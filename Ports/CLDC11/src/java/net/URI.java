@@ -26,158 +26,120 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.StringTokenizer;
 
-/**
- * An implementation of a Univeral Resource Identifier (URI). While the output
- * is mostly compatible with the Java 6 API, there are a few somewhat subtle
- * differences:
- * 
- * <pre>
- * 1) For socket related URIs, the toString() methods use semicolon (;) as the
- *    query marker instead of the normal question mark (?), and the parameters are separated
- *    with a semicolon instead of the normal ampersand (&amp;).  With this, the URIs are compatible
- *    with those used by J2ME socket connectors.  (The Java 6 API treats socket URIs as URNs).
- * 2) This implementation does not yet "rigorously parse IPv4" addresses like the Java 6 version does,
- *    the host address is simply stored as provided by the caller.  This will be enhanced using the
- *    InetAddress class when available.
- * 3) The characters defined as legal "other characters" are not all interpreted correctly, which
- *    just means some unicode characters will get encoded that aren't required to be.  The 
- *    method URIHelper.isLegalUnicode() needs to be inspected further.
- * 4) Because of 3) toASCIIString() and toString() return the same value.
- * TODO: finish this list
- * </pre>
- * 
- * @author Eric Coolman
- * 
- * @see <a href="http://docs.oracle.com/javase/6/docs/api/java/net/URI.html">http://docs.oracle.com/javase/6/docs/api/java/net/URI.html</a>
- * @see <a href="http://en.wikipedia.org/wiki/Uniform_resource_identifier">http://en.wikipedia.org/wiki/Uniform_resource_identifier</a>
- * @see <a href="http://en.wikipedia.org/wiki/Uniform_resource_name">http://en.wikipedia.org/wiki/Uniform_resource_name</a>
- * @see <a href="http://www.ietf.org/rfc/rfc2396.txt">http://www.ietf.org/rfc/rfc2396.txt</a>
- * @see <a href="http://www.ietf.org/rfc/rfc2732.txt">http://www.ietf.org/rfc/rfc2732.txt</a>
- * @see <a href="http://tools.ietf.org/html/rfc2141">http://tools.ietf.org/html/rfc2141</a>
- */
+/// An implementation of a Univeral Resource Identifier (URI). While the output
+/// is mostly compatible with the Java 6 API, there are a few somewhat subtle
+/// differences:
+///
+/// ```java
+/// 1) For socket related URIs, the toString() methods use semicolon (;) as the
+///    query marker instead of the normal question mark (?), and the parameters are separated
+///    with a semicolon instead of the normal ampersand (&).  With this, the URIs are compatible
+///    with those used by J2ME socket connectors.  (The Java 6 API treats socket URIs as URNs).
+/// 2) This implementation does not yet "rigorously parse IPv4" addresses like the Java 6 version does,
+///    the host address is simply stored as provided by the caller.  This will be enhanced using the
+///    InetAddress class when available.
+/// 3) The characters defined as legal "other characters" are not all interpreted correctly, which
+///    just means some unicode characters will get encoded that aren't required to be.  The
+///    method URIHelper.isLegalUnicode() needs to be inspected further.
+/// 4) Because of 3) toASCIIString() and toString() return the same value.
+/// TODO: finish this list
+/// ```
+///
+/// @author Eric Coolman
+///
+/// #### See also
+///
+/// - [http://docs.oracle.com/javase/6/docs/api/java/net/URI.html](http://docs.oracle.com/javase/6/docs/api/java/net/URI.html)
+///
+/// - [http://en.wikipedia.org/wiki/Uniform_resource_identifier](http://en.wikipedia.org/wiki/Uniform_resource_identifier)
+///
+/// - [http://en.wikipedia.org/wiki/Uniform_resource_name](http://en.wikipedia.org/wiki/Uniform_resource_name)
+///
+/// - [http://www.ietf.org/rfc/rfc2396.txt](http://www.ietf.org/rfc/rfc2396.txt)
+///
+/// - [http://www.ietf.org/rfc/rfc2732.txt](http://www.ietf.org/rfc/rfc2732.txt)
+///
+/// - [http://tools.ietf.org/html/rfc2141](http://tools.ietf.org/html/rfc2141)
 public class URI {
-	/**
-	 * Characters that are valid within a URI
-	 */
+	/// Characters that are valid within a URI
 	static final String UNRESERVED_EXTRAS = "_-!.~'()*";
-	/**
-	 * Characters that have special meaning within a URI.
-	 */
+	/// Characters that have special meaning within a URI.
 	static final String PUNCTUATION = ",;:$&+=";
-	/**
-	 * More characters that have special meaning within a URI.
-	 */
+	/// More characters that have special meaning within a URI.
 	static final String RESERVED = PUNCTUATION + "?/[]@";
-	/**
-	 * Character that separates the scheme from the rest of the URI.
-	 */
+	/// Character that separates the scheme from the rest of the URI.
 	static final char SCHEME_SEPARATOR = ':';
-	/**
-	 * Character that separates the port value within an authority.
-	 */
+	/// Character that separates the port value within an authority.
 	static final char PORT_SEPARATOR = ':';
-	/**
-	 * Character that separates the user info value within an authority.
-	 */
+	/// Character that separates the user info value within an authority.
 	static final char USERINFO_SEPARATOR = '@';
-	/**
-	 * Character that separates the path value from the authority
-	 */
+	/// Character that separates the path value from the authority
 	static final char PATH_SEPARATOR = '/';
-	/**
-	 * A marker that identifies an authority value follows
-	 */
+	/// A marker that identifies an authority value follows
 	static final String AUTHORITY_MARKER = "//";
-	/**
-	 * Character that identifies an escaped octet value.
-	 */
+	/// Character that identifies an escaped octet value.
 	static final char QUOTE_MARKER = '%';
-	/**
-	 * Character that identifies the start of a query.
-	 */
+	/// Character that identifies the start of a query.
 	static final char QUERY_MARKER = '?';
-	/**
-	 * Character that separates arguments within a query
-	 */
+	/// Character that separates arguments within a query
 	static final char QUERY_SEPARATOR = '&';
-	/**
-	 * Character that separates name/value within a query parameter.
-	 */
+	/// Character that separates name/value within a query parameter.
 	static final char PARAMETER_SEPARATOR = '=';
-	/**
-	 * Character that separates arguments within a query for socket-based URLs.
-	 */
+	/// Character that separates arguments within a query for socket-based URLs.
 	static final char SOCKET_QUERY_SEPARATOR = ';';
-	/**
-	 * Character that identifies the start of a fragment.
-	 */
+	/// Character that identifies the start of a fragment.
 	static final char FRAGMENT_SEPARATOR = '#';
-	/**
- * The character that should be used for separating query for this URI (; or
- * &amp;).
-	 */
+	/// The character that should be used for separating query for this URI (; or
+	/// &).
 	private char querySeparator;
-	/**
-	 * Flag that identifies if this URI has a scheme and starts with a '/'.
-	 */
+	/// Flag that identifies if this URI has a scheme and starts with a '/'.
 	private boolean opaque;
-	/**
-	 * Flag that identifies if this URI is relative.
-	 */
+	/// Flag that identifies if this URI is relative.
 	private boolean absolute;
-	/**
-	 * The encoded URI string value, without the scheme and fragment.
-	 */
+	/// The encoded URI string value, without the scheme and fragment.
 	private String schemeSpecificPart;
-	/**
-	 * The userinfo, host, and port segment of the URI.
-	 */
+	/// The userinfo, host, and port segment of the URI.
 	private String authority;
-	/**
-	 * The encoded userinfo part of the URI.
-	 */
+	/// The encoded userinfo part of the URI.
 	private String userInfo;
-	/**
-	 * The encoded host value of the URI.
-	 */
+	/// The encoded host value of the URI.
 	private String host;
-	/**
-	 * The URI scheme, or null for opaque URIs.
-	 */
+	/// The URI scheme, or null for opaque URIs.
 	private String scheme;
-	/**
-	 * The encoded path value of the URI.
-	 */
+	/// The encoded path value of the URI.
 	private String path;
-	/**
-	 * The encoded query value of the URI.
-	 */
+	/// The encoded query value of the URI.
 	private String query;
-	/**
-	 * The encoded fragment value of the URI.
-	 */
+	/// The encoded fragment value of the URI.
 	private String fragment;
-	/**
-	 * The port value of the URI, or -1 if no port specified.
-	 */
+	/// The port value of the URI, or -1 if no port specified.
 	private int port;
 
-	/**
-	 * Constructor to create a new URI object. The userInfo, path, query and
-	 * fragment should be unencoded values - they will be encoded as required.
-	 * 
-	 * @param scheme the scheme of the URI (for URLs, this would be the
-	 *            protocol), or null for relative URIs.
-	 * @param userInfo the unencoded userinfo segment (ie. username:password) or
-	 *            null.
-	 * @param host the hostname or address, or null.
-	 * @param port the host port, or -1.
-	 * @param path the unencoded path segment.
-	 * @param query the unencoded query segment.
-	 * @param fragment the unencoded fragment (often referred to as the
-	 *            'reference' or 'anchor'), or null.
-	 * @throws URISyntaxException if any of the fragments are invalid.
-	 */
+	/// Constructor to create a new URI object. The userInfo, path, query and
+	/// fragment should be unencoded values - they will be encoded as required.
+	///
+	/// #### Parameters
+	///
+	/// - `scheme`: @param scheme the scheme of the URI (for URLs, this would be the
+	/// protocol), or null for relative URIs.
+	///
+	/// - `userInfo`: @param userInfo the unencoded userinfo segment (ie. username:password) or
+	/// null.
+	///
+	/// - `host`: the hostname or address, or null.
+	///
+	/// - `port`: the host port, or -1.
+	///
+	/// - `path`: the unencoded path segment.
+	///
+	/// - `query`: the unencoded query segment.
+	///
+	/// - `fragment`: @param fragment the unencoded fragment (often referred to as the
+	/// 'reference' or 'anchor'), or null.
+	///
+	/// #### Throws
+	///
+	/// - `URISyntaxException`: if any of the fragments are invalid.
 	public URI(String scheme, String userInfo, String host, int port, String path, String query, String fragment)
 			throws URISyntaxException {
 		init();
@@ -188,20 +150,27 @@ public class URI {
 		setFragment(fragment, true);
 	}
 
-	/**
-	 * Constructor to create a new URI object. The authority, path, query and
-	 * fragment should be unencoded values - they will be encoded as required.
-	 * 
-	 * @param scheme the scheme of the URI (for URLs, this would be the
-	 *            protocol), or null for relative URIs.
-	 * @param authority the unencoded authority segment (ie.
-	 *            username:password@host:port, or simply: host) or null.
-	 * @param path the unencoded path segment.
-	 * @param query the unencoded query segment.
-	 * @param fragment the unencoded fragment (often referred to as the
-	 *            'reference' or 'anchor'), or null.
-	 * @throws URISyntaxException if any of the fragments are invalid.
-	 */
+	/// Constructor to create a new URI object. The authority, path, query and
+	/// fragment should be unencoded values - they will be encoded as required.
+	///
+	/// #### Parameters
+	///
+	/// - `scheme`: @param scheme the scheme of the URI (for URLs, this would be the
+	/// protocol), or null for relative URIs.
+	///
+	/// - `authority`: @param authority the unencoded authority segment (ie.
+	/// username:password@host:port, or simply: host) or null.
+	///
+	/// - `path`: the unencoded path segment.
+	///
+	/// - `query`: the unencoded query segment.
+	///
+	/// - `fragment`: @param fragment the unencoded fragment (often referred to as the
+	/// 'reference' or 'anchor'), or null.
+	///
+	/// #### Throws
+	///
+	/// - `URISyntaxException`: if any of the fragments are invalid.
 	public URI(String scheme, String authority, String path, String query, String fragment) throws URISyntaxException {
 		init();
 		setScheme(scheme);
@@ -211,19 +180,24 @@ public class URI {
 		setFragment(fragment, true);
 	}
 
-	/**
-	 * Constructor for building URNs. The ssp and fragment should be unencoded
-	 * values - they will be encoded as required.
-	 * 
-	 * Examples: mailto:user@codenameone.com sms:+5555551212 tel:+5555551212
-	 * isbn:9781935182962
-	 * 
-	 * @param scheme
-	 * @param ssp the unencoded scheme specific part (everything except the
-	 *            scheme and fragment)
-	 * @param fragment the unencoded fragment, or null
-	 * @throws URISyntaxException if any of the segments are invalid.
-	 */
+	/// Constructor for building URNs. The ssp and fragment should be unencoded
+	/// values - they will be encoded as required.
+	///
+	/// Examples: mailto:user@codenameone.com sms:+5555551212 tel:+5555551212
+	/// isbn:9781935182962
+	///
+	/// #### Parameters
+	///
+	/// - `scheme`
+	///
+	/// - `ssp`: @param ssp the unencoded scheme specific part (everything except the
+	/// scheme and fragment)
+	///
+	/// - `fragment`: the unencoded fragment, or null
+	///
+	/// #### Throws
+	///
+	/// - `URISyntaxException`: if any of the segments are invalid.
 	public URI(String scheme, String ssp, String fragment) throws URISyntaxException {
 		init();
 		setScheme(scheme);
@@ -231,14 +205,17 @@ public class URI {
 		setFragment(fragment, true);
 	}
 
-	/**
-	 * Constructor that parses its values from a URI string. This method expects
-	 * all segments to be property encoded by the caller. The URIHelper class
-	 * can be used to encode segments.
-	 * 
-	 * @param uriString a full encoded URI in string form to be parsed.
-	 * @throws URISyntaxException if any of the parsed segments are invalid.
-	 */
+	/// Constructor that parses its values from a URI string. This method expects
+	/// all segments to be property encoded by the caller. The URIHelper class
+	/// can be used to encode segments.
+	///
+	/// #### Parameters
+	///
+	/// - `uriString`: a full encoded URI in string form to be parsed.
+	///
+	/// #### Throws
+	///
+	/// - `URISyntaxException`: if any of the parsed segments are invalid.
 	public URI(String uriString) throws URISyntaxException {
 		if (uriString == null) {
 			throw new URISyntaxException(uriString, "Input is null");
@@ -247,9 +224,7 @@ public class URI {
 		parseURI(uriString);
 	}
 
-	/**
-	 * Internal - Set the default values.
-	 */
+	/// Internal - Set the default values.
 	void init() {
 		absolute = true;
 		querySeparator = QUERY_SEPARATOR;
@@ -257,12 +232,12 @@ public class URI {
 		port = -1;
 	}
 
-	/**
-	 * Utility method - set the scheme, ensuring valid format, and determining
-	 * the query separator to use.
-	 * 
-         * @see <a href="http://en.wikipedia.org/wiki/Uniform_resource_name">http://en.wikipedia.org/wiki/Uniform_resource_name</a>
-	 */
+	/// Utility method - set the scheme, ensuring valid format, and determining
+	/// the query separator to use.
+	///
+	/// #### See also
+	///
+	/// - [http://en.wikipedia.org/wiki/Uniform_resource_name](http://en.wikipedia.org/wiki/Uniform_resource_name)
 	protected void setScheme(String scheme) throws URISyntaxException {
 		if ((this.scheme = scheme) == null) {
 			absolute = false;
@@ -276,89 +251,96 @@ public class URI {
 		}
 	}
 
-	/**
-	 * Utility method - set the scheme specific part, ensuring valid format. If
-	 * encode=true, then some elements will be run through the encoder (path,
-	 * userinfo, query, fragment), otherwise the elements will be validated for
-	 * proper encoding.
-	 */
+	/// Utility method - set the scheme specific part, ensuring valid format. If
+	/// encode=true, then some elements will be run through the encoder (path,
+	/// userinfo, query, fragment), otherwise the elements will be validated for
+	/// proper encoding.
 	protected void setSchemeSpecificPart(String ssp, boolean encode) throws URISyntaxException {
 		parseSchemeSpecificPart(ssp, true);
 	}
 
-	/**
-	 * Utility method - set the part, ensuring valid format. If encode=true,
-	 * then some elements will be run through the encoder (path, userinfo,
-	 * query, fragment), otherwise the elements will be validated for proper
-	 * encoding.
-	 */
+	/// Utility method - set the part, ensuring valid format. If encode=true,
+	/// then some elements will be run through the encoder (path, userinfo,
+	/// query, fragment), otherwise the elements will be validated for proper
+	/// encoding.
 	protected void setAuthority(String newAuthority, boolean encode) throws URISyntaxException {
 	}
 
-	/**
-	 * Utility method to set the query. If parameter encode=true, then the
-	 * result will be encoded, otherwise the result will be validated to ensure
-	 * encoding is valid. Typically the multi-parameter constructors will call
-	 * this method with encode=true, and the single parameter construct will
-	 * pass encode=false.
-	 * 
-	 * @param query
-	 * @param encode
-	 * @throws URISyntaxException
-	 */
+	/// Utility method to set the query. If parameter encode=true, then the
+	/// result will be encoded, otherwise the result will be validated to ensure
+	/// encoding is valid. Typically the multi-parameter constructors will call
+	/// this method with encode=true, and the single parameter construct will
+	/// pass encode=false.
+	///
+	/// #### Parameters
+	///
+	/// - `query`
+	///
+	/// - `encode`
+	///
+	/// #### Throws
+	///
+	/// - `URISyntaxException`
 	protected void setQuery(String query, boolean encode) throws URISyntaxException {
 	}
 
-	/**
-	 * Utility method to set the path. If parameter encode=true, then the result
-	 * will be encoded, otherwise the result will be validated to ensure
-	 * encoding is valid. Typically the multi-parameter constructors will call
-	 * this method with encode=true, and the single parameter construct will
-	 * pass encode=false.
-	 * 
-	 * @param path
-	 * @param encode
-	 * @throws URISyntaxException
-	 */
+	/// Utility method to set the path. If parameter encode=true, then the result
+	/// will be encoded, otherwise the result will be validated to ensure
+	/// encoding is valid. Typically the multi-parameter constructors will call
+	/// this method with encode=true, and the single parameter construct will
+	/// pass encode=false.
+	///
+	/// #### Parameters
+	///
+	/// - `path`
+	///
+	/// - `encode`
+	///
+	/// #### Throws
+	///
+	/// - `URISyntaxException`
 	protected void setPath(String path, boolean encode) throws URISyntaxException {
 	}
 
-	/**
-	 * Utility method to construct the authority segment from given host, port,
-	 * and userinfo segments. If parameter encode=true, then the userinfo
-	 * segment will be encoded, otherwise the it will be validated to ensure
-	 * encoding is valid. Typically the multi-parameter constructors will call
-	 * this method with encode=true, and the single parameter construct will
-	 * pass encode=false.
-	 * 
-	 * @param host
-	 * @param port
-	 * @param userInfo
-	 * @param encode
-	 * @throws URISyntaxException
-	 */
+	/// Utility method to construct the authority segment from given host, port,
+	/// and userinfo segments. If parameter encode=true, then the userinfo
+	/// segment will be encoded, otherwise the it will be validated to ensure
+	/// encoding is valid. Typically the multi-parameter constructors will call
+	/// this method with encode=true, and the single parameter construct will
+	/// pass encode=false.
+	///
+	/// #### Parameters
+	///
+	/// - `host`
+	///
+	/// - `port`
+	///
+	/// - `userInfo`
+	///
+	/// - `encode`
+	///
+	/// #### Throws
+	///
+	/// - `URISyntaxException`
 	protected void setAuthority(String host, int port, String userInfo, boolean encode) throws URISyntaxException {
 	}
 
-	/**
-	 * Utility method to set the fragment. If parameter encode=true, then the
-	 * result will be encoded, otherwise the result will be validated to ensure
-	 * encoding is valid. Typically the multi-parameter constructors will call
-	 * this method with encode=true, and the single parameter construct will
-	 * pass encode=false.
-	 * 
-	 * @param fragment
-	 * @param encode
-	 */
+	/// Utility method to set the fragment. If parameter encode=true, then the
+	/// result will be encoded, otherwise the result will be validated to ensure
+	/// encoding is valid. Typically the multi-parameter constructors will call
+	/// this method with encode=true, and the single parameter construct will
+	/// pass encode=false.
+	///
+	/// #### Parameters
+	///
+	/// - `fragment`
+	///
+	/// - `encode`
 	protected void setFragment(String fragment, boolean encode) {
 	}
 
-	/**
-	 * Utility method to construct the scheme specific part from the uri
-	 * segments (less scheme and fragment)
-	 * 
-	 * @return
-	 */
+	/// Utility method to construct the scheme specific part from the uri
+	/// segments (less scheme and fragment)
 	protected String rebuildSchemeSpecificPart() {
 		StringBuffer buffer = new StringBuffer();
 		if (opaque == false && (host != null || port != -1)) {
@@ -387,20 +369,23 @@ public class URI {
 		return buffer.toString();
 	}
 
-	/**
-	 * A convenience factory method, intended to be used when the URI string is
-	 * known to be valid (ie. a static application URI), so it is not needed for
-	 * the caller to handle invalid syntax. NOTE: this is not away to avoid
-	 * handling errors altogether - passing an invalid URI string will result in
-	 * an IllegalArgumentException being thrown. The benefit here is that the
-	 * compiler will not complain if you don't explicitly handle the error at
-	 * compile time.
-	 * 
-	 * When handling a user-editable URI, use the URI constructors instead.
-	 * 
-	 * @param uriString URI address as a string
-	 * @return parsed URI object
-	 */
+	/// A convenience factory method, intended to be used when the URI string is
+	/// known to be valid (ie. a static application URI), so it is not needed for
+	/// the caller to handle invalid syntax. NOTE: this is not away to avoid
+	/// handling errors altogether - passing an invalid URI string will result in
+	/// an IllegalArgumentException being thrown. The benefit here is that the
+	/// compiler will not complain if you don't explicitly handle the error at
+	/// compile time.
+	///
+	/// When handling a user-editable URI, use the URI constructors instead.
+	///
+	/// #### Parameters
+	///
+	/// - `uriString`: URI address as a string
+	///
+	/// #### Returns
+	///
+	/// parsed URI object
 	public static URI create(String uriString) {
 		URI uri;
 		try {
@@ -411,13 +396,16 @@ public class URI {
 		return uri;
 	}
 
-	/**
-	 * Rather than attempting to process the uri string in a linear fashion,
-	 * this implementation works its way from outside-in
-	 * 
-	 * @param uriString
-	 * @throws URISyntaxException
-	 */
+	/// Rather than attempting to process the uri string in a linear fashion,
+	/// this implementation works its way from outside-in
+	///
+	/// #### Parameters
+	///
+	/// - `uriString`
+	///
+	/// #### Throws
+	///
+	/// - `URISyntaxException`
 	protected void parseURI(String uriString) throws URISyntaxException {
 		String s = uriString;
 		int index = s.indexOf(FRAGMENT_SEPARATOR);
@@ -436,19 +424,23 @@ public class URI {
 		parseSchemeSpecificPart(s, false);
 	}
 
-	/**
-	 * Utility method used to parse a given scheme specific part. If parameter
-	 * encode=true, then the result will be encoded, otherwise the result will
-	 * be validated to ensure encoding is valid. Typically the multi-parameter
-	 * constructors will call this method with encode=true, and the single
-	 * parameter construct will pass encode=false.
-	 * 
-	 * @param ssp scheme specific part (the URI without the scheme or fragment
-	 *            included).
-	 * @param encode true if ssp needs to be encoded, false if ssp needs to be
-	 *            verified.
-	 * @throws URISyntaxException if the ssp is invalid.
-	 */
+	/// Utility method used to parse a given scheme specific part. If parameter
+	/// encode=true, then the result will be encoded, otherwise the result will
+	/// be validated to ensure encoding is valid. Typically the multi-parameter
+	/// constructors will call this method with encode=true, and the single
+	/// parameter construct will pass encode=false.
+	///
+	/// #### Parameters
+	///
+	/// - `ssp`: @param ssp scheme specific part (the URI without the scheme or fragment
+	/// included).
+	///
+	/// - `encode`: @param encode true if ssp needs to be encoded, false if ssp needs to be
+	/// verified.
+	///
+	/// #### Throws
+	///
+	/// - `URISyntaxException`: if the ssp is invalid.
 	protected void parseSchemeSpecificPart(String ssp, boolean encode) throws URISyntaxException {
 		if (ssp == null) {
 			throw new URISyntaxException(ssp, "Invalid scheme specific part");
@@ -478,15 +470,22 @@ public class URI {
 		setAuthority(s, encode);
 	}
 
-	/**
-	 * Internal utility method to throw a syntax error if a value can not be
-	 * parsed.
-	 * 
-	 * @param key name of the value being parsed, for error reporting.
-	 * @param value value to be parsed.
-	 * @return parsed integer.
-	 * @throws URISyntaxException if value can not be parsed.
-	 */
+	/// Internal utility method to throw a syntax error if a value can not be
+	/// parsed.
+	///
+	/// #### Parameters
+	///
+	/// - `key`: name of the value being parsed, for error reporting.
+	///
+	/// - `value`: value to be parsed.
+	///
+	/// #### Returns
+	///
+	/// parsed integer.
+	///
+	/// #### Throws
+	///
+	/// - `URISyntaxException`: if value can not be parsed.
 	int parseIntOption(String key, String value) throws URISyntaxException {
 		try {
 			return Integer.parseInt(value);
@@ -495,124 +494,122 @@ public class URI {
 		}
 	}
 
-	/**
-	 * Internal utility method to determine if the given scheme should use
-         * semicolons (;) for query separator instead of ampersand (&amp;)
-	 */
+	/// Internal utility method to determine if the given scheme should use
+	/// semicolons (;) for query separator instead of ampersand (&)
 	boolean isSocketScheme(String scheme) {
 		return false;
 	}
 
-	/**
-	 * Verifies the scheme contains only valid characters as per the URN
-	 * specification (see NID).
-	 * 
-         * @see <a href="http://tools.ietf.org/html/rfc2141">http://tools.ietf.org/html/rfc2141</a>
-	 */
+	/// Verifies the scheme contains only valid characters as per the URN
+	/// specification (see NID).
+	///
+	/// #### See also
+	///
+	/// - [http://tools.ietf.org/html/rfc2141](http://tools.ietf.org/html/rfc2141)
 	boolean isValidScheme(String scheme) {
 		return true;
 	}
 
-	/**
-	 * Get the scheme part of the URI.
-	 * 
-	 * @return the scheme part of the URI.
-	 */
+	/// Get the scheme part of the URI.
+	///
+	/// #### Returns
+	///
+	/// the scheme part of the URI.
 	public String getScheme() {
 		return scheme;
 	}
 
-	/**
-	 * Get the host name part of the URI.
-	 * 
-	 * @return the host name part of the URI.
-	 */
+	/// Get the host name part of the URI.
+	///
+	/// #### Returns
+	///
+	/// the host name part of the URI.
 	public String getHost() {
 		return host;
 	}
 
-	/**
-	 * Get the port number for this URI.
-	 * 
-	 * @return the port number for this URI, or -1 if a port number was not
-	 *         specified.
-	 */
+	/// Get the port number for this URI.
+	///
+	/// #### Returns
+	///
+	/// @return the port number for this URI, or -1 if a port number was not
+	/// specified.
 	public int getPort() {
 		return port;
 	}
 
-	/**
-	 * Get the decoded path part of the uri.
-	 * 
-	 * @return the query part of the URI, or an empty string if no path is
-	 *         included in the URI.
-	 */
+	/// Get the decoded path part of the uri.
+	///
+	/// #### Returns
+	///
+	/// @return the query part of the URI, or an empty string if no path is
+	/// included in the URI.
 	public String getPath() {
 		return null;
 	}
 
-	/**
-	 * Get the encoded path part of the uri.
-	 * 
-	 * @return the query part of the URI, or an empty string if no path is
-	 *         included in the URI.
-	 */
+	/// Get the encoded path part of the uri.
+	///
+	/// #### Returns
+	///
+	/// @return the query part of the URI, or an empty string if no path is
+	/// included in the URI.
 	public String getRawPath() {
 		return path;
 	}
 
-	/**
-	 * Get the decoded query part of the uri. The query marker (?) itself is not
-	 * included in the result.
-	 * 
-	 * @return the query part of the URI.
-	 */
+	/// Get the decoded query part of the uri. The query marker (?) itself is not
+	/// included in the result.
+	///
+	/// #### Returns
+	///
+	/// the query part of the URI.
 	public String getQuery() {
 		return null;
 	}
 
-	/**
-	 * Get the encoded query part of the uri. The query marker (?) itself is not
-	 * included in the result.
-	 * 
-	 * @return the query part of the URI.
-	 */
+	/// Get the encoded query part of the uri. The query marker (?) itself is not
+	/// included in the result.
+	///
+	/// #### Returns
+	///
+	/// the query part of the URI.
 	public String getRawQuery() {
 		return query;
 	}
 
-	/**
-	 * Get the decoded fragment (otherwise known as the &quot;reference&quot; or
-	 * &quot;anchor&quot;) part of the uri. The anchor marker (#) itself is not
-	 * included in the result.
-	 * 
-	 * @return the anchor part of the URI.
-	 */
+	/// Get the decoded fragment (otherwise known as the "reference" or
+	/// "anchor") part of the uri. The anchor marker (#) itself is not
+	/// included in the result.
+	///
+	/// #### Returns
+	///
+	/// the anchor part of the URI.
 	public String getFragment() {
 		return null;
 	}
 
-	/**
-	 * Get the encoded fragment (otherwise known as the &quot;reference&quot; or
-	 * &quot;anchor&quot;) part of the uri. The anchor marker (#) itself is not
-	 * included in the result.
-	 * 
-	 * @return the anchor part of the URI.
-	 */
+	/// Get the encoded fragment (otherwise known as the "reference" or
+	/// "anchor") part of the uri. The anchor marker (#) itself is not
+	/// included in the result.
+	///
+	/// #### Returns
+	///
+	/// the anchor part of the URI.
 	public String getRawFragment() {
 		return fragment;
 	}
 
-	/**
-	 * @return the schemeSpecificPart
-	 */
+	/// #### Returns
+	///
+	/// the schemeSpecificPart
 	public String getSchemeSpecificPart() {
 		return null;
 	}
 
-	/**
-	 * @return the schemeSpecificPart
-	 */
+	/// #### Returns
+	///
+	/// the schemeSpecificPart
 	public String getRawSchemeSpecificPart() {
 		if (schemeSpecificPart == null) {
 			schemeSpecificPart = rebuildSchemeSpecificPart();
@@ -620,66 +617,64 @@ public class URI {
 		return schemeSpecificPart;
 	}
 
-	/**
-	 * @return the authority
-	 */
+	/// #### Returns
+	///
+	/// the authority
 	public String getAuthority() {
 		return null;
 	}
 
-	/**
-	 * @return the authority
-	 */
+	/// #### Returns
+	///
+	/// the authority
 	public String getRawAuthority() {
 		return authority;
 	}
 
-	/**
-	 * @return the userInfo
-	 */
+	/// #### Returns
+	///
+	/// the userInfo
 	public String getUserInfo() {
 		return null;
 	}
 
-	/**
-	 * @return the userInfo
-	 */
+	/// #### Returns
+	///
+	/// the userInfo
 	public String getRawUserInfo() {
 		return userInfo;
 	}
 
-	/**
-	 * @return true if this URI has a scheme and starts with a slash
-	 */
+	/// #### Returns
+	///
+	/// true if this URI has a scheme and starts with a slash
 	public boolean isOpaque() {
 		return opaque;
 	}
 
-	/**
-	 * @return true if the URI is not a relative URI.
-	 */
+	/// #### Returns
+	///
+	/// true if the URI is not a relative URI.
 	public boolean isAbsolute() {
 		return absolute;
 	}
 
-	/**
-	 * Get the character used for separating query. Normally this will return
-	 * '?'. On J2ME Connector URLs, this method will return ';'.
-	 */
+	/// Get the character used for separating query. Normally this will return
+	/// '?'. On J2ME Connector URLs, this method will return ';'.
 	char getQuerySeparator() {
 		return querySeparator;
 	}
 
-	/**
-	 * @return the uri as a string
-	 */
+	/// #### Returns
+	///
+	/// the uri as a string
 	public String toString() {
 		return toASCIIString();
 	}
 
-	/**
-	 * @return the uri as a string with parts encoded.
-	 */
+	/// #### Returns
+	///
+	/// the uri as a string with parts encoded.
 	public String toASCIIString() {
 		StringBuffer buffer = new StringBuffer();
 		if (scheme != null) {
@@ -692,13 +687,15 @@ public class URI {
 		return buffer.toString();
 	}
 
-	/**
-	 * Create a relative URI object against this URI, given the uri parameter.
-	 * 
-	 * @param uri
-	 * @return
-         * @see <a href="http://docs.oracle.com/javase/6/docs/api/java/net/URI.html#relativize%28java.net.URI%29">http://docs.oracle.com/javase/6/docs/api/java/net/URI.html#relativize%28java.net.URI%29</a>
-	 */
+	/// Create a relative URI object against this URI, given the uri parameter.
+	///
+	/// #### Parameters
+	///
+	/// - `uri`
+	///
+	/// #### See also
+	///
+	/// - [http://docs.oracle.com/javase/6/docs/api/java/net/URI.html#relativize%28java.net.URI%29](http://docs.oracle.com/javase/6/docs/api/java/net/URI.html#relativize%28java.net.URI%29)
 	public URI relativize(URI uri) {
 		if (isOpaque() || uri.isOpaque()) {
 			return uri;
@@ -726,13 +723,19 @@ public class URI {
 		}
 	}
 
-	/**
-	 * Resolve a relative URI by merging it with this URI.
-	 * 
-	 * @param uri a URI to resolve against this URI.
-	 * @return a new URI created by merging given URI with this URI.
-         * @see <a href="http://docs.oracle.com/javase/6/docs/api/java/net/URI.html#resolve%28java.net.URI%29">http://docs.oracle.com/javase/6/docs/api/java/net/URI.html#resolve%28java.net.URI%29</a>
-	 */
+	/// Resolve a relative URI by merging it with this URI.
+	///
+	/// #### Parameters
+	///
+	/// - `uri`: a URI to resolve against this URI.
+	///
+	/// #### Returns
+	///
+	/// a new URI created by merging given URI with this URI.
+	///
+	/// #### See also
+	///
+	/// - [http://docs.oracle.com/javase/6/docs/api/java/net/URI.html#resolve%28java.net.URI%29](http://docs.oracle.com/javase/6/docs/api/java/net/URI.html#resolve%28java.net.URI%29)
 	public URI resolve(URI uri) {
 		if (isOpaque() || uri.isAbsolute()) {
 			return uri;
@@ -771,12 +774,15 @@ public class URI {
 
 	}
 
-	/**
-	 * Normalize a URI by removing any "./" segments, and "path/../" segments.
-	 * 
-	 * @return a new URI instance with redundant segments removed.
-         * @see <a href="http://docs.oracle.com/javase/6/docs/api/java/net/URI.html#normalize%28%29">http://docs.oracle.com/javase/6/docs/api/java/net/URI.html#normalize%28%29</a>
-	 */
+	/// Normalize a URI by removing any "./" segments, and "path/../" segments.
+	///
+	/// #### Returns
+	///
+	/// a new URI instance with redundant segments removed.
+	///
+	/// #### See also
+	///
+	/// - [http://docs.oracle.com/javase/6/docs/api/java/net/URI.html#normalize%28%29](http://docs.oracle.com/javase/6/docs/api/java/net/URI.html#normalize%28%29)
 	public URI normalize() {
 		return null;
 	}

@@ -17,19 +17,19 @@
 
 package java.util;
 
-/**
- * An implementation of Deque, backed by an array.
- * 
- * ArrayDeques have no size limit, can not contain null element, and they are
- * not thread-safe.
- * 
- * All optional operations are supported, and the elements can be any objects.
- * 
- * @param <E>
- *            the type of elements in this collection
- * 
- * @since 1.6
- */
+/// An implementation of Deque, backed by an array.
+///
+/// ArrayDeques have no size limit, can not contain null element, and they are
+/// not thread-safe.
+///
+/// All optional operations are supported, and the elements can be any objects.
+///
+/// @param
+/// the type of elements in this collection
+///
+/// #### Since
+///
+/// 1.6
 public class ArrayDeque<E> extends AbstractCollection<E> implements Deque<E> {
 
     private static final int DEFAULT_SIZE = 16;
@@ -172,20 +172,17 @@ public class ArrayDeque<E> extends AbstractCollection<E> implements Deque<E> {
         }
     }
 
-    /**
-     * Constructs a new empty instance of ArrayDeque big enough for 16 elements.
-     */
+    /// Constructs a new empty instance of ArrayDeque big enough for 16 elements.
     public ArrayDeque() {
         this(DEFAULT_SIZE);
     }
 
-    /**
-     * Constructs a new empty instance of ArrayDeque big enough for specified
-     * number of elements.
-     * 
-     * @param minSize
-     *            the smallest size of the ArrayDeque
-     */
+    /// Constructs a new empty instance of ArrayDeque big enough for specified
+    /// number of elements.
+    ///
+    /// #### Parameters
+    ///
+    /// - `minSize`: the smallest size of the ArrayDeque
     @SuppressWarnings("unchecked")
     public ArrayDeque(final int minSize) {
         int size = countInitSize(minSize);
@@ -202,16 +199,17 @@ public class ArrayDeque<E> extends AbstractCollection<E> implements Deque<E> {
         return -1;
     }
 
-    /**
-     * Constructs a new instance of ArrayDeque containing the elements of the
-     * specified collection, with the order returned by the collection's
-     * iterator.
-     * 
-     * @param c
-     *            the source of the elements
-     * @throws NullPointerException
-     *             if the collection is null
-     */
+    /// Constructs a new instance of ArrayDeque containing the elements of the
+    /// specified collection, with the order returned by the collection's
+    /// iterator.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the source of the elements
+    ///
+    /// #### Throws
+    ///
+    /// - `NullPointerException`: if the collection is null
     @SuppressWarnings("unchecked")
     public ArrayDeque(Collection<? extends E> c) {
         elements = (E[]) new Object[countInitSize(c.size())];
@@ -224,42 +222,57 @@ public class ArrayDeque<E> extends AbstractCollection<E> implements Deque<E> {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * @param e
-     *            the element
-     * @throws NullPointerException
-     *             if the element is null
-     * @see java.util.Deque#addFirst(java.lang.Object)
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Parameters
+    ///
+    /// - `e`: the element
+    ///
+    /// #### Throws
+    ///
+    /// - `NullPointerException`: if the element is null
+    ///
+    /// #### See also
+    ///
+    /// - java.util.Deque#addFirst(java.lang.Object)
     public void addFirst(E e) {
         offerFirst(e);
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * @param e
-     *            the element
-     * @throws NullPointerException
-     *             if the element is null
-     * @see java.util.Deque#addLast(java.lang.Object)
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Parameters
+    ///
+    /// - `e`: the element
+    ///
+    /// #### Throws
+    ///
+    /// - `NullPointerException`: if the element is null
+    ///
+    /// #### See also
+    ///
+    /// - java.util.Deque#addLast(java.lang.Object)
     public void addLast(E e) {
         addLastImpl(e);
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * @param e
-     *            the element
-     * @return true
-     * @throws NullPointerException
-     *             if the element is null
-     * @see java.util.Deque#offerFirst(java.lang.Object)
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Parameters
+    ///
+    /// - `e`: the element
+    ///
+    /// #### Returns
+    ///
+    /// true
+    ///
+    /// #### Throws
+    ///
+    /// - `NullPointerException`: if the element is null
+    ///
+    /// #### See also
+    ///
+    /// - java.util.Deque#offerFirst(java.lang.Object)
     public  boolean offerFirst(E e) {
         checkNull(e);
         checkAndExpand();
@@ -270,208 +283,284 @@ public class ArrayDeque<E> extends AbstractCollection<E> implements Deque<E> {
         return true;
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * @param e
-     *            the element
-     * @return true if the operation succeeds or false if it fails
-     * @throws NullPointerException
-     *             if the element is null
-     * @see java.util.Deque#offerLast(java.lang.Object)
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Parameters
+    ///
+    /// - `e`: the element
+    ///
+    /// #### Returns
+    ///
+    /// true if the operation succeeds or false if it fails
+    ///
+    /// #### Throws
+    ///
+    /// - `NullPointerException`: if the element is null
+    ///
+    /// #### See also
+    ///
+    /// - java.util.Deque#offerLast(java.lang.Object)
     public boolean offerLast(E e) {
         return addLastImpl(e);
     }
 
-    /**
-     * Inserts the element at the tail of the deque.
-     * 
-     * @param e
-     *            the element
-     * @return true if the operation succeeds or false if it fails.
-     * @throws NullPointerException
-     *             if the element is null
-     * @see java.util.Queue#offer(java.lang.Object)
-     */
+    /// Inserts the element at the tail of the deque.
+    ///
+    /// #### Parameters
+    ///
+    /// - `e`: the element
+    ///
+    /// #### Returns
+    ///
+    /// true if the operation succeeds or false if it fails.
+    ///
+    /// #### Throws
+    ///
+    /// - `NullPointerException`: if the element is null
+    ///
+    /// #### See also
+    ///
+    /// - java.util.Queue#offer(java.lang.Object)
     public boolean offer(E e) {
         return addLastImpl(e);
     }
 
-    /**
-     * Inserts the element to the tail of the deque.
-     * 
-     * @param e
-     *            the element
-     * @return true
-     * @see java.util.AbstractCollection#add(java.lang.Object)
-     */
+    /// Inserts the element to the tail of the deque.
+    ///
+    /// #### Parameters
+    ///
+    /// - `e`: the element
+    ///
+    /// #### Returns
+    ///
+    /// true
+    ///
+    /// #### See also
+    ///
+    /// - java.util.AbstractCollection#add(java.lang.Object)
     @Override
     public boolean add(E e) {
         return addLastImpl(e);
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * @param e
-     *            the element to push
-     * @throws NullPointerException
-     *             if the element is null
-     * @see java.util.Deque#push(java.lang.Object)
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Parameters
+    ///
+    /// - `e`: the element to push
+    ///
+    /// #### Throws
+    ///
+    /// - `NullPointerException`: if the element is null
+    ///
+    /// #### See also
+    ///
+    /// - java.util.Deque#push(java.lang.Object)
     public void push(E e) {
         offerFirst(e);
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * @return the head element
-     * @throws NoSuchElementException
-     *             if the deque is empty
-     * @see java.util.Deque#removeFirst()
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Returns
+    ///
+    /// the head element
+    ///
+    /// #### Throws
+    ///
+    /// - `NoSuchElementException`: if the deque is empty
+    ///
+    /// #### See also
+    ///
+    /// - java.util.Deque#removeFirst()
     public  E removeFirst() {
         checkEmpty();
         return removePollFirstImpl();
     }
 
-    /**
-     * Gets and removes the head element of this deque. This method throws an
-     * exception if the deque is empty.
-     * 
-     * @return the head element
-     * @throws NoSuchElementException
-     *             if the deque is empty
-     * @see java.util.Queue#remove()
-     */
+    /// Gets and removes the head element of this deque. This method throws an
+    /// exception if the deque is empty.
+    ///
+    /// #### Returns
+    ///
+    /// the head element
+    ///
+    /// #### Throws
+    ///
+    /// - `NoSuchElementException`: if the deque is empty
+    ///
+    /// #### See also
+    ///
+    /// - java.util.Queue#remove()
     public E remove() {
         return removeFirst();
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * @return the head element
-     * @throws NoSuchElementException
-     *             if the deque is empty
-     * @see java.util.Deque#pop()
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Returns
+    ///
+    /// the head element
+    ///
+    /// #### Throws
+    ///
+    /// - `NoSuchElementException`: if the deque is empty
+    ///
+    /// #### See also
+    ///
+    /// - java.util.Deque#pop()
     public E pop() {
         return removeFirst();
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * @return the tail element
-     * @throws NoSuchElementException
-     *             if the deque is empty
-     * @see java.util.Deque#removeLast()
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Returns
+    ///
+    /// the tail element
+    ///
+    /// #### Throws
+    ///
+    /// - `NoSuchElementException`: if the deque is empty
+    ///
+    /// #### See also
+    ///
+    /// - java.util.Deque#removeLast()
     public  E removeLast() {
         checkEmpty();
         return removeLastImpl();
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * @return the head element or null if the deque is empty
-     * @see java.util.Deque#pollFirst()
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Returns
+    ///
+    /// the head element or null if the deque is empty
+    ///
+    /// #### See also
+    ///
+    /// - java.util.Deque#pollFirst()
     public  E pollFirst() {
         return (status == DequeStatus.Empty) ? null : removePollFirstImpl();
     }
 
-    /**
-     * Gets and removes the head element of this deque. This method returns null
-     * if the deque is empty.
-     * 
-     * @return the head element or null if the deque is empty
-     * @see java.util.Queue#poll()
-     */
+    /// Gets and removes the head element of this deque. This method returns null
+    /// if the deque is empty.
+    ///
+    /// #### Returns
+    ///
+    /// the head element or null if the deque is empty
+    ///
+    /// #### See also
+    ///
+    /// - java.util.Queue#poll()
     public E poll() {
         return pollFirst();
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * @return the tail element or null if the deque is empty
-     * @see java.util.Deque#pollLast()
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Returns
+    ///
+    /// the tail element or null if the deque is empty
+    ///
+    /// #### See also
+    ///
+    /// - java.util.Deque#pollLast()
     public  E pollLast() {
         return (status == DequeStatus.Empty) ? null : removeLastImpl();
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * @return the head element
-     * @throws NoSuchElementException
-     *             if the deque is empty
-     * @see java.util.Deque#getFirst()
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Returns
+    ///
+    /// the head element
+    ///
+    /// #### Throws
+    ///
+    /// - `NoSuchElementException`: if the deque is empty
+    ///
+    /// #### See also
+    ///
+    /// - java.util.Deque#getFirst()
     public  E getFirst() {
         checkEmpty();
         return elements[front];
     }
 
-    /**
-     * Gets but does not remove the head element of this deque. It throws an
-     * exception if the deque is empty.
-     * 
-     * @return the head element
-     * @throws NoSuchElementException
-     *             if the deque is empty
-     * @see java.util.Queue#element()
-     */
+    /// Gets but does not remove the head element of this deque. It throws an
+    /// exception if the deque is empty.
+    ///
+    /// #### Returns
+    ///
+    /// the head element
+    ///
+    /// #### Throws
+    ///
+    /// - `NoSuchElementException`: if the deque is empty
+    ///
+    /// #### See also
+    ///
+    /// - java.util.Queue#element()
     public E element() {
         return getFirst();
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * @return the tail element
-     * @throws NoSuchElementException
-     *             if the deque is empty
-     * @see java.util.Deque#getLast()
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Returns
+    ///
+    /// the tail element
+    ///
+    /// #### Throws
+    ///
+    /// - `NoSuchElementException`: if the deque is empty
+    ///
+    /// #### See also
+    ///
+    /// - java.util.Deque#getLast()
     public  E getLast() {
         checkEmpty();
         return elements[circularSmallerPos(rear)];
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * @return the head element or null if the deque is empty
-     * @see java.util.Deque#peekFirst()
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Returns
+    ///
+    /// the head element or null if the deque is empty
+    ///
+    /// #### See also
+    ///
+    /// - java.util.Deque#peekFirst()
     public  E peekFirst() {
         return (status == DequeStatus.Empty) ? null : elements[front];
     }
 
-    /**
-     * Gets but not removes the head element of this deque. This method returns
-     * null if the deque is empty.
-     * 
-     * @return the head element or null if the deque is empty
-     * @see java.util.Queue#peek()
-     */
+    /// Gets but not removes the head element of this deque. This method returns
+    /// null if the deque is empty.
+    ///
+    /// #### Returns
+    ///
+    /// the head element or null if the deque is empty
+    ///
+    /// #### See also
+    ///
+    /// - java.util.Queue#peek()
     public  E peek() {
         return (status == DequeStatus.Empty) ? null : elements[front];
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * @return the tail element or null if the deque is empty
-     * @see java.util.Deque#peekLast()
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Returns
+    ///
+    /// the tail element or null if the deque is empty
+    ///
+    /// #### See also
+    ///
+    /// - java.util.Deque#peekLast()
     public  E peekLast() {
         return (status == DequeStatus.Empty) ? null
                 : elements[circularSmallerPos(rear)];
@@ -524,12 +613,11 @@ public class ArrayDeque<E> extends AbstractCollection<E> implements Deque<E> {
         elements = newElements;
     }
 
-    /**
-     * Resets the status after adding or removing operation.
-     * 
-     * @param adding
-     *            if the method is called after an "adding" operation
-     */
+    /// Resets the status after adding or removing operation.
+    ///
+    /// #### Parameters
+    ///
+    /// - `adding`: if the method is called after an "adding" operation
     private void resetStatus(boolean adding) {
         if (front == rear) {
             status = adding ? DequeStatus.Full : DequeStatus.Empty;
@@ -567,43 +655,58 @@ public class ArrayDeque<E> extends AbstractCollection<E> implements Deque<E> {
         return element;
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * @param obj
-     *            the element to be removed
-     * @return true if the operation succeeds or false if the deque does not
-     *         contain the element
-     * @see java.util.Deque#removeFirstOccurrence(java.lang.Object)
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Parameters
+    ///
+    /// - `obj`: the element to be removed
+    ///
+    /// #### Returns
+    ///
+    /// @return true if the operation succeeds or false if the deque does not
+    /// contain the element
+    ///
+    /// #### See also
+    ///
+    /// - java.util.Deque#removeFirstOccurrence(java.lang.Object)
     public boolean removeFirstOccurrence(Object obj) {
         return removeFirstOccurrenceImpl(obj);
     }
 
-    /**
-     * Removes the first equivalent element of the specified object. If the
-     * deque does not contain the element, it is unchanged and returns false.
-     * 
-     * @param obj
-     *            the element to be removed
-     * @return true if the operation succeeds or false if the deque does not
-     *         contain the element
-     * @see java.util.AbstractCollection#remove(java.lang.Object)
-     */
+    /// Removes the first equivalent element of the specified object. If the
+    /// deque does not contain the element, it is unchanged and returns false.
+    ///
+    /// #### Parameters
+    ///
+    /// - `obj`: the element to be removed
+    ///
+    /// #### Returns
+    ///
+    /// @return true if the operation succeeds or false if the deque does not
+    /// contain the element
+    ///
+    /// #### See also
+    ///
+    /// - java.util.AbstractCollection#remove(java.lang.Object)
     @Override
     public boolean remove(Object obj) {
         return removeFirstOccurrenceImpl(obj);
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * @param obj
-     *            the element to be removed
-     * @return true if the operation succeeds or false if the deque does not
-     *         contain the element.
-     * @see java.util.Deque#removeLastOccurrence(java.lang.Object)
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Parameters
+    ///
+    /// - `obj`: the element to be removed
+    ///
+    /// #### Returns
+    ///
+    /// @return true if the operation succeeds or false if the deque does not
+    /// contain the element.
+    ///
+    /// #### See also
+    ///
+    /// - java.util.Deque#removeLastOccurrence(java.lang.Object)
     public  boolean removeLastOccurrence(final Object obj) {
         if (null != obj) {
             Iterator<E> iter = descendingIterator();
@@ -656,12 +759,15 @@ public class ArrayDeque<E> extends AbstractCollection<E> implements Deque<E> {
         resetStatus(false);
     }
 
-    /**
-     * Returns the size of the deque.
-     * 
-     * @return the size of the deque
-     * @see java.util.AbstractCollection#size()
-     */
+    /// Returns the size of the deque.
+    ///
+    /// #### Returns
+    ///
+    /// the size of the deque
+    ///
+    /// #### See also
+    ///
+    /// - java.util.AbstractCollection#size()
     @Override
     public  int size() {
         if (status == DequeStatus.Full) {
@@ -671,25 +777,33 @@ public class ArrayDeque<E> extends AbstractCollection<E> implements Deque<E> {
                 : (rear + elements.length - front);
     }
 
-    /**
-     * Returns true if the deque has no elements.
-     * 
-     * @return true if the deque has no elements, false otherwise
-     * @see java.util.AbstractCollection#isEmpty()
-     */
+    /// Returns true if the deque has no elements.
+    ///
+    /// #### Returns
+    ///
+    /// true if the deque has no elements, false otherwise
+    ///
+    /// #### See also
+    ///
+    /// - java.util.AbstractCollection#isEmpty()
     @Override
     public  boolean isEmpty() {
         return 0 == size();
     }
 
-    /**
-     * Returns true if the specified element is in the deque.
-     * 
-     * @param obj
-     *            the element
-     * @return true if the element is in the deque, false otherwise
-     * @see java.util.AbstractCollection#contains(java.lang.Object)
-     */
+    /// Returns true if the specified element is in the deque.
+    ///
+    /// #### Parameters
+    ///
+    /// - `obj`: the element
+    ///
+    /// #### Returns
+    ///
+    /// true if the element is in the deque, false otherwise
+    ///
+    /// #### See also
+    ///
+    /// - java.util.AbstractCollection#contains(java.lang.Object)
     @SuppressWarnings("cast")
     @Override
     public  boolean contains(final Object obj) {
@@ -704,11 +818,11 @@ public class ArrayDeque<E> extends AbstractCollection<E> implements Deque<E> {
         return false;
     }
 
-    /**
-     * Empty the deque.
-     * 
-     * @see java.util.AbstractCollection#clear()
-     */
+    /// Empty the deque.
+    ///
+    /// #### See also
+    ///
+    /// - java.util.AbstractCollection#clear()
     @SuppressWarnings("cast")
     @Override
     public  void clear() {
@@ -724,25 +838,31 @@ public class ArrayDeque<E> extends AbstractCollection<E> implements Deque<E> {
         modCount = 0;
     }
 
-    /**
-     * Returns the iterator of the deque. The elements will be ordered from head
-     * to tail.
-     * 
-     * @return the iterator
-     * @see java.util.AbstractCollection#iterator()
-     */
+    /// Returns the iterator of the deque. The elements will be ordered from head
+    /// to tail.
+    ///
+    /// #### Returns
+    ///
+    /// the iterator
+    ///
+    /// #### See also
+    ///
+    /// - java.util.AbstractCollection#iterator()
     @SuppressWarnings("synthetic-access")
     @Override
     public Iterator<E> iterator() {
         return new ArrayDequeIterator<E>();
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * @return the reverse order Iterator
-     * @see java.util.Deque#descendingIterator()
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Returns
+    ///
+    /// the reverse order Iterator
+    ///
+    /// #### See also
+    ///
+    /// - java.util.Deque#descendingIterator()
     public Iterator<E> descendingIterator() {
         return new ReverseArrayDequeIterator<E>();
     }

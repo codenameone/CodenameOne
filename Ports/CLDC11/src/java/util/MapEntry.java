@@ -17,9 +17,7 @@
 
 package java.util;
 
-/**
- * MapEntry is an internal class which provides an implementation of Map.Entry.
- */
+/// MapEntry is an internal class which provides an implementation of Map.Entry.
 class MapEntry<K, V> implements Map.Entry<K, V> {
 
     K key;

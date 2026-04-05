@@ -18,23 +18,22 @@
 package java.util;
 
 
-/**
- * {@code Observer} is the interface to be implemented by objects that 
- * receive notification of updates on an {@code Observable} object.
- * 
- * @see Observable 
- */
+/// `Observer` is the interface to be implemented by objects that
+/// receive notification of updates on an `Observable` object.
+///
+/// #### See also
+///
+/// - Observable
 public interface Observer {
 
-    /**
-     * This method is called if the specified {@code Observable} object's
-     * {@code notifyObservers} method is called (because the {@code Observable} 
-     * object has been updated.
-     * 
-     * @param observable
-     *            the {@link Observable} object.
-     * @param data
-     *            the data passed to {@link Observable#notifyObservers(Object)}.
-     */
+    /// This method is called if the specified `Observable` object's
+    /// `notifyObservers` method is called (because the `Observable`
+    /// object has been updated.
+    ///
+    /// #### Parameters
+    ///
+    /// - `observable`: the `Observable` object.
+    ///
+    /// - `data`: the data passed to `Observable#notifyObservers(Object)`.
     void update(Observable observable, Object data);
 }

@@ -17,39 +17,40 @@
 
 package java.util;
 
-/**
- * {@code Stack} is a Last-In/First-Out(LIFO) data structure which represents a
- * stack of objects. It enables users to pop to and push from the stack,
- * including null objects. There is no limit to the size of the stack.
- */
+/// `Stack` is a Last-In/First-Out(LIFO) data structure which represents a
+/// stack of objects. It enables users to pop to and push from the stack,
+/// including null objects. There is no limit to the size of the stack.
 public class Stack<E> extends Vector<E> {
 
     private static final long serialVersionUID = 1224463164541339165L;
 
-    /**
-     * Constructs a stack with the default size of {@code Vector}.
-     */
+    /// Constructs a stack with the default size of `Vector`.
     public Stack() {
         super();
     }
 
-    /**
-     * Returns whether the stack is empty or not.
-     * 
-     * @return {@code true} if the stack is empty, {@code false} otherwise.
-     */
+    /// Returns whether the stack is empty or not.
+    ///
+    /// #### Returns
+    ///
+    /// `true` if the stack is empty, `false` otherwise.
     public boolean empty() {
         return isEmpty();
     }
 
-    /**
-     * Returns the element at the top of the stack without removing it.
-     * 
-     * @return the element at the top of the stack.
-     * @throws EmptyStackException
-     *             if the stack is empty.
-     * @see #pop
-     */
+    /// Returns the element at the top of the stack without removing it.
+    ///
+    /// #### Returns
+    ///
+    /// the element at the top of the stack.
+    ///
+    /// #### Throws
+    ///
+    /// - `EmptyStackException`: if the stack is empty.
+    ///
+    /// #### See also
+    ///
+    /// - #pop
     @SuppressWarnings("unchecked")
     public synchronized E peek() {
         try {
@@ -59,15 +60,21 @@ public class Stack<E> extends Vector<E> {
         }
     }
 
-    /**
-     * Returns the element at the top of the stack and removes it.
-     * 
-     * @return the element at the top of the stack.
-     * @throws EmptyStackException
-     *             if the stack is empty.
-     * @see #peek
-     * @see #push
-     */
+    /// Returns the element at the top of the stack and removes it.
+    ///
+    /// #### Returns
+    ///
+    /// the element at the top of the stack.
+    ///
+    /// #### Throws
+    ///
+    /// - `EmptyStackException`: if the stack is empty.
+    ///
+    /// #### See also
+    ///
+    /// - #peek
+    ///
+    /// - #push
     @SuppressWarnings("unchecked")
     public synchronized E pop() {
         if (elementCount == 0) {
@@ -80,29 +87,37 @@ public class Stack<E> extends Vector<E> {
         return obj;
     }
 
-    /**
-     * Pushes the specified object onto the top of the stack.
-     * 
-     * @param object
-     *            The object to be added on top of the stack.
-     * @return the object argument.
-     * @see #peek
-     * @see #pop
-     */
+    /// Pushes the specified object onto the top of the stack.
+    ///
+    /// #### Parameters
+    ///
+    /// - `object`: The object to be added on top of the stack.
+    ///
+    /// #### Returns
+    ///
+    /// the object argument.
+    ///
+    /// #### See also
+    ///
+    /// - #peek
+    ///
+    /// - #pop
     public E push(E object) {
         addElement(object);
         return object;
     }
 
-    /**
-     * Returns the index of the first occurrence of the object, starting from
-     * the top of the stack.
-     * 
-     * @return the index of the first occurrence of the object, assuming that
-     *         the topmost object on the stack has a distance of one.
-     * @param o
-     *            the object to be searched.
-     */
+    /// Returns the index of the first occurrence of the object, starting from
+    /// the top of the stack.
+    ///
+    /// #### Parameters
+    ///
+    /// - `o`: the object to be searched.
+    ///
+    /// #### Returns
+    ///
+    /// @return the index of the first occurrence of the object, assuming that
+    /// the topmost object on the stack has a distance of one.
     public synchronized int search(Object o) {
         final Object[] dumpArray = elementData;
         final int size = elementCount;

@@ -18,12 +18,12 @@
 package java.util;
 
 
-/**
- * {@code Collections} contains static methods which operate on
- * {@code Collection} classes.
- * 
- * @since 1.2
- */
+/// `Collections` contains static methods which operate on
+/// `Collection` classes.
+///
+/// #### Since
+///
+/// 1.2
 public class Collections {
 
     private static final class CopiesList<E> extends AbstractList<E> {
@@ -158,27 +158,19 @@ public class Collections {
         }
     }
 
-    /**
-     * An empty immutable instance of {@link List}.
-     */
+    /// An empty immutable instance of `List`.
     @SuppressWarnings("unchecked")
     public static final List EMPTY_LIST = new EmptyList();
 
-    /**
-     * An empty immutable instance of {@link Set}.
-     */
+    /// An empty immutable instance of `Set`.
     @SuppressWarnings("unchecked")
     public static final Set EMPTY_SET = new EmptySet();
 
-    /**
-     * An empty immutable instance of {@link Map}.
-     */
+    /// An empty immutable instance of `Map`.
     @SuppressWarnings("unchecked")
     public static final Map EMPTY_MAP = new EmptyMap();
 
-    /**
-     * This class is a singleton so that equals() and hashCode() work properly.
-     */
+    /// This class is a singleton so that equals() and hashCode() work properly.
     private static final class ReverseComparator<T> implements Comparator<T> {
 
         private static final ReverseComparator<Object> INSTANCE
@@ -492,17 +484,18 @@ public class Collections {
             }
         }
 
-        /**
-         * Replaces this SynchronizedRandomAccessList with a SynchronizedList so
-         * that JREs before 1.4 can deserialize this object without any
-         * problems. This is necessary since RandomAccess API was introduced
-         * only in 1.4.
-         * <p>
-         * 
-         * @return SynchronizedList
-         * 
-         * @see SynchronizedList#readResolve()
-         */
+        /// Replaces this SynchronizedRandomAccessList with a SynchronizedList so
+        /// that JREs before 1.4 can deserialize this object without any
+        /// problems. This is necessary since RandomAccess API was introduced
+        /// only in 1.4.
+        ///
+        /// #### Returns
+        ///
+        /// SynchronizedList
+        ///
+        /// #### See also
+        ///
+        /// - SynchronizedList#readResolve()
         private Object writeReplace() {
             return new SynchronizedList<E>(list);
         }
@@ -634,20 +627,21 @@ public class Collections {
             }
         }
 
-        /**
-         * Resolves SynchronizedList instances to SynchronizedRandomAccessList
-         * instances if the underlying list is a Random Access list.
-         * <p>
-         * This is necessary since SynchronizedRandomAccessList instances are
-         * replaced with SynchronizedList instances during serialization for
-         * compliance with JREs before 1.4.
-         * <p>
-         * 
-         * @return a SynchronizedList instance if the underlying list implements
-         *         RandomAccess interface, or this same object if not.
-         * 
-         * @see SynchronizedRandomAccessList#writeReplace()
-         */
+        /// Resolves SynchronizedList instances to SynchronizedRandomAccessList
+        /// instances if the underlying list is a Random Access list.
+        ///
+        /// This is necessary since SynchronizedRandomAccessList instances are
+        /// replaced with SynchronizedList instances during serialization for
+        /// compliance with JREs before 1.4.
+        ///
+        /// #### Returns
+        ///
+        /// @return a SynchronizedList instance if the underlying list implements
+        /// RandomAccess interface, or this same object if not.
+        ///
+        /// #### See also
+        ///
+        /// - SynchronizedRandomAccessList#writeReplace()
         private Object readResolve() {
             if (list instanceof RandomAccess) {
                 return new SynchronizedRandomAccessList<E>(list, mutex);
@@ -992,17 +986,18 @@ public class Collections {
             return new UnmodifiableRandomAccessList<E>(list.subList(start, end));
         }
 
-        /**
-         * Replaces this UnmodifiableRandomAccessList with an UnmodifiableList
-         * so that JREs before 1.4 can deserialize this object without any
-         * problems. This is necessary since RandomAccess API was introduced
-         * only in 1.4.
-         * <p>
-         * 
-         * @return UnmodifiableList
-         * 
-         * @see UnmodifiableList#readResolve()
-         */
+        /// Replaces this UnmodifiableRandomAccessList with an UnmodifiableList
+        /// so that JREs before 1.4 can deserialize this object without any
+        /// problems. This is necessary since RandomAccess API was introduced
+        /// only in 1.4.
+        ///
+        /// #### Returns
+        ///
+        /// UnmodifiableList
+        ///
+        /// #### See also
+        ///
+        /// - UnmodifiableList#readResolve()
         private Object writeReplace() {
             return new UnmodifiableList<E>(list);
         }
@@ -1105,21 +1100,22 @@ public class Collections {
             return new UnmodifiableList<E>(list.subList(start, end));
         }
 
-        /**
-         * Resolves UnmodifiableList instances to UnmodifiableRandomAccessList
-         * instances if the underlying list is a Random Access list.
-         * <p>
-         * This is necessary since UnmodifiableRandomAccessList instances are
-         * replaced with UnmodifiableList instances during serialization for
-         * compliance with JREs before 1.4.
-         * <p>
-         * 
-         * @return an UnmodifiableList instance if the underlying list
-         *         implements RandomAccess interface, or this same object if
-         *         not.
-         * 
-         * @see UnmodifiableRandomAccessList#writeReplace()
-         */
+        /// Resolves UnmodifiableList instances to UnmodifiableRandomAccessList
+        /// instances if the underlying list is a Random Access list.
+        ///
+        /// This is necessary since UnmodifiableRandomAccessList instances are
+        /// replaced with UnmodifiableList instances during serialization for
+        /// compliance with JREs before 1.4.
+        ///
+        /// #### Returns
+        ///
+        /// @return an UnmodifiableList instance if the underlying list
+        /// implements RandomAccess interface, or this same object if
+        /// not.
+        ///
+        /// #### See also
+        ///
+        /// - UnmodifiableRandomAccessList#writeReplace()
         private Object readResolve() {
             if (list instanceof RandomAccess) {
                 return new UnmodifiableRandomAccessList<E>(list);
@@ -1387,23 +1383,28 @@ public class Collections {
         /* empty */
     }
 
-    /**
-     * Performs a binary search for the specified element in the specified
-     * sorted list. The list needs to be already sorted in natural sorting
-     * order. Searching in an unsorted array has an undefined result. It's also
-     * undefined which element is found if there are multiple occurrences of the
-     * same element.
-     * 
-     * @param list
-     *            the sorted list to search.
-     * @param object
-     *            the element to find.
-     * @return the non-negative index of the element, or a negative index which
-     *         is the {@code -index - 1} where the element would be inserted
-     * @throws ClassCastException
-     *             if an element in the List or the search element does not
-     *             implement Comparable, or cannot be compared to each other.
-     */
+    /// Performs a binary search for the specified element in the specified
+    /// sorted list. The list needs to be already sorted in natural sorting
+    /// order. Searching in an unsorted array has an undefined result. It's also
+    /// undefined which element is found if there are multiple occurrences of the
+    /// same element.
+    ///
+    /// #### Parameters
+    ///
+    /// - `list`: the sorted list to search.
+    ///
+    /// - `object`: the element to find.
+    ///
+    /// #### Returns
+    ///
+    /// @return the non-negative index of the element, or a negative index which
+    /// is the `-index - 1` where the element would be inserted
+    ///
+    /// #### Throws
+    ///
+    /// - `ClassCastException`: @throws ClassCastException
+    /// if an element in the List or the search element does not
+    /// implement Comparable, or cannot be compared to each other.
     @SuppressWarnings("unchecked")
     public static <T> int binarySearch(
             List<? extends java.lang.Comparable<? super T>> list, T object) {
@@ -1443,27 +1444,34 @@ public class Collections {
         return -mid - (result < 0 ? 1 : 2);
     }
 
-    /**
-     * Performs a binary search for the specified element in the specified
-     * sorted list using the specified comparator. The list needs to be already
-     * sorted according to the comparator passed. Searching in an unsorted array
-     * has an undefined result. It's also undefined which element is found if
-     * there are multiple occurrences of the same element.
-     * 
-     * @param <T> The element type
-     * @param list
-     *            the sorted List to search.
-     * @param object
-     *            the element to find.
-     * @param comparator
-     *            the comparator. If the comparator is {@code null} then the
-     *            search uses the objects' natural ordering.
-     * @return the non-negative index of the element, or a negative index which
-     *         is the {@code -index - 1} where the element would be inserted.
-     * @throws ClassCastException
-     *             when an element in the list and the searched element cannot
-     *             be compared to each other using the comparator.
-     */
+    /// Performs a binary search for the specified element in the specified
+    /// sorted list using the specified comparator. The list needs to be already
+    /// sorted according to the comparator passed. Searching in an unsorted array
+    /// has an undefined result. It's also undefined which element is found if
+    /// there are multiple occurrences of the same element.
+    ///
+    /// #### Parameters
+    ///
+    /// - `The`: element type
+    ///
+    /// - `list`: the sorted List to search.
+    ///
+    /// - `object`: the element to find.
+    ///
+    /// - `comparator`: @param comparator
+    /// the comparator. If the comparator is `null` then the
+    /// search uses the objects' natural ordering.
+    ///
+    /// #### Returns
+    ///
+    /// @return the non-negative index of the element, or a negative index which
+    /// is the `-index - 1` where the element would be inserted.
+    ///
+    /// #### Throws
+    ///
+    /// - `ClassCastException`: @throws ClassCastException
+    /// when an element in the list and the searched element cannot
+    /// be compared to each other using the comparator.
     @SuppressWarnings("unchecked")
     public static <T> int binarySearch(List<? extends T> list, T object,
             Comparator<? super T> comparator) {
@@ -1499,22 +1507,24 @@ public class Collections {
         return -mid - (result < 0 ? 1 : 2);
     }
 
-    /**
-     * Copies the elements from the source list to the destination list. At the
-     * end both lists will have the same objects at the same index. If the
-     * destination array is larger than the source list, the elements in the
-     * destination list with {@code index >= source.size()} will be unchanged.
-     * 
-     * @param destination
-     *            the list whose elements are set from the source list.
-     * @param source
-     *            the list with the elements to be copied into the destination.
-     * @throws IndexOutOfBoundsException
-     *             when the destination list is smaller than the source list.
-     * @throws UnsupportedOperationException
-     *             when replacing an element in the destination list is not
-     *             supported.
-     */
+    /// Copies the elements from the source list to the destination list. At the
+    /// end both lists will have the same objects at the same index. If the
+    /// destination array is larger than the source list, the elements in the
+    /// destination list with `index >= source.size()` will be unchanged.
+    ///
+    /// #### Parameters
+    ///
+    /// - `destination`: the list whose elements are set from the source list.
+    ///
+    /// - `source`: the list with the elements to be copied into the destination.
+    ///
+    /// #### Throws
+    ///
+    /// - `IndexOutOfBoundsException`: when the destination list is smaller than the source list.
+    ///
+    /// - `UnsupportedOperationException`: @throws UnsupportedOperationException
+    /// when replacing an element in the destination list is not
+    /// supported.
     public static <T> void copy(List<? super T> destination,
             List<? extends T> source) {
         if (destination.size() < source.size()) {
@@ -1534,13 +1544,15 @@ public class Collections {
         }
     }
 
-    /**
-     * Returns an {@code Enumeration} on the specified collection.
-     * 
-     * @param collection
-     *            the collection to enumerate.
-     * @return an Enumeration.
-     */
+    /// Returns an `Enumeration` on the specified collection.
+    ///
+    /// #### Parameters
+    ///
+    /// - `collection`: the collection to enumerate.
+    ///
+    /// #### Returns
+    ///
+    /// an Enumeration.
     public static <T> java.util.Enumeration<T> enumeration(Collection<T> collection) {
         final Collection<T> c = collection;
         return new java.util.Enumeration<T>() {
@@ -1556,16 +1568,17 @@ public class Collections {
         };
     }
 
-    /**
-     * Fills the specified list with the specified element.
-     * 
-     * @param list
-     *            the list to fill.
-     * @param object
-     *            the element to fill the list with.
-     * @throws UnsupportedOperationException
-     *             when replacing an element in the List is not supported.
-     */
+    /// Fills the specified list with the specified element.
+    ///
+    /// #### Parameters
+    ///
+    /// - `list`: the list to fill.
+    ///
+    /// - `object`: the element to fill the list with.
+    ///
+    /// #### Throws
+    ///
+    /// - `UnsupportedOperationException`: when replacing an element in the List is not supported.
     public static <T> void fill(List<? super T> list, T object) {
         ListIterator<? super T> it = list.listIterator();
         while (it.hasNext()) {
@@ -1574,17 +1587,22 @@ public class Collections {
         }
     }
 
-    /**
-     * Searches the specified collection for the maximum element.
-     * 
-     * @param collection
-     *            the collection to search.
-     * @return the maximum element in the Collection.
-     * @throws ClassCastException
-     *             when an element in the collection does not implement
-     *             {@code Comparable} or elements cannot be compared to each
-     *             other.
-     */
+    /// Searches the specified collection for the maximum element.
+    ///
+    /// #### Parameters
+    ///
+    /// - `collection`: the collection to search.
+    ///
+    /// #### Returns
+    ///
+    /// the maximum element in the Collection.
+    ///
+    /// #### Throws
+    ///
+    /// - `ClassCastException`: @throws ClassCastException
+    /// when an element in the collection does not implement
+    /// `Comparable` or elements cannot be compared to each
+    /// other.
     public static <T extends Object & java.lang.Comparable<? super T>> T max(
             Collection<? extends T> collection) {
         Iterator<? extends T> it = collection.iterator();
@@ -1598,19 +1616,24 @@ public class Collections {
         return max;
     }
 
-    /**
-     * Searches the specified collection for the maximum element using the
-     * specified comparator.
-     * 
-     * @param collection
-     *            the collection to search.
-     * @param comparator
-     *            the comparator.
-     * @return the maximum element in the Collection.
-     * @throws ClassCastException
-     *             when elements in the collection cannot be compared to each
-     *             other using the {@code Comparator}.
-     */
+    /// Searches the specified collection for the maximum element using the
+    /// specified comparator.
+    ///
+    /// #### Parameters
+    ///
+    /// - `collection`: the collection to search.
+    ///
+    /// - `comparator`: the comparator.
+    ///
+    /// #### Returns
+    ///
+    /// the maximum element in the Collection.
+    ///
+    /// #### Throws
+    ///
+    /// - `ClassCastException`: @throws ClassCastException
+    /// when elements in the collection cannot be compared to each
+    /// other using the `Comparator`.
     public static <T> T max(Collection<? extends T> collection,
             Comparator<? super T> comparator) {
         if (comparator == null) {
@@ -1630,17 +1653,22 @@ public class Collections {
         return max;
     }
 
-    /**
-     * Searches the specified collection for the minimum element.
-     * 
-     * @param collection
-     *            the collection to search.
-     * @return the minimum element in the collection.
-     * @throws ClassCastException
-     *             when an element in the collection does not implement
-     *             {@code Comparable} or elements cannot be compared to each
-     *             other.
-     */
+    /// Searches the specified collection for the minimum element.
+    ///
+    /// #### Parameters
+    ///
+    /// - `collection`: the collection to search.
+    ///
+    /// #### Returns
+    ///
+    /// the minimum element in the collection.
+    ///
+    /// #### Throws
+    ///
+    /// - `ClassCastException`: @throws ClassCastException
+    /// when an element in the collection does not implement
+    /// `Comparable` or elements cannot be compared to each
+    /// other.
     public static <T extends Object & java.lang.Comparable<? super T>> T min(
             Collection<? extends T> collection) {
         Iterator<? extends T> it = collection.iterator();
@@ -1654,19 +1682,24 @@ public class Collections {
         return min;
     }
 
-    /**
-     * Searches the specified collection for the minimum element using the
-     * specified comparator.
-     * 
-     * @param collection
-     *            the collection to search.
-     * @param comparator
-     *            the comparator.
-     * @return the minimum element in the collection.
-     * @throws ClassCastException
-     *             when elements in the collection cannot be compared to each
-     *             other using the {@code Comparator}.
-     */
+    /// Searches the specified collection for the minimum element using the
+    /// specified comparator.
+    ///
+    /// #### Parameters
+    ///
+    /// - `collection`: the collection to search.
+    ///
+    /// - `comparator`: the comparator.
+    ///
+    /// #### Returns
+    ///
+    /// the minimum element in the collection.
+    ///
+    /// #### Throws
+    ///
+    /// - `ClassCastException`: @throws ClassCastException
+    /// when elements in the collection cannot be compared to each
+    /// other using the `Comparator`.
     public static <T> T min(Collection<? extends T> collection,
             Comparator<? super T> comparator) {
         if (comparator == null) {
@@ -1686,31 +1719,36 @@ public class Collections {
         return min;
     }
 
-    /**
-     * Returns a list containing the specified number of the specified element.
-     * The list cannot be modified. The list is serializable.
-     * 
-     * @param length
-     *            the size of the returned list.
-     * @param object
-     *            the element to be added {@code length} times to a list.
-     * @return a list containing {@code length} copies of the element.
-     * @throws IllegalArgumentException
-     *             when {@code length < 0}.
-     */
+    /// Returns a list containing the specified number of the specified element.
+    /// The list cannot be modified. The list is serializable.
+    ///
+    /// #### Parameters
+    ///
+    /// - `length`: the size of the returned list.
+    ///
+    /// - `object`: the element to be added `length` times to a list.
+    ///
+    /// #### Returns
+    ///
+    /// a list containing `length` copies of the element.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when `length < 0`.
     public static <T> List<T> nCopies(final int length, T object) {
         return new CopiesList<T>(length, object);
     }
 
-    /**
-     * Modifies the specified {@code List} by reversing the order of the
-     * elements.
-     * 
-     * @param list
-     *            the list to reverse.
-     * @throws UnsupportedOperationException
-     *             when replacing an element in the List is not supported.
-     */
+    /// Modifies the specified `List` by reversing the order of the
+    /// elements.
+    ///
+    /// #### Parameters
+    ///
+    /// - `list`: the list to reverse.
+    ///
+    /// #### Throws
+    ///
+    /// - `UnsupportedOperationException`: when replacing an element in the List is not supported.
     @SuppressWarnings("unchecked")
     public static void reverse(List<?> list) {
         int size = list.size();
@@ -1725,34 +1763,47 @@ public class Collections {
         }
     }
 
-    /**
-     * A comparator which reverses the natural order of the elements. The
-     * {@code Comparator} that's returned is {@link Serializable}.
-     *
-     * @return a {@code Comparator} instance.
-     * @see Comparator
-     * @see Comparable
-     * @see Serializable
-     */
+    /// A comparator which reverses the natural order of the elements. The
+    /// `Comparator` that's returned is `Serializable`.
+    ///
+    /// #### Returns
+    ///
+    /// a `Comparator` instance.
+    ///
+    /// #### See also
+    ///
+    /// - Comparator
+    ///
+    /// - Comparable
+    ///
+    /// - Serializable
     @SuppressWarnings("unchecked")
     public static <T> Comparator<T> reverseOrder() {
         return (Comparator) ReverseComparator.INSTANCE;
     }
 
-    /**
-     * Returns a {@link Comparator} that reverses the order of the
-     * {@code Comparator} passed. If the {@code Comparator} passed is
-     * {@code null}, then this method is equivalent to {@link #reverseOrder()}.
-     * <p>
-     * The {@code Comparator} that's returned is {@link Serializable} if the
-     * {@code Comparator} passed is serializable or {@code null}.
-     *
-     * @param c
-     *            the {@code Comparator} to reverse or {@code null}.
-     * @return a {@code Comparator} instance.
-     * @see Comparator
-     * @since 1.5
-     */
+    /// Returns a `Comparator` that reverses the order of the
+    /// `Comparator` passed. If the `Comparator` passed is
+    /// `null`, then this method is equivalent to `#reverseOrder()`.
+    ///
+    /// The `Comparator` that's returned is `Serializable` if the
+    /// `Comparator` passed is serializable or `null`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the `Comparator` to reverse or `null`.
+    ///
+    /// #### Returns
+    ///
+    /// a `Comparator` instance.
+    ///
+    /// #### Since
+    ///
+    /// 1.5
+    ///
+    /// #### See also
+    ///
+    /// - Comparator
     public static <T> Comparator<T> reverseOrder(Comparator<T> c) {
         if (c == null) {
             return reverseOrder();
@@ -1763,30 +1814,31 @@ public class Collections {
         return new ReverseComparatorWithComparator<T>(c);
     }
 
-    /**
-     * Moves every element of the list to a random new position in the list.
-     * 
-     * @param list
-     *            the List to shuffle.
-     * 
-     * @throws UnsupportedOperationException
-     *             when replacing an element in the List is not supported.
-     */
+    /// Moves every element of the list to a random new position in the list.
+    ///
+    /// #### Parameters
+    ///
+    /// - `list`: the List to shuffle.
+    ///
+    /// #### Throws
+    ///
+    /// - `UnsupportedOperationException`: when replacing an element in the List is not supported.
     public static void shuffle(List<?> list) {
         shuffle(list, new java.util.Random());
     }
 
-    /**
-     * Moves every element of the list to a random new position in the list
-     * using the specified random number generator.
-     * 
-     * @param list
-     *            the list to shuffle.
-     * @param random
-     *            the random number generator.
-     * @throws UnsupportedOperationException
-     *             when replacing an element in the list is not supported.
-     */
+    /// Moves every element of the list to a random new position in the list
+    /// using the specified random number generator.
+    ///
+    /// #### Parameters
+    ///
+    /// - `list`: the list to shuffle.
+    ///
+    /// - `random`: the random number generator.
+    ///
+    /// #### Throws
+    ///
+    /// - `UnsupportedOperationException`: when replacing an element in the list is not supported.
     public static void shuffle(List<?> list, java.util.Random random) {
         @SuppressWarnings("unchecked") // we won't put foreign objects in
         final List<Object> objectList = (List<Object>) list;
@@ -1814,54 +1866,62 @@ public class Collections {
         }
     }
 
-    /**
-     * Returns a set containing the specified element. The set cannot be
-     * modified. The set is serializable.
-     * 
-     * @param object
-     *            the element.
-     * @return a set containing the element.
-     */
+    /// Returns a set containing the specified element. The set cannot be
+    /// modified. The set is serializable.
+    ///
+    /// #### Parameters
+    ///
+    /// - `object`: the element.
+    ///
+    /// #### Returns
+    ///
+    /// a set containing the element.
     public static <E> Set<E> singleton(E object) {
         return new SingletonSet<E>(object);
     }
 
-    /**
-     * Returns a list containing the specified element. The list cannot be
-     * modified. The list is serializable.
-     * 
-     * @param object
-     *            the element.
-     * @return a list containing the element.
-     */
+    /// Returns a list containing the specified element. The list cannot be
+    /// modified. The list is serializable.
+    ///
+    /// #### Parameters
+    ///
+    /// - `object`: the element.
+    ///
+    /// #### Returns
+    ///
+    /// a list containing the element.
     public static <E> List<E> singletonList(E object) {
         return new SingletonList<E>(object);
     }
 
-    /**
-     * Returns a Map containing the specified key and value. The map cannot be
-     * modified. The map is serializable.
-     * 
-     * @param key
-     *            the key.
-     * @param value
-     *            the value.
-     * @return a Map containing the key and value.
-     */
+    /// Returns a Map containing the specified key and value. The map cannot be
+    /// modified. The map is serializable.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key.
+    ///
+    /// - `value`: the value.
+    ///
+    /// #### Returns
+    ///
+    /// a Map containing the key and value.
     public static <K, V> Map<K, V> singletonMap(K key, V value) {
         return new SingletonMap<K, V>(key, value);
     }
 
-    /**
-     * Sorts the specified list in ascending natural order. The algorithm is
-     * stable which means equal elements don't get reordered.
-     * 
-     * @param list
-     *            the list to be sorted.
-     * @throws ClassCastException
-     *             when an element in the List does not implement Comparable or
-     *             elements cannot be compared to each other.
-     */
+    /// Sorts the specified list in ascending natural order. The algorithm is
+    /// stable which means equal elements don't get reordered.
+    ///
+    /// #### Parameters
+    ///
+    /// - `list`: the list to be sorted.
+    ///
+    /// #### Throws
+    ///
+    /// - `ClassCastException`: @throws ClassCastException
+    /// when an element in the List does not implement Comparable or
+    /// elements cannot be compared to each other.
     @SuppressWarnings("unchecked")
     public static <T extends java.lang.Comparable<? super T>> void sort(List<T> list) {
         Object[] array = list.toArray();
@@ -1874,18 +1934,20 @@ public class Collections {
         }
     }
 
-    /**
-     * Sorts the specified list using the specified comparator. The algorithm is
-     * stable which means equal elements don't get reordered.
-     * 
-     * @param list
-     *            the list to be sorted.
-     * @param comparator
-     *            the comparator.
-     * @throws ClassCastException
-     *             when elements in the list cannot be compared to each other
-     *             using the comparator.
-     */
+    /// Sorts the specified list using the specified comparator. The algorithm is
+    /// stable which means equal elements don't get reordered.
+    ///
+    /// #### Parameters
+    ///
+    /// - `list`: the list to be sorted.
+    ///
+    /// - `comparator`: the comparator.
+    ///
+    /// #### Throws
+    ///
+    /// - `ClassCastException`: @throws ClassCastException
+    /// when elements in the list cannot be compared to each other
+    /// using the comparator.
     @SuppressWarnings("unchecked")
     public static <T> void sort(List<T> list, Comparator<? super T> comparator) {
         T[] array = list.toArray((T[]) new Object[list.size()]);
@@ -1898,22 +1960,26 @@ public class Collections {
         }
     }
 
-    /**
-     * Swaps the elements of list {@code list} at indices {@code index1} and
-     * {@code index2}.
-     * 
-     * @param list
-     *            the list to manipulate.
-     * @param index1
-     *            position of the first element to swap with the element in
-     *            index2.
-     * @param index2
-     *            position of the other element.
-     * 
-     * @throws IndexOutOfBoundsException
-     *             if index1 or index2 is out of range of this list.
-     * @since 1.4
-     */
+    /// Swaps the elements of list `list` at indices `index1` and
+    /// `index2`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `list`: the list to manipulate.
+    ///
+    /// - `index1`: @param index1
+    /// position of the first element to swap with the element in
+    /// index2.
+    ///
+    /// - `index2`: position of the other element.
+    ///
+    /// #### Throws
+    ///
+    /// - `IndexOutOfBoundsException`: if index1 or index2 is out of range of this list.
+    ///
+    /// #### Since
+    ///
+    /// 1.4
     @SuppressWarnings("unchecked")
     public static void swap(List<?> list, int index1, int index2) {
         if (list == null) {
@@ -1930,23 +1996,28 @@ public class Collections {
         rawList.set(index2, rawList.set(index1, rawList.get(index2)));
     }
 
-    /**
-     * Replaces all occurrences of Object {@code obj} in {@code list} with
-     * {@code newObj}. If the {@code obj} is {@code null}, then all
-     * occurrences of {@code null} are replaced with {@code newObj}.
-     * 
-     * @param list
-     *            the list to modify.
-     * @param obj
-     *            the object to find and replace occurrences of.
-     * @param obj2
-     *            the object to replace all occurrences of {@code obj} in
-     *            {@code list}.
-     * @return true, if at least one occurrence of {@code obj} has been found in
-     *         {@code list}.
-     * @throws UnsupportedOperationException
-     *             if the list does not support setting elements.
-     */
+    /// Replaces all occurrences of Object `obj` in `list` with
+    /// `newObj`. If the `obj` is `null`, then all
+    /// occurrences of `null` are replaced with `newObj`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `list`: the list to modify.
+    ///
+    /// - `obj`: the object to find and replace occurrences of.
+    ///
+    /// - `obj2`: @param obj2
+    /// the object to replace all occurrences of `obj` in
+    /// `list`.
+    ///
+    /// #### Returns
+    ///
+    /// @return true, if at least one occurrence of `obj` has been found in
+    /// `list`.
+    ///
+    /// #### Throws
+    ///
+    /// - `UnsupportedOperationException`: if the list does not support setting elements.
     public static <T> boolean replaceAll(List<T> list, T obj, T obj2) {
         int index;
         boolean found = false;
@@ -1958,19 +2029,19 @@ public class Collections {
         return found;
     }
 
-    /**
-     * Rotates the elements in {@code list} by the distance {@code dist}
-     * <p>
-     * e.g. for a given list with elements [1, 2, 3, 4, 5, 6, 7, 8, 9, 0],
-     * calling rotate(list, 3) or rotate(list, -7) would modify the list to look
-     * like this: [8, 9, 0, 1, 2, 3, 4, 5, 6, 7]
-     *
-     * @param lst
-     *            the list whose elements are to be rotated.
-     * @param dist
-     *            is the distance the list is rotated. This can be any valid
-     *            integer. Negative values rotate the list backwards.
-     */
+    /// Rotates the elements in `list` by the distance `dist`
+    ///
+    /// e.g. for a given list with elements [1, 2, 3, 4, 5, 6, 7, 8, 9, 0],
+    /// calling rotate(list, 3) or rotate(list, -7) would modify the list to look
+    /// like this: [8, 9, 0, 1, 2, 3, 4, 5, 6, 7]
+    ///
+    /// #### Parameters
+    ///
+    /// - `lst`: the list whose elements are to be rotated.
+    ///
+    /// - `dist`: @param dist
+    /// is the distance the list is rotated. This can be any valid
+    /// integer. Negative values rotate the list backwards.
     @SuppressWarnings("unchecked")
     public static void rotate(List<?> lst, int dist) {
         List<Object> list = (List<Object>) lst;
@@ -2016,19 +2087,21 @@ public class Collections {
         }
     }
 
-    /**
-     * Searches the {@code list} for {@code sublist} and returns the beginning
-     * index of the first occurrence.
-     * <p>
-     * -1 is returned if the {@code sublist} does not exist in {@code list}.
-     * 
-     * @param list
-     *            the List to search {@code sublist} in.
-     * @param sublist
-     *            the List to search in {@code list}.
-     * @return the beginning index of the first occurrence of {@code sublist} in
-     *         {@code list}, or -1.
-     */
+    /// Searches the `list` for `sublist` and returns the beginning
+    /// index of the first occurrence.
+    ///
+    /// -1 is returned if the `sublist` does not exist in `list`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `list`: the List to search `sublist` in.
+    ///
+    /// - `sublist`: the List to search in `list`.
+    ///
+    /// #### Returns
+    ///
+    /// @return the beginning index of the first occurrence of `sublist` in
+    /// `list`, or -1.
     public static int indexOfSubList(List<?> list, List<?> sublist) {
         int size = list.size();
         int sublistSize = sublist.size();
@@ -2083,19 +2156,21 @@ public class Collections {
         return -1;
     }
 
-    /**
-     * Searches the {@code list} for {@code sublist} and returns the beginning
-     * index of the last occurrence.
-     * <p>
-     * -1 is returned if the {@code sublist} does not exist in {@code list}.
-     * 
-     * @param list
-     *            the list to search {@code sublist} in.
-     * @param sublist
-     *            the list to search in {@code list}.
-     * @return the beginning index of the last occurrence of {@code sublist} in
-     *         {@code list}, or -1.
-     */
+    /// Searches the `list` for `sublist` and returns the beginning
+    /// index of the last occurrence.
+    ///
+    /// -1 is returned if the `sublist` does not exist in `list`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `list`: the list to search `sublist` in.
+    ///
+    /// - `sublist`: the list to search in `list`.
+    ///
+    /// #### Returns
+    ///
+    /// @return the beginning index of the last occurrence of `sublist` in
+    /// `list`, or -1.
     public static int lastIndexOfSubList(List<?> list, List<?> sublist) {
         int sublistSize = sublist.size();
         int size = list.size();
@@ -2147,27 +2222,30 @@ public class Collections {
         return -1;
     }
 
-    /**
-     * Returns an {@code ArrayList} with all the elements in the {@code
-     * enumeration}. The elements in the returned {@code ArrayList} are in the
-     * same order as in the {@code enumeration}.
-     * 
-     * @param enumeration
-     *            the source {@link Enumeration}.
-     * @return an {@code ArrayList} from {@code enumeration}.
-     */
+    /// Returns an `ArrayList` with all the elements in the `enumeration`. The elements in the returned `ArrayList` are in the
+    /// same order as in the `enumeration`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `enumeration`: the source `Enumeration`.
+    ///
+    /// #### Returns
+    ///
+    /// an `ArrayList` from `enumeration`.
     public static <T> ArrayList<T> list(java.util.Enumeration<T> enumeration) {
         return null;
     }
 
-    /**
-     * Returns a wrapper on the specified collection which synchronizes all
-     * access to the collection.
-     * 
-     * @param collection
-     *            the Collection to wrap in a synchronized collection.
-     * @return a synchronized Collection.
-     */
+    /// Returns a wrapper on the specified collection which synchronizes all
+    /// access to the collection.
+    ///
+    /// #### Parameters
+    ///
+    /// - `collection`: the Collection to wrap in a synchronized collection.
+    ///
+    /// #### Returns
+    ///
+    /// a synchronized Collection.
     public static <T> Collection<T> synchronizedCollection(
             Collection<T> collection) {
         if (collection == null) {
@@ -2176,14 +2254,16 @@ public class Collections {
         return new SynchronizedCollection<T>(collection);
     }
 
-    /**
-     * Returns a wrapper on the specified List which synchronizes all access to
-     * the List.
-     * 
-     * @param list
-     *            the List to wrap in a synchronized list.
-     * @return a synchronized List.
-     */
+    /// Returns a wrapper on the specified List which synchronizes all access to
+    /// the List.
+    ///
+    /// #### Parameters
+    ///
+    /// - `list`: the List to wrap in a synchronized list.
+    ///
+    /// #### Returns
+    ///
+    /// a synchronized List.
     public static <T> List<T> synchronizedList(List<T> list) {
         if (list == null) {
             throw new NullPointerException();
@@ -2194,14 +2274,16 @@ public class Collections {
         return new SynchronizedList<T>(list);
     }
 
-    /**
-     * Returns a wrapper on the specified map which synchronizes all access to
-     * the map.
-     * 
-     * @param map
-     *            the map to wrap in a synchronized map.
-     * @return a synchronized Map.
-     */
+    /// Returns a wrapper on the specified map which synchronizes all access to
+    /// the map.
+    ///
+    /// #### Parameters
+    ///
+    /// - `map`: the map to wrap in a synchronized map.
+    ///
+    /// #### Returns
+    ///
+    /// a synchronized Map.
     public static <K, V> Map<K, V> synchronizedMap(Map<K, V> map) {
         if (map == null) {
             throw new NullPointerException();
@@ -2209,14 +2291,16 @@ public class Collections {
         return new SynchronizedMap<K, V>(map);
     }
 
-    /**
-     * Returns a wrapper on the specified set which synchronizes all access to
-     * the set.
-     * 
-     * @param set
-     *            the set to wrap in a synchronized set.
-     * @return a synchronized set.
-     */
+    /// Returns a wrapper on the specified set which synchronizes all access to
+    /// the set.
+    ///
+    /// #### Parameters
+    ///
+    /// - `set`: the set to wrap in a synchronized set.
+    ///
+    /// #### Returns
+    ///
+    /// a synchronized set.
     public static <E> Set<E> synchronizedSet(Set<E> set) {
         if (set == null) {
             throw new NullPointerException();
@@ -2224,14 +2308,16 @@ public class Collections {
         return new SynchronizedSet<E>(set);
     }
 
-    /**
-     * Returns a wrapper on the specified sorted map which synchronizes all
-     * access to the sorted map.
-     * 
-     * @param map
-     *            the sorted map to wrap in a synchronized sorted map.
-     * @return a synchronized sorted map.
-     */
+    /// Returns a wrapper on the specified sorted map which synchronizes all
+    /// access to the sorted map.
+    ///
+    /// #### Parameters
+    ///
+    /// - `map`: the sorted map to wrap in a synchronized sorted map.
+    ///
+    /// #### Returns
+    ///
+    /// a synchronized sorted map.
     public static <K, V> SortedMap<K, V> synchronizedSortedMap(
             SortedMap<K, V> map) {
         if (map == null) {
@@ -2240,14 +2326,16 @@ public class Collections {
         return new SynchronizedSortedMap<K, V>(map);
     }
 
-    /**
-     * Returns a wrapper on the specified sorted set which synchronizes all
-     * access to the sorted set.
-     * 
-     * @param set
-     *            the sorted set to wrap in a synchronized sorted set.
-     * @return a synchronized sorted set.
-     */
+    /// Returns a wrapper on the specified sorted set which synchronizes all
+    /// access to the sorted set.
+    ///
+    /// #### Parameters
+    ///
+    /// - `set`: the sorted set to wrap in a synchronized sorted set.
+    ///
+    /// #### Returns
+    ///
+    /// a synchronized sorted set.
     public static <E> SortedSet<E> synchronizedSortedSet(SortedSet<E> set) {
         if (set == null) {
             throw new NullPointerException();
@@ -2255,15 +2343,17 @@ public class Collections {
         return new SynchronizedSortedSet<E>(set);
     }
 
-    /**
-     * Returns a wrapper on the specified collection which throws an
-     * {@code UnsupportedOperationException} whenever an attempt is made to
-     * modify the collection.
-     * 
-     * @param collection
-     *            the collection to wrap in an unmodifiable collection.
-     * @return an unmodifiable collection.
-     */
+    /// Returns a wrapper on the specified collection which throws an
+    /// `UnsupportedOperationException` whenever an attempt is made to
+    /// modify the collection.
+    ///
+    /// #### Parameters
+    ///
+    /// - `collection`: the collection to wrap in an unmodifiable collection.
+    ///
+    /// #### Returns
+    ///
+    /// an unmodifiable collection.
     @SuppressWarnings("unchecked")
     public static <E> Collection<E> unmodifiableCollection(
             Collection<? extends E> collection) {
@@ -2273,15 +2363,17 @@ public class Collections {
         return new UnmodifiableCollection<E>((Collection<E>) collection);
     }
 
-    /**
-     * Returns a wrapper on the specified list which throws an
-     * {@code UnsupportedOperationException} whenever an attempt is made to
-     * modify the list.
-     * 
-     * @param list
-     *            the list to wrap in an unmodifiable list.
-     * @return an unmodifiable List.
-     */
+    /// Returns a wrapper on the specified list which throws an
+    /// `UnsupportedOperationException` whenever an attempt is made to
+    /// modify the list.
+    ///
+    /// #### Parameters
+    ///
+    /// - `list`: the list to wrap in an unmodifiable list.
+    ///
+    /// #### Returns
+    ///
+    /// an unmodifiable List.
     @SuppressWarnings("unchecked")
     public static <E> List<E> unmodifiableList(List<? extends E> list) {
         if (list == null) {
@@ -2293,15 +2385,17 @@ public class Collections {
         return new UnmodifiableList<E>((List<E>) list);
     }
 
-    /**
-     * Returns a wrapper on the specified map which throws an
-     * {@code UnsupportedOperationException} whenever an attempt is made to
-     * modify the map.
-     * 
-     * @param map
-     *            the map to wrap in an unmodifiable map.
-     * @return a unmodifiable map.
-     */
+    /// Returns a wrapper on the specified map which throws an
+    /// `UnsupportedOperationException` whenever an attempt is made to
+    /// modify the map.
+    ///
+    /// #### Parameters
+    ///
+    /// - `map`: the map to wrap in an unmodifiable map.
+    ///
+    /// #### Returns
+    ///
+    /// a unmodifiable map.
     @SuppressWarnings("unchecked")
     public static <K, V> Map<K, V> unmodifiableMap(
             Map<? extends K, ? extends V> map) {
@@ -2311,15 +2405,17 @@ public class Collections {
         return new UnmodifiableMap<K, V>((Map<K, V>) map);
     }
 
-    /**
-     * Returns a wrapper on the specified set which throws an
-     * {@code UnsupportedOperationException} whenever an attempt is made to
-     * modify the set.
-     * 
-     * @param set
-     *            the set to wrap in an unmodifiable set.
-     * @return a unmodifiable set
-     */
+    /// Returns a wrapper on the specified set which throws an
+    /// `UnsupportedOperationException` whenever an attempt is made to
+    /// modify the set.
+    ///
+    /// #### Parameters
+    ///
+    /// - `set`: the set to wrap in an unmodifiable set.
+    ///
+    /// #### Returns
+    ///
+    /// a unmodifiable set
     @SuppressWarnings("unchecked")
     public static <E> Set<E> unmodifiableSet(Set<? extends E> set) {
         if (set == null) {
@@ -2328,15 +2424,17 @@ public class Collections {
         return new UnmodifiableSet<E>((Set<E>) set);
     }
 
-    /**
-     * Returns a wrapper on the specified sorted map which throws an
-     * {@code UnsupportedOperationException} whenever an attempt is made to
-     * modify the sorted map.
-     * 
-     * @param map
-     *            the sorted map to wrap in an unmodifiable sorted map.
-     * @return a unmodifiable sorted map
-     */
+    /// Returns a wrapper on the specified sorted map which throws an
+    /// `UnsupportedOperationException` whenever an attempt is made to
+    /// modify the sorted map.
+    ///
+    /// #### Parameters
+    ///
+    /// - `map`: the sorted map to wrap in an unmodifiable sorted map.
+    ///
+    /// #### Returns
+    ///
+    /// a unmodifiable sorted map
     @SuppressWarnings("unchecked")
     public static <K, V> SortedMap<K, V> unmodifiableSortedMap(
             SortedMap<K, ? extends V> map) {
@@ -2346,15 +2444,17 @@ public class Collections {
         return new UnmodifiableSortedMap<K, V>((SortedMap<K, V>) map);
     }
 
-    /**
-     * Returns a wrapper on the specified sorted set which throws an
-     * {@code UnsupportedOperationException} whenever an attempt is made to
-     * modify the sorted set.
-     * 
-     * @param set
-     *            the sorted set to wrap in an unmodifiable sorted set.
-     * @return a unmodifiable sorted set.
-     */
+    /// Returns a wrapper on the specified sorted set which throws an
+    /// `UnsupportedOperationException` whenever an attempt is made to
+    /// modify the sorted set.
+    ///
+    /// #### Parameters
+    ///
+    /// - `set`: the sorted set to wrap in an unmodifiable sorted set.
+    ///
+    /// #### Returns
+    ///
+    /// a unmodifiable sorted set.
     public static <E> SortedSet<E> unmodifiableSortedSet(SortedSet<E> set) {
         if (set == null) {
             throw new NullPointerException();
@@ -2362,20 +2462,27 @@ public class Collections {
         return new UnmodifiableSortedSet<E>(set);
     }
 
-    /**
-     * Returns the number of elements in the {@code Collection} that match the
-     * {@code Object} passed. If the {@code Object} is {@code null}, then the
-     * number of {@code null} elements is returned.
-     * 
-     * @param c
-     *            the {@code Collection} to search.
-     * @param o
-     *            the {@code Object} to search for.
-     * @return the number of matching elements.
-     * @throws NullPointerException
-     *             if the {@code Collection} parameter is {@code null}.
-     * @since 1.5
-     */
+    /// Returns the number of elements in the `Collection` that match the
+    /// `Object` passed. If the `Object` is `null`, then the
+    /// number of `null` elements is returned.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the `Collection` to search.
+    ///
+    /// - `o`: the `Object` to search for.
+    ///
+    /// #### Returns
+    ///
+    /// the number of matching elements.
+    ///
+    /// #### Throws
+    ///
+    /// - `NullPointerException`: if the `Collection` parameter is `null`.
+    ///
+    /// #### Since
+    ///
+    /// 1.5
     public static int frequency(Collection<?> c, Object o) {
         if (c == null) {
             throw new NullPointerException();
@@ -2394,78 +2501,104 @@ public class Collections {
         return result;
     }
 
-    /**
-     * Returns a type-safe empty, immutable {@link List}.
-     * 
-     * @return an empty {@link List}.
-     * @since 1.5
-     * @see #EMPTY_LIST
-     */
+    /// Returns a type-safe empty, immutable `List`.
+    ///
+    /// #### Returns
+    ///
+    /// an empty `List`.
+    ///
+    /// #### Since
+    ///
+    /// 1.5
+    ///
+    /// #### See also
+    ///
+    /// - #EMPTY_LIST
     @SuppressWarnings("unchecked")
     public static final <T> List<T> emptyList() {
         return EMPTY_LIST;
     }
 
-    /**
-     * Returns a type-safe empty, immutable {@link Set}.
-     * 
-     * @return an empty {@link Set}.
-     * @since 1.5
-     * @see #EMPTY_SET
-     */
+    /// Returns a type-safe empty, immutable `Set`.
+    ///
+    /// #### Returns
+    ///
+    /// an empty `Set`.
+    ///
+    /// #### Since
+    ///
+    /// 1.5
+    ///
+    /// #### See also
+    ///
+    /// - #EMPTY_SET
     @SuppressWarnings("unchecked")
     public static final <T> Set<T> emptySet() {
         return EMPTY_SET;
     }
 
-    /**
-     * Returns a type-safe empty, immutable {@link Map}.
-     * 
-     * @return an empty {@link Map}.
-     * @since 1.5
-     * @see #EMPTY_MAP
-     */
+    /// Returns a type-safe empty, immutable `Map`.
+    ///
+    /// #### Returns
+    ///
+    /// an empty `Map`.
+    ///
+    /// #### Since
+    ///
+    /// 1.5
+    ///
+    /// #### See also
+    ///
+    /// - #EMPTY_MAP
     @SuppressWarnings("unchecked")
     public static final <K, V> Map<K, V> emptyMap() {
         return EMPTY_MAP;
     }
 
-    /**
-     * Returns a dynamically typesafe view of the specified collection. Trying
-     * to insert an element of the wrong type into this collection throws a
-     * {@code ClassCastException}. At creation time the types in {@code c} are
-     * not checked for correct type.
-     * 
-     * @param c
-     *            the collection to be wrapped in a typesafe collection.
-     * @param type
-     *            the type of the elements permitted to insert.
-     * @return a typesafe collection.
-     */
+    /// Returns a dynamically typesafe view of the specified collection. Trying
+    /// to insert an element of the wrong type into this collection throws a
+    /// `ClassCastException`. At creation time the types in `c` are
+    /// not checked for correct type.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the collection to be wrapped in a typesafe collection.
+    ///
+    /// - `type`: the type of the elements permitted to insert.
+    ///
+    /// #### Returns
+    ///
+    /// a typesafe collection.
     public static <E> Collection<E> checkedCollection(Collection<E> c,
             Class<E> type) {
         return new CheckedCollection<E>(c, type);
     }
 
 
-    /**
-     * Adds all the specified elements to the specified collection.
-     * 
-     * @param c
-     *            the collection the elements are to be inserted into.
-     * @param a
-     *            the elements to insert.
-     * @return true if the collection changed during insertion.
-     * @throws UnsupportedOperationException
-     *             when the method is not supported.
-     * @throws NullPointerException
-     *             when {@code c} or {@code a} is {@code null}, or {@code a}
-     *             contains one or more {@code null} elements and {@code c}
-     *             doesn't support {@code null} elements.
-     * @throws IllegalArgumentException
-     *             if at least one of the elements can't be inserted into the
-     *             collection.
-     */
+    /// Adds all the specified elements to the specified collection.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the collection the elements are to be inserted into.
+    ///
+    /// - `a`: the elements to insert.
+    ///
+    /// #### Returns
+    ///
+    /// true if the collection changed during insertion.
+    ///
+    /// #### Throws
+    ///
+    /// - `UnsupportedOperationException`: when the method is not supported.
+    ///
+    /// - `NullPointerException`: @throws NullPointerException
+    /// when `c` or `a` is `null`, or `a`
+    /// contains one or more `null` elements and `c`
+    /// doesn't support `null` elements.
+    ///
+    /// - `IllegalArgumentException`: @throws IllegalArgumentException
+    /// if at least one of the elements can't be inserted into the
+    /// collection.
     public static <T> boolean addAll(Collection<? super T> c, T... a) {
         boolean modified = false;
         for (int i = 0; i < a.length; i++) {
@@ -2474,18 +2607,22 @@ public class Collections {
         return modified;
     }
 
-    /**
-     * Returns whether the specified collections have no elements in common.
-     * 
-     * @param c1
-     *            the first collection.
-     * @param c2
-     *            the second collection.
-     * @return {@code true} if the collections have no elements in common,
-     *         {@code false} otherwise.
-     * @throws NullPointerException
-     *             if one of the collections is {@code null}.
-     */
+    /// Returns whether the specified collections have no elements in common.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c1`: the first collection.
+    ///
+    /// - `c2`: the second collection.
+    ///
+    /// #### Returns
+    ///
+    /// @return `true` if the collections have no elements in common,
+    /// `false` otherwise.
+    ///
+    /// #### Throws
+    ///
+    /// - `NullPointerException`: if one of the collections is `null`.
     public static boolean disjoint(Collection<?> c1, Collection<?> c2) {
         if ((c1 instanceof Set) && !(c2 instanceof Set)
                 || (c2.size()) > c1.size()) {
@@ -2502,16 +2639,20 @@ public class Collections {
         return true;
     }
 
-    /**
-     * Checks if specified object is instance of specified class. Used for a
-     * dynamically typesafe view of the collections.
-     * 
-     * @param obj -
-     *            object is to be checked
-     * @param type -
-     *            class of object that should be
-     * @return specified object
-     */
+    /// Checks if specified object is instance of specified class. Used for a
+    /// dynamically typesafe view of the collections.
+    ///
+    /// #### Parameters
+    ///
+    /// - `obj`: @param obj -
+    /// object is to be checked
+    ///
+    /// - `type`: @param type -
+    /// class of object that should be
+    ///
+    /// #### Returns
+    ///
+    /// specified object
     static <E> E checkType(E obj, Class<? extends E> type) {
         if (obj != null && !type.isInstance(obj)) {
             // luni.05=Attempt to insert {0} element into collection with
@@ -2521,19 +2662,27 @@ public class Collections {
         return obj;
     }
     
-    /**
-     * Answers a set backed by a map. And the map must be empty when this method
-     * is called.
-     * 
-     * @param <E>
-     *            type of elements in set
-     * @param map
-     *            the backing map
-     * @return the set from the map
-     * @throws IllegalArgumentException
-     *             if the map is not empty
-     * @since 1.6
-     */
+    /// Answers a set backed by a map. And the map must be empty when this method
+    /// is called.
+    ///
+    /// @param
+    /// type of elements in set
+    ///
+    /// #### Parameters
+    ///
+    /// - `map`: the backing map
+    ///
+    /// #### Returns
+    ///
+    /// the set from the map
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if the map is not empty
+    ///
+    /// #### Since
+    ///
+    /// 1.6
     public static <E> Set<E> newSetFromMap(Map<E, Boolean> map) {
         if (map.isEmpty()) {
             return new SetFromMap<E>(map);
@@ -2541,17 +2690,23 @@ public class Collections {
         throw new IllegalArgumentException();
     }
 
-    /**
-     * Answers a LIFO Queue as a view of a Deque. Methods in the returned Queue
-     * need to be re-written to implement the LIFO feature.
-     * 
-     * @param <T>
-     *            type of elements
-     * @param deque
-     *            the Deque
-     * @return the LIFO Queue
-     * @since 1.6
-     */
+    /// Answers a LIFO Queue as a view of a Deque. Methods in the returned Queue
+    /// need to be re-written to implement the LIFO feature.
+    ///
+    /// @param
+    /// type of elements
+    ///
+    /// #### Parameters
+    ///
+    /// - `deque`: the Deque
+    ///
+    /// #### Returns
+    ///
+    /// the LIFO Queue
+    ///
+    /// #### Since
+    ///
+    /// 1.6
     public static <T> Queue<T> asLifoQueue(Deque<T> deque) {
         return new AsLIFOQueue<T>(deque);
     }
@@ -2739,9 +2894,7 @@ public class Collections {
         }
     }
     
-    /**
-     * Class represents a dynamically typesafe view of the specified collection.
-     */
+    /// Class represents a dynamically typesafe view of the specified collection.
     private static class CheckedCollection<E> implements Collection<E> {
 
         private static final long serialVersionUID = 1578914078182001775L;
@@ -2750,13 +2903,13 @@ public class Collections {
 
         Class<E> type;
 
-        /**
-         * Constructs a dynamically typesafe view of the specified collection.
-         * 
-         * @param c -
-         *            the collection for which an unmodifiable view is to be
-         *            constructed.
-         */
+        /// Constructs a dynamically typesafe view of the specified collection.
+        ///
+        /// #### Parameters
+        ///
+        /// - `c`: @param c -
+        /// the collection for which an unmodifiable view is to be
+        /// constructed.
         public CheckedCollection(Collection<E> c, Class<E> type) {
             if (c == null || type == null) {
                 throw new NullPointerException();
@@ -2765,30 +2918,30 @@ public class Collections {
             this.type = type;
         }
 
-        /**
-         * @see java.util.Collection#size()
-         */
+        /// #### See also
+        ///
+        /// - java.util.Collection#size()
         public int size() {
             return c.size();
         }
 
-        /**
-         * @see java.util.Collection#isEmpty()
-         */
+        /// #### See also
+        ///
+        /// - java.util.Collection#isEmpty()
         public boolean isEmpty() {
             return c.isEmpty();
         }
 
-        /**
-         * @see java.util.Collection#contains(Object)
-         */
+        /// #### See also
+        ///
+        /// - java.util.Collection#contains(Object)
         public boolean contains(Object obj) {
             return c.contains(obj);
         }
 
-        /**
-         * @see java.util.Collection#iterator()
-         */
+        /// #### See also
+        ///
+        /// - java.util.Collection#iterator()
         public Iterator<E> iterator() {
             Iterator<E> i = c.iterator();
             if (i instanceof ListIterator) {
@@ -2797,44 +2950,44 @@ public class Collections {
             return i;
         }
 
-        /**
-         * @see java.util.Collection#toArray()
-         */
+        /// #### See also
+        ///
+        /// - java.util.Collection#toArray()
         public Object[] toArray() {
             return c.toArray();
         }
 
-        /**
-         * @see java.util.Collection#toArray(Object[])
-         */
+        /// #### See also
+        ///
+        /// - java.util.Collection#toArray(Object[])
         public <T> T[] toArray(T[] arr) {
             return c.toArray(arr);
         }
 
-        /**
-         * @see java.util.Collection#add(Object)
-         */
+        /// #### See also
+        ///
+        /// - java.util.Collection#add(Object)
         public boolean add(E obj) {
             return c.add(checkType(obj, type));
         }
 
-        /**
-         * @see java.util.Collection#remove(Object)
-         */
+        /// #### See also
+        ///
+        /// - java.util.Collection#remove(Object)
         public boolean remove(Object obj) {
             return c.remove(obj);
         }
 
-        /**
-         * @see java.util.Collection#containsAll(Collection)
-         */
+        /// #### See also
+        ///
+        /// - java.util.Collection#containsAll(Collection)
         public boolean containsAll(Collection<?> c1) {
             return c.containsAll(c1);
         }
 
-        /**
-         * @see java.util.Collection#addAll(Collection)
-         */
+        /// #### See also
+        ///
+        /// - java.util.Collection#addAll(Collection)
         @SuppressWarnings("unchecked")
         public boolean addAll(Collection<? extends E> c1) {
             Object[] array = c1.toArray();
@@ -2844,117 +2997,115 @@ public class Collections {
             return c.addAll((List<E>) Arrays.asList(array));
         }
 
-        /**
-         * @see java.util.Collection#removeAll(Collection)
-         */
+        /// #### See also
+        ///
+        /// - java.util.Collection#removeAll(Collection)
         public boolean removeAll(Collection<?> c1) {
             return c.removeAll(c1);
         }
 
-        /**
-         * @see java.util.Collection#retainAll(Collection)
-         */
+        /// #### See also
+        ///
+        /// - java.util.Collection#retainAll(Collection)
         public boolean retainAll(Collection<?> c1) {
             return c.retainAll(c1);
         }
 
-        /**
-         * @see java.util.Collection#clear()
-         */
+        /// #### See also
+        ///
+        /// - java.util.Collection#clear()
         public void clear() {
             c.clear();
         }
 
-        /**
-         * @see java.lang.Object#toString()
-         */
+        /// #### See also
+        ///
+        /// - java.lang.Object#toString()
         @Override
         public String toString() {
             return c.toString();
         }
     }
 
-    /**
-     * Class represents a dynamically typesafe view of the specified
-     * ListIterator.
-     */
+    /// Class represents a dynamically typesafe view of the specified
+    /// ListIterator.
     private static class CheckedListIterator<E> implements ListIterator<E> {
 
         private ListIterator<E> i;
 
         private Class<E> type;
 
-        /**
-         * Constructs a dynamically typesafe view of the specified ListIterator.
-         * 
-         * @param i -
-         *            the listIterator for which a dynamically typesafe view to
-         *            be constructed.
-         */
+        /// Constructs a dynamically typesafe view of the specified ListIterator.
+        ///
+        /// #### Parameters
+        ///
+        /// - `i`: @param i -
+        /// the listIterator for which a dynamically typesafe view to
+        /// be constructed.
         public CheckedListIterator(ListIterator<E> i, Class<E> type) {
             this.i = i;
             this.type = type;
         }
 
-        /**
-         * @see java.util.Iterator#hasNext()
-         */
+        /// #### See also
+        ///
+        /// - java.util.Iterator#hasNext()
         public boolean hasNext() {
             return i.hasNext();
         }
 
-        /**
-         * @see java.util.Iterator#next()
-         */
+        /// #### See also
+        ///
+        /// - java.util.Iterator#next()
         public E next() {
             return i.next();
         }
 
-        /**
-         * @see java.util.Iterator#remove()
-         */
+        /// #### See also
+        ///
+        /// - java.util.Iterator#remove()
         public void remove() {
             i.remove();
         }
 
-        /**
-         * @see java.util.ListIterator#hasPrevious()
-         */
+        /// #### See also
+        ///
+        /// - java.util.ListIterator#hasPrevious()
         public boolean hasPrevious() {
             return i.hasPrevious();
         }
 
-        /**
-         * @see java.util.ListIterator#previous()
-         */
+        /// #### See also
+        ///
+        /// - java.util.ListIterator#previous()
         public E previous() {
             return i.previous();
         }
 
-        /**
-         * @see java.util.ListIterator#nextIndex()
-         */
+        /// #### See also
+        ///
+        /// - java.util.ListIterator#nextIndex()
         public int nextIndex() {
             return i.nextIndex();
         }
 
-        /**
-         * @see java.util.ListIterator#previousIndex()
-         */
+        /// #### See also
+        ///
+        /// - java.util.ListIterator#previousIndex()
         public int previousIndex() {
             return i.previousIndex();
         }
 
-        /**
-         * @see java.util.ListIterator#set(Object)
-         */
+        /// #### See also
+        ///
+        /// - java.util.ListIterator#set(Object)
         public void set(E obj) {
             i.set(checkType(obj, type));
         }
 
-        /**
-         * @see java.util.ListIterator#add(Object)
-         */
+        /// #### See also
+        ///
+        /// - java.util.ListIterator#add(Object)
         public void add(E obj) {
             i.add(checkType(obj, type));
         }

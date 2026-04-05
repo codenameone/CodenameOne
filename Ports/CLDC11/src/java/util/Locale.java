@@ -1,9 +1,6 @@
 package java.util;
 
-/**
- *
- * @author Shai Almog
- */
+/// @author Shai Almog
 public class Locale {
     private static Locale defaultLocale;
     private String language;

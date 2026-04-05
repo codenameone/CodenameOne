@@ -15,18 +15,16 @@
  */
 package java.util;
 
-/**
- * A PriorityQueue holds elements on a priority heap, which orders the elements
- * according to their natural order or according to the comparator specified at
- * construction time. If the queue uses natural ordering, only elements that are
- * comparable are permitted to be inserted into the queue.
- * <p>
- * The least element of the specified ordering is stored at the head of the
- * queue and the greatest element is stored at the tail of the queue.
- * <p>
- * A PriorityQueue is not synchronized. If multiple threads will have to access
- * it concurrently, use the {@link java.util.concurrent.PriorityBlockingQueue}.
- */
+/// A PriorityQueue holds elements on a priority heap, which orders the elements
+/// according to their natural order or according to the comparator specified at
+/// construction time. If the queue uses natural ordering, only elements that are
+/// comparable are permitted to be inserted into the queue.
+///
+/// The least element of the specified ordering is stored at the head of the
+/// queue and the greatest element is stored at the tail of the queue.
+///
+/// A PriorityQueue is not synchronized. If multiple threads will have to access
+/// it concurrently, use the `java.util.concurrent.PriorityBlockingQueue`.
 public class PriorityQueue<E> extends AbstractQueue<E> {
 
     private static final int DEFAULT_CAPACITY = 11;
@@ -41,38 +39,39 @@ public class PriorityQueue<E> extends AbstractQueue<E> {
 
     private transient E[] elements;
 
-    /**
-     * Constructs a priority queue with an initial capacity of 11 and natural
-     * ordering.
-     */
+    /// Constructs a priority queue with an initial capacity of 11 and natural
+    /// ordering.
     public PriorityQueue() {
         this(DEFAULT_CAPACITY);
     }
 
-    /**
-     * Constructs a priority queue with the specified capacity and natural
-     * ordering.
-     * 
-     * @param initialCapacity
-     *            the specified capacity.
-     * @throws IllegalArgumentException
-     *             if the initialCapacity is less than 1.
-     */
+    /// Constructs a priority queue with the specified capacity and natural
+    /// ordering.
+    ///
+    /// #### Parameters
+    ///
+    /// - `initialCapacity`: the specified capacity.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if the initialCapacity is less than 1.
     public PriorityQueue(int initialCapacity) {
         this(initialCapacity, null);
     }
 
-    /**
-     * Constructs a priority queue with the specified capacity and comparator.
-     * 
-     * @param initialCapacity
-     *            the specified capacity.
-     * @param comparator
-     *            the specified comparator. If it is null, the natural ordering
-     *            will be used.
-     * @throws IllegalArgumentException
-     *             if the initialCapacity is less than 1.
-     */
+    /// Constructs a priority queue with the specified capacity and comparator.
+    ///
+    /// #### Parameters
+    ///
+    /// - `initialCapacity`: the specified capacity.
+    ///
+    /// - `comparator`: @param comparator
+    /// the specified comparator. If it is null, the natural ordering
+    /// will be used.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if the initialCapacity is less than 1.
     public PriorityQueue(int initialCapacity, Comparator<? super E> comparator) {
         if (initialCapacity < 1) {
             throw new IllegalArgumentException();
@@ -81,20 +80,22 @@ public class PriorityQueue<E> extends AbstractQueue<E> {
         this.comparator = comparator;
     }
 
-    /**
-     * Constructs a priority queue that contains the elements of a collection.
-     * The constructed priority queue has the initial capacity of 110% of the
-     * size of the collection. The queue uses natural ordering to order its
-     * elements.
-     * 
-     * @param c
-     *            the collection whose elements will be added to the priority
-     *            queue to be constructed.
-     * @throws ClassCastException
-     *             if any of the elements in the collection are not comparable.
-     * @throws NullPointerException
-     *             if any of the elements in the collection are null.
-     */
+    /// Constructs a priority queue that contains the elements of a collection.
+    /// The constructed priority queue has the initial capacity of 110% of the
+    /// size of the collection. The queue uses natural ordering to order its
+    /// elements.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: @param c
+    /// the collection whose elements will be added to the priority
+    /// queue to be constructed.
+    ///
+    /// #### Throws
+    ///
+    /// - `ClassCastException`: if any of the elements in the collection are not comparable.
+    ///
+    /// - `NullPointerException`: if any of the elements in the collection are null.
     public PriorityQueue(Collection<? extends E> c) {
         if (c instanceof PriorityQueue) {
             getFromPriorityQueue((PriorityQueue<? extends E>) c);
@@ -106,77 +107,80 @@ public class PriorityQueue<E> extends AbstractQueue<E> {
         }
     }
 
-    /**
-     * Constructs a priority queue that contains the elements of another
-     * priority queue. The constructed priority queue has the initial capacity
-     * of 110% of the specified one. Both priority queues have the same
-     * comparator.
-     * 
-     * @param c
-     *            the priority queue whose elements will be added to the
-     *            priority queue to be constructed.
-     */
+    /// Constructs a priority queue that contains the elements of another
+    /// priority queue. The constructed priority queue has the initial capacity
+    /// of 110% of the specified one. Both priority queues have the same
+    /// comparator.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: @param c
+    /// the priority queue whose elements will be added to the
+    /// priority queue to be constructed.
     public PriorityQueue(PriorityQueue<? extends E> c) {
         getFromPriorityQueue(c);
     }
 
-    /**
-     * Constructs a priority queue that contains the elements of a sorted set.
-     * The constructed priority queue has the initial capacity of 110% of the
-     * size of the sorted set. The priority queue will have the same comparator
-     * as the sorted set.
-     * 
-     * @param c
-     *            the sorted set whose elements will be added to the priority
-     *            queue to be constructed.
-     */
+    /// Constructs a priority queue that contains the elements of a sorted set.
+    /// The constructed priority queue has the initial capacity of 110% of the
+    /// size of the sorted set. The priority queue will have the same comparator
+    /// as the sorted set.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: @param c
+    /// the sorted set whose elements will be added to the priority
+    /// queue to be constructed.
     public PriorityQueue(SortedSet<? extends E> c) {
         getFromSortedSet(c);
     }
 
-    /**
-     * Gets the iterator of the priority queue, which will not return elements
-     * in any specified ordering.
-     * 
-     * @return the iterator of the priority queue.
-     */
+    /// Gets the iterator of the priority queue, which will not return elements
+    /// in any specified ordering.
+    ///
+    /// #### Returns
+    ///
+    /// the iterator of the priority queue.
     @Override
     public Iterator<E> iterator() {
         return new PriorityIterator();
     }
 
-    /**
-     * Gets the size of the priority queue. If the size of the queue is greater
-     * than the Integer.MAX, then it returns Integer.MAX.
-     * 
-     * @return the size of the priority queue.
-     */
+    /// Gets the size of the priority queue. If the size of the queue is greater
+    /// than the Integer.MAX, then it returns Integer.MAX.
+    ///
+    /// #### Returns
+    ///
+    /// the size of the priority queue.
     @Override
     public int size() {
         return size;
     }
 
-    /**
-     * Removes all the elements of the priority queue.
-     */
+    /// Removes all the elements of the priority queue.
     @Override
     public void clear() {
         Arrays.fill(elements, null);
         size = 0;
     }
 
-    /**
-     * Inserts the element to the priority queue.
-     * 
-     * @param o
-     *            the element to add to the priority queue.
-     * @return always true
-     * @throws ClassCastException
-     *             if the element cannot be compared with the elements in the
-     *             priority queue using the ordering of the priority queue.
-     * @throws NullPointerException
-     *             if {@code o} is {@code null}.
-     */
+    /// Inserts the element to the priority queue.
+    ///
+    /// #### Parameters
+    ///
+    /// - `o`: the element to add to the priority queue.
+    ///
+    /// #### Returns
+    ///
+    /// always true
+    ///
+    /// #### Throws
+    ///
+    /// - `ClassCastException`: @throws ClassCastException
+    /// if the element cannot be compared with the elements in the
+    /// priority queue using the ordering of the priority queue.
+    ///
+    /// - `NullPointerException`: if `o` is `null`.
     public boolean offer(E o) {
         if (null == o) {
             throw new NullPointerException();
@@ -187,11 +191,11 @@ public class PriorityQueue<E> extends AbstractQueue<E> {
         return true;
     }
 
-    /**
-     * Gets and removes the head of the queue.
-     * 
-     * @return the head of the queue or null if the queue is empty.
-     */
+    /// Gets and removes the head of the queue.
+    ///
+    /// #### Returns
+    ///
+    /// the head of the queue or null if the queue is empty.
     public E poll() {
         if (isEmpty()) {
             return null;
@@ -201,11 +205,11 @@ public class PriorityQueue<E> extends AbstractQueue<E> {
         return result;
     }
 
-    /**
-     * Gets but does not remove the head of the queue.
-     * 
-     * @return the head of the queue or null if the queue is empty.
-     */
+    /// Gets but does not remove the head of the queue.
+    ///
+    /// #### Returns
+    ///
+    /// the head of the queue or null if the queue is empty.
     public E peek() {
         if (isEmpty()) {
             return null;
@@ -213,24 +217,26 @@ public class PriorityQueue<E> extends AbstractQueue<E> {
         return elements[0];
     }
 
-    /**
-     * Gets the comparator of the priority queue.
-     * 
-     * @return the comparator of the priority queue or null if the natural
-     *         ordering is used.
-     */
+    /// Gets the comparator of the priority queue.
+    ///
+    /// #### Returns
+    ///
+    /// @return the comparator of the priority queue or null if the natural
+    /// ordering is used.
     public Comparator<? super E> comparator() {
         return comparator;
     }
 
-    /**
-     * Removes the specified object from the priority queue.
-     * 
-     * @param o
-     *            the object to be removed.
-     * @return true if the object was in the priority queue, false if the object
-     *         was not in the priority queue.
-     */
+    /// Removes the specified object from the priority queue.
+    ///
+    /// #### Parameters
+    ///
+    /// - `o`: the object to be removed.
+    ///
+    /// #### Returns
+    ///
+    /// @return true if the object was in the priority queue, false if the object
+    /// was not in the priority queue.
     @Override
     public boolean remove(Object o) {
         if (o == null || size == 0) {
@@ -245,28 +251,33 @@ public class PriorityQueue<E> extends AbstractQueue<E> {
         return false;
     }
 
-    /**
-     * Adds the specified object to the priority queue.
-     * 
-     * @param o
-     *            the object to be added.
-     * @return always true.
-     * @throws ClassCastException
-     *             if the element cannot be compared with the elements in the
-     *             priority queue using the ordering of the priority queue.
-     * @throws NullPointerException
-     *             if {@code o} is {@code null}.
-     */
+    /// Adds the specified object to the priority queue.
+    ///
+    /// #### Parameters
+    ///
+    /// - `o`: the object to be added.
+    ///
+    /// #### Returns
+    ///
+    /// always true.
+    ///
+    /// #### Throws
+    ///
+    /// - `ClassCastException`: @throws ClassCastException
+    /// if the element cannot be compared with the elements in the
+    /// priority queue using the ordering of the priority queue.
+    ///
+    /// - `NullPointerException`: if `o` is `null`.
     @Override
     public boolean add(E o) {
         return offer(o);
     }
     
-    /**
-     * Answers if there is an element in this queue equals to the object.
-     * 
-     * @see java.util.AbstractCollection#contains(java.lang.Object)
-     */
+    /// Answers if there is an element in this queue equals to the object.
+    ///
+    /// #### See also
+    ///
+    /// - java.util.AbstractCollection#contains(java.lang.Object)
     @Override
     public boolean contains(Object object) {
         if (object == null) {
@@ -280,40 +291,53 @@ public class PriorityQueue<E> extends AbstractQueue<E> {
         return false;
     }
 
-    /**
-     * Returns all the elements in an array. The result is a copy of all the
-     * elements.
-     * 
-     * @return the Array of all the elements
-     * @see java.util.AbstractCollection#toArray()
-     */
+    /// Returns all the elements in an array. The result is a copy of all the
+    /// elements.
+    ///
+    /// #### Returns
+    ///
+    /// the Array of all the elements
+    ///
+    /// #### See also
+    ///
+    /// - java.util.AbstractCollection#toArray()
     @Override
     public Object[] toArray() {
         return newArray(new Object[size()]);
     }
 
-    /**
-     * Returns all the elements in an array, and the type of the result array is
-     * the type of the argument array. If the argument array is big enough, the
-     * elements from the queue will be stored in it(element immediately
-     * following the end of the queue is set to null, if any); otherwise, it
-     * will return a new array with the size of the argument array and size of
-     * the queue.
-     * 
-     * @param <T>
-     *            the type of elements in the array
-     * @param array
-     *            the array stores all the elements from the queue, if it has
-     *            enough space; otherwise, a new array of the same type and the
-     *            size of the queue will be used
-     * @return the Array of all the elements
-     * @throws ArrayStoreException
-     *             if the type of the argument array is not compatible with
-     *             every element in the queue
-     * @throws NullPointerException
-     *             if the argument array is null
-     * @see java.util.AbstractCollection#toArray(T[])
-     */
+    /// Returns all the elements in an array, and the type of the result array is
+    /// the type of the argument array. If the argument array is big enough, the
+    /// elements from the queue will be stored in it(element immediately
+    /// following the end of the queue is set to null, if any); otherwise, it
+    /// will return a new array with the size of the argument array and size of
+    /// the queue.
+    ///
+    /// @param
+    /// the type of elements in the array
+    ///
+    /// #### Parameters
+    ///
+    /// - `array`: @param array
+    /// the array stores all the elements from the queue, if it has
+    /// enough space; otherwise, a new array of the same type and the
+    /// size of the queue will be used
+    ///
+    /// #### Returns
+    ///
+    /// the Array of all the elements
+    ///
+    /// #### Throws
+    ///
+    /// - `ArrayStoreException`: @throws ArrayStoreException
+    /// if the type of the argument array is not compatible with
+    /// every element in the queue
+    ///
+    /// - `NullPointerException`: if the argument array is null
+    ///
+    /// #### See also
+    ///
+    /// - java.util.AbstractCollection#toArray(T[])
     @Override
     public <T> T[] toArray(T[] array) {
         return newArray(array);

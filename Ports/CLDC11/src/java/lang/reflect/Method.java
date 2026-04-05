@@ -5,10 +5,7 @@
  */
 package java.lang.reflect;
 
-/**
- *
- * @author shannah
- */
+/// @author shannah
 public class Method {
     public String getName() {
         return null;

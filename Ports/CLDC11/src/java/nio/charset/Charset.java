@@ -22,10 +22,8 @@
  */
 package java.nio.charset;
 
-/**
- * Added this for Kotlin
- * @author shannah
- */
+/// Added this for Kotlin
+/// @author shannah
 public class Charset implements Comparable<Charset> {
 
     private String name;

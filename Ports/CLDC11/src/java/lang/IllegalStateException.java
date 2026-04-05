@@ -23,24 +23,17 @@
  */
 package java.lang;
 
-/**
- *
- * @author user2
- */
+/// @author user2
 public class IllegalStateException extends RuntimeException {
     public IllegalStateException() {}
     public IllegalStateException(String s) {}
 
-    /**
-     * Constructs an IllegalStateException with the specified detail message and cause.
-     * s - the detail message.
-     * cause - the cause.
-     */
+    /// Constructs an IllegalStateException with the specified detail message and cause.
+    /// s - the detail message.
+    /// cause - the cause.
     public IllegalStateException(String s, Throwable cause) {}
 
-    /**
-     * Constructs an IllegalStateException with the specified cause.
-     * cause - the cause.
-     */
+    /// Constructs an IllegalStateException with the specified cause.
+    /// cause - the cause.
     public IllegalStateException(Throwable cause) {}
 }

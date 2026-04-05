@@ -18,70 +18,83 @@ package java.lang;
 
 import java.io.IOException;
 
-/**
- * Declares methods to append characters or character sequences. Any class that
- * implements this interface can receive data formatted by a
- * <code>java.util.Formatter</code>. The appended character or character sequence
- * should be valid according to the rules described in
- * {@link Character Unicode Character Representation}.
- * <p>
- * {@code Appendable} itself does not guarantee thread safety. This
- * responsibility is up to the implementing class.
- * <p>
- * Implementing classes can choose different exception handling mechanism. They
- * can choose to throw exceptions other than {@code IOException} or they do not
- * throw any exceptions at all and use error codes instead.
- */
+/// Declares methods to append characters or character sequences. Any class that
+/// implements this interface can receive data formatted by a
+/// `java.util.Formatter`. The appended character or character sequence
+/// should be valid according to the rules described in
+/// `Unicode Character Representation`.
+///
+/// `Appendable` itself does not guarantee thread safety. This
+/// responsibility is up to the implementing class.
+///
+/// Implementing classes can choose different exception handling mechanism. They
+/// can choose to throw exceptions other than `IOException` or they do not
+/// throw any exceptions at all and use error codes instead.
 public interface Appendable {
 
-    /**
-     * Appends the specified character.
-     * 
-     * @param c
-     *            the character to append.
-     * @return this {@code Appendable}.
-     * @throws IOException
-     *             if an I/O error occurs.
-     */
+    /// Appends the specified character.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the character to append.
+    ///
+    /// #### Returns
+    ///
+    /// this `Appendable`.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if an I/O error occurs.
     Appendable append(char c) throws IOException;
 
-    /**
-     * Appends the character sequence {@code csq}. Implementation classes may
-     * not append the whole sequence, for example if the target is a buffer with
-     * limited size.
-     * <p>
-     * If {@code csq} is {@code null}, the characters "null" are appended.
-     *
-     * @param csq
-     *            the character sequence to append.
-     * @return this {@code Appendable}.
-     * @throws IOException
-     *             if an I/O error occurs.
-     */
+    /// Appends the character sequence `csq`. Implementation classes may
+    /// not append the whole sequence, for example if the target is a buffer with
+    /// limited size.
+    ///
+    /// If `csq` is `null`, the characters "null" are appended.
+    ///
+    /// #### Parameters
+    ///
+    /// - `csq`: the character sequence to append.
+    ///
+    /// #### Returns
+    ///
+    /// this `Appendable`.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if an I/O error occurs.
     Appendable append(CharSequence csq) throws IOException;
 
-    /**
-     * Appends a subsequence of {@code csq}.
-     * <p>
-     * If {@code csq} is not {@code null} then calling this method is equivalent
-     * to calling {@code append(csq.subSequence(start, end))}.
-     * <p>
-     * If {@code csq} is {@code null}, the characters "null" are appended.
-     * 
-     * @param csq
-     *            the character sequence to append.
-     * @param start
-     *            the first index of the subsequence of {@code csq} that is
-     *            appended.
-     * @param end
-     *            the last index of the subsequence of {@code csq} that is
-     *            appended.
-     * @return this {@code Appendable}.
-     * @throws IndexOutOfBoundsException
-     *             if {@code start < 0}, {@code end < 0}, {@code start > end}
-     *             or {@code end} is greater than the length of {@code csq}.
-     * @throws IOException
-     *             if an I/O error occurs.
-     */
+    /// Appends a subsequence of `csq`.
+    ///
+    /// If `csq` is not `null` then calling this method is equivalent
+    /// to calling `append(csq.subSequence(start, end))`.
+    ///
+    /// If `csq` is `null`, the characters "null" are appended.
+    ///
+    /// #### Parameters
+    ///
+    /// - `csq`: the character sequence to append.
+    ///
+    /// - `start`: @param start
+    /// the first index of the subsequence of `csq` that is
+    /// appended.
+    ///
+    /// - `end`: @param end
+    /// the last index of the subsequence of `csq` that is
+    /// appended.
+    ///
+    /// #### Returns
+    ///
+    /// this `Appendable`.
+    ///
+    /// #### Throws
+    ///
+    /// - `IndexOutOfBoundsException`: @throws IndexOutOfBoundsException
+    /// if `start  end`
+    /// or `end` is greater than the length of `csq`.
+    ///
+    /// - `IOException`: if an I/O error occurs.
     Appendable append(CharSequence csq, int start, int end) throws IOException;
 }

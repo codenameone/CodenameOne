@@ -22,352 +22,342 @@
  * have any questions.
  */
 package java.lang;
-/**
- * The Character class wraps a value of the primitive type char in an object. An object of type Character contains a single field whose type is char.
- * In addition, this class provides several methods for determining the type of a character and converting characters from uppercase to lowercase and vice versa.
- * Character information is based on the Unicode Standard, version 3.0. However, in order to reduce footprint, by default the character property and case conversion operations in CLDC are available only for the ISO Latin-1 range of characters. Other Unicode character blocks can be supported as necessary.
- * Since: JDK1.0, CLDC 1.0
- */
+/// The Character class wraps a value of the primitive type char in an object. An object of type Character contains a single field whose type is char.
+/// In addition, this class provides several methods for determining the type of a character and converting characters from uppercase to lowercase and vice versa.
+/// Character information is based on the Unicode Standard, version 3.0. However, in order to reduce footprint, by default the character property and case conversion operations in CLDC are available only for the ISO Latin-1 range of characters. Other Unicode character blocks can be supported as necessary.
+/// Since: JDK1.0, CLDC 1.0
 public final class Character{
-    /**
-     * The maximum radix available for conversion to and from Strings.
-     * See Also:Integer.toString(int, int), Integer.valueOf(java.lang.String), Constant Field Values
-     */
+    /// The maximum radix available for conversion to and from Strings.
+    /// See Also:Integer.toString(int, int), Integer.valueOf(java.lang.String), Constant Field Values
     public static final int MAX_RADIX=36;
 
-    /**
-     * The constant value of this field is the largest value of type char.
-     * Since: JDK1.0.2 See Also:Constant Field Values
-     */
+    /// The constant value of this field is the largest value of type char.
+    /// Since: JDK1.0.2 See Also:Constant Field Values
     public static final char MAX_VALUE=(char)65535;
 
-    /**
-     * The minimum radix available for conversion to and from Strings.
-     * See Also:Integer.toString(int, int), Integer.valueOf(java.lang.String), Constant Field Values
-     */
+    /// The minimum radix available for conversion to and from Strings.
+    /// See Also:Integer.toString(int, int), Integer.valueOf(java.lang.String), Constant Field Values
     public static final int MIN_RADIX=2;
 
-    /**
-     * The constant value of this field is the smallest value of type char.
-     * Since: JDK1.0.2 See Also:Constant Field Values
-     */
+    /// The constant value of this field is the smallest value of type char.
+    /// Since: JDK1.0.2 See Also:Constant Field Values
     public static final char MIN_VALUE=(char)0;
     
 
-    /**
-     * Constructs a Character object and initializes it so that it represents the primitive value argument.
-     * value - value for the new Character object.
-     */
+    /// Constructs a Character object and initializes it so that it represents the primitive value argument.
+    /// value - value for the new Character object.
     public Character(char value){
          //TODO codavaj!!
     }
 
-    /**
-     * Returns the value of this Character object.
-     */
+    /// Returns the value of this Character object.
     public char charValue(){
         return ' '; //TODO codavaj!!
     }
 
-    /**
-     * Returns the numeric value of the character ch in the specified radix.
-     */
+    /// Returns the numeric value of the character ch in the specified radix.
     public static int digit(char ch, int radix){
         return 0; //TODO codavaj!!
     }
 
-    /**
-     * Compares this object against the specified object. The result is true if and only if the argument is not null and is a Character object that represents the same char value as this object.
-     */
+    /// Compares this object against the specified object. The result is true if and only if the argument is not null and is a Character object that represents the same char value as this object.
     public boolean equals(java.lang.Object obj){
         return false; //TODO codavaj!!
     }
 
-    /**
-     * Returns a hash code for this Character.
-     */
+    /// Returns a hash code for this Character.
     public int hashCode(){
         return 0; //TODO codavaj!!
     }
 
-    /**
-     * Determines if the specified character is alphabetic.
-     */
+    /// Determines if the specified character is alphabetic.
     static boolean isLetterCompat(char ch){
         return isLowerCase(ch) || isUpperCase(ch);
     }
 
-    /**
-     * Determines if the specified character is numeric.
-     */
+    /// Determines if the specified character is numeric.
     static boolean isDigitCompat(char ch){
         return isDigit(ch);
     }
 
-    /**
-     * Determines if the specified character is alphabetic or numeric.
-     */
+    /// Determines if the specified character is alphabetic or numeric.
     static boolean isLetterOrDigitCompat(char ch){
         return isLetterCompat(ch) || isDigitCompat(ch);
     }
 
-    /**
-     * Determines if the specified character is a digit.
-     */
+    /// Determines if the specified character is a digit.
     public static boolean isDigit(char ch){
         return false; //TODO codavaj!!
     }
 
-    /**
-     * Determines if the specified character is a lowercase character.
-     * Note that by default CLDC only supports the ISO Latin-1 range of characters.
-     * Of the ISO Latin-1 characters (character codes 0x0000 through 0x00FF), the following are lowercase:
-     * a b c d e f g h i j k l m n o p q r s t u v w x y z u00DF u00E0 u00E1 u00E2 u00E3 u00E4 u00E5 u00E6 u00E7 u00E8 u00E9 u00EA u00EB u00EC u00ED u00EE u00EF u00F0 u00F1 u00F2 u00F3 u00F4 u00F5 u00F6 u00F8 u00F9 u00FA u00FB u00FC u00FD u00FE u00FF
-     */
+    /// Determines if the specified character is a lowercase character.
+    /// Note that by default CLDC only supports the ISO Latin-1 range of characters.
+    /// Of the ISO Latin-1 characters (character codes 0x0000 through 0x00FF), the following are lowercase:
+    /// a b c d e f g h i j k l m n o p q r s t u v w x y z u00DF u00E0 u00E1 u00E2 u00E3 u00E4 u00E5 u00E6 u00E7 u00E8 u00E9 u00EA u00EB u00EC u00ED u00EE u00EF u00F0 u00F1 u00F2 u00F3 u00F4 u00F5 u00F6 u00F8 u00F9 u00FA u00FB u00FC u00FD u00FE u00FF
     public static boolean isLowerCase(char ch){
         return false; //TODO codavaj!!
     }
 
-    /**
-     * Determines if the specified character is an uppercase character.
-     * Note that by default CLDC only supports the ISO Latin-1 range of characters.
-     * Of the ISO Latin-1 characters (character codes 0x0000 through 0x00FF), the following are uppercase:
-     * A B C D E F G H I J K L M N O P Q R S T U V W X Y Z u00C0 u00C1 u00C2 u00C3 u00C4 u00C5 u00C6 u00C7 u00C8 u00C9 u00CA u00CB u00CC u00CD u00CE u00CF u00D0 u00D1 u00D2 u00D3 u00D4 u00D5 u00D6 u00D8 u00D9 u00DA u00DB u00DC u00DD u00DE
-     */
+    /// Determines if the specified character is an uppercase character.
+    /// Note that by default CLDC only supports the ISO Latin-1 range of characters.
+    /// Of the ISO Latin-1 characters (character codes 0x0000 through 0x00FF), the following are uppercase:
+    /// A B C D E F G H I J K L M N O P Q R S T U V W X Y Z u00C0 u00C1 u00C2 u00C3 u00C4 u00C5 u00C6 u00C7 u00C8 u00C9 u00CA u00CB u00CC u00CD u00CE u00CF u00D0 u00D1 u00D2 u00D3 u00D4 u00D5 u00D6 u00D8 u00D9 u00DA u00DB u00DC u00DD u00DE
     public static boolean isUpperCase(char ch){
         return false; //TODO codavaj!!
     }
 
-    /**
-     * The given character is mapped to its lowercase equivalent; if the character has no lowercase equivalent, the character itself is returned.
-     * Note that by default CLDC only supports the ISO Latin-1 range of characters.
-     */
+    /// The given character is mapped to its lowercase equivalent; if the character has no lowercase equivalent, the character itself is returned.
+    /// Note that by default CLDC only supports the ISO Latin-1 range of characters.
     public static char toLowerCase(char ch){
         return ' '; //TODO codavaj!!
     }
 
-    /**
-     * Returns a String object representing this character's value. Converts this Character object to a string. The result is a string whose length is 1. The string's sole component is the primitive char value represented by this object.
-     */
+    /// Returns a String object representing this character's value. Converts this Character object to a string. The result is a string whose length is 1. The string's sole component is the primitive char value represented by this object.
     public java.lang.String toString(){
         return null; //TODO codavaj!!
     }
 
-    /**
-     * Converts the character argument to uppercase; if the character has no uppercase equivalent, the character itself is returned.
-     * Note that by default CLDC only supports the ISO Latin-1 range of characters.
-     */
+    /// Converts the character argument to uppercase; if the character has no uppercase equivalent, the character itself is returned.
+    /// Note that by default CLDC only supports the ISO Latin-1 range of characters.
     public static char toUpperCase(char ch){
         return ' '; //TODO codavaj!!
     }
 
 
-    /**
-     * <p>
-     * Minimum value of a high surrogate or leading surrogate unit in UTF-16
-     * encoding - <code>'\uD800'</code>.
-     * </p>
-     * 
-     * @since 1.5
-     */
+    /// Minimum value of a high surrogate or leading surrogate unit in UTF-16
+    /// encoding - `'\uD800'`.
+    ///
+    /// #### Since
+    ///
+    /// 1.5
     public static final char MIN_HIGH_SURROGATE = '\uD800';
 
-    /**
-     * <p>
-     * Maximum value of a high surrogate or leading surrogate unit in UTF-16
-     * encoding - <code>'\uDBFF'</code>.
-     * </p>
-     * 
-     * @since 1.5
-     */
+    /// Maximum value of a high surrogate or leading surrogate unit in UTF-16
+    /// encoding - `'\uDBFF'`.
+    ///
+    /// #### Since
+    ///
+    /// 1.5
     public static final char MAX_HIGH_SURROGATE = '\uDBFF';
 
-    /**
-     * <p>
-     * Minimum value of a low surrogate or trailing surrogate unit in UTF-16
-     * encoding - <code>'\uDC00'</code>.
-     * </p>
-     * 
-     * @since 1.5
-     */
+    /// Minimum value of a low surrogate or trailing surrogate unit in UTF-16
+    /// encoding - `'\uDC00'`.
+    ///
+    /// #### Since
+    ///
+    /// 1.5
     public static final char MIN_LOW_SURROGATE = '\uDC00';
 
-    /**
-     * Maximum value of a low surrogate or trailing surrogate unit in UTF-16
-     * encoding - <code>'\uDFFF'</code>.
-     * </p>
-     * 
-     * @since 1.5
-     */
+    /// Maximum value of a low surrogate or trailing surrogate unit in UTF-16
+    /// encoding - `'\uDFFF'`.
+    ///
+    /// #### Since
+    ///
+    /// 1.5
     public static final char MAX_LOW_SURROGATE = '\uDFFF';
 
-    /**
-     * <p>
-     * Minimum value of a surrogate unit in UTF-16 encoding - <code>'\uD800'</code>.
-     * </p>
-     * 
-     * @since 1.5
-     */
+    /// Minimum value of a surrogate unit in UTF-16 encoding - `'\uD800'`.
+    ///
+    /// #### Since
+    ///
+    /// 1.5
     public static final char MIN_SURROGATE = '\uD800';
 
-    /**
-     * <p>
-     * Maximum value of a surrogate unit in UTF-16 encoding - <code>'\uDFFF'</code>.
-     * </p>
-     * 
-     * @since 1.5
-     */
+    /// Maximum value of a surrogate unit in UTF-16 encoding - `'\uDFFF'`.
+    ///
+    /// #### Since
+    ///
+    /// 1.5
     public static final char MAX_SURROGATE = '\uDFFF';
 
-    /**
-     * <p>
-     * Minimum value of a supplementary code point - <code>U+010000</code>.
-     * </p>
-     * 
-     * @since 1.5
-     */
+    /// Minimum value of a supplementary code point - `U+010000`.
+    ///
+    /// #### Since
+    ///
+    /// 1.5
     public static final int MIN_SUPPLEMENTARY_CODE_POINT = 0x10000;
 
-    /**
-     * <p>
-     * Minimum code point value - <code>U+0000</code>.
-     * </p>
-     * 
-     * @since 1.5
-     */
+    /// Minimum code point value - `U+0000`.
+    ///
+    /// #### Since
+    ///
+    /// 1.5
     public static final int MIN_CODE_POINT = 0x000000;
 
-    /**
-     * <p>
-     * Maximum code point value - <code>U+10FFFF</code>.
-     * </p>
-     * 
-     * @since 1.5
-     */
+    /// Maximum code point value - `U+10FFFF`.
+    ///
+    /// #### Since
+    ///
+    /// 1.5
     public static final int MAX_CODE_POINT = 0x10FFFF;
 
-    /**
-     * <p>
-     * Constant for the number of bits to represent a <code>char</code> in
-     * two's compliment form.
-     * </p>
-     * 
-     * @since 1.5
-     */
+    /// Constant for the number of bits to represent a `char` in
+    /// two's compliment form.
+    ///
+    /// #### Since
+    ///
+    /// 1.5
     public static final int SIZE = 16;
 
-    /**
-     * <p>
-     * A test for determining if the <code>codePoint</code> is a valid Unicode
-     * code point.
-     * </p>
-     * 
-     * @param codePoint The code point to test.
-     * @return A boolean value.
-     * @since 1.5
-     */
+    /// A test for determining if the `codePoint` is a valid Unicode
+    /// code point.
+    ///
+    /// #### Parameters
+    ///
+    /// - `codePoint`: The code point to test.
+    ///
+    /// #### Returns
+    ///
+    /// A boolean value.
+    ///
+    /// #### Since
+    ///
+    /// 1.5
     public static boolean isValidCodePoint(int codePoint) {
         return (MIN_CODE_POINT <= codePoint && MAX_CODE_POINT >= codePoint);
     }
 
-    /**
-     * <p>
-     * A test for determining if the <code>codePoint</code> is within the
-     * supplementary code point range.
-     * </p>
-     * 
-     * @param codePoint The code point to test.
-     * @return A boolean value.
-     * @since 1.5
-     */
+    /// A test for determining if the `codePoint` is within the
+    /// supplementary code point range.
+    ///
+    /// #### Parameters
+    ///
+    /// - `codePoint`: The code point to test.
+    ///
+    /// #### Returns
+    ///
+    /// A boolean value.
+    ///
+    /// #### Since
+    ///
+    /// 1.5
     public static boolean isSupplementaryCodePoint(int codePoint) {
         return (MIN_SUPPLEMENTARY_CODE_POINT <= codePoint && MAX_CODE_POINT >= codePoint);
     }
 
-    /**
-     * <p>
-     * A test for determining if the <code>char</code> is a high
-     * surrogate/leading surrogate unit that's used for representing
-     * supplementary characters in UTF-16 encoding.
-     * </p>
-     * 
-     * @param ch The <code>char</code> unit to test.
-     * @return A boolean value.
-     * @since 1.5
-     * @see #isLowSurrogate(char)
-     */
+    /// A test for determining if the `char` is a high
+    /// surrogate/leading surrogate unit that's used for representing
+    /// supplementary characters in UTF-16 encoding.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ch`: The `char` unit to test.
+    ///
+    /// #### Returns
+    ///
+    /// A boolean value.
+    ///
+    /// #### Since
+    ///
+    /// 1.5
+    ///
+    /// #### See also
+    ///
+    /// - #isLowSurrogate(char)
     public static boolean isHighSurrogate(char ch) {
         return (MIN_HIGH_SURROGATE <= ch && MAX_HIGH_SURROGATE >= ch);
     }
 
-    /**
-     * <p>
-     * A test for determining if the <code>char</code> is a high
-     * surrogate/leading surrogate unit that's used for representing
-     * supplementary characters in UTF-16 encoding.
-     * </p>
-     * 
-     * @param ch The <code>char</code> unit to test.
-     * @return A boolean value.
-     * @since 1.5
-     * @see #isHighSurrogate(char)
-     */
+    /// A test for determining if the `char` is a high
+    /// surrogate/leading surrogate unit that's used for representing
+    /// supplementary characters in UTF-16 encoding.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ch`: The `char` unit to test.
+    ///
+    /// #### Returns
+    ///
+    /// A boolean value.
+    ///
+    /// #### Since
+    ///
+    /// 1.5
+    ///
+    /// #### See also
+    ///
+    /// - #isHighSurrogate(char)
     public static boolean isLowSurrogate(char ch) {
         return (MIN_LOW_SURROGATE <= ch && MAX_LOW_SURROGATE >= ch);
     }
 
-    /**
-     * <p>
-     * A test for determining if the <code>char</code> pair is a valid
-     * surrogate pair.
-     * </p>
-     * 
-     * @param high The high surrogate unit to test.
-     * @param low The low surrogate unit to test.
-     * @return A boolean value.
-     * @since 1.5
-     * @see #isHighSurrogate(char)
-     * @see #isLowSurrogate(char)
-     */
+    /// A test for determining if the `char` pair is a valid
+    /// surrogate pair.
+    ///
+    /// #### Parameters
+    ///
+    /// - `high`: The high surrogate unit to test.
+    ///
+    /// - `low`: The low surrogate unit to test.
+    ///
+    /// #### Returns
+    ///
+    /// A boolean value.
+    ///
+    /// #### Since
+    ///
+    /// 1.5
+    ///
+    /// #### See also
+    ///
+    /// - #isHighSurrogate(char)
+    ///
+    /// - #isLowSurrogate(char)
     public static boolean isSurrogatePair(char high, char low) {
         return (isHighSurrogate(high) && isLowSurrogate(low));
     }
 
-    /**
-     * <p>
-     * Calculates the number of <code>char</code> values required to represent
-     * the Unicode code point. This method only tests if the
-     * <code>codePoint</code> is greater than or equal to <code>0x10000</code>,
-     * in which case <code>2</code> is returned, otherwise <code>1</code>.
-     * To test if the code point is valid, use the
-     * {@link #isValidCodePoint(int)} method.
-     * </p>
-     * 
-     * @param codePoint The code point to test.
-     * @return An <code>int</code> value of 2 or 1.
-     * @since 1.5
-     * @see #isValidCodePoint(int)
-     * @see #isSupplementaryCodePoint(int)
-     */
+    /// Calculates the number of `char` values required to represent
+    /// the Unicode code point. This method only tests if the
+    /// `codePoint` is greater than or equal to `0x10000`,
+    /// in which case `2` is returned, otherwise `1`.
+    /// To test if the code point is valid, use the
+    /// `#isValidCodePoint(int)` method.
+    ///
+    /// #### Parameters
+    ///
+    /// - `codePoint`: The code point to test.
+    ///
+    /// #### Returns
+    ///
+    /// An `int` value of 2 or 1.
+    ///
+    /// #### Since
+    ///
+    /// 1.5
+    ///
+    /// #### See also
+    ///
+    /// - #isValidCodePoint(int)
+    ///
+    /// - #isSupplementaryCodePoint(int)
     public static int charCount(int codePoint) {
         return (codePoint >= 0x10000 ? 2 : 1);
     }
 
-    /**
-     * <p>
-     * Converts a surrogate pair into a Unicode code point. This method assume
-     * that the pair are valid surrogates. If the pair are NOT valid surrogates,
-     * then the result is indeterminate. The
-     * {@link #isSurrogatePair(char, char)} method should be used prior to this
-     * method to validate the pair.
-     * </p>
-     * 
-     * @param high The high surrogate unit.
-     * @param low The low surrogate unit.
-     * @return The decoded code point.
-     * @since 1.5
-     * @see #isSurrogatePair(char, char)
-     */
+    /// Converts a surrogate pair into a Unicode code point. This method assume
+    /// that the pair are valid surrogates. If the pair are NOT valid surrogates,
+    /// then the result is indeterminate. The
+    /// `char)` method should be used prior to this
+    /// method to validate the pair.
+    ///
+    /// #### Parameters
+    ///
+    /// - `high`: The high surrogate unit.
+    ///
+    /// - `low`: The low surrogate unit.
+    ///
+    /// #### Returns
+    ///
+    /// The decoded code point.
+    ///
+    /// #### Since
+    ///
+    /// 1.5
+    ///
+    /// #### See also
+    ///
+    /// - #isSurrogatePair(char, char)
     public static int toCodePoint(char high, char low) {
         // See RFC 2781, Section 2.2
         // http://www.faqs.org/rfcs/rfc2781.html
@@ -376,25 +366,34 @@ public final class Character{
         return (h | l) + 0x10000;
     }
 
-    /**
-     * <p>
-     * Returns the code point at the index in the <code>CharSequence</code>.
-     * If <code>char</code> unit at the index is a high-surrogate unit, the
-     * next index is less than the length of the sequence and the
-     * <code>char</code> unit at the next index is a low surrogate unit, then
-     * the code point represented by the pair is returned; otherwise the
-     * <code>char</code> unit at the index is returned.
-     * </p>
-     * 
-     * @param seq The sequence of <code>char</code> units.
-     * @param index The index into the <code>seq</code> to retrieve and
-     *        convert.
-     * @return The Unicode code point.
-     * @throws NullPointerException if <code>seq</code> is <code>null</code>.
-     * @throws IndexOutOfBoundsException if the <code>index</code> is negative
-     *         or greater than or equal to <code>seq.length()</code>.
-     * @since 1.5
-     */
+    /// Returns the code point at the index in the `CharSequence`.
+    /// If `char` unit at the index is a high-surrogate unit, the
+    /// next index is less than the length of the sequence and the
+    /// `char` unit at the next index is a low surrogate unit, then
+    /// the code point represented by the pair is returned; otherwise the
+    /// `char` unit at the index is returned.
+    ///
+    /// #### Parameters
+    ///
+    /// - `seq`: The sequence of `char` units.
+    ///
+    /// - `index`: @param index The index into the `seq` to retrieve and
+    /// convert.
+    ///
+    /// #### Returns
+    ///
+    /// The Unicode code point.
+    ///
+    /// #### Throws
+    ///
+    /// - `NullPointerException`: if `seq` is `null`.
+    ///
+    /// - `IndexOutOfBoundsException`: @throws IndexOutOfBoundsException if the `index` is negative
+    /// or greater than or equal to `seq.length()`.
+    ///
+    /// #### Since
+    ///
+    /// 1.5
     public static int codePointAt(CharSequence seq, int index) {
         if (seq == null) {
             throw new NullPointerException();
@@ -415,25 +414,34 @@ public final class Character{
         return high;
     }
 
-    /**
-     * <p>
-     * Returns the code point at the index in the <code>char[]</code>. If
-     * <code>char</code> unit at the index is a high-surrogate unit, the next
-     * index is less than the length of the sequence and the <code>char</code>
-     * unit at the next index is a low surrogate unit, then the code point
-     * represented by the pair is returned; otherwise the <code>char</code>
-     * unit at the index is returned.
-     * </p>
-     * 
-     * @param seq The sequence of <code>char</code> units.
-     * @param index The index into the <code>seq</code> to retrieve and
-     *        convert.
-     * @return The Unicode code point.
-     * @throws NullPointerException if <code>seq</code> is <code>null</code>.
-     * @throws IndexOutOfBoundsException if the <code>index</code> is negative
-     *         or greater than or equal to <code>seq.length()</code>.
-     * @since 1.5
-     */
+    /// Returns the code point at the index in the `char[]`. If
+    /// `char` unit at the index is a high-surrogate unit, the next
+    /// index is less than the length of the sequence and the `char`
+    /// unit at the next index is a low surrogate unit, then the code point
+    /// represented by the pair is returned; otherwise the `char`
+    /// unit at the index is returned.
+    ///
+    /// #### Parameters
+    ///
+    /// - `seq`: The sequence of `char` units.
+    ///
+    /// - `index`: @param index The index into the `seq` to retrieve and
+    /// convert.
+    ///
+    /// #### Returns
+    ///
+    /// The Unicode code point.
+    ///
+    /// #### Throws
+    ///
+    /// - `NullPointerException`: if `seq` is `null`.
+    ///
+    /// - `IndexOutOfBoundsException`: @throws IndexOutOfBoundsException if the `index` is negative
+    /// or greater than or equal to `seq.length()`.
+    ///
+    /// #### Since
+    ///
+    /// 1.5
     public static int codePointAt(char[] seq, int index) {
         if (seq == null) {
             throw new NullPointerException();
@@ -454,29 +462,39 @@ public final class Character{
         return high;
     }
 
-    /**
-     * <p>
-     * Returns the code point at the index in the <code>char[]</code> that's
-     * within the limit. If <code>char</code> unit at the index is a
-     * high-surrogate unit, the next index is less than the <code>limit</code>
-     * and the <code>char</code> unit at the next index is a low surrogate
-     * unit, then the code point represented by the pair is returned; otherwise
-     * the <code>char</code> unit at the index is returned.
-     * </p>
-     * 
-     * @param seq The sequence of <code>char</code> units.
-     * @param index The index into the <code>seq</code> to retrieve and
-     *        convert.
-     * @param limit The exclusive index into the <code>seq</code> that marks
-     *        the end of the units that can be used.
-     * @return The Unicode code point.
-     * @throws NullPointerException if <code>seq</code> is <code>null</code>.
-     * @throws IndexOutOfBoundsException if the <code>index</code> is
-     *         negative, greater than or equal to <code>limit</code>,
-     *         <code>limit</code> is negative or <code>limit</code> is
-     *         greater than the length of <code>seq</code>.
-     * @since 1.5
-     */
+    /// Returns the code point at the index in the `char[]` that's
+    /// within the limit. If `char` unit at the index is a
+    /// high-surrogate unit, the next index is less than the `limit`
+    /// and the `char` unit at the next index is a low surrogate
+    /// unit, then the code point represented by the pair is returned; otherwise
+    /// the `char` unit at the index is returned.
+    ///
+    /// #### Parameters
+    ///
+    /// - `seq`: The sequence of `char` units.
+    ///
+    /// - `index`: @param index The index into the `seq` to retrieve and
+    /// convert.
+    ///
+    /// - `limit`: @param limit The exclusive index into the `seq` that marks
+    /// the end of the units that can be used.
+    ///
+    /// #### Returns
+    ///
+    /// The Unicode code point.
+    ///
+    /// #### Throws
+    ///
+    /// - `NullPointerException`: if `seq` is `null`.
+    ///
+    /// - `IndexOutOfBoundsException`: @throws IndexOutOfBoundsException if the `index` is
+    /// negative, greater than or equal to `limit`,
+    /// `limit` is negative or `limit` is
+    /// greater than the length of `seq`.
+    ///
+    /// #### Since
+    ///
+    /// 1.5
     public static int codePointAt(char[] seq, int index, int limit) {
         if (index < 0 || index >= limit || limit < 0 || limit > seq.length) {
             throw new IndexOutOfBoundsException();
@@ -493,26 +511,35 @@ public final class Character{
         return high;
     }
 
-    /**
-     * <p>
-     * Returns the Unicode code point that proceeds the <code>index</code> in
-     * the <code>CharSequence</code>. If the <code>char</code> unit at
-     * <code>index - 1</code> is within the low surrogate range, the value
-     * <code>index - 2</code> isn't negative and the <code>char</code> unit
-     * at <code>index - 2</code> is within the high surrogate range, then the
-     * supplementary code point made up of the surrogate pair is returned;
-     * otherwise, the <code>char</code> value at <code>index - 1</code> is
-     * returned.
-     * </p>
-     * 
-     * @param seq The <code>CharSequence</code> to search.
-     * @param index The index into the <code>seq</code>.
-     * @return A Unicode code point.
-     * @throws NullPointerException if <code>seq</code> is <code>null</code>.
-     * @throws IndexOutOfBoundsException if <code>index</code> is less than 1
-     *         or greater than <code>seq.length()</code>.
-     * @since 1.5
-     */
+    /// Returns the Unicode code point that proceeds the `index` in
+    /// the `CharSequence`. If the `char` unit at
+    /// `index - 1` is within the low surrogate range, the value
+    /// `index - 2` isn't negative and the `char` unit
+    /// at `index - 2` is within the high surrogate range, then the
+    /// supplementary code point made up of the surrogate pair is returned;
+    /// otherwise, the `char` value at `index - 1` is
+    /// returned.
+    ///
+    /// #### Parameters
+    ///
+    /// - `seq`: The `CharSequence` to search.
+    ///
+    /// - `index`: The index into the `seq`.
+    ///
+    /// #### Returns
+    ///
+    /// A Unicode code point.
+    ///
+    /// #### Throws
+    ///
+    /// - `NullPointerException`: if `seq` is `null`.
+    ///
+    /// - `IndexOutOfBoundsException`: @throws IndexOutOfBoundsException if `index` is less than 1
+    /// or greater than `seq.length()`.
+    ///
+    /// #### Since
+    ///
+    /// 1.5
     public static int codePointBefore(CharSequence seq, int index) {
         if (seq == null) {
             throw new NullPointerException();
@@ -533,26 +560,35 @@ public final class Character{
         return low;
     }
 
-    /**
-     * <p>
-     * Returns the Unicode code point that proceeds the <code>index</code> in
-     * the <code>char[]</code>. If the <code>char</code> unit at
-     * <code>index - 1</code> is within the low surrogate range, the value
-     * <code>index - 2</code> isn't negative and the <code>char</code> unit
-     * at <code>index - 2</code> is within the high surrogate range, then the
-     * supplementary code point made up of the surrogate pair is returned;
-     * otherwise, the <code>char</code> value at <code>index - 1</code> is
-     * returned.
-     * </p>
-     * 
-     * @param seq The <code>char[]</code> to search.
-     * @param index The index into the <code>seq</code>.
-     * @return A Unicode code point.
-     * @throws NullPointerException if <code>seq</code> is <code>null</code>.
-     * @throws IndexOutOfBoundsException if <code>index</code> is less than 1
-     *         or greater than <code>seq.length</code>.
-     * @since 1.5
-     */
+    /// Returns the Unicode code point that proceeds the `index` in
+    /// the `char[]`. If the `char` unit at
+    /// `index - 1` is within the low surrogate range, the value
+    /// `index - 2` isn't negative and the `char` unit
+    /// at `index - 2` is within the high surrogate range, then the
+    /// supplementary code point made up of the surrogate pair is returned;
+    /// otherwise, the `char` value at `index - 1` is
+    /// returned.
+    ///
+    /// #### Parameters
+    ///
+    /// - `seq`: The `char[]` to search.
+    ///
+    /// - `index`: The index into the `seq`.
+    ///
+    /// #### Returns
+    ///
+    /// A Unicode code point.
+    ///
+    /// #### Throws
+    ///
+    /// - `NullPointerException`: if `seq` is `null`.
+    ///
+    /// - `IndexOutOfBoundsException`: @throws IndexOutOfBoundsException if `index` is less than 1
+    /// or greater than `seq.length`.
+    ///
+    /// #### Since
+    ///
+    /// 1.5
     public static int codePointBefore(char[] seq, int index) {
         if (seq == null) {
             throw new NullPointerException();
@@ -573,30 +609,39 @@ public final class Character{
         return low;
     }
 
-    /**
-     * <p>
-     * Returns the Unicode code point that proceeds the <code>index</code> in
-     * the <code>char[]</code> and isn't less than <code>start</code>. If
-     * the <code>char</code> unit at <code>index - 1</code> is within the
-     * low surrogate range, the value <code>index - 2</code> isn't less than
-     * <code>start</code> and the <code>char</code> unit at
-     * <code>index - 2</code> is within the high surrogate range, then the
-     * supplementary code point made up of the surrogate pair is returned;
-     * otherwise, the <code>char</code> value at <code>index - 1</code> is
-     * returned.
-     * </p>
-     * 
-     * @param seq The <code>char[]</code> to search.
-     * @param index The index into the <code>seq</code>.
-     * @return A Unicode code point.
-     * @throws NullPointerException if <code>seq</code> is <code>null</code>.
-     * @throws IndexOutOfBoundsException if <code>index</code> is less than or
-     *         equal to <code>start</code>, <code>index</code> is greater
-     *         than <code>seq.length</code>, <code>start</code> is not
-     *         negative and <code>start</code> is greater than
-     *         <code>seq.length</code>.
-     * @since 1.5
-     */
+    /// Returns the Unicode code point that proceeds the `index` in
+    /// the `char[]` and isn't less than `start`. If
+    /// the `char` unit at `index - 1` is within the
+    /// low surrogate range, the value `index - 2` isn't less than
+    /// `start` and the `char` unit at
+    /// `index - 2` is within the high surrogate range, then the
+    /// supplementary code point made up of the surrogate pair is returned;
+    /// otherwise, the `char` value at `index - 1` is
+    /// returned.
+    ///
+    /// #### Parameters
+    ///
+    /// - `seq`: The `char[]` to search.
+    ///
+    /// - `index`: The index into the `seq`.
+    ///
+    /// #### Returns
+    ///
+    /// A Unicode code point.
+    ///
+    /// #### Throws
+    ///
+    /// - `NullPointerException`: if `seq` is `null`.
+    ///
+    /// - `IndexOutOfBoundsException`: @throws IndexOutOfBoundsException if `index` is less than or
+    /// equal to `start`, `index` is greater
+    /// than `seq.length`, `start` is not
+    /// negative and `start` is greater than
+    /// `seq.length`.
+    ///
+    /// #### Since
+    ///
+    /// 1.5
     public static int codePointBefore(char[] seq, int index, int start) {
         if (seq == null) {
             throw new NullPointerException();
@@ -617,28 +662,39 @@ public final class Character{
         return low;
     }
 
-    /**
-     * <p>
-     * Converts the Unicode code point, <code>codePoint</code>, into a UTF-16
-     * encoded sequence and copies the value(s) into the
-     * <code>char[]</code> <code>dst</code>, starting at the index
-     * <code>dstIndex</code>.
-     * </p>
-     * 
-     * @param codePoint The Unicode code point to encode.
-     * @param dst The <code>char[]</code> to copy the encoded value into.
-     * @param dstIndex The index to start copying into <code>dst</code>.
-     * @return The number of <code>char</code> value units copied into
-     *         <code>dst</code>.
-     * @throws IllegalArgumentException if <code>codePoint</code> is not a
-     *         valid Unicode code point.
-     * @throws NullPointerException if <code>dst</code> is <code>null</code>.
-     * @throws IndexOutOfBoundsException if <code>dstIndex</code> is negative,
-     *         greater than or equal to <code>dst.length</code> or equals
-     *         <code>dst.length - 1</code> when <code>codePoint</code> is a
-     *         {@link #isSupplementaryCodePoint(int) supplementary code point}.
-     * @since 1.5
-     */
+    /// Converts the Unicode code point, `codePoint`, into a UTF-16
+    /// encoded sequence and copies the value(s) into the
+    /// `char[]` `dst`, starting at the index
+    /// `dstIndex`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `codePoint`: The Unicode code point to encode.
+    ///
+    /// - `dst`: The `char[]` to copy the encoded value into.
+    ///
+    /// - `dstIndex`: The index to start copying into `dst`.
+    ///
+    /// #### Returns
+    ///
+    /// @return The number of `char` value units copied into
+    /// `dst`.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: @throws IllegalArgumentException if `codePoint` is not a
+    /// valid Unicode code point.
+    ///
+    /// - `NullPointerException`: if `dst` is `null`.
+    ///
+    /// - `IndexOutOfBoundsException`: @throws IndexOutOfBoundsException if `dstIndex` is negative,
+    /// greater than or equal to `dst.length` or equals
+    /// `dst.length - 1` when `codePoint` is a
+    /// `supplementary code point`.
+    ///
+    /// #### Since
+    ///
+    /// 1.5
     public static int toChars(int codePoint, char[] dst, int dstIndex) {
         if (!isValidCodePoint(codePoint)) {
             throw new IllegalArgumentException();
@@ -668,21 +724,28 @@ public final class Character{
         return 1;
     }
 
-    /**
-     * <p>
-     * Converts the Unicode code point, <code>codePoint</code>, into a UTF-16
-     * encoded sequence that is returned as a <code>char[]</code>.
-     * </p>
-     * 
-     * @param codePoint The Unicode code point to encode.
-     * @return The UTF-16 encoded <code>char</code> sequence; if code point is
-     *         a {@link #isSupplementaryCodePoint(int) supplementary code point},
-     *         then a 2 <code>char</code> array is returned, otherwise a 1
-     *         <code>char</code> array is returned.
-     * @throws IllegalArgumentException if <code>codePoint</code> is not a
-     *         valid Unicode code point.
-     * @since 1.5
-     */
+    /// Converts the Unicode code point, `codePoint`, into a UTF-16
+    /// encoded sequence that is returned as a `char[]`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `codePoint`: The Unicode code point to encode.
+    ///
+    /// #### Returns
+    ///
+    /// @return The UTF-16 encoded `char` sequence; if code point is
+    /// a `supplementary code point`,
+    /// then a 2 `char` array is returned, otherwise a 1
+    /// `char` array is returned.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: @throws IllegalArgumentException if `codePoint` is not a
+    /// valid Unicode code point.
+    ///
+    /// #### Since
+    ///
+    /// 1.5
     public static char[] toChars(int codePoint) {
         if (!isValidCodePoint(codePoint)) {
             throw new IllegalArgumentException();
@@ -697,24 +760,34 @@ public final class Character{
         return new char[] { (char) codePoint };
     }
 
-    /**
-     * <p>
-     * Counts the number of Unicode code points in the subsequence of the
-     * <code>CharSequence</code>, as delineated by the
-     * <code>beginIndex</code> and <code>endIndex</code>. Any surrogate
-     * values with missing pair values will be counted as 1 code point.
-     * </p>
-     * 
-     * @param seq The <code>CharSequence</code> to look through.
-     * @param beginIndex The inclusive index to begin counting at.
-     * @param endIndex The exclusive index to stop counting at.
-     * @return The number of Unicode code points.
-     * @throws NullPointerException if <code>seq</code> is <code>null</code>.
-     * @throws IndexOutOfBoundsException if <code>beginIndex</code> is
-     *         negative, greater than <code>seq.length()</code> or greater
-     *         than <code>endIndex</code>.
-     * @since 1.5
-     */
+    /// Counts the number of Unicode code points in the subsequence of the
+    /// `CharSequence`, as delineated by the
+    /// `beginIndex` and `endIndex`. Any surrogate
+    /// values with missing pair values will be counted as 1 code point.
+    ///
+    /// #### Parameters
+    ///
+    /// - `seq`: The `CharSequence` to look through.
+    ///
+    /// - `beginIndex`: The inclusive index to begin counting at.
+    ///
+    /// - `endIndex`: The exclusive index to stop counting at.
+    ///
+    /// #### Returns
+    ///
+    /// The number of Unicode code points.
+    ///
+    /// #### Throws
+    ///
+    /// - `NullPointerException`: if `seq` is `null`.
+    ///
+    /// - `IndexOutOfBoundsException`: @throws IndexOutOfBoundsException if `beginIndex` is
+    /// negative, greater than `seq.length()` or greater
+    /// than `endIndex`.
+    ///
+    /// #### Since
+    ///
+    /// 1.5
     public static int codePointCount(CharSequence seq, int beginIndex,
             int endIndex) {
         if (seq == null) {
@@ -741,25 +814,35 @@ public final class Character{
         return result;
     }
 
-    /**
-     * <p>
-     * Counts the number of Unicode code points in the subsequence of the
-     * <code>char[]</code>, as delineated by the <code>offset</code> and
-     * <code>count</code>. Any surrogate values with missing pair values will
-     * be counted as 1 code point.
-     * </p>
-     * 
-     * @param seq The <code>char[]</code> to look through.
-     * @param offset The inclusive index to begin counting at.
-     * @param count The number of <code>char</code> values to look through in
-     *        <code>seq</code>.
-     * @return The number of Unicode code points.
-     * @throws NullPointerException if <code>seq</code> is <code>null</code>.
-     * @throws IndexOutOfBoundsException if <code>offset</code> or
-     *         <code>count</code> is negative or if <code>endIndex</code> is
-     *         greater than <code>seq.length</code>.
-     * @since 1.5
-     */
+    /// Counts the number of Unicode code points in the subsequence of the
+    /// `char[]`, as delineated by the `offset` and
+    /// `count`. Any surrogate values with missing pair values will
+    /// be counted as 1 code point.
+    ///
+    /// #### Parameters
+    ///
+    /// - `seq`: The `char[]` to look through.
+    ///
+    /// - `offset`: The inclusive index to begin counting at.
+    ///
+    /// - `count`: @param count The number of `char` values to look through in
+    /// `seq`.
+    ///
+    /// #### Returns
+    ///
+    /// The number of Unicode code points.
+    ///
+    /// #### Throws
+    ///
+    /// - `NullPointerException`: if `seq` is `null`.
+    ///
+    /// - `IndexOutOfBoundsException`: @throws IndexOutOfBoundsException if `offset` or
+    /// `count` is negative or if `endIndex` is
+    /// greater than `seq.length`.
+    ///
+    /// #### Since
+    ///
+    /// 1.5
     public static int codePointCount(char[] seq, int offset, int count) {
         if (seq == null) {
             throw new NullPointerException();
@@ -786,28 +869,38 @@ public final class Character{
         return result;
     }
 
-    /**
-     * <p>
-     * Determines the index into the <code>CharSequence</code> that is offset
-     * (measured in code points and specified by <code>codePointOffset</code>),
-     * from the <code>index</code> argument.
-     * </p>
-     * 
-     * @param seq The <code>CharSequence</code> to find the index within.
-     * @param index The index to begin from, within the
-     *        <code>CharSequence</code>.
-     * @param codePointOffset The number of code points to look back or
-     *        forwards; may be a negative or positive value.
-     * @return The calculated index that is <code>codePointOffset</code> code
-     *         points from <code>index</code>.
-     * @throws NullPointerException if <code>seq</code> is <code>null</code>.
-     * @throws IndexOutOfBoundsException if <code>index</code> is negative,
-     *         greater than <code>seq.length()</code>, there aren't enough
-     *         values in <code>seq</code> after <code>index</code> or before
-     *         <code>index</code> if <code>codePointOffset</code> is
-     *         negative.
-     * @since 1.5
-     */
+    /// Determines the index into the `CharSequence` that is offset
+    /// (measured in code points and specified by `codePointOffset`),
+    /// from the `index` argument.
+    ///
+    /// #### Parameters
+    ///
+    /// - `seq`: The `CharSequence` to find the index within.
+    ///
+    /// - `index`: @param index The index to begin from, within the
+    /// `CharSequence`.
+    ///
+    /// - `codePointOffset`: @param codePointOffset The number of code points to look back or
+    /// forwards; may be a negative or positive value.
+    ///
+    /// #### Returns
+    ///
+    /// @return The calculated index that is `codePointOffset` code
+    /// points from `index`.
+    ///
+    /// #### Throws
+    ///
+    /// - `NullPointerException`: if `seq` is `null`.
+    ///
+    /// - `IndexOutOfBoundsException`: @throws IndexOutOfBoundsException if `index` is negative,
+    /// greater than `seq.length()`, there aren't enough
+    /// values in `seq` after `index` or before
+    /// `index` if `codePointOffset` is
+    /// negative.
+    ///
+    /// #### Since
+    ///
+    /// 1.5
     public static int offsetByCodePoints(CharSequence seq, int index,
             int codePointOffset) {
         if (seq == null) {
@@ -859,36 +952,47 @@ public final class Character{
         return i;
     }
 
-    /**
-     * <p>
-     * Determines the index into the <code>char[]</code> that is offset
-     * (measured in code points and specified by <code>codePointOffset</code>),
-     * from the <code>index</code> argument and is within the subsequence as
-     * delineated by <code>start</code> and <code>count</code>.
-     * </p>
-     * 
-     * @param seq The <code>char[]</code> to find the index within.
-     * 
-     * @param index The index to begin from, within the <code>char[]</code>.
-     * @param codePointOffset The number of code points to look back or
-     *        forwards; may be a negative or positive value.
-     * @param start The inclusive index that marks the beginning of the
-     *        subsequence.
-     * @param count The number of <code>char</code> values to include within
-     *        the subsequence.
-     * @return The calculated index that is <code>codePointOffset</code> code
-     *         points from <code>index</code>.
-     * @throws NullPointerException if <code>seq</code> is <code>null</code>.
-     * @throws IndexOutOfBoundsException if <code>start</code> or
-     *         <code>count</code> is negative, <code>start + count</code>
-     *         greater than <code>seq.length</code>, <code>index</code> is
-     *         less than <code>start</code>, <code>index</code> is greater
-     *         than <code>start + count</code> or there aren't enough values
-     *         in <code>seq</code> after <code>index</code> or before
-     *         <code>index</code> if <code>codePointOffset</code> is
-     *         negative.
-     * @since 1.5
-     */
+    /// Determines the index into the `char[]` that is offset
+    /// (measured in code points and specified by `codePointOffset`),
+    /// from the `index` argument and is within the subsequence as
+    /// delineated by `start` and `count`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `seq`: The `char[]` to find the index within.
+    ///
+    /// - `index`: The index to begin from, within the `char[]`.
+    ///
+    /// - `codePointOffset`: @param codePointOffset The number of code points to look back or
+    /// forwards; may be a negative or positive value.
+    ///
+    /// - `start`: @param start The inclusive index that marks the beginning of the
+    /// subsequence.
+    ///
+    /// - `count`: @param count The number of `char` values to include within
+    /// the subsequence.
+    ///
+    /// #### Returns
+    ///
+    /// @return The calculated index that is `codePointOffset` code
+    /// points from `index`.
+    ///
+    /// #### Throws
+    ///
+    /// - `NullPointerException`: if `seq` is `null`.
+    ///
+    /// - `IndexOutOfBoundsException`: @throws IndexOutOfBoundsException if `start` or
+    /// `count` is negative, `start + count`
+    /// greater than `seq.length`, `index` is
+    /// less than `start`, `index` is greater
+    /// than `start + count` or there aren't enough values
+    /// in `seq` after `index` or before
+    /// `index` if `codePointOffset` is
+    /// negative.
+    ///
+    /// #### Since
+    ///
+    /// 1.5
     public static int offsetByCodePoints(char[] seq, int start, int count,
             int index, int codePointOffset) {
         if (seq == null) {
@@ -941,29 +1045,34 @@ public final class Character{
         return i;
     }
 
-    /**
-     * Reverse the order of the first and second bytes in character
-     * @param c
-     *            the character
-     * @return    the character with reordered bytes.
-     */
+    /// Reverse the order of the first and second bytes in character
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the character
+    ///
+    /// #### Returns
+    ///
+    /// the character with reordered bytes.
     public static char reverseBytes(char c) {
         return (char)((c<<8) | (c>>8));
     }
 
 
-    /**
-     * Returns the object instance of i
-     * @param i the primitive
-     * @return object instance
-     */
+    /// Returns the object instance of i
+    ///
+    /// #### Parameters
+    ///
+    /// - `i`: the primitive
+    ///
+    /// #### Returns
+    ///
+    /// object instance
     public static Character valueOf(char i) {
         return null;
     }
 
-    /**
-     * See {@link #isWhitespace(int)}.
-     */
+    /// See `#isWhitespace(int)`.
     public static boolean isWhitespace(char c) {
         return isWhitespace((int) c);
     }
@@ -988,13 +1097,11 @@ public final class Character{
 
     
     
-    /**
-     * Returns true if the given code point is a Unicode whitespace character.
-     * The exact set of characters considered as whitespace varies with Unicode version.
-     * Note that non-breaking spaces are not considered whitespace.
-     * Note also that line separators are considered whitespace; see {@link #isSpaceChar}
-     * for an alternative.
-     */
+    /// Returns true if the given code point is a Unicode whitespace character.
+    /// The exact set of characters considered as whitespace varies with Unicode version.
+    /// Note that non-breaking spaces are not considered whitespace.
+    /// Note also that line separators are considered whitespace; see `#isSpaceChar`
+    /// for an alternative.
     public static boolean isWhitespace(int codePoint) {
         // We don't just call into icu4c because of the JNI overhead. Ideally we'd fix that.
         // Any ASCII whitespace character?

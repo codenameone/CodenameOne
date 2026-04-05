@@ -18,13 +18,13 @@
 package java.util;
 
 
-/**
- * This class is an abstract implementation of the {@code Map} interface. This
- * implementation does not support adding. A subclass must implement the
- * abstract method entrySet().
- * 
- * @since 1.2
- */
+/// This class is an abstract implementation of the `Map` interface. This
+/// implementation does not support adding. A subclass must implement the
+/// abstract method entrySet().
+///
+/// #### Since
+///
+/// 1.2
 public abstract class AbstractMap<K, V> implements Map<K, V> {
 
     // Lazily initialized key set.
@@ -32,16 +32,16 @@ public abstract class AbstractMap<K, V> implements Map<K, V> {
 
     Collection<V> valuesCollection;
 
-    /**
-     * An immutable key-value mapping.
-     * 
-     * @param <K>
-     *            the type of key
-     * @param <V>
-     *            the type of value
-     * 
-     * @since 1.6
-     */
+    /// An immutable key-value mapping.
+    ///
+    /// @param
+    /// the type of key
+    /// @param
+    /// the type of value
+    ///
+    /// #### Since
+    ///
+    /// 1.6
     public static class SimpleImmutableEntry<K, V> implements Map.Entry<K, V> {
 
         private static final long serialVersionUID = 7138329143949025153L;
@@ -50,70 +50,74 @@ public abstract class AbstractMap<K, V> implements Map<K, V> {
 
         private V value;
 
-        /**
-         * Constructs a new instance by key and value.
-         * 
-         * @param theKey
-         *            the key
-         * @param theValue
-         *            the value
-         */
+        /// Constructs a new instance by key and value.
+        ///
+        /// #### Parameters
+        ///
+        /// - `theKey`: the key
+        ///
+        /// - `theValue`: the value
         public SimpleImmutableEntry(K theKey, V theValue) {
             key = theKey;
             value = theValue;
         }
 
-        /**
-         * Constructs a new instance by an entry
-         * 
-         * @param entry
-         *            the entry
-         */
+        /// Constructs a new instance by an entry
+        ///
+        /// #### Parameters
+        ///
+        /// - `entry`: the entry
         public SimpleImmutableEntry(Map.Entry<? extends K, ? extends V> entry) {
             key = entry.getKey();
             value = entry.getValue();
         }
 
-        /**
-         * {@inheritDoc}
-         * 
-         * @see java.util.Map.Entry#getKey()
-         */
+        /// {@inheritDoc}
+        ///
+        /// #### See also
+        ///
+        /// - java.util.Map.Entry#getKey()
         public K getKey() {
             return key;
         }
 
-        /**
-         * {@inheritDoc}
-         * 
-         * @see java.util.Map.Entry#getValue()
-         */
+        /// {@inheritDoc}
+        ///
+        /// #### See also
+        ///
+        /// - java.util.Map.Entry#getValue()
         public V getValue() {
             return value;
         }
 
-        /**
-         * Throws an UnsupportedOperationException.
-         * 
-         * @param object
-         *            new value
-         * @return (Does not)
-         * @throws UnsupportedOperationException
-         *             always
-         * 
-         * @see java.util.Map.Entry#setValue(java.lang.Object)
-         */
+        /// Throws an UnsupportedOperationException.
+        ///
+        /// #### Parameters
+        ///
+        /// - `object`: new value
+        ///
+        /// #### Returns
+        ///
+        /// (Does not)
+        ///
+        /// #### Throws
+        ///
+        /// - `UnsupportedOperationException`: always
+        ///
+        /// #### See also
+        ///
+        /// - java.util.Map.Entry#setValue(java.lang.Object)
         public V setValue(@SuppressWarnings("unused")
         V object) {
             throw new UnsupportedOperationException();
         }
 
-        /**
-         * Answers whether the object is equal to this entry. This works across
-         * all kinds of the Map.Entry interface.
-         * 
-         * @see java.lang.Object#equals(java.lang.Object)
-         */
+        /// Answers whether the object is equal to this entry. This works across
+        /// all kinds of the Map.Entry interface.
+        ///
+        /// #### See also
+        ///
+        /// - java.lang.Object#equals(java.lang.Object)
         @Override
         public boolean equals(Object object) {
             if (this == object) {
@@ -129,38 +133,38 @@ public abstract class AbstractMap<K, V> implements Map<K, V> {
             return false;
         }
 
-        /**
-         * Answers the hash code of this entry.
-         * 
-         * @see java.lang.Object#hashCode()
-         */
+        /// Answers the hash code of this entry.
+        ///
+        /// #### See also
+        ///
+        /// - java.lang.Object#hashCode()
         @Override
         public int hashCode() {
             return (key == null ? 0 : key.hashCode())
                     ^ (value == null ? 0 : value.hashCode());
         }
 
-        /**
-         * Answers a String representation of this entry.
-         * 
-         * @see java.lang.Object#toString()
-         */
+        /// Answers a String representation of this entry.
+        ///
+        /// #### See also
+        ///
+        /// - java.lang.Object#toString()
         @Override
         public String toString() {
             return key + "=" + value; //$NON-NLS-1$
         }
     }
 
-    /**
-     * A key-value mapping.
-     * 
-     * @param <K>
-     *            the type of key
-     * @param <V>
-     *            the type of value
-     * 
-     * @since 1.6
-     */
+    /// A key-value mapping.
+    ///
+    /// @param
+    /// the type of key
+    /// @param
+    /// the type of value
+    ///
+    /// #### Since
+    ///
+    /// 1.6
     public static class SimpleEntry<K, V> implements Map.Entry<K, V> {
 
         private static final long serialVersionUID = -8499721149061103585L;
@@ -169,65 +173,63 @@ public abstract class AbstractMap<K, V> implements Map<K, V> {
 
         private V value;
 
-        /**
-         * Constructs a new instance by key and value.
-         * 
-         * @param theKey
-         *            the key
-         * @param theValue
-         *            the value
-         */
+        /// Constructs a new instance by key and value.
+        ///
+        /// #### Parameters
+        ///
+        /// - `theKey`: the key
+        ///
+        /// - `theValue`: the value
         public SimpleEntry(K theKey, V theValue) {
             key = theKey;
             value = theValue;
         }
 
-        /**
-         * Constructs a new instance by an entry
-         * 
-         * @param entry
-         *            the entry
-         */
+        /// Constructs a new instance by an entry
+        ///
+        /// #### Parameters
+        ///
+        /// - `entry`: the entry
         public SimpleEntry(Map.Entry<? extends K, ? extends V> entry) {
             key = entry.getKey();
             value = entry.getValue();
         }
 
-        /**
-         * {@inheritDoc}
-         * 
-         * @see java.util.Map.Entry#getKey()
-         */
+        /// {@inheritDoc}
+        ///
+        /// #### See also
+        ///
+        /// - java.util.Map.Entry#getKey()
         public K getKey() {
             return key;
         }
 
-        /**
-         * {@inheritDoc}
-         * 
-         * @see java.util.Map.Entry#getValue()
-         */
+        /// {@inheritDoc}
+        ///
+        /// #### See also
+        ///
+        /// - java.util.Map.Entry#getValue()
         public V getValue() {
             return value;
         }
 
-        /**
-         * {@inheritDoc}
-         * 
-         * @see java.util.Map.Entry#setValue(java.lang.Object)
-         */
+        /// {@inheritDoc}
+        ///
+        /// #### See also
+        ///
+        /// - java.util.Map.Entry#setValue(java.lang.Object)
         public V setValue(V object) {
             V result = value;
             value = object;
             return result;
         }
 
-        /**
-         * Answers whether the object is equal to this entry. This works across
-         * all kinds of the Map.Entry interface.
-         * 
-         * @see java.lang.Object#equals(java.lang.Object)
-         */
+        /// Answers whether the object is equal to this entry. This works across
+        /// all kinds of the Map.Entry interface.
+        ///
+        /// #### See also
+        ///
+        /// - java.lang.Object#equals(java.lang.Object)
         @Override
         public boolean equals(Object object) {
             if (this == object) {
@@ -243,55 +245,58 @@ public abstract class AbstractMap<K, V> implements Map<K, V> {
             return false;
         }
 
-        /**
-         * Answers the hash code of this entry.
-         * 
-         * @see java.lang.Object#hashCode()
-         */
+        /// Answers the hash code of this entry.
+        ///
+        /// #### See also
+        ///
+        /// - java.lang.Object#hashCode()
         @Override
         public int hashCode() {
             return (key == null ? 0 : key.hashCode())
                     ^ (value == null ? 0 : value.hashCode());
         }
 
-        /**
-         * Answers a String representation of this entry.
-         * 
-         * @see java.lang.Object#toString()
-         */
+        /// Answers a String representation of this entry.
+        ///
+        /// #### See also
+        ///
+        /// - java.lang.Object#toString()
         @Override
         public String toString() {
             return key + "=" + value; //$NON-NLS-1$
         }
     }
 
-    /**
-     * Constructs a new instance of this {@code AbstractMap}.
-     */
+    /// Constructs a new instance of this `AbstractMap`.
     protected AbstractMap() {
         super();
     }
 
-    /**
-     * Removes all elements from this map, leaving it empty.
-     * 
-     * @throws UnsupportedOperationException
-     *                if removing from this map is not supported.
-     * @see #isEmpty()
-     * @see #size()
-     */
+    /// Removes all elements from this map, leaving it empty.
+    ///
+    /// #### Throws
+    ///
+    /// - `UnsupportedOperationException`: if removing from this map is not supported.
+    ///
+    /// #### See also
+    ///
+    /// - #isEmpty()
+    ///
+    /// - #size()
     public void clear() {
         entrySet().clear();
     }
 
-    /**
-     * Returns whether this map contains the specified key.
-     * 
-     * @param key
-     *            the key to search for.
-     * @return {@code true} if this map contains the specified key,
-     *         {@code false} otherwise.
-     */
+    /// Returns whether this map contains the specified key.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key to search for.
+    ///
+    /// #### Returns
+    ///
+    /// @return `true` if this map contains the specified key,
+    /// `false` otherwise.
     public boolean containsKey(Object key) {
         Iterator<Map.Entry<K, V>> it = entrySet().iterator();
         if (key != null) {
@@ -310,14 +315,16 @@ public abstract class AbstractMap<K, V> implements Map<K, V> {
         return false;
     }
 
-    /**
-     * Returns whether this map contains the specified value.
-     * 
-     * @param value
-     *            the value to search for.
-     * @return {@code true} if this map contains the specified value,
-     *         {@code false} otherwise.
-     */
+    /// Returns whether this map contains the specified value.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the value to search for.
+    ///
+    /// #### Returns
+    ///
+    /// @return `true` if this map contains the specified value,
+    /// `false` otherwise.
     public boolean containsValue(Object value) {
         Iterator<Map.Entry<K, V>> it = entrySet().iterator();
         if (value != null) {
@@ -336,26 +343,32 @@ public abstract class AbstractMap<K, V> implements Map<K, V> {
         return false;
     }
 
-    /**
-     * Returns a set containing all of the mappings in this map. Each mapping is
-     * an instance of {@link Map.Entry}. As the set is backed by this map,
-     * changes in one will be reflected in the other.
-     * 
-     * @return a set of the mappings.
-     */
+    /// Returns a set containing all of the mappings in this map. Each mapping is
+    /// an instance of `Map.Entry`. As the set is backed by this map,
+    /// changes in one will be reflected in the other.
+    ///
+    /// #### Returns
+    ///
+    /// a set of the mappings.
     public abstract Set<Map.Entry<K, V>> entrySet();
 
-    /**
-     * Compares the specified object to this instance, and returns {@code true}
-     * if the specified object is a map and both maps contain the same mappings.
-     * 
-     * @param object
-     *            the object to compare with this object.
-     * @return boolean {@code true} if the object is the same as this object,
-     *         and {@code false} if it is different from this object.
-     * @see #hashCode()
-     * @see #entrySet()
-     */
+    /// Compares the specified object to this instance, and returns `true`
+    /// if the specified object is a map and both maps contain the same mappings.
+    ///
+    /// #### Parameters
+    ///
+    /// - `object`: the object to compare with this object.
+    ///
+    /// #### Returns
+    ///
+    /// @return boolean `true` if the object is the same as this object,
+    /// and `false` if it is different from this object.
+    ///
+    /// #### See also
+    ///
+    /// - #hashCode()
+    ///
+    /// - #entrySet()
     @Override
     public boolean equals(Object object) {
         if (this == object) {
@@ -392,14 +405,16 @@ public abstract class AbstractMap<K, V> implements Map<K, V> {
         return false;
     }
 
-    /**
-     * Returns the value of the mapping with the specified key.
-     * 
-     * @param key
-     *            the key.
-     * @return the value of the mapping with the specified key, or {@code null}
-     *         if no mapping for the specified key is found.
-     */
+    /// Returns the value of the mapping with the specified key.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key.
+    ///
+    /// #### Returns
+    ///
+    /// @return the value of the mapping with the specified key, or `null`
+    /// if no mapping for the specified key is found.
     public V get(Object key) {
         Iterator<Map.Entry<K, V>> it = entrySet().iterator();
         if (key != null) {
@@ -420,13 +435,16 @@ public abstract class AbstractMap<K, V> implements Map<K, V> {
         return null;
     }
 
-    /**
-     * Returns the hash code for this object. Objects which are equal must
-     * return the same value for this method.
-     * 
-     * @return the hash code of this object.
-     * @see #equals(Object)
-     */
+    /// Returns the hash code for this object. Objects which are equal must
+    /// return the same value for this method.
+    ///
+    /// #### Returns
+    ///
+    /// the hash code of this object.
+    ///
+    /// #### See also
+    ///
+    /// - #equals(Object)
     @Override
     public int hashCode() {
         int result = 0;
@@ -437,24 +455,27 @@ public abstract class AbstractMap<K, V> implements Map<K, V> {
         return result;
     }
 
-    /**
-     * Returns whether this map is empty.
-     * 
-     * @return {@code true} if this map has no elements, {@code false}
-     *         otherwise.
-     * @see #size()
-     */
+    /// Returns whether this map is empty.
+    ///
+    /// #### Returns
+    ///
+    /// @return `true` if this map has no elements, `false`
+    /// otherwise.
+    ///
+    /// #### See also
+    ///
+    /// - #size()
     public boolean isEmpty() {
         return size() == 0;
     }
 
-    /**
-     * Returns a set of the keys contained in this map. The set is backed by
-     * this map so changes to one are reflected by the other. The returned set
-     * does not support adding.
-     * 
-     * @return a set of the keys.
-     */
+    /// Returns a set of the keys contained in this map. The set is backed by
+    /// this map so changes to one are reflected by the other. The returned set
+    /// does not support adding.
+    ///
+    /// #### Returns
+    ///
+    /// a set of the keys.
     public Set<K> keySet() {
         if (keySet == null) {
             keySet = new AbstractSet<K>() {
@@ -492,48 +513,57 @@ public abstract class AbstractMap<K, V> implements Map<K, V> {
         return keySet;
     }
 
-    /**
-     * Maps the specified key to the specified value.
-     * 
-     * @param key
-     *            the key.
-     * @param value
-     *            the value.
-     * @return the value of any previous mapping with the specified key or
-     *         {@code null} if there was no mapping.
-     * @throws UnsupportedOperationException
-     *                if adding to this map is not supported.
-     * @throws ClassCastException
-     *                if the class of the key or value is inappropriate for this
-     *                map.
-     * @throws IllegalArgumentException
-     *                if the key or value cannot be added to this map.
-     * @throws NullPointerException
-     *                if the key or value is {@code null} and this Map does not
-     *                support {@code null} keys or values.
-     */
+    /// Maps the specified key to the specified value.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key.
+    ///
+    /// - `value`: the value.
+    ///
+    /// #### Returns
+    ///
+    /// @return the value of any previous mapping with the specified key or
+    /// `null` if there was no mapping.
+    ///
+    /// #### Throws
+    ///
+    /// - `UnsupportedOperationException`: if adding to this map is not supported.
+    ///
+    /// - `ClassCastException`: @throws ClassCastException
+    /// if the class of the key or value is inappropriate for this
+    /// map.
+    ///
+    /// - `IllegalArgumentException`: if the key or value cannot be added to this map.
+    ///
+    /// - `NullPointerException`: @throws NullPointerException
+    /// if the key or value is `null` and this Map does not
+    /// support `null` keys or values.
     public V put(@SuppressWarnings("unused")
     K key, @SuppressWarnings("unused")
     V value) {
         throw new UnsupportedOperationException();
     }
 
-    /**
-     * Copies every mapping in the specified map to this map.
-     * 
-     * @param map
-     *            the map to copy mappings from.
-     * @throws UnsupportedOperationException
-     *                if adding to this map is not supported.
-     * @throws ClassCastException
-     *                if the class of a key or value is inappropriate for this
-     *                map.
-     * @throws IllegalArgumentException
-     *                if a key or value cannot be added to this map.
-     * @throws NullPointerException
-     *                if a key or value is {@code null} and this map does not
-     *                support {@code null} keys or values.
-     */
+    /// Copies every mapping in the specified map to this map.
+    ///
+    /// #### Parameters
+    ///
+    /// - `map`: the map to copy mappings from.
+    ///
+    /// #### Throws
+    ///
+    /// - `UnsupportedOperationException`: if adding to this map is not supported.
+    ///
+    /// - `ClassCastException`: @throws ClassCastException
+    /// if the class of a key or value is inappropriate for this
+    /// map.
+    ///
+    /// - `IllegalArgumentException`: if a key or value cannot be added to this map.
+    ///
+    /// - `NullPointerException`: @throws NullPointerException
+    /// if a key or value is `null` and this map does not
+    /// support `null` keys or values.
     public void putAll(Map<? extends K, ? extends V> map) {
         Iterator it = map.entrySet().iterator();
         while (it.hasNext()) {
@@ -542,16 +572,20 @@ public abstract class AbstractMap<K, V> implements Map<K, V> {
         }
     }
 
-    /**
-     * Removes a mapping with the specified key from this Map.
-     * 
-     * @param key
-     *            the key of the mapping to remove.
-     * @return the value of the removed mapping or {@code null} if no mapping
-     *         for the specified key was found.
-     * @throws UnsupportedOperationException
-     *                if removing from this map is not supported.
-     */
+    /// Removes a mapping with the specified key from this Map.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key of the mapping to remove.
+    ///
+    /// #### Returns
+    ///
+    /// @return the value of the removed mapping or `null` if no mapping
+    /// for the specified key was found.
+    ///
+    /// #### Throws
+    ///
+    /// - `UnsupportedOperationException`: if removing from this map is not supported.
     public V remove(Object key) {
         Iterator<Map.Entry<K, V>> it = entrySet().iterator();
         if (key != null) {
@@ -574,20 +608,20 @@ public abstract class AbstractMap<K, V> implements Map<K, V> {
         return null;
     }
 
-    /**
-     * Returns the number of elements in this map.
-     * 
-     * @return the number of elements in this map.
-     */
+    /// Returns the number of elements in this map.
+    ///
+    /// #### Returns
+    ///
+    /// the number of elements in this map.
     public int size() {
         return entrySet().size();
     }
 
-    /**
-     * Returns the string representation of this map.
-     * 
-     * @return the string representation of this map.
-     */
+    /// Returns the string representation of this map.
+    ///
+    /// #### Returns
+    ///
+    /// the string representation of this map.
     @Override
     public String toString() {
         if (isEmpty()) {
@@ -620,25 +654,25 @@ public abstract class AbstractMap<K, V> implements Map<K, V> {
         return buffer.toString();
     }
 
-    /**
-     * Returns a collection of the values contained in this map. The collection
-     * is backed by this map so changes to one are reflected by the other. The
-     * collection supports remove, removeAll, retainAll and clear operations,
-     * and it does not support add or addAll operations.
-     * <p>
-     * This method returns a collection which is the subclass of
-     * AbstractCollection. The iterator method of this subclass returns a
-     * "wrapper object" over the iterator of map's entrySet(). The {@code size}
-     * method wraps the map's size method and the {@code contains} method wraps
-     * the map's containsValue method.
-     * <p>
-     * The collection is created when this method is called for the first time
-     * and returned in response to all subsequent calls. This method may return
-     * different collections when multiple concurrent calls occur to this
-     * method, since no synchronization is performed.
-     *
-     * @return a collection of the values contained in this map.
-     */
+    /// Returns a collection of the values contained in this map. The collection
+    /// is backed by this map so changes to one are reflected by the other. The
+    /// collection supports remove, removeAll, retainAll and clear operations,
+    /// and it does not support add or addAll operations.
+    ///
+    /// This method returns a collection which is the subclass of
+    /// AbstractCollection. The iterator method of this subclass returns a
+    /// "wrapper object" over the iterator of map's entrySet(). The `size`
+    /// method wraps the map's size method and the `contains` method wraps
+    /// the map's containsValue method.
+    ///
+    /// The collection is created when this method is called for the first time
+    /// and returned in response to all subsequent calls. This method may return
+    /// different collections when multiple concurrent calls occur to this
+    /// method, since no synchronization is performed.
+    ///
+    /// #### Returns
+    ///
+    /// a collection of the values contained in this map.
     public Collection<V> values() {
         if (valuesCollection == null) {
             valuesCollection = new AbstractCollection<V>() {

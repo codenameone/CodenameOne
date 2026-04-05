@@ -17,74 +17,68 @@
 
 package java.util;
 
-/**
- * Vector is a variable size contiguous indexable array of objects. The size of
- * the vector is the number of objects it contains. The capacity of the vector
- * is the number of objects it can hold.
- * <p>
- * Objects may be inserted at any position up to the size of the vector, thus
- * increasing the size of the vector. Objects at any position in the vector may
- * be removed, thus shrinking the size of the Vector. Objects at any position in
- * the Vector may be replaced, which does not affect the vector's size.
- * <p>
- * The capacity of a vector may be specified when the vector is created. If the
- * capacity of the vector is exceeded, the capacity is increased (doubled by
- * default).
- * 
- * @see java.lang.StringBuffer
- */
+/// Vector is a variable size contiguous indexable array of objects. The size of
+/// the vector is the number of objects it contains. The capacity of the vector
+/// is the number of objects it can hold.
+///
+/// Objects may be inserted at any position up to the size of the vector, thus
+/// increasing the size of the vector. Objects at any position in the vector may
+/// be removed, thus shrinking the size of the Vector. Objects at any position in
+/// the Vector may be replaced, which does not affect the vector's size.
+///
+/// The capacity of a vector may be specified when the vector is created. If the
+/// capacity of the vector is exceeded, the capacity is increased (doubled by
+/// default).
+///
+/// #### See also
+///
+/// - java.lang.StringBuffer
 public class Vector<E> extends AbstractList<E> implements List<E>,
         RandomAccess {
 
-    /**
-     * The number of elements or the size of the vector.
-     */
+    /// The number of elements or the size of the vector.
     protected int elementCount;
 
-    /**
-     * The elements of the vector.
-     */
+    /// The elements of the vector.
     protected Object[] elementData;
 
-    /**
-     * How many elements should be added to the vector when it is detected that
-     * it needs to grow to accommodate extra entries. If this value is zero or
-     * negative the size will be doubled if an increase is needed.
-     */
+    /// How many elements should be added to the vector when it is detected that
+    /// it needs to grow to accommodate extra entries. If this value is zero or
+    /// negative the size will be doubled if an increase is needed.
     protected int capacityIncrement;
 
     private static final int DEFAULT_SIZE = 10;
 
-    /**
-     * Constructs a new vector using the default capacity.
-     */
+    /// Constructs a new vector using the default capacity.
     public Vector() {
         this(DEFAULT_SIZE, 0);
     }
 
-    /**
-     * Constructs a new vector using the specified capacity.
-     * 
-     * @param capacity
-     *            the initial capacity of the new vector.
-     * @throws IllegalArgumentException
-     *             if {@code capacity} is negative.
-     */
+    /// Constructs a new vector using the specified capacity.
+    ///
+    /// #### Parameters
+    ///
+    /// - `capacity`: the initial capacity of the new vector.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if `capacity` is negative.
     public Vector(int capacity) {
         this(capacity, 0);
     }
 
-    /**
-     * Constructs a new vector using the specified capacity and capacity
-     * increment.
-     * 
-     * @param capacity
-     *            the initial capacity of the new vector.
-     * @param capacityIncrement
-     *            the amount to increase the capacity when this vector is full.
-     * @throws IllegalArgumentException
-     *             if {@code capacity} is negative.
-     */
+    /// Constructs a new vector using the specified capacity and capacity
+    /// increment.
+    ///
+    /// #### Parameters
+    ///
+    /// - `capacity`: the initial capacity of the new vector.
+    ///
+    /// - `capacityIncrement`: the amount to increase the capacity when this vector is full.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if `capacity` is negative.
     public Vector(int capacity, int capacityIncrement) {
         if (capacity < 0) {
             throw new IllegalArgumentException();
@@ -94,14 +88,13 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
         this.capacityIncrement = capacityIncrement;
     }
 
-    /**
-     * Constructs a new instance of {@code Vector} containing the elements in
-     * {@code collection}. The order of the elements in the new {@code Vector}
-     * is dependent on the iteration order of the seed collection.
-     * 
-     * @param collection
-     *            the collection of elements to add.
-     */
+    /// Constructs a new instance of `Vector` containing the elements in
+    /// `collection`. The order of the elements in the new `Vector`
+    /// is dependent on the iteration order of the seed collection.
+    ///
+    /// #### Parameters
+    ///
+    /// - `collection`: the collection of elements to add.
     public Vector(Collection<? extends E> collection) {
         this(collection.size(), 0);
         Iterator<? extends E> it = collection.iterator();
@@ -115,33 +108,40 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
         return (E[]) new Object[size];
     }
 
-    /**
-     * Adds the specified object into this vector at the specified location. The
-     * object is inserted before any element with the same or a higher index
-     * increasing their index by 1. If the location is equal to the size of this
-     * vector, the object is added at the end.
-     * 
-     * @param location
-     *            the index at which to insert the element.
-     * @param object
-     *            the object to insert in this vector.
-     * @throws ArrayIndexOutOfBoundsException
-     *                if {@code location < 0 || location > size()}.
-     * @see #addElement
-     * @see #size
-     */
+    /// Adds the specified object into this vector at the specified location. The
+    /// object is inserted before any element with the same or a higher index
+    /// increasing their index by 1. If the location is equal to the size of this
+    /// vector, the object is added at the end.
+    ///
+    /// #### Parameters
+    ///
+    /// - `location`: the index at which to insert the element.
+    ///
+    /// - `object`: the object to insert in this vector.
+    ///
+    /// #### Throws
+    ///
+    /// - `ArrayIndexOutOfBoundsException`: if `location  size()`.
+    ///
+    /// #### See also
+    ///
+    /// - #addElement
+    ///
+    /// - #size
     @Override
     public void add(int location, E object) {
         insertElementAt(object, location);
     }
 
-    /**
-     * Adds the specified object at the end of this vector.
-     * 
-     * @param object
-     *            the object to add to the vector.
-     * @return {@code true}
-     */
+    /// Adds the specified object at the end of this vector.
+    ///
+    /// #### Parameters
+    ///
+    /// - `object`: the object to add to the vector.
+    ///
+    /// #### Returns
+    ///
+    /// `true`
     @Override
     public synchronized boolean add(E object) {
         if (elementCount == elementData.length) {
@@ -152,21 +152,25 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
         return true;
     }
 
-    /**
-     * Inserts the objects in the specified collection at the specified location
-     * in this vector. The objects are inserted in the order in which they are
-     * returned from the Collection iterator. The elements with an index equal
-     * or higher than {@code location} have their index increased by the size of
-     * the added collection.
-     * 
-     * @param location
-     *            the location to insert the objects.
-     * @param collection
-     *            the collection of objects.
-     * @return {@code true} if this vector is modified, {@code false} otherwise.
-     * @throws ArrayIndexOutOfBoundsException
-     *                if {@code location < 0} or {@code location > size()}.
-     */
+    /// Inserts the objects in the specified collection at the specified location
+    /// in this vector. The objects are inserted in the order in which they are
+    /// returned from the Collection iterator. The elements with an index equal
+    /// or higher than `location` have their index increased by the size of
+    /// the added collection.
+    ///
+    /// #### Parameters
+    ///
+    /// - `location`: the location to insert the objects.
+    ///
+    /// - `collection`: the collection of objects.
+    ///
+    /// #### Returns
+    ///
+    /// `true` if this vector is modified, `false` otherwise.
+    ///
+    /// #### Throws
+    ///
+    /// - `ArrayIndexOutOfBoundsException`: if `location  size()`.
     @Override
     public synchronized boolean addAll(int location,
             Collection<? extends E> collection) {
@@ -195,24 +199,25 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
         throw new ArrayIndexOutOfBoundsException(location);
     }
 
-    /**
-     * Adds the objects in the specified collection to the end of this vector.
-     * 
-     * @param collection
-     *            the collection of objects.
-     * @return {@code true} if this vector is modified, {@code false} otherwise.
-     */
+    /// Adds the objects in the specified collection to the end of this vector.
+    ///
+    /// #### Parameters
+    ///
+    /// - `collection`: the collection of objects.
+    ///
+    /// #### Returns
+    ///
+    /// `true` if this vector is modified, `false` otherwise.
     @Override
     public synchronized boolean addAll(Collection<? extends E> collection) {
         return addAll(elementCount, collection);
     }
 
-    /**
-     * Adds the specified object at the end of this vector.
-     * 
-     * @param object
-     *            the object to add to the vector.
-     */
+    /// Adds the specified object at the end of this vector.
+    ///
+    /// #### Parameters
+    ///
+    /// - `object`: the object to add to the vector.
     public synchronized void addElement(E object) {
         if (elementCount == elementData.length) {
             growByOne();
@@ -221,82 +226,108 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
         modCount++;
     }
 
-    /**
-     * Returns the number of elements this vector can hold without growing.
-     * 
-     * @return the capacity of this vector.
-     * @see #ensureCapacity
-     * @see #size
-     */
+    /// Returns the number of elements this vector can hold without growing.
+    ///
+    /// #### Returns
+    ///
+    /// the capacity of this vector.
+    ///
+    /// #### See also
+    ///
+    /// - #ensureCapacity
+    ///
+    /// - #size
     public synchronized int capacity() {
         return elementData.length;
     }
 
-    /**
-     * Removes all elements from this vector, leaving it empty.
-     * 
-     * @see #isEmpty
-     * @see #size
-     */
+    /// Removes all elements from this vector, leaving it empty.
+    ///
+    /// #### See also
+    ///
+    /// - #isEmpty
+    ///
+    /// - #size
     @Override
     public void clear() {
         removeAllElements();
     }
 
-    /**
-     * Searches this vector for the specified object.
-     * 
-     * @param object
-     *            the object to look for in this vector.
-     * @return {@code true} if object is an element of this vector,
-     *         {@code false} otherwise.
-     * @see #indexOf(Object)
-     * @see #indexOf(Object, int)
-     * @see java.lang.Object#equals
-     */
+    /// Searches this vector for the specified object.
+    ///
+    /// #### Parameters
+    ///
+    /// - `object`: the object to look for in this vector.
+    ///
+    /// #### Returns
+    ///
+    /// @return `true` if object is an element of this vector,
+    /// `false` otherwise.
+    ///
+    /// #### See also
+    ///
+    /// - #indexOf(Object)
+    ///
+    /// - #indexOf(Object, int)
+    ///
+    /// - java.lang.Object#equals
     @Override
     public boolean contains(Object object) {
         return indexOf(object, 0) != -1;
     }
 
-    /**
-     * Searches this vector for all objects in the specified collection.
-     * 
-     * @param collection
-     *            the collection of objects.
-     * @return {@code true} if all objects in the specified collection are
-     *         elements of this vector, {@code false} otherwise.
-     */
+    /// Searches this vector for all objects in the specified collection.
+    ///
+    /// #### Parameters
+    ///
+    /// - `collection`: the collection of objects.
+    ///
+    /// #### Returns
+    ///
+    /// @return `true` if all objects in the specified collection are
+    /// elements of this vector, `false` otherwise.
     @Override
     public synchronized boolean containsAll(Collection<?> collection) {
         return super.containsAll(collection);
     }
 
-    /**
-     * Attempts to copy elements contained by this {@code Vector} into the
-     * corresponding elements of the supplied {@code Object} array.
-     * 
-     * @param elements
-     *            the {@code Object} array into which the elements of this
-     *            vector are copied.
-     * @throws IndexOutOfBoundsException
-     *             if {@code elements} is not big enough.
-     * @see #clone
-     */
+    /// Attempts to copy elements contained by this `Vector` into the
+    /// corresponding elements of the supplied `Object` array.
+    ///
+    /// #### Parameters
+    ///
+    /// - `elements`: @param elements
+    /// the `Object` array into which the elements of this
+    /// vector are copied.
+    ///
+    /// #### Throws
+    ///
+    /// - `IndexOutOfBoundsException`: if `elements` is not big enough.
+    ///
+    /// #### See also
+    ///
+    /// - #clone
     public synchronized void copyInto(Object[] elements) {
         System.arraycopy(elementData, 0, elements, 0, elementCount);
     }
 
-    /**
-     * Returns the element at the specified location in this vector.
-     * 
-     * @param location
-     *            the index of the element to return in this vector.
-     * @return the element at the specified location.
-     * @throws ArrayIndexOutOfBoundsException
-     *                if {@code location < 0 || location >= size()}.
-     * @see #size
-     */
+    /// Returns the element at the specified location in this vector.
+    ///
+    /// #### Parameters
+    ///
+    /// - `location`: the index of the element to return in this vector.
+    ///
+    /// #### Returns
+    ///
+    /// the element at the specified location.
+    ///
+    /// #### Throws
+    ///
+    /// - `ArrayIndexOutOfBoundsException`: if `location = size()`.
+    ///
+    /// #### See also
+    ///
+    /// - #size
     @SuppressWarnings("unchecked")
     public synchronized E elementAt(int location) {
         if (location < elementCount) {
@@ -305,14 +336,18 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
         throw new ArrayIndexOutOfBoundsException(location);
     }
 
-    /**
-     * Returns an enumeration on the elements of this vector. The results of the
-     * enumeration may be affected if the contents of this vector is modified.
-     * 
-     * @return an enumeration of the elements of this vector.
-     * @see #elementAt
-     * @see Enumeration
-     */
+    /// Returns an enumeration on the elements of this vector. The results of the
+    /// enumeration may be affected if the contents of this vector is modified.
+    ///
+    /// #### Returns
+    ///
+    /// an enumeration of the elements of this vector.
+    ///
+    /// #### See also
+    ///
+    /// - #elementAt
+    ///
+    /// - Enumeration
     public java.util.Enumeration<E> elements() {
         return new java.util.Enumeration<E>() {
             int pos = 0;
@@ -333,15 +368,18 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
         };
     }
 
-    /**
-     * Ensures that this vector can hold the specified number of elements
-     * without growing.
-     * 
-     * @param minimumCapacity
-     *            the minimum number of elements that this vector will hold
-     *            before growing.
-     * @see #capacity
-     */
+    /// Ensures that this vector can hold the specified number of elements
+    /// without growing.
+    ///
+    /// #### Parameters
+    ///
+    /// - `minimumCapacity`: @param minimumCapacity
+    /// the minimum number of elements that this vector will hold
+    /// before growing.
+    ///
+    /// #### See also
+    ///
+    /// - #capacity
     public synchronized void ensureCapacity(int minimumCapacity) {
         if (elementData.length < minimumCapacity) {
             int next = (capacityIncrement <= 0 ? elementData.length
@@ -351,17 +389,22 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
         }
     }
 
-    /**
-     * Compares the specified object to this vector and returns if they are
-     * equal. The object must be a List which contains the same objects in the
-     * same order.
-     * 
-     * @param object
-     *            the object to compare with this object
-     * @return {@code true} if the specified object is equal to this vector,
-     *         {@code false} otherwise.
-     * @see #hashCode
-     */
+    /// Compares the specified object to this vector and returns if they are
+    /// equal. The object must be a List which contains the same objects in the
+    /// same order.
+    ///
+    /// #### Parameters
+    ///
+    /// - `object`: the object to compare with this object
+    ///
+    /// #### Returns
+    ///
+    /// @return `true` if the specified object is equal to this vector,
+    /// `false` otherwise.
+    ///
+    /// #### See also
+    ///
+    /// - #hashCode
     @Override
     public synchronized boolean equals(Object object) {
         if (this == object) {
@@ -386,16 +429,23 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
         return false;
     }
 
-    /**
-     * Returns the first element in this vector.
-     * 
-     * @return the element at the first position.
-     * @throws NoSuchElementException
-     *                if this vector is empty.
-     * @see #elementAt
-     * @see #lastElement
-     * @see #size
-     */
+    /// Returns the first element in this vector.
+    ///
+    /// #### Returns
+    ///
+    /// the element at the first position.
+    ///
+    /// #### Throws
+    ///
+    /// - `NoSuchElementException`: if this vector is empty.
+    ///
+    /// #### See also
+    ///
+    /// - #elementAt
+    ///
+    /// - #lastElement
+    ///
+    /// - #size
     @SuppressWarnings("unchecked")
     public synchronized E firstElement() {
         if (elementCount > 0) {
@@ -404,16 +454,23 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
         throw new NoSuchElementException();
     }
 
-    /**
-     * Returns the element at the specified location in this vector.
-     * 
-     * @param location
-     *            the index of the element to return in this vector.
-     * @return the element at the specified location.
-     * @throws ArrayIndexOutOfBoundsException
-     *                if {@code location < 0 || location >= size()}.
-     * @see #size
-     */
+    /// Returns the element at the specified location in this vector.
+    ///
+    /// #### Parameters
+    ///
+    /// - `location`: the index of the element to return in this vector.
+    ///
+    /// #### Returns
+    ///
+    /// the element at the specified location.
+    ///
+    /// #### Throws
+    ///
+    /// - `ArrayIndexOutOfBoundsException`: if `location = size()`.
+    ///
+    /// #### See also
+    ///
+    /// - #size
     @Override
     public E get(int location) {
         return elementAt(location);
@@ -426,9 +483,7 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
         elementData = newData;
     }
 
-    /**
-     * JIT optimization
-     */
+    /// JIT optimization
     private void growByOne() {
         int adding = 0;
         if (capacityIncrement <= 0) {
@@ -464,13 +519,16 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
         elementData = newData;
     }
 
-    /**
-     * Returns an integer hash code for the receiver. Objects which are equal
-     * return the same value for this method.
-     * 
-     * @return the receiver's hash.
-     * @see #equals
-     */
+    /// Returns an integer hash code for the receiver. Objects which are equal
+    /// return the same value for this method.
+    ///
+    /// #### Returns
+    ///
+    /// the receiver's hash.
+    ///
+    /// #### See also
+    ///
+    /// - #equals
     @Override
     public synchronized int hashCode() {
         int result = 1;
@@ -481,41 +539,57 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
         return result;
     }
 
-    /**
-     * Searches in this vector for the index of the specified object. The search
-     * for the object starts at the beginning and moves towards the end of this
-     * vector.
-     * 
-     * @param object
-     *            the object to find in this vector.
-     * @return the index in this vector of the specified element, -1 if the
-     *         element isn't found.
-     * @see #contains
-     * @see #lastIndexOf(Object)
-     * @see #lastIndexOf(Object, int)
-     */
+    /// Searches in this vector for the index of the specified object. The search
+    /// for the object starts at the beginning and moves towards the end of this
+    /// vector.
+    ///
+    /// #### Parameters
+    ///
+    /// - `object`: the object to find in this vector.
+    ///
+    /// #### Returns
+    ///
+    /// @return the index in this vector of the specified element, -1 if the
+    /// element isn't found.
+    ///
+    /// #### See also
+    ///
+    /// - #contains
+    ///
+    /// - #lastIndexOf(Object)
+    ///
+    /// - #lastIndexOf(Object, int)
     @Override
     public int indexOf(Object object) {
         return indexOf(object, 0);
     }
 
-    /**
-     * Searches in this vector for the index of the specified object. The search
-     * for the object starts at the specified location and moves towards the end
-     * of this vector.
-     * 
-     * @param object
-     *            the object to find in this vector.
-     * @param location
-     *            the index at which to start searching.
-     * @return the index in this vector of the specified element, -1 if the
-     *         element isn't found.
-     * @throws ArrayIndexOutOfBoundsException
-     *                if {@code location < 0}.
-     * @see #contains
-     * @see #lastIndexOf(Object)
-     * @see #lastIndexOf(Object, int)
-     */
+    /// Searches in this vector for the index of the specified object. The search
+    /// for the object starts at the specified location and moves towards the end
+    /// of this vector.
+    ///
+    /// #### Parameters
+    ///
+    /// - `object`: the object to find in this vector.
+    ///
+    /// - `location`: the index at which to start searching.
+    ///
+    /// #### Returns
+    ///
+    /// @return the index in this vector of the specified element, -1 if the
+    /// element isn't found.
+    ///
+    /// #### Throws
+    ///
+    /// - `ArrayIndexOutOfBoundsException`: if `location < 0`.
+    ///
+    /// #### See also
+    ///
+    /// - #contains
+    ///
+    /// - #lastIndexOf(Object)
+    ///
+    /// - #lastIndexOf(Object, int)
     public synchronized int indexOf(Object object, int location) {
         if (object != null) {
             for (int i = location; i < elementCount; i++) {
@@ -533,22 +607,27 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
         return -1;
     }
 
-    /**
-     * Inserts the specified object into this vector at the specified location.
-     * This object is inserted before any previous element at the specified
-     * location. All elements with an index equal or greater than
-     * {@code location} have their index increased by 1. If the location is
-     * equal to the size of this vector, the object is added at the end.
-     * 
-     * @param object
-     *            the object to insert in this vector.
-     * @param location
-     *            the index at which to insert the element.
-     * @throws ArrayIndexOutOfBoundsException
-     *                if {@code location < 0 || location > size()}.
-     * @see #addElement
-     * @see #size
-     */
+    /// Inserts the specified object into this vector at the specified location.
+    /// This object is inserted before any previous element at the specified
+    /// location. All elements with an index equal or greater than
+    /// `location` have their index increased by 1. If the location is
+    /// equal to the size of this vector, the object is added at the end.
+    ///
+    /// #### Parameters
+    ///
+    /// - `object`: the object to insert in this vector.
+    ///
+    /// - `location`: the index at which to insert the element.
+    ///
+    /// #### Throws
+    ///
+    /// - `ArrayIndexOutOfBoundsException`: if `location  size()`.
+    ///
+    /// #### See also
+    ///
+    /// - #addElement
+    ///
+    /// - #size
     public synchronized void insertElementAt(E object, int location) {
         if (0 <= location && location <= elementCount) {
             if (elementCount == elementData.length) {
@@ -567,28 +646,38 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
         }
     }
 
-    /**
-     * Returns if this vector has no elements, a size of zero.
-     * 
-     * @return {@code true} if this vector has no elements, {@code false}
-     *         otherwise.
-     * @see #size
-     */
+    /// Returns if this vector has no elements, a size of zero.
+    ///
+    /// #### Returns
+    ///
+    /// @return `true` if this vector has no elements, `false`
+    /// otherwise.
+    ///
+    /// #### See also
+    ///
+    /// - #size
     @Override
     public synchronized boolean isEmpty() {
         return elementCount == 0;
     }
 
-    /**
-     * Returns the last element in this vector.
-     * 
-     * @return the element at the last position.
-     * @throws NoSuchElementException
-     *                if this vector is empty.
-     * @see #elementAt
-     * @see #firstElement
-     * @see #size
-     */
+    /// Returns the last element in this vector.
+    ///
+    /// #### Returns
+    ///
+    /// the element at the last position.
+    ///
+    /// #### Throws
+    ///
+    /// - `NoSuchElementException`: if this vector is empty.
+    ///
+    /// #### See also
+    ///
+    /// - #elementAt
+    ///
+    /// - #firstElement
+    ///
+    /// - #size
     @SuppressWarnings("unchecked")
     public synchronized E lastElement() {
         try {
@@ -598,41 +687,57 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
         }
     }
 
-    /**
-     * Searches in this vector for the index of the specified object. The search
-     * for the object starts at the end and moves towards the start of this
-     * vector.
-     * 
-     * @param object
-     *            the object to find in this vector.
-     * @return the index in this vector of the specified element, -1 if the
-     *         element isn't found.
-     * @see #contains
-     * @see #indexOf(Object)
-     * @see #indexOf(Object, int)
-     */
+    /// Searches in this vector for the index of the specified object. The search
+    /// for the object starts at the end and moves towards the start of this
+    /// vector.
+    ///
+    /// #### Parameters
+    ///
+    /// - `object`: the object to find in this vector.
+    ///
+    /// #### Returns
+    ///
+    /// @return the index in this vector of the specified element, -1 if the
+    /// element isn't found.
+    ///
+    /// #### See also
+    ///
+    /// - #contains
+    ///
+    /// - #indexOf(Object)
+    ///
+    /// - #indexOf(Object, int)
     @Override
     public synchronized int lastIndexOf(Object object) {
         return lastIndexOf(object, elementCount - 1);
     }
 
-    /**
-     * Searches in this vector for the index of the specified object. The search
-     * for the object starts at the specified location and moves towards the
-     * start of this vector.
-     * 
-     * @param object
-     *            the object to find in this vector.
-     * @param location
-     *            the index at which to start searching.
-     * @return the index in this vector of the specified element, -1 if the
-     *         element isn't found.
-     * @throws ArrayIndexOutOfBoundsException
-     *                if {@code location >= size()}.
-     * @see #contains
-     * @see #indexOf(Object)
-     * @see #indexOf(Object, int)
-     */
+    /// Searches in this vector for the index of the specified object. The search
+    /// for the object starts at the specified location and moves towards the
+    /// start of this vector.
+    ///
+    /// #### Parameters
+    ///
+    /// - `object`: the object to find in this vector.
+    ///
+    /// - `location`: the index at which to start searching.
+    ///
+    /// #### Returns
+    ///
+    /// @return the index in this vector of the specified element, -1 if the
+    /// element isn't found.
+    ///
+    /// #### Throws
+    ///
+    /// - `ArrayIndexOutOfBoundsException`: if `location >= size()`.
+    ///
+    /// #### See also
+    ///
+    /// - #contains
+    ///
+    /// - #indexOf(Object)
+    ///
+    /// - #indexOf(Object, int)
     public synchronized int lastIndexOf(Object object, int location) {
         if (location < elementCount) {
             if (object != null) {
@@ -653,17 +758,21 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
         throw new ArrayIndexOutOfBoundsException(location);
     }
 
-    /**
-     * Removes the object at the specified location from this vector. All
-     * elements with an index bigger than {@code location} have their index
-     * decreased by 1.
-     * 
-     * @param location
-     *            the index of the object to remove.
-     * @return the removed object.
-     * @throws IndexOutOfBoundsException
-     *                if {@code location < 0 || location >= size()}.
-     */
+    /// Removes the object at the specified location from this vector. All
+    /// elements with an index bigger than `location` have their index
+    /// decreased by 1.
+    ///
+    /// #### Parameters
+    ///
+    /// - `location`: the index of the object to remove.
+    ///
+    /// #### Returns
+    ///
+    /// the removed object.
+    ///
+    /// #### Throws
+    ///
+    /// - `IndexOutOfBoundsException`: if `location = size()`.
     @SuppressWarnings("unchecked")
     @Override
     public synchronized E remove(int location) {
@@ -682,47 +791,61 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
         throw new ArrayIndexOutOfBoundsException(location);
     }
 
-    /**
-     * Removes the first occurrence, starting at the beginning and moving
-     * towards the end, of the specified object from this vector. All elements
-     * with an index bigger than the element that gets removed have their index
-     * decreased by 1.
-     * 
-     * @param object
-     *            the object to remove from this vector.
-     * @return {@code true} if the specified object was found, {@code false}
-     *         otherwise.
-     * @see #removeAllElements
-     * @see #removeElementAt
-     * @see #size
-     */
+    /// Removes the first occurrence, starting at the beginning and moving
+    /// towards the end, of the specified object from this vector. All elements
+    /// with an index bigger than the element that gets removed have their index
+    /// decreased by 1.
+    ///
+    /// #### Parameters
+    ///
+    /// - `object`: the object to remove from this vector.
+    ///
+    /// #### Returns
+    ///
+    /// @return `true` if the specified object was found, `false`
+    /// otherwise.
+    ///
+    /// #### See also
+    ///
+    /// - #removeAllElements
+    ///
+    /// - #removeElementAt
+    ///
+    /// - #size
     @Override
     public boolean remove(Object object) {
         return removeElement(object);
     }
 
-    /**
-     * Removes all occurrences in this vector of each object in the specified
-     * Collection.
-     * 
-     * @param collection
-     *            the collection of objects to remove.
-     * @return {@code true} if this vector is modified, {@code false} otherwise.
-     * @see #remove(Object)
-     * @see #contains(Object)
-     */
+    /// Removes all occurrences in this vector of each object in the specified
+    /// Collection.
+    ///
+    /// #### Parameters
+    ///
+    /// - `collection`: the collection of objects to remove.
+    ///
+    /// #### Returns
+    ///
+    /// `true` if this vector is modified, `false` otherwise.
+    ///
+    /// #### See also
+    ///
+    /// - #remove(Object)
+    ///
+    /// - #contains(Object)
     @Override
     public synchronized boolean removeAll(Collection<?> collection) {
         return super.removeAll(collection);
     }
 
-    /**
-     * Removes all elements from this vector, leaving the size zero and the
-     * capacity unchanged.
-     * 
-     * @see #isEmpty
-     * @see #size
-     */
+    /// Removes all elements from this vector, leaving the size zero and the
+    /// capacity unchanged.
+    ///
+    /// #### See also
+    ///
+    /// - #isEmpty
+    ///
+    /// - #size
     public synchronized void removeAllElements() {
         for (int i = 0; i < elementCount; i++) {
             elementData[i] = null;
@@ -731,20 +854,27 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
         elementCount = 0;
     }
 
-    /**
-     * Removes the first occurrence, starting at the beginning and moving
-     * towards the end, of the specified object from this vector. All elements
-     * with an index bigger than the element that gets removed have their index
-     * decreased by 1.
-     * 
-     * @param object
-     *            the object to remove from this vector.
-     * @return {@code true} if the specified object was found, {@code false}
-     *         otherwise.
-     * @see #removeAllElements
-     * @see #removeElementAt
-     * @see #size
-     */
+    /// Removes the first occurrence, starting at the beginning and moving
+    /// towards the end, of the specified object from this vector. All elements
+    /// with an index bigger than the element that gets removed have their index
+    /// decreased by 1.
+    ///
+    /// #### Parameters
+    ///
+    /// - `object`: the object to remove from this vector.
+    ///
+    /// #### Returns
+    ///
+    /// @return `true` if the specified object was found, `false`
+    /// otherwise.
+    ///
+    /// #### See also
+    ///
+    /// - #removeAllElements
+    ///
+    /// - #removeElementAt
+    ///
+    /// - #size
     public synchronized boolean removeElement(Object object) {
         int index;
         if ((index = indexOf(object, 0)) == -1) {
@@ -754,19 +884,25 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
         return true;
     }
 
-    /**
-     * Removes the element found at index position {@code location} from
-     * this {@code Vector}. All elements with an index bigger than
-     * {@code location} have their index decreased by 1.
-     * 
-     * @param location
-     *            the index of the element to remove.
-     * @throws ArrayIndexOutOfBoundsException
-     *                if {@code location < 0 || location >= size()}.
-     * @see #removeElement
-     * @see #removeAllElements
-     * @see #size
-     */
+    /// Removes the element found at index position `location` from
+    /// this `Vector`. All elements with an index bigger than
+    /// `location` have their index decreased by 1.
+    ///
+    /// #### Parameters
+    ///
+    /// - `location`: the index of the element to remove.
+    ///
+    /// #### Throws
+    ///
+    /// - `ArrayIndexOutOfBoundsException`: if `location = size()`.
+    ///
+    /// #### See also
+    ///
+    /// - #removeElement
+    ///
+    /// - #removeAllElements
+    ///
+    /// - #size
     public synchronized void removeElementAt(int location) {
         if (0 <= location && location < elementCount) {
             elementCount--;
@@ -782,19 +918,21 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
         }
     }
 
-    /**
-     * Removes the objects in the specified range from the start to the, but not
-     * including, end index. All elements with an index bigger than or equal to
-     * {@code end} have their index decreased by {@code end - start}.
-     * 
-     * @param start
-     *            the index at which to start removing.
-     * @param end
-     *            the index one past the end of the range to remove.
-     * @throws IndexOutOfBoundsException
-     *                if {@code start < 0, start > end} or
-     *                {@code end > size()}.
-     */
+    /// Removes the objects in the specified range from the start to the, but not
+    /// including, end index. All elements with an index bigger than or equal to
+    /// `end` have their index decreased by `end - start`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `start`: the index at which to start removing.
+    ///
+    /// - `end`: the index one past the end of the range to remove.
+    ///
+    /// #### Throws
+    ///
+    /// - `IndexOutOfBoundsException`: @throws IndexOutOfBoundsException
+    /// if `start  end` or
+    /// `end > size()`.
     @Override
     protected void removeRange(int start, int end) {
         if (start >= 0 && start <= end && end <= elementCount) {
@@ -817,33 +955,45 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
         }
     }
 
-    /**
-     * Removes all objects from this vector that are not contained in the
-     * specified collection.
-     * 
-     * @param collection
-     *            the collection of objects to retain.
-     * @return {@code true} if this vector is modified, {@code false} otherwise.
-     * @see #remove(Object)
-     */
+    /// Removes all objects from this vector that are not contained in the
+    /// specified collection.
+    ///
+    /// #### Parameters
+    ///
+    /// - `collection`: the collection of objects to retain.
+    ///
+    /// #### Returns
+    ///
+    /// `true` if this vector is modified, `false` otherwise.
+    ///
+    /// #### See also
+    ///
+    /// - #remove(Object)
     @Override
     public synchronized boolean retainAll(Collection<?> collection) {
         return super.retainAll(collection);
     }
 
-    /**
-     * Replaces the element at the specified location in this vector with the
-     * specified object.
-     * 
-     * @param location
-     *            the index at which to put the specified object.
-     * @param object
-     *            the object to add to this vector.
-     * @return the previous element at the location.
-     * @throws ArrayIndexOutOfBoundsException
-     *                if {@code location < 0 || location >= size()}.
-     * @see #size
-     */
+    /// Replaces the element at the specified location in this vector with the
+    /// specified object.
+    ///
+    /// #### Parameters
+    ///
+    /// - `location`: the index at which to put the specified object.
+    ///
+    /// - `object`: the object to add to this vector.
+    ///
+    /// #### Returns
+    ///
+    /// the previous element at the location.
+    ///
+    /// #### Throws
+    ///
+    /// - `ArrayIndexOutOfBoundsException`: if `location = size()`.
+    ///
+    /// #### See also
+    ///
+    /// - #size
     @SuppressWarnings("unchecked")
     @Override
     public synchronized E set(int location, E object) {
@@ -855,18 +1005,22 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
         throw new ArrayIndexOutOfBoundsException(location);
     }
 
-    /**
-     * Replaces the element at the specified location in this vector with the
-     * specified object.
-     * 
-     * @param object
-     *            the object to add to this vector.
-     * @param location
-     *            the index at which to put the specified object.
-     * @throws ArrayIndexOutOfBoundsException
-     *                if {@code location < 0 || location >= size()}.
-     * @see #size
-     */
+    /// Replaces the element at the specified location in this vector with the
+    /// specified object.
+    ///
+    /// #### Parameters
+    ///
+    /// - `object`: the object to add to this vector.
+    ///
+    /// - `location`: the index at which to put the specified object.
+    ///
+    /// #### Throws
+    ///
+    /// - `ArrayIndexOutOfBoundsException`: if `location = size()`.
+    ///
+    /// #### See also
+    ///
+    /// - #size
     public synchronized void setElementAt(E object, int location) {
         if (location < elementCount) {
             elementData[location] = object;
@@ -875,16 +1029,18 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
         }
     }
 
-    /**
-     * Sets the size of this vector to the specified size. If there are more
-     * than length elements in this vector, the elements at end are lost. If
-     * there are less than length elements in the vector, the additional
-     * elements contain null.
-     * 
-     * @param length
-     *            the new size of this vector.
-     * @see #size
-     */
+    /// Sets the size of this vector to the specified size. If there are more
+    /// than length elements in this vector, the elements at end are lost. If
+    /// there are less than length elements in the vector, the additional
+    /// elements contain null.
+    ///
+    /// #### Parameters
+    ///
+    /// - `length`: the new size of this vector.
+    ///
+    /// #### See also
+    ///
+    /// - #size
     public synchronized void setSize(int length) {
         if (length == elementCount) {
             return;
@@ -897,44 +1053,52 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
         modCount++;
     }
 
-    /**
-     * Returns the number of elements in this vector.
-     * 
-     * @return the number of elements in this vector.
-     * @see #elementCount
-     * @see #lastElement
-     */
+    /// Returns the number of elements in this vector.
+    ///
+    /// #### Returns
+    ///
+    /// the number of elements in this vector.
+    ///
+    /// #### See also
+    ///
+    /// - #elementCount
+    ///
+    /// - #lastElement
     @Override
     public synchronized int size() {
         return elementCount;
     }
 
-    /**
-     * Returns a List of the specified portion of this vector from the start
-     * index to one less than the end index. The returned List is backed by this
-     * vector so changes to one are reflected by the other.
-     * 
-     * @param start
-     *            the index at which to start the sublist.
-     * @param end
-     *            the index one past the end of the sublist.
-     * @return a List of a portion of this vector.
-     * @throws IndexOutOfBoundsException
-     *                if {@code start < 0} or {@code end > size()}.
-     * @throws IllegalArgumentException
-     *                if {@code start > end}.
-     */
+    /// Returns a List of the specified portion of this vector from the start
+    /// index to one less than the end index. The returned List is backed by this
+    /// vector so changes to one are reflected by the other.
+    ///
+    /// #### Parameters
+    ///
+    /// - `start`: the index at which to start the sublist.
+    ///
+    /// - `end`: the index one past the end of the sublist.
+    ///
+    /// #### Returns
+    ///
+    /// a List of a portion of this vector.
+    ///
+    /// #### Throws
+    ///
+    /// - `IndexOutOfBoundsException`: if `start  size()`.
+    ///
+    /// - `IllegalArgumentException`: if `start > end`.
     @Override
     public synchronized List<E> subList(int start, int end) {
         return new Collections.SynchronizedRandomAccessList<E>(super.subList(
                 start, end), this);
     }
 
-    /**
-     * Returns a new array containing all elements contained in this vector.
-     * 
-     * @return an array of the elements from this vector.
-     */
+    /// Returns a new array containing all elements contained in this vector.
+    ///
+    /// #### Returns
+    ///
+    /// an array of the elements from this vector.
     @Override
     public synchronized Object[] toArray() {
         Object[] result = new Object[elementCount];
@@ -942,20 +1106,25 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
         return result;
     }
 
-    /**
-     * Returns an array containing all elements contained in this vector. If the
-     * specified array is large enough to hold the elements, the specified array
-     * is used, otherwise an array of the same type is created. If the specified
-     * array is used and is larger than this vector, the array element following
-     * the collection elements is set to null.
-     * 
-     * @param contents
-     *            the array to fill.
-     * @return an array of the elements from this vector.
-     * @throws ArrayStoreException
-     *                if the type of an element in this vector cannot be
-     *                stored in the type of the specified array.
-     */
+    /// Returns an array containing all elements contained in this vector. If the
+    /// specified array is large enough to hold the elements, the specified array
+    /// is used, otherwise an array of the same type is created. If the specified
+    /// array is used and is larger than this vector, the array element following
+    /// the collection elements is set to null.
+    ///
+    /// #### Parameters
+    ///
+    /// - `contents`: the array to fill.
+    ///
+    /// #### Returns
+    ///
+    /// an array of the elements from this vector.
+    ///
+    /// #### Throws
+    ///
+    /// - `ArrayStoreException`: @throws ArrayStoreException
+    /// if the type of an element in this vector cannot be
+    /// stored in the type of the specified array.
     @Override
     @SuppressWarnings("unchecked")
     public synchronized <T> T[] toArray(T[] contents) {
@@ -969,12 +1138,15 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
         return contents;
     }
 
-    /**
-     * Returns the string representation of this vector.
-     * 
-     * @return the string representation of this vector.
-     * @see #elements
-     */
+    /// Returns the string representation of this vector.
+    ///
+    /// #### Returns
+    ///
+    /// the string representation of this vector.
+    ///
+    /// #### See also
+    ///
+    /// - #elements
     @Override
     public synchronized String toString() {
         if (elementCount == 0) {
@@ -1000,13 +1172,15 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
         return buffer.toString();
     }
 
-    /**
-     * Sets the capacity of this vector to be the same as the size.
-     * 
-     * @see #capacity
-     * @see #ensureCapacity
-     * @see #size
-     */
+    /// Sets the capacity of this vector to be the same as the size.
+    ///
+    /// #### See also
+    ///
+    /// - #capacity
+    ///
+    /// - #ensureCapacity
+    ///
+    /// - #size
     public synchronized void trimToSize() {
         if (elementData.length != elementCount) {
             grow(elementCount);

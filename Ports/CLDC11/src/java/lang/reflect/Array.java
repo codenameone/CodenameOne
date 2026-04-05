@@ -22,10 +22,8 @@
  */
 package java.lang.reflect;
 
-/**
- * Added this for Kotlin
- * @author shannah
- */
+/// Added this for Kotlin
+/// @author shannah
 public class Array {
     public static Object newInstance(Class<?> componentType,
                  int[] dimensions) {

@@ -21,14 +21,12 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.lang.annotation.ElementType;
 
-/**
- * <p>
- * An annotation that indicates a compiler should suppress any warnings of the
- * type specified in the {@link #value()}.
- * </p>
- * 
- * @since 1.5
- */
+/// An annotation that indicates a compiler should suppress any warnings of the
+/// type specified in the `#value()`.
+///
+/// #### Since
+///
+/// 1.5
 @Target( { ElementType.TYPE, ElementType.FIELD, ElementType.METHOD,
 ElementType.PARAMETER, ElementType.CONSTRUCTOR,
 ElementType.LOCAL_VARIABLE })

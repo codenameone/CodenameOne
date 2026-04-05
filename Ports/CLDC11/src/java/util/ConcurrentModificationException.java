@@ -17,32 +17,29 @@
 
 package java.util;
 
-/**
- * An {@code ConcurrentModificationException} is thrown when a Collection is
- * modified and an existing iterator on the Collection is used to modify the
- * Collection as well.
- * 
- * @see java.lang.RuntimeException
- */
+/// An `ConcurrentModificationException` is thrown when a Collection is
+/// modified and an existing iterator on the Collection is used to modify the
+/// Collection as well.
+///
+/// #### See also
+///
+/// - java.lang.RuntimeException
 public class ConcurrentModificationException extends RuntimeException {
 
     private static final long serialVersionUID = -3666751008965953603L;
 
-    /**
-     * Constructs a new {@code ConcurrentModificationException} with the current
-     * stack trace filled in.
-     */
+    /// Constructs a new `ConcurrentModificationException` with the current
+    /// stack trace filled in.
     public ConcurrentModificationException() {
         /*empty*/
     }
 
-    /**
-     * Constructs a new {@code ConcurrentModificationException} with the current
-     * stack trace and message filled in.
-     * 
-     * @param detailMessage
-     *           the detail message for the exception.
-     */
+    /// Constructs a new `ConcurrentModificationException` with the current
+    /// stack trace and message filled in.
+    ///
+    /// #### Parameters
+    ///
+    /// - `detailMessage`: the detail message for the exception.
     public ConcurrentModificationException(String detailMessage) {
         super(detailMessage);
     }

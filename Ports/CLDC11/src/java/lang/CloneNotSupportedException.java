@@ -17,31 +17,28 @@
 
 package java.lang;
 
-/**
- * Thrown when a program attempts to clone an object which does not support the
- * {@link Cloneable} interface.
- * 
- * @see Cloneable
- */
+/// Thrown when a program attempts to clone an object which does not support the
+/// `Cloneable` interface.
+///
+/// #### See also
+///
+/// - Cloneable
 public class CloneNotSupportedException extends Exception {
 
     private static final long serialVersionUID = 5195511250079656443L;
 
-    /**
-     * Constructs a new {@code CloneNotSupportedException} that includes the
-     * current stack trace.
-     */
+    /// Constructs a new `CloneNotSupportedException` that includes the
+    /// current stack trace.
     public CloneNotSupportedException() {
         super();
     }
 
-    /**
-     * Constructs a new {@code CloneNotSupportedException} with the current
-     * stack trace and the specified detail message.
-     * 
-     * @param detailMessage
-     *            the detail message for this exception.
-     */
+    /// Constructs a new `CloneNotSupportedException` with the current
+    /// stack trace and the specified detail message.
+    ///
+    /// #### Parameters
+    ///
+    /// - `detailMessage`: the detail message for this exception.
     public CloneNotSupportedException(String detailMessage) {
         super(detailMessage);
     }

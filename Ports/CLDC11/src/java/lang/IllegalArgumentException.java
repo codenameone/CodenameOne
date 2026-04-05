@@ -22,39 +22,29 @@
  * have any questions.
  */
 package java.lang;
-/**
- * Thrown to indicate that a method has been passed an illegal or inappropriate argument.
- * Since: JDK1.0, CLDC 1.0 See Also:Thread.setPriority(int)
- */
+/// Thrown to indicate that a method has been passed an illegal or inappropriate argument.
+/// Since: JDK1.0, CLDC 1.0 See Also:Thread.setPriority(int)
 public class IllegalArgumentException extends java.lang.RuntimeException{
-    /**
-     * Constructs an IllegalArgumentException with no detail message.
-     */
+    /// Constructs an IllegalArgumentException with no detail message.
     public IllegalArgumentException(){
          //TODO codavaj!!
     }
 
-    /**
-     * Constructs an IllegalArgumentException with the specified detail message.
-     * s - the detail message.
-     */
+    /// Constructs an IllegalArgumentException with the specified detail message.
+    /// s - the detail message.
     public IllegalArgumentException(java.lang.String s){
          //TODO codavaj!!
     }
 
-    /**
-     * Constructs an IllegalArgumentException with the specified detail message and cause.
-     * s - the detail message.
-     * cause - the cause.
-     */
+    /// Constructs an IllegalArgumentException with the specified detail message and cause.
+    /// s - the detail message.
+    /// cause - the cause.
     public IllegalArgumentException(java.lang.String s, java.lang.Throwable cause) {
          //TODO codavaj!!
     }
 
-    /**
-     * Constructs an IllegalArgumentException with the specified cause.
-     * cause - the cause.
-     */
+    /// Constructs an IllegalArgumentException with the specified cause.
+    /// cause - the cause.
     public IllegalArgumentException(java.lang.Throwable cause) {
          //TODO codavaj!!
     }

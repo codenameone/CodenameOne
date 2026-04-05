@@ -18,22 +18,17 @@ package java.io;
 
 import java.io.IOException;
 
-/**
- * <p>
- * Indicates that an output object can be flushed.
- * </p>
- * 
- * @since 1.5
- */
+/// Indicates that an output object can be flushed.
+///
+/// #### Since
+///
+/// 1.5
 public interface Flushable {
-    /**
-     * <p>
-     * Flushes the object by writing out any buffered data to the underlying
-     * output.
-     * </p>
-     * 
-     * @throws IOException
-     *             if there are any issues writing the data.
-     */
+    /// Flushes the object by writing out any buffered data to the underlying
+    /// output.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if there are any issues writing the data.
     void flush() throws IOException;
 }

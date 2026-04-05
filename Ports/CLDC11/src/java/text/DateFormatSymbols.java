@@ -25,10 +25,7 @@ package java.text;
 import java.util.Hashtable;
 import java.util.TimeZone;
 
-/**
- * @author Eric Coolman
- * 
- */
+/// @author Eric Coolman
 public class DateFormatSymbols implements Cloneable {
 	static final int ZONE_ID = 0;
 	static final int ZONE_LONGNAME = 1;

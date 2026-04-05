@@ -10,10 +10,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-/**
- *
- * @author shannah
- */
+/// @author shannah
 public class ThreadLocal<T> extends Object {
 
     private Map<Thread,T> value = new HashMap<Thread,T>();

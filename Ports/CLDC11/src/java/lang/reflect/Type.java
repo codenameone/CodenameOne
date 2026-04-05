@@ -5,10 +5,7 @@
  */
 package java.lang.reflect;
 
-/**
- *
- * @author shannah
- */
+/// @author shannah
 public interface Type {
     
 }

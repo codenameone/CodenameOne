@@ -23,10 +23,7 @@
  */
 package java.lang;
 
-/**
- *
- * @author Shai Almog
- */
+/// @author Shai Almog
 public final class Void {
     public static final Class TYPE = Void.class;
 }

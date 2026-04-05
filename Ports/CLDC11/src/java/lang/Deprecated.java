@@ -20,13 +20,11 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Documented;
 
-/**
- * <p>
- * An annotation for marking an element as deprecated.
- * </p>
- * 
- * @since 1.5
- */
+/// An annotation for marking an element as deprecated.
+///
+/// #### Since
+///
+/// 1.5
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Deprecated {

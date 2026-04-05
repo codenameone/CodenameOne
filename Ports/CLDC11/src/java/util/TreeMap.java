@@ -17,18 +17,18 @@
 
 package java.util;
 
-/**
- * TreeMap is an implementation of SortedMap. All optional operations (adding
- * and removing) are supported. The values can be any objects. The keys can be
- * any objects which are comparable to each other either using their natural
- * 
- * @param <K>
- *            type of key
- * @param <V>
- *            type of value
- * 
- * @since 1.2
- */
+/// TreeMap is an implementation of SortedMap. All optional operations (adding
+/// and removing) are supported. The values can be any objects. The keys can be
+/// any objects which are comparable to each other either using their natural
+///
+/// @param
+/// type of key
+/// @param
+/// type of value
+///
+/// #### Since
+///
+/// 1.2
 public class TreeMap<K, V> extends AbstractMap<K, V> implements
         NavigableMap<K, V> {
     private static final long serialVersionUID = 919286545866124006L;
@@ -73,12 +73,10 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
         }
     }
     
-    /**
-     * Entry is an internal class which is used to hold the entries of a
-     * TreeMap.
-     * 
-     * also used to record key, value, and position
-     */
+    /// Entry is an internal class which is used to hold the entries of a
+    /// TreeMap.
+    ///
+    /// also used to record key, value, and position
     static class Entry<K, V> extends MapEntry<K, V> {
         Entry<K, V> parent, left, right;
         
@@ -2561,11 +2559,13 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
 
         public abstract NavigableMap<K, V> tailMap(K start, boolean inclusive);
 
-        /**
-         * 
-         * @param key
-         * @return false if the key bigger than the end key (if any)
-         */
+        /// #### Parameters
+        ///
+        /// - `key`
+        ///
+        /// #### Returns
+        ///
+        /// false if the key bigger than the end key (if any)
         final boolean checkUpperBound(K key) {
             if (toEnd) {
                 int result = (null != comparator()) ? comparator().compare(key, hi)
@@ -2575,11 +2575,13 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
             return true;
         }
 
-        /**
-         * 
-         * @param key
-         * @return false if the key smaller than the start key (if any)
-         */
+        /// #### Parameters
+        ///
+        /// - `key`
+        ///
+        /// #### Returns
+        ///
+        /// false if the key smaller than the start key (if any)
         final boolean checkLowerBound(K key) {
             if (fromStart) {
                 int result = - ((null != comparator()) ? comparator().compare(lo,key)
@@ -3675,47 +3677,45 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
         }
     }
 
-    /**
-     * Constructs a new empty {@code TreeMap} instance.
-     */
+    /// Constructs a new empty `TreeMap` instance.
     public TreeMap() {
         super();
     }
 
-    /**
-     * Constructs a new empty {@code TreeMap} instance with the specified
-     * comparator.
-     *
-     * @param comparator
-     *            the comparator to compare keys with.
-     */
+    /// Constructs a new empty `TreeMap` instance with the specified
+    /// comparator.
+    ///
+    /// #### Parameters
+    ///
+    /// - `comparator`: the comparator to compare keys with.
     public TreeMap(Comparator<? super K> comparator) {
         this.comparator = comparator;
     }
 
-    /**
-     * Constructs a new {@code TreeMap} instance containing the mappings from
-     * the specified map and using natural ordering.
-     *
-     * @param map
-     *            the mappings to add.
-     * @throws ClassCastException
-     *             if a key in the specified map does not implement the
-     *             Comparable interface, or if the keys in the map cannot be
-     *             compared.
-     */
+    /// Constructs a new `TreeMap` instance containing the mappings from
+    /// the specified map and using natural ordering.
+    ///
+    /// #### Parameters
+    ///
+    /// - `map`: the mappings to add.
+    ///
+    /// #### Throws
+    ///
+    /// - `ClassCastException`: @throws ClassCastException
+    /// if a key in the specified map does not implement the
+    /// Comparable interface, or if the keys in the map cannot be
+    /// compared.
     public TreeMap(Map<? extends K, ? extends V> map) {
         this();
         putAll(map);
     }
 
-    /**
-     * Constructs a new {@code TreeMap} instance containing the mappings from
-     * the specified SortedMap and using the same comparator.
-     *
-     * @param map
-     *            the mappings to add.
-     */
+    /// Constructs a new `TreeMap` instance containing the mappings from
+    /// the specified SortedMap and using the same comparator.
+    ///
+    /// #### Parameters
+    ///
+    /// - `map`: the mappings to add.
     public TreeMap(SortedMap<K, ? extends V> map) {
         this(map.comparator());
         Node<K, V> lastNode = null;
@@ -3744,12 +3744,13 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
         return last;
     }
 
-    /**
-     * Removes all mappings from this TreeMap, leaving it empty.
-     *
-     * @see Map#isEmpty()
-     * @see #size()
-     */
+    /// Removes all mappings from this TreeMap, leaving it empty.
+    ///
+    /// #### See also
+    ///
+    /// - Map#isEmpty()
+    ///
+    /// - #size()
     @Override
     public void clear() {
         root = null;
@@ -3757,29 +3758,35 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
         modCount++;
     }
 
-    /**
-     * Returns the comparator used to compare elements in this map.
-     *
-     * @return the comparator or {@code null} if the natural ordering is used.
-     */
+    /// Returns the comparator used to compare elements in this map.
+    ///
+    /// #### Returns
+    ///
+    /// the comparator or `null` if the natural ordering is used.
     public Comparator<? super K> comparator() {
         return comparator;
     }
 
-    /**
-     * Returns whether this map contains the specified key.
-     *
-     * @param key
-     *            the key to search for.
-     * @return {@code true} if this map contains the specified key,
-     *         {@code false} otherwise.
-     * @throws ClassCastException
-     *             if the specified key cannot be compared with the keys in this
-     *             map.
-     * @throws NullPointerException
-     *             if the specified key is {@code null} and the comparator
-     *             cannot handle {@code null} keys.
-     */
+    /// Returns whether this map contains the specified key.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key to search for.
+    ///
+    /// #### Returns
+    ///
+    /// @return `true` if this map contains the specified key,
+    /// `false` otherwise.
+    ///
+    /// #### Throws
+    ///
+    /// - `ClassCastException`: @throws ClassCastException
+    /// if the specified key cannot be compared with the keys in this
+    /// map.
+    ///
+    /// - `NullPointerException`: @throws NullPointerException
+    /// if the specified key is `null` and the comparator
+    /// cannot handle `null` keys.
     @SuppressWarnings("unchecked")
     @Override
     public boolean containsKey(Object key) {
@@ -3825,14 +3832,16 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
         return false;
     }
 
-    /**
-     * Returns whether this map contains the specified value.
-     *
-     * @param value
-     *            the value to search for.
-     * @return {@code true} if this map contains the specified value,
-     *         {@code false} otherwise.
-     */
+    /// Returns whether this map contains the specified value.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the value to search for.
+    ///
+    /// #### Returns
+    ///
+    /// @return `true` if this map contains the specified value,
+    /// `false` otherwise.
     @Override
     public boolean containsValue(Object value) {
         if (root == null) {
@@ -4197,13 +4206,15 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
         return null;
     }
 
-    /**
-     * Returns the first key in this map.
-     *
-     * @return the first key in this map.
-     * @throws NoSuchElementException
-     *                if this map is empty.
-     */
+    /// Returns the first key in this map.
+    ///
+    /// #### Returns
+    ///
+    /// the first key in this map.
+    ///
+    /// #### Throws
+    ///
+    /// - `NoSuchElementException`: if this map is empty.
     public K firstKey() {
         if (root != null) {
             Node<K, V> node = minimum(root);
@@ -4240,18 +4251,23 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
 		return null;
 	}
     
-    /**
-     * Returns the value of the mapping with the specified key.
-     *
-     * @param key
-     *            the key.
-     * @return the value of the mapping with the specified key.
-     * @throws ClassCastException
-     *             if the key cannot be compared with the keys in this map.
-     * @throws NullPointerException
-     *             if the key is {@code null} and the comparator cannot handle
-     *             {@code null}.
-     */
+    /// Returns the value of the mapping with the specified key.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key.
+    ///
+    /// #### Returns
+    ///
+    /// the value of the mapping with the specified key.
+    ///
+    /// #### Throws
+    ///
+    /// - `ClassCastException`: if the key cannot be compared with the keys in this map.
+    ///
+    /// - `NullPointerException`: @throws NullPointerException
+    /// if the key is `null` and the comparator cannot handle
+    /// `null`.
     @SuppressWarnings("unchecked")
     @Override
     public V get(Object key) {
@@ -4296,13 +4312,13 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
         return null;
     }
 
-    /**
-     * Returns a set of the keys contained in this map. The set is backed by
-     * this map so changes to one are reflected by the other. The set does not
-     * support adding.
-     *
-     * @return a set of the keys.
-     */
+    /// Returns a set of the keys contained in this map. The set is backed by
+    /// this map so changes to one are reflected by the other. The set does not
+    /// support adding.
+    ///
+    /// #### Returns
+    ///
+    /// a set of the keys.
     @Override
     public Set<K> keySet() {
         if (keySet == null) {
@@ -4331,13 +4347,15 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
         return keySet;
     }
 
-    /**
-     * Returns the last key in this map.
-     *
-     * @return the last key in this map.
-     * @throws NoSuchElementException
-     *             if this map is empty.
-     */
+    /// Returns the last key in this map.
+    ///
+    /// #### Returns
+    ///
+    /// the last key in this map.
+    ///
+    /// #### Throws
+    ///
+    /// - `NoSuchElementException`: if this map is empty.
     public K lastKey() {
         if (root != null) {
             Node<K, V> node = maximum(root);
@@ -4389,22 +4407,28 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
                 key1, key2);
     }
 
-    /**
-     * Maps the specified key to the specified value.
-     *
-     * @param key
-     *            the key.
-     * @param value
-     *            the value.
-     * @return the value of any previous mapping with the specified key or
-     *         {@code null} if there was no mapping.
-     * @throws ClassCastException
-     *             if the specified key cannot be compared with the keys in this
-     *             map.
-     * @throws NullPointerException
-     *             if the specified key is {@code null} and the comparator
-     *             cannot handle {@code null} keys.
-     */
+    /// Maps the specified key to the specified value.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key.
+    ///
+    /// - `value`: the value.
+    ///
+    /// #### Returns
+    ///
+    /// @return the value of any previous mapping with the specified key or
+    /// `null` if there was no mapping.
+    ///
+    /// #### Throws
+    ///
+    /// - `ClassCastException`: @throws ClassCastException
+    /// if the specified key cannot be compared with the keys in this
+    /// map.
+    ///
+    /// - `NullPointerException`: @throws NullPointerException
+    /// if the specified key is `null` and the comparator
+    /// cannot handle `null` keys.
     @Override
     public V put(K key, V value) {
         return putImpl(key, value);
@@ -4776,20 +4800,23 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
         x.parent = y;
     }
 
-    /**
-     * Copies all the mappings in the given map to this map. These mappings will
-     * replace all mappings that this map had for any of the keys currently in
-     * the given map.
-     *
-     * @param map
-     *            the map to copy mappings from.
-     * @throws ClassCastException
-     *             if a key in the specified map cannot be compared with the
-     *             keys in this map.
-     * @throws NullPointerException
-     *             if a key in the specified map is {@code null} and the
-     *             comparator cannot handle {@code null} keys.
-     */
+    /// Copies all the mappings in the given map to this map. These mappings will
+    /// replace all mappings that this map had for any of the keys currently in
+    /// the given map.
+    ///
+    /// #### Parameters
+    ///
+    /// - `map`: the map to copy mappings from.
+    ///
+    /// #### Throws
+    ///
+    /// - `ClassCastException`: @throws ClassCastException
+    /// if a key in the specified map cannot be compared with the
+    /// keys in this map.
+    ///
+    /// - `NullPointerException`: @throws NullPointerException
+    /// if a key in the specified map is `null` and the
+    /// comparator cannot handle `null` keys.
     @Override
     public void putAll(Map<? extends K, ? extends V> map) {
         Iterator it = map.entrySet().iterator();
@@ -4799,20 +4826,26 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
         }
     }
 
-    /**
-     * Removes the mapping with the specified key from this map.
-     *
-     * @param key
-     *            the key of the mapping to remove.
-     * @return the value of the removed mapping or {@code null} if no mapping
-     *         for the specified key was found.
-     * @throws ClassCastException
-     *             if the specified key cannot be compared with the keys in this
-     *             map.
-     * @throws NullPointerException
-     *             if the specified key is {@code null} and the comparator
-     *             cannot handle {@code null} keys.
-     */
+    /// Removes the mapping with the specified key from this map.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key of the mapping to remove.
+    ///
+    /// #### Returns
+    ///
+    /// @return the value of the removed mapping or `null` if no mapping
+    /// for the specified key was found.
+    ///
+    /// #### Throws
+    ///
+    /// - `ClassCastException`: @throws ClassCastException
+    /// if the specified key cannot be compared with the keys in this
+    /// map.
+    ///
+    /// - `NullPointerException`: @throws NullPointerException
+    /// if the specified key is `null` and the comparator
+    /// cannot handle `null` keys.
     @SuppressWarnings("unchecked")
     @Override
     public V remove(Object key) {
@@ -5192,35 +5225,35 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
         x.color = false;
     }
 
-    /**
-     * Returns the number of mappings in this map.
-     *
-     * @return the number of mappings in this map.
-     */
+    /// Returns the number of mappings in this map.
+    ///
+    /// #### Returns
+    ///
+    /// the number of mappings in this map.
     @Override
     public int size() {
         return size;
     }
 
-    /**
-     * Returns a collection of the values contained in this map. The collection
-     * is backed by this map so changes to one are reflected by the other. The
-     * collection supports remove, removeAll, retainAll and clear operations,
-     * and it does not support add or addAll operations.
-     * <p>
-     * This method returns a collection which is the subclass of
-     * AbstractCollection. The iterator method of this subclass returns a
-     * "wrapper object" over the iterator of map's entrySet(). The {@code size}
-     * method wraps the map's size method and the {@code contains} method wraps
-     * the map's containsValue method.
-     * <p>
-     * The collection is created when this method is called for the first time
-     * and returned in response to all subsequent calls. This method may return
-     * different collections when multiple concurrent calls occur, since no
-     * synchronization is performed.
-     *
-     * @return a collection of the values contained in this map.
-     */
+    /// Returns a collection of the values contained in this map. The collection
+    /// is backed by this map so changes to one are reflected by the other. The
+    /// collection supports remove, removeAll, retainAll and clear operations,
+    /// and it does not support add or addAll operations.
+    ///
+    /// This method returns a collection which is the subclass of
+    /// AbstractCollection. The iterator method of this subclass returns a
+    /// "wrapper object" over the iterator of map's entrySet(). The `size`
+    /// method wraps the map's size method and the `contains` method wraps
+    /// the map's containsValue method.
+    ///
+    /// The collection is created when this method is called for the first time
+    /// and returned in response to all subsequent calls. This method may return
+    /// different collections when multiple concurrent calls occur, since no
+    /// synchronization is performed.
+    ///
+    /// #### Returns
+    ///
+    /// a collection of the values contained in this map.
     @Override
     public Collection<V> values() {
         if (valuesCollection == null) {
@@ -5249,32 +5282,41 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
         return valuesCollection;
     }    
 
-    /**
-     * {@inheritDoc}
-     * 
-     * @see java.util.NavigableMap#firstEntry()
-     * @since 1.6
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Since
+    ///
+    /// 1.6
+    ///
+    /// #### See also
+    ///
+    /// - java.util.NavigableMap#firstEntry()
     public Map.Entry<K, V> firstEntry() {
         return newImmutableEntry(findSmallestEntry());
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * @see java.util.NavigableMap#lastEntry()
-     * @since 1.6
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Since
+    ///
+    /// 1.6
+    ///
+    /// #### See also
+    ///
+    /// - java.util.NavigableMap#lastEntry()
     public Map.Entry<K, V> lastEntry() {
         return newImmutableEntry(findBiggestEntry());
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * @see java.util.NavigableMap#pollFirstEntry()
-     * @since 1.6
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Since
+    ///
+    /// 1.6
+    ///
+    /// #### See also
+    ///
+    /// - java.util.NavigableMap#pollFirstEntry()
     public Map.Entry<K, V> pollFirstEntry() {
         Entry<K, V> node = findSmallestEntry();
         SimpleImmutableEntry<K, V> result = newImmutableEntry(node);
@@ -5284,12 +5326,15 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
         return result;
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * @see java.util.NavigableMap#pollLastEntry()
-     * @since 1.6
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Since
+    ///
+    /// 1.6
+    ///
+    /// #### See also
+    ///
+    /// - java.util.NavigableMap#pollLastEntry()
     public Map.Entry<K, V> pollLastEntry() {
         Entry<K, V> node = findBiggestEntry();
         SimpleImmutableEntry<K, V> result = newImmutableEntry(node);
@@ -5299,85 +5344,109 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
         return result;
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * @see java.util.NavigableMap#higherEntry(Object)
-     * @since 1.6
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Since
+    ///
+    /// 1.6
+    ///
+    /// #### See also
+    ///
+    /// - java.util.NavigableMap#higherEntry(Object)
     public Map.Entry<K, V> higherEntry(K key) {
         return newImmutableEntry(findHigherEntry(key));
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * @see java.util.NavigableMap#higherKey(Object)
-     * @since 1.6
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Since
+    ///
+    /// 1.6
+    ///
+    /// #### See also
+    ///
+    /// - java.util.NavigableMap#higherKey(Object)
     public K higherKey(K key) {
         Map.Entry<K, V> entry = higherEntry(key);
         return (null == entry) ? null : entry.getKey();
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * @see java.util.NavigableMap#lowerEntry(Object)
-     * @since 1.6
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Since
+    ///
+    /// 1.6
+    ///
+    /// #### See also
+    ///
+    /// - java.util.NavigableMap#lowerEntry(Object)
     public Map.Entry<K, V> lowerEntry(K key) {
         return newImmutableEntry(findLowerEntry(key));
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * @see java.util.NavigableMap#lowerKey(Object)
-     * @since 1.6
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Since
+    ///
+    /// 1.6
+    ///
+    /// #### See also
+    ///
+    /// - java.util.NavigableMap#lowerKey(Object)
     public K lowerKey(K key) {
         Map.Entry<K, V> entry = lowerEntry(key);
         return (null == entry) ? null : entry.getKey();
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * @see java.util.NavigableMap#ceilingEntry(java.lang.Object)
-     * @since 1.6
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Since
+    ///
+    /// 1.6
+    ///
+    /// #### See also
+    ///
+    /// - java.util.NavigableMap#ceilingEntry(java.lang.Object)
     public Map.Entry<K, V> ceilingEntry(K key) {
         return newImmutableEntry(findCeilingEntry(key));
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * @see java.util.NavigableMap#ceilingKey(java.lang.Object)
-     * @since 1.6
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Since
+    ///
+    /// 1.6
+    ///
+    /// #### See also
+    ///
+    /// - java.util.NavigableMap#ceilingKey(java.lang.Object)
     public K ceilingKey(K key) {
         Map.Entry<K, V> entry = ceilingEntry(key);
         return (null == entry) ? null : entry.getKey();
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * @see java.util.NavigableMap#floorEntry(Object)
-     * @since 1.6
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Since
+    ///
+    /// 1.6
+    ///
+    /// #### See also
+    ///
+    /// - java.util.NavigableMap#floorEntry(Object)
     public Map.Entry<K, V> floorEntry(K key) {
         return newImmutableEntry(findFloorEntry(key));
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * @see java.util.NavigableMap#floorKey(Object)
-     * @since 1.6
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Since
+    ///
+    /// 1.6
+    ///
+    /// #### See also
+    ///
+    /// - java.util.NavigableMap#floorKey(Object)
     public K floorKey(K key) {
         Map.Entry<K, V> entry = floorEntry(key);
         return (null == entry) ? null : entry.getKey();
@@ -5421,14 +5490,14 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
         return x;
     }
 
-    /**
-     * Returns a set containing all of the mappings in this map. Each mapping is
-     * an instance of {@link Map.Entry}. As the set is backed by this map,
-     * changes in one will be reflected in the other. It does not support adding
-     * operations.
-     *
-     * @return a set of the mappings.
-     */
+    /// Returns a set containing all of the mappings in this map. Each mapping is
+    /// an instance of `Map.Entry`. As the set is backed by this map,
+    /// changes in one will be reflected in the other. It does not support adding
+    /// operations.
+    ///
+    /// #### Returns
+    ///
+    /// a set of the mappings.
     @Override
     public Set<Map.Entry<K, V>> entrySet() {
         if (entrySet == null) {
@@ -5464,12 +5533,15 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
         return entrySet;
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * @see java.util.NavigableMap#navigableKeySet()
-     * @since 1.6
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Since
+    ///
+    /// 1.6
+    ///
+    /// #### See also
+    ///
+    /// - java.util.NavigableMap#navigableKeySet()
     @SuppressWarnings("unchecked")
     public NavigableSet<K> navigableKeySet() {
         return (null != navigableKeySet) ? navigableKeySet
@@ -5477,33 +5549,42 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
                         .navigableKeySet());
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * @see java.util.NavigableMap#descendingKeySet()
-     * @since 1.6
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Since
+    ///
+    /// 1.6
+    ///
+    /// #### See also
+    ///
+    /// - java.util.NavigableMap#descendingKeySet()
     public NavigableSet<K> descendingKeySet() {
         return descendingMap().navigableKeySet();
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * @see java.util.NavigableMap#descendingMap()
-     * @since 1.6
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Since
+    ///
+    /// 1.6
+    ///
+    /// #### See also
+    ///
+    /// - java.util.NavigableMap#descendingMap()
     public NavigableMap<K, V> descendingMap() {
         return (null != descendingMap) ? descendingMap
                 : (descendingMap = new DescendingSubMap<K, V>(this));
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * @see java.util.NavigableMap#subMap(Object, boolean, Object, boolean)
-     * @since 1.6
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Since
+    ///
+    /// 1.6
+    ///
+    /// #### See also
+    ///
+    /// - java.util.NavigableMap#subMap(Object, boolean, Object, boolean)
     public NavigableMap<K, V> subMap(K start, boolean startInclusive, K end,
             boolean endInclusive) {
         if (keyCompare(start, end) <= 0) {
@@ -5513,55 +5594,68 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
         throw new IllegalArgumentException();
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * @see java.util.NavigableMap#headMap(Object, boolean)
-     * @since 1.6
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Since
+    ///
+    /// 1.6
+    ///
+    /// #### See also
+    ///
+    /// - java.util.NavigableMap#headMap(Object, boolean)
     public NavigableMap<K, V> headMap(K end, boolean inclusive) {
         // check for error
         keyCompare(end, end);
         return new AscendingSubMap<K, V>(this, end, inclusive);
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * @see java.util.NavigableMap#tailMap(Object, boolean)
-     * @since 1.6
-     */
+    /// {@inheritDoc}
+    ///
+    /// #### Since
+    ///
+    /// 1.6
+    ///
+    /// #### See also
+    ///
+    /// - java.util.NavigableMap#tailMap(Object, boolean)
     public NavigableMap<K, V> tailMap(K start, boolean inclusive) {
         // check for error
         keyCompare(start, start);
         return new AscendingSubMap<K, V>(start, inclusive, this);
     }
 
-    /**
-     * Returns a sorted map over a range of this sorted map with all keys
-     * greater than or equal to the specified {@code startKey} and less than the
-     * specified {@code endKey}. Changes to the returned sorted map are
-     * reflected in this sorted map and vice versa.
-     * <p>
-     * Note: The returned map will not allow an insertion of a key outside the
-     * specified range.
-     *
-     * @param startKey
-     *            the low boundary of the range (inclusive).
-     * @param endKey
-     *            the high boundary of the range (exclusive),
-     * @return a sorted map with the key from the specified range.
-     * @throws ClassCastException
-     *             if the start or end key cannot be compared with the keys in
-     *             this map.
-     * @throws NullPointerException
-     *             if the start or end key is {@code null} and the comparator
-     *             cannot handle {@code null} keys.
-     * @throws IllegalArgumentException
-     *             if the start key is greater than the end key, or if this map
-     *             is itself a sorted map over a range of another sorted map and
-     *             the specified range is outside of its range.
-     */
+    /// Returns a sorted map over a range of this sorted map with all keys
+    /// greater than or equal to the specified `startKey` and less than the
+    /// specified `endKey`. Changes to the returned sorted map are
+    /// reflected in this sorted map and vice versa.
+    ///
+    /// Note: The returned map will not allow an insertion of a key outside the
+    /// specified range.
+    ///
+    /// #### Parameters
+    ///
+    /// - `startKey`: the low boundary of the range (inclusive).
+    ///
+    /// - `endKey`: the high boundary of the range (exclusive),
+    ///
+    /// #### Returns
+    ///
+    /// a sorted map with the key from the specified range.
+    ///
+    /// #### Throws
+    ///
+    /// - `ClassCastException`: @throws ClassCastException
+    /// if the start or end key cannot be compared with the keys in
+    /// this map.
+    ///
+    /// - `NullPointerException`: @throws NullPointerException
+    /// if the start or end key is `null` and the comparator
+    /// cannot handle `null` keys.
+    ///
+    /// - `IllegalArgumentException`: @throws IllegalArgumentException
+    /// if the start key is greater than the end key, or if this map
+    /// is itself a sorted map over a range of another sorted map and
+    /// the specified range is outside of its range.
     public SortedMap<K, V> subMap(K startKey, K endKey) {
         if (comparator == null) {
             if (toComparable(startKey).compareTo(endKey) <= 0) {
@@ -5575,53 +5669,67 @@ public class TreeMap<K, V> extends AbstractMap<K, V> implements
         throw new IllegalArgumentException();
     }
 
-    /**
-     * Returns a sorted map over a range of this sorted map with all keys that
-     * are less than the specified {@code endKey}. Changes to the returned
-     * sorted map are reflected in this sorted map and vice versa.
-     * <p>
-     * Note: The returned map will not allow an insertion of a key outside the
-     * specified range.
-     *
-     * @param endKey
-     *            the high boundary of the range specified.
-     * @return a sorted map where the keys are less than {@code endKey}.
-     * @throws ClassCastException
-     *             if the specified key cannot be compared with the keys in this
-     *             map.
-     * @throws NullPointerException
-     *             if the specified key is {@code null} and the comparator
-     *             cannot handle {@code null} keys.
-     * @throws IllegalArgumentException
-     *             if this map is itself a sorted map over a range of another
-     *             map and the specified key is outside of its range.
-     */
+    /// Returns a sorted map over a range of this sorted map with all keys that
+    /// are less than the specified `endKey`. Changes to the returned
+    /// sorted map are reflected in this sorted map and vice versa.
+    ///
+    /// Note: The returned map will not allow an insertion of a key outside the
+    /// specified range.
+    ///
+    /// #### Parameters
+    ///
+    /// - `endKey`: the high boundary of the range specified.
+    ///
+    /// #### Returns
+    ///
+    /// a sorted map where the keys are less than `endKey`.
+    ///
+    /// #### Throws
+    ///
+    /// - `ClassCastException`: @throws ClassCastException
+    /// if the specified key cannot be compared with the keys in this
+    /// map.
+    ///
+    /// - `NullPointerException`: @throws NullPointerException
+    /// if the specified key is `null` and the comparator
+    /// cannot handle `null` keys.
+    ///
+    /// - `IllegalArgumentException`: @throws IllegalArgumentException
+    /// if this map is itself a sorted map over a range of another
+    /// map and the specified key is outside of its range.
     public SortedMap<K, V> headMap(K endKey) {
         return headMap(endKey, false);
     }
 
-    /**
-     * Returns a sorted map over a range of this sorted map with all keys that
-     * are greater than or equal to the specified {@code startKey}. Changes to
-     * the returned sorted map are reflected in this sorted map and vice versa.
-     * <p>
-     * Note: The returned map will not allow an insertion of a key outside the
-     * specified range.
-     *
-     * @param startKey
-     *            the low boundary of the range specified.
-     * @return a sorted map where the keys are greater or equal to
-     *         {@code startKey}.
-     * @throws ClassCastException
-     *             if the specified key cannot be compared with the keys in this
-     *             map.
-     * @throws NullPointerException
-     *             if the specified key is {@code null} and the comparator
-     *             cannot handle {@code null} keys.
-     * @throws IllegalArgumentException
-     *             if this map itself a sorted map over a range of another map
-     *             and the specified key is outside of its range.
-     */
+    /// Returns a sorted map over a range of this sorted map with all keys that
+    /// are greater than or equal to the specified `startKey`. Changes to
+    /// the returned sorted map are reflected in this sorted map and vice versa.
+    ///
+    /// Note: The returned map will not allow an insertion of a key outside the
+    /// specified range.
+    ///
+    /// #### Parameters
+    ///
+    /// - `startKey`: the low boundary of the range specified.
+    ///
+    /// #### Returns
+    ///
+    /// @return a sorted map where the keys are greater or equal to
+    /// `startKey`.
+    ///
+    /// #### Throws
+    ///
+    /// - `ClassCastException`: @throws ClassCastException
+    /// if the specified key cannot be compared with the keys in this
+    /// map.
+    ///
+    /// - `NullPointerException`: @throws NullPointerException
+    /// if the specified key is `null` and the comparator
+    /// cannot handle `null` keys.
+    ///
+    /// - `IllegalArgumentException`: @throws IllegalArgumentException
+    /// if this map itself a sorted map over a range of another map
+    /// and the specified key is outside of its range.
     public SortedMap<K, V> tailMap(K startKey) {
         return tailMap(startKey, true);
     }

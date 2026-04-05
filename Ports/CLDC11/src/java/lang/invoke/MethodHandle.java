@@ -23,9 +23,9 @@
  */
 package java.lang.invoke;
 
-/**
- * @deprecated these classes are used internally for Lambda compatibility
- */
+/// #### Deprecated
+///
+/// these classes are used internally for Lambda compatibility
 public abstract class MethodHandle {
   public MethodHandle() {
   }

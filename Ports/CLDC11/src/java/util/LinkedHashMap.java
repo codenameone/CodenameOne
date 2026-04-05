@@ -17,37 +17,37 @@
 
 package java.util;
 
-/**
- * LinkedHashMap is a variant of HashMap. Its entries are kept in a
- * doubly-linked list. The iteration order is, by default, the order in which
- * keys were inserted. Reinserting an already existing key doesn't change the
- * order. A key is existing if a call to {@code containsKey} would return true.
- * <p>
- * If the three argument constructor is used, and {@code order} is specified as
- * {@code true}, the iteration will be in the order that entries were accessed.
- * The access order gets affected by put(), get(), putAll() operations, but not
- * by operations on the collection views.
- * <p>
- * Null elements are allowed, and all the optional map operations are supported.
- * <p>
- * <b>Note:</b> The implementation of {@code LinkedHashMap} is not synchronized.
- * If one thread of several threads accessing an instance modifies the map
- * structurally, access to the map needs to be synchronized. For
- * insertion-ordered instances a structural modification is an operation that
- * removes or adds an entry. Access-ordered instances also are structurally
- * modified by put(), get() and putAll() since these methods change the order of
- * the entries. Changes in the value of an entry are not structural changes.
- * <p>
- * The Iterator that can be created by calling the {@code iterator} method
- * throws a {@code ConcurrentModificationException} if the map is structurally
- * changed while an iterator is used to iterate over the elements. Only the
- * {@code remove} method that is provided by the iterator allows for removal of
- * elements during iteration. It is not possible to guarantee that this
- * mechanism works in all cases of unsynchronized concurrent modification. It
- * should only be used for debugging purposes.
- *
- * @since 1.4
- */
+/// LinkedHashMap is a variant of HashMap. Its entries are kept in a
+/// doubly-linked list. The iteration order is, by default, the order in which
+/// keys were inserted. Reinserting an already existing key doesn't change the
+/// order. A key is existing if a call to `containsKey` would return true.
+///
+/// If the three argument constructor is used, and `order` is specified as
+/// `true`, the iteration will be in the order that entries were accessed.
+/// The access order gets affected by put(), get(), putAll() operations, but not
+/// by operations on the collection views.
+///
+/// Null elements are allowed, and all the optional map operations are supported.
+///
+/// **Note:** The implementation of `LinkedHashMap` is not synchronized.
+/// If one thread of several threads accessing an instance modifies the map
+/// structurally, access to the map needs to be synchronized. For
+/// insertion-ordered instances a structural modification is an operation that
+/// removes or adds an entry. Access-ordered instances also are structurally
+/// modified by put(), get() and putAll() since these methods change the order of
+/// the entries. Changes in the value of an entry are not structural changes.
+///
+/// The Iterator that can be created by calling the `iterator` method
+/// throws a `ConcurrentModificationException` if the map is structurally
+/// changed while an iterator is used to iterate over the elements. Only the
+/// `remove` method that is provided by the iterator allows for removal of
+/// elements during iteration. It is not possible to guarantee that this
+/// mechanism works in all cases of unsynchronized concurrent modification. It
+/// should only be used for debugging purposes.
+///
+/// #### Since
+///
+/// 1.4
 public class LinkedHashMap<K, V> extends HashMap<K, V> implements Map<K, V> {
 
     private static final long serialVersionUID = 3801124242820219131L;
@@ -56,42 +56,43 @@ public class LinkedHashMap<K, V> extends HashMap<K, V> implements Map<K, V> {
 
     transient private LinkedHashMapEntry<K, V> head, tail;
 
-    /**
-     * Constructs a new empty {@code LinkedHashMap} instance.
-     */
+    /// Constructs a new empty `LinkedHashMap` instance.
     public LinkedHashMap() {
         super();
         accessOrder = false;
         head = null;
     }
 
-    /**
-     * Constructs a new {@code LinkedHashMap} instance with the specified
-     * capacity.
-     * 
-     * @param s
-     *            the initial capacity of this map.
-     * @throws IllegalArgumentException
-     *                if the capacity is less than zero.
-     */
+    /// Constructs a new `LinkedHashMap` instance with the specified
+    /// capacity.
+    ///
+    /// #### Parameters
+    ///
+    /// - `s`: the initial capacity of this map.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if the capacity is less than zero.
     public LinkedHashMap(int s) {
         super(s);
         accessOrder = false;
         head = null;
     }
 
-    /**
-     * Constructs a new {@code LinkedHashMap} instance with the specified
-     * capacity and load factor.
-     * 
-     * @param s
-     *            the initial capacity of this map.
-     * @param lf
-     *            the initial load factor.
-     * @throws IllegalArgumentException
-     *             when the capacity is less than zero or the load factor is
-     *             less or equal to zero.
-     */
+    /// Constructs a new `LinkedHashMap` instance with the specified
+    /// capacity and load factor.
+    ///
+    /// #### Parameters
+    ///
+    /// - `s`: the initial capacity of this map.
+    ///
+    /// - `lf`: the initial load factor.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: @throws IllegalArgumentException
+    /// when the capacity is less than zero or the load factor is
+    /// less or equal to zero.
     public LinkedHashMap(int s, float lf) {
         super(s, lf);
         accessOrder = false;
@@ -99,23 +100,26 @@ public class LinkedHashMap<K, V> extends HashMap<K, V> implements Map<K, V> {
         tail = null;
     }
 
-    /**
-     * Constructs a new {@code LinkedHashMap} instance with the specified
-     * capacity, load factor and a flag specifying the ordering behavior.
-     * 
-     * @param s
-     *            the initial capacity of this hash map.
-     * @param lf
-     *            the initial load factor.
-     * @param order
-     *            {@code true} if the ordering should be done based on the last
-     *            access (from least-recently accessed to most-recently
-     *            accessed), and {@code false} if the ordering should be the
-     *            order in which the entries were inserted.
-     * @throws IllegalArgumentException
-     *             when the capacity is less than zero or the load factor is
-     *             less or equal to zero.
-     */
+    /// Constructs a new `LinkedHashMap` instance with the specified
+    /// capacity, load factor and a flag specifying the ordering behavior.
+    ///
+    /// #### Parameters
+    ///
+    /// - `s`: the initial capacity of this hash map.
+    ///
+    /// - `lf`: the initial load factor.
+    ///
+    /// - `order`: @param order
+    /// `true` if the ordering should be done based on the last
+    /// access (from least-recently accessed to most-recently
+    /// accessed), and `false` if the ordering should be the
+    /// order in which the entries were inserted.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: @throws IllegalArgumentException
+    /// when the capacity is less than zero or the load factor is
+    /// less or equal to zero.
     public LinkedHashMap(int s, float lf, boolean order) {
         super(s, lf);
         accessOrder = order;
@@ -123,13 +127,12 @@ public class LinkedHashMap<K, V> extends HashMap<K, V> implements Map<K, V> {
         tail = null;
     }
 
-    /**
-     * Constructs a new {@code LinkedHashMap} instance containing the mappings
-     * from the specified map. The order of the elements is preserved.
-     * 
-     * @param m
-     *            the mappings to add.
-     */
+    /// Constructs a new `LinkedHashMap` instance containing the mappings
+    /// from the specified map. The order of the elements is preserved.
+    ///
+    /// #### Parameters
+    ///
+    /// - `m`: the mappings to add.
     public LinkedHashMap(Map<? extends K, ? extends V> m) {
         accessOrder = false;
         head = null;
@@ -283,26 +286,31 @@ public class LinkedHashMap<K, V> extends HashMap<K, V> implements Map<K, V> {
         return false;
     }
 
-    /**
-     * Create a new element array
-     * 
-     * @param s
-     * @return Reference to the element array
-     */
+    /// Create a new element array
+    ///
+    /// #### Parameters
+    ///
+    /// - `s`
+    ///
+    /// #### Returns
+    ///
+    /// Reference to the element array
     @Override
     @SuppressWarnings("unchecked")
     HashMap.Entry<K, V>[] newElementArray(int s) {
         return new LinkedHashMapEntry[s];
     }
 
-    /**
-     * Returns the value of the mapping with the specified key.
-     * 
-     * @param key
-     *            the key.
-     * @return the value of the mapping with the specified key, or {@code null}
-     *         if no mapping for the specified key is found.
-     */
+    /// Returns the value of the mapping with the specified key.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key.
+    ///
+    /// #### Returns
+    ///
+    /// @return the value of the mapping with the specified key, or `null`
+    /// if no mapping for the specified key is found.
     @Override
     public V get(Object key) {
         LinkedHashMapEntry<K, V> m;
@@ -353,16 +361,18 @@ public class LinkedHashMap<K, V> extends HashMap<K, V> implements Map<K, V> {
         return m;
     }
 
-    /**
-     * Maps the specified key to the specified value.
-     * 
-     * @param key
-     *            the key.
-     * @param value
-     *            the value.
-     * @return the value of any previous mapping with the specified key or
-     *         {@code null} if there was no such mapping.
-     */
+    /// Maps the specified key to the specified value.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key.
+    ///
+    /// - `value`: the value.
+    ///
+    /// #### Returns
+    ///
+    /// @return the value of any previous mapping with the specified key or
+    /// `null` if there was no such mapping.
     @Override
     public V put(K key, V value) {
         V result = putImpl(key, value);
@@ -470,25 +480,25 @@ public class LinkedHashMap<K, V> extends HashMap<K, V> implements Map<K, V> {
         }
     }
 
-    /**
-     * Returns a set containing all of the mappings in this map. Each mapping is
-     * an instance of {@link Map.Entry}. As the set is backed by this map,
-     * changes in one will be reflected in the other.
-     * 
-     * @return a set of the mappings.
-     */
+    /// Returns a set containing all of the mappings in this map. Each mapping is
+    /// an instance of `Map.Entry`. As the set is backed by this map,
+    /// changes in one will be reflected in the other.
+    ///
+    /// #### Returns
+    ///
+    /// a set of the mappings.
     @Override
     public Set<Map.Entry<K, V>> entrySet() {
         return new LinkedHashMapEntrySet<K, V>(this);
     }
 
-    /**
-     * Returns a set of the keys contained in this map. The set is backed by
-     * this map so changes to one are reflected by the other. The set does not
-     * support adding.
-     * 
-     * @return a set of the keys.
-     */
+    /// Returns a set of the keys contained in this map. The set is backed by
+    /// this map so changes to one are reflected by the other. The set does not
+    /// support adding.
+    ///
+    /// #### Returns
+    ///
+    /// a set of the keys.
     @Override
     public Set<K> keySet() {
         if (keySet == null) {
@@ -526,25 +536,25 @@ public class LinkedHashMap<K, V> extends HashMap<K, V> implements Map<K, V> {
         return keySet;
     }
 
-    /**
-     * Returns a collection of the values contained in this map. The collection
-     * is backed by this map so changes to one are reflected by the other. The
-     * collection supports remove, removeAll, retainAll and clear operations,
-     * and it does not support add or addAll operations.
-     * <p>
-     * This method returns a collection which is the subclass of
-     * AbstractCollection. The iterator method of this subclass returns a
-     * "wrapper object" over the iterator of map's entrySet(). The size method
-     * wraps the map's size method and the contains method wraps the map's
-     * containsValue method.
-     * <p>
-     * The collection is created when this method is called for the first time
-     * and returned in response to all subsequent calls. This method may return
-     * different collections when multiple concurrent calls occur, since no
-     * synchronization is performed.
-     *
-     * @return a collection of the values contained in this map.
-     */
+    /// Returns a collection of the values contained in this map. The collection
+    /// is backed by this map so changes to one are reflected by the other. The
+    /// collection supports remove, removeAll, retainAll and clear operations,
+    /// and it does not support add or addAll operations.
+    ///
+    /// This method returns a collection which is the subclass of
+    /// AbstractCollection. The iterator method of this subclass returns a
+    /// "wrapper object" over the iterator of map's entrySet(). The size method
+    /// wraps the map's size method and the contains method wraps the map's
+    /// containsValue method.
+    ///
+    /// The collection is created when this method is called for the first time
+    /// and returned in response to all subsequent calls. This method may return
+    /// different collections when multiple concurrent calls occur, since no
+    /// synchronization is performed.
+    ///
+    /// #### Returns
+    ///
+    /// a collection of the values contained in this map.
     @Override
     public Collection<V> values() {
         if (valuesCollection == null) {
@@ -573,14 +583,16 @@ public class LinkedHashMap<K, V> extends HashMap<K, V> implements Map<K, V> {
         return valuesCollection;
     }
 
-    /**
-     * Removes the mapping with the specified key from this map.
-     * 
-     * @param key
-     *            the key of the mapping to remove.
-     * @return the value of the removed mapping or {@code null} if no mapping
-     *         for the specified key was found.
-     */
+    /// Removes the mapping with the specified key from this map.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key of the mapping to remove.
+    ///
+    /// #### Returns
+    ///
+    /// @return the value of the removed mapping or `null` if no mapping
+    /// for the specified key was found.
     @Override
     public V remove(Object key) {
         LinkedHashMapEntry<K, V> m = (LinkedHashMapEntry<K, V>) removeEntry(key);
@@ -602,26 +614,29 @@ public class LinkedHashMap<K, V> extends HashMap<K, V> implements Map<K, V> {
         return m.value;
     }
 
-    /**
-     * This method is queried from the put and putAll methods to check if the
-     * eldest member of the map should be deleted before adding the new member.
-     * If this map was created with accessOrder = true, then the result of
-     * removeEldestEntry is assumed to be false.
-     * 
-     * @param eldest
-     *            the entry to check if it should be removed.
-     * @return {@code true} if the eldest member should be removed.
-     */
+    /// This method is queried from the put and putAll methods to check if the
+    /// eldest member of the map should be deleted before adding the new member.
+    /// If this map was created with accessOrder = true, then the result of
+    /// removeEldestEntry is assumed to be false.
+    ///
+    /// #### Parameters
+    ///
+    /// - `eldest`: the entry to check if it should be removed.
+    ///
+    /// #### Returns
+    ///
+    /// `true` if the eldest member should be removed.
     protected boolean removeEldestEntry(Map.Entry<K, V> eldest) {
         return false;
     }
 
-    /**
-     * Removes all elements from this map, leaving it empty.
-     * 
-     * @see #isEmpty()
-     * @see #size()
-     */
+    /// Removes all elements from this map, leaving it empty.
+    ///
+    /// #### See also
+    ///
+    /// - #isEmpty()
+    ///
+    /// - #size()
     @Override
     public void clear() {
         super.clear();

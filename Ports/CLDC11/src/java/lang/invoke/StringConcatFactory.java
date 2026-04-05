@@ -23,9 +23,9 @@
  */
 package java.lang.invoke;
 
-/**
- * @deprecated this class is used internally for String concatenation compatibility
- */
+/// #### Deprecated
+///
+/// this class is used internally for String concatenation compatibility
 public final class StringConcatFactory {
     private StringConcatFactory() {
     }

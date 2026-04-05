@@ -18,12 +18,10 @@
 package java.util;
 
 
-/**
- * The {@code BitSet} class implements a bit field. Each element in a
- * {@code BitSet} can be on(1) or off(0). A {@code BitSet} is created with a
- * given size and grows if this size is exceeded. Growth is always rounded to a
- * 64 bit boundary.
- */
+/// The `BitSet` class implements a bit field. Each element in a
+/// `BitSet` can be on(1) or off(0). A `BitSet` is created with a
+/// given size and grows if this size is exceeded. Growth is always rounded to a
+/// 64 bit boundary.
 public class BitSet {
     private static final int OFFSET = 6;
 
@@ -55,40 +53,56 @@ public class BitSet {
 
     private transient boolean isLengthActual;
 
-    /**
-     * Create a new {@code BitSet} with size equal to 64 bits.
-     * 
-     * @see #clear(int)
-     * @see #set(int)
-     * @see #clear()
-     * @see #clear(int, int)
-     * @see #set(int, boolean)
-     * @see #set(int, int)
-     * @see #set(int, int, boolean)
-     */
+    /// Create a new `BitSet` with size equal to 64 bits.
+    ///
+    /// #### See also
+    ///
+    /// - #clear(int)
+    ///
+    /// - #set(int)
+    ///
+    /// - #clear()
+    ///
+    /// - #clear(int, int)
+    ///
+    /// - #set(int, boolean)
+    ///
+    /// - #set(int, int)
+    ///
+    /// - #set(int, int, boolean)
     public BitSet() {
         bits = new long[1];
         actualArrayLength = 0;
         isLengthActual = true;
     }
 
-    /**
-     * Create a new {@code BitSet} with size equal to nbits. If nbits is not a
-     * multiple of 64, then create a {@code BitSet} with size nbits rounded to
-     * the next closest multiple of 64.
-     * 
-     * @param nbits
-     *            the size of the bit set.
-     * @throws NegativeArraySizeException
-     *             if {@code nbits} is negative.
-     * @see #clear(int)
-     * @see #set(int)
-     * @see #clear()
-     * @see #clear(int, int)
-     * @see #set(int, boolean)
-     * @see #set(int, int)
-     * @see #set(int, int, boolean)
-     */
+    /// Create a new `BitSet` with size equal to nbits. If nbits is not a
+    /// multiple of 64, then create a `BitSet` with size nbits rounded to
+    /// the next closest multiple of 64.
+    ///
+    /// #### Parameters
+    ///
+    /// - `nbits`: the size of the bit set.
+    ///
+    /// #### Throws
+    ///
+    /// - `NegativeArraySizeException`: if `nbits` is negative.
+    ///
+    /// #### See also
+    ///
+    /// - #clear(int)
+    ///
+    /// - #set(int)
+    ///
+    /// - #clear()
+    ///
+    /// - #clear(int, int)
+    ///
+    /// - #set(int, boolean)
+    ///
+    /// - #set(int, int)
+    ///
+    /// - #set(int, int, boolean)
     public BitSet(int nbits) {
         if (nbits < 0) {
             throw new NegativeArraySizeException();
@@ -98,12 +112,11 @@ public class BitSet {
         isLengthActual = true;
     }
 
-    /**
-     * Private constructor called from get(int, int) method
-     * 
-     * @param bits
-     *            the size of the bit set
-     */
+    /// Private constructor called from get(int, int) method
+    ///
+    /// #### Parameters
+    ///
+    /// - `bits`: the size of the bit set
     private BitSet(long[] bits, boolean needClear, int actualArrayLength,
             boolean isLengthActual) {
         this.bits = bits;
@@ -112,17 +125,22 @@ public class BitSet {
         this.isLengthActual = isLengthActual;
     }
 
-    /**
-     * Compares the argument to this {@code BitSet} and returns whether they are
-     * equal. The object must be an instance of {@code BitSet} with the same
-     * bits set.
-     * 
-     * @param obj
-     *            the {@code BitSet} object to compare.
-     * @return a {@code boolean} indicating whether or not this {@code BitSet} and
-     *         {@code obj} are equal.
-     * @see #hashCode
-     */
+    /// Compares the argument to this `BitSet` and returns whether they are
+    /// equal. The object must be an instance of `BitSet` with the same
+    /// bits set.
+    ///
+    /// #### Parameters
+    ///
+    /// - `obj`: the `BitSet` object to compare.
+    ///
+    /// #### Returns
+    ///
+    /// @return a `boolean` indicating whether or not this `BitSet` and
+    /// `obj` are equal.
+    ///
+    /// #### See also
+    ///
+    /// - #hashCode
     @Override
     public boolean equals(Object obj) {
         if (this == obj) {
@@ -165,28 +183,31 @@ public class BitSet {
         return false;
     }
 
-    /**
-     * Increase the size of the internal array to accommodate {@code pos} bits.
-     * The new array max index will be a multiple of 64.
-     * 
-     * @param len
-     *            the index the new array needs to be able to access.
-     */
+    /// Increase the size of the internal array to accommodate `pos` bits.
+    /// The new array max index will be a multiple of 64.
+    ///
+    /// #### Parameters
+    ///
+    /// - `len`: the index the new array needs to be able to access.
     private final void growLength(int len) {
         long[] tempBits = new long[Math.max(len, bits.length * 2)];
         System.arraycopy(bits, 0, tempBits, 0, this.actualArrayLength);
         bits = tempBits;
     }
 
-    /**
-     * Computes the hash code for this {@code BitSet}. If two {@code BitSet}s are equal
-     * the have to return the same result for {@code hashCode()}.
-     * 
-     * @return the {@code int} representing the hash code for this bit
-     *         set.
-     * @see #equals
-     * @see java.util.Hashtable
-     */
+    /// Computes the hash code for this `BitSet`. If two `BitSet`s are equal
+    /// the have to return the same result for `hashCode()`.
+    ///
+    /// #### Returns
+    ///
+    /// @return the `int` representing the hash code for this bit
+    /// set.
+    ///
+    /// #### See also
+    ///
+    /// - #equals
+    ///
+    /// - java.util.Hashtable
     @Override
     public int hashCode() {
         long x = 1234;
@@ -196,24 +217,37 @@ public class BitSet {
         return (int) ((x >> 32) ^ x);
     }
 
-    /**
-     * Retrieves the bit at index {@code pos}. Grows the {@code BitSet} if
-     * {@code pos > size}.
-     * 
-     * @param pos
-     *            the index of the bit to be retrieved.
-     * @return {@code true} if the bit at {@code pos} is set,
-     *         {@code false} otherwise.
-     * @throws IndexOutOfBoundsException
-     *             if {@code pos} is negative.
-     * @see #clear(int)
-     * @see #set(int)
-     * @see #clear()
-     * @see #clear(int, int)
-     * @see #set(int, boolean)
-     * @see #set(int, int)
-     * @see #set(int, int, boolean)
-     */
+    /// Retrieves the bit at index `pos`. Grows the `BitSet` if
+    /// `pos > size`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pos`: the index of the bit to be retrieved.
+    ///
+    /// #### Returns
+    ///
+    /// @return `true` if the bit at `pos` is set,
+    /// `false` otherwise.
+    ///
+    /// #### Throws
+    ///
+    /// - `IndexOutOfBoundsException`: if `pos` is negative.
+    ///
+    /// #### See also
+    ///
+    /// - #clear(int)
+    ///
+    /// - #set(int)
+    ///
+    /// - #clear()
+    ///
+    /// - #clear(int, int)
+    ///
+    /// - #set(int, boolean)
+    ///
+    /// - #set(int, int)
+    ///
+    /// - #set(int, int, boolean)
     public boolean get(int pos) {
         if (pos < 0) {
             // Negative index specified
@@ -227,21 +261,29 @@ public class BitSet {
         return false;
     }
 
-    /**
-     * Retrieves the bits starting from {@code pos1} to {@code pos2} and returns
-     * back a new bitset made of these bits. Grows the {@code BitSet} if
-     * {@code pos2 > size}.
-     * 
-     * @param pos1
-     *            beginning position.
-     * @param pos2
-     *            ending position.
-     * @return new bitset of the range specified.
-     * @throws IndexOutOfBoundsException
-     *             if {@code pos1} or {@code pos2} is negative, or if
-     *             {@code pos2} is smaller than {@code pos1}.
-     * @see #get(int)
-     */
+    /// Retrieves the bits starting from `pos1` to `pos2` and returns
+    /// back a new bitset made of these bits. Grows the `BitSet` if
+    /// `pos2 > size`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pos1`: beginning position.
+    ///
+    /// - `pos2`: ending position.
+    ///
+    /// #### Returns
+    ///
+    /// new bitset of the range specified.
+    ///
+    /// #### Throws
+    ///
+    /// - `IndexOutOfBoundsException`: @throws IndexOutOfBoundsException
+    /// if `pos1` or `pos2` is negative, or if
+    /// `pos2` is smaller than `pos1`.
+    ///
+    /// #### See also
+    ///
+    /// - #get(int)
     public BitSet get(int pos1, int pos2) {
         if (pos1 < 0 || pos2 < 0 || pos2 < pos1) {
             throw new IndexOutOfBoundsException("" + pos1 + " and: " + pos2);
@@ -301,18 +343,24 @@ public class BitSet {
                 newbits[actualLen - 1] != 0);
     }
 
-    /**
-     * Sets the bit at index {@code pos} to 1. Grows the {@code BitSet} if
-     * {@code pos > size}.
-     * 
-     * @param pos
-     *            the index of the bit to set.
-     * @throws IndexOutOfBoundsException
-     *             if {@code pos} is negative.
-     * @see #clear(int)
-     * @see #clear()
-     * @see #clear(int, int)
-     */
+    /// Sets the bit at index `pos` to 1. Grows the `BitSet` if
+    /// `pos > size`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pos`: the index of the bit to set.
+    ///
+    /// #### Throws
+    ///
+    /// - `IndexOutOfBoundsException`: if `pos` is negative.
+    ///
+    /// #### See also
+    ///
+    /// - #clear(int)
+    ///
+    /// - #clear()
+    ///
+    /// - #clear(int, int)
     public void set(int pos) {
         if (pos < 0) {
             throw new IndexOutOfBoundsException("" + pos);
@@ -330,18 +378,22 @@ public class BitSet {
         needClear();
     }
 
-    /**
-     * Sets the bit at index {@code pos} to {@code val}. Grows the
-     * {@code BitSet} if {@code pos > size}.
-     * 
-     * @param pos
-     *            the index of the bit to set.
-     * @param val
-     *            value to set the bit.
-     * @throws IndexOutOfBoundsException
-     *             if {@code pos} is negative.
-     * @see #set(int)
-     */
+    /// Sets the bit at index `pos` to `val`. Grows the
+    /// `BitSet` if `pos > size`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pos`: the index of the bit to set.
+    ///
+    /// - `val`: value to set the bit.
+    ///
+    /// #### Throws
+    ///
+    /// - `IndexOutOfBoundsException`: if `pos` is negative.
+    ///
+    /// #### See also
+    ///
+    /// - #set(int)
     public void set(int pos, boolean val) {
         if (val) {
             set(pos);
@@ -350,19 +402,24 @@ public class BitSet {
         }
     }
 
-    /**
-     * Sets the bits starting from {@code pos1} to {@code pos2}. Grows the
-     * {@code BitSet} if {@code pos2 > size}.
-     * 
-     * @param pos1
-     *            beginning position.
-     * @param pos2
-     *            ending position.
-     * @throws IndexOutOfBoundsException
-     *             if {@code pos1} or {@code pos2} is negative, or if
-     *             {@code pos2} is smaller than {@code pos1}.
-     * @see #set(int)
-     */
+    /// Sets the bits starting from `pos1` to `pos2`. Grows the
+    /// `BitSet` if `pos2 > size`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pos1`: beginning position.
+    ///
+    /// - `pos2`: ending position.
+    ///
+    /// #### Throws
+    ///
+    /// - `IndexOutOfBoundsException`: @throws IndexOutOfBoundsException
+    /// if `pos1` or `pos2` is negative, or if
+    /// `pos2` is smaller than `pos1`.
+    ///
+    /// #### See also
+    ///
+    /// - #set(int)
     public void set(int pos1, int pos2) {
         if (pos1 < 0 || pos2 < 0 || pos2 < pos1) {
             throw new IndexOutOfBoundsException("" + pos1 + " and: " + pos2);
@@ -401,21 +458,26 @@ public class BitSet {
         this.needClear = true;
     }
 
-    /**
-     * Sets the bits starting from {@code pos1} to {@code pos2} to the given
-     * {@code val}. Grows the {@code BitSet} if {@code pos2 > size}.
-     * 
-     * @param pos1
-     *            beginning position.
-     * @param pos2
-     *            ending position.
-     * @param val
-     *            value to set these bits.
-     * @throws IndexOutOfBoundsException
-     *             if {@code pos1} or {@code pos2} is negative, or if
-     *             {@code pos2} is smaller than {@code pos1}.
-     * @see #set(int,int)
-     */
+    /// Sets the bits starting from `pos1` to `pos2` to the given
+    /// `val`. Grows the `BitSet` if `pos2 > size`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pos1`: beginning position.
+    ///
+    /// - `pos2`: ending position.
+    ///
+    /// - `val`: value to set these bits.
+    ///
+    /// #### Throws
+    ///
+    /// - `IndexOutOfBoundsException`: @throws IndexOutOfBoundsException
+    /// if `pos1` or `pos2` is negative, or if
+    /// `pos2` is smaller than `pos1`.
+    ///
+    /// #### See also
+    ///
+    /// - #set(int,int)
     public void set(int pos1, int pos2, boolean val) {
         if (val) {
             set(pos1, pos2);
@@ -424,12 +486,13 @@ public class BitSet {
         }
     }
 
-    /**
-     * Clears all the bits in this {@code BitSet}.
-     * 
-     * @see #clear(int)
-     * @see #clear(int, int)
-     */
+    /// Clears all the bits in this `BitSet`.
+    ///
+    /// #### See also
+    ///
+    /// - #clear(int)
+    ///
+    /// - #clear(int, int)
     public void clear() {
         if (needClear) {
             for (int i = 0; i < bits.length; i++) {
@@ -441,16 +504,20 @@ public class BitSet {
         }
     }
 
-    /**
-     * Clears the bit at index {@code pos}. Grows the {@code BitSet} if
-     * {@code pos > size}.
-     * 
-     * @param pos
-     *            the index of the bit to clear.
-     * @throws IndexOutOfBoundsException
-     *             if {@code pos} is negative.
-     * @see #clear(int, int)
-     */
+    /// Clears the bit at index `pos`. Grows the `BitSet` if
+    /// `pos > size`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pos`: the index of the bit to clear.
+    ///
+    /// #### Throws
+    ///
+    /// - `IndexOutOfBoundsException`: if `pos` is negative.
+    ///
+    /// #### See also
+    ///
+    /// - #clear(int, int)
     public void clear(int pos) {
         if (pos < 0) {
             // Negative index specified
@@ -469,19 +536,24 @@ public class BitSet {
         }
     }
 
-    /**
-     * Clears the bits starting from {@code pos1} to {@code pos2}. Grows the
-     * {@code BitSet} if {@code pos2 > size}.
-     * 
-     * @param pos1
-     *            beginning position.
-     * @param pos2
-     *            ending position.
-     * @throws IndexOutOfBoundsException
-     *             if {@code pos1} or {@code pos2} is negative, or if
-     *             {@code pos2} is smaller than {@code pos1}.
-     * @see #clear(int)
-     */
+    /// Clears the bits starting from `pos1` to `pos2`. Grows the
+    /// `BitSet` if `pos2 > size`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pos1`: beginning position.
+    ///
+    /// - `pos2`: ending position.
+    ///
+    /// #### Throws
+    ///
+    /// - `IndexOutOfBoundsException`: @throws IndexOutOfBoundsException
+    /// if `pos1` or `pos2` is negative, or if
+    /// `pos2` is smaller than `pos1`.
+    ///
+    /// #### See also
+    ///
+    /// - #clear(int)
     public void clear(int pos1, int pos2) {
         if (pos1 < 0 || pos2 < 0 || pos2 < pos1) {
             throw new IndexOutOfBoundsException("" + pos1 + " and: " + pos2);
@@ -517,16 +589,20 @@ public class BitSet {
         }
     }
 
-    /**
-     * Flips the bit at index {@code pos}. Grows the {@code BitSet} if
-     * {@code pos > size}.
-     * 
-     * @param pos
-     *            the index of the bit to flip.
-     * @throws IndexOutOfBoundsException
-     *             if {@code pos} is negative.
-     * @see #flip(int, int)
-     */
+    /// Flips the bit at index `pos`. Grows the `BitSet` if
+    /// `pos > size`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pos`: the index of the bit to flip.
+    ///
+    /// #### Throws
+    ///
+    /// - `IndexOutOfBoundsException`: if `pos` is negative.
+    ///
+    /// #### See also
+    ///
+    /// - #flip(int, int)
     public void flip(int pos) {
         if (pos < 0) {
             throw new IndexOutOfBoundsException("" + pos);
@@ -544,19 +620,24 @@ public class BitSet {
         needClear();
     }
 
-    /**
-     * Flips the bits starting from {@code pos1} to {@code pos2}. Grows the
-     * {@code BitSet} if {@code pos2 > size}.
-     * 
-     * @param pos1
-     *            beginning position.
-     * @param pos2
-     *            ending position.
-     * @throws IndexOutOfBoundsException
-     *             if {@code pos1} or {@code pos2} is negative, or if
-     *             {@code pos2} is smaller than {@code pos1}.
-     * @see #flip(int)
-     */
+    /// Flips the bits starting from `pos1` to `pos2`. Grows the
+    /// `BitSet` if `pos2 > size`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pos1`: beginning position.
+    ///
+    /// - `pos2`: ending position.
+    ///
+    /// #### Throws
+    ///
+    /// - `IndexOutOfBoundsException`: @throws IndexOutOfBoundsException
+    /// if `pos1` or `pos2` is negative, or if
+    /// `pos2` is smaller than `pos1`.
+    ///
+    /// #### See also
+    ///
+    /// - #flip(int)
     public void flip(int pos1, int pos2) {
         if (pos1 < 0 || pos2 < 0 || pos2 < pos1) {
             throw new IndexOutOfBoundsException("" + pos1 + " and: " + pos2);
@@ -591,15 +672,17 @@ public class BitSet {
         needClear();
     }
 
-    /**
-     * Checks if these two {@code BitSet}s have at least one bit set to true in the same
-     * position.
-     * 
-     * @param bs
-     *            {@code BitSet} used to calculate the intersection.
-     * @return {@code true} if bs intersects with this {@code BitSet},
-     *         {@code false} otherwise.
-     */
+    /// Checks if these two `BitSet`s have at least one bit set to true in the same
+    /// position.
+    ///
+    /// #### Parameters
+    ///
+    /// - `bs`: `BitSet` used to calculate the intersection.
+    ///
+    /// #### Returns
+    ///
+    /// @return `true` if bs intersects with this `BitSet`,
+    /// `false` otherwise.
     public boolean intersects(BitSet bs) {
         long[] bsBits = bs.bits;
         int length1 = actualArrayLength, length2 = bs.actualArrayLength;
@@ -621,15 +704,18 @@ public class BitSet {
         return false;
     }
 
-    /**
-     * Performs the logical AND of this {@code BitSet} with another
-     * {@code BitSet}. The values of this {@code BitSet} are changed accordingly.
-     * 
-     * @param bs
-     *            {@code BitSet} to AND with.
-     * @see #or
-     * @see #xor
-     */
+    /// Performs the logical AND of this `BitSet` with another
+    /// `BitSet`. The values of this `BitSet` are changed accordingly.
+    ///
+    /// #### Parameters
+    ///
+    /// - `bs`: `BitSet` to AND with.
+    ///
+    /// #### See also
+    ///
+    /// - #or
+    ///
+    /// - #xor
     public void and(BitSet bs) {
         long[] bsBits = bs.bits;
         if (!needClear) {
@@ -652,13 +738,12 @@ public class BitSet {
         isLengthActual = !((actualArrayLength > 0) && (bits[actualArrayLength - 1] == 0));
     }
 
-    /**
-     * Clears all bits in the receiver which are also set in the parameter
-     * {@code BitSet}. The values of this {@code BitSet} are changed accordingly.
-     * 
-     * @param bs
-     *            {@code BitSet} to ANDNOT with.
-     */
+    /// Clears all bits in the receiver which are also set in the parameter
+    /// `BitSet`. The values of this `BitSet` are changed accordingly.
+    ///
+    /// #### Parameters
+    ///
+    /// - `bs`: `BitSet` to ANDNOT with.
     public void andNot(BitSet bs) {
         long[] bsBits = bs.bits;
         if (!needClear) {
@@ -676,15 +761,18 @@ public class BitSet {
         isLengthActual = !((actualArrayLength > 0) && (bits[actualArrayLength - 1] == 0));
     }
 
-    /**
-     * Performs the logical OR of this {@code BitSet} with another {@code BitSet}.
-     * The values of this {@code BitSet} are changed accordingly.
-     *
-     * @param bs
-     *            {@code BitSet} to OR with.
-     * @see #xor
-     * @see #and
-     */
+    /// Performs the logical OR of this `BitSet` with another `BitSet`.
+    /// The values of this `BitSet` are changed accordingly.
+    ///
+    /// #### Parameters
+    ///
+    /// - `bs`: `BitSet` to OR with.
+    ///
+    /// #### See also
+    ///
+    /// - #xor
+    ///
+    /// - #and
     public void or(BitSet bs) {
         int bsActualLen = bs.getActualArrayLength();
         if (bsActualLen > bits.length) {
@@ -709,15 +797,18 @@ public class BitSet {
         needClear();
     }
 
-    /**
-     * Performs the logical XOR of this {@code BitSet} with another {@code BitSet}.
-     * The values of this {@code BitSet} are changed accordingly.
-     *
-     * @param bs
-     *            {@code BitSet} to XOR with.
-     * @see #or
-     * @see #and
-     */
+    /// Performs the logical XOR of this `BitSet` with another `BitSet`.
+    /// The values of this `BitSet` are changed accordingly.
+    ///
+    /// #### Parameters
+    ///
+    /// - `bs`: `BitSet` to XOR with.
+    ///
+    /// #### See also
+    ///
+    /// - #or
+    ///
+    /// - #and
     public void xor(BitSet bs) {
         int bsActualLen = bs.getActualArrayLength();
         if (bsActualLen > bits.length) {
@@ -742,21 +833,24 @@ public class BitSet {
         needClear();
     }
 
-    /**
-     * Returns the number of bits this {@code BitSet} has.
-     * 
-     * @return the number of bits contained in this {@code BitSet}.
-     * @see #length
-     */
+    /// Returns the number of bits this `BitSet` has.
+    ///
+    /// #### Returns
+    ///
+    /// the number of bits contained in this `BitSet`.
+    ///
+    /// #### See also
+    ///
+    /// - #length
     public int size() {
         return bits.length << OFFSET;
     }
 
-    /**
-     * Returns the number of bits up to and including the highest bit set.
-     * 
-     * @return the length of the {@code BitSet}.
-     */
+    /// Returns the number of bits up to and including the highest bit set.
+    ///
+    /// #### Returns
+    ///
+    /// the length of the `BitSet`.
     public int length() {
         int idx = actualArrayLength - 1;
         while (idx >= 0 && bits[idx] == 0) {
@@ -787,12 +881,12 @@ public class BitSet {
         return actualArrayLength;
     }
 
-    /**
-     * Returns a string containing a concise, human-readable description of the
-     * receiver.
-     * 
-     * @return a comma delimited list of the indices of all bits that are set.
-     */
+    /// Returns a string containing a concise, human-readable description of the
+    /// receiver.
+    ///
+    /// #### Returns
+    ///
+    /// a comma delimited list of the indices of all bits that are set.
     @Override
     public String toString() {
         StringBuffer sb = new StringBuffer(bits.length / 2);
@@ -819,13 +913,15 @@ public class BitSet {
         return sb.toString();
     }
 
-    /**
-     * Returns the position of the first bit that is {@code true} on or after {@code pos}.
-     * 
-     * @param pos
-     *            the starting position (inclusive).
-     * @return -1 if there is no bits that are set to {@code true} on or after {@code pos}.
-     */
+    /// Returns the position of the first bit that is `true` on or after `pos`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pos`: the starting position (inclusive).
+    ///
+    /// #### Returns
+    ///
+    /// -1 if there is no bits that are set to `true` on or after `pos`.
     public int nextSetBit(int pos) {
         if (pos < 0) {
             throw new IndexOutOfBoundsException("" + pos);
@@ -864,14 +960,16 @@ public class BitSet {
         return -1;
     }
 
-    /**
-     * Returns the position of the first bit that is {@code false} on or after {@code pos}.
-     * 
-     * @param pos
-     *            the starting position (inclusive).
-     * @return the position of the next bit set to {@code false}, even if it is further
-     *         than this {@code BitSet}'s size.
-     */
+    /// Returns the position of the first bit that is `false` on or after `pos`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pos`: the starting position (inclusive).
+    ///
+    /// #### Returns
+    ///
+    /// @return the position of the next bit set to `false`, even if it is further
+    /// than this `BitSet`'s size.
     public int nextClearBit(int pos) {
         if (pos < 0) {
             throw new IndexOutOfBoundsException("" + pos);
@@ -911,12 +1009,12 @@ public class BitSet {
         return bssize;
     }
 
-    /**
-     * Returns true if all the bits in this {@code BitSet} are set to false.
-     * 
-     * @return {@code true} if the {@code BitSet} is empty,
-     *         {@code false} otherwise.
-     */
+    /// Returns true if all the bits in this `BitSet` are set to false.
+    ///
+    /// #### Returns
+    ///
+    /// @return `true` if the `BitSet` is empty,
+    /// `false` otherwise.
     public boolean isEmpty() {
         if (!needClear) {
             return true;
@@ -930,11 +1028,11 @@ public class BitSet {
         return true;
     }
 
-    /**
-     * Returns the number of bits that are {@code true} in this {@code BitSet}.
-     * 
-     * @return the number of {@code true} bits in the set.
-     */
+    /// Returns the number of bits that are `true` in this `BitSet`.
+    ///
+    /// #### Returns
+    ///
+    /// the number of `true` bits in the set.
     public int cardinality() {
         if (!needClear) {
             return 0;

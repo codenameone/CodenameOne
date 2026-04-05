@@ -18,31 +18,28 @@
 package java.lang;
 
 
-/**
- * {@code LinkageError} is the superclass of all error classes that occur when
- * loading and linking class files.
- * 
- * @see Error
- */
+/// `LinkageError` is the superclass of all error classes that occur when
+/// loading and linking class files.
+///
+/// #### See also
+///
+/// - Error
 public class LinkageError extends Error {
 
     private static final long serialVersionUID = 3579600108157160122L;
 
-    /**
-     * Constructs a new {@code LinkageError} that includes the current stack
-     * trace.
-     */
+    /// Constructs a new `LinkageError` that includes the current stack
+    /// trace.
     public LinkageError() {
         super();
     }
 
-    /**
-     * Constructs a new {@code LinkageError} with the current stack trace and
-     * the specified detail message.
-     * 
-     * @param detailMessage
-     *            the detail message for this error.
-     */
+    /// Constructs a new `LinkageError` with the current stack trace and
+    /// the specified detail message.
+    ///
+    /// #### Parameters
+    ///
+    /// - `detailMessage`: the detail message for this error.
     public LinkageError(String detailMessage) {
         super(detailMessage);
     }
