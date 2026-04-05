@@ -299,6 +299,31 @@ function wrapVirtualMethodWithDiag(className, methodId, marker) {
   return true;
 }
 
+function wrapGlobalGeneratorWithDiag(symbol, marker) {
+  if (typeof global[symbol] !== "function") {
+    return false;
+  }
+  const original = global[symbol];
+  if (original.__cn1DiagWrapped) {
+    return true;
+  }
+  const wrapped = function*() {
+    emitDiagLine("PARPAR:DIAG:" + marker + ":enter");
+    try {
+      const result = yield* original.apply(this, arguments);
+      emitDiagLine("PARPAR:DIAG:" + marker + ":exit");
+      return result;
+    } catch (err) {
+      const detail = stringifyThrowable(err);
+      emitDiagLine("PARPAR:DIAG:" + marker + ":error=" + detail);
+      throw err;
+    }
+  };
+  wrapped.__cn1DiagWrapped = true;
+  global[symbol] = wrapped;
+  return true;
+}
+
 function installLifecycleDiagnostics() {
   if (!getQueryParameter("parparDiag")) {
     return;
@@ -324,19 +349,66 @@ function installLifecycleDiagnostics() {
     emitDiagLine("PARPAR:DIAG:INIT:lifecycleDiagWrap:" + target[2] + "=" + (ok ? "1" : "0"));
   }
   emitDiagLine("PARPAR:DIAG:INIT:lifecycleDiagWrapped=" + wrappedCount);
+
+  const globalTargets = [
+    ["cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_createForm_java_lang_String_com_codename1_ui_layouts_Layout_java_lang_String_R_com_codename1_ui_Form", "BASETEST_CREATE_FORM"],
+    ["cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_1___INIT___com_codenameone_examples_hellocodenameone_tests_BaseTest_java_lang_String_com_codename1_ui_layouts_Layout_java_lang_String", "BASETEST_FORM_INIT"],
+    ["cn1_com_codename1_ui_Form___INIT___java_lang_String_com_codename1_ui_layouts_Layout", "FORM_INIT_LAYOUT"],
+    ["cn1_com_codename1_ui_Display_setCurrent_com_codename1_ui_Form_boolean", "DISPLAY_SET_CURRENT"]
+  ];
+  for (let i = 0; i < globalTargets.length; i++) {
+    const target = globalTargets[i];
+    const ok = wrapGlobalGeneratorWithDiag(target[0], target[1]);
+    emitDiagLine("PARPAR:DIAG:INIT:globalDiagWrap:" + target[1] + "=" + (ok ? "1" : "0"));
+  }
 }
 
 installLifecycleDiagnostics();
-aliasGlobalToImpl("cn1_com_codename1_ui_Container_setVisible_boolean");
 if (typeof global.cn1_com_codename1_ui_Container_setVisible_boolean !== "function") {
   global.cn1_com_codename1_ui_Container_setVisible_boolean = function*(__cn1ThisObject, visible) {
-    if (!__cn1ThisObject || !__cn1ThisObject.__class) {
+    if (!__cn1ThisObject) {
       return null;
     }
-    const method = jvm.resolveVirtual(__cn1ThisObject.__class, "cn1_com_codename1_ui_Component_setVisible_boolean");
-    return yield* method(__cn1ThisObject, visible);
+    const containerClass = jvm.classes && jvm.classes["com_codename1_ui_Container"];
+    const containerMethod = containerClass && containerClass.methods
+      ? containerClass.methods["cn1_com_codename1_ui_Container_setVisible_boolean"]
+      : null;
+    if (typeof containerMethod === "function") {
+      return yield* containerMethod(__cn1ThisObject, visible);
+    }
+    const componentClass = jvm.classes && jvm.classes["com_codename1_ui_Component"];
+    const componentMethod = componentClass && componentClass.methods
+      ? componentClass.methods["cn1_com_codename1_ui_Component_setVisible_boolean"]
+      : null;
+    if (typeof componentMethod === "function") {
+      return yield* componentMethod(__cn1ThisObject, visible);
+    }
+    return null;
   };
-  emitDiagLine("PARPAR:DIAG:INIT:shim=cn1_com_codename1_ui_Container_setVisible_boolean");
+  emitDiagLine("PARPAR:DIAG:INIT:shim=containerSetVisibleDirect");
+}
+if (typeof global.cn1_com_codename1_ui_Container_setAlwaysTensile_boolean !== "function") {
+  global.cn1_com_codename1_ui_Container_setAlwaysTensile_boolean = function*(__cn1ThisObject, enabled) {
+    if (!__cn1ThisObject) {
+      return null;
+    }
+    const containerClass = jvm.classes && jvm.classes["com_codename1_ui_Container"];
+    const containerMethod = containerClass && containerClass.methods
+      ? containerClass.methods["cn1_com_codename1_ui_Container_setAlwaysTensile_boolean"]
+      : null;
+    if (typeof containerMethod === "function") {
+      return yield* containerMethod(__cn1ThisObject, enabled);
+    }
+    const componentClass = jvm.classes && jvm.classes["com_codename1_ui_Component"];
+    const componentMethod = componentClass && componentClass.methods
+      ? componentClass.methods["cn1_com_codename1_ui_Component_setAlwaysTensile_boolean"]
+      : null;
+    if (typeof componentMethod === "function") {
+      return yield* componentMethod(__cn1ThisObject, enabled);
+    }
+    return null;
+  };
+  emitDiagLine("PARPAR:DIAG:INIT:shim=containerSetAlwaysTensileDirect");
 }
 
 bindNative(["cn1_com_codename1_html5_js_core_JSArray_create_R_com_codename1_html5_js_core_JSArray", "cn1_com_codename1_html5_js_core_JSArray_create___R_com_codename1_html5_js_core_JSArray"], function*() {
@@ -752,6 +824,71 @@ bindCiFallback("Font.createTrueTypeFont", [
   return null;
 });
 
+const styleSetPaddingUnitMethodId = "cn1_com_codename1_ui_plaf_Style_setPaddingUnit_byte_1ARRAY";
+const styleSetMarginUnitMethodId = "cn1_com_codename1_ui_plaf_Style_setMarginUnit_byte_1ARRAY";
+const styleConvertUnitMethodId = "cn1_com_codename1_ui_plaf_Style_convertUnit_byte_1ARRAY_float_int_R_int";
+const styleSetPaddingUnitOriginal = (jvm.classes && jvm.classes["com_codename1_ui_plaf_Style"] && jvm.classes["com_codename1_ui_plaf_Style"].methods)
+  ? jvm.classes["com_codename1_ui_plaf_Style"].methods[styleSetPaddingUnitMethodId]
+  : null;
+const styleSetMarginUnitOriginal = (jvm.classes && jvm.classes["com_codename1_ui_plaf_Style"] && jvm.classes["com_codename1_ui_plaf_Style"].methods)
+  ? jvm.classes["com_codename1_ui_plaf_Style"].methods[styleSetMarginUnitMethodId]
+  : null;
+const styleConvertUnitOriginal = (jvm.classes && jvm.classes["com_codename1_ui_plaf_Style"] && jvm.classes["com_codename1_ui_plaf_Style"].methods)
+  ? jvm.classes["com_codename1_ui_plaf_Style"].methods[styleConvertUnitMethodId]
+  : null;
+
+function ensureJavaByteArray4(value) {
+  if (value && value.__array) {
+    if ((value.length | 0) >= 4) {
+      return value;
+    }
+    const outArr = jvm.newArray(4, "JAVA_BYTE", 1);
+    for (let i = 0; i < 4; i++) {
+      outArr[i] = i < value.length ? (value[i] | 0) : 0;
+    }
+    return outArr;
+  }
+  const out = jvm.newArray(4, "JAVA_BYTE", 1);
+  if (Array.isArray(value)) {
+    for (let i = 0; i < 4; i++) {
+      out[i] = i < value.length ? (value[i] | 0) : 0;
+    }
+    return out;
+  }
+  const scalar = value == null ? 0 : (value | 0);
+  for (let i = 0; i < 4; i++) {
+    out[i] = scalar;
+  }
+  return out;
+}
+
+bindCiFallback("Style.setPaddingUnitArrayCoerce", [
+  styleSetPaddingUnitMethodId
+], function*(__cn1ThisObject, arr) {
+  if (typeof styleSetPaddingUnitOriginal !== "function") {
+    return null;
+  }
+  return yield* styleSetPaddingUnitOriginal(__cn1ThisObject, ensureJavaByteArray4(arr));
+});
+
+bindCiFallback("Style.setMarginUnitArrayCoerce", [
+  styleSetMarginUnitMethodId
+], function*(__cn1ThisObject, arr) {
+  if (typeof styleSetMarginUnitOriginal !== "function") {
+    return null;
+  }
+  return yield* styleSetMarginUnitOriginal(__cn1ThisObject, ensureJavaByteArray4(arr));
+});
+
+bindCiFallback("Style.convertUnitArrayCoerce", [
+  styleConvertUnitMethodId
+], function*(__cn1ThisObject, arr, value, side) {
+  if (typeof styleConvertUnitOriginal !== "function") {
+    return 0;
+  }
+  return yield* styleConvertUnitOriginal(__cn1ThisObject, ensureJavaByteArray4(arr), value, side);
+});
+
 const formInitLafMethodId = "cn1_com_codename1_ui_Form_initLaf_com_codename1_ui_plaf_UIManager";
 const formInitLafOriginalMethod = (function() {
   if (!jvm || !jvm.classes || !jvm.classes["com_codename1_ui_Form"] || !jvm.classes["com_codename1_ui_Form"].methods) {
@@ -773,7 +910,75 @@ function isLikelyFormObject(value) {
     return false;
   }
   const classId = value.__class ? String(value.__class) : "";
-  return classId.indexOf("com_codename1_ui_Form") === 0 || classId.indexOf("com_codename1_ui_Dialog") === 0;
+  if (classId.indexOf("com_codename1_ui_Form") === 0 || classId.indexOf("com_codename1_ui_Dialog") === 0) {
+    return true;
+  }
+  const classDef = value.__classDef;
+  if (classDef && classDef.assignableTo) {
+    if (classDef.assignableTo["com_codename1_ui_Form"] || classDef.assignableTo["com_codename1_ui_Dialog"]) {
+      return true;
+    }
+  }
+  if (typeof jvm.instanceOf === "function") {
+    try {
+      return jvm.instanceOf(value, "com_codename1_ui_Form") || jvm.instanceOf(value, "com_codename1_ui_Dialog");
+    } catch (_err) {
+      return false;
+    }
+  }
+  return false;
+}
+
+function* safeInitLafPath(form, uiManager, lookAndFeel) {
+  const containerInitLaf = global.cn1_com_codename1_ui_Container_initLaf_com_codename1_ui_plaf_UIManager;
+  if (typeof containerInitLaf === "function") {
+    yield* containerInitLaf(form, uiManager);
+  }
+  let effectiveLookAndFeel = lookAndFeel || null;
+  if (!effectiveLookAndFeel && uiManager && uiManager.__class) {
+    try {
+      const getLookAndFeel = jvm.resolveVirtual(
+        uiManager.__class,
+        "cn1_com_codename1_ui_plaf_UIManager_getLookAndFeel_R_com_codename1_ui_plaf_LookAndFeel"
+      );
+      effectiveLookAndFeel = yield* getLookAndFeel(uiManager);
+    } catch (_err) {
+      effectiveLookAndFeel = null;
+    }
+  }
+  let menuBar = form["cn1_com_codename1_ui_Form_menuBar"] || null;
+  if (!menuBar) {
+    const menuBarCtor = global.cn1_com_codename1_ui_MenuBar___INIT____impl
+      || global.cn1_com_codename1_ui_MenuBar___INIT__;
+    if (typeof menuBarCtor === "function") {
+      menuBar = jvm.newObject("com_codename1_ui_MenuBar");
+      yield* menuBarCtor(menuBar);
+      form["cn1_com_codename1_ui_Form_menuBar"] = menuBar;
+    }
+  }
+  if (menuBar && menuBar.__class) {
+    try {
+      const initMenuBar = jvm.resolveVirtual(
+        menuBar.__class,
+        "cn1_com_codename1_ui_MenuBar_initMenuBar_com_codename1_ui_Form"
+      );
+      yield* initMenuBar(menuBar, form);
+    } catch (_err) {
+      // best effort
+    }
+  }
+  if (effectiveLookAndFeel && effectiveLookAndFeel.__class) {
+    try {
+      const getTint = jvm.resolveVirtual(
+        effectiveLookAndFeel.__class,
+        "cn1_com_codename1_ui_plaf_LookAndFeel_getDefaultFormTintColor_R_int"
+      );
+      form["cn1_com_codename1_ui_Form_tintColor"] = yield* getTint(effectiveLookAndFeel);
+    } catch (_err) {
+      // best effort
+    }
+  }
+  return null;
 }
 
 bindCiFallback("Form.initLafNullUiManagerBridge", [
@@ -846,12 +1051,33 @@ bindCiFallback("Form.initLafNullUiManagerBridge", [
       emitFormInitLafDiag("PARPAR:DIAG:FALLBACK:formInitLaf:defaultLookAndFeelCtorMissing=1");
     }
   }
+  if (!effectiveSelf["cn1_com_codename1_ui_Form_menuBar"]) {
+    const menuBarCtor = global.cn1_com_codename1_ui_MenuBar___INIT____impl
+      || global.cn1_com_codename1_ui_MenuBar___INIT__;
+    if (typeof menuBarCtor === "function") {
+      const menuBar = jvm.newObject("com_codename1_ui_MenuBar");
+      yield* menuBarCtor(menuBar);
+      effectiveSelf["cn1_com_codename1_ui_Form_menuBar"] = menuBar;
+      emitFormInitLafDiag("PARPAR:DIAG:FALLBACK:formInitLaf:menuBarInjected=1");
+    } else {
+      emitFormInitLafDiag("PARPAR:DIAG:FALLBACK:formInitLaf:menuBarCtorMissing=1");
+    }
+  }
   if (typeof formInitLafOriginalMethod !== "function") {
     emitFormInitLafDiag("PARPAR:DIAG:FALLBACK:formInitLaf:originalMissing=1");
-    return null;
+    return yield* safeInitLafPath(effectiveSelf, effectiveUiManager, lookAndFeel);
   }
   emitFormInitLafDiag("PARPAR:DIAG:FALLBACK:formInitLaf:invokeOriginal=1");
-  return yield* formInitLafOriginalMethod(effectiveSelf, effectiveUiManager);
+  try {
+    return yield* formInitLafOriginalMethod(effectiveSelf, effectiveUiManager);
+  } catch (err) {
+    const message = String(err && err.message ? err.message : err || "");
+    if (message.indexOf("__classDef") >= 0) {
+      emitFormInitLafDiag("PARPAR:DIAG:FALLBACK:formInitLaf:recoverFromNullClassDef=1");
+      return yield* safeInitLafPath(effectiveSelf, effectiveUiManager, lookAndFeel);
+    }
+    throw err;
+  }
 });
 
 const cn1ssLambdaBridgeMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_runNextTest_2_java_lang_String_com_codenameone_examples_hellocodenameone_tests_BaseTest_int";
