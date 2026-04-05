@@ -34,10 +34,13 @@ final class PlaygroundProjectExporter {
     private void writeZip(OutputStream out, ExportModel model) throws IOException {
         try (ZipOutputStream zos = new ZipOutputStream(out)) {
             addText(zos, "pom.xml", rootPom(model.appName));
-            addText(zos, "build.sh", "#!/bin/sh\ncd \"$(dirname \"$0\")\" || exit 1\nmvn package\n");
-            addText(zos, "run.sh", "#!/bin/sh\ncd \"$(dirname \"$0\")\" || exit 1\nmvn -f javase/pom.xml exec:java\n");
+            addText(zos, "build.sh", "#!/bin/sh\ncd \"$(dirname \"$0\")\" || exit 1\nmvn -DskipTests package\n");
+            addText(zos, "run.sh", "#!/bin/sh\ncd \"$(dirname \"$0\")\" || exit 1\nmvn -pl javase -am cn1:java -Dcodename1.platform=javase\n");
             addText(zos, "build.bat", "@echo off\r\ncd /d %~dp0\r\nmvn package\r\n");
-            addText(zos, "run.bat", "@echo off\r\ncd /d %~dp0\r\nmvn -f javase/pom.xml exec:java\r\n");
+            addText(zos, "run.bat", "@echo off\r\ncd /d %~dp0\r\nmvn -pl javase -am cn1:java -Dcodename1.platform=javase\r\n");
+            addText(zos, ".idea/misc.xml", ideaMiscXml());
+            addText(zos, ".idea/runConfigurations/CN1_Simulator.xml", ideaSimulatorRunConfiguration());
+            addText(zos, ".idea/runConfigurations/CN1_Build.xml", ideaBuildRunConfiguration());
             addText(zos, "common/pom.xml", commonPom(model.appName));
             addText(zos, "common/codenameone_settings.properties", codenameOneSettings(model.appName));
             addText(zos, "common/src/main/css/theme.css", themeCss(model.css));
@@ -113,6 +116,48 @@ final class PlaygroundProjectExporter {
                 + "  <artifactId>" + appName.toLowerCase() + "-javase</artifactId>\n"
                 + "  <dependencies><dependency><groupId>com.cn1.playground</groupId><artifactId>" + appName.toLowerCase() + "-common</artifactId><version>1.0-SNAPSHOT</version></dependency></dependencies>\n"
                 + "</project>\n";
+    }
+
+    private String ideaMiscXml() {
+        return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+                + "<project version=\"4\">\n"
+                + "  <component name=\"ProjectRootManager\" version=\"2\" languageLevel=\"JDK_1_8\" default=\"true\" project-jdk-name=\"1.8\" project-jdk-type=\"JavaSDK\" />\n"
+                + "</project>\n";
+    }
+
+    private String ideaSimulatorRunConfiguration() {
+        return "<component name=\"ProjectRunConfigurationManager\">\n"
+                + "  <configuration default=\"false\" name=\"CN1 Simulator\" type=\"MavenRunConfiguration\" factoryName=\"Maven\">\n"
+                + "    <MavenSettings>\n"
+                + "      <option name=\"myWorkingDirectory\" value=\"$PROJECT_DIR$\" />\n"
+                + "      <option name=\"myGoals\">\n"
+                + "        <list>\n"
+                + "          <option value=\"-pl\" />\n"
+                + "          <option value=\"javase\" />\n"
+                + "          <option value=\"-am\" />\n"
+                + "          <option value=\"cn1:java\" />\n"
+                + "          <option value=\"-Dcodename1.platform=javase\" />\n"
+                + "        </list>\n"
+                + "      </option>\n"
+                + "    </MavenSettings>\n"
+                + "  </configuration>\n"
+                + "</component>\n";
+    }
+
+    private String ideaBuildRunConfiguration() {
+        return "<component name=\"ProjectRunConfigurationManager\">\n"
+                + "  <configuration default=\"false\" name=\"CN1 Package\" type=\"MavenRunConfiguration\" factoryName=\"Maven\">\n"
+                + "    <MavenSettings>\n"
+                + "      <option name=\"myWorkingDirectory\" value=\"$PROJECT_DIR$\" />\n"
+                + "      <option name=\"myGoals\">\n"
+                + "        <list>\n"
+                + "          <option value=\"-DskipTests\" />\n"
+                + "          <option value=\"package\" />\n"
+                + "        </list>\n"
+                + "      </option>\n"
+                + "    </MavenSettings>\n"
+                + "  </configuration>\n"
+                + "</component>\n";
     }
 
     private String codenameOneSettings(String appName) {
@@ -337,6 +382,9 @@ final class PlaygroundProjectExporter {
                 if (trimmed.startsWith("package ")) {
                     continue;
                 }
+                if ("root;".equals(trimmed) || "ctx.log(\"Preview built successfully\");".equals(trimmed)) {
+                    continue;
+                }
                 body.append("        ").append(line).append('\n');
             }
             StringBuilder out = new StringBuilder();
@@ -348,11 +396,20 @@ final class PlaygroundProjectExporter {
             out.append("\npublic class ").append(FALLBACK_APP_NAME).append(" extends Lifecycle {\n");
             out.append("    @Override\n");
             out.append("    public void runApp() {\n");
+            out.append("        Object root = null;\n");
             if (body.length() == 0) {
                 out.append("        // Add snippet code here.\n");
             } else {
                 out.append(body);
             }
+            out.append("\n")
+                    .append("        if (root instanceof com.codename1.ui.Form) {\n")
+                    .append("            ((com.codename1.ui.Form) root).show();\n")
+                    .append("        } else if (root instanceof com.codename1.ui.Container) {\n")
+                    .append("            com.codename1.ui.Form playgroundForm = new com.codename1.ui.Form(\"Playground Snippet\", new com.codename1.ui.layouts.BorderLayout());\n")
+                    .append("            playgroundForm.add(com.codename1.ui.layouts.BorderLayout.CENTER, (com.codename1.ui.Container) root);\n")
+                    .append("            playgroundForm.show();\n")
+                    .append("        }\n");
             out.append("    }\n");
             out.append("}\n");
             return out.toString();
