@@ -487,7 +487,7 @@ const jvm = {
       this.resolvedVirtualCache[cacheKey] = nativeOverride;
       return nativeOverride;
     }
-    if (String(className).endsWith("[]") && this.methodTail(methodId) === "_clone_R_java_lang_Object") {
+    if (String(className).endsWith("[]") && this.isArrayCloneMethodId(methodId)) {
       const arrayCloneOverride = (function*(__cn1ThisObject) {
         return jvm.cloneArrayObject(__cn1ThisObject);
       });
@@ -694,6 +694,12 @@ const jvm = {
   isEncodedMethodToken(token) {
     const ch = token && token.charAt(0);
     return !!(ch && ch >= "a" && ch <= "z");
+  },
+  isArrayCloneMethodId(methodId) {
+    if (typeof methodId !== "string" || methodId.length === 0) {
+      return false;
+    }
+    return /(?:^|_)clone_R_java_lang_Object$/.test(methodId);
   },
   methodTail(methodId) {
     let cached = this.methodTailCache[methodId];

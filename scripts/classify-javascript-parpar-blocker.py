@@ -15,7 +15,7 @@ from pathlib import Path
 
 
 PARPAR_ERROR_PREFIX = "BROWSER:PARPAR_ERROR:"
-MISSING_VIRTUAL_RE = re.compile(r"Missing virtual method ([^\s]+) on ([^\s]+)")
+MISSING_VIRTUAL_RE = re.compile(r"Missing virtual method ([^\s\"\\]+) on ([^\s\"\\]+)")
 
 
 def normalize(value: str | None) -> str:
@@ -42,6 +42,11 @@ def classify(log_text: str) -> tuple[str, str, str]:
             break
 
     if first_parpar_error is None:
+        parsed_method, parsed_receiver = parse_virtual_from_message(log_text)
+        if parsed_method != "none":
+            if parsed_receiver in ("null", "undefined"):
+                return ("missing_receiver", parsed_method, parsed_receiver)
+            return ("missing_class_method", parsed_method, parsed_receiver)
         if "Timed out waiting for CN1SS:SUITE:FINISHED" in log_text:
             return ("timeout_no_error", "none", "none")
         if "BROWSER:ERROR:" in log_text:
@@ -101,4 +106,3 @@ def main(argv: list[str]) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main(sys.argv))
-
