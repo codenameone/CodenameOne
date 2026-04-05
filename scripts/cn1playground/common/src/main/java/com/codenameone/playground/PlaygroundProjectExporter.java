@@ -74,8 +74,8 @@ final class PlaygroundProjectExporter {
                 + "    <cn1.version>7.0.230</cn1.version>\n"
                 + "    <cn1.plugin.version>${cn1.version}</cn1.plugin.version>\n"
                 + "    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>\n"
-                + "    <maven.compiler.source>1.8</maven.compiler.source>\n"
-                + "    <maven.compiler.target>1.8</maven.compiler.target>\n"
+                + "    <maven.compiler.source>17</maven.compiler.source>\n"
+                + "    <maven.compiler.target>17</maven.compiler.target>\n"
                 + "  </properties>\n"
                 + "  <modules><module>common</module><module>javase</module><module>android</module><module>ios</module><module>javascript</module><module>win</module></modules>\n"
                 + "  <build><pluginManagement><plugins>\n"
@@ -95,6 +95,9 @@ final class PlaygroundProjectExporter {
                 + "    <dependency><groupId>com.codenameone</groupId><artifactId>codenameone-core</artifactId><version>${cn1.version}</version></dependency>\n"
                 + "    <dependency><groupId>com.cn1.playground</groupId><artifactId>" + zipArtifact + "</artifactId><version>1.0-SNAPSHOT</version><classifier>common</classifier><type>jar</type></dependency>\n"
                 + "  </dependencies>\n"
+                + "  <profiles>\n"
+                + "    <profile><id>simulator</id><properties><codename1.targetPlatform>javase</codename1.targetPlatform></properties></profile>\n"
+                + "  </profiles>\n"
                 + "</project>\n";
     }
 
@@ -121,21 +124,20 @@ final class PlaygroundProjectExporter {
     private String ideaMiscXml() {
         return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
                 + "<project version=\"4\">\n"
-                + "  <component name=\"ProjectRootManager\" version=\"2\" languageLevel=\"JDK_1_8\" default=\"true\" project-jdk-name=\"1.8\" project-jdk-type=\"JavaSDK\" />\n"
+                + "  <component name=\"ProjectRootManager\" version=\"2\" languageLevel=\"JDK_17\" default=\"true\" />\n"
                 + "</project>\n";
     }
 
     private String ideaSimulatorRunConfiguration() {
         return "<component name=\"ProjectRunConfigurationManager\">\n"
-                + "  <configuration default=\"false\" name=\"CN1 Simulator\" type=\"MavenRunConfiguration\" factoryName=\"Maven\">\n"
+                + "  <configuration default=\"false\" name=\"Simulator\" type=\"MavenRunConfiguration\" factoryName=\"Maven\">\n"
                 + "    <MavenSettings>\n"
                 + "      <option name=\"myWorkingDirectory\" value=\"$PROJECT_DIR$\" />\n"
                 + "      <option name=\"myGoals\">\n"
                 + "        <list>\n"
-                + "          <option value=\"-pl\" />\n"
-                + "          <option value=\"javase\" />\n"
-                + "          <option value=\"-am\" />\n"
                 + "          <option value=\"cn1:java\" />\n"
+                + "          <option value=\"-P\" />\n"
+                + "          <option value=\"simulator\" />\n"
                 + "          <option value=\"-Dcodename1.platform=javase\" />\n"
                 + "        </list>\n"
                 + "      </option>\n"
@@ -146,7 +148,7 @@ final class PlaygroundProjectExporter {
 
     private String ideaBuildRunConfiguration() {
         return "<component name=\"ProjectRunConfigurationManager\">\n"
-                + "  <configuration default=\"false\" name=\"CN1 Package\" type=\"MavenRunConfiguration\" factoryName=\"Maven\">\n"
+                + "  <configuration default=\"false\" name=\"Build\" type=\"MavenRunConfiguration\" factoryName=\"Maven\">\n"
                 + "    <MavenSettings>\n"
                 + "      <option name=\"myWorkingDirectory\" value=\"$PROJECT_DIR$\" />\n"
                 + "      <option name=\"myGoals\">\n"
@@ -161,7 +163,7 @@ final class PlaygroundProjectExporter {
     }
 
     private String codenameOneSettings(String appName) {
-        return "codename1.arg.java.version=8\n"
+        return "codename1.arg.java.version=17\n"
                 + "codename1.mainName=" + appName + "\n"
                 + "codename1.packageName=" + PACKAGE_NAME + "\n"
                 + "codename1.displayName=" + appName + "\n"
