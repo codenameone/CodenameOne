@@ -3,8 +3,8 @@ package com.codenameone.playground;
 import com.codename1.components.ToastBar;
 import com.codename1.io.Log;
 import com.codename1.io.Util;
-import net.sf.zipme.ZipEntry;
-import net.sf.zipme.ZipOutputStream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 import java.io.IOException;
 import java.io.OutputStream;
