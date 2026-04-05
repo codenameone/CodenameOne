@@ -393,6 +393,8 @@ final class PlaygroundProjectExporter {
         private static String buildSnippetLifecycle(String script) {
             Set<String> imports = new LinkedHashSet<String>();
             StringBuilder body = new StringBuilder();
+            String detectedFormVar = null;
+            String detectedContainerVar = null;
             String[] lines = Util.split(script, "\n");
             for (String line : lines) {
                 String trimmed = line.trim();
@@ -406,6 +408,20 @@ final class PlaygroundProjectExporter {
                 if ("root;".equals(trimmed) || "ctx.log(\"Preview built successfully\");".equals(trimmed)) {
                     continue;
                 }
+                String formVar = detectDeclaredVariableName(trimmed, "Form");
+                if (formVar == null) {
+                    formVar = detectDeclaredVariableName(trimmed, "com.codename1.ui.Form");
+                }
+                if (formVar != null) {
+                    detectedFormVar = formVar;
+                }
+                String containerVar = detectDeclaredVariableName(trimmed, "Container");
+                if (containerVar == null) {
+                    containerVar = detectDeclaredVariableName(trimmed, "com.codename1.ui.Container");
+                }
+                if (containerVar != null) {
+                    detectedContainerVar = containerVar;
+                }
                 body.append("        ").append(line).append('\n');
             }
             StringBuilder out = new StringBuilder();
@@ -417,23 +433,54 @@ final class PlaygroundProjectExporter {
             out.append("\npublic class ").append(FALLBACK_APP_NAME).append(" extends Lifecycle {\n");
             out.append("    @Override\n");
             out.append("    public void runApp() {\n");
-            out.append("        Object root = null;\n");
             if (body.length() == 0) {
                 out.append("        // Add snippet code here.\n");
             } else {
                 out.append(body);
             }
-            out.append("\n")
-                    .append("        if (root instanceof com.codename1.ui.Form) {\n")
-                    .append("            ((com.codename1.ui.Form) root).show();\n")
-                    .append("        } else if (root instanceof com.codename1.ui.Container) {\n")
+            out.append("\n");
+            if (detectedFormVar != null) {
+                out.append("        ").append(detectedFormVar).append(".show();\n");
+            } else if (detectedContainerVar != null) {
+                out.append("        if (").append(detectedContainerVar).append(" != null) {\n")
                     .append("            com.codename1.ui.Form playgroundForm = new com.codename1.ui.Form(\"Playground Snippet\", new com.codename1.ui.layouts.BorderLayout());\n")
-                    .append("            playgroundForm.add(com.codename1.ui.layouts.BorderLayout.CENTER, (com.codename1.ui.Container) root);\n")
+                    .append("            playgroundForm.add(com.codename1.ui.layouts.BorderLayout.CENTER, ").append(detectedContainerVar).append(");\n")
                     .append("            playgroundForm.show();\n")
                     .append("        }\n");
+            } else {
+                out.append("        // No top-level Form/Container variable was detected. Show a Form here.\n");
+            }
             out.append("    }\n");
             out.append("}\n");
             return out.toString();
+        }
+
+        private static String detectDeclaredVariableName(String line, String typeName) {
+            String normalized = line;
+            if (normalized.startsWith("final ")) {
+                normalized = normalized.substring("final ".length()).trim();
+            }
+            String prefix = typeName + " ";
+            if (!normalized.startsWith(prefix)) {
+                return null;
+            }
+            int eq = normalized.indexOf('=');
+            if (eq < 0) {
+                return null;
+            }
+            String name = normalized.substring(prefix.length(), eq).trim();
+            if (name.length() == 0) {
+                return null;
+            }
+            if (!isIdentifierStart(name.charAt(0))) {
+                return null;
+            }
+            for (int i = 1; i < name.length(); i++) {
+                if (!isIdentifierPart(name.charAt(i))) {
+                    return null;
+                }
+            }
+            return name;
         }
 
         private static String removePackageDeclaration(String source) {
