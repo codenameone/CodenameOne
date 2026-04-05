@@ -27,8 +27,17 @@ PROBE_JS = r"""
     }
   }
 
-  function send(line) {
-    var payload = String(line) + "\n";
+  var logSendDisabled = false;
+  var logQueue = '';
+  var logFlushScheduled = false;
+
+  function flushLogs() {
+    logFlushScheduled = false;
+    if (logSendDisabled || !logQueue) {
+      return;
+    }
+    var payload = logQueue;
+    logQueue = '';
     try {
       if (navigator.sendBeacon) {
         var blob = new Blob([payload], { type: 'text/plain' });
@@ -42,7 +51,20 @@ PROBE_JS = r"""
       headers: { 'Content-Type': 'text/plain' },
       body: payload,
       keepalive: true
-    }).catch(function() {});
+    }).catch(function() {
+      logSendDisabled = true;
+    });
+  }
+
+  function send(line) {
+    if (logSendDisabled) {
+      return;
+    }
+    logQueue += String(line) + "\n";
+    if (!logFlushScheduled) {
+      logFlushScheduled = true;
+      setTimeout(flushLogs, 50);
+    }
   }
 
   var screenshotStartSent = false;

@@ -761,7 +761,8 @@ final class JavascriptMethodGenerator {
                 String indexTemp = ctx.nextTemp("__idx");
                 out.append("  { const ").append(arrayTemp).append(" = ").append(arr)
                         .append("; const ").append(indexTemp).append(" = ").append(idx)
-                        .append("; if (!").append(arrayTemp).append(".__array) throw new Error(\"Array expected\"); if (")
+                        .append("; if (!").append(arrayTemp).append(" || !").append(arrayTemp).append(".__array) throw new Error(\"Array expected: \" + (")
+                        .append(arrayTemp).append(" == null ? \"null\" : (").append(arrayTemp).append(".__class || typeof ").append(arrayTemp).append("))); if (")
                         .append(indexTemp).append(" < 0 || ").append(indexTemp).append(" >= ").append(arrayTemp)
                         .append(".length) throw new Error(\"ArrayIndexOutOfBoundsException\"); ")
                         .append(ctx.push(arrayTemp + "[" + indexTemp + "]")).append("; }\n");
@@ -782,7 +783,8 @@ final class JavascriptMethodGenerator {
                 String indexTemp = ctx.nextTemp("__idx");
                 out.append("  { const ").append(arrayTemp).append(" = ").append(arr)
                         .append("; const ").append(indexTemp).append(" = ").append(idx)
-                        .append("; if (!").append(arrayTemp).append(".__array) throw new Error(\"Array expected\"); if (")
+                        .append("; if (!").append(arrayTemp).append(" || !").append(arrayTemp).append(".__array) throw new Error(\"Array expected: \" + (")
+                        .append(arrayTemp).append(" == null ? \"null\" : (").append(arrayTemp).append(".__class || typeof ").append(arrayTemp).append("))); if (")
                         .append(indexTemp).append(" < 0 || ").append(indexTemp).append(" >= ").append(arrayTemp)
                         .append(".length) throw new Error(\"ArrayIndexOutOfBoundsException\"); ")
                         .append(arrayTemp).append("[").append(indexTemp).append("] = ").append(value).append("; }\n");
@@ -1594,7 +1596,7 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             case Opcodes.BALOAD:
             case Opcodes.CALOAD:
             case Opcodes.SALOAD:
-                out.append("        { const idx = stack.pop(); const arr = stack.pop(); if (!arr.__array) throw new Error(\"Array expected\"); if (idx < 0 || idx >= arr.length) throw new Error(\"ArrayIndexOutOfBoundsException\"); stack.push(arr[idx]); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { const idx = stack.pop(); const arr = stack.pop(); if (!arr || !arr.__array) throw new Error(\"Array expected: \" + (arr == null ? \"null\" : (arr.__class || typeof arr))); if (idx < 0 || idx >= arr.length) throw new Error(\"ArrayIndexOutOfBoundsException\"); stack.push(arr[idx]); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.AASTORE:
             case Opcodes.IASTORE:
@@ -1604,7 +1606,7 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             case Opcodes.BASTORE:
             case Opcodes.CASTORE:
             case Opcodes.SASTORE:
-                out.append("        { const value = stack.pop(); const idx = stack.pop(); const arr = stack.pop(); if (!arr.__array) throw new Error(\"Array expected\"); if (idx < 0 || idx >= arr.length) throw new Error(\"ArrayIndexOutOfBoundsException\"); arr[idx] = value; pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { const value = stack.pop(); const idx = stack.pop(); const arr = stack.pop(); if (!arr || !arr.__array) throw new Error(\"Array expected: \" + (arr == null ? \"null\" : (arr.__class || typeof arr))); if (idx < 0 || idx >= arr.length) throw new Error(\"ArrayIndexOutOfBoundsException\"); arr[idx] = value; pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.MONITORENTER:
                 out.append("        jvm.monitorEnter(jvm.currentThread, stack.pop()); pc = ").append(index + 1).append("; break;\n");

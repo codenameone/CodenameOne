@@ -363,6 +363,8 @@ function installLifecycleDiagnostics() {
   }
   const targets = [
     ["com_codename1_ui_Form", "cn1_com_codename1_ui_Form_show", "FORM_SHOW"],
+    ["com_codename1_ui_Form", "cn1_com_codename1_ui_Form_onShowCompletedImpl", "FORM_ON_SHOW_COMPLETED_IMPL"],
+    ["com_codename1_ui_Form", "cn1_com_codename1_ui_Form_onShowCompleted", "FORM_ON_SHOW_COMPLETED"],
     ["com_codename1_ui_Display", "cn1_com_codename1_ui_Display_setCurrentForm_com_codename1_ui_Form", "DISPLAY_SET_CURRENT_FORM"],
     ["com_codename1_system_Lifecycle", "cn1_com_codename1_system_Lifecycle_setCurrentForm_com_codename1_ui_Form", "LIFECYCLE_SET_CURRENT_FORM"],
     ["com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner", "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_runSuite", "CN1SS_RUNNER_SUITE"],
@@ -386,7 +388,20 @@ function installLifecycleDiagnostics() {
   const globalTargets = [
     ["cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_createForm_java_lang_String_com_codename1_ui_layouts_Layout_java_lang_String_R_com_codename1_ui_Form", "BASETEST_CREATE_FORM"],
     ["cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_1___INIT___com_codenameone_examples_hellocodenameone_tests_BaseTest_java_lang_String_com_codename1_ui_layouts_Layout_java_lang_String", "BASETEST_FORM_INIT"],
+    ["cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_1_onShowCompleted", "BASETEST_ONSHOW_COMPLETED"],
+    ["cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_1_onShowCompleted__impl", "BASETEST_ONSHOW_COMPLETED_IMPL"],
+    ["cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_1_lambda_onShowCompleted_0_java_lang_String", "BASETEST_ONSHOW_LAMBDA"],
+    ["cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_1_lambda_onShowCompleted_0_java_lang_String__impl", "BASETEST_ONSHOW_LAMBDA_IMPL"],
+    ["cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerHelper_emitCurrentFormScreenshot_java_lang_String_java_lang_Runnable", "CN1SS_HELPER_EMIT_SCREENSHOT"],
+    ["cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerHelper_emitCurrentFormScreenshot_java_lang_String_java_lang_Runnable__impl", "CN1SS_HELPER_EMIT_SCREENSHOT_IMPL"],
+    ["cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerHelper_lambda_emitCurrentFormScreenshot_0_java_lang_String_java_lang_Runnable_int_int_com_codename1_ui_Image", "CN1SS_HELPER_EMIT_SCREENSHOT_LAMBDA"],
+    ["cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerHelper_lambda_emitCurrentFormScreenshot_0_java_lang_String_java_lang_Runnable_int_int_com_codename1_ui_Image__impl", "CN1SS_HELPER_EMIT_SCREENSHOT_LAMBDA_IMPL"],
+    ["cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerHelper_emitChannel_byte_1ARRAY_java_lang_String_java_lang_String", "CN1SS_HELPER_EMIT_CHANNEL"],
+    ["cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerHelper_emitChannel_byte_1ARRAY_java_lang_String_java_lang_String__impl", "CN1SS_HELPER_EMIT_CHANNEL_IMPL"],
+    ["cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerHelper_complete_java_lang_Runnable", "CN1SS_HELPER_COMPLETE"],
+    ["cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerHelper_complete_java_lang_Runnable__impl", "CN1SS_HELPER_COMPLETE_IMPL"],
     ["cn1_com_codename1_ui_Form___INIT___java_lang_String_com_codename1_ui_layouts_Layout", "FORM_INIT_LAYOUT"],
+    ["cn1_com_codename1_ui_Form_onShowCompletedImpl", "FORM_ON_SHOW_COMPLETED_IMPL_GLOBAL"],
     ["cn1_com_codename1_ui_Display_setCurrent_com_codename1_ui_Form_boolean", "DISPLAY_SET_CURRENT"]
   ];
   for (let i = 0; i < globalTargets.length; i++) {
@@ -943,6 +958,59 @@ bindNative([
   return null;
 });
 
+bindCiFallback("BlobUtil.canvasToBlobDirect", [
+  "cn1_com_codename1_teavm_io_BlobUtil_canvasToBlob_com_codename1_html5_js_dom_HTMLCanvasElement_java_lang_String_double_R_com_codename1_teavm_jso_io_Blob",
+  "cn1_com_codename1_teavm_io_BlobUtil_canvasToBlob_com_codename1_html5_js_dom_HTMLCanvasElement_java_lang_String_double_R_com_codename1_teavm_jso_io_Blob__impl"
+], function*(canvas, mimeType, quality) {
+  const nativeCanvas = jvm.unwrapJsValue(canvas) || canvas;
+  if (!nativeCanvas || typeof nativeCanvas.toDataURL !== "function") {
+    emitDiagLine("PARPAR:DIAG:FALLBACK:blobUtilCanvasToBlob:missingCanvas=1");
+    return null;
+  }
+  const mime = mimeType && mimeType.__class === "java_lang_String"
+    ? jvm.toNativeString(mimeType)
+    : (typeof mimeType === "string" ? mimeType : "image/png");
+  const q = typeof quality === "number" ? quality : 0.92;
+  let dataUrl = "";
+  try {
+    dataUrl = nativeCanvas.toDataURL(mime || "image/png", q);
+  } catch (_err) {
+    dataUrl = nativeCanvas.toDataURL("image/png");
+  }
+  const comma = dataUrl.indexOf(",");
+  if (comma < 0) {
+    return null;
+  }
+  const header = dataUrl.substring(0, comma);
+  const payload = dataUrl.substring(comma + 1);
+  const match = /data:([^;]+);base64/i.exec(header);
+  const contentType = match && match[1] ? match[1] : (mime || "image/png");
+  const decoded = global.atob ? global.atob(payload) : "";
+  const bytes = new global.Uint8Array(decoded.length);
+  for (let i = 0; i < decoded.length; i++) {
+    bytes[i] = decoded.charCodeAt(i) & 0xff;
+  }
+  const blob = new global.Blob([bytes], { type: contentType });
+  const wrappedBlob = jvm.wrapJsObject(blob, "com_codename1_teavm_jso_io_Blob");
+  wrappedBlob.__cn1BlobBytes = bytes;
+  return wrappedBlob;
+});
+
+bindCiFallback("BlobUtil.toUint8ArrayDirect", [
+  "cn1_com_codename1_teavm_io_BlobUtil_toUint8Array_com_codename1_teavm_jso_io_Blob_R_com_codename1_html5_js_typedarrays_Uint8Array",
+  "cn1_com_codename1_teavm_io_BlobUtil_toUint8Array_com_codename1_teavm_jso_io_Blob_R_com_codename1_html5_js_typedarrays_Uint8Array__impl"
+], function*(blob) {
+  if (blob && blob.__cn1BlobBytes) {
+    return jvm.wrapJsObject(new global.Uint8Array(blob.__cn1BlobBytes), "com_codename1_html5_js_typedarrays_Uint8Array");
+  }
+  const nativeBlob = jvm.unwrapJsValue(blob);
+  if (nativeBlob && nativeBlob.__cn1BlobBytes) {
+    return jvm.wrapJsObject(new global.Uint8Array(nativeBlob.__cn1BlobBytes), "com_codename1_html5_js_typedarrays_Uint8Array");
+  }
+  emitDiagLine("PARPAR:DIAG:FALLBACK:blobUtilToUint8Array:empty=1");
+  return jvm.wrapJsObject(new global.Uint8Array(0), "com_codename1_html5_js_typedarrays_Uint8Array");
+});
+
 bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_requestAnimationFrameNative_com_codename1_impl_html5_JavaScriptAnimationFrameCallback_R_int",
   "cn1_com_codename1_impl_html5_HTML5Implementation_requestAnimationFrameNative___com_codename1_impl_html5_JavaScriptAnimationFrameCallback_R_int"
@@ -1070,7 +1138,7 @@ bindCiFallback("NativeFont.getCSSNullSafe", [
   } catch (err) {
     const message = String(err && err.message ? err.message : err || "");
     if (message.indexOf("__classDef") >= 0) {
-      emitDiagLine("PARPAR:DIAG:FALLBACK:nativeFontGetCSS:nullReceiver=1");
+      emitCiFallbackMarker("NativeFont.getCSSNullReceiver", "HIT");
       return jvm.createStringLiteral("16px sans-serif");
     }
     throw err;
@@ -1086,7 +1154,7 @@ bindCiFallback("NativeFont.charWidthNullSafe", [
   try {
     return yield* nativeFontCharWidthOriginal(__cn1ThisObject, chr);
   } catch (err) {
-    emitDiagLine("PARPAR:DIAG:FALLBACK:nativeFontCharWidth:defaulted=1");
+    emitCiFallbackMarker("NativeFont.charWidthDefaulted", "HIT");
     return 8;
   }
 });
@@ -1562,6 +1630,8 @@ installGlobalIllegalStateBypass(formCtorTitleLayoutMethodId, "formCtorTitleLayou
 
 const cn1ssLambdaBridgeMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_runNextTest_2_java_lang_String_com_codenameone_examples_hellocodenameone_tests_BaseTest_int";
 const cn1ssCompleteMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerHelper_complete_java_lang_Runnable";
+const cn1ssEmitChannelMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerHelper_emitChannel_byte_1ARRAY_java_lang_String_java_lang_String";
+const baseTestRegisterReadyCallbackMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_registerReadyCallback_com_codename1_ui_Form_java_lang_Runnable";
 const cn1ssRunnerClassId = "com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner";
 const cn1ssLambdaClassId = "com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_1";
 const cn1ssLambdaBridgeOriginalRunnerMethod = (function() {
@@ -1656,6 +1726,117 @@ bindCiFallback("Cn1ssDeviceRunner.lambdaRunNextTestBridge", [
   }
 });
 
+function toCn1StringValue(value) {
+  if (value && value.__class === "java_lang_String") {
+    try {
+      return jvm.toNativeString(value);
+    } catch (_err) {
+      return "";
+    }
+  }
+  if (value == null) {
+    return "";
+  }
+  return String(value);
+}
+
+function byteArrayToBase64(value) {
+  if (!value || typeof value.length !== "number") {
+    return "";
+  }
+  const len = value.length | 0;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    let b = value[i] | 0;
+    if (b < 0) {
+      b += 256;
+    }
+    bytes[i] = b & 0xff;
+  }
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const sub = bytes.subarray(i, i + chunkSize);
+    binary += String.fromCharCode.apply(null, sub);
+  }
+  if (typeof global.btoa === "function") {
+    return global.btoa(binary);
+  }
+  if (typeof Buffer !== "undefined") {
+    return Buffer.from(bytes).toString("base64");
+  }
+  return "";
+}
+
+function normalizeCn1ssTestName(raw) {
+  const value = raw && raw.length > 0 ? raw : "default";
+  const normalized = String(value).replace(/[^A-Za-z0-9_.-]/g, "_");
+  return normalized.length > 0 ? normalized : "default";
+}
+
+const cn1ssChunkIndexByStream = Object.create(null);
+const cn1ssScreenshotEmitted = Object.create(null);
+
+function emitCn1ssChunks(base64, testName, channelName) {
+  const channel = channelName ? String(channelName).toUpperCase() : "";
+  const prefix = "CN1SS" + channel;
+  const test = normalizeCn1ssTestName(testName);
+  const streamKey = channel + "|" + test;
+  let nextIndex = cn1ssChunkIndexByStream[streamKey] || 0;
+  const chunkSize = 8000;
+  for (let offset = 0; offset < base64.length; offset += chunkSize) {
+    const payload = base64.substring(offset, offset + chunkSize);
+    const index = String(nextIndex++).padStart(6, "0");
+    emitDiagLine(prefix + ":" + test + ":" + index + ":" + payload);
+  }
+  cn1ssChunkIndexByStream[streamKey] = nextIndex;
+  if (base64.length === 0) {
+    const index = String(nextIndex).padStart(6, "0");
+    emitDiagLine(prefix + ":" + test + ":" + index + ":");
+    cn1ssChunkIndexByStream[streamKey] = nextIndex + 1;
+  }
+}
+
+const cn1ssEmitCurrentFormScreenshotMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerHelper_emitCurrentFormScreenshot_java_lang_String_java_lang_Runnable";
+
+bindCiFallback("Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshotDom", [
+  cn1ssEmitCurrentFormScreenshotMethodId,
+  cn1ssEmitCurrentFormScreenshotMethodId + "__impl"
+], function*(testName, completion) {
+  const canvas = global.document && typeof global.document.querySelector === "function"
+    ? global.document.querySelector("canvas")
+    : null;
+  const test = toCn1StringValue(testName);
+  const normalizedTest = normalizeCn1ssTestName(test);
+  if (cn1ssScreenshotEmitted[normalizedTest]) {
+    emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:skipDuplicate=" + normalizedTest);
+  } else if (canvas && typeof canvas.toDataURL === "function") {
+    cn1ssScreenshotEmitted[normalizedTest] = true;
+    const dataUrl = String(canvas.toDataURL("image/png") || "");
+    const comma = dataUrl.indexOf(",");
+    const base64 = comma >= 0 ? dataUrl.substring(comma + 1) : "";
+    emitCn1ssChunks(base64, normalizedTest, "");
+  } else {
+    emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:noCanvas=1");
+  }
+  if (completion && completion.__class) {
+    const runMethod = jvm.resolveVirtual(completion.__class, "cn1_java_lang_Runnable_run");
+    yield* runMethod(completion);
+  }
+  return null;
+});
+
+bindCiFallback("Cn1ssDeviceRunnerHelper.emitChannelFastJs", [
+  cn1ssEmitChannelMethodId,
+  cn1ssEmitChannelMethodId + "__impl"
+], function*(payloadBytes, testName, channelName) {
+  const base64 = byteArrayToBase64(payloadBytes);
+  const test = toCn1StringValue(testName);
+  const channel = toCn1StringValue(channelName);
+  emitCn1ssChunks(base64, test, channel);
+  return null;
+});
+
 bindCiFallback("Cn1ssDeviceRunnerHelper.completeNullRunnableGuard", [
   cn1ssCompleteMethodId,
   cn1ssCompleteMethodId + "__impl"
@@ -1666,6 +1847,18 @@ bindCiFallback("Cn1ssDeviceRunnerHelper.completeNullRunnableGuard", [
   }
   const runMethod = jvm.resolveVirtual(completion.__class, "cn1_java_lang_Runnable_run");
   return yield* runMethod(completion);
+});
+
+bindCiFallback("BaseTest.registerReadyCallbackImmediate", [
+  baseTestRegisterReadyCallbackMethodId,
+  baseTestRegisterReadyCallbackMethodId + "__impl"
+], function*(_baseTest, _form, callback) {
+  emitDiagLine("PARPAR:DIAG:FALLBACK:baseTestRegisterReady:immediateDispatch=1");
+  if (!callback || !callback.__class) {
+    return null;
+  }
+  const runMethod = jvm.resolveVirtual(callback.__class, "cn1_java_lang_Runnable_run");
+  return yield* runMethod(callback);
 });
 
 const baseTestOnShowLambdaMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_1_lambda_onShowCompleted_0_java_lang_String";

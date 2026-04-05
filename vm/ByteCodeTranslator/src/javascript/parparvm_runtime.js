@@ -59,7 +59,23 @@ function emitVmMessage(message) {
   }
   global.postMessage(message);
 }
+const VM_TRACE_WAIT_LIMIT = 64;
+let vmTraceWaitCount = 0;
+let vmTraceWaitSuppressed = false;
 function vmTrace(line) {
+  if (typeof line === "string" && line.indexOf("runtime.") === 0) {
+    return;
+  }
+  if (typeof line === "string" && line.indexOf("runtime.handleYield.thread-") === 0 && line.indexOf(":wait") > 0) {
+    vmTraceWaitCount++;
+    if (vmTraceWaitCount > VM_TRACE_WAIT_LIMIT) {
+      if (!vmTraceWaitSuppressed && global.console && typeof global.console.log === "function") {
+        vmTraceWaitSuppressed = true;
+        global.console.log("PARPAR:runtime.handleYield:wait:throttled");
+      }
+      return;
+    }
+  }
   if (global.console && typeof global.console.log === "function") {
     global.console.log("PARPAR:" + line);
   }
@@ -292,7 +308,7 @@ const jvm = {
     }
     const normalized = String(desc);
     if (!normalized) {
-      return true;
+      return false;
     }
     if (normalized.length === 1 && "ZCBSIFJD".indexOf(normalized) >= 0) {
       return true;
@@ -348,6 +364,7 @@ const jvm = {
     }
     array.__class = this.arrayClassName(componentClass, dimensions);
     array.__classDef = this.getArrayClass(componentClass, dimensions);
+    array.__id = this.nextIdentity++;
     array.__dimensions = dimensions;
     array.__array = true;
     array.__monitor = this.createMonitor();
@@ -429,6 +446,24 @@ const jvm = {
   isPrimitiveComponent(componentClass) {
     return componentClass.indexOf("JAVA_") === 0;
   },
+  cloneArrayObject(arrayObject) {
+    if (!arrayObject || !arrayObject.__array) {
+      return null;
+    }
+    const className = String(arrayObject.__class || "");
+    let componentClass = "java_lang_Object";
+    if (className.endsWith("[]")) {
+      componentClass = className.substring(0, className.length - 2);
+    } else if (arrayObject.__classDef && arrayObject.__classDef.componentClass) {
+      componentClass = arrayObject.__classDef.componentClass;
+    }
+    const dimensions = arrayObject.__dimensions > 0 ? (arrayObject.__dimensions | 0) : 1;
+    const clone = this.newArray(arrayObject.length | 0, componentClass, dimensions);
+    for (let i = 0; i < arrayObject.length; i++) {
+      clone[i] = arrayObject[i];
+    }
+    return clone;
+  },
   resolveVirtual(className, methodId) {
     if (className == null || className === "undefined") {
       const missingReceiver = {
@@ -451,6 +486,13 @@ const jvm = {
     if (typeof nativeOverride === "function") {
       this.resolvedVirtualCache[cacheKey] = nativeOverride;
       return nativeOverride;
+    }
+    if (String(className).endsWith("[]") && this.methodTail(methodId) === "_clone_R_java_lang_Object") {
+      const arrayCloneOverride = (function*(__cn1ThisObject) {
+        return jvm.cloneArrayObject(__cn1ThisObject);
+      });
+      this.resolvedVirtualCache[cacheKey] = arrayCloneOverride;
+      return arrayCloneOverride;
     }
     const tail = this.methodTail(methodId);
     let remapAttempted = false;
