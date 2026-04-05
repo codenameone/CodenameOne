@@ -195,7 +195,7 @@ final class PlaygroundProjectExporter {
                 return null;
             }
             char first = text.charAt(from);
-            if (!Character.isLetter(first) && first != '_' && first != '$') {
+            if (!isIdentifierStart(first)) {
                 return null;
             }
             int end = from + 1;
@@ -205,8 +205,20 @@ final class PlaygroundProjectExporter {
             return text.substring(from, end);
         }
 
+        private static boolean isIdentifierStart(char ch) {
+            return isAsciiLetter(ch) || ch == '_' || ch == '$';
+        }
+
         private static boolean isIdentifierPart(char ch) {
-            return Character.isLetterOrDigit(ch) || ch == '_' || ch == '$';
+            return isAsciiLetter(ch) || isAsciiDigit(ch) || ch == '_' || ch == '$';
+        }
+
+        private static boolean isAsciiLetter(char ch) {
+            return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z');
+        }
+
+        private static boolean isAsciiDigit(char ch) {
+            return ch >= '0' && ch <= '9';
         }
 
         private static String stripCommentsAndStrings(String source) {
