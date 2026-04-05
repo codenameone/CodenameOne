@@ -45,18 +45,9 @@ public final class NativeInterfaceLanguageValidator {
             lastStatus = "MISMATCH expected=" + expected + " actual=" + actual + " diagnostics=" + diagnostics;
             throw new IllegalStateException("Expected " + expected + " implementation on " + platformName + " but got " + actual + ". diagnostics=" + diagnostics);
         }
-        if (isIos) {
-            if ("ios-swift-native-impl".equals(diagnostics)) {
-                // Preferred path: Swift bridge class was loaded successfully.
-            } else if ("ios-swift-bridge-missing-using-objc-shim".equals(diagnostics)) {
-                // Graceful fallback path: Objective-C shim is active. Keep CI green while
-                // still surfacing the diagnostics payload for visibility in logs.
-                lastStatus = "OK expected=" + expected + " actual=" + actual + " diagnostics=" + diagnostics + " fallback=objc-shim";
-                return;
-            } else {
-                lastStatus = "SWIFT_BRIDGE_MISSING diagnostics=" + diagnostics;
-                throw new IllegalStateException("Swift implementation bridge not confirmed on iOS. diagnostics=" + diagnostics);
-            }
+        if (isIos && !"ios-swift-native-impl".equals(diagnostics)) {
+            lastStatus = "SWIFT_BRIDGE_MISSING diagnostics=" + diagnostics;
+            throw new IllegalStateException("Swift implementation bridge not confirmed on iOS. diagnostics=" + diagnostics);
         }
         lastStatus = "OK expected=" + expected + " actual=" + actual + " diagnostics=" + diagnostics;
     }
