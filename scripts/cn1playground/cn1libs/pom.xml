@@ -31,6 +31,7 @@
     <build>
         <plugins>
             <plugin>
+                <inherited>false</inherited>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>
                 <executions>
