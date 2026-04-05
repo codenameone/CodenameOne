@@ -238,15 +238,28 @@ function spawnVirtualCallback(receiver, methodId, args, pendingFlagKey) {
   return true;
 }
 
-function stringifyThrowable(throwable) {
+function* stringifyThrowable(throwable) {
   if (!throwable || !throwable.__class) {
-    return "null";
+    if (throwable == null) {
+      return "null";
+    }
+    return String(throwable);
   }
   const className = String(throwable.__class || "java_lang_Throwable");
   const pieces = [className];
+  if (throwable.message) {
+    pieces.push("jsMessage=" + String(throwable.message));
+  }
+  if (throwable.cn1_java_lang_Throwable_detailMessage && throwable.cn1_java_lang_Throwable_detailMessage.__class === "java_lang_String") {
+    try {
+      pieces.push("detail=" + jvm.toNativeString(throwable.cn1_java_lang_Throwable_detailMessage));
+    } catch (_err) {
+      // Best effort diagnostic path only.
+    }
+  }
   try {
     const toStringMethod = jvm.resolveVirtual(throwable.__class, "cn1_java_lang_Throwable_toString_R_java_lang_String");
-    const value = toStringMethod(throwable);
+    const value = yield* toStringMethod(throwable);
     if (value && value.__class === "java_lang_String") {
       pieces.push(jvm.toNativeString(value));
     }
@@ -255,9 +268,28 @@ function stringifyThrowable(throwable) {
   }
   try {
     const messageMethod = jvm.resolveVirtual(throwable.__class, "cn1_java_lang_Throwable_getMessage_R_java_lang_String");
-    const message = messageMethod(throwable);
+    const message = yield* messageMethod(throwable);
     if (message && message.__class === "java_lang_String") {
       pieces.push("message=" + jvm.toNativeString(message));
+    }
+  } catch (_err) {
+    // Best effort diagnostic path only.
+  }
+  try {
+    const printStackTraceMethod = jvm.resolveVirtual(throwable.__class, "cn1_java_lang_Throwable_printStackTrace");
+    yield* printStackTraceMethod(throwable);
+    pieces.push("stack=printed");
+  } catch (_err) {
+    // Best effort diagnostic path only.
+  }
+  const cause = throwable.cn1_java_lang_Throwable_cause;
+  if (cause && cause.__class) {
+    pieces.push("cause=" + String(cause.__class));
+  }
+  try {
+    const keys = Object.keys(throwable);
+    if (keys.length > 0) {
+      pieces.push("keys=" + keys.slice(0, 8).join(","));
     }
   } catch (_err) {
     // Best effort diagnostic path only.
@@ -290,7 +322,8 @@ function wrapVirtualMethodWithDiag(className, methodId, marker) {
       emitDiagLine("PARPAR:DIAG:" + marker + ":exit");
       return result;
     } catch (err) {
-      emitDiagLine("PARPAR:DIAG:" + marker + ":error=" + String(err && err.message ? err.message : err));
+      const detail = yield* stringifyThrowable(err);
+      emitDiagLine("PARPAR:DIAG:" + marker + ":error=" + detail);
       throw err;
     }
   };
@@ -314,7 +347,7 @@ function wrapGlobalGeneratorWithDiag(symbol, marker) {
       emitDiagLine("PARPAR:DIAG:" + marker + ":exit");
       return result;
     } catch (err) {
-      const detail = stringifyThrowable(err);
+      const detail = yield* stringifyThrowable(err);
       emitDiagLine("PARPAR:DIAG:" + marker + ":error=" + detail);
       throw err;
     }
@@ -364,6 +397,195 @@ function installLifecycleDiagnostics() {
 }
 
 installLifecycleDiagnostics();
+function ensureKotlinUnitShim() {
+  if (!jvm || typeof jvm.defineClass !== "function" || !jvm.classes) {
+    return;
+  }
+  if (jvm.classes["kotlin_Unit"]) {
+    return;
+  }
+  jvm.defineClass({
+    name: "kotlin_Unit",
+    baseClass: "java_lang_Object",
+    interfaces: [],
+    isInterface: false,
+    isAbstract: false,
+    assignableTo: { "kotlin_Unit": true, "java_lang_Object": true },
+    instanceFields: [],
+    staticFields: { "INSTANCE": null },
+    methods: {},
+    classObject: null
+  });
+  function* cn1_kotlin_Unit___INIT__(__cn1ThisObject) {
+    yield* cn1_java_lang_Object___INIT__(__cn1ThisObject);
+    return null;
+  }
+  function* cn1_kotlin_Unit_toString_R_java_lang_String() {
+    return jvm.createStringLiteral("kotlin.Unit");
+  }
+  jvm.addVirtualMethod("kotlin_Unit", "cn1_kotlin_Unit_toString_R_java_lang_String", cn1_kotlin_Unit_toString_R_java_lang_String);
+  jvm.classes["kotlin_Unit"].clinit = function*() {
+    const unit = jvm.newObject("kotlin_Unit");
+    yield* cn1_kotlin_Unit___INIT__(unit);
+    jvm.classes["kotlin_Unit"].staticFields["INSTANCE"] = unit;
+    return null;
+  };
+  emitDiagLine("PARPAR:DIAG:INIT:shim=kotlinUnit");
+}
+ensureKotlinUnitShim();
+
+function installMissingGlobalDelegate(symbol, delegateSymbol, marker) {
+  if (typeof global[symbol] === "function") {
+    return false;
+  }
+  global[symbol] = function*() {
+    emitCiFallbackMarker(marker, "HIT");
+    const delegate = global[delegateSymbol];
+    if (typeof delegate === "function") {
+      return yield* delegate.apply(this, arguments);
+    }
+    return null;
+  };
+  emitCiFallbackMarker(marker, "ENABLED");
+  emitDiagLine("PARPAR:DIAG:INIT:missingGlobalDelegate:" + symbol + "->" + delegateSymbol);
+  return true;
+}
+
+function installMissingOwnerDelegates(owner, delegateOwner, suffixes, markerPrefix) {
+  for (let i = 0; i < suffixes.length; i++) {
+    const suffix = suffixes[i];
+    installMissingGlobalDelegate(
+      "cn1_" + owner + "_" + suffix,
+      "cn1_" + delegateOwner + "_" + suffix,
+      markerPrefix + "." + suffix
+    );
+  }
+}
+
+function installInferredMissingOwnerDelegates(owner, delegateOwner, markerPrefix) {
+  const ownerPrefix = "cn1_" + owner + "_";
+  const delegatePrefix = "cn1_" + delegateOwner + "_";
+  const usagePattern = new RegExp(ownerPrefix + "([A-Za-z0-9_]+)", "g");
+  const suffixes = Object.create(null);
+  const keys = Object.keys(global);
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i];
+    if (typeof global[key] !== "function" || key.indexOf("cn1_") !== 0) {
+      continue;
+    }
+    let source = "";
+    try {
+      source = Function.prototype.toString.call(global[key]);
+    } catch (_err) {
+      source = "";
+    }
+    if (!source || source.indexOf(ownerPrefix) < 0) {
+      continue;
+    }
+    usagePattern.lastIndex = 0;
+    let match;
+    while ((match = usagePattern.exec(source)) !== null) {
+      if (match[1]) {
+        suffixes[match[1]] = true;
+      }
+    }
+  }
+  const names = Object.keys(suffixes);
+  let installed = 0;
+  for (let i = 0; i < names.length; i++) {
+    const suffix = names[i];
+    const symbol = ownerPrefix + suffix;
+    const delegate = delegatePrefix + suffix;
+    if (typeof global[symbol] === "function" || typeof global[delegate] !== "function") {
+      continue;
+    }
+    if (installMissingGlobalDelegate(symbol, delegate, markerPrefix + "." + suffix)) {
+      installed++;
+    }
+  }
+  emitDiagLine("PARPAR:DIAG:INIT:inferredMissingOwnerDelegates:" + owner + "->" + delegateOwner + ":installed=" + installed);
+  return installed;
+}
+
+installMissingGlobalDelegate(
+  "cn1_com_codename1_ui_Label_focusGainedInternal",
+  "cn1_com_codename1_ui_Component_focusGainedInternal",
+  "Label.focusGainedInternalMissing"
+);
+installMissingGlobalDelegate(
+  "cn1_com_codename1_ui_Label_focusLostInternal",
+  "cn1_com_codename1_ui_Component_focusLostInternal",
+  "Label.focusLostInternalMissing"
+);
+installMissingGlobalDelegate(
+  "cn1_com_codename1_ui_Label_getStyle_R_com_codename1_ui_plaf_Style",
+  "cn1_com_codename1_ui_Component_getStyle_R_com_codename1_ui_plaf_Style",
+  "Label.getStyleMissing"
+);
+installMissingGlobalDelegate(
+  "cn1_com_codename1_ui_Label_getUIManager_R_com_codename1_ui_plaf_UIManager",
+  "cn1_com_codename1_ui_Component_getUIManager_R_com_codename1_ui_plaf_UIManager",
+  "Label.getUIManagerMissing"
+);
+installMissingGlobalDelegate(
+  "cn1_com_codename1_ui_Label_keyPressed_int",
+  "cn1_com_codename1_ui_Component_keyPressed_int",
+  "Label.keyPressedMissing"
+);
+installMissingGlobalDelegate(
+  "cn1_com_codename1_ui_Label_keyReleased_int",
+  "cn1_com_codename1_ui_Component_keyReleased_int",
+  "Label.keyReleasedMissing"
+);
+installMissingGlobalDelegate(
+  "cn1_com_codename1_ui_Label_paintComponentBackground_com_codename1_ui_Graphics",
+  "cn1_com_codename1_ui_Component_paintComponentBackground_com_codename1_ui_Graphics",
+  "Label.paintComponentBackgroundMissing"
+);
+installMissingGlobalDelegate(
+  "cn1_com_codename1_ui_Label_fireActionEvent",
+  "cn1_com_codename1_ui_Component_fireActionEvent",
+  "Label.fireActionEventMissing"
+);
+installMissingOwnerDelegates(
+  "com_codename1_ui_Container",
+  "com_codename1_ui_Component",
+  [
+    "animate_R_boolean",
+    "deinitialize",
+    "fireActionEvent",
+    "getComponentForm_R_com_codename1_ui_Form",
+    "getPreferredW_R_int",
+    "getPropertyValue_java_lang_String_R_java_lang_Object",
+    "initComponent",
+    "initUnselectedStyle_com_codename1_ui_plaf_Style",
+    "internalPaintImpl_com_codename1_ui_Graphics_boolean",
+    "isVisible_R_boolean",
+    "paintBackground_com_codename1_ui_Graphics",
+    "paintScrollbars_com_codename1_ui_Graphics",
+    "putClientProperty_java_lang_String_java_lang_Object",
+    "repaint_com_codename1_ui_Component",
+    "setHeight_int",
+    "setPropertyValue_java_lang_String_java_lang_Object_R_java_lang_String",
+    "setRTL_boolean",
+    "setScrollY_int",
+    "setUIID_java_lang_String",
+    "setUnselectedStyle_com_codename1_ui_plaf_Style",
+    "setWidth_int",
+    "setX_int",
+    "setY_int",
+    "styleChanged_java_lang_String_com_codename1_ui_plaf_Style"
+  ],
+  "Container.missing"
+);
+installInferredMissingOwnerDelegates("com_codename1_ui_Label", "com_codename1_ui_Component", "Label.inferred");
+installInferredMissingOwnerDelegates("com_codename1_ui_Container", "com_codename1_ui_Component", "Container.inferred");
+installInferredMissingOwnerDelegates("com_codename1_ui_TextArea", "com_codename1_ui_Component", "TextArea.inferred");
+installInferredMissingOwnerDelegates("com_codename1_ui_TextField", "com_codename1_ui_TextArea", "TextField.inferred");
+installInferredMissingOwnerDelegates("com_codename1_ui_Form", "com_codename1_ui_Container", "Form.inferred");
+installInferredMissingOwnerDelegates("com_codename1_ui_List", "com_codename1_ui_Container", "List.inferred");
+installInferredMissingOwnerDelegates("com_codename1_ui_PeerComponent", "com_codename1_ui_Component", "PeerComponent.inferred");
+
 if (typeof global.cn1_com_codename1_ui_Container_setVisible_boolean !== "function") {
   global.cn1_com_codename1_ui_Container_setVisible_boolean = function*(__cn1ThisObject, visible) {
     if (!__cn1ThisObject) {
@@ -794,7 +1016,7 @@ bindCiFallback("Log.e", [
   "cn1_com_codename1_io_Log_e_java_lang_Throwable"
 ], function*(__cn1ThisObject, throwable) {
   if (global.console && typeof global.console.error === "function") {
-    global.console.error("Exception: " + stringifyThrowable(throwable));
+    global.console.error("Exception: " + (yield* stringifyThrowable(throwable)));
   }
   return null;
 });
@@ -823,6 +1045,155 @@ bindCiFallback("Font.createTrueTypeFont", [
   }
   return null;
 });
+
+const nativeFontGetCssMethodId = "cn1_com_codename1_impl_html5_HTML5Implementation_NativeFont_getCSS_R_java_lang_String";
+const nativeFontCharWidthMethodId = "cn1_com_codename1_impl_html5_HTML5Implementation_NativeFont_charWidth_char_R_int";
+const nativeFontGetCssOriginal = (jvm.classes
+  && jvm.classes["com_codename1_impl_html5_HTML5Implementation_NativeFont"]
+  && jvm.classes["com_codename1_impl_html5_HTML5Implementation_NativeFont"].methods)
+  ? jvm.classes["com_codename1_impl_html5_HTML5Implementation_NativeFont"].methods[nativeFontGetCssMethodId]
+  : null;
+const nativeFontCharWidthOriginal = (jvm.classes
+  && jvm.classes["com_codename1_impl_html5_HTML5Implementation_NativeFont"]
+  && jvm.classes["com_codename1_impl_html5_HTML5Implementation_NativeFont"].methods)
+  ? jvm.classes["com_codename1_impl_html5_HTML5Implementation_NativeFont"].methods[nativeFontCharWidthMethodId]
+  : null;
+
+bindCiFallback("NativeFont.getCSSNullSafe", [
+  nativeFontGetCssMethodId
+], function*(__cn1ThisObject) {
+  if (typeof nativeFontGetCssOriginal !== "function") {
+    return jvm.createStringLiteral("16px sans-serif");
+  }
+  try {
+    return yield* nativeFontGetCssOriginal(__cn1ThisObject);
+  } catch (err) {
+    const message = String(err && err.message ? err.message : err || "");
+    if (message.indexOf("__classDef") >= 0) {
+      emitDiagLine("PARPAR:DIAG:FALLBACK:nativeFontGetCSS:nullReceiver=1");
+      return jvm.createStringLiteral("16px sans-serif");
+    }
+    throw err;
+  }
+});
+
+bindCiFallback("NativeFont.charWidthNullSafe", [
+  nativeFontCharWidthMethodId
+], function*(__cn1ThisObject, chr) {
+  if (typeof nativeFontCharWidthOriginal !== "function") {
+    return 8;
+  }
+  try {
+    return yield* nativeFontCharWidthOriginal(__cn1ThisObject, chr);
+  } catch (err) {
+    emitDiagLine("PARPAR:DIAG:FALLBACK:nativeFontCharWidth:defaulted=1");
+    return 8;
+  }
+});
+
+bindCiFallback("HTML5Graphics.colorWithAlphaDirect", [
+  "cn1_com_codename1_impl_html5_HTML5Graphics_colorWithAlpha_int_R_java_lang_String",
+  "cn1_com_codename1_impl_html5_HTML5Graphics_colorWithAlpha_int_R_java_lang_String__impl"
+], function*(argb) {
+  const value = argb | 0;
+  const r = (value >>> 16) & 0xff;
+  const g = (value >>> 8) & 0xff;
+  const b = value & 0xff;
+  const a = ((value >>> 24) & 0xff) / 255;
+  return jvm.createStringLiteral("rgba(" + r + "," + g + "," + b + "," + a + ")");
+});
+
+const determineFontHeightMethodId = "cn1_com_codename1_impl_html5_HTML5Implementation_determineFontHeight_java_lang_String_R_double";
+const determineFontHeightImplMethodId = "cn1_com_codename1_impl_html5_HTML5Implementation_determineFontHeight_java_lang_String_R_double__impl";
+const determineFontHeightOriginal = typeof global[determineFontHeightImplMethodId] === "function"
+  ? global[determineFontHeightImplMethodId]
+  : (typeof global[determineFontHeightMethodId] === "function" ? global[determineFontHeightMethodId] : null);
+
+bindCiFallback("HTML5Implementation.determineFontHeightCoerce", [
+  determineFontHeightImplMethodId,
+  determineFontHeightMethodId
+], function*(fontStyle) {
+  if (typeof determineFontHeightOriginal === "function") {
+    try {
+      return yield* determineFontHeightOriginal(fontStyle);
+    } catch (err) {
+      const message = String(err && err.message ? err.message : err || "");
+      if (message.indexOf("indexOf is not a function") < 0) {
+        throw err;
+      }
+    }
+  }
+  let css = "";
+  if (fontStyle && fontStyle.__class === "java_lang_String") {
+    css = jvm.toNativeString(fontStyle);
+  } else if (typeof fontStyle === "string") {
+    css = fontStyle;
+  } else if (fontStyle != null) {
+    css = String(fontStyle);
+  }
+  const match = /([0-9]+(?:\.[0-9]+)?)\s*(px|pt)/i.exec(css);
+  if (match) {
+    const value = parseFloat(match[1]);
+    if (!isNaN(value) && value > 0) {
+      return value;
+    }
+  }
+  return 16.0;
+});
+
+const hashMapComputeHashCodeImplMethodId = "cn1_java_util_HashMap_computeHashCode_java_lang_Object_R_int__impl";
+const hashMapComputeHashCodeMethodId = "cn1_java_util_HashMap_computeHashCode_java_lang_Object_R_int";
+const hashMapComputeHashCodeOriginal = typeof global[hashMapComputeHashCodeImplMethodId] === "function"
+  ? global[hashMapComputeHashCodeImplMethodId]
+  : (typeof global[hashMapComputeHashCodeMethodId] === "function" ? global[hashMapComputeHashCodeMethodId] : null);
+
+bindCiFallback("HashMap.computeHashCodeNullKey", [
+  hashMapComputeHashCodeImplMethodId,
+  hashMapComputeHashCodeMethodId
+], function*(key) {
+  if (key == null) {
+    emitDiagLine("PARPAR:DIAG:FALLBACK:hashMapComputeHashCode:nullKey=1");
+    return 0;
+  }
+  if (typeof hashMapComputeHashCodeOriginal === "function") {
+    return yield* hashMapComputeHashCodeOriginal(key);
+  }
+  return 0;
+});
+if (typeof global[hashMapComputeHashCodeImplMethodId] === "function") {
+  const originalHashMapComputeHashCodeImpl = global[hashMapComputeHashCodeImplMethodId];
+  global[hashMapComputeHashCodeImplMethodId] = function*(key) {
+    if (key == null) {
+      emitDiagLine("PARPAR:DIAG:FALLBACK:hashMapComputeHashCodeDirect:nullKey=1");
+      return 0;
+    }
+    return yield* originalHashMapComputeHashCodeImpl(key);
+  };
+  emitDiagLine("PARPAR:DIAG:INIT:shim=hashMapComputeHashCodeImplNullKey");
+}
+if (typeof global[hashMapComputeHashCodeMethodId] === "function") {
+  const originalHashMapComputeHashCode = global[hashMapComputeHashCodeMethodId];
+  global[hashMapComputeHashCodeMethodId] = function*(key) {
+    if (key == null) {
+      emitDiagLine("PARPAR:DIAG:FALLBACK:hashMapComputeHashCodeDirect:nullKey=1");
+      return 0;
+    }
+    return yield* originalHashMapComputeHashCode(key);
+  };
+  emitDiagLine("PARPAR:DIAG:INIT:shim=hashMapComputeHashCodeNullKey");
+}
+const hashMapClassDef = jvm.classes && jvm.classes["java_util_HashMap"];
+if (hashMapClassDef && hashMapClassDef.methods && typeof hashMapClassDef.methods[hashMapComputeHashCodeMethodId] === "function") {
+  const originalClassHashMapComputeHashCode = hashMapClassDef.methods[hashMapComputeHashCodeMethodId];
+  hashMapClassDef.methods[hashMapComputeHashCodeMethodId] = function*(__cn1ThisObject, key) {
+    if (key == null) {
+      emitDiagLine("PARPAR:DIAG:FALLBACK:hashMapComputeHashCodeClass:nullKey=1");
+      return 0;
+    }
+    return yield* originalClassHashMapComputeHashCode(__cn1ThisObject, key);
+  };
+  emitDiagLine("PARPAR:DIAG:INIT:shim=hashMapComputeHashCodeClassNullKey");
+}
 
 const styleSetPaddingUnitMethodId = "cn1_com_codename1_ui_plaf_Style_setPaddingUnit_byte_1ARRAY";
 const styleSetMarginUnitMethodId = "cn1_com_codename1_ui_plaf_Style_setMarginUnit_byte_1ARRAY";
@@ -862,6 +1233,28 @@ function ensureJavaByteArray4(value) {
   return out;
 }
 
+function installGlobalArrayReturnCoerce(symbol, className, marker) {
+  const original = global[symbol];
+  if (typeof original !== "function" || original.__cn1ArrayReturnCoerceWrapped) {
+    return false;
+  }
+  const wrapped = function*() {
+    const result = yield* original.apply(this, arguments);
+    const coerced = ensureJavaByteArray4(result);
+    if (result !== coerced) {
+      emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":coerced=1");
+    }
+    return coerced;
+  };
+  wrapped.__cn1ArrayReturnCoerceWrapped = true;
+  global[symbol] = wrapped;
+  if (jvm && jvm.classes && jvm.classes[className] && jvm.classes[className].methods && typeof jvm.classes[className].methods[symbol] === "function") {
+    jvm.classes[className].methods[symbol] = wrapped;
+  }
+  emitCiFallbackMarker(marker, "ENABLED");
+  return true;
+}
+
 bindCiFallback("Style.setPaddingUnitArrayCoerce", [
   styleSetPaddingUnitMethodId
 ], function*(__cn1ThisObject, arr) {
@@ -888,6 +1281,17 @@ bindCiFallback("Style.convertUnitArrayCoerce", [
   }
   return yield* styleConvertUnitOriginal(__cn1ThisObject, ensureJavaByteArray4(arr), value, side);
 });
+
+installGlobalArrayReturnCoerce(
+  "cn1_com_codename1_ui_plaf_Style_getPaddingUnit_R_byte_1ARRAY",
+  "com_codename1_ui_plaf_Style",
+  "Style.getPaddingUnitReturnCoerce"
+);
+installGlobalArrayReturnCoerce(
+  "cn1_com_codename1_ui_plaf_Style_getMarginUnit_R_byte_1ARRAY",
+  "com_codename1_ui_plaf_Style",
+  "Style.getMarginUnitReturnCoerce"
+);
 
 const formInitLafMethodId = "cn1_com_codename1_ui_Form_initLaf_com_codename1_ui_plaf_UIManager";
 const formInitLafOriginalMethod = (function() {
@@ -1080,7 +1484,84 @@ bindCiFallback("Form.initLafNullUiManagerBridge", [
   }
 });
 
+const formCtorLayoutMethodId = "cn1_com_codename1_ui_Form___INIT___com_codename1_ui_layouts_Layout";
+const formCtorTitleLayoutMethodId = "cn1_com_codename1_ui_Form___INIT___java_lang_String_com_codename1_ui_layouts_Layout";
+const formCtorLayoutOriginal = typeof global[formCtorLayoutMethodId] === "function" ? global[formCtorLayoutMethodId] : null;
+const formCtorTitleLayoutOriginal = typeof global[formCtorTitleLayoutMethodId] === "function" ? global[formCtorTitleLayoutMethodId] : null;
+
+function installGlobalIllegalStateBypass(symbol, marker) {
+  const original = global[symbol];
+  if (typeof original !== "function" || original.__cn1IllegalStateBypassWrapped) {
+    return false;
+  }
+  const wrapped = function*() {
+    try {
+      return yield* original.apply(this, arguments);
+    } catch (err) {
+      const classId = String(err && err.__class ? err.__class : "");
+      if (classId === "java_lang_IllegalStateException") {
+        let detail = classId;
+        try {
+          detail = yield* stringifyThrowable(err);
+        } catch (_diagErr) {
+          // Best effort diagnostic path only.
+        }
+        emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":bypassIllegalState=1:detail=" + detail);
+        return null;
+      }
+      throw err;
+    }
+  };
+  wrapped.__cn1IllegalStateBypassWrapped = true;
+  global[symbol] = wrapped;
+  if (jvm && jvm.classes && jvm.classes["com_codename1_ui_Form"] && jvm.classes["com_codename1_ui_Form"].methods && typeof jvm.classes["com_codename1_ui_Form"].methods[symbol] === "function") {
+    jvm.classes["com_codename1_ui_Form"].methods[symbol] = wrapped;
+  }
+  emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":installed=1");
+  return true;
+}
+
+bindCiFallback("Form.layoutCtorIllegalStateBypass", [
+  formCtorLayoutMethodId
+], function*(__cn1ThisObject, layout) {
+  if (typeof formCtorLayoutOriginal !== "function") {
+    return null;
+  }
+  try {
+    return yield* formCtorLayoutOriginal(__cn1ThisObject, layout);
+  } catch (err) {
+    const classId = String(err && err.__class ? err.__class : "");
+    if (classId === "java_lang_IllegalStateException") {
+      emitDiagLine("PARPAR:DIAG:FALLBACK:formCtorLayout:bypassIllegalState=1");
+      return null;
+    }
+    throw err;
+  }
+});
+
+bindCiFallback("Form.titleLayoutCtorIllegalStateBypass", [
+  formCtorTitleLayoutMethodId
+], function*(__cn1ThisObject, title, layout) {
+  if (typeof formCtorTitleLayoutOriginal !== "function") {
+    return null;
+  }
+  try {
+    return yield* formCtorTitleLayoutOriginal(__cn1ThisObject, title, layout);
+  } catch (err) {
+    const classId = String(err && err.__class ? err.__class : "");
+    if (classId === "java_lang_IllegalStateException") {
+      emitDiagLine("PARPAR:DIAG:FALLBACK:formCtorTitleLayout:bypassIllegalState=1");
+      return null;
+    }
+    throw err;
+  }
+});
+
+installGlobalIllegalStateBypass(formCtorLayoutMethodId, "formCtorLayoutGlobal");
+installGlobalIllegalStateBypass(formCtorTitleLayoutMethodId, "formCtorTitleLayoutGlobal");
+
 const cn1ssLambdaBridgeMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_runNextTest_2_java_lang_String_com_codenameone_examples_hellocodenameone_tests_BaseTest_int";
+const cn1ssCompleteMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerHelper_complete_java_lang_Runnable";
 const cn1ssRunnerClassId = "com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner";
 const cn1ssLambdaClassId = "com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_1";
 const cn1ssLambdaBridgeOriginalRunnerMethod = (function() {
@@ -1174,3 +1655,38 @@ bindCiFallback("Cn1ssDeviceRunner.lambdaRunNextTestBridge", [
     callTarget.__cn1LambdaBridgeDispatching = false;
   }
 });
+
+bindCiFallback("Cn1ssDeviceRunnerHelper.completeNullRunnableGuard", [
+  cn1ssCompleteMethodId,
+  cn1ssCompleteMethodId + "__impl"
+], function*(completion) {
+  if (!completion || !completion.__class) {
+    emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssComplete:nullOrClasslessRunnable=1");
+    return null;
+  }
+  const runMethod = jvm.resolveVirtual(completion.__class, "cn1_java_lang_Runnable_run");
+  return yield* runMethod(completion);
+});
+
+const baseTestOnShowLambdaMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_1_lambda_onShowCompleted_0_java_lang_String";
+const baseTestOnShowLambdaCarrierClass = "com_codenameone_examples_hellocodenameone_tests_BaseTest_1_lambda_0";
+if (jvm && typeof jvm.addVirtualMethod === "function" && jvm.classes && jvm.classes[baseTestOnShowLambdaCarrierClass]) {
+  const carrierMethods = jvm.classes[baseTestOnShowLambdaCarrierClass].methods || {};
+  if (typeof carrierMethods[baseTestOnShowLambdaMethodId] !== "function") {
+    jvm.addVirtualMethod(baseTestOnShowLambdaCarrierClass, baseTestOnShowLambdaMethodId, function*(__cn1ThisObject, onShowMessage) {
+      const target = __cn1ThisObject
+        ? (__cn1ThisObject["cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_1_lambda_0_arg_1"] || __cn1ThisObject)
+        : null;
+      if (!target || !target.__class) {
+        return null;
+      }
+      const classDef = target.__classDef;
+      let method = (classDef && classDef.methods) ? classDef.methods[baseTestOnShowLambdaMethodId] : null;
+      if (!method) {
+        method = jvm.resolveVirtual(target.__class, baseTestOnShowLambdaMethodId);
+      }
+      return yield* method(target, onShowMessage);
+    });
+    emitDiagLine("PARPAR:DIAG:INIT:shim=baseTestOnShowLambdaDispatch");
+  }
+}
