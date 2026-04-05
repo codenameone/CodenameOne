@@ -1989,6 +1989,7 @@ public class IPhoneBuilder extends Executor {
                             + "rescue => e\n"
                             + "  puts \"Error while correcting Swift build phases: #{$!}\"\n"
                             + "  puts \"Backtrace:\\n\\t#{e.backtrace.join(\"\\n\\t\")}\"\n"
+                            + "  raise e\n"
                             + "end\n"
                             + deploymentTargetStr
                             + appExtensionsBuilder.toString();
