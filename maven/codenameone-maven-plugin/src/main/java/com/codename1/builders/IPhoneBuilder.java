@@ -2360,7 +2360,7 @@ public class IPhoneBuilder extends Executor {
         if (file == null || !file.exists() || snippets == null || snippets.length == 0) {
             return;
         }
-        String content = Util.readToString(file);
+        String content = new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
         StringBuilder sb = new StringBuilder(content.length());
         try (BufferedReader reader = new BufferedReader(new StringReader(content))) {
             String line;
