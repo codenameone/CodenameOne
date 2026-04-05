@@ -2166,7 +2166,10 @@ public class IPhoneBuilder extends Executor {
             }
 
             try {
-
+                File pbxprojFile = new File(tmpFile, "dist/" + request.getMainClass() + ".xcodeproj/project.pbxproj");
+                removeLinesContaining(pbxprojFile,
+                        ".swift in Resources",
+                        request.getMainClass() + "-src in Resources");
 
                 if (request.getArg("ios.buildType", "debug").equals("debug") &&
                         request.getArg("ios.no_strip", "false").equalsIgnoreCase("true")) {
@@ -2351,6 +2354,30 @@ public class IPhoneBuilder extends Executor {
                 appendFilesToXcodeProjGroup(sb, f, serviceGroupVarName, serviceTargetVarName, baseDir);
             }
         }
+    }
+
+    private void removeLinesContaining(File file, String... snippets) throws IOException {
+        if (file == null || !file.exists() || snippets == null || snippets.length == 0) {
+            return;
+        }
+        String content = Util.readToString(file);
+        StringBuilder sb = new StringBuilder(content.length());
+        try (BufferedReader reader = new BufferedReader(new StringReader(content))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                boolean remove = false;
+                for (String snippet : snippets) {
+                    if (snippet != null && !snippet.isEmpty() && line.contains(snippet)) {
+                        remove = true;
+                        break;
+                    }
+                }
+                if (!remove) {
+                    sb.append(line).append('\n');
+                }
+            }
+        }
+        createFile(file, sb.toString().getBytes(StandardCharsets.UTF_8));
     }
 
     
