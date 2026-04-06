@@ -366,7 +366,7 @@ cn1ss_process_and_report() {
 
   # Pass any stats files found in artifacts
   if [ -n "$artifacts_dir" ] && [ -d "$artifacts_dir" ]; then
-    for stats_file in "$artifacts_dir"/iphone-builder-stats.txt "$artifacts_dir"/ios-test-stats.txt; do
+    for stats_file in "$artifacts_dir"/iphone-builder-stats.txt "$artifacts_dir"/ios-test-stats.txt "$artifacts_dir"/android-test-stats.txt "$artifacts_dir"/base64-performance-stats.txt; do
       if [ -f "$stats_file" ]; then
         render_args+=(--extra-stats "$stats_file")
       fi

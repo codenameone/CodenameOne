@@ -6,6 +6,24 @@ ri_log() { echo "[run-ios-ui-tests] $1"; }
 
 ensure_dir() { mkdir -p "$1" 2>/dev/null || true; }
 
+extract_base64_stats() {
+  local log_file="$1"
+  local out_file="$2"
+  [ -f "$log_file" ] || return 0
+
+  local lines
+  lines="$(grep 'CN1SS:STAT:' "$log_file" 2>/dev/null | sed -E 's/^.*CN1SS:STAT://')" || true
+  if [ -z "${lines:-}" ]; then
+    return 0
+  fi
+
+  : > "$out_file"
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    echo "$line" >> "$out_file"
+  done <<< "$lines"
+}
+
 if [ $# -lt 1 ]; then
   ri_log "Usage: $0 <workspace_path> [app_bundle] [scheme]" >&2
   exit 2
@@ -654,6 +672,11 @@ while true; do
 done
 END_TIME=$(date +%s)
 echo "Test Execution : $(( (END_TIME - START_TIME) * 1000 )) ms" >> "$ARTIFACTS_DIR/ios-test-stats.txt"
+BASE64_STATS_FILE="$ARTIFACTS_DIR/base64-performance-stats.txt"
+extract_base64_stats "$TEST_LOG" "$BASE64_STATS_FILE"
+if [ -s "$BASE64_STATS_FILE" ]; then
+  ri_log "Base64 benchmark stats captured at $BASE64_STATS_FILE"
+fi
 
 sleep 3
 

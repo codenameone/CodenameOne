@@ -8,6 +8,24 @@ ra_log() { echo "[run-android-instrumentation-tests] $1"; }
 
 ensure_dir() { mkdir -p "$1" 2>/dev/null || true; }
 
+extract_base64_stats() {
+  local log_file="$1"
+  local out_file="$2"
+  [ -f "$log_file" ] || return 0
+
+  local lines
+  lines="$(grep 'CN1SS:STAT:' "$log_file" 2>/dev/null | sed -E 's/^.*CN1SS:STAT://')" || true
+  if [ -z "${lines:-}" ]; then
+    return 0
+  fi
+
+  : > "$out_file"
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    echo "$line" >> "$out_file"
+  done <<< "$lines"
+}
+
 # CN1SS helpers are implemented in Java for easier maintenance
 # (Defaults for class names are provided by cn1ss.sh)
 
@@ -274,6 +292,12 @@ done
 COMPARE_JSON="$SCREENSHOT_TMP_DIR/screenshot-compare.json"
 SUMMARY_FILE="$SCREENSHOT_TMP_DIR/screenshot-summary.txt"
 COMMENT_FILE="$SCREENSHOT_TMP_DIR/screenshot-comment.md"
+
+BASE64_STATS_FILE="$ARTIFACTS_DIR/base64-performance-stats.txt"
+extract_base64_stats "$TEST_LOG" "$BASE64_STATS_FILE"
+if [ -s "$BASE64_STATS_FILE" ]; then
+  ra_log "Base64 benchmark stats captured at $BASE64_STATS_FILE"
+fi
 
 export CN1SS_PREVIEW_DIR="$SCREENSHOT_PREVIEW_DIR"
 export CN1SS_COMMENT_MARKER="<!-- CN1SS_ANDROID_COMMENT -->"
