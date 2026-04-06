@@ -122,12 +122,14 @@ public class Sheet extends Container {
     private static final int DEFAULT_TRANSITION_DURATION = 300;
     private final Sheet parentSheet;
     private final Label title = new Label();
+    private Component titleComponent = title;
     private final EventDispatcher closeListeners = new EventDispatcher();
     private final EventDispatcher backListeners = new EventDispatcher();
     private final Button backButton = new Button(FontImage.MATERIAL_CLOSE);
     private final Container commandsContainer = new Container(BoxLayout.x());
+    private final Container titleComponentContainer = FlowLayout.encloseCenterMiddle(title);
     private final Container titleBar = BorderLayout.center(LayeredLayout.encloseIn(
-            BorderLayout.center(FlowLayout.encloseCenterMiddle(title)),
+            BorderLayout.center(titleComponentContainer),
             BorderLayout.centerEastWest(null, commandsContainer, backButton)
     ));
     private final Container contentPane = new Container(BoxLayout.y());
@@ -399,6 +401,77 @@ public class Sheet extends Container {
         return commandsContainer;
     }
 
+    /// Gets the title text displayed in the default title label.
+    ///
+    /// #### Returns
+    ///
+    /// The sheet title text.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
+    public String getTitle() {
+        return title.getText();
+    }
+
+    /// Sets the title text displayed in the default title label.
+    ///
+    /// If a custom title component is currently installed via {@link #setTitleComponent(Component)},
+    /// this method still updates the default title label so that it will be shown if the title
+    /// component is reset back to null.
+    ///
+    /// #### Parameters
+    ///
+    /// - `title`: The title text.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
+    public void setTitle(String title) {
+        this.title.setText(title);
+    }
+
+    /// Gets the component currently used in the center of the title bar.
+    ///
+    /// #### Returns
+    ///
+    /// The current title component.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
+    public Component getTitleComponent() {
+        return titleComponent;
+    }
+
+    /// Sets the title component rendered in the center of the title bar.
+    ///
+    /// This allows for custom title layouts such as including an image above the title text.
+    /// If `null` is passed, the default title label is restored.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: The component to use for the title area, or `null` to restore the default title label.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
+    public void setTitleComponent(Component cmp) {
+        if (cmp == null) {
+            cmp = title;
+        }
+        if (cmp == titleComponent) { //NOPMD CompareObjectsWithEquals
+            return;
+        }
+        if (cmp.getParent() != null) {
+            cmp.remove();
+        }
+        titleComponentContainer.removeAll();
+        titleComponentContainer.add(cmp);
+        titleComponent = cmp;
+        titleComponentContainer.revalidateLater();
+    }
+
     private void initUI() {
         setLayout(new BorderLayout());
         contentPane.setSafeArea(true);
@@ -449,7 +522,7 @@ public class Sheet extends Container {
 
         // Set the padding in the content pane to match the corner radius
         Style s = getStyle();
-        Style titleParentStyle = title.getParent().getStyle();
+        Style titleParentStyle = titleComponentContainer.getStyle();
         titleParentStyle.setMarginLeft(titleMargin);
         titleParentStyle.setMarginRight(titleMargin);
         Border border = s.getBorder();

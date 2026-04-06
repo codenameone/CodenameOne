@@ -2,8 +2,8 @@ package com.codename1.ui;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
-import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -84,5 +84,34 @@ class SheetTest extends UITestBase {
 
         form.getAnimationManager().flush();
         assertNull(Sheet.getCurrentSheet(), "No sheet should remain after backing out");
+    }
+
+    @FormTest
+    void titleComponentCanBeCustomized() {
+        implementation.setBuiltinSoundsEnabled(false);
+        Form form = Display.getInstance().getCurrent();
+        form.setLayout(new BorderLayout());
+
+        Sheet sheet = new Sheet(null, "Default Title");
+        Container customTitle = BoxLayout.encloseY(
+                new Label("Icon"),
+                new Label("Custom Title")
+        );
+        sheet.setTitleComponent(customTitle);
+
+        assertSame(customTitle, sheet.getTitleComponent(), "Custom title component should be installed");
+        assertEquals("Default Title", sheet.getTitle(), "getTitle() should still return default title label text");
+
+        sheet.show(0);
+        form.getAnimationManager().flush();
+        flushSerialCalls();
+
+        assertSame(sheet, Sheet.findContainingSheet(customTitle), "Custom title component should be in the sheet hierarchy");
+
+        sheet.setTitle("Updated");
+        assertEquals("Updated", sheet.getTitle(), "setTitle() should update default title label text");
+
+        sheet.setTitleComponent(null);
+        assertNotNull(sheet.getTitleComponent(), "Resetting title component should restore default title label");
     }
 }
