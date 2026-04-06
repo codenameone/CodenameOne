@@ -1600,7 +1600,17 @@ bindCiFallback("Form.layoutCtorIllegalStateBypass", [
   } catch (err) {
     const classId = String(err && err.__class ? err.__class : "");
     if (classId === "java_lang_IllegalStateException") {
-      emitDiagLine("PARPAR:DIAG:FALLBACK:formCtorLayout:bypassIllegalState=1");
+      let detail = classId;
+      try {
+        detail = yield* stringifyThrowable(err);
+      } catch (_diagErr) {
+        // Diagnostic path only.
+      }
+      emitDiagLine(
+        "PARPAR:DIAG:FALLBACK:formCtorLayout:bypassIllegalState=1:detail=" + detail
+        + ":self=" + (__cn1ThisObject && __cn1ThisObject.__class ? __cn1ThisObject.__class : "null")
+        + ":layout=" + (layout && layout.__class ? layout.__class : (layout == null ? "null" : typeof layout))
+      );
       return null;
     }
     throw err;
@@ -1618,7 +1628,18 @@ bindCiFallback("Form.titleLayoutCtorIllegalStateBypass", [
   } catch (err) {
     const classId = String(err && err.__class ? err.__class : "");
     if (classId === "java_lang_IllegalStateException") {
-      emitDiagLine("PARPAR:DIAG:FALLBACK:formCtorTitleLayout:bypassIllegalState=1");
+      let detail = classId;
+      try {
+        detail = yield* stringifyThrowable(err);
+      } catch (_diagErr) {
+        // Diagnostic path only.
+      }
+      emitDiagLine(
+        "PARPAR:DIAG:FALLBACK:formCtorTitleLayout:bypassIllegalState=1:detail=" + detail
+        + ":self=" + (__cn1ThisObject && __cn1ThisObject.__class ? __cn1ThisObject.__class : "null")
+        + ":title=" + (title && title.__class ? title.__class : (title == null ? "null" : typeof title))
+        + ":layout=" + (layout && layout.__class ? layout.__class : (layout == null ? "null" : typeof layout))
+      );
       return null;
     }
     throw err;
@@ -1628,18 +1649,44 @@ bindCiFallback("Form.titleLayoutCtorIllegalStateBypass", [
 installGlobalIllegalStateBypass(formCtorLayoutMethodId, "formCtorLayoutGlobal");
 installGlobalIllegalStateBypass(formCtorTitleLayoutMethodId, "formCtorTitleLayoutGlobal");
 
-const cn1ssLambdaBridgeMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_runNextTest_2_java_lang_String_com_codenameone_examples_hellocodenameone_tests_BaseTest_int";
 const cn1ssCompleteMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerHelper_complete_java_lang_Runnable";
 const cn1ssEmitChannelMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerHelper_emitChannel_byte_1ARRAY_java_lang_String_java_lang_String";
 const baseTestRegisterReadyCallbackMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_registerReadyCallback_com_codename1_ui_Form_java_lang_Runnable";
 const cn1ssRunnerClassId = "com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner";
-const cn1ssLambdaClassId = "com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_1";
+function collectCn1ssRunnerLambdaMethodIds() {
+  const ids = [];
+  if (!jvm || !jvm.classes || !jvm.classes[cn1ssRunnerClassId] || !jvm.classes[cn1ssRunnerClassId].methods) {
+    return ids;
+  }
+  const methods = jvm.classes[cn1ssRunnerClassId].methods;
+  const prefix = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_runNextTest_";
+  for (const methodId in methods) {
+    if (methodId.indexOf(prefix) === 0 && methodId.endsWith("_java_lang_String_com_codenameone_examples_hellocodenameone_tests_BaseTest_int")) {
+      ids.push(methodId);
+    }
+  }
+  ids.sort();
+  return ids;
+}
+const cn1ssLambdaBridgeMethodIds = (function() {
+  const collected = collectCn1ssRunnerLambdaMethodIds();
+  if (collected.length > 0) {
+    return collected;
+  }
+  return ["cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_runNextTest_2_java_lang_String_com_codenameone_examples_hellocodenameone_tests_BaseTest_int"];
+})();
 const cn1ssLambdaBridgeOriginalRunnerMethod = (function() {
   if (!jvm || !jvm.classes || !jvm.classes[cn1ssRunnerClassId] || !jvm.classes[cn1ssRunnerClassId].methods) {
     return null;
   }
-  const candidate = jvm.classes[cn1ssRunnerClassId].methods[cn1ssLambdaBridgeMethodId];
-  return typeof candidate === "function" ? candidate : null;
+  const methods = jvm.classes[cn1ssRunnerClassId].methods;
+  for (let i = 0; i < cn1ssLambdaBridgeMethodIds.length; i++) {
+    const candidate = methods[cn1ssLambdaBridgeMethodIds[i]];
+    if (typeof candidate === "function") {
+      return candidate;
+    }
+  }
+  return null;
 })();
 let cn1ssLambdaBridgeDiagCount = 0;
 function emitLambdaBridgeDiag(line) {
@@ -1650,9 +1697,7 @@ function emitLambdaBridgeDiag(line) {
   emitDiagLine(line);
 }
 
-bindCiFallback("Cn1ssDeviceRunner.lambdaRunNextTestBridge", [
-  cn1ssLambdaBridgeMethodId
-], function*(__cn1ThisObject, testName, testObject, index) {
+bindCiFallback("Cn1ssDeviceRunner.lambdaRunNextTestBridge", cn1ssLambdaBridgeMethodIds, function*(__cn1ThisObject, testName, testObject, index) {
   const toSimpleClassName = function(classId) {
     const raw = String(classId || "");
     const pos = raw.lastIndexOf("_");
@@ -1673,11 +1718,30 @@ bindCiFallback("Cn1ssDeviceRunner.lambdaRunNextTestBridge", [
   if (!__cn1ThisObject) {
     return null;
   }
-  const extractedRunner = __cn1ThisObject["cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_1_arg_1"] || null;
+  let extractedRunner = null;
+  let capturedTestName = null;
+  let capturedTestObject = null;
+  let capturedIndex = null;
+  const fieldKeys = __cn1ThisObject && typeof __cn1ThisObject === "object" ? Object.keys(__cn1ThisObject) : [];
+  for (let i = 0; i < fieldKeys.length; i++) {
+    const key = fieldKeys[i];
+    const match = key.match(/Cn1ssDeviceRunner_lambda_\d+_arg_(\d+)$/);
+    if (!match) {
+      continue;
+    }
+    const ordinal = match[1];
+    const value = __cn1ThisObject[key];
+    if (ordinal === "1") {
+      extractedRunner = value;
+    } else if (ordinal === "2") {
+      capturedTestName = value;
+    } else if (ordinal === "3") {
+      capturedTestObject = value;
+    } else if (ordinal === "4") {
+      capturedIndex = value;
+    }
+  }
   const runner = extractedRunner || (__cn1ThisObject.__class === cn1ssRunnerClassId ? __cn1ThisObject : null);
-  const capturedTestName = __cn1ThisObject["cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_1_arg_2"];
-  const capturedTestObject = __cn1ThisObject["cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_1_arg_3"];
-  const capturedIndex = __cn1ThisObject["cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_1_arg_4"];
   let effectiveTestObject = capturedTestObject != null ? capturedTestObject : testObject;
   if (!jvm.instanceOf(effectiveTestObject, "com_codenameone_examples_hellocodenameone_tests_BaseTest")) {
     if (jvm.instanceOf(testName, "com_codenameone_examples_hellocodenameone_tests_BaseTest")) {
@@ -1706,7 +1770,9 @@ bindCiFallback("Cn1ssDeviceRunner.lambdaRunNextTestBridge", [
   if (!jvm.instanceOf(effectiveTestObject, "com_codenameone_examples_hellocodenameone_tests_BaseTest")) {
     return null;
   }
-  const callTarget = __cn1ThisObject.__class === cn1ssLambdaClassId ? runner : __cn1ThisObject;
+  const isRunnerLambda = __cn1ThisObject && __cn1ThisObject.__class
+    && String(__cn1ThisObject.__class).indexOf("com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_") === 0;
+  const callTarget = isRunnerLambda ? runner : __cn1ThisObject;
   if (!callTarget || callTarget.__class !== cn1ssRunnerClassId) {
     return null;
   }

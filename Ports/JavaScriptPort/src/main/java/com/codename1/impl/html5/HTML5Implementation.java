@@ -4802,6 +4802,40 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
 
     @Override
+    public void screenshot(SuccessCallback<Image> callback) {
+        if (callback == null) {
+            return;
+        }
+        if (outputCanvas == null) {
+            super.screenshot(callback);
+            return;
+        }
+        flushGraphics();
+        final int width = outputCanvas.getWidth();
+        final int height = outputCanvas.getHeight();
+        if (width <= 0 || height <= 0) {
+            super.screenshot(callback);
+            return;
+        }
+        final CanvasRenderingContext2D context = (CanvasRenderingContext2D) outputCanvas.getContext("2d");
+        final ImageData imageData = context.getImageData(0, 0, width, height);
+        final Uint8ClampedArray data = imageData.getData();
+        final int[] rgb = new int[width * height];
+        JavaScriptImageDataAdapter.readRgbaToArgb(new JavaScriptImageDataAdapter.PixelReader() {
+            @Override
+            public int get(int index) {
+                return data.get(index);
+            }
+
+            @Override
+            public int length() {
+                return data.getLength();
+            }
+        }, rgb, 0);
+        callback.onSucess(Image.createImage(rgb, width, height));
+    }
+
+    @Override
     public void getRGB(Object nativeImage, int[] arr, int offset, int x, int y, int width, int height) {
     	NativeImage im = (NativeImage)nativeImage;
         if (im.img != null && !im.loaded) {

@@ -1,106 +1,89 @@
-JavaScript Port Status
-======================
+JavaScript Port Status (ParparVM)
+=================================
 
-Implemented
------------
+Last updated: 2026-04-06
 
-- [x] PolyForm Noncommercial 1.0.0 license boundary for `Ports/JavaScriptPort/**`
-- [x] Imported browser-port baseline into the repository as a working reference subtree
-- [x] ParparVM-side production host bridge in [JavaScriptPortHost.java](/Users/shai/dev/cn1/Ports/JavaScriptPort/src/main/java/com/codename1/impl/platform/js/JavaScriptPortHost.java)
-- [x] Native method bindings resolved at runtime via `bindNative()` in `parparvm_runtime.js` and `port.js` (no hardcoded registry needed)
-- [x] Browser bundle bootstrap shell and host bridge in `vm/ByteCodeTranslator`
-- [x] JSO interfaces created under `com.codename1.html5.js.*` for browser DOM APIs
-- [x] @JSBody annotation processing implemented in ByteCodeTranslator for inline JavaScript generation
-- [x] Wrapped static method body generation fixed - `__impl` functions now properly generated
+Current CI State
+----------------
 
-Current Blocker
+- JavaScript screenshot pipeline now reaches completion:
+  - `CN1SS:SUITE:FINISHED` is present.
+  - `TOP_BLOCKER=none|none|none` is present.
+  - 5 screenshots are emitted as artifacts.
+- Major remaining problem: screenshots are still visually wrong (black/flat/patterned output in key tests).
+
+What Is Working
 ---------------
 
-**FIXED**: All three critical bugs have been resolved:
+- End-to-end browser harness execution is stable enough to complete.
+- Screenshot chunk emission/decoding path works in CI and local reproduction.
+- Earlier deterministic VM blockers were resolved (including missing virtual array clone handling).
+- Local and CI diagnostics are actionable (`PARPAR:DIAG:*`, fallback markers, blocker classifier output).
 
-### Bug 1: @JSBody Inline Script Syntax Error ✅ FIXED
-The `@JSBody` annotation scripts contain `return` statements but were being assigned directly:
-```javascript
-// WRONG
-const __jsBodyResult = return evt.source;
+Latest High-Value Change
+------------------------
 
-// FIXED
-const __jsBodyResult = (function() { return evt.source; }).call(this);
-```
+- Implemented `INVOKESPECIAL` owner resolution in JS code generation:
+  - File: `vm/ByteCodeTranslator/src/com/codename1/tools/translator/JavascriptMethodGenerator.java`
+  - Change: for non-constructor/non-clinit `INVOKESPECIAL`, resolve actual method owner using:
+    - `Util.resolveInvokeSpecialOwner(owner, name, desc)`
+  - Applied in both straight-line and interpreter invoke emission paths.
+- Expanded `Form` constructor fallback diagnostics in `port.js`:
+  - `formCtorLayout` and `formCtorTitleLayout` bypass logs now include throwable detail and receiver/arg class metadata.
 
-### Bug 2: Wrapped Static Methods Missing `__impl` Body ✅ FIXED
-Static methods were generating only the wrapper but skipping the method body generation due to an early return.
+Why this matters:
+- The generated JS previously emitted direct calls against unresolved intermediate owners in inherited/super-call paths.
+- This contributed to runtime dependence on emergency owner-delegate fallbacks.
 
-**Root cause**: In `appendMethod()`, wrapped static methods returned after generating the wrapper, skipping lines 253-277 that generate the actual bytecode body.
+Observed Effect Of Latest Change
+--------------------------------
 
-**Fix**: Removed the early return - now the `__impl` function body is generated before the wrapper.
+- Local run still finishes and emits screenshots.
+- In new local artifacts, these fallback keys remain enabled but are no longer hit:
+  - `FALLBACK:Container.missing.internalPaintImpl_com_codename1_ui_Graphics_boolean`
+  - `FALLBACK:Container.missing.paintBackground_com_codename1_ui_Graphics`
+  - `FALLBACK:Label.paintComponentBackgroundMissing`
+- Screenshot hashes changed for some tests (`graphics-draw-line`, `graphics-draw-rect`) but are still incorrect overall.
+- `MainActivity.png` and `kotlin.png` remain black and identical.
 
-**Verification**: After fix, generated code shows both functions:
-```javascript
-// __impl function with actual bytecode
-function* main__impl(args) {
-  // Actual method body
-}
-// Wrapper that calls __impl
-function* main(args) {
-  jvm.ensureClassInitialized("...");
-  return yield* main__impl(args);
-}
-```
+Primary Remaining Blocker
+-------------------------
 
-### Bug 3: Playwright Not Loadable in CI ✅ FIXED
-Playwright installed globally (`npm install -g`) is not accessible via ES module imports.
+- Form initialization still repeatedly throws and is bypassed by CI fallbacks:
+  - `PARPAR:DIAG:FORM_INIT_LAYOUT:error=java_lang_IllegalStateException`
+  - `FALLBACK:Form.layoutCtorIllegalStateBypass:HIT`
+  - `FALLBACK:Form.titleLayoutCtorIllegalStateBypass:HIT`
+  - `FALLBACK:Form.initLafNullUiManagerBridge:HIT`
 
-**Fix**: Install locally in `scripts/` directory:
-```yaml
-- name: Install Playwright Chromium
-  run: |
-    cd scripts
-    npm init -y 2>/dev/null || true
-    npm install playwright
-    npx playwright install --with-deps chromium
-```
+Assessment:
+- This is currently the highest-probability root cause for wrong UI state at screenshot time.
+- The constructor bypasses prevent hard failure but likely leave form/layout/laf state partially initialized.
 
-Next Steps
-----------
+Priority Order (Do Next)
+------------------------
 
-1. Push changes and run CI to verify fixes work end-to-end
-2. If browser tests pass, the JavaScript port is functional
+1. Eliminate `Form(..., Layout)`/`Form(String, Layout)` illegal-state bypass dependence.
+   - Instrument and fix root cause so constructors complete without fallback catch-and-return.
+   - Exit condition: no `FORM_INIT_LAYOUT:error=java_lang_IllegalStateException` for screenshot scenario.
 
-Files Modified
---------------
+2. Re-validate rendering once form init is clean.
+   - Confirm black/flat screenshots are resolved or significantly improved.
+   - Re-check whether paint-path fallbacks remain unused.
 
-1. **vm/ByteCodeTranslator/src/com/codename1/tools/translator/BytecodeMethod.java**:
-   - Added `jsBodyScript`, `jsBodyParams` fields
-   - Added getters/setters for JSBody annotation data
+3. Tighten fallback surface after rendering is correct.
+   - Keep only minimal required fallbacks.
+   - Remove stale fallback entries and document each retained one with rationale.
 
-2. **vm/ByteCodeTranslator/src/com/codename1/tools/translator/ByteCodeMethodArg.java**:
-   - Added `getTypeName()` and `getPrimitiveType()` getters
+4. Final CI hardening.
+   - Repeat-run stability checks.
+   - Ensure artifacts and logs remain deterministic.
 
-3. **vm/ByteCodeTranslator/src/com/codename1/tools/translator/Parser.java**:
-   - Added `JSBodyAnnotationVisitor` inner class
-   - Modified `visitAnnotation()` to capture @JSBody data
+Known Important Context
+-----------------------
 
-4. **vm/ByteCodeTranslator/src/com/codename1/tools/translator/JavascriptMethodGenerator.java**:
-   - Added `appendJsBodyMethod()` for @JSBody inline JavaScript generation
-   - Fixed @JSBody script wrapping in IIFE for proper return value handling
-   - **Critical fix**: Removed early return in `appendMethod()` that was skipping `__impl` body generation for wrapped static methods
-
-5. **scripts/run-javascript-headless-browser.mjs**:
-   - Improved error messages for Playwright import failures
-
-6. **.github/workflows/scripts-javascript.yml**:
-   - Changed Playwright installation from global to local `scripts/` directory
-
-Verification
-------------
-
-After fixes, the generated JavaScript bundle correctly shows:
-
-```bash
-$ unzip -p /tmp/test-fix.zip HelloCodenameOne-js/translated_app.js | grep -A15 "function\* main__impl"
-# Shows __impl function with actual bytecode (object creation, method calls)
-# Shows wrapper function that ensures class init and calls __impl
-```
-
-The bytecode translation now correctly generates both the `__impl` function body and the wrapper for all static methods.
+- This file supersedes older status notes that referenced initial JSBody/static-wrapper bootstrap issues as the primary blocker.
+- Current bottleneck is no longer “suite timeout”; it is “suite passes but screenshots are wrong”.
+- Existing local tree also includes ongoing debug-oriented changes in:
+  - `Ports/JavaScriptPort/src/main/webapp/port.js`
+  - `Ports/JavaScriptPort/src/main/java/com/codename1/impl/html5/HTML5Implementation.java`
+  These are part of the active CI recovery/debugging workflow.

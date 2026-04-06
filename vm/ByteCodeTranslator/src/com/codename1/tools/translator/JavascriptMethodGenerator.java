@@ -933,9 +933,15 @@ final class JavascriptMethodGenerator {
     }
 
     private static boolean appendStraightLineInvokeInstruction(StringBuilder out, Invoke invoke, StraightLineContext ctx) {
-        String owner = JavascriptNameUtil.sanitizeClassName(invoke.getOwner());
-        String methodId = JavascriptNameUtil.methodIdentifier(invoke.getOwner(), invoke.getName(), invoke.getDesc());
-        String methodBodyId = jsStaticMethodBodyIdentifier(invoke.getOwner(), invoke.getName(), invoke.getDesc());
+        String invokeOwner = invoke.getOwner();
+        if (invoke.getOpcode() == Opcodes.INVOKESPECIAL
+                && !"<init>".equals(invoke.getName())
+                && !"<clinit>".equals(invoke.getName())) {
+            invokeOwner = Util.resolveInvokeSpecialOwner(invokeOwner, invoke.getName(), invoke.getDesc());
+        }
+        String owner = JavascriptNameUtil.sanitizeClassName(invokeOwner);
+        String methodId = JavascriptNameUtil.methodIdentifier(invokeOwner, invoke.getName(), invoke.getDesc());
+        String methodBodyId = jsStaticMethodBodyIdentifier(invokeOwner, invoke.getName(), invoke.getDesc());
         List<String> args = JavascriptNameUtil.argumentTypes(invoke.getDesc());
         boolean hasReturn = invoke.getDesc().charAt(invoke.getDesc().length() - 1) != 'V';
         String[] argValues = new String[args.size()];
@@ -1860,9 +1866,15 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
 
     private static void appendInvokeInstruction(StringBuilder out, Invoke invoke, int index, boolean usesClassInitCache,
             boolean usesVirtualDispatchCache) {
-        String owner = JavascriptNameUtil.sanitizeClassName(invoke.getOwner());
-        String methodId = JavascriptNameUtil.methodIdentifier(invoke.getOwner(), invoke.getName(), invoke.getDesc());
-        String methodBodyId = jsStaticMethodBodyIdentifier(invoke.getOwner(), invoke.getName(), invoke.getDesc());
+        String invokeOwner = invoke.getOwner();
+        if (invoke.getOpcode() == Opcodes.INVOKESPECIAL
+                && !"<init>".equals(invoke.getName())
+                && !"<clinit>".equals(invoke.getName())) {
+            invokeOwner = Util.resolveInvokeSpecialOwner(invokeOwner, invoke.getName(), invoke.getDesc());
+        }
+        String owner = JavascriptNameUtil.sanitizeClassName(invokeOwner);
+        String methodId = JavascriptNameUtil.methodIdentifier(invokeOwner, invoke.getName(), invoke.getDesc());
+        String methodBodyId = jsStaticMethodBodyIdentifier(invokeOwner, invoke.getName(), invoke.getDesc());
         List<String> args = JavascriptNameUtil.argumentTypes(invoke.getDesc());
         boolean hasReturn = invoke.getDesc().charAt(invoke.getDesc().length() - 1) != 'V';
         int argCount = args.size();
