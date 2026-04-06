@@ -441,9 +441,9 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     public static boolean isRetina() {
         boolean isRetina = false;
-        GraphicsDevice graphicsDevice = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
 
         try {
+            GraphicsDevice graphicsDevice = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
             if (getJavaVersion() >= 9) {
                 // JDK9 Doesn't like the old hack for getting the scale via reflection.
                 // https://bugs.openjdk.java.net/browse/JDK-8172962
@@ -475,10 +475,8 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
     
     public static double calcRetinaScale() {
-        
-        GraphicsDevice graphicsDevice = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
-
         try {
+            GraphicsDevice graphicsDevice = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
             if (getJavaVersion() >= 9) {
                 // JDK9 Doesn't like the old hack for getting the scale via reflection.
                 // https://bugs.openjdk.java.net/browse/JDK-8172962
