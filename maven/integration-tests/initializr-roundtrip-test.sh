@@ -57,9 +57,9 @@ normalize_project() {
   PROJECT_DIR="$1"
   while read -r SETTINGS_FILE; do
     NORMALIZED_FILE="$SETTINGS_FILE.normalized"
-    grep -v '^#' "$SETTINGS_FILE" | sort > "$NORMALIZED_FILE"
+    grep -v '^[[:space:]]*#' "$SETTINGS_FILE" | sort > "$NORMALIZED_FILE"
     if [ ! -s "$NORMALIZED_FILE" ]; then
-      echo "Normalized settings file became empty: $SETTINGS_FILE"
+      echo "Normalization produced an empty codenameone_settings.properties file: $SETTINGS_FILE (expected non-comment property entries)."
       rm -f "$NORMALIZED_FILE"
       exit 1
     fi
