@@ -2003,18 +2003,7 @@ bindNative(["cn1_java_lang_String_format_java_lang_String_java_lang_Object_1ARRA
 
   const nextArgString = function*(token) {
     const arg = values.length ? values.shift() : null;
-    if (token === "c") {
-      const native = yield* runtimeToNativeString(arg);
-      if (native == null || native.length === 0) {
-        return "";
-      }
-      if (native.length === 1) {
-        return native;
-      }
-      const asInt = parseInt(native, 10);
-      return isNaN(asInt) ? native.charAt(0) : String.fromCharCode(asInt);
-    }
-    return yield* runtimeToNativeString(arg);
+    return yield* runtimeFormatTokenValue("%" + token, arg);
   };
 
   let out = "";

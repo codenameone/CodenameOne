@@ -1,3 +1,5 @@
+<!-- Licensed under the PolyForm Noncommercial License 1.0.0 -->
+
 JavaScriptPort is the browser-runtime work area for the new Codename One JavaScript port.
 
 Scope of this bootstrap:

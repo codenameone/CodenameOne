@@ -933,15 +933,9 @@ final class JavascriptMethodGenerator {
     }
 
     private static boolean appendStraightLineInvokeInstruction(StringBuilder out, Invoke invoke, StraightLineContext ctx) {
-        String invokeOwner = invoke.getOwner();
-        if (invoke.getOpcode() == Opcodes.INVOKESPECIAL
-                && !"<init>".equals(invoke.getName())
-                && !"<clinit>".equals(invoke.getName())) {
-            invokeOwner = Util.resolveInvokeSpecialOwner(invokeOwner, invoke.getName(), invoke.getDesc());
-        }
-        String owner = JavascriptNameUtil.sanitizeClassName(invokeOwner);
-        String methodId = JavascriptNameUtil.methodIdentifier(invokeOwner, invoke.getName(), invoke.getDesc());
-        String methodBodyId = jsStaticMethodBodyIdentifier(invokeOwner, invoke.getName(), invoke.getDesc());
+        String owner = JavascriptNameUtil.sanitizeClassName(invoke.getOwner());
+        String methodId = JavascriptNameUtil.methodIdentifier(invoke.getOwner(), invoke.getName(), invoke.getDesc());
+        String methodBodyId = jsStaticMethodBodyIdentifier(invoke.getOwner(), invoke.getName(), invoke.getDesc());
         List<String> args = JavascriptNameUtil.argumentTypes(invoke.getDesc());
         boolean hasReturn = invoke.getDesc().charAt(invoke.getDesc().length() - 1) != 'V';
         String[] argValues = new String[args.size()];
@@ -1111,6 +1105,11 @@ private static void appendNativeStubIfNeeded(StringBuilder out, ByteCodeClass cl
         if (method.isJsBodyMethod()) {
             appendJsBodyMethod(out, cls, method, jsMethodName);
         } else {
+            JavascriptNativeRegistry.NativeCategory category = JavascriptNativeRegistry.categoryFor(jsMethodName);
+            if (category == JavascriptNativeRegistry.NativeCategory.RUNTIME_IMPLEMENTED) {
+                return;
+            }
+            String reason = JavascriptNativeRegistry.unsupportedReason(jsMethodName);
             out.append("if (typeof ").append(jsMethodName).append(" === \"undefined\") {\n");
             out.append("  ").append(jsMethodName).append(" = function*(");
             boolean first = true;
@@ -1126,7 +1125,32 @@ private static void appendNativeStubIfNeeded(StringBuilder out, ByteCodeClass cl
                 first = false;
                 out.append("__cn1Arg").append(i + 1);
             }
-            out.append(") { throw new Error(\"Missing javascript native method ").append(jsMethodName).append("\"); }\n");
+            out.append(") { ");
+            if (category == JavascriptNativeRegistry.NativeCategory.HOST_HOOK) {
+                out.append("return yield jvm.invokeHostNative(\"").append(jsMethodName).append("\", [");
+                boolean firstArg = true;
+                if (!method.isStatic()) {
+                    out.append("__cn1ThisObject");
+                    firstArg = false;
+                }
+                for (int i = 0; i < arguments.size(); i++) {
+                    if (!firstArg) {
+                        out.append(", ");
+                    }
+                    firstArg = false;
+                    out.append("__cn1Arg").append(i + 1);
+                }
+                out.append("]);");
+            } else {
+                out.append("throw new Error(\"");
+                if (reason == null) {
+                    out.append("Missing javascript native method ").append(jsMethodName);
+                } else {
+                    out.append(JavascriptNameUtil.escapeJs(reason));
+                }
+                out.append("\");");
+            }
+            out.append(" };\n");
             out.append("}\n");
         }
     }
@@ -1866,15 +1890,9 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
 
     private static void appendInvokeInstruction(StringBuilder out, Invoke invoke, int index, boolean usesClassInitCache,
             boolean usesVirtualDispatchCache) {
-        String invokeOwner = invoke.getOwner();
-        if (invoke.getOpcode() == Opcodes.INVOKESPECIAL
-                && !"<init>".equals(invoke.getName())
-                && !"<clinit>".equals(invoke.getName())) {
-            invokeOwner = Util.resolveInvokeSpecialOwner(invokeOwner, invoke.getName(), invoke.getDesc());
-        }
-        String owner = JavascriptNameUtil.sanitizeClassName(invokeOwner);
-        String methodId = JavascriptNameUtil.methodIdentifier(invokeOwner, invoke.getName(), invoke.getDesc());
-        String methodBodyId = jsStaticMethodBodyIdentifier(invokeOwner, invoke.getName(), invoke.getDesc());
+        String owner = JavascriptNameUtil.sanitizeClassName(invoke.getOwner());
+        String methodId = JavascriptNameUtil.methodIdentifier(invoke.getOwner(), invoke.getName(), invoke.getDesc());
+        String methodBodyId = jsStaticMethodBodyIdentifier(invoke.getOwner(), invoke.getName(), invoke.getDesc());
         List<String> args = JavascriptNameUtil.argumentTypes(invoke.getDesc());
         boolean hasReturn = invoke.getDesc().charAt(invoke.getDesc().length() - 1) != 'V';
         int argCount = args.size();
