@@ -216,23 +216,35 @@ final class PlaygroundRunner {
         if (classBlock == null) {
             return null;
         }
-        if (findSingleTopLevelClass(script, classBlock.bodyEnd + 1) != null) {
-            return null;
-        }
         int classModifiersStart = findClassModifiersStart(script, classBlock.classStart);
         String prefix = script.substring(0, classModifiersStart);
-        String suffix = script.substring(classBlock.bodyEnd + 1);
-        if (containsTopLevelTypeDeclaration(classBlock.body)) {
+        StringBuilder body = new StringBuilder();
+        int cursor = classModifiersStart;
+        while (classBlock != null) {
+            if (containsNonWhitespace(script.substring(cursor, classModifiersStart))) {
+                return null;
+            }
+            if (containsTopLevelTypeDeclaration(classBlock.body)) {
+                return null;
+            }
+            String classBody = classBlock.body;
+            if (containsFieldDeclaration(classBody)) {
+                classBody = transformFieldDeclarations(classBody);
+            }
+            if (body.length() > 0) {
+                body.append('\n');
+            }
+            body.append(classBody);
+            cursor = classBlock.bodyEnd + 1;
+            classBlock = findSingleTopLevelClass(script, cursor);
+            if (classBlock != null) {
+                classModifiersStart = findClassModifiersStart(script, classBlock.classStart);
+            }
+        }
+        if (containsNonWhitespace(script.substring(cursor))) {
             return null;
         }
-        if (containsNonWhitespace(suffix)) {
-            return null;
-        }
-        String body = classBlock.body;
-        if (containsFieldDeclaration(body)) {
-            body = transformFieldDeclarations(body);
-        }
-        return prefix + body;
+        return prefix + body.toString();
     }
 
     private int findClassModifiersStart(String script, int classKeywordPos) {

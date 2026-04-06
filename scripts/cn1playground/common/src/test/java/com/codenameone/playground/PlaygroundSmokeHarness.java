@@ -21,6 +21,7 @@ public final class PlaygroundSmokeHarness {
         smokeLooseScriptListeners();
         smokeLooseScriptListSnippet();
         smokeLifecycleDemo();
+        smokeMultipleClassWrapperScript();
         smokeRestScriptWithLambda();
         smokeStringMethods();
         smokeComponentTypeResolvesWithoutExplicitImport();
@@ -277,6 +278,54 @@ public final class PlaygroundSmokeHarness {
             out.append(messages.get(i).text);
         }
         return out.toString();
+    }
+
+    private static void smokeMultipleClassWrapperScript() {
+        Display.init(null);
+
+        Form host = new Form("Host", new BorderLayout());
+        Container preview = new Container(new BorderLayout());
+        host.add(BorderLayout.CENTER, preview);
+        host.show();
+
+        final List<String> log = new ArrayList<String>();
+        PlaygroundContext context = new PlaygroundContext(host, preview, null,
+                new PlaygroundContext.Logger() {
+                    public void log(String message) {
+                        log.add(message);
+                    }
+                });
+
+        PlaygroundRunner runner = new PlaygroundRunner();
+        PlaygroundRunner.RunResult result = runner.run(
+                "import com.codename1.ui.*;\n"
+                + "import com.codename1.ui.layouts.*;\n"
+                + "public class Helpers {\n"
+                + "private String greeting;\n"
+                + "public void init(Object context) {\n"
+                + "greeting = \"Hello\";\n"
+                + "}\n"
+                + "public String message(String name) {\n"
+                + "return greeting + \" \" + name;\n"
+                + "}\n"
+                + "}\n"
+                + "public class Demo {\n"
+                + "public void start() {\n"
+                + "Form root = new Form(\"Multi Class\", BoxLayout.y());\n"
+                + "root.add(new Label(message(\"Playground\")));\n"
+                + "ctx.log(\"multi-class ok\");\n"
+                + "root.show();\n"
+                + "}\n"
+                + "}\n",
+                context);
+
+        require(result.getComponent() != null,
+                "Multi class wrapper script did not produce a component: " + summarizeMessages(result));
+        require(result.getComponent() instanceof Form, "Multi class wrapper script should return the shown Form");
+        require("Multi Class".equals(((Form) result.getComponent()).getTitle()),
+                "Multi class wrapper script should preserve shown form title");
+        require(log.size() == 1 && "multi-class ok".equals(log.get(0)),
+                "Multi class wrapper script did not run expected body");
     }
 
     private static void smokeLifecycleDemo() {

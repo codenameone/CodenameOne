@@ -206,7 +206,7 @@ The playground uses a customized version of [BeanShell](https://github.com/beans
 
 #### Class Declarations Have Limited Support
 
-BeanShell's class generation is disabled in this playground, but single top-level classes are automatically unwrapped:
+BeanShell's class generation is disabled in this playground, but top-level classes are automatically unwrapped:
 
 ```java
 // This works - playground unwraps the class:
@@ -222,7 +222,6 @@ public class DemoApp {
 
 **What doesn't work**:
 - Nested classes
-- Multiple top-level classes
 - Interfaces or enums
 - Static fields or methods that reference instance fields
 
