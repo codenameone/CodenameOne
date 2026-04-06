@@ -7,8 +7,8 @@ bash migrate-googlemapsdemo-test.sh
 bash migrate-coderad-lib.sh
 bash cssfonts.sh
 bash native-interfaces.sh
+bash initializr-roundtrip-test.sh
 bash cn1app-archetype-test.sh
 bash bare-bones-kotlin-test.sh
 bash  migrate-kitchensink-test.sh
 bash googlemaps-demo.sh
-
