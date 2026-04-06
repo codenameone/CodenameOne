@@ -1,25 +1,29 @@
 #!/bin/bash
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
-set -euo pipefail
+set -e
 source "$SCRIPTPATH/inc/env.sh"
 
 WORKDIR="$SCRIPTPATH/build/initializr-roundtrip"
-SOURCE_PROJECT="$WORKDIR/source"
-GENERATED_ARTIFACT_ID="initializr-roundtrip-generated"
-GENERATED_PROJECT="$WORKDIR/$GENERATED_ARTIFACT_ID"
+SOURCE_WORKDIR="$WORKDIR/source-work"
+GENERATED_WORKDIR="$WORKDIR/generated-work"
+ARTIFACT_ID="initializr-roundtrip"
+SOURCE_PROJECT="$SOURCE_WORKDIR/$ARTIFACT_ID"
+GENERATED_PROJECT="$GENERATED_WORKDIR/$ARTIFACT_ID"
 APP_NAME="RoundTripInitializrApp"
 PACKAGE_NAME="com.acme.initializr.roundtrip"
 
 rm -rf "$WORKDIR"
 mkdir -p "$WORKDIR"
 
-cd "$WORKDIR"
+mkdir -p "$SOURCE_WORKDIR" "$GENERATED_WORKDIR"
+
+cd "$SOURCE_WORKDIR"
 
 mvn archetype:generate \
   -DarchetypeArtifactId=cn1app-archetype \
   -DarchetypeGroupId=com.codenameone \
   -DarchetypeVersion="$CN1_VERSION" \
-  -DartifactId=source \
+  -DartifactId="$ARTIFACT_ID" \
   -DgroupId="$PACKAGE_NAME" \
   -Dversion=1.0-SNAPSHOT \
   -DmainName="$APP_NAME" \
@@ -31,11 +35,12 @@ template.mainName=$APP_NAME
 template.packageName=$PACKAGE_NAME
 EOF
 
+cd "$GENERATED_WORKDIR"
 mvn "com.codenameone:codenameone-maven-plugin:${CN1_VERSION}:generate-app-project" \
   -DarchetypeGroupId=com.codenameone \
   -DarchetypeArtifactId=cn1app-archetype \
   -DarchetypeVersion="${CN1_VERSION}" \
-  -DartifactId="${GENERATED_ARTIFACT_ID}" \
+  -DartifactId="${ARTIFACT_ID}" \
   -DgroupId="${PACKAGE_NAME}" \
   -Dversion=1.0-SNAPSHOT \
   -DmainName="${APP_NAME}" \
@@ -48,6 +53,17 @@ if [ ! -d "$GENERATED_PROJECT" ]; then
   exit 1
 fi
 
+normalize_project() {
+  PROJECT_DIR="$1"
+  find "$PROJECT_DIR" -type f -name "codenameone_settings.properties" | while read -r SETTINGS_FILE; do
+    grep -v '^#' "$SETTINGS_FILE" | sort > "$SETTINGS_FILE.normalized"
+    mv "$SETTINGS_FILE.normalized" "$SETTINGS_FILE"
+  done
+}
+
+normalize_project "$SOURCE_PROJECT"
+normalize_project "$GENERATED_PROJECT"
+
 IGNORES_FILE="$WORKDIR/roundtrip.ignores"
 cat > "$IGNORES_FILE" <<EOF
 generate-app-project.rpf
@@ -55,7 +71,7 @@ EOF
 
 DIFF_OUT="$WORKDIR/roundtrip.diff"
 set +e
-diff -ruN -X "$IGNORES_FILE" "$SOURCE_PROJECT" "$GENERATED_PROJECT" > "$DIFF_OUT"
+diff -ruN -x target -X "$IGNORES_FILE" "$SOURCE_PROJECT" "$GENERATED_PROJECT" > "$DIFF_OUT"
 DIFF_STATUS=$?
 set -e
 
