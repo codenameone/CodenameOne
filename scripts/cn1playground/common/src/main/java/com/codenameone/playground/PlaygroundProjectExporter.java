@@ -27,6 +27,7 @@ final class PlaygroundProjectExporter {
     private static final String TEMPLATE_PACKAGE = "com.example.myapp";
     private static final String TEMPLATE_APP_NAME = "MyAppName";
     private static final String TEMPLATE_APP_NAME_LOWER = "myappname";
+    private static final String TEMPLATE_PACKAGE_PATH = TEMPLATE_PACKAGE.replace('.', '/');
     private static final String CN1_PLUGIN_VERSION = "7.0.230";
 
     void export(String script, String css) {
@@ -53,7 +54,7 @@ final class PlaygroundProjectExporter {
         putText(entries, "common/pom.xml", readResourceToString("/barebones-pom.xml"));
         putText(entries, "common/codenameone_settings.properties", codenameOneSettings(model.appName));
         putText(entries, "common/src/main/css/theme.css", themeCss(model.css));
-        putText(entries, "common/src/main/java/" + TEMPLATE_PACKAGE.replace('.', '/') + "/" + TEMPLATE_APP_NAME + ".java", model.javaSource);
+        putText(entries, "common/src/main/java/" + TEMPLATE_PACKAGE_PATH + "/" + TEMPLATE_APP_NAME + ".java", model.javaSource);
 
         try (ZipOutputStream zos = new ZipOutputStream(out)) {
             for (Map.Entry<String, byte[]> fileEntry : entries.entrySet()) {
@@ -86,9 +87,8 @@ final class PlaygroundProjectExporter {
 
     private String applyPathReplacements(String path, ExportModel model) {
         String packagePath = PACKAGE_NAME.replace('.', '/');
-        String templatePackagePath = TEMPLATE_PACKAGE.replace('.', '/');
         String replaced = path;
-        replaced = StringUtil.replaceAll(replaced, templatePackagePath, packagePath);
+        replaced = StringUtil.replaceAll(replaced, TEMPLATE_PACKAGE_PATH, packagePath);
         replaced = StringUtil.replaceAll(replaced, TEMPLATE_APP_NAME, model.appName);
         replaced = StringUtil.replaceAll(replaced, TEMPLATE_APP_NAME_LOWER, model.appName.toLowerCase());
         return replaced;
