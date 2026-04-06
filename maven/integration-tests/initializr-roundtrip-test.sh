@@ -55,10 +55,16 @@ fi
 
 normalize_project() {
   PROJECT_DIR="$1"
-  find "$PROJECT_DIR" -type f -name "codenameone_settings.properties" | while read -r SETTINGS_FILE; do
-    grep -v '^#' "$SETTINGS_FILE" | sort > "$SETTINGS_FILE.normalized"
-    mv "$SETTINGS_FILE.normalized" "$SETTINGS_FILE"
-  done
+  while read -r SETTINGS_FILE; do
+    NORMALIZED_FILE="$SETTINGS_FILE.normalized"
+    grep -v '^#' "$SETTINGS_FILE" | sort > "$NORMALIZED_FILE"
+    if [ ! -s "$NORMALIZED_FILE" ]; then
+      echo "Normalized settings file became empty: $SETTINGS_FILE"
+      rm -f "$NORMALIZED_FILE"
+      exit 1
+    fi
+    mv "$NORMALIZED_FILE" "$SETTINGS_FILE"
+  done < <(find "$PROJECT_DIR" -type f -name "codenameone_settings.properties")
 }
 
 normalize_project "$SOURCE_PROJECT"
