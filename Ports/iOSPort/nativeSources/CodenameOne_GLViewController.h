@@ -163,7 +163,7 @@
 
 //ADD_INCLUDE
 
-@interface CodenameOne_GLViewController : UIViewController<UIImagePickerControllerDelegate, MFMailComposeViewControllerDelegate, 
+@interface CodenameOne_GLViewController : UIViewController<UIImagePickerControllerDelegate, MFMailComposeViewControllerDelegate, UIScrollViewDelegate,
 #ifdef CN1_USE_STOREKIT
 SKProductsRequestDelegate, SKPaymentTransactionObserver, 
 #endif

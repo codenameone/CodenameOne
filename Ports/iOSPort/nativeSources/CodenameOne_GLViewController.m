@@ -167,6 +167,7 @@ static void updateDisplayMetricsFromView(UIView *view) {
     displayHeight = (int)(view.bounds.size.height * scaleValue);
 }
 BOOL forceSlideUpField;
+static UIScrollView *cn1StatusBarTapProxy = nil;
 
 
 // 1 for portrait lock, and 2 for landscape lock
@@ -1896,6 +1897,7 @@ static CodenameOne_GLViewController *sharedSingleton;
     [self.adView loadAd];
     [super viewDidLoad];
     updateDisplayMetricsFromView(self.view);
+    [self cn1InstallStatusBarTapProxy];
     //replaceViewDidLoad
     [self initGoogleConnect];
 }
@@ -1908,10 +1910,41 @@ static CodenameOne_GLViewController *sharedSingleton;
 - (void)viewDidLoad {
     [super viewDidLoad];
     updateDisplayMetricsFromView(self.view);
+    [self cn1InstallStatusBarTapProxy];
     //replaceViewDidLoad
     [self initGoogleConnect];
 }
 #endif
+
+- (void)cn1InstallStatusBarTapProxy {
+    if (cn1StatusBarTapProxy != nil) {
+        return;
+    }
+    cn1StatusBarTapProxy = [[UIScrollView alloc] initWithFrame:self.view.bounds];
+    cn1StatusBarTapProxy.delegate = self;
+    cn1StatusBarTapProxy.backgroundColor = [UIColor clearColor];
+    cn1StatusBarTapProxy.contentSize = CGSizeMake(1, 2);
+    cn1StatusBarTapProxy.contentOffset = CGPointMake(0, 1);
+    cn1StatusBarTapProxy.scrollsToTop = YES;
+    cn1StatusBarTapProxy.userInteractionEnabled = NO;
+    cn1StatusBarTapProxy.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    cn1StatusBarTapProxy.alpha = 0.0f;
+    [self.view addSubview:cn1StatusBarTapProxy];
+}
+
+- (BOOL)scrollViewShouldScrollToTop:(UIScrollView *)scrollView {
+    if (scrollView == cn1StatusBarTapProxy) {
+        int xArray[1];
+        int yArray[1];
+        xArray[0] = displayWidth / 2;
+        yArray[0] = 0;
+        pointerPressedC(xArray, yArray, 1);
+        pointerReleasedC(xArray, yArray, 1);
+        cn1StatusBarTapProxy.contentOffset = CGPointMake(0, 1);
+        return NO;
+    }
+    return YES;
+}
 
 - (void)initGoogleConnect {
 #ifdef INCLUDE_GOOGLE_CONNECT
@@ -2485,6 +2518,11 @@ BOOL prefersStatusBarHidden = NO;
 #ifdef INCLUDE_MOPUB
     self.adView = nil;
 #endif
+    
+#ifndef CN1_USE_ARC
+    [cn1StatusBarTapProxy release];
+#endif
+    cn1StatusBarTapProxy = nil;
     
 #ifndef CN1_USE_ARC
     [super dealloc];
