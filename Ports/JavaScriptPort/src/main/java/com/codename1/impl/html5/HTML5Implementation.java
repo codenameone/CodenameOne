@@ -2643,20 +2643,27 @@ public class HTML5Implementation extends CodenameOneImplementation {
         return scratchBuffer;
     }
     
+    @Override
     public void installNativeTheme(){
     	try {
             String nativeTheme = Display.getInstance().getProperty("javascript.native.theme", isAndroid_() ? "/android_holo_light.res" : "/iOS7Theme.res");
-                    
+            Log.p("[installNativeTheme] attempting to load theme from " + nativeTheme);
             Resources r = Resources.open(nativeTheme);
+            Log.p("[installNativeTheme] loaded theme resources, theme names: " + java.util.Arrays.toString(r.getThemeResourceNames()));
             Hashtable tp = r.getTheme(r.getThemeResourceNames()[0]);
             
             tp.put("StatusBar.padding", "0,0,0,0");
             
             UIManager.getInstance().setThemeProps(tp);
+            Log.p("[installNativeTheme] successfully installed theme");
             return;
     	} catch (IOException ex){
+            Log.p("[installNativeTheme] IOException loading theme: " + (ex.getMessage() != null ? ex.getMessage() : "null"));
             Log.e(ex);
-    	}
+    	} catch (Exception ex) {
+            Log.p("[installNativeTheme] Exception loading theme: " + ex.getClass().getName() + ": " + (ex.getMessage() != null ? ex.getMessage() : "null"));
+            Log.e(ex);
+        }
         return;
     }
 

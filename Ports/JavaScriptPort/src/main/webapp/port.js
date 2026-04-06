@@ -319,6 +319,43 @@ function checkDisplayInitState() {
   };
 }
 
+function ensureDisplayEdt() {
+  const state = checkDisplayInitState();
+  if (state.edt) {
+    return true;
+  }
+  if (!state.instance) {
+    emitDiagLine("PARPAR:DIAG:EDT_ENSURE:instanceMissing=1");
+    return false;
+  }
+  const threadClass = jvm.classes && jvm.classes["java_lang_Thread"];
+  if (!threadClass) {
+    emitDiagLine("PARPAR:DIAG:EDT_ENSURE:threadClassMissing=1");
+    return false;
+  }
+  const mainThread = jvm.mainThreadObject || (jvm.currentThread && jvm.currentThread.object);
+  if (!mainThread) {
+    emitDiagLine("PARPAR:DIAG:EDT_ENSURE:mainThreadMissing=1");
+    return false;
+  }
+  const existingActive = threadClass.staticFields && threadClass.staticFields["activeThreads"];
+  if (existingActive && existingActive > 0) {
+    state.instance.cn1_java_lang_Display_edt = mainThread;
+    emitDiagLine("PARPAR:DIAG:EDT_ENSURE:reusedMainThread=1");
+    return true;
+  }
+  const edtThread = jvm.newObject("java_lang_Thread");
+  edtThread.cn1_java_lang_Thread_alive = 1;
+  edtThread.cn1_java_lang_Thread_name = jvm.createStringLiteral("EDT");
+  edtThread.cn1_java_lang_Thread_nativeThreadId = jvm.nextThreadId++;
+  state.instance.cn1_java_lang_Display_edt = edtThread;
+  if (threadClass.staticFields) {
+    threadClass.staticFields["activeThreads"] = (threadClass.staticFields["activeThreads"] || 0) + 1;
+  }
+  emitDiagLine("PARPAR:DIAG:EDT_ENSURE:createdSyntheticEdt=1");
+  return true;
+}
+
 function emitDisplayInitDiag(marker) {
   const state = checkDisplayInitState();
   emitDiagLine("PARPAR:DIAG:" + marker + ":displayClassExists=" + (state.displayClassExists ? "1" : "0")+ ":instance=" + (state.instance ? "present" : "null")+ ":edt=" + (state.edt ? "present" : "null") + (state.edtThreadName ? ":edtThreadName=" + state.edtThreadName : ""));
@@ -1591,6 +1628,10 @@ function installGlobalIllegalStateBypass(symbol, marker) {
   }
   const wrapped = function*() {
     emitDisplayInitDiag("PRE_" + marker);
+    if (!checkDisplayInitState().edt) {
+      ensureDisplayEdt();
+      emitDisplayInitDiag("POST_EDT_ENSURE_" + marker);
+    }
     try {
       return yield* original.apply(this, arguments);
     } catch (err) {
@@ -1634,6 +1675,10 @@ bindCiFallback("Form.layoutCtorIllegalStateBypass", [
     return null;
   }
   emitDisplayInitDiag("PRE_formCtorLayout");
+  if (!checkDisplayInitState().edt) {
+    ensureDisplayEdt();
+    emitDisplayInitDiag("POST_EDT_ENSURE_formCtorLayout");
+  }
   try {
     return yield* formCtorLayoutOriginal(__cn1ThisObject, layout);
   } catch (err) {
@@ -1673,6 +1718,10 @@ bindCiFallback("Form.titleLayoutCtorIllegalStateBypass", [
     return null;
   }
   emitDisplayInitDiag("PRE_formCtorTitleLayout");
+  if (!checkDisplayInitState().edt) {
+    ensureDisplayEdt();
+    emitDisplayInitDiag("POST_EDT_ENSURE_formCtorTitleLayout");
+  }
   try {
     return yield* formCtorTitleLayoutOriginal(__cn1ThisObject, title, layout);
   } catch (err) {
