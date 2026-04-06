@@ -3,20 +3,32 @@ package com.codenameone.playground;
 import com.codename1.components.ToastBar;
 import com.codename1.io.Log;
 import com.codename1.io.Util;
+import com.codename1.util.StringUtil;
 import net.sf.zipme.ZipEntry;
+import net.sf.zipme.ZipInputStream;
 import net.sf.zipme.ZipOutputStream;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.Set;
 
 import static com.codename1.ui.CN.execute;
+import static com.codename1.ui.CN.getResourceAsStream;
 import static com.codename1.ui.CN.openFileOutputStream;
 
 final class PlaygroundProjectExporter {
     private static final String PACKAGE_NAME = "com.cn1.playground.snippet";
     private static final String FALLBACK_APP_NAME = "PlaygroundSnippet";
+    private static final String TEMPLATE_PACKAGE = "com.example.myapp";
+    private static final String TEMPLATE_APP_NAME = "MyAppName";
+    private static final String TEMPLATE_APP_NAME_LOWER = "myappname";
+    private static final String TEMPLATE_PACKAGE_PATH = TEMPLATE_PACKAGE.replace('.', '/');
+    private static final String CN1_PLUGIN_VERSION = "7.0.230";
 
     void export(String script, String css) {
         ExportModel model = ExportModel.fromScript(script, css);
@@ -32,141 +44,224 @@ final class PlaygroundProjectExporter {
     }
 
     private void writeZip(OutputStream out, ExportModel model) throws IOException {
+        Map<String, byte[]> entries = new LinkedHashMap<String, byte[]>();
+
+        copyZipResource("/idea.zip", entries);
+        copyZipResource("/common.zip", entries);
+
+        putText(entries, ".gitignore", "**/target/\n.idea/\n*.iml\n.DS_Store\nThumbs.db\n");
+        putText(entries, "README.md", readme(model.appName));
+        putText(entries, "common/pom.xml", readResourceToString("/barebones-pom.xml"));
+        putText(entries, "common/codenameone_settings.properties", codenameOneSettings(model.appName));
+        putText(entries, "common/src/main/css/theme.css", themeCss(model.css));
+        putText(entries, "common/src/main/java/" + TEMPLATE_PACKAGE_PATH + "/" + TEMPLATE_APP_NAME + ".java", model.javaSource);
+
         try (ZipOutputStream zos = new ZipOutputStream(out)) {
-            addText(zos, "pom.xml", rootPom(model.appName));
-            addText(zos, ".gitignore", "**/target/\n.idea/\n*.iml\n.DS_Store\nThumbs.db\n");
-            addText(zos, ".mvn/jvm.config", "-Xmx1024M\n");
-            addText(zos, "mvnw", "#!/bin/sh\nmvn \"$@\"\n");
-            addText(zos, "mvnw.cmd", "@echo off\r\nmvn %*\r\n");
-            addText(zos, "build.sh", "#!/bin/sh\ncd \"$(dirname \"$0\")\" || exit 1\nmvn -DskipTests package\n");
-            addText(zos, "run.sh", "#!/bin/sh\ncd \"$(dirname \"$0\")\" || exit 1\nmvn -pl javase -am cn1:java -Dcodename1.platform=javase\n");
-            addText(zos, "build.bat", "@echo off\r\ncd /d %~dp0\r\nmvn package\r\n");
-            addText(zos, "run.bat", "@echo off\r\ncd /d %~dp0\r\nmvn -pl javase -am cn1:java -Dcodename1.platform=javase\r\n");
-            addText(zos, ".idea/misc.xml", ideaMiscXml());
-            addText(zos, ".idea/runConfigurations/CN1_Simulator.xml", ideaSimulatorRunConfiguration());
-            addText(zos, ".idea/runConfigurations/CN1_Build.xml", ideaBuildRunConfiguration());
-            addText(zos, "common/pom.xml", commonPom(model.appName));
-            addText(zos, "common/codenameone_settings.properties", codenameOneSettings(model.appName));
-            addText(zos, "common/src/main/css/theme.css", themeCss(model.css));
-            addText(zos, "common/src/main/java/" + PACKAGE_NAME.replace('.', '/') + "/" + model.mainClassName + ".java", model.javaSource);
-            addText(zos, "android/pom.xml", platformPom(model.appName, "android"));
-            addText(zos, "ios/pom.xml", platformPom(model.appName, "ios"));
-            addText(zos, "javascript/pom.xml", platformPom(model.appName, "javascript"));
-            addText(zos, "javase/pom.xml", javasePom(model.appName));
-            addText(zos, "win/pom.xml", platformPom(model.appName, "win"));
-            addText(zos, "README.md", readme(model.appName, model.mainClassName));
+            for (Map.Entry<String, byte[]> fileEntry : entries.entrySet()) {
+                String path = applyPathReplacements(fileEntry.getKey(), model);
+                byte[] data = applyDataReplacements(path, fileEntry.getValue(), model);
+                ZipEntry zipEntry = new ZipEntry(path);
+                zos.putNextEntry(zipEntry);
+                zos.write(data);
+                zos.closeEntry();
+            }
         }
     }
 
-    private void addText(ZipOutputStream zos, String path, String text) throws IOException {
-        ZipEntry entry = new ZipEntry(path);
-        zos.putNextEntry(entry);
-        zos.write(text.getBytes("UTF-8"));
-        zos.closeEntry();
+    private void copyZipResource(String resourcePath, Map<String, byte[]> entries) throws IOException {
+        try (ZipInputStream zis = new ZipInputStream(getResourceAsStream(resourcePath))) {
+            ZipEntry entry = zis.getNextEntry();
+            while (entry != null) {
+                if (!entry.isDirectory()) {
+                    entries.put(entry.getName(), readToBytesNoClose(zis));
+                }
+                zis.closeEntry();
+                entry = zis.getNextEntry();
+            }
+        }
     }
 
-    private String rootPom(String appName) {
-        return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-                + "<project xmlns=\"http://maven.apache.org/POM/4.0.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\">\n"
-                + "  <modelVersion>4.0.0</modelVersion>\n"
-                + "  <groupId>com.cn1.playground.snippet</groupId>\n"
-                + "  <artifactId>" + appName.toLowerCase() + "</artifactId>\n"
-                + "  <version>1.0-SNAPSHOT</version>\n"
-                + "  <packaging>pom</packaging>\n"
-                + "  <name>" + appName.toLowerCase() + "</name>\n"
-                + "  <description>" + appName.toLowerCase() + "</description>\n"
-                + "  <url>https://www.codenameone.com</url>\n"
-                + "  <licenses><license><name>GPL v2 With Classpath Exception</name><url>https://openjdk.java.net/legal/gplv2+ce.html</url><distribution>repo</distribution><comments>A business-friendly OSS license</comments></license></licenses>\n"
-                + "  <properties>\n"
-                + "    <cn1.version>7.0.230</cn1.version>\n"
-                + "    <cn1.plugin.version>${cn1.version}</cn1.plugin.version>\n"
-                + "    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>\n"
-                + "    <maven.compiler.source>17</maven.compiler.source>\n"
-                + "    <maven.compiler.target>17</maven.compiler.target>\n"
-                + "  </properties>\n"
-                + "  <modules><module>common</module><module>javase</module><module>android</module><module>ios</module><module>javascript</module><module>win</module></modules>\n"
-                + "  <build><pluginManagement><plugins>\n"
-                + "    <plugin><groupId>com.codenameone</groupId><artifactId>codenameone-maven-plugin</artifactId><version>${cn1.plugin.version}</version></plugin>\n"
-                + "  </plugins></pluginManagement></build>\n"
-                + "</project>\n";
+    private void putText(Map<String, byte[]> entries, String path, String text) throws IOException {
+        entries.put(path, text.getBytes("UTF-8"));
     }
 
-    private String commonPom(String appName) {
-        String zipArtifact = appName.toLowerCase() + "-zipsupport";
-        return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-                + "<project xmlns=\"http://maven.apache.org/POM/4.0.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\">\n"
-                + "  <modelVersion>4.0.0</modelVersion>\n"
-                + "  <parent><groupId>com.cn1.playground.snippet</groupId><artifactId>" + appName.toLowerCase() + "</artifactId><version>1.0-SNAPSHOT</version></parent>\n"
-                + "  <artifactId>" + appName.toLowerCase() + "-common</artifactId>\n"
-                + "  <dependencies>\n"
-                + "    <dependency><groupId>com.codenameone</groupId><artifactId>codenameone-core</artifactId><version>${cn1.version}</version></dependency>\n"
-                + "    <dependency><groupId>com.cn1.playground.snippet</groupId><artifactId>" + zipArtifact + "</artifactId><version>1.0-SNAPSHOT</version><classifier>common</classifier><type>jar</type></dependency>\n"
-                + "  </dependencies>\n"
-                + "  <profiles>\n"
-                + "    <profile><id>simulator</id><properties><codename1.targetPlatform>javase</codename1.targetPlatform></properties></profile>\n"
-                + "  </profiles>\n"
-                + "</project>\n";
+    private String applyPathReplacements(String path, ExportModel model) {
+        String packagePath = PACKAGE_NAME.replace('.', '/');
+        String replaced = path;
+        replaced = StringUtil.replaceAll(replaced, TEMPLATE_PACKAGE_PATH, packagePath);
+        replaced = StringUtil.replaceAll(replaced, TEMPLATE_APP_NAME, model.appName);
+        replaced = StringUtil.replaceAll(replaced, TEMPLATE_APP_NAME_LOWER, model.appName.toLowerCase());
+        return replaced;
     }
 
-    private String platformPom(String appName, String module) {
-        return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-                + "<project xmlns=\"http://maven.apache.org/POM/4.0.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\">\n"
-                + "  <modelVersion>4.0.0</modelVersion>\n"
-                + "  <parent><groupId>com.cn1.playground.snippet</groupId><artifactId>" + appName.toLowerCase() + "</artifactId><version>1.0-SNAPSHOT</version></parent>\n"
-                + "  <artifactId>" + appName.toLowerCase() + "-" + module + "</artifactId>\n"
-                + "  <packaging>pom</packaging>\n"
-                + "</project>\n";
+    private byte[] applyDataReplacements(String path, byte[] data, ExportModel model) throws IOException {
+        if (!isTextFile(path)) {
+            return data;
+        }
+        String content = StringUtil.newString(data);
+        content = StringUtil.replaceAll(content, TEMPLATE_PACKAGE, PACKAGE_NAME);
+        content = StringUtil.replaceAll(content, TEMPLATE_APP_NAME, model.appName);
+        content = StringUtil.replaceAll(content, TEMPLATE_APP_NAME_LOWER, model.appName.toLowerCase());
+        if ("pom.xml".equals(path)) {
+            content = replaceTagValue(content, "cn1.plugin.version", CN1_PLUGIN_VERSION);
+            content = replaceTagValue(content, "cn1.version", CN1_PLUGIN_VERSION);
+        }
+        if ("common/pom.xml".equals(path)) {
+            content = StringUtil.replaceAll(content, "<source>1.8</source>", "<source>17</source>");
+            content = StringUtil.replaceAll(content, "<target>1.8</target>", "<target>17</target>");
+        }
+        if (".idea/misc.xml".equals(path)) {
+            content = removeXmlAttribute(content, "project-jdk-name");
+            content = removeXmlAttribute(content, "project-jdk-type");
+            content = setXmlAttribute(content, "languageLevel", "JDK_17");
+        }
+        if ("common/codenameone_settings.properties".equals(path)) {
+            content = replaceProperty(content, "codename1.arg.java.version", "17");
+        }
+        if ("android/pom.xml".equals(path) || "ios/pom.xml".equals(path) || "javascript/pom.xml".equals(path)) {
+            content = hardenPlatformModulePomAgainstDoubleJarAttach(content);
+        }
+        if ("javase/pom.xml".equals(path)) {
+            content = normalizeJavasePom(content);
+        }
+        return content.getBytes("UTF-8");
     }
 
-    private String javasePom(String appName) {
-        return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-                + "<project xmlns=\"http://maven.apache.org/POM/4.0.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\">\n"
-                + "  <modelVersion>4.0.0</modelVersion>\n"
-                + "  <parent><groupId>com.cn1.playground.snippet</groupId><artifactId>" + appName.toLowerCase() + "</artifactId><version>1.0-SNAPSHOT</version></parent>\n"
-                + "  <artifactId>" + appName.toLowerCase() + "-javase</artifactId>\n"
-                + "  <dependencies><dependency><groupId>com.cn1.playground.snippet</groupId><artifactId>" + appName.toLowerCase() + "-common</artifactId><version>1.0-SNAPSHOT</version></dependency></dependencies>\n"
-                + "</project>\n";
+    private static boolean isTextFile(String path) {
+        return path.endsWith(".xml")
+                || path.endsWith(".properties")
+                || path.endsWith(".java")
+                || path.endsWith(".kt")
+                || path.endsWith(".json")
+                || path.endsWith(".launch")
+                || path.endsWith(".css")
+                || path.endsWith(".xsd")
+                || path.endsWith(".md")
+                || path.endsWith(".adoc")
+                || path.endsWith(".bat")
+                || path.endsWith(".cmd")
+                || path.endsWith(".sh")
+                || "mvnw".equals(path);
     }
 
-    private String ideaMiscXml() {
-        return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-                + "<project version=\"4\">\n"
-                + "  <component name=\"ProjectRootManager\" version=\"2\" languageLevel=\"JDK_17\" default=\"true\" />\n"
-                + "</project>\n";
+    private static String replaceTagValue(String xml, String tagName, String value) {
+        String open = "<" + tagName + ">";
+        String close = "</" + tagName + ">";
+        int start = xml.indexOf(open);
+        if (start < 0) {
+            return xml;
+        }
+        int valueStart = start + open.length();
+        int end = xml.indexOf(close, valueStart);
+        if (end < 0) {
+            return xml;
+        }
+        return xml.substring(0, valueStart) + value + xml.substring(end);
     }
 
-    private String ideaSimulatorRunConfiguration() {
-        return "<component name=\"ProjectRunConfigurationManager\">\n"
-                + "  <configuration default=\"false\" name=\"Simulator\" type=\"MavenRunConfiguration\" factoryName=\"Maven\">\n"
-                + "    <MavenSettings>\n"
-                + "      <option name=\"myWorkingDirectory\" value=\"$PROJECT_DIR$\" />\n"
-                + "      <option name=\"myGoals\">\n"
-                + "        <list>\n"
-                + "          <option value=\"cn1:java\" />\n"
-                + "          <option value=\"-P\" />\n"
-                + "          <option value=\"simulator\" />\n"
-                + "          <option value=\"-Dcodename1.platform=javase\" />\n"
-                + "        </list>\n"
-                + "      </option>\n"
-                + "    </MavenSettings>\n"
-                + "  </configuration>\n"
-                + "</component>\n";
+    private static String removeXmlAttribute(String xml, String attributeName) {
+        String pattern = attributeName + "=\"";
+        int pos = xml.indexOf(pattern);
+        if (pos < 0) {
+            return xml;
+        }
+        int valueStart = pos + pattern.length();
+        int valueEnd = xml.indexOf('"', valueStart);
+        if (valueEnd < 0) {
+            return xml;
+        }
+        int removeStart = pos;
+        while (removeStart > 0 && xml.charAt(removeStart - 1) == ' ') {
+            removeStart--;
+        }
+        return xml.substring(0, removeStart) + xml.substring(valueEnd + 1);
     }
 
-    private String ideaBuildRunConfiguration() {
-        return "<component name=\"ProjectRunConfigurationManager\">\n"
-                + "  <configuration default=\"false\" name=\"Build\" type=\"MavenRunConfiguration\" factoryName=\"Maven\">\n"
-                + "    <MavenSettings>\n"
-                + "      <option name=\"myWorkingDirectory\" value=\"$PROJECT_DIR$\" />\n"
-                + "      <option name=\"myGoals\">\n"
-                + "        <list>\n"
-                + "          <option value=\"-DskipTests\" />\n"
-                + "          <option value=\"package\" />\n"
-                + "        </list>\n"
-                + "      </option>\n"
-                + "    </MavenSettings>\n"
-                + "  </configuration>\n"
-                + "</component>\n";
+    private static String setXmlAttribute(String xml, String attributeName, String value) {
+        String pattern = attributeName + "=\"";
+        int pos = xml.indexOf(pattern);
+        if (pos < 0) {
+            return xml;
+        }
+        int valueStart = pos + pattern.length();
+        int valueEnd = xml.indexOf('"', valueStart);
+        if (valueEnd < 0) {
+            return xml;
+        }
+        return xml.substring(0, valueStart) + value + xml.substring(valueEnd);
+    }
+
+    private static String replaceProperty(String content, String key, String value) {
+        String linePrefix = key + "=";
+        int start = content.indexOf(linePrefix);
+        if (start < 0) {
+            return content + "\n" + linePrefix + value;
+        }
+        int end = content.indexOf('\n', start);
+        if (end < 0) {
+            return content.substring(0, start) + linePrefix + value;
+        }
+        return content.substring(0, start) + linePrefix + value + content.substring(end);
+    }
+
+    private static String hardenPlatformModulePomAgainstDoubleJarAttach(String pom) {
+        String pluginBlock =
+                "<plugin>\n" +
+                "                <groupId>org.apache.maven.plugins</groupId>\n" +
+                "                <artifactId>maven-jar-plugin</artifactId>\n" +
+                "                <version>3.4.1</version>\n" +
+                "                <executions>\n" +
+                "                    <execution>\n" +
+                "                        <id>default-jar</id>\n" +
+                "                        <phase>none</phase>\n" +
+                "                    </execution>\n" +
+                "                </executions>\n" +
+                "            </plugin>\n";
+        if (pom.indexOf("<artifactId>maven-jar-plugin</artifactId>") >= 0) {
+            if (pom.indexOf("<id>default-jar</id>") >= 0 && pom.indexOf("<phase>none</phase>") >= 0) {
+                return pom;
+            }
+            int pluginsTag = pom.indexOf("<plugins>\n");
+            if (pluginsTag >= 0) {
+                int firstPluginStart = pom.indexOf("<plugin>", pluginsTag);
+                if (firstPluginStart >= 0) {
+                    return pom.substring(0, firstPluginStart) + pluginBlock + pom.substring(firstPluginStart);
+                }
+            }
+            return pom;
+        }
+        return StringUtil.replaceAll(pom,
+                "<plugins>\n",
+                "<plugins>\n" + pluginBlock);
+    }
+
+    private static String normalizeJavasePom(String pom) {
+        pom = removeDependencyBlock(pom, "com.codenameone", "codenameone-core", "provided");
+        pom = removeDependencyBlock(pom, "com.codenameone", "codenameone-javase", "provided");
+        return pom;
+    }
+
+    private static String removeDependencyBlock(String xml, String groupId, String artifactId, String scope) {
+        String block =
+                "<dependency>\n" +
+                "          <groupId>" + groupId + "</groupId>\n" +
+                "          <artifactId>" + artifactId + "</artifactId>\n" +
+                "          <scope>" + scope + "</scope>\n" +
+                "      </dependency>\n";
+        return StringUtil.replaceAll(xml, block, "");
+    }
+
+    private static String readResourceToString(String resourcePath) throws IOException {
+        try (InputStream inputStream = getResourceAsStream(resourcePath)) {
+            return StringUtil.newString(readToBytesNoClose(inputStream));
+        }
+    }
+
+    private static byte[] readToBytesNoClose(InputStream is) throws IOException {
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        Util.copyNoClose(is, bos, 8192);
+        bos.close();
+        return bos.toByteArray();
     }
 
     private String codenameOneSettings(String appName) {
@@ -185,7 +280,7 @@ final class PlaygroundProjectExporter {
         return base + "\n/* Playground CSS */\n" + css + "\n";
     }
 
-    private String readme(String appName, String mainClassName) {
+    private String readme(String appName) {
         return "# Codename One Project\n\n"
                 + "This is a multi-module Maven project for a Codename One app.\n"
                 + "You can write the app in Java and/or Kotlin, and build for Android, iOS, desktop, and web.\n\n"
@@ -197,8 +292,7 @@ final class PlaygroundProjectExporter {
                 + "You usually don't need to copy or tweak any project files.\n\n"
                 + "## Help and Support\n\n"
                 + "- Codename One website: https://www.codenameone.com\n"
-                + "- Codename One GitHub: https://github.com/codenameone/CodenameOne\n\n"
-                + "Main class: `" + PACKAGE_NAME + "." + mainClassName + "`\n";
+                + "- Codename One GitHub: https://github.com/codenameone/CodenameOne\n";
     }
 
     private static final class ExportModel {
