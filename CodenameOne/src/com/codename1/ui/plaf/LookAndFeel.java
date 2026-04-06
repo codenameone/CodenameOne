@@ -1490,7 +1490,19 @@ public abstract class LookAndFeel {
 
     /// #### Parameters
     ///
-    /// - `fadeScrollBarSpeed`: the fadeScrollBarSpeed to set
+    /// - `fadeScrollBarSpeed`: per-frame opacity decrement used for fading the scrollbar.
+    ///   Larger values fade out faster.
+    ///
+    /// #### Notes
+    ///
+    /// - This value is **not milliseconds**.
+    /// - Approximate fade duration in milliseconds:
+    ///   `durationMs ~= (255 / fadeScrollBarSpeed) * (1000 / Display.getInstance().getFrameRate())`
+    /// - At 60 FPS, common values are:
+    ///   - `5`  -> about `850ms`
+    ///   - `3`  -> about `1400ms`
+    ///   - `2`  -> about `2100ms`
+    ///   - `1`  -> about `4250ms`
     public void setFadeScrollBarSpeed(int fadeScrollBarSpeed) {
         this.fadeScrollBarSpeed = fadeScrollBarSpeed;
     }
