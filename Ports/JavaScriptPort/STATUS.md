@@ -10,6 +10,7 @@ Current State
 
 - Screenshot CI reaches suite completion and emits screenshots, but output images are still incorrect.
 - The separate ParparVM Java test pipelines that were failing in CI (`job-logs2.txt`, `job-logs3.txt`) are now reproduced and fixed locally.
+- **Diagnostic improvements added**: Form constructor bypass handlers now log Display initialization state and exception messages separately for easier debugging.
 
 What Was Fixed In This Round
 ----------------------------
@@ -37,6 +38,12 @@ What Was Fixed In This Round
    - Removed the recent `Util.resolveInvokeSpecialOwner(...)` injection from JS invoke emission paths for now.
    - The broader regressions observed in CI are fixed without that change.
 
+6. **Enhanced Form constructor error diagnostics** (NEW).
+   - Added `checkDisplayInitState()` function to report Display.INSTANCE and EDT state.
+   - Added `emitDisplayInitDiag()` calls before and after Form constructor execution.
+   - Enhanced `stringifyThrowable()` to capture `messageOnly` separately.
+   - Bypass handlers now log `PRE_` and `ERR_` Display state along with exception details.
+
 Validated Locally
 -----------------
 
@@ -46,27 +53,44 @@ Validated Locally
 Primary Remaining Work (Screenshot Correctness)
 -----------------------------------------------
 
-1. Remove/replace `Form` constructor IllegalState fallbacks in runtime path.
-   - Current evidence still points to `FORM_INIT_LAYOUT:error=java_lang_IllegalStateException` as the highest-value screenshot blocker.
+1. **Capture and analyze ILLEGAL_STATE error message from CI logs**.
+   - The bypass handlers now emit `PARPAR:DIAG:FALLBACK:formCtorLayout:messageOnly=...` lines.
+   - Check CI browser logs for the actual error message (likely "Initialize must be invoked before setCurrent!").
 
-2. Validate form-show lifecycle correctness before rendering.
+2. Remove/replace `Form` constructor IllegalState fallbacks in runtime path.
+   - Current evidence still points to `FORM_INIT_LAYOUT:error=java_lang_IllegalStateException` as the highest-value screenshot blocker.
+   - The new diagnostics will reveal whether Display.edt is null at construction time.
+
+3. Validate form-show lifecycle correctness before rendering.
    - Ensure no constructor-bypass fallback is hit in the screenshot scenario.
    - Confirm `show()` path reaches expected layout/paint readiness markers.
 
-3. Re-run screenshot CI and compare artifact diffs.
+4. Re-run screenshot CI and compare artifact diffs.
    - Goal is not just "suite finished", but visually correct screenshots.
 
+Diagnostic Output Format (NEW)
+-------------------------------
+
+When Form constructor bypasses trigger, logs will include:
+```
+PARPAR:DIAG:PRE_formCtorLayout:displayClassExists=1:instance=present:edt=present:edtThreadName=EDT
+PARPAR:DIAG:FALLBACK:formCtorLayout:bypassIllegalState=1:detail=java_lang_IllegalStateException | message=...
+PARPAR:DIAG:FALLBACK:formCtorLayout:messageOnly=Initialize must be invoked before setCurrent!
+PARPAR:DIAG:ERR_formCtorLayout:displayClassExists=1:instance=present:edt=null:...
+```
+
 Important Notes
----------------
+--------------
 
 - The CI breakage in the ParparVM Java test pipelines was real and not just screenshot-noise; it is now addressed by the translator/runtime fixes above.
 - The screenshot problem remains a separate rendering/lifecycle issue after startup/protocol recovery.
+- Error messages are now extracted separately from the full throwable detail for easier parsing.
 
 Known Important Context
 -----------------------
 
 - This file supersedes older status notes that referenced initial JSBody/static-wrapper bootstrap issues as the primary blocker.
-- Current bottleneck is no longer “suite timeout”; it is “suite passes but screenshots are wrong”.
+- Current bottleneck is no longer "suite timeout"; it is "suite passes but screenshots are wrong".
 - Existing local tree also includes ongoing debug-oriented changes in:
   - `Ports/JavaScriptPort/src/main/webapp/port.js`
   - `Ports/JavaScriptPort/src/main/java/com/codename1/impl/html5/HTML5Implementation.java`

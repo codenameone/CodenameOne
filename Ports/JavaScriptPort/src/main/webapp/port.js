@@ -297,6 +297,33 @@ function* stringifyThrowable(throwable) {
   return pieces.join(" | ");
 }
 
+function checkDisplayInitState() {
+  const displayClass = jvm && jvm.classes ? jvm.classes["com_codename1_ui_Display"] : null;
+  if (!displayClass) {
+    return { displayClassExists: false, instance: null, edt: null };
+  }
+  const instanceField = displayClass.staticFields ? displayClass.staticFields["INSTANCE"] : null;
+  const edtValue = instanceField && instanceField.cn1_java_lang_Display_edt ? instanceField.cn1_java_lang_Display_edt : null;
+  return {
+    displayClassExists: true,
+    instance: instanceField,
+    edt: edtValue,
+    edtThreadName: edtValue && edtValue.cn1_java_lang_Thread_name ? function() {
+      try {
+        const nameField = edtValue.cn1_java_lang_Thread_name;
+        return nameField && nameField.__class === "java_lang_String" ? jvm.toNativeString(nameField) : String(nameField);
+      } catch (_e) {
+        return String(edtValue.cn1_java_lang_Thread_name);
+      }
+    }() : null
+  };
+}
+
+function emitDisplayInitDiag(marker) {
+  const state = checkDisplayInitState();
+  emitDiagLine("PARPAR:DIAG:" + marker + ":displayClassExists=" + (state.displayClassExists ? "1" : "0")+ ":instance=" + (state.instance ? "present" : "null")+ ":edt=" + (state.edt ? "present" : "null") + (state.edtThreadName ? ":edtThreadName=" + state.edtThreadName : ""));
+}
+
 function emitDiagLine(line) {
   if (global.console && typeof global.console.log === "function") {
     global.console.log(line);
@@ -1563,18 +1590,29 @@ function installGlobalIllegalStateBypass(symbol, marker) {
     return false;
   }
   const wrapped = function*() {
+    emitDisplayInitDiag("PRE_" + marker);
     try {
       return yield* original.apply(this, arguments);
     } catch (err) {
       const classId = String(err && err.__class ? err.__class : "");
       if (classId === "java_lang_IllegalStateException") {
         let detail = classId;
+        let messageOnly = "";
         try {
           detail = yield* stringifyThrowable(err);
+          if (err.cn1_java_lang_Throwable_detailMessage && err.cn1_java_lang_Throwable_detailMessage.__class === "java_lang_String") {
+            messageOnly = jvm.toNativeString(err.cn1_java_lang_Throwable_detailMessage);
+          } else if (err.message) {
+            messageOnly = String(err.message);
+          }
         } catch (_diagErr) {
           // Best effort diagnostic path only.
         }
+        emitDisplayInitDiag("ERR_" + marker);
         emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":bypassIllegalState=1:detail=" + detail);
+        if (messageOnly) {
+          emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":messageOnly=" + messageOnly);
+        }
         return null;
       }
       throw err;
@@ -1595,22 +1633,33 @@ bindCiFallback("Form.layoutCtorIllegalStateBypass", [
   if (typeof formCtorLayoutOriginal !== "function") {
     return null;
   }
+  emitDisplayInitDiag("PRE_formCtorLayout");
   try {
     return yield* formCtorLayoutOriginal(__cn1ThisObject, layout);
   } catch (err) {
     const classId = String(err && err.__class ? err.__class : "");
     if (classId === "java_lang_IllegalStateException") {
       let detail = classId;
+      let messageOnly = "";
       try {
         detail = yield* stringifyThrowable(err);
+        if (err.cn1_java_lang_Throwable_detailMessage && err.cn1_java_lang_Throwable_detailMessage.__class === "java_lang_String") {
+          messageOnly = jvm.toNativeString(err.cn1_java_lang_Throwable_detailMessage);
+        } else if (err.message) {
+          messageOnly = String(err.message);
+        }
       } catch (_diagErr) {
         // Diagnostic path only.
       }
+      emitDisplayInitDiag("ERR_formCtorLayout");
       emitDiagLine(
         "PARPAR:DIAG:FALLBACK:formCtorLayout:bypassIllegalState=1:detail=" + detail
         + ":self=" + (__cn1ThisObject && __cn1ThisObject.__class ? __cn1ThisObject.__class : "null")
         + ":layout=" + (layout && layout.__class ? layout.__class : (layout == null ? "null" : typeof layout))
       );
+      if (messageOnly) {
+        emitDiagLine("PARPAR:DIAG:FALLBACK:formCtorLayout:messageOnly=" + messageOnly);
+      }
       return null;
     }
     throw err;
@@ -1623,23 +1672,34 @@ bindCiFallback("Form.titleLayoutCtorIllegalStateBypass", [
   if (typeof formCtorTitleLayoutOriginal !== "function") {
     return null;
   }
+  emitDisplayInitDiag("PRE_formCtorTitleLayout");
   try {
     return yield* formCtorTitleLayoutOriginal(__cn1ThisObject, title, layout);
   } catch (err) {
     const classId = String(err && err.__class ? err.__class : "");
     if (classId === "java_lang_IllegalStateException") {
       let detail = classId;
+      let messageOnly = "";
       try {
         detail = yield* stringifyThrowable(err);
+        if (err.cn1_java_lang_Throwable_detailMessage && err.cn1_java_lang_Throwable_detailMessage.__class === "java_lang_String") {
+          messageOnly = jvm.toNativeString(err.cn1_java_lang_Throwable_detailMessage);
+        } else if (err.message) {
+          messageOnly = String(err.message);
+        }
       } catch (_diagErr) {
         // Diagnostic path only.
       }
+      emitDisplayInitDiag("ERR_formCtorTitleLayout");
       emitDiagLine(
         "PARPAR:DIAG:FALLBACK:formCtorTitleLayout:bypassIllegalState=1:detail=" + detail
         + ":self=" + (__cn1ThisObject && __cn1ThisObject.__class ? __cn1ThisObject.__class : "null")
         + ":title=" + (title && title.__class ? title.__class : (title == null ? "null" : typeof title))
         + ":layout=" + (layout && layout.__class ? layout.__class : (layout == null ? "null" : typeof layout))
       );
+      if (messageOnly) {
+        emitDiagLine("PARPAR:DIAG:FALLBACK:formCtorTitleLayout:messageOnly=" + messageOnly);
+      }
       return null;
     }
     throw err;
