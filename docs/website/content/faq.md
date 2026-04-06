@@ -33,6 +33,20 @@ Not if you use the Codename One cloud build service. The cloud handles iOS compi
 
 If you build fully offline, Apple tooling still requires macOS for iOS builds and submission workflows.
 
+### Do `native:*` fonts in the JavaSE simulator match current iOS fonts?
+They can. The simulator now tries to use installed iOS-family fonts (San Francisco/SF Pro first, then Helvetica Neue) when the app runs with an iOS simulator skin.
+
+If those fonts are not installed on the host OS, the simulator falls back to bundled Roboto fonts so behavior remains consistent.
+
+### Can Codename One bundle Apple's San Francisco fonts?
+No. Codename One doesn't bundle Apple's proprietary iOS fonts. If you want exact iOS typography in the simulator on Windows/Linux, install the fonts separately under your own Apple license terms. Apple publishes font information and downloads at: https://developer.apple.com/fonts/
+
+Practical setup guidance:
+
+- **macOS**: You usually already have the required iOS font families installed with the OS/Xcode toolchain.
+- **Windows/Linux**: Install San Francisco/SF Pro fonts from Apple's official distribution channels for licensed developers, then restart the simulator.
+- If those fonts are unavailable, simulator rendering still works using Roboto fallback, but text metrics may differ from real iOS devices.
+
 ### How does performance compare to native or HTML-based solutions?
 Codename One compiles to native targets and is designed for production-level performance, including optimized rendering and modern VM/runtime improvements.
 

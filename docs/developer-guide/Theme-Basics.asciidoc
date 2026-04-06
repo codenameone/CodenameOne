@@ -450,7 +450,7 @@ Notice that, in code, only pixel sizes are supported, so it’s up to you to dec
 
 The font name is the difficult bit, iOS requires the name of the font in order to load the font. This font name doesn't always correlate to the file name making this task rather "tricky". The actual font name is sometimes viewable within a font viewer. It isn't always intuitive, so be sure to test that on the device to make sure you got it right.
 
-IMPORTANT: due to copyright restrictions we cannot distribute Helvetica and thus can't simulate it. In the simulator you will see Roboto and not the device font unless you are running on a Mac
+IMPORTANT: Due to licensing restrictions Codename One doesn't bundle Apple's iOS fonts. In the simulator with an iOS skin we try to use installed San Francisco/SF Pro (or Helvetica Neue) fonts when available on your machine; otherwise we fall back to bundled Roboto. You can obtain Apple's font downloads and terms at https://developer.apple.com/fonts/
 
 The code below demonstrates all the major fonts available in Codename One with the handlee ttf file posing as a standin for arbitrary TTF:
 
