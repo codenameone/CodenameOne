@@ -5,7 +5,6 @@ import com.codename1.ui.Display;
 import com.codenameone.examples.hellocodenameone.Base64Native;
 import com.codename1.util.Base64;
 
-import java.util.Locale;
 
 public class Base64NativePerformanceTest extends BaseTest {
     private static final int PAYLOAD_BYTES = 8192;
@@ -144,16 +143,34 @@ public class Base64NativePerformanceTest extends BaseTest {
 
     private static boolean isIos() {
         String platformName = Display.getInstance().getPlatformName();
-        return platformName != null && platformName.toLowerCase(Locale.US).contains("ios");
+        return platformName != null && platformName.toLowerCase().contains("ios");
     }
 
     private static String formatMs(double millis) {
-        return String.format(Locale.US, "%.3f ms", millis);
+        return formatDecimal(millis, 3) + " ms";
     }
 
     private static String formatRatio(double ratio) {
         double slowerPct = (ratio - 1.0) * 100.0;
-        return String.format(Locale.US, "%.3fx (%.1f%% %s)", ratio, Math.abs(slowerPct), slowerPct >= 0 ? "slower" : "faster");
+        return formatDecimal(ratio, 3) + "x (" + formatDecimal(Math.abs(slowerPct), 1) + "% " + (slowerPct >= 0 ? "slower" : "faster") + ")";
+    }
+
+    private static String formatDecimal(double value, int decimals) {
+        boolean negative = value < 0;
+        double abs = Math.abs(value);
+        long scale = 1;
+        for (int i = 0; i < decimals; i++) {
+            scale *= 10;
+        }
+        long scaled = Math.round(abs * scale);
+        long whole = scaled / scale;
+        long fraction = scaled % scale;
+        String fractionStr = String.valueOf(fraction);
+        while (fractionStr.length() < decimals) {
+            fractionStr = "0" + fractionStr;
+        }
+        String formatted = whole + (decimals > 0 ? "." + fractionStr : "");
+        return negative ? "-" + formatted : formatted;
     }
 
     private static void emitStat(String metric, String value) {
