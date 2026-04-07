@@ -281,3 +281,196 @@ contactsDemo.addScrollListener(new ScrollListener() {
 ----
 
 NOTE: Due to technical constraints we can't use a lambda in this specific case...
+
+==== SIMD Hint Annotations (ParparVM)
+
+SIMD stands for *Single Instruction, Multiple Data*. It is a CPU capability that lets one
+instruction operate on multiple array elements at once (also called “lanes”).
+For data-parallel code (e.g. transforms, codecs, DSP, image math), SIMD can reduce loop
+overhead and improve throughput.
+
+Conceptually, this scalar loop:
+
+[source,java]
+----
+for (int i = 0; i < n; i++) {
+    out[i] = (byte)(in[i] ^ 0x5a);
+}
+----
+
+may be lowered by an optimizer into a vector loop plus a scalar tail:
+
+[source,java]
+----
+int i = 0;
+int vecEnd = n - (n % 16); // vector width example
+for (; i < vecEnd; i += 16) {
+    // vectorized body over lanes [i ... i+15]
+}
+for (; i < n; i++) {
+    // scalar tail for remaining elements
+}
+----
+
+ParparVM includes optional SIMD hint annotations that you can use to mark hot methods as vectorization candidates.
+
+These hints are advisory only:
+
+* They do **not** change correctness/semantics.
+* They may be ignored on runtimes/targets that don't support a given optimization.
+* You should still write clean scalar code first, then add hints where profiling shows bottlenecks.
+
+The annotations are in `com.codename1.annotations.Simd`:
+
+* `@Simd.Candidate` - marks a method as a likely SIMD candidate.
+* `@Simd.Reduction` - marks methods containing reductions (e.g. sum/min/max loops).
+* `@Simd.WidthHint(n)` - suggests a preferred SIMD lane width.
+
+===== `@Simd.Candidate`
+
+Use this when the method has a clear data-parallel loop where each iteration is mostly
+independent (map/transform style operations).
+
+[source,java]
+----
+@Simd.Candidate
+public static int xorTransform(byte[] in, byte[] out) {
+    int n = Math.min(in.length, out.length);
+    for (int i = 0; i < n; i++) {
+        out[i] = (byte)(in[i] ^ 0x5a);
+    }
+    return n;
+}
+----
+
+===== `@Simd.Reduction`
+
+Use this for accumulation patterns that combine many values into one result
+(sum/min/max/dot product). Reductions often require special vector handling.
+
+[source,java]
+----
+@Simd.Candidate
+@Simd.Reduction
+public static int sum(int[] values) {
+    int s = 0;
+    for (int i = 0; i < values.length; i++) {
+        s += values[i];
+    }
+    return s;
+}
+----
+
+===== `@Simd.WidthHint(n)`
+
+Use this to suggest a preferred lane count (for example 16-byte chunks for byte-oriented work).
+This is only a hint; the runtime/translator may choose a different width.
+
+[source,java]
+----
+@Simd.Candidate
+@Simd.WidthHint(16)
+public static int encodeChunked(byte[] in, byte[] out) {
+    // regular scalar implementation; translator may use hint for vector planning
+    int n = Math.min(in.length, out.length);
+    for (int i = 0; i < n; i++) {
+        out[i] = in[i];
+    }
+    return n;
+}
+----
+
+===== Using hints together
+
+You can combine hints when appropriate:
+
+[source,java]
+----
+@Simd.Candidate
+@Simd.Reduction
+@Simd.WidthHint(8)
+public static long sumLongs(long[] values) {
+    long s = 0L;
+    for (int i = 0; i < values.length; i++) {
+        s += values[i];
+    }
+    return s;
+}
+----
+
+===== What to avoid / FAQ
+
+SIMD hints work best when loops are regular and predictable. They are much less effective
+when code has complex control flow, aliasing uncertainty, or side effects in the hot loop.
+
+*Avoid these patterns in the hot loop body when possible:*
+
+* Per-iteration object allocation.
+* Method calls with unknown side effects.
+* Multiple unpredictable branches in the same loop.
+* Mixing unrelated work (I/O/logging/UI updates) with data-parallel math.
+
+*What if a method contains both SIMD-friendly and non-SIMD code?*
+
+That is common and fine. Prefer extracting the SIMD-friendly loop into a small helper method
+and annotate that helper, while leaving orchestration/error handling in the caller:
+
+[source,java]
+----
+public static int process(byte[] in, byte[] out) {
+    // setup/validation/non-SIMD control flow
+    int n = Math.min(in.length, out.length);
+    int written = processVectorFriendly(in, out, n); // SIMD-candidate helper
+    // non-SIMD post-processing
+    return written;
+}
+
+@Simd.Candidate
+@Simd.WidthHint(16)
+private static int processVectorFriendly(byte[] in, byte[] out, int n) {
+    for (int i = 0; i < n; i++) {
+        out[i] = (byte)(in[i] ^ 0x5a);
+    }
+    return n;
+}
+----
+
+*Should I annotate everything that has a loop?*
+
+No. Use profiling first and annotate genuine hot spots. Over-annotation adds noise and makes it
+harder to tell where optimization effort should focus.
+
+*Do hints guarantee SIMD code generation?*
+
+No. They are hints, not directives. Translator/runtime safety checks and target capabilities
+still decide whether vectorization is legal and profitable.
+
+[source,java]
+----
+import com.codename1.annotations.Simd;
+
+public class FastOps {
+    @Simd.Candidate
+    @Simd.WidthHint(16)
+    public static int transform(byte[] in, byte[] out) {
+        int n = Math.min(in.length, out.length);
+        for (int i = 0; i < n; i++) {
+            out[i] = (byte)(in[i] ^ 0x5a);
+        }
+        return n;
+    }
+
+    @Simd.Candidate
+    @Simd.Reduction
+    public static int sum(int[] values) {
+        int s = 0;
+        for (int i = 0; i < values.length; i++) {
+            s += values[i];
+        }
+        return s;
+    }
+}
+----
+
+Current ParparVM stages primarily consume these hints as optimizer metadata and diagnostics.
+As SIMD passes mature, this same API will continue to be the forward-compatible way to provide intent.

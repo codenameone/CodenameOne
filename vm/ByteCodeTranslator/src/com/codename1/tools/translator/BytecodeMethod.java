@@ -101,6 +101,9 @@ public class BytecodeMethod implements SignatureSet {
     private static boolean acceptStaticOnEquals;
     private int methodOffset;
     private boolean forceVirtual;
+    private boolean simdCandidateHint;
+    private boolean simdReductionHint;
+    private int simdWidthHint = -1;
     private boolean virtualOverriden;
     private boolean finalMethod;
     private boolean synchronizedMethod;
@@ -1502,6 +1505,10 @@ public class BytecodeMethod implements SignatureSet {
     
     
     boolean optimize() {
+        if (ByteCodeTranslator.verbose && hasSimdHints()) {
+            System.out.println("SIMD hint metadata on " + clsName + "." + methodName + desc + ": " + getSimdHintSummary());
+        }
+
         int instructionCount = instructions.size();
         
         // optimize away a method that only contains the void return instruction e.g. blank constructors etc.
@@ -2384,6 +2391,57 @@ public class BytecodeMethod implements SignatureSet {
 	public String getSignature() {
 		return desc;
 	}
+
+    public void setSimdCandidateHint(boolean simdCandidateHint) {
+        this.simdCandidateHint = simdCandidateHint;
+    }
+
+    public boolean isSimdCandidateHint() {
+        return simdCandidateHint;
+    }
+
+    public void setSimdReductionHint(boolean simdReductionHint) {
+        this.simdReductionHint = simdReductionHint;
+    }
+
+    public boolean isSimdReductionHint() {
+        return simdReductionHint;
+    }
+
+    public void setSimdWidthHint(int simdWidthHint) {
+        this.simdWidthHint = simdWidthHint;
+    }
+
+    public int getSimdWidthHint() {
+        return simdWidthHint;
+    }
+
+    public boolean hasSimdHints() {
+        return simdCandidateHint || simdReductionHint || simdWidthHint > 0;
+    }
+
+    public String getSimdHintSummary() {
+        StringBuilder out = new StringBuilder();
+        if (simdCandidateHint) {
+            out.append("candidate");
+        }
+        if (simdReductionHint) {
+            if (out.length() > 0) {
+                out.append(", ");
+            }
+            out.append("reduction");
+        }
+        if (simdWidthHint > 0) {
+            if (out.length() > 0) {
+                out.append(", ");
+            }
+            out.append("width=").append(simdWidthHint);
+        }
+        if (out.length() == 0) {
+            out.append("none");
+        }
+        return out.toString();
+    }
 
     @Override
     public SignatureSet nextSignature() {
