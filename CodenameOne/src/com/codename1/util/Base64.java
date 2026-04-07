@@ -286,26 +286,25 @@ public abstract class Base64 {
         }
         int outputLength = ((inputLength + 2) / 3) * 4;
         byte[] out = new byte[outputLength];
-
-        int outIndex = 0;
-        int inIndex = 0;
+        byte[] mapLocal = map;
         int end = inputLength - (inputLength % 3);
-        while (inIndex < end) {
-            int b0 = in[inIndex++] & 0xff;
-            int b1 = in[inIndex++] & 0xff;
-            int b2 = in[inIndex++] & 0xff;
+        int outIndex = 0;
+        for (int i = 0; i < end; i += 3) {
+            int b0 = in[i] & 0xff;
+            int b1 = in[i + 1] & 0xff;
+            int b2 = in[i + 2] & 0xff;
 
-            out[outIndex++] = map[b0 >> 2];
-            out[outIndex++] = map[((b0 & 0x03) << 4) | (b1 >> 4)];
-            out[outIndex++] = map[((b1 & 0x0f) << 2) | (b2 >> 6)];
-            out[outIndex++] = map[b2 & 0x3f];
+            out[outIndex++] = mapLocal[b0 >> 2];
+            out[outIndex++] = mapLocal[((b0 & 0x03) << 4) | (b1 >> 4)];
+            out[outIndex++] = mapLocal[((b1 & 0x0f) << 2) | (b2 >> 6)];
+            out[outIndex++] = mapLocal[b2 & 0x3f];
         }
 
         switch (inputLength - end) {
             case 1: {
                 int b0 = in[end] & 0xff;
-                out[outIndex++] = map[b0 >> 2];
-                out[outIndex++] = map[(b0 & 0x03) << 4];
+                out[outIndex++] = mapLocal[b0 >> 2];
+                out[outIndex++] = mapLocal[(b0 & 0x03) << 4];
                 out[outIndex++] = '=';
                 out[outIndex++] = '=';
                 break;
@@ -313,15 +312,15 @@ public abstract class Base64 {
             case 2: {
                 int b0 = in[end] & 0xff;
                 int b1 = in[end + 1] & 0xff;
-                out[outIndex++] = map[b0 >> 2];
-                out[outIndex++] = map[((b0 & 0x03) << 4) | (b1 >> 4)];
-                out[outIndex++] = map[(b1 & 0x0f) << 2];
+                out[outIndex++] = mapLocal[b0 >> 2];
+                out[outIndex++] = mapLocal[((b0 & 0x03) << 4) | (b1 >> 4)];
+                out[outIndex++] = mapLocal[(b1 & 0x0f) << 2];
                 out[outIndex++] = '=';
                 break;
             }
             default:
                 break;
         }
-        return com.codename1.util.StringUtil.newString(out, 0, outIndex);
+        return com.codename1.util.StringUtil.newString(out, 0, outputLength);
     }
 }
