@@ -32,8 +32,16 @@ jobs:
           java-version: '17'
           cache: maven
 
+      - name: Ensure Xvfb is available
+        run: |
+          set -euo pipefail
+          if ! command -v xvfb-run >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y xvfb
+          fi
+
       - name: Run playground language smoke tests
         run: |
           set -euo pipefail
           cd scripts/cn1playground
-          bash tools/run-playground-smoke-tests.sh
+          xvfb-run -a bash tools/run-playground-smoke-tests.sh
