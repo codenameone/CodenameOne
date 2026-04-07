@@ -1,6 +1,5 @@
 package com.codenameone.playground;
 
-import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
@@ -9,10 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Syntax regression matrix for Playground language support.
- *
- * <p>When adding new syntax support, update the expected outcome for the
- * relevant test case from FAILURE to SUCCESS.</p>
+ * Table-driven syntax regression matrix for playground language support.
  */
 public final class PlaygroundSyntaxMatrixHarness {
     private PlaygroundSyntaxMatrixHarness() {
@@ -20,18 +16,21 @@ public final class PlaygroundSyntaxMatrixHarness {
 
     private enum ExpectedOutcome {
         SUCCESS,
-        FAILURE
+        PARSE_ERROR,
+        EVAL_ERROR
     }
 
     private static final class Case {
         final String name;
-        final ExpectedOutcome expected;
-        final String script;
+        final String sourceSnippet;
+        final ExpectedOutcome expectedOutcome;
+        final String expectedDiagnosticSubstring;
 
-        Case(String name, ExpectedOutcome expected, String script) {
+        Case(String name, String sourceSnippet, ExpectedOutcome expectedOutcome, String expectedDiagnosticSubstring) {
             this.name = name;
-            this.expected = expected;
-            this.script = script;
+            this.sourceSnippet = sourceSnippet;
+            this.expectedOutcome = expectedOutcome;
+            this.expectedDiagnosticSubstring = expectedDiagnosticSubstring;
         }
     }
 
@@ -39,9 +38,9 @@ public final class PlaygroundSyntaxMatrixHarness {
         int exitCode = 0;
         try {
             List<Case> cases = new ArrayList<Case>();
-            // Control cases that should stay green.
-            cases.add(new Case("lambda_listener", ExpectedOutcome.SUCCESS,
-                    """
+
+            // Control cases (known good behavior).
+            cases.add(new Case("control_lambda_listener", """
                     import com.codename1.ui.*;
                     import com.codename1.ui.layouts.*;
                     Container root = new Container(BoxLayout.y());
@@ -49,9 +48,8 @@ public final class PlaygroundSyntaxMatrixHarness {
                     b.addActionListener(e -> {});
                     root.add(b);
                     root;
-                    """));
-            cases.add(new Case("anonymous_listener", ExpectedOutcome.SUCCESS,
-                    """
+                    """, ExpectedOutcome.SUCCESS, null));
+            cases.add(new Case("control_anonymous_listener", """
                     import com.codename1.ui.*;
                     import com.codename1.ui.events.*;
                     import com.codename1.ui.layouts.*;
@@ -60,9 +58,99 @@ public final class PlaygroundSyntaxMatrixHarness {
                     b.addActionListener(new ActionListener() { public void actionPerformed(ActionEvent e) {} });
                     root.add(b);
                     root;
-                    """));
-            cases.add(new Case("enhanced_for_array", ExpectedOutcome.SUCCESS,
-                    """
+                    """, ExpectedOutcome.SUCCESS, null));
+            cases.add(new Case("control_classic_for_loop", """
+                    import com.codename1.ui.*;
+                    import com.codename1.ui.layouts.*;
+                    Container root = new Container(BoxLayout.y());
+                    int sum = 0;
+                    for (int i = 0; i < 3; i++) {
+                        sum += i;
+                    }
+                    root.add(new Label("sum=" + sum));
+                    root;
+                    """, ExpectedOutcome.SUCCESS, null));
+
+            // Method references.
+            cases.add(new Case("method_reference_type", """
+                    import com.codename1.ui.*;
+                    import com.codename1.ui.layouts.*;
+                    Container root = new Container(BoxLayout.y());
+                    Button b = new Button("Go");
+                    b.addActionListener(System.out::println);
+                    root.add(b);
+                    root;
+                    """, ExpectedOutcome.PARSE_ERROR, "Parse error:"));
+            cases.add(new Case("method_reference_instance", """
+                    import com.codename1.ui.*;
+                    import com.codename1.ui.layouts.*;
+                    Container root = new Container(BoxLayout.y());
+                    String prefix = "X:";
+                    Button b = new Button("Go");
+                    b.addActionListener(prefix::concat);
+                    root.add(b);
+                    root;
+                    """, ExpectedOutcome.PARSE_ERROR, "Parse error:"));
+            cases.add(new Case("method_reference_constructor", """
+                    import com.codename1.ui.*;
+                    import com.codename1.ui.layouts.*;
+                    import java.util.function.*;
+                    Container root = new Container(BoxLayout.y());
+                    Supplier<StringBuilder> ctor = StringBuilder::new;
+                    root.add(new Label(ctor.get().toString()));
+                    root;
+                    """, ExpectedOutcome.PARSE_ERROR, "Parse error:"));
+
+            // Try-with-resources variants.
+            cases.add(new Case("twr_single_resource", """
+                    import com.codename1.ui.*;
+                    import com.codename1.ui.layouts.*;
+                    import java.io.*;
+                    Container root = new Container(BoxLayout.y());
+                    try (ByteArrayInputStream in = new ByteArrayInputStream(new byte[]{1,2,3})) {
+                        root.add(new Label("ok=" + in.read()));
+                    }
+                    root;
+                    """, ExpectedOutcome.SUCCESS, null));
+            cases.add(new Case("twr_multiple_resources", """
+                    import com.codename1.ui.*;
+                    import com.codename1.ui.layouts.*;
+                    import java.io.*;
+                    Container root = new Container(BoxLayout.y());
+                    try (ByteArrayInputStream in = new ByteArrayInputStream(new byte[]{1}); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+                        out.write(in.read());
+                    }
+                    root;
+                    """, ExpectedOutcome.PARSE_ERROR, "Parse error:"));
+            cases.add(new Case("twr_trailing_semicolon", """
+                    import com.codename1.ui.*;
+                    import com.codename1.ui.layouts.*;
+                    import java.io.*;
+                    Container root = new Container(BoxLayout.y());
+                    try (ByteArrayInputStream in = new ByteArrayInputStream(new byte[]{1});) {
+                        root.add(new Label("ok"));
+                    }
+                    root;
+                    """, ExpectedOutcome.PARSE_ERROR, "Parse error:"));
+            cases.add(new Case("twr_nested_try_catch_finally", """
+                    import com.codename1.ui.*;
+                    import com.codename1.ui.layouts.*;
+                    import java.io.*;
+                    Container root = new Container(BoxLayout.y());
+                    try (ByteArrayInputStream in = new ByteArrayInputStream(new byte[]{1})) {
+                        try {
+                            root.add(new Label("inner"));
+                        } catch (RuntimeException ex) {
+                            root.add(new Label("catch"));
+                        } finally {
+                            root.add(new Label("finally"));
+                        }
+                    }
+                    root;
+                    """, ExpectedOutcome.SUCCESS, null));
+
+            // Enhanced-for arrays.
+            cases.add(new Case("enhanced_for_primitive_array", """
                     import com.codename1.ui.*;
                     import com.codename1.ui.layouts.*;
                     Container root = new Container(BoxLayout.y());
@@ -72,39 +160,86 @@ public final class PlaygroundSyntaxMatrixHarness {
                     }
                     root.add(new Label("sum=" + sum));
                     root;
-                    """));
-
-            // Known syntax gaps: flip these to SUCCESS as support lands.
-            cases.add(new Case("method_reference", ExpectedOutcome.FAILURE,
-                    """
+                    """, ExpectedOutcome.SUCCESS, null));
+            cases.add(new Case("enhanced_for_object_array", """
                     import com.codename1.ui.*;
+                    import com.codename1.ui.layouts.*;
+                    Container root = new Container(BoxLayout.y());
+                    String txt = "";
+                    for (String v : new String[]{"a","b"}) {
+                        txt += v;
+                    }
+                    root.add(new Label(txt));
+                    root;
+                    """, ExpectedOutcome.SUCCESS, null));
+            cases.add(new Case("enhanced_for_null_array", """
+                    import com.codename1.ui.*;
+                    import com.codename1.ui.layouts.*;
+                    Container root = new Container(BoxLayout.y());
+                    int[] values = null;
+                    for (int v : values) {
+                        root.add(new Label("v=" + v));
+                    }
+                    root;
+                    """, ExpectedOutcome.EVAL_ERROR, "Evaluation error:"));
+            cases.add(new Case("enhanced_for_nested", """
+                    import com.codename1.ui.*;
+                    import com.codename1.ui.layouts.*;
+                    Container root = new Container(BoxLayout.y());
+                    int count = 0;
+                    for (int row : new int[]{1,2}) {
+                        for (int col : new int[]{3,4}) {
+                            count += row + col;
+                        }
+                    }
+                    root.add(new Label("count=" + count));
+                    root;
+                    """, ExpectedOutcome.SUCCESS, null));
+
+            // Multiple classes / inner class variants.
+            cases.add(new Case("multiple_top_level_classes", """
+                    class A {}
+                    class B {}
+                    new A();
+                    """, ExpectedOutcome.PARSE_ERROR, "Parse error:"));
+            cases.add(new Case("inner_class_static_member", """
+                    class Outer {
+                        static class Inner {
+                            String label() { return "ok"; }
+                        }
+                    }
+                    new Outer.Inner().label();
+                    """, ExpectedOutcome.SUCCESS, null));
+            cases.add(new Case("inner_class_anonymous", """
+                    import com.codename1.ui.*;
+                    import com.codename1.ui.events.*;
                     import com.codename1.ui.layouts.*;
                     Container root = new Container(BoxLayout.y());
                     Button b = new Button("Go");
-                    b.addActionListener(System.out::println);
+                    b.addActionListener(new ActionListener() {
+                        public void actionPerformed(ActionEvent evt) {}
+                    });
                     root.add(b);
                     root;
-                    """));
-            cases.add(new Case("try_with_resources_multi", ExpectedOutcome.FAILURE,
-                    """
-                    import com.codename1.ui.*;
-                    import com.codename1.ui.layouts.*;
-                    import java.io.*;
-                    Container root = new Container(BoxLayout.y());
-                    try (ByteArrayInputStream in = new ByteArrayInputStream(new byte[]{1}); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-                        out.write(in.read());
-                    }
-                    root;
-                    """));
+                    """, ExpectedOutcome.SUCCESS, null));
 
             int passed = 0;
             for (Case testCase : cases) {
-                PlaygroundRunner.RunResult result = runSnippet(testCase.script);
-                boolean success = result.getComponent() instanceof Component;
-                boolean casePassed = testCase.expected == ExpectedOutcome.SUCCESS ? success : !success;
-                if (!casePassed) {
+                PlaygroundRunner.RunResult result = runSnippet(testCase.sourceSnippet);
+                ExpectedOutcome actual = classify(result);
+                if (actual != testCase.expectedOutcome) {
                     throw new IllegalStateException("Case failed: " + testCase.name
-                            + " expected=" + testCase.expected + " messages=" + summarizeMessages(result));
+                            + " expected=" + testCase.expectedOutcome
+                            + " actual=" + actual
+                            + " messages=" + summarizeMessages(result));
+                }
+                if (testCase.expectedDiagnosticSubstring != null) {
+                    String message = firstDiagnosticMessage(result);
+                    if (message == null || message.indexOf(testCase.expectedDiagnosticSubstring) < 0) {
+                        throw new IllegalStateException("Case failed: " + testCase.name
+                                + " expected diagnostic containing='" + testCase.expectedDiagnosticSubstring
+                                + "' actual='" + message + "'");
+                    }
                 }
                 passed++;
             }
@@ -116,6 +251,29 @@ public final class PlaygroundSyntaxMatrixHarness {
         } finally {
             System.exit(exitCode);
         }
+    }
+
+    private static ExpectedOutcome classify(PlaygroundRunner.RunResult result) {
+        if (result.getComponent() != null) {
+            return ExpectedOutcome.SUCCESS;
+        }
+        String message = firstDiagnosticMessage(result);
+        if (message != null && message.startsWith("Parse error:")) {
+            return ExpectedOutcome.PARSE_ERROR;
+        }
+        return ExpectedOutcome.EVAL_ERROR;
+    }
+
+    private static String firstDiagnosticMessage(PlaygroundRunner.RunResult result) {
+        List<PlaygroundRunner.Diagnostic> diagnostics = result.getDiagnostics();
+        if (!diagnostics.isEmpty()) {
+            return diagnostics.get(0).message;
+        }
+        List<PlaygroundRunner.InlineMessage> messages = result.getMessages();
+        if (!messages.isEmpty()) {
+            return messages.get(0).text;
+        }
+        return null;
     }
 
     private static PlaygroundRunner.RunResult runSnippet(String script) {
