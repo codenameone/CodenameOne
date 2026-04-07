@@ -36,4 +36,4 @@ jobs:
         run: |
           set -euo pipefail
           cd scripts/cn1playground
-          tools/run-playground-smoke-tests.sh
+          bash tools/run-playground-smoke-tests.sh
