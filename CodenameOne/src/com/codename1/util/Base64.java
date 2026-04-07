@@ -23,12 +23,30 @@ package com.codename1.util;
 /// as specified in RFC 2045 (http://www.ietf.org/rfc/rfc2045.txt).
 public abstract class Base64 {
 
+    private static final int DECODE_INVALID = -1;
+    private static final int DECODE_WHITESPACE = -2;
+
     private static final byte[] map = new byte[]
             {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N',
                     'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b',
                     'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p',
                     'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '0', '1', '2', '3',
                     '4', '5', '6', '7', '8', '9', '+', '/'};
+
+    private static final byte[] decodeMap = new byte[256];
+
+    static {
+        for (int i = 0; i < decodeMap.length; i++) {
+            decodeMap[i] = (byte) DECODE_INVALID;
+        }
+        for (int i = 0; i < map.length; i++) {
+            decodeMap[map[i] & 0xff] = (byte) i;
+        }
+        decodeMap['\n'] = (byte) DECODE_WHITESPACE;
+        decodeMap['\r'] = (byte) DECODE_WHITESPACE;
+        decodeMap[' '] = (byte) DECODE_WHITESPACE;
+        decodeMap['\t'] = (byte) DECODE_WHITESPACE;
+    }
 
     public static byte[] decode(byte[] in) {
         return decode(in, in.length);
@@ -46,95 +64,88 @@ public abstract class Base64 {
     ///
     /// the decoded array
     public static byte[] decode(byte[] in, int len) {
-        // approximate output length
-        int length = len / 4 * 3;
-        // return an empty array on emtpy or short input without padding
-        if (length == 0) {
+        if (len == 0) {
             return new byte[0];
         }
-        // temporary array
-        byte[] out = new byte[length];
-        // number of padding characters ('=')
+
         int pad = 0;
-        byte chr;
-        // compute the number of the padding characters
-        // and adjust the length of the input
-        for (; ; len--) {
-            chr = in[len - 1];
-            // skip the neutral characters
-            if ((chr == '\n') || (chr == '\r') ||
-                    (chr == ' ') || (chr == '\t')) {
+        int end = len;
+        while (end > 0) {
+            int chr = in[end - 1] & 0xff;
+            if (decodeMap[chr] == DECODE_WHITESPACE) {
+                end--;
                 continue;
             }
             if (chr == '=') {
                 pad++;
+                end--;
             } else {
                 break;
             }
         }
-        // index in the output array
-        int outIndex = 0;
-        // index in the input array
-        int inIndex = 0;
-        // holds the value of the input character
-        int bits = 0;
-        // holds the value of the input quantum
-        int quantum = 0;
-        for (int i = 0; i < len; i++) {
-            chr = in[i];
+
+        int validChars = 0;
+        for (int i = 0; i < end; i++) {
+            int chr = in[i] & 0xff;
             if (chr == '=') {
                 break;
             }
-            // skip the neutral characters
-            if ((chr == '\n') || (chr == '\r') ||
-                    (chr == ' ') || (chr == '\t')) {
+            int value = decodeMap[chr];
+            if (value == DECODE_WHITESPACE) {
                 continue;
             }
-            if ((chr >= 'A') && (chr <= 'Z')) {
-                // char ASCII value
-                //  A    65    0
-                //  Z    90    25 (ASCII - 65)
-                bits = chr - 65;
-            } else if ((chr >= 'a') && (chr <= 'z')) {
-                // char ASCII value
-                //  a    97    26
-                //  z    122   51 (ASCII - 71)
-                bits = chr - 71;
-            } else if ((chr >= '0') && (chr <= '9')) {
-                // char ASCII value
-                //  0    48    52
-                //  9    57    61 (ASCII + 4)
-                bits = chr + 4;
-            } else if (chr == '+') {
-                bits = 62;
-            } else if (chr == '/') {
-                bits = 63;
-            } else {
+            if (value == DECODE_INVALID) {
                 return null;
             }
-            // append the value to the quantum
-            quantum = (quantum << 6) | (byte) bits;
-            if (inIndex % 4 == 3) {
-                // 4 characters were read, so make the output:
+            validChars++;
+        }
+
+        int totalSymbols = validChars + pad;
+        int outputLength = (totalSymbols / 4) * 3 - pad;
+        if (outputLength <= 0) {
+            return new byte[0];
+        }
+
+        byte[] out = new byte[outputLength];
+        int outIndex = 0;
+
+        int quantum = 0;
+        int quantumChars = 0;
+        for (int i = 0; i < end; i++) {
+            int chr = in[i] & 0xff;
+            if (chr == '=') {
+                break;
+            }
+            int bits = decodeMap[chr];
+            if (bits == DECODE_WHITESPACE) {
+                continue;
+            }
+            if (bits == DECODE_INVALID) {
+                return null;
+            }
+            quantum = (quantum << 6) | bits;
+            quantumChars++;
+            if (quantumChars == 4) {
                 out[outIndex++] = (byte) ((quantum & 0x00FF0000) >> 16);
                 out[outIndex++] = (byte) ((quantum & 0x0000FF00) >> 8);
                 out[outIndex++] = (byte) (quantum & 0x000000FF);
+                quantumChars = 0;
+                quantum = 0;
             }
-            inIndex++;
         }
+
         if (pad > 0) {
-            // adjust the quantum value according to the padding
+            if ((pad == 1 && quantumChars != 3) || (pad == 2 && quantumChars != 2)) {
+                return null;
+            }
             quantum = quantum << (6 * pad);
-            // make output
             out[outIndex++] = (byte) ((quantum & 0x00FF0000) >> 16);
             if (pad == 1) {
                 out[outIndex++] = (byte) ((quantum & 0x0000FF00) >> 8);
             }
         }
-        // create the resulting array
-        byte[] result = new byte[outIndex];
-        System.arraycopy(out, 0, result, 0, outIndex);
-        return result;
+
+        return out;
     }
 
     /// Encodes the given array as a base64 string
@@ -233,4 +244,3 @@ public abstract class Base64 {
         return com.codename1.util.StringUtil.newString(out, 0, index);
     }
 }
-
