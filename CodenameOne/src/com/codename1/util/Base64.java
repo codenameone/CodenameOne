@@ -67,6 +67,12 @@ public abstract class Base64 {
         if (len == 0) {
             return new byte[0];
         }
+        if ((len & 0x3) == 0) {
+            byte[] fast = decodeNoWhitespace(in, len);
+            if (fast != null) {
+                return fast;
+            }
+        }
 
         int pad = 0;
         int end = len;
@@ -145,6 +151,71 @@ public abstract class Base64 {
             }
         }
 
+        return out;
+    }
+
+    private static byte[] decodeNoWhitespace(byte[] in, int len) {
+        int pad = 0;
+        if (len > 0 && in[len - 1] == '=') {
+            pad++;
+            if (len > 1 && in[len - 2] == '=') {
+                pad++;
+            }
+        }
+        if (pad > 2) {
+            return null;
+        }
+
+        int outLength = (len / 4) * 3 - pad;
+        if (outLength <= 0) {
+            return new byte[0];
+        }
+        byte[] out = new byte[outLength];
+        int outIndex = 0;
+
+        int lastBlock = len - 4;
+        for (int i = 0; i < len; i += 4) {
+            int c0 = in[i] & 0xff;
+            int c1 = in[i + 1] & 0xff;
+            int c2 = in[i + 2] & 0xff;
+            int c3 = in[i + 3] & 0xff;
+            int b0 = decodeMap[c0];
+            int b1 = decodeMap[c1];
+            if (b0 < 0 || b1 < 0) {
+                return null;
+            }
+
+            if (i == lastBlock && pad > 0) {
+                if (pad == 2) {
+                    if (c2 != '=' || c3 != '=') {
+                        return null;
+                    }
+                    out[outIndex++] = (byte) ((b0 << 2) | (b1 >> 4));
+                    break;
+                } else {
+                    if (c3 != '=') {
+                        return null;
+                    }
+                    int b2 = decodeMap[c2];
+                    if (b2 < 0) {
+                        return null;
+                    }
+                    out[outIndex++] = (byte) ((b0 << 2) | (b1 >> 4));
+                    out[outIndex++] = (byte) ((b1 << 4) | (b2 >> 2));
+                    break;
+                }
+            }
+
+            int b2 = decodeMap[c2];
+            int b3 = decodeMap[c3];
+            if (b2 < 0 || b3 < 0) {
+                return null;
+            }
+            int quantum = (b0 << 18) | (b1 << 12) | (b2 << 6) | b3;
+            out[outIndex++] = (byte) ((quantum >> 16) & 0xff);
+            out[outIndex++] = (byte) ((quantum >> 8) & 0xff);
+            out[outIndex++] = (byte) (quantum & 0xff);
+        }
         return out;
     }
 
