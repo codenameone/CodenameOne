@@ -927,114 +927,126 @@ static inline JAVA_BOOLEAN cn1_array_access_in_bounds(JAVA_OBJECT array, JAVA_IN
     return array != JAVA_NULL && index >= 0 && index < ((JAVA_ARRAY)array)->length;
 }
 
+static inline JAVA_BOOLEAN cn1_array_access_validate(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index) {
+    if (array == JAVA_NULL) {
+        throwException(threadStateData, __NEW_java_lang_NullPointerException(threadStateData));
+        return JAVA_FALSE;
+    }
+    if (index < 0 || index >= ((JAVA_ARRAY)array)->length) {
+        throwArrayIndexOutOfBoundsException(threadStateData, index);
+        return JAVA_FALSE;
+    }
+    return JAVA_TRUE;
+}
+
 static inline JAVA_INT cn1_array_element_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index) {
-    if (!cn1_array_access_in_bounds(array, index)) {
-        CHECK_ARRAY_ACCESS_WITH_ARGS(array, index);
+    if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
+        return 0;
     }
     return ((JAVA_ARRAY_INT*) (*(JAVA_ARRAY)array).data)[index];
 }
 
 static inline JAVA_BYTE cn1_array_element_byte(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index) {
-    if (!cn1_array_access_in_bounds(array, index)) {
-        CHECK_ARRAY_ACCESS_WITH_ARGS(array, index);
+    if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
+        return 0;
     }
     return ((JAVA_ARRAY_BYTE*) (*(JAVA_ARRAY)array).data)[index];
 }
 
 static inline JAVA_FLOAT cn1_array_element_float(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index) {
-    if (!cn1_array_access_in_bounds(array, index)) {
-        CHECK_ARRAY_ACCESS_WITH_ARGS(array, index);
+    if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
+        return 0;
     }
     return ((JAVA_ARRAY_FLOAT*) (*(JAVA_ARRAY)array).data)[index];
 }
 
 static inline JAVA_DOUBLE cn1_array_element_double(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index) {
-    if (!cn1_array_access_in_bounds(array, index)) {
-        CHECK_ARRAY_ACCESS_WITH_ARGS(array, index);
+    if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
+        return 0;
     }
     return ((JAVA_ARRAY_DOUBLE*) (*(JAVA_ARRAY)array).data)[index];
 }
 
 static inline JAVA_LONG cn1_array_element_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index) {
-    if (!cn1_array_access_in_bounds(array, index)) {
-        CHECK_ARRAY_ACCESS_WITH_ARGS(array, index);
+    if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
+        return 0;
     }
     return ((JAVA_ARRAY_LONG*) (*(JAVA_ARRAY)array).data)[index];
 }
 
 static inline JAVA_OBJECT cn1_array_element_object(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index) {
-    if (!cn1_array_access_in_bounds(array, index)) {
-        CHECK_ARRAY_ACCESS_WITH_ARGS(array, index);
+    if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
+        return JAVA_NULL;
     }
     return ((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)array).data)[index];
 }
 
 static inline JAVA_SHORT cn1_array_element_short(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index) {
-    if (!cn1_array_access_in_bounds(array, index)) {
-        CHECK_ARRAY_ACCESS_WITH_ARGS(array, index);
+    if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
+        return 0;
     }
     return ((JAVA_ARRAY_SHORT*) (*(JAVA_ARRAY)array).data)[index];
 }
 
 static inline JAVA_CHAR cn1_array_element_char(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index) {
-    if (!cn1_array_access_in_bounds(array, index)) {
-        CHECK_ARRAY_ACCESS_WITH_ARGS(array, index);
+    if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
+        return 0;
     }
     return ((JAVA_ARRAY_CHAR*) (*(JAVA_ARRAY)array).data)[index];
 }
 
 static inline JAVA_VOID cn1_set_array_element_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index, JAVA_INT value) {
-    if (!cn1_array_access_in_bounds(array, index)) {
-        CHECK_ARRAY_ACCESS_WITH_ARGS(array, index);
+    if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
+        return;
     }
     ((JAVA_ARRAY_INT*) (*(JAVA_ARRAY)array).data)[index] = value;
 }
 
 static inline JAVA_VOID cn1_set_array_element_byte(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index, JAVA_BYTE value) {
-    if (!cn1_array_access_in_bounds(array, index)) {
-        CHECK_ARRAY_ACCESS_WITH_ARGS(array, index);
+    if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
+        return;
     }
     ((JAVA_ARRAY_BYTE*) (*(JAVA_ARRAY)array).data)[index] = value;
 }
 
 static inline JAVA_VOID cn1_set_array_element_float(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index, JAVA_FLOAT value) {
-    if (!cn1_array_access_in_bounds(array, index)) {
-        CHECK_ARRAY_ACCESS_WITH_ARGS(array, index);
+    if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
+        return;
     }
     ((JAVA_ARRAY_FLOAT*) (*(JAVA_ARRAY)array).data)[index] = value;
 }
 
 static inline JAVA_VOID cn1_set_array_element_double(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index, JAVA_DOUBLE value) {
-    if (!cn1_array_access_in_bounds(array, index)) {
-        CHECK_ARRAY_ACCESS_WITH_ARGS(array, index);
+    if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
+        return;
     }
     ((JAVA_ARRAY_DOUBLE*) (*(JAVA_ARRAY)array).data)[index] = value;
 }
 
 static inline JAVA_VOID cn1_set_array_element_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index, JAVA_LONG value) {
-    if (!cn1_array_access_in_bounds(array, index)) {
-        CHECK_ARRAY_ACCESS_WITH_ARGS(array, index);
+    if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
+        return;
     }
     ((JAVA_ARRAY_LONG*) (*(JAVA_ARRAY)array).data)[index] = value;
 }
 
 static inline JAVA_VOID cn1_set_array_element_object(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index, JAVA_OBJECT value) {
-    if (!cn1_array_access_in_bounds(array, index)) {
-        CHECK_ARRAY_ACCESS_WITH_ARGS(array, index);
+    if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
+        return;
     }
     ((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)array).data)[index] = value;
 }
 
 static inline JAVA_VOID cn1_set_array_element_short(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index, JAVA_SHORT value) {
-    if (!cn1_array_access_in_bounds(array, index)) {
-        CHECK_ARRAY_ACCESS_WITH_ARGS(array, index);
+    if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
+        return;
     }
     ((JAVA_ARRAY_SHORT*) (*(JAVA_ARRAY)array).data)[index] = value;
 }
 
 static inline JAVA_VOID cn1_set_array_element_char(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index, JAVA_CHAR value) {
-    if (!cn1_array_access_in_bounds(array, index)) {
-        CHECK_ARRAY_ACCESS_WITH_ARGS(array, index);
+    if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
+        return;
     }
     ((JAVA_ARRAY_CHAR*) (*(JAVA_ARRAY)array).data)[index] = value;
 }
