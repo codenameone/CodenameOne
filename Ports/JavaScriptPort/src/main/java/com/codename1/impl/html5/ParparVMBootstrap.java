@@ -27,22 +27,7 @@ public final class ParparVMBootstrap implements Runnable {
     public static void bootstrap(Lifecycle lifecycle) {
         com.codename1.impl.ImplementationFactory.setInstance(new com.codename1.impl.ImplementationFactory());
         ParparVMBootstrap bootstrap = new ParparVMBootstrap(lifecycle);
-        Log.p("[ParparVMBootstrap] Calling Display.init");
         Display.init(bootstrap);
-        Log.p("[ParparVMBootstrap] Display.init complete, hasNativeTheme=" + Display.getInstance().hasNativeTheme());
-        // Install native theme before starting the lifecycle
-        try {
-            if (Display.getInstance().hasNativeTheme()) {
-                Log.p("[ParparVMBootstrap] Installing native theme");
-                Display.getInstance().installNativeTheme();
-                Log.p("[ParparVMBootstrap] Native theme installed successfully");
-            } else {
-                Log.p("[ParparVMBootstrap] No native theme available");
-            }
-        } catch (Throwable t) {
-            Log.p("[ParparVMBootstrap] Failed to install native theme: " + (t.getMessage() != null ? t.getMessage() : "null"));
-            Log.e(t);
-        }
         bootstrap.run();
     }
 

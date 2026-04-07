@@ -2058,3 +2058,72 @@ if (jvm && typeof jvm.addVirtualMethod === "function" && jvm.classes && jvm.clas
     emitDiagLine("PARPAR:DIAG:INIT:shim=baseTestOnShowLambdaDispatch");
   }
 }
+
+// ---------------------------------------------------------------------------
+// Shim: CodenameOneImplementation.initImpl – guard against getClass()/getName()
+// failures on the Runnable argument passed to Display.init().
+//
+// In the ParparVM JS translation, Object.getClass() may return null or
+// Class.getName() may return a name with underscores instead of dots.
+// The base initImpl calls m.getClass().getName() and then
+// String.substring(0, String.lastIndexOf('.')) which can throw a TypeError
+// (null receiver) or StringIndexOutOfBoundsException (-1 index).
+//
+// This shim wraps the original initImpl; if it fails it falls back to calling
+// init(m) directly and setting the packageName field from the class name of the
+// bootstrap object.
+// ---------------------------------------------------------------------------
+const initImplMethodId = "cn1_com_codename1_impl_CodenameOneImplementation_initImpl_java_lang_Object";
+const initImplOriginal = (function() {
+  if (!jvm || !jvm.classes) {
+    return null;
+  }
+  const cls = jvm.classes["com_codename1_impl_CodenameOneImplementation"];
+  if (cls && cls.methods && typeof cls.methods[initImplMethodId] === "function") {
+    return cls.methods[initImplMethodId];
+  }
+  return typeof global[initImplMethodId] === "function" ? global[initImplMethodId] :
+         typeof global[initImplMethodId + "__impl"] === "function" ? global[initImplMethodId + "__impl"] : null;
+})();
+
+bindCiFallback("CodenameOneImplementation.initImplSafe", [
+  initImplMethodId,
+  initImplMethodId + "__impl"
+], function*(__cn1ThisObject, m) {
+  if (typeof initImplOriginal === "function") {
+    try {
+      return yield* initImplOriginal(__cn1ThisObject, m);
+    } catch (err) {
+      const message = String(err && err.message ? err.message : err || "");
+      if (message.indexOf("__classDef") >= 0 || message.indexOf("lastIndexOf") >= 0 || message.indexOf("substring") >= 0) {
+        emitCiFallbackMarker("CodenameOneImplementation.initImplSafe.recover", "HIT");
+        // The original initImpl calls init(m) first, then m.getClass().getName().
+        // If we land here, init(m) already succeeded – only the getClass/getName
+        // chain failed.  Do NOT call init(m) again; just set the missing fields.
+        const className = (m && m.__class) ? String(m.__class).replace(/_/g, ".") : "com.codename1.impl.html5";
+        const dotIndex = className.lastIndexOf(".");
+        const pkg = dotIndex >= 0 ? className.substring(0, dotIndex) : className;
+        __cn1ThisObject["cn1_com_codename1_impl_CodenameOneImplementation_packageName"] = jvm.createStringLiteral(pkg);
+        __cn1ThisObject["cn1_com_codename1_impl_CodenameOneImplementation_initiailized"] = 1;
+        return null;
+      }
+      throw err;
+    }
+  }
+  // No original method found – perform safe init inline
+  const initMethodId2 = "cn1_com_codename1_impl_CodenameOneImplementation_init_java_lang_Object";
+  try {
+    const initMethod2 = jvm.resolveVirtual(__cn1ThisObject.__class, initMethodId2);
+    if (typeof initMethod2 === "function") {
+      yield* initMethod2(__cn1ThisObject, m);
+    }
+  } catch (_ignore) {
+    // Best effort – init may already have been called
+  }
+  const className2 = (m && m.__class) ? String(m.__class).replace(/_/g, ".") : "com.codename1.impl.html5";
+  const dotIndex2 = className2.lastIndexOf(".");
+  const pkg2 = dotIndex2 >= 0 ? className2.substring(0, dotIndex2) : className2;
+  __cn1ThisObject["cn1_com_codename1_impl_CodenameOneImplementation_packageName"] = jvm.createStringLiteral(pkg2);
+  __cn1ThisObject["cn1_com_codename1_impl_CodenameOneImplementation_initiailized"] = 1;
+  return null;
+});
