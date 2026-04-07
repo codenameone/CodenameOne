@@ -1506,7 +1506,7 @@ public class BytecodeMethod implements SignatureSet {
     
     boolean optimize() {
         if (ByteCodeTranslator.verbose && hasSimdHints()) {
-            System.out.println("SIMD hint metadata on " + clsName + "." + methodName + desc + ": " + getSimdHintSummary());
+            logSimdHintStatus();
         }
 
         int instructionCount = instructions.size();
@@ -2441,6 +2441,98 @@ public class BytecodeMethod implements SignatureSet {
             out.append("none");
         }
         return out.toString();
+    }
+
+    private void logSimdHintStatus() {
+        StringBuilder reason = new StringBuilder();
+        if (!simdCandidateHint) {
+            appendReason(reason, "missing @Simd.Candidate");
+        }
+        if (nativeMethod || abstractMethod) {
+            appendReason(reason, "native/abstract method");
+        }
+        if (synchronizedMethod) {
+            appendReason(reason, "synchronized method");
+        }
+        if (hasExceptionHandlingOrMethodCalls()) {
+            appendReason(reason, "complex control flow or method calls");
+        }
+        if (!hasArrayAccessOpcode()) {
+            appendReason(reason, "no primitive/object array access opcodes found");
+        }
+        if (simdReductionHint && !hasReductionOpcode()) {
+            appendReason(reason, "marked reduction but no reduction-like arithmetic ops found");
+        }
+        String methodId = clsName + "." + methodName + desc;
+        if (reason.length() == 0) {
+            System.out.println("SIMD hints accepted for " + methodId + ": " + getSimdHintSummary());
+        } else {
+            System.out.println("SIMD hints noted but not currently vectorization-ready for " + methodId
+                    + ": " + getSimdHintSummary() + " (" + reason.toString() + ")");
+        }
+    }
+
+    private static void appendReason(StringBuilder sb, String value) {
+        if (sb.length() > 0) {
+            sb.append("; ");
+        }
+        sb.append(value);
+    }
+
+    private boolean hasArrayAccessOpcode() {
+        for (Instruction ins : instructions) {
+            switch (ins.getOpcode()) {
+                case Opcodes.IALOAD:
+                case Opcodes.LALOAD:
+                case Opcodes.FALOAD:
+                case Opcodes.DALOAD:
+                case Opcodes.AALOAD:
+                case Opcodes.BALOAD:
+                case Opcodes.CALOAD:
+                case Opcodes.SALOAD:
+                case Opcodes.IASTORE:
+                case Opcodes.LASTORE:
+                case Opcodes.FASTORE:
+                case Opcodes.DASTORE:
+                case Opcodes.AASTORE:
+                case Opcodes.BASTORE:
+                case Opcodes.CASTORE:
+                case Opcodes.SASTORE:
+                    return true;
+                default:
+                    break;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasReductionOpcode() {
+        for (Instruction ins : instructions) {
+            switch (ins.getOpcode()) {
+                case Opcodes.IADD:
+                case Opcodes.LADD:
+                case Opcodes.FADD:
+                case Opcodes.DADD:
+                case Opcodes.ISUB:
+                case Opcodes.LSUB:
+                case Opcodes.FSUB:
+                case Opcodes.DSUB:
+                case Opcodes.IMUL:
+                case Opcodes.LMUL:
+                case Opcodes.FMUL:
+                case Opcodes.DMUL:
+                case Opcodes.IAND:
+                case Opcodes.LAND:
+                case Opcodes.IOR:
+                case Opcodes.LOR:
+                case Opcodes.IXOR:
+                case Opcodes.LXOR:
+                    return true;
+                default:
+                    break;
+            }
+        }
+        return false;
     }
 
     @Override
