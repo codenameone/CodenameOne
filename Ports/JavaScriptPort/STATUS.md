@@ -3,13 +3,20 @@
 JavaScript Port Status (ParparVM)
 =================================
 
-Last updated: 2026-04-06
+Last updated: 2026-04-07
 
 Current State
 -------------
 
-- **WORKAROUND IN PLACE**: `ensureDisplayEdt()` in port.js creates synthetic EDT if missing. Tests now complete successfully.
-- Screenshot tests pass - suite finishes and screenshots are generated.
+- **WORKAROUND IN PLACE**: `ensureDisplayEdt()` in port.js creates synthetic EDT if missing.
+- **FIX**: `initImpl` shim in port.js guards against `getClass().getName()` failures during `Display.init()`.
+  - In the ParparVM JS translation, `Object.getClass()` may return null or `Class.getName()` may return an underscore-separated name,
+    causing `String.lastIndexOf('.')` to return -1 and a subsequent `substring(0, -1)` to throw.
+  - The shim catches these errors, calls `init(m)` directly, and sets `packageName` from the bootstrap object's class metadata.
+- **FIX**: Simplified `ParparVMBootstrap.bootstrap()` to match `JavaScriptPortBootstrap.bootstrap()` structure.
+  - Removed intermediate `hasNativeTheme()`/`installNativeTheme()` calls between `Display.init()` and `bootstrap.run()`.
+  - These calls were triggering additional failures in the partially-initialized Display state.
+- **Removed**: Bogus root-level `ParparVMBootstrap.java` that had incorrect imports and structure.
 - **Remaining issue**: `IllegalStateException` still caught in fallback handlers even after EDT is set. May be unrelated to EDT (different code path).
 - The separate ParparVM Java test pipelines that were failing in CI (`job-logs2.txt`, `job-logs3.txt`) are now reproduced and fixed locally.
 
