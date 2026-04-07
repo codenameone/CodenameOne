@@ -143,62 +143,64 @@ public class ArrayLoadExpression extends Instruction implements AssignableExpres
         }
 
         boolean useTemporaries = varName != null && (!isSimpleExpression(arrayExpr) || !isSimpleExpression(indexExpr));
-
+        String arrayType = null;
+        String arrayDataType = null;
+        switch (loadInstruction.getOpcode()) {
+            case Opcodes.FALOAD:
+                arrayType = "FLOAT";
+                arrayDataType = "JAVA_ARRAY_FLOAT";
+                break;
+            case Opcodes.DALOAD:
+                arrayType = "DOUBLE";
+                arrayDataType = "JAVA_ARRAY_DOUBLE";
+                break;
+            case Opcodes.LALOAD:
+                arrayType = "LONG";
+                arrayDataType = "JAVA_ARRAY_LONG";
+                break;
+            case Opcodes.IALOAD:
+                arrayType = "INT";
+                arrayDataType = "JAVA_ARRAY_INT";
+                break;
+            case Opcodes.BALOAD:
+                arrayType = "BYTE";
+                arrayDataType = "JAVA_ARRAY_BYTE";
+                break;
+            case Opcodes.CALOAD:
+                arrayType = "CHAR";
+                arrayDataType = "JAVA_ARRAY_CHAR";
+                break;
+            case Opcodes.AALOAD:
+                arrayType = "OBJECT";
+                arrayDataType = "JAVA_ARRAY_OBJECT";
+                break;
+            case Opcodes.SALOAD:
+                arrayType = "SHORT";
+                arrayDataType = "JAVA_ARRAY_SHORT";
+                break;
+                
+        }
         if (useTemporaries) {
             b.append("{\n");
             b.append("    JAVA_OBJECT __cn1ArrayTmp = ").append(arrayExpr).append(";\n");
             b.append("    JAVA_INT __cn1IndexTmp = ").append(indexExpr).append(";\n");
-            b.append("    ").append(varName).append("=");
-        } else if (varName != null) {
-            b.append(varName).append("=");
+            b.append("    CHECK_ARRAY_ACCESS_WITH_ARGS(__cn1ArrayTmp, __cn1IndexTmp);\n");
+            b.append("    ").append(varName).append(" = ((").append(arrayDataType).append("*) (*(JAVA_ARRAY)__cn1ArrayTmp).data)[__cn1IndexTmp];\n");
+            b.append("}\n");
+            sb.append(b);
+            return true;
         }
 
+        if (varName != null) {
+            b.append(varName).append("=");
+        }
         b.append("CN1_ARRAY_ELEMENT_");
-        String arrayType = null;
-        switch (loadInstruction.getOpcode()) {
-            case Opcodes.FALOAD:
-                arrayType = "FLOAT";
-                break;
-            case Opcodes.DALOAD:
-                arrayType = "DOUBLE";
-                break;
-            case Opcodes.LALOAD:
-                arrayType = "LONG";
-                break;
-            case Opcodes.IALOAD:
-                arrayType = "INT";
-                break;
-            case Opcodes.BALOAD:
-                arrayType = "BYTE";
-                break;
-            case Opcodes.CALOAD:
-                arrayType = "CHAR";
-                break;
-            case Opcodes.AALOAD:
-                arrayType = "OBJECT";
-                break;
-            case Opcodes.SALOAD:
-                arrayType = "SHORT";
-                break;
-                
-        }
         b.append(arrayType).append("(");
-        if (useTemporaries) {
-            b.append("__cn1ArrayTmp");
-        } else {
-            b.append(arrayExpr);
-        }
+        b.append(arrayExpr);
         b.append(", ");
-        if (useTemporaries) {
-            b.append("__cn1IndexTmp");
-        } else {
-            b.append(indexExpr);
-        }
+        b.append(indexExpr);
         b.append(")");
-        if (useTemporaries) {
-            b.append(";\n");
-            b.append("}\n");
-        } else if (varName != null) {
+        if (varName != null) {
             b.append(";\n");
         }
         
