@@ -209,38 +209,48 @@ public abstract class Base64 {
     ///
     /// the String containing the array
     public static String encodeNoNewline(byte[] in) {
-        // notice that this method isn't genric to increase performance slightly
-        int length = in.length * 4 / 3;
-        length += length / 76 + 3;
-        byte[] out = new byte[length];
-        int index = 0;
-        int i;
-        int end = in.length - in.length % 3;
-        for (i = 0; i < end; i += 3) {
-            out[index++] = map[(in[i] & 0xff) >> 2];
-            out[index++] = map[((in[i] & 0x03) << 4)
-                    | ((in[i + 1] & 0xff) >> 4)];
-            out[index++] = map[((in[i + 1] & 0x0f) << 2)
-                    | ((in[i + 2] & 0xff) >> 6)];
-            out[index++] = map[(in[i + 2] & 0x3f)];
+        int inputLength = in.length;
+        if (inputLength == 0) {
+            return "";
         }
-        switch (in.length % 3) {
-            case 1:
-                out[index++] = map[(in[end] & 0xff) >> 2];
-                out[index++] = map[(in[end] & 0x03) << 4];
-                out[index++] = '=';
-                out[index++] = '=';
+        int outputLength = ((inputLength + 2) / 3) * 4;
+        byte[] out = new byte[outputLength];
+
+        int outIndex = 0;
+        int inIndex = 0;
+        int end = inputLength - (inputLength % 3);
+        while (inIndex < end) {
+            int b0 = in[inIndex++] & 0xff;
+            int b1 = in[inIndex++] & 0xff;
+            int b2 = in[inIndex++] & 0xff;
+
+            out[outIndex++] = map[b0 >> 2];
+            out[outIndex++] = map[((b0 & 0x03) << 4) | (b1 >> 4)];
+            out[outIndex++] = map[((b1 & 0x0f) << 2) | (b2 >> 6)];
+            out[outIndex++] = map[b2 & 0x3f];
+        }
+
+        switch (inputLength - end) {
+            case 1: {
+                int b0 = in[end] & 0xff;
+                out[outIndex++] = map[b0 >> 2];
+                out[outIndex++] = map[(b0 & 0x03) << 4];
+                out[outIndex++] = '=';
+                out[outIndex++] = '=';
                 break;
-            case 2:
-                out[index++] = map[(in[end] & 0xff) >> 2];
-                out[index++] = map[((in[end] & 0x03) << 4)
-                        | ((in[end + 1] & 0xff) >> 4)];
-                out[index++] = map[((in[end + 1] & 0x0f) << 2)];
-                out[index++] = '=';
+            }
+            case 2: {
+                int b0 = in[end] & 0xff;
+                int b1 = in[end + 1] & 0xff;
+                out[outIndex++] = map[b0 >> 2];
+                out[outIndex++] = map[((b0 & 0x03) << 4) | (b1 >> 4)];
+                out[outIndex++] = map[(b1 & 0x0f) << 2];
+                out[outIndex++] = '=';
                 break;
+            }
             default:
                 break;
         }
-        return com.codename1.util.StringUtil.newString(out, 0, index);
+        return com.codename1.util.StringUtil.newString(out, 0, outIndex);
     }
 }
