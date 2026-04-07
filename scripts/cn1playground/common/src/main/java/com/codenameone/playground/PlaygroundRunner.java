@@ -24,8 +24,6 @@ import com.codename1.ui.plaf.UIManager;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 final class PlaygroundRunner {
     static final class Diagnostic {
@@ -309,30 +307,92 @@ final class PlaygroundRunner {
     }
 
     private String rewriteNestedTypeMethodCalls(String body, NestedTypeDescriptor[] nestedTypes) {
-        String rewritten = body;
-        for (int i = 0; i < nestedTypes.length; i++) {
-            NestedTypeDescriptor type = nestedTypes[i];
-            for (int j = 0; j < type.simpleStringMethods.length; j++) {
-                SimpleStringMethod method = type.simpleStringMethods[j];
-                Pattern pattern = Pattern.compile("\\b([A-Za-z_][A-Za-z0-9_]*)\\s*\\.\\s*"
-                        + Pattern.quote(method.name) + "\\s*\\(\\s*\\)");
-                Matcher matcher = pattern.matcher(rewritten);
-                StringBuffer sb = new StringBuffer();
-                while (matcher.find()) {
-                    String receiver = matcher.group(1);
+        String text = body;
+        for (int t = 0; t < nestedTypes.length; t++) {
+            NestedTypeDescriptor type = nestedTypes[t];
+            for (int m = 0; m < type.simpleStringMethods.length; m++) {
+                SimpleStringMethod method = type.simpleStringMethods[m];
+                StringBuilder out = new StringBuilder();
+                int i = 0;
+                while (i < text.length()) {
+                    char ch = text.charAt(i);
+                    if (ch == '"' || ch == '\'') {
+                        int end = skipQuoted(text, i);
+                        out.append(text.substring(i, end + 1));
+                        i = end + 1;
+                        continue;
+                    }
+                    if (startsLineComment(text, i)) {
+                        int end = skipLineComment(text, i);
+                        out.append(text.substring(i, end + 1));
+                        i = end + 1;
+                        continue;
+                    }
+                    if (startsBlockComment(text, i)) {
+                        int end = skipBlockComment(text, i);
+                        out.append(text.substring(i, end + 1));
+                        i = end + 1;
+                        continue;
+                    }
+                    if (!isIdentifierStart(ch)) {
+                        out.append(ch);
+                        i++;
+                        continue;
+                    }
+                    int receiverStart = i;
+                    while (i < text.length() && isIdentifierPart(text.charAt(i))) {
+                        i++;
+                    }
+                    String receiver = text.substring(receiverStart, i);
+                    int dotPos = skipWhitespace(text, i);
+                    if (dotPos >= text.length() || text.charAt(dotPos) != '.') {
+                        out.append(receiver);
+                        continue;
+                    }
+                    int methodPos = skipWhitespace(text, dotPos + 1);
+                    if (!startsWithWord(text, methodPos, method.name)) {
+                        out.append(receiver);
+                        continue;
+                    }
+                    int afterMethod = methodPos + method.name.length();
+                    int openParen = skipWhitespace(text, afterMethod);
+                    if (openParen >= text.length() || text.charAt(openParen) != '(') {
+                        out.append(receiver);
+                        continue;
+                    }
+                    int closeParen = skipWhitespace(text, openParen + 1);
+                    if (closeParen >= text.length() || text.charAt(closeParen) != ')') {
+                        out.append(receiver);
+                        continue;
+                    }
                     String expr = method.expression;
                     for (int f = 0; f < type.fieldNames.length; f++) {
                         String field = type.fieldNames[f];
-                        expr = expr.replaceAll("\\b" + Pattern.quote(field) + "\\b",
+                        expr = replaceIdentifierWord(expr, field,
                                 "((java.util.Hashtable)" + receiver + ").get(\"" + field + "\")");
                     }
-                    matcher.appendReplacement(sb, Matcher.quoteReplacement("(" + expr + ")"));
+                    out.append('(').append(expr).append(')');
+                    i = closeParen + 1;
                 }
-                matcher.appendTail(sb);
-                rewritten = sb.toString();
+                text = out.toString();
             }
         }
-        return rewritten;
+        return text;
+    }
+
+    private String replaceIdentifierWord(String text, String word, String replacement) {
+        StringBuilder out = new StringBuilder();
+        int i = 0;
+        while (i < text.length()) {
+            if (startsWithWord(text, i, word)) {
+                out.append(replacement);
+                i += word.length();
+            } else {
+                out.append(text.charAt(i));
+                i++;
+            }
+        }
+        return out.toString();
     }
 
     private String findMatchingTypeName(String body, int index, String[] typeNames) {
@@ -416,19 +476,115 @@ final class PlaygroundRunner {
 
     private NestedTypeDescriptor parseNestedTypeDescriptor(String typeName, String typeBody) {
         List<String> fieldNames = new ArrayList<String>();
-        Matcher fieldMatcher = Pattern.compile("(?m)(?:^|\\s)(?:public\\s+|protected\\s+|private\\s+)?(?:final\\s+)?[A-Za-z_][A-Za-z0-9_\\[\\]<>]*\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;").matcher(typeBody);
-        while (fieldMatcher.find()) {
-            String name = fieldMatcher.group(1);
-            if (name != null && name.length() > 0) {
-                fieldNames.add(name);
+        List<SimpleStringMethod> methods = new ArrayList<SimpleStringMethod>();
+        int depth = 0;
+        int stmtStart = 0;
+        for (int i = 0; i < typeBody.length(); i++) {
+            char ch = typeBody.charAt(i);
+            if (ch == '"' || ch == '\'') {
+                i = skipQuoted(typeBody, i);
+                continue;
+            }
+            if (startsLineComment(typeBody, i)) {
+                i = skipLineComment(typeBody, i);
+                continue;
+            }
+            if (startsBlockComment(typeBody, i)) {
+                i = skipBlockComment(typeBody, i);
+                continue;
+            }
+            if (ch == '{') {
+                if (depth == 0) {
+                    String header = typeBody.substring(stmtStart, i).trim();
+                    int bodyEnd = findMatchingBrace(typeBody, i);
+                    if (bodyEnd < 0) {
+                        break;
+                    }
+                    String blockBody = typeBody.substring(i + 1, bodyEnd).trim();
+                    SimpleStringMethod method = parseSimpleStringMethod(header, blockBody);
+                    if (method != null) {
+                        methods.add(method);
+                    }
+                    i = bodyEnd;
+                    stmtStart = i + 1;
+                    continue;
+                }
+                depth++;
+            } else if (ch == '}') {
+                depth--;
+            } else if (depth == 0 && ch == ';') {
+                String statement = typeBody.substring(stmtStart, i + 1).trim();
+                String field = parseFieldName(statement);
+                if (field != null) {
+                    fieldNames.add(field);
+                }
+                stmtStart = i + 1;
             }
         }
-        List<SimpleStringMethod> methods = new ArrayList<SimpleStringMethod>();
-        Matcher methodMatcher = Pattern.compile("(?s)(?:public\\s+|protected\\s+|private\\s+)?String\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*\\(\\s*\\)\\s*\\{\\s*return\\s+(.+?)\\s*;\\s*\\}").matcher(typeBody);
-        while (methodMatcher.find()) {
-            methods.add(new SimpleStringMethod(methodMatcher.group(1), methodMatcher.group(2)));
-        }
         return new NestedTypeDescriptor(typeName, fieldNames, methods);
+    }
+
+    private String parseFieldName(String statement) {
+        if (statement.indexOf('(') >= 0 || statement.indexOf('=') >= 0) {
+            return null;
+        }
+        int end = statement.length() - 1;
+        while (end >= 0 && (statement.charAt(end) == ';' || Character.isWhitespace(statement.charAt(end)))) {
+            end--;
+        }
+        if (end < 0) {
+            return null;
+        }
+        int start = end;
+        while (start >= 0 && isIdentifierPart(statement.charAt(start))) {
+            start--;
+        }
+        start++;
+        if (start > end || !isIdentifierStart(statement.charAt(start))) {
+            return null;
+        }
+        return statement.substring(start, end + 1);
+    }
+
+    private SimpleStringMethod parseSimpleStringMethod(String header, String body) {
+        int openParen = header.indexOf('(');
+        int closeParen = header.indexOf(')', openParen + 1);
+        if (openParen < 0 || closeParen < 0) {
+            return null;
+        }
+        String params = header.substring(openParen + 1, closeParen).trim();
+        if (params.length() > 0) {
+            return null;
+        }
+        int nameEnd = openParen - 1;
+        while (nameEnd >= 0 && Character.isWhitespace(header.charAt(nameEnd))) {
+            nameEnd--;
+        }
+        int nameStart = nameEnd;
+        while (nameStart >= 0 && isIdentifierPart(header.charAt(nameStart))) {
+            nameStart--;
+        }
+        nameStart++;
+        if (nameStart > nameEnd) {
+            return null;
+        }
+        String methodName = header.substring(nameStart, nameEnd + 1);
+        if (methodName.length() == 0) {
+            return null;
+        }
+        String beforeName = header.substring(0, nameStart).trim();
+        if (!beforeName.endsWith("String")) {
+            return null;
+        }
+        String trimmedBody = body.trim();
+        if (!trimmedBody.startsWith("return ") || !trimmedBody.endsWith(";")) {
+            return null;
+        }
+        String expr = trimmedBody.substring(7, trimmedBody.length() - 1).trim();
+        if (expr.length() == 0) {
+            return null;
+        }
+        return new SimpleStringMethod(methodName, expr);
     }
 
     private String readIdentifier(String text, int start) {
