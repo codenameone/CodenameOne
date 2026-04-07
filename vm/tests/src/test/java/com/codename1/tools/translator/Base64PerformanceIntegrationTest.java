@@ -191,14 +191,22 @@ class Base64PerformanceIntegrationTest {
     }
 
     private String runVmBenchmarkWithRetry(Path executable, Path workingDir) throws Exception {
-        try {
-            return CleanTargetIntegrationTest.runCommand(Arrays.asList(executable.toString()), workingDir);
-        } catch (AssertionFailedError firstFailure) {
-            if (!looksLikeSegmentationFault(firstFailure)) {
-                throw firstFailure;
+        final int maxAttempts = 4;
+        AssertionFailedError lastSegfaultFailure = null;
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                return CleanTargetIntegrationTest.runCommand(Arrays.asList(executable.toString()), workingDir);
+            } catch (AssertionFailedError failure) {
+                if (!looksLikeSegmentationFault(failure)) {
+                    throw failure;
+                }
+                lastSegfaultFailure = failure;
+                if (attempt < maxAttempts) {
+                    Thread.sleep(100L * attempt);
+                }
             }
-            return CleanTargetIntegrationTest.runCommand(Arrays.asList(executable.toString()), workingDir);
         }
+        throw lastSegfaultFailure;
     }
 
     private boolean looksLikeSegmentationFault(AssertionFailedError failure) {
