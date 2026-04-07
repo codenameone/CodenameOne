@@ -842,6 +842,15 @@ public class CN extends CN1Constants {
         Display.impl.lockOrientation(portrait);
     }
 
+    /// Returns true if orientation was locked using #lockOrientation(boolean) and not yet unlocked via #unlockOrientation().
+    ///
+    /// #### Returns
+    ///
+    /// true if orientation is currently marked as locked
+    public static boolean isLockOrientation() {
+        return Display.getInstance().isLockOrientation();
+    }
+
     /// This is the reverse method for lock orientation allowing orientation lock to be disabled
     public static void unlockOrientation() {
         Display.impl.unlockOrientation();

@@ -22,39 +22,36 @@
  * have any questions.
  */
 package java.lang;
-/**
- * The class Exception and its subclasses are a form of Throwable that indicates conditions that a reasonable application might want to catch.
- * Since: JDK1.0, CLDC 1.0 See Also:Error
- */
+/// The class Exception and its subclasses are a form of Throwable that indicates conditions that a reasonable application might want to catch.
+/// Since: JDK1.0, CLDC 1.0 See Also:Error
 public class Exception extends java.lang.Throwable{
-    /**
-     * Constructs an Exception with no specified detail message.
-     */
+    /// Constructs an Exception with no specified detail message.
     public Exception(){
          //TODO codavaj!!
     }
 
-    /**
-     * Constructs an Exception with the specified detail message.
-     * s - the detail message.
-     */
+    /// Constructs an Exception with the specified detail message.
+    /// s - the detail message.
     public Exception(java.lang.String s){
          //TODO codavaj!!
     }
 
-    /**
-     * Constructs a new exception with the provided cause.
-     * @param cause The cause of the exception.
-     */
+    /// Constructs a new exception with the provided cause.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cause`: The cause of the exception.
     public Exception(Throwable cause) {
         //TODO codavaj!!
     }
     
-    /**
-     * Constructs a new exception with message and cause.
-     * @param s The detail message.
-     * @param cause The cause of the exception
-     */
+    /// Constructs a new exception with message and cause.
+    ///
+    /// #### Parameters
+    ///
+    /// - `s`: The detail message.
+    ///
+    /// - `cause`: The cause of the exception
     public Exception(java.lang.String s, Throwable cause) {
         //TODO codavaj!!
     }

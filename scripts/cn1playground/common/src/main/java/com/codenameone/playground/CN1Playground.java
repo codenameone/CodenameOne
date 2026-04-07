@@ -19,7 +19,6 @@ import com.codename1.ui.Tabs;
 import com.codename1.ui.Toolbar;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
-import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.Resources;
 import com.codename1.ui.util.UITimer;
@@ -38,8 +37,8 @@ public class CN1Playground extends Lifecycle {
     private static final String ROLE_EMBEDDED_FORM = "embeddedForm";
     private static final String ROLE_EMBEDDED_TITLE_AREA = "embeddedTitleArea";
     private static final String SHARE_BUTTON_LABEL = "Copy Shareable Playground URL";
-
     private final PlaygroundRunner runner = new PlaygroundRunner();
+    private final PlaygroundProjectExporter projectExporter = new PlaygroundProjectExporter();
 
     private Form appForm;
     private PlaygroundBrowserEditor editor;
@@ -47,6 +46,7 @@ public class CN1Playground extends Lifecycle {
     private PlaygroundInspector inspector;
     private Container previewRoot;
     private Container historyMenu;
+    private final List<Component> sideMenuComponents = new ArrayList<>();
     private Resources theme;
     private boolean websiteDarkMode = DEFAULT_DARK_MODE;
     private String currentScript;
@@ -75,6 +75,8 @@ public class CN1Playground extends Lifecycle {
         if (toolbar.getTitleComponent() != null) {
             toolbar.getTitleComponent().setUIID("PlaygroundTitle");
         }
+
+        toolbar.addMaterialCommandToRightBar("Download", com.codename1.ui.FontImage.MATERIAL_DOWNLOAD, e -> projectExporter.export(currentScript, currentCss));
 
         editor = new PlaygroundBrowserEditor(PlaygroundBrowserEditor.Mode.JAVA, currentScript, websiteDarkMode, this::handleSourceChanged);
         cssEditor = new PlaygroundBrowserEditor(PlaygroundBrowserEditor.Mode.CSS, currentCss, websiteDarkMode, this::handleCssChanged);
@@ -155,12 +157,12 @@ public class CN1Playground extends Lifecycle {
     }
 
     private Component createMainContent(Tabs tabs, Container previewPanel) {
-        if (CN.getDisplayWidth() >= 900) {
+        tabs.setSwipeActivated(false);
+        if (!Display.getInstance().isPortrait()) {
             return new SplitPane(SplitPane.HORIZONTAL_SPLIT, tabs, previewPanel, "25%", "50%", "75%");
         }
-        Container stacked = new Container(new GridLayout(2, 1));
-        stacked.addAll(tabs, previewPanel);
-        return stacked;
+        tabs.addTab("Preview", previewPanel);
+        return tabs;
     }
 
     private void runScript(Form form) {
@@ -242,27 +244,34 @@ public class CN1Playground extends Lifecycle {
     }
 
     private void installSideMenu(Toolbar toolbar) {
+        Toolbar.setEnableSideMenuSwipe(false);
         PlaygroundMenuSection shareSection = new PlaygroundMenuSection("Share");
-        toolbar.addComponentToSideMenu(shareSection);
-        toolbar.addComponentToSideMenu(createSideMenuButton(SHARE_BUTTON_LABEL, () -> {
+        addSideMenuComponent(toolbar, shareSection);
+        addSideMenuComponent(toolbar, createSideMenuButton(SHARE_BUTTON_LABEL, () -> {
             copyCurrentSourceUrl();
             toolbar.closeSideMenu();
         }));
 
         PlaygroundMenuSection samplesSection = new PlaygroundMenuSection("Samples");
-        toolbar.addComponentToSideMenu(samplesSection);
+        addSideMenuComponent(toolbar, samplesSection);
         for (PlaygroundExamples.Sample sample : PlaygroundExamples.SAMPLES) {
-            toolbar.addComponentToSideMenu(createSideMenuButton(sample.title, () -> {
+            addSideMenuComponent(toolbar, createSideMenuButton(sample.title, () -> {
                 setScript(sample.script, true);
                 toolbar.closeSideMenu();
             }));
         }
 
         PlaygroundMenuSection historySection = new PlaygroundMenuSection("History");
-        toolbar.addComponentToSideMenu(historySection);
-        toolbar.addComponentToSideMenu(historyMenu);
+        addSideMenuComponent(toolbar, historySection);
+        addSideMenuComponent(toolbar, historyMenu);
 
         refreshHistoryMenu(toolbar, PlaygroundStateStore.loadHistory());
+    }
+
+    private void addSideMenuComponent(Toolbar toolbar, Component component) {
+        applyWebsiteTheme(component, websiteDarkMode);
+        sideMenuComponents.add(component);
+        toolbar.addComponentToSideMenu(component);
     }
 
     private void refreshHistoryMenu(Toolbar toolbar, List<PlaygroundStateStore.HistoryEntry> history) {
@@ -294,6 +303,7 @@ public class CN1Playground extends Lifecycle {
             setScript(entry.script, true);
             toolbar.closeSideMenu();
         });
+        applyWebsiteTheme(button, websiteDarkMode);
         return button;
     }
 
@@ -301,6 +311,7 @@ public class CN1Playground extends Lifecycle {
         Button button = new Button(text);
         button.setUIID("PlaygroundSideCommand");
         button.addActionListener(e -> action.run());
+        applyWebsiteTheme(button, websiteDarkMode);
         return button;
     }
 
@@ -451,6 +462,7 @@ public class CN1Playground extends Lifecycle {
             return;
         }
         restoreThemeDefaults();
+        applySideMenuPalette(websiteDarkMode);
         List<PlaygroundRunner.Diagnostic> diagnostics = new ArrayList<PlaygroundRunner.Diagnostic>();
         List<PlaygroundRunner.InlineMessage> messages = new ArrayList<PlaygroundRunner.InlineMessage>();
         try {
@@ -467,6 +479,7 @@ public class CN1Playground extends Lifecycle {
         cssEditor.setMarkers(diagnostics);
         cssEditor.setInlineMessages(messages);
         cssEditor.setUiidCompletions(PlaygroundCssSupport.collectVisibleUiids(previewRoot));
+        applyTabsTheme(websiteDarkMode);
         appForm.refreshTheme();
     }
 
@@ -561,6 +574,7 @@ public class CN1Playground extends Lifecycle {
         websiteThemeNative = NativeLookup.create(WebsiteThemeNative.class);
         refreshWebsiteTheme(form);
         UITimer.timer(900, true, form, () -> refreshWebsiteTheme(form));
+        UITimer.timer(250, true, form, this::syncOpenSideMenuTheme);
     }
 
     private void notifyWebsiteUiReady() {
@@ -636,6 +650,7 @@ public class CN1Playground extends Lifecycle {
         if (!websiteThemeInitialized || dark != websiteDarkMode) {
             websiteDarkMode = dark;
             websiteThemeInitialized = true;
+            applySideMenuPalette(dark);
             applyWebsiteTheme(form, dark);
             applyTabsTheme(dark);
             form.refreshTheme();
@@ -648,6 +663,62 @@ public class CN1Playground extends Lifecycle {
             }
             if (inspector != null) {
                 inspector.applyTheme(dark);
+            }
+            for (Component cmp : sideMenuComponents) {
+                applyWebsiteTheme(cmp, dark);
+            }
+        }
+    }
+
+    private void applySideMenuPalette(boolean dark) {
+        Hashtable sideMenuPalette = new Hashtable();
+        int bgColor = dark ? 0x0f172a : 0xffffff;
+        int borderColor = dark ? 0x1f2937 : 0xcccccc;
+
+        sideMenuPalette.put("SideNavigationPanel.bgColor", bgColor);
+        sideMenuPalette.put("SideNavigationPanel.bgTransparency", 255);
+        sideMenuPalette.put("SideNavigationPanelDark.bgColor", bgColor);
+        sideMenuPalette.put("SideNavigationPanelDark.bgTransparency", 255);
+        sideMenuPalette.put("RightSideNavigationPanel.bgColor", bgColor);
+        sideMenuPalette.put("RightSideNavigationPanel.bgTransparency", 255);
+
+        sideMenuPalette.put("StatusBarSideMenu.bgColor", bgColor);
+        sideMenuPalette.put("StatusBarSideMenu.bgTransparency", 255);
+        sideMenuPalette.put("StatusBarSideMenuDark.bgColor", bgColor);
+        sideMenuPalette.put("StatusBarSideMenuDark.bgTransparency", 255);
+
+        sideMenuPalette.put("SideCommand.bgColor", bgColor);
+        sideMenuPalette.put("SideCommand.bgTransparency", 255);
+        sideMenuPalette.put("SideCommand.border", com.codename1.ui.plaf.Border.createLineBorder(2, borderColor));
+        UIManager.getInstance().addThemeProps(sideMenuPalette);
+    }
+
+    private void syncOpenSideMenuTheme() {
+        Form current = Display.getInstance().getCurrent();
+        if (current == null) {
+            return;
+        }
+        applySideMenuContainerTheme(current);
+    }
+
+    private void applySideMenuContainerTheme(Component component) {
+        if (component == null) {
+            return;
+        }
+        String uiid = component.getUIID();
+        if ("SideNavigationPanel".equals(uiid)
+                || "SideNavigationPanelDark".equals(uiid)
+                || "RightSideNavigationPanel".equals(uiid)
+                || "StatusBarSideMenu".equals(uiid)
+                || "StatusBarSideMenuDark".equals(uiid)) {
+            applyWebsiteTheme(component, websiteDarkMode);
+            component.getAllStyles().setBgTransparency(255);
+            component.getAllStyles().setBgColor(websiteDarkMode ? 0x0f172a : 0xffffff);
+        }
+        if (component instanceof Container) {
+            Container cnt = (Container) component;
+            for (int i = 0; i < cnt.getComponentCount(); i++) {
+                applySideMenuContainerTheme(cnt.getComponentAt(i));
             }
         }
     }
@@ -710,6 +781,16 @@ public class CN1Playground extends Lifecycle {
             case "PlaygroundTitle":
             case "PlaygroundPanel":
             case "PlaygroundPreview":
+            case "SideNavigationPanel":
+            case "RightSideNavigationPanel":
+            case "StatusBarSideMenu":
+            case "PlaygroundSideCommand":
+            case "PlaygroundSideCommandLine1":
+            case "PlaygroundSideCommandLine2":
+            case "PlaygroundMenuSection":
+            case "PlaygroundMenuSectionTitle":
+            case "PlaygroundMenuEmpty":
+            case "PlaygroundMenuContainer":
             case "PlaygroundEmbeddedForm":
             case "PlaygroundEmbeddedTitleArea":
             case "PlaygroundInspectorRoot":
@@ -730,8 +811,14 @@ public class CN1Playground extends Lifecycle {
 
     private void applyTabsTheme(boolean dark) {
         if (editorTabs != null) {
-            editorTabs.setUIID(dark ? "PlaygroundEditorTabsDark" : "PlaygroundEditorTabs");
-            editorTabs.setTabUIID(dark ? "TabDark" : "Tab");
+            String tabsUiid = dark ? "PlaygroundEditorTabsDark" : "PlaygroundEditorTabs";
+            String tabUiid = dark ? "TabDark" : "Tab";
+            editorTabs.setUIID(tabsUiid);
+            editorTabs.setTabUIID(tabUiid);
+            Container tabsContainer = editorTabs.getTabsContainer();
+            for (int i = 0; i < tabsContainer.getComponentCount(); i++) {
+                tabsContainer.getComponentAt(i).setUIID(tabUiid);
+            }
             editorTabs.refreshTheme();
             editorTabs.revalidate();
         }

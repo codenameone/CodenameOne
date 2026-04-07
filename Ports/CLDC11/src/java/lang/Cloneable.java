@@ -18,16 +18,20 @@
 package java.lang;
 
 
-/**
- * This (empty) interface must be implemented by all classes that wish to
- * support cloning. The implementation of {@code clone()} in {@code Object}
- * checks if the object being cloned implements this interface and throws
- * {@code CloneNotSupportedException} if it does not.
- * 
- * @see Object#clone
- * @see CloneNotSupportedException
- * @deprecated clone isn't supported in Codename One, this interface is here strictly for compilation purposes
- */
+/// This (empty) interface must be implemented by all classes that wish to
+/// support cloning. The implementation of `clone()` in `Object`
+/// checks if the object being cloned implements this interface and throws
+/// `CloneNotSupportedException` if it does not.
+///
+/// #### Deprecated
+///
+/// clone isn't supported in Codename One, this interface is here strictly for compilation purposes
+///
+/// #### See also
+///
+/// - Object#clone
+///
+/// - CloneNotSupportedException
 public interface Cloneable {
     // Marker interface
 }

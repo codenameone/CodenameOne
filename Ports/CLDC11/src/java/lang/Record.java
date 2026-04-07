@@ -22,9 +22,7 @@
  */
 package java.lang;
 
-/**
- * Base class for Java record types.
- */
+/// Base class for Java record types.
 public abstract class Record {
     protected Record() {
     }

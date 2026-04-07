@@ -2,6 +2,8 @@
 #Constants {
     includeNativeBool: true;
     defaultSourceDPIInt: "0";
+    sideMenuSizeLandscapeInt: "75";
+    sideMenuSizeTabLandscapeInt: "75";
 }
 
 /** Style for Button class */
@@ -395,6 +397,18 @@ TabDark {
     font-family: "native:MainLight";
     font-size: 3mm;
     text-align: center;
+}
+
+TabSelected {
+    background: #ffffff;
+    color: #111827;
+    border: 1px solid #94a3b8;
+}
+
+TabSelectedDark {
+    background: #1f2937;
+    color: #f8fafc;
+    border: 1px solid #64748b;
 }
 
 TabsContainer {

@@ -22,10 +22,7 @@
  */
 package java.lang;
 
-/**
- *
- * @author shannah
- */
+/// @author shannah
 public class StackTraceElement {
     private String declaringClass;
     private String methodName;

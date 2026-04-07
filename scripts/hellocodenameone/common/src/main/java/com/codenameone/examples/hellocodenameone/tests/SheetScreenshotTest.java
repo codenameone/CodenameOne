@@ -3,6 +3,7 @@ package com.codenameone.examples.hellocodenameone.tests;
 import com.codename1.ui.Button;
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;
+import com.codename1.ui.FontImage;
 import com.codename1.ui.Label;
 import com.codename1.ui.Sheet;
 import com.codename1.ui.layouts.BorderLayout;
@@ -35,6 +36,12 @@ public class SheetScreenshotTest extends BaseTest {
 
     private Sheet createSheet(Sheet parent, String title) {
         Sheet newSheet = new Sheet(parent, title);
+        Label titleIcon = new Label();
+        FontImage.setMaterialIcon(titleIcon, FontImage.MATERIAL_IMAGE, 3f);
+        titleIcon.setUIID("SheetTitleIcon");
+        Label titleLabel = new Label(title);
+        titleLabel.setUIID("SheetTitleText");
+        newSheet.setTitleComponent(BoxLayout.encloseYCenter(titleIcon, titleLabel));
         Container content = newSheet.getContentPane();
         content.setLayout(BoxLayout.y());
         content.add(new Label("Sheet content"));

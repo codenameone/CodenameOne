@@ -17,57 +17,65 @@
 
 package java.util;
 
-/**
- * A {@code Comparator} is used to compare two objects to determine their ordering with
- * respect to each other. On a given {@code Collection}, a {@code Comparator} can be used to
- * obtain a sorted {@code Collection} which is <i>totally ordered</i>. For a {@code Comparator}
- * to be <i>consistent with equals</i>, its {code #compare(Object, Object)}
- * method has to return zero for each pair of elements (a,b) where a.equals(b)
- * holds true. It is recommended that a {@code Comparator} implements
- * {@link java.io.Serializable}.
- *
- * @since 1.2
- */
+/// A `Comparator` is used to compare two objects to determine their ordering with
+/// respect to each other. On a given `Collection`, a `Comparator` can be used to
+/// obtain a sorted `Collection` which is *totally ordered*. For a `Comparator`
+/// to be *consistent with equals*, its {code #compare(Object, Object)}
+/// method has to return zero for each pair of elements (a,b) where a.equals(b)
+/// holds true. It is recommended that a `Comparator` implements
+/// `java.io.Serializable`.
+///
+/// #### Since
+///
+/// 1.2
 public interface Comparator<T> {
-    /**
-     * Compares the two specified objects to determine their relative ordering. The ordering
-     * implied by the return value of this method for all possible pairs of
-     * {@code (object1, object2)} should form an <i>equivalence relation</i>.
-     * This means that
-     * <ul>
-     * <li>{@code compare(a,a)} returns zero for all {@code a}</li>
-     * <li>the sign of {@code compare(a,b)} must be the opposite of the sign of {@code
-     * compare(b,a)} for all pairs of (a,b)</li>
-     * <li>From {@code compare(a,b) > 0} and {@code compare(b,c) > 0} it must
-     * follow {@code compare(a,c) > 0} for all possible combinations of {@code
-     * (a,b,c)}</li>
-     * </ul>
-     * 
-     * @param object1
-     *            an {@code Object}.
-     * @param object2
-     *            a second {@code Object} to compare with {@code object1}.
-     * @return an integer < 0 if {@code object1} is less than {@code object2}, 0 if they are
-     *         equal, and > 0 if {@code object1} is greater than {@code object2}.
-     * @throws ClassCastException
-     *                if objects are not of the correct type.
-     */
+    /// Compares the two specified objects to determine their relative ordering. The ordering
+    /// implied by the return value of this method for all possible pairs of
+    /// `(object1, object2)` should form an *equivalence relation*.
+    /// This means that
+    ///
+    /// - `compare(a,a)` returns zero for all `a`
+    ///
+    /// - the sign of `compare(a,b)` must be the opposite of the sign of `compare(b,a)` for all pairs of (a,b)
+    ///
+    /// - From `compare(a,b) > 0` and `compare(b,c) > 0` it must
+    /// follow `compare(a,c) > 0` for all possible combinations of `(a,b,c)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `object1`: an `Object`.
+    ///
+    /// - `object2`: a second `Object` to compare with `object1`.
+    ///
+    /// #### Returns
+    ///
+    /// an integer  0 if `object1` is greater than `object2`.
+    ///
+    /// #### Throws
+    ///
+    /// - `ClassCastException`: if objects are not of the correct type.
     public int compare(T object1, T object2);
 
-    /**
-     * Compares this {@code Comparator} with the specified {@code Object} and indicates whether they
-     * are equal. In order to be equal, {@code object} must represent the same object
-     * as this instance using a class-specific comparison.
-     * <p>
-     * A {@code Comparator} never needs to override this method, but may choose so for
-     * performance reasons.
-     * 
-     * @param object
-     *            the {@code Object} to compare with this comparator.
-     * @return boolean {@code true} if specified {@code Object} is the same as this
-     *         {@code Object}, and {@code false} otherwise.
-     * @see Object#hashCode
-     * @see Object#equals
-     */
+    /// Compares this `Comparator` with the specified `Object` and indicates whether they
+    /// are equal. In order to be equal, `object` must represent the same object
+    /// as this instance using a class-specific comparison.
+    ///
+    /// A `Comparator` never needs to override this method, but may choose so for
+    /// performance reasons.
+    ///
+    /// #### Parameters
+    ///
+    /// - `object`: the `Object` to compare with this comparator.
+    ///
+    /// #### Returns
+    ///
+    /// @return boolean `true` if specified `Object` is the same as this
+    /// `Object`, and `false` otherwise.
+    ///
+    /// #### See also
+    ///
+    /// - Object#hashCode
+    ///
+    /// - Object#equals
     public boolean equals(Object object);
 }

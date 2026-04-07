@@ -18,18 +18,18 @@ package java.lang;
 
 import java.util.Iterator;
 
-/**
- * Objects of classes that implement this interface can be used within a
- * {@code foreach} statement.
- *
- * @since 1.5
- */
+/// Objects of classes that implement this interface can be used within a
+/// `foreach` statement.
+///
+/// #### Since
+///
+/// 1.5
 public interface Iterable<T> {
 
-    /**
-     * Returns an {@link Iterator} for the elements in this object.
-     * 
-     * @return An {@code Iterator} instance.
-     */
+    /// Returns an `Iterator` for the elements in this object.
+    ///
+    /// #### Returns
+    ///
+    /// An `Iterator` instance.
     Iterator<T> iterator();
 }

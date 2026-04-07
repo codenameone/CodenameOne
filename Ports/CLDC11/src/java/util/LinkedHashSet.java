@@ -17,59 +17,54 @@
 
 package java.util;
 
-/**
- * LinkedHashSet is a variant of HashSet. Its entries are kept in a
- * doubly-linked list. The iteration order is the order in which entries were
- * inserted.
- * <p>
- * Null elements are allowed, and all the optional Set operations are supported.
- * <p>
- * Like HashSet, LinkedHashSet is not thread safe, so access by multiple threads
- * must be synchronized by an external mechanism such as
- * {@link Collections#synchronizedSet(Set)}.
- *
- * @since 1.4
- */
+/// LinkedHashSet is a variant of HashSet. Its entries are kept in a
+/// doubly-linked list. The iteration order is the order in which entries were
+/// inserted.
+///
+/// Null elements are allowed, and all the optional Set operations are supported.
+///
+/// Like HashSet, LinkedHashSet is not thread safe, so access by multiple threads
+/// must be synchronized by an external mechanism such as
+/// `Collections#synchronizedSet(Set)`.
+///
+/// #### Since
+///
+/// 1.4
 public class LinkedHashSet<E> extends HashSet<E> implements Set<E> {
 
-    /**
-     * Constructs a new empty instance of {@code LinkedHashSet}.
-     */
+    /// Constructs a new empty instance of `LinkedHashSet`.
     public LinkedHashSet() {
         super(new LinkedHashMap<E, HashSet<E>>());
     }
 
-    /**
-     * Constructs a new instance of {@code LinkedHashSet} with the specified
-     * capacity.
-     * 
-     * @param capacity
-     *            the initial capacity of this {@code LinkedHashSet}.
-     */
+    /// Constructs a new instance of `LinkedHashSet` with the specified
+    /// capacity.
+    ///
+    /// #### Parameters
+    ///
+    /// - `capacity`: the initial capacity of this `LinkedHashSet`.
     public LinkedHashSet(int capacity) {
         super(new LinkedHashMap<E, HashSet<E>>(capacity));
     }
 
-    /**
-     * Constructs a new instance of {@code LinkedHashSet} with the specified
-     * capacity and load factor.
-     * 
-     * @param capacity
-     *            the initial capacity.
-     * @param loadFactor
-     *            the initial load factor.
-     */
+    /// Constructs a new instance of `LinkedHashSet` with the specified
+    /// capacity and load factor.
+    ///
+    /// #### Parameters
+    ///
+    /// - `capacity`: the initial capacity.
+    ///
+    /// - `loadFactor`: the initial load factor.
     public LinkedHashSet(int capacity, float loadFactor) {
         super(new LinkedHashMap<E, HashSet<E>>(capacity, loadFactor));
     }
 
-    /**
-     * Constructs a new instance of {@code LinkedHashSet} containing the unique
-     * elements in the specified collection.
-     * 
-     * @param collection
-     *            the collection of elements to add.
-     */
+    /// Constructs a new instance of `LinkedHashSet` containing the unique
+    /// elements in the specified collection.
+    ///
+    /// #### Parameters
+    ///
+    /// - `collection`: the collection of elements to add.
     public LinkedHashSet(Collection<? extends E> collection) {
         super(new LinkedHashMap<E, HashSet<E>>(collection.size() < 6 ? 11
                 : collection.size() * 2));

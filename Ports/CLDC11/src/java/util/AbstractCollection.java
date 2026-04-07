@@ -17,20 +17,16 @@
 
 package java.util;
 
-/**
- * Class {@code AbstractCollection} is an abstract implementation of the {@code
- * Collection} interface. A subclass must implement the abstract methods {@code
- * iterator()} and {@code size()} to create an immutable collection. To create a
- * modifiable collection it's necessary to override the {@code add()} method that
- * currently throws an {@code UnsupportedOperationException}.
- *
- * @since 1.2
- */
+/// Class `AbstractCollection` is an abstract implementation of the `Collection` interface. A subclass must implement the abstract methods `iterator()` and `size()` to create an immutable collection. To create a
+/// modifiable collection it's necessary to override the `add()` method that
+/// currently throws an `UnsupportedOperationException`.
+///
+/// #### Since
+///
+/// 1.2
 public abstract class AbstractCollection<E> implements Collection<E> {
 
-    /**
-     * Constructs a new instance of this AbstractCollection.
-     */
+    /// Constructs a new instance of this AbstractCollection.
     protected AbstractCollection() {
         super();
     }
@@ -39,35 +35,40 @@ public abstract class AbstractCollection<E> implements Collection<E> {
         throw new UnsupportedOperationException();
     }
 
-    /**
-     * Attempts to add all of the objects contained in {@code collection}
-     * to the contents of this {@code Collection} (optional). This implementation
-     * iterates over the given {@code Collection} and calls {@code add} for each
-     * element. If any of these calls return {@code true}, then {@code true} is
-     * returned as result of this method call, {@code false} otherwise. If this
-     * {@code Collection} does not support adding elements, an {@code
-     * UnsupportedOperationException} is thrown.
-     * <p>
-     * If the passed {@code Collection} is changed during the process of adding elements
-     * to this {@code Collection}, the behavior depends on the behavior of the passed
-     * {@code Collection}.
-     * 
-     * @param collection
-     *            the collection of objects.
-     * @return {@code true} if this {@code Collection} is modified, {@code false}
-     *         otherwise.
-     * @throws UnsupportedOperationException
-     *                if adding to this {@code Collection} is not supported.
-     * @throws ClassCastException
-     *                if the class of an object is inappropriate for this
-     *                {@code Collection}.
-     * @throws IllegalArgumentException
-     *                if an object cannot be added to this {@code Collection}.
-     * @throws NullPointerException
-     *                if {@code collection} is {@code null}, or if it contains
-     *                {@code null} elements and this {@code Collection} does not support
-     *                such elements.
-     */
+    /// Attempts to add all of the objects contained in `collection`
+    /// to the contents of this `Collection` (optional). This implementation
+    /// iterates over the given `Collection` and calls `add` for each
+    /// element. If any of these calls return `true`, then `true` is
+    /// returned as result of this method call, `false` otherwise. If this
+    /// `Collection` does not support adding elements, an `UnsupportedOperationException` is thrown.
+    ///
+    /// If the passed `Collection` is changed during the process of adding elements
+    /// to this `Collection`, the behavior depends on the behavior of the passed
+    /// `Collection`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `collection`: the collection of objects.
+    ///
+    /// #### Returns
+    ///
+    /// @return `true` if this `Collection` is modified, `false`
+    /// otherwise.
+    ///
+    /// #### Throws
+    ///
+    /// - `UnsupportedOperationException`: if adding to this `Collection` is not supported.
+    ///
+    /// - `ClassCastException`: @throws ClassCastException
+    /// if the class of an object is inappropriate for this
+    /// `Collection`.
+    ///
+    /// - `IllegalArgumentException`: if an object cannot be added to this `Collection`.
+    ///
+    /// - `NullPointerException`: @throws NullPointerException
+    /// if `collection` is `null`, or if it contains
+    /// `null` elements and this `Collection` does not support
+    /// such elements.
     public boolean addAll(Collection<? extends E> collection) {
         boolean result = false;
         Iterator<? extends E> it = collection.iterator();
@@ -79,22 +80,26 @@ public abstract class AbstractCollection<E> implements Collection<E> {
         return result;
     }
 
-    /**
-     * Removes all elements from this {@code Collection}, leaving it empty (optional).
-     * This implementation iterates over this {@code Collection} and calls the {@code
-     * remove} method on each element. If the iterator does not support removal
-     * of elements, an {@code UnsupportedOperationException} is thrown.
-     * <p>
-     * Concrete implementations usually can clear a {@code Collection} more efficiently
-     * and should therefore overwrite this method.
-     * 
-     * @throws UnsupportedOperationException
-     *                it the iterator does not support removing elements from
-     *                this {@code Collection}
-     * @see #iterator
-     * @see #isEmpty
-     * @see #size
-     */
+    /// Removes all elements from this `Collection`, leaving it empty (optional).
+    /// This implementation iterates over this `Collection` and calls the `remove` method on each element. If the iterator does not support removal
+    /// of elements, an `UnsupportedOperationException` is thrown.
+    ///
+    /// Concrete implementations usually can clear a `Collection` more efficiently
+    /// and should therefore overwrite this method.
+    ///
+    /// #### Throws
+    ///
+    /// - `UnsupportedOperationException`: @throws UnsupportedOperationException
+    /// it the iterator does not support removing elements from
+    /// this `Collection`
+    ///
+    /// #### See also
+    ///
+    /// - #iterator
+    ///
+    /// - #isEmpty
+    ///
+    /// - #size
     public void clear() {
         Iterator<E> it = iterator();
         while (it.hasNext()) {
@@ -103,25 +108,29 @@ public abstract class AbstractCollection<E> implements Collection<E> {
         }
     }
 
-    /**
-     * Tests whether this {@code Collection} contains the specified object. This
-     * implementation iterates over this {@code Collection} and tests, whether any
-     * element is equal to the given object. If {@code object != null} then
-     * {@code object.equals(e)} is called for each element {@code e} returned by
-     * the iterator until the element is found. If {@code object == null} then
-     * each element {@code e} returned by the iterator is compared with the test
-     * {@code e == null}.
-     * 
-     * @param object
-     *            the object to search for.
-     * @return {@code true} if object is an element of this {@code Collection}, {@code
-     *         false} otherwise.
-     * @throws ClassCastException
-     *                if the object to look for isn't of the correct type.
-     * @throws NullPointerException
-     *                if the object to look for is {@code null} and this
-     *                {@code Collection} doesn't support {@code null} elements.
-     */
+    /// Tests whether this `Collection` contains the specified object. This
+    /// implementation iterates over this `Collection` and tests, whether any
+    /// element is equal to the given object. If `object != null` then
+    /// `object.equals(e)` is called for each element `e` returned by
+    /// the iterator until the element is found. If `object == null` then
+    /// each element `e` returned by the iterator is compared with the test
+    /// `e == null`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `object`: the object to search for.
+    ///
+    /// #### Returns
+    ///
+    /// `true` if object is an element of this `Collection`, `false` otherwise.
+    ///
+    /// #### Throws
+    ///
+    /// - `ClassCastException`: if the object to look for isn't of the correct type.
+    ///
+    /// - `NullPointerException`: @throws NullPointerException
+    /// if the object to look for is `null` and this
+    /// `Collection` doesn't support `null` elements.
     public boolean contains(Object object) {
         Iterator<E> it = iterator();
         if (object != null) {
@@ -140,26 +149,32 @@ public abstract class AbstractCollection<E> implements Collection<E> {
         return false;
     }
 
-    /**
-     * Tests whether this {@code Collection} contains all objects contained in the
-     * specified {@code Collection}. This implementation iterates over the specified
-     * {@code Collection}. If one element returned by the iterator is not contained in
-     * this {@code Collection}, then {@code false} is returned; {@code true} otherwise.
-     * 
-     * @param collection
-     *            the collection of objects.
-     * @return {@code true} if all objects in the specified {@code Collection} are
-     *         elements of this {@code Collection}, {@code false} otherwise.
-     * @throws ClassCastException
-     *                if one or more elements of {@code collection} isn't of the
-     *                correct type.
-     * @throws NullPointerException
-     *                if {@code collection} contains at least one {@code null}
-     *                element and this {@code Collection} doesn't support {@code null}
-     *                elements.
-     * @throws NullPointerException
-     *                if {@code collection} is {@code null}.
-     */
+    /// Tests whether this `Collection` contains all objects contained in the
+    /// specified `Collection`. This implementation iterates over the specified
+    /// `Collection`. If one element returned by the iterator is not contained in
+    /// this `Collection`, then `false` is returned; `true` otherwise.
+    ///
+    /// #### Parameters
+    ///
+    /// - `collection`: the collection of objects.
+    ///
+    /// #### Returns
+    ///
+    /// @return `true` if all objects in the specified `Collection` are
+    /// elements of this `Collection`, `false` otherwise.
+    ///
+    /// #### Throws
+    ///
+    /// - `ClassCastException`: @throws ClassCastException
+    /// if one or more elements of `collection` isn't of the
+    /// correct type.
+    ///
+    /// - `NullPointerException`: @throws NullPointerException
+    /// if `collection` contains at least one `null`
+    /// element and this `Collection` doesn't support `null`
+    /// elements.
+    ///
+    /// - `NullPointerException`: if `collection` is `null`.
     public boolean containsAll(Collection<?> collection) {
         Iterator<?> it = collection.iterator();
         while (it.hasNext()) {
@@ -170,56 +185,63 @@ public abstract class AbstractCollection<E> implements Collection<E> {
         return true;
     }
 
-    /**
-     * Returns if this {@code Collection} contains no elements. This implementation
-     * tests, whether {@code size} returns 0.
-     * 
-     * @return {@code true} if this {@code Collection} has no elements, {@code false}
-     *         otherwise.
-     *
-     * @see #size
-     */
+    /// Returns if this `Collection` contains no elements. This implementation
+    /// tests, whether `size` returns 0.
+    ///
+    /// #### Returns
+    ///
+    /// @return `true` if this `Collection` has no elements, `false`
+    /// otherwise.
+    ///
+    /// #### See also
+    ///
+    /// - #size
     public boolean isEmpty() {
         return size() == 0;
     }
 
-    /**
-     * Returns an instance of {@link Iterator} that may be used to access the
-     * objects contained by this {@code Collection}. The order in which the elements are
-     * returned by the {@link Iterator} is not defined unless the instance of the
-     * {@code Collection} has a defined order.  In that case, the elements are returned in that order.
-     * <p>
-     * In this class this method is declared abstract and has to be implemented
-     * by concrete {@code Collection} implementations.
-     * 
-     * @return an iterator for accessing the {@code Collection} contents.
-     */
+    /// Returns an instance of `Iterator` that may be used to access the
+    /// objects contained by this `Collection`. The order in which the elements are
+    /// returned by the `Iterator` is not defined unless the instance of the
+    /// `Collection` has a defined order.  In that case, the elements are returned in that order.
+    ///
+    /// In this class this method is declared abstract and has to be implemented
+    /// by concrete `Collection` implementations.
+    ///
+    /// #### Returns
+    ///
+    /// an iterator for accessing the `Collection` contents.
     public abstract Iterator<E> iterator();
 
-    /**
-     * Removes one instance of the specified object from this {@code Collection} if one
-     * is contained (optional). This implementation iterates over this
-     * {@code Collection} and tests for each element {@code e} returned by the iterator,
-     * whether {@code e} is equal to the given object. If {@code object != null}
-     * then this test is performed using {@code object.equals(e)}, otherwise
-     * using {@code object == null}. If an element equal to the given object is
-     * found, then the {@code remove} method is called on the iterator and
-     * {@code true} is returned, {@code false} otherwise. If the iterator does
-     * not support removing elements, an {@code UnsupportedOperationException}
-     * is thrown.
-     * 
-     * @param object
-     *            the object to remove.
-     * @return {@code true} if this {@code Collection} is modified, {@code false}
-     *         otherwise.
-     * @throws UnsupportedOperationException
-     *                if removing from this {@code Collection} is not supported.
-     * @throws ClassCastException
-     *                if the object passed is not of the correct type.
-     * @throws NullPointerException
-     *                if {@code object} is {@code null} and this {@code Collection}
-     *                doesn't support {@code null} elements.
-     */
+    /// Removes one instance of the specified object from this `Collection` if one
+    /// is contained (optional). This implementation iterates over this
+    /// `Collection` and tests for each element `e` returned by the iterator,
+    /// whether `e` is equal to the given object. If `object != null`
+    /// then this test is performed using `object.equals(e)`, otherwise
+    /// using `object == null`. If an element equal to the given object is
+    /// found, then the `remove` method is called on the iterator and
+    /// `true` is returned, `false` otherwise. If the iterator does
+    /// not support removing elements, an `UnsupportedOperationException`
+    /// is thrown.
+    ///
+    /// #### Parameters
+    ///
+    /// - `object`: the object to remove.
+    ///
+    /// #### Returns
+    ///
+    /// @return `true` if this `Collection` is modified, `false`
+    /// otherwise.
+    ///
+    /// #### Throws
+    ///
+    /// - `UnsupportedOperationException`: if removing from this `Collection` is not supported.
+    ///
+    /// - `ClassCastException`: if the object passed is not of the correct type.
+    ///
+    /// - `NullPointerException`: @throws NullPointerException
+    /// if `object` is `null` and this `Collection`
+    /// doesn't support `null` elements.
     public boolean remove(Object object) {
         Iterator<?> it = iterator();
         if (object != null) {
@@ -240,35 +262,40 @@ public abstract class AbstractCollection<E> implements Collection<E> {
         return false;
     }
 
-    /**
-     * Removes all occurrences in this {@code Collection} of each object in the
-     * specified {@code Collection} (optional). After this method returns none of the
-     * elements in the passed {@code Collection} can be found in this {@code Collection}
-     * anymore.
-     * <p>
-     * This implementation iterates over this {@code Collection} and tests for each
-     * element {@code e} returned by the iterator, whether it is contained in
-     * the specified {@code Collection}. If this test is positive, then the {@code
-     * remove} method is called on the iterator. If the iterator does not
-     * support removing elements, an {@code UnsupportedOperationException} is
-     * thrown.
-     * 
-     * @param collection
-     *            the collection of objects to remove.
-     * @return {@code true} if this {@code Collection} is modified, {@code false}
-     *         otherwise.
-     * @throws UnsupportedOperationException
-     *                if removing from this {@code Collection} is not supported.
-     * @throws ClassCastException
-     *                if one or more elements of {@code collection} isn't of the
-     *                correct type.
-     * @throws NullPointerException
-     *                if {@code collection} contains at least one {@code null}
-     *                element and this {@code Collection} doesn't support {@code null}
-     *                elements.
-     * @throws NullPointerException
-     *                if {@code collection} is {@code null}.
-     */
+    /// Removes all occurrences in this `Collection` of each object in the
+    /// specified `Collection` (optional). After this method returns none of the
+    /// elements in the passed `Collection` can be found in this `Collection`
+    /// anymore.
+    ///
+    /// This implementation iterates over this `Collection` and tests for each
+    /// element `e` returned by the iterator, whether it is contained in
+    /// the specified `Collection`. If this test is positive, then the `remove` method is called on the iterator. If the iterator does not
+    /// support removing elements, an `UnsupportedOperationException` is
+    /// thrown.
+    ///
+    /// #### Parameters
+    ///
+    /// - `collection`: the collection of objects to remove.
+    ///
+    /// #### Returns
+    ///
+    /// @return `true` if this `Collection` is modified, `false`
+    /// otherwise.
+    ///
+    /// #### Throws
+    ///
+    /// - `UnsupportedOperationException`: if removing from this `Collection` is not supported.
+    ///
+    /// - `ClassCastException`: @throws ClassCastException
+    /// if one or more elements of `collection` isn't of the
+    /// correct type.
+    ///
+    /// - `NullPointerException`: @throws NullPointerException
+    /// if `collection` contains at least one `null`
+    /// element and this `Collection` doesn't support `null`
+    /// elements.
+    ///
+    /// - `NullPointerException`: if `collection` is `null`.
     public boolean removeAll(Collection<?> collection) {
         boolean result = false;
         Iterator<?> it = iterator();
@@ -281,35 +308,40 @@ public abstract class AbstractCollection<E> implements Collection<E> {
         return result;
     }
 
-    /**
-     * Removes all objects from this {@code Collection} that are not also found in the
-     * {@code Collection} passed (optional). After this method returns this {@code Collection}
-     * will only contain elements that also can be found in the {@code Collection}
-     * passed to this method.
-     * <p>
-     * This implementation iterates over this {@code Collection} and tests for each
-     * element {@code e} returned by the iterator, whether it is contained in
-     * the specified {@code Collection}. If this test is negative, then the {@code
-     * remove} method is called on the iterator. If the iterator does not
-     * support removing elements, an {@code UnsupportedOperationException} is
-     * thrown.
-     * 
-     * @param collection
-     *            the collection of objects to retain.
-     * @return {@code true} if this {@code Collection} is modified, {@code false}
-     *         otherwise.
-     * @throws UnsupportedOperationException
-     *                if removing from this {@code Collection} is not supported.
-     * @throws ClassCastException
-     *                if one or more elements of {@code collection}
-     *                isn't of the correct type.
-     * @throws NullPointerException
-     *                if {@code collection} contains at least one
-     *                {@code null} element and this {@code Collection} doesn't support
-     *                {@code null} elements.
-     * @throws NullPointerException
-     *                if {@code collection} is {@code null}.
-     */
+    /// Removes all objects from this `Collection` that are not also found in the
+    /// `Collection` passed (optional). After this method returns this `Collection`
+    /// will only contain elements that also can be found in the `Collection`
+    /// passed to this method.
+    ///
+    /// This implementation iterates over this `Collection` and tests for each
+    /// element `e` returned by the iterator, whether it is contained in
+    /// the specified `Collection`. If this test is negative, then the `remove` method is called on the iterator. If the iterator does not
+    /// support removing elements, an `UnsupportedOperationException` is
+    /// thrown.
+    ///
+    /// #### Parameters
+    ///
+    /// - `collection`: the collection of objects to retain.
+    ///
+    /// #### Returns
+    ///
+    /// @return `true` if this `Collection` is modified, `false`
+    /// otherwise.
+    ///
+    /// #### Throws
+    ///
+    /// - `UnsupportedOperationException`: if removing from this `Collection` is not supported.
+    ///
+    /// - `ClassCastException`: @throws ClassCastException
+    /// if one or more elements of `collection`
+    /// isn't of the correct type.
+    ///
+    /// - `NullPointerException`: @throws NullPointerException
+    /// if `collection` contains at least one
+    /// `null` element and this `Collection` doesn't support
+    /// `null` elements.
+    ///
+    /// - `NullPointerException`: if `collection` is `null`.
     public boolean retainAll(Collection<?> collection) {
         boolean result = false;
         Iterator<?> it = iterator();
@@ -322,25 +354,25 @@ public abstract class AbstractCollection<E> implements Collection<E> {
         return result;
     }
 
-    /**
-     * Returns a count of how many objects this {@code Collection} contains.
-     * <p>
-     * In this class this method is declared abstract and has to be implemented
-     * by concrete {@code Collection} implementations.
-     * 
-     * @return how many objects this {@code Collection} contains, or {@code Integer.MAX_VALUE}
-     *         if there are more than {@code Integer.MAX_VALUE} elements in this
-     *         {@code Collection}.
-     */
+    /// Returns a count of how many objects this `Collection` contains.
+    ///
+    /// In this class this method is declared abstract and has to be implemented
+    /// by concrete `Collection` implementations.
+    ///
+    /// #### Returns
+    ///
+    /// @return how many objects this `Collection` contains, or `Integer.MAX_VALUE`
+    /// if there are more than `Integer.MAX_VALUE` elements in this
+    /// `Collection`.
     public abstract int size();
 
-    /**
-     * Returns the string representation of this {@code Collection}. The presentation
-     * has a specific format. It is enclosed by square brackets ("[]"). Elements
-     * are separated by ', ' (comma and space).
-     * 
-     * @return the string representation of this {@code Collection}.
-     */
+    /// Returns the string representation of this `Collection`. The presentation
+    /// has a specific format. It is enclosed by square brackets ("[]"). Elements
+    /// are separated by ', ' (comma and space).
+    ///
+    /// #### Returns
+    ///
+    /// the string representation of this `Collection`.
     @Override
     public String toString() {
         if (isEmpty()) {
@@ -366,32 +398,37 @@ public abstract class AbstractCollection<E> implements Collection<E> {
     }
 
 
-    /**
-     * Returns a new array containing all elements contained in this
-     * {@code ArrayList}.
-     * 
-     * @return an array of the elements from this {@code ArrayList}
-     */
+    /// Returns a new array containing all elements contained in this
+    /// `ArrayList`.
+    ///
+    /// #### Returns
+    ///
+    /// an array of the elements from this `ArrayList`
     @Override
     public Object[] toArray() {
         return ArrayList.toObjectArray(this);
     }
 
-    /**
-     * Returns an array containing all elements contained in this
-     * {@code ArrayList}. If the specified array is large enough to hold the
-     * elements, the specified array is used, otherwise an array of the same
-     * type is created. If the specified array is used and is larger than this
-     * {@code ArrayList}, the array element following the collection elements
-     * is set to null.
-     * 
-     * @param contents
-     *            the array.
-     * @return an array of the elements from this {@code ArrayList}.
-     * @throws ArrayStoreException
-     *             when the type of an element in this {@code ArrayList} cannot
-     *             be stored in the type of the specified array.
-     */
+    /// Returns an array containing all elements contained in this
+    /// `ArrayList`. If the specified array is large enough to hold the
+    /// elements, the specified array is used, otherwise an array of the same
+    /// type is created. If the specified array is used and is larger than this
+    /// `ArrayList`, the array element following the collection elements
+    /// is set to null.
+    ///
+    /// #### Parameters
+    ///
+    /// - `contents`: the array.
+    ///
+    /// #### Returns
+    ///
+    /// an array of the elements from this `ArrayList`.
+    ///
+    /// #### Throws
+    ///
+    /// - `ArrayStoreException`: @throws ArrayStoreException
+    /// when the type of an element in this `ArrayList` cannot
+    /// be stored in the type of the specified array.
     @Override
     @SuppressWarnings("unchecked")
     public <T> T[] toArray(T[] contents) {

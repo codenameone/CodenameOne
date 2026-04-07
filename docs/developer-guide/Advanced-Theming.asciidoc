@@ -238,6 +238,9 @@ SoftKey, Touch, Bar, Title, Right, Native
 |fadeScrollBarBool
 |Boolean indicating if the scrollbar should fade when there is inactivity
 
+|setFadeScrollBarSpeed(int) _(API)_
+|Sets the per-frame opacity decrement for scrollbar fading (not milliseconds). Approximate fade duration is `durationMs ~= (255 / speed) * (1000 / frameRate)`. At 60 FPS: speed `5` ~= `850ms`, `3` ~= `1400ms`, `2` ~= `2100ms`, `1` ~= `4250ms`
+
 |fadeScrollEdgeBool
 |Places a fade effect at the edges of the screen to indicate that it's possible to scroll until we reach the edge (common on Android)
 

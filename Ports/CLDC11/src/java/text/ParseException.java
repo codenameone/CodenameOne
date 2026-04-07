@@ -22,43 +22,40 @@
  */
 package java.text;
 
-/**
- * An error occurred during parsing.
- * 
- * @author Eric Coolman
- *
- */
+/// An error occurred during parsing.
+///
+/// @author Eric Coolman
 public class ParseException extends Exception {
 	private int errorOffset;
 	private Throwable causedBy;
 	
-	/**
-	 * @param errorOffset
-	 */
+	/// #### Parameters
+	///
+	/// - `errorOffset`
 	public ParseException(String s, int errorOffset) {
 		super(s);
 		this.errorOffset = errorOffset;
 	}
 
-	/**
-	 * @param errorOffset
-	 */
+	/// #### Parameters
+	///
+	/// - `errorOffset`
 	ParseException(Throwable causedBy, String s, int errorOffset) {
 		super((s == null && causedBy != null) ? causedBy.getMessage() : s);
 		this.causedBy = causedBy;
 		this.errorOffset = errorOffset;
 	}
 
-	/**
-	 * @return the errorOffset
-	 */
+	/// #### Returns
+	///
+	/// the errorOffset
 	public int getErrorOffset() {
 		return errorOffset;
 	}
 
-	/**
-	 * @return the causedBy
-	 */
+	/// #### Returns
+	///
+	/// the causedBy
 	Throwable getCausedBy() {
 		return causedBy;
 	}

@@ -17,11 +17,11 @@
 
 package java.util;
 
-/**
- * EventListener is the superclass of all event listener interfaces.
- * 
- * @see EventObject
- */
+/// EventListener is the superclass of all event listener interfaces.
+///
+/// #### See also
+///
+/// - EventObject
 public interface EventListener {
     /* empty */
 }

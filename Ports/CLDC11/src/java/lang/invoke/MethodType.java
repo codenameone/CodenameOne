@@ -23,9 +23,9 @@
  */
 package java.lang.invoke;
 
-/**
- * @deprecated these classes are used internally for Lambda compatibility
- */
+/// #### Deprecated
+///
+/// these classes are used internally for Lambda compatibility
 public class MethodType {
     public MethodType() {}
   public static java.lang.invoke.MethodType methodType(java.lang.Class<?> a, java.lang.Class<?>[] b) {

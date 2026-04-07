@@ -23,9 +23,9 @@
  */
 package java.lang.invoke;
 
-/**
- * @deprecated these classes are used internally for Lambda compatibility
- */
+/// #### Deprecated
+///
+/// these classes are used internally for Lambda compatibility
 public class LambdaMetafactory {
   public static final int FLAG_SERIALIZABLE = 1;
   public static final int FLAG_MARKERS = 2;

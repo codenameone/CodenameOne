@@ -21,15 +21,13 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.lang.annotation.ElementType;
 
-/**
- * <p>
- * An annotation to indicate that a method is intended to override a superclass
- * method. This provides a compile-time assertion that a method actually
- * overrides the superclass method.
- * </p>
- * 
- * @since 1.5
- */
+/// An annotation to indicate that a method is intended to override a superclass
+/// method. This provides a compile-time assertion that a method actually
+/// overrides the superclass method.
+///
+/// #### Since
+///
+/// 1.5
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.SOURCE)
 public @interface Override {

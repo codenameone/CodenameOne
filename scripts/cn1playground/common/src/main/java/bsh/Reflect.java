@@ -64,14 +64,33 @@ public final class Reflect {
             }
         }
         if (object instanceof Class) {
+            Class<?> classObject = (Class<?>) object;
+            if ("getName".equals(methodName) && (args == null || args.length == 0)) {
+                return classObject.getName();
+            }
+            if ("getSimpleName".equals(methodName) && (args == null || args.length == 0)) {
+                return classObject.getSimpleName();
+            }
             try {
                 return invokeStaticMethod(interpreter == null ? null : interpreter.getClassManager(),
-                        (Class<?>) object, methodName, args, callerInfo, callstack);
+                        classObject, methodName, args, callerInfo, callstack);
             } catch (ReflectError e) {
                 throw new EvalError(e.getMessage(), callerInfo, callstack, e);
             } catch (UtilEvalError e) {
                 throw e.toEvalError(callerInfo, callstack);
             }
+        }
+        if ("getClass".equals(methodName) && (args == null || args.length == 0)) {
+            return object.getClass();
+        }
+        if ("hashCode".equals(methodName) && (args == null || args.length == 0)) {
+            return Integer.valueOf(object.hashCode());
+        }
+        if ("toString".equals(methodName) && (args == null || args.length == 0)) {
+            return object.toString();
+        }
+        if ("equals".equals(methodName) && args != null && args.length == 1) {
+            return Boolean.valueOf(object.equals(args[0]));
         }
         if (PlaygroundContext.interceptMethodInvocation(object, methodName, unwrapArgs(args))) {
             return Primitive.VOID;

@@ -72,6 +72,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new MediaPlaybackScreenshotTest(),
             new SheetScreenshotTest(),
             new ImageViewerNavigationScreenshotTest(),
+            new TabsScreenshotTest(),
             new TextAreaAlignmentScreenshotTest(),
             new ValidatorLightweightPickerScreenshotTest(),
             // Keep this as the last screenshot test; orientation changes can leak into subsequent screenshots.
@@ -85,6 +86,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new VPNDetectionAPITest(),
             new CallDetectionAPITest(),
             new LocalNotificationOverrideTest(),
+            new Base64NativePerformanceTest(),
             new AccessibilityTest()));
 
     public static void addTest(BaseTest test) {

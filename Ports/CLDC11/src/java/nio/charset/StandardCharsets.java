@@ -9,9 +9,7 @@
  */
 package java.nio.charset;
 
-/**
- * Minimal charset constants supported by CLDC11 stubs.
- */
+/// Minimal charset constants supported by CLDC11 stubs.
 public final class StandardCharsets {
     private StandardCharsets() {
     }

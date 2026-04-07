@@ -22,28 +22,41 @@
  */
 package java.text;
 
-/**
- * An abstract class for parsing and formatting localisation sensitive information, compatible with JDK 6.
- * 
- * @see <a href="http://docs.oracle.com/javase/6/docs/api/java/text/Format.html">http://docs.oracle.com/javase/6/docs/api/java/text/Format.html</a>
- * @author Eric Coolman
- */
+/// An abstract class for parsing and formatting localisation sensitive information, compatible with JDK 6.
+///
+/// @author Eric Coolman
+///
+/// #### See also
+///
+/// - [http://docs.oracle.com/javase/6/docs/api/java/text/Format.html](http://docs.oracle.com/javase/6/docs/api/java/text/Format.html)
 public abstract class Format implements Cloneable {
-	/**
-	 * Format an object.
-	 * 
-	 * @param source object to be formatted to text.
-	 * @return formatted text.
-	 * @throws IllegalArgumentException if the source can not be formatted. 
-	 */
+	/// Format an object.
+	///
+	/// #### Parameters
+	///
+	/// - `source`: object to be formatted to text.
+	///
+	/// #### Returns
+	///
+	/// formatted text.
+	///
+	/// #### Throws
+	///
+	/// - `IllegalArgumentException`: if the source can not be formatted.
 	public abstract String format(Object source) throws IllegalArgumentException;
 
-	/**
-	 * Parse an string to an object.
-	 * 
-	 * @param source document to be parsed.
-	 * @return parsed object.
-	 * @throws ParseException if the source could not be parsed.
-	 */
+	/// Parse an string to an object.
+	///
+	/// #### Parameters
+	///
+	/// - `source`: document to be parsed.
+	///
+	/// #### Returns
+	///
+	/// parsed object.
+	///
+	/// #### Throws
+	///
+	/// - `ParseException`: if the source could not be parsed.
 	public abstract Object parseObject(String source) throws ParseException;
 }

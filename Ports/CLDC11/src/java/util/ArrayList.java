@@ -18,13 +18,13 @@
 package java.util;
 
 
-/**
- * ArrayList is an implementation of {@link List}, backed by an array. All
- * optional operations adding, removing, and replacing are supported. The
- * elements can be any objects.
- * 
- * @since 1.2
- */
+/// ArrayList is an implementation of `List`, backed by an array. All
+/// optional operations adding, removing, and replacing are supported. The
+/// elements can be any objects.
+///
+/// #### Since
+///
+/// 1.2
 public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAccess {
 
     private static final long serialVersionUID = 8683452581122892189L;
@@ -35,20 +35,17 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
 
     private transient E[] array;
 
-    /**
-     * Constructs a new instance of {@code ArrayList} with ten capacity.
-     */
+    /// Constructs a new instance of `ArrayList` with ten capacity.
     public ArrayList() {
         this(10);
     }
 
-    /**
-     * Constructs a new instance of {@code ArrayList} with the specified
-     * capacity.
-     * 
-     * @param capacity
-     *            the initial capacity of this {@code ArrayList}.
-     */
+    /// Constructs a new instance of `ArrayList` with the specified
+    /// capacity.
+    ///
+    /// #### Parameters
+    ///
+    /// - `capacity`: the initial capacity of this `ArrayList`.
     public ArrayList(int capacity) {
         if (capacity < 0) {
             throw new IllegalArgumentException();
@@ -57,14 +54,13 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
         array = newElementArray(capacity);
     }
 
-    /**
-     * Constructs a new instance of {@code ArrayList} containing the elements of
-     * the specified collection. The initial size of the {@code ArrayList} will
-     * be 10% larger than the size of the specified collection.
-     * 
-     * @param collection
-     *            the collection of elements to add.
-     */
+    /// Constructs a new instance of `ArrayList` containing the elements of
+    /// the specified collection. The initial size of the `ArrayList` will
+    /// be 10% larger than the size of the specified collection.
+    ///
+    /// #### Parameters
+    ///
+    /// - `collection`: the collection of elements to add.
     public ArrayList(Collection<? extends E> collection) {
         firstIndex = 0;
         Object[] objects = toObjectArray(collection);
@@ -96,19 +92,20 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
         return (E[]) new Object[size];
     }
 
-    /**
-     * Inserts the specified object into this {@code ArrayList} at the specified
-     * location. The object is inserted before any previous element at the
-     * specified location. If the location is equal to the size of this
-     * {@code ArrayList}, the object is added at the end.
-     * 
-     * @param location
-     *            the index at which to insert the object.
-     * @param object
-     *            the object to add.
-     * @throws IndexOutOfBoundsException
-     *             when {@code location < 0 || > size()}
-     */
+    /// Inserts the specified object into this `ArrayList` at the specified
+    /// location. The object is inserted before any previous element at the
+    /// specified location. If the location is equal to the size of this
+    /// `ArrayList`, the object is added at the end.
+    ///
+    /// #### Parameters
+    ///
+    /// - `location`: the index at which to insert the object.
+    ///
+    /// - `object`: the object to add.
+    ///
+    /// #### Throws
+    ///
+    /// - `IndexOutOfBoundsException`: when `location  size()`
     @Override
     public void add(int location, E object) {
         if (location < 0 || location > size) {
@@ -143,13 +140,15 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
         modCount++;
     }
 
-    /**
-     * Adds the specified object at the end of this {@code ArrayList}.
-     * 
-     * @param object
-     *            the object to add.
-     * @return always true
-     */
+    /// Adds the specified object at the end of this `ArrayList`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `object`: the object to add.
+    ///
+    /// #### Returns
+    ///
+    /// always true
     @Override
     public boolean add(E object) {
         if (firstIndex + size == array.length) {
@@ -161,20 +160,24 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
         return true;
     }
 
-    /**
-     * Inserts the objects in the specified collection at the specified location
-     * in this List. The objects are added in the order they are returned from
-     * the collection's iterator.
-     * 
-     * @param location
-     *            the index at which to insert.
-     * @param collection
-     *            the collection of objects.
-     * @return {@code true} if this {@code ArrayList} is modified, {@code false}
-     *         otherwise.
-     * @throws IndexOutOfBoundsException
-     *             when {@code location < 0 || > size()}
-     */
+    /// Inserts the objects in the specified collection at the specified location
+    /// in this List. The objects are added in the order they are returned from
+    /// the collection's iterator.
+    ///
+    /// #### Parameters
+    ///
+    /// - `location`: the index at which to insert.
+    ///
+    /// - `collection`: the collection of objects.
+    ///
+    /// #### Returns
+    ///
+    /// @return `true` if this `ArrayList` is modified, `false`
+    /// otherwise.
+    ///
+    /// #### Throws
+    ///
+    /// - `IndexOutOfBoundsException`: when `location  size()`
     @Override
     public boolean addAll(int location, Collection<? extends E> collection) {
         if (location < 0 || location > size) {
@@ -224,14 +227,16 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
         return true;
     }
 
-    /**
-     * Adds the objects in the specified collection to this {@code ArrayList}.
-     * 
-     * @param collection
-     *            the collection of objects.
-     * @return {@code true} if this {@code ArrayList} is modified, {@code false}
-     *         otherwise.
-     */
+    /// Adds the objects in the specified collection to this `ArrayList`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `collection`: the collection of objects.
+    ///
+    /// #### Returns
+    ///
+    /// @return `true` if this `ArrayList` is modified, `false`
+    /// otherwise.
     @Override
     public boolean addAll(Collection<? extends E> collection) {
         Object[] dumpArray = toObjectArray(collection);
@@ -248,12 +253,13 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
         return true;
     }
 
-    /**
-     * Removes all elements from this {@code ArrayList}, leaving it empty.
-     * 
-     * @see #isEmpty
-     * @see #size
-     */
+    /// Removes all elements from this `ArrayList`, leaving it empty.
+    ///
+    /// #### See also
+    ///
+    /// - #isEmpty
+    ///
+    /// - #size
     @Override
     public void clear() {
         if (size != 0) {
@@ -268,14 +274,16 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
         }
     }
 
-    /**
-     * Searches this {@code ArrayList} for the specified object.
-     * 
-     * @param object
-     *            the object to search for.
-     * @return {@code true} if {@code object} is an element of this
-     *         {@code ArrayList}, {@code false} otherwise
-     */
+    /// Searches this `ArrayList` for the specified object.
+    ///
+    /// #### Parameters
+    ///
+    /// - `object`: the object to search for.
+    ///
+    /// #### Returns
+    ///
+    /// @return `true` if `object` is an element of this
+    /// `ArrayList`, `false` otherwise
     @Override
     public boolean contains(Object object) {
         int lastIndex = firstIndex + size;
@@ -295,13 +303,12 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
         return false;
     }
 
-    /**
-     * Ensures that after this operation the {@code ArrayList} can hold the
-     * specified number of elements without further growing.
-     * 
-     * @param minimumCapacity
-     *            the minimum capacity asked for.
-     */
+    /// Ensures that after this operation the `ArrayList` can hold the
+    /// specified number of elements without further growing.
+    ///
+    /// #### Parameters
+    ///
+    /// - `minimumCapacity`: the minimum capacity asked for.
     public void ensureCapacity(int minimumCapacity) {
         int required = minimumCapacity - array.length;
         if (required > 0) {
@@ -452,15 +459,19 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
         return -1;
     }
 
-    /**
-     * Removes the object at the specified location from this list.
-     * 
-     * @param location
-     *            the index of the object to remove.
-     * @return the removed object.
-     * @throws IndexOutOfBoundsException
-     *             when {@code location < 0 || >= size()}
-     */
+    /// Removes the object at the specified location from this list.
+    ///
+    /// #### Parameters
+    ///
+    /// - `location`: the index of the object to remove.
+    ///
+    /// #### Returns
+    ///
+    /// the removed object.
+    ///
+    /// #### Throws
+    ///
+    /// - `IndexOutOfBoundsException`: when `location = size()`
     @Override
     public E remove(int location) {
         E result;
@@ -509,17 +520,18 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
         return false;
     }
 
-    /**
-     * Removes the objects in the specified range from the start to the end, but
-     * not including the end index.
-     * 
-     * @param start
-     *            the index at which to start removing.
-     * @param end
-     *            the index one after the end of the range to remove.
-     * @throws IndexOutOfBoundsException
-     *             when {@code start < 0, start > end} or {@code end > size()}
-     */
+    /// Removes the objects in the specified range from the start to the end, but
+    /// not including the end index.
+    ///
+    /// #### Parameters
+    ///
+    /// - `start`: the index at which to start removing.
+    ///
+    /// - `end`: the index one after the end of the range to remove.
+    ///
+    /// #### Throws
+    ///
+    /// - `IndexOutOfBoundsException`: when `start  end` or `end > size()`
     @Override
     protected void removeRange(int start, int end) {
         // REVIEW: does RI call this from remove(location)
@@ -551,18 +563,22 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
         modCount++;
     }
 
-    /**
-     * Replaces the element at the specified location in this {@code ArrayList}
-     * with the specified object.
-     * 
-     * @param location
-     *            the index at which to put the specified object.
-     * @param object
-     *            the object to add.
-     * @return the previous element at the index.
-     * @throws IndexOutOfBoundsException
-     *             when {@code location < 0 || >= size()}
-     */
+    /// Replaces the element at the specified location in this `ArrayList`
+    /// with the specified object.
+    ///
+    /// #### Parameters
+    ///
+    /// - `location`: the index at which to put the specified object.
+    ///
+    /// - `object`: the object to add.
+    ///
+    /// #### Returns
+    ///
+    /// the previous element at the index.
+    ///
+    /// #### Throws
+    ///
+    /// - `IndexOutOfBoundsException`: when `location = size()`
     @Override
     public E set(int location, E object) {
         if (location < 0 || location >= size) {
@@ -573,22 +589,22 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
         return result;
     }
 
-    /**
-     * Returns the number of elements in this {@code ArrayList}.
-     * 
-     * @return the number of elements in this {@code ArrayList}.
-     */
+    /// Returns the number of elements in this `ArrayList`.
+    ///
+    /// #### Returns
+    ///
+    /// the number of elements in this `ArrayList`.
     @Override
     public int size() {
         return size;
     }
 
-    /**
-     * Returns a new array containing all elements contained in this
-     * {@code ArrayList}.
-     * 
-     * @return an array of the elements from this {@code ArrayList}
-     */
+    /// Returns a new array containing all elements contained in this
+    /// `ArrayList`.
+    ///
+    /// #### Returns
+    ///
+    /// an array of the elements from this `ArrayList`
     @Override
     public Object[] toArray() {
         Object[] result = new Object[size];
@@ -596,21 +612,26 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
         return result;
     }
 
-    /**
-     * Returns an array containing all elements contained in this
-     * {@code ArrayList}. If the specified array is large enough to hold the
-     * elements, the specified array is used, otherwise an array of the same
-     * type is created. If the specified array is used and is larger than this
-     * {@code ArrayList}, the array element following the collection elements
-     * is set to null.
-     * 
-     * @param contents
-     *            the array.
-     * @return an array of the elements from this {@code ArrayList}.
-     * @throws ArrayStoreException
-     *             when the type of an element in this {@code ArrayList} cannot
-     *             be stored in the type of the specified array.
-     */
+    /// Returns an array containing all elements contained in this
+    /// `ArrayList`. If the specified array is large enough to hold the
+    /// elements, the specified array is used, otherwise an array of the same
+    /// type is created. If the specified array is used and is larger than this
+    /// `ArrayList`, the array element following the collection elements
+    /// is set to null.
+    ///
+    /// #### Parameters
+    ///
+    /// - `contents`: the array.
+    ///
+    /// #### Returns
+    ///
+    /// an array of the elements from this `ArrayList`.
+    ///
+    /// #### Throws
+    ///
+    /// - `ArrayStoreException`: @throws ArrayStoreException
+    /// when the type of an element in this `ArrayList` cannot
+    /// be stored in the type of the specified array.
     @Override
     @SuppressWarnings("unchecked")
     public <T> T[] toArray(T[] contents) {
@@ -627,12 +648,12 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
         return (T[])arr;
     }
 
-    /**
-     * Sets the capacity of this {@code ArrayList} to be the same as the current
-     * size.
-     * 
-     * @see #size
-     */
+    /// Sets the capacity of this `ArrayList` to be the same as the current
+    /// size.
+    ///
+    /// #### See also
+    ///
+    /// - #size
     public void trimToSize() {
         E[] newArray = newElementArray(size);
         System.arraycopy(array, firstIndex, newArray, 0, size);

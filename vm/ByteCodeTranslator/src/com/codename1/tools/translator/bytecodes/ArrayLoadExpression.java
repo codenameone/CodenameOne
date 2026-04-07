@@ -116,62 +116,89 @@ public class ArrayLoadExpression extends Instruction implements AssignableExpres
     @Override
     public boolean assignTo(String varName, StringBuilder sb) {
         StringBuilder b = new StringBuilder();
-        if (varName != null) {
-            b.append(varName).append("=");
-        }
-        
-        b.append("CN1_ARRAY_ELEMENT_");
-        String arrayType = null;
-        switch (loadInstruction.getOpcode()) {
-            case Opcodes.FALOAD:
-                arrayType = "FLOAT";
-                break;
-            case Opcodes.DALOAD:
-                arrayType = "DOUBLE";
-                break;
-            case Opcodes.LALOAD:
-                arrayType = "LONG";
-                break;
-            case Opcodes.IALOAD:
-                arrayType = "INT";
-                break;
-            case Opcodes.BALOAD:
-                arrayType = "BYTE";
-                break;
-            case Opcodes.CALOAD:
-                arrayType = "CHAR";
-                break;
-            case Opcodes.AALOAD:
-                arrayType = "OBJECT";
-                break;
-            case Opcodes.SALOAD:
-                arrayType = "SHORT";
-                break;
-                
-        }
-        b.append(arrayType).append("(");
+
+        String arrayExpr;
+        String indexExpr;
         if (targetArrayInstruction instanceof AssignableExpression) {
             StringBuilder sb2 = new StringBuilder();
             boolean res = ((AssignableExpression)targetArrayInstruction).assignTo(null, sb2);
             if (!res) {
                 return false;
             }
-            b.append(sb2.toString().trim());
+            arrayExpr = sb2.toString().trim();
         } else {
             return false;
         }
-        b.append(", ");
+
         if (indexInstruction instanceof AssignableExpression) {
             StringBuilder sb2 = new StringBuilder();
-            
+
             boolean res = ((AssignableExpression)indexInstruction).assignTo(null, sb2);
             if (!res) {
                 return false;
             }
-            b.append(sb2.toString().trim());
+            indexExpr = sb2.toString().trim();
         } else {
             return false;
         }
+
+        boolean useTemporaries = varName != null && (!isSimpleExpression(arrayExpr) || !isSimpleExpression(indexExpr));
+        String arrayType = null;
+        String arrayDataType = null;
+        switch (loadInstruction.getOpcode()) {
+            case Opcodes.FALOAD:
+                arrayType = "FLOAT";
+                arrayDataType = "JAVA_ARRAY_FLOAT";
+                break;
+            case Opcodes.DALOAD:
+                arrayType = "DOUBLE";
+                arrayDataType = "JAVA_ARRAY_DOUBLE";
+                break;
+            case Opcodes.LALOAD:
+                arrayType = "LONG";
+                arrayDataType = "JAVA_ARRAY_LONG";
+                break;
+            case Opcodes.IALOAD:
+                arrayType = "INT";
+                arrayDataType = "JAVA_ARRAY_INT";
+                break;
+            case Opcodes.BALOAD:
+                arrayType = "BYTE";
+                arrayDataType = "JAVA_ARRAY_BYTE";
+                break;
+            case Opcodes.CALOAD:
+                arrayType = "CHAR";
+                arrayDataType = "JAVA_ARRAY_CHAR";
+                break;
+            case Opcodes.AALOAD:
+                arrayType = "OBJECT";
+                arrayDataType = "JAVA_ARRAY_OBJECT";
+                break;
+            case Opcodes.SALOAD:
+                arrayType = "SHORT";
+                arrayDataType = "JAVA_ARRAY_SHORT";
+                break;
+                
+        }
+        if (useTemporaries) {
+            b.append("{\n");
+            b.append("    JAVA_OBJECT __cn1ArrayTmp = ").append(arrayExpr).append(";\n");
+            b.append("    JAVA_INT __cn1IndexTmp = ").append(indexExpr).append(";\n");
+            b.append("    CHECK_ARRAY_ACCESS_WITH_ARGS(__cn1ArrayTmp, __cn1IndexTmp);\n");
+            b.append("    ").append(varName).append(" = ((").append(arrayDataType).append("*) (*(JAVA_ARRAY)__cn1ArrayTmp).data)[__cn1IndexTmp];\n");
+            b.append("}\n");
+            sb.append(b);
+            return true;
+        }
+
+        if (varName != null) {
+            b.append(varName).append("=");
+        }
+        b.append("CN1_ARRAY_ELEMENT_");
+        b.append(arrayType).append("(");
+        b.append(arrayExpr);
+        b.append(", ");
+        b.append(indexExpr);
         b.append(")");
         if (varName != null) {
             b.append(";\n");
@@ -183,5 +210,22 @@ public class ArrayLoadExpression extends Instruction implements AssignableExpres
 
     public boolean isObject() {
         return loadInstruction != null && loadInstruction.getOpcode() == Opcodes.AALOAD;
+    }
+
+    private static boolean isSimpleExpression(String expr) {
+        if (expr == null || expr.length() == 0) {
+            return false;
+        }
+        for (int i = 0; i < expr.length(); i++) {
+            char c = expr.charAt(i);
+            if ((c >= 'a' && c <= 'z')
+                    || (c >= 'A' && c <= 'Z')
+                    || (c >= '0' && c <= '9')
+                    || c == '_' || c == '.') {
+                continue;
+            }
+            return false;
+        }
+        return true;
     }
 }

@@ -922,30 +922,152 @@ extern JAVA_BOOLEAN throwArrayIndexOutOfBoundsException_R_boolean(CODENAME_ONE_T
 #else
 #define CN1_ARRAY_LENGTH(array) ((*((JAVA_ARRAY)array)).length)
 #endif
-#define CN1_ARRAY_ELEMENT_INT(array, index) (CHECK_ARRAY_ACCESS_EXPR(array,index) ? ((JAVA_ARRAY_INT*) (*(JAVA_ARRAY)array).data)[index] : 0)
-#define CN1_ARRAY_ELEMENT_BYTE(array, index) (CHECK_ARRAY_ACCESS_EXPR(array,index) ? ((JAVA_ARRAY_BYTE*) (*(JAVA_ARRAY)array).data)[index] : 0)
-#define CN1_ARRAY_ELEMENT_FLOAT(array, index) (CHECK_ARRAY_ACCESS_EXPR(array,index) ? ((JAVA_ARRAY_FLOAT*) (*(JAVA_ARRAY)array).data)[index] : 0)
-#define CN1_ARRAY_ELEMENT_DOUBLE(array, index) (CHECK_ARRAY_ACCESS_EXPR(array,index) ? ((JAVA_ARRAY_DOUBLE*) (*(JAVA_ARRAY)array).data)[index] : 0)
-#define CN1_ARRAY_ELEMENT_LONG(array, index) (CHECK_ARRAY_ACCESS_EXPR(array,index) ? ((JAVA_ARRAY_LONG*) (*(JAVA_ARRAY)array).data)[index] : 0)
-#define CN1_ARRAY_ELEMENT_OBJECT(array, index) (CHECK_ARRAY_ACCESS_EXPR(array,index) ? ((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)array).data)[index] : 0)
-#define CN1_ARRAY_ELEMENT_SHORT(array, index) (CHECK_ARRAY_ACCESS_EXPR(array,index) ? ((JAVA_ARRAY_SHORT*) (*(JAVA_ARRAY)array).data)[index] : 0)
-#define CN1_ARRAY_ELEMENT_CHAR(array, index) (CHECK_ARRAY_ACCESS_EXPR(array,index) ? ((JAVA_ARRAY_CHAR*) (*(JAVA_ARRAY)array).data)[index] : 0)
-#define CN1_SET_ARRAY_ELEMENT_INT(array, index, value) CHECK_ARRAY_ACCESS_WITH_ARGS(array, index); \
+
+static inline JAVA_BOOLEAN cn1_array_access_in_bounds(JAVA_OBJECT array, JAVA_INT index) {
+    return array != JAVA_NULL && index >= 0 && index < ((JAVA_ARRAY)array)->length;
+}
+
+static inline JAVA_BOOLEAN cn1_array_access_validate(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index) {
+    if (array == JAVA_NULL) {
+        throwException(threadStateData, __NEW_java_lang_NullPointerException(threadStateData));
+        return JAVA_FALSE;
+    }
+    if (index < 0 || index >= ((JAVA_ARRAY)array)->length) {
+        throwArrayIndexOutOfBoundsException(threadStateData, index);
+        return JAVA_FALSE;
+    }
+    return JAVA_TRUE;
+}
+
+static inline JAVA_INT cn1_array_element_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index) {
+    if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
+        return 0;
+    }
+    return ((JAVA_ARRAY_INT*) (*(JAVA_ARRAY)array).data)[index];
+}
+
+static inline JAVA_BYTE cn1_array_element_byte(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index) {
+    if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
+        return 0;
+    }
+    return ((JAVA_ARRAY_BYTE*) (*(JAVA_ARRAY)array).data)[index];
+}
+
+static inline JAVA_FLOAT cn1_array_element_float(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index) {
+    if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
+        return 0;
+    }
+    return ((JAVA_ARRAY_FLOAT*) (*(JAVA_ARRAY)array).data)[index];
+}
+
+static inline JAVA_DOUBLE cn1_array_element_double(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index) {
+    if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
+        return 0;
+    }
+    return ((JAVA_ARRAY_DOUBLE*) (*(JAVA_ARRAY)array).data)[index];
+}
+
+static inline JAVA_LONG cn1_array_element_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index) {
+    if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
+        return 0;
+    }
+    return ((JAVA_ARRAY_LONG*) (*(JAVA_ARRAY)array).data)[index];
+}
+
+static inline JAVA_OBJECT cn1_array_element_object(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index) {
+    if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
+        return JAVA_NULL;
+    }
+    return ((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)array).data)[index];
+}
+
+static inline JAVA_SHORT cn1_array_element_short(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index) {
+    if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
+        return 0;
+    }
+    return ((JAVA_ARRAY_SHORT*) (*(JAVA_ARRAY)array).data)[index];
+}
+
+static inline JAVA_CHAR cn1_array_element_char(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index) {
+    if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
+        return 0;
+    }
+    return ((JAVA_ARRAY_CHAR*) (*(JAVA_ARRAY)array).data)[index];
+}
+
+static inline JAVA_VOID cn1_set_array_element_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index, JAVA_INT value) {
+    if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
+        return;
+    }
     ((JAVA_ARRAY_INT*) (*(JAVA_ARRAY)array).data)[index] = value;
-#define CN1_SET_ARRAY_ELEMENT_BYTE(array, index, value) CHECK_ARRAY_ACCESS_WITH_ARGS(array, index); \
+}
+
+static inline JAVA_VOID cn1_set_array_element_byte(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index, JAVA_BYTE value) {
+    if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
+        return;
+    }
     ((JAVA_ARRAY_BYTE*) (*(JAVA_ARRAY)array).data)[index] = value;
-#define CN1_SET_ARRAY_ELEMENT_FLOAT(array, index, value) CHECK_ARRAY_ACCESS_WITH_ARGS(array, index); \
+}
+
+static inline JAVA_VOID cn1_set_array_element_float(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index, JAVA_FLOAT value) {
+    if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
+        return;
+    }
     ((JAVA_ARRAY_FLOAT*) (*(JAVA_ARRAY)array).data)[index] = value;
-#define CN1_SET_ARRAY_ELEMENT_DOUBLE(array, index, value) CHECK_ARRAY_ACCESS_WITH_ARGS(array, index); \
+}
+
+static inline JAVA_VOID cn1_set_array_element_double(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index, JAVA_DOUBLE value) {
+    if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
+        return;
+    }
     ((JAVA_ARRAY_DOUBLE*) (*(JAVA_ARRAY)array).data)[index] = value;
-#define CN1_SET_ARRAY_ELEMENT_LONG(array, index, value) CHECK_ARRAY_ACCESS_WITH_ARGS(array, index); \
+}
+
+static inline JAVA_VOID cn1_set_array_element_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index, JAVA_LONG value) {
+    if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
+        return;
+    }
     ((JAVA_ARRAY_LONG*) (*(JAVA_ARRAY)array).data)[index] = value;
-#define CN1_SET_ARRAY_ELEMENT_OBJECT(array, index, value) CHECK_ARRAY_ACCESS_WITH_ARGS(array, index); \
+}
+
+static inline JAVA_VOID cn1_set_array_element_object(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index, JAVA_OBJECT value) {
+    if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
+        return;
+    }
     ((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)array).data)[index] = value;
-#define CN1_SET_ARRAY_ELEMENT_SHORT(array, index, value) CHECK_ARRAY_ACCESS_WITH_ARGS(array, index); \
+}
+
+static inline JAVA_VOID cn1_set_array_element_short(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index, JAVA_SHORT value) {
+    if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
+        return;
+    }
     ((JAVA_ARRAY_SHORT*) (*(JAVA_ARRAY)array).data)[index] = value;
-#define CN1_SET_ARRAY_ELEMENT_CHAR(array, index, value) CHECK_ARRAY_ACCESS_WITH_ARGS(array, index); \
+}
+
+static inline JAVA_VOID cn1_set_array_element_char(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index, JAVA_CHAR value) {
+    if (!cn1_array_access_in_bounds(array, index) && !cn1_array_access_validate(threadStateData, array, index)) {
+        return;
+    }
     ((JAVA_ARRAY_CHAR*) (*(JAVA_ARRAY)array).data)[index] = value;
+}
+
+#define CN1_ARRAY_ELEMENT_INT(array, index) cn1_array_element_int(threadStateData, array, index)
+#define CN1_ARRAY_ELEMENT_BYTE(array, index) cn1_array_element_byte(threadStateData, array, index)
+#define CN1_ARRAY_ELEMENT_FLOAT(array, index) cn1_array_element_float(threadStateData, array, index)
+#define CN1_ARRAY_ELEMENT_DOUBLE(array, index) cn1_array_element_double(threadStateData, array, index)
+#define CN1_ARRAY_ELEMENT_LONG(array, index) cn1_array_element_long(threadStateData, array, index)
+#define CN1_ARRAY_ELEMENT_OBJECT(array, index) cn1_array_element_object(threadStateData, array, index)
+#define CN1_ARRAY_ELEMENT_SHORT(array, index) cn1_array_element_short(threadStateData, array, index)
+#define CN1_ARRAY_ELEMENT_CHAR(array, index) cn1_array_element_char(threadStateData, array, index)
+
+#define CN1_SET_ARRAY_ELEMENT_INT(array, index, value) cn1_set_array_element_int(threadStateData, array, index, value)
+#define CN1_SET_ARRAY_ELEMENT_BYTE(array, index, value) cn1_set_array_element_byte(threadStateData, array, index, value)
+#define CN1_SET_ARRAY_ELEMENT_FLOAT(array, index, value) cn1_set_array_element_float(threadStateData, array, index, value)
+#define CN1_SET_ARRAY_ELEMENT_DOUBLE(array, index, value) cn1_set_array_element_double(threadStateData, array, index, value)
+#define CN1_SET_ARRAY_ELEMENT_LONG(array, index, value) cn1_set_array_element_long(threadStateData, array, index, value)
+#define CN1_SET_ARRAY_ELEMENT_OBJECT(array, index, value) cn1_set_array_element_object(threadStateData, array, index, value)
+#define CN1_SET_ARRAY_ELEMENT_SHORT(array, index, value) cn1_set_array_element_short(threadStateData, array, index, value)
+#define CN1_SET_ARRAY_ELEMENT_CHAR(array, index, value) cn1_set_array_element_char(threadStateData, array, index, value)
 
 extern JAVA_VOID monitorEnter(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj);
 extern JAVA_VOID monitorExit(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj);

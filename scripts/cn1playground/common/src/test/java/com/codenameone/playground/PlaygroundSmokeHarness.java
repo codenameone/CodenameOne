@@ -24,6 +24,7 @@ public final class PlaygroundSmokeHarness {
         smokeRestScriptWithLambda();
         smokeStringMethods();
         smokeComponentTypeResolvesWithoutExplicitImport();
+        smokeUIManagerClassImportDoesNotCollideWithGlobals();
         System.out.println("Playground smoke tests passed.");
     }
 
@@ -212,6 +213,40 @@ public final class PlaygroundSmokeHarness {
                 "Component type should resolve without explicit import: " + summarizeMessages(result));
     }
 
+
+    private static void smokeUIManagerClassImportDoesNotCollideWithGlobals() {
+        Display.init(null);
+
+        Form host = new Form("Host", new BorderLayout());
+        Container preview = new Container(new BorderLayout());
+        host.add(BorderLayout.CENTER, preview);
+        host.show();
+
+        PlaygroundContext context = new PlaygroundContext(host, preview, null,
+                new PlaygroundContext.Logger() {
+                    public void log(String message) {
+                    }
+                });
+
+        PlaygroundRunner runner = new PlaygroundRunner();
+        PlaygroundRunner.RunResult result = runner.run(
+                "import com.codename1.ui.plaf.Border;\n"
+                        + "import com.codename1.ui.plaf.UIManager;\n"
+                        + "Button top = new Button(\"Top\");\n"
+                        + "String cls = top.getClass().getName();\n"
+                        + "UIManager uim = UIManager.getInstance();\n"
+                        + "boolean hasArrow = uim.isThemeConstant(\"PopupDialogArrowBool\", false);\n"
+                        + "InteractionDialog it = new InteractionDialog();\n"
+                        + "it.setUIID(\"PopupDialog\");\n"
+                        + "Border b = it.getStyle().getBorder();\n"
+                        + "Container c = BorderLayout.north(top);\n"
+                        + "c.add(BorderLayout.CENTER, new Label(cls + \" \" + (hasArrow ? \"1\" : \"0\") + \" \" + (b == null ? \"null\" : b.getClass().getName())));\n"
+                        + "c;\n",
+                context);
+
+        require(result.getComponent() instanceof Container,
+                "UIManager import snippet should produce a Container: " + summarizeMessages(result));
+    }
     private static void require(boolean condition, String message) {
         if (!condition) {
             throw new IllegalStateException(message);

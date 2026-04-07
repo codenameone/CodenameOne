@@ -17,34 +17,37 @@
 
 package java.util;
 
-/**
- * An AbstractSet is an abstract implementation of the Set interface. This
- * implementation does not support adding. A subclass must implement the
- * abstract methods iterator() and size().
- * 
- * @since 1.2
- */
+/// An AbstractSet is an abstract implementation of the Set interface. This
+/// implementation does not support adding. A subclass must implement the
+/// abstract methods iterator() and size().
+///
+/// #### Since
+///
+/// 1.2
 public abstract class AbstractSet<E> extends AbstractCollection<E> implements
         Set<E> {
 
-    /**
-     * Constructs a new instance of this AbstractSet.
-     */
+    /// Constructs a new instance of this AbstractSet.
     protected AbstractSet() {
         super();
     }
 
-    /**
-     * Compares the specified object to this Set and returns true if they are
-     * equal. The object must be an instance of Set and contain the same
-     * objects.
-     * 
-     * @param object
-     *            the object to compare with this set.
-     * @return {@code true} if the specified object is equal to this set,
-     *         {@code false} otherwise
-     * @see #hashCode
-     */
+    /// Compares the specified object to this Set and returns true if they are
+    /// equal. The object must be an instance of Set and contain the same
+    /// objects.
+    ///
+    /// #### Parameters
+    ///
+    /// - `object`: the object to compare with this set.
+    ///
+    /// #### Returns
+    ///
+    /// @return `true` if the specified object is equal to this set,
+    /// `false` otherwise
+    ///
+    /// #### See also
+    ///
+    /// - #hashCode
     @Override
     public boolean equals(Object object) {
         if (this == object) {
@@ -64,14 +67,17 @@ public abstract class AbstractSet<E> extends AbstractCollection<E> implements
         return false;
     }
 
-    /**
-     * Returns the hash code for this set. Two set which are equal must return
-     * the same value. This implementation calculates the hash code by adding
-     * each element's hash code.
-     * 
-     * @return the hash code of this set.
-     * @see #equals
-     */
+    /// Returns the hash code for this set. Two set which are equal must return
+    /// the same value. This implementation calculates the hash code by adding
+    /// each element's hash code.
+    ///
+    /// #### Returns
+    ///
+    /// the hash code of this set.
+    ///
+    /// #### See also
+    ///
+    /// - #equals
     @Override
     public int hashCode() {
         int result = 0;
@@ -83,17 +89,21 @@ public abstract class AbstractSet<E> extends AbstractCollection<E> implements
         return result;
     }
 
-    /**
-     * Removes all occurrences in this collection which are contained in the
-     * specified collection.
-     * 
-     * @param collection
-     *            the collection of objects to remove.
-     * @return {@code true} if this collection was modified, {@code false}
-     *         otherwise.
-     * @throws UnsupportedOperationException
-     *                if removing from this collection is not supported.
-     */
+    /// Removes all occurrences in this collection which are contained in the
+    /// specified collection.
+    ///
+    /// #### Parameters
+    ///
+    /// - `collection`: the collection of objects to remove.
+    ///
+    /// #### Returns
+    ///
+    /// @return `true` if this collection was modified, `false`
+    /// otherwise.
+    ///
+    /// #### Throws
+    ///
+    /// - `UnsupportedOperationException`: if removing from this collection is not supported.
     @Override
     public boolean removeAll(Collection<?> collection) {
         boolean result = false;

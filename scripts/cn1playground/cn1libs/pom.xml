@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <artifactId>cn1playground</artifactId>
+        <groupId>com.codenameone.playground</groupId>
+        <version>1.0-SNAPSHOT</version>
+    </parent>
+
+    <groupId>com.codenameone.playground</groupId>
+    <artifactId>cn1playground-cn1libs</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <name>cn1playground-cn1libs</name>
+    <profiles>
+        <profile>
+            <id>ZipSupport.cn1lib-cn1lib</id>
+            <activation>
+                <file><exists>${basedir}/ZipSupport/pom.xml</exists></file>
+            </activation>
+            <modules><module>ZipSupport</module></modules>
+        </profile>
+        <profile>
+            <id>ZipSupport.cn1lib-cn1lib-fromroot</id>
+            <activation>
+                <file><exists>${basedir}/cn1libs/ZipSupport/pom.xml</exists></file>
+            </activation>
+            <modules><module>ZipSupport</module></modules>
+        </profile>
+    </profiles>
+    <build>
+        <plugins>
+            <plugin>
+                <inherited>false</inherited>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>sync-zipsupport-assets</id>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>sh</executable>
+                            <workingDirectory>${project.parent.basedir}</workingDirectory>
+                            <arguments>
+                                <argument>${project.parent.basedir}/tools/sync-zipsupport-from-initializr.sh</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

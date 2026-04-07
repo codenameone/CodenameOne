@@ -23,11 +23,9 @@
  */
 package java.lang;
 
-/**
- * Implementation class required to compile enums
- *
- * @author Shai Almog
- */
+/// Implementation class required to compile enums
+///
+/// @author Shai Almog
 public class Enum<E extends Enum<E>> implements Comparable<E> {
 
     protected Enum(final String name, final int ordinal) {

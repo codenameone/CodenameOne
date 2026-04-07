@@ -124,8 +124,8 @@ final class PlaygroundRunner {
         interpreter.set("theme", context.getTheme());
         interpreter.set("hostForm", context.getHostForm());
         interpreter.set("previewRoot", context.getPreviewRoot());
-        interpreter.set("Display", Display.getInstance());
-        interpreter.set("UIManager", UIManager.getInstance());
+        interpreter.set("display", Display.getInstance());
+        interpreter.set("uiManager", UIManager.getInstance());
         interpreter.set("FontImage", FontImage.class);
         interpreter.set("CN", com.codename1.ui.CN.class);
         interpreter.set("BoxLayout", BoxLayout.class);

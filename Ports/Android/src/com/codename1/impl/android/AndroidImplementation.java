@@ -1561,11 +1561,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         //ugly workaround for a bug where on some android versions the async view
         //came back black from the background.
         if(myView instanceof AndroidAsyncView){
+            final AndroidAsyncView finalView = (AndroidAsyncView)myView;
             new Thread(new Runnable() {
                 @Override
                 public void run() {
                     Util.sleep(1000);
-                    ((AndroidAsyncView)myView).setPaintViewOnBuffer(false);
+                    finalView.setPaintViewOnBuffer(false);
                 }
             }).start();
         }

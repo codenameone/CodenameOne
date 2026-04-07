@@ -17,10 +17,8 @@
 
 package java.util;
 
-/**
- * RandomAccess is implemented by {@code List} implementations that support fast
- * (usually constant time) random access.
- */
+/// RandomAccess is implemented by `List` implementations that support fast
+/// (usually constant time) random access.
 public interface RandomAccess {
     /* empty */
 }
