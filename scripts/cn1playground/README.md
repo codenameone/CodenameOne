@@ -347,8 +347,36 @@ mvn clean install
 
 ```bash
 cd scripts/cn1playground
-./scripts/run-tests.sh
+bash tools/run-playground-smoke-tests.sh
 ```
+
+This smoke command currently runs:
+
+1. CN1 access registry generation (`tools/generate-cn1-access-registry.sh`).
+2. Registry sanity checks (expected/forbidden class entries).
+3. `PlaygroundSmokeHarness` end-to-end behavior checks.
+4. `PlaygroundSyntaxMatrixHarness` syntax regression checks.
+
+## Language Feature Rollout Process
+
+Use this process when adding or fixing Java syntax support in Playground:
+
+1. **Add/adjust matrix coverage first**  
+   Update `common/src/test/java/com/codenameone/playground/PlaygroundSyntaxMatrixHarness.java` with a focused snippet for the target syntax.
+   - For currently unsupported syntax, add as `ExpectedOutcome.FAILURE`.
+   - When support lands, flip that case to `ExpectedOutcome.SUCCESS`.
+
+2. **Implement parser/runtime change in small steps**  
+   Prefer one syntax feature per PR (e.g. method references only) to keep regressions easy to isolate.
+
+3. **Run smoke + syntax matrix locally**  
+   Run `bash tools/run-playground-smoke-tests.sh` from `scripts/cn1playground`.
+
+4. **Require CI green before merge**  
+   The `CN1 Playground Language Tests` workflow runs the same smoke command under CI (`xvfb-run`) and should pass before merging syntax updates.
+
+5. **Document behavior changes**  
+   Update this README's known issues/limitations when syntax support changes so users know what is now supported.
 
 ## Known Issues
 
