@@ -36,79 +36,86 @@ public final class PlaygroundSyntaxMatrixHarness {
     }
 
     public static void main(String[] args) {
-        List<Case> cases = new ArrayList<Case>();
-        // Control cases that should stay green.
-        cases.add(new Case("lambda_listener", ExpectedOutcome.SUCCESS,
-                """
-                import com.codename1.ui.*;
-                import com.codename1.ui.layouts.*;
-                Container root = new Container(BoxLayout.y());
-                Button b = new Button("Go");
-                b.addActionListener(e -> {});
-                root.add(b);
-                root;
-                """));
-        cases.add(new Case("anonymous_listener", ExpectedOutcome.SUCCESS,
-                """
-                import com.codename1.ui.*;
-                import com.codename1.ui.events.*;
-                import com.codename1.ui.layouts.*;
-                Container root = new Container(BoxLayout.y());
-                Button b = new Button("Go");
-                b.addActionListener(new ActionListener() { public void actionPerformed(ActionEvent e) {} });
-                root.add(b);
-                root;
-                """));
+        int exitCode = 0;
+        try {
+            List<Case> cases = new ArrayList<Case>();
+            // Control cases that should stay green.
+            cases.add(new Case("lambda_listener", ExpectedOutcome.SUCCESS,
+                    """
+                    import com.codename1.ui.*;
+                    import com.codename1.ui.layouts.*;
+                    Container root = new Container(BoxLayout.y());
+                    Button b = new Button("Go");
+                    b.addActionListener(e -> {});
+                    root.add(b);
+                    root;
+                    """));
+            cases.add(new Case("anonymous_listener", ExpectedOutcome.SUCCESS,
+                    """
+                    import com.codename1.ui.*;
+                    import com.codename1.ui.events.*;
+                    import com.codename1.ui.layouts.*;
+                    Container root = new Container(BoxLayout.y());
+                    Button b = new Button("Go");
+                    b.addActionListener(new ActionListener() { public void actionPerformed(ActionEvent e) {} });
+                    root.add(b);
+                    root;
+                    """));
+            cases.add(new Case("enhanced_for_array", ExpectedOutcome.SUCCESS,
+                    """
+                    import com.codename1.ui.*;
+                    import com.codename1.ui.layouts.*;
+                    Container root = new Container(BoxLayout.y());
+                    int sum = 0;
+                    for (int v : new int[]{1,2,3}) {
+                        sum += v;
+                    }
+                    root.add(new Label("sum=" + sum));
+                    root;
+                    """));
 
-        // Known syntax gaps: flip these to SUCCESS as support lands.
-        cases.add(new Case("method_reference", ExpectedOutcome.FAILURE,
-                """
-                import com.codename1.ui.*;
-                import com.codename1.ui.layouts.*;
-                Container root = new Container(BoxLayout.y());
-                Button b = new Button("Go");
-                b.addActionListener(System.out::println);
-                root.add(b);
-                root;
-                """));
-        cases.add(new Case("try_with_resources_multi", ExpectedOutcome.FAILURE,
-                """
-                import com.codename1.ui.*;
-                import com.codename1.ui.layouts.*;
-                import java.io.*;
-                Container root = new Container(BoxLayout.y());
-                try (ByteArrayInputStream in = new ByteArrayInputStream(new byte[]{1}); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-                    out.write(in.read());
-                }
-                root;
-                """));
-        cases.add(new Case("enhanced_for_array", ExpectedOutcome.FAILURE,
-                """
-                import com.codename1.ui.*;
-                import com.codename1.ui.layouts.*;
-                Container root = new Container(BoxLayout.y());
-                int sum = 0;
-                for (int v : new int[]{1,2,3}) {
-                    sum += v;
-                }
-                root.add(new Label("sum=" + sum));
-                root;
-                """));
+            // Known syntax gaps: flip these to SUCCESS as support lands.
+            cases.add(new Case("method_reference", ExpectedOutcome.FAILURE,
+                    """
+                    import com.codename1.ui.*;
+                    import com.codename1.ui.layouts.*;
+                    Container root = new Container(BoxLayout.y());
+                    Button b = new Button("Go");
+                    b.addActionListener(System.out::println);
+                    root.add(b);
+                    root;
+                    """));
+            cases.add(new Case("try_with_resources_multi", ExpectedOutcome.FAILURE,
+                    """
+                    import com.codename1.ui.*;
+                    import com.codename1.ui.layouts.*;
+                    import java.io.*;
+                    Container root = new Container(BoxLayout.y());
+                    try (ByteArrayInputStream in = new ByteArrayInputStream(new byte[]{1}); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+                        out.write(in.read());
+                    }
+                    root;
+                    """));
 
-        int passed = 0;
-        for (Case testCase : cases) {
-            PlaygroundRunner.RunResult result = runSnippet(testCase.script);
-            boolean success = result.getComponent() instanceof Component;
-            boolean casePassed = testCase.expected == ExpectedOutcome.SUCCESS ? success : !success;
-            if (!casePassed) {
-                throw new IllegalStateException("Case failed: " + testCase.name
-                        + " expected=" + testCase.expected + " messages=" + summarizeMessages(result));
+            int passed = 0;
+            for (Case testCase : cases) {
+                PlaygroundRunner.RunResult result = runSnippet(testCase.script);
+                boolean success = result.getComponent() instanceof Component;
+                boolean casePassed = testCase.expected == ExpectedOutcome.SUCCESS ? success : !success;
+                if (!casePassed) {
+                    throw new IllegalStateException("Case failed: " + testCase.name
+                            + " expected=" + testCase.expected + " messages=" + summarizeMessages(result));
+                }
+                passed++;
             }
-            passed++;
-        }
 
-        System.out.println("Playground syntax matrix passed (" + passed + "/" + cases.size() + ").");
-        System.exit(0);
+            System.out.println("Playground syntax matrix passed (" + passed + "/" + cases.size() + ").");
+        } catch (Throwable t) {
+            t.printStackTrace(System.err);
+            exitCode = 1;
+        } finally {
+            System.exit(exitCode);
+        }
     }
 
     private static PlaygroundRunner.RunResult runSnippet(String script) {
