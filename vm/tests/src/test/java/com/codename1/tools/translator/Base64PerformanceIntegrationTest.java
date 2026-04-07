@@ -8,10 +8,13 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -28,6 +31,8 @@ class Base64PerformanceIntegrationTest {
         Path sourceDir = Files.createTempDirectory("base64-perf-sources");
         Path classesDir = Files.createTempDirectory("base64-perf-classes");
         Path javaApiDir = Files.createTempDirectory("base64-perf-javaapi");
+        Path coreJar = findClasspathJar("codenameone-core");
+        assertNotNull(coreJar, "codenameone-core jar should be present on the test classpath");
 
         Path source = sourceDir.resolve("Base64PerfApp.java");
         Files.write(source, loadAppSource().getBytes(StandardCharsets.UTF_8));
@@ -49,10 +54,10 @@ class Base64PerformanceIntegrationTest {
         compileArgs.add(config.targetVersion);
         if (CompilerHelper.useClasspath(config)) {
             compileArgs.add("-classpath");
-            compileArgs.add(javaApiDir.toString());
+            compileArgs.add(javaApiDir + System.getProperty("path.separator") + coreJar);
         } else {
             compileArgs.add("-bootclasspath");
-            compileArgs.add(javaApiDir.toString());
+            compileArgs.add(javaApiDir + System.getProperty("path.separator") + coreJar);
             compileArgs.add("-Xlint:-options");
         }
         compileArgs.add("-d");
@@ -62,11 +67,12 @@ class Base64PerformanceIntegrationTest {
         int compileResult = CompilerHelper.compile(config.jdkHome, compileArgs);
         assertEquals(0, compileResult, "Base64PerfApp should compile. " + CompilerHelper.getLastErrorLog());
 
-        String javaOutput = runJavaMain(config, classesDir, javaApiDir);
+        String javaOutput = runJavaMain(config, classesDir, javaApiDir, coreJar);
         String javaResult = extractLine(javaOutput, "RESULT=");
         assertTrue(javaResult.startsWith("RESULT="), "JavaSE should produce RESULT=. Output: " + javaOutput);
 
         CompilerHelper.copyDirectory(javaApiDir, classesDir);
+        unzipAllClasses(coreJar, classesDir);
 
         Path outputDir = Files.createTempDirectory("base64-perf-output");
         CleanTargetIntegrationTest.runTranslator(classesDir, outputDir, "Base64PerfApp");
@@ -110,7 +116,7 @@ class Base64PerformanceIntegrationTest {
         }
     }
 
-    private String runJavaMain(CompilerHelper.CompilerConfig config, Path classesDir, Path javaApiDir) throws Exception {
+    private String runJavaMain(CompilerHelper.CompilerConfig config, Path classesDir, Path javaApiDir, Path coreJar) throws Exception {
         String javaExe = config.jdkHome.resolve("bin").resolve("java").toString();
         if (System.getProperty("os.name").toLowerCase().contains("win")) {
             javaExe += ".exe";
@@ -119,7 +125,7 @@ class Base64PerformanceIntegrationTest {
         ProcessBuilder pb = new ProcessBuilder(
                 javaExe,
                 "-cp",
-                classesDir + System.getProperty("path.separator") + javaApiDir,
+                classesDir + System.getProperty("path.separator") + javaApiDir + System.getProperty("path.separator") + coreJar,
                 "Base64PerfApp"
         );
         pb.redirectErrorStream(true);
@@ -155,5 +161,31 @@ class Base64PerformanceIntegrationTest {
             }
         }
         return null;
+    }
+
+    private Path findClasspathJar(String namePart) {
+        String classpath = System.getProperty("java.class.path");
+        String[] entries = classpath.split(System.getProperty("path.separator"));
+        for (String entry : entries) {
+            Path p = Paths.get(entry);
+            if (Files.isRegularFile(p) && p.getFileName().toString().contains(namePart)) {
+                return p.toAbsolutePath().normalize();
+            }
+        }
+        return null;
+    }
+
+    private void unzipAllClasses(Path zipFile, Path outputDir) throws Exception {
+        try (ZipInputStream zis = new ZipInputStream(Files.newInputStream(zipFile))) {
+            ZipEntry entry;
+            while ((entry = zis.getNextEntry()) != null) {
+                if (entry.isDirectory() || !entry.getName().endsWith(".class")) {
+                    continue;
+                }
+                Path out = outputDir.resolve(entry.getName());
+                Files.createDirectories(out.getParent());
+                Files.copy(zis, out, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
+        }
     }
 }
