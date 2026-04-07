@@ -848,8 +848,11 @@ public class BytecodeMethod implements SignatureSet {
             }
             return;
         }
-            
+        
         b.append(declaration);
+        if (simdCandidateHint && simdWidthHint > 0) {
+            b.append("    const JAVA_INT __cn1SimdWidthHint = ").append(simdWidthHint).append(";\n");
+        }
         
         boolean hasInstructions = true;
         if(optimizerOn) {
