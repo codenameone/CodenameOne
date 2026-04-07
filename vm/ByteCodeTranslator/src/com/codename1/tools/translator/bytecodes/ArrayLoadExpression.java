@@ -142,11 +142,15 @@ public class ArrayLoadExpression extends Instruction implements AssignableExpres
             return false;
         }
 
-        if (varName != null) {
+        boolean useTemporaries = varName != null && (!isSimpleExpression(arrayExpr) || !isSimpleExpression(indexExpr));
+
+        if (useTemporaries) {
             b.append("{\n");
             b.append("    JAVA_OBJECT __cn1ArrayTmp = ").append(arrayExpr).append(";\n");
             b.append("    JAVA_INT __cn1IndexTmp = ").append(indexExpr).append(";\n");
             b.append("    ").append(varName).append("=");
+        } else if (varName != null) {
+            b.append(varName).append("=");
         }
 
         b.append("CN1_ARRAY_ELEMENT_");
@@ -179,21 +183,23 @@ public class ArrayLoadExpression extends Instruction implements AssignableExpres
                 
         }
         b.append(arrayType).append("(");
-        if (varName != null) {
+        if (useTemporaries) {
             b.append("__cn1ArrayTmp");
         } else {
             b.append(arrayExpr);
         }
         b.append(", ");
-        if (varName != null) {
+        if (useTemporaries) {
             b.append("__cn1IndexTmp");
         } else {
             b.append(indexExpr);
         }
         b.append(")");
-        if (varName != null) {
+        if (useTemporaries) {
             b.append(";\n");
             b.append("}\n");
+        } else if (varName != null) {
+            b.append(";\n");
         }
         
         sb.append(b);
@@ -202,5 +208,22 @@ public class ArrayLoadExpression extends Instruction implements AssignableExpres
 
     public boolean isObject() {
         return loadInstruction != null && loadInstruction.getOpcode() == Opcodes.AALOAD;
+    }
+
+    private static boolean isSimpleExpression(String expr) {
+        if (expr == null || expr.length() == 0) {
+            return false;
+        }
+        for (int i = 0; i < expr.length(); i++) {
+            char c = expr.charAt(i);
+            if ((c >= 'a' && c <= 'z')
+                    || (c >= 'A' && c <= 'Z')
+                    || (c >= '0' && c <= '9')
+                    || c == '_' || c == '.') {
+                continue;
+            }
+            return false;
+        }
+        return true;
     }
 }
