@@ -52,22 +52,23 @@ public class Base64NativePerformanceTest extends BaseTest {
             return false;
         }
 
-        byte[] cn1EncodedBytes;
-        try {
-            cn1EncodedBytes = cn1Encoded.getBytes("UTF-8");
-        } catch (Exception ex) {
-            fail("Failed to encode CN1 Base64 payload for decode benchmark: " + ex);
+        int encodedLen = ((payloadBytes.length + 2) / 3) * 4;
+        byte[] cn1EncodedBytes = new byte[encodedLen];
+        int encodedWritten = Base64.encodeNoNewline(payloadBytes, cn1EncodedBytes);
+        if (encodedWritten != encodedLen) {
+            fail("CN1 preallocated Base64 encode returned unexpected length");
             return false;
         }
+        byte[] cn1DecodedBuffer = new byte[payloadBytes.length];
 
         if (!isIos()) {
-            warmup(nativeBase64, payload, payloadBytes, nativeEncoded, cn1EncodedBytes);
+            warmup(nativeBase64, payload, payloadBytes, nativeEncoded, cn1EncodedBytes, cn1DecodedBuffer);
         }
 
         long nativeEncodeMs = measureNativeEncode(nativeBase64, payload);
-        long cn1EncodeMs = measureCn1Encode(payloadBytes);
+        long cn1EncodeMs = measureCn1Encode(payloadBytes, cn1EncodedBytes);
         long nativeDecodeMs = measureNativeDecode(nativeBase64, nativeEncoded);
-        long cn1DecodeMs = measureCn1Decode(cn1EncodedBytes);
+        long cn1DecodeMs = measureCn1Decode(cn1EncodedBytes, cn1DecodedBuffer);
 
         double encodeRatio = cn1EncodeMs / Math.max(1.0, (double) nativeEncodeMs);
         double decodeRatio = cn1DecodeMs / Math.max(1.0, (double) nativeDecodeMs);
@@ -84,12 +85,12 @@ public class Base64NativePerformanceTest extends BaseTest {
         return true;
     }
 
-    private static void warmup(Base64Native nativeBase64, String payload, byte[] payloadBytes, String nativeEncoded, byte[] cn1EncodedBytes) {
+    private static void warmup(Base64Native nativeBase64, String payload, byte[] payloadBytes, String nativeEncoded, byte[] cn1EncodedBytes, byte[] cn1DecodedBuffer) {
         for (int i = 0; i < 40; i++) {
             nativeBase64.encodeUtf8(payload);
-            Base64.encodeNoNewline(payloadBytes);
+            Base64.encodeNoNewline(payloadBytes, cn1EncodedBytes);
             nativeBase64.decodeToUtf8(nativeEncoded);
-            Base64.decode(cn1EncodedBytes);
+            Base64.decode(cn1EncodedBytes, cn1DecodedBuffer);
         }
     }
 
@@ -101,10 +102,10 @@ public class Base64NativePerformanceTest extends BaseTest {
         return System.currentTimeMillis() - start;
     }
 
-    private static long measureCn1Encode(byte[] payloadBytes) {
+    private static long measureCn1Encode(byte[] payloadBytes, byte[] outputBuffer) {
         long start = System.currentTimeMillis();
         for (int i = 0; i < ITERATIONS; i++) {
-            Base64.encodeNoNewline(payloadBytes);
+            Base64.encodeNoNewline(payloadBytes, outputBuffer);
         }
         return System.currentTimeMillis() - start;
     }
@@ -117,10 +118,10 @@ public class Base64NativePerformanceTest extends BaseTest {
         return System.currentTimeMillis() - start;
     }
 
-    private static long measureCn1Decode(byte[] encoded) {
+    private static long measureCn1Decode(byte[] encoded, byte[] outputBuffer) {
         long start = System.currentTimeMillis();
         for (int i = 0; i < ITERATIONS; i++) {
-            Base64.decode(encoded);
+            Base64.decode(encoded, outputBuffer);
         }
         return System.currentTimeMillis() - start;
     }

@@ -67,13 +67,38 @@ public abstract class Base64 {
         if (len == 0) {
             return new byte[0];
         }
+        int maxOutputLength = (len / 4) * 3 + 3;
+        byte[] out = new byte[maxOutputLength];
+        int outputLength = decode(in, len, out);
+        if (outputLength < 0) {
+            return null;
+        }
+        if (outputLength == out.length) {
+            return out;
+        }
+        byte[] trimmed = new byte[outputLength];
+        System.arraycopy(out, 0, trimmed, 0, outputLength);
+        return trimmed;
+    }
+
+    /**
+     * Decodes Base64 input into a caller-provided output buffer.
+     *
+     * @param in Base64 bytes
+     * @param len bytes from {@code in} to decode
+     * @param out destination buffer
+     * @return decoded length, or {@code -1} for invalid Base64
+     */
+    public static int decode(byte[] in, int len, byte[] out) {
+        if (len == 0) {
+            return 0;
+        }
         if ((len & 0x3) == 0) {
-            byte[] fast = decodeNoWhitespace(in, len);
-            if (fast != null) {
-                return fast;
+            int fastLength = decodeNoWhitespace(in, len, out);
+            if (fastLength >= 0) {
+                return fastLength;
             }
         }
-
         int pad = 0;
         int end = len;
         while (end > 0) {
@@ -101,7 +126,7 @@ public abstract class Base64 {
                 continue;
             }
             if (value == DECODE_INVALID) {
-                return null;
+                return -1;
             }
             validChars++;
         }
@@ -109,10 +134,11 @@ public abstract class Base64 {
         int totalSymbols = validChars + pad;
         int outputLength = (totalSymbols / 4) * 3 - pad;
         if (outputLength <= 0) {
-            return new byte[0];
+            return 0;
         }
-
-        byte[] out = new byte[outputLength];
+        if (out.length < outputLength) {
+            throw new IllegalArgumentException("Output buffer too small for decoded data");
+        }
         int outIndex = 0;
 
         int quantum = 0;
@@ -127,7 +153,7 @@ public abstract class Base64 {
                 continue;
             }
             if (bits == DECODE_INVALID) {
-                return null;
+                return -1;
             }
             quantum = (quantum << 6) | bits;
             quantumChars++;
@@ -142,7 +168,7 @@ public abstract class Base64 {
 
         if (pad > 0) {
             if ((pad == 1 && quantumChars != 3) || (pad == 2 && quantumChars != 2)) {
-                return null;
+                return -1;
             }
             quantum = quantum << (6 * pad);
             out[outIndex++] = (byte) ((quantum & 0x00FF0000) >> 16);
@@ -151,12 +177,16 @@ public abstract class Base64 {
             }
         }
 
-        return out;
+        return outIndex;
     }
 
-    private static byte[] decodeNoWhitespace(byte[] in, int len) {
+    public static int decode(byte[] in, byte[] out) {
+        return decode(in, in.length, out);
+    }
+
+    private static int decodeNoWhitespace(byte[] in, int len, byte[] out) {
         if ((len & 0x3) != 0) {
-            return null;
+            return -1;
         }
         int pad = 0;
         if (len > 0 && in[len - 1] == '=') {
@@ -166,14 +196,16 @@ public abstract class Base64 {
             }
         }
         if (pad > 2) {
-            return null;
+            return -1;
         }
 
         int outLength = (len / 4) * 3 - pad;
         if (outLength <= 0) {
-            return new byte[0];
+            return 0;
         }
-        byte[] out = new byte[outLength];
+        if (out.length < outLength) {
+            throw new IllegalArgumentException("Output buffer too small for decoded data");
+        }
         int outIndex = 0;
         byte[] decodeMapLocal = decodeMap;
         int fullLen = len - (pad > 0 ? 4 : 0);
@@ -188,7 +220,7 @@ public abstract class Base64 {
             int b2 = decodeMapLocal[c2];
             int b3 = decodeMapLocal[c3];
             if ((b0 | b1 | b2 | b3) < 0) {
-                return null;
+                return -1;
             }
             int quantum = (b0 << 18) | (b1 << 12) | (b2 << 6) | b3;
             out[outIndex++] = (byte) ((quantum >> 16) & 0xff);
@@ -197,7 +229,7 @@ public abstract class Base64 {
         }
 
         if (pad == 0) {
-            return out;
+            return outIndex;
         }
 
         int i = len - 4;
@@ -206,22 +238,22 @@ public abstract class Base64 {
         int b0 = decodeMapLocal[c0];
         int b1 = decodeMapLocal[c1];
         if ((b0 | b1) < 0) {
-            return null;
+            return -1;
         }
         out[outIndex++] = (byte) ((b0 << 2) | (b1 >> 4));
         if (pad == 2) {
-            return (in[i + 2] == '=' && in[i + 3] == '=') ? out : null;
+            return (in[i + 2] == '=' && in[i + 3] == '=') ? outIndex : -1;
         }
 
         if (in[i + 3] != '=') {
-            return null;
+            return -1;
         }
         int b2 = decodeMapLocal[in[i + 2] & 0xff];
         if (b2 < 0) {
-            return null;
+            return -1;
         }
         out[outIndex] = (byte) ((b1 << 4) | (b2 >> 2));
-        return out;
+        return outLength;
     }
 
     /// Encodes the given array as a base64 string
@@ -291,6 +323,26 @@ public abstract class Base64 {
         }
         int outputLength = ((inputLength + 2) / 3) * 4;
         byte[] out = new byte[outputLength];
+        encodeNoNewline(in, out);
+        return com.codename1.util.StringUtil.newString(out, 0, outputLength);
+    }
+
+    /**
+     * Encodes input into a caller-provided output buffer without line breaks.
+     *
+     * @param in input bytes
+     * @param out destination buffer
+     * @return number of bytes written to {@code out}
+     */
+    public static int encodeNoNewline(byte[] in, byte[] out) {
+        int inputLength = in.length;
+        int outputLength = ((inputLength + 2) / 3) * 4;
+        if (out.length < outputLength) {
+            throw new IllegalArgumentException("Output buffer too small for encoded data");
+        }
+        if (inputLength == 0) {
+            return 0;
+        }
         byte[] mapLocal = map;
         int end = inputLength - (inputLength % 3);
         int outIndex = 0;
@@ -362,6 +414,6 @@ public abstract class Base64 {
             default:
                 break;
         }
-        return com.codename1.util.StringUtil.newString(out, 0, outputLength);
+        return outIndex;
     }
 }
