@@ -224,10 +224,11 @@ final class PlaygroundRunner {
             if (containsNonWhitespace(script.substring(cursor, classModifiersStart))) {
                 return null;
             }
-            String classBody = stripTopLevelTypeDeclarations(classBlock.body);
-            if (classBody == null) {
+            StripTypeDeclarationsResult stripped = stripTopLevelTypeDeclarations(classBlock.body);
+            if (stripped == null) {
                 return null;
             }
+            String classBody = rewriteNestedTypeReferences(stripped.body, stripped.typeNames);
             if (containsFieldDeclaration(classBody)) {
                 classBody = transformFieldDeclarations(classBody);
             }
@@ -247,8 +248,76 @@ final class PlaygroundRunner {
         return prefix + body.toString();
     }
 
-    private String stripTopLevelTypeDeclarations(String body) {
+    private String rewriteNestedTypeReferences(String body, String[] typeNames) {
+        if (typeNames.length == 0) {
+            return body;
+        }
         StringBuilder out = new StringBuilder();
+        int i = 0;
+        while (i < body.length()) {
+            char ch = body.charAt(i);
+            if (ch == '"' || ch == '\'') {
+                int end = skipQuoted(body, i);
+                out.append(body.substring(i, end + 1));
+                i = end + 1;
+                continue;
+            }
+            if (startsLineComment(body, i)) {
+                int end = skipLineComment(body, i);
+                out.append(body.substring(i, end + 1));
+                i = end + 1;
+                continue;
+            }
+            if (startsBlockComment(body, i)) {
+                int end = skipBlockComment(body, i);
+                out.append(body.substring(i, end + 1));
+                i = end + 1;
+                continue;
+            }
+            if (startsWithWord(body, i, "new")) {
+                int nameStart = skipWhitespace(body, i + 3);
+                String matchedType = findMatchingTypeName(body, nameStart, typeNames);
+                if (matchedType != null) {
+                    int afterName = nameStart + matchedType.length();
+                    int openParen = skipWhitespace(body, afterName);
+                    if (openParen < body.length() && body.charAt(openParen) == '(') {
+                        int closeParen = findMatchingParen(body, openParen);
+                        if (closeParen < 0) {
+                            return body;
+                        }
+                        out.append(body.substring(i, nameStart));
+                        out.append("java.util.Hashtable");
+                        out.append("()");
+                        i = closeParen + 1;
+                        continue;
+                    }
+                }
+            }
+            String matchedType = findMatchingTypeName(body, i, typeNames);
+            if (matchedType != null) {
+                out.append("Object");
+                i += matchedType.length();
+                continue;
+            }
+            out.append(ch);
+            i++;
+        }
+        return out.toString();
+    }
+
+    private String findMatchingTypeName(String body, int index, String[] typeNames) {
+        for (int i = 0; i < typeNames.length; i++) {
+            String type = typeNames[i];
+            if (startsWithWord(body, index, type)) {
+                return type;
+            }
+        }
+        return null;
+    }
+
+    private StripTypeDeclarationsResult stripTopLevelTypeDeclarations(String body) {
+        StringBuilder out = new StringBuilder();
+        List<String> typeNames = new ArrayList<String>();
         int depth = 0;
         int i = 0;
         int last = 0;
@@ -279,6 +348,11 @@ final class PlaygroundRunner {
             if (depth == 0 && (startsWithWord(body, i, "class")
                     || startsWithWord(body, i, "interface")
                     || startsWithWord(body, i, "enum"))) {
+                int namePos = skipWhitespace(body, i + indexOfWordEnd(body, i));
+                String typeName = readIdentifier(body, namePos);
+                if (typeName != null) {
+                    typeNames.add(typeName);
+                }
                 int openingBrace = findOpeningBrace(body, i);
                 if (openingBrace < 0) {
                     return null;
@@ -303,7 +377,18 @@ final class PlaygroundRunner {
         if (last < body.length()) {
             out.append(body.substring(last));
         }
-        return out.toString();
+        return new StripTypeDeclarationsResult(out.toString(), typeNames);
+    }
+
+    private String readIdentifier(String text, int start) {
+        if (start < 0 || start >= text.length() || !isIdentifierStart(text.charAt(start))) {
+            return null;
+        }
+        int i = start + 1;
+        while (i < text.length() && isIdentifierPart(text.charAt(i))) {
+            i++;
+        }
+        return text.substring(start, i);
     }
 
     private int findClassModifiersStart(String script, int classKeywordPos) {
@@ -1841,6 +1926,16 @@ final class PlaygroundRunner {
             this.bodyStart = bodyStart;
             this.bodyEnd = bodyEnd;
             this.body = body;
+        }
+    }
+
+    private static final class StripTypeDeclarationsResult {
+        final String body;
+        final String[] typeNames;
+
+        StripTypeDeclarationsResult(String body, List<String> typeNames) {
+            this.body = body;
+            this.typeNames = typeNames.toArray(new String[typeNames.size()]);
         }
     }
 }

@@ -21,7 +21,9 @@ public final class PlaygroundSmokeHarness {
         smokeLooseScriptListeners();
         smokeLooseScriptListSnippet();
         smokeLifecycleDemo();
+        smokeNestedClassReferenceInLifecycleScript();
         smokeMultipleClassWrapperScript();
+        smokeMultipleClassWrapperWithNestedTypeReference();
         smokeRestScriptWithLambda();
         smokeStringMethods();
         smokeComponentTypeResolvesWithoutExplicitImport();
@@ -64,6 +66,81 @@ public final class PlaygroundSmokeHarness {
         }
         require(showContext.getShownForm() == shown, "Form.show() dispatch should capture the shown form");
         require(Display.getInstance().getCurrent() != shown, "Form.show() interception should not replace the host UI");
+    }
+
+    private static void smokeNestedClassReferenceInLifecycleScript() {
+        Display.init(null);
+
+        Form host = new Form("Host", new BorderLayout());
+        Container preview = new Container(new BorderLayout());
+        host.add(BorderLayout.CENTER, preview);
+        host.show();
+
+        PlaygroundContext context = new PlaygroundContext(host, preview, null,
+                new PlaygroundContext.Logger() {
+                    public void log(String message) {
+                    }
+                });
+
+        PlaygroundRunner runner = new PlaygroundRunner();
+        PlaygroundRunner.RunResult result = runner.run(
+                "import com.codename1.ui.*;\n"
+                        + "import com.codename1.ui.layouts.*;\n"
+                        + "public class DemoApp {\n"
+                        + "    private C last;\n"
+                        + "    public void init(Object context) {}\n"
+                        + "    public void start() {\n"
+                        + "        C c = new C(3, 4);\n"
+                        + "        last = c;\n"
+                        + "        Form form = new Form(\"Nested Ref\", BoxLayout.y());\n"
+                        + "        form.add(new Label(\"ok\"));\n"
+                        + "        form.show();\n"
+                        + "    }\n"
+                        + "    class C {\n"
+                        + "        C(int x, int y) {}\n"
+                        + "    }\n"
+                        + "}\n",
+                context);
+
+        require(result.getComponent() instanceof Form,
+                "Nested class reference script should still render: " + summarizeMessages(result));
+    }
+
+    private static void smokeMultipleClassWrapperWithNestedTypeReference() {
+        Display.init(null);
+
+        Form host = new Form("Host", new BorderLayout());
+        Container preview = new Container(new BorderLayout());
+        host.add(BorderLayout.CENTER, preview);
+        host.show();
+
+        PlaygroundContext context = new PlaygroundContext(host, preview, null,
+                new PlaygroundContext.Logger() {
+                    public void log(String message) {
+                    }
+                });
+
+        PlaygroundRunner runner = new PlaygroundRunner();
+        PlaygroundRunner.RunResult result = runner.run(
+                "import com.codename1.ui.*;\n"
+                        + "import com.codename1.ui.layouts.*;\n"
+                        + "public class Helpers {\n"
+                        + "    class Pair {\n"
+                        + "        Pair(int x, int y) {}\n"
+                        + "    }\n"
+                        + "    Pair make() { return new Pair(1, 2); }\n"
+                        + "}\n"
+                        + "public class Demo {\n"
+                        + "    public void start() {\n"
+                        + "        Form f = new Form(\"Multi Nested\", BoxLayout.y());\n"
+                        + "        f.add(new Label(\"ok\"));\n"
+                        + "        f.show();\n"
+                        + "    }\n"
+                        + "}\n",
+                context);
+
+        require(result.getComponent() instanceof Form,
+                "Multi class wrapper with nested type references should render: " + summarizeMessages(result));
     }
 
     private static void smokeLifecycleWrapperScript() {
@@ -356,6 +433,7 @@ public final class PlaygroundSmokeHarness {
                         + "    public void init(Object context) {}\n"
                         + "\n"
                         + "    public void start() {\n"
+                        + "        C c = new C(3, 4);\n"
                         + "        Form form = new Form(\"Lifecycle Demo\", BoxLayout.y());\n"
                         + "        status = new Label(\"Ready\");\n"
                         + "        Button button = new Button(\"Tap me\");\n"
@@ -368,7 +446,14 @@ public final class PlaygroundSmokeHarness {
                         + "        form.addAll(new Label(\"Lifecycle-style scripts are the easiest place to test listeners.\"), button, status);\n"
                         + "        form.show();\n"
                         + "    }\n"
-                        + "    class C {}\n"
+                        + "    class C {\n"
+                        + "        int x;\n"
+                        + "        int y;\n"
+                        + "        C(int x, int y) {\n"
+                        + "            this.x = x;\n"
+                        + "            this.y = y;\n"
+                        + "        }\n"
+                        + "    }\n"
                         + "}\n",
                 context);
 

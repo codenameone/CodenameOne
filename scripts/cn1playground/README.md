@@ -221,7 +221,7 @@ public class DemoApp {
 ```
 
 **What doesn't work**:
-- Nested classes are ignored during unwrapping and cannot be referenced
+- Nested classes are erased during unwrapping (references are treated as `Object` placeholders, without class semantics)
 - Interfaces or enums
 - Static fields or methods that reference instance fields
 
