@@ -286,9 +286,8 @@ final class PlaygroundRunner {
                         if (closeParen < 0) {
                             return rewritten;
                         }
-                        out.append(rewritten.substring(i, nameStart));
-                        out.append("java.util.Hashtable");
-                        out.append("()");
+                        String args = rewritten.substring(openParen + 1, closeParen);
+                        out.append("__cn1_new_").append(matchedType).append("(").append(args).append(")");
                         i = closeParen + 1;
                         continue;
                     }
@@ -303,7 +302,7 @@ final class PlaygroundRunner {
             out.append(ch);
             i++;
         }
-        return out.toString();
+        return stripped.helperPrefix + out.toString();
     }
 
     private String rewriteNestedTypeMethodCalls(String body, NestedTypeDescriptor[] nestedTypes) {
@@ -471,12 +470,14 @@ final class PlaygroundRunner {
         if (last < body.length()) {
             out.append(body.substring(last));
         }
-        return new StripTypeDeclarationsResult(out.toString(), typeNames, nestedTypes);
+        return new StripTypeDeclarationsResult(out.toString(), typeNames, nestedTypes,
+                buildNestedTypeHelpers(nestedTypes.toArray(new NestedTypeDescriptor[nestedTypes.size()])));
     }
 
     private NestedTypeDescriptor parseNestedTypeDescriptor(String typeName, String typeBody) {
         List<String> fieldNames = new ArrayList<String>();
         List<SimpleStringMethod> methods = new ArrayList<SimpleStringMethod>();
+        ConstructorPlan constructor = null;
         int depth = 0;
         int stmtStart = 0;
         for (int i = 0; i < typeBody.length(); i++) {
@@ -501,6 +502,10 @@ final class PlaygroundRunner {
                         break;
                     }
                     String blockBody = typeBody.substring(i + 1, bodyEnd).trim();
+                    String memberName = parseMemberName(header);
+                    if (typeName.equals(memberName)) {
+                        constructor = parseConstructorPlan(header, blockBody);
+                    }
                     SimpleStringMethod method = parseSimpleStringMethod(header, blockBody);
                     if (method != null) {
                         methods.add(method);
@@ -521,7 +526,102 @@ final class PlaygroundRunner {
                 stmtStart = i + 1;
             }
         }
-        return new NestedTypeDescriptor(typeName, fieldNames, methods);
+        return new NestedTypeDescriptor(typeName, fieldNames, methods, constructor);
+    }
+
+    private String parseMemberName(String header) {
+        int openParen = header.indexOf('(');
+        if (openParen < 0) {
+            return null;
+        }
+        int nameEnd = openParen - 1;
+        while (nameEnd >= 0 && Character.isWhitespace(header.charAt(nameEnd))) {
+            nameEnd--;
+        }
+        int nameStart = nameEnd;
+        while (nameStart >= 0 && isIdentifierPart(header.charAt(nameStart))) {
+            nameStart--;
+        }
+        nameStart++;
+        if (nameStart > nameEnd) {
+            return null;
+        }
+        return header.substring(nameStart, nameEnd + 1);
+    }
+
+    private ConstructorPlan parseConstructorPlan(String header, String body) {
+        int openParen = header.indexOf('(');
+        int closeParen = header.indexOf(')', openParen + 1);
+        if (openParen < 0 || closeParen < 0) {
+            return new ConstructorPlan(new String[0], new String[0], new String[0]);
+        }
+        String params = header.substring(openParen + 1, closeParen).trim();
+        List<String> paramNames = new ArrayList<String>();
+        if (params.length() > 0) {
+            int start = 0;
+            while (start < params.length()) {
+                int comma = params.indexOf(',', start);
+                if (comma < 0) {
+                    comma = params.length();
+                }
+                String part = params.substring(start, comma).trim();
+                int end = part.length() - 1;
+                while (end >= 0 && Character.isWhitespace(part.charAt(end))) {
+                    end--;
+                }
+                int p = end;
+                while (p >= 0 && isIdentifierPart(part.charAt(p))) {
+                    p--;
+                }
+                p++;
+                if (p <= end) {
+                    paramNames.add(part.substring(p, end + 1));
+                }
+                start = comma + 1;
+            }
+        }
+        List<String> assignFields = new ArrayList<String>();
+        List<String> assignParams = new ArrayList<String>();
+        int stmtStart = 0;
+        int depth = 0;
+        for (int i = 0; i < body.length(); i++) {
+            char ch = body.charAt(i);
+            if (ch == '"' || ch == '\'') {
+                i = skipQuoted(body, i);
+                continue;
+            }
+            if (startsLineComment(body, i)) {
+                i = skipLineComment(body, i);
+                continue;
+            }
+            if (startsBlockComment(body, i)) {
+                i = skipBlockComment(body, i);
+                continue;
+            }
+            if (ch == '{') {
+                depth++;
+            } else if (ch == '}') {
+                depth--;
+            } else if (depth == 0 && ch == ';') {
+                String stmt = body.substring(stmtStart, i).trim();
+                if (stmt.startsWith("this.")) {
+                    int eq = stmt.indexOf('=');
+                    if (eq > 5) {
+                        String field = stmt.substring(5, eq).trim();
+                        String expr = stmt.substring(eq + 1).trim();
+                        if (field.length() > 0 && expr.length() > 0) {
+                            assignFields.add(field);
+                            assignParams.add(expr);
+                        }
+                    }
+                }
+                stmtStart = i + 1;
+            }
+        }
+        return new ConstructorPlan(
+                paramNames.toArray(new String[paramNames.size()]),
+                assignFields.toArray(new String[assignFields.size()]),
+                assignParams.toArray(new String[assignParams.size()]));
     }
 
     private String parseFieldName(String statement) {
@@ -596,6 +696,32 @@ final class PlaygroundRunner {
             i++;
         }
         return text.substring(start, i);
+    }
+
+    private String buildNestedTypeHelpers(NestedTypeDescriptor[] nestedTypes) {
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < nestedTypes.length; i++) {
+            NestedTypeDescriptor type = nestedTypes[i];
+            out.append("java.util.Hashtable __cn1_new_").append(type.typeName).append('(');
+            ConstructorPlan ctor = type.constructorPlan;
+            String[] params = ctor != null ? ctor.paramNames : new String[0];
+            for (int p = 0; p < params.length; p++) {
+                if (p > 0) {
+                    out.append(", ");
+                }
+                out.append("Object ").append(params[p]);
+            }
+            out.append(") {\n");
+            out.append("java.util.Hashtable __self = new java.util.Hashtable();\n");
+            if (ctor != null) {
+                for (int a = 0; a < ctor.assignedFields.length; a++) {
+                    out.append("__self.put(\"").append(ctor.assignedFields[a]).append("\", ")
+                            .append(ctor.assignedExpressions[a]).append(");\n");
+                }
+            }
+            out.append("return __self;\n}\n");
+        }
+        return out.toString();
     }
 
     private int findClassModifiersStart(String script, int classKeywordPos) {
@@ -2140,11 +2266,14 @@ final class PlaygroundRunner {
         final String body;
         final String[] typeNames;
         final NestedTypeDescriptor[] nestedTypes;
+        final String helperPrefix;
 
-        StripTypeDeclarationsResult(String body, List<String> typeNames, List<NestedTypeDescriptor> nestedTypes) {
+        StripTypeDeclarationsResult(String body, List<String> typeNames, List<NestedTypeDescriptor> nestedTypes,
+                String helperPrefix) {
             this.body = body;
             this.typeNames = typeNames.toArray(new String[typeNames.size()]);
             this.nestedTypes = nestedTypes.toArray(new NestedTypeDescriptor[nestedTypes.size()]);
+            this.helperPrefix = helperPrefix;
         }
     }
 
@@ -2152,11 +2281,14 @@ final class PlaygroundRunner {
         final String typeName;
         final String[] fieldNames;
         final SimpleStringMethod[] simpleStringMethods;
+        final ConstructorPlan constructorPlan;
 
-        NestedTypeDescriptor(String typeName, List<String> fieldNames, List<SimpleStringMethod> methods) {
+        NestedTypeDescriptor(String typeName, List<String> fieldNames, List<SimpleStringMethod> methods,
+                ConstructorPlan constructorPlan) {
             this.typeName = typeName;
             this.fieldNames = fieldNames.toArray(new String[fieldNames.size()]);
             this.simpleStringMethods = methods.toArray(new SimpleStringMethod[methods.size()]);
+            this.constructorPlan = constructorPlan;
         }
     }
 
@@ -2167,6 +2299,18 @@ final class PlaygroundRunner {
         SimpleStringMethod(String name, String expression) {
             this.name = name;
             this.expression = expression;
+        }
+    }
+
+    private static final class ConstructorPlan {
+        final String[] paramNames;
+        final String[] assignedFields;
+        final String[] assignedExpressions;
+
+        ConstructorPlan(String[] paramNames, String[] assignedFields, String[] assignedExpressions) {
+            this.paramNames = paramNames;
+            this.assignedFields = assignedFields;
+            this.assignedExpressions = assignedExpressions;
         }
     }
 }
