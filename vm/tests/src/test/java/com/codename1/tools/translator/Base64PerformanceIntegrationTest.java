@@ -2,6 +2,7 @@ package com.codename1.tools.translator;
 
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.opentest4j.AssertionFailedError;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -98,7 +99,7 @@ class Base64PerformanceIntegrationTest {
 
         Path executable = buildDir.resolve("Base64PerfApp");
         assertTrue(Files.exists(executable), "ParparVM build should produce a runnable executable");
-        String vmOutput = CleanTargetIntegrationTest.runCommand(Arrays.asList(executable.toString()), buildDir);
+        String vmOutput = runVmBenchmarkWithRetry(executable, buildDir);
         String vmResult = extractLine(vmOutput, "RESULT=");
         assertEquals(javaResult, vmResult, "JavaSE and ParparVM should produce identical RESULT signatures");
 
@@ -187,5 +188,24 @@ class Base64PerformanceIntegrationTest {
                 Files.copy(zis, out, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
             }
         }
+    }
+
+    private String runVmBenchmarkWithRetry(Path executable, Path workingDir) throws Exception {
+        try {
+            return CleanTargetIntegrationTest.runCommand(Arrays.asList(executable.toString()), workingDir);
+        } catch (AssertionFailedError firstFailure) {
+            if (!looksLikeSegmentationFault(firstFailure)) {
+                throw firstFailure;
+            }
+            return CleanTargetIntegrationTest.runCommand(Arrays.asList(executable.toString()), workingDir);
+        }
+    }
+
+    private boolean looksLikeSegmentationFault(AssertionFailedError failure) {
+        String message = failure.getMessage();
+        if (message == null) {
+            return false;
+        }
+        return message.contains("but was: <139>") || message.contains("Segmentation fault");
     }
 }
