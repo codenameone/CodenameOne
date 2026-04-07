@@ -1,0 +1,39 @@
+name: CN1 Playground Language Tests
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'scripts/cn1playground/**'
+      - '.github/workflows/cn1playground-language.yml'
+  push:
+    branches: [main, master]
+    paths:
+      - 'scripts/cn1playground/**'
+      - '.github/workflows/cn1playground-language.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  language-smoke:
+    name: Playground language smoke
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 8
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '8'
+          cache: maven
+
+      - name: Run playground language smoke tests
+        run: |
+          set -euo pipefail
+          cd scripts/cn1playground
+          tools/run-playground-smoke-tests.sh
