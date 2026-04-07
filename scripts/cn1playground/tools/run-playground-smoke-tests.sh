@@ -33,3 +33,6 @@ mvn -pl common -am -DskipTests install
 mvn -f common/pom.xml -DskipTests org.codehaus.mojo:exec-maven-plugin:3.0.0:java \
   -Dexec.classpathScope=test \
   -Dexec.mainClass=com.codenameone.playground.PlaygroundSmokeHarness
+mvn -f common/pom.xml -DskipTests org.codehaus.mojo:exec-maven-plugin:3.0.0:java \
+  -Dexec.classpathScope=test \
+  -Dexec.mainClass=com.codenameone.playground.PlaygroundSyntaxMatrixHarness
