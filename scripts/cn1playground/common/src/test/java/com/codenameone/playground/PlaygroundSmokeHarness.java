@@ -368,6 +368,7 @@ public final class PlaygroundSmokeHarness {
                         + "        form.addAll(new Label(\"Lifecycle-style scripts are the easiest place to test listeners.\"), button, status);\n"
                         + "        form.show();\n"
                         + "    }\n"
+                        + "    class C {}\n"
                         + "}\n",
                 context);
 

@@ -221,7 +221,7 @@ public class DemoApp {
 ```
 
 **What doesn't work**:
-- Nested classes
+- Nested classes are ignored during unwrapping and cannot be referenced
 - Interfaces or enums
 - Static fields or methods that reference instance fields
 

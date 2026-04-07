@@ -224,10 +224,10 @@ final class PlaygroundRunner {
             if (containsNonWhitespace(script.substring(cursor, classModifiersStart))) {
                 return null;
             }
-            if (containsTopLevelTypeDeclaration(classBlock.body)) {
+            String classBody = stripTopLevelTypeDeclarations(classBlock.body);
+            if (classBody == null) {
                 return null;
             }
-            String classBody = classBlock.body;
             if (containsFieldDeclaration(classBody)) {
                 classBody = transformFieldDeclarations(classBody);
             }
@@ -245,6 +245,65 @@ final class PlaygroundRunner {
             return null;
         }
         return prefix + body.toString();
+    }
+
+    private String stripTopLevelTypeDeclarations(String body) {
+        StringBuilder out = new StringBuilder();
+        int depth = 0;
+        int i = 0;
+        int last = 0;
+        while (i < body.length()) {
+            char ch = body.charAt(i);
+            if (ch == '"' || ch == '\'') {
+                i = skipQuoted(body, i) + 1;
+                continue;
+            }
+            if (startsLineComment(body, i)) {
+                i = skipLineComment(body, i) + 1;
+                continue;
+            }
+            if (startsBlockComment(body, i)) {
+                i = skipBlockComment(body, i) + 1;
+                continue;
+            }
+            if (ch == '{') {
+                depth++;
+                i++;
+                continue;
+            }
+            if (ch == '}') {
+                depth--;
+                i++;
+                continue;
+            }
+            if (depth == 0 && (startsWithWord(body, i, "class")
+                    || startsWithWord(body, i, "interface")
+                    || startsWithWord(body, i, "enum"))) {
+                int openingBrace = findOpeningBrace(body, i);
+                if (openingBrace < 0) {
+                    return null;
+                }
+                int closingBrace = findMatchingBrace(body, openingBrace);
+                if (closingBrace < 0) {
+                    return null;
+                }
+                out.append(body.substring(last, i));
+                i = closingBrace + 1;
+                while (i < body.length() && Character.isWhitespace(body.charAt(i))) {
+                    i++;
+                }
+                if (i < body.length() && body.charAt(i) == ';') {
+                    i++;
+                }
+                last = i;
+                continue;
+            }
+            i++;
+        }
+        if (last < body.length()) {
+            out.append(body.substring(last));
+        }
+        return out.toString();
     }
 
     private int findClassModifiersStart(String script, int classKeywordPos) {
@@ -549,39 +608,6 @@ final class PlaygroundRunner {
             }
         }
         return -1;
-    }
-
-    private boolean containsTopLevelTypeDeclaration(String body) {
-        int depth = 0;
-        for (int i = 0; i < body.length(); i++) {
-            char ch = body.charAt(i);
-            if (ch == '"' || ch == '\'') {
-                i = skipQuoted(body, i);
-                continue;
-            }
-            if (startsLineComment(body, i)) {
-                i = skipLineComment(body, i);
-                continue;
-            }
-            if (startsBlockComment(body, i)) {
-                i = skipBlockComment(body, i);
-                continue;
-            }
-            if (ch == '{') {
-                depth++;
-                continue;
-            }
-            if (ch == '}') {
-                depth--;
-                continue;
-            }
-            if (depth == 0 && (startsWithWord(body, i, "class")
-                    || startsWithWord(body, i, "interface")
-                    || startsWithWord(body, i, "enum"))) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private boolean containsFieldDeclaration(String body) {
