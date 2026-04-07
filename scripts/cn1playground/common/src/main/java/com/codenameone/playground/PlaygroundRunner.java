@@ -24,6 +24,8 @@ import com.codename1.ui.plaf.UIManager;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 final class PlaygroundRunner {
     static final class Diagnostic {
@@ -228,7 +230,7 @@ final class PlaygroundRunner {
             if (stripped == null) {
                 return null;
             }
-            String classBody = rewriteNestedTypeReferences(stripped.body, stripped.typeNames);
+            String classBody = rewriteNestedTypeReferences(stripped.body, stripped);
             if (containsFieldDeclaration(classBody)) {
                 classBody = transformFieldDeclarations(classBody);
             }
@@ -248,44 +250,45 @@ final class PlaygroundRunner {
         return prefix + body.toString();
     }
 
-    private String rewriteNestedTypeReferences(String body, String[] typeNames) {
-        if (typeNames.length == 0) {
+    private String rewriteNestedTypeReferences(String body, StripTypeDeclarationsResult stripped) {
+        if (stripped.typeNames.length == 0) {
             return body;
         }
+        String rewritten = rewriteNestedTypeMethodCalls(body, stripped.nestedTypes);
         StringBuilder out = new StringBuilder();
         int i = 0;
-        while (i < body.length()) {
-            char ch = body.charAt(i);
+        while (i < rewritten.length()) {
+            char ch = rewritten.charAt(i);
             if (ch == '"' || ch == '\'') {
-                int end = skipQuoted(body, i);
-                out.append(body.substring(i, end + 1));
+                int end = skipQuoted(rewritten, i);
+                out.append(rewritten.substring(i, end + 1));
                 i = end + 1;
                 continue;
             }
-            if (startsLineComment(body, i)) {
-                int end = skipLineComment(body, i);
-                out.append(body.substring(i, end + 1));
+            if (startsLineComment(rewritten, i)) {
+                int end = skipLineComment(rewritten, i);
+                out.append(rewritten.substring(i, end + 1));
                 i = end + 1;
                 continue;
             }
-            if (startsBlockComment(body, i)) {
-                int end = skipBlockComment(body, i);
-                out.append(body.substring(i, end + 1));
+            if (startsBlockComment(rewritten, i)) {
+                int end = skipBlockComment(rewritten, i);
+                out.append(rewritten.substring(i, end + 1));
                 i = end + 1;
                 continue;
             }
-            if (startsWithWord(body, i, "new")) {
-                int nameStart = skipWhitespace(body, i + 3);
-                String matchedType = findMatchingTypeName(body, nameStart, typeNames);
+            if (startsWithWord(rewritten, i, "new")) {
+                int nameStart = skipWhitespace(rewritten, i + 3);
+                String matchedType = findMatchingTypeName(rewritten, nameStart, stripped.typeNames);
                 if (matchedType != null) {
                     int afterName = nameStart + matchedType.length();
-                    int openParen = skipWhitespace(body, afterName);
-                    if (openParen < body.length() && body.charAt(openParen) == '(') {
-                        int closeParen = findMatchingParen(body, openParen);
+                    int openParen = skipWhitespace(rewritten, afterName);
+                    if (openParen < rewritten.length() && rewritten.charAt(openParen) == '(') {
+                        int closeParen = findMatchingParen(rewritten, openParen);
                         if (closeParen < 0) {
-                            return body;
+                            return rewritten;
                         }
-                        out.append(body.substring(i, nameStart));
+                        out.append(rewritten.substring(i, nameStart));
                         out.append("java.util.Hashtable");
                         out.append("()");
                         i = closeParen + 1;
@@ -293,7 +296,7 @@ final class PlaygroundRunner {
                     }
                 }
             }
-            String matchedType = findMatchingTypeName(body, i, typeNames);
+            String matchedType = findMatchingTypeName(rewritten, i, stripped.typeNames);
             if (matchedType != null) {
                 out.append("Object");
                 i += matchedType.length();
@@ -303,6 +306,33 @@ final class PlaygroundRunner {
             i++;
         }
         return out.toString();
+    }
+
+    private String rewriteNestedTypeMethodCalls(String body, NestedTypeDescriptor[] nestedTypes) {
+        String rewritten = body;
+        for (int i = 0; i < nestedTypes.length; i++) {
+            NestedTypeDescriptor type = nestedTypes[i];
+            for (int j = 0; j < type.simpleStringMethods.length; j++) {
+                SimpleStringMethod method = type.simpleStringMethods[j];
+                Pattern pattern = Pattern.compile("\\b([A-Za-z_][A-Za-z0-9_]*)\\s*\\.\\s*"
+                        + Pattern.quote(method.name) + "\\s*\\(\\s*\\)");
+                Matcher matcher = pattern.matcher(rewritten);
+                StringBuffer sb = new StringBuffer();
+                while (matcher.find()) {
+                    String receiver = matcher.group(1);
+                    String expr = method.expression;
+                    for (int f = 0; f < type.fieldNames.length; f++) {
+                        String field = type.fieldNames[f];
+                        expr = expr.replaceAll("\\b" + Pattern.quote(field) + "\\b",
+                                "((java.util.Hashtable)" + receiver + ").get(\"" + field + "\")");
+                    }
+                    matcher.appendReplacement(sb, Matcher.quoteReplacement("(" + expr + ")"));
+                }
+                matcher.appendTail(sb);
+                rewritten = sb.toString();
+            }
+        }
+        return rewritten;
     }
 
     private String findMatchingTypeName(String body, int index, String[] typeNames) {
@@ -318,6 +348,7 @@ final class PlaygroundRunner {
     private StripTypeDeclarationsResult stripTopLevelTypeDeclarations(String body) {
         StringBuilder out = new StringBuilder();
         List<String> typeNames = new ArrayList<String>();
+        List<NestedTypeDescriptor> nestedTypes = new ArrayList<NestedTypeDescriptor>();
         int depth = 0;
         int i = 0;
         int last = 0;
@@ -361,6 +392,9 @@ final class PlaygroundRunner {
                 if (closingBrace < 0) {
                     return null;
                 }
+                if (typeName != null) {
+                    nestedTypes.add(parseNestedTypeDescriptor(typeName, body.substring(openingBrace + 1, closingBrace)));
+                }
                 out.append(body.substring(last, i));
                 i = closingBrace + 1;
                 while (i < body.length() && Character.isWhitespace(body.charAt(i))) {
@@ -377,7 +411,24 @@ final class PlaygroundRunner {
         if (last < body.length()) {
             out.append(body.substring(last));
         }
-        return new StripTypeDeclarationsResult(out.toString(), typeNames);
+        return new StripTypeDeclarationsResult(out.toString(), typeNames, nestedTypes);
+    }
+
+    private NestedTypeDescriptor parseNestedTypeDescriptor(String typeName, String typeBody) {
+        List<String> fieldNames = new ArrayList<String>();
+        Matcher fieldMatcher = Pattern.compile("(?m)(?:^|\\s)(?:public\\s+|protected\\s+|private\\s+)?(?:final\\s+)?[A-Za-z_][A-Za-z0-9_\\[\\]<>]*\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;").matcher(typeBody);
+        while (fieldMatcher.find()) {
+            String name = fieldMatcher.group(1);
+            if (name != null && name.length() > 0) {
+                fieldNames.add(name);
+            }
+        }
+        List<SimpleStringMethod> methods = new ArrayList<SimpleStringMethod>();
+        Matcher methodMatcher = Pattern.compile("(?s)(?:public\\s+|protected\\s+|private\\s+)?String\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*\\(\\s*\\)\\s*\\{\\s*return\\s+(.+?)\\s*;\\s*\\}").matcher(typeBody);
+        while (methodMatcher.find()) {
+            methods.add(new SimpleStringMethod(methodMatcher.group(1), methodMatcher.group(2)));
+        }
+        return new NestedTypeDescriptor(typeName, fieldNames, methods);
     }
 
     private String readIdentifier(String text, int start) {
@@ -1932,10 +1983,34 @@ final class PlaygroundRunner {
     private static final class StripTypeDeclarationsResult {
         final String body;
         final String[] typeNames;
+        final NestedTypeDescriptor[] nestedTypes;
 
-        StripTypeDeclarationsResult(String body, List<String> typeNames) {
+        StripTypeDeclarationsResult(String body, List<String> typeNames, List<NestedTypeDescriptor> nestedTypes) {
             this.body = body;
             this.typeNames = typeNames.toArray(new String[typeNames.size()]);
+            this.nestedTypes = nestedTypes.toArray(new NestedTypeDescriptor[nestedTypes.size()]);
+        }
+    }
+
+    private static final class NestedTypeDescriptor {
+        final String typeName;
+        final String[] fieldNames;
+        final SimpleStringMethod[] simpleStringMethods;
+
+        NestedTypeDescriptor(String typeName, List<String> fieldNames, List<SimpleStringMethod> methods) {
+            this.typeName = typeName;
+            this.fieldNames = fieldNames.toArray(new String[fieldNames.size()]);
+            this.simpleStringMethods = methods.toArray(new SimpleStringMethod[methods.size()]);
+        }
+    }
+
+    private static final class SimpleStringMethod {
+        final String name;
+        final String expression;
+
+        SimpleStringMethod(String name, String expression) {
+            this.name = name;
+            this.expression = expression;
         }
     }
 }
