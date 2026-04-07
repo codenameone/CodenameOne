@@ -26,6 +26,9 @@ public final class PlaygroundSmokeHarness {
         smokeComponentTypeResolvesWithoutExplicitImport();
         smokeUIManagerClassImportDoesNotCollideWithGlobals();
         System.out.println("Playground smoke tests passed.");
+        // Codename One/JavaSE initialization may leave non-daemon threads running.
+        // Force a clean exit so CI jobs don't hang after successful completion.
+        System.exit(0);
     }
 
     private static void smokeGeneratedRegistry() throws Exception {
