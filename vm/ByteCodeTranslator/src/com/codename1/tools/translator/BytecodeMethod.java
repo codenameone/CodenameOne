@@ -2409,7 +2409,7 @@ public class BytecodeMethod implements SignatureSet {
     }
 
     public void setSimdWidthHint(int simdWidthHint) {
-        this.simdWidthHint = simdWidthHint;
+        this.simdWidthHint = simdWidthHint > 0 ? simdWidthHint : -1;
     }
 
     public int getSimdWidthHint() {

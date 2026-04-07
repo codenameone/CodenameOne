@@ -1217,7 +1217,10 @@ public class Parser extends ClassVisitor {
                 @Override
                 public void visit(String name, Object value) {
                     if ("value".equals(name) && value instanceof Integer) {
-                        mtd.setSimdWidthHint(((Integer)value).intValue());
+                        int widthHint = ((Integer)value).intValue();
+                        if (widthHint > 0) {
+                            mtd.setSimdWidthHint(widthHint);
+                        }
                     }
                     super.visit(name, value);
                 }
