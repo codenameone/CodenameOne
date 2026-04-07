@@ -62,9 +62,25 @@ else
 fi
 
 mkdir -p "$BUILD_DIR"
-javac -d "$BUILD_DIR" "$SRC"
-if [ -n "$CN1_SOURCE_ROOTS_VALUE" ]; then
-  CN1_SOURCE_ROOTS="$CN1_SOURCE_ROOTS_VALUE" java -cp "$BUILD_DIR" com.codenameone.playground.tools.GenerateCN1AccessRegistry "$OUT"
+TOOLS_JAR="${JAVA_HOME:-}/lib/tools.jar"
+EXTRA_CP=""
+if [ -f "$TOOLS_JAR" ]; then
+  EXTRA_CP="$TOOLS_JAR"
+fi
+
+if [ -n "$EXTRA_CP" ]; then
+  javac -cp "$EXTRA_CP" -d "$BUILD_DIR" "$SRC"
 else
-  java -cp "$BUILD_DIR" com.codenameone.playground.tools.GenerateCN1AccessRegistry "$OUT"
+  javac -d "$BUILD_DIR" "$SRC"
+fi
+
+RUNTIME_CP="$BUILD_DIR"
+if [ -n "$EXTRA_CP" ]; then
+  RUNTIME_CP="$BUILD_DIR:$EXTRA_CP"
+fi
+
+if [ -n "$CN1_SOURCE_ROOTS_VALUE" ]; then
+  CN1_SOURCE_ROOTS="$CN1_SOURCE_ROOTS_VALUE" java -cp "$RUNTIME_CP" com.codenameone.playground.tools.GenerateCN1AccessRegistry "$OUT"
+else
+  java -cp "$RUNTIME_CP" com.codenameone.playground.tools.GenerateCN1AccessRegistry "$OUT"
 fi
