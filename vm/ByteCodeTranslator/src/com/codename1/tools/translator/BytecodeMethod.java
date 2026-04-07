@@ -1837,27 +1837,44 @@ public class BytecodeMethod implements SignatureSet {
                         
                         if (arrayLiteral != null  && indexLiteral != null && valueLiteral != null) {
                             String elementType = null;
+                            String valueType = null;
                             switch (current.getOpcode()) {
                                 case Opcodes.AASTORE:
-                                    elementType = "OBJECT";break;
+                                    elementType = "OBJECT";
+                                    valueType = "JAVA_OBJECT";
+                                    break;
                                 case Opcodes.IASTORE:
-                                    elementType = "INT"; break;
+                                    elementType = "INT";
+                                    valueType = "JAVA_INT";
+                                    break;
                                 case Opcodes.DASTORE:
-                                    elementType = "DOUBLE"; break;
+                                    elementType = "DOUBLE";
+                                    valueType = "JAVA_DOUBLE";
+                                    break;
                                     
                                 case Opcodes.LASTORE:
-                                    elementType = "LONG"; break;
+                                    elementType = "LONG";
+                                    valueType = "JAVA_LONG";
+                                    break;
                                 case Opcodes.FASTORE:
-                                    elementType = "FLOAT"; break;
+                                    elementType = "FLOAT";
+                                    valueType = "JAVA_FLOAT";
+                                    break;
                                 case Opcodes.CASTORE:
-                                    elementType = "CHAR";break;
+                                    elementType = "CHAR";
+                                    valueType = "JAVA_CHAR";
+                                    break;
                                 case Opcodes.BASTORE:
-                                    elementType = "BYTE"; break;
+                                    elementType = "BYTE";
+                                    valueType = "JAVA_BYTE";
+                                    break;
                                 case Opcodes.SASTORE:
-                                    elementType = "SHORT"; break;
+                                    elementType = "SHORT";
+                                    valueType = "JAVA_SHORT";
+                                    break;
                                     
                             }
-                            if (elementType == null) {
+                            if (elementType == null || valueType == null) {
                                 break;
                             }
                             
@@ -1865,7 +1882,12 @@ public class BytecodeMethod implements SignatureSet {
                             instructions.remove(iter-3);
                             instructions.remove(iter-3);
                             instructions.remove(iter-3);
-                            String code = "    CN1_SET_ARRAY_ELEMENT_"+elementType+"(" + arrayLiteral + ", "+indexLiteral+", "+valueLiteral+");\n";
+                            String code = "    {\n" +
+                                    "        JAVA_OBJECT __cn1ArrayTmp = " + arrayLiteral + ";\n" +
+                                    "        JAVA_INT __cn1IndexTmp = " + indexLiteral + ";\n" +
+                                    "        " + valueType + " __cn1ValueTmp = " + valueLiteral + ";\n" +
+                                    "        CN1_SET_ARRAY_ELEMENT_"+elementType+"(__cn1ArrayTmp, __cn1IndexTmp, __cn1ValueTmp);\n" +
+                                    "    }\n";
                             instructions.add(iter-3, new CustomIntruction(code, code, dependentClasses));
                             iter = iter-3;
                             instructionCount = instructions.size();

@@ -116,10 +116,39 @@ public class ArrayLoadExpression extends Instruction implements AssignableExpres
     @Override
     public boolean assignTo(String varName, StringBuilder sb) {
         StringBuilder b = new StringBuilder();
-        if (varName != null) {
-            b.append(varName).append("=");
+
+        String arrayExpr;
+        String indexExpr;
+        if (targetArrayInstruction instanceof AssignableExpression) {
+            StringBuilder sb2 = new StringBuilder();
+            boolean res = ((AssignableExpression)targetArrayInstruction).assignTo(null, sb2);
+            if (!res) {
+                return false;
+            }
+            arrayExpr = sb2.toString().trim();
+        } else {
+            return false;
         }
-        
+
+        if (indexInstruction instanceof AssignableExpression) {
+            StringBuilder sb2 = new StringBuilder();
+
+            boolean res = ((AssignableExpression)indexInstruction).assignTo(null, sb2);
+            if (!res) {
+                return false;
+            }
+            indexExpr = sb2.toString().trim();
+        } else {
+            return false;
+        }
+
+        if (varName != null) {
+            b.append("{\n");
+            b.append("    JAVA_OBJECT __cn1ArrayTmp = ").append(arrayExpr).append(";\n");
+            b.append("    JAVA_INT __cn1IndexTmp = ").append(indexExpr).append(";\n");
+            b.append("    ").append(varName).append("=");
+        }
+
         b.append("CN1_ARRAY_ELEMENT_");
         String arrayType = null;
         switch (loadInstruction.getOpcode()) {
@@ -150,31 +179,21 @@ public class ArrayLoadExpression extends Instruction implements AssignableExpres
                 
         }
         b.append(arrayType).append("(");
-        if (targetArrayInstruction instanceof AssignableExpression) {
-            StringBuilder sb2 = new StringBuilder();
-            boolean res = ((AssignableExpression)targetArrayInstruction).assignTo(null, sb2);
-            if (!res) {
-                return false;
-            }
-            b.append(sb2.toString().trim());
+        if (varName != null) {
+            b.append("__cn1ArrayTmp");
         } else {
-            return false;
+            b.append(arrayExpr);
         }
         b.append(", ");
-        if (indexInstruction instanceof AssignableExpression) {
-            StringBuilder sb2 = new StringBuilder();
-            
-            boolean res = ((AssignableExpression)indexInstruction).assignTo(null, sb2);
-            if (!res) {
-                return false;
-            }
-            b.append(sb2.toString().trim());
+        if (varName != null) {
+            b.append("__cn1IndexTmp");
         } else {
-            return false;
+            b.append(indexExpr);
         }
         b.append(")");
         if (varName != null) {
             b.append(";\n");
+            b.append("}\n");
         }
         
         sb.append(b);
