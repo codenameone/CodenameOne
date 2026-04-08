@@ -105,9 +105,11 @@ public final class PlaygroundSyntaxMatrixHarness {
             cases.add(new Case("twr_single_resource", """
                     import com.codename1.ui.*;
                     import com.codename1.ui.layouts.*;
-                    import java.io.*;
+                    class Res implements AutoCloseable {
+                        public void close() {}
+                    }
                     Container root = new Container(BoxLayout.y());
-                    try (StringReader in = new StringReader("abc")) {
+                    try (Res in = new Res()) {
                         root.add(new Label("ok"));
                     }
                     root;
