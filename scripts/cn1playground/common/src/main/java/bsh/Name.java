@@ -25,7 +25,6 @@
  *****************************************************************************/
 package bsh;
 
-import java.lang.reflect.InvocationTargetException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -809,14 +808,9 @@ class Name implements java.io.Serializable
             if ( classNameSpace != null ) {
                 Object instance = classNameSpace.getClassInstance();
                 Class<?> classStatic = classNameSpace.classStatic;
-                try {
-                    return ClassGenerator.getClassGenerator()
-                        .invokeSuperclassMethod( bcm, instance, classStatic, methodName, args );
-                } catch (InvocationTargetException e) {
-                    throw new UtilTargetError(e.getTargetException());
-                } catch (ReflectError e) {
-                    throw new UtilEvalError("Error invoking superclass method: " + e.getMessage());
-                }
+
+                return ClassGenerator.getClassGenerator()
+                    .invokeSuperclassMethod( bcm, instance, classStatic, methodName, args );
             }
         }
 
