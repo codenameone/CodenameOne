@@ -67,6 +67,9 @@ class BSHEnhancedForStatement extends SimpleNode implements ParserConstants {
             statement = nodeCount > 1 ? jjtGetChild(1) : null;
         }
         final Object iteratee = expression.eval(callstack, interpreter);
+        if (iteratee == null || iteratee == Primitive.NULL) {
+            throw new EvalException("Cannot iterate over null value", this, callstack);
+        }
         final CollectionManager cm = CollectionManager.getCollectionManager();
         final Iterator<?> iterator = cm.getBshIterator(iteratee);
         try {
