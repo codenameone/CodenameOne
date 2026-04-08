@@ -6,6 +6,7 @@ import org.objectweb.asm.Opcodes;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BytecodeMethodSimdHintTest {
 
@@ -47,7 +48,13 @@ class BytecodeMethodSimdHintTest {
         method.setMaxes(1, 0);
         method.addInstruction(Opcodes.BALOAD);
         method.addInstruction(Opcodes.RETURN);
-        assertDoesNotThrow(() -> method.appendMethodC(new StringBuilder()),
+        StringBuilder out = new StringBuilder();
+        assertDoesNotThrow(() -> method.appendMethodC(out),
                 "SIMD-candidate methods with array access opcodes should pass validation");
+        String generated = out.toString();
+        assertTrue(generated.contains("#pragma clang attribute push(__attribute__((target(\"neon\"))), apply_to=function)"),
+                "SIMD-eligible methods should emit NEON target pragmas");
+        assertTrue(generated.contains("#pragma clang attribute pop"),
+                "SIMD-eligible methods should close NEON target pragma scope");
     }
 }
