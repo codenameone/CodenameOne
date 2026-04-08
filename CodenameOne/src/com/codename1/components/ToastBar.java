@@ -688,12 +688,13 @@ public final class ToastBar {
                 s.setPaddingBottom(safeBottomMargin);
             } else if (position == Component.TOP && safeArea.getY() > 0) {
                 Container parent = c.getParent();
-                int parentAbsY = parent != null ? parent.getAbsoluteY() : 0;
-                int neededPadding = safeArea.getY() - parentAbsY;
-                if (neededPadding > 0) {
-                    Style s = c.getAllStyles();
-                    s.setPaddingUnit(Style.UNIT_TYPE_PIXELS);
-                    s.setPaddingTop(neededPadding);
+                if (parent != null) {
+                    int neededPadding = safeArea.getY() - parent.getAbsoluteY();
+                    if (neededPadding > 0) {
+                        Style s = c.getAllStyles();
+                        s.setPaddingUnit(Style.UNIT_TYPE_PIXELS);
+                        s.setPaddingTop(neededPadding);
+                    }
                 }
             }
 
