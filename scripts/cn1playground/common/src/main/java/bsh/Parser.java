@@ -4546,6 +4546,7 @@ if (jjtc000) {
       switch (jj_ntk == -1 ? jj_ntk_f() : jj_ntk) {
       case LPAREN:{
         TryWithResources();
+closed = true;
         break;
         }
       default:
