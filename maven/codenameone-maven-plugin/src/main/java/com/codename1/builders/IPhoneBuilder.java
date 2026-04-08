@@ -1101,6 +1101,7 @@ public class IPhoneBuilder extends Executor {
                         + "#import \"CodenameOne_GLViewController.h\"\n"
                         + "#import <UIKit/UIKit.h>\n"
                         + "#import <objc/runtime.h>\n"
+                        + "#import \"" + classNameWithUnderscores + "Impl.h\"\n"
                         + newVMInclude
                         + "#include \"" + classNameWithUnderscores + "ImplCodenameOne.h\"\n\n"
                         + "static id cn1_createNativeInterfacePeer(NSString* className) {\n"
@@ -2165,6 +2166,38 @@ public class IPhoneBuilder extends Executor {
                 }
             }
 
+            // Detect whether the project contains any Swift source files.
+            // If so, inject SWIFT_VERSION and related build settings into the
+            // pbxproj and create the bridging header.  This avoids adding
+            // Swift-specific settings to pure Objective-C projects.
+            File distDir = new File(tmpFile, "dist");
+            if (hasSwiftFiles(distDir)) {
+                File bridgingHeader = new File(distDir, "cn1-Bridging-Header.h");
+                if (!bridgingHeader.exists()) {
+                    try {
+                        this.createFile(bridgingHeader, "// Codename One generated Swift bridging header\n".getBytes(StandardCharsets.UTF_8));
+                    } catch (IOException ex) {
+                        log("Warning: failed to create Swift bridging header: " + ex.getMessage());
+                    }
+                }
+
+                try {
+                    File pbx = new File(tmpFile, "dist/" + request.getMainClass() + ".xcodeproj/project.pbxproj");
+                    // Inject Swift build settings by anchoring on SDKROOT which appears in
+                    // every project-level build configuration.
+                    replaceInFile(pbx,
+                            "SDKROOT = iphoneos;",
+                            "SDKROOT = iphoneos;\n\t\t\t\tSWIFT_VERSION = 5.0;");
+                    // Inject target-level settings by anchoring on PRODUCT_NAME which
+                    // appears in every target build configuration.
+                    replaceInFile(pbx,
+                            "PRODUCT_NAME = \"$(TARGET_NAME)\";",
+                            "DEFINES_MODULE = YES;\n\t\t\t\tPRODUCT_NAME = \"$(TARGET_NAME)\";\n\t\t\t\tSWIFT_OBJC_BRIDGING_HEADER = \"$(SRCROOT)/cn1-Bridging-Header.h\";");
+                } catch (IOException ex) {
+                    throw new BuildException("Failed to inject Swift build settings into pbxproj", ex);
+                }
+            }
+
             try {
                 File pbxprojFile = new File(tmpFile, "dist/" + request.getMainClass() + ".xcodeproj/project.pbxproj");
                 removeLinesContaining(pbxprojFile,
@@ -2378,6 +2411,28 @@ public class IPhoneBuilder extends Executor {
             }
         }
         createFile(file, sb.toString().getBytes(StandardCharsets.UTF_8));
+    }
+
+    /**
+     * Recursively checks whether the given directory contains any {@code .swift} files.
+     */
+    private static boolean hasSwiftFiles(File dir) {
+        if (dir == null || !dir.isDirectory()) {
+            return false;
+        }
+        File[] children = dir.listFiles();
+        if (children == null) {
+            return false;
+        }
+        for (File f : children) {
+            if (f.isFile() && f.getName().endsWith(".swift")) {
+                return true;
+            }
+            if (f.isDirectory() && hasSwiftFiles(f)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     

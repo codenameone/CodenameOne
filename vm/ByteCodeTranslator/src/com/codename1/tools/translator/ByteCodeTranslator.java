@@ -448,7 +448,7 @@ public class ByteCodeTranslator {
             } else {
                 fileListEntry.append("; path = \"");
                 if(file.endsWith(".m") || file.endsWith(".c") || file.endsWith(".cpp") || file.endsWith(".mm") || file.endsWith(".h") || 
-                        file.endsWith(".bundle") || file.endsWith(".xcdatamodeld") || file.endsWith(".hh") || file.endsWith(".hpp") || file.endsWith(".xib")) {
+                        file.endsWith(".swift") || file.endsWith(".bundle") || file.endsWith(".xcdatamodeld") || file.endsWith(".hh") || file.endsWith(".hpp") || file.endsWith(".xib")) {
                     fileListEntry.append(file);
                 } else {
                     fileListEntry.append(appName);
@@ -483,7 +483,7 @@ public class ByteCodeTranslator {
             }
             
             if(file.endsWith(".m") || file.endsWith(".c") || file.endsWith(".cpp") || file.endsWith(".hh") || file.endsWith(".hpp") || 
-                    file.endsWith(".mm") || file.endsWith(".h") || file.endsWith(".bundle") || file.endsWith(".xcdatamodeld") || file.endsWith(".xib")) {
+                    file.endsWith(".swift") || file.endsWith(".mm") || file.endsWith(".h") || file.endsWith(".bundle") || file.endsWith(".xcdatamodeld") || file.endsWith(".xib")) {
                 
                 // bundle also needs to be a runtime resource
                 if(file.endsWith(".bundle") || file.endsWith(".xcdatamodeld")) {
@@ -607,6 +607,9 @@ public class ByteCodeTranslator {
         }
         if(s.endsWith(".mm") || s.endsWith(".cpp")) {
             return "sourcecode.cpp.objc";
+        }
+        if(s.endsWith(".swift")) {
+            return "sourcecode.swift";
         }
         if(s.endsWith(".xib")) {
             return "file.xib";
