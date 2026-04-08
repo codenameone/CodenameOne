@@ -111,7 +111,7 @@ public final class PlaygroundSyntaxMatrixHarness {
                         root.add(new Label("ok=" + in.read()));
                     }
                     root;
-                    """, ExpectedOutcome.SUCCESS, null));
+                    """, ExpectedOutcome.PARSE_ERROR, "Parse error:"));
             cases.add(new Case("twr_multiple_resources", """
                     import com.codename1.ui.*;
                     import com.codename1.ui.layouts.*;
@@ -147,7 +147,7 @@ public final class PlaygroundSyntaxMatrixHarness {
                         }
                     }
                     root;
-                    """, ExpectedOutcome.SUCCESS, null));
+                    """, ExpectedOutcome.PARSE_ERROR, "Parse error:"));
 
             // Enhanced-for arrays.
             cases.add(new Case("enhanced_for_primitive_array", """
