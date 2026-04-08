@@ -2166,6 +2166,17 @@ public class IPhoneBuilder extends Executor {
                 }
             }
 
+            // Ensure the Swift bridging header exists so that the SWIFT_OBJC_BRIDGING_HEADER
+            // build setting in the pbxproj template does not point to a missing file.
+            File bridgingHeader = new File(new File(tmpFile, "dist"), "cn1-Bridging-Header.h");
+            if (!bridgingHeader.exists()) {
+                try {
+                    this.createFile(bridgingHeader, "// Codename One generated Swift bridging header\n".getBytes(StandardCharsets.UTF_8));
+                } catch (IOException ex) {
+                    log("Warning: failed to create Swift bridging header: " + ex.getMessage());
+                }
+            }
+
             try {
                 File pbxprojFile = new File(tmpFile, "dist/" + request.getMainClass() + ".xcodeproj/project.pbxproj");
                 removeLinesContaining(pbxprojFile,
