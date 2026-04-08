@@ -105,11 +105,9 @@ public final class PlaygroundSyntaxMatrixHarness {
             cases.add(new Case("twr_single_resource", """
                     import com.codename1.ui.*;
                     import com.codename1.ui.layouts.*;
-                    class Res implements AutoCloseable {
-                        public void close() {}
-                    }
+                    import java.io.*;
                     Container root = new Container(BoxLayout.y());
-                    try (Res in = new Res()) {
+                    try (StringReader in = new StringReader("abc")) {
                         root.add(new Label("ok"));
                     }
                     root;
@@ -117,11 +115,9 @@ public final class PlaygroundSyntaxMatrixHarness {
             cases.add(new Case("twr_multiple_resources", """
                     import com.codename1.ui.*;
                     import com.codename1.ui.layouts.*;
-                    class Res implements AutoCloseable {
-                        public void close() {}
-                    }
+                    import java.io.*;
                     Container root = new Container(BoxLayout.y());
-                    try (Res in = new Res(); Res out = new Res()) {
+                    try (StringReader in = new StringReader("a"); StringReader out = new StringReader("b")) {
                         root.add(new Label("ok"));
                     }
                     root;
@@ -129,11 +125,9 @@ public final class PlaygroundSyntaxMatrixHarness {
             cases.add(new Case("twr_trailing_semicolon", """
                     import com.codename1.ui.*;
                     import com.codename1.ui.layouts.*;
-                    class Res implements AutoCloseable {
-                        public void close() {}
-                    }
+                    import java.io.*;
                     Container root = new Container(BoxLayout.y());
-                    try (Res in = new Res();) {
+                    try (StringReader in = new StringReader("a");) {
                         root.add(new Label("ok"));
                     }
                     root;
@@ -141,11 +135,9 @@ public final class PlaygroundSyntaxMatrixHarness {
             cases.add(new Case("twr_nested_try_catch_finally", """
                     import com.codename1.ui.*;
                     import com.codename1.ui.layouts.*;
-                    class Res implements AutoCloseable {
-                        public void close() {}
-                    }
+                    import java.io.*;
                     Container root = new Container(BoxLayout.y());
-                    try (Res in = new Res()) {
+                    try (StringReader in = new StringReader("abc")) {
                         try {
                             root.add(new Label("inner"));
                         } catch (RuntimeException ex) {
