@@ -1101,6 +1101,7 @@ public class IPhoneBuilder extends Executor {
                         + "#import \"CodenameOne_GLViewController.h\"\n"
                         + "#import <UIKit/UIKit.h>\n"
                         + "#import <objc/runtime.h>\n"
+                        + "#import \"" + classNameWithUnderscores + "Impl.h\"\n"
                         + newVMInclude
                         + "#include \"" + classNameWithUnderscores + "ImplCodenameOne.h\"\n\n"
                         + "static id cn1_createNativeInterfacePeer(NSString* className) {\n"
