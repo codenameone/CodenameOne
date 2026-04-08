@@ -52,6 +52,8 @@ class BytecodeMethodSimdHintTest {
         assertDoesNotThrow(() -> method.appendMethodC(out),
                 "SIMD-candidate methods with array access opcodes should pass validation");
         String generated = out.toString();
+        assertTrue(generated.contains("cn1_simd_com_example_SimdCarrier_vectorBody__"),
+                "SIMD-eligible methods should emit weak SIMD hook declarations");
         assertTrue(generated.contains("#if defined(CN1_ENABLE_SIMD_PRAGMAS) && defined(__clang__)"),
                 "SIMD-eligible methods should emit opt-in SIMD pragma guards");
         assertTrue(generated.contains("#pragma clang attribute push(__attribute__((target(\"neon\"))), apply_to=function)"),

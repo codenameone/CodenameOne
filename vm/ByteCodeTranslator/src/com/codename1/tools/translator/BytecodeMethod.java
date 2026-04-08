@@ -857,6 +857,9 @@ public class BytecodeMethod implements SignatureSet {
         }
         
         b.append(declaration);
+        if (isSimdEligibleForCodegen()) {
+            appendSimdHookCall(b);
+        }
         
         boolean hasInstructions = true;
         if(optimizerOn) {
@@ -2504,6 +2507,64 @@ public class BytecodeMethod implements SignatureSet {
 
     private boolean isSimdEligibleForCodegen() {
         return simdCandidateHint && getSimdIneligibilityReason().length() == 0;
+    }
+
+    private String getSimdHookName() {
+        StringBuilder out = new StringBuilder();
+        out.append("cn1_simd_");
+        out.append(clsName);
+        out.append("_");
+        out.append(getCMethodName());
+        out.append("__");
+        for (ByteCodeMethodArg args : arguments) {
+            args.appendCMethodExt(out);
+        }
+        if (!returnType.isVoid()) {
+            out.append("_R");
+            returnType.appendCMethodExt(out);
+        }
+        return out.toString();
+    }
+
+    private void appendSimdHookCall(StringBuilder b) {
+        String simdHookName = getSimdHookName();
+        b.append("    #if defined(__GNUC__) || defined(__clang__)\n");
+        b.append("    extern ");
+        returnType.appendCSig(b);
+        b.append(" ").append(simdHookName).append("(CODENAME_ONE_THREAD_STATE");
+        int arg = 1;
+        if (!staticMethod) {
+            b.append(", ");
+            new ByteCodeMethodArg(clsName, 0).appendCSig(b);
+            b.append(" __cn1ThisObject");
+        }
+        for (ByteCodeMethodArg args : arguments) {
+            b.append(", ");
+            args.appendCSig(b);
+            b.append("__cn1Arg");
+            b.append(arg++);
+        }
+        b.append(") __attribute__((weak));\n");
+        b.append("    if (").append(simdHookName).append(") {\n");
+        if (!returnType.isVoid()) {
+            b.append("        return ");
+        } else {
+            b.append("        ");
+        }
+        b.append(simdHookName).append("(threadStateData");
+        arg = 1;
+        if (!staticMethod) {
+            b.append(", __cn1ThisObject");
+        }
+        for (int i = 0; i < arguments.size(); i++) {
+            b.append(", __cn1Arg").append(arg++);
+        }
+        b.append(");\n");
+        if (returnType.isVoid()) {
+            b.append("        return;\n");
+        }
+        b.append("    }\n");
+        b.append("    #endif\n");
     }
 
     private static void appendSimdTargetPragmaPush(StringBuilder b) {

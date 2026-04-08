@@ -478,3 +478,8 @@ As SIMD passes mature, this same API will continue to be the forward-compatible 
 When generating C for eligible SIMD-candidate methods, ParparVM can also emit
 Clang ARM/AArch64 NEON target pragmas, but this path is disabled by default and
 must be explicitly enabled with `CN1_ENABLE_SIMD_PRAGMAS` at compile time.
+
+ParparVM now also emits a weak SIMD hook symbol for eligible methods
+(`cn1_simd_<translated-method-signature>`). Platform ports can provide a strong
+implementation for this symbol to run a real SIMD/NEON fast-path, while keeping
+the generated scalar method body as the default fallback.
