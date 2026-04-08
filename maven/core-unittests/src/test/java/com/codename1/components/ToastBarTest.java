@@ -16,6 +16,13 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class ToastBarTest extends UITestBase {
 
+    /**
+     * Upper bound on the default UIID padding (in pixels).  Safe-area compensation
+     * values are typically 30-100+ px, so anything below this threshold means the
+     * safe-area code path did not add extra padding.
+     */
+    private static final int MAX_DEFAULT_STYLE_PADDING = 10;
+
     @FormTest
     void testGetInstanceReturnsSingleton() {
         ToastBar tb1 = ToastBar.getInstance();
@@ -98,6 +105,21 @@ class ToastBarTest extends UITestBase {
     }
 
     /**
+     * Cleans up the ToastBarComponent from the current form and resets the
+     * implementation's safe area to the default.
+     */
+    private void cleanupToastBar(Container toastBarComponent) {
+        if (toastBarComponent != null) {
+            toastBarComponent.remove();
+        }
+        Form f = Display.getInstance().getCurrent();
+        if (f != null) {
+            f.putClientProperty("ToastBarComponent", null);
+        }
+        implementation.setDisplaySafeArea(null);
+    }
+
+    /**
      * Regression test: when position is TOP and the device has a safe area inset
      * (e.g. notch), the ToastBar should NOT double-count the inset if its parent
      * container is already positioned below the safe area boundary.
@@ -135,9 +157,7 @@ class ToastBarTest extends UITestBase {
                     "Top padding should equal safeArea.getY() - parent.getAbsoluteY()");
         }
 
-        c.remove();
-        f.putClientProperty("ToastBarComponent", null);
-        implementation.setDisplaySafeArea(null);
+        cleanupToastBar(c);
     }
 
     /**
@@ -161,11 +181,10 @@ class ToastBarTest extends UITestBase {
         // The default UIID may have some small padding, but it should be well below
         // any safe area inset value.
         int paddingTop = c.getStyle().getPaddingTop();
-        assertTrue(paddingTop < 10,
+        assertTrue(paddingTop < MAX_DEFAULT_STYLE_PADDING,
                 "Top padding should not contain safe area compensation when no inset, got: " + paddingTop);
 
-        c.remove();
-        f.putClientProperty("ToastBarComponent", null);
+        cleanupToastBar(c);
     }
 
     /**
@@ -192,9 +211,7 @@ class ToastBarTest extends UITestBase {
         assertEquals(expectedBottomPadding, s.getPaddingBottom(),
                 "Bottom padding should equal the safe area bottom margin");
 
-        c.remove();
-        f.putClientProperty("ToastBarComponent", null);
-        implementation.setDisplaySafeArea(null);
+        cleanupToastBar(c);
     }
 
     /**
@@ -216,14 +233,11 @@ class ToastBarTest extends UITestBase {
 
         // With full-screen safe area (y=0, height=displayHeight), bottom margin = 0
         // so no extra bottom padding should be applied.
-        // The default UIID may have some small padding, but it should be well below
-        // any safe area inset value (typically 30-100+ pixels).
         int paddingBottom = c.getStyle().getPaddingBottom();
-        assertTrue(paddingBottom < 10,
+        assertTrue(paddingBottom < MAX_DEFAULT_STYLE_PADDING,
                 "Bottom padding should not contain safe area compensation, got: " + paddingBottom);
 
-        c.remove();
-        f.putClientProperty("ToastBarComponent", null);
+        cleanupToastBar(c);
     }
 
     /**
@@ -256,9 +270,7 @@ class ToastBarTest extends UITestBase {
                     "Top padding should equal safeArea.getY() when parent is at Y=0");
         }
 
-        c.remove();
-        f.putClientProperty("ToastBarComponent", null);
+        cleanupToastBar(c);
         tb.useFormLayeredPane(false);
-        implementation.setDisplaySafeArea(null);
     }
 }
