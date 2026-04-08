@@ -111,7 +111,7 @@ public final class PlaygroundSyntaxMatrixHarness {
                         root.add(new Label("ok=" + in.read()));
                     }
                     root;
-                    """, ExpectedOutcome.PARSE_ERROR, "Parse error:"));
+                    """, ExpectedOutcome.SUCCESS, null));
             cases.add(new Case("twr_multiple_resources", """
                     import com.codename1.ui.*;
                     import com.codename1.ui.layouts.*;
@@ -121,7 +121,7 @@ public final class PlaygroundSyntaxMatrixHarness {
                         out.write(in.read());
                     }
                     root;
-                    """, ExpectedOutcome.PARSE_ERROR, "Parse error:"));
+                    """, ExpectedOutcome.SUCCESS, null));
             cases.add(new Case("twr_trailing_semicolon", """
                     import com.codename1.ui.*;
                     import com.codename1.ui.layouts.*;
@@ -147,7 +147,7 @@ public final class PlaygroundSyntaxMatrixHarness {
                         }
                     }
                     root;
-                    """, ExpectedOutcome.PARSE_ERROR, "Parse error:"));
+                    """, ExpectedOutcome.SUCCESS, null));
 
             // Enhanced-for arrays.
             cases.add(new Case("enhanced_for_primitive_array", """
