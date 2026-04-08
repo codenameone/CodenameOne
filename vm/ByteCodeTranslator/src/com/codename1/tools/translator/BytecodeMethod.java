@@ -838,6 +838,10 @@ public class BytecodeMethod implements SignatureSet {
         if(nativeMethod) {
             return;
         }
+        boolean emitSimdTargetPragmas = isSimdEligibleForCodegen();
+        if (emitSimdTargetPragmas) {
+            appendSimdTargetPragmaPush(b);
+        }
         appendCMethodPrefix(b, "");
         b.append(" {\n");
         if(eliminated) {
@@ -845,6 +849,9 @@ public class BytecodeMethod implements SignatureSet {
                 b.append("    return;\n}\n\n");
             } else {
                 b.append("    return 0;\n}\n\n");
+            }
+            if (emitSimdTargetPragmas) {
+                appendSimdTargetPragmaPop(b);
             }
             return;
         }
@@ -999,6 +1006,9 @@ public class BytecodeMethod implements SignatureSet {
             } else {
                 b.append("    return 0;\n}\n\n");
             }
+            if (emitSimdTargetPragmas) {
+                appendSimdTargetPragmaPop(b);
+            }
             return;
         }
         Instruction inst = instructions.get(instructions.size() - 1);
@@ -1018,6 +1028,9 @@ public class BytecodeMethod implements SignatureSet {
             } else {
                 b.append("    return 0;\n}\n\n");
             }
+        }
+        if (emitSimdTargetPragmas) {
+            appendSimdTargetPragmaPop(b);
         }
     }
     
@@ -2487,6 +2500,22 @@ public class BytecodeMethod implements SignatureSet {
             appendReason(reason, "marked reduction but no reduction-like arithmetic ops found");
         }
         return reason.toString();
+    }
+
+    private boolean isSimdEligibleForCodegen() {
+        return simdCandidateHint && getSimdIneligibilityReason().length() == 0;
+    }
+
+    private static void appendSimdTargetPragmaPush(StringBuilder b) {
+        b.append("#if defined(CN1_ENABLE_SIMD_PRAGMAS) && defined(__clang__) && (defined(__arm__) || defined(__aarch64__))\n");
+        b.append("#pragma clang attribute push(__attribute__((target(\"neon\"))), apply_to=function)\n");
+        b.append("#endif\n");
+    }
+
+    private static void appendSimdTargetPragmaPop(StringBuilder b) {
+        b.append("#if defined(CN1_ENABLE_SIMD_PRAGMAS) && defined(__clang__) && (defined(__arm__) || defined(__aarch64__))\n");
+        b.append("#pragma clang attribute pop\n");
+        b.append("#endif\n");
     }
 
     private static void appendReason(StringBuilder sb, String value) {

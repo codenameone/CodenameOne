@@ -474,3 +474,7 @@ public class FastOps {
 
 Current ParparVM stages primarily consume these hints as optimizer metadata and diagnostics.
 As SIMD passes mature, this same API will continue to be the forward-compatible way to provide intent.
+
+When generating C for eligible SIMD-candidate methods, ParparVM can also emit
+Clang ARM/AArch64 NEON target pragmas, but this path is disabled by default and
+must be explicitly enabled with `CN1_ENABLE_SIMD_PRAGMAS` at compile time.
