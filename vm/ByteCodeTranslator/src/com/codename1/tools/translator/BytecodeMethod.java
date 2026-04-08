@@ -850,9 +850,6 @@ public class BytecodeMethod implements SignatureSet {
         }
         
         b.append(declaration);
-        if (simdCandidateHint && simdWidthHint > 0) {
-            b.append("    const JAVA_INT __cn1SimdWidthHint = ").append(simdWidthHint).append(";\n");
-        }
         
         boolean hasInstructions = true;
         if(optimizerOn) {
@@ -1508,8 +1505,15 @@ public class BytecodeMethod implements SignatureSet {
     
     
     boolean optimize() {
+        if (simdCandidateHint) {
+            enforceValidSimdCandidate();
+        } else if (simdReductionHint) {
+            throw new IllegalStateException("SIMD annotation validation failed for " + clsName + "."
+                    + methodName + desc + ": @Simd.Reduction requires @Simd.Candidate");
+        }
+
         if (ByteCodeTranslator.verbose && hasSimdHints()) {
-            logSimdHintStatus();
+            logSimdHintStatus(getSimdIneligibilityReason());
         }
 
         int instructionCount = instructions.size();
@@ -2446,11 +2450,27 @@ public class BytecodeMethod implements SignatureSet {
         return out.toString();
     }
 
-    private void logSimdHintStatus() {
-        StringBuilder reason = new StringBuilder();
-        if (!simdCandidateHint) {
-            appendReason(reason, "missing @Simd.Candidate");
+    private void logSimdHintStatus(String reason) {
+        String methodId = clsName + "." + methodName + desc;
+        if (reason == null || reason.length() == 0) {
+            System.out.println("SIMD hints accepted for " + methodId + ": " + getSimdHintSummary());
+        } else {
+            System.out.println("SIMD hints noted but not currently vectorization-ready for " + methodId
+                    + ": " + getSimdHintSummary() + " (" + reason + ")");
         }
+    }
+
+    private void enforceValidSimdCandidate() {
+        String reason = getSimdIneligibilityReason();
+        if (reason.length() == 0) {
+            return;
+        }
+        throw new IllegalStateException("SIMD annotation validation failed for " + clsName + "."
+                + methodName + desc + ": " + reason);
+    }
+
+    private String getSimdIneligibilityReason() {
+        StringBuilder reason = new StringBuilder();
         if (nativeMethod || abstractMethod) {
             appendReason(reason, "native/abstract method");
         }
@@ -2466,13 +2486,7 @@ public class BytecodeMethod implements SignatureSet {
         if (simdReductionHint && !hasReductionOpcode()) {
             appendReason(reason, "marked reduction but no reduction-like arithmetic ops found");
         }
-        String methodId = clsName + "." + methodName + desc;
-        if (reason.length() == 0) {
-            System.out.println("SIMD hints accepted for " + methodId + ": " + getSimdHintSummary());
-        } else {
-            System.out.println("SIMD hints noted but not currently vectorization-ready for " + methodId
-                    + ": " + getSimdHintSummary() + " (" + reason.toString() + ")");
-        }
+        return reason.toString();
     }
 
     private static void appendReason(StringBuilder sb, String value) {
