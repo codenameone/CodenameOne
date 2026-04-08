@@ -105,29 +105,35 @@ public final class PlaygroundSyntaxMatrixHarness {
             cases.add(new Case("twr_single_resource", """
                     import com.codename1.ui.*;
                     import com.codename1.ui.layouts.*;
-                    import java.io.*;
+                    class Res implements AutoCloseable {
+                        public void close() {}
+                    }
                     Container root = new Container(BoxLayout.y());
-                    try (ByteArrayInputStream in = new ByteArrayInputStream(new byte[]{1,2,3})) {
-                        root.add(new Label("ok=" + in.read()));
+                    try (Res in = new Res()) {
+                        root.add(new Label("ok"));
                     }
                     root;
                     """, ExpectedOutcome.SUCCESS, null));
             cases.add(new Case("twr_multiple_resources", """
                     import com.codename1.ui.*;
                     import com.codename1.ui.layouts.*;
-                    import java.io.*;
+                    class Res implements AutoCloseable {
+                        public void close() {}
+                    }
                     Container root = new Container(BoxLayout.y());
-                    try (ByteArrayInputStream in = new ByteArrayInputStream(new byte[]{1}); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-                        out.write(in.read());
+                    try (Res in = new Res(); Res out = new Res()) {
+                        root.add(new Label("ok"));
                     }
                     root;
                     """, ExpectedOutcome.SUCCESS, null));
             cases.add(new Case("twr_trailing_semicolon", """
                     import com.codename1.ui.*;
                     import com.codename1.ui.layouts.*;
-                    import java.io.*;
+                    class Res implements AutoCloseable {
+                        public void close() {}
+                    }
                     Container root = new Container(BoxLayout.y());
-                    try (ByteArrayInputStream in = new ByteArrayInputStream(new byte[]{1});) {
+                    try (Res in = new Res();) {
                         root.add(new Label("ok"));
                     }
                     root;
@@ -135,9 +141,11 @@ public final class PlaygroundSyntaxMatrixHarness {
             cases.add(new Case("twr_nested_try_catch_finally", """
                     import com.codename1.ui.*;
                     import com.codename1.ui.layouts.*;
-                    import java.io.*;
+                    class Res implements AutoCloseable {
+                        public void close() {}
+                    }
                     Container root = new Container(BoxLayout.y());
-                    try (ByteArrayInputStream in = new ByteArrayInputStream(new byte[]{1})) {
+                    try (Res in = new Res()) {
                         try {
                             root.add(new Label("inner"));
                         } catch (RuntimeException ex) {
