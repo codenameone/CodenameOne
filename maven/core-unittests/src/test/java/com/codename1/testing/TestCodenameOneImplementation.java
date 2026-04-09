@@ -93,6 +93,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private Dimension desktopSize = new Dimension(displayWidth, displayHeight);
     private Dimension lastWindowSize;
     private Rectangle windowBounds = new Rectangle(0, 0, displayWidth, displayHeight);
+    private Rectangle displaySafeArea = null;
     private int deviceDensity = Display.DENSITY_MEDIUM;
     private boolean portrait = true;
     private boolean tablet = false;
@@ -1096,6 +1097,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         displayHeight = 1920;
         desktopSize = new Dimension(displayWidth, displayHeight);
         windowBounds = new Rectangle(0, 0, displayWidth, displayHeight);
+        displaySafeArea = null;
         lastWindowSize = null;
         nativeTitle = false;
         softkeyCount = 2;
@@ -1124,6 +1126,27 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     public void setDisplaySize(int width, int height) {
         this.displayWidth = width;
         this.displayHeight = height;
+    }
+
+    /**
+     * Sets a custom display safe area to simulate devices with notches or safe area insets.
+     * Pass {@code null} to revert to the default behavior (full display area).
+     */
+    public void setDisplaySafeArea(Rectangle safeArea) {
+        this.displaySafeArea = safeArea;
+    }
+
+    @Override
+    public Rectangle getDisplaySafeArea(Rectangle rect) {
+        if (displaySafeArea != null) {
+            if (rect == null) {
+                rect = new Rectangle();
+            }
+            rect.setBounds(displaySafeArea.getX(), displaySafeArea.getY(),
+                    displaySafeArea.getWidth(), displaySafeArea.getHeight());
+            return rect;
+        }
+        return super.getDisplaySafeArea(rect);
     }
 
     public void setDeviceDensity(int density) {

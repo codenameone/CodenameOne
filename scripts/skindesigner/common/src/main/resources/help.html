@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Help</title>
+        <meta charset="windows-1252">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body>
+        <h1>Skin Designer Help</h1>
+        <p>The skin designer tool allows you to visually design and save a Codename One skin file that you can
+        use to simulate a custom device type. To use this tool you need two pictures of the device in portrait
+        and landscape mode. The screen area of these pictures must match the device screen size!</p>
+        
+        <p>
+            <b>TIP:</b> To find files like that just search for the name of the device you are looking for followed by
+            "mockup". This will bring up device mockups you can often use. FYI be sure to read the license of the 
+            graphic you use if you intend to publish this, many creators require attribution!
+        </p>
+        
+        <h2>Creating a Skin</h2>
+        <p>
+            You will need to select the device image in portrait/landscape, you can then enter the screen dimensions
+            in pixels that should match the area within the graphic. <br />
+            You can enter the X/Y position or use the hand "pan tool" to visually position the screen within the graphic.
+        </p>
+        <p>
+            This process should be repeated both for portrait and landscape images respectively.
+        </p>
+        <p>
+            You then need to enter a set of values to indicate details about the skin as described below:
+        </p>
+        <ul>
+            <li><b>Native Theme</b> - the underlying native theme of the device, e.g. iOS devices use an iOS 7+ native theme</li>
+            <li><b>Platform name</b> - This affects the <a href="https://www.codenameone.com/javadoc/com/codename1/ui/Display.html">Display</a> 
+                platform name</li>
+            <li><b>Tablet</b> - this indicates if the <code>isTablet()</code> method will return true or false</li>
+            <li><b>System Font Family</b> - the default builtin font family. Notice that this only applies to system fonts and not to native fonts</li>
+            <li><b>Proportional Font Family</b> - the proportional builtin font family. Notice that this only applies to system fonts and not to native fonts</li>
+            <li><b>Monospace Font Family</b> - the monospace font family. Notice that this only applies to system fonts and not to native fonts</li>
+            <li><b>Small font size</b> - when you pick "small" for the font size this is the size it will have in pixels</li>
+            <li><b>Medium font size</b> - when you pick "medium" for the font size this is the size it will have in pixels</li>
+            <li><b>Large font size</b> - when you pick "large" for the font size this is the size it will have in pixels</li>
+            <li><b>Pixel Ratio</b> - the number of pixels per <b>millimeter</b> on the device. To convert a PPI (pixels per inch) 
+                value to millimeters just divide the value by <code>25.4</code>. <br />
+                E.g. a device with 264 ppi will have <code>264 / 25.4 = 10.3937008</code> pixels per millimeter</li>
+            <li><b>Platform overrides</b> - These represent the theme override behavior which you can use
+            to override platform specific behavior on the device</li>
+        </ul>
+        
+        <h3>Saving &amp; Testing</h3>
+        
+        <p>
+            You can save the skin by pressing the save button on the top right. In the desktop version it will reside in
+            the <code>.SkinDesigner</code> directory in your home folder. In the web version you will be prompted
+            to save the skin file.
+        </p>
+        <p>
+            Rename the file to a name the represents the device and test it in the simulator by pressing the "Add" button
+            in the skins menu.
+        </p>
+        
+        <h2>Submitting the Skin</h2>
+        <p>
+            Assuming your skin file doesn't violate any copyrights we'd appreciate if you submit it to our official skin 
+            repository!<br />
+            If your skin file requires attribution please include that within the skin image...
+        </p>
+        <p>
+            Start by navigating to <a  href="https://github.com/codenameone/codenameone-skins">github.com/codenameone/codenameone-skins</a>
+            &amp; fork the project. Drag your skin file into the OTA directory. Create a 112x112 icon png file for the skin
+            and drag it into that directory as well.
+        </p>
+        <p>
+            Next select the <code>Skins.xml</code> file and edit it. Add your skin in a similar way to the other skin files
+            and commit.
+        </p>
+        <p>
+            Now click the submit pull request button to submit these changes for inclusion in the main repository.
+        </p>
+        
+    </body>
+</html>

@@ -690,6 +690,17 @@ xcrun simctl spawn "$SIM_DEVICE_ID" \
   --predicate '(composedMessage CONTAINS "CN1SS") OR (eventMessage CONTAINS "CN1SS")' \
   > "$FALLBACK_LOG" 2>/dev/null || true
 
+SWIFT_DIAG_LINE="$( (grep -h "CN1SS:INFO:swift_diag_status=" "$TEST_LOG" "$FALLBACK_LOG" || true) | tail -n 1 )"
+if [ -n "$SWIFT_DIAG_LINE" ]; then
+  ri_log "Detected swift diagnostic status line: $SWIFT_DIAG_LINE"
+  if ! echo "$SWIFT_DIAG_LINE" | grep -q "swift_diag_status=OK "; then
+    ri_log "STAGE:SWIFT_DIAG_FAILED -> $SWIFT_DIAG_LINE"
+    exit 13
+  fi
+else
+  ri_log "STAGE:SWIFT_DIAG_MISSING -> No swift_diag_status marker found"
+fi
+
 if [ -n "$SIM_DEVICE_ID" ]; then
   xcrun simctl terminate "$SIM_DEVICE_ID" "$BUNDLE_IDENTIFIER" >/dev/null 2>&1 || true
 fi

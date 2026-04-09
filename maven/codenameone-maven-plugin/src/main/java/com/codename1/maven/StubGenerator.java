@@ -47,15 +47,24 @@ public class StubGenerator {
     private File csFile;
     private File iosHFile;
     private File iosMFile;
+    private File iosSwiftFile;
+    private File androidKotlinFile;
     private File jsFile;
     private Log log;
+    private boolean generateIosSwift;
+    private boolean generateAndroidKotlin;
 
 
     public static StubGenerator create(Log log, Class nativeInterface) {
+        return create(log, nativeInterface, false, false);
+    }
 
+    public static StubGenerator create(Log log, Class nativeInterface, boolean generateIosSwift, boolean generateAndroidKotlin) {
         StubGenerator instance = new StubGenerator();
         instance.log = log;
         instance.nativeInterface = nativeInterface;
+        instance.generateIosSwift = generateIosSwift;
+        instance.generateAndroidKotlin = generateAndroidKotlin;
         return instance;
     }
 
@@ -142,7 +151,9 @@ public class StubGenerator {
         String iosFilename = nativeInterface.getName().replace('.', '_') + "Impl.";
         iosHFile = new File(path(destination.getAbsolutePath(), "ios", "src", "main", "objectivec", iosFilename+"h"));
         iosMFile = new File(path(destination.getAbsolutePath(), "ios", "src", "main", "objectivec", iosFilename+"m"));
+        iosSwiftFile = new File(path(destination.getAbsolutePath(), "ios", "src", "main", "objectivec", iosFilename+"swift"));
         iosMFile.getParentFile().mkdirs();
+        androidKotlinFile = new File(path(destination.getAbsolutePath(), "android", "src", "main", "java", nativeInterface.getName().replace('.', File.separatorChar) + "Impl.kt"));
 
         jsFile = new File(path(destination.getAbsolutePath(), "javascript", "src", "main", "javascript", nativeInterface.getName().replace('.', '_') + ".js"));
         jsFile.getParentFile().mkdirs();
@@ -153,7 +164,7 @@ public class StubGenerator {
      */
     public boolean isFilesExist(File destination) {
         initFileNames(destination);
-        return androidFile.exists() || iosHFile.exists() || iosMFile.exists() ||
+        return androidFile.exists() || androidKotlinFile.exists() || iosHFile.exists() || iosMFile.exists() || iosSwiftFile.exists() ||
                 csFile.exists() || javaseFile.exists() || jsFile.exists();
     }
 
@@ -189,6 +200,22 @@ public class StubGenerator {
             generateIOSFiles();
         } else {
             log.debug(iosHFile+" already exists. Skipping");
+        }
+        if(generateIosSwift) {
+            if(overwrite || !iosSwiftFile.exists()) {
+                log.info("Writing " + iosSwiftFile);
+                generateIOSSwiftFile();
+            } else {
+                log.debug(iosSwiftFile + " already exists. Skipping");
+            }
+        }
+        if(generateAndroidKotlin) {
+            if(overwrite || !androidKotlinFile.exists()) {
+                log.info("Writing " + androidKotlinFile);
+                generateAndroidKotlinFile();
+            } else {
+                log.debug(androidKotlinFile + " already exists. Skipping");
+            }
         }
         if(overwrite || !(jsFile.exists())) {
             log.info("Writing "+jsFile);
@@ -269,6 +296,119 @@ public class StubGenerator {
         fo = new FileOutputStream(iosMFile);
         fo.write(m.getBytes(StandardCharsets.UTF_8));
         fo.close();
+    }
+
+    private void generateIOSSwiftFile() throws IOException {
+        String className = nativeInterface.getName().replace('.', '_') + "Impl";
+        String swift = "import Foundation\n\n"
+                + "@objc(" + className + ")\n"
+                + "@objcMembers\n"
+                + "public class " + className + ": NSObject {\n";
+        for (Method mtd : nativeInterface.getMethods()) {
+            swift += "    public func " + mtd.getName() + "(";
+            Class[] params = mtd.getParameterTypes();
+            if (params != null && params.length > 0) {
+                for (int i = 0; i < params.length; i++) {
+                    if (i > 0) {
+                        swift += ", ";
+                    }
+                    swift += "param" + i + ": " + javaTypeToSwiftType(params[i]);
+                }
+            }
+            Class returnType = mtd.getReturnType();
+            if (returnType != Void.TYPE && returnType != Void.class) {
+                swift += ") -> " + javaTypeToSwiftType(returnType) + " {\n";
+                swift += "        return " + defaultSwiftReturn(returnType) + "\n";
+            } else {
+                swift += ") {\n";
+            }
+            swift += "    }\n\n";
+        }
+        swift += "}\n";
+        try (FileOutputStream fo = new FileOutputStream(iosSwiftFile)) {
+            fo.write(swift.getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
+    private void generateAndroidKotlinFile() throws IOException {
+        String className = nativeInterface.getSimpleName() + "Impl";
+        StringBuilder kotlin = new StringBuilder();
+        kotlin.append("package ").append(nativeInterface.getPackage().getName()).append("\n\n");
+        kotlin.append("class ").append(className).append(" {\n");
+        for (Method mtd : nativeInterface.getMethods()) {
+            kotlin.append("    fun ").append(mtd.getName()).append("(");
+            Class[] params = mtd.getParameterTypes();
+            if (params != null && params.length > 0) {
+                for (int i = 0; i < params.length; i++) {
+                    if (i > 0) {
+                        kotlin.append(", ");
+                    }
+                    kotlin.append("param").append(i).append(": ").append(javaTypeToKotlinType(params[i]));
+                }
+            }
+            Class returnType = mtd.getReturnType();
+            if (returnType != Void.TYPE && returnType != Void.class) {
+                kotlin.append("): ").append(javaTypeToKotlinType(returnType)).append(" {\n");
+                kotlin.append("        return ").append(defaultKotlinReturn(returnType)).append("\n");
+            } else {
+                kotlin.append(") {\n");
+            }
+            kotlin.append("    }\n\n");
+        }
+        kotlin.append("}\n");
+        try (FileOutputStream fo = new FileOutputStream(androidKotlinFile)) {
+            fo.write(kotlin.toString().getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
+    private String javaTypeToSwiftType(Class t) {
+        if (t == String.class) return "String";
+        if (t.isArray()) return "Data?";
+        if (t == Integer.class || t == Integer.TYPE || t == Character.class || t == Character.TYPE) return "Int";
+        if (t == Long.class || t == Long.TYPE) return "Int64";
+        if (t == Byte.class || t == Byte.TYPE || t == Short.class || t == Short.TYPE) return "Int";
+        if (t == Boolean.class || t == Boolean.TYPE) return "Bool";
+        if (t == Float.class || t == Float.TYPE) return "Float";
+        if (t == Double.class || t == Double.TYPE) return "Double";
+        if (t == Void.class || t == Void.TYPE) return "Void";
+        return "Any?";
+    }
+
+    private String defaultSwiftReturn(Class t) {
+        if (t == String.class) return "\"\"";
+        if (t.isArray()) return "nil";
+        if (t == Boolean.class || t == Boolean.TYPE) return "false";
+        if (t == Float.class || t == Float.TYPE || t == Double.class || t == Double.TYPE) return "0";
+        if (t.isPrimitive()) return "0";
+        return "nil";
+    }
+
+    private String javaTypeToKotlinType(Class t) {
+        if (t.getName().equals("com.codename1.ui.PeerComponent")) return "Any?";
+        if (t == String.class) return "String";
+        if (t.isArray()) return "ByteArray?";
+        if (t == Integer.class || t == Integer.TYPE || t == Character.class || t == Character.TYPE) return "Int";
+        if (t == Long.class || t == Long.TYPE) return "Long";
+        if (t == Byte.class || t == Byte.TYPE) return "Byte";
+        if (t == Short.class || t == Short.TYPE) return "Short";
+        if (t == Boolean.class || t == Boolean.TYPE) return "Boolean";
+        if (t == Float.class || t == Float.TYPE) return "Float";
+        if (t == Double.class || t == Double.TYPE) return "Double";
+        if (t == Void.class || t == Void.TYPE) return "Unit";
+        return "Any?";
+    }
+
+    private String defaultKotlinReturn(Class t) {
+        if (t == String.class) return "\"\"";
+        if (t.isArray()) return "null";
+        if (t == Boolean.class || t == Boolean.TYPE) return "false";
+        if (t == Float.class || t == Float.TYPE) return "0f";
+        if (t == Double.class || t == Double.TYPE) return "0.0";
+        if (t == Long.class || t == Long.TYPE) return "0L";
+        if (t == Byte.class || t == Byte.TYPE) return "0";
+        if (t == Short.class || t == Short.TYPE) return "0";
+        if (t == Integer.class || t == Integer.TYPE || t == Character.class || t == Character.TYPE) return "0";
+        return "null";
     }
 
     private String javaTypeToObjectiveCType(Class t) {

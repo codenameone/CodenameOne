@@ -1097,16 +1097,63 @@ public class IPhoneBuilder extends Executor {
                 String classNameWithUnderscores = currentNative.getName().replace('.', '_');
                 String mSourceFile = "#include \"xmlvm.h\"\n"
                         + "#include \"java_lang_String.h\"\n"
+                        + "#include <stdlib.h>\n"
                         + "#import \"CodenameOne_GLViewController.h\"\n"
                         + "#import <UIKit/UIKit.h>\n"
-                        + "#import \"" + classNameWithUnderscores + "Impl.h\"\n" + newVMInclude
+                        + "#import <objc/runtime.h>\n"
+                        + "#import \"" + classNameWithUnderscores + "Impl.h\"\n"
+                        + newVMInclude
                         + "#include \"" + classNameWithUnderscores + "ImplCodenameOne.h\"\n\n"
+                        + "static id cn1_createNativeInterfacePeer(NSString* className) {\n"
+                        + "    NSMutableArray* candidates = [NSMutableArray arrayWithObject:className];\n"
+                        + "    NSString* executableName = [[NSBundle mainBundle] objectForInfoDictionaryKey:@\"CFBundleExecutable\"];\n"
+                        + "    NSString* bundleName = [[NSBundle mainBundle] objectForInfoDictionaryKey:@\"CFBundleName\"];\n"
+                        + "    NSArray* moduleNames = @[executableName ?: @\"\", bundleName ?: @\"\"];\n"
+                        + "    for(NSString* moduleName in moduleNames) {\n"
+                        + "        if(moduleName.length == 0) {\n"
+                        + "            continue;\n"
+                        + "        }\n"
+                        + "        NSString* sanitized = [[moduleName stringByReplacingOccurrencesOfString:@\"-\" withString:@\"_\"] stringByReplacingOccurrencesOfString:@\" \" withString:@\"_\"];\n"
+                        + "        [candidates addObject:[sanitized stringByAppendingFormat:@\".%@\", className]];\n"
+                        + "        if(![sanitized isEqualToString:moduleName]) {\n"
+                        + "            [candidates addObject:[moduleName stringByAppendingFormat:@\".%@\", className]];\n"
+                        + "        }\n"
+                        + "    }\n"
+                        + "    Class cls = Nil;\n"
+                        + "    for(NSString* candidate in candidates) {\n"
+                        + "        cls = NSClassFromString(candidate);\n"
+                        + "        if(cls != Nil) {\n"
+                        + "            break;\n"
+                        + "        }\n"
+                        + "    }\n"
+                        + "    if(cls == Nil) {\n"
+                        + "        unsigned int classCount = 0;\n"
+                        + "        Class *classList = objc_copyClassList(&classCount);\n"
+                        + "        NSString* dottedSuffix = [@\".\" stringByAppendingString:className];\n"
+                        + "        for(unsigned int i = 0; i < classCount; i++) {\n"
+                        + "            NSString* runtimeName = [NSString stringWithUTF8String:class_getName(classList[i])];\n"
+                        + "            if([runtimeName isEqualToString:className] || [runtimeName hasSuffix:dottedSuffix] || [runtimeName hasSuffix:className]) {\n"
+                        + "                cls = classList[i];\n"
+                        + "                NSLog(@\"[CN1] Resolved native interface class %@ via runtime scan as %@\", className, runtimeName);\n"
+                        + "                break;\n"
+                        + "            }\n"
+                        + "        }\n"
+                        + "        if(classList != NULL) {\n"
+                        + "            free(classList);\n"
+                        + "        }\n"
+                        + "    }\n"
+                        + "    if(cls == Nil) {\n"
+                        + "        NSLog(@\"[CN1] Failed to find native interface class %@. Tried: %@\", className, candidates);\n"
+                        + "        return nil;\n"
+                        + "    }\n"
+                        + "    return [[cls alloc] init];\n"
+                        + "}\n\n"
                         + "JAVA_LONG " + classNameWithUnderscores + "ImplCodenameOne_initializeNativePeer__" + postfixForNewVM + "(" + prefixForNewVM + ") {\n"
-                        + "    " + classNameWithUnderscores + "Impl* i = [[" + classNameWithUnderscores + "Impl alloc] init];\n"
+                        + "    id i = cn1_createNativeInterfacePeer(@\"" + classNameWithUnderscores + "Impl\");\n"
                         + "    return i;\n"
                         + "}\n\n"
                         + "void " + classNameWithUnderscores + "ImplCodenameOne_releaseNativePeerInstance___long(" + prefix2ForNewVM + "JAVA_LONG l) {\n"
-                        + "    " + classNameWithUnderscores + "Impl* i = (" + classNameWithUnderscores + "Impl*)l;\n"
+                        + "    id i = (id)l;\n"
                         + "    [i release];\n"
                         + "}\n\n"
                         + "extern NSData* arrayToData(JAVA_OBJECT arr);\n"
@@ -1135,8 +1182,7 @@ public class IPhoneBuilder extends Executor {
                     String mFileBody;
 
                     mFileArgs = "(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me";
-                    mFileBody = "    " + classNameWithUnderscores + "Impl* ptr = (" + classNameWithUnderscores +
-                        "Impl*)get_field_" + classNameWithUnderscores + "ImplCodenameOne_nativePeer(me);\n";
+                    mFileBody = "    id ptr = (id)get_field_" + classNameWithUnderscores + "ImplCodenameOne_nativePeer(me);\n";
 
                     
                     if(!(returnType.equals(Void.class) || returnType.equals(Void.TYPE))) {
@@ -1714,6 +1760,9 @@ public class IPhoneBuilder extends Executor {
                     deploymentTargetStr = "begin\n"
                             + "  xcproj.targets.find{|e|e.name=='" + request.getMainClass() + "'}.build_configurations.each{|config| \n"
                             + "    config.build_settings['PRODUCT_BUNDLE_IDENTIFIER']='"+request.getPackageName()+"'\n"
+                            + "    config.build_settings['DEFINES_MODULE']='YES'\n"
+                            + "    config.build_settings['SWIFT_VERSION']='5.0'\n"
+                            + "    config.build_settings['SWIFT_OBJC_BRIDGING_HEADER']='$(SRCROOT)/cn1-Bridging-Header.h'\n"
                             + "  }\n"
                             + "  xcproj.targets.each do |target|\n"
                             + "    target.build_configurations.each do |config|\n"
@@ -1853,6 +1902,7 @@ public class IPhoneBuilder extends Executor {
 
                     String createSchemesScript = "#!/usr/bin/env ruby\n" +
                             "require 'xcodeproj'\n" +
+                            "require 'pathname'\n" +
                             "main_class_name = \"" + request.getMainClass() + "\"\n" +
                             "project_file = \"" +
                                 tmpDir.getAbsolutePath() + "/dist/" +
@@ -1866,8 +1916,99 @@ public class IPhoneBuilder extends Executor {
                             + "  puts \"Backtrace:\\n\\t#{e.backtrace.join(\"\\n\\t\")}\"\n"
                             + "  puts 'An error occurred recreating schemes, but the build still might work...'\n"
                             + "end\n"
+                            + "begin\n"
+                            + "  main_target = xcproj.targets.find{|e| e.name==main_class_name}\n"
+                            + "  targets_to_fix = []\n"
+                            + "  if main_target\n"
+                            + "    targets_to_fix << main_target\n"
+                            + "  else\n"
+                            + "    targets_to_fix = xcproj.targets.select{|t| t.respond_to?(:product_type) && t.product_type == 'com.apple.product-type.application'}\n"
+                            + "  end\n"
+                            + "  if targets_to_fix.empty?\n"
+                            + "    raise \"Unable to find iOS app target for Swift phase fixups. main_class_name=#{main_class_name}, available=#{xcproj.targets.map(&:name).join(', ')}\"\n"
+                            + "  end\n"
+                            + "  targets_to_fix.each do |main_target|\n"
+                            + "    project_root = File.dirname(project_file)\n"
+                            + "    swift_paths = Dir.glob(File.join(project_root, main_class_name + '-src', '**', '*.swift'))\n"
+                            + "    swift_paths.each do |swift_path|\n"
+                            + "      rel_path = Pathname.new(swift_path).relative_path_from(Pathname.new(project_root)).to_s\n"
+                            + "      ref = xcproj.files.find{|f| f.path == rel_path} || xcproj.main_group.new_file(rel_path)\n"
+                            + "      unless main_target.source_build_phase.files_references.include?(ref)\n"
+                            + "        main_target.source_build_phase.add_file_reference(ref, true)\n"
+                            + "      end\n"
+                            + "      begin\n"
+                            + "        main_target.resources_build_phase.remove_file_reference(ref)\n"
+                            + "      rescue\n"
+                            + "      end\n"
+                            + "    end\n"
+                            + "    swift_refs = xcproj.files.select do |f|\n"
+                            + "      file_name = f.path || f.name || f.display_name\n"
+                            + "      file_name && file_name.downcase.end_with?('.swift')\n"
+                            + "    end\n"
+                            + "    swift_refs.each do |ref|\n"
+                            + "      unless main_target.source_build_phase.files_references.include?(ref)\n"
+                            + "        main_target.source_build_phase.add_file_reference(ref, true)\n"
+                            + "      end\n"
+                            + "      begin\n"
+                            + "        main_target.resources_build_phase.remove_file_reference(ref)\n"
+                            + "      rescue\n"
+                            + "      end\n"
+                            + "    end\n"
+                            + "    swift_resource_files = main_target.resources_build_phase.files.select do |bf|\n"
+                            + "      ref = bf.file_ref\n"
+                            + "      file_name = (ref && (ref.path || ref.name || ref.display_name)) || bf.display_name\n"
+                            + "      file_name && file_name.downcase.end_with?('.swift')\n"
+                            + "    end\n"
+                            + "    swift_resource_files.each do |bf|\n"
+                            + "      main_target.resources_build_phase.files.delete(bf)\n"
+                            + "    end\n"
+                            + "    source_folder_resources = main_target.resources_build_phase.files.select do |bf|\n"
+                            + "      ref = bf.file_ref\n"
+                            + "      ref_name = ref && (ref.path || ref.name || ref.display_name)\n"
+                            + "      next false unless ref_name\n"
+                            + "      if ref_name =~ /(^|\\/)[^\\/]*-src$/\n"
+                            + "        true\n"
+                            + "      else\n"
+                            + "        dir_path = File.join(project_root, ref_name)\n"
+                            + "        File.directory?(dir_path) && !Dir.glob(File.join(dir_path, '**', '*.swift')).empty?\n"
+                            + "      end\n"
+                            + "    end\n"
+                            + "    source_folder_resources.each do |bf|\n"
+                            + "      main_target.resources_build_phase.files.delete(bf)\n"
+                            + "    end\n"
+                            + "    remaining_swift_resources = main_target.resources_build_phase.files.select do |bf|\n"
+                            + "      ref = bf.file_ref\n"
+                            + "      file_name = (ref && (ref.path || ref.name || ref.display_name)) || bf.display_name\n"
+                            + "      if file_name && file_name.downcase.end_with?('.swift')\n"
+                            + "        true\n"
+                            + "      elsif file_name && file_name =~ /(^|\\/)[^\\/]*-src$/\n"
+                            + "        true\n"
+                            + "      elsif file_name\n"
+                            + "        dir_path = File.join(project_root, file_name)\n"
+                            + "        File.directory?(dir_path) && !Dir.glob(File.join(dir_path, '**', '*.swift')).empty?\n"
+                            + "      else\n"
+                            + "        false\n"
+                            + "      end\n"
+                            + "    end\n"
+                            + "    unless remaining_swift_resources.empty?\n"
+                            + "      names = remaining_swift_resources.map do |bf|\n"
+                            + "        ref = bf.file_ref\n"
+                            + "        (ref && (ref.path || ref.name || ref.display_name)) || bf.display_name || '<unknown>'\n"
+                            + "      end\n"
+                            + "      raise \"Swift files/resources still present in Copy Bundle Resources: #{names.join(', ')}\"\n"
+                            + "    end\n"
+                            + "  end\n"
+                            + "rescue => e\n"
+                            + "  puts \"Error while correcting Swift build phases: #{$!}\"\n"
+                            + "  puts \"Backtrace:\\n\\t#{e.backtrace.join(\"\\n\\t\")}\"\n"
+                            + "  raise e\n"
+                            + "end\n"
                             + deploymentTargetStr
                             + appExtensionsBuilder.toString();
+                    File bridgingHeaderFile = new File(new File(tmpDir, "dist"), "cn1-Bridging-Header.h");
+                    if (!bridgingHeaderFile.exists()) {
+                        this.createFile(bridgingHeaderFile, "// Codename One generated Swift bridging header\n".getBytes(StandardCharsets.UTF_8));
+                    }
                     File hooksDir = new File(tmpFile, "hooks");
                     hooksDir.mkdir();
                     File fixSchemesFile = new File(hooksDir, "fix_xcode_schemes.rb");
@@ -2013,8 +2154,55 @@ public class IPhoneBuilder extends Executor {
                 stopwatch.split("SwiftPM");
             }
 
-            try {
+            File postPodsFixSchemesFile = new File(new File(tmpFile, "hooks"), "fix_xcode_schemes.rb");
+            if (postPodsFixSchemesFile.exists()) {
+                try {
+                    if (!exec(postPodsFixSchemesFile.getParentFile(), postPodsFixSchemesFile.getAbsolutePath())) {
+                        log("Failed to re-run xcode project Swift/resource phase fixups after dependency integration.");
+                        return false;
+                    }
+                } catch (Exception ex) {
+                    throw new BuildException("Failed to re-run xcode project Swift/resource phase fixups after dependency integration.", ex);
+                }
+            }
 
+            // Detect whether the project contains any Swift source files.
+            // If so, inject SWIFT_VERSION and related build settings into the
+            // pbxproj and create the bridging header.  This avoids adding
+            // Swift-specific settings to pure Objective-C projects.
+            File distDir = new File(tmpFile, "dist");
+            if (hasSwiftFiles(distDir)) {
+                File bridgingHeader = new File(distDir, "cn1-Bridging-Header.h");
+                if (!bridgingHeader.exists()) {
+                    try {
+                        this.createFile(bridgingHeader, "// Codename One generated Swift bridging header\n".getBytes(StandardCharsets.UTF_8));
+                    } catch (IOException ex) {
+                        log("Warning: failed to create Swift bridging header: " + ex.getMessage());
+                    }
+                }
+
+                try {
+                    File pbx = new File(tmpFile, "dist/" + request.getMainClass() + ".xcodeproj/project.pbxproj");
+                    // Inject Swift build settings by anchoring on SDKROOT which appears in
+                    // every project-level build configuration.
+                    replaceInFile(pbx,
+                            "SDKROOT = iphoneos;",
+                            "SDKROOT = iphoneos;\n\t\t\t\tSWIFT_VERSION = 5.0;");
+                    // Inject target-level settings by anchoring on PRODUCT_NAME which
+                    // appears in every target build configuration.
+                    replaceInFile(pbx,
+                            "PRODUCT_NAME = \"$(TARGET_NAME)\";",
+                            "DEFINES_MODULE = YES;\n\t\t\t\tPRODUCT_NAME = \"$(TARGET_NAME)\";\n\t\t\t\tSWIFT_OBJC_BRIDGING_HEADER = \"$(SRCROOT)/cn1-Bridging-Header.h\";");
+                } catch (IOException ex) {
+                    throw new BuildException("Failed to inject Swift build settings into pbxproj", ex);
+                }
+            }
+
+            try {
+                File pbxprojFile = new File(tmpFile, "dist/" + request.getMainClass() + ".xcodeproj/project.pbxproj");
+                removeLinesContaining(pbxprojFile,
+                        ".swift in Resources",
+                        request.getMainClass() + "-src in Resources");
 
                 if (request.getArg("ios.buildType", "debug").equals("debug") &&
                         request.getArg("ios.no_strip", "false").equalsIgnoreCase("true")) {
@@ -2199,6 +2387,52 @@ public class IPhoneBuilder extends Executor {
                 appendFilesToXcodeProjGroup(sb, f, serviceGroupVarName, serviceTargetVarName, baseDir);
             }
         }
+    }
+
+    private void removeLinesContaining(File file, String... snippets) throws IOException {
+        if (file == null || !file.exists() || snippets == null || snippets.length == 0) {
+            return;
+        }
+        String content = new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
+        StringBuilder sb = new StringBuilder(content.length());
+        try (BufferedReader reader = new BufferedReader(new StringReader(content))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                boolean remove = false;
+                for (String snippet : snippets) {
+                    if (snippet != null && !snippet.isEmpty() && line.contains(snippet)) {
+                        remove = true;
+                        break;
+                    }
+                }
+                if (!remove) {
+                    sb.append(line).append('\n');
+                }
+            }
+        }
+        createFile(file, sb.toString().getBytes(StandardCharsets.UTF_8));
+    }
+
+    /**
+     * Recursively checks whether the given directory contains any {@code .swift} files.
+     */
+    private static boolean hasSwiftFiles(File dir) {
+        if (dir == null || !dir.isDirectory()) {
+            return false;
+        }
+        File[] children = dir.listFiles();
+        if (children == null) {
+            return false;
+        }
+        for (File f : children) {
+            if (f.isFile() && f.getName().endsWith(".swift")) {
+                return true;
+            }
+            if (f.isDirectory() && hasSwiftFiles(f)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     

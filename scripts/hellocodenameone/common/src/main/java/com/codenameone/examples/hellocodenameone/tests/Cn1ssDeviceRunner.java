@@ -6,6 +6,7 @@ import com.codename1.ui.CN;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.util.StringUtil;
+import com.codenameone.examples.hellocodenameone.NativeInterfaceLanguageValidator;
 import com.codenameone.examples.hellocodenameone.tests.graphics.AffineScale;
 import com.codenameone.examples.hellocodenameone.tests.graphics.Clip;
 import com.codenameone.examples.hellocodenameone.tests.graphics.DrawArc;
@@ -75,6 +76,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new TabsScreenshotTest(),
             new TextAreaAlignmentScreenshotTest(),
             new ValidatorLightweightPickerScreenshotTest(),
+            new ToastBarTopPositionScreenshotTest(),
             // Keep this as the last screenshot test; orientation changes can leak into subsequent screenshots.
             new OrientationLockScreenshotTest(),
             new InPlaceEditViewTest(),
@@ -160,6 +162,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     }
 
     private void finishSuite() {
+        log("CN1SS:INFO:swift_diag_status=" + NativeInterfaceLanguageValidator.getLastStatus());
         log("CN1SS:SUITE:FINISHED");
         TestReporting.getInstance().testExecutionFinished(getClass().getName());
         if (CN.isSimulator()) {

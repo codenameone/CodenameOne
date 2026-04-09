@@ -41,7 +41,9 @@ import java.awt.image.ImageFilter;
 import java.awt.image.ImageProducer;
 import java.awt.image.RGBImageFilter;
 import java.io.*;
+import java.lang.reflect.Method;
 
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.channels.FileChannel;
@@ -3971,6 +3973,117 @@ public class AndroidGradleBuilder extends Executor {
         return s;
     }
 
+
+    @Override
+    protected String registerNativeImplementationsAndCreateStubs(ClassLoader parentClassLoader, File stubDir, File... classesDirectory) throws MalformedURLException, IOException {
+        Class[] discoveredNativeInterfaces = findNativeInterfaces(parentClassLoader, classesDirectory);
+        String registerNativeFunctions = "";
+        if (discoveredNativeInterfaces != null && discoveredNativeInterfaces.length > 0) {
+            for (Class n : discoveredNativeInterfaces) {
+                registerNativeFunctions += "        NativeLookup.register(" + n.getName() + ".class, "
+                        + n.getName() + "Stub.class" + ");\n";
+            }
+        }
+
+        if (discoveredNativeInterfaces != null && discoveredNativeInterfaces.length > 0) {
+            for (Class currentNative : discoveredNativeInterfaces) {
+                File folder = new File(stubDir, currentNative.getPackage().getName().replace('.', File.separatorChar));
+                folder.mkdirs();
+                File javaFile = new File(folder, currentNative.getSimpleName() + "Stub.java");
+
+                String javaImplSourceFile = "package " + currentNative.getPackage().getName() + ";\n\n"
+                        + "import com.codename1.ui.PeerComponent;\n\n"
+                        + "public class " + currentNative.getSimpleName() + "Stub implements " + currentNative.getSimpleName() + "{\n"
+                        + "    private final Object impl = createImpl();\n\n"
+                        + "    private static Object createImpl() {\n"
+                        + "        try {\n"
+                        + "            return Class.forName(\"" + currentNative.getName() + getImplSuffix() + "\").newInstance();\n"
+                        + "        } catch (Throwable t) {\n"
+                        + "            throw new RuntimeException(\"Failed to instantiate native implementation for " + currentNative.getName() + "\", t);\n"
+                        + "        }\n"
+                        + "    }\n\n"
+                        + "    private Object __cn1Invoke(String methodName, Object[] args) {\n"
+                        + "        try {\n"
+                        + "            java.lang.reflect.Method[] methods = impl.getClass().getMethods();\n"
+                        + "            for (java.lang.reflect.Method method : methods) {\n"
+                        + "                if (method.getName().equals(methodName) && method.getParameterTypes().length == args.length) {\n"
+                        + "                    return method.invoke(impl, args);\n"
+                        + "                }\n"
+                        + "            }\n"
+                        + "            throw new RuntimeException(methodName + \" with \" + args.length + \" args\");\n"
+                        + "        } catch (Throwable t) {\n"
+                        + "            throw new RuntimeException(\"Failed to invoke native method \" + methodName, t);\n"
+                        + "        }\n"
+                        + "    }\n\n";
+
+                for (Method m : currentNative.getMethods()) {
+                    String name = m.getName();
+                    if (name.equals("hashCode") || name.equals("equals") || name.equals("toString")) {
+                        continue;
+                    }
+
+                    Class returnType = m.getReturnType();
+
+                    javaImplSourceFile += "    public " + returnType.getSimpleName() + " " + name + "(";
+                    Class[] params = m.getParameterTypes();
+                    String args = "";
+                    if (params != null && params.length > 0) {
+                        for (int iter = 0; iter < params.length; iter++) {
+                            if (iter > 0) {
+                                javaImplSourceFile += ", ";
+                                args += ", ";
+                            }
+                            javaImplSourceFile += params[iter].getSimpleName() + " param" + iter;
+                            if (params[iter].getName().equals("com.codename1.ui.PeerComponent")) {
+                                args += convertPeerComponentToNative("param" + iter);
+                            } else {
+                                args += "param" + iter;
+                            }
+                        }
+                    }
+                    javaImplSourceFile += ") {\n";
+                    String invocationExpression = "__cn1Invoke(\"" + name + "\", new Object[]{" + args + "})";
+                    if (Void.class == returnType || Void.TYPE == returnType) {
+                        javaImplSourceFile += "        " + invocationExpression + ";\n    }\n\n";
+                    } else {
+                        if (returnType.getName().equals("com.codename1.ui.PeerComponent")) {
+                            javaImplSourceFile += "        return " + generatePeerComponentCreationCode(invocationExpression) + ";\n    }\n\n";
+                        } else if (returnType.isPrimitive()) {
+                            if (returnType == Boolean.TYPE) {
+                                javaImplSourceFile += "        return ((Boolean)" + invocationExpression + ").booleanValue();\n    }\n\n";
+                            } else if (returnType == Integer.TYPE) {
+                                javaImplSourceFile += "        return ((Integer)" + invocationExpression + ").intValue();\n    }\n\n";
+                            } else if (returnType == Long.TYPE) {
+                                javaImplSourceFile += "        return ((Long)" + invocationExpression + ").longValue();\n    }\n\n";
+                            } else if (returnType == Byte.TYPE) {
+                                javaImplSourceFile += "        return ((Byte)" + invocationExpression + ").byteValue();\n    }\n\n";
+                            } else if (returnType == Short.TYPE) {
+                                javaImplSourceFile += "        return ((Short)" + invocationExpression + ").shortValue();\n    }\n\n";
+                            } else if (returnType == Character.TYPE) {
+                                javaImplSourceFile += "        return ((Character)" + invocationExpression + ").charValue();\n    }\n\n";
+                            } else if (returnType == Float.TYPE) {
+                                javaImplSourceFile += "        return ((Float)" + invocationExpression + ").floatValue();\n    }\n\n";
+                            } else if (returnType == Double.TYPE) {
+                                javaImplSourceFile += "        return ((Double)" + invocationExpression + ").doubleValue();\n    }\n\n";
+                            } else {
+                                javaImplSourceFile += "        return (" + returnType.getSimpleName() + ")" + invocationExpression + ";\n    }\n\n";
+                            }
+                        } else {
+                            javaImplSourceFile += "        return (" + returnType.getSimpleName() + ")" + invocationExpression + ";\n    }\n\n";
+                        }
+                    }
+                }
+
+                javaImplSourceFile += "}\n";
+
+                try (FileOutputStream out = new FileOutputStream(javaFile)) {
+                    out.write(javaImplSourceFile.getBytes(StandardCharsets.UTF_8));
+                }
+            }
+        }
+
+        return registerNativeFunctions;
+    }
 
     @Override
     protected String generatePeerComponentCreationCode(String methodCallString) {

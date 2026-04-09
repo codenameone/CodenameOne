@@ -7,6 +7,7 @@ import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.Execute;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
+import org.apache.maven.plugins.annotations.Parameter;
 import org.objectweb.asm.*;
 
 import java.io.File;
@@ -26,6 +27,11 @@ import static com.codename1.maven.PathUtil.path;
 @Mojo(name="generate-native-interfaces")
 @Execute(phase= LifecyclePhase.COMPILE)
 public class GenerateNativeInterfaces extends AbstractCN1Mojo {
+    @Parameter(property = "cn1.generateNativeInterfaces.swift", defaultValue = "false")
+    private boolean generateIosSwift;
+
+    @Parameter(property = "cn1.generateNativeInterfaces.kotlin", defaultValue = "false")
+    private boolean generateAndroidKotlin;
 
     @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
@@ -115,7 +121,7 @@ public class GenerateNativeInterfaces extends AbstractCN1Mojo {
             throw new IllegalStateException("Project needs to be compiled first");
         }
 
-        StubGenerator g = StubGenerator.create(getLog(), c);
+        StubGenerator g = StubGenerator.create(getLog(), c, generateIosSwift, generateAndroidKotlin);
         String s = g.verify();
         if (s != null) {
             throw new RuntimeException("Generation Failed: " + s);

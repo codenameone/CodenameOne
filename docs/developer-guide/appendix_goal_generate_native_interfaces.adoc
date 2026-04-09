@@ -17,6 +17,15 @@ After creating this (and possibly other) native interfaces in our project,  run 
 mvn cn1:generate-native-interfaces
 ----
 
+By default this generates Java/Objective-C stubs. You can optionally include Swift and Kotlin stubs (both off by default):
+
+[source,bash]
+----
+mvn cn1:generate-native-interfaces \
+  -Dcn1.generateNativeInterfaces.swift=true \
+  -Dcn1.generateNativeInterfaces.kotlin=true
+----
+
 This will generate the following files (if they don't exist yet).
 
 javase::
@@ -26,9 +35,12 @@ ios::
 . `ios/src/main/objectivec/com_mycompany_myapp_MyNativeImpl.m`
 android::
 `android/src/main/java/com/mycompany/myapp/MyNativeImpl.java`
+android (optional Kotlin)::
+`android/src/main/java/com/mycompany/myapp/MyNativeImpl.kt`
 javascript::
 `javascript/src/main/javascript/com_mycompany_myapp_MyNativeImpl.js`
+ios (optional Swift)::
+`ios/src/main/objectivec/com_mycompany_myapp_MyNativeImpl.swift`
 
 Open and edit these files to implement your native interface methods as desired.
-
 
