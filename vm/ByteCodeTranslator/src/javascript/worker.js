@@ -1,6 +1,9 @@
 self.window = self;
 self.global = self;
 /*__IMPORTS__*/
+if (typeof self.__parparInstallNativeBindings === 'function') {
+  self.__parparInstallNativeBindings();
+}
 self.onmessage = function(event) {
   if (!event || !event.data) {
     return;
