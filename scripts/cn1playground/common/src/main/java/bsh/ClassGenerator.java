@@ -27,7 +27,6 @@ package bsh;
 
 import static bsh.This.Keys.BSHSUPER;
 
-import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -58,7 +57,7 @@ public final class ClassGenerator {
      * This is not a normal function of the Java reflection API and is
      * provided by generated class accessor methods.
      */
-    public Object invokeSuperclassMethod(BshClassManager bcm, Object instance, Class<?> classStatic, String methodName, Object[] args) throws UtilEvalError, ReflectError, InvocationTargetException {
+    public Object invokeSuperclassMethod(BshClassManager bcm, Object instance, Class<?> classStatic, String methodName, Object[] args) throws UtilEvalError, ReflectError {
         // Delegate to the static method
         return invokeSuperclassMethodImpl(bcm, instance, classStatic, methodName, args);
     }
@@ -279,7 +278,7 @@ public final class ClassGenerator {
     /** Find and invoke the super class delegate method. */
     public static Object invokeSuperclassMethodImpl(BshClassManager bcm,
             Object instance, Class<?> classStatic, String methodName, Object[] args)
-                throws UtilEvalError, ReflectError, InvocationTargetException {
+                throws UtilEvalError, ReflectError {
         Class<?> superClass = classStatic.getSuperclass();
         Class<?> clas = instance.getClass();
         String superName = BSHSUPER + superClass.getSimpleName() + methodName;
