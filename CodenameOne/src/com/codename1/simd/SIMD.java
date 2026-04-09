@@ -106,4 +106,111 @@ public final class SIMD {
     public static Float4 fma(Float4 a, Float4 b, Float4 c) {
         return add(mul(a, b), c);
     }
+
+    /**
+     * 4-lane integer vector.
+     */
+    public static final class Int4 {
+        public final int x;
+        public final int y;
+        public final int z;
+        public final int w;
+
+        public Int4(int x, int y, int z, int w) {
+            this.x = x;
+            this.y = y;
+            this.z = z;
+            this.w = w;
+        }
+    }
+
+    public static Int4 makeInt4(int x, int y, int z, int w) {
+        return new Int4(x, y, z, w);
+    }
+
+    public static Int4 add(Int4 a, Int4 b) {
+        return new Int4(a.x + b.x, a.y + b.y, a.z + b.z, a.w + b.w);
+    }
+
+    public static Int4 sub(Int4 a, Int4 b) {
+        return new Int4(a.x - b.x, a.y - b.y, a.z - b.z, a.w - b.w);
+    }
+
+    public static Int4 and(Int4 a, Int4 b) {
+        return new Int4(a.x & b.x, a.y & b.y, a.z & b.z, a.w & b.w);
+    }
+
+    public static Int4 or(Int4 a, Int4 b) {
+        return new Int4(a.x | b.x, a.y | b.y, a.z | b.z, a.w | b.w);
+    }
+
+    public static Int4 shl(Int4 a, int bits) {
+        return new Int4(a.x << bits, a.y << bits, a.z << bits, a.w << bits);
+    }
+
+    public static Int4 ushr(Int4 a, int bits) {
+        return new Int4(a.x >>> bits, a.y >>> bits, a.z >>> bits, a.w >>> bits);
+    }
+
+    /**
+     * Unsigned byte 16-lane vector.
+     */
+    public static final class U8x16 {
+        private final int[] lanes = new int[16];
+
+        private U8x16() {
+        }
+    }
+
+    public static U8x16 loadU8(byte[] values, int offset) {
+        U8x16 out = new U8x16();
+        for (int i = 0; i < 16; i++) {
+            out.lanes[i] = values[offset + i] & 0xff;
+        }
+        return out;
+    }
+
+    public static int laneU8(U8x16 value, int lane) {
+        return value.lanes[lane] & 0xff;
+    }
+
+    public static U8x16 and(U8x16 a, U8x16 b) {
+        U8x16 out = new U8x16();
+        for (int i = 0; i < 16; i++) {
+            out.lanes[i] = (a.lanes[i] & b.lanes[i]) & 0xff;
+        }
+        return out;
+    }
+
+    public static U8x16 or(U8x16 a, U8x16 b) {
+        U8x16 out = new U8x16();
+        for (int i = 0; i < 16; i++) {
+            out.lanes[i] = (a.lanes[i] | b.lanes[i]) & 0xff;
+        }
+        return out;
+    }
+
+    public static U8x16 xor(U8x16 a, U8x16 b) {
+        U8x16 out = new U8x16();
+        for (int i = 0; i < 16; i++) {
+            out.lanes[i] = (a.lanes[i] ^ b.lanes[i]) & 0xff;
+        }
+        return out;
+    }
+
+    public static U8x16 shl(U8x16 a, int bits) {
+        U8x16 out = new U8x16();
+        for (int i = 0; i < 16; i++) {
+            out.lanes[i] = ((a.lanes[i] << bits) & 0xff);
+        }
+        return out;
+    }
+
+    public static U8x16 ushr(U8x16 a, int bits) {
+        U8x16 out = new U8x16();
+        for (int i = 0; i < 16; i++) {
+            out.lanes[i] = (a.lanes[i] >>> bits) & 0xff;
+        }
+        return out;
+    }
 }

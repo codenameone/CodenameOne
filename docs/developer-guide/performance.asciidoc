@@ -495,6 +495,13 @@ translator and lower directly to platform SIMD instructions.
 The default Java implementation is scalar and portable, so it runs correctly even
 when SIMD lowering is not available.
 
+The API currently includes:
+
+* `SIMD.Float4` and `SIMD.Int4` vector value types.
+* `SIMD.U8x16` for unsigned-byte lane work.
+* Constructors and operations such as `makeFloat4()`, `makeInt4()`, `load()`, `store()`,
+  `add()`, `mul()`, `fma()`, `and()`, `or()`, shifts, and lane extraction for `U8x16`.
+
 [source,java]
 ----
 if (SIMD.isSupported()) {
@@ -514,3 +521,7 @@ if (SIMD.isSupported()) {
     }
 }
 ----
+
+`Base64.encodeNoNewline(byte[], byte[])` also includes an explicit SIMD-API code path
+that can be toggled via `Base64.setExplicitSimdApiEnabled(true)` and is activated only
+when `SIMD.isSupported()` is true.

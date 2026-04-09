@@ -20,6 +20,7 @@
 package com.codename1.util;
 
 import com.codename1.annotations.Simd;
+import com.codename1.simd.SIMD;
 
 /// This class implements Base64 encoding/decoding functionality
 /// as specified in RFC 2045 (http://www.ietf.org/rfc/rfc2045.txt).
@@ -27,6 +28,7 @@ public abstract class Base64 {
 
     private static final int DECODE_INVALID = -1;
     private static final int DECODE_WHITESPACE = -2;
+    private static volatile boolean explicitSimdApiEnabled;
 
     private static final byte[] map = new byte[]
             {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N',
@@ -349,6 +351,9 @@ public abstract class Base64 {
         if (inputLength == 0) {
             return 0;
         }
+        if (explicitSimdApiEnabled && SIMD.isSupported() && inputLength >= 16) {
+            return encodeNoNewlineSimdApi(in, out);
+        }
         byte[] mapLocal = map;
         int end = inputLength - (inputLength % 3);
         int outIndex = 0;
@@ -399,6 +404,82 @@ public abstract class Base64 {
             out[outIndex++] = mapLocal[b2 & 0x3f];
         }
 
+        switch (inputLength - end) {
+            case 1: {
+                int b0 = in[end] & 0xff;
+                out[outIndex++] = mapLocal[b0 >> 2];
+                out[outIndex++] = mapLocal[(b0 & 0x03) << 4];
+                out[outIndex++] = '=';
+                out[outIndex++] = '=';
+                break;
+            }
+            case 2: {
+                int b0 = in[end] & 0xff;
+                int b1 = in[end + 1] & 0xff;
+                out[outIndex++] = mapLocal[b0 >> 2];
+                out[outIndex++] = mapLocal[((b0 & 0x03) << 4) | (b1 >> 4)];
+                out[outIndex++] = mapLocal[(b1 & 0x0f) << 2];
+                out[outIndex++] = '=';
+                break;
+            }
+            default:
+                break;
+        }
+        return outIndex;
+    }
+
+    /**
+     * Enables/disables the explicit SIMD API fast path.
+     *
+     * @param enabled true to enable the explicit SIMD API path
+     */
+    public static void setExplicitSimdApiEnabled(boolean enabled) {
+        explicitSimdApiEnabled = enabled;
+    }
+
+    public static boolean isExplicitSimdApiEnabled() {
+        return explicitSimdApiEnabled;
+    }
+
+    private static int encodeNoNewlineSimdApi(byte[] in, byte[] out) {
+        int inputLength = in.length;
+        int outputLength = ((inputLength + 2) / 3) * 4;
+        byte[] mapLocal = map;
+        int end = inputLength - (inputLength % 3);
+        int outIndex = 0;
+        int i = 0;
+        for (; i + 16 <= end; i += 12) {
+            SIMD.U8x16 v = SIMD.loadU8(in, i);
+            out[outIndex++] = mapLocal[SIMD.laneU8(v, 0) >> 2];
+            out[outIndex++] = mapLocal[((SIMD.laneU8(v, 0) & 0x03) << 4) | (SIMD.laneU8(v, 1) >> 4)];
+            out[outIndex++] = mapLocal[((SIMD.laneU8(v, 1) & 0x0f) << 2) | (SIMD.laneU8(v, 2) >> 6)];
+            out[outIndex++] = mapLocal[SIMD.laneU8(v, 2) & 0x3f];
+
+            out[outIndex++] = mapLocal[SIMD.laneU8(v, 3) >> 2];
+            out[outIndex++] = mapLocal[((SIMD.laneU8(v, 3) & 0x03) << 4) | (SIMD.laneU8(v, 4) >> 4)];
+            out[outIndex++] = mapLocal[((SIMD.laneU8(v, 4) & 0x0f) << 2) | (SIMD.laneU8(v, 5) >> 6)];
+            out[outIndex++] = mapLocal[SIMD.laneU8(v, 5) & 0x3f];
+
+            out[outIndex++] = mapLocal[SIMD.laneU8(v, 6) >> 2];
+            out[outIndex++] = mapLocal[((SIMD.laneU8(v, 6) & 0x03) << 4) | (SIMD.laneU8(v, 7) >> 4)];
+            out[outIndex++] = mapLocal[((SIMD.laneU8(v, 7) & 0x0f) << 2) | (SIMD.laneU8(v, 8) >> 6)];
+            out[outIndex++] = mapLocal[SIMD.laneU8(v, 8) & 0x3f];
+
+            out[outIndex++] = mapLocal[SIMD.laneU8(v, 9) >> 2];
+            out[outIndex++] = mapLocal[((SIMD.laneU8(v, 9) & 0x03) << 4) | (SIMD.laneU8(v, 10) >> 4)];
+            out[outIndex++] = mapLocal[((SIMD.laneU8(v, 10) & 0x0f) << 2) | (SIMD.laneU8(v, 11) >> 6)];
+            out[outIndex++] = mapLocal[SIMD.laneU8(v, 11) & 0x3f];
+        }
+        for (; i < end; i += 3) {
+            int b0 = in[i] & 0xff;
+            int b1 = in[i + 1] & 0xff;
+            int b2 = in[i + 2] & 0xff;
+
+            out[outIndex++] = mapLocal[b0 >> 2];
+            out[outIndex++] = mapLocal[((b0 & 0x03) << 4) | (b1 >> 4)];
+            out[outIndex++] = mapLocal[((b1 & 0x0f) << 2) | (b2 >> 6)];
+            out[outIndex++] = mapLocal[b2 & 0x3f];
+        }
         switch (inputLength - end) {
             case 1: {
                 int b0 = in[end] & 0xff;

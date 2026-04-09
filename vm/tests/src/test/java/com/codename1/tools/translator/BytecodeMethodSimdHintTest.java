@@ -59,4 +59,5 @@ class BytecodeMethodSimdHintTest {
         assertTrue(generated.contains("#pragma clang attribute push(__attribute__((target(\"neon\"))), apply_to=function)"),
                 "SIMD-eligible methods should include NEON targeting pragmas under the opt-in guard");
     }
+
 }

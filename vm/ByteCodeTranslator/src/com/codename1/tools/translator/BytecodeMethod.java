@@ -2506,7 +2506,23 @@ public class BytecodeMethod implements SignatureSet {
     }
 
     private boolean isSimdEligibleForCodegen() {
+        if (hasExplicitSimdApiUsage()) {
+            return true;
+        }
         return simdCandidateHint && getSimdIneligibilityReason().length() == 0;
+    }
+
+    private boolean hasExplicitSimdApiUsage() {
+        for (Instruction ins : instructions) {
+            if (ins instanceof Invoke) {
+                String owner = ((Invoke)ins).getOwner();
+                if (owner != null && (owner.equals("com/codename1/simd/SIMD")
+                        || owner.startsWith("com/codename1/simd/SIMD$"))) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private String getSimdHookName() {
