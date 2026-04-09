@@ -1,5 +1,6 @@
 package com.codename1.tools.translator;
 
+import com.codename1.tools.translator.bytecodes.Invoke;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.objectweb.asm.Opcodes;
@@ -58,6 +59,22 @@ class BytecodeMethodSimdHintTest {
                 "SIMD-eligible methods should emit opt-in SIMD pragma guards");
         assertTrue(generated.contains("#pragma clang attribute push(__attribute__((target(\"neon\"))), apply_to=function)"),
                 "SIMD-eligible methods should include NEON targeting pragmas under the opt-in guard");
+    }
+
+    @Test
+    void emitsSimdApiInvokeMarkersForApiCallsAndValueTypes() {
+        StringBuilder out = new StringBuilder();
+        new Invoke(Opcodes.INVOKESTATIC, "com/codename1/simd/SIMD", "loadU8", "([BI)Lcom/codename1/simd/SIMD$U8x16;", false)
+                .appendInstruction(out);
+        new Invoke(Opcodes.INVOKESTATIC, "com/codename1/simd/SIMD", "laneU8", "(Lcom/codename1/simd/SIMD$U8x16;I)I", false)
+                .appendInstruction(out);
+        new Invoke(Opcodes.INVOKESPECIAL, "com/codename1/simd/SIMD$Int4", "<init>", "(IIII)V", false)
+                .appendInstruction(out);
+
+        String generated = out.toString();
+        int markerCount = generated.split("CN1_SIMD_API_INVOKE:", -1).length - 1;
+        assertTrue(markerCount == 3,
+                "All SIMD API and SIMD value-type constructor calls should carry translation markers");
     }
 
 }

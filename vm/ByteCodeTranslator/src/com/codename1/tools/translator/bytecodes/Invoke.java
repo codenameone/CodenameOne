@@ -86,6 +86,11 @@ public class Invoke extends Instruction {
         }
         return cMethodName;
     }
+
+    private boolean isSimdApiOwner() {
+        return owner != null && (owner.equals("com/codename1/simd/SIMD")
+                || owner.startsWith("com/codename1/simd/SIMD$"));
+    }
     
     @Override
     public void addDependencies(List<String> dependencyList) {
@@ -141,6 +146,14 @@ public class Invoke extends Instruction {
                 && "()Z".equals(desc)) {
             b.append("    PUSH_INT(1);\n");
             return;
+        }
+        if (isSimdApiOwner()) {
+            b.append("    /* CN1_SIMD_API_INVOKE: ")
+                    .append(owner.replace('/', '.'))
+                    .append(".")
+                    .append(name)
+                    .append(desc)
+                    .append(" */\n");
         }
         // special case for clone on an array which isn't a real method invocation
         if(name.equals("clone") && owner.indexOf('[') > -1) {
