@@ -176,7 +176,10 @@ final class PlaygroundRunner {
         for (int i = 0; i < helperClassNames.size(); i++) {
             String className = helperClassNames.get(i);
             String classToken = escapeRegexLiteral(className);
+            RE resourceTypePattern = new RE("([\\(;]\\s*)" + classToken + "(\\s+[A-Za-z_$][A-Za-z0-9_$]*\\s*=)");
             RE ctorPattern = new RE("\\bnew\\s+" + classToken + "\\s*\\(\\s*\\)");
+            rewritten = resourceTypePattern.subst(rewritten, "$1AutoCloseable$2",
+                    RE.REPLACE_ALL | RE.REPLACE_BACKREFERENCES);
             rewritten = ctorPattern.subst(rewritten,
                     "(new AutoCloseable() { public void close() {} })", RE.REPLACE_ALL);
             rewritten = StringUtil.replaceAll(rewritten, "new " + className + "()",
