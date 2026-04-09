@@ -483,3 +483,34 @@ ParparVM now also emits a weak SIMD hook symbol for eligible methods
 (`cn1_simd_<translated-method-signature>`). Platform ports can provide a strong
 implementation for this symbol to run a real SIMD/NEON fast-path, while keeping
 the generated scalar method body as the default fallback.
+
+==== Explicit SIMD API
+
+For low-level control, Codename One now also includes an explicit SIMD helper API in
+`com.codename1.simd.SIMD`.
+
+This API is intended for writing code that is straightforward to recognize by the
+translator and lower directly to platform SIMD instructions.
+
+The default Java implementation is scalar and portable, so it runs correctly even
+when SIMD lowering is not available.
+
+[source,java]
+----
+if (SIMD.isSupported()) {
+    SIMD.Float4 vc = SIMD.makeFloat4(c, c, c, c);
+    int i = 0;
+    for (; i + 4 <= n; i += 4) {
+        SIMD.Float4 va = SIMD.load(a, i);
+        SIMD.Float4 vb = SIMD.load(b, i);
+        SIMD.store(out, i, SIMD.fma(va, vb, vc));
+    }
+    for (; i < n; i++) {
+        out[i] = a[i] * b[i] + c;
+    }
+} else {
+    for (int i = 0; i < n; i++) {
+        out[i] = a[i] * b[i] + c;
+    }
+}
+----
