@@ -25,7 +25,6 @@
  *****************************************************************************/
 package bsh;
 
-import java.lang.reflect.InvocationTargetException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -810,13 +809,8 @@ class Name implements java.io.Serializable
                 Object instance = classNameSpace.getClassInstance();
                 Class<?> classStatic = classNameSpace.classStatic;
 
-                try {
-                    return ClassGenerator.getClassGenerator()
-                        .invokeSuperclassMethod( bcm, instance, classStatic, methodName, args );
-                } catch (InvocationTargetException e) {
-                    throw new UtilTargetError(
-                        "Error invoking superclass method: " + methodName, e);
-                }
+                return ClassGenerator.getClassGenerator()
+                    .invokeSuperclassMethod( bcm, instance, classStatic, methodName, args );
             }
         }
 
