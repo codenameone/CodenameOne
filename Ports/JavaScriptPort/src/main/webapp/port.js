@@ -1620,6 +1620,69 @@ const formCtorLayoutMethodId = "cn1_com_codename1_ui_Form___INIT___com_codename1
 const formCtorTitleLayoutMethodId = "cn1_com_codename1_ui_Form___INIT___java_lang_String_com_codename1_ui_layouts_Layout";
 const formCtorLayoutOriginal = typeof global[formCtorLayoutMethodId] === "function" ? global[formCtorLayoutMethodId] : null;
 const formCtorTitleLayoutOriginal = typeof global[formCtorTitleLayoutMethodId] === "function" ? global[formCtorTitleLayoutMethodId] : null;
+const formDefaultCtorMethodId = "cn1_com_codename1_ui_Form___INIT__";
+const formSetTitleMethodId = "cn1_com_codename1_ui_Form_setTitle_java_lang_String";
+const containerSetLayoutMethodId = "cn1_com_codename1_ui_Container_setLayout_com_codename1_ui_layouts_Layout";
+
+function* recoverFormCtorIllegalState(self, title, layout, marker) {
+  if (!self || !self.__class) {
+    emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":recoverSkipped=noSelf");
+    return null;
+  }
+  if (self.__cn1FormCtorRecovering) {
+    emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":recoverSkipped=reentry");
+    return null;
+  }
+  self.__cn1FormCtorRecovering = true;
+  let ctorApplied = false;
+  try {
+    const defaultCtor = global[formDefaultCtorMethodId + "__impl"] || global[formDefaultCtorMethodId];
+    if (typeof defaultCtor === "function") {
+      try {
+        yield* defaultCtor(self);
+        ctorApplied = true;
+      } catch (ctorErr) {
+        emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":recoverCtorError=" + String(ctorErr && ctorErr.__class ? ctorErr.__class : ctorErr));
+      }
+    }
+    if (layout && layout.__class) {
+      let layoutApplied = false;
+      try {
+        const setLayout = jvm.resolveVirtual(self.__class, containerSetLayoutMethodId);
+        yield* setLayout(self, layout);
+        layoutApplied = true;
+      } catch (_setLayoutErr) {
+        // Fall through to direct field patch.
+      }
+      if (!layoutApplied) {
+        self["cn1_com_codename1_ui_Container_layout"] = layout;
+      }
+    }
+    if (title && title.__class === "java_lang_String") {
+      let titleApplied = false;
+      try {
+        const setTitle = jvm.resolveVirtual(self.__class, formSetTitleMethodId);
+        yield* setTitle(self, title);
+        titleApplied = true;
+      } catch (_setTitleErr) {
+        // Fall through to direct field patch.
+      }
+      if (!titleApplied) {
+        self["cn1_com_codename1_ui_Form_title"] = title;
+      }
+    }
+    self.__cn1FormCtorRecovered = true;
+  } finally {
+    self.__cn1FormCtorRecovering = false;
+  }
+  emitDiagLine(
+    "PARPAR:DIAG:FALLBACK:" + marker + ":recoverApplied=1"
+    + ":ctor=" + (ctorApplied ? "1" : "0")
+    + ":layout=" + (layout && layout.__class ? "1" : "0")
+    + ":title=" + (title && title.__class === "java_lang_String" ? "1" : "0")
+  );
+  return null;
+}
 
 function installGlobalIllegalStateBypass(symbol, marker) {
   const original = global[symbol];
@@ -1705,7 +1768,7 @@ bindCiFallback("Form.layoutCtorIllegalStateBypass", [
       if (messageOnly) {
         emitDiagLine("PARPAR:DIAG:FALLBACK:formCtorLayout:messageOnly=" + messageOnly);
       }
-      return null;
+      return yield* recoverFormCtorIllegalState(__cn1ThisObject, null, layout, "formCtorLayout");
     }
     throw err;
   }
@@ -1749,7 +1812,7 @@ bindCiFallback("Form.titleLayoutCtorIllegalStateBypass", [
       if (messageOnly) {
         emitDiagLine("PARPAR:DIAG:FALLBACK:formCtorTitleLayout:messageOnly=" + messageOnly);
       }
-      return null;
+      return yield* recoverFormCtorIllegalState(__cn1ThisObject, title, layout, "formCtorTitleLayout");
     }
     throw err;
   }
@@ -1762,6 +1825,7 @@ const cn1ssCompleteMethodId = "cn1_com_codenameone_examples_hellocodenameone_tes
 const cn1ssEmitChannelMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerHelper_emitChannel_byte_1ARRAY_java_lang_String_java_lang_String";
 const baseTestRegisterReadyCallbackMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_registerReadyCallback_com_codename1_ui_Form_java_lang_Runnable";
 const cn1ssRunnerClassId = "com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner";
+const cn1ssRunnerListGetMethodId = "cn1_java_util_List_get_int_R_java_lang_Object";
 function collectCn1ssRunnerLambdaMethodIds() {
   const ids = [];
   if (!jvm || !jvm.classes || !jvm.classes[cn1ssRunnerClassId] || !jvm.classes[cn1ssRunnerClassId].methods) {
@@ -1866,6 +1930,33 @@ bindCiFallback("Cn1ssDeviceRunner.lambdaRunNextTestBridge", cn1ssLambdaBridgeMet
     }
   }
   const effectiveIndex = capturedIndex != null ? (capturedIndex | 0) : (index | 0);
+  // Prefer runner static test list over lambda captures when available. Captured
+  // lambda arguments have been observed to drift after initial indices in ParparVM.
+  let indexedTestObject = null;
+  if (runner && runner.__class === cn1ssRunnerClassId) {
+    try {
+      const runnerClass = jvm.classes[cn1ssRunnerClassId];
+      const testClasses = runnerClass && runnerClass.staticFields
+        ? runnerClass.staticFields["TEST_CLASSES"]
+        : null;
+      if (testClasses && testClasses.__class) {
+        const listGetMethod = jvm.resolveVirtual(testClasses.__class, cn1ssRunnerListGetMethodId);
+        indexedTestObject = yield* listGetMethod(testClasses, effectiveIndex);
+      }
+    } catch (_err) {
+      indexedTestObject = null;
+    }
+  }
+  if (jvm.instanceOf(indexedTestObject, "com_codenameone_examples_hellocodenameone_tests_BaseTest")) {
+    if (!effectiveTestObject || !effectiveTestObject.__class || effectiveTestObject.__class !== indexedTestObject.__class) {
+      emitLambdaBridgeDiag(
+        "PARPAR:DIAG:FALLBACK:lambdaBridge:indexedOverride:index=" + String(effectiveIndex)
+        + ":from=" + (effectiveTestObject && effectiveTestObject.__class ? effectiveTestObject.__class : "null")
+        + ":to=" + indexedTestObject.__class
+      );
+    }
+    effectiveTestObject = indexedTestObject;
+  }
   emitLambdaBridgeDiag(
     "PARPAR:DIAG:FALLBACK:lambdaBridge:capturedRunner="
     + (runner && runner.__class ? runner.__class : "null")

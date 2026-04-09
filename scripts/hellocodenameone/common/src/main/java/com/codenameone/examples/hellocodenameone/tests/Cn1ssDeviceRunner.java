@@ -34,15 +34,11 @@ import com.codenameone.examples.hellocodenameone.tests.graphics.TransformRotatio
 import com.codenameone.examples.hellocodenameone.tests.graphics.TransformTranslation;
 import com.codenameone.examples.hellocodenameone.tests.accessibility.AccessibilityTest;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-
 public final class Cn1ssDeviceRunner extends DeviceRunner {
     private static final int TEST_TIMEOUT_MS = 30000;
     private static final int TEST_POLL_INTERVAL_MS = 50;
 
-    private static final List<BaseTest> TEST_CLASSES = new ArrayList<>(Arrays.asList(
+    private static final BaseTest[] DEFAULT_TEST_CLASSES = new BaseTest[]{
             new MainScreenScreenshotTest(),
             new DrawLine(),
             new FillRect(),
@@ -89,10 +85,12 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new CallDetectionAPITest(),
             new LocalNotificationOverrideTest(),
             new Base64NativePerformanceTest(),
-            new AccessibilityTest()));
+            new AccessibilityTest()
+    };
+    private static BaseTest prependedTest;
 
     public static void addTest(BaseTest test) {
-        TEST_CLASSES.add(0, test);
+        prependedTest = test;
     }
 
     public void runSuite() {
@@ -113,11 +111,13 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     }
 
     private void runNextTest(int index) {
-        if (index >= TEST_CLASSES.size()) {
+        int offset = prependedTest != null ? 1 : 0;
+        int total = DEFAULT_TEST_CLASSES.length + offset;
+        if (index >= total) {
             finishSuite();
             return;
         }
-        BaseTest testClass = TEST_CLASSES.get(index);
+        BaseTest testClass = (offset == 1 && index == 0) ? prependedTest : DEFAULT_TEST_CLASSES[index - offset];
         String testName = testClass.getClass().getSimpleName();
         CN.callSerially(() -> {
             log("CN1SS:INFO:suite starting test=" + testName);

@@ -36,14 +36,14 @@ public class SheetScreenshotTest extends BaseTest {
 
     private Sheet createSheet(Sheet parent, String title) {
         Sheet newSheet = new Sheet(parent, title);
+        Container content = newSheet.getContentPane();
+        content.setLayout(BoxLayout.y());
         Label titleIcon = new Label();
         FontImage.setMaterialIcon(titleIcon, FontImage.MATERIAL_IMAGE, 3f);
         titleIcon.setUIID("SheetTitleIcon");
         Label titleLabel = new Label(title);
         titleLabel.setUIID("SheetTitleText");
-        newSheet.setTitleComponent(BoxLayout.encloseYCenter(titleIcon, titleLabel));
-        Container content = newSheet.getContentPane();
-        content.setLayout(BoxLayout.y());
+        content.add(BoxLayout.encloseYCenter(titleIcon, titleLabel));
         content.add(new Label("Sheet content"));
         content.add(new Button("Primary Action"));
         content.add(new Label("Secondary details"));
