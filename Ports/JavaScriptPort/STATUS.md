@@ -22,6 +22,14 @@ Current State
 - Bundle generation ordering bug identified and fixed for worker mode:
   - Cause: `worker.js` was generated before `port.js` was copied into the output bundle, so worker never imported JavaScriptPort natives.
   - Fix: copy JavaScriptPort assets before `worker.js` generation and keep service-worker/shell scripts excluded from worker imports.
+- Latest CI artifact confirms `worker.js` now imports `port.js`, but startup still fails in `HTML5Implementation.__init`:
+  - first failure remains `TypeError: Cannot read properties of null (reading '__classDef')`
+  - crash site moved to `HTMLDocument.createElement(...)` invocation with null document target.
+- Added explicit worker-native bindings for initial DOM bridge path:
+  - `Window.getDocument()`
+  - `HTMLDocument.createElement(String)`
+  - `HTMLDocument.getBody()`
+  - `HTMLDocument.getElementById(String)`
 - Latest CI artifacts now run worker mode but fail early before suite start with:
   - `PARPAR:DIAG:FIRST_FAILURE:category=runtime_error`
   - `TypeError: Cannot read properties of null (reading '__classDef')`

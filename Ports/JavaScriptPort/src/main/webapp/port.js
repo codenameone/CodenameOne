@@ -733,6 +733,54 @@ bindNative(["cn1_com_codename1_html5_js_browser_Window_current_R_com_codename1_h
 });
 
 bindNative([
+  "cn1_com_codename1_html5_js_browser_Window_getDocument_R_com_codename1_html5_js_dom_HTMLDocument",
+  "cn1_com_codename1_html5_js_browser_Window_getDocument___R_com_codename1_html5_js_dom_HTMLDocument"
+], function*(__cn1ThisObject) {
+  const win = jvm.unwrapJsValue(__cn1ThisObject);
+  if (!win || !win.document) {
+    return null;
+  }
+  return jvm.wrapJsObject(win.document, "com_codename1_html5_js_dom_HTMLDocument");
+});
+
+bindNative([
+  "cn1_com_codename1_html5_js_dom_HTMLDocument_createElement_java_lang_String_R_com_codename1_html5_js_dom_HTMLElement",
+  "cn1_com_codename1_html5_js_dom_HTMLDocument_createElement___java_lang_String_R_com_codename1_html5_js_dom_HTMLElement"
+], function*(__cn1ThisObject, tagName) {
+  const doc = jvm.unwrapJsValue(__cn1ThisObject);
+  if (!doc || typeof doc.createElement !== "function") {
+    return null;
+  }
+  const tag = tagName == null ? "" : jvm.toNativeString(tagName);
+  const element = doc.createElement(tag);
+  return jvm.wrapJsObject(element, jvm.inferJsObjectClass(element, "com_codename1_html5_js_dom_HTMLElement"));
+});
+
+bindNative([
+  "cn1_com_codename1_html5_js_dom_HTMLDocument_getBody_R_com_codename1_html5_js_dom_HTMLElement",
+  "cn1_com_codename1_html5_js_dom_HTMLDocument_getBody___R_com_codename1_html5_js_dom_HTMLElement"
+], function*(__cn1ThisObject) {
+  const doc = jvm.unwrapJsValue(__cn1ThisObject);
+  if (!doc || !doc.body) {
+    return null;
+  }
+  return jvm.wrapJsObject(doc.body, "com_codename1_html5_js_dom_HTMLBodyElement");
+});
+
+bindNative([
+  "cn1_com_codename1_html5_js_dom_HTMLDocument_getElementById_java_lang_String_R_com_codename1_html5_js_dom_HTMLElement",
+  "cn1_com_codename1_html5_js_dom_HTMLDocument_getElementById___java_lang_String_R_com_codename1_html5_js_dom_HTMLElement"
+], function*(__cn1ThisObject, id) {
+  const doc = jvm.unwrapJsValue(__cn1ThisObject);
+  if (!doc || typeof doc.getElementById !== "function") {
+    return null;
+  }
+  const nativeId = id == null ? "" : jvm.toNativeString(id);
+  const element = doc.getElementById(nativeId);
+  return element == null ? null : jvm.wrapJsObject(element, jvm.inferJsObjectClass(element, "com_codename1_html5_js_dom_HTMLElement"));
+});
+
+bindNative([
   "cn1_com_codename1_html5_js_ajax_XMLHttpRequest_create_R_com_codename1_html5_js_ajax_XMLHttpRequest",
   "cn1_com_codename1_html5_js_ajax_XMLHttpRequest_create___R_com_codename1_html5_js_ajax_XMLHttpRequest"
 ], function*() {
