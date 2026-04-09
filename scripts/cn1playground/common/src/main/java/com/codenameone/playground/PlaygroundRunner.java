@@ -24,8 +24,6 @@ import com.codename1.ui.plaf.UIManager;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 final class PlaygroundRunner {
     static final class Diagnostic {
@@ -148,48 +146,10 @@ final class PlaygroundRunner {
     private String adaptScript(String script) {
         String adapted = unwrapSingleTopLevelClass(script);
         String normalized = adapted == null ? script : adapted;
-        normalized = rewriteInlineAutoCloseableClasses(normalized);
         normalized = rewriteKnownSamCalls(normalized);
         normalized = rewriteLambdaArguments(normalized);
         String wrapped = wrapLooseScript(normalized);
         return wrapped == null ? normalized : wrapped;
-    }
-
-    /**
-     * Minimal inline-class support for helper resources used in try-with-resources
-     * snippets, e.g.:
-     *
-     * class Res implements AutoCloseable { public void close() {} }
-     * try (Res r = new Res()) { ... }
-     *
-     * BeanShell class generation is intentionally constrained in playground runtime;
-     * this rewrite keeps common helper-resource patterns working without requiring
-     * full scripted class generation support.
-     */
-    private String rewriteInlineAutoCloseableClasses(String script) {
-        Pattern declarationPattern = Pattern.compile(
-                "class\\s+([A-Za-z_$][A-Za-z0-9_$]*)\\s+implements\\s+AutoCloseable\\s*\\{\\s*public\\s+void\\s+close\\s*\\(\\s*\\)\\s*\\{\\s*\\}\\s*\\}",
-                Pattern.DOTALL);
-        Matcher matcher = declarationPattern.matcher(script);
-        List<String> helperClassNames = new ArrayList<String>();
-        while (matcher.find()) {
-            helperClassNames.add(matcher.group(1));
-        }
-        if (helperClassNames.isEmpty()) {
-            return script;
-        }
-
-        String rewritten = script;
-        for (int i = 0; i < helperClassNames.size(); i++) {
-            String className = helperClassNames.get(i);
-            String ctorPattern = "\\bnew\\s+" + Pattern.quote(className) + "\\s*\\(\\s*\\)";
-            String replacementExpr = "(new AutoCloseable() { public void close() {} })";
-            rewritten = rewritten.replaceAll(ctorPattern, replacementExpr);
-        }
-
-        // Remove declarations only after constructor rewrites are done.
-        rewritten = declarationPattern.matcher(rewritten).replaceAll("");
-        return rewritten;
     }
 
     private RunResult failure(String message, int line, int column, List<InlineMessage> inlineMessages) {

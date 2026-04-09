@@ -33,6 +33,7 @@ import static bsh.This.Keys.BSHCLASSMODIFIERS;
 import static bsh.This.Keys.BSHCONSTRUCTORS;
 import static bsh.This.Keys.BSHINIT;
 import static bsh.This.Keys.BSHSTATIC;
+import static bsh.This.Keys.BSHSUPER;
 import static bsh.This.Keys.BSHTHIS;
 
 import java.io.IOException;
@@ -695,7 +696,7 @@ public class ClassGeneratorUtil implements Opcodes {
         String paramTypesSig = getTypeParameterSignature(paramTypes);
 
         // Add method body
-        MethodVisitor cv = cw.visitMethod(modifiers, "_bshSuper" + superClass.getSimpleName() + methodName, methodDescriptor, paramTypesSig, exceptions);
+        MethodVisitor cv = cw.visitMethod(modifiers, BSHSUPER + methodName, methodDescriptor, paramTypesSig, exceptions);
 
         cv.visitVarInsn(ALOAD, 0);
         // Push vars
@@ -726,8 +727,6 @@ public class ClassGeneratorUtil implements Opcodes {
         final List<Method> meths = new ArrayList<>();
         class Reflector {
             void gatherMethods(Class<?> type) {
-                if (null != type.getSuperclass())
-                    gatherMethods(type.getSuperclass());
                 meths.addAll(Arrays.asList(type.getDeclaredMethods()));
                 for (Class<?> i : type.getInterfaces())
                     gatherMethods(i);
@@ -791,18 +790,23 @@ public class ClassGeneratorUtil implements Opcodes {
      * @param paramTypes type descriptor of parameter types
      * @return matching method or null if not found */
     static Method classContainsMethod(Class<?> clas, String methodName, String[] paramTypes) {
-        while ( clas != null ) {
-            for ( Method method : clas.getDeclaredMethods() )
-                if ( method.getName().equals(methodName)
-                        && paramTypes.length == method.getParameterCount() ) {
-                    String[] methodParamTypes = getTypeDescriptors(method.getParameterTypes());
-                    boolean found = true;
-                    for ( int j = 0; j < paramTypes.length; j++ )
-                        if (false == (found = paramTypes[j].equals(methodParamTypes[j])))
-                            break;
-                    if (found) return method;
+        if (clas == null) {
+            return null;
+        }
+        for (Method method : clas.getDeclaredMethods()) {
+            if (method.getName().equals(methodName)
+                    && paramTypes.length == method.getParameterCount()) {
+                String[] methodParamTypes = getTypeDescriptors(method.getParameterTypes());
+                boolean found = true;
+                for (int j = 0; j < paramTypes.length; j++) {
+                    if (false == (found = paramTypes[j].equals(methodParamTypes[j]))) {
+                        break;
+                    }
                 }
-            clas = clas.getSuperclass();
+                if (found) {
+                    return method;
+                }
+            }
         }
         return null;
     }
