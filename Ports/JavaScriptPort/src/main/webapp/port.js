@@ -727,7 +727,17 @@ bindNative(["cn1_com_codename1_html5_js_core_JSArray_create_int_R_com_codename1_
 });
 
 bindNative(["cn1_com_codename1_html5_js_browser_Window_current_R_com_codename1_html5_js_browser_Window", "cn1_com_codename1_html5_js_browser_Window_current___R_com_codename1_html5_js_browser_Window"], function*() {
-  const wrapper = jvm.wrapJsObject(global.window || global.self || global, "com_codename1_html5_js_browser_Window");
+  const nativeWindow = global.window;
+  const hasDomWindow = !!(nativeWindow && nativeWindow.document);
+  if (!hasDomWindow && typeof jvm.invokeHostNative === "function") {
+    const hostWindow = yield jvm.invokeHostNative("__cn1_dom_window_current__", []);
+    if (hostWindow != null) {
+      const workerWrapper = jvm.wrapJsObject(hostWindow, "com_codename1_html5_js_browser_Window");
+      jvm.enhanceJsWrapper(workerWrapper, "com_codename1_impl_html5_JSOImplementations_WindowExt");
+      return workerWrapper;
+    }
+  }
+  const wrapper = jvm.wrapJsObject((hasDomWindow ? nativeWindow : null) || global.self || global, "com_codename1_html5_js_browser_Window");
   jvm.enhanceJsWrapper(wrapper, "com_codename1_impl_html5_JSOImplementations_WindowExt");
   return wrapper;
 });
@@ -737,6 +747,27 @@ bindNative([
   "cn1_com_codename1_html5_js_browser_Window_getDocument___R_com_codename1_html5_js_dom_HTMLDocument"
 ], function*(__cn1ThisObject) {
   const win = jvm.unwrapJsValue(__cn1ThisObject);
+  if (win && win.__cn1HostRef != null && typeof jvm.invokeHostNative === "function") {
+    const hostResult = yield jvm.invokeHostNative("__cn1_jso_bridge__", [{
+      receiver: win,
+      kind: "getter",
+      member: "document",
+      args: []
+    }]);
+    return hostResult == null ? null : jvm.wrapJsObject(hostResult, "com_codename1_html5_js_dom_HTMLDocument");
+  }
+  if (typeof jvm.invokeHostNative === "function" && (!win || !win.document)) {
+    const hostWindow = yield jvm.invokeHostNative("__cn1_dom_window_current__", []);
+    if (hostWindow != null) {
+      const hostDocument = yield jvm.invokeHostNative("__cn1_jso_bridge__", [{
+        receiver: hostWindow,
+        kind: "getter",
+        member: "document",
+        args: []
+      }]);
+      return hostDocument == null ? null : jvm.wrapJsObject(hostDocument, "com_codename1_html5_js_dom_HTMLDocument");
+    }
+  }
   if (!win || !win.document) {
     return null;
   }
@@ -748,12 +779,31 @@ bindNative([
   "cn1_com_codename1_html5_js_dom_HTMLDocument_createElement___java_lang_String_R_com_codename1_html5_js_dom_HTMLElement"
 ], function*(__cn1ThisObject, tagName) {
   const doc = jvm.unwrapJsValue(__cn1ThisObject);
+  const tag = tagName == null ? "" : jvm.toNativeString(tagName);
+  const canvasClass = "com_codename1_html5_js_dom_HTMLCanvasElement";
+  if (doc && doc.__cn1HostRef != null && typeof jvm.invokeHostNative === "function") {
+    const hostResult = yield jvm.invokeHostNative("__cn1_jso_bridge__", [{
+      receiver: doc,
+      kind: "method",
+      member: "createElement",
+      args: [tag]
+    }]);
+    if (hostResult == null) {
+      return null;
+    }
+    const expectedClass = String(tag).toLowerCase() === "canvas"
+      ? canvasClass
+      : jvm.inferJsObjectClass(hostResult, "com_codename1_html5_js_dom_HTMLElement");
+    return jvm.wrapJsObject(hostResult, expectedClass);
+  }
   if (!doc || typeof doc.createElement !== "function") {
     return null;
   }
-  const tag = tagName == null ? "" : jvm.toNativeString(tagName);
   const element = doc.createElement(tag);
-  return jvm.wrapJsObject(element, jvm.inferJsObjectClass(element, "com_codename1_html5_js_dom_HTMLElement"));
+  const expectedClass = String(tag).toLowerCase() === "canvas"
+    ? canvasClass
+    : jvm.inferJsObjectClass(element, "com_codename1_html5_js_dom_HTMLElement");
+  return jvm.wrapJsObject(element, expectedClass);
 });
 
 bindNative([
@@ -761,6 +811,15 @@ bindNative([
   "cn1_com_codename1_html5_js_dom_HTMLDocument_getBody___R_com_codename1_html5_js_dom_HTMLElement"
 ], function*(__cn1ThisObject) {
   const doc = jvm.unwrapJsValue(__cn1ThisObject);
+  if (doc && doc.__cn1HostRef != null && typeof jvm.invokeHostNative === "function") {
+    const hostResult = yield jvm.invokeHostNative("__cn1_jso_bridge__", [{
+      receiver: doc,
+      kind: "getter",
+      member: "body",
+      args: []
+    }]);
+    return hostResult == null ? null : jvm.wrapJsObject(hostResult, "com_codename1_html5_js_dom_HTMLBodyElement");
+  }
   if (!doc || !doc.body) {
     return null;
   }
@@ -772,10 +831,32 @@ bindNative([
   "cn1_com_codename1_html5_js_dom_HTMLDocument_getElementById___java_lang_String_R_com_codename1_html5_js_dom_HTMLElement"
 ], function*(__cn1ThisObject, id) {
   const doc = jvm.unwrapJsValue(__cn1ThisObject);
+  const nativeId = id == null ? "" : jvm.toNativeString(id);
+  const canvasClass = "com_codename1_html5_js_dom_HTMLCanvasElement";
+  if (doc && doc.__cn1HostRef != null && typeof jvm.invokeHostNative === "function") {
+    const hostResult = yield jvm.invokeHostNative("__cn1_jso_bridge__", [{
+      receiver: doc,
+      kind: "method",
+      member: "getElementById",
+      args: [nativeId]
+    }]);
+    if (hostResult == null) {
+      return null;
+    }
+    const tagName = yield jvm.invokeHostNative("__cn1_jso_bridge__", [{
+      receiver: hostResult,
+      kind: "getter",
+      member: "tagName",
+      args: []
+    }]);
+    const expectedClass = String(tagName || "").toUpperCase() === "CANVAS"
+      ? canvasClass
+      : jvm.inferJsObjectClass(hostResult, "com_codename1_html5_js_dom_HTMLElement");
+    return jvm.wrapJsObject(hostResult, expectedClass);
+  }
   if (!doc || typeof doc.getElementById !== "function") {
     return null;
   }
-  const nativeId = id == null ? "" : jvm.toNativeString(id);
   const element = doc.getElementById(nativeId);
   return element == null ? null : jvm.wrapJsObject(element, jvm.inferJsObjectClass(element, "com_codename1_html5_js_dom_HTMLElement"));
 });

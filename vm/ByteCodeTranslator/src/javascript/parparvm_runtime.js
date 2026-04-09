@@ -625,6 +625,20 @@ const jvm = {
       }
       const bridge = self.parseJsoBridgeMethod(className, methodId);
       const nativeArgs = self.toNativeJsArgs(args || []);
+      if (receiver && receiver.__cn1HostRef != null) {
+        const transferableArgs = new Array(nativeArgs.length);
+        for (let i = 0; i < nativeArgs.length; i++) {
+          const arg = nativeArgs[i];
+          transferableArgs[i] = (typeof arg === "function") ? null : arg;
+        }
+        const hostResult = yield self.invokeHostNative("__cn1_jso_bridge__", [{
+          receiver: receiver,
+          kind: bridge.kind,
+          member: bridge.member,
+          args: transferableArgs
+        }]);
+        return self.wrapJsResult(hostResult, bridge.returnClass);
+      }
       let result;
       if (bridge.kind === "getter") {
         result = receiver[bridge.member];
@@ -923,6 +937,9 @@ const jvm = {
     if (value && value.__classDef && value.__jsValue === undefined) {
       return value.__class;
     }
+    if (value && value.__cn1HostClass) {
+      return value.__cn1HostClass;
+    }
     if (jsoRegistry.inferFn) {
       const inferred = jsoRegistry.inferFn(value, expectedClass, this);
       if (inferred) {
@@ -987,6 +1004,34 @@ const jvm = {
       this.drain();
     }
     return true;
+  },
+  toHostTransferArg(value) {
+    if (value == null) {
+      return value;
+    }
+    const type = typeof value;
+    if (type === "string" || type === "number" || type === "boolean") {
+      return value;
+    }
+    if (type === "function") {
+      return null;
+    }
+    if (Array.isArray(value)) {
+      const out = new Array(value.length);
+      for (let i = 0; i < value.length; i++) {
+        out[i] = this.toHostTransferArg(value[i]);
+      }
+      return out;
+    }
+    if (value.__cn1HostRef != null) {
+      return value.__cn1HostClass
+        ? { __cn1HostRef: value.__cn1HostRef, __cn1HostClass: value.__cn1HostClass }
+        : { __cn1HostRef: value.__cn1HostRef };
+    }
+    if (value.__jsValue !== undefined) {
+      return this.toHostTransferArg(value.__jsValue);
+    }
+    return null;
   },
   spawn(threadObject, generator) {
     const thread = { id: this.nextThreadId++, object: threadObject, generator: generator, waiting: null, interrupted: false, done: false };
@@ -1099,7 +1144,12 @@ const jvm = {
     if (yielded.op === this.protocol.messages.HOST_CALL) {
       thread.waiting = { op: this.protocol.messages.HOST_CALL, id: yielded.id };
       this.pendingHostCalls[yielded.id] = { thread: thread };
-      emitVmMessage({ type: this.protocol.messages.HOST_CALL, id: yielded.id, symbol: yielded.symbol, args: yielded.args || [] });
+      const rawArgs = yielded.args || [];
+      const safeArgs = new Array(rawArgs.length);
+      for (let i = 0; i < rawArgs.length; i++) {
+        safeArgs[i] = this.toHostTransferArg(rawArgs[i]);
+      }
+      emitVmMessage({ type: this.protocol.messages.HOST_CALL, id: yielded.id, symbol: yielded.symbol, args: safeArgs });
       return;
     }
     throw new Error("Unsupported yield op " + yielded.op);

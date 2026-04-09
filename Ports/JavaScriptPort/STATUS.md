@@ -22,47 +22,54 @@ Current State
 - Bundle generation ordering bug identified and fixed for worker mode:
   - Cause: `worker.js` was generated before `port.js` was copied into the output bundle, so worker never imported JavaScriptPort natives.
   - Fix: copy JavaScriptPort assets before `worker.js` generation and keep service-worker/shell scripts excluded from worker imports.
-- Latest CI artifact confirms `worker.js` now imports `port.js`, but startup still fails in `HTML5Implementation.__init`:
-  - first failure remains `TypeError: Cannot read properties of null (reading '__classDef')`
-  - crash site moved to `HTMLDocument.createElement(...)` invocation with null document target.
 - Added explicit worker-native bindings for initial DOM bridge path:
   - `Window.getDocument()`
   - `HTMLDocument.createElement(String)`
   - `HTMLDocument.getBody()`
   - `HTMLDocument.getElementById(String)`
-- Latest CI artifacts now run worker mode but fail early before suite start with:
-  - `PARPAR:DIAG:FIRST_FAILURE:category=runtime_error`
-  - `TypeError: Cannot read properties of null (reading '__classDef')`
-  - stack rooted in `HTML5Implementation.__init` after `Window.current()` returned `null`.
+- Worker/main-thread JSO bridge introduced:
+  - `parparvm_runtime.js` now routes JSO calls on host refs through `host-call` (`__cn1_jso_bridge__`).
+  - `browser_bridge.js` now resolves host refs and executes getter/setter/method operations on main-thread DOM objects.
+  - `Window.current()` now requests host window in worker mode (instead of using `self.window` shim).
+- Host-ref class metadata added:
+  - host markers include `__cn1HostClass`, and runtime class inference consumes it.
+  - this moved startup failure from null receiver to later bridge/cast and callback transport issues.
+- Latest local repro first blocker moved again:
+  - `DataCloneError: Failed to execute 'postMessage' ... function(...) could not be cloned`
+  - cause: non-cloneable callback/function payload crossing worker host-call boundary.
+  - mitigation added: runtime host-call argument sanitization (`toHostTransferArg`) before `emitVmMessage`.
 - Existing form-constructor recovery diagnostics remain active in `port.js` and are still relevant while migrating.
 
 Next Steps
 ----------
 
-1. Validate worker-only boot in CI and local:
+1. Validate latest host-call serialization fix in CI artifacts:
+   - Check whether first failure moved off `DataCloneError`.
+   - If still present, capture offending host symbol + argument type and add explicit callback-handle transport (not null coercion) for that symbol.
+2. Continue worker-only boot validation:
    - Required markers: `PARPAR:worker-mode`, `PARPAR:DIAG:BOOT:bridgeMode=worker`.
    - Any `main-thread-mode` marker now indicates stale artifact or wrong bundle.
-2. Confirm worker native rebind fix is present in produced bundle:
+3. Confirm worker native rebind fix is present in produced bundle:
    - In generated `worker.js`, ensure `__parparInstallNativeBindings()` is invoked after imports and before `start`.
    - This must eliminate `Window.current()` null stubs from startup execution.
-3. Separate VM/EDT execution from main-thread host services cleanly:
+4. Separate VM/EDT execution from main-thread host services cleanly:
    - Keep VM/EDT scheduling in worker.
    - Ensure main-thread browser APIs are reached through explicit host-call handlers rather than direct worker DOM access.
-4. Re-triage screenshot correctness in worker mode only:
+5. Re-triage screenshot correctness in worker mode only:
    - Re-run screenshot suite and classify first blocker using the existing `TOP_BLOCKER` output.
    - Prioritize deterministic runtime failures before throughput tuning.
-5. Restore full screenshot count and correctness:
+6. Restore full screenshot count and correctness:
    - Exit gate remains `CN1SS:SUITE:FINISHED` with expected screenshot artifacts and no `BROWSER:PARPAR_ERROR`.
 
 Important Notes
 --------------
 
-- Current CI artifact (`~/Downloads/javascript-ui-tests/browser.log`) shows:
+- Current local debug artifact (`/tmp/js-ci-debug/browser.log`) shows:
   - `PARPAR:worker-mode`
   - `PARPAR:DIAG:BOOT:bridgeMode=worker`
   - `TOP_BLOCKER=runtime_error|none|none`
-  - first crash in `HTML5Implementation.__init` due null window wrapper.
-- This is consistent with native rebind order being a primary startup blocker in worker mode.
+  - first crash currently as `DataCloneError` during worker->host message transport.
+- This indicates startup has progressed beyond initial null DOM receiver failure and is now blocked by host-call payload transport semantics.
 
 Known Important Context
 -----------------------
@@ -78,5 +85,6 @@ Known Important Context
   - `CN1SS:SUITE:FINISHED`
 - Current local patch set touches:
   - `vm/ByteCodeTranslator/src/javascript/browser_bridge.js`
+  - `vm/ByteCodeTranslator/src/javascript/parparvm_runtime.js`
   - `Ports/JavaScriptPort/src/main/webapp/port.js`
   - `scripts/hellocodenameone/common/src/main/java/com/codenameone/examples/hellocodenameone/tests/Cn1ssDeviceRunner.java`

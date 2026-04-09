@@ -100,6 +100,128 @@
       }
     }
   };
+
+  var hostRefNextId = 1;
+  var hostRefById = {};
+  var hostRefByObject = (typeof WeakMap === 'function') ? new WeakMap() : null;
+
+  function isHostRefMarker(value) {
+    return !!(value && typeof value === 'object'
+      && value.__cn1HostRef != null
+      && value.__cn1HostRef !== 0);
+  }
+
+  function storeHostRef(value) {
+    if (value == null || (typeof value !== 'object' && typeof value !== 'function')) {
+      return value;
+    }
+    var inferredClass = inferHostClass(value);
+    if (hostRefByObject && hostRefByObject.has(value)) {
+      var existing = { __cn1HostRef: hostRefByObject.get(value) };
+      if (inferredClass) {
+        existing.__cn1HostClass = inferredClass;
+      }
+      return existing;
+    }
+    var id = hostRefNextId++;
+    hostRefById[id] = value;
+    if (hostRefByObject) {
+      hostRefByObject.set(value, id);
+    }
+    var marker = { __cn1HostRef: id };
+    if (inferredClass) {
+      marker.__cn1HostClass = inferredClass;
+    }
+    return marker;
+  }
+
+  function resolveHostRef(marker) {
+    if (!isHostRefMarker(marker)) {
+      return marker;
+    }
+    return hostRefById[marker.__cn1HostRef] || null;
+  }
+
+  function mapHostArgs(args) {
+    var out = [];
+    var list = args || [];
+    for (var i = 0; i < list.length; i++) {
+      out.push(resolveHostRef(list[i]));
+    }
+    return out;
+  }
+
+  function hostResult(value) {
+    if (value == null || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+      return value;
+    }
+    return storeHostRef(value);
+  }
+
+  function inferHostClass(value) {
+    if (value === global.window) {
+      return 'com_codename1_html5_js_browser_Window';
+    }
+    if (value && value.nodeType === 9) {
+      return 'com_codename1_html5_js_dom_HTMLDocument';
+    }
+    if (value && value.canvas && typeof value.drawImage === 'function' && typeof value.fillRect === 'function') {
+      return 'com_codename1_html5_js_canvas_CanvasRenderingContext2D';
+    }
+    if (value && value.setProperty && value.removeProperty) {
+      return 'com_codename1_html5_js_dom_CSSStyleDeclaration';
+    }
+    if (value && value.tagName) {
+      var tagName = String(value.tagName).toUpperCase();
+      if (tagName === 'CANVAS') {
+        return 'com_codename1_html5_js_dom_HTMLCanvasElement';
+      }
+      if (tagName === 'BODY') {
+        return 'com_codename1_html5_js_dom_HTMLBodyElement';
+      }
+      return 'com_codename1_html5_js_dom_HTMLElement';
+    }
+    if (value && value.nodeType === 1) {
+      return 'com_codename1_html5_js_dom_Element';
+    }
+    return null;
+  }
+
+  hostBridge.register('__cn1_dom_window_current__', function() {
+    if (global.window) {
+      return hostResult(global.window);
+    }
+    return null;
+  });
+
+  hostBridge.register('__cn1_jso_bridge__', function(request) {
+    var payload = request || {};
+    var receiver = resolveHostRef(payload.receiver);
+    if (receiver == null) {
+      throw new Error('Missing host receiver for JSO bridge');
+    }
+    var kind = payload.kind;
+    var member = payload.member;
+    var args = mapHostArgs(payload.args || []);
+    var value;
+    if (kind === 'getter') {
+      value = receiver[member];
+    } else if (kind === 'setter') {
+      receiver[member] = args.length ? args[0] : null;
+      value = null;
+    } else {
+      var fn = receiver[member];
+      if (typeof fn === 'function') {
+        value = fn.apply(receiver, args);
+      } else if (!args.length && Object.prototype.hasOwnProperty.call(receiver, member)) {
+        value = receiver[member];
+      } else {
+        throw new Error('Missing JS member ' + member + ' for host receiver');
+      }
+    }
+    return hostResult(value);
+  });
+
   global.__parparMessages = [];
   global.cn1Initialized = false;
   global.cn1Started = false;
