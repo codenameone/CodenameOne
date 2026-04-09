@@ -19,7 +19,6 @@
 
 package com.codename1.util;
 
-import com.codename1.annotations.Simd;
 import com.codename1.simd.SIMD;
 
 /// This class implements Base64 encoding/decoding functionality
@@ -28,7 +27,6 @@ public abstract class Base64 {
 
     private static final int DECODE_INVALID = -1;
     private static final int DECODE_WHITESPACE = -2;
-    private static volatile boolean explicitSimdApiEnabled;
 
     private static final byte[] map = new byte[]
             {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N',
@@ -188,8 +186,6 @@ public abstract class Base64 {
         return decode(in, in.length, out);
     }
 
-    @Simd.Candidate
-    @Simd.WidthHint(16)
     private static int decodeNoWhitespace(byte[] in, int len, byte[] out) {
         if ((len & 0x3) != 0) {
             return -1;
@@ -340,8 +336,6 @@ public abstract class Base64 {
      * @param out destination buffer
      * @return number of bytes written to {@code out}
      */
-    @Simd.Candidate
-    @Simd.WidthHint(16)
     public static int encodeNoNewline(byte[] in, byte[] out) {
         int inputLength = in.length;
         int outputLength = ((inputLength + 2) / 3) * 4;
@@ -351,7 +345,7 @@ public abstract class Base64 {
         if (inputLength == 0) {
             return 0;
         }
-        if (explicitSimdApiEnabled && SIMD.isSupported() && inputLength >= 16) {
+        if (SIMD.isSupported() && inputLength >= 16) {
             return encodeNoNewlineSimdApi(in, out);
         }
         byte[] mapLocal = map;
@@ -426,19 +420,6 @@ public abstract class Base64 {
                 break;
         }
         return outIndex;
-    }
-
-    /**
-     * Enables/disables the explicit SIMD API fast path.
-     *
-     * @param enabled true to enable the explicit SIMD API path
-     */
-    public static void setExplicitSimdApiEnabled(boolean enabled) {
-        explicitSimdApiEnabled = enabled;
-    }
-
-    public static boolean isExplicitSimdApiEnabled() {
-        return explicitSimdApiEnabled;
     }
 
     private static int encodeNoNewlineSimdApi(byte[] in, byte[] out) {

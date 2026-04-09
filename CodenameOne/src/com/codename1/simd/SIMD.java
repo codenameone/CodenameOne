@@ -45,7 +45,12 @@ public final class SIMD {
      * @return true if SIMD backend support is available.
      */
     public static boolean isSupported() {
-        return false;
+        String explicit = System.getProperty("cn1.parparvm");
+        if ("true".equalsIgnoreCase(explicit)) {
+            return true;
+        }
+        String vmName = System.getProperty("java.vm.name", "");
+        return vmName != null && vmName.toLowerCase().contains("parparvm");
     }
 
     /**

@@ -11,7 +11,17 @@ class SIMDTest extends UITestBase {
 
     @FormTest
     void testSupportDefaultsToFalse() {
-        assertFalse(SIMD.isSupported());
+        String oldValue = System.getProperty("cn1.parparvm");
+        try {
+            System.setProperty("cn1.parparvm", "false");
+            assertFalse(SIMD.isSupported());
+        } finally {
+            if (oldValue == null) {
+                System.clearProperty("cn1.parparvm");
+            } else {
+                System.setProperty("cn1.parparvm", oldValue);
+            }
+        }
     }
 
     @FormTest

@@ -135,6 +135,13 @@ public class Invoke extends Instruction {
     
     @Override
     public void appendInstruction(StringBuilder b) {
+        if (opcode == Opcodes.INVOKESTATIC
+                && "com/codename1/simd/SIMD".equals(owner)
+                && "isSupported".equals(name)
+                && "()Z".equals(desc)) {
+            b.append("    PUSH_INT(1);\n");
+            return;
+        }
         // special case for clone on an array which isn't a real method invocation
         if(name.equals("clone") && owner.indexOf('[') > -1) {
             b.append("    POP_MANY_AND_PUSH_OBJ(cloneArray(PEEK_OBJ(1)), 1);\n");

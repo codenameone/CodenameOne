@@ -523,5 +523,4 @@ if (SIMD.isSupported()) {
 ----
 
 `Base64.encodeNoNewline(byte[], byte[])` also includes an explicit SIMD-API code path
-that can be toggled via `Base64.setExplicitSimdApiEnabled(true)` and is activated only
-when `SIMD.isSupported()` is true.
+that is activated automatically when `SIMD.isSupported()` is true.
