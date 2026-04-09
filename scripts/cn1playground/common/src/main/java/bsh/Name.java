@@ -25,10 +25,11 @@
  *****************************************************************************/
 package bsh;
 
+import java.lang.reflect.InvocationTargetException;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.HashMap;
 
 /**
     What's in a name?  I'll tell you...
@@ -809,8 +810,13 @@ class Name implements java.io.Serializable
                 Object instance = classNameSpace.getClassInstance();
                 Class<?> classStatic = classNameSpace.classStatic;
 
-                return ClassGenerator.getClassGenerator()
-                    .invokeSuperclassMethod( bcm, instance, classStatic, methodName, args );
+                try {
+                    return ClassGenerator.getClassGenerator()
+                        .invokeSuperclassMethod( bcm, instance, classStatic, methodName, args );
+                } catch (InvocationTargetException e) {
+                    throw new UtilTargetError(
+                        "Error invoking superclass method: " + methodName, e);
+                }
             }
         }
 
