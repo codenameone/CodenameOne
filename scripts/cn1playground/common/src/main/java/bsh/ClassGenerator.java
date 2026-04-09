@@ -279,20 +279,17 @@ public final class ClassGenerator {
     public static Object invokeSuperclassMethodImpl(BshClassManager bcm,
             Object instance, Class<?> classStatic, String methodName, Object[] args)
                 throws UtilEvalError, ReflectError {
-        Class<?> superClass = classStatic.getSuperclass();
         Class<?> clas = instance.getClass();
-        String superName = BSHSUPER + superClass.getSimpleName() + methodName;
+        String superName = BSHSUPER + methodName;
 
         // look for the specially named super delegate method
         Invocable superMethod = Reflect.resolveJavaMethod(clas, superName,
                 Types.getTypes(args), false/*onlyStatic*/);
-        if (superMethod != null) return superMethod.invoke(instance, args);
+        if (superMethod != null) {
+            return superMethod.invoke(instance, args);
+        }
 
-        // No super method, try to invoke regular method
-        // could be a superfluous "super." which is legal.
-        superMethod = Reflect.resolveExpectedJavaMethod(bcm, superClass, instance,
-                methodName, args, false/*onlyStatic*/);
-        return superMethod.invoke(instance, args);
+        throw new ReflectError("Superclass method delegate not found: " + methodName);
     }
 
 }
