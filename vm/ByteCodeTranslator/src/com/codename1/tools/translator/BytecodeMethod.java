@@ -101,9 +101,6 @@ public class BytecodeMethod implements SignatureSet {
     private static boolean acceptStaticOnEquals;
     private int methodOffset;
     private boolean forceVirtual;
-    private boolean simdCandidateHint;
-    private boolean simdReductionHint;
-    private int simdWidthHint = -1;
     private boolean virtualOverriden;
     private boolean finalMethod;
     private boolean synchronizedMethod;
@@ -838,10 +835,6 @@ public class BytecodeMethod implements SignatureSet {
         if(nativeMethod) {
             return;
         }
-        boolean emitSimdTargetPragmas = isSimdEligibleForCodegen();
-        if (emitSimdTargetPragmas) {
-            appendSimdTargetPragmaPush(b);
-        }
         appendCMethodPrefix(b, "");
         b.append(" {\n");
         if(eliminated) {
@@ -850,16 +843,10 @@ public class BytecodeMethod implements SignatureSet {
             } else {
                 b.append("    return 0;\n}\n\n");
             }
-            if (emitSimdTargetPragmas) {
-                appendSimdTargetPragmaPop(b);
-            }
             return;
         }
-        
+            
         b.append(declaration);
-        if (isSimdEligibleForCodegen()) {
-            appendSimdHookCall(b);
-        }
         
         boolean hasInstructions = true;
         if(optimizerOn) {
@@ -1009,9 +996,6 @@ public class BytecodeMethod implements SignatureSet {
             } else {
                 b.append("    return 0;\n}\n\n");
             }
-            if (emitSimdTargetPragmas) {
-                appendSimdTargetPragmaPop(b);
-            }
             return;
         }
         Instruction inst = instructions.get(instructions.size() - 1);
@@ -1031,9 +1015,6 @@ public class BytecodeMethod implements SignatureSet {
             } else {
                 b.append("    return 0;\n}\n\n");
             }
-        }
-        if (emitSimdTargetPragmas) {
-            appendSimdTargetPragmaPop(b);
         }
     }
     
@@ -1521,17 +1502,6 @@ public class BytecodeMethod implements SignatureSet {
     
     
     boolean optimize() {
-        if (simdCandidateHint) {
-            enforceValidSimdCandidate();
-        } else if (simdReductionHint) {
-            throw new IllegalStateException("SIMD annotation validation failed for " + clsName + "."
-                    + methodName + desc + ": @Simd.Reduction requires @Simd.Candidate");
-        }
-
-        if (ByteCodeTranslator.verbose && hasSimdHints()) {
-            logSimdHintStatus(getSimdIneligibilityReason());
-        }
-
         int instructionCount = instructions.size();
         
         // optimize away a method that only contains the void return instruction e.g. blank constructors etc.
@@ -2414,249 +2384,6 @@ public class BytecodeMethod implements SignatureSet {
 	public String getSignature() {
 		return desc;
 	}
-
-    public void setSimdCandidateHint(boolean simdCandidateHint) {
-        this.simdCandidateHint = simdCandidateHint;
-    }
-
-    public boolean isSimdCandidateHint() {
-        return simdCandidateHint;
-    }
-
-    public void setSimdReductionHint(boolean simdReductionHint) {
-        this.simdReductionHint = simdReductionHint;
-    }
-
-    public boolean isSimdReductionHint() {
-        return simdReductionHint;
-    }
-
-    public void setSimdWidthHint(int simdWidthHint) {
-        this.simdWidthHint = simdWidthHint > 0 ? simdWidthHint : -1;
-    }
-
-    public int getSimdWidthHint() {
-        return simdWidthHint;
-    }
-
-    public boolean hasSimdHints() {
-        return simdCandidateHint || simdReductionHint || simdWidthHint > 0;
-    }
-
-    public String getSimdHintSummary() {
-        StringBuilder out = new StringBuilder();
-        if (simdCandidateHint) {
-            out.append("candidate");
-        }
-        if (simdReductionHint) {
-            if (out.length() > 0) {
-                out.append(", ");
-            }
-            out.append("reduction");
-        }
-        if (simdWidthHint > 0) {
-            if (out.length() > 0) {
-                out.append(", ");
-            }
-            out.append("width=").append(simdWidthHint);
-        }
-        if (out.length() == 0) {
-            out.append("none");
-        }
-        return out.toString();
-    }
-
-    private void logSimdHintStatus(String reason) {
-        String methodId = clsName + "." + methodName + desc;
-        if (reason == null || reason.length() == 0) {
-            System.out.println("SIMD hints accepted for " + methodId + ": " + getSimdHintSummary());
-        } else {
-            System.out.println("SIMD hints noted but not currently vectorization-ready for " + methodId
-                    + ": " + getSimdHintSummary() + " (" + reason + ")");
-        }
-    }
-
-    private void enforceValidSimdCandidate() {
-        String reason = getSimdIneligibilityReason();
-        if (reason.length() == 0) {
-            return;
-        }
-        throw new IllegalStateException("SIMD annotation validation failed for " + clsName + "."
-                + methodName + desc + ": " + reason);
-    }
-
-    private String getSimdIneligibilityReason() {
-        StringBuilder reason = new StringBuilder();
-        if (nativeMethod || abstractMethod) {
-            appendReason(reason, "native/abstract method");
-        }
-        if (synchronizedMethod) {
-            appendReason(reason, "synchronized method");
-        }
-        if (hasExceptionHandlingOrMethodCalls()) {
-            appendReason(reason, "complex control flow or method calls");
-        }
-        if (!hasArrayAccessOpcode()) {
-            appendReason(reason, "no primitive/object array access opcodes found");
-        }
-        if (simdReductionHint && !hasReductionOpcode()) {
-            appendReason(reason, "marked reduction but no reduction-like arithmetic ops found");
-        }
-        return reason.toString();
-    }
-
-    private boolean isSimdEligibleForCodegen() {
-        if (hasExplicitSimdApiUsage()) {
-            return true;
-        }
-        return simdCandidateHint && getSimdIneligibilityReason().length() == 0;
-    }
-
-    private boolean hasExplicitSimdApiUsage() {
-        for (Instruction ins : instructions) {
-            if (ins instanceof Invoke) {
-                String owner = ((Invoke)ins).getOwner();
-                if (owner != null && (owner.equals("com/codename1/simd/SIMD")
-                        || owner.startsWith("com/codename1/simd/SIMD$"))) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    private String getSimdHookName() {
-        StringBuilder out = new StringBuilder();
-        out.append("cn1_simd_");
-        out.append(clsName);
-        out.append("_");
-        out.append(getCMethodName());
-        out.append("__");
-        for (ByteCodeMethodArg args : arguments) {
-            args.appendCMethodExt(out);
-        }
-        if (!returnType.isVoid()) {
-            out.append("_R");
-            returnType.appendCMethodExt(out);
-        }
-        return out.toString();
-    }
-
-    private void appendSimdHookCall(StringBuilder b) {
-        String simdHookName = getSimdHookName();
-        b.append("    #if defined(__GNUC__) || defined(__clang__)\n");
-        b.append("    extern ");
-        returnType.appendCSig(b);
-        b.append(" ").append(simdHookName).append("(CODENAME_ONE_THREAD_STATE");
-        int arg = 1;
-        if (!staticMethod) {
-            b.append(", ");
-            new ByteCodeMethodArg(clsName, 0).appendCSig(b);
-            b.append(" __cn1ThisObject");
-        }
-        for (ByteCodeMethodArg args : arguments) {
-            b.append(", ");
-            args.appendCSig(b);
-            b.append("__cn1Arg");
-            b.append(arg++);
-        }
-        b.append(") __attribute__((weak));\n");
-        b.append("    if (").append(simdHookName).append(") {\n");
-        if (!returnType.isVoid()) {
-            b.append("        return ");
-        } else {
-            b.append("        ");
-        }
-        b.append(simdHookName).append("(threadStateData");
-        arg = 1;
-        if (!staticMethod) {
-            b.append(", __cn1ThisObject");
-        }
-        for (int i = 0; i < arguments.size(); i++) {
-            b.append(", __cn1Arg").append(arg++);
-        }
-        b.append(");\n");
-        if (returnType.isVoid()) {
-            b.append("        return;\n");
-        }
-        b.append("    }\n");
-        b.append("    #endif\n");
-    }
-
-    private static void appendSimdTargetPragmaPush(StringBuilder b) {
-        b.append("#if defined(CN1_ENABLE_SIMD_PRAGMAS) && defined(__clang__) && (defined(__arm__) || defined(__aarch64__))\n");
-        b.append("#pragma clang attribute push(__attribute__((target(\"neon\"))), apply_to=function)\n");
-        b.append("#endif\n");
-    }
-
-    private static void appendSimdTargetPragmaPop(StringBuilder b) {
-        b.append("#if defined(CN1_ENABLE_SIMD_PRAGMAS) && defined(__clang__) && (defined(__arm__) || defined(__aarch64__))\n");
-        b.append("#pragma clang attribute pop\n");
-        b.append("#endif\n");
-    }
-
-    private static void appendReason(StringBuilder sb, String value) {
-        if (sb.length() > 0) {
-            sb.append("; ");
-        }
-        sb.append(value);
-    }
-
-    private boolean hasArrayAccessOpcode() {
-        for (Instruction ins : instructions) {
-            switch (ins.getOpcode()) {
-                case Opcodes.IALOAD:
-                case Opcodes.LALOAD:
-                case Opcodes.FALOAD:
-                case Opcodes.DALOAD:
-                case Opcodes.AALOAD:
-                case Opcodes.BALOAD:
-                case Opcodes.CALOAD:
-                case Opcodes.SALOAD:
-                case Opcodes.IASTORE:
-                case Opcodes.LASTORE:
-                case Opcodes.FASTORE:
-                case Opcodes.DASTORE:
-                case Opcodes.AASTORE:
-                case Opcodes.BASTORE:
-                case Opcodes.CASTORE:
-                case Opcodes.SASTORE:
-                    return true;
-                default:
-                    break;
-            }
-        }
-        return false;
-    }
-
-    private boolean hasReductionOpcode() {
-        for (Instruction ins : instructions) {
-            switch (ins.getOpcode()) {
-                case Opcodes.IADD:
-                case Opcodes.LADD:
-                case Opcodes.FADD:
-                case Opcodes.DADD:
-                case Opcodes.ISUB:
-                case Opcodes.LSUB:
-                case Opcodes.FSUB:
-                case Opcodes.DSUB:
-                case Opcodes.IMUL:
-                case Opcodes.LMUL:
-                case Opcodes.FMUL:
-                case Opcodes.DMUL:
-                case Opcodes.IAND:
-                case Opcodes.LAND:
-                case Opcodes.IOR:
-                case Opcodes.LOR:
-                case Opcodes.IXOR:
-                case Opcodes.LXOR:
-                    return true;
-                default:
-                    break;
-            }
-        }
-        return false;
-    }
 
     @Override
     public SignatureSet nextSignature() {

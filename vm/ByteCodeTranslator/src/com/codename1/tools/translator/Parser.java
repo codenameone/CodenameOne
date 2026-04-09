@@ -740,9 +740,6 @@ public class Parser extends ClassVisitor {
     }    
     
     class MethodVisitorWrapper extends MethodVisitor {
-        private static final String SIMD_CANDIDATE_DESC = "Lcom/codename1/annotations/Simd$Candidate;";
-        private static final String SIMD_REDUCTION_DESC = "Lcom/codename1/annotations/Simd$Reduction;";
-        private static final String SIMD_WIDTH_HINT_DESC = "Lcom/codename1/annotations/Simd$WidthHint;";
         private final BytecodeMethod mtd;
         public MethodVisitorWrapper(MethodVisitor mv, BytecodeMethod mtd) {
             super(Opcodes.ASM9, mv);
@@ -1201,30 +1198,7 @@ public class Parser extends ClassVisitor {
         @Override
         public AnnotationVisitor visitAnnotation(String desc, boolean visible) {
             if (mv == null) return null;
-            if (SIMD_CANDIDATE_DESC.equals(desc)) {
-                mtd.setSimdCandidateHint(true);
-            } else if (SIMD_REDUCTION_DESC.equals(desc)) {
-                mtd.setSimdReductionHint(true);
-            }
-
-            AnnotationVisitor base = super.visitAnnotation(desc, visible);
-            AnnotationVisitor wrapped = new AnnotationVisitorWrapper(base);
-            if (!SIMD_WIDTH_HINT_DESC.equals(desc)) {
-                return wrapped;
-            }
-
-            return new AnnotationVisitor(Opcodes.ASM9, wrapped) {
-                @Override
-                public void visit(String name, Object value) {
-                    if ("value".equals(name) && value instanceof Integer) {
-                        int widthHint = ((Integer)value).intValue();
-                        if (widthHint > 0) {
-                            mtd.setSimdWidthHint(widthHint);
-                        }
-                    }
-                    super.visit(name, value);
-                }
-            };
+            return new AnnotationVisitorWrapper(super.visitAnnotation(desc, visible)); 
         }
 
         @Override
