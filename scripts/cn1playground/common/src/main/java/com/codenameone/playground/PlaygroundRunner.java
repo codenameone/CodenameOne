@@ -148,7 +148,6 @@ final class PlaygroundRunner {
     private String adaptScript(String script) {
         String adapted = unwrapSingleTopLevelClass(script);
         String normalized = adapted == null ? script : adapted;
-        normalized = rewriteInlineAutoCloseableClasses(normalized);
         normalized = rewriteKnownSamCalls(normalized);
         normalized = rewriteLambdaArguments(normalized);
         String wrapped = wrapLooseScript(normalized);
