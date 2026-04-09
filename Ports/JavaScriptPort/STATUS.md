@@ -8,49 +8,54 @@ Last updated: 2026-04-09
 Current State
 -------------
 
-- Startup/protocol is no longer the primary blocker. Main remaining blockers are in screenshot correctness and screenshot pipeline throughput.
-- `ensureDisplayEdt()` and diagnostics remain active in `port.js`.
-- Form constructor `IllegalStateException` bypass now attempts recovery instead of returning `null`:
-  - calls default `Form` constructor
-  - reapplies layout
-  - reapplies title (for title+layout constructor)
-  - emits `PARPAR:DIAG:FALLBACK:formCtor*:recoverApplied=1` markers
-- CI artifact behavior and fresh local rebuild behavior are currently diverged (details below).
+- Architecture direction has been explicitly shifted to worker-first execution for ParparVM (EDT and VM scheduler in worker, browser UI/native host on main thread).
+- `browser_bridge.js` is now worker-only. Main-thread VM mode and mode toggles were removed.
+- If worker support is missing, runtime now fails explicitly with:
+  - `PARPAR:worker-mode-required`
+  - `PARPAR:DIAG:FIRST_FAILURE:category=worker_missing`
+- Worker host-call misses now emit explicit first-failure diagnostics:
+  - `PARPAR:DIAG:FIRST_FAILURE:category=host_call_unhandled`
+  - `PARPAR:DIAG:FIRST_FAILURE:symbol=<nativeSymbol>`
+- Latest CI artifacts still ran `main-thread-mode` (before this change) and timed out before `CN1SS:SUITE:FINISHED`.
+- Existing form-constructor recovery diagnostics remain active in `port.js` and are still relevant while migrating.
 
 Next Steps
 ----------
 
-1. Unify build provenance first:
-   - Confirm CI bundle contains expected translated `Cn1ssDeviceRunner` variant.
-   - In generated `translated_app.js`, verify whether runner uses `TEST_CLASSES` (old list path) or `DEFAULT_TEST_CLASSES/prependedTest` (new array path).
-   - This directly changes failure mode and must be deterministic before further triage.
-2. Reduce EDT starvation in screenshot emission:
-   - Current fresh local run advances to 11 tests, then stalls after `DrawImage` due very large `CN1SS:<name>:<chunk>` emissions.
-   - Add bounded chunk/preview strategy for extremely large screenshots and move heavy conversion off hot EDT path where possible.
-3. Keep form-constructor fallback bounded:
-   - `IllegalStateException` still occurs frequently.
-   - Recovery now preserves object state better, but we need to reduce recursive/looping constructor retry behavior and make one-shot recovery per form instance.
-4. After throughput fix, run 3 repeated local runs and one CI run:
-   - Exit gate is `CN1SS:SUITE:FINISHED` + 33 screenshot streams + no repeated stream collapse.
+1. Validate worker-only boot in CI and local:
+   - Required markers: `PARPAR:worker-mode`, `PARPAR:DIAG:BOOT:bridgeMode=worker`.
+   - Any `main-thread-mode` marker now indicates stale artifact or wrong bundle.
+2. Separate VM/EDT execution from main-thread host services cleanly:
+   - Keep VM/EDT scheduling in worker.
+   - Ensure main-thread browser APIs are reached through explicit host-call handlers rather than direct worker DOM access.
+3. Re-triage screenshot correctness in worker mode only:
+   - Re-run screenshot suite and classify first blocker using the existing `TOP_BLOCKER` output.
+   - Prioritize deterministic runtime failures before throughput tuning.
+4. Restore full screenshot count and correctness:
+   - Exit gate remains `CN1SS:SUITE:FINISHED` with expected screenshot artifacts and no `BROWSER:PARPAR_ERROR`.
 
 Important Notes
 --------------
 
-- Fresh local rebuild (`/tmp/cn1-js-fresh*.zip`) now translates current runner code and shows 11 unique tests before timeout.
-- Existing CI artifact in `javascript-ui-tests/HelloCodenameOne-js/translated_app.js` still shows old list-based runner (`TEST_CLASSES`) and produces only 5 screenshot streams with suite completion.
-- This means there are at least two active failure modes:
-  1. old-runner path: suite finishes with only 5 streams (wrong collapse)
-  2. new-runner path: progresses further but times out during heavy screenshot emission
+- Current CI artifact (`~/Downloads/javascript-ui-tests/browser.log`) shows:
+  - `PARPAR:main-thread-mode`
+  - `PARPAR:DIAG:BOOT:bridgeMode=main-thread`
+  - timeout with `TOP_BLOCKER=unknown|none|none`
+- This is consistent with the new migration priority: enforce worker mode first, then debug screenshot behavior.
 
 Known Important Context
 -----------------------
 
 - Useful diagnostics to grep:
+  - `PARPAR:worker-mode`
+  - `PARPAR:DIAG:BOOT:bridgeMode=worker`
+  - `PARPAR:DIAG:FIRST_FAILURE:category=worker_missing`
   - `PARPAR:DIAG:FALLBACK:lambdaBridge:capturedTest=...:capturedIndex=...`
   - `PARPAR:DIAG:FALLBACK:formCtorLayout:bypassIllegalState=1`
   - `PARPAR:DIAG:FALLBACK:formCtorLayout:recoverApplied=1`
   - `CN1SS:INFO:suite starting test=...`
   - `CN1SS:SUITE:FINISHED`
 - Current local patch set touches:
+  - `vm/ByteCodeTranslator/src/javascript/browser_bridge.js`
   - `Ports/JavaScriptPort/src/main/webapp/port.js`
   - `scripts/hellocodenameone/common/src/main/java/com/codenameone/examples/hellocodenameone/tests/Cn1ssDeviceRunner.java`

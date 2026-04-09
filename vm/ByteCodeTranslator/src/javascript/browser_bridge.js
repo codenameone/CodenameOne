@@ -86,6 +86,8 @@
     invoke: function(symbol, args, target, id) {
       var handler = this.handlers[symbol];
       if (!handler) {
+        diag('FIRST_FAILURE', 'category', 'host_call_unhandled');
+        diag('FIRST_FAILURE', 'symbol', symbol);
         postHostCallback(target, id, null, 'Unhandled host call ' + symbol);
         return;
       }
@@ -157,50 +159,6 @@
     return worker;
   }
 
-  function loadScript(src, callback) {
-    log('load-script:' + src);
-    var script = document.createElement('script');
-    script.src = src;
-    script.onload = function() {
-      callback(null);
-    };
-    script.onerror = function(err) {
-      callback(err || new Error('Failed to load ' + src));
-    };
-    document.head.appendChild(script);
-  }
-
-  function installMainThreadMode(onReady) {
-    log('main-thread-mode');
-    diag('BOOT', 'bridgeMode', 'main-thread');
-    global.__cn1ParparDispatchMessage = function(data) {
-      handleVmMessage(data, null);
-    };
-    loadScript('parparvm_runtime.js', function(runtimeErr) {
-      if (runtimeErr) {
-        global.__parparError = { type: 'error', message: String(runtimeErr) };
-        return;
-      }
-      loadScript('translated_app.js', function(appErr) {
-        if (appErr) {
-          global.__parparError = { type: 'error', message: String(appErr) };
-          return;
-        }
-        if (typeof global.__parparInstallNativeBindings === 'function') {
-          global.__parparInstallNativeBindings();
-          diag('INIT', 'nativeRebind', 'applied');
-        }
-        loadScript('port.js', function(portErr) {
-          if (portErr) {
-            log('optional-script-missing:port.js');
-          }
-          log('translated-app-ready');
-          onReady();
-        });
-      });
-    });
-  }
-
   var appStarter = null;
 
   global.startParparVmApp = function() {
@@ -213,27 +171,19 @@
     }
   };
 
-  if (global.cn1UseWorkerVm) {
-    var worker = installWorkerMode();
-    appStarter = function() {
-      worker.postMessage({ type: 'start' });
-    };
-  } else {
-    installMainThreadMode(function() {
-      appStarter = function() {
-        if (global.jvm && typeof global.jvm.start === 'function') {
-          log('jvm.start.begin');
-          diag('LIFECYCLE_START', 'jvm.start', 'begin');
-          global.jvm.start();
-          log('jvm.start.end');
-        }
-      };
-      log('appStarter-ready');
-      if (global.cn1Initialized) {
-        appStarter();
-      }
-    });
+  if (typeof Worker !== 'function') {
+    var missingWorkerMessage = 'ParparVM requires Worker support; non-worker mode is not supported';
+    log('worker-mode-required');
+    diag('BOOT', 'bridgeMode', 'worker-only');
+    diag('FIRST_FAILURE', 'category', 'worker_missing');
+    diag('FIRST_FAILURE', 'message', missingWorkerMessage);
+    global.__parparError = { type: 'error', message: missingWorkerMessage };
+    return;
   }
+  var worker = installWorkerMode();
+  appStarter = function() {
+    worker.postMessage({ type: 'start' });
+  };
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', global.startParparVmApp);
