@@ -20,6 +20,8 @@ import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
+import com.codename1.util.StringUtil;
+import com.codename1.util.regex.RE;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -146,10 +148,56 @@ final class PlaygroundRunner {
     private String adaptScript(String script) {
         String adapted = unwrapSingleTopLevelClass(script);
         String normalized = adapted == null ? script : adapted;
+        normalized = rewriteInlineAutoCloseableClasses(normalized);
         normalized = rewriteKnownSamCalls(normalized);
         normalized = rewriteLambdaArguments(normalized);
         String wrapped = wrapLooseScript(normalized);
         return wrapped == null ? normalized : wrapped;
+    }
+
+    private String rewriteInlineAutoCloseableClasses(String script) {
+        RE declarationPattern = new RE(
+                "class\\s+([A-Za-z_$][A-Za-z0-9_$]*)\\s+implements\\s+AutoCloseable\\s*\\{\\s*public\\s+void\\s+close\\s*\\(\\s*\\)\\s*\\{\\s*\\}\\s*\\}");
+        List<String> helperClassNames = new ArrayList<String>();
+        int searchFrom = 0;
+        while (searchFrom < script.length() && declarationPattern.match(script, searchFrom)) {
+            helperClassNames.add(declarationPattern.getParen(1));
+            int next = declarationPattern.getParenEnd(0);
+            if (next <= searchFrom) {
+                break;
+            }
+            searchFrom = next;
+        }
+        if (helperClassNames.isEmpty()) {
+            return script;
+        }
+
+        String rewritten = script;
+        for (int i = 0; i < helperClassNames.size(); i++) {
+            String className = helperClassNames.get(i);
+            String classToken = escapeRegexLiteral(className);
+            RE ctorPattern = new RE("\\bnew\\s+" + classToken + "\\s*\\(\\s*\\)");
+            rewritten = ctorPattern.subst(rewritten,
+                    "(new AutoCloseable() { public void close() {} })", RE.REPLACE_ALL);
+            rewritten = StringUtil.replaceAll(rewritten, "new " + className + "()",
+                    "(new AutoCloseable() { public void close() {} })");
+        }
+        rewritten = declarationPattern.subst(rewritten, "", RE.REPLACE_ALL);
+        return rewritten;
+    }
+
+    private String escapeRegexLiteral(String value) {
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < value.length(); i++) {
+            char ch = value.charAt(i);
+            if (ch == '\\' || ch == '$' || ch == '.' || ch == '[' || ch == ']' || ch == '(' || ch == ')'
+                    || ch == '{' || ch == '}' || ch == '+' || ch == '*' || ch == '?' || ch == '^'
+                    || ch == '|') {
+                out.append('\\');
+            }
+            out.append(ch);
+        }
+        return out.toString();
     }
 
     private RunResult failure(String message, int line, int column, List<InlineMessage> inlineMessages) {
