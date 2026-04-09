@@ -19,6 +19,9 @@ Current State
 - Worker native-rebind bug identified and fixed:
   - Cause: `translated_app.js` redefined native stubs after `port.js` bind phase in worker startup order.
   - Fix: `worker.js` now calls `__parparInstallNativeBindings()` after imports, before handling `start`.
+- Bundle generation ordering bug identified and fixed for worker mode:
+  - Cause: `worker.js` was generated before `port.js` was copied into the output bundle, so worker never imported JavaScriptPort natives.
+  - Fix: copy JavaScriptPort assets before `worker.js` generation and keep service-worker/shell scripts excluded from worker imports.
 - Latest CI artifacts now run worker mode but fail early before suite start with:
   - `PARPAR:DIAG:FIRST_FAILURE:category=runtime_error`
   - `TypeError: Cannot read properties of null (reading '__classDef')`

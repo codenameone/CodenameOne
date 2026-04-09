@@ -82,6 +82,8 @@ class JavascriptTargetIntegrationTest {
                 "Unsupported filesystem natives should fail with an explicit JS-mode message when translated");
         assertTrue(worker.contains("importScripts('parparvm_runtime.js');"),
                 "Worker bootstrap should load the runtime first");
+        assertTrue(worker.contains("importScripts('port.js');"),
+                "Worker bootstrap should load JavaScriptPort native bindings");
         assertTrue(worker.contains("__parparInstallNativeBindings"),
                 "Worker bootstrap should reapply runtime native bindings after translated app load");
         assertTrue(index.contains("browser_bridge.js") && index.contains("js/fontmetrics.js") && index.contains("codenameone-canvas"),

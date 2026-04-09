@@ -23,8 +23,8 @@ final class JavascriptBundleWriter {
     static void write(File outputDirectory, List<ByteCodeClass> classes) throws IOException {
         writeRuntime(outputDirectory);
         writeTranslatedClasses(outputDirectory, classes);
-        writeWorker(outputDirectory);
         copyJavaScriptPortWebAppAssets(outputDirectory);
+        writeWorker(outputDirectory);
         writeBrowserBridge(outputDirectory);
         writeIndex(outputDirectory);
         writeProtocol(outputDirectory);
@@ -92,7 +92,11 @@ final class JavascriptBundleWriter {
                 if (!name.endsWith(".js")) {
                     continue;
                 }
-                if ("parparvm_runtime.js".equals(name) || "translated_app.js".equals(name) || "worker.js".equals(name)) {
+                if ("parparvm_runtime.js".equals(name)
+                        || "translated_app.js".equals(name)
+                        || "worker.js".equals(name)
+                        || "sw.js".equals(name)
+                        || "browser_bridge.js".equals(name)) {
                     continue;
                 }
                 nativeScripts.add(name);
