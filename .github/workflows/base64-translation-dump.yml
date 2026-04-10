@@ -41,7 +41,7 @@ jobs:
         run: mvn -B -f vm/pom.xml -pl ByteCodeTranslator -am -DskipTests=true install
 
       - name: Generate Base64 translation dump
-        run: mvn -B -f vm/pom.xml -pl tests -am -Dtest=Base64PerformanceIntegrationTest test
+        run: mvn -B -f vm/pom.xml -pl tests -am -Dtest=Base64PerformanceIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test
 
       - name: Upload Base64 translation dump artifacts
         if: always()
