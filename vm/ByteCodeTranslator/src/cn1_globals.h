@@ -1129,7 +1129,29 @@ extern JAVA_OBJECT newStringFromCString(CODENAME_ONE_THREAD_STATE, const char *s
 extern void initConstantPool();
 
 extern void initMethodStack(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, int stackSize, int localsStackSize, int classNameId, int methodNameId);
-extern void initMethodStackFast(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, int stackSize, int localsStackSize);
+static inline void cn1_init_method_stack_fast(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, int stackSize, int localsStackSize, JAVA_BOOLEAN fullClear) {
+#ifdef CN1_INCLUDE_NPE_CHECKS
+    if(__cn1ThisObject == JAVA_NULL) {
+        THROW_NULL_POINTER_EXCEPTION();
+    }
+#endif
+    if (threadStateData->callStackOffset >= CN1_STACK_OVERFLOW_CALL_DEPTH_LIMIT - 1) {
+        throwException(threadStateData, __NEW_INSTANCE_java_lang_StackOverflowError(threadStateData));
+        return;
+    }
+    if (fullClear) {
+        memset(&threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset], 0,
+                sizeof(struct elementStruct) * (localsStackSize + stackSize));
+    } else {
+        int cn1Count = localsStackSize + stackSize;
+        struct elementStruct* cn1Slot = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset];
+        for (int cn1Iter = 0; cn1Iter < cn1Count; cn1Iter++) {
+            cn1Slot[cn1Iter].type = CN1_TYPE_INVALID;
+        }
+    }
+    threadStateData->threadObjectStackOffset += localsStackSize + stackSize;
+    threadStateData->callStackOffset++;
+}
 
 // we need to zero out the values with memset otherwise we will run into a problem
 // when invoking release on pre-existing object which might be garbage
@@ -1151,23 +1173,45 @@ extern void initMethodStackFast(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1This
     const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;\
     int methodBlockOffset = threadStateData->tryBlockOffset;
 
-#define DEFINE_METHOD_STACK_FAST(stackSize, localsStackSize, spPosition) \
+#define DEFINE_METHOD_STACK_FAST_REF(stackSize, localsStackSize, spPosition) \
     const int cn1LocalsBeginInThread = threadStateData->threadObjectStackOffset; \
     struct elementStruct* locals = &threadStateData->threadObjectStack[cn1LocalsBeginInThread]; \
     struct elementStruct* stack = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset + localsStackSize]; \
     struct elementStruct* SP = &stack[spPosition]; \
-    initMethodStackFast(threadStateData, (JAVA_OBJECT)1, stackSize, localsStackSize); \
+    cn1_init_method_stack_fast(threadStateData, (JAVA_OBJECT)1, stackSize, localsStackSize, JAVA_TRUE); \
     const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;\
     int methodBlockOffset = threadStateData->tryBlockOffset;
 
-#define DEFINE_INSTANCE_METHOD_STACK_FAST(stackSize, localsStackSize, spPosition) \
+#define DEFINE_INSTANCE_METHOD_STACK_FAST_REF(stackSize, localsStackSize, spPosition) \
     const int cn1LocalsBeginInThread = threadStateData->threadObjectStackOffset; \
     struct elementStruct* locals = &threadStateData->threadObjectStack[cn1LocalsBeginInThread]; \
     struct elementStruct* stack = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset + localsStackSize]; \
     struct elementStruct* SP = &stack[spPosition]; \
-    initMethodStackFast(threadStateData, __cn1ThisObject, stackSize, localsStackSize); \
+    cn1_init_method_stack_fast(threadStateData, __cn1ThisObject, stackSize, localsStackSize, JAVA_TRUE); \
     const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;\
     int methodBlockOffset = threadStateData->tryBlockOffset;
+
+#define DEFINE_METHOD_STACK_FAST_PRIMITIVE(stackSize, localsStackSize, spPosition) \
+    const int cn1LocalsBeginInThread = threadStateData->threadObjectStackOffset; \
+    struct elementStruct* locals = &threadStateData->threadObjectStack[cn1LocalsBeginInThread]; \
+    struct elementStruct* stack = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset + localsStackSize]; \
+    struct elementStruct* SP = &stack[spPosition]; \
+    cn1_init_method_stack_fast(threadStateData, (JAVA_OBJECT)1, stackSize, localsStackSize, JAVA_FALSE); \
+    const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;\
+    int methodBlockOffset = threadStateData->tryBlockOffset;
+
+#define DEFINE_INSTANCE_METHOD_STACK_FAST_PRIMITIVE(stackSize, localsStackSize, spPosition) \
+    const int cn1LocalsBeginInThread = threadStateData->threadObjectStackOffset; \
+    struct elementStruct* locals = &threadStateData->threadObjectStack[cn1LocalsBeginInThread]; \
+    struct elementStruct* stack = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset + localsStackSize]; \
+    struct elementStruct* SP = &stack[spPosition]; \
+    cn1_init_method_stack_fast(threadStateData, __cn1ThisObject, stackSize, localsStackSize, JAVA_FALSE); \
+    const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;\
+    int methodBlockOffset = threadStateData->tryBlockOffset;
+
+#define CN1_FAST_RETURN_RELEASE() \
+    threadStateData->threadObjectStackOffset = cn1LocalsBeginInThread; \
+    threadStateData->callStackOffset--;
 
 
 #if defined(__APPLE__) && defined(__OBJC__)

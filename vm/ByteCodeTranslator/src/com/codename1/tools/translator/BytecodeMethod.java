@@ -110,6 +110,8 @@ public class BytecodeMethod implements SignatureSet {
     private boolean barebone;
     private boolean disableDebugInfo;
     private boolean disableNullAndArrayBoundsChecks;
+    private boolean fastMethodStackInUse;
+    private boolean fastMethodStackPrimitiveOnly;
 
     
     static boolean optimizerOn;
@@ -298,8 +300,10 @@ public class BytecodeMethod implements SignatureSet {
                     || instruction instanceof Field
                     || instruction instanceof TypeInstruction
                     || instruction instanceof MultiArray
-                    || instruction instanceof ArrayLoadExpression
                     || instruction instanceof CustomIntruction) {
+                return false;
+            }
+            if (instruction instanceof ArrayLoadExpression && !disableNullAndArrayBoundsChecks) {
                 return false;
             }
             if (instruction instanceof BasicInstruction) {
@@ -308,16 +312,49 @@ public class BytecodeMethod implements SignatureSet {
                         || op == Opcodes.ATHROW
                         || op == Opcodes.IDIV || op == Opcodes.LDIV || op == Opcodes.IREM || op == Opcodes.LREM
                         || op == Opcodes.ARRAYLENGTH
-                        || (op >= Opcodes.IALOAD && op <= Opcodes.SALOAD)
-                        || (op >= Opcodes.IASTORE && op <= Opcodes.SASTORE)
-                        || op == Opcodes.AALOAD || op == Opcodes.AASTORE
-                        || op == Opcodes.BALOAD || op == Opcodes.BASTORE || op == Opcodes.CALOAD || op == Opcodes.CASTORE
+                        || (!disableNullAndArrayBoundsChecks && (op >= Opcodes.IALOAD && op <= Opcodes.SALOAD))
+                        || (!disableNullAndArrayBoundsChecks && (op >= Opcodes.IASTORE && op <= Opcodes.SASTORE))
+                        || (!disableNullAndArrayBoundsChecks && (op == Opcodes.AALOAD || op == Opcodes.AASTORE
+                        || op == Opcodes.BALOAD || op == Opcodes.BASTORE || op == Opcodes.CALOAD || op == Opcodes.CASTORE))
                         || op == Opcodes.NEWARRAY) {
                     return false;
                 }
             }
         }
         return true;
+    }
+
+    private boolean isPrimitiveOnlyFastFrameCandidate() {
+        for (ByteCodeMethodArg arg : arguments) {
+            if (arg.getQualifier() == 'o') {
+                return false;
+            }
+        }
+        if (!returnType.isVoid() && returnType.getQualifier() == 'o') {
+            return false;
+        }
+        if (!staticMethod) {
+            return false;
+        }
+        for (Instruction instruction : instructions) {
+            if (instruction instanceof VarOp) {
+                int op = instruction.getOpcode();
+                if (op == Opcodes.ALOAD || op == Opcodes.ASTORE) {
+                    return false;
+                }
+            }
+            if (instruction instanceof BasicInstruction) {
+                int op = instruction.getOpcode();
+                if (op == Opcodes.ARETURN || op == Opcodes.ACONST_NULL || op == Opcodes.AALOAD || op == Opcodes.AASTORE) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    public boolean useFastReturnRelease() {
+        return fastMethodStackInUse && !TryCatch.isTryCatchInMethod();
     }
     
     public BytecodeMethod(String clsName, int access, String name, String desc, String signature, String[] exceptions) {
@@ -936,11 +973,18 @@ public class BytecodeMethod implements SignatureSet {
             }
             
             boolean useFastMethodStack = !barebone && fastMethodStackCandidate;
+            boolean usePrimitiveFastFrame = useFastMethodStack && isPrimitiveOnlyFastFrameCandidate();
+            fastMethodStackInUse = useFastMethodStack;
+            fastMethodStackPrimitiveOnly = usePrimitiveFastFrame;
             if(!barebone) {
                 if(staticMethod) {
                     if(methodName.equals("__CLINIT__")) {
                         if (useFastMethodStack) {
-                            b.append("    DEFINE_METHOD_STACK_FAST(");
+                            if (usePrimitiveFastFrame) {
+                                b.append("    DEFINE_METHOD_STACK_FAST_PRIMITIVE(");
+                            } else {
+                                b.append("    DEFINE_METHOD_STACK_FAST_REF(");
+                            }
                         } else {
                             b.append("    DEFINE_METHOD_STACK(");
                         }
@@ -950,14 +994,22 @@ public class BytecodeMethod implements SignatureSet {
                         b.append(".initialized) __STATIC_INITIALIZER_");
                         b.append(clsName.replace('/', '_').replace('$', '_'));
                         if (useFastMethodStack) {
-                            b.append("(threadStateData);\n    DEFINE_METHOD_STACK_FAST(");
+                            if (usePrimitiveFastFrame) {
+                                b.append("(threadStateData);\n    DEFINE_METHOD_STACK_FAST_PRIMITIVE(");
+                            } else {
+                                b.append("(threadStateData);\n    DEFINE_METHOD_STACK_FAST_REF(");
+                            }
                         } else {
                             b.append("(threadStateData);\n    DEFINE_METHOD_STACK(");
                         }
                     }
                 } else {
                     if (useFastMethodStack) {
-                        b.append("    DEFINE_INSTANCE_METHOD_STACK_FAST(");
+                        if (usePrimitiveFastFrame) {
+                            b.append("    DEFINE_INSTANCE_METHOD_STACK_FAST_PRIMITIVE(");
+                        } else {
+                            b.append("    DEFINE_INSTANCE_METHOD_STACK_FAST_REF(");
+                        }
                     } else {
                         b.append("    DEFINE_INSTANCE_METHOD_STACK(");
                     }
