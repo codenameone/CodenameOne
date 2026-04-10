@@ -162,13 +162,25 @@ final class PlaygroundRunner {
     }
 
     private String rewriteSimpleClassDeclarations(String script) {
-        RE staticInnerStringReturn = new RE(
-                "class\\s+([A-Za-z_$][A-Za-z0-9_$]*)\\s*\\{\\s*static\\s+class\\s+([A-Za-z_$][A-Za-z0-9_$]*)\\s*\\{\\s*String\\s+([A-Za-z_$][A-Za-z0-9_$]*)\\s*\\(\\s*\\)\\s*\\{\\s*return\\s+\\\"([^\\\"]*)\\\"\\s*;\\s*\\}\\s*\\}\\s*\\}\\s*new\\s+\\1\\.\\2\\s*\\(\\s*\\)\\s*\\.\\3\\s*\\(\\s*\\)\\s*;");
-        if (staticInnerStringReturn.match(script)) {
-            String literal = staticInnerStringReturn.getParen(4);
-            return StringUtil.replaceAll(script, staticInnerStringReturn.getParen(0), "\"" + literal + "\";");
+        RE staticInnerDeclaration = new RE(
+                "class\\s+([A-Za-z_$][A-Za-z0-9_$]*)\\s*\\{\\s*static\\s+class\\s+([A-Za-z_$][A-Za-z0-9_$]*)\\s*\\{\\s*String\\s+([A-Za-z_$][A-Za-z0-9_$]*)\\s*\\(\\s*\\)\\s*\\{\\s*return\\s+\\\"([^\\\"]*)\\\"\\s*;\\s*\\}\\s*\\}\\s*\\}");
+        String rewritten = script;
+        int searchFrom = 0;
+        while (searchFrom < rewritten.length() && staticInnerDeclaration.match(rewritten, searchFrom)) {
+            String outer = staticInnerDeclaration.getParen(1);
+            String inner = staticInnerDeclaration.getParen(2);
+            String method = staticInnerDeclaration.getParen(3);
+            String literal = staticInnerDeclaration.getParen(4);
+            String declaration = staticInnerDeclaration.getParen(0);
+
+            RE invocation = new RE("new\\s+" + escapeRegexLiteral(outer) + "\\."
+                    + escapeRegexLiteral(inner) + "\\s*\\(\\s*\\)\\s*\\.\\s*"
+                    + escapeRegexLiteral(method) + "\\s*\\(\\s*\\)");
+            rewritten = invocation.subst(rewritten, "\"" + literal + "\"", RE.REPLACE_ALL);
+            rewritten = StringUtil.replaceAll(rewritten, declaration, "");
+            searchFrom = 0;
         }
-        return script;
+        return rewritten;
     }
 
     private String rewriteInlineAutoCloseableClasses(String script) {
