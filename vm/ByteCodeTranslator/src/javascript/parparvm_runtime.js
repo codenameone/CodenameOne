@@ -52,12 +52,55 @@ const jsoRegistry = {
   inferFn: null,
   nativeArgConverters: []
 };
+function sanitizeMessagePayload(value, seen) {
+  if (value == null) {
+    return value;
+  }
+  const type = typeof value;
+  if (type === "string" || type === "number" || type === "boolean") {
+    return value;
+  }
+  if (type === "function" || type === "symbol") {
+    return null;
+  }
+  if (!seen) {
+    seen = typeof WeakSet === "function" ? new WeakSet() : null;
+  }
+  if (seen && value && (type === "object" || type === "function")) {
+    if (seen.has(value)) {
+      return null;
+    }
+    seen.add(value);
+  }
+  if (Array.isArray(value)) {
+    const out = new Array(value.length);
+    for (let i = 0; i < value.length; i++) {
+      out[i] = sanitizeMessagePayload(value[i], seen);
+    }
+    return out;
+  }
+  if (value instanceof Error) {
+    return {
+      name: value.name || "Error",
+      message: value.message || String(value),
+      stack: value.stack || null
+    };
+  }
+  const out = {};
+  const keys = Object.keys(value);
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i];
+    out[key] = sanitizeMessagePayload(value[key], seen);
+  }
+  return out;
+}
 function emitVmMessage(message) {
+  const safeMessage = sanitizeMessagePayload(message);
   if (typeof global.__cn1ParparDispatchMessage === "function") {
-    global.__cn1ParparDispatchMessage(message);
+    global.__cn1ParparDispatchMessage(safeMessage);
     return;
   }
-  global.postMessage(message);
+  global.postMessage(safeMessage);
 }
 const VM_TRACE_WAIT_LIMIT = 64;
 let vmTraceWaitCount = 0;
@@ -633,6 +676,7 @@ const jvm = {
         }
         const hostResult = yield self.invokeHostNative("__cn1_jso_bridge__", [{
           receiver: receiver,
+          receiverClass: (receiver && receiver.__cn1HostClass) ? receiver.__cn1HostClass : className,
           kind: bridge.kind,
           member: bridge.member,
           args: transferableArgs
@@ -1030,6 +1074,15 @@ const jvm = {
     }
     if (value.__jsValue !== undefined) {
       return this.toHostTransferArg(value.__jsValue);
+    }
+    if (type === "object") {
+      const out = {};
+      const keys = Object.keys(value);
+      for (let i = 0; i < keys.length; i++) {
+        const key = keys[i];
+        out[key] = this.toHostTransferArg(value[key]);
+      }
+      return out;
     }
     return null;
   },

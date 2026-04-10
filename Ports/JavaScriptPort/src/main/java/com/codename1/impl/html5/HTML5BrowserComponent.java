@@ -245,7 +245,10 @@ public class HTML5BrowserComponent extends HTML5Peer {
     @JSBody(params={"doc", "str"}, script="doc.write(str)")
     private static native void documentWrite(HTMLDocument doc, String str);
     
-    @JSBody(params={}, script="!!(\"srcdoc\" in document.createElement(\"iframe\"))")
+    @JSBody(
+            params={},
+            script="var d=(typeof document!=='undefined'&&document)?document:((typeof window!=='undefined'&&window.document)?window.document:null);"
+                    + "return !!(d&&('srcdoc' in d.createElement('iframe')));")
     private static native boolean supportsSrcdocAttribute();
     private boolean supportsSrcdocAttribute;
     

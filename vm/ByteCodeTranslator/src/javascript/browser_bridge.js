@@ -135,11 +135,54 @@
     return marker;
   }
 
+  function fallbackHostObjectForClass(hostClass) {
+    if (!hostClass) {
+      return null;
+    }
+    if (hostClass.indexOf('com_codename1_impl_html5_JSOImplementations_Window') === 0) {
+      return global.window || null;
+    }
+    if (hostClass.indexOf('com_codename1_impl_html5_JSOImplementations_Document') === 0) {
+      if (global.document) {
+        return global.document;
+      }
+      return global.window && global.window.document ? global.window.document : null;
+    }
+    if (hostClass === 'com_codename1_html5_js_browser_Window') {
+      return global.window || null;
+    }
+    if (hostClass === 'com_codename1_html5_js_dom_HTMLDocument') {
+      if (global.document) {
+        return global.document;
+      }
+      return global.window && global.window.document ? global.window.document : null;
+    }
+    if (hostClass === 'com_codename1_html5_js_dom_HTMLBodyElement') {
+      var doc = global.document || (global.window && global.window.document);
+      return doc && doc.body ? doc.body : null;
+    }
+    return null;
+  }
+
   function resolveHostRef(marker) {
     if (!isHostRefMarker(marker)) {
       return marker;
     }
-    return hostRefById[marker.__cn1HostRef] || null;
+    var id = marker.__cn1HostRef;
+    var existing = hostRefById[id];
+    if (existing != null) {
+      return existing;
+    }
+    var fallback = fallbackHostObjectForClass(marker.__cn1HostClass || null);
+    if (fallback != null) {
+      hostRefById[id] = fallback;
+      if (hostRefByObject) {
+        hostRefByObject.set(fallback, id);
+      }
+      diag('HOST', 'receiverRehydrated', String(marker.__cn1HostClass || 'unknown') + '#' + String(id));
+      return fallback;
+    }
+    return null;
   }
 
   function mapHostArgs(args) {
@@ -162,6 +205,9 @@
     if (value === global.window) {
       return 'com_codename1_html5_js_browser_Window';
     }
+    if (typeof Event === 'function' && value instanceof Event) {
+      return 'com_codename1_html5_js_dom_Event';
+    }
     if (value && value.nodeType === 9) {
       return 'com_codename1_html5_js_dom_HTMLDocument';
     }
@@ -175,6 +221,9 @@
       var tagName = String(value.tagName).toUpperCase();
       if (tagName === 'CANVAS') {
         return 'com_codename1_html5_js_dom_HTMLCanvasElement';
+      }
+      if (tagName === 'IFRAME') {
+        return 'com_codename1_impl_html5_JSOImplementations_HTMLIFrameElement';
       }
       if (tagName === 'BODY') {
         return 'com_codename1_html5_js_dom_HTMLBodyElement';
@@ -197,7 +246,37 @@
   hostBridge.register('__cn1_jso_bridge__', function(request) {
     var payload = request || {};
     var receiver = resolveHostRef(payload.receiver);
+    var receiverClassHint = (payload.receiver && payload.receiver.__cn1HostClass)
+      || payload.receiverClass
+      || null;
+    diag('HOST', 'jsoBridgeKind', payload.kind || 'unknown');
+    diag('HOST', 'jsoBridgeMember', payload.member || 'unknown');
+    if (payload.receiver && payload.receiver.__cn1HostRef != null) {
+      diag('HOST', 'jsoBridgeReceiverRef', payload.receiver.__cn1HostRef);
+      diag('HOST', 'jsoBridgeReceiverClass', payload.receiver.__cn1HostClass || 'unknown');
+    } else {
+      diag('HOST', 'jsoBridgeReceiverRef', 'none');
+      diag('HOST', 'jsoBridgeReceiverClass', 'none');
+    }
     if (receiver == null) {
+      receiver = fallbackHostObjectForClass(receiverClassHint);
+      if (receiver != null) {
+        diag('HOST', 'receiverFallback', String(receiverClassHint || 'unknown'));
+      }
+    }
+    if (receiver == null) {
+      if (payload && payload.kind === 'getter' && payload.member === 'document') {
+        receiver = global.window || null;
+        if (receiver != null) {
+          diag('HOST', 'receiverFallback', 'window.document');
+        }
+      }
+    }
+    if (receiver == null) {
+      diag('FIRST_FAILURE', 'category', 'host_receiver_missing');
+      diag('FIRST_FAILURE', 'hostMember', payload.member || 'unknown');
+      diag('FIRST_FAILURE', 'hostKind', payload.kind || 'unknown');
+      diag('FIRST_FAILURE', 'hostReceiverClass', receiverClassHint || 'none');
       throw new Error('Missing host receiver for JSO bridge');
     }
     var kind = payload.kind;
@@ -220,6 +299,40 @@
       }
     }
     return hostResult(value);
+  });
+
+  hostBridge.register('__cn1_create_custom_event__', function(request) {
+    var payload = request || {};
+    var type = payload.type == null ? '' : String(payload.type);
+    var detail = payload.detail == null ? null : payload.detail;
+    var code = payload.code == null ? 0 : (payload.code | 0);
+    var targetWindow = global.window || global.self || global;
+    var event;
+    if (typeof targetWindow.CustomEvent === 'function') {
+      event = new targetWindow.CustomEvent(type, {
+        detail: detail,
+        bubbles: false,
+        cancelable: false
+      });
+    } else if (typeof targetWindow.Event === 'function') {
+      event = new targetWindow.Event(type);
+      event.detail = detail;
+    } else {
+      throw new Error('CustomEvent is not available in host environment');
+    }
+    if (event && event.code == null) {
+      try {
+        Object.defineProperty(event, 'code', {
+          configurable: true,
+          enumerable: false,
+          writable: true,
+          value: code
+        });
+      } catch (err) {
+        event.code = code;
+      }
+    }
+    return hostResult(event);
   });
 
   global.__parparMessages = [];

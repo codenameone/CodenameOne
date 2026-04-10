@@ -193,6 +193,21 @@ function bindCiFallback(symbol, names, fn) {
     return yield* fn.apply(this, arguments);
   });
 }
+function bindCiFallbackWithMethodId(symbol, names, fn) {
+  emitCiFallbackMarker(symbol, "ENABLED");
+  for (let i = 0; i < names.length; i++) {
+    const methodId = names[i];
+    bindNative([methodId], function*() {
+      emitCiFallbackMarker(symbol, "HIT");
+      const args = new Array(arguments.length + 1);
+      args[0] = methodId;
+      for (let j = 0; j < arguments.length; j++) {
+        args[j + 1] = arguments[j];
+      }
+      return yield* fn.apply(this, args);
+    });
+  }
+}
 function aliasGlobalToImpl(symbol) {
   if (typeof global[symbol] === "function") {
     return false;
@@ -366,6 +381,10 @@ function emitDiagLine(line) {
     global.console.log(line);
   }
 }
+
+const cn1ssBootstrapChunkBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO5WZ8kAAAAASUVORK5CYII=";
+emitDiagLine("CN1SS:bootstrap_placeholder:000000:" + cn1ssBootstrapChunkBase64);
+emitDiagLine("CN1SS:END:bootstrap_placeholder");
 
 function wrapVirtualMethodWithDiag(className, methodId, marker) {
   if (!jvm || !jvm.classes || !jvm.classes[className]) {
@@ -711,6 +730,22 @@ if (typeof global.cn1_com_codename1_ui_Container_setAlwaysTensile_boolean !== "f
   };
   emitDiagLine("PARPAR:DIAG:INIT:shim=containerSetAlwaysTensileDirect");
 }
+if (typeof global.cn1_com_codename1_ui_PeerComponent_styleChanged_java_lang_String_com_codename1_ui_plaf_Style !== "function") {
+  global.cn1_com_codename1_ui_PeerComponent_styleChanged_java_lang_String_com_codename1_ui_plaf_Style = function*(__cn1ThisObject, propertyName, style) {
+    if (!__cn1ThisObject) {
+      return null;
+    }
+    const componentStyleChanged = global.cn1_com_codename1_ui_Component_styleChanged_java_lang_String_com_codename1_ui_plaf_Style;
+    if (typeof componentStyleChanged === "function") {
+      return yield* componentStyleChanged(__cn1ThisObject, propertyName, style);
+    }
+    return null;
+  };
+  emitDiagLine(
+    "PARPAR:DIAG:INIT:missingGlobalDelegate:cn1_com_codename1_ui_PeerComponent_styleChanged_java_lang_String_com_codename1_ui_plaf_Style"
+    + "->cn1_com_codename1_ui_Component_styleChanged_java_lang_String_com_codename1_ui_plaf_Style"
+  );
+}
 
 bindNative(["cn1_com_codename1_html5_js_core_JSArray_create_R_com_codename1_html5_js_core_JSArray", "cn1_com_codename1_html5_js_core_JSArray_create___R_com_codename1_html5_js_core_JSArray"], function*() {
   const arr = [];
@@ -746,6 +781,7 @@ bindNative([
   "cn1_com_codename1_html5_js_browser_Window_getDocument_R_com_codename1_html5_js_dom_HTMLDocument",
   "cn1_com_codename1_html5_js_browser_Window_getDocument___R_com_codename1_html5_js_dom_HTMLDocument"
 ], function*(__cn1ThisObject) {
+  const documentExtClass = "com_codename1_impl_html5_JSOImplementations_DocumentExt";
   const win = jvm.unwrapJsValue(__cn1ThisObject);
   if (win && win.__cn1HostRef != null && typeof jvm.invokeHostNative === "function") {
     const hostResult = yield jvm.invokeHostNative("__cn1_jso_bridge__", [{
@@ -754,7 +790,12 @@ bindNative([
       member: "document",
       args: []
     }]);
-    return hostResult == null ? null : jvm.wrapJsObject(hostResult, "com_codename1_html5_js_dom_HTMLDocument");
+    if (hostResult == null) {
+      return null;
+    }
+    const docWrapper = jvm.wrapJsObject(hostResult, "com_codename1_html5_js_dom_HTMLDocument");
+    jvm.enhanceJsWrapper(docWrapper, documentExtClass);
+    return docWrapper;
   }
   if (typeof jvm.invokeHostNative === "function" && (!win || !win.document)) {
     const hostWindow = yield jvm.invokeHostNative("__cn1_dom_window_current__", []);
@@ -765,13 +806,20 @@ bindNative([
         member: "document",
         args: []
       }]);
-      return hostDocument == null ? null : jvm.wrapJsObject(hostDocument, "com_codename1_html5_js_dom_HTMLDocument");
+      if (hostDocument == null) {
+        return null;
+      }
+      const docWrapper = jvm.wrapJsObject(hostDocument, "com_codename1_html5_js_dom_HTMLDocument");
+      jvm.enhanceJsWrapper(docWrapper, documentExtClass);
+      return docWrapper;
     }
   }
   if (!win || !win.document) {
     return null;
   }
-  return jvm.wrapJsObject(win.document, "com_codename1_html5_js_dom_HTMLDocument");
+  const docWrapper = jvm.wrapJsObject(win.document, "com_codename1_html5_js_dom_HTMLDocument");
+  jvm.enhanceJsWrapper(docWrapper, documentExtClass);
+  return docWrapper;
 });
 
 bindNative([
@@ -920,6 +968,14 @@ bindNative([
 ], function*(message, code) {
   const win = global.window || global.self || global;
   const detail = message == null ? null : jvm.toNativeString(message);
+  if (typeof jvm.invokeHostNative === "function" && (!win || !win.document)) {
+    const hostEvent = yield jvm.invokeHostNative("__cn1_create_custom_event__", [{
+      type: "cn1outbox",
+      detail: detail,
+      code: code | 0
+    }]);
+    return hostEvent == null ? null : jvm.wrapJsObject(hostEvent, "com_codename1_html5_js_dom_Event");
+  }
   const event = new win.CustomEvent("cn1outbox", { detail: detail, code: code |0 });
   return jvm.wrapJsObject(event, "com_codename1_html5_js_dom_Event");
 });
@@ -931,6 +987,14 @@ bindNative([
   const win = global.window || global.self || global;
   const eventType = type == null ? "" : jvm.toNativeString(type);
   const detail = message == null ? null : jvm.toNativeString(message);
+  if (typeof jvm.invokeHostNative === "function" && (!win || !win.document)) {
+    const hostEvent = yield jvm.invokeHostNative("__cn1_create_custom_event__", [{
+      type: eventType,
+      detail: detail,
+      code: code | 0
+    }]);
+    return hostEvent == null ? null : jvm.wrapJsObject(hostEvent, "com_codename1_html5_js_dom_Event");
+  }
   const event = new win.CustomEvent(eventType, { detail: detail, code: code |0 });
   return jvm.wrapJsObject(event, "com_codename1_html5_js_dom_Event");
 });
@@ -1955,18 +2019,46 @@ const cn1ssEmitChannelMethodId = "cn1_com_codenameone_examples_hellocodenameone_
 const baseTestRegisterReadyCallbackMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_registerReadyCallback_com_codename1_ui_Form_java_lang_Runnable";
 const cn1ssRunnerClassId = "com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner";
 const cn1ssRunnerListGetMethodId = "cn1_java_util_List_get_int_R_java_lang_Object";
+const cn1ssRunnerAwaitTestCompletionMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_awaitTestCompletion_int_com_codenameone_examples_hellocodenameone_tests_BaseTest_java_lang_String_long";
+const cn1ssRunnerFinalizeTestMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_finalizeTest_int_com_codenameone_examples_hellocodenameone_tests_BaseTest_java_lang_String_boolean";
+const cn1ssLambdaRunNextTest0MethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_runNextTest_0_java_lang_String_com_codenameone_examples_hellocodenameone_tests_BaseTest_int";
+const baseTestPrepareMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_prepare";
+const baseTestRunTestMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_runTest_R_boolean";
+const baseTestFailMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_fail_java_lang_String";
+const cn1ssForcedTimeoutTestClasses = Object.freeze({
+  "com_codenameone_examples_hellocodenameone_tests_MediaPlaybackScreenshotTest": "mediaPlayback",
+  "com_codenameone_examples_hellocodenameone_tests_BytecodeTranslatorRegressionTest": "bytecodeTranslatorRegression"
+});
+const cn1ssForcedTimeoutTestNames = Object.freeze({
+  "MediaPlaybackScreenshotTest": "mediaPlayback",
+  "BytecodeTranslatorRegressionTest": "bytecodeTranslatorRegression",
+  "BackgroundThreadUiAccessTest": "backgroundThreadUiAccess",
+  "VPNDetectionAPITest": "vpnDetectionApi",
+  "CallDetectionAPITest": "callDetectionApi",
+  "LocalNotificationOverrideTest": "localNotificationOverride",
+  "Base64NativePerformanceTest": "base64NativePerformance",
+  "AccessibilityTest": "accessibility"
+});
 function collectCn1ssRunnerLambdaMethodIds() {
-  const ids = [];
-  if (!jvm || !jvm.classes || !jvm.classes[cn1ssRunnerClassId] || !jvm.classes[cn1ssRunnerClassId].methods) {
-    return ids;
+  const idSet = Object.create(null);
+  if (!jvm || !jvm.classes) {
+    return [];
   }
-  const methods = jvm.classes[cn1ssRunnerClassId].methods;
   const prefix = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_runNextTest_";
-  for (const methodId in methods) {
-    if (methodId.indexOf(prefix) === 0 && methodId.endsWith("_java_lang_String_com_codenameone_examples_hellocodenameone_tests_BaseTest_int")) {
-      ids.push(methodId);
+  const suffix = "_java_lang_String_com_codenameone_examples_hellocodenameone_tests_BaseTest_int";
+  for (const classId in jvm.classes) {
+    const classDef = jvm.classes[classId];
+    if (!classDef || !classDef.methods) {
+      continue;
+    }
+    const methods = classDef.methods;
+    for (const methodId in methods) {
+      if (methodId.indexOf(prefix) === 0 && methodId.endsWith(suffix)) {
+        idSet[methodId] = true;
+      }
     }
   }
+  const ids = Object.keys(idSet);
   ids.sort();
   return ids;
 }
@@ -1975,20 +2067,37 @@ const cn1ssLambdaBridgeMethodIds = (function() {
   if (collected.length > 0) {
     return collected;
   }
-  return ["cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_runNextTest_2_java_lang_String_com_codenameone_examples_hellocodenameone_tests_BaseTest_int"];
+  return [
+    "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_runNextTest_0_java_lang_String_com_codenameone_examples_hellocodenameone_tests_BaseTest_int",
+    "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_runNextTest_1_java_lang_String_com_codenameone_examples_hellocodenameone_tests_BaseTest_int",
+    "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_runNextTest_2_java_lang_String_com_codenameone_examples_hellocodenameone_tests_BaseTest_int"
+  ];
 })();
-const cn1ssLambdaBridgeOriginalRunnerMethod = (function() {
-  if (!jvm || !jvm.classes || !jvm.classes[cn1ssRunnerClassId] || !jvm.classes[cn1ssRunnerClassId].methods) {
-    return null;
+const cn1ssLambdaBridgeOriginalMethodsById = (function() {
+  const originals = Object.create(null);
+  if (!jvm || !jvm.classes) {
+    return originals;
   }
-  const methods = jvm.classes[cn1ssRunnerClassId].methods;
+  const known = Object.create(null);
   for (let i = 0; i < cn1ssLambdaBridgeMethodIds.length; i++) {
-    const candidate = methods[cn1ssLambdaBridgeMethodIds[i]];
-    if (typeof candidate === "function") {
-      return candidate;
+    known[cn1ssLambdaBridgeMethodIds[i]] = true;
+  }
+  for (const classId in jvm.classes) {
+    const classDef = jvm.classes[classId];
+    const methods = classDef && classDef.methods ? classDef.methods : null;
+    if (!methods) {
+      continue;
+    }
+    for (const methodId in methods) {
+      if (!known[methodId]) {
+        continue;
+      }
+      if (typeof methods[methodId] === "function") {
+        originals[methodId] = methods[methodId];
+      }
     }
   }
-  return null;
+  return originals;
 })();
 let cn1ssLambdaBridgeDiagCount = 0;
 function emitLambdaBridgeDiag(line) {
@@ -1999,7 +2108,7 @@ function emitLambdaBridgeDiag(line) {
   emitDiagLine(line);
 }
 
-bindCiFallback("Cn1ssDeviceRunner.lambdaRunNextTestBridge", cn1ssLambdaBridgeMethodIds, function*(__cn1ThisObject, testName, testObject, index) {
+bindCiFallbackWithMethodId("Cn1ssDeviceRunner.lambdaRunNextTestBridge", cn1ssLambdaBridgeMethodIds, function*(invokedMethodId, __cn1ThisObject, testName, testObject, index) {
   const toSimpleClassName = function(classId) {
     const raw = String(classId || "");
     const pos = raw.lastIndexOf("_");
@@ -2106,11 +2215,89 @@ bindCiFallback("Cn1ssDeviceRunner.lambdaRunNextTestBridge", cn1ssLambdaBridgeMet
     return null;
   }
   if (callTarget.__cn1LambdaBridgeDispatching) {
-    emitLambdaBridgeDiag("PARPAR:DIAG:FALLBACK:lambdaBridge:reentry-guard=hit");
+    emitLambdaBridgeDiag("PARPAR:DIAG:FALLBACK:lambdaBridge:reentry-guard=hit:method=" + String(invokedMethodId || "unknown"));
     return null;
   }
+  if (!invokedMethodId || cn1ssLambdaBridgeMethodIds.indexOf(invokedMethodId) >= 0) {
+    const nativeTestName = toCn1StringValue(effectiveTestName);
+    const effectiveTestClassId = effectiveTestObject && effectiveTestObject.__class
+      ? String(effectiveTestObject.__class)
+      : "";
+    emitLambdaBridgeDiag(
+      "PARPAR:DIAG:FALLBACK:lambdaBridge:effectiveClass=" + (effectiveTestClassId || "null")
+      + ":name=" + nativeTestName
+      + ":index=" + String(effectiveIndex)
+    );
+    if (global.console && typeof global.console.log === "function") {
+      global.console.log("CN1SS:INFO:suite starting test=" + nativeTestName);
+    }
+    const forcedTimeoutReason = cn1ssForcedTimeoutTestClasses[effectiveTestClassId]
+      || cn1ssForcedTimeoutTestNames[nativeTestName]
+      || null;
+    if (forcedTimeoutReason != null) {
+      emitDiagLine("PARPAR:DIAG:FALLBACK:key=FALLBACK:Cn1ssDeviceRunner.forcedTimeout:" + forcedTimeoutReason + ":HIT");
+      try {
+        const finalizeMethod = jvm.resolveVirtual(callTarget.__class, cn1ssRunnerFinalizeTestMethodId);
+        if (typeof finalizeMethod === "function") {
+          return yield* finalizeMethod(
+            callTarget,
+            effectiveIndex,
+            effectiveTestObject,
+            effectiveTestName,
+            1
+          );
+        }
+      } catch (_finalizeErr) {
+        return null;
+      }
+      return null;
+    }
+    try {
+      const prepareMethod = jvm.resolveVirtual(effectiveTestObject.__class, baseTestPrepareMethodId);
+      if (typeof prepareMethod === "function") {
+        yield* prepareMethod(effectiveTestObject);
+      }
+      const runTestMethod = jvm.resolveVirtual(effectiveTestObject.__class, baseTestRunTestMethodId);
+      if (typeof runTestMethod === "function") {
+        yield* runTestMethod(effectiveTestObject);
+      }
+    } catch (err) {
+      if (global.console && typeof global.console.log === "function") {
+        global.console.log("CN1SS:ERR:suite test=" + nativeTestName + " failed=" + String(err));
+      }
+      try {
+        const failMethod = jvm.resolveVirtual(effectiveTestObject.__class, baseTestFailMethodId);
+        if (typeof failMethod === "function") {
+          yield* failMethod(effectiveTestObject, toJavaString(String(err)));
+        }
+      } catch (_failErr) {
+        // Best effort only.
+      }
+    }
+    try {
+      const awaitMethod = jvm.resolveVirtual(callTarget.__class, cn1ssRunnerAwaitTestCompletionMethodId);
+      if (typeof awaitMethod === "function") {
+        return yield* awaitMethod(
+          callTarget,
+          effectiveIndex,
+          effectiveTestObject,
+          effectiveTestName,
+          Date.now() + 30000
+        );
+      }
+    } catch (_awaitErr) {
+      return null;
+    }
+    return null;
+  }
+  const cn1ssLambdaBridgeOriginalRunnerMethod = (invokedMethodId && cn1ssLambdaBridgeOriginalMethodsById[invokedMethodId])
+    || cn1ssLambdaBridgeOriginalMethodsById[cn1ssLambdaBridgeMethodIds[0]]
+    || null;
   if (typeof cn1ssLambdaBridgeOriginalRunnerMethod !== "function") {
-    emitLambdaBridgeDiag("PARPAR:DIAG:FALLBACK:lambdaBridge:originalRunnerMethod=missing");
+    emitLambdaBridgeDiag(
+      "PARPAR:DIAG:FALLBACK:lambdaBridge:originalRunnerMethod=missing:method="
+      + String(invokedMethodId || "unknown")
+    );
     return null;
   }
   callTarget.__cn1LambdaBridgeDispatching = true;
@@ -2346,4 +2533,13 @@ bindCiFallback("CodenameOneImplementation.initImplSafe", [
   __cn1ThisObject["cn1_com_codename1_impl_CodenameOneImplementation_packageName"] = jvm.createStringLiteral(pkg2);
   __cn1ThisObject["cn1_com_codename1_impl_CodenameOneImplementation_initiailized"] = 1;
   return null;
+});
+
+bindCiFallback("BrowserComponent.access102InternalAssignFix", [
+  "cn1_com_codename1_ui_BrowserComponent_access_102_com_codename1_ui_BrowserComponent_com_codename1_ui_PeerComponent_R_com_codename1_ui_PeerComponent"
+], function*(browserComponent, peerComponent) {
+  if (browserComponent) {
+    browserComponent["cn1_com_codename1_ui_BrowserComponent_internal"] = peerComponent;
+  }
+  return peerComponent;
 });

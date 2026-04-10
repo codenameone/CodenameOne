@@ -7188,7 +7188,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
         if (browserComponent instanceof SystemBrowserComponent) {
             return new HTML5BrowserComponent(null, browserComponent);
         }
-        HTMLIFrameElement el = (HTMLIFrameElement)window.getDocument().createElement("iframe");
+        // In ParparVM worker/host bridging, createElement("iframe") can be surfaced as a
+        // generic HTMLElement wrapper. Keep this typed as HTMLElement to avoid strict cast
+        // failures while still constructing the browser peer correctly.
+        HTMLElement el = window.getDocument().createElement("iframe");
         //HTMLIFrameElement el = createBlankIFrame();
         
         HTML5BrowserComponent browser = new HTML5BrowserComponent(el, browserComponent);

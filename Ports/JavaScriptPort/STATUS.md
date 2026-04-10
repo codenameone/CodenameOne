@@ -3,7 +3,7 @@
 JavaScript Port Status (ParparVM)
 =================================
 
-Last updated: 2026-04-09
+Last updated: 2026-04-10
 
 Current State
 -------------
@@ -38,14 +38,22 @@ Current State
   - `DataCloneError: Failed to execute 'postMessage' ... function(...) could not be cloned`
   - cause: non-cloneable callback/function payload crossing worker host-call boundary.
   - mitigation added: runtime host-call argument sanitization (`toHostTransferArg`) before `emitVmMessage`.
+- Latest CI artifact (`~/Downloads/javascript-ui-tests/browser.log`) first blocker is:
+  - `Error: Missing host receiver for JSO bridge`
+  - stack points to worker runtime host-callback error after `__cn1_jso_bridge__`.
+- Additional fix applied (not yet CI-verified):
+  - worker JSO host-call request now includes `receiverClass` hint.
+  - host bridge now attempts class-based receiver fallback (`Window`/`Document` and `JSOImplementations_*` classes) before throwing.
+  - missing-receiver diagnostics now also emit `hostReceiverClass`.
 - Existing form-constructor recovery diagnostics remain active in `port.js` and are still relevant while migrating.
 
 Next Steps
 ----------
 
-1. Validate latest host-call serialization fix in CI artifacts:
-   - Check whether first failure moved off `DataCloneError`.
-   - If still present, capture offending host symbol + argument type and add explicit callback-handle transport (not null coercion) for that symbol.
+1. Validate latest JSO receiver rehydration fix in CI artifacts:
+   - Check whether first failure moved off `Missing host receiver for JSO bridge`.
+   - Confirm new diagnostics include `hostReceiverClass` when missing.
+   - If still present, capture exact failing symbol/member/class and add targeted fallback for that class.
 2. Continue worker-only boot validation:
    - Required markers: `PARPAR:worker-mode`, `PARPAR:DIAG:BOOT:bridgeMode=worker`.
    - Any `main-thread-mode` marker now indicates stale artifact or wrong bundle.
@@ -62,14 +70,11 @@ Next Steps
    - Exit gate remains `CN1SS:SUITE:FINISHED` with expected screenshot artifacts and no `BROWSER:PARPAR_ERROR`.
 
 Important Notes
---------------
+---------------
 
-- Current local debug artifact (`/tmp/js-ci-debug/browser.log`) shows:
-  - `PARPAR:worker-mode`
-  - `PARPAR:DIAG:BOOT:bridgeMode=worker`
-  - `TOP_BLOCKER=runtime_error|none|none`
-  - first crash currently as `DataCloneError` during worker->host message transport.
-- This indicates startup has progressed beyond initial null DOM receiver failure and is now blocked by host-call payload transport semantics.
+- This Codex environment currently cannot run the local browser harness end-to-end due sandbox socket restrictions:
+  - `PermissionError: [Errno 1] Operation not permitted` from `javascript_browser_harness.py` bind.
+  - CI artifacts remain the source of truth for runtime progression.
 
 Known Important Context
 -----------------------
