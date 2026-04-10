@@ -38,12 +38,9 @@ import static bsh.This.Keys.BSHTHIS;
 
 import java.io.IOException;
 import java.io.Reader;
-import java.lang.reflect.Method;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.UUID;
 
 import bsh.org.objectweb.asm.ClassWriter;
 import bsh.org.objectweb.asm.Label;
@@ -139,7 +136,8 @@ public class ClassGeneratorUtil implements Opcodes {
         this.vars = vars;
         classStaticNameSpace.isInterface = type == INTERFACE;
         classStaticNameSpace.isEnum = type == ENUM;
-        This.contextStore.put(this.uuid = UUID.randomUUID().toString(), classStaticNameSpace);
+        this.uuid = className + "_" + Long.toString(System.currentTimeMillis(), 36);
+        This.contextStore.put(this.uuid, classStaticNameSpace);
 
         // Split the methods into constructors and regular method lists
         List<DelayedEvalBshMethod> consl = new ArrayList<>();
@@ -290,8 +288,8 @@ public class ClassGeneratorUtil implements Opcodes {
             generateMethod(className, fqClassName, method.getName(), method.getReturnTypeDescriptor(),
                     method.getParamTypeDescriptors(), modifiers, cw);
 
-            // check if method overrides existing method and generate super delegate.
-            if ( null != classContainsMethod(superClass, method.getName(), method.getParamTypeDescriptors()) && !isStatic )
+            // Generate super delegate for instance methods.
+            if ( !isStatic )
                 generateSuperDelegateMethod(superClass, superClassName, method.getName(), method.getReturnTypeDescriptor(),
                         method.getParamTypeDescriptors(), ACC_PUBLIC, cw);
         }
@@ -717,98 +715,9 @@ public class ClassGeneratorUtil implements Opcodes {
         cv.visitMaxs(0, 0);
     }
 
-    /** Validate abstract method implementation.
-     * Check that class is abstract or implements all abstract methods.
-     * BSH classes are not abstract which allows us to instantiate abstract
-     * classes. Also applies inheritance rules @see checkInheritanceRules().
-     * @param type The class to check.
-     * @throws RuntimException if validation fails. */
+    /** Strict-Java abstract checks are not supported in the CN1 playground runtime. */
     static void checkAbstractMethodImplementation(Class<?> type) {
-        final List<Method> meths = new ArrayList<>();
-        class Reflector {
-            void gatherMethods(Class<?> type) {
-                meths.addAll(Arrays.asList(type.getDeclaredMethods()));
-                for (Class<?> i : type.getInterfaces())
-                    gatherMethods(i);
-            }
-        }
-        new Reflector().gatherMethods(type);
-        // for each filtered abstract method
-        meths.stream().filter( m -> ( m.getModifiers() & ACC_ABSTRACT ) > 0 )
-        .forEach( method -> {
-            Method[] meth = meths.stream()
-                    // find methods of the same name
-                .filter( m -> method.getName().equals(m.getName() )
-                    // not abstract nor private
-                    && ( m.getModifiers() & (ACC_ABSTRACT|ACC_PRIVATE) ) == 0
-                    // with matching parameters
-                    && Types.areSignaturesEqual(
-                            method.getParameterTypes(), m.getParameterTypes()))
-                // sort most visible methods to the top
-                // comparator: -1 if a is public or b not public or protected
-                //              0 if access modifiers for a and b are equal
-                .sorted( (a, b) -> ( a.getModifiers() & ACC_PUBLIC ) > 0
-                      || ( b.getModifiers() & (ACC_PUBLIC|ACC_PROTECTED) ) == 0
-                            ? -1 : ( a.getModifiers() & ACCESS_MODIFIERS ) ==
-                                   ( b.getModifiers() & ACCESS_MODIFIERS )
-                            ?  0 : 1 )
-                .toArray(Method[]::new);
-            // with no overriding methods class must be abstract
-            if ( meth.length == 0 && !Reflect.getClassModifiers(type)
-                    .hasModifier("abstract") )
-                throw new RuntimeException(type.getSimpleName()
-                    + " is not abstract and does not override abstract method "
-                    + method.getName() + "() in "
-                    + method.getDeclaringClass().getSimpleName());
-            // apply inheritance rules to most visible method at index 0
-            if ( meth.length > 0)
-                checkInheritanceRules(method.getModifiers(),
-                        meth[0].getModifiers(), method.getDeclaringClass());
-        });
-    }
-
-    /** Apply inheritance rules. Overridden methods may not reduce visibility.
-     * @param parentModifiers parent modifiers of method being overridden
-     * @param overriddenModifiers overridden modifiers of new method
-     * @param parentClass parent class name
-     * @return true if visibility is not reduced
-     * @throws RuntimeException if validation fails */
-    static boolean checkInheritanceRules(int parentModifiers, int overriddenModifiers, Class<?> parentClass) {
-        int prnt = parentModifiers & ( ACC_PUBLIC | ACC_PRIVATE | ACC_PROTECTED );
-        int chld = overriddenModifiers & ( ACC_PUBLIC | ACC_PRIVATE | ACC_PROTECTED );
-
-        if ( chld == prnt || prnt == ACC_PRIVATE || chld == ACC_PUBLIC || prnt == 0 && chld != ACC_PRIVATE )
-            return true;
-
-        throw new RuntimeException("Cannot reduce the visibility of the inherited method from "
-                + parentClass.getName());
-    }
-
-    /** Check if method name and type descriptor signature is overridden.
-     * @param clas super class
-     * @param methodName name of method
-     * @param paramTypes type descriptor of parameter types
-     * @return matching method or null if not found */
-    static Method classContainsMethod(Class<?> clas, String methodName, String[] paramTypes) {
-        if (clas == null) {
-            return null;
-        }
-        for (Method method : clas.getDeclaredMethods()) {
-            if (method.getName().equals(methodName)
-                    && paramTypes.length == method.getParameterCount()) {
-                String[] methodParamTypes = getTypeDescriptors(method.getParameterTypes());
-                boolean found = true;
-                for (int j = 0; j < paramTypes.length; j++) {
-                    if (false == (found = paramTypes[j].equals(methodParamTypes[j]))) {
-                        break;
-                    }
-                }
-                if (found) {
-                    return method;
-                }
-            }
-        }
-        return null;
+        // no-op
     }
 
     /** Generate return code for a normal bytecode
