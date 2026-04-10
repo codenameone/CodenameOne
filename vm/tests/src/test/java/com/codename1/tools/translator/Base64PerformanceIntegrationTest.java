@@ -34,7 +34,9 @@ class Base64PerformanceIntegrationTest {
         Path sourceDir = Files.createTempDirectory("base64-perf-sources");
         Path classesDir = Files.createTempDirectory("base64-perf-classes");
         Path javaApiDir = Files.createTempDirectory("base64-perf-javaapi");
+        Path factoryJar = findClasspathJar("codenameone-factory");
         Path coreJar = findClasspathJar("codenameone-core");
+        assertNotNull(factoryJar, "codenameone-factory jar should be present on the test classpath");
         assertNotNull(coreJar, "codenameone-core jar should be present on the test classpath");
 
         Path source = sourceDir.resolve("Base64PerfApp.java");
@@ -57,10 +59,10 @@ class Base64PerformanceIntegrationTest {
         compileArgs.add(config.targetVersion);
         if (CompilerHelper.useClasspath(config)) {
             compileArgs.add("-classpath");
-            compileArgs.add(javaApiDir + System.getProperty("path.separator") + coreJar);
+            compileArgs.add(javaApiDir + System.getProperty("path.separator") + factoryJar + System.getProperty("path.separator") + coreJar);
         } else {
             compileArgs.add("-bootclasspath");
-            compileArgs.add(javaApiDir + System.getProperty("path.separator") + coreJar);
+            compileArgs.add(javaApiDir + System.getProperty("path.separator") + factoryJar + System.getProperty("path.separator") + coreJar);
             compileArgs.add("-Xlint:-options");
         }
         compileArgs.add("-d");
@@ -70,11 +72,12 @@ class Base64PerformanceIntegrationTest {
         int compileResult = CompilerHelper.compile(config.jdkHome, compileArgs);
         assertEquals(0, compileResult, "Base64PerfApp should compile. " + CompilerHelper.getLastErrorLog());
 
-        String javaOutput = runJavaMain(config, classesDir, javaApiDir, coreJar);
+        String javaOutput = runJavaMain(config, classesDir, javaApiDir, factoryJar, coreJar);
         String javaResult = extractLine(javaOutput, "RESULT=");
         assertTrue(javaResult.startsWith("RESULT="), "JavaSE should produce RESULT=. Output: " + javaOutput);
 
         CompilerHelper.copyDirectory(javaApiDir, classesDir);
+        unzipAllClasses(factoryJar, classesDir);
         unzipAllClasses(coreJar, classesDir);
 
         Path outputDir = Files.createTempDirectory("base64-perf-output");
@@ -123,11 +126,12 @@ class Base64PerformanceIntegrationTest {
                 StandardOpenOption.CREATE,
                 StandardOpenOption.TRUNCATE_EXISTING);
         List<String> symbols = Arrays.asList(
-                "com_codename1_util_Base64_",
-                "com_codename1_simd_SIMD_"
+                "com_codename1_util_Base64_encodeNoNewline___byte_1ARRAY_byte_1ARRAY_R_int",
+                "com_codename1_util_Base64_encodeNoNewlineSimdApi___byte_1ARRAY_byte_1ARRAY_R_int",
+                "com_codename1_simd_SIMD_isSupported___R_boolean"
         );
         for (String symbol : symbols) {
-            String snippet = extractMethodSnippet(distDir, symbol, 180);
+            String snippet = extractMethodSnippet(distDir, symbol, 220);
             System.out.println("\n==== TRANSLATED METHOD SNIPPET: " + symbol + " ====");
             List<String> outLines = new ArrayList<String>();
             outLines.add("==== TRANSLATED METHOD SNIPPET: " + symbol + " ====");
@@ -154,7 +158,20 @@ class Base64PerformanceIntegrationTest {
             List<Path> candidates = files
                     .filter(Files::isRegularFile)
                     .filter(p -> p.getFileName().toString().endsWith(".c"))
+                    .sorted()
                     .collect(Collectors.toList());
+            String methodPattern = symbol + "(";
+            for (Path file : candidates) {
+                List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
+                for (int i = 0; i < lines.size(); i++) {
+                    if (!lines.get(i).contains(methodPattern)) {
+                        continue;
+                    }
+                    int start = Math.max(0, i - 3);
+                    int end = Math.min(lines.size(), i + maxLines);
+                    return lines.subList(start, end).stream().collect(Collectors.joining("\n"));
+                }
+            }
             for (Path file : candidates) {
                 List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
                 for (int i = 0; i < lines.size(); i++) {
@@ -178,7 +195,7 @@ class Base64PerformanceIntegrationTest {
         }
     }
 
-    private String runJavaMain(CompilerHelper.CompilerConfig config, Path classesDir, Path javaApiDir, Path coreJar) throws Exception {
+    private String runJavaMain(CompilerHelper.CompilerConfig config, Path classesDir, Path javaApiDir, Path factoryJar, Path coreJar) throws Exception {
         String javaExe = config.jdkHome.resolve("bin").resolve("java").toString();
         if (System.getProperty("os.name").toLowerCase().contains("win")) {
             javaExe += ".exe";
@@ -187,7 +204,7 @@ class Base64PerformanceIntegrationTest {
         ProcessBuilder pb = new ProcessBuilder(
                 javaExe,
                 "-cp",
-                classesDir + System.getProperty("path.separator") + javaApiDir + System.getProperty("path.separator") + coreJar,
+                classesDir + System.getProperty("path.separator") + javaApiDir + System.getProperty("path.separator") + factoryJar + System.getProperty("path.separator") + coreJar,
                 "Base64PerfApp"
         );
         pb.redirectErrorStream(true);

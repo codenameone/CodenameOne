@@ -40,8 +40,11 @@ jobs:
       - name: Build ByteCodeTranslator
         run: mvn -B -f vm/pom.xml -pl ByteCodeTranslator -am -DskipTests=true install
 
+      - name: Build Codename One core artifact
+        run: mvn -B -f maven/pom.xml -pl core -am -DunitTests=true -DskipTests=true -Dspotbugs.skip=true -Dmaven.javadoc.skip=true install
+
       - name: Generate Base64 translation dump
-        run: mvn -B -f vm/pom.xml -pl tests -am -Dtest=Base64PerformanceIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test
+        run: mvn -B -f vm/pom.xml -pl tests -am -Dcodenameone.core.version=8.0-SNAPSHOT -Dtest=Base64PerformanceIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test
 
       - name: Upload Base64 translation dump artifacts
         if: always()
