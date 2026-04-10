@@ -16,7 +16,6 @@ permissions:
 jobs:
   base64-translation-dump:
     runs-on: ubuntu-latest
-    container: ghcr.io/codenameone/codenameone/pr-ci-container:latest
     defaults:
       run:
         shell: bash
@@ -25,9 +24,10 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Set up Java 8
-        run: |
-          echo "JAVA_HOME=${JAVA_HOME_8}" >> "$GITHUB_ENV"
-          echo "${JAVA_HOME_8}/bin" >> "$GITHUB_PATH"
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '8'
 
       - name: Cache Maven dependencies
         uses: actions/cache@v4
