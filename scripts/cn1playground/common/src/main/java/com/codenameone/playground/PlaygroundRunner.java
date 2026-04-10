@@ -20,7 +20,6 @@ import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
-import com.codename1.util.StringUtil;
 import com.codename1.util.regex.RE;
 
 import java.util.ArrayList;
@@ -90,8 +89,11 @@ final class PlaygroundRunner {
             PlaygroundContext.pushCurrent(context);
             CN1LambdaSupport.pushInterpreter(interpreter);
             try {
-                String adapted = adaptScript(script);
-                Object result = interpreter.eval(adapted);
+                ScriptPlan plan = adaptScript(script);
+                for (int i = 0; i < plan.typeDeclarations.size(); i++) {
+                    interpreter.eval(plan.typeDeclarations.get(i));
+                }
+                Object result = interpreter.eval(plan.executableScript);
                 Component component = resolveComponent(interpreter, result, context);
                 inlineMessages.add(new InlineMessage(0, "Preview updated.", "success"));
                 return new RunResult(component, Collections.<Diagnostic>emptyList(), inlineMessages);
@@ -145,41 +147,43 @@ final class PlaygroundRunner {
         namespace.importClass("com.codenameone.playground.PlaygroundContext");
     }
 
-    private String adaptScript(String script) {
+    private ScriptPlan adaptScript(String script) {
         String adapted = unwrapSingleTopLevelClass(script);
         String normalized = adapted == null ? script : adapted;
         normalized = rewriteClassModel(normalized);
-        String wrapped = wrapLooseScript(normalized);
-        return wrapped == null ? normalized : wrapped;
+        int packageEnd = skipPackageDeclaration(normalized, 0);
+        int importEnd = skipImports(normalized, packageEnd);
+        List<TypeDeclarationBlock> declarations = findTopLevelTypeDeclarations(normalized, importEnd);
+        if (declarations.isEmpty()) {
+            String wrapped = wrapLooseScript(normalized);
+            return new ScriptPlan(Collections.<String>emptyList(), wrapped == null ? normalized : wrapped);
+        }
+
+        String importSection = normalized.substring(packageEnd, importEnd);
+        List<String> declarationScripts = new ArrayList<String>();
+        StringBuilder remainingBody = new StringBuilder();
+        int cursor = importEnd;
+        for (int i = 0; i < declarations.size(); i++) {
+            TypeDeclarationBlock block = declarations.get(i);
+            declarationScripts.add(importSection + normalized.substring(block.start, block.end + 1));
+            if (cursor < block.start) {
+                remainingBody.append(normalized.substring(cursor, block.start));
+            }
+            cursor = block.end + 1;
+        }
+        if (cursor < normalized.length()) {
+            remainingBody.append(normalized.substring(cursor));
+        }
+
+        String rewritten = normalized.substring(0, importEnd) + remainingBody.toString();
+        String wrapped = wrapLooseScript(rewritten);
+        return new ScriptPlan(declarationScripts, wrapped == null ? rewritten : wrapped);
     }
 
     private String rewriteClassModel(String script) {
-        String rewritten = rewriteSimpleClassDeclarations(script);
-        rewritten = rewriteInlineAutoCloseableClasses(rewritten);
+        String rewritten = rewriteInlineAutoCloseableClasses(script);
         rewritten = rewriteKnownSamCalls(rewritten);
         rewritten = rewriteLambdaArguments(rewritten);
-        return rewritten;
-    }
-
-    private String rewriteSimpleClassDeclarations(String script) {
-        RE staticInnerDeclaration = new RE(
-                "class\\s+([A-Za-z_$][A-Za-z0-9_$]*)\\s*\\{\\s*static\\s+class\\s+([A-Za-z_$][A-Za-z0-9_$]*)\\s*\\{\\s*String\\s+([A-Za-z_$][A-Za-z0-9_$]*)\\s*\\(\\s*\\)\\s*\\{\\s*return\\s+\\\"([^\\\"]*)\\\"\\s*;\\s*\\}\\s*\\}\\s*\\}");
-        String rewritten = script;
-        int searchFrom = 0;
-        while (searchFrom < rewritten.length() && staticInnerDeclaration.match(rewritten, searchFrom)) {
-            String outer = staticInnerDeclaration.getParen(1);
-            String inner = staticInnerDeclaration.getParen(2);
-            String method = staticInnerDeclaration.getParen(3);
-            String literal = staticInnerDeclaration.getParen(4);
-            String declaration = staticInnerDeclaration.getParen(0);
-
-            RE invocation = new RE("new\\s+" + escapeRegexLiteral(outer) + "\\."
-                    + escapeRegexLiteral(inner) + "\\s*\\(\\s*\\)\\s*\\.\\s*"
-                    + escapeRegexLiteral(method) + "\\s*\\(\\s*\\)");
-            rewritten = invocation.subst(rewritten, "\"" + literal + "\"", RE.REPLACE_ALL);
-            rewritten = StringUtil.replaceAll(rewritten, declaration, "");
-            searchFrom = 0;
-        }
         return rewritten;
     }
 
@@ -210,8 +214,6 @@ final class PlaygroundRunner {
                     RE.REPLACE_ALL | RE.REPLACE_BACKREFERENCES);
             rewritten = ctorPattern.subst(rewritten,
                     "new java.io.StringReader(\"\")", RE.REPLACE_ALL);
-            rewritten = StringUtil.replaceAll(rewritten, "new " + className + "()",
-                    "new java.io.StringReader(\"\")");
         }
         rewritten = declarationPattern.subst(rewritten, "", RE.REPLACE_ALL);
         return rewritten;
@@ -229,6 +231,53 @@ final class PlaygroundRunner {
             out.append(ch);
         }
         return out.toString();
+    }
+
+    private List<TypeDeclarationBlock> findTopLevelTypeDeclarations(String script, int start) {
+        List<TypeDeclarationBlock> out = new ArrayList<TypeDeclarationBlock>();
+        int depth = 0;
+        for (int i = start; i < script.length(); i++) {
+            char ch = script.charAt(i);
+            if (ch == '"' || ch == '\'') {
+                i = skipQuoted(script, i);
+                continue;
+            }
+            if (startsLineComment(script, i)) {
+                i = skipLineComment(script, i);
+                continue;
+            }
+            if (startsBlockComment(script, i)) {
+                i = skipBlockComment(script, i);
+                continue;
+            }
+            if (ch == '{') {
+                depth++;
+                continue;
+            }
+            if (ch == '}') {
+                depth--;
+                continue;
+            }
+            if (depth != 0) {
+                continue;
+            }
+            if (startsWithWord(script, i, "class")
+                    || startsWithWord(script, i, "interface")
+                    || startsWithWord(script, i, "enum")) {
+                int declarationStart = findClassModifiersStart(script, i);
+                int openingBrace = findOpeningBrace(script, i);
+                if (openingBrace < 0) {
+                    continue;
+                }
+                int end = findMatchingBrace(script, openingBrace);
+                if (end < 0) {
+                    continue;
+                }
+                out.add(new TypeDeclarationBlock(declarationStart, end));
+                i = end;
+            }
+        }
+        return out;
     }
 
     private RunResult failure(String message, int line, int column, List<InlineMessage> inlineMessages) {
@@ -1882,6 +1931,26 @@ final class PlaygroundRunner {
             this.bodyStart = bodyStart;
             this.bodyEnd = bodyEnd;
             this.body = body;
+        }
+    }
+
+    private static final class TypeDeclarationBlock {
+        final int start;
+        final int end;
+
+        TypeDeclarationBlock(int start, int end) {
+            this.start = start;
+            this.end = end;
+        }
+    }
+
+    private static final class ScriptPlan {
+        final List<String> typeDeclarations;
+        final String executableScript;
+
+        ScriptPlan(List<String> typeDeclarations, String executableScript) {
+            this.typeDeclarations = typeDeclarations;
+            this.executableScript = executableScript;
         }
     }
 }
