@@ -13,6 +13,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Stream;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -77,6 +78,7 @@ class Base64PerformanceIntegrationTest {
 
         Path outputDir = Files.createTempDirectory("base64-perf-output");
         CleanTargetIntegrationTest.runTranslator(classesDir, outputDir, "Base64PerfApp");
+        dumpTranslatedBase64Methods(outputDir);
 
         Path distDir = outputDir.resolve("dist");
         Path cmakeLists = distDir.resolve("CMakeLists.txt");
@@ -107,6 +109,44 @@ class Base64PerformanceIntegrationTest {
                 "ParparVM output should include ENCODE_MS timing. Output: " + vmOutput);
         assertTrue(extractLine(vmOutput, "DECODE_MS=").startsWith("DECODE_MS="),
                 "ParparVM output should include DECODE_MS timing. Output: " + vmOutput);
+    }
+
+    private void dumpTranslatedBase64Methods(Path outputDir) throws Exception {
+        Path distDir = outputDir.resolve("dist");
+        List<String> symbols = Arrays.asList(
+                "com_codename1_util_Base64_",
+                "com_codename1_simd_SIMD_"
+        );
+        for (String symbol : symbols) {
+            String snippet = extractMethodSnippet(distDir, symbol, 180);
+            System.out.println("\n==== TRANSLATED METHOD SNIPPET: " + symbol + " ====");
+            if (snippet.isEmpty()) {
+                System.out.println("(not found)");
+            } else {
+                System.out.println(snippet);
+            }
+        }
+    }
+
+    private String extractMethodSnippet(Path rootDir, String symbol, int maxLines) throws Exception {
+        try (Stream<Path> files = Files.walk(rootDir)) {
+            List<Path> candidates = files
+                    .filter(Files::isRegularFile)
+                    .filter(p -> p.getFileName().toString().endsWith(".c"))
+                    .collect(Collectors.toList());
+            for (Path file : candidates) {
+                List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
+                for (int i = 0; i < lines.size(); i++) {
+                    if (!lines.get(i).contains(symbol)) {
+                        continue;
+                    }
+                    int start = Math.max(0, i - 3);
+                    int end = Math.min(lines.size(), i + maxLines);
+                    return lines.subList(start, end).stream().collect(Collectors.joining("\n"));
+                }
+            }
+        }
+        return "";
     }
 
     private String loadAppSource() throws Exception {
