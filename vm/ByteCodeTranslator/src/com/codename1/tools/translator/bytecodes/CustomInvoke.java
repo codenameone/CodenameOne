@@ -65,6 +65,13 @@ public class CustomInvoke extends Instruction {
         }
         return cMethodName;
     }
+
+    private boolean isSimdIsSupportedStaticCall() {
+        return origOpcode == Opcodes.INVOKESTATIC
+                && "com/codename1/simd/SIMD".equals(owner)
+                && "isSupported".equals(name)
+                && "()Z".equals(desc);
+    }
     
     public void setTargetObjectLiteral(String lit) {
         this.targetObjectLiteral = lit;
@@ -147,6 +154,10 @@ public class CustomInvoke extends Instruction {
     
     
     public boolean appendExpression(StringBuilder b) {
+        if (isSimdIsSupportedStaticCall()) {
+            b.append("1");
+            return true;
+        }
         // special case for clone on an array which isn't a real method invocation
         if(name.equals("clone") && owner.indexOf('[') > -1) {
             if (targetObjectLiteral != null) {
@@ -251,6 +262,10 @@ public class CustomInvoke extends Instruction {
     
     @Override
     public void appendInstruction(StringBuilder b) {
+        if (isSimdIsSupportedStaticCall()) {
+            b.append("    PUSH_INT(1);\n");
+            return;
+        }
         // special case for clone on an array which isn't a real method invocation
         if(name.equals("clone") && owner.indexOf('[') > -1) {
             if (targetObjectLiteral != null) {
