@@ -39,7 +39,7 @@ public class LineNumber extends Instruction {
 
     @Override
     public void appendInstruction(StringBuilder b) {
-        if(hasInstructions) {
+        if(hasInstructions && (getMethod() == null || !getMethod().isDisableDebugInfo())) {
             b.append("    __CN1_DEBUG_INFO(");
             b.append(line);
             b.append(");\n");

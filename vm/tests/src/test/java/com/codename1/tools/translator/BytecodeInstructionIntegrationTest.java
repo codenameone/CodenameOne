@@ -6,6 +6,7 @@ import com.codename1.tools.translator.bytecodes.AssignableExpression;
 import com.codename1.tools.translator.bytecodes.BasicInstruction;
 import com.codename1.tools.translator.bytecodes.Instruction;
 import com.codename1.tools.translator.bytecodes.Ldc;
+import com.codename1.tools.translator.bytecodes.LineNumber;
 import com.codename1.tools.translator.bytecodes.LocalVariable;
 import com.codename1.tools.translator.bytecodes.MultiArray;
 import com.codename1.tools.translator.bytecodes.VarOp;
@@ -440,6 +441,34 @@ class BytecodeInstructionIntegrationTest {
         AnnotationVisitor result = wrapperWithDelegate.visitArray("values");
         assertSame(delegate, result);
         assertTrue(delegated.get(), "AnnotationVisitorWrapper should forward to the underlying visitor");
+    }
+
+    @Test
+    void disableDebugInfoFlagSkipsLineNumberEmission() {
+        BytecodeMethod method = new BytecodeMethod("Example", Opcodes.ACC_STATIC, "sample", "()V", null, null);
+        method.setDisableDebugInfo(true);
+
+        Instruction.setHasInstructions(true);
+        LineNumber lineNumber = new LineNumber("Example.java", 42);
+        lineNumber.setMethod(method);
+
+        StringBuilder generated = new StringBuilder();
+        lineNumber.appendInstruction(generated);
+        assertEquals("", generated.toString(), "Disabled debug info should suppress __CN1_DEBUG_INFO emission");
+    }
+
+    @Test
+    void disableNullAndArrayBoundsChecksSkipsArrayCheckEmission() {
+        BytecodeMethod method = new BytecodeMethod("Example", Opcodes.ACC_STATIC, "sample", "()V", null, null);
+        method.setDisableNullAndArrayBoundsChecks(true);
+
+        BasicInstruction instruction = new BasicInstruction(Opcodes.IALOAD, 0);
+        instruction.setMethod(method);
+
+        StringBuilder generated = new StringBuilder();
+        instruction.appendInstruction(generated);
+        assertFalse(generated.toString().contains("CHECK_ARRAY_ACCESS"),
+                "Disabled null and array bounds checks should suppress CHECK_ARRAY_ACCESS emission");
     }
 
     @Test

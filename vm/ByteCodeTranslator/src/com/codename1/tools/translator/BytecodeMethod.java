@@ -108,6 +108,8 @@ public class BytecodeMethod implements SignatureSet {
     private String desc;
     private boolean eliminated;
     private boolean barebone;
+    private boolean disableDebugInfo;
+    private boolean disableNullAndArrayBoundsChecks;
 
     
     static boolean optimizerOn;
@@ -120,6 +122,22 @@ public class BytecodeMethod implements SignatureSet {
 
     public boolean isBarebone() {
         return barebone;
+    }
+
+    public boolean isDisableDebugInfo() {
+        return disableDebugInfo;
+    }
+
+    public void setDisableDebugInfo(boolean disableDebugInfo) {
+        this.disableDebugInfo = disableDebugInfo;
+    }
+
+    public boolean isDisableNullAndArrayBoundsChecks() {
+        return disableNullAndArrayBoundsChecks;
+    }
+
+    public void setDisableNullAndArrayBoundsChecks(boolean disableNullAndArrayBoundsChecks) {
+        this.disableNullAndArrayBoundsChecks = disableNullAndArrayBoundsChecks;
     }
 
     private boolean checkBarebone() {
