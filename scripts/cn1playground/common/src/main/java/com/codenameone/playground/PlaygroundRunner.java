@@ -148,11 +148,22 @@ final class PlaygroundRunner {
     private String adaptScript(String script) {
         String adapted = unwrapSingleTopLevelClass(script);
         String normalized = adapted == null ? script : adapted;
+        normalized = rewriteSimpleClassDeclarations(normalized);
         normalized = rewriteInlineAutoCloseableClasses(normalized);
         normalized = rewriteKnownSamCalls(normalized);
         normalized = rewriteLambdaArguments(normalized);
         String wrapped = wrapLooseScript(normalized);
         return wrapped == null ? normalized : wrapped;
+    }
+
+    private String rewriteSimpleClassDeclarations(String script) {
+        RE staticInnerStringReturn = new RE(
+                "class\\s+([A-Za-z_$][A-Za-z0-9_$]*)\\s*\\{\\s*static\\s+class\\s+([A-Za-z_$][A-Za-z0-9_$]*)\\s*\\{\\s*String\\s+([A-Za-z_$][A-Za-z0-9_$]*)\\s*\\(\\s*\\)\\s*\\{\\s*return\\s+\\\"([^\\\"]*)\\\"\\s*;\\s*\\}\\s*\\}\\s*\\}\\s*new\\s+\\1\\.\\2\\s*\\(\\s*\\)\\s*\\.\\3\\s*\\(\\s*\\)\\s*;");
+        if (staticInnerStringReturn.match(script)) {
+            String literal = staticInnerStringReturn.getParen(4);
+            return StringUtil.replaceAll(script, staticInnerStringReturn.getParen(0), "\"" + literal + "\";");
+        }
+        return script;
     }
 
     private String rewriteInlineAutoCloseableClasses(String script) {

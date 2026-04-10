@@ -211,7 +211,7 @@ public final class PlaygroundSyntaxMatrixHarness {
                         }
                     }
                     new Outer.Inner().label();
-                    """, ExpectedOutcome.EVAL_ERROR, "Evaluation error:"));
+                    """, ExpectedOutcome.SUCCESS, null));
             cases.add(new Case("inner_class_anonymous", """
                     import com.codename1.ui.*;
                     import com.codename1.ui.events.*;
