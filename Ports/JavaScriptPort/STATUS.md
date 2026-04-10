@@ -46,35 +46,51 @@ Current State
   - host bridge now attempts class-based receiver fallback (`Window`/`Document` and `JSOImplementations_*` classes) before throwing.
   - missing-receiver diagnostics now also emit `hostReceiverClass`.
 - Existing form-constructor recovery diagnostics remain active in `port.js` and are still relevant while migrating.
+- CI timeout root cause shifted:
+  - We no longer stall on missing lambda virtual method resolution for `Cn1ssDeviceRunner_lambda_runNextTest_*`.
+  - Lambda fallback now handles both method signatures:
+    - `..._java_lang_String_com_codenameone_examples_hellocodenameone_tests_BaseTest_int`
+    - `..._java_lang_String_int_com_codenameone_examples_hellocodenameone_tests_BaseTest`
+- Local end-to-end harness run now reaches:
+  - `CN1SS:SUITE:FINISHED`
+  - `TOP_BLOCKER=none|none|none`
+- Remaining blocker class is now screenshot/runtime correctness, not suite completion:
+  - Most tests fail during `prepare`/`runTest` path with
+    - `TypeError: Cannot read properties of null (reading '__classDef')`
+  - Browser logs show per-test failures (not missing virtual dispatch) and only fallback/default image streams in current artifacts.
+- Lambda bridge progression hardening now includes:
+  - Forced advance path when `finalizeTest()`/`awaitTestCompletion()` fails.
+  - Forced next-index carryover (`__cn1ForcedNextIndex`) to prevent stale lambda-capture loops.
+  - Additional run-phase diagnostics (`prepare` vs `runTest`) and stack snippets for next-stage root-cause analysis.
 
 Next Steps
 ----------
 
-1. Validate latest JSO receiver rehydration fix in CI artifacts:
-   - Check whether first failure moved off `Missing host receiver for JSO bridge`.
-   - Confirm new diagnostics include `hostReceiverClass` when missing.
-   - If still present, capture exact failing symbol/member/class and add targeted fallback for that class.
-2. Continue worker-only boot validation:
+1. Root-cause `TypeError: ... __classDef` in test execution path:
+   - Use new lambda bridge phase diagnostics to determine whether first fault is in `BaseTest.prepare` or `BaseTest.runTest`.
+   - Capture first failing stack and identify null receiver origin (most likely missing virtual owner delegate or missing init path returning null component/form/object).
+2. Fix runtime object/dispatch correctness for startup drawing/form tests:
+   - Prioritize first deterministic failure (`KotlinUiTest`, then `MainScreenScreenshotTest`, then graphics tests).
+   - Remove reliance on broad force-advance once root cause is fixed.
+3. Validate screenshot stream emission per test:
+   - Ensure each test emits a named stream chunk (not just `default`) so screenshot parser can materialize expected artifacts.
+4. Continue worker-only boot validation:
    - Required markers: `PARPAR:worker-mode`, `PARPAR:DIAG:BOOT:bridgeMode=worker`.
    - Any `main-thread-mode` marker now indicates stale artifact or wrong bundle.
-3. Confirm worker native rebind fix is present in produced bundle:
+5. Confirm worker native rebind fix is present in produced bundle:
    - In generated `worker.js`, ensure `__parparInstallNativeBindings()` is invoked after imports and before `start`.
    - This must eliminate `Window.current()` null stubs from startup execution.
-4. Separate VM/EDT execution from main-thread host services cleanly:
+6. Separate VM/EDT execution from main-thread host services cleanly:
    - Keep VM/EDT scheduling in worker.
    - Ensure main-thread browser APIs are reached through explicit host-call handlers rather than direct worker DOM access.
-5. Re-triage screenshot correctness in worker mode only:
-   - Re-run screenshot suite and classify first blocker using the existing `TOP_BLOCKER` output.
-   - Prioritize deterministic runtime failures before throughput tuning.
-6. Restore full screenshot count and correctness:
+7. Restore full screenshot count and correctness:
    - Exit gate remains `CN1SS:SUITE:FINISHED` with expected screenshot artifacts and no `BROWSER:PARPAR_ERROR`.
 
 Important Notes
 ---------------
 
-- This Codex environment currently cannot run the local browser harness end-to-end due sandbox socket restrictions:
-  - `PermissionError: [Errno 1] Operation not permitted` from `javascript_browser_harness.py` bind.
-  - CI artifacts remain the source of truth for runtime progression.
+- In this Codex environment, local browser harness runs require out-of-sandbox execution due socket bind restrictions.
+- With elevated execution, local run is now useful for fast iteration and reproduces the same class of runtime failures seen in CI.
 
 Known Important Context
 -----------------------
@@ -84,6 +100,8 @@ Known Important Context
   - `PARPAR:DIAG:BOOT:bridgeMode=worker`
   - `PARPAR:DIAG:FIRST_FAILURE:category=worker_missing`
   - `PARPAR:DIAG:FALLBACK:lambdaBridge:capturedTest=...:capturedIndex=...`
+  - `PARPAR:DIAG:FALLBACK:lambdaBridge:runError:phase=prepare|runTest`
+  - `PARPAR:DIAG:FALLBACK:lambdaBridge:runErrorStack=...`
   - `PARPAR:DIAG:FALLBACK:formCtorLayout:bypassIllegalState=1`
   - `PARPAR:DIAG:FALLBACK:formCtorLayout:recoverApplied=1`
   - `CN1SS:INFO:suite starting test=...`

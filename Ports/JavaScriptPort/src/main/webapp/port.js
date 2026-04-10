@@ -1619,11 +1619,25 @@ installGlobalArrayReturnCoerce(
 );
 
 const formInitLafMethodId = "cn1_com_codename1_ui_Form_initLaf_com_codename1_ui_plaf_UIManager";
+const formInitFocusedMethodId = "cn1_com_codename1_ui_Form_initFocused";
+const formGetActualPaneMethodId = "cn1_com_codename1_ui_Form_getActualPane_R_com_codename1_ui_Container";
+const formSetFocusedMethodId = "cn1_com_codename1_ui_Form_setFocused_com_codename1_ui_Component";
+const formLayoutContainerMethodId = "cn1_com_codename1_ui_Form_layoutContainer";
+const containerFindFirstFocusableMethodId = "cn1_com_codename1_ui_Container_findFirstFocusable_R_com_codename1_ui_Component";
+const displayGetInstanceMethodId = "cn1_com_codename1_ui_Display_getInstance_R_com_codename1_ui_Display";
+const displayShouldRenderSelectionMethodId = "cn1_com_codename1_ui_Display_shouldRenderSelection_R_boolean";
 const formInitLafOriginalMethod = (function() {
   if (!jvm || !jvm.classes || !jvm.classes["com_codename1_ui_Form"] || !jvm.classes["com_codename1_ui_Form"].methods) {
     return null;
   }
   const candidate = jvm.classes["com_codename1_ui_Form"].methods[formInitLafMethodId];
+  return typeof candidate === "function" ? candidate : null;
+})();
+const formInitFocusedOriginalMethod = (function() {
+  if (!jvm || !jvm.classes || !jvm.classes["com_codename1_ui_Form"] || !jvm.classes["com_codename1_ui_Form"].methods) {
+    return null;
+  }
+  const candidate = jvm.classes["com_codename1_ui_Form"].methods[formInitFocusedMethodId];
   return typeof candidate === "function" ? candidate : null;
 })();
 let formInitLafDiagCount = 0;
@@ -1707,6 +1721,80 @@ function* safeInitLafPath(form, uiManager, lookAndFeel) {
       // best effort
     }
   }
+  return null;
+}
+
+function* recoverInitFocusedNullReceiver(form) {
+  if (!form || !form.__class) {
+    emitDiagLine("PARPAR:DIAG:FALLBACK:formInitFocused:recoverSkipped=noForm");
+    return null;
+  }
+  yield* ensureComponentBounds(form, "formInitFocused:self");
+  yield* ensureContainerComponentsList(form, "formInitFocused:self");
+  let focusCandidate = null;
+  const formLayeredPane = form["cn1_com_codename1_ui_Form_formLayeredPane"] || null;
+  if (formLayeredPane && formLayeredPane.__class) {
+    try {
+      const findFirstFocusable = jvm.resolveVirtual(formLayeredPane.__class, containerFindFirstFocusableMethodId);
+      focusCandidate = yield* findFirstFocusable(formLayeredPane);
+    } catch (_err) {
+      focusCandidate = null;
+    }
+  }
+  if (!focusCandidate) {
+    let pane = null;
+    try {
+      const getActualPane = jvm.resolveVirtual(form.__class, formGetActualPaneMethodId);
+      pane = yield* getActualPane(form);
+    } catch (_err) {
+      pane = null;
+    }
+    if (!pane || !pane.__class) {
+      pane = yield* ensureFormContentPane(form, "formInitFocused");
+    }
+    if (pane && pane.__class) {
+      yield* ensureComponentBounds(pane, "formInitFocused:pane");
+      yield* ensureContainerComponentsList(pane, "formInitFocused:pane");
+      try {
+        const findFirstFocusable = jvm.resolveVirtual(pane.__class, containerFindFirstFocusableMethodId);
+        focusCandidate = yield* findFirstFocusable(pane);
+      } catch (_err) {
+        focusCandidate = null;
+      }
+    }
+  }
+  try {
+    const setFocused = jvm.resolveVirtual(form.__class, formSetFocusedMethodId);
+    yield* setFocused(form, focusCandidate);
+  } catch (_err) {
+    form["cn1_com_codename1_ui_Form_focused"] = focusCandidate || null;
+  }
+  let shouldRenderSelection = 0;
+  try {
+    const getDisplay = global[displayGetInstanceMethodId + "__impl"] || global[displayGetInstanceMethodId];
+    if (typeof getDisplay === "function") {
+      const display = yield* getDisplay();
+      if (display && display.__class) {
+        const shouldRenderSelectionFn = jvm.resolveVirtual(display.__class, displayShouldRenderSelectionMethodId);
+        shouldRenderSelection = (yield* shouldRenderSelectionFn(display)) | 0;
+      }
+    }
+  } catch (_err) {
+    shouldRenderSelection = 0;
+  }
+  if (shouldRenderSelection) {
+    try {
+      const layoutContainer = jvm.resolveVirtual(form.__class, formLayoutContainerMethodId);
+      yield* layoutContainer(form);
+    } catch (_err) {
+      // Best effort.
+    }
+  }
+  emitDiagLine(
+    "PARPAR:DIAG:FALLBACK:formInitFocused:recoverApplied=1"
+    + ":focus=" + (focusCandidate && focusCandidate.__class ? focusCandidate.__class : "null")
+    + ":render=" + (shouldRenderSelection ? "1" : "0")
+  );
   return null;
 }
 
@@ -1809,13 +1897,143 @@ bindCiFallback("Form.initLafNullUiManagerBridge", [
   }
 });
 
+bindCiFallback("Form.initFocusedNullPaneGuard", [
+  formInitFocusedMethodId
+], function*(__cn1ThisObject) {
+  if (typeof formInitFocusedOriginalMethod !== "function") {
+    return yield* recoverInitFocusedNullReceiver(__cn1ThisObject);
+  }
+  try {
+    return yield* formInitFocusedOriginalMethod(__cn1ThisObject);
+  } catch (err) {
+    const message = String(err && err.message ? err.message : err || "");
+    if (message.indexOf("__classDef") >= 0) {
+      emitDiagLine("PARPAR:DIAG:FALLBACK:formInitFocused:recoverFromNullClassDef=1");
+      return yield* recoverInitFocusedNullReceiver(__cn1ThisObject);
+    }
+    throw err;
+  }
+});
+
 const formCtorLayoutMethodId = "cn1_com_codename1_ui_Form___INIT___com_codename1_ui_layouts_Layout";
 const formCtorTitleLayoutMethodId = "cn1_com_codename1_ui_Form___INIT___java_lang_String_com_codename1_ui_layouts_Layout";
+const formAddComponentMethodIds = [
+  "cn1_com_codename1_ui_Form_addComponent_com_codename1_ui_Component",
+  "cn1_com_codename1_ui_Form_addComponent_java_lang_Object_com_codename1_ui_Component",
+  "cn1_com_codename1_ui_Form_addComponent_int_java_lang_Object_com_codename1_ui_Component",
+  "cn1_com_codename1_ui_Form_addComponent_int_com_codename1_ui_Component"
+];
 const formCtorLayoutOriginal = typeof global[formCtorLayoutMethodId] === "function" ? global[formCtorLayoutMethodId] : null;
 const formCtorTitleLayoutOriginal = typeof global[formCtorTitleLayoutMethodId] === "function" ? global[formCtorTitleLayoutMethodId] : null;
+const formAddComponentOriginalById = (function() {
+  const out = Object.create(null);
+  for (let i = 0; i < formAddComponentMethodIds.length; i++) {
+    const methodId = formAddComponentMethodIds[i];
+    const fn = typeof global[methodId] === "function" ? global[methodId] : null;
+    if (fn) {
+      out[methodId] = fn;
+    }
+  }
+  return out;
+})();
 const formDefaultCtorMethodId = "cn1_com_codename1_ui_Form___INIT__";
 const formSetTitleMethodId = "cn1_com_codename1_ui_Form_setTitle_java_lang_String";
 const containerSetLayoutMethodId = "cn1_com_codename1_ui_Container_setLayout_com_codename1_ui_layouts_Layout";
+const containerDefaultCtorMethodId = "cn1_com_codename1_ui_Container___INIT__";
+const componentDefaultCtorMethodId = "cn1_com_codename1_ui_Component___INIT__";
+const arrayListDefaultCtorMethodId = "cn1_java_util_ArrayList___INIT__";
+const containerComponentsFieldId = "cn1_com_codename1_ui_Container_components";
+const componentBoundsFieldId = "cn1_com_codename1_ui_Component_bounds";
+const formContentPaneFieldId = "cn1_com_codename1_ui_Form_contentPane";
+
+function* ensureContainerComponentsList(container, marker) {
+  if (!container || !container.__class) {
+    return null;
+  }
+  const existing = container[containerComponentsFieldId];
+  if (existing && existing.__class) {
+    return existing;
+  }
+  const arrayListCtor = global[arrayListDefaultCtorMethodId + "__impl"] || global[arrayListDefaultCtorMethodId];
+  if (typeof arrayListCtor !== "function") {
+    emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":componentsCtorMissing=1");
+    return null;
+  }
+  let list = null;
+  try {
+    list = jvm.newObject("java_util_ArrayList");
+    yield* arrayListCtor(list);
+  } catch (err) {
+    emitDiagLine(
+      "PARPAR:DIAG:FALLBACK:" + marker + ":componentsCtorErr="
+      + String(err && err.message ? err.message : err)
+    );
+    return null;
+  }
+  container[containerComponentsFieldId] = list;
+  emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":componentsInjected=1");
+  return list;
+}
+
+function* ensureComponentBounds(component, marker) {
+  if (!component || !component.__class) {
+    return null;
+  }
+  const bounds = component[componentBoundsFieldId];
+  if (bounds && bounds.__class) {
+    return bounds;
+  }
+  const componentCtor = global[componentDefaultCtorMethodId + "__impl"] || global[componentDefaultCtorMethodId];
+  if (typeof componentCtor !== "function") {
+    emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":componentCtorMissing=1");
+    return null;
+  }
+  try {
+    yield* componentCtor(component);
+  } catch (err) {
+    emitDiagLine(
+      "PARPAR:DIAG:FALLBACK:" + marker + ":componentCtorErr="
+      + String(err && err.message ? err.message : err)
+    );
+    return null;
+  }
+  emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":componentInitApplied=1");
+  return component[componentBoundsFieldId] || null;
+}
+
+function* ensureFormContentPane(form, marker) {
+  if (!form || !form.__class) {
+    return null;
+  }
+  yield* ensureComponentBounds(form, marker + ":form");
+  yield* ensureContainerComponentsList(form, marker + ":form");
+  let contentPane = form[formContentPaneFieldId] || null;
+  if (contentPane && contentPane.__class) {
+    yield* ensureComponentBounds(contentPane, marker + ":pane");
+    yield* ensureContainerComponentsList(contentPane, marker + ":pane");
+    return contentPane;
+  }
+  const containerCtor = global[containerDefaultCtorMethodId + "__impl"] || global[containerDefaultCtorMethodId];
+  if (typeof containerCtor !== "function") {
+    emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":contentPaneCtorMissing=1");
+    return null;
+  }
+  contentPane = jvm.newObject("com_codename1_ui_Container");
+  try {
+    yield* containerCtor(contentPane);
+  } catch (err) {
+    emitDiagLine(
+      "PARPAR:DIAG:FALLBACK:" + marker + ":contentPaneCtorErr="
+      + String(err && err.message ? err.message : err)
+    );
+    return null;
+  }
+  form[formContentPaneFieldId] = contentPane;
+  yield* ensureComponentBounds(contentPane, marker + ":pane");
+  yield* ensureContainerComponentsList(contentPane, marker + ":pane");
+  emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":contentPaneInjected=1");
+  return contentPane;
+}
 
 function* recoverFormCtorIllegalState(self, title, layout, marker) {
   if (!self || !self.__class) {
@@ -1864,6 +2082,8 @@ function* recoverFormCtorIllegalState(self, title, layout, marker) {
         self["cn1_com_codename1_ui_Form_title"] = title;
       }
     }
+    yield* ensureComponentBounds(self, marker + ":self");
+    yield* ensureContainerComponentsList(self, marker + ":self");
     self.__cn1FormCtorRecovered = true;
   } finally {
     self.__cn1FormCtorRecovering = false;
@@ -2014,11 +2234,58 @@ bindCiFallback("Form.titleLayoutCtorIllegalStateBypass", [
 installGlobalIllegalStateBypass(formCtorLayoutMethodId, "formCtorLayoutGlobal");
 installGlobalIllegalStateBypass(formCtorTitleLayoutMethodId, "formCtorTitleLayoutGlobal");
 
+bindCiFallbackWithMethodId("Form.addComponentNullContentPaneGuard", formAddComponentMethodIds, function*(invokedMethodId, __cn1ThisObject) {
+  const original = formAddComponentOriginalById[invokedMethodId];
+  if (typeof original !== "function") {
+    return null;
+  }
+  let effectiveSelf = __cn1ThisObject;
+  let receiverRemapField = null;
+  if (!(effectiveSelf && effectiveSelf.__class && effectiveSelf.__class.indexOf("com_codename1_ui_Form") === 0) && effectiveSelf && typeof effectiveSelf === "object") {
+    const keys = Object.keys(effectiveSelf);
+    for (let i = 0; i < keys.length; i++) {
+      const key = keys[i];
+      const value = effectiveSelf[key];
+      if (value && value.__class && value.__class.indexOf("com_codename1_ui_Form") === 0) {
+        effectiveSelf = value;
+        receiverRemapField = key;
+        break;
+      }
+    }
+  }
+  if (receiverRemapField) {
+    emitDiagLine("PARPAR:DIAG:FALLBACK:formAddComponent:receiverRemap=" + receiverRemapField);
+  }
+  if (effectiveSelf && effectiveSelf.__class && effectiveSelf.__class.indexOf("com_codename1_ui_Form") === 0) {
+    emitDiagLine(
+      "PARPAR:DIAG:FALLBACK:formAddComponent:receiver="
+      + effectiveSelf.__class
+      + ":contentPaneBefore="
+      + (effectiveSelf[formContentPaneFieldId] && effectiveSelf[formContentPaneFieldId].__class
+        ? effectiveSelf[formContentPaneFieldId].__class
+        : "null")
+    );
+    yield* ensureFormContentPane(effectiveSelf, "formAddComponent");
+    emitDiagLine(
+      "PARPAR:DIAG:FALLBACK:formAddComponent:contentPaneAfter="
+      + (effectiveSelf[formContentPaneFieldId] && effectiveSelf[formContentPaneFieldId].__class
+        ? effectiveSelf[formContentPaneFieldId].__class
+        : "null")
+    );
+  }
+  const args = [effectiveSelf];
+  for (let i = 2; i < arguments.length; i++) {
+    args.push(arguments[i]);
+  }
+  return yield* original.apply(null, args);
+});
+
 const cn1ssCompleteMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerHelper_complete_java_lang_Runnable";
 const cn1ssEmitChannelMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerHelper_emitChannel_byte_1ARRAY_java_lang_String_java_lang_String";
 const baseTestRegisterReadyCallbackMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_registerReadyCallback_com_codename1_ui_Form_java_lang_Runnable";
 const cn1ssRunnerClassId = "com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner";
 const cn1ssRunnerListGetMethodId = "cn1_java_util_List_get_int_R_java_lang_Object";
+const cn1ssRunnerRunNextTestMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_runNextTest_int";
 const cn1ssRunnerAwaitTestCompletionMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_awaitTestCompletion_int_com_codenameone_examples_hellocodenameone_tests_BaseTest_java_lang_String_long";
 const cn1ssRunnerFinalizeTestMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_finalizeTest_int_com_codenameone_examples_hellocodenameone_tests_BaseTest_java_lang_String_boolean";
 const cn1ssLambdaRunNextTest0MethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_runNextTest_0_java_lang_String_com_codenameone_examples_hellocodenameone_tests_BaseTest_int";
@@ -2045,7 +2312,10 @@ function collectCn1ssRunnerLambdaMethodIds() {
     return [];
   }
   const prefix = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_runNextTest_";
-  const suffix = "_java_lang_String_com_codenameone_examples_hellocodenameone_tests_BaseTest_int";
+  const suffixes = [
+    "_java_lang_String_com_codenameone_examples_hellocodenameone_tests_BaseTest_int",
+    "_java_lang_String_int_com_codenameone_examples_hellocodenameone_tests_BaseTest"
+  ];
   for (const classId in jvm.classes) {
     const classDef = jvm.classes[classId];
     if (!classDef || !classDef.methods) {
@@ -2053,8 +2323,13 @@ function collectCn1ssRunnerLambdaMethodIds() {
     }
     const methods = classDef.methods;
     for (const methodId in methods) {
-      if (methodId.indexOf(prefix) === 0 && methodId.endsWith(suffix)) {
-        idSet[methodId] = true;
+      if (methodId.indexOf(prefix) === 0) {
+        for (let s = 0; s < suffixes.length; s++) {
+          if (methodId.endsWith(suffixes[s])) {
+            idSet[methodId] = true;
+            break;
+          }
+        }
       }
     }
   }
@@ -2070,7 +2345,10 @@ const cn1ssLambdaBridgeMethodIds = (function() {
   return [
     "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_runNextTest_0_java_lang_String_com_codenameone_examples_hellocodenameone_tests_BaseTest_int",
     "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_runNextTest_1_java_lang_String_com_codenameone_examples_hellocodenameone_tests_BaseTest_int",
-    "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_runNextTest_2_java_lang_String_com_codenameone_examples_hellocodenameone_tests_BaseTest_int"
+    "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_runNextTest_2_java_lang_String_com_codenameone_examples_hellocodenameone_tests_BaseTest_int",
+    "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_runNextTest_0_java_lang_String_int_com_codenameone_examples_hellocodenameone_tests_BaseTest",
+    "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_runNextTest_1_java_lang_String_int_com_codenameone_examples_hellocodenameone_tests_BaseTest",
+    "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_runNextTest_2_java_lang_String_int_com_codenameone_examples_hellocodenameone_tests_BaseTest"
   ];
 })();
 const cn1ssLambdaBridgeOriginalMethodsById = (function() {
@@ -2100,6 +2378,7 @@ const cn1ssLambdaBridgeOriginalMethodsById = (function() {
   return originals;
 })();
 let cn1ssLambdaBridgeDiagCount = 0;
+let cn1ssLambdaRunErrorStackCount = 0;
 function emitLambdaBridgeDiag(line) {
   if (cn1ssLambdaBridgeDiagCount >= 60) {
     return;
@@ -2107,8 +2386,36 @@ function emitLambdaBridgeDiag(line) {
   cn1ssLambdaBridgeDiagCount++;
   emitDiagLine(line);
 }
+function* forceAdvanceCn1ssRunner(callTarget, currentIndex, reason) {
+  if (!callTarget || callTarget.__class !== cn1ssRunnerClassId) {
+    return null;
+  }
+  const nextIndex = ((currentIndex | 0) + 1) | 0;
+  callTarget.__cn1ForcedNextIndex = nextIndex;
+  emitLambdaBridgeDiag(
+    "PARPAR:DIAG:FALLBACK:lambdaBridge:forceAdvance:reason=" + String(reason || "unknown")
+    + ":nextIndex=" + String(nextIndex)
+  );
+  try {
+    const runNextTestMethod = jvm.resolveVirtual(callTarget.__class, cn1ssRunnerRunNextTestMethodId);
+    if (typeof runNextTestMethod === "function") {
+      return yield* runNextTestMethod(callTarget, nextIndex);
+    }
+  } catch (advanceErr) {
+    emitLambdaBridgeDiag(
+      "PARPAR:DIAG:FALLBACK:lambdaBridge:forceAdvanceError="
+      + String(advanceErr && advanceErr.message ? advanceErr.message : advanceErr)
+    );
+  }
+  return null;
+}
 
-bindCiFallbackWithMethodId("Cn1ssDeviceRunner.lambdaRunNextTestBridge", cn1ssLambdaBridgeMethodIds, function*(invokedMethodId, __cn1ThisObject, testName, testObject, index) {
+bindCiFallbackWithMethodId("Cn1ssDeviceRunner.lambdaRunNextTestBridge", cn1ssLambdaBridgeMethodIds, function*(invokedMethodId, __cn1ThisObject, arg1, arg2, arg3) {
+  const signatureStringIntBaseTest = invokedMethodId
+    && String(invokedMethodId).indexOf("_java_lang_String_int_com_codenameone_examples_hellocodenameone_tests_BaseTest") >= 0;
+  const testName = arg1;
+  const index = signatureStringIntBaseTest ? arg2 : arg3;
+  const testObject = signatureStringIntBaseTest ? arg3 : arg2;
   const toSimpleClassName = function(classId) {
     const raw = String(classId || "");
     const pos = raw.lastIndexOf("_");
@@ -2153,13 +2460,38 @@ bindCiFallbackWithMethodId("Cn1ssDeviceRunner.lambdaRunNextTestBridge", cn1ssLam
     }
   }
   const runner = extractedRunner || (__cn1ThisObject.__class === cn1ssRunnerClassId ? __cn1ThisObject : null);
-  let effectiveTestObject = capturedTestObject != null ? capturedTestObject : testObject;
+  let effectiveTestObject = testObject;
   if (!jvm.instanceOf(effectiveTestObject, "com_codenameone_examples_hellocodenameone_tests_BaseTest")) {
-    if (jvm.instanceOf(testName, "com_codenameone_examples_hellocodenameone_tests_BaseTest")) {
+    if (jvm.instanceOf(capturedTestObject, "com_codenameone_examples_hellocodenameone_tests_BaseTest")) {
+      effectiveTestObject = capturedTestObject;
+    } else if (jvm.instanceOf(testName, "com_codenameone_examples_hellocodenameone_tests_BaseTest")) {
       effectiveTestObject = testName;
     }
   }
-  let effectiveTestName = capturedTestName != null ? capturedTestName : testName;
+  if (!jvm.instanceOf(effectiveTestObject, "com_codenameone_examples_hellocodenameone_tests_BaseTest")) {
+    const rawArgs = [arg1, arg2, arg3];
+    for (let i = 0; i < rawArgs.length; i++) {
+      if (jvm.instanceOf(rawArgs[i], "com_codenameone_examples_hellocodenameone_tests_BaseTest")) {
+        effectiveTestObject = rawArgs[i];
+        break;
+      }
+    }
+  }
+  let effectiveTestName = testName;
+  if ((!effectiveTestName || effectiveTestName.__class !== "java_lang_String")) {
+    if (capturedTestName && capturedTestName.__class === "java_lang_String") {
+      effectiveTestName = capturedTestName;
+    } else {
+      const rawArgs = [arg1, arg2, arg3];
+      for (let i = 0; i < rawArgs.length; i++) {
+        const raw = rawArgs[i];
+        if (raw && raw.__class === "java_lang_String") {
+          effectiveTestName = raw;
+          break;
+        }
+      }
+    }
+  }
   if (!effectiveTestName || effectiveTestName.__class !== "java_lang_String") {
     if (effectiveTestObject && effectiveTestObject.__class) {
       effectiveTestName = toJavaString(toSimpleClassName(effectiveTestObject.__class));
@@ -2167,7 +2499,32 @@ bindCiFallbackWithMethodId("Cn1ssDeviceRunner.lambdaRunNextTestBridge", cn1ssLam
       effectiveTestName = toJavaString("unknown");
     }
   }
-  const effectiveIndex = capturedIndex != null ? (capturedIndex | 0) : (index | 0);
+  let effectiveIndex = index | 0;
+  if (typeof index !== "number") {
+    const rawArgs = [arg1, arg2, arg3];
+    for (let i = 0; i < rawArgs.length; i++) {
+      const raw = rawArgs[i];
+      if (typeof raw === "number") {
+        effectiveIndex = raw | 0;
+        break;
+      }
+    }
+    if (capturedIndex != null) {
+      effectiveIndex = capturedIndex | 0;
+    }
+  } else if (capturedIndex != null && (capturedIndex | 0) !== effectiveIndex) {
+    emitLambdaBridgeDiag(
+      "PARPAR:DIAG:FALLBACK:lambdaBridge:indexFromArgsOverride:capture="
+      + String(capturedIndex | 0) + ":effective=" + String(effectiveIndex)
+    );
+  }
+  if (runner && typeof runner.__cn1ForcedNextIndex === "number" && (runner.__cn1ForcedNextIndex | 0) > effectiveIndex) {
+    effectiveIndex = runner.__cn1ForcedNextIndex | 0;
+    emitLambdaBridgeDiag(
+      "PARPAR:DIAG:FALLBACK:lambdaBridge:indexForcedOverride="
+      + String(effectiveIndex)
+    );
+  }
   // Prefer runner static test list over lambda captures when available. Captured
   // lambda arguments have been observed to drift after initial indices in ParparVM.
   let indexedTestObject = null;
@@ -2248,31 +2605,62 @@ bindCiFallbackWithMethodId("Cn1ssDeviceRunner.lambdaRunNextTestBridge", cn1ssLam
           );
         }
       } catch (_finalizeErr) {
-        return null;
+        return yield* forceAdvanceCn1ssRunner(callTarget, effectiveIndex, "forcedTimeoutFinalizeFailed");
       }
-      return null;
+      return yield* forceAdvanceCn1ssRunner(callTarget, effectiveIndex, "forcedTimeoutFinalizeMissing");
     }
+    let runErrored = false;
+    let runPhase = "prepare";
     try {
       const prepareMethod = jvm.resolveVirtual(effectiveTestObject.__class, baseTestPrepareMethodId);
       if (typeof prepareMethod === "function") {
         yield* prepareMethod(effectiveTestObject);
       }
+      runPhase = "runTest";
       const runTestMethod = jvm.resolveVirtual(effectiveTestObject.__class, baseTestRunTestMethodId);
       if (typeof runTestMethod === "function") {
         yield* runTestMethod(effectiveTestObject);
       }
     } catch (err) {
+      runErrored = true;
+      const errText = String(err && err.message ? err.message : err);
+      const errStack = err && err.stack ? String(err.stack) : "";
       if (global.console && typeof global.console.log === "function") {
-        global.console.log("CN1SS:ERR:suite test=" + nativeTestName + " failed=" + String(err));
+        global.console.log("CN1SS:ERR:suite test=" + nativeTestName + " failed=" + errText + " phase=" + runPhase);
+      }
+      emitLambdaBridgeDiag("PARPAR:DIAG:FALLBACK:lambdaBridge:runError:phase=" + runPhase + ":error=" + errText);
+      if (errStack) {
+        emitLambdaBridgeDiag("PARPAR:DIAG:FALLBACK:lambdaBridge:runErrorStack=" + errStack.substring(0, 320));
+        if (cn1ssLambdaRunErrorStackCount < 6 && global.console && typeof global.console.log === "function") {
+          cn1ssLambdaRunErrorStackCount++;
+          global.console.log("PARPAR:RUN_ERROR_STACK:test=" + nativeTestName + ":phase=" + runPhase + ":" + errStack);
+        }
       }
       try {
         const failMethod = jvm.resolveVirtual(effectiveTestObject.__class, baseTestFailMethodId);
         if (typeof failMethod === "function") {
-          yield* failMethod(effectiveTestObject, toJavaString(String(err)));
+          yield* failMethod(effectiveTestObject, toJavaString(errText));
         }
       } catch (_failErr) {
         // Best effort only.
       }
+    }
+    if (runErrored) {
+      try {
+        const finalizeMethod = jvm.resolveVirtual(callTarget.__class, cn1ssRunnerFinalizeTestMethodId);
+        if (typeof finalizeMethod === "function") {
+          return yield* finalizeMethod(
+            callTarget,
+            effectiveIndex,
+            effectiveTestObject,
+            effectiveTestName,
+            0
+          );
+        }
+      } catch (_finalizeAfterRunErr) {
+        return yield* forceAdvanceCn1ssRunner(callTarget, effectiveIndex, "runErrorFinalizeFailed");
+      }
+      return yield* forceAdvanceCn1ssRunner(callTarget, effectiveIndex, "runErrorFinalizeMissing");
     }
     try {
       const awaitMethod = jvm.resolveVirtual(callTarget.__class, cn1ssRunnerAwaitTestCompletionMethodId);
@@ -2285,8 +2673,33 @@ bindCiFallbackWithMethodId("Cn1ssDeviceRunner.lambdaRunNextTestBridge", cn1ssLam
           Date.now() + 30000
         );
       }
+      const finalizeMethod = jvm.resolveVirtual(callTarget.__class, cn1ssRunnerFinalizeTestMethodId);
+      if (typeof finalizeMethod === "function") {
+        return yield* finalizeMethod(
+          callTarget,
+          effectiveIndex,
+          effectiveTestObject,
+          effectiveTestName,
+          1
+        );
+      }
+      return yield* forceAdvanceCn1ssRunner(callTarget, effectiveIndex, "awaitMissingFinalizeMissing");
     } catch (_awaitErr) {
-      return null;
+      try {
+        const finalizeMethod = jvm.resolveVirtual(callTarget.__class, cn1ssRunnerFinalizeTestMethodId);
+        if (typeof finalizeMethod === "function") {
+          return yield* finalizeMethod(
+            callTarget,
+            effectiveIndex,
+            effectiveTestObject,
+            effectiveTestName,
+            1
+          );
+        }
+      } catch (_finalizeAfterAwaitErr) {
+        return yield* forceAdvanceCn1ssRunner(callTarget, effectiveIndex, "awaitFinalizeFailed");
+      }
+      return yield* forceAdvanceCn1ssRunner(callTarget, effectiveIndex, "awaitFinalizeMissing");
     }
     return null;
   }
