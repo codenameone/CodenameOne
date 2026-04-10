@@ -715,9 +715,41 @@ public class ClassGeneratorUtil implements Opcodes {
         cv.visitMaxs(0, 0);
     }
 
-    /** Strict-Java abstract checks are not supported in the CN1 playground runtime. */
+    /**
+     * Strict-Java validation using BeanShell's faux-reflection descriptors.
+     */
     static void checkAbstractMethodImplementation(Class<?> type) {
-        // no-op
+        BshMethod[] methods = Reflect.getDeclaredMethods(type);
+        for (int i = 0; i < methods.length; i++) {
+            BshMethod parent = methods[i];
+            if (!parent.hasModifier("abstract")) {
+                continue;
+            }
+
+            BshMethod impl = null;
+            for (int j = 0; j < methods.length; j++) {
+                BshMethod candidate = methods[j];
+                if (candidate == parent) {
+                    continue;
+                }
+                if (!candidate.getName().equals(parent.getName())) {
+                    continue;
+                }
+                if (candidate.hasModifier("abstract") || candidate.hasModifier("private")) {
+                    continue;
+                }
+                if (Types.areSignaturesEqual(parent.getParameterTypes(), candidate.getParameterTypes())) {
+                    impl = candidate;
+                    break;
+                }
+            }
+
+            if (impl == null && !Reflect.getClassModifiers(type).hasModifier("abstract")) {
+                throw new RuntimeException(type.getName()
+                        + " is not abstract and does not implement "
+                        + parent.getName() + "()");
+            }
+        }
     }
 
     /** Generate return code for a normal bytecode
