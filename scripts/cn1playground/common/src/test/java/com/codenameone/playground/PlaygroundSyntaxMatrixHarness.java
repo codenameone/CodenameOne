@@ -203,7 +203,7 @@ public final class PlaygroundSyntaxMatrixHarness {
                     class A {}
                     class B {}
                     new A();
-                    """, ExpectedOutcome.EVAL_ERROR, "Evaluation error:"));
+                    """, ExpectedOutcome.SUCCESS, null));
             cases.add(new Case("inner_class_static_member", """
                     import com.codename1.ui.*;
                     import com.codename1.ui.layouts.*;
@@ -214,6 +214,19 @@ public final class PlaygroundSyntaxMatrixHarness {
                     }
                     Container root = new Container(BoxLayout.y());
                     root.add(new Label(new Outer.Inner().label()));
+                    root;
+                    """, ExpectedOutcome.SUCCESS, null));
+            cases.add(new Case("generic_top_level_class_usage", """
+                    import com.codename1.ui.*;
+                    import com.codename1.ui.layouts.*;
+                    class Pair<T> {
+                        private final T value;
+                        Pair(T value) { this.value = value; }
+                        T get() { return value; }
+                    }
+                    Container root = new Container(BoxLayout.y());
+                    Pair<String> p = new Pair<String>("generic-ok");
+                    root.add(new Label(p.get()));
                     root;
                     """, ExpectedOutcome.SUCCESS, null));
             cases.add(new Case("inner_class_anonymous", """
