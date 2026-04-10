@@ -837,6 +837,12 @@ public class BytecodeMethod implements SignatureSet {
         }
         appendCMethodPrefix(b, "");
         b.append(" {\n");
+        if (("com/codename1/simd/SIMD".equals(clsName) || "com_codename1_simd_SIMD".equals(clsName))
+                && "isSupported".equals(methodName)
+                && "()Z".equals(desc)) {
+            b.append("    return 1;\n}\n\n");
+            return;
+        }
         if(eliminated) {
             if(returnType.isVoid()) {
                 b.append("    return;\n}\n\n");
