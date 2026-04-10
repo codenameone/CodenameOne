@@ -10,6 +10,9 @@ on:
       - 'vm/tests/**'
       - '.github/workflows/base64-translation-dump.yml'
 
+permissions:
+  contents: read
+
 jobs:
   base64-translation-dump:
     runs-on: ubuntu-latest
@@ -35,10 +38,10 @@ jobs:
             ${{ runner.os }}-m2
 
       - name: Build ByteCodeTranslator
-        run: mvn -B -DskipTests=true -f vm/ByteCodeTranslator/pom.xml install
+        run: mvn -B -f vm/pom.xml -pl ByteCodeTranslator -am -DskipTests=true install
 
       - name: Generate Base64 translation dump
-        run: mvn -B -f vm/tests/pom.xml -Dtest=Base64PerformanceIntegrationTest test
+        run: mvn -B -f vm/pom.xml -pl tests -am -Dtest=Base64PerformanceIntegrationTest test
 
       - name: Upload Base64 translation dump artifacts
         if: always()
