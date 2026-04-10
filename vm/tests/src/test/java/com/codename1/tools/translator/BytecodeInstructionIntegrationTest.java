@@ -490,6 +490,23 @@ class BytecodeInstructionIntegrationTest {
     }
 
     @Test
+    void noThrowNoMonitorNoTryMethodsUseFastMethodStackMacro() {
+        BytecodeMethod method = new BytecodeMethod("Example", Opcodes.ACC_STATIC, "sample", "()V", null, null);
+        method.addInstruction(Opcodes.ICONST_0);
+        method.addInstruction(Opcodes.POP);
+        method.addInstruction(Opcodes.RETURN);
+        method.setMaxes(1, 4);
+
+        StringBuilder generated = new StringBuilder();
+        method.appendMethodC(generated);
+        String c = generated.toString();
+        assertTrue(c.contains("DEFINE_METHOD_STACK_FAST("),
+                "No-throw/no-monitor/no-try methods should use DEFINE_METHOD_STACK_FAST");
+        assertTrue(c.contains("if (!__Example_LOADED__) __STATIC_INITIALIZER_Example(threadStateData);"),
+                "Static methods should emit a fast-path loaded check before static initialization");
+    }
+
+    @Test
     void concatenatingFileOutputStreamWritesShardedOutputs() throws Exception {
         Path outputDir = Files.createTempDirectory("concatenating-output");
         ByteCodeTranslator.OutputType original = ByteCodeTranslator.output;

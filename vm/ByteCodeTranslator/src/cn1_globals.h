@@ -1129,6 +1129,7 @@ extern JAVA_OBJECT newStringFromCString(CODENAME_ONE_THREAD_STATE, const char *s
 extern void initConstantPool();
 
 extern void initMethodStack(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, int stackSize, int localsStackSize, int classNameId, int methodNameId);
+extern void initMethodStackFast(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, int stackSize, int localsStackSize);
 
 // we need to zero out the values with memset otherwise we will run into a problem
 // when invoking release on pre-existing object which might be garbage
@@ -1147,6 +1148,24 @@ extern void initMethodStack(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObje
     struct elementStruct* stack = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset + localsStackSize]; \
     struct elementStruct* SP = &stack[spPosition]; \
     initMethodStack(threadStateData, __cn1ThisObject, stackSize,localsStackSize, classNameId, methodNameId); \
+    const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;\
+    int methodBlockOffset = threadStateData->tryBlockOffset;
+
+#define DEFINE_METHOD_STACK_FAST(stackSize, localsStackSize, spPosition) \
+    const int cn1LocalsBeginInThread = threadStateData->threadObjectStackOffset; \
+    struct elementStruct* locals = &threadStateData->threadObjectStack[cn1LocalsBeginInThread]; \
+    struct elementStruct* stack = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset + localsStackSize]; \
+    struct elementStruct* SP = &stack[spPosition]; \
+    initMethodStackFast(threadStateData, (JAVA_OBJECT)1, stackSize, localsStackSize); \
+    const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;\
+    int methodBlockOffset = threadStateData->tryBlockOffset;
+
+#define DEFINE_INSTANCE_METHOD_STACK_FAST(stackSize, localsStackSize, spPosition) \
+    const int cn1LocalsBeginInThread = threadStateData->threadObjectStackOffset; \
+    struct elementStruct* locals = &threadStateData->threadObjectStack[cn1LocalsBeginInThread]; \
+    struct elementStruct* stack = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset + localsStackSize]; \
+    struct elementStruct* SP = &stack[spPosition]; \
+    initMethodStackFast(threadStateData, __cn1ThisObject, stackSize, localsStackSize); \
     const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;\
     int methodBlockOffset = threadStateData->tryBlockOffset;
 

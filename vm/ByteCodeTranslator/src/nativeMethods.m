@@ -1569,6 +1569,21 @@ void initMethodStack(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, int
     threadStateData->callStackOffset++;
 }
 
+void initMethodStackFast(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, int stackSize, int localsStackSize) {
+#ifdef CN1_INCLUDE_NPE_CHECKS
+    if(__cn1ThisObject == JAVA_NULL) {
+        THROW_NULL_POINTER_EXCEPTION();
+    }
+#endif
+    if (threadStateData->callStackOffset >= CN1_STACK_OVERFLOW_CALL_DEPTH_LIMIT - 1) {
+        throwException(threadStateData, __NEW_INSTANCE_java_lang_StackOverflowError(threadStateData));
+        return;
+    }
+    memset(&threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset], 0, sizeof(struct elementStruct) * (localsStackSize + stackSize));
+    threadStateData->threadObjectStackOffset += localsStackSize + stackSize;
+    threadStateData->callStackOffset++;
+}
+
 void releaseForReturn(CODENAME_ONE_THREAD_STATE, int cn1LocalsBeginInThread) {
     threadStateData->threadObjectStackOffset = cn1LocalsBeginInThread;
     threadStateData->callStackOffset--;

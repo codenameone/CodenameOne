@@ -286,6 +286,39 @@ public class BytecodeMethod implements SignatureSet {
         }
         return true;
     }
+
+    private boolean canUseFastMethodStack() {
+        if (synchronizedMethod || nativeMethod || abstractMethod) {
+            return false;
+        }
+        for (Instruction instruction : instructions) {
+            if (instruction instanceof TryCatch
+                    || instruction instanceof Invoke
+                    || instruction instanceof CustomInvoke
+                    || instruction instanceof Field
+                    || instruction instanceof TypeInstruction
+                    || instruction instanceof MultiArray
+                    || instruction instanceof ArrayLoadExpression
+                    || instruction instanceof CustomIntruction) {
+                return false;
+            }
+            if (instruction instanceof BasicInstruction) {
+                int op = instruction.getOpcode();
+                if (op == Opcodes.MONITORENTER || op == Opcodes.MONITOREXIT
+                        || op == Opcodes.ATHROW
+                        || op == Opcodes.IDIV || op == Opcodes.LDIV || op == Opcodes.IREM || op == Opcodes.LREM
+                        || op == Opcodes.ARRAYLENGTH
+                        || (op >= Opcodes.IALOAD && op <= Opcodes.SALOAD)
+                        || (op >= Opcodes.IASTORE && op <= Opcodes.SASTORE)
+                        || op == Opcodes.AALOAD || op == Opcodes.AASTORE
+                        || op == Opcodes.BALOAD || op == Opcodes.BASTORE || op == Opcodes.CALOAD || op == Opcodes.CASTORE
+                        || op == Opcodes.NEWARRAY) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
     
     public BytecodeMethod(String clsName, int access, String name, String desc, String signature, String[] exceptions) {
         methodName = name;
@@ -865,6 +898,7 @@ public class BytecodeMethod implements SignatureSet {
         }
             
         b.append(declaration);
+        boolean fastMethodStackCandidate = canUseFastMethodStack();
         
         boolean hasInstructions = true;
         if(optimizerOn) {
@@ -901,25 +935,43 @@ public class BytecodeMethod implements SignatureSet {
                 }
             }
             
+            boolean useFastMethodStack = !barebone && fastMethodStackCandidate;
             if(!barebone) {
                 if(staticMethod) {
                     if(methodName.equals("__CLINIT__")) {
-                        b.append("    DEFINE_METHOD_STACK(");
+                        if (useFastMethodStack) {
+                            b.append("    DEFINE_METHOD_STACK_FAST(");
+                        } else {
+                            b.append("    DEFINE_METHOD_STACK(");
+                        }
                     } else {
-                        b.append("    __STATIC_INITIALIZER_");
+                        b.append("    if (!__");
                         b.append(clsName.replace('/', '_').replace('$', '_'));
-                        b.append("(threadStateData);\n    DEFINE_METHOD_STACK(");
+                        b.append("_LOADED__) __STATIC_INITIALIZER_");
+                        b.append(clsName.replace('/', '_').replace('$', '_'));
+                        if (useFastMethodStack) {
+                            b.append("(threadStateData);\n    DEFINE_METHOD_STACK_FAST(");
+                        } else {
+                            b.append("(threadStateData);\n    DEFINE_METHOD_STACK(");
+                        }
                     }
                 } else {
-                    b.append("    DEFINE_INSTANCE_METHOD_STACK(");
+                    if (useFastMethodStack) {
+                        b.append("    DEFINE_INSTANCE_METHOD_STACK_FAST(");
+                    } else {
+                        b.append("    DEFINE_INSTANCE_METHOD_STACK(");
+                    }
                 }
                 b.append(maxStack);
                 b.append(", ");
                 b.append(maxLocals);
-                b.append(", 0, ");
-                b.append(Parser.addToConstantPool(clsName));
-                b.append(", ");
-                b.append(Parser.addToConstantPool(methodName));
+                b.append(", 0");
+                if (!useFastMethodStack) {
+                    b.append(", ");
+                    b.append(Parser.addToConstantPool(clsName));
+                    b.append(", ");
+                    b.append(Parser.addToConstantPool(methodName));
+                }
                 b.append(");\n");
             } else {
                 b.append("    struct elementStruct* SP = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset];\n");
