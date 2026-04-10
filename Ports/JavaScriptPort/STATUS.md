@@ -3,10 +3,32 @@
 JavaScript Port Status (ParparVM)
 =================================
 
-Last updated: 2026-04-10 (late)
+Last updated: 2026-04-10 (late, post-stream-recovery pass)
 
 Current State
 -------------
+
+- Local/CI-equivalent harness now consistently reaches `CN1SS:SUITE:FINISHED` with `TOP_BLOCKER=none|none|none`.
+- Lambda-bridge finalize classification bug fixed:
+  - normal completion now calls `finalizeTest(..., timedOut=false)`.
+  - this removed blanket `failed due to timeout waiting for DONE` from most screenshot tests.
+- Screenshot stream extraction materially improved:
+  - parser now sees many per-test streams (e.g. `MainActivity`, `graphics-*`, `BrowserComponent`, `Sheet`, `TextAreaAlignmentStates`, `ToastBarTopPosition`) instead of only `default`.
+  - chunk count jumped from ~36 to ~191 in local harness.
+- Host canvas capture bridge is now active:
+  - `browser_bridge.js` includes `__cn1_capture_canvas_png__`.
+  - `port.js` logs `cn1ssEmitCurrentFormScreenshotDom:hostCanvas=1:test=<name>` for many tests.
+- `BaseTest.createForm(...)` null-return path is now guarded:
+  - fallback reconstructs `BaseTest_1` form and logs `baseTestCreateForm:recoveredSubclassCtor=1`.
+- Form deinit null receiver crash was reduced by targeted Form animation-manager guards:
+  - added `Form.deinitializeImplAnimManagerNullGuard` and animation manager injection helper.
+- Remaining major failure mode is now a smaller timeout subset:
+  - timeouts persist mainly in forced-timeout tests plus selected problematic flows (`MediaPlaybackScreenshotTest`, `BytecodeTranslatorRegressionTest`, and some API/background tests).
+  - many screenshot tests now finish without timeout markers.
+- Confirmed persistent deterministic non-timeout blockers:
+  - `TabsScreenshotTest`: `cn1_com_codename1_ui_Button_initLaf_com_codename1_ui_plaf_UIManager is not defined`
+  - `OrientationLockScreenshotTest`: `document is not defined`
+  - selected tests still hit `Cannot read properties of null (reading '__classDef')` in `runTest`.
 
 - Architecture direction has been explicitly shifted to worker-first execution for ParparVM (EDT and VM scheduler in worker, browser UI/native host on main thread).
 - `browser_bridge.js` is now worker-only. Main-thread VM mode and mode toggles were removed.
@@ -84,25 +106,27 @@ Current State
 Next Steps
 ----------
 
-1. Restore per-test screenshot channel emission:
-   - `Cn1ssDeviceRunner` flow currently advances but produces mostly `default` channels.
-   - Reconcile finalize/await path so each test emits named stream chunks consistently.
-2. Root-cause `TypeError: ... __classDef` in `runTest` path:
-   - First deterministic failures are still `KotlinUiTest`/`MainScreenScreenshotTest`.
-   - Capture receiver/class/method at first null dereference after current form/layout/queue guards.
+1. Eliminate timeout-before-DONE in screenshot tests:
+   - host canvas capture now succeeds for many tests, but `BaseTest.done` still often remains false.
+   - instrument `BaseTest_1_lambda_1.run` / `BaseTest.done` invocation path and make completion deterministic.
+2. Replace fallback tiny-image emission with real completion-driven screenshots:
+   - keep per-test stream naming path, but stop relying on timeout finalization for screenshot artifacts.
 3. Fix known missing method hotspot:
    - `cn1_com_codename1_ui_Button_initLaf_com_codename1_ui_plaf_UIManager` missing in `TabsScreenshotTest`.
    - Add correct owner delegate or native rebind (not a silent no-op).
-4. Continue worker-only boot validation:
+4. Fix JS environment mismatch in OrientationLock path:
+   - `OrientationLockScreenshotTest` currently fails with `document is not defined`.
+   - route DOM access through host bridge in worker mode.
+5. Continue worker-only boot validation:
    - Required markers: `PARPAR:worker-mode`, `PARPAR:DIAG:BOOT:bridgeMode=worker`.
    - Any `main-thread-mode` marker now indicates stale artifact or wrong bundle.
-5. Confirm worker native rebind fix is present in produced bundle:
+6. Confirm worker native rebind fix is present in produced bundle:
    - In generated `worker.js`, ensure `__parparInstallNativeBindings()` is invoked after imports and before `start`.
    - This must eliminate `Window.current()` null stubs from startup execution.
-6. Separate VM/EDT execution from main-thread host services cleanly:
+7. Separate VM/EDT execution from main-thread host services cleanly:
    - Keep VM/EDT scheduling in worker.
    - Ensure main-thread browser APIs are reached through explicit host-call handlers rather than direct worker DOM access.
-7. Restore full screenshot count and correctness:
+8. Restore full screenshot count and correctness:
    - Exit gate remains `CN1SS:SUITE:FINISHED` with expected named screenshot artifacts (33 target) and no `BROWSER:PARPAR_ERROR`.
 
 Important Notes

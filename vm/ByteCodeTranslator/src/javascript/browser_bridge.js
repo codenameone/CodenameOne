@@ -335,6 +335,40 @@
     return hostResult(event);
   });
 
+  hostBridge.register('__cn1_capture_canvas_png__', function() {
+    var doc = global.document || (global.window && global.window.document) || null;
+    if (!doc || typeof doc.querySelectorAll !== 'function') {
+      return '';
+    }
+    var canvases = doc.querySelectorAll('canvas');
+    if (!canvases || !canvases.length) {
+      return '';
+    }
+    var best = null;
+    var bestArea = -1;
+    for (var i = 0; i < canvases.length; i++) {
+      var c = canvases[i];
+      if (!c || typeof c.toDataURL !== 'function') {
+        continue;
+      }
+      var w = (c.width | 0);
+      var h = (c.height | 0);
+      var area = w * h;
+      if (area > bestArea) {
+        bestArea = area;
+        best = c;
+      }
+    }
+    if (!best) {
+      return '';
+    }
+    try {
+      return String(best.toDataURL('image/png') || '');
+    } catch (_err) {
+      return '';
+    }
+  });
+
   global.__parparMessages = [];
   global.cn1Initialized = false;
   global.cn1Started = false;
