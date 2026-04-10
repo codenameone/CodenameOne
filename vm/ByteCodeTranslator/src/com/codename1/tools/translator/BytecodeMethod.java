@@ -881,7 +881,10 @@ public class BytecodeMethod implements SignatureSet {
                 String variableName = lv.getQualifier() + "locals_"+lv.getIndex()+"_";
                 if (!added.contains(variableName) && (barebone || lv.getQualifier() != 'o')) {
                     added.add(variableName);
-                    b.append("    volatile ");
+                    b.append("    ");
+                    if (!disableDebugInfo) {
+                        b.append("volatile ");
+                    }
                     switch (lv.getQualifier()) {
                         case 'i' :
                             b.append("JAVA_INT"); break;
@@ -1333,6 +1336,9 @@ public class BytecodeMethod implements SignatureSet {
     }
     
     public void addLocalVariable(String name, String desc, String signature, Label start, Label end, int index) {
+        if (disableDebugInfo) {
+            return;
+        }
         //addInstruction(0, new LocalVariable(name, desc, signature, start, end, index));
         localVariables.add(new LocalVariable(name, desc, signature, start, end, index));
     }
@@ -1342,6 +1348,9 @@ public class BytecodeMethod implements SignatureSet {
     } 
     
     public void addDebugInfo(int line) {
+        if (disableDebugInfo) {
+            return;
+        }
         addInstruction(new LineNumber(sourceFile, line));
     }
     

@@ -472,6 +472,24 @@ class BytecodeInstructionIntegrationTest {
     }
 
     @Test
+    void disableDebugInfoSkipsLocalVariableMetadataAndVolatileLocals() {
+        BytecodeMethod method = new BytecodeMethod("Example", Opcodes.ACC_STATIC, "sample", "()V", null, null);
+        method.setDisableDebugInfo(true);
+        method.addLocalVariable("counter", "I", null, new Label(), new Label(), 1);
+        method.addDebugInfo(100);
+        method.addInstruction(Opcodes.RETURN);
+        method.setMaxes(1, 2);
+
+        StringBuilder generated = new StringBuilder();
+        method.appendMethodC(generated);
+        String c = generated.toString();
+        assertFalse(c.contains("volatile JAVA_INT ilocals_1_"),
+                "Debug-disabled methods should not emit volatile locals from local variable metadata");
+        assertFalse(c.contains("__CN1_DEBUG_INFO("),
+                "Debug-disabled methods should not emit line debug information");
+    }
+
+    @Test
     void concatenatingFileOutputStreamWritesShardedOutputs() throws Exception {
         Path outputDir = Files.createTempDirectory("concatenating-output");
         ByteCodeTranslator.OutputType original = ByteCodeTranslator.output;
