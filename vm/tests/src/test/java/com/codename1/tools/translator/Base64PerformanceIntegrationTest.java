@@ -13,6 +13,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.nio.file.StandardOpenOption;
 import java.util.stream.Stream;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
@@ -78,7 +79,8 @@ class Base64PerformanceIntegrationTest {
 
         Path outputDir = Files.createTempDirectory("base64-perf-output");
         CleanTargetIntegrationTest.runTranslator(classesDir, outputDir, "Base64PerfApp");
-        dumpTranslatedBase64Methods(outputDir);
+        Path translatedDump = dumpTranslatedBase64Methods(outputDir);
+        assertTrue(Files.exists(translatedDump), "Expected translated method dump file at " + translatedDump);
 
         Path distDir = outputDir.resolve("dist");
         Path cmakeLists = distDir.resolve("CMakeLists.txt");
@@ -111,8 +113,15 @@ class Base64PerformanceIntegrationTest {
                 "ParparVM output should include DECODE_MS timing. Output: " + vmOutput);
     }
 
-    private void dumpTranslatedBase64Methods(Path outputDir) throws Exception {
+    private Path dumpTranslatedBase64Methods(Path outputDir) throws Exception {
         Path distDir = outputDir.resolve("dist");
+        Path dumpFile = Paths.get("target", "base64-translated-snippets.txt");
+        Files.createDirectories(dumpFile.getParent());
+        Files.write(dumpFile,
+                Arrays.asList("Base64 translation dump from " + distDir.toAbsolutePath(), ""),
+                StandardCharsets.UTF_8,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING);
         List<String> symbols = Arrays.asList(
                 "com_codename1_util_Base64_",
                 "com_codename1_simd_SIMD_"
@@ -120,12 +129,24 @@ class Base64PerformanceIntegrationTest {
         for (String symbol : symbols) {
             String snippet = extractMethodSnippet(distDir, symbol, 180);
             System.out.println("\n==== TRANSLATED METHOD SNIPPET: " + symbol + " ====");
+            List<String> outLines = new ArrayList<String>();
+            outLines.add("==== TRANSLATED METHOD SNIPPET: " + symbol + " ====");
             if (snippet.isEmpty()) {
                 System.out.println("(not found)");
+                outLines.add("(not found)");
             } else {
                 System.out.println(snippet);
+                outLines.add(snippet);
             }
+            outLines.add("");
+            Files.write(dumpFile,
+                    outLines,
+                    StandardCharsets.UTF_8,
+                    StandardOpenOption.CREATE,
+                    StandardOpenOption.APPEND);
         }
+        System.out.println("Saved translated method dump to " + dumpFile.toAbsolutePath());
+        return dumpFile;
     }
 
     private String extractMethodSnippet(Path rootDir, String symbol, int maxLines) throws Exception {
