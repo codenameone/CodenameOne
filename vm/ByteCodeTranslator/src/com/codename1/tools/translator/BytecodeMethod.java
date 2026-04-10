@@ -945,9 +945,9 @@ public class BytecodeMethod implements SignatureSet {
                             b.append("    DEFINE_METHOD_STACK(");
                         }
                     } else {
-                        b.append("    if (!__");
+                        b.append("    if (!class__");
                         b.append(clsName.replace('/', '_').replace('$', '_'));
-                        b.append("_LOADED__) __STATIC_INITIALIZER_");
+                        b.append(".initialized) __STATIC_INITIALIZER_");
                         b.append(clsName.replace('/', '_').replace('$', '_'));
                         if (useFastMethodStack) {
                             b.append("(threadStateData);\n    DEFINE_METHOD_STACK_FAST(");

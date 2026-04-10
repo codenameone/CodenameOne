@@ -502,7 +502,7 @@ class BytecodeInstructionIntegrationTest {
         String c = generated.toString();
         assertTrue(c.contains("DEFINE_METHOD_STACK_FAST("),
                 "No-throw/no-monitor/no-try methods should use DEFINE_METHOD_STACK_FAST");
-        assertTrue(c.contains("if (!__Example_LOADED__) __STATIC_INITIALIZER_Example(threadStateData);"),
+        assertTrue(c.contains("if (!class__Example.initialized) __STATIC_INITIALIZER_Example(threadStateData);"),
                 "Static methods should emit a fast-path loaded check before static initialization");
     }
 
