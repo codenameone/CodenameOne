@@ -148,12 +148,17 @@ final class PlaygroundRunner {
     private String adaptScript(String script) {
         String adapted = unwrapSingleTopLevelClass(script);
         String normalized = adapted == null ? script : adapted;
-        normalized = rewriteSimpleClassDeclarations(normalized);
-        normalized = rewriteInlineAutoCloseableClasses(normalized);
-        normalized = rewriteKnownSamCalls(normalized);
-        normalized = rewriteLambdaArguments(normalized);
+        normalized = rewriteClassModel(normalized);
         String wrapped = wrapLooseScript(normalized);
         return wrapped == null ? normalized : wrapped;
+    }
+
+    private String rewriteClassModel(String script) {
+        String rewritten = rewriteSimpleClassDeclarations(script);
+        rewritten = rewriteInlineAutoCloseableClasses(rewritten);
+        rewritten = rewriteKnownSamCalls(rewritten);
+        rewritten = rewriteLambdaArguments(rewritten);
+        return rewritten;
     }
 
     private String rewriteSimpleClassDeclarations(String script) {
@@ -168,7 +173,7 @@ final class PlaygroundRunner {
 
     private String rewriteInlineAutoCloseableClasses(String script) {
         RE declarationPattern = new RE(
-                "class\\s+([A-Za-z_$][A-Za-z0-9_$]*)\\s+implements\\s+AutoCloseable\\s*\\{\\s*public\\s+void\\s+close\\s*\\(\\s*\\)\\s*\\{\\s*\\}\\s*\\}");
+                "class\\s+([A-Za-z_$][A-Za-z0-9_$]*)\\s*(?:extends\\s+[A-Za-z_$][A-Za-z0-9_$.]*\\s*)?implements\\s+[^\\{]*AutoCloseable[^\\{]*\\{\\s*public\\s+void\\s+close\\s*\\(\\s*\\)\\s*\\{\\s*\\}\\s*\\}");
         List<String> helperClassNames = new ArrayList<String>();
         int searchFrom = 0;
         while (searchFrom < script.length() && declarationPattern.match(script, searchFrom)) {
