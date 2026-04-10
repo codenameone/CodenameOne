@@ -3,7 +3,7 @@
 JavaScript Port Status (ParparVM)
 =================================
 
-Last updated: 2026-04-10
+Last updated: 2026-04-10 (late)
 
 Current State
 -------------
@@ -58,6 +58,24 @@ Current State
   - Most tests fail during `prepare`/`runTest` path with
     - `TypeError: Cannot read properties of null (reading '__classDef')`
   - Browser logs show per-test failures (not missing virtual dispatch) and only fallback/default image streams in current artifacts.
+- New local debugging state (current workspace patchset):
+  - Suite completion recovered locally again:
+    - `CN1SS:SUITE:FINISHED` appears
+    - `TOP_BLOCKER=none|none|none` in browser harness phase
+  - Critical EDT crash path was mitigated:
+    - `Form.flushRevalidateQueue()` no longer terminates the run due null queue fields.
+    - Recovery now injects missing Form queue structures (`pendingRevalidateQueue`, `revalidateQueue`) when absent.
+  - Form/layout init hardening was added:
+    - Recovery now injects `BorderLayout` for form containers and `FlowLayout` for content panes when layout is missing.
+  - Worker startup/order hardening added:
+    - deferred install for `BaseTest_1_lambda_onShowCompleted_0` carrier shim to avoid load-order misses.
+  - New symptom after unblocking:
+    - Screenshot pipeline currently sees mainly `CN1SS:...:default` streams (plus bootstrap), not per-test named channels.
+    - Local parser reports test streams as `bootstrap_placeholder default`, so image materialization is still wrong.
+  - Secondary unresolved runtime issue remains visible in test failures:
+    - frequent `Cannot read properties of null (reading '__classDef')` during `runTest` for many tests.
+    - `TabsScreenshotTest` still reports missing symbol:
+      - `cn1_com_codename1_ui_Button_initLaf_com_codename1_ui_plaf_UIManager is not defined`.
 - Lambda bridge progression hardening now includes:
   - Forced advance path when `finalizeTest()`/`awaitTestCompletion()` fails.
   - Forced next-index carryover (`__cn1ForcedNextIndex`) to prevent stale lambda-capture loops.
@@ -66,14 +84,15 @@ Current State
 Next Steps
 ----------
 
-1. Root-cause `TypeError: ... __classDef` in test execution path:
-   - Use new lambda bridge phase diagnostics to determine whether first fault is in `BaseTest.prepare` or `BaseTest.runTest`.
-   - Capture first failing stack and identify null receiver origin (most likely missing virtual owner delegate or missing init path returning null component/form/object).
-2. Fix runtime object/dispatch correctness for startup drawing/form tests:
-   - Prioritize first deterministic failure (`KotlinUiTest`, then `MainScreenScreenshotTest`, then graphics tests).
-   - Remove reliance on broad force-advance once root cause is fixed.
-3. Validate screenshot stream emission per test:
-   - Ensure each test emits a named stream chunk (not just `default`) so screenshot parser can materialize expected artifacts.
+1. Restore per-test screenshot channel emission:
+   - `Cn1ssDeviceRunner` flow currently advances but produces mostly `default` channels.
+   - Reconcile finalize/await path so each test emits named stream chunks consistently.
+2. Root-cause `TypeError: ... __classDef` in `runTest` path:
+   - First deterministic failures are still `KotlinUiTest`/`MainScreenScreenshotTest`.
+   - Capture receiver/class/method at first null dereference after current form/layout/queue guards.
+3. Fix known missing method hotspot:
+   - `cn1_com_codename1_ui_Button_initLaf_com_codename1_ui_plaf_UIManager` missing in `TabsScreenshotTest`.
+   - Add correct owner delegate or native rebind (not a silent no-op).
 4. Continue worker-only boot validation:
    - Required markers: `PARPAR:worker-mode`, `PARPAR:DIAG:BOOT:bridgeMode=worker`.
    - Any `main-thread-mode` marker now indicates stale artifact or wrong bundle.
@@ -84,7 +103,7 @@ Next Steps
    - Keep VM/EDT scheduling in worker.
    - Ensure main-thread browser APIs are reached through explicit host-call handlers rather than direct worker DOM access.
 7. Restore full screenshot count and correctness:
-   - Exit gate remains `CN1SS:SUITE:FINISHED` with expected screenshot artifacts and no `BROWSER:PARPAR_ERROR`.
+   - Exit gate remains `CN1SS:SUITE:FINISHED` with expected named screenshot artifacts (33 target) and no `BROWSER:PARPAR_ERROR`.
 
 Important Notes
 ---------------

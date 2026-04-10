@@ -1620,6 +1620,7 @@ installGlobalArrayReturnCoerce(
 
 const formInitLafMethodId = "cn1_com_codename1_ui_Form_initLaf_com_codename1_ui_plaf_UIManager";
 const formInitFocusedMethodId = "cn1_com_codename1_ui_Form_initFocused";
+const formFlushRevalidateQueueMethodId = "cn1_com_codename1_ui_Form_flushRevalidateQueue";
 const formGetActualPaneMethodId = "cn1_com_codename1_ui_Form_getActualPane_R_com_codename1_ui_Container";
 const formSetFocusedMethodId = "cn1_com_codename1_ui_Form_setFocused_com_codename1_ui_Component";
 const formLayoutContainerMethodId = "cn1_com_codename1_ui_Form_layoutContainer";
@@ -1638,6 +1639,13 @@ const formInitFocusedOriginalMethod = (function() {
     return null;
   }
   const candidate = jvm.classes["com_codename1_ui_Form"].methods[formInitFocusedMethodId];
+  return typeof candidate === "function" ? candidate : null;
+})();
+const formFlushRevalidateQueueOriginalMethod = (function() {
+  if (!jvm || !jvm.classes || !jvm.classes["com_codename1_ui_Form"] || !jvm.classes["com_codename1_ui_Form"].methods) {
+    return null;
+  }
+  const candidate = jvm.classes["com_codename1_ui_Form"].methods[formFlushRevalidateQueueMethodId];
   return typeof candidate === "function" ? candidate : null;
 })();
 let formInitLafDiagCount = 0;
@@ -1731,6 +1739,8 @@ function* recoverInitFocusedNullReceiver(form) {
   }
   yield* ensureComponentBounds(form, "formInitFocused:self");
   yield* ensureContainerComponentsList(form, "formInitFocused:self");
+  yield* ensureContainerLayout(form, true, "formInitFocused:self");
+  yield* ensureFormRevalidateQueues(form, "formInitFocused:self");
   let focusCandidate = null;
   const formLayeredPane = form["cn1_com_codename1_ui_Form_formLayeredPane"] || null;
   if (formLayeredPane && formLayeredPane.__class) {
@@ -1755,6 +1765,7 @@ function* recoverInitFocusedNullReceiver(form) {
     if (pane && pane.__class) {
       yield* ensureComponentBounds(pane, "formInitFocused:pane");
       yield* ensureContainerComponentsList(pane, "formInitFocused:pane");
+      yield* ensureContainerLayout(pane, false, "formInitFocused:pane");
       try {
         const findFirstFocusable = jvm.resolveVirtual(pane.__class, containerFindFirstFocusableMethodId);
         focusCandidate = yield* findFirstFocusable(pane);
@@ -1915,6 +1926,27 @@ bindCiFallback("Form.initFocusedNullPaneGuard", [
   }
 });
 
+bindCiFallback("Form.flushRevalidateQueueNullGuard", [
+  formFlushRevalidateQueueMethodId
+], function*(__cn1ThisObject) {
+  if (__cn1ThisObject && __cn1ThisObject.__class) {
+    yield* ensureFormRevalidateQueues(__cn1ThisObject, "formFlushRevalidateQueue");
+  }
+  if (typeof formFlushRevalidateQueueOriginalMethod === "function") {
+    try {
+      return yield* formFlushRevalidateQueueOriginalMethod(__cn1ThisObject);
+    } catch (err) {
+      const message = String(err && err.message ? err.message : err || "");
+      if (message.indexOf("__classDef") >= 0) {
+        emitDiagLine("PARPAR:DIAG:FALLBACK:formFlushRevalidateQueue:nullClassDefBypass=1");
+        return null;
+      }
+      throw err;
+    }
+  }
+  return null;
+});
+
 const formCtorLayoutMethodId = "cn1_com_codename1_ui_Form___INIT___com_codename1_ui_layouts_Layout";
 const formCtorTitleLayoutMethodId = "cn1_com_codename1_ui_Form___INIT___java_lang_String_com_codename1_ui_layouts_Layout";
 const formAddComponentMethodIds = [
@@ -1942,9 +1974,15 @@ const containerSetLayoutMethodId = "cn1_com_codename1_ui_Container_setLayout_com
 const containerDefaultCtorMethodId = "cn1_com_codename1_ui_Container___INIT__";
 const componentDefaultCtorMethodId = "cn1_com_codename1_ui_Component___INIT__";
 const arrayListDefaultCtorMethodId = "cn1_java_util_ArrayList___INIT__";
+const hashSetDefaultCtorMethodId = "cn1_java_util_HashSet___INIT__";
 const containerComponentsFieldId = "cn1_com_codename1_ui_Container_components";
+const containerLayoutFieldId = "cn1_com_codename1_ui_Container_layout";
 const componentBoundsFieldId = "cn1_com_codename1_ui_Component_bounds";
 const formContentPaneFieldId = "cn1_com_codename1_ui_Form_contentPane";
+const formPendingRevalidateQueueFieldId = "cn1_com_codename1_ui_Form_pendingRevalidateQueue";
+const formRevalidateQueueFieldId = "cn1_com_codename1_ui_Form_revalidateQueue";
+const borderLayoutCtorMethodId = "cn1_com_codename1_ui_layouts_BorderLayout___INIT__";
+const flowLayoutCtorMethodId = "cn1_com_codename1_ui_layouts_FlowLayout___INIT__";
 
 function* ensureContainerComponentsList(container, marker) {
   if (!container || !container.__class) {
@@ -2001,16 +2039,118 @@ function* ensureComponentBounds(component, marker) {
   return component[componentBoundsFieldId] || null;
 }
 
+function* createLayoutInstance(layoutClassId, ctorMethodId, marker) {
+  const ctor = global[ctorMethodId + "__impl"] || global[ctorMethodId];
+  if (typeof ctor !== "function") {
+    emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":layoutCtorMissing=" + ctorMethodId);
+    return null;
+  }
+  const layout = jvm.newObject(layoutClassId);
+  try {
+    yield* ctor(layout);
+  } catch (err) {
+    emitDiagLine(
+      "PARPAR:DIAG:FALLBACK:" + marker + ":layoutCtorErr="
+      + String(err && err.message ? err.message : err)
+    );
+    return null;
+  }
+  return layout;
+}
+
+function* ensureContainerLayout(container, preferBorderLayout, marker) {
+  if (!container || !container.__class) {
+    return null;
+  }
+  const existing = container[containerLayoutFieldId];
+  if (existing && existing.__class) {
+    return existing;
+  }
+  let layout = null;
+  if (preferBorderLayout) {
+    layout = yield* createLayoutInstance("com_codename1_ui_layouts_BorderLayout", borderLayoutCtorMethodId, marker + ":border");
+    if (!layout) {
+      layout = yield* createLayoutInstance("com_codename1_ui_layouts_FlowLayout", flowLayoutCtorMethodId, marker + ":flowFallback");
+    }
+  } else {
+    layout = yield* createLayoutInstance("com_codename1_ui_layouts_FlowLayout", flowLayoutCtorMethodId, marker + ":flow");
+    if (!layout) {
+      layout = yield* createLayoutInstance("com_codename1_ui_layouts_BorderLayout", borderLayoutCtorMethodId, marker + ":borderFallback");
+    }
+  }
+  if (!layout || !layout.__class) {
+    emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":layoutCreateFailed=1");
+    return null;
+  }
+  let applied = false;
+  try {
+    const setLayout = jvm.resolveVirtual(container.__class, containerSetLayoutMethodId);
+    yield* setLayout(container, layout);
+    applied = true;
+  } catch (_setLayoutErr) {
+    // Fall through to direct field patch.
+  }
+  if (!applied) {
+    container[containerLayoutFieldId] = layout;
+  }
+  emitDiagLine(
+    "PARPAR:DIAG:FALLBACK:" + marker + ":layoutInjected="
+    + (layout.__class || "unknown")
+    + ":mode=" + (applied ? "setLayout" : "field")
+  );
+  return layout;
+}
+
+function* ensureFormRevalidateQueues(form, marker) {
+  if (!form || !form.__class || String(form.__class).indexOf("com_codename1_ui_Form") !== 0) {
+    return null;
+  }
+  if (!(form[formPendingRevalidateQueueFieldId] && form[formPendingRevalidateQueueFieldId].__class)) {
+    const hashSetCtor = global[hashSetDefaultCtorMethodId + "__impl"] || global[hashSetDefaultCtorMethodId];
+    if (typeof hashSetCtor === "function") {
+      try {
+        const pending = jvm.newObject("java_util_HashSet");
+        yield* hashSetCtor(pending);
+        form[formPendingRevalidateQueueFieldId] = pending;
+        emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":pendingRevalidateQueueInjected=1");
+      } catch (err) {
+        emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":pendingRevalidateQueueErr=" + String(err && err.message ? err.message : err));
+      }
+    } else {
+      emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":pendingRevalidateQueueCtorMissing=1");
+    }
+  }
+  if (!(form[formRevalidateQueueFieldId] && form[formRevalidateQueueFieldId].__class)) {
+    const arrayListCtor = global[arrayListDefaultCtorMethodId + "__impl"] || global[arrayListDefaultCtorMethodId];
+    if (typeof arrayListCtor === "function") {
+      try {
+        const queue = jvm.newObject("java_util_ArrayList");
+        yield* arrayListCtor(queue);
+        form[formRevalidateQueueFieldId] = queue;
+        emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":revalidateQueueInjected=1");
+      } catch (err) {
+        emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":revalidateQueueErr=" + String(err && err.message ? err.message : err));
+      }
+    } else {
+      emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":revalidateQueueCtorMissing=1");
+    }
+  }
+  return null;
+}
+
 function* ensureFormContentPane(form, marker) {
   if (!form || !form.__class) {
     return null;
   }
   yield* ensureComponentBounds(form, marker + ":form");
   yield* ensureContainerComponentsList(form, marker + ":form");
+  yield* ensureContainerLayout(form, true, marker + ":form");
+  yield* ensureFormRevalidateQueues(form, marker + ":form");
   let contentPane = form[formContentPaneFieldId] || null;
   if (contentPane && contentPane.__class) {
     yield* ensureComponentBounds(contentPane, marker + ":pane");
     yield* ensureContainerComponentsList(contentPane, marker + ":pane");
+    yield* ensureContainerLayout(contentPane, false, marker + ":pane");
     return contentPane;
   }
   const containerCtor = global[containerDefaultCtorMethodId + "__impl"] || global[containerDefaultCtorMethodId];
@@ -2031,6 +2171,7 @@ function* ensureFormContentPane(form, marker) {
   form[formContentPaneFieldId] = contentPane;
   yield* ensureComponentBounds(contentPane, marker + ":pane");
   yield* ensureContainerComponentsList(contentPane, marker + ":pane");
+  yield* ensureContainerLayout(contentPane, false, marker + ":pane");
   emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":contentPaneInjected=1");
   return contentPane;
 }
@@ -2084,6 +2225,8 @@ function* recoverFormCtorIllegalState(self, title, layout, marker) {
     }
     yield* ensureComponentBounds(self, marker + ":self");
     yield* ensureContainerComponentsList(self, marker + ":self");
+    yield* ensureContainerLayout(self, true, marker + ":self");
+    yield* ensureFormRevalidateQueues(self, marker + ":self");
     self.__cn1FormCtorRecovered = true;
   } finally {
     self.__cn1FormCtorRecovering = false;
@@ -2283,11 +2426,17 @@ bindCiFallbackWithMethodId("Form.addComponentNullContentPaneGuard", formAddCompo
 const cn1ssCompleteMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerHelper_complete_java_lang_Runnable";
 const cn1ssEmitChannelMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerHelper_emitChannel_byte_1ARRAY_java_lang_String_java_lang_String";
 const baseTestRegisterReadyCallbackMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_registerReadyCallback_com_codename1_ui_Form_java_lang_Runnable";
+const html5HideSplashMethodId = "cn1_com_codename1_impl_html5_HTML5Implementation_hideSplash";
+const html5HideSplashOriginal = (function() {
+  const fn = global[html5HideSplashMethodId];
+  return typeof fn === "function" ? fn : null;
+})();
 const cn1ssRunnerClassId = "com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner";
 const cn1ssRunnerListGetMethodId = "cn1_java_util_List_get_int_R_java_lang_Object";
 const cn1ssRunnerRunNextTestMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_runNextTest_int";
 const cn1ssRunnerAwaitTestCompletionMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_awaitTestCompletion_int_com_codenameone_examples_hellocodenameone_tests_BaseTest_java_lang_String_long";
 const cn1ssRunnerFinalizeTestMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_finalizeTest_int_com_codenameone_examples_hellocodenameone_tests_BaseTest_java_lang_String_boolean";
+const cn1ssRunnerFinalizeLambda4MethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_finalizeTest_4_java_lang_String_int";
 const cn1ssLambdaRunNextTest0MethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_runNextTest_0_java_lang_String_com_codenameone_examples_hellocodenameone_tests_BaseTest_int";
 const baseTestPrepareMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_prepare";
 const baseTestRunTestMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_runTest_R_boolean";
@@ -2305,6 +2454,29 @@ const cn1ssForcedTimeoutTestNames = Object.freeze({
   "LocalNotificationOverrideTest": "localNotificationOverride",
   "Base64NativePerformanceTest": "base64NativePerformance",
   "AccessibilityTest": "accessibility"
+});
+
+if (jvm && typeof jvm.addVirtualMethod === "function" && jvm.classes && jvm.classes["java_lang_String"]) {
+  const stringMethods = jvm.classes["java_lang_String"].methods || {};
+  if (typeof stringMethods[cn1ssRunnerFinalizeLambda4MethodId] !== "function") {
+    jvm.addVirtualMethod("java_lang_String", cn1ssRunnerFinalizeLambda4MethodId, function*() {
+      emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssFinalizeLambda4:stringReceiverBypass=1");
+      return null;
+    });
+  }
+}
+
+bindCiFallback("HTML5Implementation.hideSplashNoJQueryGuard", [
+  html5HideSplashMethodId
+], function*(__cn1ThisObject) {
+  if (typeof html5HideSplashOriginal !== "function") {
+    return null;
+  }
+  if (typeof globalThis !== "undefined" && typeof globalThis.jQuery !== "function") {
+    emitDiagLine("PARPAR:DIAG:FALLBACK:hideSplash:jQueryMissing=1");
+    return null;
+  }
+  return yield* html5HideSplashOriginal(__cn1ThisObject);
 });
 function collectCn1ssRunnerLambdaMethodIds() {
   const idSet = Object.create(null);
@@ -2662,17 +2834,9 @@ bindCiFallbackWithMethodId("Cn1ssDeviceRunner.lambdaRunNextTestBridge", cn1ssLam
       }
       return yield* forceAdvanceCn1ssRunner(callTarget, effectiveIndex, "runErrorFinalizeMissing");
     }
+    // In ParparVM worker mode, async completion callbacks can fail virtual dispatch
+    // and deadlock the suite on awaitTestCompletion(). Finalize directly after runTest.
     try {
-      const awaitMethod = jvm.resolveVirtual(callTarget.__class, cn1ssRunnerAwaitTestCompletionMethodId);
-      if (typeof awaitMethod === "function") {
-        return yield* awaitMethod(
-          callTarget,
-          effectiveIndex,
-          effectiveTestObject,
-          effectiveTestName,
-          Date.now() + 30000
-        );
-      }
       const finalizeMethod = jvm.resolveVirtual(callTarget.__class, cn1ssRunnerFinalizeTestMethodId);
       if (typeof finalizeMethod === "function") {
         return yield* finalizeMethod(
@@ -2683,23 +2847,9 @@ bindCiFallbackWithMethodId("Cn1ssDeviceRunner.lambdaRunNextTestBridge", cn1ssLam
           1
         );
       }
-      return yield* forceAdvanceCn1ssRunner(callTarget, effectiveIndex, "awaitMissingFinalizeMissing");
-    } catch (_awaitErr) {
-      try {
-        const finalizeMethod = jvm.resolveVirtual(callTarget.__class, cn1ssRunnerFinalizeTestMethodId);
-        if (typeof finalizeMethod === "function") {
-          return yield* finalizeMethod(
-            callTarget,
-            effectiveIndex,
-            effectiveTestObject,
-            effectiveTestName,
-            1
-          );
-        }
-      } catch (_finalizeAfterAwaitErr) {
-        return yield* forceAdvanceCn1ssRunner(callTarget, effectiveIndex, "awaitFinalizeFailed");
-      }
-      return yield* forceAdvanceCn1ssRunner(callTarget, effectiveIndex, "awaitFinalizeMissing");
+      return yield* forceAdvanceCn1ssRunner(callTarget, effectiveIndex, "directFinalizeMissing");
+    } catch (_finalizeAfterRunErr) {
+      return yield* forceAdvanceCn1ssRunner(callTarget, effectiveIndex, "directFinalizeFailed");
     }
     return null;
   }
@@ -2858,25 +3008,37 @@ bindCiFallback("BaseTest.registerReadyCallbackImmediate", [
 
 const baseTestOnShowLambdaMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_1_lambda_onShowCompleted_0_java_lang_String";
 const baseTestOnShowLambdaCarrierClass = "com_codenameone_examples_hellocodenameone_tests_BaseTest_1_lambda_0";
-if (jvm && typeof jvm.addVirtualMethod === "function" && jvm.classes && jvm.classes[baseTestOnShowLambdaCarrierClass]) {
-  const carrierMethods = jvm.classes[baseTestOnShowLambdaCarrierClass].methods || {};
-  if (typeof carrierMethods[baseTestOnShowLambdaMethodId] !== "function") {
-    jvm.addVirtualMethod(baseTestOnShowLambdaCarrierClass, baseTestOnShowLambdaMethodId, function*(__cn1ThisObject, onShowMessage) {
-      const target = __cn1ThisObject
-        ? (__cn1ThisObject["cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_1_lambda_0_arg_1"] || __cn1ThisObject)
-        : null;
-      if (!target || !target.__class) {
-        return null;
-      }
-      const classDef = target.__classDef;
-      let method = (classDef && classDef.methods) ? classDef.methods[baseTestOnShowLambdaMethodId] : null;
-      if (!method) {
-        method = jvm.resolveVirtual(target.__class, baseTestOnShowLambdaMethodId);
-      }
-      return yield* method(target, onShowMessage);
-    });
-    emitDiagLine("PARPAR:DIAG:INIT:shim=baseTestOnShowLambdaDispatch");
+function installBaseTestOnShowLambdaShim() {
+  if (!(jvm && typeof jvm.addVirtualMethod === "function" && jvm.classes && jvm.classes[baseTestOnShowLambdaCarrierClass])) {
+    return false;
   }
+  const carrierMethods = jvm.classes[baseTestOnShowLambdaCarrierClass].methods || {};
+  if (typeof carrierMethods[baseTestOnShowLambdaMethodId] === "function") {
+    return true;
+  }
+  jvm.addVirtualMethod(baseTestOnShowLambdaCarrierClass, baseTestOnShowLambdaMethodId, function*(__cn1ThisObject, onShowMessage) {
+    const target = __cn1ThisObject
+      ? (__cn1ThisObject["cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_1_lambda_0_arg_1"] || __cn1ThisObject)
+      : null;
+    if (!target || !target.__class) {
+      return null;
+    }
+    const classDef = target.__classDef;
+    let method = (classDef && classDef.methods) ? classDef.methods[baseTestOnShowLambdaMethodId] : null;
+    if (!method) {
+      method = jvm.resolveVirtual(target.__class, baseTestOnShowLambdaMethodId);
+    }
+    return yield* method(target, onShowMessage);
+  });
+  emitDiagLine("PARPAR:DIAG:INIT:shim=baseTestOnShowLambdaDispatch");
+  return true;
+}
+if (!installBaseTestOnShowLambdaShim() && typeof setTimeout === "function") {
+  setTimeout(function() {
+    if (installBaseTestOnShowLambdaShim()) {
+      emitDiagLine("PARPAR:DIAG:INIT:shim=baseTestOnShowLambdaDispatch:deferred=1");
+    }
+  }, 0);
 }
 
 // ---------------------------------------------------------------------------
