@@ -205,12 +205,16 @@ public final class PlaygroundSyntaxMatrixHarness {
                     new A();
                     """, ExpectedOutcome.EVAL_ERROR, "Evaluation error:"));
             cases.add(new Case("inner_class_static_member", """
+                    import com.codename1.ui.*;
+                    import com.codename1.ui.layouts.*;
                     class Outer {
                         static class Inner {
                             String label() { return "ok"; }
                         }
                     }
-                    new Outer.Inner().label();
+                    Container root = new Container(BoxLayout.y());
+                    root.add(new Label(new Outer.Inner().label()));
+                    root;
                     """, ExpectedOutcome.SUCCESS, null));
             cases.add(new Case("inner_class_anonymous", """
                     import com.codename1.ui.*;
