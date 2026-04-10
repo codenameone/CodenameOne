@@ -345,7 +345,7 @@ public abstract class Base64 {
         if (inputLength == 0) {
             return 0;
         }
-        if (SIMD.isSupported() && inputLength >= 16) {
+        if (SIMD.isSupported() && inputLength >= 64) {
             return encodeNoNewlineSimdApi(in, out);
         }
         byte[] mapLocal = map;
@@ -424,32 +424,44 @@ public abstract class Base64 {
 
     private static int encodeNoNewlineSimdApi(byte[] in, byte[] out) {
         int inputLength = in.length;
-        int outputLength = ((inputLength + 2) / 3) * 4;
         byte[] mapLocal = map;
         int end = inputLength - (inputLength % 3);
         int outIndex = 0;
         int i = 0;
         for (; i + 16 <= end; i += 12) {
             SIMD.U8x16 v = SIMD.loadU8(in, i);
-            out[outIndex++] = mapLocal[SIMD.laneU8(v, 0) >> 2];
-            out[outIndex++] = mapLocal[((SIMD.laneU8(v, 0) & 0x03) << 4) | (SIMD.laneU8(v, 1) >> 4)];
-            out[outIndex++] = mapLocal[((SIMD.laneU8(v, 1) & 0x0f) << 2) | (SIMD.laneU8(v, 2) >> 6)];
-            out[outIndex++] = mapLocal[SIMD.laneU8(v, 2) & 0x3f];
+            int b0 = SIMD.laneU8(v, 0);
+            int b1 = SIMD.laneU8(v, 1);
+            int b2 = SIMD.laneU8(v, 2);
+            int b3 = SIMD.laneU8(v, 3);
+            int b4 = SIMD.laneU8(v, 4);
+            int b5 = SIMD.laneU8(v, 5);
+            int b6 = SIMD.laneU8(v, 6);
+            int b7 = SIMD.laneU8(v, 7);
+            int b8 = SIMD.laneU8(v, 8);
+            int b9 = SIMD.laneU8(v, 9);
+            int b10 = SIMD.laneU8(v, 10);
+            int b11 = SIMD.laneU8(v, 11);
 
-            out[outIndex++] = mapLocal[SIMD.laneU8(v, 3) >> 2];
-            out[outIndex++] = mapLocal[((SIMD.laneU8(v, 3) & 0x03) << 4) | (SIMD.laneU8(v, 4) >> 4)];
-            out[outIndex++] = mapLocal[((SIMD.laneU8(v, 4) & 0x0f) << 2) | (SIMD.laneU8(v, 5) >> 6)];
-            out[outIndex++] = mapLocal[SIMD.laneU8(v, 5) & 0x3f];
+            out[outIndex++] = mapLocal[b0 >> 2];
+            out[outIndex++] = mapLocal[((b0 & 0x03) << 4) | (b1 >> 4)];
+            out[outIndex++] = mapLocal[((b1 & 0x0f) << 2) | (b2 >> 6)];
+            out[outIndex++] = mapLocal[b2 & 0x3f];
 
-            out[outIndex++] = mapLocal[SIMD.laneU8(v, 6) >> 2];
-            out[outIndex++] = mapLocal[((SIMD.laneU8(v, 6) & 0x03) << 4) | (SIMD.laneU8(v, 7) >> 4)];
-            out[outIndex++] = mapLocal[((SIMD.laneU8(v, 7) & 0x0f) << 2) | (SIMD.laneU8(v, 8) >> 6)];
-            out[outIndex++] = mapLocal[SIMD.laneU8(v, 8) & 0x3f];
+            out[outIndex++] = mapLocal[b3 >> 2];
+            out[outIndex++] = mapLocal[((b3 & 0x03) << 4) | (b4 >> 4)];
+            out[outIndex++] = mapLocal[((b4 & 0x0f) << 2) | (b5 >> 6)];
+            out[outIndex++] = mapLocal[b5 & 0x3f];
 
-            out[outIndex++] = mapLocal[SIMD.laneU8(v, 9) >> 2];
-            out[outIndex++] = mapLocal[((SIMD.laneU8(v, 9) & 0x03) << 4) | (SIMD.laneU8(v, 10) >> 4)];
-            out[outIndex++] = mapLocal[((SIMD.laneU8(v, 10) & 0x0f) << 2) | (SIMD.laneU8(v, 11) >> 6)];
-            out[outIndex++] = mapLocal[SIMD.laneU8(v, 11) & 0x3f];
+            out[outIndex++] = mapLocal[b6 >> 2];
+            out[outIndex++] = mapLocal[((b6 & 0x03) << 4) | (b7 >> 4)];
+            out[outIndex++] = mapLocal[((b7 & 0x0f) << 2) | (b8 >> 6)];
+            out[outIndex++] = mapLocal[b8 & 0x3f];
+
+            out[outIndex++] = mapLocal[b9 >> 2];
+            out[outIndex++] = mapLocal[((b9 & 0x03) << 4) | (b10 >> 4)];
+            out[outIndex++] = mapLocal[((b10 & 0x0f) << 2) | (b11 >> 6)];
+            out[outIndex++] = mapLocal[b11 & 0x3f];
         }
         for (; i < end; i += 3) {
             int b0 = in[i] & 0xff;
