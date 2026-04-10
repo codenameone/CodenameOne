@@ -203,7 +203,7 @@ public final class PlaygroundSyntaxMatrixHarness {
                     class A {}
                     class B {}
                     new A();
-                    """, ExpectedOutcome.PARSE_ERROR, "Parse error:"));
+                    """, ExpectedOutcome.EVAL_ERROR, "Evaluation error:"));
             cases.add(new Case("inner_class_static_member", """
                     class Outer {
                         static class Inner {
@@ -211,7 +211,7 @@ public final class PlaygroundSyntaxMatrixHarness {
                         }
                     }
                     new Outer.Inner().label();
-                    """, ExpectedOutcome.SUCCESS, null));
+                    """, ExpectedOutcome.EVAL_ERROR, "Evaluation error:"));
             cases.add(new Case("inner_class_anonymous", """
                     import com.codename1.ui.*;
                     import com.codename1.ui.events.*;

@@ -63,22 +63,9 @@ class BSHClassDeclaration extends SimpleNode
 
 
     private Class<?> generateClass(final CallStack callstack, final Interpreter interpreter) throws EvalError {
-        int child = 0;
-        Class<?> superClass = null;
-        if (extend) {
-            BSHAmbiguousName superNode = (BSHAmbiguousName) jjtGetChild(child++);
-            superClass = superNode.toClass(callstack, interpreter);
-        }
-
-        Class<?>[] interfaces = new Class<?>[numInterfaces];
-        for (int i = 0; i < numInterfaces; i++) {
-            BSHAmbiguousName iface = (BSHAmbiguousName) jjtGetChild(child++);
-            interfaces[i] = iface.toClass(callstack, interpreter);
-        }
-
-        BSHBlock body = (BSHBlock) jjtGetChild(child);
-        return ClassGenerator.getClassGenerator().generateClass(
-                name, modifiers, interfaces, superClass, body, type, callstack, interpreter);
+        throw new EvalError(
+                "Class, interface, and enum declarations are not supported in the Codename One BeanShell runtime.",
+                this, callstack);
     }
 
     public String toString() {

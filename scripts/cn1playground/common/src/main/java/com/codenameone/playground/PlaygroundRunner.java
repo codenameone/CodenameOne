@@ -148,6 +148,7 @@ final class PlaygroundRunner {
     private String adaptScript(String script) {
         String adapted = unwrapSingleTopLevelClass(script);
         String normalized = adapted == null ? script : adapted;
+        normalized = rewriteInlineAutoCloseableClasses(normalized);
         normalized = rewriteKnownSamCalls(normalized);
         normalized = rewriteLambdaArguments(normalized);
         String wrapped = wrapLooseScript(normalized);
@@ -177,12 +178,12 @@ final class PlaygroundRunner {
             String classToken = escapeRegexLiteral(className);
             RE resourceTypePattern = new RE("([\\(;]\\s*)" + classToken + "(\\s+[A-Za-z_$][A-Za-z0-9_$]*\\s*=)");
             RE ctorPattern = new RE("\\bnew\\s+" + classToken + "\\s*\\(\\s*\\)");
-            rewritten = resourceTypePattern.subst(rewritten, "$1AutoCloseable$2",
+            rewritten = resourceTypePattern.subst(rewritten, "$1java.io.StringReader$2",
                     RE.REPLACE_ALL | RE.REPLACE_BACKREFERENCES);
             rewritten = ctorPattern.subst(rewritten,
-                    "(new AutoCloseable() { public void close() {} })", RE.REPLACE_ALL);
+                    "new java.io.StringReader(\"\")", RE.REPLACE_ALL);
             rewritten = StringUtil.replaceAll(rewritten, "new " + className + "()",
-                    "(new AutoCloseable() { public void close() {} })");
+                    "new java.io.StringReader(\"\")");
         }
         rewritten = declarationPattern.subst(rewritten, "", RE.REPLACE_ALL);
         return rewritten;
