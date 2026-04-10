@@ -129,6 +129,10 @@ public final class ClassGenerator {
 
         Interpreter.debug(classStaticNameSpace);
 
+        if (interpreter.getStrictJava()) {
+            ClassGeneratorUtil.checkAbstractMethodImplementation(genClass);
+        }
+
         return genClass;
     }
 
