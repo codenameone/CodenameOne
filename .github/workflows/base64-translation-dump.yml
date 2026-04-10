@@ -1,0 +1,51 @@
+name: Base64 Translation Dump
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - master
+    paths:
+      - 'vm/ByteCodeTranslator/**'
+      - 'vm/tests/**'
+      - '.github/workflows/base64-translation-dump.yml'
+
+jobs:
+  base64-translation-dump:
+    runs-on: ubuntu-latest
+    container: ghcr.io/codenameone/codenameone/pr-ci-container:latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java 8
+        run: |
+          echo "JAVA_HOME=${JAVA_HOME_8}" >> "$GITHUB_ENV"
+          echo "${JAVA_HOME_8}/bin" >> "$GITHUB_PATH"
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2
+
+      - name: Build ByteCodeTranslator
+        run: mvn -B -DskipTests=true -f vm/ByteCodeTranslator/pom.xml install
+
+      - name: Generate Base64 translation dump
+        run: mvn -B -f vm/tests/pom.xml -Dtest=Base64PerformanceIntegrationTest test
+
+      - name: Upload Base64 translation dump artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: base64-translation-dump
+          path: |
+            vm/tests/target/base64-translated-snippets.txt
+            vm/tests/target/surefire-reports/**
+          if-no-files-found: warn
