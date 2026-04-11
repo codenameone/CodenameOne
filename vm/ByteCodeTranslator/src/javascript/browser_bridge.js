@@ -104,6 +104,17 @@
   var hostRefNextId = 1;
   var hostRefById = {};
   var hostRefByObject = (typeof WeakMap === 'function') ? new WeakMap() : null;
+  var drawMethodNames = {
+    clearRect: true,
+    fillRect: true,
+    strokeRect: true,
+    fillText: true,
+    strokeText: true,
+    drawImage: true,
+    putImageData: true,
+    fill: true,
+    stroke: true
+  };
 
   function isHostRefMarker(value) {
     return !!(value && typeof value === 'object'
@@ -199,6 +210,33 @@
       return value;
     }
     return storeHostRef(value);
+  }
+
+  function isCanvasLike(value) {
+    return !!(value
+      && typeof value.toDataURL === 'function'
+      && typeof value.width === 'number'
+      && typeof value.height === 'number');
+  }
+
+  function noteDrawTarget(receiver, kind, member) {
+    if (!receiver || (kind !== 'method' && kind !== 'setter')) {
+      return;
+    }
+    var canvas = null;
+    if (isCanvasLike(receiver)) {
+      canvas = receiver;
+    } else if (receiver.canvas && isCanvasLike(receiver.canvas)) {
+      canvas = receiver.canvas;
+    }
+    if (!canvas) {
+      return;
+    }
+    if (kind === 'method' && !drawMethodNames[member]) {
+      return;
+    }
+    global.__cn1LastDrawCanvas = canvas;
+    global.__cn1LastDrawMember = String(member || 'unknown');
   }
 
   function inferHostClass(value) {
@@ -297,6 +335,11 @@
       } else {
         throw new Error('Missing JS member ' + member + ' for host receiver');
       }
+    }
+    noteDrawTarget(receiver, kind, member);
+    if (isCanvasLike(receiver) && kind === 'method' && member === 'getContext') {
+      global.__cn1LastDrawCanvas = receiver;
+      global.__cn1LastDrawMember = 'getContext';
     }
     return hostResult(value);
   });
@@ -424,21 +467,52 @@
   }
 
   function pickBestCanvasSnapshot(includeDataUrl) {
-    var doc = global.document || (global.window && global.window.document) || null;
-    if (!doc || typeof doc.querySelectorAll !== 'function') {
-      return null;
+    function pushCanvas(list, seen, canvas, source) {
+      if (!canvas || !isCanvasLike(canvas)) {
+        return;
+      }
+      if (seen.indexOf(canvas) >= 0) {
+        return;
+      }
+      seen.push(canvas);
+      list.push({ canvas: canvas, source: source });
     }
-    var canvases = doc.querySelectorAll('canvas');
-    if (!canvases || !canvases.length) {
+    var candidates = [];
+    var seenCanvases = [];
+    var doc = global.document || (global.window && global.window.document) || null;
+    if (doc && typeof doc.querySelectorAll === 'function') {
+      var domCanvases = doc.querySelectorAll('canvas');
+      if (domCanvases && domCanvases.length) {
+        for (var di = 0; di < domCanvases.length; di++) {
+          pushCanvas(candidates, seenCanvases, domCanvases[di], 'dom');
+        }
+      }
+    }
+    pushCanvas(candidates, seenCanvases, global.__cn1LastDrawCanvas || null, 'lastDraw');
+    if (hostRefById) {
+      var refKeys = Object.keys(hostRefById);
+      for (var rk = 0; rk < refKeys.length; rk++) {
+        var refVal = hostRefById[refKeys[rk]];
+        if (isCanvasLike(refVal)) {
+          pushCanvas(candidates, seenCanvases, refVal, 'hostRef');
+          continue;
+        }
+        if (refVal && refVal.canvas && isCanvasLike(refVal.canvas)) {
+          pushCanvas(candidates, seenCanvases, refVal.canvas, 'hostRefCanvas');
+        }
+      }
+    }
+    if (!candidates.length) {
       return null;
     }
     var best = null;
     var bestArea = -1;
     var bestScore = -1;
     var bestIndex = -1;
+    var bestSource = 'none';
     var bestSignature = 'none';
-    for (var i = 0; i < canvases.length; i++) {
-      var c = canvases[i];
+    for (var i = 0; i < candidates.length; i++) {
+      var c = candidates[i].canvas;
       if (!c || (includeDataUrl && typeof c.toDataURL !== 'function')) {
         continue;
       }
@@ -453,6 +527,7 @@
         bestArea = area;
         best = c;
         bestIndex = i;
+        bestSource = candidates[i].source || 'unknown';
         bestSignature = signature;
       }
     }
@@ -460,10 +535,11 @@
       return null;
     }
     var out = {
-      canvasCount: canvases.length,
+      canvasCount: candidates.length,
       canvasPick: bestIndex,
       canvasArea: bestArea,
       canvasScore: bestScore,
+      canvasSource: bestSource,
       canvasSignature: bestSignature
     };
     if (!includeDataUrl) {
@@ -604,6 +680,7 @@
       diag('SCREENSHOT_START', 'canvasPick', result.canvasPick);
       diag('SCREENSHOT_START', 'canvasArea', result.canvasArea);
       diag('SCREENSHOT_START', 'canvasScore', result.canvasScore);
+      diag('SCREENSHOT_START', 'canvasSource', result.canvasSource || 'unknown');
       diag('SCREENSHOT_START', 'canvasSig', result.canvasSignature || 'none');
       diag('SCREENSHOT_START', 'attempt', result.attempt | 0);
       diag('SCREENSHOT_START', 'changed', result.changedFromPrevious ? 1 : 0);

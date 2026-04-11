@@ -17,6 +17,7 @@ Current State
 - The screenshot pipeline now decodes/report-generates reliably from logs, but screenshot content is still mostly wrong (white-frame capture path is still being used in CI artifacts).
 - New patch (not yet CI-validated in this document revision): worker-side fallback screenshot path now waits for a host-side UI-settle barrier before ready-callback dispatch and before canvas capture, to avoid pre-paint frame capture.
 - Note: a short-lived `forceShow()` experiment in `BaseTest.registerReadyCallback` was reverted because it caused re-entrant callback loops and prevented `CN1SS:SUITE:FINISHED`.
+- New patch (not yet CI-validated in this document revision): host screenshot capture now tracks the real draw target canvas and includes off-DOM canvases reachable via host refs.
 
 What Was Fixed In This Pass
 ---------------------------
@@ -96,6 +97,20 @@ What Was Fixed In This Pass
      - Removed `forceShow()` from this fallback path.
      - Kept the host-side settle barrier and diagnostics (non-recursive).
 
+9. Added draw-target aware screenshot capture in browser bridge.
+   - File:
+     - `vm/ByteCodeTranslator/src/javascript/browser_bridge.js`
+   - Changes:
+     - Host JSO bridge now records the last canvas that received draw operations.
+     - Screenshot candidate selection now includes:
+       - DOM canvases
+       - last draw target canvas
+       - canvases reachable through host refs (including context `.canvas`)
+     - Added diagnostic:
+       - `PARPAR:DIAG:SCREENSHOT_START:canvasSource=...` (`dom`, `lastDraw`, `hostRef`, `hostRefCanvas`)
+   - Motivation:
+     - Current logs show active drawing calls while DOM-canvas snapshots remain static/white; this addresses likely off-DOM/back-buffer capture misses.
+
 Known Failing Symptoms (Latest CI Logs/Artifacts)
 -------------------------------------------------
 
@@ -119,8 +134,8 @@ Priority Next Steps
 
 1. Validate CI output after UI-settle barrier:
    - Expect non-identical PNG hashes for distinct tests.
-   - Confirm `settleChanged` and `canvasSig` diagnostics vary across tests.
-2. If white-frame reuse persists, capture and compare per-test `settleSig`/`canvasSig` to identify whether paint is not happening or capture target is wrong.
+   - Confirm `settleChanged`, `canvasSig`, and `canvasSource` diagnostics vary across tests.
+2. If white-frame reuse persists, capture and compare per-test `settleSig`/`canvasSig`/`canvasSource` to identify whether paint is not happening or capture target is still wrong.
 3. Fix per-test null receiver/init path (`__classDef` null) at first failing stack, not via broad fallbacks.
 4. Fix missing `Button.initLaf(UIManager)` symbol resolution in worker runtime path.
 5. Fix worker-mode orientation lock path so DOM access is host-bridge mediated (no direct `document` access in worker).
