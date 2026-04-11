@@ -505,12 +505,8 @@
     if (!candidates.length) {
       return null;
     }
-    var best = null;
-    var bestArea = -1;
-    var bestScore = -1;
-    var bestIndex = -1;
-    var bestSource = 'none';
-    var bestSignature = 'none';
+    var evaluated = [];
+    var maxArea = -1;
     for (var i = 0; i < candidates.length; i++) {
       var c = candidates[i].canvas;
       if (!c || (includeDataUrl && typeof c.toDataURL !== 'function')) {
@@ -522,13 +518,48 @@
       var scoreMeta = canvasContentScore(c);
       var score = scoreMeta && scoreMeta.score != null ? (scoreMeta.score | 0) : -1;
       var signature = scoreMeta && scoreMeta.signature ? String(scoreMeta.signature) : 'none';
-      if (score > bestScore || (score === bestScore && area > bestArea)) {
-        bestScore = score;
-        bestArea = area;
-        best = c;
-        bestIndex = i;
-        bestSource = candidates[i].source || 'unknown';
-        bestSignature = signature;
+      evaluated.push({
+        canvas: c,
+        index: i,
+        source: candidates[i].source || 'unknown',
+        area: area,
+        score: score,
+        signature: signature,
+        width: w,
+        height: h
+      });
+      if (area > maxArea) {
+        maxArea = area;
+      }
+    }
+    if (!evaluated.length) {
+      return null;
+    }
+    var minLargeArea = Math.max(65536, Math.floor(maxArea * 0.45));
+    var pool = [];
+    for (var p = 0; p < evaluated.length; p++) {
+      if (evaluated[p].area >= minLargeArea) {
+        pool.push(evaluated[p]);
+      }
+    }
+    if (!pool.length) {
+      pool = evaluated;
+    }
+    var best = null;
+    var bestArea = -1;
+    var bestScore = -1;
+    var bestIndex = -1;
+    var bestSource = 'none';
+    var bestSignature = 'none';
+    for (var j = 0; j < pool.length; j++) {
+      var pick = pool[j];
+      if (pick.score > bestScore || (pick.score === bestScore && pick.area > bestArea)) {
+        bestScore = pick.score;
+        bestArea = pick.area;
+        best = pick.canvas;
+        bestIndex = pick.index;
+        bestSource = pick.source;
+        bestSignature = pick.signature;
       }
     }
     if (!best) {
@@ -536,6 +567,9 @@
     }
     var out = {
       canvasCount: candidates.length,
+      canvasConsidered: evaluated.length,
+      canvasLargeCount: pool.length,
+      canvasMinLargeArea: minLargeArea,
       canvasPick: bestIndex,
       canvasArea: bestArea,
       canvasScore: bestScore,
@@ -677,6 +711,9 @@
       }
       global.__cn1LastScreenshotSignature = result.canvasSignature || '';
       diag('SCREENSHOT_START', 'canvasCount', result.canvasCount);
+      diag('SCREENSHOT_START', 'canvasConsidered', result.canvasConsidered | 0);
+      diag('SCREENSHOT_START', 'canvasLargeCount', result.canvasLargeCount | 0);
+      diag('SCREENSHOT_START', 'canvasMinLargeArea', result.canvasMinLargeArea | 0);
       diag('SCREENSHOT_START', 'canvasPick', result.canvasPick);
       diag('SCREENSHOT_START', 'canvasArea', result.canvasArea);
       diag('SCREENSHOT_START', 'canvasScore', result.canvasScore);

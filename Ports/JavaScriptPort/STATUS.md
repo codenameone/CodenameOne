@@ -18,6 +18,7 @@ Current State
 - New patch (not yet CI-validated in this document revision): worker-side fallback screenshot path now waits for a host-side UI-settle barrier before ready-callback dispatch and before canvas capture, to avoid pre-paint frame capture.
 - Note: a short-lived `forceShow()` experiment in `BaseTest.registerReadyCallback` was reverted because it caused re-entrant callback loops and prevented `CN1SS:SUITE:FINISHED`.
 - New patch (not yet CI-validated in this document revision): host screenshot capture now tracks the real draw target canvas and includes off-DOM canvases reachable via host refs.
+- New patch (not yet CI-validated in this document revision): screenshot candidate selection now prioritizes near-screen-sized canvases to prevent tiny offscreen buffers from being selected (fixes unexpected `120x80`/`4x4` outputs).
 
 What Was Fixed In This Pass
 ---------------------------
@@ -111,6 +112,19 @@ What Was Fixed In This Pass
    - Motivation:
      - Current logs show active drawing calls while DOM-canvas snapshots remain static/white; this addresses likely off-DOM/back-buffer capture misses.
 
+10. Added large-canvas gating for screenshot candidate selection.
+   - File:
+     - `vm/ByteCodeTranslator/src/javascript/browser_bridge.js`
+   - Changes:
+     - Evaluate all candidate canvases, compute max area, and prefer candidates with area >= 45% of max (with floor at 65536).
+     - Only fall back to tiny-canvas pool if no large candidates exist.
+     - Added diagnostics:
+       - `PARPAR:DIAG:SCREENSHOT_START:canvasConsidered=...`
+       - `PARPAR:DIAG:SCREENSHOT_START:canvasLargeCount=...`
+       - `PARPAR:DIAG:SCREENSHOT_START:canvasMinLargeArea=...`
+   - Motivation:
+     - Latest artifacts showed mixed dimensions (`120x80`, `4x4`) and colored tiny captures, indicating offscreen utility buffers were being selected.
+
 Known Failing Symptoms (Latest CI Logs/Artifacts)
 -------------------------------------------------
 
@@ -135,7 +149,9 @@ Priority Next Steps
 1. Validate CI output after UI-settle barrier:
    - Expect non-identical PNG hashes for distinct tests.
    - Confirm `settleChanged`, `canvasSig`, and `canvasSource` diagnostics vary across tests.
-2. If white-frame reuse persists, capture and compare per-test `settleSig`/`canvasSig`/`canvasSource` to identify whether paint is not happening or capture target is still wrong.
+2. Validate size normalization after large-canvas gating:
+   - Expect screenshot dimensions to remain consistent at app target size (no `120x80`/`4x4` non-bootstrap outputs).
+3. If white-frame reuse persists, capture and compare per-test `settleSig`/`canvasSig`/`canvasSource` to identify whether paint is not happening or capture target is still wrong.
 3. Fix per-test null receiver/init path (`__classDef` null) at first failing stack, not via broad fallbacks.
 4. Fix missing `Button.initLaf(UIManager)` symbol resolution in worker runtime path.
 5. Fix worker-mode orientation lock path so DOM access is host-bridge mediated (no direct `document` access in worker).
