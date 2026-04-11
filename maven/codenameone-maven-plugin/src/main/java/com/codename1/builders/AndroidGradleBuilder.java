@@ -3605,6 +3605,24 @@ public class AndroidGradleBuilder extends Executor {
                 gradleDependency = "classpath 'com.android.tools.build:gradle:8.1.0'\n";
             }
         }
+        boolean hasKotlinSources = hasSourceFileWithExtension(new File(projectDir, "src/main/java"), ".kt");
+        String kotlinVersion = request.getArg("requireKotlinStdlib", "").trim();
+        if (hasKotlinSources && kotlinVersion.length() == 0) {
+            kotlinVersion = useGradle8 ? "1.9.22" : "1.7.22";
+        }
+        String kotlinPluginApply = "";
+        String kotlinRuntimeDependency = "";
+        if (hasKotlinSources) {
+            if (!request.getArg("android.topDependency", "").contains("kotlin-gradle-plugin")) {
+                gradleDependency += "classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:" + kotlinVersion + "'\n";
+            }
+            kotlinPluginApply = "apply plugin: 'kotlin-android'\n";
+            String gradleDeps = request.getArg("android.gradleDep", "");
+            if (!additionalDependencies.contains("org.jetbrains.kotlin:kotlin-stdlib")
+                    && !gradleDeps.contains("org.jetbrains.kotlin:kotlin-stdlib")) {
+                kotlinRuntimeDependency = "    implementation 'org.jetbrains.kotlin:kotlin-stdlib:" + kotlinVersion + "'\n";
+            }
+        }
         gradleDependency += request.getArg("android.topDependency", "");
 
         String compileSdkVersion = "'android-21'";
@@ -3743,6 +3761,7 @@ public class AndroidGradleBuilder extends Executor {
         }
 
         String gradleProps = "apply plugin: 'com.android.application'\n"
+                + kotlinPluginApply
                 + request.getArg("android.gradlePlugin", "")
                 + "\n"
                 + "buildscript {\n"
@@ -3826,6 +3845,7 @@ public class AndroidGradleBuilder extends Executor {
                 + "dependencies {\n"
                 + "    "+compile+" fileTree(dir: 'libs', include: ['*.jar'])\n"
                 + request.getArg("android.supportv4Dep",supportV4Default) + "\n"
+                + kotlinRuntimeDependency
                 + addNewlineIfMissing(additionalDependencies)
                 + addNewlineIfMissing(request.getArg("android.gradleDep", ""))
                 + addNewlineIfMissing(aarDependencies)
@@ -3994,27 +4014,7 @@ public class AndroidGradleBuilder extends Executor {
                 String javaImplSourceFile = "package " + currentNative.getPackage().getName() + ";\n\n"
                         + "import com.codename1.ui.PeerComponent;\n\n"
                         + "public class " + currentNative.getSimpleName() + "Stub implements " + currentNative.getSimpleName() + "{\n"
-                        + "    private final Object impl = createImpl();\n\n"
-                        + "    private static Object createImpl() {\n"
-                        + "        try {\n"
-                        + "            return Class.forName(\"" + currentNative.getName() + getImplSuffix() + "\").newInstance();\n"
-                        + "        } catch (Throwable t) {\n"
-                        + "            throw new RuntimeException(\"Failed to instantiate native implementation for " + currentNative.getName() + "\", t);\n"
-                        + "        }\n"
-                        + "    }\n\n"
-                        + "    private Object __cn1Invoke(String methodName, Object[] args) {\n"
-                        + "        try {\n"
-                        + "            java.lang.reflect.Method[] methods = impl.getClass().getMethods();\n"
-                        + "            for (java.lang.reflect.Method method : methods) {\n"
-                        + "                if (method.getName().equals(methodName) && method.getParameterTypes().length == args.length) {\n"
-                        + "                    return method.invoke(impl, args);\n"
-                        + "                }\n"
-                        + "            }\n"
-                        + "            throw new RuntimeException(methodName + \" with \" + args.length + \" args\");\n"
-                        + "        } catch (Throwable t) {\n"
-                        + "            throw new RuntimeException(\"Failed to invoke native method \" + methodName, t);\n"
-                        + "        }\n"
-                        + "    }\n\n";
+                        + "    private " + currentNative.getSimpleName() + getImplSuffix() + " impl = new " + currentNative.getSimpleName() + getImplSuffix() + "();\n\n";
 
                 for (Method m : currentNative.getMethods()) {
                     String name = m.getName();
@@ -4042,34 +4042,13 @@ public class AndroidGradleBuilder extends Executor {
                         }
                     }
                     javaImplSourceFile += ") {\n";
-                    String invocationExpression = "__cn1Invoke(\"" + name + "\", new Object[]{" + args + "})";
                     if (Void.class == returnType || Void.TYPE == returnType) {
-                        javaImplSourceFile += "        " + invocationExpression + ";\n    }\n\n";
+                        javaImplSourceFile += "        impl." + name + "(" + args + ");\n    }\n\n";
                     } else {
                         if (returnType.getName().equals("com.codename1.ui.PeerComponent")) {
-                            javaImplSourceFile += "        return " + generatePeerComponentCreationCode(invocationExpression) + ";\n    }\n\n";
-                        } else if (returnType.isPrimitive()) {
-                            if (returnType == Boolean.TYPE) {
-                                javaImplSourceFile += "        return ((Boolean)" + invocationExpression + ").booleanValue();\n    }\n\n";
-                            } else if (returnType == Integer.TYPE) {
-                                javaImplSourceFile += "        return ((Integer)" + invocationExpression + ").intValue();\n    }\n\n";
-                            } else if (returnType == Long.TYPE) {
-                                javaImplSourceFile += "        return ((Long)" + invocationExpression + ").longValue();\n    }\n\n";
-                            } else if (returnType == Byte.TYPE) {
-                                javaImplSourceFile += "        return ((Byte)" + invocationExpression + ").byteValue();\n    }\n\n";
-                            } else if (returnType == Short.TYPE) {
-                                javaImplSourceFile += "        return ((Short)" + invocationExpression + ").shortValue();\n    }\n\n";
-                            } else if (returnType == Character.TYPE) {
-                                javaImplSourceFile += "        return ((Character)" + invocationExpression + ").charValue();\n    }\n\n";
-                            } else if (returnType == Float.TYPE) {
-                                javaImplSourceFile += "        return ((Float)" + invocationExpression + ").floatValue();\n    }\n\n";
-                            } else if (returnType == Double.TYPE) {
-                                javaImplSourceFile += "        return ((Double)" + invocationExpression + ").doubleValue();\n    }\n\n";
-                            } else {
-                                javaImplSourceFile += "        return (" + returnType.getSimpleName() + ")" + invocationExpression + ";\n    }\n\n";
-                            }
+                            javaImplSourceFile += "        return " + generatePeerComponentCreationCode("impl." + name + "(" + args + ")") + ";\n    }\n\n";
                         } else {
-                            javaImplSourceFile += "        return (" + returnType.getSimpleName() + ")" + invocationExpression + ";\n    }\n\n";
+                            javaImplSourceFile += "        return impl." + name + "(" + args + ");\n    }\n\n";
                         }
                     }
                 }
@@ -4412,7 +4391,7 @@ public class AndroidGradleBuilder extends Executor {
                 if (entryName.endsWith(".class")) {
                     destFile = new File(classesDir, entryName);
                 } else {
-                    if (entryName.endsWith(".java") || entryName.endsWith(".m") || entryName.endsWith(".h")) {
+                    if (entryName.endsWith(".java") || entryName.endsWith(".kt") || entryName.endsWith(".swift") || entryName.endsWith(".m") || entryName.endsWith(".h")) {
                         destFile = new File(sourceDir, entryName);
                     } else {
                         if (entryName.endsWith(".jar") || entryName.endsWith(".a") || entryName.endsWith(".dylib") || entryName.endsWith(".andlib") || entryName.endsWith(".aar")) {
@@ -4764,6 +4743,25 @@ public class AndroidGradleBuilder extends Executor {
         } catch (NumberFormatException ex) {
             return null;
         }
+    }
+
+    private boolean hasSourceFileWithExtension(File dir, String extension) {
+        if (dir == null || !dir.exists()) {
+            return false;
+        }
+        if (dir.isFile()) {
+            return dir.getName().endsWith(extension);
+        }
+        File[] children = dir.listFiles();
+        if (children == null) {
+            return false;
+        }
+        for (File child : children) {
+            if (hasSourceFileWithExtension(child, extension)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void stripKotlin(File dummyClassesDir) {

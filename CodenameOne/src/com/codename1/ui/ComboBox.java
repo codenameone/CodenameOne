@@ -485,8 +485,13 @@ public class ComboBox<T> extends List<T> implements ActionSource {
         l.eventSource = this;
         l.disposeDialogOnSelection = true;
         Form parentForm = getComponentForm();
-        //l.getSelectedStyle().setBorder(null);
 
+        // unlikely to ever happen but occurs on EDT violations 
+        // github.com/codenameone/CodenameOne/issues/4726
+        if (parentForm == null) {
+            return;
+        }
+        
         int tint = parentForm.getTintColor();
         parentForm.setTintColor(0);
         Dialog popupDialog = createPopupDialog(l);

@@ -19,6 +19,10 @@
 
 package com.codename1.util;
 
+import com.codename1.annotations.DisableDebugInfo;
+import com.codename1.annotations.DisableNullChecksAndArrayBoundsChecks;
+
+
 /// This class implements Base64 encoding/decoding functionality
 /// as specified in RFC 2045 (http://www.ietf.org/rfc/rfc2045.txt).
 public abstract class Base64 {
@@ -34,18 +38,25 @@ public abstract class Base64 {
                     '4', '5', '6', '7', '8', '9', '+', '/'};
 
     private static final byte[] decodeMap = new byte[256];
+    private static final int[] decodeMapInt = new int[256];
 
     static {
         for (int i = 0; i < decodeMap.length; i++) {
             decodeMap[i] = (byte) DECODE_INVALID;
+            decodeMapInt[i] = DECODE_INVALID;
         }
         for (int i = 0; i < map.length; i++) {
             decodeMap[map[i] & 0xff] = (byte) i;
+            decodeMapInt[map[i] & 0xff] = i;
         }
         decodeMap['\n'] = (byte) DECODE_WHITESPACE;
         decodeMap['\r'] = (byte) DECODE_WHITESPACE;
         decodeMap[' '] = (byte) DECODE_WHITESPACE;
         decodeMap['\t'] = (byte) DECODE_WHITESPACE;
+        decodeMapInt['\n'] = DECODE_WHITESPACE;
+        decodeMapInt['\r'] = DECODE_WHITESPACE;
+        decodeMapInt[' '] = DECODE_WHITESPACE;
+        decodeMapInt['\t'] = DECODE_WHITESPACE;
     }
 
     public static byte[] decode(byte[] in) {
@@ -89,6 +100,8 @@ public abstract class Base64 {
      * @param out destination buffer
      * @return decoded length, or {@code -1} for invalid Base64
      */
+    @DisableDebugInfo
+    @DisableNullChecksAndArrayBoundsChecks
     public static int decode(byte[] in, int len, byte[] out) {
         if (len == 0) {
             return 0;
@@ -103,7 +116,7 @@ public abstract class Base64 {
         int end = len;
         while (end > 0) {
             int chr = in[end - 1] & 0xff;
-            if (decodeMap[chr] == DECODE_WHITESPACE) {
+            if (decodeMapInt[chr] == DECODE_WHITESPACE) {
                 end--;
                 continue;
             }
@@ -121,7 +134,7 @@ public abstract class Base64 {
             if (chr == '=') {
                 break;
             }
-            int value = decodeMap[chr];
+            int value = decodeMapInt[chr];
             if (value == DECODE_WHITESPACE) {
                 continue;
             }
@@ -148,7 +161,7 @@ public abstract class Base64 {
             if (chr == '=') {
                 break;
             }
-            int bits = decodeMap[chr];
+            int bits = decodeMapInt[chr];
             if (bits == DECODE_WHITESPACE) {
                 continue;
             }
@@ -184,6 +197,8 @@ public abstract class Base64 {
         return decode(in, in.length, out);
     }
 
+    @DisableDebugInfo
+    @DisableNullChecksAndArrayBoundsChecks
     private static int decodeNoWhitespace(byte[] in, int len, byte[] out) {
         if ((len & 0x3) != 0) {
             return -1;
@@ -207,8 +222,8 @@ public abstract class Base64 {
             throw new IllegalArgumentException("Output buffer too small for decoded data");
         }
         int outIndex = 0;
-        byte[] decodeMapLocal = decodeMap;
         int fullLen = len - (pad > 0 ? 4 : 0);
+        int[] decodeMapLocal = decodeMapInt;
 
         for (int i = 0; i < fullLen; i += 4) {
             int c0 = in[i] & 0xff;
@@ -334,6 +349,8 @@ public abstract class Base64 {
      * @param out destination buffer
      * @return number of bytes written to {@code out}
      */
+    @DisableDebugInfo
+    @DisableNullChecksAndArrayBoundsChecks
     public static int encodeNoNewline(byte[] in, byte[] out) {
         int inputLength = in.length;
         int outputLength = ((inputLength + 2) / 3) * 4;

@@ -91,6 +91,7 @@ class Base64PerformanceIntegrationTest {
                 "cmake",
                 "-S", distDir.toString(),
                 "-B", buildDir.toString(),
+                "-DCMAKE_BUILD_TYPE=Release",
                 "-DCMAKE_C_COMPILER=clang",
                 "-DCMAKE_OBJC_COMPILER=clang"
         ), distDir);

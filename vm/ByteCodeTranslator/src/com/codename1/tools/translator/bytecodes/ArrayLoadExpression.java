@@ -184,7 +184,9 @@ public class ArrayLoadExpression extends Instruction implements AssignableExpres
             b.append("{\n");
             b.append("    JAVA_OBJECT __cn1ArrayTmp = ").append(arrayExpr).append(";\n");
             b.append("    JAVA_INT __cn1IndexTmp = ").append(indexExpr).append(";\n");
-            b.append("    CHECK_ARRAY_ACCESS_WITH_ARGS(__cn1ArrayTmp, __cn1IndexTmp);\n");
+            if (getMethod() == null || !getMethod().isDisableNullAndArrayBoundsChecks()) {
+                b.append("    CHECK_ARRAY_ACCESS_WITH_ARGS(__cn1ArrayTmp, __cn1IndexTmp);\n");
+            }
             b.append("    ").append(varName).append(" = ((").append(arrayDataType).append("*) (*(JAVA_ARRAY)__cn1ArrayTmp).data)[__cn1IndexTmp];\n");
             b.append("}\n");
             sb.append(b);

@@ -74,6 +74,10 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
         return synchronizedMethod;
     }
 
+    private boolean shouldEmitNullAndArrayBoundsChecks() {
+        return getMethod() == null || !getMethod().isDisableNullAndArrayBoundsChecks();
+    }
+
     @Override
     public boolean isConstant() {
         switch (opcode) {
@@ -167,92 +171,168 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 break;
 
             case Opcodes.BALOAD:
-                b.append("    { CHECK_ARRAY_ACCESS(2, SP[-1].data.i); /* BALOAD */ \n" +
+                b.append("    { ");
+                if (shouldEmitNullAndArrayBoundsChecks()) {
+                    b.append("CHECK_ARRAY_ACCESS(2, SP[-1].data.i); ");
+                }
+                b.append("/* BALOAD */ \n" +
                     "    SP--; SP[-1].type = CN1_TYPE_INT; \n" +
                     "    SP[-1].data.i = ((JAVA_ARRAY_BYTE*) (*(JAVA_ARRAY)SP[-1].data.o).data)[(*SP).data.i]; \n" +
                     "    }\n");
                 break;
 
             case Opcodes.CALOAD:
-                b.append("    CHECK_ARRAY_ACCESS(2, SP[-1].data.i); /* CALOAD */\n" +
+                if (shouldEmitNullAndArrayBoundsChecks()) {
+                    b.append("    CHECK_ARRAY_ACCESS(2, SP[-1].data.i); ");
+                } else {
+                    b.append("    ");
+                }
+                b.append("/* CALOAD */\n" +
                     "    SP--; SP[-1].type = CN1_TYPE_INT; \n" +
                     "    SP[-1].data.i = ((JAVA_ARRAY_CHAR*) (*(JAVA_ARRAY)SP[-1].data.o).data)[(*SP).data.i];\n");
                 break;
                 
             case Opcodes.IALOAD:
-                b.append("    CHECK_ARRAY_ACCESS(2, SP[-1].data.i); /* IALOAD */\n" +
+                if (shouldEmitNullAndArrayBoundsChecks()) {
+                    b.append("    CHECK_ARRAY_ACCESS(2, SP[-1].data.i); ");
+                } else {
+                    b.append("    ");
+                }
+                b.append("/* IALOAD */\n" +
                         "    SP--; SP[-1].type = CN1_TYPE_INT; \n" +
                         "    SP[-1].data.i = ((JAVA_ARRAY_INT*) (*(JAVA_ARRAY)SP[-1].data.o).data)[(*SP).data.i];\n");
                 break;
 
             case Opcodes.SALOAD:
-                b.append("    CHECK_ARRAY_ACCESS(2, SP[-1].data.i); \n" +
+                if (shouldEmitNullAndArrayBoundsChecks()) {
+                    b.append("    CHECK_ARRAY_ACCESS(2, SP[-1].data.i); \n");
+                }
+                b.append(
                         "    SP--; SP[-1].type = CN1_TYPE_INT; \n" +
                         "    SP[-1].data.i = ((JAVA_ARRAY_SHORT*) (*(JAVA_ARRAY)SP[-1].data.o).data)[(*SP).data.i]; /* SALOAD */\n");
                 break;
 
             case Opcodes.LALOAD:
-                b.append("    CHECK_ARRAY_ACCESS(2, SP[-1].data.i); /* LALOAD */\n" +
+                if (shouldEmitNullAndArrayBoundsChecks()) {
+                    b.append("    CHECK_ARRAY_ACCESS(2, SP[-1].data.i); ");
+                } else {
+                    b.append("    ");
+                }
+                b.append("/* LALOAD */\n" +
                         "    SP--; SP[-1].type = CN1_TYPE_LONG; \n" +
                         "    SP[-1].data.l = LONG_ARRAY_LOOKUP((JAVA_ARRAY)SP[-1].data.o, (*SP).data.i);\n");
                 break;
 
             case Opcodes.FALOAD:
-                b.append("    CHECK_ARRAY_ACCESS(2, SP[-1].data.i); /* FALOAD */\n" +
+                if (shouldEmitNullAndArrayBoundsChecks()) {
+                    b.append("    CHECK_ARRAY_ACCESS(2, SP[-1].data.i); ");
+                } else {
+                    b.append("    ");
+                }
+                b.append("/* FALOAD */\n" +
                         "    SP--; SP[-1].type = CN1_TYPE_FLOAT; \n" +
                         "    SP[-1].data.f = FLOAT_ARRAY_LOOKUP((JAVA_ARRAY)SP[-1].data.o, (*SP).data.i);\n");
                 break;
 
             case Opcodes.DALOAD:
-                b.append("    CHECK_ARRAY_ACCESS(2, SP[-1].data.i); /* DALOAD */\n" +
+                if (shouldEmitNullAndArrayBoundsChecks()) {
+                    b.append("    CHECK_ARRAY_ACCESS(2, SP[-1].data.i); ");
+                } else {
+                    b.append("    ");
+                }
+                b.append("/* DALOAD */\n" +
                         "    SP--; SP[-1].type = CN1_TYPE_DOUBLE; \n" +
                         "    SP[-1].data.d = DOUBLE_ARRAY_LOOKUP((JAVA_ARRAY)SP[-1].data.o, (*SP).data.i);\n");
                 break;
 
             case Opcodes.AALOAD:
-                b.append("    CHECK_ARRAY_ACCESS(2, SP[-1].data.i); /* AALOAD */\n" +
+                if (shouldEmitNullAndArrayBoundsChecks()) {
+                    b.append("    CHECK_ARRAY_ACCESS(2, SP[-1].data.i); ");
+                } else {
+                    b.append("    ");
+                }
+                b.append("/* AALOAD */\n" +
                         "    SP--; SP[-1].type = CN1_TYPE_INVALID; \n" +
                         "    SP[-1].data.o = ((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)SP[-1].data.o).data)[(*SP).data.i]; \n" +
                         "    SP[-1].type = CN1_TYPE_OBJECT; \n");
                 break;
 
             case Opcodes.BASTORE:
-                b.append("    CHECK_ARRAY_ACCESS(3, SP[-2].data.i); /* BASTORE */\n" +
+                if (shouldEmitNullAndArrayBoundsChecks()) {
+                    b.append("    CHECK_ARRAY_ACCESS(3, SP[-2].data.i); ");
+                } else {
+                    b.append("    ");
+                }
+                b.append("/* BASTORE */\n" +
                         "    ((JAVA_ARRAY_BYTE*) (*(JAVA_ARRAY)SP[-3].data.o).data)[SP[-2].data.i] = SP[-1].data.i; SP -= 3;\n");
                 break;
 
             case Opcodes.CASTORE:
-                b.append("    CHECK_ARRAY_ACCESS(3, SP[-2].data.i); /* CASTORE */\n" +
+                if (shouldEmitNullAndArrayBoundsChecks()) {
+                    b.append("    CHECK_ARRAY_ACCESS(3, SP[-2].data.i); ");
+                } else {
+                    b.append("    ");
+                }
+                b.append("/* CASTORE */\n" +
                         "    ((JAVA_ARRAY_CHAR*) (*(JAVA_ARRAY)SP[-3].data.o).data)[SP[-2].data.i] = SP[-1].data.i; SP -= 3;\n\n");
                 break;
 
             case Opcodes.SASTORE:
-                b.append("    CHECK_ARRAY_ACCESS(3, SP[-2].data.i); /* SASTORE */\n" +
+                if (shouldEmitNullAndArrayBoundsChecks()) {
+                    b.append("    CHECK_ARRAY_ACCESS(3, SP[-2].data.i); ");
+                } else {
+                    b.append("    ");
+                }
+                b.append("/* SASTORE */\n" +
                         "    ((JAVA_ARRAY_SHORT*) (*(JAVA_ARRAY)SP[-3].data.o).data)[SP[-2].data.i] = SP[-1].data.i; SP -= 3;\n");
                 break;
 
             case Opcodes.IASTORE:
-                b.append("    CHECK_ARRAY_ACCESS(3, SP[-2].data.i); /* IASTORE */\n" +
+                if (shouldEmitNullAndArrayBoundsChecks()) {
+                    b.append("    CHECK_ARRAY_ACCESS(3, SP[-2].data.i); ");
+                } else {
+                    b.append("    ");
+                }
+                b.append("/* IASTORE */\n" +
                         "    ((JAVA_ARRAY_INT*) (*(JAVA_ARRAY)SP[-3].data.o).data)[SP[-2].data.i] = SP[-1].data.i; SP -= 3;\n");
                 break;
 
             case Opcodes.LASTORE:
-                b.append("    CHECK_ARRAY_ACCESS(3, SP[-2].data.i); /* LASTORE */\n" +
+                if (shouldEmitNullAndArrayBoundsChecks()) {
+                    b.append("    CHECK_ARRAY_ACCESS(3, SP[-2].data.i); ");
+                } else {
+                    b.append("    ");
+                }
+                b.append("/* LASTORE */\n" +
                         "    LONG_ARRAY_LOOKUP((JAVA_ARRAY)SP[-3].data.o, SP[-2].data.i) = SP[-1].data.l; SP -= 3;\n");
                 break;
 
             case Opcodes.FASTORE:
-                b.append("    CHECK_ARRAY_ACCESS(3, SP[-2].data.i); /* FASTORE */\n" +
+                if (shouldEmitNullAndArrayBoundsChecks()) {
+                    b.append("    CHECK_ARRAY_ACCESS(3, SP[-2].data.i); ");
+                } else {
+                    b.append("    ");
+                }
+                b.append("/* FASTORE */\n" +
                         "    FLOAT_ARRAY_LOOKUP((JAVA_ARRAY)SP[-3].data.o, SP[-2].data.i) = SP[-1].data.f; SP -= 3;\n");
                 break;
 
             case Opcodes.DASTORE:
-                b.append("    CHECK_ARRAY_ACCESS(3, SP[-2].data.i); /* DASTORE */\n" +
+                if (shouldEmitNullAndArrayBoundsChecks()) {
+                    b.append("    CHECK_ARRAY_ACCESS(3, SP[-2].data.i); ");
+                } else {
+                    b.append("    ");
+                }
+                b.append("/* DASTORE */\n" +
                         "    DOUBLE_ARRAY_LOOKUP((JAVA_ARRAY)SP[-3].data.o, SP[-2].data.i) = SP[-1].data.d; SP -= 3;\n");
                 break;
 
             case Opcodes.AASTORE:
-                b.append("    CHECK_ARRAY_ACCESS(3, SP[-2].data.i); { /* BC_AASTORE */\n" +
+                b.append("    ");
+                if (shouldEmitNullAndArrayBoundsChecks()) {
+                    b.append("CHECK_ARRAY_ACCESS(3, SP[-2].data.i); ");
+                }
+                b.append("{ /* BC_AASTORE */\n" +
                         "    JAVA_OBJECT aastoreTmp = SP[-3].data.o; \n" +
                         "    ((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)aastoreTmp).data)[SP[-2].data.i] = SP[-1].data.o; \n" +
                         "    SP -= 3; }\n");
@@ -535,7 +615,11 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                     if(getMethod() != null && getMethod().isBarebone()) {
                         b.append("    return SP[-1].data.i;\n");
                     } else {
-                        b.append("    releaseForReturn(threadStateData, cn1LocalsBeginInThread); return SP[-1].data.i;\n");
+                        if (getMethod() != null && getMethod().useFastReturnRelease()) {
+                            b.append("    CN1_FAST_RETURN_RELEASE(); return SP[-1].data.i;\n");
+                        } else {
+                            b.append("    releaseForReturn(threadStateData, cn1LocalsBeginInThread); return SP[-1].data.i;\n");
+                        }
 //                    b.append(maxLocals);
 //                    b.append(", stack, locals); \n    return SP[-1].data.i;\n");
                     }
@@ -551,7 +635,11 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                     if(getMethod() != null && getMethod().isBarebone()) {
                         b.append("    return POP_LONG();\n");
                     } else {
-                        b.append("    releaseForReturn(threadStateData, cn1LocalsBeginInThread); \n    return POP_LONG();\n");
+                        if (getMethod() != null && getMethod().useFastReturnRelease()) {
+                            b.append("    CN1_FAST_RETURN_RELEASE(); \n    return POP_LONG();\n");
+                        } else {
+                            b.append("    releaseForReturn(threadStateData, cn1LocalsBeginInThread); \n    return POP_LONG();\n");
+                        }
                     }
                 }
                 break;                
@@ -565,7 +653,11 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                     if(getMethod() != null && getMethod().isBarebone()) {
                         b.append("    return POP_FLOAT();\n");
                     } else {
-                        b.append("    releaseForReturn(threadStateData, cn1LocalsBeginInThread); \n    return POP_FLOAT();\n");
+                        if (getMethod() != null && getMethod().useFastReturnRelease()) {
+                            b.append("    CN1_FAST_RETURN_RELEASE(); \n    return POP_FLOAT();\n");
+                        } else {
+                            b.append("    releaseForReturn(threadStateData, cn1LocalsBeginInThread); \n    return POP_FLOAT();\n");
+                        }
                     }
                 }
                 break;                
@@ -579,7 +671,11 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                     if(getMethod() != null && getMethod().isBarebone()) {
                         b.append("    return POP_DOUBLE();\n");
                     } else {
-                        b.append("    releaseForReturn(threadStateData, cn1LocalsBeginInThread); \n    return POP_DOUBLE();\n");
+                        if (getMethod() != null && getMethod().useFastReturnRelease()) {
+                            b.append("    CN1_FAST_RETURN_RELEASE(); \n    return POP_DOUBLE();\n");
+                        } else {
+                            b.append("    releaseForReturn(threadStateData, cn1LocalsBeginInThread); \n    return POP_DOUBLE();\n");
+                        }
                     }
                 }
                 break;
@@ -593,7 +689,11 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                     if(getMethod() != null && getMethod().isBarebone()) {
                         b.append("    return POP_OBJ();\n");
                     } else {
-                        b.append("    releaseForReturn(threadStateData, cn1LocalsBeginInThread); \n    return POP_OBJ();\n");
+                        if (getMethod() != null && getMethod().useFastReturnRelease()) {
+                            b.append("    CN1_FAST_RETURN_RELEASE(); \n    return POP_OBJ();\n");
+                        } else {
+                            b.append("    releaseForReturn(threadStateData, cn1LocalsBeginInThread); \n    return POP_OBJ();\n");
+                        }
                     }
                 }
                 break;
@@ -611,7 +711,11 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                     if(getMethod() != null && getMethod().isBarebone()) {
                         b.append("    return;\n");
                     } else {
-                        b.append("    releaseForReturn(threadStateData, cn1LocalsBeginInThread); \n    return;\n");
+                        if (getMethod() != null && getMethod().useFastReturnRelease()) {
+                            b.append("    CN1_FAST_RETURN_RELEASE(); \n    return;\n");
+                        } else {
+                            b.append("    releaseForReturn(threadStateData, cn1LocalsBeginInThread); \n    return;\n");
+                        }
                     }
                 }
                 break;

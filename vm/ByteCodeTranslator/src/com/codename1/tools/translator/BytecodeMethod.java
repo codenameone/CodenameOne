@@ -108,6 +108,10 @@ public class BytecodeMethod implements SignatureSet {
     private String desc;
     private boolean eliminated;
     private boolean barebone;
+    private boolean disableDebugInfo;
+    private boolean disableNullAndArrayBoundsChecks;
+    private boolean fastMethodStackInUse;
+    private boolean fastMethodStackPrimitiveOnly;
     private String jsBodyScript;
     private String[] jsBodyParams;
 
@@ -122,6 +126,22 @@ public class BytecodeMethod implements SignatureSet {
 
     public boolean isBarebone() {
         return barebone;
+    }
+
+    public boolean isDisableDebugInfo() {
+        return disableDebugInfo;
+    }
+
+    public void setDisableDebugInfo(boolean disableDebugInfo) {
+        this.disableDebugInfo = disableDebugInfo;
+    }
+
+    public boolean isDisableNullAndArrayBoundsChecks() {
+        return disableNullAndArrayBoundsChecks;
+    }
+
+    public void setDisableNullAndArrayBoundsChecks(boolean disableNullAndArrayBoundsChecks) {
+        this.disableNullAndArrayBoundsChecks = disableNullAndArrayBoundsChecks;
     }
 
     private boolean checkBarebone() {
@@ -270,7 +290,75 @@ public class BytecodeMethod implements SignatureSet {
         }
         return true;
     }
-    
+
+    private boolean canUseFastMethodStack() {
+        if (synchronizedMethod || nativeMethod || abstractMethod) {
+            return false;
+        }
+        for (Instruction instruction : instructions) {
+            if (instruction instanceof TryCatch
+                    || instruction instanceof Invoke
+                    || instruction instanceof CustomInvoke
+                    || instruction instanceof Field
+                    || instruction instanceof TypeInstruction
+                    || instruction instanceof MultiArray
+                    || instruction instanceof CustomIntruction) {
+                return false;
+            }
+            if (instruction instanceof ArrayLoadExpression && !disableNullAndArrayBoundsChecks) {
+                return false;
+            }
+            if (instruction instanceof BasicInstruction) {
+                int op = instruction.getOpcode();
+                if (op == Opcodes.MONITORENTER || op == Opcodes.MONITOREXIT
+                        || op == Opcodes.ATHROW
+                        || op == Opcodes.IDIV || op == Opcodes.LDIV || op == Opcodes.IREM || op == Opcodes.LREM
+                        || op == Opcodes.ARRAYLENGTH
+                        || (!disableNullAndArrayBoundsChecks && (op >= Opcodes.IALOAD && op <= Opcodes.SALOAD))
+                        || (!disableNullAndArrayBoundsChecks && (op >= Opcodes.IASTORE && op <= Opcodes.SASTORE))
+                        || (!disableNullAndArrayBoundsChecks && (op == Opcodes.AALOAD || op == Opcodes.AASTORE
+                        || op == Opcodes.BALOAD || op == Opcodes.BASTORE || op == Opcodes.CALOAD || op == Opcodes.CASTORE))
+                        || op == Opcodes.NEWARRAY) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private boolean isPrimitiveOnlyFastFrameCandidate() {
+        for (ByteCodeMethodArg arg : arguments) {
+            if (arg.getQualifier() == 'o') {
+                return false;
+            }
+        }
+        if (!returnType.isVoid() && returnType.getQualifier() == 'o') {
+            return false;
+        }
+        if (!staticMethod) {
+            return false;
+        }
+        for (Instruction instruction : instructions) {
+            if (instruction instanceof VarOp) {
+                int op = instruction.getOpcode();
+                if (op == Opcodes.ALOAD || op == Opcodes.ASTORE) {
+                    return false;
+                }
+            }
+            if (instruction instanceof BasicInstruction) {
+                int op = instruction.getOpcode();
+                if (op == Opcodes.ARETURN || op == Opcodes.ACONST_NULL || op == Opcodes.AALOAD || op == Opcodes.AASTORE) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    public boolean useFastReturnRelease() {
+        return fastMethodStackInUse && !TryCatch.isTryCatchInMethod();
+    }
+
     public BytecodeMethod(String clsName, int access, String name, String desc, String signature, String[] exceptions) {
         methodName = name;
         this.clsName = clsName;
@@ -849,7 +937,8 @@ public class BytecodeMethod implements SignatureSet {
         }
             
         b.append(declaration);
-        
+        boolean fastMethodStackCandidate = canUseFastMethodStack();
+
         boolean hasInstructions = true;
         if(optimizerOn) {
             hasInstructions = optimize();
@@ -865,7 +954,10 @@ public class BytecodeMethod implements SignatureSet {
                 String variableName = lv.getQualifier() + "locals_"+lv.getIndex()+"_";
                 if (!added.contains(variableName) && (barebone || lv.getQualifier() != 'o')) {
                     added.add(variableName);
-                    b.append("    volatile ");
+                    b.append("    ");
+                    if (!disableDebugInfo) {
+                        b.append("volatile ");
+                    }
                     switch (lv.getQualifier()) {
                         case 'i' :
                             b.append("JAVA_INT"); break;
@@ -882,25 +974,58 @@ public class BytecodeMethod implements SignatureSet {
                 }
             }
             
+            boolean useFastMethodStack = !barebone && fastMethodStackCandidate;
+            boolean usePrimitiveFastFrame = useFastMethodStack && isPrimitiveOnlyFastFrameCandidate();
+            fastMethodStackInUse = useFastMethodStack;
+            fastMethodStackPrimitiveOnly = usePrimitiveFastFrame;
             if(!barebone) {
                 if(staticMethod) {
                     if(methodName.equals("__CLINIT__")) {
-                        b.append("    DEFINE_METHOD_STACK(");
+                        if (useFastMethodStack) {
+                            if (usePrimitiveFastFrame) {
+                                b.append("    DEFINE_METHOD_STACK_FAST_PRIMITIVE(");
+                            } else {
+                                b.append("    DEFINE_METHOD_STACK_FAST_REF(");
+                            }
+                        } else {
+                            b.append("    DEFINE_METHOD_STACK(");
+                        }
                     } else {
-                        b.append("    __STATIC_INITIALIZER_");
+                        b.append("    if (!class__");
                         b.append(clsName.replace('/', '_').replace('$', '_'));
-                        b.append("(threadStateData);\n    DEFINE_METHOD_STACK(");
+                        b.append(".initialized) __STATIC_INITIALIZER_");
+                        b.append(clsName.replace('/', '_').replace('$', '_'));
+                        if (useFastMethodStack) {
+                            if (usePrimitiveFastFrame) {
+                                b.append("(threadStateData);\n    DEFINE_METHOD_STACK_FAST_PRIMITIVE(");
+                            } else {
+                                b.append("(threadStateData);\n    DEFINE_METHOD_STACK_FAST_REF(");
+                            }
+                        } else {
+                            b.append("(threadStateData);\n    DEFINE_METHOD_STACK(");
+                        }
                     }
                 } else {
-                    b.append("    DEFINE_INSTANCE_METHOD_STACK(");
+                    if (useFastMethodStack) {
+                        if (usePrimitiveFastFrame) {
+                            b.append("    DEFINE_INSTANCE_METHOD_STACK_FAST_PRIMITIVE(");
+                        } else {
+                            b.append("    DEFINE_INSTANCE_METHOD_STACK_FAST_REF(");
+                        }
+                    } else {
+                        b.append("    DEFINE_INSTANCE_METHOD_STACK(");
+                    }
                 }
                 b.append(maxStack);
                 b.append(", ");
                 b.append(maxLocals);
-                b.append(", 0, ");
-                b.append(Parser.addToConstantPool(clsName));
-                b.append(", ");
-                b.append(Parser.addToConstantPool(methodName));
+                b.append(", 0");
+                if (!useFastMethodStack) {
+                    b.append(", ");
+                    b.append(Parser.addToConstantPool(clsName));
+                    b.append(", ");
+                    b.append(Parser.addToConstantPool(methodName));
+                }
                 b.append(");\n");
             } else {
                 b.append("    struct elementStruct* SP = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset];\n");
@@ -1317,6 +1442,9 @@ public class BytecodeMethod implements SignatureSet {
     }
     
     public void addLocalVariable(String name, String desc, String signature, Label start, Label end, int index) {
+        if (disableDebugInfo) {
+            return;
+        }
         //addInstruction(0, new LocalVariable(name, desc, signature, start, end, index));
         localVariables.add(new LocalVariable(name, desc, signature, start, end, index));
     }
@@ -1326,6 +1454,9 @@ public class BytecodeMethod implements SignatureSet {
     } 
     
     public void addDebugInfo(int line) {
+        if (disableDebugInfo) {
+            return;
+        }
         addInstruction(new LineNumber(sourceFile, line));
     }
     

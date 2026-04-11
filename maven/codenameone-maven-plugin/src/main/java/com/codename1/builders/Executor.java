@@ -1089,7 +1089,7 @@ public abstract class Executor {
                     destFile = new File(classesDir, fileName);
                 }
             } else {
-                if (fileName.endsWith(".java") || fileName.endsWith(".m") || fileName.endsWith(".h") || fileName.endsWith(".cs")) {
+                if (fileName.endsWith(".java") || fileName.endsWith(".kt") || fileName.endsWith(".swift") || fileName.endsWith(".m") || fileName.endsWith(".h") || fileName.endsWith(".cs")) {
                     destFile = new File(sourceDir, fileName);
                 } else {
                     if (fileName.endsWith(".jar") || fileName.endsWith(".a") || fileName.endsWith(".dylib")) {
@@ -1319,7 +1319,7 @@ public abstract class Executor {
                         destFile = new File(classesDir, entryName);
                     }
                 } else {
-                    if (entryName.endsWith(".java") || entryName.endsWith(".m") || entryName.endsWith(".h") || entryName.endsWith(".cs")) {
+                    if (entryName.endsWith(".java") || entryName.endsWith(".kt") || entryName.endsWith(".swift") || entryName.endsWith(".m") || entryName.endsWith(".h") || entryName.endsWith(".cs")) {
                         destFile = new File(sourceDir, entryName);
                     } else {
                         if (entryName.endsWith(".jar") || entryName.endsWith(".a") || entryName.endsWith(".dylib") || entryName.endsWith(".andlib") || entryName.endsWith(".aar") || entryName.endsWith(dll)) {

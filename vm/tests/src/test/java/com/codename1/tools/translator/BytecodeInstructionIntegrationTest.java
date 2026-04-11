@@ -6,6 +6,7 @@ import com.codename1.tools.translator.bytecodes.AssignableExpression;
 import com.codename1.tools.translator.bytecodes.BasicInstruction;
 import com.codename1.tools.translator.bytecodes.Instruction;
 import com.codename1.tools.translator.bytecodes.Ldc;
+import com.codename1.tools.translator.bytecodes.LineNumber;
 import com.codename1.tools.translator.bytecodes.LocalVariable;
 import com.codename1.tools.translator.bytecodes.MultiArray;
 import com.codename1.tools.translator.bytecodes.VarOp;
@@ -440,6 +441,71 @@ class BytecodeInstructionIntegrationTest {
         AnnotationVisitor result = wrapperWithDelegate.visitArray("values");
         assertSame(delegate, result);
         assertTrue(delegated.get(), "AnnotationVisitorWrapper should forward to the underlying visitor");
+    }
+
+    @Test
+    void disableDebugInfoFlagSkipsLineNumberEmission() {
+        BytecodeMethod method = new BytecodeMethod("Example", Opcodes.ACC_STATIC, "sample", "()V", null, null);
+        method.setDisableDebugInfo(true);
+
+        Instruction.setHasInstructions(true);
+        LineNumber lineNumber = new LineNumber("Example.java", 42);
+        lineNumber.setMethod(method);
+
+        StringBuilder generated = new StringBuilder();
+        lineNumber.appendInstruction(generated);
+        assertEquals("", generated.toString(), "Disabled debug info should suppress __CN1_DEBUG_INFO emission");
+    }
+
+    @Test
+    void disableNullAndArrayBoundsChecksSkipsArrayCheckEmission() {
+        BytecodeMethod method = new BytecodeMethod("Example", Opcodes.ACC_STATIC, "sample", "()V", null, null);
+        method.setDisableNullAndArrayBoundsChecks(true);
+
+        BasicInstruction instruction = new BasicInstruction(Opcodes.IALOAD, 0);
+        instruction.setMethod(method);
+
+        StringBuilder generated = new StringBuilder();
+        instruction.appendInstruction(generated);
+        assertFalse(generated.toString().contains("CHECK_ARRAY_ACCESS"),
+                "Disabled null and array bounds checks should suppress CHECK_ARRAY_ACCESS emission");
+    }
+
+    @Test
+    void disableDebugInfoSkipsLocalVariableMetadataAndVolatileLocals() {
+        BytecodeMethod method = new BytecodeMethod("Example", Opcodes.ACC_STATIC, "sample", "()V", null, null);
+        method.setDisableDebugInfo(true);
+        method.addLocalVariable("counter", "I", null, new Label(), new Label(), 1);
+        method.addDebugInfo(100);
+        method.addInstruction(Opcodes.RETURN);
+        method.setMaxes(1, 2);
+
+        StringBuilder generated = new StringBuilder();
+        method.appendMethodC(generated);
+        String c = generated.toString();
+        assertFalse(c.contains("volatile JAVA_INT ilocals_1_"),
+                "Debug-disabled methods should not emit volatile locals from local variable metadata");
+        assertFalse(c.contains("__CN1_DEBUG_INFO("),
+                "Debug-disabled methods should not emit line debug information");
+    }
+
+    @Test
+    void noThrowNoMonitorNoTryMethodsUseFastMethodStackMacro() {
+        BytecodeMethod method = new BytecodeMethod("Example", Opcodes.ACC_STATIC, "sample", "()V", null, null);
+        method.addInstruction(Opcodes.ICONST_0);
+        method.addInstruction(Opcodes.POP);
+        method.addInstruction(Opcodes.RETURN);
+        method.setMaxes(1, 4);
+
+        StringBuilder generated = new StringBuilder();
+        method.appendMethodC(generated);
+        String c = generated.toString();
+        assertTrue(c.contains("DEFINE_METHOD_STACK_FAST_PRIMITIVE("),
+                "Primitive no-throw/no-monitor/no-try methods should use DEFINE_METHOD_STACK_FAST_PRIMITIVE");
+        assertTrue(c.contains("if (!class__Example.initialized) __STATIC_INITIALIZER_Example(threadStateData);"),
+                "Static methods should emit a fast-path loaded check before static initialization");
+        assertTrue(c.contains("CN1_FAST_RETURN_RELEASE();"),
+                "Fast stack methods should use inline fast return release");
     }
 
     @Test
