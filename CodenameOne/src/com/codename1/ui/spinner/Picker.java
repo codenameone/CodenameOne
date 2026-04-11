@@ -764,12 +764,15 @@ public class Picker extends Button {
                 $(row).selectAllStyles().setMargin(0).setPadding(0).setBorder(Border.createEmpty()).setBgTransparency(0);
             }
             Button button = new Button(entry.text, isTablet ? "PickerButtonTablet" : "PickerButton");
-            button.addActionListener(e -> {
-                if (entry.action != null) {
-                    entry.action.run();
+            button.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+                    if (entry.action != null) {
+                        entry.action.run();
+                    }
+                    spinner.setValue(value);
+                    updateValue();
                 }
-                spinner.setValue(value);
-                updateValue();
             });
             row.add(button);
         }
