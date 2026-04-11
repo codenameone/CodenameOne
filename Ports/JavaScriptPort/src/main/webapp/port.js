@@ -3116,6 +3116,7 @@ function emitCn1ssChunks(base64, testName, channelName) {
 
 const cn1ssEmitCurrentFormScreenshotMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerHelper_emitCurrentFormScreenshot_java_lang_String_java_lang_Runnable";
 const cn1ssHelperClassName = "com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerHelper";
+let cn1ssEmitCurrentFormScreenshotInvokeDepth = 0;
 
 function isFallbackFunctionForSymbol(fn, symbol) {
   return !!(fn && fn.__cn1CiFallbackSymbol === symbol);
@@ -3162,18 +3163,28 @@ bindCiFallback("Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshotDom", [
   const normalizedTest = resolveCn1ssTestName(test);
   let shouldUseDomFallback = true;
   const originalResolved = resolveTranslatedMethodCandidate([
-    cn1ssEmitCurrentFormScreenshotMethodId,
-    cn1ssEmitCurrentFormScreenshotMethodId + "__impl"
+    // Prefer translated __impl first. The non-impl wrapper may dispatch via
+    // rebound globals and recurse into this fallback.
+    cn1ssEmitCurrentFormScreenshotMethodId + "__impl",
+    cn1ssEmitCurrentFormScreenshotMethodId
   ], cn1ssHelperClassName, fallbackSymbol);
   if (originalResolved && typeof originalResolved.fn === "function") {
-    try {
-      emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:originalResolved=" + originalResolved.source);
-      yield* originalResolved.fn(testName, completion);
-      return null;
-    } catch (originalErr) {
-      emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:originalInvokeErr="
-        + String(originalErr && originalErr.message ? originalErr.message : originalErr));
+    if (cn1ssEmitCurrentFormScreenshotInvokeDepth > 0) {
+      emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:originalReentryBypass=1");
       shouldUseDomFallback = true;
+    } else {
+      try {
+        cn1ssEmitCurrentFormScreenshotInvokeDepth++;
+        emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:originalResolved=" + originalResolved.source);
+        yield* originalResolved.fn(testName, completion);
+        return null;
+      } catch (originalErr) {
+        emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:originalInvokeErr="
+          + String(originalErr && originalErr.message ? originalErr.message : originalErr));
+        shouldUseDomFallback = true;
+      } finally {
+        cn1ssEmitCurrentFormScreenshotInvokeDepth = Math.max(0, cn1ssEmitCurrentFormScreenshotInvokeDepth - 1);
+      }
     }
   } else {
     emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:originalMissing=1");

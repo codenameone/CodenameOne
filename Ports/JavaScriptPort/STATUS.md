@@ -147,6 +147,22 @@ What Was Fixed In This Pass
    - Motivation:
      - White-frame capture can occur when center-only sampling misses rendered content (e.g., content concentrated away from center).
 
+13. Fixed screenshot-helper recursion regression that collapsed streams to `default`.
+   - File:
+     - `Ports/JavaScriptPort/src/main/webapp/port.js`
+   - CI symptom:
+     - `run-javascript-screenshot-tests` reported:
+       - `ERROR: No meaningful screenshots decoded (only default/bootstrap streams were present)`
+     - Browser logs showed repeated:
+       - `originalResolved=translated:...emitCurrentFormScreenshot...` followed by
+       - `originalInvokeErr=Maximum call stack size exceeded`
+     - Then only `CN1SS:default` chunks were emitted.
+   - Changes:
+     - Prefer translated `__impl` method resolution over non-impl wrapper.
+     - Added re-entry guard (`cn1ssEmitCurrentFormScreenshotInvokeDepth`) so recursive original calls are bypassed into deterministic host fallback instead of stack overflow.
+   - Expected effect:
+     - Restore named screenshot stream emission (`CN1SS:<test>`) instead of collapsing to `default`-only stream.
+
 Known Failing Symptoms (Latest CI Logs/Artifacts)
 -------------------------------------------------
 
@@ -179,12 +195,14 @@ Priority Next Steps
    - Confirm `settleChanged`, `canvasSig`, and `canvasSource` diagnostics vary across tests.
 2. Validate size normalization after large-canvas gating:
    - Expect screenshot dimensions to remain consistent at app target size (no `120x80`/`4x4` non-bootstrap outputs).
-3. Validate `originalResolved=translated:...` vs `originalMissing=1` in CI browser log after translated-method preservation patch.
-4. If white-frame reuse persists, capture and compare per-test `settleSig`/`canvasSig`/`canvasSource` to identify whether paint is not happening or capture target is still wrong.
-5. Fix per-test null receiver/init path (`__classDef` null) at first failing stack, not via broad fallbacks.
-6. Fix missing `Button.initLaf(UIManager)` symbol resolution in worker runtime path.
-7. Fix worker-mode orientation lock path so DOM access is host-bridge mediated (no direct `document` access in worker).
-8. Confirm VM completeness stability in CI with parser/runtime patches (`expected 7` consistently).
+3. Validate no `originalInvokeErr=Maximum call stack size exceeded` in CI browser log for screenshot helper path.
+4. Validate `CN1SS` named test streams are emitted again (not only `default/bootstrap`).
+5. Validate `originalResolved=translated:...__impl` (or equivalent non-recursive path) in CI browser log after translated-method preservation patch.
+6. If white-frame reuse persists, capture and compare per-test `settleSig`/`canvasSig`/`canvasSource` to identify whether paint is not happening or capture target is still wrong.
+7. Fix per-test null receiver/init path (`__classDef` null) at first failing stack, not via broad fallbacks.
+8. Fix missing `Button.initLaf(UIManager)` symbol resolution in worker runtime path.
+9. Fix worker-mode orientation lock path so DOM access is host-bridge mediated (no direct `document` access in worker).
+10. Confirm VM completeness stability in CI with parser/runtime patches (`expected 7` consistently).
 
 Files Touched In This Pass
 --------------------------
