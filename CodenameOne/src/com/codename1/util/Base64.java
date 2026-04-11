@@ -106,11 +106,8 @@ public abstract class Base64 {
         if (len == 0) {
             return 0;
         }
-        byte[] inLocal = in;
-        byte[] outLocal = out;
-        int[] decodeMapLocal = decodeMapInt;
         if ((len & 0x3) == 0) {
-            int fastLength = decodeNoWhitespace(inLocal, len, outLocal);
+            int fastLength = decodeNoWhitespace(in, len, out);
             if (fastLength >= 0) {
                 return fastLength;
             }
@@ -118,8 +115,8 @@ public abstract class Base64 {
         int pad = 0;
         int end = len;
         while (end > 0) {
-            int chr = inLocal[end - 1] & 0xff;
-            if (decodeMapLocal[chr] == DECODE_WHITESPACE) {
+            int chr = in[end - 1] & 0xff;
+            if (decodeMapInt[chr] == DECODE_WHITESPACE) {
                 end--;
                 continue;
             }
@@ -133,11 +130,11 @@ public abstract class Base64 {
 
         int validChars = 0;
         for (int i = 0; i < end; i++) {
-            int chr = inLocal[i] & 0xff;
+            int chr = in[i] & 0xff;
             if (chr == '=') {
                 break;
             }
-            int value = decodeMapLocal[chr];
+            int value = decodeMapInt[chr];
             if (value == DECODE_WHITESPACE) {
                 continue;
             }
@@ -152,7 +149,7 @@ public abstract class Base64 {
         if (outputLength <= 0) {
             return 0;
         }
-        if (outLocal.length < outputLength) {
+        if (out.length < outputLength) {
             throw new IllegalArgumentException("Output buffer too small for decoded data");
         }
         int outIndex = 0;
@@ -160,11 +157,11 @@ public abstract class Base64 {
         int quantum = 0;
         int quantumChars = 0;
         for (int i = 0; i < end; i++) {
-            int chr = inLocal[i] & 0xff;
+            int chr = in[i] & 0xff;
             if (chr == '=') {
                 break;
             }
-            int bits = decodeMapLocal[chr];
+            int bits = decodeMapInt[chr];
             if (bits == DECODE_WHITESPACE) {
                 continue;
             }
@@ -174,9 +171,9 @@ public abstract class Base64 {
             quantum = (quantum << 6) | bits;
             quantumChars++;
             if (quantumChars == 4) {
-                outLocal[outIndex++] = (byte) ((quantum & 0x00FF0000) >> 16);
-                outLocal[outIndex++] = (byte) ((quantum & 0x0000FF00) >> 8);
-                outLocal[outIndex++] = (byte) (quantum & 0x000000FF);
+                out[outIndex++] = (byte) ((quantum & 0x00FF0000) >> 16);
+                out[outIndex++] = (byte) ((quantum & 0x0000FF00) >> 8);
+                out[outIndex++] = (byte) (quantum & 0x000000FF);
                 quantumChars = 0;
                 quantum = 0;
             }
@@ -187,9 +184,9 @@ public abstract class Base64 {
                 return -1;
             }
             quantum = quantum << (6 * pad);
-            outLocal[outIndex++] = (byte) ((quantum & 0x00FF0000) >> 16);
+            out[outIndex++] = (byte) ((quantum & 0x00FF0000) >> 16);
             if (pad == 1) {
-                outLocal[outIndex++] = (byte) ((quantum & 0x0000FF00) >> 8);
+                out[outIndex++] = (byte) ((quantum & 0x0000FF00) >> 8);
             }
         }
 
@@ -206,13 +203,10 @@ public abstract class Base64 {
         if ((len & 0x3) != 0) {
             return -1;
         }
-        byte[] inLocal = in;
-        byte[] outLocal = out;
-        int[] decodeMapLocal = decodeMapInt;
         int pad = 0;
-        if (len > 0 && inLocal[len - 1] == '=') {
+        if (len > 0 && in[len - 1] == '=') {
             pad++;
-            if (len > 1 && inLocal[len - 2] == '=') {
+            if (len > 1 && in[len - 2] == '=') {
                 pad++;
             }
         }
@@ -224,17 +218,18 @@ public abstract class Base64 {
         if (outLength <= 0) {
             return 0;
         }
-        if (outLocal.length < outLength) {
+        if (out.length < outLength) {
             throw new IllegalArgumentException("Output buffer too small for decoded data");
         }
         int outIndex = 0;
         int fullLen = len - (pad > 0 ? 4 : 0);
+        int[] decodeMapLocal = decodeMapInt;
 
         for (int i = 0; i < fullLen; i += 4) {
-            int c0 = inLocal[i] & 0xff;
-            int c1 = inLocal[i + 1] & 0xff;
-            int c2 = inLocal[i + 2] & 0xff;
-            int c3 = inLocal[i + 3] & 0xff;
+            int c0 = in[i] & 0xff;
+            int c1 = in[i + 1] & 0xff;
+            int c2 = in[i + 2] & 0xff;
+            int c3 = in[i + 3] & 0xff;
             int b0 = decodeMapLocal[c0];
             int b1 = decodeMapLocal[c1];
             int b2 = decodeMapLocal[c2];
@@ -242,13 +237,10 @@ public abstract class Base64 {
             if ((b0 | b1 | b2 | b3) < 0) {
                 return -1;
             }
-            if (outIndex + 2 >= outLength) {
-                return -1;
-            }
             int quantum = (b0 << 18) | (b1 << 12) | (b2 << 6) | b3;
-            outLocal[outIndex++] = (byte) ((quantum >> 16) & 0xff);
-            outLocal[outIndex++] = (byte) ((quantum >> 8) & 0xff);
-            outLocal[outIndex++] = (byte) (quantum & 0xff);
+            out[outIndex++] = (byte) ((quantum >> 16) & 0xff);
+            out[outIndex++] = (byte) ((quantum >> 8) & 0xff);
+            out[outIndex++] = (byte) (quantum & 0xff);
         }
 
         if (pad == 0) {
@@ -256,32 +248,26 @@ public abstract class Base64 {
         }
 
         int i = len - 4;
-        int c0 = inLocal[i] & 0xff;
-        int c1 = inLocal[i + 1] & 0xff;
+        int c0 = in[i] & 0xff;
+        int c1 = in[i + 1] & 0xff;
         int b0 = decodeMapLocal[c0];
         int b1 = decodeMapLocal[c1];
         if ((b0 | b1) < 0) {
             return -1;
         }
-        if (outIndex >= outLength) {
-            return -1;
-        }
-        outLocal[outIndex++] = (byte) ((b0 << 2) | (b1 >> 4));
+        out[outIndex++] = (byte) ((b0 << 2) | (b1 >> 4));
         if (pad == 2) {
-            return (inLocal[i + 2] == '=' && inLocal[i + 3] == '=') ? outIndex : -1;
+            return (in[i + 2] == '=' && in[i + 3] == '=') ? outIndex : -1;
         }
 
-        if (inLocal[i + 3] != '=') {
+        if (in[i + 3] != '=') {
             return -1;
         }
-        int b2 = decodeMapLocal[inLocal[i + 2] & 0xff];
+        int b2 = decodeMapLocal[in[i + 2] & 0xff];
         if (b2 < 0) {
             return -1;
         }
-        if (outIndex >= outLength) {
-            return -1;
-        }
-        outLocal[outIndex] = (byte) ((b1 << 4) | (b2 >> 2));
+        out[outIndex] = (byte) ((b1 << 4) | (b2 >> 2));
         return outLength;
     }
 
