@@ -45,6 +45,60 @@ The simulator contains some tools to measure performance overhead of a specific 
 * *On some platforms mutable images are slow* - mutable images are images you can draw on (using `getGraphics()`). On some platforms they perform quite badly (e.g. iOS) and should generally be avoided. You can check if mutable images are fast in a platform using `Display.areMutableImagesFast()`
 * * Make components either transparent or opaque * - a translucent component must paint it's parent every time. This can be expensive. An opaque component might have margins that would require that we paint the parent so there is often overdraw in such cases (overdraw means the same pixel being painted twice).
 
+==== ParparVM Native Translation Performance Hints
+
+For ParparVM-generated native code, we now support method-level optimization hints via annotations. These can provide very good wins in hot code paths, but they come with tradeoffs and should be applied surgically.
+
+===== Method-level codegen hints
+
+* `@DisableDebugInfo` +
+  Suppresses generated line/debug metadata for the annotated method.
+  This can reduce generated C size and remove some per-instruction debug overhead.
+
+* `@DisableNullChecksAndArrayBoundsChecks` +
+  Suppresses generated null and array-bounds checks for the annotated method.
+  This can significantly reduce branch-heavy code in tight loops.
+
+TIP: Use these only on methods that are both performance-critical and well-covered by tests. These annotations intentionally trade runtime safety diagnostics for speed.
+
+===== Fast method-stack path
+
+The translator can emit a fast method-stack prologue/epilogue (`DEFINE_METHOD_STACK_FAST_*` and `CN1_FAST_RETURN_RELEASE`) for methods that meet strict safety criteria.
+
+In practice, this tends to help for:
+
+* Small, hot methods.
+* Methods without monitor usage / exception-heavy flow.
+* Methods with straightforward control flow and low instruction complexity.
+
+Tradeoffs:
+
+* Overly broad fast-path eligibility can regress performance if extra branches or memory writes are introduced.
+* Primitive-only fast-frame variants may not always outperform a straightforward full clear on all targets/compilers.
+
+TIP: Benchmark representative workloads after enabling fast-stack behavior. Keep eligibility conservative and expand only where measurement shows consistent gains.
+
+===== Base64-style hot-loop guidelines
+
+For low-level loops (e.g. Base64 encode/decode):
+
+* Prefer simple loop bodies with predictable branches.
+* Cache decode/lookup tables in primitive arrays (`int[]` lookup tables can reduce per-iteration conversion overhead).
+* Avoid adding “defensive” branches in the inner-most loop unless they are required for correctness in production inputs.
+
+===== Build configuration matters
+
+When benchmarking translator output, ensure native projects are compiled with optimization enabled (e.g. CMake `Release` builds). Debug/default builds can hide improvements or produce misleading regressions.
+
+If you are using the integration test harness, make sure CMake is configured with:
+
+[source]
+----
+-DCMAKE_BUILD_TYPE=Release
+----
+
+Without this setting, comparison between Java and ParparVM native output is often noisy and can lead to incorrect optimization conclusions.
+
 === Performance Monitor
 
 The Performance Monitor tool can be accessible via the #Simulator# -> #Performance Monitor# menu option in the simulator. This launches the following UI that can help you improve application performance:
