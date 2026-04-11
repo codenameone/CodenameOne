@@ -47,6 +47,7 @@ const PRIMITIVE_INFO = {
   JAVA_LONG: { javaName: "long", descriptor: "J" }
 };
 const jsObjectWrappers = typeof WeakMap === "function" ? new WeakMap() : null;
+const externalIdentityMap = typeof WeakMap === "function" ? new WeakMap() : null;
 const jsoRegistry = {
   classPrefixes: [],
   inferFn: null,
@@ -206,6 +207,52 @@ function printToConsole(line) {
   if (global.console && typeof global.console.log === "function") {
     global.console.log(line);
   }
+}
+function isObjectLike(value) {
+  return value != null && (typeof value === "object" || typeof value === "function");
+}
+function isJavaStringObject(value) {
+  return !!(value && value.__class === "java_lang_String");
+}
+function areStringLikeEqual(a, b) {
+  if (!((typeof a === "string") || isJavaStringObject(a))) {
+    return false;
+  }
+  if (!((typeof b === "string") || isJavaStringObject(b))) {
+    return false;
+  }
+  return jvm.toNativeString(a) === jvm.toNativeString(b);
+}
+function identityHash(obj) {
+  if (obj == null) {
+    return 0;
+  }
+  if (typeof obj.__id === "number" && obj.__id !== 0) {
+    return obj.__id | 0;
+  }
+  if (!isObjectLike(obj)) {
+    return 0;
+  }
+  if (externalIdentityMap) {
+    const existing = externalIdentityMap.get(obj);
+    if (typeof existing === "number" && existing !== 0) {
+      return existing | 0;
+    }
+  }
+  const id = jvm.nextIdentity++ | 0;
+  if (Object.isExtensible && Object.isExtensible(obj)) {
+    try {
+      obj.__id = id;
+      return id;
+    } catch (ignored) {
+      // Fall back to WeakMap when direct assignment is not possible.
+    }
+  }
+  if (externalIdentityMap) {
+    externalIdentityMap.set(obj, id);
+    return id;
+  }
+  return 0;
 }
 function createConsolePrintStream() {
   try {
@@ -1960,7 +2007,7 @@ bindNative(["cn1_java_lang_Thread_start", "cn1_java_lang_Thread_start__"], funct
   return null;
 });
 bindNative(["cn1_java_lang_System_currentTimeMillis_R_long", "cn1_java_lang_System_currentTimeMillis___R_long"], function*() { return Date.now(); });
-bindNative(["cn1_java_lang_System_identityHashCode_java_lang_Object_R_int", "cn1_java_lang_System_identityHashCode___java_lang_Object_R_int"], function*(obj) { return obj == null ? 0 : (obj.__id | 0); });
+bindNative(["cn1_java_lang_System_identityHashCode_java_lang_Object_R_int", "cn1_java_lang_System_identityHashCode___java_lang_Object_R_int"], function*(obj) { return identityHash(obj); });
 bindNative(["cn1_java_lang_System_arraycopy_java_lang_Object_int_java_lang_Object_int_int", "cn1_java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int_int"], function*(src, srcOffset, dst, dstOffset, length) {
   for (let i = 0; i < length; i++) dst[dstOffset + i] = src[srcOffset + i];
   return null;
@@ -2261,6 +2308,12 @@ bindNative(["cn1_java_util_HashMap_areEqualKeys_java_lang_Object_java_lang_Objec
     return 1;
   }
   if (key1 == null || key2 == null) {
+    return 0;
+  }
+  if (areStringLikeEqual(key1, key2)) {
+    return 1;
+  }
+  if (!key1.__class) {
     return 0;
   }
   const equalsMethod = jvm.resolveVirtual(key1.__class, "cn1_java_lang_Object_equals_java_lang_Object_R_boolean");

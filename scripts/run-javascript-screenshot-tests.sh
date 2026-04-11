@@ -99,7 +99,11 @@ rj_log "Detected CN1SS test streams: ${TEST_NAMES[*]}"
 declare -a FAILED_TESTS=()
 declare -a COMPARE_ENTRIES=()
 
-cn1ss_print_log "$LOG_FILE"
+if ! cn1ss_print_log "$LOG_FILE"; then
+  # Keep processing screenshots even when suite logs include CN1SS error markers.
+  # The report/comment output is needed specifically for these failing runs.
+  rj_log "CN1SS log check reported test errors; continuing with screenshot decode/report generation"
+fi
 
 for test in "${TEST_NAMES[@]}"; do
   dest="$SCREENSHOT_RAW_DIR/${test}.png"
