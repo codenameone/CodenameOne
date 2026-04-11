@@ -3153,6 +3153,11 @@ bindCiFallback("Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshotDom", [
     let capturedDataUrl = "";
     if (jvm && typeof jvm.invokeHostNative === "function") {
       try {
+        yield jvm.invokeHostNative("__cn1_wait_for_ui_settle__", [{
+          reason: "screenshot:" + normalizedTest,
+          maxFrames: 18,
+          stableFrames: 2
+        }]);
         const hostResult = yield jvm.invokeHostNative("__cn1_capture_canvas_png__", []);
         capturedDataUrl = hostResult == null ? "" : String(hostResult);
       } catch (_hostCaptureErr) {
@@ -3230,7 +3235,23 @@ bindCiFallback("BaseTest.registerReadyCallbackImmediate", [
   baseTestRegisterReadyCallbackMethodId,
   baseTestRegisterReadyCallbackMethodId + "__impl"
 ], function*(_baseTest, _form, callback) {
-  emitDiagLine("PARPAR:DIAG:FALLBACK:baseTestRegisterReady:immediateDispatch=1");
+  const activeTest = normalizeCn1ssTestName(cn1ssActiveTestName || "default");
+  let settleChanged = "na";
+  if (jvm && typeof jvm.invokeHostNative === "function") {
+    try {
+      const settleResult = yield jvm.invokeHostNative("__cn1_wait_for_ui_settle__", [{
+        reason: "ready:" + activeTest,
+        maxFrames: 24,
+        stableFrames: 2
+      }]);
+      if (settleResult && settleResult.changedFromPrevious != null) {
+        settleChanged = String((settleResult.changedFromPrevious | 0) !== 0 ? 1 : 0);
+      }
+    } catch (_settleErr) {
+      settleChanged = "err";
+    }
+  }
+  emitDiagLine("PARPAR:DIAG:FALLBACK:baseTestRegisterReady:afterUiSettle=1:test=" + activeTest + ":changed=" + settleChanged);
   if (!callback || !callback.__class) {
     return null;
   }

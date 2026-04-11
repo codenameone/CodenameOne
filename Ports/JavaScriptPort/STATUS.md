@@ -15,6 +15,7 @@ Current State
   - `CN1SS:SUITE:FINISHED`
   - `TOP_BLOCKER=none|none|none`
 - The screenshot pipeline now decodes/report-generates reliably from logs, but screenshot content is still mostly wrong (white-frame capture path is still being used in CI artifacts).
+- New patch (not yet CI-validated in this document revision): worker-side fallback screenshot path now waits for a host-side UI-settle barrier before ready-callback dispatch and before canvas capture, to avoid pre-paint frame capture.
 
 What Was Fixed In This Pass
 ---------------------------
@@ -70,6 +71,21 @@ What Was Fixed In This Pass
    - Local check:
      - `JavascriptCn1CoreCompletenessTest#executesMeaningfulCodenameOneCoreSliceInWorkerRuntime` passes locally after this update.
 
+7. Added explicit host-side UI settle barrier and wired it into screenshot readiness/capture flow.
+   - Files:
+     - `vm/ByteCodeTranslator/src/javascript/browser_bridge.js`
+     - `Ports/JavaScriptPort/src/main/webapp/port.js`
+   - Changes:
+     - New host native `__cn1_wait_for_ui_settle__` waits across RAF frames and monitors canvas signature/score stability.
+     - `BaseTest.registerReadyCallbackImmediate` now waits on host UI settle before invoking callback.
+     - `Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshotDom` now waits on host UI settle before `__cn1_capture_canvas_png__`.
+     - Added diagnostics:
+       - `PARPAR:DIAG:SCREENSHOT_START:settleReason=...`
+       - `PARPAR:DIAG:SCREENSHOT_START:settleChanged=...`
+       - `PARPAR:DIAG:FALLBACK:baseTestRegisterReady:afterUiSettle=1:...`
+   - Motivation:
+     - CI showed near-identical screenshot payloads (same hash/size) indicating repeated capture of a stale frame rather than per-test painted UI.
+
 Known Failing Symptoms (Latest CI Logs/Artifacts)
 -------------------------------------------------
 
@@ -91,16 +107,18 @@ Other CI Signal
 Priority Next Steps
 -------------------
 
-1. Eliminate host-canvas screenshot fallback usage for named tests; route through translated screenshot helper path and capture real UI frames.
-2. Fix per-test null receiver/init path (`__classDef` null) at first failing stack, not via broad fallbacks.
-3. Fix missing `Button.initLaf(UIManager)` symbol resolution in worker runtime path.
-4. Fix worker-mode orientation lock path so DOM access is host-bridge mediated (no direct `document` access in worker).
-5. Confirm VM completeness stability in CI with new parser/runtime patches (`expected 7` consistently).
+1. Validate CI output after UI-settle barrier:
+   - Expect non-identical PNG hashes for distinct tests.
+   - Confirm `settleChanged` and `canvasSig` diagnostics vary across tests.
+2. If white-frame reuse persists, capture and compare per-test `settleSig`/`canvasSig` to identify whether paint is not happening or capture target is wrong.
+3. Fix per-test null receiver/init path (`__classDef` null) at first failing stack, not via broad fallbacks.
+4. Fix missing `Button.initLaf(UIManager)` symbol resolution in worker runtime path.
+5. Fix worker-mode orientation lock path so DOM access is host-bridge mediated (no direct `document` access in worker).
+6. Confirm VM completeness stability in CI with parser/runtime patches (`expected 7` consistently).
 
 Files Touched In This Pass
 --------------------------
 
-- `scripts/run-javascript-screenshot-tests.sh`
-- `vm/ByteCodeTranslator/src/javascript/parparvm_runtime.js`
-- `vm/tests/src/test/java/com/codename1/tools/translator/JavascriptRuntimeSemanticsTest.java`
+- `vm/ByteCodeTranslator/src/javascript/browser_bridge.js`
+- `Ports/JavaScriptPort/src/main/webapp/port.js`
 - `Ports/JavaScriptPort/STATUS.md`

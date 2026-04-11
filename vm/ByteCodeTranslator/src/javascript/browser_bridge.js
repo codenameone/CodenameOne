@@ -335,116 +335,281 @@
     return hostResult(event);
   });
 
-  hostBridge.register('__cn1_capture_canvas_png__', function() {
-    function afterPaint() {
-      return new Promise(function(resolve) {
-        var win = global.window || global;
-        var raf = win && typeof win.requestAnimationFrame === 'function' ? win.requestAnimationFrame.bind(win) : null;
-        if (!raf) {
-          setTimeout(resolve, 16);
-          return;
-        }
+  function afterPaint(frames) {
+    return new Promise(function(resolve) {
+      var win = global.window || global;
+      var raf = win && typeof win.requestAnimationFrame === 'function' ? win.requestAnimationFrame.bind(win) : null;
+      var remaining = Math.max(1, frames | 0);
+      if (!raf) {
+        setTimeout(resolve, 16 * remaining);
+        return;
+      }
+      function step() {
         raf(function() {
-          raf(function() {
+          remaining--;
+          if (remaining <= 0) {
             resolve();
-          });
+            return;
+          }
+          step();
         });
-      });
+      }
+      step();
+    });
+  }
+
+  function shortSignatureFromImageData(img) {
+    if (!img || !img.data || !img.data.length) {
+      return 'none';
     }
-    function captureNow() {
-      var doc = global.document || (global.window && global.window.document) || null;
-      if (!doc || typeof doc.querySelectorAll !== 'function') {
-        return '';
+    var data = img.data;
+    var hash = 2166136261 >>> 0;
+    for (var i = 0; i < data.length; i += 17) {
+      hash ^= data[i] | 0;
+      hash = Math.imul(hash, 16777619);
+    }
+    return String((hash >>> 0).toString(16));
+  }
+
+  function canvasContentScore(canvas) {
+    if (!canvas || typeof canvas.getContext !== 'function') {
+      return null;
+    }
+    var w = canvas.width | 0;
+    var h = canvas.height | 0;
+    if (w <= 0 || h <= 0) {
+      return null;
+    }
+    var ctx = null;
+    try {
+      ctx = canvas.getContext('2d');
+    } catch (_err) {
+      ctx = null;
+    }
+    if (!ctx || typeof ctx.getImageData !== 'function') {
+      return null;
+    }
+    var sampleW = Math.min(48, w);
+    var sampleH = Math.min(48, h);
+    var startX = ((w - sampleW) / 2) | 0;
+    var startY = ((h - sampleH) / 2) | 0;
+    var img;
+    try {
+      img = ctx.getImageData(startX, startY, sampleW, sampleH);
+    } catch (_err) {
+      return null;
+    }
+    if (!img || !img.data || !img.data.length) {
+      return null;
+    }
+    var data = img.data;
+    var opaqueCount = 0;
+    var nonWhiteCount = 0;
+    for (var i = 0; i < data.length; i += 4) {
+      var r = data[i] | 0;
+      var g = data[i + 1] | 0;
+      var b = data[i + 2] | 0;
+      var a = data[i + 3] | 0;
+      if (a > 12) {
+        opaqueCount++;
+        if (!(r >= 248 && g >= 248 && b >= 248)) {
+          nonWhiteCount++;
+        }
       }
-      var canvases = doc.querySelectorAll('canvas');
-      if (!canvases || !canvases.length) {
-        return '';
+    }
+    return {
+      score: (nonWhiteCount * 4) + opaqueCount,
+      signature: shortSignatureFromImageData(img)
+    };
+  }
+
+  function pickBestCanvasSnapshot(includeDataUrl) {
+    var doc = global.document || (global.window && global.window.document) || null;
+    if (!doc || typeof doc.querySelectorAll !== 'function') {
+      return null;
+    }
+    var canvases = doc.querySelectorAll('canvas');
+    if (!canvases || !canvases.length) {
+      return null;
+    }
+    var best = null;
+    var bestArea = -1;
+    var bestScore = -1;
+    var bestIndex = -1;
+    var bestSignature = 'none';
+    for (var i = 0; i < canvases.length; i++) {
+      var c = canvases[i];
+      if (!c || (includeDataUrl && typeof c.toDataURL !== 'function')) {
+        continue;
       }
-      function canvasContentScore(canvas) {
-        if (!canvas || typeof canvas.getContext !== 'function') {
-          return -1;
-        }
-        var w = canvas.width | 0;
-        var h = canvas.height | 0;
-        if (w <= 0 || h <= 0) {
-          return -1;
-        }
-        var ctx = null;
-        try {
-          ctx = canvas.getContext('2d');
-        } catch (_err) {
-          ctx = null;
-        }
-        if (!ctx || typeof ctx.getImageData !== 'function') {
-          return -1;
-        }
-        var sampleW = Math.min(48, w);
-        var sampleH = Math.min(48, h);
-        var startX = ((w - sampleW) / 2) | 0;
-        var startY = ((h - sampleH) / 2) | 0;
-        var img;
-        try {
-          img = ctx.getImageData(startX, startY, sampleW, sampleH);
-        } catch (_err) {
-          return -1;
-        }
-        if (!img || !img.data || !img.data.length) {
-          return -1;
-        }
-        var data = img.data;
-        var opaqueCount = 0;
-        var nonWhiteCount = 0;
-        for (var i = 0; i < data.length; i += 4) {
-          var r = data[i] | 0;
-          var g = data[i + 1] | 0;
-          var b = data[i + 2] | 0;
-          var a = data[i + 3] | 0;
-          if (a > 12) {
-            opaqueCount++;
-            if (!(r >= 248 && g >= 248 && b >= 248)) {
-              nonWhiteCount++;
-            }
+      var w = (c.width | 0);
+      var h = (c.height | 0);
+      var area = w * h;
+      var scoreMeta = canvasContentScore(c);
+      var score = scoreMeta && scoreMeta.score != null ? (scoreMeta.score | 0) : -1;
+      var signature = scoreMeta && scoreMeta.signature ? String(scoreMeta.signature) : 'none';
+      if (score > bestScore || (score === bestScore && area > bestArea)) {
+        bestScore = score;
+        bestArea = area;
+        best = c;
+        bestIndex = i;
+        bestSignature = signature;
+      }
+    }
+    if (!best) {
+      return null;
+    }
+    var out = {
+      canvasCount: canvases.length,
+      canvasPick: bestIndex,
+      canvasArea: bestArea,
+      canvasScore: bestScore,
+      canvasSignature: bestSignature
+    };
+    if (!includeDataUrl) {
+      return out;
+    }
+    try {
+      out.dataUrl = String(best.toDataURL('image/png') || '');
+      return out;
+    } catch (_err) {
+      return null;
+    }
+  }
+
+  hostBridge.register('__cn1_wait_for_ui_settle__', function(request) {
+    var payload = request || {};
+    var reason = payload.reason == null ? 'unknown' : String(payload.reason);
+    var maxFrames = Math.max(1, Math.min(48, (payload.maxFrames | 0) || 14));
+    var stableFrames = Math.max(1, Math.min(6, (payload.stableFrames | 0) || 2));
+    var previousSignature = String(global.__cn1LastScreenshotSignature || '');
+    var changed = false;
+    var stableCount = 0;
+    var lastSignature = '';
+    var best = null;
+    function chooseBetter(a, b) {
+      if (!a) {
+        return b;
+      }
+      if (!b) {
+        return a;
+      }
+      if ((b.canvasScore | 0) !== (a.canvasScore | 0)) {
+        return (b.canvasScore | 0) > (a.canvasScore | 0) ? b : a;
+      }
+      if ((b.canvasArea | 0) !== (a.canvasArea | 0)) {
+        return (b.canvasArea | 0) > (a.canvasArea | 0) ? b : a;
+      }
+      return b;
+    }
+    function runFrame(index) {
+      return afterPaint(1).then(function() {
+        var sample = pickBestCanvasSnapshot(false);
+        best = chooseBetter(best, sample);
+        if (sample && sample.canvasSignature && sample.canvasSignature !== 'none') {
+          var sig = String(sample.canvasSignature);
+          if (sig !== previousSignature) {
+            changed = true;
+          }
+          if (sig === lastSignature) {
+            stableCount++;
+          } else {
+            stableCount = 1;
+            lastSignature = sig;
+          }
+          if (changed && stableCount >= stableFrames) {
+            return sample;
           }
         }
-        return (nonWhiteCount * 4) + opaqueCount;
-      }
-
-      var best = null;
-      var bestArea = -1;
-      var bestScore = -1;
-      var bestIndex = -1;
-      for (var i = 0; i < canvases.length; i++) {
-        var c = canvases[i];
-        if (!c || typeof c.toDataURL !== 'function') {
-          continue;
+        if (index + 1 >= maxFrames) {
+          return best;
         }
-        var w = (c.width | 0);
-        var h = (c.height | 0);
-        var area = w * h;
-        var score = canvasContentScore(c);
-        if (score > bestScore || (score === bestScore && area > bestArea)) {
-          bestScore = score;
-          bestArea = area;
-          best = c;
-          bestIndex = i;
-        }
-      }
-      if (!best) {
-        return '';
-      }
-      try {
-        var out = String(best.toDataURL('image/png') || '');
-        diag('SCREENSHOT_START', 'canvasCount', canvases.length);
-        diag('SCREENSHOT_START', 'canvasPick', bestIndex);
-        diag('SCREENSHOT_START', 'canvasArea', bestArea);
-        diag('SCREENSHOT_START', 'canvasScore', bestScore);
-        diag('SCREENSHOT_START', 'pngLen', out.length);
-        return out;
-      } catch (_err) {
-        return '';
-      }
+        return runFrame(index + 1);
+      });
     }
-    return afterPaint().then(captureNow);
+    return runFrame(0).then(function(result) {
+      var meta = result || {
+        canvasCount: 0,
+        canvasPick: -1,
+        canvasArea: -1,
+        canvasScore: -1,
+        canvasSignature: 'none'
+      };
+      global.__cn1LastUiSettleSignature = meta.canvasSignature || '';
+      diag('SCREENSHOT_START', 'settleReason', reason);
+      diag('SCREENSHOT_START', 'settleFrames', maxFrames);
+      diag('SCREENSHOT_START', 'settleStableFrames', stableFrames);
+      diag('SCREENSHOT_START', 'settleChanged', changed ? 1 : 0);
+      diag('SCREENSHOT_START', 'settleSig', meta.canvasSignature || 'none');
+      diag('SCREENSHOT_START', 'settleScore', meta.canvasScore | 0);
+      return {
+        changedFromPrevious: changed ? 1 : 0,
+        canvasSignature: meta.canvasSignature || 'none',
+        canvasScore: meta.canvasScore | 0,
+        canvasArea: meta.canvasArea | 0,
+        canvasCount: meta.canvasCount | 0,
+        canvasPick: meta.canvasPick | 0
+      };
+    });
+  });
+
+  hostBridge.register('__cn1_capture_canvas_png__', function() {
+    function captureNow() {
+      return pickBestCanvasSnapshot(true);
+    }
+    var previousSignature = String(global.__cn1LastScreenshotSignature || '');
+    var attempts = 8;
+    var best = null;
+    function chooseBetter(a, b) {
+      if (!a) {
+        return b;
+      }
+      if (!b) {
+        return a;
+      }
+      if (!!b.changedFromPrevious !== !!a.changedFromPrevious) {
+        return b.changedFromPrevious ? b : a;
+      }
+      if ((b.canvasScore | 0) !== (a.canvasScore | 0)) {
+        return (b.canvasScore | 0) > (a.canvasScore | 0) ? b : a;
+      }
+      if ((b.canvasArea | 0) !== (a.canvasArea | 0)) {
+        return (b.canvasArea | 0) > (a.canvasArea | 0) ? b : a;
+      }
+      return (String(b.dataUrl || '').length > String(a.dataUrl || '').length) ? b : a;
+    }
+    function runAttempt(index) {
+      return afterPaint(index === 0 ? 2 : 1).then(function() {
+        var sample = captureNow();
+        if (sample) {
+          sample.attempt = index;
+          sample.changedFromPrevious = !!(sample.canvasSignature && sample.canvasSignature !== previousSignature);
+          best = chooseBetter(best, sample);
+          if (sample.changedFromPrevious && (sample.canvasScore | 0) > 0) {
+            return sample;
+          }
+        }
+        if (index + 1 >= attempts) {
+          return best;
+        }
+        return runAttempt(index + 1);
+      });
+    }
+    return runAttempt(0).then(function(result) {
+      if (!result || !result.dataUrl) {
+        return '';
+      }
+      global.__cn1LastScreenshotSignature = result.canvasSignature || '';
+      diag('SCREENSHOT_START', 'canvasCount', result.canvasCount);
+      diag('SCREENSHOT_START', 'canvasPick', result.canvasPick);
+      diag('SCREENSHOT_START', 'canvasArea', result.canvasArea);
+      diag('SCREENSHOT_START', 'canvasScore', result.canvasScore);
+      diag('SCREENSHOT_START', 'canvasSig', result.canvasSignature || 'none');
+      diag('SCREENSHOT_START', 'attempt', result.attempt | 0);
+      diag('SCREENSHOT_START', 'changed', result.changedFromPrevious ? 1 : 0);
+      diag('SCREENSHOT_START', 'pngLen', String(result.dataUrl || '').length);
+      return String(result.dataUrl || '');
+    });
   });
 
   global.__parparMessages = [];
