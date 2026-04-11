@@ -19,6 +19,8 @@ Current State
 - Note: a short-lived `forceShow()` experiment in `BaseTest.registerReadyCallback` was reverted because it caused re-entrant callback loops and prevented `CN1SS:SUITE:FINISHED`.
 - New patch (not yet CI-validated in this document revision): host screenshot capture now tracks the real draw target canvas and includes off-DOM canvases reachable via host refs.
 - New patch (not yet CI-validated in this document revision): screenshot candidate selection now prioritizes near-screen-sized canvases to prevent tiny offscreen buffers from being selected (fixes unexpected `120x80`/`4x4` outputs).
+- New patch (not yet CI-validated in this document revision): native rebinding now preserves overwritten translated JS method functions in `jvm.translatedMethods` for targeted fallback/original resolution.
+- New patch (not yet CI-validated in this document revision): canvas visual scoring now samples multiple regions (not only center), to better detect non-white drawn content.
 
 What Was Fixed In This Pass
 ---------------------------
@@ -125,6 +127,26 @@ What Was Fixed In This Pass
    - Motivation:
      - Latest artifacts showed mixed dimensions (`120x80`, `4x4`) and colored tiny captures, indicating offscreen utility buffers were being selected.
 
+11. Added translated-method preservation during native rebinding.
+   - Files:
+     - `vm/ByteCodeTranslator/src/javascript/parparvm_runtime.js`
+     - `Ports/JavaScriptPort/src/main/webapp/port.js`
+   - Changes:
+     - Runtime now records pre-override translated functions in `jvm.translatedMethods` when installing/reinstalling natives.
+     - `Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot...` fallback resolution now checks `jvm.translatedMethods` before globals/class tables.
+     - CI fallback wrappers are tagged (`__cn1CiFallbackSymbol`) so resolution can skip recursive self-selection.
+   - Motivation:
+     - `originalMissing=1` persisted even though translated helper symbols exist in `translated_app.js`; rebinding order was losing discoverability of original translated handlers.
+
+12. Improved screenshot canvas scoring robustness.
+   - File:
+     - `vm/ByteCodeTranslator/src/javascript/browser_bridge.js`
+   - Changes:
+     - Replaced single-center 48x48 sample with multi-region sampling (center, corners, and edge midpoints).
+     - Score still prefers non-white/opaque content, but now reflects content distribution across the frame.
+   - Motivation:
+     - White-frame capture can occur when center-only sampling misses rendered content (e.g., content concentrated away from center).
+
 Known Failing Symptoms (Latest CI Logs/Artifacts)
 -------------------------------------------------
 
@@ -136,6 +158,12 @@ Known Failing Symptoms (Latest CI Logs/Artifacts)
     - Seen in `ValidatorLightweightPickerScreenshotTest`, `InPlaceEditViewTest`, `StreamApiTest`, `TimeApiTest`.
 - Timeout-only tests still timeout by design/behavior (`MediaPlayback...`, `BytecodeTranslatorRegression...`, selected API tests).
 - Screenshot pixels are still wrong in CI (host-canvas fallback path remains dominant in logs).
+- Local note from current workspace revalidation:
+  - Fresh locally built bundle (`/tmp/hellocodenameone-javascript-port-local.zip`) currently emits only `bootstrap_placeholder` as a named stream.
+  - Browser diagnostics in that run show repeated:
+    - `PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:originalMissing=1`
+    - `PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:noCanvas=1:test=...`
+  - This local symptom differs from the latest CI artifacts (which still emit 32 screenshots, mostly white), so CI confirmation is required before accepting/rejecting the current translated-method resolution patch.
 
 Other CI Signal
 ---------------
@@ -151,11 +179,12 @@ Priority Next Steps
    - Confirm `settleChanged`, `canvasSig`, and `canvasSource` diagnostics vary across tests.
 2. Validate size normalization after large-canvas gating:
    - Expect screenshot dimensions to remain consistent at app target size (no `120x80`/`4x4` non-bootstrap outputs).
-3. If white-frame reuse persists, capture and compare per-test `settleSig`/`canvasSig`/`canvasSource` to identify whether paint is not happening or capture target is still wrong.
-3. Fix per-test null receiver/init path (`__classDef` null) at first failing stack, not via broad fallbacks.
-4. Fix missing `Button.initLaf(UIManager)` symbol resolution in worker runtime path.
-5. Fix worker-mode orientation lock path so DOM access is host-bridge mediated (no direct `document` access in worker).
-6. Confirm VM completeness stability in CI with parser/runtime patches (`expected 7` consistently).
+3. Validate `originalResolved=translated:...` vs `originalMissing=1` in CI browser log after translated-method preservation patch.
+4. If white-frame reuse persists, capture and compare per-test `settleSig`/`canvasSig`/`canvasSource` to identify whether paint is not happening or capture target is still wrong.
+5. Fix per-test null receiver/init path (`__classDef` null) at first failing stack, not via broad fallbacks.
+6. Fix missing `Button.initLaf(UIManager)` symbol resolution in worker runtime path.
+7. Fix worker-mode orientation lock path so DOM access is host-bridge mediated (no direct `document` access in worker).
+8. Confirm VM completeness stability in CI with parser/runtime patches (`expected 7` consistently).
 
 Files Touched In This Pass
 --------------------------

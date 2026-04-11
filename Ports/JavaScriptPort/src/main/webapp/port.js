@@ -188,16 +188,18 @@ function emitCiFallbackMarker(symbol, markerType) {
 }
 function bindCiFallback(symbol, names, fn) {
   emitCiFallbackMarker(symbol, "ENABLED");
-  bindNative(names, function*() {
+  const wrappedFallback = function*() {
     emitCiFallbackMarker(symbol, "HIT");
     return yield* fn.apply(this, arguments);
-  });
+  };
+  wrappedFallback.__cn1CiFallbackSymbol = symbol;
+  bindNative(names, wrappedFallback);
 }
 function bindCiFallbackWithMethodId(symbol, names, fn) {
   emitCiFallbackMarker(symbol, "ENABLED");
   for (let i = 0; i < names.length; i++) {
     const methodId = names[i];
-    bindNative([methodId], function*() {
+    const wrappedFallback = function*() {
       emitCiFallbackMarker(symbol, "HIT");
       const args = new Array(arguments.length + 1);
       args[0] = methodId;
@@ -205,7 +207,9 @@ function bindCiFallbackWithMethodId(symbol, names, fn) {
         args[j + 1] = arguments[j];
       }
       return yield* fn.apply(this, args);
-    });
+    };
+    wrappedFallback.__cn1CiFallbackSymbol = symbol;
+    bindNative([methodId], wrappedFallback);
   }
 }
 function aliasGlobalToImpl(symbol) {
@@ -3111,23 +3115,60 @@ function emitCn1ssChunks(base64, testName, channelName) {
 }
 
 const cn1ssEmitCurrentFormScreenshotMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerHelper_emitCurrentFormScreenshot_java_lang_String_java_lang_Runnable";
-const cn1ssEmitCurrentFormScreenshotOriginal =
-  (typeof global[cn1ssEmitCurrentFormScreenshotMethodId] === "function")
-    ? global[cn1ssEmitCurrentFormScreenshotMethodId]
-    : ((typeof global[cn1ssEmitCurrentFormScreenshotMethodId + "__impl"] === "function")
-      ? global[cn1ssEmitCurrentFormScreenshotMethodId + "__impl"]
-      : null);
+const cn1ssHelperClassName = "com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerHelper";
+
+function isFallbackFunctionForSymbol(fn, symbol) {
+  return !!(fn && fn.__cn1CiFallbackSymbol === symbol);
+}
+
+function resolveTranslatedMethodCandidate(methodIds, ownerClassName, fallbackSymbol) {
+  const translatedMethods = jvm && jvm.translatedMethods ? jvm.translatedMethods : null;
+  if (translatedMethods) {
+    for (let i = 0; i < methodIds.length; i++) {
+      const methodId = methodIds[i];
+      const candidate = translatedMethods[methodId];
+      if (typeof candidate === "function" && !isFallbackFunctionForSymbol(candidate, fallbackSymbol)) {
+        return { fn: candidate, source: "translated:" + methodId };
+      }
+    }
+  }
+  for (let i = 0; i < methodIds.length; i++) {
+    const methodId = methodIds[i];
+    const candidate = global[methodId];
+    if (typeof candidate === "function" && !isFallbackFunctionForSymbol(candidate, fallbackSymbol)) {
+      return { fn: candidate, source: "global:" + methodId };
+    }
+  }
+  const ownerClass = jvm && jvm.classes ? jvm.classes[ownerClassName] : null;
+  const methods = ownerClass && ownerClass.methods ? ownerClass.methods : null;
+  if (methods) {
+    for (let i = 0; i < methodIds.length; i++) {
+      const methodId = methodIds[i];
+      const candidate = methods[methodId];
+      if (typeof candidate === "function" && !isFallbackFunctionForSymbol(candidate, fallbackSymbol)) {
+        return { fn: candidate, source: "class:" + ownerClassName + ":" + methodId };
+      }
+    }
+  }
+  return null;
+}
 
 bindCiFallback("Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshotDom", [
   cn1ssEmitCurrentFormScreenshotMethodId,
   cn1ssEmitCurrentFormScreenshotMethodId + "__impl"
 ], function*(testName, completion) {
+  const fallbackSymbol = "Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshotDom";
   const test = toCn1StringValue(testName);
   const normalizedTest = resolveCn1ssTestName(test);
   let shouldUseDomFallback = true;
-  if (typeof cn1ssEmitCurrentFormScreenshotOriginal === "function") {
+  const originalResolved = resolveTranslatedMethodCandidate([
+    cn1ssEmitCurrentFormScreenshotMethodId,
+    cn1ssEmitCurrentFormScreenshotMethodId + "__impl"
+  ], cn1ssHelperClassName, fallbackSymbol);
+  if (originalResolved && typeof originalResolved.fn === "function") {
     try {
-      yield* cn1ssEmitCurrentFormScreenshotOriginal(testName, completion);
+      emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:originalResolved=" + originalResolved.source);
+      yield* originalResolved.fn(testName, completion);
       return null;
     } catch (originalErr) {
       emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:originalInvokeErr="

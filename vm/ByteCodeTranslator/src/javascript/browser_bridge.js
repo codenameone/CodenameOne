@@ -434,35 +434,62 @@
     }
     var sampleW = Math.min(48, w);
     var sampleH = Math.min(48, h);
-    var startX = ((w - sampleW) / 2) | 0;
-    var startY = ((h - sampleH) / 2) | 0;
-    var img;
-    try {
-      img = ctx.getImageData(startX, startY, sampleW, sampleH);
-    } catch (_err) {
-      return null;
-    }
-    if (!img || !img.data || !img.data.length) {
-      return null;
-    }
-    var data = img.data;
+    var regions = [
+      [0.5, 0.5],
+      [0.2, 0.2], [0.8, 0.2], [0.2, 0.8], [0.8, 0.8],
+      [0.5, 0.2], [0.5, 0.8], [0.2, 0.5], [0.8, 0.5]
+    ];
     var opaqueCount = 0;
     var nonWhiteCount = 0;
-    for (var i = 0; i < data.length; i += 4) {
-      var r = data[i] | 0;
-      var g = data[i + 1] | 0;
-      var b = data[i + 2] | 0;
-      var a = data[i + 3] | 0;
-      if (a > 12) {
-        opaqueCount++;
-        if (!(r >= 248 && g >= 248 && b >= 248)) {
-          nonWhiteCount++;
+    var signature = 'none';
+    var sigHash = 2166136261 >>> 0;
+    var sampled = 0;
+    for (var ri = 0; ri < regions.length; ri++) {
+      var rx = regions[ri][0];
+      var ry = regions[ri][1];
+      var startX = Math.max(0, Math.min(w - sampleW, (((w - sampleW) * rx) | 0)));
+      var startY = Math.max(0, Math.min(h - sampleH, (((h - sampleH) * ry) | 0)));
+      var img;
+      try {
+        img = ctx.getImageData(startX, startY, sampleW, sampleH);
+      } catch (_err) {
+        continue;
+      }
+      if (!img || !img.data || !img.data.length) {
+        continue;
+      }
+      sampled++;
+      var data = img.data;
+      for (var i = 0; i < data.length; i += 4) {
+        var r = data[i] | 0;
+        var g = data[i + 1] | 0;
+        var b = data[i + 2] | 0;
+        var a = data[i + 3] | 0;
+        if (a > 12) {
+          opaqueCount++;
+          if (!(r >= 248 && g >= 248 && b >= 248)) {
+            nonWhiteCount++;
+          }
+        }
+        if ((i & 31) === 0) {
+          sigHash ^= r;
+          sigHash = Math.imul(sigHash, 16777619);
+          sigHash ^= g;
+          sigHash = Math.imul(sigHash, 16777619);
+          sigHash ^= b;
+          sigHash = Math.imul(sigHash, 16777619);
+          sigHash ^= a;
+          sigHash = Math.imul(sigHash, 16777619);
         }
       }
     }
+    if (sampled === 0) {
+      return null;
+    }
+    signature = String((sigHash >>> 0).toString(16));
     return {
       score: (nonWhiteCount * 4) + opaqueCount,
-      signature: shortSignatureFromImageData(img)
+      signature: signature
     };
   }
 

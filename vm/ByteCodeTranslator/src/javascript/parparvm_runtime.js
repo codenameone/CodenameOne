@@ -1797,7 +1797,19 @@ function bindNative(names, fn) {
       cls.methods[name] = fn;
     }
   }
+  function rememberTranslatedMethod(name, existingFn) {
+    if (typeof existingFn !== "function" || existingFn === fn) {
+      return;
+    }
+    if (!jvm.translatedMethods) {
+      jvm.translatedMethods = Object.create(null);
+    }
+    if (typeof jvm.translatedMethods[name] !== "function") {
+      jvm.translatedMethods[name] = existingFn;
+    }
+  }
   function registerNative(name) {
+    rememberTranslatedMethod(name, global[name]);
     jvm.nativeMethods[name] = fn;
     global[name] = fn;
     jvm[name] = fn;
@@ -1831,6 +1843,9 @@ function installCompatibilityClasses() {
   }
 }
 function installNativeBindings() {
+  if (!jvm.translatedMethods) {
+    jvm.translatedMethods = Object.create(null);
+  }
   const names = Object.keys(jvm.nativeMethods || {});
   for (let i = 0; i < names.length; i++) {
     const name = names[i];
@@ -1838,9 +1853,22 @@ function installNativeBindings() {
     if (typeof nativeFn !== "function") {
       continue;
     }
+    const existingGlobal = global[name];
+    if (typeof existingGlobal === "function" && existingGlobal !== nativeFn) {
+      if (typeof jvm.translatedMethods[name] !== "function") {
+        jvm.translatedMethods[name] = existingGlobal;
+      }
+    }
     global[name] = nativeFn;
     jvm[name] = nativeFn;
     if (!name.endsWith("__impl")) {
+      const implName = name + "__impl";
+      const existingImpl = global[implName];
+      if (typeof existingImpl === "function" && existingImpl !== nativeFn) {
+        if (typeof jvm.translatedMethods[implName] !== "function") {
+          jvm.translatedMethods[implName] = existingImpl;
+        }
+      }
       global[name + "__impl"] = nativeFn;
       jvm[name + "__impl"] = nativeFn;
     }
