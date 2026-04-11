@@ -585,17 +585,21 @@ public class Picker extends Button {
                         .setBgTransparency(0)
                         .setMargin(0)
                         .setPaddingMillimeters(3f, 0);
-                Container spinnerSection = new Container(new BorderLayout());
-                spinnerSection.add(BorderLayout.CENTER, wrapper);
                 Container topCustomButtons = createLightweightPopupButtonRow(spinner, LightweightPopupButtonPlacement.ABOVE_SPINNER, isTablet);
-                if (topCustomButtons != null) {
-                    spinnerSection.add(BorderLayout.NORTH, topCustomButtons);
-                }
                 Container bottomCustomButtons = createLightweightPopupButtonRow(spinner, LightweightPopupButtonPlacement.BELOW_SPINNER, isTablet);
-                if (bottomCustomButtons != null) {
-                    spinnerSection.add(BorderLayout.SOUTH, bottomCustomButtons);
+                if (topCustomButtons != null || bottomCustomButtons != null) {
+                    Container spinnerSection = new Container(new BorderLayout());
+                    spinnerSection.add(BorderLayout.CENTER, wrapper);
+                    if (topCustomButtons != null) {
+                        spinnerSection.add(BorderLayout.NORTH, topCustomButtons);
+                    }
+                    if (bottomCustomButtons != null) {
+                        spinnerSection.add(BorderLayout.SOUTH, bottomCustomButtons);
+                    }
+                    dlg.getContentPane().add(BorderLayout.CENTER, spinnerSection);
+                } else {
+                    dlg.getContentPane().add(BorderLayout.CENTER, wrapper);
                 }
-                dlg.getContentPane().add(BorderLayout.CENTER, spinnerSection);
 
 
                 Button doneButton = new Button("Done", isTablet ? "PickerButtonTablet" : "PickerButton");
