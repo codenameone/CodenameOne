@@ -3525,6 +3525,30 @@ The text displayed by the picker on selection is generated automatically by the 
 
 A common use case is to format date values based on a specific appearance and `Picker` has builtin support for a custom display formatter. Just use the `setFormatter(SimpleDateFormat)` method and set the appearance for the field.
 
+When using lightweight picker mode (`setUseLightweightPopup(true)`), you can add custom quick-action buttons to the popup. This is useful for actions like setting the date to "Today" or "+7 Days" without scrolling the wheels manually.
+
+[source,java]
+----
+Picker picker = new Picker();
+picker.setType(Display.PICKER_TYPE_DATE);
+picker.setUseLightweightPopup(true);
+picker.setDate(new Date());
+
+picker.addLightweightPopupButton("Today", () -> picker.setDate(new Date()));
+
+picker.addLightweightPopupButton("+7 Days", () -> {
+    Calendar cal = Calendar.getInstance();
+    cal.add(Calendar.DAY_OF_MONTH, 7);
+    picker.setDate(cal.getTime());
+}, Picker.LightweightPopupButtonPlacement.BELOW_SPINNER);
+----
+
+Button placement options are:
+
+- `Picker.LightweightPopupButtonPlacement.BETWEEN_CANCEL_AND_DONE` (default)
+- `Picker.LightweightPopupButtonPlacement.ABOVE_SPINNER`
+- `Picker.LightweightPopupButtonPlacement.BELOW_SPINNER`
+
 === SwipeableContainer
 
 The https://www.codenameone.com/javadoc/com/codename1/ui/SwipeableContainer.html[SwipeableContainer] allows us to place a component such as a https://www.codenameone.com/javadoc/com/codename1/components/MultiButton.html[MultiButton] on top of additional "options"
