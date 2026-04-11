@@ -16,6 +16,7 @@ Current State
   - `TOP_BLOCKER=none|none|none`
 - The screenshot pipeline now decodes/report-generates reliably from logs, but screenshot content is still mostly wrong (white-frame capture path is still being used in CI artifacts).
 - New patch (not yet CI-validated in this document revision): worker-side fallback screenshot path now waits for a host-side UI-settle barrier before ready-callback dispatch and before canvas capture, to avoid pre-paint frame capture.
+- Note: a short-lived `forceShow()` experiment in `BaseTest.registerReadyCallback` was reverted because it caused re-entrant callback loops and prevented `CN1SS:SUITE:FINISHED`.
 
 What Was Fixed In This Pass
 ---------------------------
@@ -85,6 +86,15 @@ What Was Fixed In This Pass
        - `PARPAR:DIAG:FALLBACK:baseTestRegisterReady:afterUiSettle=1:...`
    - Motivation:
      - CI showed near-identical screenshot payloads (same hash/size) indicating repeated capture of a stale frame rather than per-test painted UI.
+
+8. Reverted force-show experiment due re-entrancy regression.
+   - File:
+     - `Ports/JavaScriptPort/src/main/webapp/port.js`
+   - Observation:
+     - Calling `Form.show()` inside `BaseTest.registerReadyCallbackImmediate` caused repeated `registerReadyCallback`/settle cycles on the same test and CI timeout before suite completion.
+   - Action:
+     - Removed `forceShow()` from this fallback path.
+     - Kept the host-side settle barrier and diagnostics (non-recursive).
 
 Known Failing Symptoms (Latest CI Logs/Artifacts)
 -------------------------------------------------
