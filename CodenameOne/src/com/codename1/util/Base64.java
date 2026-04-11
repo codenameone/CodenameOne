@@ -19,6 +19,9 @@
 
 package com.codename1.util;
 
+import com.codename1.annotations.DisableDebugInfo;
+import com.codename1.annotations.DisableNullChecksAndArrayBoundsChecks;
+
 
 /// This class implements Base64 encoding/decoding functionality
 /// as specified in RFC 2045 (http://www.ietf.org/rfc/rfc2045.txt).
@@ -90,6 +93,8 @@ public abstract class Base64 {
      * @param out destination buffer
      * @return decoded length, or {@code -1} for invalid Base64
      */
+    @DisableDebugInfo
+    @DisableNullChecksAndArrayBoundsChecks
     public static int decode(byte[] in, int len, byte[] out) {
         if (len == 0) {
             return 0;
@@ -185,6 +190,8 @@ public abstract class Base64 {
         return decode(in, in.length, out);
     }
 
+    @DisableDebugInfo
+    @DisableNullChecksAndArrayBoundsChecks
     private static int decodeNoWhitespace(byte[] in, int len, byte[] out) {
         if ((len & 0x3) != 0) {
             return -1;
@@ -335,6 +342,8 @@ public abstract class Base64 {
      * @param out destination buffer
      * @return number of bytes written to {@code out}
      */
+    @DisableDebugInfo
+    @DisableNullChecksAndArrayBoundsChecks
     public static int encodeNoNewline(byte[] in, byte[] out) {
         int inputLength = in.length;
         int outputLength = ((inputLength + 2) / 3) * 4;
