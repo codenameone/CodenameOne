@@ -209,6 +209,19 @@
     if (value == null || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
       return value;
     }
+    // Avoid per-element host RPC on large typed-array reads (e.g. ImageData.data).
+    // Returning a clone transfers data once to the worker so get(index) executes locally.
+    if (typeof Uint8ClampedArray !== 'undefined' && value instanceof Uint8ClampedArray) {
+      return new Uint8Array(value);
+    }
+    if (typeof ArrayBuffer !== 'undefined') {
+      if (value instanceof ArrayBuffer) {
+        return value.slice(0);
+      }
+      if (typeof ArrayBuffer.isView === 'function' && ArrayBuffer.isView(value)) {
+        return value.slice ? value.slice(0) : value;
+      }
+    }
     return storeHostRef(value);
   }
 
@@ -330,11 +343,22 @@
       var fn = receiver[member];
       if (typeof fn === 'function') {
         value = fn.apply(receiver, args);
+      } else if (member === 'get' && args.length === 1 && receiver && typeof receiver.length === 'number') {
+        value = receiver[args[0] | 0];
+      } else if (member === 'set' && args.length === 2 && receiver && typeof receiver.length === 'number') {
+        receiver[args[0] | 0] = args[1];
+        value = null;
       } else if (!args.length && Object.prototype.hasOwnProperty.call(receiver, member)) {
         value = receiver[member];
       } else {
         throw new Error('Missing JS member ' + member + ' for host receiver');
       }
+    }
+    if (kind === 'getter' && member === 'data' && value && typeof value.length === 'number') {
+      if (value.slice) {
+        return value.slice(0);
+      }
+      return Array.prototype.slice.call(value);
     }
     noteDrawTarget(receiver, kind, member);
     if (isCanvasLike(receiver) && kind === 'method' && member === 'getContext') {

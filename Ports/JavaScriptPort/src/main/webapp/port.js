@@ -3181,6 +3181,10 @@ bindCiFallback("Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshotDom", [
       } catch (originalErr) {
         emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:originalInvokeErr="
           + String(originalErr && originalErr.message ? originalErr.message : originalErr));
+        if (originalErr && originalErr.stack) {
+          emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:originalInvokeStack="
+            + String(originalErr.stack).split("\n").slice(0, 2).join(" | "));
+        }
         shouldUseDomFallback = true;
       } finally {
         cn1ssEmitCurrentFormScreenshotInvokeDepth = Math.max(0, cn1ssEmitCurrentFormScreenshotInvokeDepth - 1);
@@ -3328,7 +3332,11 @@ function installBaseTestOnShowLambdaShim() {
     if (!target || !target.__class) {
       return null;
     }
-    const classDef = target.__classDef;
+    const classDef = target.__classDef || (jvm.classes ? jvm.classes[target.__class] : null);
+    if (!classDef) {
+      emitDiagLine("PARPAR:DIAG:FALLBACK:baseTestOnShowLambda:noClassDef=1:class=" + String(target.__class || "null"));
+      return null;
+    }
     let method = (classDef && classDef.methods) ? classDef.methods[baseTestOnShowLambdaMethodId] : null;
     if (!method) {
       method = jvm.resolveVirtual(target.__class, baseTestOnShowLambdaMethodId);

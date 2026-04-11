@@ -5,6 +5,27 @@ JavaScript Port Status (ParparVM)
 
 Last updated: 2026-04-11
 
+Latest Investigation Snapshot (this round)
+------------------------------------------
+
+- Input artifacts analyzed:
+  - `~/Downloads/job-logs.txt`
+  - `~/Downloads/javascript-ui-tests/browser.log`
+- Confirmed in that artifact set:
+  - Suite completes (`CN1SS:SUITE:FINISHED`) and 32 named streams decode.
+  - Most PNGs are still identical/white (`canvasSig=7263bb45` repeated).
+  - Screenshot helper repeatedly falls back due:
+    - `PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:originalInvokeErr=Error: Missing JS member get for host receiver`
+- New code changes in workspace (not CI-validated yet):
+  1. Host/runtime JSO bridge now supports array-like indexed fallback for `get(index)`/`set(index,value)` when no callable member exists.
+  2. Host bridge attempts to avoid per-pixel host RPC by cloning typed-array payloads.
+  3. Host bridge has explicit `getter:data` fast-return clone path.
+  4. BaseTest on-show lambda shim now guards missing `target.__classDef` by resolving class metadata from `target.__class`.
+  5. Screenshot fallback now logs short `originalInvokeStack` for first-failure localization.
+- Important caveat from local replay:
+  - Replaying patched runtime against the previously archived CI zip can regress to timeout and show `originalInvokeErr=Cannot read properties of null (reading '__classDef')` during per-test screenshot emission.
+  - This indicates the first blocker has shifted from missing host `.get` to a null receiver/class-init path in translated screenshot execution.
+
 Current State
 -------------
 
@@ -163,10 +184,45 @@ What Was Fixed In This Pass
    - Expected effect:
      - Restore named screenshot stream emission (`CN1SS:<test>`) instead of collapsing to `default`-only stream.
 
+14. Added JSO bridge indexed-access compatibility for array-like receivers.
+   - Files:
+     - `vm/ByteCodeTranslator/src/javascript/browser_bridge.js`
+     - `vm/ByteCodeTranslator/src/javascript/parparvm_runtime.js`
+   - Changes:
+     - If a bridged `method` call has member `get`/`set` and receiver is array-like (`length`), map to indexed element access when no callable JS member exists.
+   - Motivation:
+     - Fixes deterministic screenshot-path failure:
+       - `Missing JS member get for host receiver`
+     - Seen when translated code accesses pixel buffers via `get(index)`.
+
+15. Added host bridge typed-array transfer fast paths.
+   - File:
+     - `vm/ByteCodeTranslator/src/javascript/browser_bridge.js`
+   - Changes:
+     - `hostResult()` now clones/returns typed-array and `ArrayBuffer` values directly instead of always creating host refs.
+     - Added explicit `getter:data` direct-clone return path in `__cn1_jso_bridge__`.
+   - Motivation:
+     - Prevents pathological per-element host RPC loops during pixel-buffer reads.
+   - Status:
+     - Local replay indicates this removes the old `Missing JS member get...` failure, but uncovers a later null `__classDef` path that still needs repair.
+
+16. Hardened BaseTest on-show lambda shim for missing class definition.
+   - File:
+     - `Ports/JavaScriptPort/src/main/webapp/port.js`
+   - Changes:
+     - `target.__classDef` access now falls back to `jvm.classes[target.__class]` and exits safely with diagnostic if unresolved.
+   - Motivation:
+     - Targets recurring per-test failure signature:
+       - `Cannot read properties of null (reading '__classDef')`
+     - This is now the highest-priority blocker after `.get` bridge repair.
+
 Known Failing Symptoms (Latest CI Logs/Artifacts)
 -------------------------------------------------
 
 - Screenshot suite finishes but many tests fail during `runTest`.
+- Latest primary blocker progression:
+  - Earlier blocker in CI artifacts: `Missing JS member get for host receiver`.
+  - After bridge compatibility work in local replay: blocker shifts to `Cannot read properties of null (reading '__classDef')` in translated screenshot helper path.
 - Repeated deterministic blockers in browser log:
   - `TabsScreenshotTest`: `cn1_com_codename1_ui_Button_initLaf_com_codename1_ui_plaf_UIManager is not defined`
   - `OrientationLockScreenshotTest`: `document is not defined`
@@ -199,7 +255,7 @@ Priority Next Steps
 4. Validate `CN1SS` named test streams are emitted again (not only `default/bootstrap`).
 5. Validate `originalResolved=translated:...__impl` (or equivalent non-recursive path) in CI browser log after translated-method preservation patch.
 6. If white-frame reuse persists, capture and compare per-test `settleSig`/`canvasSig`/`canvasSource` to identify whether paint is not happening or capture target is still wrong.
-7. Fix per-test null receiver/init path (`__classDef` null) at first failing stack, not via broad fallbacks.
+7. Fix per-test null receiver/init path (`__classDef` null) at first failing stack in translated screenshot/helper execution (no new broad fallbacks).
 8. Fix missing `Button.initLaf(UIManager)` symbol resolution in worker runtime path.
 9. Fix worker-mode orientation lock path so DOM access is host-bridge mediated (no direct `document` access in worker).
 10. Confirm VM completeness stability in CI with parser/runtime patches (`expected 7` consistently).

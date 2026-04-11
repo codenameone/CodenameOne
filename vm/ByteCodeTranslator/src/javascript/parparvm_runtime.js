@@ -740,6 +740,11 @@ const jvm = {
         const fn = receiver[bridge.member];
         if (typeof fn === "function") {
           result = fn.apply(receiver, nativeArgs);
+        } else if (bridge.member === "get" && nativeArgs.length === 1 && receiver && typeof receiver.length === "number") {
+          result = receiver[nativeArgs[0] | 0];
+        } else if (bridge.member === "set" && nativeArgs.length === 2 && receiver && typeof receiver.length === "number") {
+          receiver[nativeArgs[0] | 0] = nativeArgs[1];
+          result = null;
         } else if (!nativeArgs.length && Object.prototype.hasOwnProperty.call(receiver, bridge.member)) {
           result = receiver[bridge.member];
         } else {
