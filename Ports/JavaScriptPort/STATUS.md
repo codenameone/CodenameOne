@@ -38,6 +38,24 @@ What Was Fixed In This Pass
    - Motivation:
      - Addresses suspected object-identity/equality instability contributing to map lookup anomalies and flaky behavior.
 
+3. Host screenshot canvas selection switched from "largest canvas only" to content-aware selection.
+   - File: `vm/ByteCodeTranslator/src/javascript/browser_bridge.js`
+   - Changes:
+     - Added canvas visual scoring (opaque/non-white sampled content) and area tie-break.
+     - Added diagnostics for selected canvas (`canvasCount`, `canvasPick`, `canvasArea`, `canvasScore`, `pngLen`).
+   - Motivation:
+     - Current CI artifacts show 29/32 screenshots with identical hash (white/blank frame reuse), indicating we were repeatedly capturing the wrong canvas.
+
+4. Added LinkedHashMap non-null-key native lookup override.
+   - Files:
+     - `vm/ByteCodeTranslator/src/javascript/parparvm_runtime.js`
+     - `vm/ByteCodeTranslator/src/com/codename1/tools/translator/JavascriptNativeRegistry.java`
+   - Changes:
+     - `cn1_java_util_LinkedHashMap_findNonNullKeyEntry_java_lang_Object_int_int_R_java_util_HashMap_Entry`
+       now delegates to the runtime HashMap lookup native.
+   - Motivation:
+     - CI flake in `JavascriptCn1CoreCompletenessTest` (`expected 7 got 3`) points to JSON map key lookup path instability on worker runtime.
+
 Known Failing Symptoms (Latest CI Logs/Artifacts)
 -------------------------------------------------
 

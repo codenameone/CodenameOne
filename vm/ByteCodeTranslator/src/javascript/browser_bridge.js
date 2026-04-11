@@ -344,8 +344,60 @@
     if (!canvases || !canvases.length) {
       return '';
     }
+    function canvasContentScore(canvas) {
+      if (!canvas || typeof canvas.getContext !== 'function') {
+        return -1;
+      }
+      var w = canvas.width | 0;
+      var h = canvas.height | 0;
+      if (w <= 0 || h <= 0) {
+        return -1;
+      }
+      var ctx = null;
+      try {
+        ctx = canvas.getContext('2d');
+      } catch (_err) {
+        ctx = null;
+      }
+      if (!ctx || typeof ctx.getImageData !== 'function') {
+        return -1;
+      }
+      var sampleW = Math.min(48, w);
+      var sampleH = Math.min(48, h);
+      var startX = ((w - sampleW) / 2) | 0;
+      var startY = ((h - sampleH) / 2) | 0;
+      var img;
+      try {
+        img = ctx.getImageData(startX, startY, sampleW, sampleH);
+      } catch (_err) {
+        return -1;
+      }
+      if (!img || !img.data || !img.data.length) {
+        return -1;
+      }
+      var data = img.data;
+      var opaqueCount = 0;
+      var nonWhiteCount = 0;
+      for (var i = 0; i < data.length; i += 4) {
+        var r = data[i] | 0;
+        var g = data[i + 1] | 0;
+        var b = data[i + 2] | 0;
+        var a = data[i + 3] | 0;
+        if (a > 12) {
+          opaqueCount++;
+          if (!(r >= 248 && g >= 248 && b >= 248)) {
+            nonWhiteCount++;
+          }
+        }
+      }
+      // Prefer canvases with visible non-white content, then visible opaque content.
+      return (nonWhiteCount * 4) + opaqueCount;
+    }
+
     var best = null;
     var bestArea = -1;
+    var bestScore = -1;
+    var bestIndex = -1;
     for (var i = 0; i < canvases.length; i++) {
       var c = canvases[i];
       if (!c || typeof c.toDataURL !== 'function') {
@@ -354,16 +406,25 @@
       var w = (c.width | 0);
       var h = (c.height | 0);
       var area = w * h;
-      if (area > bestArea) {
+      var score = canvasContentScore(c);
+      if (score > bestScore || (score === bestScore && area > bestArea)) {
+        bestScore = score;
         bestArea = area;
         best = c;
+        bestIndex = i;
       }
     }
     if (!best) {
       return '';
     }
     try {
-      return String(best.toDataURL('image/png') || '');
+      var out = String(best.toDataURL('image/png') || '');
+      diag('SCREENSHOT_START', 'canvasCount', canvases.length);
+      diag('SCREENSHOT_START', 'canvasPick', bestIndex);
+      diag('SCREENSHOT_START', 'canvasArea', bestArea);
+      diag('SCREENSHOT_START', 'canvasScore', bestScore);
+      diag('SCREENSHOT_START', 'pngLen', out.length);
+      return out;
     } catch (_err) {
       return '';
     }

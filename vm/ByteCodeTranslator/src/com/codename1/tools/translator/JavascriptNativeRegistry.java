@@ -110,6 +110,7 @@ final class JavascriptNativeRegistry {
             "cn1_java_text_DateFormat_format_java_util_Date_java_lang_StringBuffer_R_java_lang_String",
             "cn1_java_util_HashMap_areEqualKeys_java_lang_Object_java_lang_Object_R_boolean",
             "cn1_java_util_HashMap_findNonNullKeyEntry_java_lang_Object_int_int_R_java_util_HashMap_Entry",
+            "cn1_java_util_LinkedHashMap_findNonNullKeyEntry_java_lang_Object_int_int_R_java_util_HashMap_Entry",
             "cn1_java_util_Locale_getOSLanguage_R_java_lang_String",
             "cn1_java_util_TimeZone_getTimezoneId_R_java_lang_String",
             "cn1_java_util_TimeZone_getTimezoneOffset_java_lang_String_int_int_int_int_R_int",
