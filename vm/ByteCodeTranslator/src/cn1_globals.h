@@ -1145,11 +1145,13 @@ static inline void cn1_init_method_stack_fast(CODENAME_ONE_THREAD_STATE, JAVA_OB
         memset(&threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset], 0,
                 sizeof(struct elementStruct) * (localsStackSize + stackSize));
     } else {
-        int cn1Count = localsStackSize + stackSize;
-        struct elementStruct* cn1Slot = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset];
-        for (int cn1Iter = 0; cn1Iter < cn1Count; cn1Iter++) {
-            cn1Slot[cn1Iter].type = CN1_TYPE_INVALID;
-        }
+        /*
+         * Primitive-only fast frames intentionally use the same memset strategy.
+         * A per-slot type-only loop was measurably slower in benchmarks and did
+         * not improve generated-code performance.
+         */
+        memset(&threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset], 0,
+                sizeof(struct elementStruct) * (localsStackSize + stackSize));
     }
     threadStateData->threadObjectStackOffset += localsStackSize + stackSize;
     threadStateData->callStackOffset++;
