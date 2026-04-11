@@ -38,18 +38,25 @@ public abstract class Base64 {
                     '4', '5', '6', '7', '8', '9', '+', '/'};
 
     private static final byte[] decodeMap = new byte[256];
+    private static final int[] decodeMapInt = new int[256];
 
     static {
         for (int i = 0; i < decodeMap.length; i++) {
             decodeMap[i] = (byte) DECODE_INVALID;
+            decodeMapInt[i] = DECODE_INVALID;
         }
         for (int i = 0; i < map.length; i++) {
             decodeMap[map[i] & 0xff] = (byte) i;
+            decodeMapInt[map[i] & 0xff] = i;
         }
         decodeMap['\n'] = (byte) DECODE_WHITESPACE;
         decodeMap['\r'] = (byte) DECODE_WHITESPACE;
         decodeMap[' '] = (byte) DECODE_WHITESPACE;
         decodeMap['\t'] = (byte) DECODE_WHITESPACE;
+        decodeMapInt['\n'] = DECODE_WHITESPACE;
+        decodeMapInt['\r'] = DECODE_WHITESPACE;
+        decodeMapInt[' '] = DECODE_WHITESPACE;
+        decodeMapInt['\t'] = DECODE_WHITESPACE;
     }
 
     public static byte[] decode(byte[] in) {
@@ -109,7 +116,7 @@ public abstract class Base64 {
         int end = len;
         while (end > 0) {
             int chr = in[end - 1] & 0xff;
-            if (decodeMap[chr] == DECODE_WHITESPACE) {
+            if (decodeMapInt[chr] == DECODE_WHITESPACE) {
                 end--;
                 continue;
             }
@@ -127,7 +134,7 @@ public abstract class Base64 {
             if (chr == '=') {
                 break;
             }
-            int value = decodeMap[chr];
+            int value = decodeMapInt[chr];
             if (value == DECODE_WHITESPACE) {
                 continue;
             }
@@ -154,7 +161,7 @@ public abstract class Base64 {
             if (chr == '=') {
                 break;
             }
-            int bits = decodeMap[chr];
+            int bits = decodeMapInt[chr];
             if (bits == DECODE_WHITESPACE) {
                 continue;
             }
@@ -215,7 +222,7 @@ public abstract class Base64 {
             throw new IllegalArgumentException("Output buffer too small for decoded data");
         }
         int outIndex = 0;
-        byte[] decodeMapLocal = decodeMap;
+        int[] decodeMapLocal = decodeMapInt;
         int fullLen = len - (pad > 0 ? 4 : 0);
 
         for (int i = 0; i < fullLen; i += 4) {
