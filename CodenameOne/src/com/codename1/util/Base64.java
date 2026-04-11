@@ -242,6 +242,9 @@ public abstract class Base64 {
             if ((b0 | b1 | b2 | b3) < 0) {
                 return -1;
             }
+            if (outIndex + 2 >= outLength) {
+                return -1;
+            }
             int quantum = (b0 << 18) | (b1 << 12) | (b2 << 6) | b3;
             outLocal[outIndex++] = (byte) ((quantum >> 16) & 0xff);
             outLocal[outIndex++] = (byte) ((quantum >> 8) & 0xff);
@@ -260,6 +263,9 @@ public abstract class Base64 {
         if ((b0 | b1) < 0) {
             return -1;
         }
+        if (outIndex >= outLength) {
+            return -1;
+        }
         outLocal[outIndex++] = (byte) ((b0 << 2) | (b1 >> 4));
         if (pad == 2) {
             return (inLocal[i + 2] == '=' && inLocal[i + 3] == '=') ? outIndex : -1;
@@ -270,6 +276,9 @@ public abstract class Base64 {
         }
         int b2 = decodeMapLocal[inLocal[i + 2] & 0xff];
         if (b2 < 0) {
+            return -1;
+        }
+        if (outIndex >= outLength) {
             return -1;
         }
         outLocal[outIndex] = (byte) ((b1 << 4) | (b2 >> 2));
