@@ -374,8 +374,9 @@ class JavascriptRuntimeSemanticsTest {
     }
 
     private static String extractJsonString(String json, String key) {
+        json = extractLastJsonObject(json);
         String marker = "\"" + key + "\":\"";
-        int start = json.indexOf(marker);
+        int start = json.lastIndexOf(marker);
         if (start < 0) {
             return null;
         }
@@ -385,8 +386,9 @@ class JavascriptRuntimeSemanticsTest {
     }
 
     private static String extractJsonNumber(String json, String key) {
+        json = extractLastJsonObject(json);
         String marker = "\"" + key + "\":";
-        int start = json.indexOf(marker);
+        int start = json.lastIndexOf(marker);
         if (start < 0) {
             return null;
         }
@@ -400,6 +402,20 @@ class JavascriptRuntimeSemanticsTest {
             end++;
         }
         return json.substring(start, end);
+    }
+
+    private static String extractLastJsonObject(String output) {
+        if (output == null || output.isEmpty()) {
+            return "";
+        }
+        String[] lines = output.split("\\R");
+        for (int i = lines.length - 1; i >= 0; i--) {
+            String line = lines[i].trim();
+            if (line.startsWith("{") && line.endsWith("}") && line.contains("\"type\"")) {
+                return line;
+            }
+        }
+        return output;
     }
 
     private static String workerHarnessSource(Path distDir, String appName) {

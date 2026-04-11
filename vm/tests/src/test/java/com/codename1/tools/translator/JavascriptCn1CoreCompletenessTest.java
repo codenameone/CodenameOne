@@ -52,7 +52,11 @@ class JavascriptCn1CoreCompletenessTest {
         JavascriptRuntimeSemanticsTest.WorkerRunResult result = JavascriptRuntimeSemanticsTest.runGeneratedWorkerBundle(distDir);
         assertEquals("result", result.type,
                 "CN1 core slice should complete through the generated worker protocol. Raw worker payload: " + result.rawMessage);
-        assertEquals(7, result.result, "CN1 core slice should execute JSON and StringUtil behavior correctly");
+        assertEquals(7, result.result,
+                "CN1 core slice should execute JSON and StringUtil behavior correctly. "
+                        + "Raw worker payload: " + result.rawMessage
+                        + " | type=" + result.type
+                        + " | error=" + result.errorMessage);
         assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(),
                 "CN1 core slice should not emit a worker error. Raw worker payload: " + result.rawMessage);
     }

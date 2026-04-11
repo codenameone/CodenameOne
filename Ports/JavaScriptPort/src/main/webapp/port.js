@@ -645,6 +645,11 @@ installMissingGlobalDelegate(
   "cn1_com_codename1_ui_Component_fireActionEvent",
   "Label.fireActionEventMissing"
 );
+installMissingGlobalDelegate(
+  "cn1_com_codename1_ui_Button_initLaf_com_codename1_ui_plaf_UIManager",
+  "cn1_com_codename1_ui_Component_initLaf_com_codename1_ui_plaf_UIManager",
+  "Button.initLafMissing"
+);
 installMissingOwnerDelegates(
   "com_codename1_ui_Container",
   "com_codename1_ui_Component",
@@ -3106,25 +3111,46 @@ function emitCn1ssChunks(base64, testName, channelName) {
 }
 
 const cn1ssEmitCurrentFormScreenshotMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerHelper_emitCurrentFormScreenshot_java_lang_String_java_lang_Runnable";
+const cn1ssEmitCurrentFormScreenshotOriginal =
+  (typeof global[cn1ssEmitCurrentFormScreenshotMethodId] === "function")
+    ? global[cn1ssEmitCurrentFormScreenshotMethodId]
+    : ((typeof global[cn1ssEmitCurrentFormScreenshotMethodId + "__impl"] === "function")
+      ? global[cn1ssEmitCurrentFormScreenshotMethodId + "__impl"]
+      : null);
 
 bindCiFallback("Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshotDom", [
   cn1ssEmitCurrentFormScreenshotMethodId,
   cn1ssEmitCurrentFormScreenshotMethodId + "__impl"
 ], function*(testName, completion) {
+  const test = toCn1StringValue(testName);
+  const normalizedTest = resolveCn1ssTestName(test);
+  const allowDomFallback = normalizedTest === "default";
+  if (typeof cn1ssEmitCurrentFormScreenshotOriginal === "function") {
+    try {
+      yield* cn1ssEmitCurrentFormScreenshotOriginal(testName, completion);
+      return null;
+    } catch (originalErr) {
+      emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:originalInvokeErr="
+        + String(originalErr && originalErr.message ? originalErr.message : originalErr));
+      if (!allowDomFallback) {
+        emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:hostCanvasBypass=1:test=" + normalizedTest);
+      }
+    }
+  } else {
+    emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:originalMissing=1");
+  }
   const canvas = global.document && typeof global.document.querySelector === "function"
     ? global.document.querySelector("canvas")
     : null;
-  const test = toCn1StringValue(testName);
-  const normalizedTest = resolveCn1ssTestName(test);
   if (cn1ssScreenshotEmitted[normalizedTest]) {
     emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:skipDuplicate=" + normalizedTest);
-  } else if (canvas && typeof canvas.toDataURL === "function") {
+  } else if (allowDomFallback && canvas && typeof canvas.toDataURL === "function") {
     cn1ssScreenshotEmitted[normalizedTest] = true;
     const dataUrl = String(canvas.toDataURL("image/png") || "");
     const comma = dataUrl.indexOf(",");
     const base64 = comma >= 0 ? dataUrl.substring(comma + 1) : "";
     emitCn1ssChunks(base64, normalizedTest, "");
-  } else {
+  } else if (allowDomFallback) {
     let capturedDataUrl = "";
     if (jvm && typeof jvm.invokeHostNative === "function") {
       try {
@@ -3143,6 +3169,8 @@ bindCiFallback("Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshotDom", [
     } else {
       emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:noCanvas=1:test=" + normalizedTest);
     }
+  } else {
+    emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:domCaptureDisabled=1:test=" + normalizedTest);
   }
   let completionRunnableRan = false;
   if (completion && completion.__class) {

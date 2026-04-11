@@ -1778,6 +1778,13 @@ function* throwInterruptedException() {
   }
   throw ex.object;
 }
+function* throwNullPointerException() {
+  const ex = jvm.createException("java_lang_NullPointerException");
+  if (typeof ex.ctor === "function") {
+    yield* ex.ctor(ex.object);
+  }
+  throw ex.object;
+}
 function bindNative(names, fn) {
   function installVirtualOverride(name) {
     const classes = jvm.classes || {};
@@ -1946,7 +1953,15 @@ bindNative([
   "cn1_java_lang_Object_getClass___R_java_lang_Class",
   "cn1_java_lang_Object_getClassImpl_R_java_lang_Class",
   "cn1_java_lang_Object_getClassImpl___R_java_lang_Class"
-], function*(__cn1ThisObject) { return __cn1ThisObject && __cn1ThisObject.__classDef ? __cn1ThisObject.__classDef.classObject : jvm.getClassObject(__cn1ThisObject.__class); });
+], function*(__cn1ThisObject) {
+  if (__cn1ThisObject == null) {
+    yield* throwNullPointerException();
+  }
+  if (__cn1ThisObject.__classDef) {
+    return __cn1ThisObject.__classDef.classObject;
+  }
+  return jvm.getClassObject(__cn1ThisObject.__class);
+});
 bindNative(["cn1_java_io_PrintStream_print_java_lang_String"], function*(__cn1ThisObject, value) {
   printToConsole(printStreamValue(value));
   return null;

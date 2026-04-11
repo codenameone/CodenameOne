@@ -14,21 +14,19 @@ Current State
 - CI/local logs now reach:
   - `CN1SS:SUITE:FINISHED`
   - `TOP_BLOCKER=none|none|none`
-- The screenshot pipeline currently still fails overall, but now for actionable per-test/runtime errors (not early startup deadlock).
+- The screenshot pipeline now decodes/report-generates reliably from logs, but screenshot content is still mostly wrong (white-frame capture path is still being used in CI artifacts).
 
 What Was Fixed In This Pass
 ---------------------------
 
-1. Screenshot report pipeline no longer aborts immediately on `CN1SS:ERR` lines.
+1. Screenshot report pipeline no longer aborts immediately on `CN1SS:ERR` lines, and synthetic `default` stream no longer causes fatal decode failure when named streams exist.
    - File: `scripts/run-javascript-screenshot-tests.sh`
-   - Root cause:
-     - `cn1ss_print_log "$LOG_FILE"` was called under `set -e`.
-     - `Cn1ssChunkTools check` exits non-zero when `CN1SS:ERR` lines are present.
-     - This stopped decode/report/comment stages, so CI artifact had no screenshots/comment update.
-   - Fix:
-     - Continue after `cn1ss_print_log` failure with explicit warning.
+   - Fixes:
+     - Continue after `cn1ss_print_log` non-zero status (report generation still runs).
+     - Filter out synthetic `default` stream when named streams are present.
+     - Treat residual synthetic `default` decode failures as non-fatal in multi-stream runs.
    - Verified locally:
-     - Script now decodes and copies many PNGs from the same failing browser log and reaches compare/comment stages.
+     - Replaying latest `javascript-device-runner.log` now exits `0`, writes compare/comment artifacts, and does not fail on `default`.
 
 2. Runtime key/identity robustness hardening in ParparVM.
    - File: `vm/ByteCodeTranslator/src/javascript/parparvm_runtime.js`
@@ -56,6 +54,22 @@ What Was Fixed In This Pass
    - Motivation:
      - CI flake in `JavascriptCn1CoreCompletenessTest` (`expected 7 got 3`) points to JSON map key lookup path instability on worker runtime.
 
+5. Fixed `Object.getClass()` null handling to throw Java NPE instead of raw JS TypeError.
+   - File: `vm/ByteCodeTranslator/src/javascript/parparvm_runtime.js`
+   - Fix:
+     - `cn1_java_lang_Object_getClass*` native now throws `java_lang_NullPointerException` when receiver is null.
+   - Motivation:
+     - Avoids leaking JS `Cannot read properties of null (reading '__classDef')` from core object/class paths.
+
+6. Hardened worker harness result parsing for VM tests.
+   - File: `vm/tests/src/test/java/com/codename1/tools/translator/JavascriptRuntimeSemanticsTest.java`
+   - Fix:
+     - Extract JSON fields from the last JSON object line containing `"type"` instead of scanning entire stdout blindly.
+   - Motivation:
+     - Reduces false extraction of intermediate `"result"` fields in noisy worker output.
+   - Local check:
+     - `JavascriptCn1CoreCompletenessTest#executesMeaningfulCodenameOneCoreSliceInWorkerRuntime` passes locally after this update.
+
 Known Failing Symptoms (Latest CI Logs/Artifacts)
 -------------------------------------------------
 
@@ -66,7 +80,7 @@ Known Failing Symptoms (Latest CI Logs/Artifacts)
   - Multiple tests: `TypeError: Cannot read properties of null (reading '__classDef')`
     - Seen in `ValidatorLightweightPickerScreenshotTest`, `InPlaceEditViewTest`, `StreamApiTest`, `TimeApiTest`.
 - Timeout-only tests still timeout by design/behavior (`MediaPlayback...`, `BytecodeTranslatorRegression...`, selected API tests).
-- `default` CN1SS stream decode can still fail in some runs while named streams decode successfully.
+- Screenshot pixels are still wrong in CI (host-canvas fallback path remains dominant in logs).
 
 Other CI Signal
 ---------------
@@ -77,15 +91,16 @@ Other CI Signal
 Priority Next Steps
 -------------------
 
-1. Fix per-test null receiver/init path (`__classDef` null) at first failing stack, not via broad fallbacks.
-2. Fix missing `Button.initLaf(UIManager)` symbol resolution in worker runtime path.
-3. Fix worker-mode orientation lock path so DOM access is host-bridge mediated (no direct `document` access in worker).
-4. Stabilize/diagnose `JavascriptCn1CoreCompletenessTest` in CI with focused logging around JSON parse/map key lookup.
-5. After runtime errors above are fixed, restore expected screenshot count/contents (target remains full set, currently partial/wrong).
+1. Eliminate host-canvas screenshot fallback usage for named tests; route through translated screenshot helper path and capture real UI frames.
+2. Fix per-test null receiver/init path (`__classDef` null) at first failing stack, not via broad fallbacks.
+3. Fix missing `Button.initLaf(UIManager)` symbol resolution in worker runtime path.
+4. Fix worker-mode orientation lock path so DOM access is host-bridge mediated (no direct `document` access in worker).
+5. Confirm VM completeness stability in CI with new parser/runtime patches (`expected 7` consistently).
 
 Files Touched In This Pass
 --------------------------
 
 - `scripts/run-javascript-screenshot-tests.sh`
 - `vm/ByteCodeTranslator/src/javascript/parparvm_runtime.js`
+- `vm/tests/src/test/java/com/codename1/tools/translator/JavascriptRuntimeSemanticsTest.java`
 - `Ports/JavaScriptPort/STATUS.md`

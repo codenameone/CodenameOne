@@ -94,6 +94,18 @@ if [ -n "$TEST_NAMES_RAW" ]; then
 else
   TEST_NAMES+=("default")
 fi
+if [ "${#TEST_NAMES[@]}" -gt 1 ]; then
+  FILTERED_TEST_NAMES=()
+  for test in "${TEST_NAMES[@]}"; do
+    if [ "$test" = "default" ]; then
+      continue
+    fi
+    FILTERED_TEST_NAMES+=("$test")
+  done
+  if [ "${#FILTERED_TEST_NAMES[@]}" -gt 0 ]; then
+    TEST_NAMES=("${FILTERED_TEST_NAMES[@]}")
+  fi
+fi
 rj_log "Detected CN1SS test streams: ${TEST_NAMES[*]}"
 
 declare -a FAILED_TESTS=()
@@ -117,6 +129,10 @@ for test in "${TEST_NAMES[@]}"; do
       rm -f "$preview_dest" 2>/dev/null || true
     fi
   else
+    if [ "$test" = "default" ] && [ "${#TEST_NAMES[@]}" -gt 1 ]; then
+      rj_log "WARN: Skipping decode failure for synthetic '$test' stream because named test streams were detected"
+      continue
+    fi
     rj_log "ERROR: Failed to extract/decode CN1SS payload for test '$test'"
     FAILED_TESTS+=("$test")
     RAW_B64_OUT="$SCREENSHOT_TMP_DIR/${test}.raw.b64"
