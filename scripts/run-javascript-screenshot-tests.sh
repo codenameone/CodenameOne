@@ -145,6 +145,16 @@ for test in "${TEST_NAMES[@]}"; do
   fi
 done
 
+decoded_count="${#COMPARE_ENTRIES[@]}"
+meaningful_decoded_count=0
+for entry in "${COMPARE_ENTRIES[@]}"; do
+  test_name="${entry%%=*}"
+  if [ "$test_name" = "bootstrap_placeholder" ] || [ "$test_name" = "default" ]; then
+    continue
+  fi
+  meaningful_decoded_count=$((meaningful_decoded_count + 1))
+done
+
 COMPARE_JSON="$SCREENSHOT_TMP_DIR/screenshot-compare.json"
 SUMMARY_FILE="$SCREENSHOT_TMP_DIR/screenshot-summary.txt"
 COMMENT_FILE="$SCREENSHOT_TMP_DIR/screenshot-comment.md"
@@ -170,6 +180,11 @@ cp -f "$LOG_FILE" "$ARTIFACTS_DIR/javascript-device-runner.log" 2>/dev/null || t
 
 if [ "${#FAILED_TESTS[@]}" -gt 0 ]; then
   rj_log "ERROR: CN1SS decode failures for tests: ${FAILED_TESTS[*]}"
+  comment_rc=12
+fi
+
+if [ "$meaningful_decoded_count" -eq 0 ]; then
+  rj_log "ERROR: No meaningful screenshots decoded (only default/bootstrap streams were present)"
   comment_rc=12
 fi
 

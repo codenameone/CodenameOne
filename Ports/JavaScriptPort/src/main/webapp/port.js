@@ -3124,7 +3124,7 @@ bindCiFallback("Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshotDom", [
 ], function*(testName, completion) {
   const test = toCn1StringValue(testName);
   const normalizedTest = resolveCn1ssTestName(test);
-  const allowDomFallback = normalizedTest === "default";
+  let shouldUseDomFallback = true;
   if (typeof cn1ssEmitCurrentFormScreenshotOriginal === "function") {
     try {
       yield* cn1ssEmitCurrentFormScreenshotOriginal(testName, completion);
@@ -3132,25 +3132,24 @@ bindCiFallback("Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshotDom", [
     } catch (originalErr) {
       emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:originalInvokeErr="
         + String(originalErr && originalErr.message ? originalErr.message : originalErr));
-      if (!allowDomFallback) {
-        emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:hostCanvasBypass=1:test=" + normalizedTest);
-      }
+      shouldUseDomFallback = true;
     }
   } else {
     emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:originalMissing=1");
+    shouldUseDomFallback = true;
   }
   const canvas = global.document && typeof global.document.querySelector === "function"
     ? global.document.querySelector("canvas")
     : null;
   if (cn1ssScreenshotEmitted[normalizedTest]) {
     emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:skipDuplicate=" + normalizedTest);
-  } else if (allowDomFallback && canvas && typeof canvas.toDataURL === "function") {
+  } else if (shouldUseDomFallback && canvas && typeof canvas.toDataURL === "function") {
     cn1ssScreenshotEmitted[normalizedTest] = true;
     const dataUrl = String(canvas.toDataURL("image/png") || "");
     const comma = dataUrl.indexOf(",");
     const base64 = comma >= 0 ? dataUrl.substring(comma + 1) : "";
     emitCn1ssChunks(base64, normalizedTest, "");
-  } else if (allowDomFallback) {
+  } else if (shouldUseDomFallback) {
     let capturedDataUrl = "";
     if (jvm && typeof jvm.invokeHostNative === "function") {
       try {
@@ -3169,8 +3168,6 @@ bindCiFallback("Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshotDom", [
     } else {
       emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:noCanvas=1:test=" + normalizedTest);
     }
-  } else {
-    emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:domCaptureDisabled=1:test=" + normalizedTest);
   }
   let completionRunnableRan = false;
   if (completion && completion.__class) {
