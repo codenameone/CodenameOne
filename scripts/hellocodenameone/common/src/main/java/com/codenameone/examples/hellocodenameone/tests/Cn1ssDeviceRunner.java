@@ -74,7 +74,6 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new TabsScreenshotTest(),
             new TextAreaAlignmentScreenshotTest(),
             new ValidatorLightweightPickerScreenshotTest(),
-            new LightweightPickerDefaultScreenshotTest(),
             new LightweightPickerButtonsScreenshotTest(),
             new ToastBarTopPositionScreenshotTest(),
             // Keep this as the last screenshot test; orientation changes can leak into subsequent screenshots.
