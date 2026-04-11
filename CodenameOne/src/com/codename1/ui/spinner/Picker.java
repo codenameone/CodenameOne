@@ -763,12 +763,13 @@ public class Picker extends Button {
                 row.setUIID(isTablet ? "PickerButtonBarTablet" : "PickerButtonBar");
                 $(row).selectAllStyles().setMargin(0).setPadding(0).setBorder(Border.createEmpty()).setBgTransparency(0);
             }
-            Button button = new Button(entry.text, isTablet ? "PickerButtonTablet" : "PickerButton");
+            final LightweightPopupButton popupButton = entry;
+            Button button = new Button(popupButton.text, isTablet ? "PickerButtonTablet" : "PickerButton");
             button.addActionListener(new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent evt) {
-                    if (entry.action != null) {
-                        entry.action.run();
+                    if (popupButton.action != null) {
+                        popupButton.action.run();
                     }
                     spinner.setValue(value);
                     updateValue();
