@@ -349,18 +349,8 @@ Currently only supported for App Store builds.  See https://www.codenameone.com/
 | (Optional)  The version of TeaVM to use for the build.  *Use caution*, only use this property if you know what you are doing!
 
 
-|rim.askPermissions
-|true/false defaults to true. Indicates whether the user is prompted for permissions on Blackberry devices.
-
 |google.adUnitId
 |Allows integrating Admob/Google Play ads into the application see link:https://www.codenameone.com/blog/adding-google-play-ads.html[this]
-
-|rim.ignor_legacy
-|true/false defaults to false. When set to true the Blackberry build targets only 5.0 devices and newer and doesn’t build the 4.x version.
-rim.nativeBrowser	true/false defaults to false. Enables the native blackberry browser on OS 5 or higher. It is disabled by default since it might casue crashes on some cases.
-
-|rim.obfuscation
-|true/false defaults to false. Obfuscate the JAR before invoking the rimc compiler.
 
 |ios.entitlementsInject
 |Content to inject into the iOS entitlements file.  This should be in the Plist XML format.  See https://developer.apple.com/documentation/bundleresources/entitlements?language=objc[Apple Entitlements Documentation].
@@ -488,8 +478,6 @@ rim.nativeBrowser	true/false defaults to false. Enables the native blackberry br
 |noExtraResources
 |true/false (defaults to false). Blocks codename one from injecting its own resources when set to true, the only effect this has is in slightly reducing archive size. This might have adverse effects on some features of Codename One so it isn't recommended.
 
-|j2me.iconSize
-|Defaults to 48x48. The size of the icon in the format of width x height (without the spacing).
 |===
 
 === Android Permissions
@@ -768,7 +756,7 @@ Codename One doesn't include the native platforms in its bundle e.g. the full An
 
 TIP: When implementing a non-trivial native interface, send a server build with the "Include Source" option checked. Implement the native interface in the native IDE then copy and paste the native code back into Codename One
 
-The implementation of this interface is nearly identical for Android (Java/Kotlin), J2ME & Java SE.
+The implementation of this interface is nearly identical for Android (Java/Kotlin) & Java SE.
 
 ===== Swift (iOS) and Kotlin (Android) options
 
@@ -1335,7 +1323,7 @@ include::../demos/android/src/main/java/com/codename1/sms/intercept/NativeSMSInt
 Native interfaces standardize the invocation of native code from Codename One, but it doesn't standardize the reverse of callbacks into Codename One Java code. The reverse is naturally more complicated since its platform specific and more error prone.
 
 A common "trick" for calling back is to just define a static method and then trigger it from native code. This works
-nicely for Android, Java SE, Blackberry & Java ME since those platforms use Java for their "native code". Mapping this to iOS requires some basic understanding of how the iOS VM works.
+nicely for Android & Java SE since those platforms use Java for their "native code". Mapping this to iOS requires some basic understanding of how the iOS VM works.
 
 For the purpose of this explanation lets pretend we have a class called NativeCallback in the src hierarchy under
 the package `com.mycompany` that has the method: `public static void callback()`.
@@ -1647,7 +1635,6 @@ javascript.minifying
 javascript.proxy.url
 javascript.sourceFilesCopied
 javascript.teavm.version
-rim.askPermissions
 google.adUnitId
 ios.includePush
 ios.headphoneCallback
@@ -1669,7 +1656,6 @@ desktop.themeMac
 desktop.themeWin
 desktop.windowsOutput
 noExtraResources
-j2me.iconSize
 android.permission.<PERMISSION_NAME>
 ----
 
@@ -1723,7 +1709,6 @@ The table below covers the files that can/should be a part of a cn1lib file:
 | nativeios.zip        | &#215;   | Native iOS sources if applicable
 | nativeand.zip        | &#215;   | Native Android sources if applicable
 | nativejavascript.zip | &#215;   | Native JavaScript sources if applicable
-| nativerim.zip        | &#215;   | Native RIM sources if applicable
 | nativese.zip         | &#215;   | Native JavaSE sources if applicable
 | nativewin.zip        | &#215;   | Native Windows sources if applicable
 | nativeme.zip         | &#215;   | Native Java ME sources if applicable

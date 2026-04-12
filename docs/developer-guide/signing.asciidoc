@@ -352,11 +352,3 @@ Executing the command will produce a Keystore.ks file in that directory which yo
 
 For more details see http://developer.android.com/guide/publishing/app-signing.html
 
-=== RIM/BlackBerry
-
-You can now get signing keys for free from Blackberry by going https://www.blackberry.com/SignedKeys/[here]. Once you obtain the certificates you need to install them on your machine (you will need the Blackberry development environment for this). You will have two files: `sigtool.db` and `sigtool.csk` on your machine (within the JDE directory hierarchy). We need them and their associated password to perform the signed build for Blackberry application.
-
-=== J2ME
-
-Currently signing J2ME applications isn't supported. You can use tools such as the Sprint WTK to sign the resulting `jad`/`jar` produced by Codename One.
- 

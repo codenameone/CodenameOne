@@ -45,9 +45,9 @@ E.g.: Since building native iOS applications requires a Mac OS X machine with a 
 
 Subscribers can receive the C source code back using the include sources feature of Codename One and use those sources for benchmarking, debugging on devices etc.
 
-The same is true for most other platforms. For the Android, J2ME & Blackberry the standard Java code is executed as is.
+The same is true for most other platforms. For the Android and Java SE the standard Java code is executed as is.
 
-Java 8 syntax is supported thru https://github.com/orfjackal/retrolambda[retrolambda] installed on the Codename One servers. This is used to convert bytecode seamlessly down to Java 5 syntax levels. Java 5 syntax is translated to the JDK 1.3 cldc subset on J2ME/Blackberry to provide those language capabilities and API's across all devices. This is done using a server based bytecode processor based on retroweaver and a great deal of custom code. Notice that this architecture is transparent to developers as the build servers abstract most of the painful differences between devices.
+Java 8 syntax is supported through https://github.com/orfjackal/retrolambda[retrolambda] installed on the Codename One servers. This is used to convert bytecode seamlessly down to Java 5 syntax levels. This is done using a server based bytecode processor based on retroweaver and a great deal of custom code. Notice that this architecture is transparent to developers as the build servers abstract most of the painful differences between devices.
 
 ==== How does Codename One Work?
 

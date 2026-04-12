@@ -1323,8 +1323,7 @@ to the image itself (e.g. the `scaled` method) it will generate a new image whic
 image.
 
 TIP: Since https://www.codenameone.com/javadoc/com/codename1/ui/util/ImageIO.html[ImageIO] is used to perform the operations of the adapter interface its required that `ImageIO` will work.
-It is currently working in JavaSE, Android, iOS & Windows Phone. It doesn't work on J2ME/Blackberry devices so if you
-pass an adapter instance on those platforms it will probably fail to perform its task.
+It is currently working in JavaSE, Android, iOS & Windows Phone.
 
 If the file in the URL contains an image that is too big it will scale it to match the size of the placeholder precisely! +
 There is also  an option to fail if the sizes don't match. Notice that the image that will be saved is the scaled
