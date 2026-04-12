@@ -14,10 +14,8 @@ import java.io.IOException;
 
 interface Cn1ssDeviceRunnerHelper {
     int CHUNK_SIZE_ANDROID = 500;
-    int CHUNK_SIZE_IOS = 120;
     int CHUNK_SIZE_DEFAULT = 900;
     int DELAY_ANDROID = 20;
-    int DELAY_IOS = 40;
     int MAX_PREVIEW_BYTES = 20 * 1024;
     String PREVIEW_CHANNEL = "PREVIEW";
     int[] PREVIEW_QUALITIES = new int[] {60, 50, 40, 35, 30, 25, 20, 18, 16, 14, 12, 10, 8, 6, 5, 4, 3, 2, 1};
@@ -34,15 +32,9 @@ interface Cn1ssDeviceRunnerHelper {
     static void emitCurrentFormScreenshot(String testName) {
         String safeName = sanitizeTestName(testName);
         Form current = Display.getInstance().getCurrent();
-        long currentFormStart = System.currentTimeMillis();
-        while (current == null && System.currentTimeMillis() - currentFormStart < 2000) {
-            Util.sleep(50);
-            current = Display.getInstance().getCurrent();
-        }
         if (current == null) {
             println("CN1SS:ERR:test=" + safeName + " message=Current form is null");
             println("CN1SS:END:" + safeName);
-            return;
         }
         int width = Math.max(1, current.getWidth());
         int height = Math.max(1, current.getHeight());
@@ -61,7 +53,6 @@ interface Cn1ssDeviceRunnerHelper {
         if (img[0] == null) {
             println("CN1SS:ERR:test=" + safeName + " message=Screenshot process timed out");
             println("CN1SS:END:" + safeName);
-            return;
         }
         Image screenshot = img[0];
         try {
@@ -69,7 +60,6 @@ interface Cn1ssDeviceRunnerHelper {
             if (io == null || !io.isFormatSupported(ImageIO.FORMAT_PNG)) {
                 println("CN1SS:ERR:test=" + safeName + " message=PNG encoding unavailable");
                 println("CN1SS:END:" + safeName);
-                return;
             }
             if(Display.getInstance().isSimulator()) {
                 io.save(screenshot, Storage.getInstance().createOutputStream(safeName + ".png"), ImageIO.FORMAT_PNG, 1);
@@ -134,11 +124,9 @@ interface Cn1ssDeviceRunnerHelper {
         String base64 = Base64.encodeNoNewline(bytes);
         int count = 0;
 
-        String platformName = Display.getInstance().getPlatformName();
-        boolean isAndroid = "and".equals(platformName);
-        boolean isIos = "ios".equals(platformName);
-        int chunkSize = isAndroid ? CHUNK_SIZE_ANDROID : isIos ? CHUNK_SIZE_IOS : CHUNK_SIZE_DEFAULT;
-        int delay = isAndroid ? DELAY_ANDROID : isIos ? DELAY_IOS : 0;
+        boolean isAndroid = "and".equals(Display.getInstance().getPlatformName());
+        int chunkSize = isAndroid ? CHUNK_SIZE_ANDROID : CHUNK_SIZE_DEFAULT;
+        int delay = isAndroid ? DELAY_ANDROID : 0;
 
         for (int pos = 0; pos < base64.length(); pos += chunkSize) {
             int end = Math.min(pos + chunkSize, base64.length());
