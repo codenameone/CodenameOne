@@ -138,6 +138,21 @@ class TextAreaTest extends UITestBase {
     }
 
     @FormTest
+    void testGrowByContentRevalidatesParentWhenRowCountChanges() {
+        TextArea textArea = new TextArea();
+        textArea.setRows(2);
+        textArea.setGrowByContent(true);
+        TrackingContainer parent = new TrackingContainer();
+        parent.add(textArea);
+
+        textArea.setText("Line 1");
+        assertFalse(parent.revalidatedLater, "Parent should not be revalidated when row count doesn't change");
+
+        textArea.setText("Line 1\nLine 2\nLine 3");
+        assertTrue(parent.revalidatedLater, "Parent should be revalidated when growByContent increases row count");
+    }
+
+    @FormTest
     void testEndsWith3Points() {
         TextArea textArea = new TextArea();
 
@@ -412,5 +427,18 @@ class TextAreaTest extends UITestBase {
         sample.setEditable(false);
         sample.setVerticalAlignment(valign);
         return sample;
+    }
+
+    private static class TrackingContainer extends Container {
+        private boolean revalidatedLater;
+
+        TrackingContainer() {
+            super(BoxLayout.y());
+        }
+
+        @Override
+        public void revalidateLater() {
+            revalidatedLater = true;
+        }
     }
 }

@@ -581,6 +581,10 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /// - `t`: new value for the text area
     @Override
     public void setText(String t) {
+        int oldActualRows = -1;
+        if (growByContent) {
+            oldActualRows = getActualRows();
+        }
         String old = this.text;
         if (!Objects.equals(t, old)) {
             // If we've previously suppressed action events,
@@ -596,6 +600,9 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         synchronized (this) {
             //zero the ArrayList in order to initialize it on the next paint
             rowStrings = null;
+        }
+        if (growByContent && oldActualRows != getActualRows() && getParent() != null) {
+            getParent().revalidateLater();
         }
         if (!Objects.equals(text, old)) {
             fireDataChanged(DataChangedListener.CHANGED, -1);
