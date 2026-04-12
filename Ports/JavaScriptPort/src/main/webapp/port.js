@@ -3174,6 +3174,9 @@ function emitCn1ssChunks(base64, testName, channelName) {
     emitDiagLine(prefix + ":" + test + ":" + index + ":");
     cn1ssChunkIndexByStream[streamKey] = nextIndex + 1;
   }
+  // Emit END marker matching the Java emitChannel convention so the
+  // downstream cn1ss_list_tests / cn1ss_decode helpers can detect the stream.
+  emitDiagLine(prefix + ":END:" + test);
 }
 
 const cn1ssEmitCurrentFormScreenshotMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerHelper_emitCurrentFormScreenshot_java_lang_String_java_lang_Runnable";
@@ -3315,9 +3318,34 @@ bindCiFallback("Cn1ssDeviceRunnerHelper.emitChannelFastJs", [
   cn1ssEmitChannelMethodId,
   cn1ssEmitChannelMethodId + "__impl"
 ], function*(payloadBytes, testName, channelName) {
-  const base64 = byteArrayToBase64(payloadBytes);
   const test = resolveCn1ssTestName(toCn1StringValue(testName));
   const channel = toCn1StringValue(channelName);
+  // For the primary screenshot channel (empty channel name), the Java-side
+  // Display.screenshot() in the worker reads from OffscreenCanvas which
+  // may not reflect the main-thread visible canvas.  Replace the payload
+  // with a main-thread canvas capture via the host bridge when available.
+  if (!channel && jvm && typeof jvm.invokeHostNative === "function" && !cn1ssScreenshotEmitted[test]) {
+    try {
+      yield jvm.invokeHostNative("__cn1_wait_for_ui_settle__", [{
+        reason: "screenshot:" + test,
+        maxFrames: 18,
+        stableFrames: 2
+      }]);
+      const hostResult = yield jvm.invokeHostNative("__cn1_capture_canvas_png__", []);
+      const capturedDataUrl = hostResult == null ? "" : String(hostResult);
+      if (capturedDataUrl && capturedDataUrl.indexOf("data:image/") === 0) {
+        cn1ssScreenshotEmitted[test] = true;
+        const comma = capturedDataUrl.indexOf(",");
+        const hostBase64 = comma >= 0 ? capturedDataUrl.substring(comma + 1) : "";
+        emitDiagLine("PARPAR:DIAG:FALLBACK:emitChannelFastJs:hostCapture=1:test=" + test + ":len=" + hostBase64.length);
+        emitCn1ssChunks(hostBase64, test, channel);
+        return null;
+      }
+    } catch (_hostErr) {
+      emitDiagLine("PARPAR:DIAG:FALLBACK:emitChannelFastJs:hostCaptureErr=" + String(_hostErr && _hostErr.message ? _hostErr.message : _hostErr));
+    }
+  }
+  const base64 = byteArrayToBase64(payloadBytes);
   emitCn1ssChunks(base64, test, channel);
   return null;
 });
