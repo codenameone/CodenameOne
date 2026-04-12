@@ -60,6 +60,7 @@ import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 import com.codename1.ui.util.ImageIO;
 import com.codename1.util.AsyncResource;
+import com.codename1.util.Simd;
 import com.codename1.util.RunnableWithResultSync;
 import com.codename1.util.SuccessCallback;
 
@@ -216,6 +217,7 @@ public final class Display extends CN1Constants {
     long time;
     private int transitionDelay = -1;
     private String selectedVirtualKeyboard = null;
+    private Simd simd;
     private CrashReport crashReporter;
     private EventDispatcher errorHandler;
     private boolean inNativeUI;
@@ -343,6 +345,7 @@ public final class Display extends CN1Constants {
                 commandBehaviour = impl.getCommandBehavior();
             }
             impl = (CodenameOneImplementation) ImplementationFactory.getInstance().createImplementation();
+            INSTANCE.simd = null;
 
             impl.setDisplayLock(lock);
             impl.initImpl(m);
@@ -491,6 +494,18 @@ public final class Display extends CN1Constants {
 
     CodenameOneImplementation getImplementation() {
         return impl;
+    }
+
+    /// Returns the SIMD API instance bound to the current implementation.
+    public Simd getSimd() {
+        if (simd == null) {
+            Simd created = impl.createSimd();
+            if (created == null) {
+                created = new Simd();
+            }
+            simd = created;
+        }
+        return simd;
     }
 
     /// Indicates the maximum frames the API will try to draw every second
