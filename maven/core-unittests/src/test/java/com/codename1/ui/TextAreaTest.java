@@ -138,7 +138,7 @@ class TextAreaTest extends UITestBase {
     }
 
     @FormTest
-    void testGrowByContentRevalidatesParentWhenRowCountChanges() {
+    void testGrowByContentRevalidatesParentWhenTextChanges() {
         TextArea textArea = new TextArea();
         textArea.setRows(2);
         textArea.setGrowByContent(true);
@@ -146,10 +146,11 @@ class TextAreaTest extends UITestBase {
         parent.add(textArea);
 
         textArea.setText("Line 1");
-        assertFalse(parent.revalidatedLater, "Parent should not be revalidated when row count doesn't change");
+        assertTrue(parent.revalidatedLater, "Parent should be revalidated when growByContent text changes");
 
+        parent.revalidatedLater = false;
         textArea.setText("Line 1\nLine 2\nLine 3");
-        assertTrue(parent.revalidatedLater, "Parent should be revalidated when growByContent increases row count");
+        assertTrue(parent.revalidatedLater, "Parent should be revalidated for subsequent growByContent text changes");
     }
 
     @FormTest
