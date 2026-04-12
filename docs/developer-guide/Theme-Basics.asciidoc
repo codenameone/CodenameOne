@@ -237,9 +237,9 @@ image::img/theme-entry-border-settings.png[Border entry in the theme]
 
 ==== 9-Piece Image Border
 
-A common border type is the 9-piece image border, to facilitate that border type you've a special #Image Border Wizard#.
+A common border type is the 9-piece image border. To simplify creating this type of border, there is a special #Image Border Wizard#.
 
-A 9 piece image border is a common convention in UI theming that divides a border into 9 pieces 4 representing corners, 4 representing the sides and one representing the middle.
+A 9-piece image border is a common convention in UI theming that divides a border into 9 pieces: 4 representing the corners, 4 representing the sides, and 1 representing the middle.
 
 TIP: Android uses a common variation on the 9-piece border: 9-patch. The main difference between the 9-piece border and 9-patch is that 9-piece borders tile the sides/center whereas 9-patch scales them
 
