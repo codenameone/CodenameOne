@@ -288,7 +288,7 @@ You can define the same border for many UIIDs from here though.
 *****
 A common oddity when using the image borders is the fact that even when padding is removed the component might take a larger size than the height of the text within it.
 
-The reason for that's the border. Because of the way borders are implemented they can't be drawn to be smaller than the sum of their corners. For example: the minimum height of a border would be the height of the bottom corner + the height of the top corner. The minimum width would be the width of the left + right corners.
+The reason for this is the border. Because of the way borders are implemented they can't be drawn to be smaller than the sum of their corners. For example: the minimum height of a border would be the height of the bottom corner + the height of the top corner. The minimum width would be the width of the left + right corners.
 
 This is coded into the common preferred size methods in Codename One and components generally don't shrink below the size of the image border even if padding is 0.
 *****
