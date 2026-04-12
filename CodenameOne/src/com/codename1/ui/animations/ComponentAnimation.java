@@ -124,7 +124,9 @@ public abstract class ComponentAnimation {
 
     /// Invoked by the animation manager internally
     public final void updateAnimationState() {
-        updateState();
+        if (isInProgress()) {
+            updateState();
+        }
         if (!isInProgress()) {
             if (!completed) {
                 completed = true;
