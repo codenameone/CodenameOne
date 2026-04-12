@@ -14,11 +14,10 @@ import java.io.IOException;
 
 interface Cn1ssDeviceRunnerHelper {
     int CHUNK_SIZE_ANDROID = 500;
-    int CHUNK_SIZE_IOS = 250;
+    int CHUNK_SIZE_IOS = 120;
     int CHUNK_SIZE_DEFAULT = 900;
     int DELAY_ANDROID = 20;
-    int DELAY_IOS = 30;
-    int CHUNK_OFFSET_WIDTH = 9;
+    int DELAY_IOS = 40;
     int MAX_PREVIEW_BYTES = 20 * 1024;
     String PREVIEW_CHANNEL = "PREVIEW";
     int[] PREVIEW_QUALITIES = new int[] {60, 50, 40, 35, 30, 25, 20, 18, 16, 14, 12, 10, 8, 6, 5, 4, 3, 2, 1};
@@ -35,6 +34,11 @@ interface Cn1ssDeviceRunnerHelper {
     static void emitCurrentFormScreenshot(String testName) {
         String safeName = sanitizeTestName(testName);
         Form current = Display.getInstance().getCurrent();
+        long currentFormStart = System.currentTimeMillis();
+        while (current == null && System.currentTimeMillis() - currentFormStart < 2000) {
+            Util.sleep(50);
+            current = Display.getInstance().getCurrent();
+        }
         if (current == null) {
             println("CN1SS:ERR:test=" + safeName + " message=Current form is null");
             println("CN1SS:END:" + safeName);
@@ -139,7 +143,7 @@ interface Cn1ssDeviceRunnerHelper {
         for (int pos = 0; pos < base64.length(); pos += chunkSize) {
             int end = Math.min(pos + chunkSize, base64.length());
             String chunk = base64.substring(pos, end);
-            println(prefix + ":" + safeName + ":" + zeroPad(pos, CHUNK_OFFSET_WIDTH) + ":" + chunk);
+            println(prefix + ":" + safeName + ":" + zeroPad(pos, 6) + ":" + chunk);
             count++;
             // Slow down to prevent logcat buffer overflow/truncation
             if (delay > 0) {
