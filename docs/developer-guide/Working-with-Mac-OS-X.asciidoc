@@ -42,7 +42,7 @@ This type of certificate is used to sign the.pkg installer for an app that's bei
 
 NOTE: Apple provides documentation on obtaining certificates https://developer.apple.com/library/content/documentation/IDEs/Conceptual/AppDistributionGuide/MaintainingCertificates/MaintainingCertificates.html#//apple_ref/doc/uid/TP40012582-CH31-SW6[on its website] but the process described there involves Xcode. This section describes an alternate process that doesn't require Xcode.
 
-If you've an Apple developer account, you can manage your certificates https://developer.apple.com/account/mac/certificate[here].
+If you have an Apple developer account, you can manage your certificates https://developer.apple.com/account/mac/certificate[here].
 
 .Mac Developer portal certificates
 image::img/mac-developer-certificates.png[Mac Developer portal certificates,scaledwidth=30%]
