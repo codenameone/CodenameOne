@@ -62,7 +62,7 @@ image::img/theme-preview-section.png[Theme preview section,scaledwidth=50%]
 
 The theme state tabs and constant tabs allow you to pass between the various editing modes for the theme and also add theme constants.
 
-You discussed styles before, you can pick the right style mode through the tabs.
+As discussed earlier, you can pick the right style mode through the tabs.
 
 .You can use these tabs to add the various types of styles and theme constants
 image::img/theme-state-tabs.png[You can use these tabs to add the various types of styles and theme constants,scaledwidth=50%]
