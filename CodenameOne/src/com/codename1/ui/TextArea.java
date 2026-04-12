@@ -597,7 +597,10 @@ public class TextArea extends Component implements ActionSource, TextHolder {
             //zero the ArrayList in order to initialize it on the next paint
             rowStrings = null;
         }
-        if (growByContent && !Objects.equals(text, old) && getParent() != null) {
+        if (growByContent
+                && !Objects.equals(text, old)
+                && getParent() != null
+                && Display.getInstance().isTextEditing(this)) {
             getParent().revalidateLater();
         }
         if (!Objects.equals(text, old)) {

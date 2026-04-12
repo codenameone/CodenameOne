@@ -138,19 +138,37 @@ class TextAreaTest extends UITestBase {
     }
 
     @FormTest
-    void testGrowByContentRevalidatesParentWhenTextChanges() {
+    void testGrowByContentRevalidatesParentWhenTextChangesDuringEditing() {
+        TextArea textArea = new TextArea();
+        textArea.setRows(2);
+        textArea.setGrowByContent(true);
+        TrackingContainer parent = new TrackingContainer();
+        parent.add(textArea);
+        Display.impl.setFocusedEditingText(textArea);
+        try {
+            textArea.setText("Line 1");
+            assertTrue(parent.revalidatedLater, "Parent should be revalidated when growByContent text changes");
+
+            parent.revalidatedLater = false;
+            textArea.setText("Line 1\nLine 2\nLine 3");
+            assertTrue(parent.revalidatedLater, "Parent should be revalidated for subsequent growByContent text changes");
+        } finally {
+            Display.impl.setFocusedEditingText(null);
+        }
+    }
+
+    @FormTest
+    void testGrowByContentDoesNotRevalidateWhenNotEditing() {
         TextArea textArea = new TextArea();
         textArea.setRows(2);
         textArea.setGrowByContent(true);
         TrackingContainer parent = new TrackingContainer();
         parent.add(textArea);
 
+        Display.impl.setFocusedEditingText(null);
         textArea.setText("Line 1");
-        assertTrue(parent.revalidatedLater, "Parent should be revalidated when growByContent text changes");
 
-        parent.revalidatedLater = false;
-        textArea.setText("Line 1\nLine 2\nLine 3");
-        assertTrue(parent.revalidatedLater, "Parent should be revalidated for subsequent growByContent text changes");
+        assertFalse(parent.revalidatedLater, "Parent should not be revalidated when text changes outside active editing");
     }
 
     @FormTest
