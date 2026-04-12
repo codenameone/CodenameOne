@@ -566,6 +566,6 @@ You can define an effect to be applied to a specific font, specifically:
 - 3d text raised/lowered
 - 3d shadow north
 
-The "3d" effects effectively draw the text twice, with a sligh offest and two different colors to create a "3d" feel.
+The "3d" effects effectively draw the text twice, with a slight offset and two different colors to create a "3d" feel.
 
 All of the effects are relatively simple and performant.
