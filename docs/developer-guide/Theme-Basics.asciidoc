@@ -5,7 +5,7 @@ This chapter covers the creation of a simple hello-world style theme and its vis
 [[theme-basics-section,Codename One Theme Basics]]
 === Understanding Codename One Themes
 
-Codename One themes are pluggable CSS-like elements that let developers determine or switch the look of the application at runtime. A theme can be installed through the https://www.codenameone.com/javadoc/com/codename1/ui/plaf/UIManager.html[UIManager class], and themes can be layered one on top of another. A theme can also be generated from CSS, and you will cover that and the supported CSS syntax soon.
+Codename One themes are pluggable CSS-like elements that let developers determine or switch the look of the application at runtime. A theme can be installed through the https://www.codenameone.com/javadoc/com/codename1/ui/plaf/UIManager.html[UIManager class], and themes can be layered one on top of another. A theme can also be generated from CSS, and this guide covers that and the supported CSS syntax later.
 
 By default, Codename One themes derive the native operating system themes, although this behavior is entirely optional.
 
