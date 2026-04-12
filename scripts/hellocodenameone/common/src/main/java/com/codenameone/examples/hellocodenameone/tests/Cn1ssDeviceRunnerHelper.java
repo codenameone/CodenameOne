@@ -14,8 +14,10 @@ import java.io.IOException;
 
 interface Cn1ssDeviceRunnerHelper {
     int CHUNK_SIZE_ANDROID = 500;
+    int CHUNK_SIZE_IOS = 500;
     int CHUNK_SIZE_DEFAULT = 900;
     int DELAY_ANDROID = 20;
+    int DELAY_IOS = 20;
     int MAX_PREVIEW_BYTES = 20 * 1024;
     String PREVIEW_CHANNEL = "PREVIEW";
     int[] PREVIEW_QUALITIES = new int[] {60, 50, 40, 35, 30, 25, 20, 18, 16, 14, 12, 10, 8, 6, 5, 4, 3, 2, 1};
@@ -124,9 +126,11 @@ interface Cn1ssDeviceRunnerHelper {
         String base64 = Base64.encodeNoNewline(bytes);
         int count = 0;
 
-        boolean isAndroid = "and".equals(Display.getInstance().getPlatformName());
-        int chunkSize = isAndroid ? CHUNK_SIZE_ANDROID : CHUNK_SIZE_DEFAULT;
-        int delay = isAndroid ? DELAY_ANDROID : 0;
+        String platformName = Display.getInstance().getPlatformName();
+        boolean isAndroid = "and".equals(platformName);
+        boolean isIos = "ios".equals(platformName);
+        int chunkSize = isAndroid ? CHUNK_SIZE_ANDROID : isIos ? CHUNK_SIZE_IOS : CHUNK_SIZE_DEFAULT;
+        int delay = isAndroid ? DELAY_ANDROID : isIos ? DELAY_IOS : 0;
 
         for (int pos = 0; pos < base64.length(); pos += chunkSize) {
             int end = Math.min(pos + chunkSize, base64.length());
