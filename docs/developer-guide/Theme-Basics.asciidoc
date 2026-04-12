@@ -226,7 +226,7 @@ The theme allows you to customize the padding/margin, and specify them for all 4
 .Padding tab
 image::img/theme-entry-padding.png[Padding tab]
 
-TIP: Recommend using millimeters for all spacing to make it look good for all device densities. Percentages make sense in extreme cases
+TIP: We recommend using millimeters for all spacing to make it look good for all device densities. Percentages make sense in extreme cases.
 
 ==== Borders
 
