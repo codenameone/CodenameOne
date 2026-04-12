@@ -18,9 +18,9 @@ Here you can provide your certificate(s) as a `.p12` file, and select a bundle t
 
 There are three bundle types which dictate what the build server produces for you when you build your project as a Desktop Mac OS App.
 
-. **DMG** - Produces a.DMG disk image with your app. This is the preferred format for distributing your app outside of the Mac App Store. If you provide a Developer ID Application certificate (see "Understanding Certificates" below), this the app will be signed so that users won't receive warnings about "Unidentified developer" when they install your app.
+. **DMG** - Produces a `.DMG` disk image with your app. This is the preferred format for distributing your app outside of the Mac App Store. If you provide a Developer ID Application certificate (see "Understanding Certificates" below), the app will be signed so that users won't receive warnings about "Unidentified developer" when they install your app.
 . **Sandboxed DMG** - Same as **DMG** bundle type except that your app is set up to use the app sandbox. Generally this would be used to test an app that's being distributed via the App Store, since App Store apps *must* use the sandbox. If you select this bundle type, you're *required* to provide a Mac App Distribution Certificate, and you should additionally specify entitlements required for your app to function properly. For more information about the app sandbox, see https://developer.apple.com/app-sandboxing/[Apple's documentation on the subject].
-. **Mac App Store Upload (PKG)** - Produces a.PKG file that you can upload to the Mac App Store. This requires that you provide *both* a Mac App Distribution certificate, and a Mac App Installer certificate (see "Understanding Certificates" below). Both of these certificates should be embedded into a single.p12 file (See "Exporting Certificates as p12" below).
+. **Mac App Store Upload (PKG)** - Produces a `.PKG` file that you can upload to the Mac App Store. This requires that you provide *both* a Mac App Distribution certificate, and a Mac App Installer certificate (see "Understanding Certificates" below). Both of these certificates should be embedded into a single `.p12` file (See "Exporting Certificates as p12" below).
 
 ==== Understanding Mac Certificates
 
