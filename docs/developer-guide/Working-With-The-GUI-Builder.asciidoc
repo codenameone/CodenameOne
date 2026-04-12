@@ -111,7 +111,7 @@ You’ll notice that the data doesn't match the original content of the list, th
 
 You can place your own data in the list using the GUI builder, which is generally desired regardless of what you end up doing, since this allows you to preview your design in the GUI builder.
 
-If you wish to populate your list from code, click the events tab and press the https://www.codenameone.com/javadoc/com/codename1/ui/list/ListModel.html[ListModel] button, you can fill up the model with an array of Hashtables, as you will explain soon enough (you can read more about the list model below).
+If you wish to populate your list from code, click the events tab and press the https://www.codenameone.com/javadoc/com/codename1/ui/list/ListModel.html[ListModel] button, you can fill up the model with an array of Hashtables, as we will explain soon enough (you can read more about the list model below).
 
 To populate the list via the GUI builder, click the properties of the list, and within them, click the ListItems entry. The entries within can be Strings or Hashtables, however in order to be customizable in the rendering stage, you will need them all to be Hashtables. Remove all the current entries and add a new entry:
 
