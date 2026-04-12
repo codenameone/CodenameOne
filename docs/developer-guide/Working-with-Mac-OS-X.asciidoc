@@ -85,7 +85,7 @@ The easiest way to produce a P12 that includes all 3 kinds of certificates is to
 
 image::img/mac-desktop-export-certificates-as-p12.png[Exporting certificates as P12,scaledwidth=10%]
 
-You will then be prompted to select a location to save the.p12 file, as well as selecting a password for the file.
+You will then be prompted to select a location to save the `.p12` file, as well as selecting a password for the file.
 
 
 ==== Entitlements
