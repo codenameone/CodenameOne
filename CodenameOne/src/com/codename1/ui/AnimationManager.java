@@ -69,7 +69,7 @@ public final class AnimationManager {
             if (c.isInProgress()) {
                 c.updateAnimationState();
             } else {
-                c.updateAnimationState();
+                c.completeAnimation();
                 anims.remove(c);
             }
         } else {
