@@ -85,6 +85,7 @@ import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.ImageIO;
 import com.codename1.util.AsyncResource;
 import com.codename1.util.FailureCallback;
+import com.codename1.util.Simd;
 import com.codename1.util.StringUtil;
 import com.codename1.util.SuccessCallback;
 
@@ -8395,6 +8396,12 @@ public abstract class CodenameOneImplementation {
     /// the image IO instance
     public ImageIO getImageIO() {
         return null;
+    }
+
+    /// Creates the SIMD implementation for this platform.
+    /// Ports may override this to provide accelerated SIMD behavior.
+    public Simd createSimd() {
+        return new Simd();
     }
 
     /// Workaround for XMLVM bug

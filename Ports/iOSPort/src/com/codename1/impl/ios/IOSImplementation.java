@@ -110,6 +110,7 @@ import com.codename1.util.AsyncResource;
 import com.codename1.util.Callback;
 import com.codename1.util.StringUtil;
 import com.codename1.util.SuccessCallback;
+import com.codename1.util.Simd;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -8089,6 +8090,11 @@ public class IOSImplementation extends CodenameOneImplementation {
      */
     public String getPlatformName() {
         return "ios";
+    }
+
+    @Override
+    public Simd createSimd() {
+        return new IOSSimd();
     }
 
     /**
