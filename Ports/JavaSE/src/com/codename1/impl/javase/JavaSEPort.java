@@ -118,6 +118,7 @@ import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.UITimer;
 import com.codename1.util.AsyncResource;
 import com.codename1.util.Callback;
+import com.codename1.util.Simd;
 import com.jhlabs.image.GaussianFilter;
 import java.awt.*;
 import java.awt.datatransfer.Clipboard;
@@ -10751,6 +10752,11 @@ public class JavaSEPort extends CodenameOneImplementation {
             return "win";
         }
         return platformName;
+    }
+
+    @Override
+    public Simd createSimd() {
+        return new JavaSESimd();
     }
 
     /**
