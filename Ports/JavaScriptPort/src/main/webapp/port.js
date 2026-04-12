@@ -380,6 +380,14 @@ function emitDisplayInitDiag(marker) {
   emitDiagLine("PARPAR:DIAG:" + marker + ":displayClassExists=" + (state.displayClassExists ? "1" : "0")+ ":instance=" + (state.instance ? "present" : "null")+ ":edt=" + (state.edt ? "present" : "null") + (state.edtThreadName ? ":edtThreadName=" + state.edtThreadName : ""));
 }
 
+// Enable forwarding System.out.println output to the main thread via postMessage.
+// This is only needed in the browser JS port where Playwright cannot reliably
+// capture Worker console.log.  Detect the browser Worker context by checking
+// for the native importScripts function (not the polyfill used in Node.js
+// worker_threads test harnesses which uses vm.runInThisContext).
+global.__cn1ForwardConsoleToMain = (typeof WorkerGlobalScope !== "undefined"
+    || (typeof self !== "undefined" && typeof self.importScripts === "function" && typeof process === "undefined"));
+
 function emitDiagLine(line) {
   if (global.console && typeof global.console.log === "function") {
     global.console.log(line);
@@ -1501,8 +1509,17 @@ bindCiFallback("HashMap.computeHashCodeNullKey", [
     emitDiagLine("PARPAR:DIAG:FALLBACK:hashMapComputeHashCode:nullKey=1");
     return 0;
   }
+  // Try the original captured at port.js load time first.
   if (typeof hashMapComputeHashCodeOriginal === "function") {
     return yield* hashMapComputeHashCodeOriginal(key);
+  }
+  // Original wasn't available yet (translated_app.js loads after port.js).
+  // computeHashCode(key) is just key.hashCode(), so call hashCode directly
+  // via virtual dispatch to avoid recursion back into computeHashCode.
+  var hashCodeMethod = jvm.resolveVirtual(key.__class || "java_lang_Object",
+    "cn1_java_lang_Object_hashCode_R_int");
+  if (typeof hashCodeMethod === "function") {
+    return yield* hashCodeMethod(key);
   }
   return 0;
 });

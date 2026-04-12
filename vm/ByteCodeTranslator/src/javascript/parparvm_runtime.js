@@ -207,10 +207,12 @@ function printToConsole(line) {
   if (global.console && typeof global.console.log === "function") {
     global.console.log(line);
   }
-  // Forward to the main thread so Playwright (page.on('console')) captures
-  // System.out.println output reliably.  Worker console.log is not always
-  // observable from the page context.
-  emitVmMessage({ type: "log", message: String(line) });
+  // When enabled by the JS port (port.js), forward System.out.println output
+  // to the main thread so Playwright can capture it.  Disabled by default to
+  // avoid flooding test harnesses that use Node.js worker_threads.
+  if (global.__cn1ForwardConsoleToMain) {
+    emitVmMessage({ type: "log", message: String(line) });
+  }
 }
 function isObjectLike(value) {
   return value != null && (typeof value === "object" || typeof value === "function");
