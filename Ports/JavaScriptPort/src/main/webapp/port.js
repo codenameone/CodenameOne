@@ -390,7 +390,11 @@ function emitDiagLine(line) {
   if (typeof global.postMessage === "function") {
     try {
       global.postMessage({ type: "log", message: String(line) });
-    } catch (_ignored) { /* non-critical */ }
+    } catch (postErr) {
+      if (global.console && typeof global.console.warn === "function") {
+        global.console.warn("emitDiagLine:postMessage failed: " + String(postErr && postErr.message ? postErr.message : postErr));
+      }
+    }
   }
 }
 

@@ -23,6 +23,8 @@ if (!url) {
   process.exit(2);
 }
 
+const SUITE_FINISHED_MARKER = 'CN1SS:SUITE:FINISHED';
+
 let suiteFinished = false;
 
 function append(line) {
@@ -51,7 +53,7 @@ try {
   page.on('console', msg => {
     const text = msg.text();
     append(`console:${msg.type()}:${text}`);
-    if (text.indexOf('CN1SS:SUITE:FINISHED') >= 0) {
+    if (text.indexOf(SUITE_FINISHED_MARKER) >= 0) {
       suiteFinished = true;
     }
   });
