@@ -90,7 +90,7 @@ You will then be prompted to select a location to save the `.p12` file, as well 
 
 ==== Entitlements
 
-When distributing apps in the Mac App Store, or when using the "Sandboxed DMG" bundle type, your app is run inside a sandboxed environment, meaning that it doesn't have access to the outside world. it's provided its own "sandboxed" container for file system access, and it doesn't get any network access. If your app requires access to the "outside world", you need to request entitlements for that access. If you select a bundle type that uses the sandbox, you you will be shown a list of all of the available entitlements from which you can "check" the ones that you wish to include.
+When distributing apps in the Mac App Store, or when using the "Sandboxed DMG" bundle type, your app is run inside a sandboxed environment, meaning that it doesn't have access to the outside world. It's provided its own "sandboxed" container for file system access, and it doesn't get any network access. If your app requires access to the "outside world", you need to request entitlements for that access. If you select a bundle type that uses the sandbox, you will be shown a list of all of the available entitlements from which you can "check" the ones that you wish to include.
 
 .App sandbox entitlements
 image::img/mac-desktop-entitlements.png[App sandbox entitlements,scaledwidth=30%]
