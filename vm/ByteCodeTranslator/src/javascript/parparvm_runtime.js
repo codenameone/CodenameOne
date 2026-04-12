@@ -743,18 +743,23 @@ const jvm = {
         receiver[bridge.member] = nativeArgs.length ? nativeArgs[0] : null;
         result = null;
       } else {
-        const fn = receiver[bridge.member];
-        if (typeof fn === "function") {
-          result = fn.apply(receiver, nativeArgs);
-        } else if (bridge.member === "get" && nativeArgs.length === 1 && receiver && typeof receiver.length === "number") {
+        // For array-like objects, prefer indexed get/set over native methods
+        // because TypedArray.prototype.set(array, offset) has different
+        // semantics than the JSO per-element set(index, value).
+        if (bridge.member === "get" && nativeArgs.length === 1 && receiver && typeof receiver.length === "number") {
           result = receiver[nativeArgs[0] | 0];
         } else if (bridge.member === "set" && nativeArgs.length === 2 && receiver && typeof receiver.length === "number") {
           receiver[nativeArgs[0] | 0] = nativeArgs[1];
           result = null;
-        } else if (!nativeArgs.length && Object.prototype.hasOwnProperty.call(receiver, bridge.member)) {
-          result = receiver[bridge.member];
         } else {
-          throw new Error("Missing JS member " + bridge.member + " for " + methodId);
+          const fn = receiver[bridge.member];
+          if (typeof fn === "function") {
+            result = fn.apply(receiver, nativeArgs);
+          } else if (!nativeArgs.length && Object.prototype.hasOwnProperty.call(receiver, bridge.member)) {
+            result = receiver[bridge.member];
+          } else {
+            throw new Error("Missing JS member " + bridge.member + " for " + methodId);
+          }
         }
       }
       return self.wrapJsResult(result, bridge.returnClass);

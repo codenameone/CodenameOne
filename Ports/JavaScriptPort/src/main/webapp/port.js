@@ -991,6 +991,36 @@ bindNative([
   return jvm.wrapJsObject(new global.Uint8Array(jvm.unwrapJsValue(buffer), offset | 0, length | 0), "com_codename1_html5_js_typedarrays_Uint8Array");
 });
 
+// Uint8ClampedArray factory methods – needed by createImageData() in
+// HTML5Implementation which converts ARGB int[] pixels into canvas ImageData.
+bindNative([
+  "cn1_com_codename1_html5_js_typedarrays_Uint8ClampedArray_create_int_R_com_codename1_html5_js_typedarrays_Uint8ClampedArray",
+  "cn1_com_codename1_html5_js_typedarrays_Uint8ClampedArray_create___int_R_com_codename1_html5_js_typedarrays_Uint8ClampedArray"
+], function*(size) {
+  return jvm.wrapJsObject(new global.Uint8ClampedArray(size | 0), "com_codename1_html5_js_typedarrays_Uint8ClampedArray");
+});
+
+bindNative([
+  "cn1_com_codename1_html5_js_typedarrays_Uint8ClampedArray_create_com_codename1_html5_js_typedarrays_ArrayBuffer_R_com_codename1_html5_js_typedarrays_Uint8ClampedArray",
+  "cn1_com_codename1_html5_js_typedarrays_Uint8ClampedArray_create___com_codename1_html5_js_typedarrays_ArrayBuffer_R_com_codename1_html5_js_typedarrays_Uint8ClampedArray"
+], function*(buffer) {
+  return jvm.wrapJsObject(new global.Uint8ClampedArray(jvm.unwrapJsValue(buffer)), "com_codename1_html5_js_typedarrays_Uint8ClampedArray");
+});
+
+bindNative([
+  "cn1_com_codename1_html5_js_typedarrays_Uint8ClampedArray_create_com_codename1_html5_js_typedarrays_ArrayBuffer_int_R_com_codename1_html5_js_typedarrays_Uint8ClampedArray",
+  "cn1_com_codename1_html5_js_typedarrays_Uint8ClampedArray_create___com_codename1_html5_js_typedarrays_ArrayBuffer_int_R_com_codename1_html5_js_typedarrays_Uint8ClampedArray"
+], function*(buffer, offset) {
+  return jvm.wrapJsObject(new global.Uint8ClampedArray(jvm.unwrapJsValue(buffer), offset | 0), "com_codename1_html5_js_typedarrays_Uint8ClampedArray");
+});
+
+bindNative([
+  "cn1_com_codename1_html5_js_typedarrays_Uint8ClampedArray_create_com_codename1_html5_js_typedarrays_ArrayBuffer_int_int_R_com_codename1_html5_js_typedarrays_Uint8ClampedArray",
+  "cn1_com_codename1_html5_js_typedarrays_Uint8ClampedArray_create___com_codename1_html5_js_typedarrays_ArrayBuffer_int_int_R_com_codename1_html5_js_typedarrays_Uint8ClampedArray"
+], function*(buffer, offset, length) {
+  return jvm.wrapJsObject(new global.Uint8ClampedArray(jvm.unwrapJsValue(buffer), offset | 0, length | 0), "com_codename1_html5_js_typedarrays_Uint8ClampedArray");
+});
+
 bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_createCNOutboxEvent_java_lang_String_int_R_com_codename1_html5_js_dom_Event",
   "cn1_com_codename1_impl_html5_HTML5Implementation_createCNOutboxEvent___java_lang_String_int_R_com_codename1_html5_js_dom_Event"
