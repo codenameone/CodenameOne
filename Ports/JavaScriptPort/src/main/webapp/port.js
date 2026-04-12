@@ -384,6 +384,14 @@ function emitDiagLine(line) {
   if (global.console && typeof global.console.log === "function") {
     global.console.log(line);
   }
+  // Forward to main thread so Playwright (page.on('console')) can capture
+  // CN1SS output from the worker.  Worker console.log is not always
+  // observable from the page context.
+  if (typeof global.postMessage === "function") {
+    try {
+      global.postMessage({ type: "log", message: String(line) });
+    } catch (_ignored) { /* non-critical */ }
+  }
 }
 
 const cn1ssBootstrapChunkBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO5WZ8kAAAAASUVORK5CYII=";

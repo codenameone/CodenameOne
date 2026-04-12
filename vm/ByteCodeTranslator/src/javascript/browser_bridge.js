@@ -816,6 +816,12 @@
       if (String(data.message).indexOf('CN1SS:INFO:suite starting test=') >= 0) {
         diag('SCREENSHOT_START', 'source', 'vm_log');
       }
+      // Detect app lifecycle start from worker-side log messages so the
+      // main-thread cn1Started flag is set even when @JSBody runs in the
+      // worker where window === self.
+      if (!global.cn1Started && String(data.message).indexOf('CN1JS:') >= 0 && String(data.message).indexOf('.runApp') >= 0) {
+        global.cn1Started = true;
+      }
     }
   }
 

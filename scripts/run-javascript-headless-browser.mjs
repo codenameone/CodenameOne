@@ -23,6 +23,8 @@ if (!url) {
   process.exit(2);
 }
 
+let suiteFinished = false;
+
 function append(line) {
   const text = `[playwright] ${line}\n`;
   if (logFile) {
@@ -46,7 +48,13 @@ try {
     viewport: { width: 1280, height: 900 }
   });
 
-  page.on('console', msg => append(`console:${msg.type()}:${msg.text()}`));
+  page.on('console', msg => {
+    const text = msg.text();
+    append(`console:${msg.type()}:${text}`);
+    if (text.indexOf('CN1SS:SUITE:FINISHED') >= 0) {
+      suiteFinished = true;
+    }
+  });
   page.on('pageerror', err => append(`pageerror:${String(err)}`));
   page.on('requestfailed', req => append(`requestfailed:${req.url()} ${req.failure()?.errorText || ''}`));
   page.on('response', resp => {
@@ -67,7 +75,7 @@ try {
       error: window.__parparError ? JSON.stringify(window.__parparError) : ''
     }));
     append(`state:${JSON.stringify(state)}`);
-    if (state.error) {
+    if (state.error || suiteFinished) {
       break;
     }
     await page.waitForTimeout(1000);
