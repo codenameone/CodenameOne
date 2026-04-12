@@ -373,7 +373,6 @@ you need a fallback path.
 | JavaScript
 | Yes
 
-| Yes
 |===
 
 
