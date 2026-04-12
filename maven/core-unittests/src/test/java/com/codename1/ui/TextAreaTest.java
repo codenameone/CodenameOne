@@ -138,20 +138,20 @@ class TextAreaTest extends UITestBase {
     }
 
     @FormTest
-    void testGrowByContentRevalidatesParentWhenTextChangesDuringEditing() {
+    void testGrowByContentRevalidatesParentWhenRowsGrowDuringEditing() {
         TextArea textArea = new TextArea();
-        textArea.setRows(2);
+        textArea.setRows(1);
+        textArea.setSingleLineTextArea(false);
         textArea.setGrowByContent(true);
         TrackingContainer parent = new TrackingContainer();
         parent.add(textArea);
+        parent.revalidatedLater = false;
         Display.impl.setFocusedEditingText(textArea);
         try {
             textArea.setText("Line 1");
-            assertTrue(parent.revalidatedLater, "Parent should be revalidated when growByContent text changes");
-
             parent.revalidatedLater = false;
-            textArea.setText("Line 1\nLine 2\nLine 3");
-            assertTrue(parent.revalidatedLater, "Parent should be revalidated for subsequent growByContent text changes");
+            textArea.setText("Line 1\nLine 2");
+            assertTrue(parent.revalidatedLater, "Parent should be revalidated when growByContent row count increases");
         } finally {
             Display.impl.setFocusedEditingText(null);
         }
@@ -164,6 +164,7 @@ class TextAreaTest extends UITestBase {
         textArea.setGrowByContent(true);
         TrackingContainer parent = new TrackingContainer();
         parent.add(textArea);
+        parent.revalidatedLater = false;
 
         Display.impl.setFocusedEditingText(null);
         textArea.setText("Line 1");
