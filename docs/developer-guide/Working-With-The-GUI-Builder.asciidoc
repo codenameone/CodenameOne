@@ -55,8 +55,8 @@ The content of the `.gui` file might also be important if the GUI builder sudden
 
 
 
-IMPORTANT: This section refers to the "old" GUI builder. Codename One is in the process of replacing the GUI builder with a new version that uses a radically different architecture. Recommend migrating to the new GUI builder and don't recommend starting new projects with this tool. +
-you're leaving this section for reference at this time
+IMPORTANT: This section refers to the "old" GUI builder. Codename One is in the process of replacing the GUI builder with a new version that uses a radically different architecture. We recommend migrating to the new GUI builder and do not recommend starting new projects with this tool. +
+We are leaving this section for reference at this time.
 
 === Basic Concepts
 
