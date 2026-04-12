@@ -236,6 +236,22 @@ What Was Fixed In This Pass
      - All CN1SS chunk data reaches Playwright, enabling screenshot extraction.
      - Playwright exits promptly after suite completion, saving CI time.
 
+18. Fixed screenshot hang caused by canvasToBlob async callback across worker boundary.
+    - File: `Ports/JavaScriptPort/src/main/webapp/port.js`
+    - Root cause:
+      - The translated screenshot method calls `ImageIO.save()` which calls
+        `BlobUtil.canvasToBlob()`.  That method uses the async
+        `HTMLCanvasElement.toBlob(BlobCallback)` browser API.  In the worker
+        architecture the BlobCallback is a Java object that cannot be invoked
+        from the host thread, so `canvasToBlob()` hangs forever in
+        `while (!complete) { lock.wait(200); }`.
+    - Fix:
+      - `emitCurrentFormScreenshotDom` now always uses the DOM-based host
+        bridge capture path (`__cn1_capture_canvas_png__`) instead of the
+        translated screenshot method.  This avoids async callbacks entirely.
+    - Also added `Uint8ClampedArray` to the JSO `inferFn` for proper type
+      recognition when wrapping typed arrays received from the host.
+
 Known Failing Symptoms (Latest CI Logs/Artifacts)
 -------------------------------------------------
 

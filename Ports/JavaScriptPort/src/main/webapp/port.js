@@ -26,6 +26,9 @@
     if (typeof global.ArrayBuffer !== "undefined" && value instanceof global.ArrayBuffer) {
       return "com_codename1_html5_js_typedarrays_ArrayBuffer";
     }
+    if (typeof global.Uint8ClampedArray !== "undefined" && value instanceof global.Uint8ClampedArray) {
+      return "com_codename1_html5_js_typedarrays_Uint8ClampedArray";
+    }
     if (typeof global.Uint8Array !== "undefined" && value instanceof global.Uint8Array) {
       return "com_codename1_html5_js_typedarrays_Uint8Array";
     }
@@ -3227,31 +3230,16 @@ bindCiFallback("Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshotDom", [
     cn1ssEmitCurrentFormScreenshotMethodId + "__impl",
     cn1ssEmitCurrentFormScreenshotMethodId
   ], cn1ssHelperClassName, fallbackSymbol);
+  // In worker mode the translated screenshot path eventually calls
+  // BlobUtil.canvasToBlob() which uses HTMLCanvasElement.toBlob(callback).
+  // That callback is a Java object and cannot be invoked from the host
+  // thread, so the worker hangs forever in a wait-loop.  Always use the
+  // DOM-based capture via host bridge calls instead – this avoids async
+  // callbacks entirely and works reliably across the worker boundary.
   if (originalResolved && typeof originalResolved.fn === "function") {
-    if (cn1ssEmitCurrentFormScreenshotInvokeDepth > 0) {
-      emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:originalReentryBypass=1");
-      shouldUseDomFallback = true;
-    } else {
-      try {
-        cn1ssEmitCurrentFormScreenshotInvokeDepth++;
-        emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:originalResolved=" + originalResolved.source);
-        yield* originalResolved.fn(testName, completion);
-        return null;
-      } catch (originalErr) {
-        emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:originalInvokeErr="
-          + String(originalErr && originalErr.message ? originalErr.message : originalErr));
-        if (originalErr && originalErr.stack) {
-          emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:originalInvokeStack="
-            + String(originalErr.stack).split("\n").slice(0, 2).join(" | "));
-        }
-        shouldUseDomFallback = true;
-      } finally {
-        cn1ssEmitCurrentFormScreenshotInvokeDepth = Math.max(0, cn1ssEmitCurrentFormScreenshotInvokeDepth - 1);
-      }
-    }
+    emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:skipTranslated=canvasToBlob_hang");
   } else {
     emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:originalMissing=1");
-    shouldUseDomFallback = true;
   }
   const canvas = global.document && typeof global.document.querySelector === "function"
     ? global.document.querySelector("canvas")
