@@ -15,7 +15,7 @@ TIP: All events are fired on the Event Dispatch Thread, the `EventDispatcher` ma
 
 Since all events fire on the EDT some complexities occur. E.g.:
 
-you've two listeners monitoring the same event (or related events e.g. pointer event and button click event both of which will fire when the button is touched).
+you have two listeners monitoring the same event (or related events e.g. pointer event and button click event both of which will fire when the button is touched).
 
 When the event occurs you can run into a scenario like this:
 
