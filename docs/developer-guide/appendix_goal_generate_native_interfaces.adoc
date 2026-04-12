@@ -1,6 +1,6 @@
 === Generate Native Interfaces (`generate-native-interfaces`)
 
-Generates stub implementations for all native interfaces defined in the project.  This won't overwrite any existing implemetations that may exist.
+Generates stub implementations for all native interfaces defined in the project. This won't overwrite any existing implemetations that may exist.
 
 You should run this goal explicitly after you create a native interface in your class.
 
@@ -8,9 +8,9 @@ See the Codename One Developer guide section on https://www.codenameone.com/deve
 
 ==== Usage Example
 
-Suppose we have created a native interface as the Java interface `com.mycompany.myapp.MyNative`, as described in the example in https://www.codenameone.com/developer-guide.html#_native_interfaces[native interfaces].
+Suppose you've created a native interface as the Java interface `com.mycompany.myapp.MyNative`, as described in the example in https://www.codenameone.com/developer-guide.html#_native_interfaces[native interfaces].
 
-After creating this (and possibly other) native interfaces in our project,  run the `generate-native-interfaces` Maven goal as follows:
+After creating this (and possibly other) native interfaces in our project, run the `generate-native-interfaces` Maven goal as follows:
 
 [source, bash]
 ----
@@ -28,8 +28,8 @@ mvn cn1:generate-native-interfaces \
 
 This will generate the following files (if they don't exist yet).
 
-javase::
-`javase/src/main/java/com/mycompany/myapp/MyNativeImpl.java`
+Java SE::
+`Java SE/src/main/java/com/mycompany/myapp/MyNativeImpl.java`
 ios::
 . `ios/src/main/objectivec/com_mycompany_myapp_MyNativeImpl.h`
 . `ios/src/main/objectivec/com_mycompany_myapp_MyNativeImpl.m`

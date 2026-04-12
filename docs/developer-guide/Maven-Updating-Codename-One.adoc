@@ -1,6 +1,6 @@
 [#updating]
 == Updating Codename One
-Codename One releases new versions weekly on Maven central.  It is recommended that you stay up to date with the latest version as much as possible to ensure compatibility with the Codename One build server, which is always running the latest version.
+Codename One releases new versions weekly on Maven central. it's recommended that you stay up to date with the latest version as much as possible to ensure compatibility with the Codename One build server, which is always running the latest version.
 
 You can use the <<update-goal, update goal>> to update both the Codename One libraries, and the Codename One dependencies in your project.
 
@@ -56,5 +56,5 @@ E.g. Open the `pom.xml` file, and look for the following:
 
 Change these values to reflect the latest version of the `codenameone-maven-plugin` found https://search.maven.org/artifact/com.codenameone/codenameone-maven-plugin[here].
 
-NOTE: Updating the `cn1.plugin.version` and `cn1.version` properties manually will update the Maven dependencies for your project but it won't update the other Codename One tools such as the GUI builder, and the Build Server Client, which are managed outside of Maven.  You should use the <<update-goal>> as described at the beginning of <<updating, this section>> to perform a "full" update.
+NOTE: Updating the `cn1.plugin.version` and `cn1.version` properties manually will update the Maven dependencies for your project but it won't update the other Codename One tools such as the GUI builder, and the Build Server Client, which are managed outside of Maven. You should use the <<update-goal>> as described at the beginning of <<updating, this section>> to perform a "full" update.
 

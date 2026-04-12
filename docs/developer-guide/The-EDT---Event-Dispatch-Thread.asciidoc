@@ -3,9 +3,9 @@
 [[edt-section]]
 === What Is The EDT
 
-Codename One allows developers to create as many threads as they want; however in order to interact with the Codename One user interface components a developer must use the EDT. The EDT stands for "Event Dispatch Thread" but it handles a lot more than just "events".
+Codename One allows developers to create as many threads as they want; however in order to interact with the Codename One user interface components a developer must use the EDT. The EDT stands for "Event Dispatch Thread" but it handles a lot more than "events".
 
-The EDT is the main thread of Codename One, by using just one thread Codename One can avoid complex synchronization code and focus on simple functionality that assumes only one thread.
+The EDT is the main thread of Codename One, by using one thread Codename One can avoid complex synchronization code and focus on simple functionality that assumes one thread.
 
 TIP: This has huge advantages for your code. You can normally assume that all code will occur on a single thread and avoid complex synchronization logic.
 
@@ -42,7 +42,7 @@ Codename One includes helper methods in the https://www.codenameone.com/javadoc/
 
 `callSerially(Runnable)` should normally be called off the EDT (in a separate thread), the run method within the submitted runnable will be invoked on the EDT.
 
-IMPORTANT: The Runnable passed to the `callSerially` and `callSeriallyAndWait` methods is not a `Thread`. We just use the `Runnable` interface as a convenient callback interface.
+IMPORTANT: The Runnable passed to the `callSerially` and `callSeriallyAndWait` methods isn't a `Thread`. use the `Runnable` interface as a convenient callback interface.
 
 [source,java]
 ----
@@ -85,13 +85,13 @@ if(!globalFlag) {
 otherMethod();
 ----
 
-TIP: If you are unsure use `callSerially`. The use cases for `callSeriallyAndWait` are very rare. When you do need to wait, the overload that accepts a timeout lets background threads marshal results back to the EDT without risking an indefinite stall if the EDT is busy.
+TIP: If you're unsure use `callSerially`. The use cases for `callSeriallyAndWait` are rare. When you do need to wait, the overload that accepts a timeout lets background threads marshal results back to the EDT without risking an indefinite stall if the EDT is busy.
 
-If the work you are posting back to the EDT is expensive and can wait until the UI finishes its current pass, use `callSeriallyOnIdle()`. This queues the runnable for execution only after the EDT completes painting, animations, and any other queued tasks. Deferring longer tasks to the idle queue helps avoid starving animations and transitions when bursts of background callbacks arrive together.
+If the work you're posting back to the EDT is expensive and can wait until the UI finishes its current pass, use `callSeriallyOnIdle()`. This queues the runnable for execution after the EDT completes painting, animations, and any other queued tasks. Deferring longer tasks to the idle queue helps avoid starving animations and transitions when bursts of background callbacks arrive together.
 
 ==== callSerially On The EDT
 
-One of the misunderstood topics is why would we ever want to invoke `callSerially` when we are still on the EDT. This is best explained by example. Say we have a button that has quite a bit of functionality tied to its events e.g.:
+One of the misunderstood topics is why would we ever want to invoke `callSerially` when you're still on the EDT. This is best explained by example. Say you've a button that has quite a bit of functionality tied to its events e.g.:
 
 1. A user added an action listener to show a Dialog.
 
@@ -101,10 +101,10 @@ One of the misunderstood topics is why would we ever want to invoke `callSeriall
 
 However, this might cause a problem if the first event that we handle (the dialog) might cause an issue to the
 following events. E.g. a dialog will block the EDT (using `invokeAndBlock`), events will keep happening but since
-the event we are in "already happened" the button repaint and the framework logging won't occur. This might
+the event you're in "already happened" the button repaint and the framework logging won't occur. This might
 also happen if we show a form which might trigger logic that relies on the current form still being present.
 
-One of the solutions to this problem is to just wrap the action listeners body with a `callSerially`. In this case the `callSerially`
+One of the solutions to this problem is to wrap the action listeners body with a `callSerially`. In this case the `callSerially`
 will postpone the event to the next cycle (loop) of the EDT and let the other events in the chain complete. Notice
 that you shouldn't use this normally since it includes an overhead and complicates application flow, however when
 you run into issues in event processing we suggest trying this to see if its the cause.
@@ -123,14 +123,14 @@ There are two types of EDT violations:
 
 Codename One provides a tool to help you detect some of these violations some caveats may apply though…
 
-It’s an imperfect tool. It might fire "false positives" meaning it might detect a violation for perfectly legal code and it might miss some illegal calls. However, it is a valuable tool in the process of detecting hard to track bugs that are sometimes only reproducible on the devices (due to race condition behavior).
+It’s an imperfect tool. It might fire "false positives" meaning it might detect a violation for perfectly legal code and it might miss some illegal calls. However, it's a valuable tool in the process of detecting hard to track bugs that are sometimes reproducible on the devices (due to race condition behavior).
 
-To activate this tool just select the Debug EDT menu option in the simulator and pick the level of output you wish to receive:
+To activate this tool select the Debug EDT menu option in the simulator and pick the level of output you wish to receive:
 
 .Debug EDT
 image::img/debug-edt.png[Debug EDT,scaledwidth=40%]
 
-Full output will include stack traces to the area in the code that is suspected in the violation.
+Full output will include stack traces to the area in the code that's suspected in the violation.
 
 [[invoke-And-Block-section]]
 === Invoke And Block
@@ -147,7 +147,7 @@ doOperationB();
 doOperationC();
 ----
 
-This works well normally but on the EDT it might be a problem, if one of the operations is slow it might slow the whole EDT (painting, event processing etc.).  Normally we can just move operations into a separate thread e.g.:
+This works well normally but on the EDT it might be a problem, if one of the operations is slow it might slow the whole EDT (painting, event processing etc.). Normally you can move operations into a separate thread e.g.:
 [source,java]
 
 ----
@@ -170,7 +170,7 @@ readAndParseFile();
 updateUIWithContentOfFile();
 ----
 
-Notice that the first and last operations must be conducted on the EDT but the middle operation might be really slow!
+Notice that the first and last operations must be conducted on the EDT but the middle operation might be slow!
 Since `updateUIWithContentOfFile` needs `readAndParseFile` to occur before it starts doing the new thread won't be enough.
 
 A simplistic approach is to do something like this:
@@ -203,7 +203,7 @@ new Thread() {
 }).start();
 ----
 
-This is perfectly legal and would work reasonably well, however it gets complicated as we add more and more features that need to be chained serially after all these are just 3 methods!
+This is perfectly legal and would work reasonably well, however it gets complicated as we add more and more features that need to be chained serially after all these are 3 methods!
 
 Invoke and block solves this in a unique way you can get almost the exact same behavior by using this:
 
@@ -232,9 +232,9 @@ Invoke and block effectively blocks the current EDT in a legal way. It spawns a 
 All events and EDT behavior still work while `invokeAndBlock` is running, this is because `invokeAndBlock()` keeps calling the main thread loop internally.
 
 IMPORTANT: Notice that `invokeAndBlock` comes at a slight performance penalty. Also notice that nesting `invokeAndBlock` calls (or over using them) isn't recommended. +
-However, they are very convenient when working with multiple threads/UI.
+However, they are convenient when working with multiple threads/UI.
 
-Even if you never call `invokeAndBlock` directly you are probably using it indirectly in API's such as https://www.codenameone.com/javadoc/com/codename1/ui/Dialog.html[Dialog] that show a dialog while blocking the current thread e.g.:
+Even if you never call `invokeAndBlock` directly you're probably using it indirectly in API's such as https://www.codenameone.com/javadoc/com/codename1/ui/Dialog.html[Dialog] that show a dialog while blocking the current thread e.g.:
 
 [source,java]
 ----
@@ -250,7 +250,7 @@ Notice that the dialog show method will block the calling thread until the user 
 
 NOTE: Other API's such as `NetworkManager.addToQueueAndWait()` also make use of this feature. Pretty much every "AndWait" method or blocking method uses this API internally!
 
-To explain how invokeAndBlock works we can return to the sample above of how the EDT works:
+To explain how invokeAndBlock works you can return to the sample above of how the EDT works:
 
 [source,java]
 ----
@@ -279,6 +279,6 @@ void invokeAndBlock(Runnable r) {
 
 So the EDT is effectively "blocked" but we "redo it" within the `invokeAndBlock` method...
 
-As you can see this is a very simple approach for thread programming in UI, you don't need to block your flow and
-track the UI thread. You can just program in a way that seems sequential (top to bottom) but really uses multi-threading
+As you can see this is a simple approach for thread programming in UI, you don't need to block your flow and
+track the UI thread. You can program in a way that seems sequential (top to bottom) but uses multi-threading
 correctly without blocking the EDT.

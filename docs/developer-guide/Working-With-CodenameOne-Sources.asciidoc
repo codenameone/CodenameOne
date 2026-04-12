@@ -14,7 +14,7 @@ your development machine includes the following tooling (see
 * JDK 8 (required for the core build and Maven invocations)
 * JDK 17 (required when compiling the Android port)
 * Apache Maven 3.6 or newer
-* macOS with Xcode (only if you plan to build or test the iOS port)
+* macOS with Xcode (if you plan to build or test the iOS port)
 
 === Preparing the Maven workspace
 
@@ -95,9 +95,9 @@ Building the SDK yourself gives you:
 
 * Immediate access to fixes and features before they reach Maven Central.
 * The ability to inspect, debug, and modify the framework when you need custom
-  behavior.
+ behavior.
 * A path to contribute improvements back to the Codename One core.
 
-Once you are comfortable with the baseline build, continue with the scripts in
+Once you're comfortable with the baseline build, continue with the scripts in
 `scripts/` or the `BUILDING.md` guide to compile specific ports (Android or
 iOS) or to automate CI workflows.

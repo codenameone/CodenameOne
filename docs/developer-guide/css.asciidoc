@@ -1,8 +1,8 @@
 == CSS
 
-In this chapter we'll discuss theming with CSS in Codename One.
+In this chapter you will discuss theming with CSS in Codename One.
 
-.CSS Changes Don't Require a Recompile
+.CSS Changes don't Require a Recompile
 TIP: You can change the CSS values while the simulator is running and the changes will reflect in the simulator within a few seconds
 
 === Activating CSS
@@ -38,7 +38,7 @@ The following are a few possible selectors you can include in your stylesheet.
 . `Button.pressed` -- Defines styles for the "Button" UIID's "pressed" state.
 . `Button, TextField, Form` -- Defines styles for the "Button", "TextField", and "Form" UIIDs.
 
-The following example creates a simple button with a border, and text aligned center.  By default the button will have a transparent background, but when it is pressed, it will have a gray background:
+The following example creates a simple button with a border, and text aligned center. By default the button will have a transparent background, but when it's pressed, it will have a gray background:
 
 [source,css]
 ----
@@ -69,7 +69,7 @@ MyButton {
 
 ==== `#Device`
 
-The `#Device` selector allows you to define which device resolutions this CSS file should target.  Mutli-images generated from this style-sheet will only be include variants for device resolutions in the range `(min-resolution, max-resolution)` as defined in this section.  By default all resolutions are generated.
+The `#Device` selector allows you to define which device resolutions this CSS file should target. Mutli-images generated from this style-sheet will be include variants for device resolutions in the range `(min-resolution, max-resolution)` as defined in this section. By default all resolutions are generated.
 
 [source,css]
 ----
@@ -161,11 +161,11 @@ In the above example, the constants referring to an image name as a string requi
 
 ==== `Default`
 
-The `Default` selector is special in that it will set properties on the theme's "default" element.  The default element is a special UIID in Codename One from which all other UIIDs in the same theme are derived.  This is a good place to set things like default fonts or background-colors.
+The `Default` selector is special in that it will set properties on the theme's "default" element. The default element is a special UIID in Codename One from which all other UIIDs in the same theme are derived. This is a good place to set things like default fonts or background-colors.
 
 === Standard CSS Properties
 
-* `padding`  (and variants)
+* `padding` (and variants)
 * `margin` (and variants)
 * `border` (and variants)
 * `border-radius`
@@ -185,13 +185,13 @@ The `Default` selector is special in that it will set properties on the theme's 
 * `text-decoration`(Usage <<text-decoration, below>>)
 * `opacity`
 * `box-shadow`
-* `width`  (only used for generating background-images and borders)
-* `height` (only used for generating background-images and borders)
+* `width` ( used for generating background-images and borders)
+* `height` ( used for generating background-images and borders)
 
 === Custom Properties
 
 `cn1-source-dpi`::
-Used to specify source DPI for multi-image generation of background images.  Accepted values: `0` (Not multi-image),  `120` (Low res), `160` (Medium Res), `320` (Very High Res), `480` (HD), Higher than `480` (2HD).  If not specified, the default value will be the value of the `defaultSourceDPIInt` theme constant, if specified, or `480`, if not specified.
+Used to specify source DPI for multi-image generation of background images. Accepted values: `0` (Not multi-image), `120` (Low res), `160` (Medium Res), `320` (Very High Res), `480` (HD), Higher than `480` (2HD). If not specified, the default value will be the value of the `defaultSourceDPIInt` theme constant, if specified, or `480`, if not specified.
 `cn1-background-type`::
 Used to explicitly specify the background-type that should be used for the class.
 `cn1-9patch`::
@@ -201,16 +201,16 @@ Used to specify that this UIID should derive from an existing UIID.
 
 === CSS Variables
 
-As of CodenameOne 7.0, you can use variables in your CSS file via the `var()` CSS function.  E.g.
+As of CodenameOne 7.0, you can use variables in your CSS file via the `var()` CSS function. E.g.
 
 [source,css]
 ----
 var(--header-color, blue);
 ----
 
-The `var()` function can only be used inside property values.  I.e. You cannot use it in property names or selectors.
+The `var()` function can be used inside property values. I.e. You can't use it in property names or selectors.
 
-**Syntax**:  
+**Syntax**:
 
 [source,css]
 ----
@@ -219,7 +219,7 @@ var(<custom-property-name>, <declaration-value>?)
 
 The `<custom-property-name>` must begin with two dashes (`--`).
 
-The `<declaration-value>` is the fallback value that will be used if the variable hasn't been defined in the CSS file.  The fallback value may include commas.
+The `<declaration-value>` is the fallback value that will be used if the variable hasn't been defined in the CSS file. The fallback value may include commas.
 
 **Examples**
 
@@ -285,11 +285,11 @@ For other CSS font settings see link:Fonts[the Fonts section]
 [[border]]
 ==== border
 
-This library supports the https://developer.mozilla.org/en-US/docs/Web/CSS/border[border property] and most of its variants (e.g. https://developer.mozilla.org/en-US/docs/Web/CSS/border-width[border-width], https://developer.mozilla.org/en-US/docs/Web/CSS/border-style[border-style], and https://developer.mozilla.org/en-US/docs/Web/CSS/border-color[border-color].  It will try to use native Codename One styles for generating borders if possible.  If the border definition is too complex, it will fall-back to generating a 9-piece image border at compile-time.  This has the effect of making the resulting resource file larger, but will produce good runtime performance, and a look that is faithful to the provided CSS.
+This library supports the https://developer.mozilla.org/en-US/docs/Web/CSS/border[border property] and most of its variants (e.g. https://developer.mozilla.org/en-US/docs/Web/CSS/border-width[border-width], https://developer.mozilla.org/en-US/docs/Web/CSS/border-style[border-style], and https://developer.mozilla.org/en-US/docs/Web/CSS/border-color[border-color]. It will try to use native Codename One styles for generating borders if possible. If the border definition is too complex, it will fall-back to generating a 9-piece image border at compile-time. This has the effect of making the resulting resource file larger, but will produce good runtime performance, and a look that's faithful to the provided CSS.
 
 The algorithm used to determine whether to use a native border or to generate a 9-piece image, is complex, but the following guidelines may help you if you wish to design borders that can be rendered natively in CN1:
 
-* Non-pixel units `border-width`.  (Except with the `cn1-round-border` and `cn1-pill-border` styles)
+* Non-pixel units `border-width`. (Except with the `cn1-round-border` and `cn1-pill-border` styles)
 * Using the `border-radius` directive.
 * Using `box-shadow` (Except when using `cn1-round-border` or `cn1-pill-border` styles)
 * Using a background gradient in combination with a border or any kind
@@ -302,11 +302,11 @@ Generating the image triggers slower CSS compilation and a larger binary so we g
 
 ===== Round Borders
 
-Rounded borders can be achieved in a few different ways.  The easiest methods are:
+Rounded borders can be achieved in a few different ways. The easiest methods are:
 
-* **The `cn1-round-border` style**.  This will render a circular round border in the background **natively**.  I.e. this doesn't require generation of an image border
-* **The `cn1-pill-border` style**.  This will render a pill-shaped border in the background natively.  This also doesn't require generation of an image border
-* **The `border-radius` property**.  This will round the corners of the border.  If the style can be achieved using the `RoundRectBorder` in CodenameOne, then it will use that border.  If not, this will cause the style to be generated as an image border
+* **The `cn1-round-border` style**. This will render a circular round border in the background **natively**. I.e. this doesn't require generation of an image border
+* **The `cn1-pill-border` style**. This will render a pill-shaped border in the background natively. This also doesn't require generation of an image border
+* **The `border-radius` property**. This will round the corners of the border. If the style can be achieved using the `RoundRectBorder` in CodenameOne, then it will use that border. If not, this will cause the style to be generated as an image border
 
 **Examples using `cn1-round-border`**
 
@@ -355,16 +355,16 @@ RoundRectLabel {
 }
 ----
 
-`cn1-pill-border` and `cn1-round-border` don't support the standard CSS `box-shadow` property.  This is because the `box-shadow` property parameters don't map nicely onto the shadow parameters for the Codename One `RoundBorder` class.  To get shadows on the `cn1-pill-border`, you should use one or more of the following CSS properties:
+`cn1-pill-border` and `cn1-round-border` don't support the standard CSS `box-shadow` property. This is because the `box-shadow` property parameters don't map nicely onto the shadow parameters for the Codename One `RoundBorder` class. To get shadows on the `cn1-pill-border`, you should use one or more of the following CSS properties:
 
-* `cn1-box-shadow-spread` -- Accepts values in any scalar unit (e.g. px, mm, cm, etc...).  This maps directly to the border's https://www.codenameone.com/javadoc/com/codename1/ui/plaf/RoundBorder.html#shadowSpread-int-boolean-[shadowSpread] property.
-* `cn1-box-shadow-h` -- Accepts values in real values or integers (not a scalar unit).  This maps directly to the border's https://www.codenameone.com/javadoc/com/codename1/ui/plaf/RoundBorder.html#shadowX-float-[shadowX] property.
-* `cn1-box-shadow-v` -- Accepts values in real values or integers (not a scalar unit).  This maps directly to the border's https://www.codenameone.com/javadoc/com/codename1/ui/plaf/RoundBorder.html#shadowY-float-[shadowY] property.
-* `cn1-box-shadow-blur` -- Scalar value.  Maps to the border's https://www.codenameone.com/javadoc/com/codename1/ui/plaf/RoundBorder.html#shadowBlur-float-[shadowBlur] property.
+* `cn1-box-shadow-spread` -- Accepts values in any scalar unit (e.g. px, mm, cm, etc...). This maps directly to the border's https://www.codenameone.com/javadoc/com/codename1/ui/plaf/RoundBorder.html#shadowSpread-int-boolean-[shadowSpread] property.
+* `cn1-box-shadow-h` -- Accepts values in real values or integers (not a scalar unit). This maps directly to the border's https://www.codenameone.com/javadoc/com/codename1/ui/plaf/RoundBorder.html#shadowX-float-[shadowX] property.
+* `cn1-box-shadow-v` -- Accepts values in real values or integers (not a scalar unit). This maps directly to the border's https://www.codenameone.com/javadoc/com/codename1/ui/plaf/RoundBorder.html#shadowY-float-[shadowY] property.
+* `cn1-box-shadow-blur` -- Scalar value. Maps to the border's https://www.codenameone.com/javadoc/com/codename1/ui/plaf/RoundBorder.html#shadowBlur-float-[shadowBlur] property.
 * `cn1-box-shadow-color` -- The shadow color
 * `cn1-box-shadow-inset` -- Set to `inset` to render an inner shadow instead of the default outer shadow spread.
 
-Currently using the regular CSS `box-shadow` in conjunction with `border-radius` will cause a 9-piece border to be generated rather than mapping to the `RoundRectBorder`.  If, however, you use the `cn1-box-*` properties for the shadow instead, it will use the RoundRectBorder -- assuming that no other styles are specified that trigger an image border to be generated.
+Currently using the regular CSS `box-shadow` in conjunction with `border-radius` will cause a 9-piece border to be generated rather than mapping to the `RoundRectBorder`. If, however, you use the `cn1-box-*` properties for the shadow instead, it will use the RoundRectBorder -- assuming that no other styles are specified that trigger an image border to be generated.
 
 Codename One also exposes per-corner elliptical radius controls that map to the `RoundBorder`'s X/Y radii. You can set them directly with `cn1-border-top-left-radius-x` / `cn1-border-top-left-radius-y` (and the equivalent `top-right`, `bottom-left`, and `bottom-right` pairs) to fine tune horizontal and vertical curvature independently. The CSS parser automatically populates these properties when you use standard `border-radius` syntax, including the longhand declarations and the `border-radius: <x-radii> / <y-radii>` shorthand.
 
@@ -386,7 +386,7 @@ In the example above, the four horizontal radii (`2mm 4mm 6mm 1mm`) populate the
 
 The `background` property supports most standard https://developer.mozilla.org/en-US/docs/Web/CSS/background[CSS values] for setting the background color, or background image.
 
-WARNING: 9-piece Image borders always take precedence over background settings in Codename One.  If your background directive seems to have no effect, it is likely because the theme has specified a 9-piece image border for the UIID.  You can disable the image border using a directive like `border: none`
+WARNING: 9-piece Image borders always take precedence over background settings in Codename One. If your background directive seems to have no effect, it's likely because the theme has specified a 9-piece image border for the UIID. You can disable the image border using a directive like `border: none`
 
 ===== Background Images
 
@@ -394,14 +394,14 @@ See link:Images[Images]
 
 ===== Gradients
 
-Both the `linear-gradient` and `radial-gradient` CSS functions are fully supported by this library.  If Codename One is capable of rendering the gradient natively then the theme resource file generated will only include encoded parameters for the gradients.  If the gradient is not supported by Codename One, then the module will fall back to an image background which it generates at compile-time.  It is generally preferable to try to stick to gradients that Codename One supports natively.  This will result in a smaller theme resource file since it doesn't need to generate any images for the gradient.
+Both the `linear-gradient` and `radial-gradient` CSS functions are fully supported by this library. If Codename One is capable of rendering the gradient natively then the theme resource file generated will include encoded parameters for the gradients. If the gradient isn't supported by Codename One, then the module will fall back to an image background which it generates at compile-time. it's generally preferable to try to stick to gradients that Codename One supports natively. This will result in a smaller theme resource file since it doesn't need to generate any images for the gradient.
 
 **Natively Supported `linear-gradient` Syntax**
 
 In order for a linear gradient to be natively supported by Codename One, the following properties must be met:
 
 . The gradient function has exactly two color stops, and these colors have the same opacity.
-. The gradient is either perfectly horizontal or perfectly vertical.  (e.g Direction can be `0deg`, `90deg`, `180deg`, or `270deg`.
+. The gradient is either perfectly horizontal or perfectly vertical. (e.g Direction can be `0deg`, `90deg`, `180deg`, or `270deg`.
 
 **Examples**
 
@@ -459,7 +459,7 @@ MyComponent {
 .45deg gradient rendered at compile-time -- uses background image
 image::img/linear-gradient-45deg.png[45deg gradient rendered at compile-time - uses background image]
 
-The above example is not supported natively because the gradient direction is 45 degrees.  Codename One only supports 0, 90, 180, and 270 degrees natively.  Therefore this would result in a background image being generated at compile-time with the appropriate gradient.
+The above example isn't supported natively because the gradient direction is 45 degrees. Codename One supports 0, 90, 180, and 270 degrees natively. Therefore this would result in a background image being generated at compile-time with the appropriate gradient.
 
 [source,css]
 ----
@@ -471,11 +471,11 @@ MyComponent {
 .Linear gradient with different alpha
 image::img/linear-gradient-diff-alpha.png[Linear gradient with different alpha]
 
-The above linear-gradient is not supported natively because the stop colors have different transparencies.  The first color has an opacity of 0.5, and the second as an opacity of 1.0 (implicitly).  Therefore, this would result in the gradient being generated as an image at compile-time.
+The above linear-gradient isn't supported natively because the stop colors have different transparencies. The first color has an opacity of 0.5, and the second as an opacity of 1.0 (implicitly). Therefore, this would result in the gradient being generated as an image at compile-time.
 
 **Natively Supported `radial-gradient` Syntax**
 
-The following syntax is supported natively for radial gradients.  Other syntaxes are also supported by the CSS library, but they will use compile-time image generation for the gradients rather than generating them at runtime.
+The following syntax is supported natively for radial gradients. Other syntaxes are also supported by the CSS library, but they will use compile-time image generation for the gradients rather than generating them at runtime.
 
 [source,css]
 ----
@@ -483,9 +483,9 @@ background: radial-gradient(circle [closest-side] [at <position>], <color stop>,
 ----
 
 * `<position>` -- The position using either offset keywords or percentages.
-* `<color stop>` -- Either a color alone, or a color followed by a percentage.  0% indicates that color begins at center of the circle.  100% indicates that the color begins at the closest edge of the bounding box.  Higher/lower values (>0%) will shift the color further or closer to circle's center.   If the first color stop is set to a non-zero value, the gradient cannot be rendered natively by Codename One, and an image of the gradient will instead be generated at compile-time.
+* `<color stop>` -- Either a color alone, or a color followed by a percentage. 0% indicates that color begins at center of the circle. 100% indicates that the color begins at the closest edge of the bounding box. Higher/lower values (>0%) will shift the color further or closer to circle's center. If the first color stop is set to a non-zero value, the gradient can't be rendered natively by Codename One, and an image of the gradient will instead be generated at compile-time.
 
-More complex gradients are supported by this library, but they will be generated at compile-time.  For more information about the `radial-gradient` CSS function see https://developer.mozilla.org/en-US/docs/Web/CSS/radial-gradient[its MDN Wiki page].
+More complex gradients are supported by this library, but they will be generated at compile-time. For more information about the `radial-gradient` CSS function see https://developer.mozilla.org/en-US/docs/Web/CSS/radial-gradient[its MDN Wiki page].
 
 **Examples**
 
@@ -533,7 +533,7 @@ image::img/radial-gradient-xeq1.png[Radial gradient at right]
 [[cn1-background-type]]
 ==== cn1-background-type
 
-It also supports some special Codename One values, which are identifiers with a "cn1-" prefix.  The following special values are available. They map to the standard Codename One values we discussed in the theming chapter:
+It also supports some special Codename One values, which are identifiers with a "cn1-" prefix. The following special values are available. They map to the standard Codename One values we discussed in the theming chapter:
 
 * `cn1-image-scaled`
 * `cn1-image-scaled-fill`
@@ -561,15 +561,15 @@ It also supports some special Codename One values, which are identifiers with a 
 [[Images]]
 === Images
 
-Images are supported as both "inputs" of the stylesheet, and as outputs to the compiled resource file.   "Input" images are usually specified via the `background-image` property in a selector. "Output" images are always saved as multi-images inside the resource file.
+Images are supported as both "inputs" of the stylesheet, and as outputs to the compiled resource file. "Input" images are usually specified via the `background-image` property in a selector. "Output" images are always saved as multi-images inside the resource file.
 
 ==== Image DPI and Device Densities
 
-In order to appropriately size the image, the CSS compiler needs to know what the source density of the image is.  E.g. if an image is 160x160 pixels with a source density of 160dpi (i.e. medium density - or the same as an iPhone 3G), then the resulting multi-image will be sized at 160x160 for medium density devices and 320x320 on very high density devices (e.g. iPhone 4S Retina) - which will result in the same perceived size to the user of 1x1 inch.
+In order to appropriately size the image, the CSS compiler needs to know what the source density of the image is. E.g. if an image is 160x160 pixels with a source density of 160dpi (i.e. medium density - or the same as an iPhone 3G), then the resulting multi-image will be sized at 160x160 for medium density devices and 320x320 on high density devices (e.g. iPhone 4S Retina) - which will result in the same perceived size to the user of 1x1 inch.
 
-However if the image has a source density of 320dpi, then the resulting multi-image would be 80x80 pixels on medium density devices and 160x160 pixels on very high density devices.
+However if the image has a source density of 320dpi, then the resulting multi-image would be 80x80 pixels on medium density devices and 160x160 pixels on high density devices.
 
-Some images have this density information embedded in the image itself so that the CSS processor will know how to resize the image properly.  However, it is usually better to explicitly document your intentions by including the `cn1-source-dpi` property as follows:
+Some images have this density information embedded in the image itself so that the CSS processor will know how to resize the image properly. However, it's usually better to explicitly document your intentions by including the `cn1-source-dpi` property as follows:
 
 [source,css]
 ----
@@ -579,11 +579,11 @@ SomeStyle {
 }
 ----
 
-NOTE: `cn1-source-dpi` values are meant to fall into threshold ranges. Values less than or equal to 120, are interpreted as low density.  121 - 160 are medium density (iPhone 3GS).  161 - 320, very high density (iPhone 4S).  321 - 480 == HD.  481 and higher == 2HD.  In general, you should try to use images that are one of these DPIs exactly:  160, 320, or 480, then images will be scaled up or down to the other densities accordingly.
+NOTE: `cn1-source-dpi` values are meant to fall into threshold ranges. Values less than or equal to 120, are interpreted as low density. 121 - 160 are medium density (iPhone 3GS). 161 - 320, high density (iPhone 4S). 321 - 480 == HD. 481 and higher == 2HD. In general, you should try to use images that are one of these DPIs exactly: 160, 320, or 480, then images will be scaled up or down to the other densities accordingly.
 
 ==== Multi-Images vs Regular Images
 
-By default all images are imported as multi-images (unless you define the `defaultSourceDPIInt` theme constant).  If you want to import an image as a "regular" image, you can simply set `cn1-source-dpi` to `0`.  E.g.
+By default all images are imported as multi-images (unless you define the `defaultSourceDPIInt` theme constant). If you want to import an image as a "regular" image, you can simply set `cn1-source-dpi` to `0`. E.g.
 
 [source,css]
 ----
@@ -595,7 +595,7 @@ SomeStyle {
 
 [NOTE]
 ====
-You can change the default source DPI for the whole stylesheet by adding `defaultSourceDPIInt: 0` to the theme constants.  E.g.
+You can change the default source DPI for the whole stylesheet by adding `defaultSourceDPIInt: 0` to the theme constants. E.g.
 
 [source,css]
 ----
@@ -610,7 +610,7 @@ Most application templates in https://start.codenameone.com[Codename One Initial
 
 ==== Multi-Images as Inputs
 
-If you have already generated images in all of the appropriate sizes for all densities, you can provide them in the same file structure used by the Codename One XML resource files:  The image path is a directory that contains images named after the density that they are intended to be used for.  The possible names include:
+If you've already generated images in all of the appropriate sizes for all densities, you can provide them in the same file structure used by the Codename One XML resource files: The image path is a directory that contains images named after the density that they are intended to be used for. The possible names include:
 
 * `verylow.png`
 * `low.png`
@@ -644,13 +644,13 @@ css/
               ... etc...
 ----
 
-NOTE: Multi-image inputs are only supported for local URLs.  You cannot use remote (e.g. `http://`) urls with multi-image inputs
+NOTE: Multi-image inputs are supported for local URLs. You can't use remote (e.g. `http://`) urls with multi-image inputs
 
 ==== Image Constants
 
-Theme constants can be images.  The convention is to suffix the constant name with "Image" so that it will be treated as an image.  In addition to the standard `url()` notation for specifying a constant image, you can provide a simple string name of the image, and the CSS processor will try to find an image by that name specified as a background image for one of the styles.  If it cannot find one, it will look inside a special directory named "res" (located in the same directory as the CSS stylesheet), inside which it will look for a directory named the same as the stylesheet, inside which it will look for a directory with the specified multi-image.  This directory structure is the same as used for Codename One's XML resources directory.
+Theme constants can be images. The convention is to suffix the constant name with "Image" so that it will be treated as an image. In addition to the standard `url()` notation for specifying a constant image, you can provide a simple string name of the image, and the CSS processor will try to find an image by that name specified as a background image for one of the styles. If it can't find one, it will look inside a special directory named "res" (located in the same directory as the CSS stylesheet), inside which it will look for a directory named the same as the stylesheet, inside which it will look for a directory with the specified multi-image. This directory structure is the same as used for Codename One's XML resources directory.
 
-E.g.  In the CSS file "mycssfile.css":
+E.g. In the CSS file "mycssfile.css":
 
 ----
 radioSelectedFocusImage: "Radio_btn_Press.png";
@@ -674,7 +674,7 @@ It will then create a multi-image from these images and include them in the reso
 
 ==== Import Multiple Images In Single Selector
 
-It is quite useful to be able to embed images inside the resource file that is generated from the CSS stylesheet so that you can access the images using the `Resources.getImage()` method in your app and set it as an icon on a button or label.  In this case, it is easier to simply create a dummy style that you don't intend to use and include multiple images in the background-image property like so:
+it's quite useful to be able to embed images inside the resource file that's generated from the CSS stylesheet so that you can access the images using the `Resources.getImage()` method in your app and set it as an icon on a button or label. In this case, it's easier to simply create a dummy style that you don't intend to use and include multiple images in the background-image property like so:
 
 [source,css]
 ----
@@ -717,7 +717,7 @@ Label bookmark = new Label(theme.getImage("Bookmark-icon.png"));
 
 ==== Loading Images from URLs
 
-You can also load images from remote URLs.  E.g.
+You can also load images from remote URLs. E.g.
 
 [source,css]
 ----
@@ -730,7 +730,7 @@ Images {
 
 image::img/css-nine-piece-border.png[]
 
-9-Piece image borders can be created using the `image-border` and `image-border-slice` properties. 
+9-Piece image borders can be created using the `image-border` and `image-border-slice` properties.
 
 E.g.
 
@@ -775,12 +775,12 @@ NinePiece4 {
 Component backgrounds in Codename One are a common source of confusion for newcomers because there are 3 different properties that can be used to define what a component's background looks like, and they have priorities:
 
 . Background Color - You can specify an RGB color to be used as the background for a component.
-. Background Image - You can specify an image to be used as the background for a component.  Codename One includes settings to define how the image is treated, e.g. scale/fill, tile, etc. If a background image is specified, it will override the background color setting - unless the image has transparent regions.
-. Image Border - You can define a 9-piece image border which will effectively cover the entire background of the component.  If an image border is specified, it will override the background image of the component.
+. Background Image - You can specify an image to be used as the background for a component. Codename One includes settings to define how the image is treated, e.g. scale/fill, tile, etc. If a background image is specified, it will override the background color setting - unless the image has transparent regions.
+. Image Border - You can define a 9-piece image border which will effectively cover the entire background of the component. If an image border is specified, it will override the background image of the component.
 
 A common scenario that I run into is trying to set the background color of a component and see no change when I preview my form because the style had an image background defined - which overrides my background color change.
 
-The potential for confusion is mitigated somewhat, but still exists when using CSS.  You can make your intentions explicit by adding the `cn1-background-type` property to your style.  Possible values include:
+The potential for confusion is mitigated somewhat, but still exists when using CSS. You can make your intentions explicit by adding the `cn1-background-type` property to your style. Possible values include:
 
 * `cn1-image-scaled`
 * `cn1-image-scaled-fill`
@@ -816,7 +816,7 @@ MyContainer {
 
 === Image Compression
 
-CN1 resource files support both PNG and JPEG images, but PNG is the default.  Multi-images that are generated by the CSS compiler will be PNG if they include alpha transparency, and JPEG otherwise.  This is to try to reduce the file size as much as possible while not sacrificing quality.
+CN1 resource files support both PNG and JPEG images, but PNG is the default. Multi-images that are generated by the CSS compiler will be PNG if they include alpha transparency, and JPEG otherwise. This is to try to reduce the file size as much as possible while not sacrificing quality.
 
 === Fonts
 
@@ -824,7 +824,7 @@ This library supports the https://developer.mozilla.org/en/docs/Web/CSS/font[fon
 
 ==== `font-family`
 
-By default, https://www.codenameone.com/blog/good-looking-by-default-native-fonts-simulator-detection-more.html[CN1's native fonts] are used.  The appropriate native font is selected for the provided font-weight and font-style properties.  You can also explicitly specify the native font you wish to use in the `font-family` property.  E.g.
+By default, https://www.codenameone.com/blog/good-looking-by-default-native-fonts-simulator-detection-more.html[CN1's native fonts] are used. The appropriate native font is selected for the provided font-weight and font-style properties. You can also explicitly specify the native font you wish to use in the `font-family` property. E.g.
 
 [source,css]
 ----
@@ -833,7 +833,7 @@ SideCommand {
 }
 ----
 
-If you omit the `font-family` directive altogether, it will use `native:MainRegular`.  The following native fonts are available:
+If you omit the `font-family` directive altogether, it will use `native:MainRegular`. The following native fonts are available:
 
 . `native:MainThin`
 . `native:MainLight`
@@ -848,7 +848,7 @@ If you omit the `font-family` directive altogether, it will use `native:MainRegu
 
 ===== Using TTF Fonts
 
-If you want to use a font other than the built-in fonts, you'll need to define the font using the `@font-face` rule.  E.g.
+If you want to use a font other than the built-in fonts, you'll need to define the font using the `@font-face` rule. E.g.
 
 [source,css]
 ----
@@ -858,7 +858,7 @@ If you want to use a font other than the built-in fonts, you'll need to define t
 }
 ----
 
-Then you'll be able to reference the font using the specified `font-family` in any CSS element.  E.g.
+Then you'll be able to reference the font using the specified `font-family` in any CSS element. E.g.
 
 [source,css]
 ----
@@ -867,7 +867,7 @@ MyLabel {
 }
 ----
 
-The `@font-face` directive's `src` property will accept both local and remote URLs.  E.g.
+The `@font-face` directive's `src` property will accept both local and remote URLs. E.g.
 
 [source,css]
 ----
@@ -877,13 +877,13 @@ The `@font-face` directive's `src` property will accept both local and remote UR
 }
 ----
 
-In this case, it will download the `myfont.ttf` file to the same directory as the CSS file.  From then on it will use that locally downloaded version of the font so that it doesn't have to make a network request for each build.
+In this case, it will download the `myfont.ttf` file to the same directory as the CSS file. From then on it will use that locally downloaded version of the font so that it doesn't have to make a network request for each build.
 
 Fonts are automatically copied to the project's "src" directory when the CSS file is compiled so that they will be distributed with the app and available at runtime.
 
 **Github URLs**
 
-Fonts hosted on GitHub are accessible using a special `github:` protocol to make it easier to reference such fonts.  E.g. the following directive includes the "FontAwesome" font directly from Github
+Fonts hosted on GitHub are accessible using a special `github:` protocol to make it easier to reference such fonts. E.g. the following directive includes the "FontAwesome" font directly from Github
 
 [source,css]
 ----
@@ -897,17 +897,17 @@ NOTE: Apparently FontAwesome has removed its public repositories from Github so 
 
 ==== `font-size`
 
-It is best practice to size your fonts using millimetres (`rem`) (or another "real-world" measurement unit such as inches (`in`), centimetres (`cm`), millimetres (`mm`).  This will allow the font to be sized appropriate for all display densities.  If you specify size in pixels (`px`), it will treat it the same as if you sized it in points (`pt`), where 1pt == 1/72 inches (one seventy-second of an inch).
+it's best practice to size your fonts using millimetres (`rem`) (or another "real-world" measurement unit such as inches (`in`), centimetres (`cm`), millimetres (`mm`). This will allow the font to be sized appropriate for all display densities. If you specify size in pixels (`px`), it will treat it the same as if you sized it in points (`pt`), where 1pt == 1/72 inches (one seventy-second of an inch).
 
-If you size your font in percentage units (e.g. `150%`) it will set the font size relative to the medium font size of the platform.  This is different than the standard behaviour of a web browser, which would size it relative to the parent element's font size.
+If you size your font in percentage units (e.g. `150%`) it will set the font size relative to the medium font size of the platform. This is different than the standard behaviour of a web browser, which would size it relative to the parent element's font size.
 
 NOTE: `font-size: 150%` is the same as `font-size: 1.5rem`.
 
-You can use system fonts, true type fonts, and native fonts in your CSS stylesheet.  True Type fonts need to be defined in a `@font-face` directive before they can be referenced.  True-type fonts and native fonts have the advantage that you can specify their sizes in generic terms (e.g. `small`, `medium`, `large`) and in more specific units such as millimeters (`mm`) or pixels (`px`).
+You can use system fonts, true type fonts, and native fonts in your CSS stylesheet. True Type fonts need to be defined in a `@font-face` directive before they can be referenced. True-type fonts and native fonts have the advantage that you can specify their sizes in generic terms (e.g. `small`, `medium`, `large`) and in more specific units such as millimeters (`mm`) or pixels (`px`).
 
 .Normalizing Default Font Size
 ****
-When trying to make a design look "good" across multiple platforms it can be difficult to deal with the differing default font sizes on different platforms. You may spend hours tweaking your UI to look perfect on iPhone X, only to find out that the fonts are too small when viewed on an android device. We have now added theme constants to explicitly set the the default font size in "screen-independent-pixels".
+When trying to make a design look "good" across multiple platforms it can be difficult to deal with the differing default font sizes on different platforms. You may spend hours tweaking your UI to look perfect on iPhone X, only to find out that the fonts are too small when viewed on an android device. you've now added theme constants to explicitly set the the default font size in "screen-independent-pixels".
 
 Note
 In this case, 1 screen-independent-pixel is defined as 1/160th of an inch on a device, and 1/96th of an inch on desktop. These values correspond to Android’s definition on device, and Windows' definition on the desktop.
@@ -917,7 +917,7 @@ If you add the following to your stylesheet, it will set the default font size t
 [source,css]
 ----
 #Constants {
-    defaultFontSizeInt: 18;
+ defaultFontSizeInt: 18;
 }
 ----
 
@@ -928,8 +928,8 @@ On the desktop, you may find that 18 is too big. You can additionally define a d
 [source,css]
 ----
 #Constants {
-    defaultFontSizeInt: 18;
-    defaultDesktopFontSizeInt: 14;
+ defaultFontSizeInt: 18;
+ defaultDesktopFontSizeInt: 14;
 }
 ----
 
@@ -1168,11 +1168,11 @@ XMLVIewIcon {
 
 === Media Queries
 
-You can use media queries to target styles to specific platforms, devices, and device densities.  Currently the following media queries are supported:
+You can use media queries to target styles to specific platforms, devices, and device densities. Currently the following media queries are supported:
 
-. `platform-xxx` - Target a specific platform.  E.g. `platform-and`, `platform-ios`, `platform-mac`, `platform-win`.
-. `density-xxx` - Target a specific device density.  E.g. `density-very-low`, `density-low`, `density-medium`, `density-high`, `density-very-high`, `density-hd`, `density-2hd`, and `density-560`.
-. `device-xxx` - Target a specific device type.  E.g. `device-desktop`, `device-tablet`, `device-phone`.
+. `platform-xxx` - Target a specific platform. E.g. `platform-and`, `platform-ios`, `platform-mac`, `platform-win`.
+. `density-xxx` - Target a specific device density. E.g. `density--low`, `density-low`, `density-medium`, `density-high`, `density--high`, `density-hd`, `density-2hd`, and `density-560`.
+. `device-xxx` - Target a specific device type. E.g. `device-desktop`, `device-tablet`, `device-phone`.
 
 In addition to the Codename One specific media tokens above, the CSS compilers also recognize standard dark-mode media queries using `prefers-color-scheme: dark`. Rules inside these blocks are compiled into `$Dark` UIIDs automatically (e.g. `Button` becomes `$DarkButton`, `Button.selected` becomes `$DarkButton.selected`).
 
@@ -1195,7 +1195,7 @@ Button {
 }
 ----
 
-.Example: Different font colors on Android and iOS.  On Android, labels will appear green.  On iOS, they will appear red.  On all other platforms, they will appear black.
+.Example: Different font colors on Android and iOS. On Android, labels will appear green. On iOS, they will appear red. On all other platforms, they will appear black.
 [source,css]
 ----
 Label {
@@ -1215,7 +1215,7 @@ Label {
 }
 ----
 
-.Example: Different font colors based on device density.  On lower densities, labels will be green.  On higher densities, labels will be red.
+.Example: Different font colors based on device density. On lower densities, labels will be green. On higher densities, labels will be red.
 ----
 Label {
     color: black;
@@ -1234,7 +1234,7 @@ Label {
 }
 ----
 
-.Example: Different label colors based on device type. 
+.Example: Different label colors based on device type.
 ----
 Label {
     color: black;
@@ -1253,13 +1253,13 @@ Label {
 }
 ----
 
-NOTE: When deploying your app using the Javascript port, it will use a platform name derived from the "UserAgent" string in the browser, rather than the result of `Display.getPlatformName()`, which is used for other ports.  When running on Android, then, the platform will be "and".  When running on iOS, the platform will be "ios". Etc...
+NOTE: When deploying your app using the Javascript port, it will use a platform name derived from the "UserAgent" string in the browser, rather than the result of `Display.getPlatformName()`, which is used for other ports. When running on Android, then, the platform will be "and". When running on iOS, the platform will be "ios". Etc...
 
 ==== Compound Media Queries
 
-You can combine multiple media queries together, separated by a comma.  Queries of the same type are "OR"ed together.  Queries of different types are "AND"ed together.  For example if you have a media query that specifies two different device densities (e.g. `density-low` and `density-high`) the query will match *both* devices with low density and high density.  However, if the query specifies a device density and a platform (e.g. `density-low` and `platform-and`), then it will only match a device if it matches the platform *and* the density.
+You can combine multiple media queries together, separated by a comma. Queries of the same type are "OR"ed together. Queries of different types are "AND"ed together. For example if you've a media query that specifies two different device densities (e.g. `density-low` and `density-high`) the query will match *both* devices with low density and high density. However, if the query specifies a device density and a platform (e.g. `density-low` and `platform-and`), then it will match a device if it matches the platform *and* the density.
 
-.Example: Targeting styles to only Android devices with high density
+.Example: Targeting styles to Android devices with high density
 [source,css]
 ----
 @media platform-and, density-high {
@@ -1275,7 +1275,7 @@ You can combine multiple media queries together, separated by a comma.  Queries 
 }
 ----
 
-.Example: Targeting only Mac Desktop.
+.Example: Targeting Mac Desktop.
 [source,css]
 ----
 @media device-desktop, platform-mac {
@@ -1302,7 +1302,7 @@ For example, consider the following simple stylesheet that defines a font size o
 [source,css]
 ----
 Label {
-    font-size: 3mm;
+ font-size: 3mm;
 }
 ----
 
@@ -1311,11 +1311,11 @@ During testing, perhaps you find that, on desktop, the fonts are a little bit to
 [source,css]
 ----
 #Constants {
-    device-desktop-font-scale: "1.5";
+ device-desktop-font-scale: "1.5";
 }
 
 Label {
-    font-size: 3mm;
+ font-size: 3mm;
 }
 ----
 
@@ -1326,13 +1326,13 @@ The above would be roughly equivalent to:
 [source,css]
 ----
 Label {
-    font-size: 3mm;
+ font-size: 3mm;
 }
 
 @media device-desktop {
-    Label {
-        font-size: 4.5mm;
-    }
+ Label {
+ font-size: 4.5mm;
+ }
 }
 ----
 
@@ -1340,12 +1340,12 @@ Label {
 [source,css]
 ----
 #Constants {
-    device-phone-font-scale: "1.5";
-    device-tablet-font-scale: "1.2";
-    device-desktop-font-scale: "1.4";
-    platform-ios-font-scale: "0.9";
-    density-low-font-scale: "1.2";
-    platform-ios-density-low-font-scale: "1.3";
+ device-phone-font-scale: "1.5";
+ device-tablet-font-scale: "1.2";
+ device-desktop-font-scale: "1.4";
+ platform-ios-font-scale: "0.9";
+ density-low-font-scale: "1.2";
+ platform-ios-density-low-font-scale: "1.3";
 }
 ----
 

@@ -3,7 +3,7 @@
 [#settings]
 == Codename One Settings
 
-The Codename One Settings app (aka Codename One Preferences, aka Control Center) allows you to configure many aspects of your application.  This is where you can generate certificates, browse/install add-ons, monitor the status of your cloud builds, configure build hints, and more.
+The Codename One Settings app (aka Codename One Preferences, aka Control Center) allows you to configure many aspects of your application. This is where you can generate certificates, browse/install add-ons, monitor the status of your cloud builds, configure build hints, and more.
 
 === Opening Codename One Settings
 
@@ -31,7 +31,7 @@ image::img/netbeans-open-control-center.png[]
 
 ==== Opening Codename One Settings from Eclipse
 
-Press the image:img/eclipse-run-as-button.png[] button, and select the "_My Project_ Settings" option. (Where _My Project_ is the name of your project).  E.g.
+Press the image:img/eclipse-run-as-button.png[] button, and select the "_My Project_ Settings" option. (Where _My Project_ is the name of your project). E.g.
 
 image:img/eclipse-open-settings.png[]
 

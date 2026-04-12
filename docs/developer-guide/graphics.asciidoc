@@ -1,38 +1,34 @@
-== Graphics, Drawing, Images & Fonts
+== Graphics, drawing, images, and fonts
 
-WARNING: Drawing is considered a low level API that might introduce some platform fragmentation.
+WARNING: Drawing is considered a low-level API that might introduce some platform fragmentation.
 
-=== Basics - Where & How Do I Draw Manually?
+=== Basics - where and how do I draw manually?
 
-The https://www.codenameone.com/javadoc/com/codename1/ui/Graphics.html[Graphics] class is responsible
-for drawing basics, shapes, images and text, it is never instantiated by the developer and is always passed on by the
-Codename One API.
+The https://www.codenameone.com/javadoc/com/codename1/ui/Graphics.html[Graphics] class is responsible for drawing basics, shapes, images, and text. Developers never instantiate it directly; the Codename One API passes it in.
 
-You can gain access to a `Graphics` using one of the following methods:
+You can gain access to a `Graphics` object using one of the following methods:
 
-* *Derive https://www.codenameone.com/javadoc/com/codename1/ui/Component.html[Component] or a subclass of Component* -
-within `Component` there are several methods that allow developers to modify the drawing behavior. These can be overridden to change the way the
-component is drawn:
+* *Derive https://www.codenameone.com/javadoc/com/codename1/ui/Component.html[Component] or a subclass of `Component`* -
+ `Component` includes many methods that let developers modify drawing behavior. Override them to change how the component is drawn:
 ** `paint(Graphics)` - invoked to draw the component, this can be overridden to draw the component from scratch.
 ** `paintBackground(Graphics)` / `paintBackgrounds(Graphics)` - these allow overriding the way the component background is painted although you would probably be better off implementing a painter (see below).
 ** `paintBorder(Graphics)` - allows overriding the process of drawing a border, notice that border drawing might differ based on the style of the component.
-** `paintComponent(Graphics)` - allows painting only the components contents while leaving the default paint behavior to the style.
+** `paintComponent(Graphics)` - allows painting the components contents while leaving the default paint behavior to the style.
 ** `paintScrollbars(Graphics)`, `paintScrollbarX(Graphics)`, `paintScrollbarY(Graphics)` allows overriding the behavior of scrollbar painting.
-* *Implement the painter interface*, this interface can be used as a `GlassPane` or a background painter.
+* *Implement the painter interface*; this interface can be used as a `GlassPane` or a background painter.
 +
-The painter interface is a simple interface that includes 1 paint method, this is a useful way to allow developers to perform custom painting without subclassing `Component`. Painters can be chained together to create elaborate paint behavior by using the https://www.codenameone.com/javadoc/com/codename1/ui/painter/PainterChain.html[PainterChain] class.
+The painter interface is simple and includes one paint method. It lets developers perform custom painting without subclassing `Component`. Painters can be chained together to create elaborate paint behavior with the https://www.codenameone.com/javadoc/com/codename1/ui/painter/PainterChain.html[PainterChain] class.
 +
 ** *Glass pane* - a glass pane allows developers to paint on top of the form painting. This allows an overlay effect on top of a form.
 +
-For a novice it might seem that a glass pane is similar to overriding the Form’s paint method and drawing after `super.paint(g)` completed. This isn’t the case.
-When a component repaints (by invoking the `repaint()` method) only that component is drawn and https://www.codenameone.com/javadoc/com/codename1/ui/Form.html[Form]’s `paint()` method wouldn’t be invoked. However, the glass pane painter is invoked for such cases and would work exactly as expected.
+At first, a glass pane may seem similar to overriding the Form’s paint method and drawing after `super.paint(g)` completes. It isn't the same. When a component repaints by invoking `repaint()`, that component is drawn, and https://www.codenameone.com/javadoc/com/codename1/ui/Form.html[Form]’s `paint()` method isn't invoked. The glass pane painter is invoked in those cases and behaves as expected.
 +
-https://www.codenameone.com/javadoc/com/codename1/ui/Container.html[Container] has a glass pane method called `paintGlass(Graphics)`, which can be overridden to provide a similar effect on a `Container` level. This is especially useful for complex containers such as https://www.codenameone.com/javadoc/com/codename1/ui/table/Table.html[Table] which draws its lines using such a methodology.
+https://www.codenameone.com/javadoc/com/codename1/ui/Container.html[Container] has a glass-pane method called `paintGlass(Graphics)`, which you can override to provide a similar effect at the `Container` level. This is especially useful for complex containers such as https://www.codenameone.com/javadoc/com/codename1/ui/table/Table.html[Table], which draws its lines using this approach.
 +
-** *Background painter* - the background painter is installed via the style, by default Codename installs a custom background painter of its own. Installing a custom painter allows a developer to completely define how the background of the component is drawn. +
-Notice that a lot of the background style behaviors can be achieved using styles alone.
+** *Background painter* - the background painter is installed through the style. By default, Codename One installs its own custom background painter. Installing a custom painter lets a developer define exactly how the component background is drawn. +
+Many background-style behaviors can also be achieved using styles alone.
 
-IMPORTANT: A common mistake developers make is overriding the `paint(Graphics)` method of `Form`. The problem with that is that form has child components which might request a repaint. To prevent that either place a paintable component in the center of the `Form`, override the `glasspane` or the background painter.
+IMPORTANT: A common mistake is overriding the `paint(Graphics)` method of `Form`. The problem is that a form has child components that may request a repaint. To avoid that, place a paintable component in the center of the `Form`, or override the `glass pane` or background painter.
 
 A paint method can be implemented as such:
 
@@ -62,11 +58,11 @@ image::img/graphics-hiworld.png[Hi world demo code, notice that the blue bar on 
 
 ==== Painting with Gradients
 
-Solid colors are only the starting point. `Graphics` also understands "paint" objects
-that describe gradients and other patterns.  You can pass an instance of
+Solid colors are the starting point. `Graphics` also understands "paint" objects
+that describe gradients and other patterns. You can pass an instance of
 https://www.codenameone.com/javadoc/com/codename1/ui/Paint.html[`Paint`]
 to `setColor(Paint)` in place of an integer color value to activate a gradient for
-subsequent fill and draw operations.  The
+subsequent fill and draw operations. The
 https://www.codenameone.com/javadoc/com/codename1/ui/LinearGradientPaint.html[`LinearGradientPaint`]
 class is the most common option and accepts a list of color stops along a line:
 
@@ -82,19 +78,19 @@ g.fillRect(getX(), getY(), getWidth(), getHeight());
 ----
 
 The `fillLinearGradient()` convenience methods (with optional `repeat` flag)
-provide a shorthand when you just need a two-color gradient without constructing
+provide a shorthand when you need a two-color gradient without constructing
 your own `Paint` object.
 
 Radial gradients are equally straightforward using
 `fillRadialGradient()` or `fillRectRadialGradient()`, which can render circular
-and rectangular radial transitions respectively.  These APIs accept the
+and rectangular radial transitions respectively. These APIs accept the
 inner/outer colors, focal point, and spread so you can combine them with linear
 gradients to build sophisticated backgrounds and lighting effects.
 
 === Glass Pane
 
-The `GlassPane `in Codename One is inspired by the Swing `GlassPane` & `LayeredPane` with quite a few twists.
-We tried to imagine how Swing developers would have implemented the glass pane knowing what they do now about painters and Swings learning curve. But first: what is the glass pane?
+The `GlassPane `in Codename One is inspired by the Swing `GlassPane` & `LayeredPane` with a few twists.
+You tried to imagine how Swing developers would have implemented the glass pane knowing what they do now about painters and Swings learning curve. But first: what is the glass pane?
 
 A typical Codename One application is essentially composed of 3 layers (this is a gross simplification though),
 the background painters are responsible for drawing the background of all components including the main form. The
@@ -103,15 +99,15 @@ component draws its own content (which might overrule the painter) and the glass
 .Form layout graphic
 image::img/perspective-form-layers.png[Form layout graphic,scaledwidth=20%]
 
-Essentially the glass pane is a painter that allows us to draw an overlay on top of the Codename One application.
+Essentially the glass pane is a painter that allows you to draw an overlay on top of the Codename One application.
 
-Overriding the paint method of a form isn't a substitute for `glasspane` as it would appear to work initially, when you enter a `Form`. However, when modifying an element within the form only that element gets repainted not the entire
+Overriding the paint method of a form isn't a substitute for `glasspane` as it would appear to work initially, when you enter a `Form`. For example, when modifying an element within the form that element gets repainted not the entire
 `Form`!
 
-So if we have a form with a https://www.codenameone.com/javadoc/com/codename1/ui/Button.html[Button] and text drawn on top using the Form's paint method it would get erased whenever the button gets focus.
+So if you've a form with a https://www.codenameone.com/javadoc/com/codename1/ui/Button.html[Button] and text drawn on top using the Form's paint method it would get erased whenever the button gets focus.
 
 The glass pane is called whenever a component gets painted,
-it only paints within the clipping region of the component hence it won't break the rest of the components on the `Form` which weren't modified.
+it paints within the clipping region of the component hence it won't break the rest of the components on the `Form` which were not modified.
 
 You can set a painter on a form using code like this:
 [source,java]
@@ -132,9 +128,9 @@ hi.setGlassPane((g, rect) -> {
 ----
 
 
-https://www.codenameone.com/javadoc/com/codename1/ui/painter/PainterChain.html[PainterChain] allows us to chain several painters together to perform different logical tasks
+https://www.codenameone.com/javadoc/com/codename1/ui/painter/PainterChain.html[PainterChain] allows you to chain many painters together to perform different logical tasks
 such as a validation painter coupled with a fade out painter. The sample below shows a crude validation panel
-that allows us to draw error icons next to components while exceeding their physical bounds as is common in
+that allows you to draw error icons next to components while exceeding their physical bounds as is common in
 many user interfaces
 
 
@@ -176,14 +172,14 @@ have reached end of life may lack these APIs, so keep the guard code shown below
 if you still target them with legacy builds.
 
 Notice that perspective transform is missing from the desktop/simulator port.
-Unfortunately there is no real equivalent to perspective transform in JavaSE that we could use.
+Unfortunately there is no real equivalent to perspective transform in Java SE that you could use.
 
 === A 2D Drawing App
 
-We can demonstrate shape drawing with a simple example of a drawing app, that allows the user to tap the screen to draw a contour picture.
+You can demonstrate shape drawing with a simple example of a drawing app, that allows the user to tap the screen to draw a contour picture.
 
 The app works by simply keeping a https://www.codenameone.com/javadoc/com/codename1/ui/geom/GeneralPath.html[GeneralPath]
-in memory, and continually adding points as bezier curves.  Whenever a point is added, the path is redrawn to the screen.
+in memory, and continually adding points as bezier curves. Whenever a point is added, the path is redrawn to the screen.
 
 The center of the app is the `DrawingCanvas` class, which extends link:https://www.codenameone.com/javadoc/com/codename1/ui/Component.html[Component].
 
@@ -220,20 +216,20 @@ public class DrawingCanvas extends Component {
 }
 ----
 
-Conceptually this is very basic component.  We will be overriding the
+Conceptually this is basic component. You will be overriding the
 https://www.codenameone.com/javadoc/com/codename1/ui/Component.html#paintBackground(com.codename1.ui.Graphics)[`paintBackground()`]
-method to draw the path.  We keep a reference to a
+method to draw the path. You keep a reference to a
 link:https://www.codenameone.com/javadoc/com/codename1/ui/geom/GeneralPath.html[GeneralPath]
 object (which is the concrete implementation of the https://www.codenameone.com/javadoc/com/codename1/ui/geom/Shape.html[Shape] interface in Codename One) to store each successive
-point in the drawing.  We also parametrize the stroke width and color.
+point in the drawing. You also parametrize the stroke width and color.
 
-The implementation of the `paintBackground()` method (shown above) should be fairly straight forward.  It creates
-a stroke of the appropriate width, and sets the color on the graphics context.  Then it calls `drawShape()` to render the path of points.
+The implementation of the `paintBackground()` method (shown above) should be fairly straight forward. It creates
+a stroke of the appropriate width, and sets the color on the graphics context. Then it calls `drawShape()` to render the path of points.
 
 
 ==== Implementing addPoint()
 
-The addPoint method is designed to allow us to add points to the drawing.  A simple implementation that uses
+The addPoint method is designed to allow you to add points to the drawing. A simple implementation that uses
 straight lines rather than curves might look like this:
 
 [source,java]
@@ -255,8 +251,8 @@ public void addPoint(float x, float y) {
 }
 ----
 
-We introduced a couple house-keeping member vars (`lastX` and `lastY`) to store the last point that was added
-so that we know whether this is the first tap or a subsequent tap.  The first tap triggers a `moveTo()` call, whereas
+You introduced a couple house-keeping member vars (`lastX` and `lastY`) to store the last point that was added
+so that you know whether this is the first tap or a subsequent tap. The first tap triggers a `moveTo()` call, whereas
 subsequent taps trigger `lineTo()` calls, which draw lines from the last point to the current point.
 
 A drawing might look like this:
@@ -267,19 +263,19 @@ image::img/lineto-example.png[lineTo example,scaledwidth=20%]
 
 ==== Using Bezier Curves
 
-Our previous implementation of addPoint() used lines for each segment of the drawing.  Let's make an adjustment
+Your previous implementation of addPoint() used lines for each segment of the drawing. Let you make an adjustment
 to allow for smoother edges by using quadratic curves instead of lines.
 
 Codename One's `GeneralPath` class includes two methods for drawing curves:
 
 1. https://www.codenameone.com/javadoc/com/codename1/ui/geom/GeneralPath.html#quadTo(float,%20float,%20float,%20float)[`quadTo()`] :
-        Appends a quadratic bezier curve.  It takes 2 points: a control point, and an end point.
+ Appends a quadratic bezier curve. It takes 2 points: a control point, and an end point.
 2. link:https://www.codenameone.com/javadoc/com/codename1/ui/geom/GeneralPath.html#curveTo(float,%20float,%20float,%20float,%20float,%20float)[`curveTo()`] :
-        Appends a cubic bezier curve, taking 3 points:  2 control points, and an end point.
+ Appends a cubic bezier curve, taking 3 points: 2 control points, and an end point.
 
 See the https://www.codenameone.com/javadoc/com/codename1/ui/geom/GeneralPath.html[General Path javadocs] for the full API.
 
-We will make use of the link:https://www.codenameone.com/javadoc/com/codename1/ui/geom/GeneralPath.html#quadTo(float,%20float,%20float,%20float)[`quadTo()`]
+You will make use of the link:https://www.codenameone.com/javadoc/com/codename1/ui/geom/GeneralPath.html#quadTo(float,%20float,%20float,%20float)[`quadTo()`]
 method to append curves to the drawing as follows:
 
 [source,java]
@@ -301,11 +297,11 @@ public void addPoint(float x, float y){
 }
 ----
 
-This change should be fairly straight forward except, perhaps, the business with the `odd` variable.  Since
-quadratic curves require two points (in addition to the implied starting point), we can't simply take the last tap
-point and the current tap point.  We need a point between them to act as a control point.  This is where we get
-the curve from.   The control point works by exerting a sort of "gravity" on the line segment, to pull the line towards
-it.  This results in the line being curved.  I use the `odd` marker to alternate the control point between positions
+This change should be fairly straight forward except, perhaps, the business with the `odd` variable. Since
+quadratic curves require two points (in addition to the implied starting point), you can't simply take the last tap
+point and the current tap point. You need a point between them to act as a control point. This is where you get
+the curve from. The control point works by exerting a sort of "gravity" on the line segment, to pull the line towards
+it. This results in the line being curved. I use the `odd` marker to alternate the control point between positions
 above the line and below the line.
 
 A drawing from the resulting app looks like:
@@ -316,10 +312,10 @@ image::img/quadto-example.png[Result of quadTo example,scaledwidth=20%]
 
 ==== Detecting Platform Support
 
-The `DrawingCanvas` example is a bit naive in that it assumes that the device supports the shape API.  If I were
-to run this code on a device that doesn't support the https://www.codenameone.com/javadoc/com/codename1/ui/geom/Shape.html[Shape] API, it would just draw a blank canvas where I
-expected my shape to be drawn.  You can fall back gracefully if you make use of the
-https://www.codenameone.com/javadoc/com/codename1/ui/Graphics.html#isShapeSupported()[`Graphics.isShapeSupported()`] method.  E.g.
+The `DrawingCanvas` example is a bit naive in that it assumes that the device supports the shape API. If I were
+to run this code on a device that doesn't support the https://www.codenameone.com/javadoc/com/codename1/ui/geom/Shape.html[Shape] API, it would draw a blank canvas where I
+expected my shape to be drawn. You can fall back gracefully if you make use of the
+https://www.codenameone.com/javadoc/com/codename1/ui/Graphics.html#isShapeSupported()[`Graphics.isShapeSupported()`] method. For example:
 
 [source,java]
 ----
@@ -347,12 +343,12 @@ The https://www.codenameone.com/javadoc/com/codename1/ui/Graphics.html[Graphics]
 * `rotate(angle)` : Rotates about the origin.
 * `rotate(angle, px, py)` : Rotates about a pivot point.
 
-NOTE: `scale()` and `rotate()` methods are only available on platforms that support Affine transforms.  See table X for a compatibility list.
+NOTE: `scale()` and `rotate()` methods are available on platforms that support Affine transforms. See table X for a compatibility list.
 
 ==== Device Support
 
-All current Codename One ports expose affine transforms (i.e. `scale()` and
-`rotate()`).  Use the following table as a quick reference when deciding whether
+All current Codename One ports expose affine transforms (that's: `scale()` and
+`rotate()`). Use the following table as a quick reference when deciding whether
 you need a fallback path.
 
 .Transforms Device Support
@@ -378,7 +374,7 @@ you need a fallback path.
 
 You can check if a particular https://www.codenameone.com/javadoc/com/codename1/ui/Graphics.html[Graphics] context supports rotation and scaling using the `isAffineSupported()` method.
 
-e.g.
+for example:
 
 [source,java]
 ----
@@ -394,23 +390,23 @@ public void paint(Graphics g){
 
 === Example: Drawing an Analog Clock
 
-In the following sections, I will implement an analog clock component.  This will demonstrate three key concepts
+In the following sections, I will implement an analog clock component. This will demonstrate three key concepts
 in Codename One's graphics:
 
 1. Using the `GeneralPath` class for drawing arbitrary shapes.
-2. Using `Graphics.translate()` to translate our drawing position by an offset.
-3. Using `Graphics.rotate()` to rotate our drawing position.
+2. Using `Graphics.translate()` to translate your drawing position by an offset.
+3. Using `Graphics.rotate()` to rotate your drawing position.
 
 There are three separate things that need to be drawn in a clock:
 
-1. **The tick marks**.  E.g. most clocks will have a tick mark for each second, larger tick marks for each hour, and
+1. **The tick marks**. For example: most clocks will have a tick mark for each second, larger tick marks for each hour, and
 sometimes even larger tick marks for each quarter hour.
-2. **The numbers**.  We will draw the clock numbers (1 through 12) in the appropriate positions.
-3. **The hands**. We will draw the clock hands to point at the appropriate points to display the current time.
+2. **The numbers**. You will draw the clock numbers (1 through 12) in the appropriate positions.
+3. **The hands**. You will draw the clock hands to point at the appropriate points to display the current time.
 
 ==== The AnalogClock Component
 
-Our clock will extend the https://www.codenameone.com/javadoc/com/codename1/ui/Component.html[Component] class, and override the `paintBackground()` method to draw the clock as follows:
+Your clock will extend the https://www.codenameone.com/javadoc/com/codename1/ui/Component.html[Component] class, and override the `paintBackground()` method to draw the clock as follows:
 
 [source,java]
 ----
@@ -426,18 +422,18 @@ public class AnalogClock extends Component {
 
 ==== Setting up the Parameters
 
-Before we actually draw anything, let's take a moment to figure out what values we need to know in order to
-draw an effective clock.  Minimally, we need two values:
+Before you actually draw anything, let's take a moment to figure out what values you need to know in order to
+draw an effective clock. Minimally, you need two values:
 
 1. The center point of the clock.
 2. The radius of the clock.
 
 In addition, I am adding the following parameters to to help customize how the clock is rendered:
 
-1. *The padding* (i.e. the space between the edge of the component and the edge of the clock circle.
-2. *The tick lengths*.  I will be using 3 different lengths of tick marks on this clock. The longest ticks will be
-    displayed at quarter points (i.e. 12, 3, 6, and 9).  Slightly shorter ticks will be displayed at the five-minute marks
-    (i.e. where the numbers appear), and the remaining marks (corresponding with seconds) will be quite short.
+1. *The padding* (that's: the space between the edge of the component and the edge of the clock circle.
+2. *The tick lengths*. I will be using 3 different lengths of tick marks on this clock. The longest ticks will be
+ displayed at quarter points (that's: 12, 3, 6, and 9). Slightly shorter ticks will be displayed at the five-minute marks
+ (that's: where the numbers appear), and the remaining marks (corresponding with seconds) will be short.
 
 
 [source,java]
@@ -462,7 +458,7 @@ Stroke tickStroke = new Stroke(2f, Stroke.CAP_BUTT, Stroke.JOIN_ROUND, 1f);
 
 ==== Drawing the Tick Marks
 
-For the tick marks, we will use a single https://www.codenameone.com/javadoc/com/codename1/ui/geom/GeneralPath.html[GeneralPath] object, making use of the `moveTo()` and `lineTo()` methods
+For the tick marks, you will use a single https://www.codenameone.com/javadoc/com/codename1/ui/geom/GeneralPath.html[GeneralPath] object, making use of the `moveTo()` and `lineTo()` methods
 to draw each individual tick.
 
 [source,java]
@@ -509,22 +505,22 @@ g.drawShape(ticksPath, tickStroke);
 ----
 
 TIP: This example uses a little bit of trigonometry to calculate the `(x,y)` coordinates of the tick marks based on
-the angle and the radius.  If math isn't your thing, don't worry.  This example just makes use of the identities: `x=r*cosθ` and `y=r*sinθ`.
+the angle and the radius. If math isn't your thing, don't worry. This example makes use of the identities: `x=r*cosθ` and `y=r*sinθ`.
 
-At this point our clock should include a series of tick marks orbiting a blank center as shown below:
+At this point your clock should include a series of tick marks orbiting a blank center as shown below:
 
 .Drawing tick marks on the watch face
 image::img/tick_marks.png[Drawing tick marks on the watch face,scaledwidth=40%]
 
 ==== Drawing the Numbers
 
-The `Graphics.drawString(str, x, y)` method allows you to draw text at any point of a component.  The tricky part
+The `Graphics.drawString(str, x, y)` method allows you to draw text at any point of a component. The tricky part
 here is calculating the correct `x` and `y` values for each string so that the number appears in the correct location.
 
-For the purposes of this tutorial, we will use the following strategy.  For each number (1 through 12):
+For the purposes of this tutorial, you will use the following strategy. For each number (1 through 12):
 
-1.  Use the `Graphics.translate(x,y)` method to apply a translation from the clock's center point to the point where the number should appear.
-2. Draw number (using `drawString()`) at the clock's center.  It should be rendered at the correct point due to our translation.
+1. Use the `Graphics.translate(x,y)` method to apply a translation from the clock's center point to the point where the number should appear.
+2. Draw number (using `drawString()`) at the clock's center. It should be rendered at the correct point due to your translation.
 3. Invert the translation performed in step 1.
 
 [source,java]
@@ -576,11 +572,11 @@ for ( int i=1; i<=12; i++){
 ----
 
 NOTE: This example is, admittedly, a little contrived to allow for a demonstration of the `Graphics.translate()` method.
-We could have just as easily passed the exact location of the number to `drawString()` rather than draw at the clock
+You could have as easily passed the exact location of the number to `drawString()` rather than draw at the clock
 center and translate to the correct location.
 
 
-Now, we should have a clock with tick marks _and_ numbers as shown below:
+Now, you should have a clock with tick marks _and_ numbers as shown below:
 
 .Drawing the numbers on the watch face
 image::img/numbers.png[Drawing the numbers on the watch face,scaledwidth=40%]
@@ -588,8 +584,8 @@ image::img/numbers.png[Drawing the numbers on the watch face,scaledwidth=40%]
 
 ==== Drawing the Hands
 
-The clock will include three hands:  Hour, Minute, and Second.  We will use a separate https://www.codenameone.com/javadoc/com/codename1/ui/geom/GeneralPath.html[GeneralPath] object
-for each hand.  For the positioning/angle of each, I will employ the following strategy:
+The clock will include three hands: Hour, Minute, and Second. You will use a separate https://www.codenameone.com/javadoc/com/codename1/ui/geom/GeneralPath.html[GeneralPath] object
+for each hand. For the positioning/angle of each, I will employ the following strategy:
 
 1. Draw the hand at the clock center pointing toward `12` (straight up).
 2. Translate the hand slightly down so that it overlaps the center.
@@ -597,7 +593,7 @@ for each hand.  For the positioning/angle of each, I will employ the following s
 
 *Drawing the Second Hand*:
 
-For the "second" hand, we will just use a simple line from the clock center to the inside edge of the medium tick
+For the "second" hand, you will use a simple line from the clock center to the inside edge of the medium tick
 mark at the 12 o'clock position.
 
 [source,java]
@@ -607,7 +603,7 @@ secondHand.moveTo((float)cX, (float)cY);
 secondHand.lineTo((float)cX, (float)(cY-(r-medTickLen)));
 ----
 
-And we will translate it down slightly so that it overlaps the center.  This translation will be performed on the `GeneralPath` object directly rather than through the `Graphics` context:
+And you will translate it down slightly so that it overlaps the center. This translation will be performed on the `GeneralPath` object directly rather than through the `Graphics` context:
 
 [source,java]
 ----
@@ -618,12 +614,12 @@ Shape translatedSecondHand = secondHand.createTransformedShape(
 
 *Rotating the Second Hand:*:
 
-The rotation of the second hand will be performed in the `Graphics` context via the `rotate(angle, px, py)` method.
-This requires us to calculate the angle.  The `px` and `py` arguments constitute the pivot point of the rotation,
-which, in our case will be the clock center.
+The rotation of the second hand will be performed in the `Graphics` context through the `rotate(angle, px, py)` method.
+This requires you to calculate the angle. The `px` and `py` arguments constitute the pivot point of the rotation,
+which, in your case will be the clock center.
 
 WARNING: The rotation pivot point is expected to be in absolute screen coordinates rather than relative
-coordinates of the component.  Therefore we need to get the absolute clock center position in order to perform the rotation.
+coordinates of the component. Therefore you need to get the absolute clock center position in order to perform the rotation.
 
 [source,java]
 ----
@@ -650,13 +646,13 @@ results on your form.
 
 *Drawing the Minute And Hour Hands*:
 
-The mechanism for drawing the hour and minute hands is largely the same as for the minute hand.  There are a
+The mechanism for drawing the hour and minute hands is largely the same as for the minute hand. There are a
 couple of added complexities though:
 
-1. We'll make these hands trapezoidal, and almost triangular rather than just using a simple line.  Therefore the
+1. You will make these hands trapezoidal, and almost triangular rather than using a simple line. Therefore the
 `GeneralPath` construction will be slightly more complex.
-2. Calculation of the angles will be slightly more complex because they need to take into account multiple
-parameters.  E.g. The hour hand angle is informed by both the hour of the day and the minute of the hour.
+2. Calculation of the angles will be slightly more complex because they need to take into account many
+parameters. For example: The hour hand angle is informed by both the hour of the day and the minute of the hour.
 
 The remaining drawing code is as follows:
 
@@ -715,7 +711,7 @@ g.resetAffine();
 
 ==== The Final Result
 
-At this point, we have a complete clock as shown below:
+At this point, you've a complete clock as shown below:
 
 .The final result - fully rendered watch face
 image::img/final.png[The final result - fully rendered watch face,scaledwidth=40%]
@@ -723,11 +719,11 @@ image::img/final.png[The final result - fully rendered watch face,scaledwidth=40
 [[clock-animation-section]]
 ==== Animating the Clock
 
-The current clock component is cool, but it is static.  It just displays the time at the point the clock was created.
-We discussed low level animations in the animation section of the guide, here we will show a somewhat more elaborate
+The current clock component is cool, but it's static. It displays the time at the point the clock was created.
+You discussed low-level animations in the animation section of the guide, here you will show a somewhat more elaborate
 example.
 
-In order to animate our clock so that it updates once per second, we only need to do two things:
+In order to animate your clock so that it updates once per second, you need to do two things:
 
 1. Implement the `animate()` method to indicate when the clock needs to be updated/re-drawn.
 2. Register the component with the form so that it will receive animation "pulses".
@@ -750,13 +746,13 @@ public boolean animate() {
 ----
 
 This method will be invoked on each "pulse" of the EDT. It checks the last time the clock was rendered and returns
-`true` only if the clock hasn't been rendered in the current "time second" interval.  Otherwise it returns false.  This
-ensures that the clock will only be redrawn when the time changes.
+`true` if the clock hasn't been rendered in the current "time second" interval. Otherwise it returns false. This
+ensures that the clock will be redrawn when the time changes.
 
 === Starting and Stopping the Animation
 
-Animations can be started and stopped via the `Form.registerAnimated(component)` and
-`Form.deregisterAnimated(component)` methods.  We chose to encapsulate these calls in `start()` and `stop()`
+Animations can be started and stopped through the `Form.registerAnimated(component)` and
+`Form.deregisterAnimated(component)` methods. You chose to encapsulate these calls in `start()` and `stop()`
 methods in the component as follows:
 
 [source,java]
@@ -781,9 +777,9 @@ clock.start();
 
 === Shape Clipping
 
-Clipping is one of the core tenants of graphics programming, you define the boundaries for drawing and when you exceed said boundaries things aren't drawn. Shape clipping allows us to clip based on any arbitrary `Shape` and not just a rectangle, this allows some unique effects generated in runtime.
+Clipping is one of the core tenants of graphics programming, you define the boundaries for drawing and when you exceed said boundaries things aren't drawn. Shape clipping allows you to clip based on any arbitrary `Shape` and not a rectangle, this allows some unique effects generated in runtime.
 
-E.g. this code allows us to draw a rather complex image of duke:
+For example: this code allows you to draw a rather complex image of duke:
 
 [source,java]
 ----
@@ -837,13 +833,13 @@ TIP: Notice that this functionality isn't available on all platforms so you norm
 === The Coordinate System
 
 The Codename One coordinate system follows the example of Swing (and many other - but not all- graphics
-libraries) and places the origin in the upper left corner of the screen.  X-values grow to the right, and Y-values
+libraries) and places the origin in the upper left corner of the screen. X-values grow to the right, and Y-values
 grow downward as illustrated below:
 
 .The Codename One graphics coordinate space
 image::img/coordinate_system.png[The Codename One graphics coordinate space,scaledwidth=20%]
 
-Therefore the screen origin is at the top left corner of the screen.  Given this information, consider the method
+Therefore the screen origin is at the top left corner of the screen. Given this information, consider the method
 call on the https://www.codenameone.com/javadoc/com/codename1/ui/Graphics.html[Graphics] context `g`:
 
 [source,java]
@@ -854,8 +850,8 @@ g.drawRect(10,10, 100, 100);
 Where would this rectangle be drawn on the screen?
 
 If you answered something something like "10 pixels from the top, and 10 pixels from the left of the screen",
-you _might_ be right.  It depends on whether the graphics has a translation or transform applied to it.  If there is
-currently a translation of `(20,20)` (i.e. 20 pixels to the right, and 20 pixels down), then the rectangle would be
+you _might_ be right. It depends on whether the graphics has a translation or transform applied to it. If there is
+currently a translation of `(20,20)` (that's: 20 pixels to the right, and 20 pixels down), then the rectangle would be
 rendered at `(30, 30)`.
 
 You can always find out the current translation of the graphics context using the `Graphics.getTranslateX()`
@@ -881,25 +877,25 @@ g.translate(currX, currY);
 ----
 
 NOTE: This example glosses over issues such as clipping and transforms which may cause it to not work as you
-expect.  E.g. When painting a component inside its `paint()` method, there is a clip applied to the context so that
-only the content you draw within the bounds of the component will be seen.
+expect. For example: When painting a component inside its `paint()` method, there is a clip applied to the context so that
+ the content you draw within the bounds of the component will be seen.
 
 If, in addition, there is a transform applied that rotates the context 45 degrees clockwise, then the rectangle will
 be drawn at a 45 degree angle with its top left corner somewhere on the left edge of the screen.
 
-Luckily you usually don't have to worry about the exact screen coordinates for the things you paint.  Most of the
-time, you will only be concerned with relative coordinates.
+Luckily you usually don't have to worry about the exact screen coordinates for the things you paint. Most of the
+time, you will be concerned with relative coordinates.
 
 ==== Relative Coordinates
 
-Usually, when you are drawing onto a `Graphics` context, you are doing so within the context of a Component's
-`paint()` method (or one of its variants).  In this case, you generally don't care what the exact screen coordinates
-are of your drawing.  You are only concerned with their relative location within the coordinate.  You can leave
-the positioning (and even sizing) of the coordinate up to Codename One.  Thank you for reading.
+Usually, when you're drawing onto a `Graphics` context, you're doing so within the context of a Component's
+`paint()` method (or one of its variants). In this case, you generally don't care what the exact screen coordinates
+are of your drawing. you're concerned with their relative location within the coordinate. You can leave
+the positioning (and even sizing) of the coordinate up to Codename One. Thank you for reading.
 
 To demonstrate this, let's create a simple component called https://www.codenameone.com/javadoc/com/codename1/ui/geom/Rectangle.html[Rectangle] component, that simply draws a
-rectangle on the screen.  We will use the component's position and size to dictate the size of the rectangle to be
-drawn.  And we will keep a 5 pixel padding between the edge of the component and the edge of our rectangle.
+rectangle on the screen. You will use the component's position and size to dictate the size of the rectangle to be
+drawn. And you will keep a 5 pixel padding between the edge of the component and the edge of your rectangle.
 
 [source,java]
 ----
@@ -917,13 +913,13 @@ The result is as follows:
 image::img/rectangle_component1.png[The rectangle component,scaledwidth=20%]
 
 NOTE: The `x` and `y` coordinates that are passed to the `drawRect(x,y,w,h)` method are relative to the
-component's _parent’s_ origin -- *not the component itself .. its parent.*  This is why we the _x_ position is `getX()+5`
-and not just _5_.
+component's _parent’s_ origin -- *not the component itself.. its parent.* This is why you the _x_ position is `getX()+5`
+and not _5_.
 
 ==== Transforms and Rotations
 
 Unlike the `Graphics` `drawXXX` primitives, methods for setting transformations, including `scale(x,y)` and
-`rotate(angle)`, are always applied in terms of screen coordinates.  This can be confusing at first, because you
+`rotate(angle)`, are always applied in terms of screen coordinates. This can be confusing at first, because you
 may be unsure whether to provide a relative coordinate or an absolute coordinate for a given method.
 
 The general rule is:
@@ -931,10 +927,10 @@ The general rule is:
 1. *All coordinates passed to the drawXXX() and fillXXX() methods will be subject to the graphics context's
 transform and translation settings*.
 2. *All coordinates passed to the context's transformation settings are considered to be screen coordinates, and
-are not subject to current transform and translation settings*.
+aren't subject to current transform and translation settings*.
 
-Let's take our `RectangleComponent` as an example.  Suppose we want to rotate the rectangle by 45 degrees,
-our first attempt might look something like:
+Let you take your `RectangleComponent` as an example. Suppose you want to rotate the rectangle by 45 degrees,
+your first attempt might look something like:
 
 [source,java]
 ----
@@ -959,7 +955,7 @@ our first attempt might look something like:
 TIP: When performing rotations and transformations inside a `paint()` method, always remember to revert your
 transformations at the end of the method so that it doesn't pollute the rendering pipeline for subsequent components.
 
-The behavior of this rotation will vary based on where the component is rendered on the screen.  To
+The behavior of this rotation will vary based on where the component is rendered on the screen. To
 demonstrate this, let's try to place five of these components on a form inside a https://www.codenameone.com/javadoc/com/codename1/ui/layouts/BorderLayout.html[BorderLayout] and see how it looks:
 
 [source,java]
@@ -980,12 +976,12 @@ The result is as follows:
 .Rotating the rectangle
 image::img/rotation1.png[Rotating the rectangle,scaledwidth=20%]
 
-This may not be an intuitive outcome since we drew 10 rectangle components, be we only see a portion of one
-rectangle.  The reason is that the `rotate(angle)` method uses the screen origin as the pivot point for the rotation.
+This may not be an intuitive outcome since you drew 10 rectangle components, be you see a portion of one
+rectangle. The reason is that the `rotate(angle)` method uses the screen origin as the pivot point for the rotation.
 Components nearer to this pivot point will experience a less dramatic effect than components farther from it. In
-our case, the rotation has caused all rectangles except the first one to be rotated outside the bounds of their
-containing component - so they are being clipped. A more sensible solution for our component would be to place
-the rotation pivot point somewhere inside the component.  That way all of the components would look the same.
+your case, the rotation has caused all rectangles except the first one to be rotated outside the bounds of their
+containing component - so they are being clipped. A more sensible solution for your component would be to place
+the rotation pivot point somewhere inside the component. That way all of the components would look the same.
 Some possibilities would be:
 
 Top Left Corner:
@@ -1027,23 +1023,23 @@ public void paint(Graphics g) {
 image::img/rotation3.png[Rotating the rectangle with the center pivot point,scaledwidth=20%]
 
 You could also use the `Graphics.setTransform()` class to apply rotations and other complex transformations
-(including 3D perspective transforms), but I'll leave that for its own topic as it is a little bit more complex.
+(including 3D perspective transforms), but I will leave that for its own topic as it's a little bit more complex.
 
 
 ==== Global Alpha & Anti-Aliasing
 
-So far we have relied on the per-pixel alpha stored in images and gradients.  `Graphics`
+So far you've relied on the per-pixel alpha stored in images and gradients. `Graphics`
 also lets you apply a global alpha multiplier to every draw call by using
 `setAlpha(int)` or `concatenateAlpha(int)` after checking `isAlphaSupported()`.
 Both methods accept values from `0` (fully transparent) to `255` (fully opaque)
-and remain active until you change them again.  `concatenateAlpha()` is
+and remain active until you change them again. `concatenateAlpha()` is
 especially handy when you need to temporarily fade a component because it
 returns the previous alpha so you can restore it later.
 
-Anti-aliasing can likewise be toggled at runtime.  Call `isAntiAliasingSupported()`
+Anti-aliasing can likewise be toggled at runtime. Call `isAntiAliasingSupported()`
 and `isAntiAliasedTextSupported()` to discover which hints the current port
 exposes, then use `setAntiAliased(boolean)` and `setAntiAliasedText(boolean)` to
-opt into smoother edges for shapes and glyphs respectively.  These switches make
+opt into smoother edges for shapes and glyphs respectively. These switches make
 it easy to balance rendering quality versus speed depending on the type of
 content you draw.
 
@@ -1051,11 +1047,11 @@ content you draw.
 ==== Event Coordinates
 
 The coordinate system and event handling are closely tied. You can listen for touch events on a component by
-overriding the `pointerPressed(x,y)` method.  The coordinates received in this method will be *absolute screen
+overriding the `pointerPressed(x,y)` method. The coordinates received in this method will be *absolute screen
 coordinates*, so you may need to do some conversions on these coordinates before using them in your `drawXXX()`
 methods.
 
-E.g. a `pointerPressed()` callback method can look like this:
+For example: a `pointerPressed()` callback method can look like this:
 
 [source,java]
 ----
@@ -1064,25 +1060,25 @@ public void pointerPressed(int x, int y) {
 }
 ----
 
-In this case we translated these points so that they would be relative to the origin of the parent component.
+In this case you translated these points so that they would be relative to the origin of the parent component.
 This is because the `drawXXX()` methods for this component take coordinates relative to the parent component.
 
 
 [[deep-into-images-section]]
 === Images
 
-Codename One has quite a few image types: loaded, RGB (builtin), RGB (Codename One), Mutable,
+Codename One has a few image types: loaded, RGB (built-in), RGB (Codename One), Mutable,
 EncodedImage, SVG, MultiImage, FontImage & Timeline. There are also URLImage, FileEncodedImage, FileEncodedImageAsync,
 `StorageEncodedImage`/Async that will be covered in the IO section.
 
-All image types are mostly seamless to use and will just work with `drawImage` and various image related image
+All image types are mostly seamless to use and will work with `drawImage` and various image related image
 API's for the most part with caveats on performance etc.
 
 TIP: For animation images the code must invoke the `animate()` method on the image (this is done automatically by Codename One when placing the image as a background or as an icon! +
-You only need to do it if you invoke `drawImage` in code rather than use a builtin component).
+You need to do it if you invoke `drawImage` in code rather than use a built-in component).
 
 Performance and memory wise you should read the section below carefully and be aware of the image types you use.
-The Codename One designer tries to conserve memory and be "clever" by using only `EncodedImage`. While these are great for low memory you need to understand the complexities of image locking and be aware that you might pay a penalty if you don't.
+The Codename One designer tries to conserve memory and be "clever" by using `EncodedImage`. While these are great for low memory you need to understand the complexities of image locking and be aware that you might pay a penalty if you don't.
 
 Here are the pros/cons and logic behind every image type. This covers the logic of how it’s created:
 
@@ -1090,7 +1086,7 @@ Here are the pros/cons and logic behind every image type. This covers the logic 
 ==== Loaded Image
 
 This is the basic image you get when loading an image from the jar or network using
-https://www.codenameone.com/javadoc/com/codename1/ui/Image.html#createImage-java.lang.String-[Image.createImage(String)], https://www.codenameone.com/javadoc/com/codename1/ui/Image.html#createImage-java.io.InputStream-[Image.createImage(InputStream)] & https://www.codenameone.com/javadoc/com/codename1/ui/Image.html#createImage-byte:A-int-int-[Image.createImage(byte array,int,int)], ...
+https://www.codenameone.com/javadoc/com/codename1/ui/Image.html#createImage-java.lang.String-[Image.createImage(String)], https://www.codenameone.com/javadoc/com/codename1/ui/Image.html#createImage-java.io.InputStream-[Image.createImage(InputStream)] & https://www.codenameone.com/javadoc/com/codename1/ui/Image.html#createImage-byte:A-int-int-[Image.createImage(byte array,int,int)],...
 
 TIP: Some other API's might return this image type but those API's do so explicitly!
 
@@ -1098,62 +1094,62 @@ In some platforms calling `getGraphics()` on an image like this will throw an ex
 
 This restriction might not apply for all platforms.
 
-The image is stored in RAM based on device logic and should be reasonably efficient in terms of drawing speed. However, it usually takes up a lot of RAM.
+The image is stored in RAM based on device logic and should be reasonably efficient in terms of drawing speed. For example, it usually takes up a lot of RAM.
 
-To calculate the amount of RAM taken by a loaded image we use the following formula:
+To calculate the amount of RAM taken by a loaded image you use the following formula:
 
 ----
 Image Width * Image Height * 4 = Size In RAM in Bytes
 ----
 
-E.g. a 50x100 image will take up 20,000 bytes of RAM.
+For example: a 50x100 image will take up 20,000 bytes of RAM.
 
 The logic behind this is simple, every pixel contains 3 color channels and an alpha component hence 3 bytes for color and one for alpha.
 
-NOTE: This isn't the case for all images but it's very common and we prefer calculating for the worst case scenario. Even with JPEG's that don't include an alpha channel some OS's might reuire that additional byte.
+NOTE: This isn't the case for all images but it's common and you prefer calculating for the worst case scenario. Even with JPEG's that don't include an alpha channel some OS's might reuire that additional byte.
 
 ==== The RGB Image's
 
-There are two types of RGB constructed images that are very different from one another but since they are both technically "RGB image's" we are bundling them under the same subsection.
+There are two types of RGB constructed images that are different from one another but since they are both technically "RGB image's" you're bundling them under the same subsection.
 
 ===== Internal
 
-This is a close cousin of the loaded image. This image is created using the method https://www.codenameone.com/javadoc/com/codename1/ui/Image.html#createImage-int:A-int-int-[Image.createImage(int array, int, int)] and receives the AARRGGBB data to form the image. It's more efficient than the Codename One RGB image but can't be modified, at least not on the pixel level.
+This is a close cousin of the loaded image. This image is created using the method https://www.codenameone.com/javadoc/com/codename1/ui/Image.html#createImage-int:A-int-int-[Image.createImage(int array, int, int)] and receives the AARRGGBB data to form the image. it's more efficient than the Codename One RGB image but can't be modified, at least not on the pixel level.
 
-The goal of this image type is to provide an easy way to render RGB data that isn't modified efficiently at platform native speeds. It's technically a <<loaded-image-section,standard "Loaded Image">> internally.
+The goal of this image type is to provide an easy way to render RGB data that isn't modified efficiently at platform native speeds. it's technically a <<loaded-image-section,standard "Loaded Image">> internally.
 
 ===== RGBImage class
 
 https://www.codenameone.com/javadoc/com/codename1/ui/RGBImage.html[RGBImage] is effectively an AARRGGBB array that can be drawn by Codename One.
 
-On most platforms this is quite inefficient but for some pixel level manipulations there is just no other way.
+On most platforms this is inefficient but for some pixel level manipulations there is no other way.
 
 An `RGBImage` is constructed with an `int` array (`int[]`) that includes `width*height` elements. You can then modify the colors and alpha channel directly within the array and draw the image to any source using standard image drawing API's.
 
-TIP: This is very inefficient in terms of rendering speed and memory overhead. Only use this technique if there is absolutely no other way!
+TIP: This is inefficient in terms of rendering speed and memory overhead. Only use this technique if there is absolutely no other way!
 
 ==== EncodedImage
 
 https://www.codenameone.com/javadoc/com/codename1/ui/EncodedImage.html[EncodedImage] is the workhorse of Codename One. Images returned from resource files are `EncodedImage` and many API's expect it.
 
-The `EncodedImage` is effectively a <<loaded-image-section,loaded image>> that is "hidden" and extracted as needed to remove the memory overhead associated with loaded image. When creating an `EncodedImage` only the PNG (or JPEG etc.) is loaded to an array in RAM. Normally such images are very small (relatively) so they can be kept in memory without much overhead.
+The `EncodedImage` is effectively a <<loaded-image-section,loaded image>> that's "hidden" and extracted as needed to remove the memory overhead associated with loaded image. When creating an `EncodedImage` the PNG (or JPEG etc.) is loaded to an array in RAM. Normally such images are small (relatively) so they can be kept in memory without much overhead.
 
 When image information is needed (pixels) the image is decoded into RAM and kept in a weak/sort reference. This allows the image to be cached for performance and allows the garbage collector to reclaim it when the memory becomes scarce.
 
-Since the fully decoded image can be pretty big (`width X height X 4`) the ability to store just the encoded image can be pretty stark. E.g. taking our example above a 50x100 image will take up 20,000 bytes of RAM for a <<loaded-image-section,loaded image>> but an `EncodedImage` can reduce that to 1kb-2kb of RAM.
+Since the fully decoded image can be pretty big (`width X height X 4`) the ability to store the encoded image can be pretty stark. For example: taking your example above a 50x100 image will take up 20,000 bytes of RAM for a <<loaded-image-section,loaded image>> but an `EncodedImage` can reduce that to 1kb-2kb of RAM.
 
-TIP: An `EncodedImage` might be more expensive than a <<loaded-image-section,loaded image>> as it will take up both the encoded size and the loaded size. So the cost might be slightly bigger in some cases. It's main value is its ability to shrink.
+TIP: An `EncodedImage` might be more expensive than a <<loaded-image-section,loaded image>> as it will take up both the encoded size and the loaded size. So the cost might be slightly bigger in some cases. it's main value is its ability to shrink.
 
-When drawing an `EncodedImage` it checks the weak reference cache and if the image is cached then it is shown  otherwise the image is loaded the encoded image cache it then drawn.
+When drawing an `EncodedImage` it checks the weak reference cache and if the image is cached then it's shown otherwise the image is loaded the encoded image cache it then drawn.
 
-`EncodedImage` is not final and can be derived to produce complex image fetching strategies e.g. the https://www.codenameone.com/javadoc/com/codename1/ui/URLImage.html[URLImage] class that can dynamically download its content from the web.
+`EncodedImage` isn't final and can be derived to produce complex image fetching strategies for example: the https://www.codenameone.com/javadoc/com/codename1/ui/URLImage.html[URLImage] class that can dynamically download its content from the web.
 
-`EncodedImage` can be instantiated via the create methods in the `EncodedImage` class. Pretty much any image can be converted into an `EncodedImage` via the  https://www.codenameone.com/javadoc/com/codename1/ui/EncodedImage.html#createFromImage-com.codename1.ui.Image-boolean-[createFromImage(Image, boolean)] method.
+`EncodedImage` can be instantiated through the create methods in the `EncodedImage` class. Pretty much any image can be converted into an `EncodedImage` through the https://www.codenameone.com/javadoc/com/codename1/ui/EncodedImage.html#createFromImage-com.codename1.ui.Image-boolean-[createFromImage(Image, boolean)] method.
 
 
 .EncodedImage Locking
 ****
-Naturally loading the image is more expensive so we want the images that are on the current form to remain in cache (otherwise GC will thrash a lot). That's where `lock()` kicks in, when `lock()` is active we keep a hard reference to the actual native image so it won't get GC'd. This significantly improves performance!
+Naturally loading the image is more expensive so we want the images that are on the current form to remain in cache (otherwise GC will thrash a lot). that's where `lock()` kicks in, when `lock()` is active we keep a hard reference to the actual native image so it won't get GC'd. This significantly improves performance!
 
 Internally this is invoked automatically for background images, icons etc. which results in a huge performance boost. This
 makes sense since these images are currently showing and they will be in RAM anyway. However, if you use a complex renderer or custom drawing UI you should `lock()` your images where possible!
@@ -1165,7 +1161,7 @@ To verify that locking might be a problem you can launch the performance monitor
 
 Multi images don't physically exist as a concept within the Codename One API so there is no way to actually create them and they are in no way distinguishable from `EnclodedImage`.
 
-The only builtin support for multi images is in the resource file loading logic where a MultiImage is decoded and only the version that matches the current DPI is physically loaded. From that point on user code can treat it like any other `EnclodedImage`.
+The built-in support for multi images is in the resource file loading logic where a MultiImage is decoded and the version that matches the current DPI is physically loaded. From that point on user code can treat it like any other `EnclodedImage`.
 
 9-image borders use multi images by default to keep their appearance more refined on the different DPI’s.
 
@@ -1191,11 +1187,11 @@ hi.show();
 .Icon font from material design icons created with the fixed size of display width
 image::img/graphics-fontimage-fixed.png[Icon font from material design icons created with the fixed size of display width,scaledwidth=20%]
 
-NOTE: The samples use the builtin material design icon font. This is for convenience so the sample will work out of the box, for everyone. However you should be able to do this with any arbitrary icon font off the internet as long as its a valid TTF file.
+NOTE: The samples use the built-in material design icon font. This is for convenience so the sample will work out of the box, for everyone. For example you should be able to do this with any arbitrary icon font off the internet as long as its a valid TTF file.
 
 A more common and arguably "correct" way to construct such an icon would be thru the https://www.codenameone.com/javadoc/com/codename1/ui/plaf/Style.html[Style] object. The `Style` object can provide the color, size and background information needed by `FontImage`.
 
-There are two versions of this method, the first one expects the `Style` object to have the correct icon font set to its font attribute. The second accepts a `Font` object as an argument. The latter is useful for a case where you want to reuse the same `Style` object that you defined for a general UI element e.g. we can set an icon for a `Button` like this and it will take up the style of the `Button`:
+There are two versions of this method, the first one expects the `Style` object to have the correct icon font set to its font attribute. The second accepts a `Font` object as an argument. The latter is useful for a case where you want to reuse the same `Style` object that you defined for a general UI element for example: you can set an icon for a `Button` like this and it will take up the style of the `Button`:
 
 [source,java]
 ----
@@ -1216,13 +1212,13 @@ WARNING: Notice that for this specific version of the method the size of the fon
 
 ===== Material Design Icons
 
-There are many icon fonts in the web, the field is rather volatile and constantly changing. However, we wanted to have builtin icons that would allow us to create better looking demos and builtin components.
+There are many icon fonts in the web, the field is rather volatile and constantly changing. For example, you wanted to have built-in icons that would allow you to create better looking demos and built-in components.
 
-That's why we picked the material design icon font for inclusion in the Codename One distribution. It features a relatively stable core set of icons, that aren't IP encumbered.
+that's why you picked the material design icon font for inclusion in the Codename One distribution. It features a relatively stable core set of icons, that aren't IP encumbered.
 
-You can use the builtin font directly as demonstrated above but there are far better ways to create a material design icon. To find the icon you want you can check out the https://design.google.com/icons/[material design icon gallery]. E.g. we used the save icon in the samples above.
+You can use the built-in font directly as demonstrated above but there are far better ways to create a material design icon. To find the icon you want you can check out the https://design.google.com/icons/[material design icon gallery]. For example: you used the save icon in the samples above.
 
-To recreate the save icon from above we can do something like:
+To recreate the save icon from above you can do something like:
 
 [source,java]
 ----
@@ -1237,7 +1233,7 @@ image::img/graphics-fontimage-material.png[Material save icon,scaledwidth=20%]
 
 NOTE: Notice that the icon is smaller now as it's calculated based on the font size of the `Button` UIID.
 
-We can even write the code in a more terse style using:
+You can even write the code in a more terse style using:
 
 [source,java]
 ----
@@ -1258,7 +1254,7 @@ Timeline's allow rudimentary animation and enable GIF importing using the Codena
 
 ==== Image Masking
 
-Image masking allows us to manipulate images by changing the opacity of an image according to a mask image. The mask image can be hardcoded or generated dynamically, it is then converted to a Mask object that can be applied to any image. Notice that the masking process is computationally intensive, it should be done once and cached/saved.
+Image masking allows you to manipulate images by changing the opacity of an image according to a mask image. The mask image can be hardcoded or generated dynamically, it's then converted to a Mask object that can be applied to any image. Notice that the masking process is computationally intensive, it should be done once and cached/saved.
 
 The code below can convert an image to a rounded image:
 
@@ -1293,7 +1289,7 @@ hi.getToolbar().addCommandToRightBar("", camera, (ev) -> {
 .Picture after the capture was complete and the resulted image was rounded. The background was set to red so the rounding effect will be more noticeable
 image::img/graphics-image-masking.png[Picture after the capture was complete and the resulted image was rounded. The background was set to red so the rounding effect will be more noticeable,scaledwidth=20%]
 
-Notice that this example is simplistic in order to be self contained. We often recommend that developers ship "ready made" mask images with their application which can allow very complex effects on the images.
+Notice that this example is simplistic in order to be self contained. You often recommend that developers ship "ready made" mask images with their application which can allow complex effects on the images.
 
 ==== URLImage
 
@@ -1319,36 +1315,36 @@ Alternatively you can use the similar `URLImage.createToFileSystem` method inste
 
 This image can now be used anywhere a regular image will appear, it will initially show the placeholder image
 and then seamlessly replace it with the file after it was downloaded and stored. Notice that if you make changes
-to the image itself (e.g. the `scaled` method) it will generate a new image which won't be able to fetch the actual
+to the image itself (for example: the `scaled` method) it will generate a new image which won't be able to fetch the actual
 image.
 
 TIP: Since https://www.codenameone.com/javadoc/com/codename1/ui/util/ImageIO.html[ImageIO] is used to perform the operations of the adapter interface its required that `ImageIO` will work.
-It is currently working in JavaSE, Android, iOS & Windows Phone.
+it's currently working in Java SE, Android, iOS & Windows Phone.
 
-If the file in the URL contains an image that is too big it will scale it to match the size of the placeholder precisely! +
-There is also  an option to fail if the sizes don't match. Notice that the image that will be saved is the scaled
-image, this means you will have very little overhead in downloading images that are the wrong size although you
+If the file in the URL contains an image that's too big it will scale it to match the size of the placeholder precisely! +
+There is also an option to fail if the sizes don't match. Notice that the image that will be saved is the scaled
+image, this means you will have little overhead in downloading images that are the wrong size although you
 will get some artifacts.
 
-The last argument is really quite powerful, its an interface called https://www.codenameone.com/javadoc/com/codename1/ui/URLImage.ImageAdapter.html[URLImage.ImageAdapter] and you can implement
-it to adapt the downloaded image in any way you like. E.g. you can use an image mask to automatically create a
+The last argument is powerful, its an interface called https://www.codenameone.com/javadoc/com/codename1/ui/URLImage.ImageAdapter.html[URLImage.ImageAdapter] and you can implement
+it to adapt the downloaded image in any way you like. For example: you can use an image mask to automatically create a
 rounded version of the downloaded image.
 
-To do this you can just override:
+To do this you can override:
 
 [source,java]
 ----
 public EncodedImage adaptImage(EncodedImage downloadedImage, Image placeholderImage)
 ----
 
-In the adapter interface and just return the processed encoded image. If you do heavy processing (e.g. rounded edge images)
-you would need to convert the processed image back to an encoded image so it can be saved. You would then also want to indicate that this operation should run asynchronously via the appropriate method in the class.
+In the adapter interface and return the processed encoded image. If you do heavy processing (for example: rounded edge images)
+you would need to convert the processed image back to an encoded image so it can be saved. You would then also want to indicate that this operation should run asynchronously through the appropriate method in the class.
 
 If you need to download the file instantly and not wait for the image to appear before download initiates you can explicitly invoke the `fetch()` method which will asynchronously fetch the image from the network. Notice that the downloading will still take time so the placeholder is still required.
 
 ===== Mask Adapter
 
-A `URLImage` can be created with a mask adapter to apply an effect to an image. This allows us to round downloaded images or apply any sort of masking e.g. we can adapt the round mask code above as such:
+A `URLImage` can be created with a mask adapter to apply an effect to an image. This allows you to round downloaded images or apply any sort of masking for example: you can adapt the round mask code above as such:
 
 [source,java]
 ----
@@ -1363,9 +1359,9 @@ Image i = URLImage.createToStorage(placeholder, "fileNameInStorage", "http://xxx
 
 ===== URLImage In Lists
 
-The biggest problem with image download service is with lists. We decided to attack this issue at the core by
+The biggest problem with image download service is with lists. You decided to attack this issue at the core by
 integrating https://www.codenameone.com/javadoc/com/codename1/ui/URLImage.html[URLImage] support directly into https://www.codenameone.com/javadoc/com/codename1/ui/list/GenericListCellRenderer.html[GenericListCellRenderer] which means it will work with https://www.codenameone.com/javadoc/com/codename1/ui/list/MultiList.html[MultiList],
-https://www.codenameone.com/javadoc/java/util/List.html[List] & https://www.codenameone.com/javadoc/com/codename1/ui/list/ContainerList.html[ContainerList]. To use this support just define the name of the component (name not UIID) to end with
+https://www.codenameone.com/javadoc/java/util/List.html[List] & https://www.codenameone.com/javadoc/com/codename1/ui/list/ContainerList.html[ContainerList]. To use this support define the name of the component (name not UIID) to end with
 `_URLImage` and give it an icon to use as the placeholder. This is easy to do in the multilist by changing the
 name of icon to `icon_URLImage` then using this in the data:
 
@@ -1377,7 +1373,7 @@ map.put("icon_URLImage", urlToActualImage);
 Make sure you also set a "real" icon to the entry in the GUI builder or in handcoded applications. This is important
 since the icon will be implicitly extracted and used as the placeholder value. Everything else should be handled
 automatically. You can use `setDefaultAdapter` & `setAdapter` on the generic list cell renderer to install adapters
-for the images. The default is a scale adapter although we might change that to scale fill in the future.
+for the images. The default is a scale adapter although you might change that to scale fill in the future.
 
 [source,java]
 ----
@@ -1426,7 +1422,7 @@ image::img/graphics-urlimage-multilist.png[A URL image fetched dynamically into 
 === Charts
 
 Codename One includes a charting toolkit in the `com.codename1.charts` package
-that is designed to integrate with regular UI layouts. Charts are drawn by
+that's designed to integrate with regular UI layouts. Charts are drawn by
 creating an appropriate dataset and renderer pair, instantiating the matching
 chart view class, and wrapping it in a
 https://www.codenameone.com/javadoc/com/codename1/charts/ChartComponent.html[`ChartComponent`]
@@ -1483,7 +1479,7 @@ The following classes are available for different kinds of visualisations:
 
 | https://www.codenameone.com/javadoc/com/codename1/charts/views/DoughnutChart.html[`DoughnutChart`]
 | `MultipleCategorySeries` / `DefaultRenderer`
-| Shows hierarchical proportions as concentric rings around a common centre.
+| Shows hierarchical proportions as concentric rings around a common center.
 
 | https://www.codenameone.com/javadoc/com/codename1/charts/views/LineChart.html[`LineChart`]
 | `XYMultipleSeriesDataset` / `XYMultipleSeriesRenderer`

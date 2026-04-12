@@ -21,11 +21,11 @@ In iOS provisioning is separate from the app and you need to also define the dev
 
 ==== What's a Signing Authority?
 
-Normally certificates are issued by a signing authority which is a body that certifies that you are who you say you are. Apple issues certificates for iOS and is in effect a signing authority.
+Normally certificates are issued by a signing authority which is a body that certifies that you're who you say you're. Apple issues certificates for iOS and is in effect a signing authority.
 
 Android uses self signed certificates which don't use a signing authority so anyone can ship an Android app.
 
-The logic with the Android approach is that a signature indicates that you are the same person who previously shipped the app. Hence an app will be updated only with the exact same certificate.
+The logic with the Android approach is that a signature indicates that you're the same person who previously shipped the app. Hence an app will be updated with the exact same certificate.
 
 ==== What is UDID?
 
@@ -33,12 +33,12 @@ The UDID is the Universal Device Identifier. It identifies mobile devices unique
 
 You need the iOS device UDID value during development to add the device into the list of allowed devices.
 
-IMPORTANT: Don't use an app to get the UDID! +
+IMPORTANT: don't use an app to get the UDID! +
 Most return the wrong value. Use the Finder device summary (macOS), Apple Configurator, or a trusted service such as http://get.udid.io/ which seems to work rather well
 
 ==== Should I Reuse the Same Certificate for All Apps?
 
-For iOS yes. It's designed to work in that way.
+For iOS yes. it's designed to work in that way.
 
 We would recommend it for all platforms for simplicity but some developers prefer creating per-application certificates for Android. The advantage here is that you can transfer ownership of the application later on without giving away what is effectively "you house keys".
 
@@ -53,18 +53,18 @@ To generate your certificates and profiles, open project's properties and click 
 .Netbeans iOS Signing properties panel
 image::img/ios-cert-wizard-1-signing.png[Netbeans iOS Signing properties panel,scaledwidth=50%]
 
-If you already have valid certificates and profiles, you can just enter their locations here.  If you don't, then you can use the wizard by clicking the #Generate# button in the lower part of the form.
+If you already have valid certificates and profiles, you can enter their locations here. If you don't, then you can use the wizard by clicking the #Generate# button in the lower part of the form.
 
 ==== Logging into the Wizard
 
-After clicking #Generate# you'll be shown a login form. Log into this form using the *App Store Connect* Apple ID that is registered on your Apple Developer Program team.  **NOT YOUR CODENAME ONE LOGIN**.
+After clicking #Generate# you'll be shown a login form. Log into this form using the *App Store Connect* Apple ID that's registered on your Apple Developer Program team. **NOT YOUR CODENAME ONE LOGIN**.
 
 .Wizard login form
 image::img/ios-cert-wizard-2-login.png[Wizard login form,scaledwidth=20%]
 
 ==== Selecting Devices
 
-Once you are logged in you will be shown a list of all of the devices that you currently have registered on your
+Once you're logged in you will be shown a list of all of the devices that you currently have registered on your
 Apple developer account.
 
 .Devices form
@@ -79,13 +79,13 @@ image::img/ios-cert-wizard-4-devices-selected.png[After selecting devices,scaled
 
 If you don't have any devices registered yet, you can click the "Add New Device" button, which will prompt you to enter the UDID for your device.
 
-====  Decisions & Edge Cases
+==== Decisions & Edge Cases
 
 IMPORTANT: If you already have iOS P12 development/distribution certificates you should reuse them for all your apps from that account and you shouldn't regenerate them
 
-After you click #Next# on the device form, the wizard checks to see if you already have a valid certificate.  If your
-project already has a valid certificate and it matches the one that is currently active in your apple developer
-account, then it will just use the same certificate.  If the certificate doesn't match the currently-active one, or you
+After you click #Next# on the device form, the wizard checks to see if you already have a valid certificate. If your
+project already has a valid certificate and it matches the one that's currently active in your apple developer
+account, then it will use the same certificate. If the certificate doesn't match the currently-active one, or you
 haven't provided a certificate, you will be prompted to overwrite the old certificate with a new one.
 
 .Prompt to overwrite existing certificate
@@ -94,11 +94,11 @@ image::img/ios-cert-wizard-4.1-overwrite-cert.png[Prompt to overwrite existing c
 .Prompt to overwrite other certificate
 image::img/ios-cert-wizard-4.2-overwrite-cert.png[Prompt to overwrite other certificate,scaledwidth=20%]
 
-The same decision need to be made twice:  Once for the development certificate, and once for the App Store distribution certificate.
+The same decision need to be made twice: Once for the development certificate, and once for the App Store distribution certificate.
 
-TIP: Each Apple Developer account can only have three active iOS Development certificates and three active iOS Distribution certificates at a time. Reuse existing certificates whenever possible to avoid hitting this limit.
+TIP: Each Apple Developer account can have three active iOS Development certificates and three active iOS Distribution certificates at a time. Reuse existing certificates whenever possible to avoid hitting this limit.
 
-TIP: You can revoke a certificate when you have an application in the store shipping with said certificate! +
+TIP: You can revoke a certificate when you've an application in the store shipping with said certificate! +
 This won't affect the shipping app see http://stackoverflow.com/questions/6320255/if-i-revoke-an-existing-distribution-certificate-will-it-mess-up-anything-with[this].
 
 .Why Two Certificates?
@@ -107,15 +107,15 @@ A typical iOS app has at least two certificates:
 
 - Development - this is used during development and can't be shipped to 3rd parties. An application signed with this certificate can only be installed on one of the up to 100 devices listed above.
 
-- Distribution - this is used when you are ready to upload your app to App Store Connect whether for final shipping or beta testing. Notice that you can't install a distribution build on your own device. You need to upload it to App Store Connect.
+- Distribution - this is used when you're ready to upload your app to App Store Connect whether for final shipping or beta testing. Notice that you can't install a distribution build on your own device. You need to upload it to App Store Connect.
 
-- There are two push certificates, they are separate from the signing certificates. Don't confuse them! +
+- There are two push certificates, they are separate from the signing certificates. don't confuse them! +
 They are used to authenticate with Apple when sending push messages.
 ****
 
 ==== App IDs and Provisioning Profiles
 
-The next form in the wizard asks for your app's bundle ID.  This should have been pre-filled, but you can change
+The next form in the wizard asks for your app's bundle ID. This should have been pre-filled, but you can change
 the app ID to a wildcard ID if you prefer.
 
 .Enter the app bundle ID
@@ -150,7 +150,7 @@ TIP: You can see the password for the P12 files in the `codenameone_settings.pro
 ==== Building Your App
 
 After selecting your local install location, and closing the wizard, you should see the fields of the "iOS Signing"
-properties panel filled in correctly.  You should now be able to send iOS debug or App Store builds without the usual hassles.
+properties panel filled in correctly. You should now be able to send iOS debug or App Store builds without the usual hassles.
 
 .Filled in signing panel after wizard complete
 image::img/ios-cert-wizard-9-signing-panel.png[Filled in signing panel after wizard complete,scaledwidth=40%]
@@ -159,9 +159,9 @@ image::img/ios-cert-wizard-9-signing-panel.png[Filled in signing panel after wiz
 
 WARNING: You should use the certificate wizard, especially if you don't have a Mac. This section is here mostly for reference and edge cases that don't work with the certificate wizard
 
-iOS signing has two distinct modes: App Store signing which is only valid for distribution via App Store Connect (you won't be able to run the resulting application without submitting it to Apple) and development mode signing.
+iOS signing has two distinct modes: App Store signing which is valid for distribution via App Store Connect (you won't be able to run the resulting application without submitting it to Apple) and development mode signing.
 
-You have two major files to keep track of:
+you've two major files to keep track of:
 
 1. *Certificate* - your signature
 2. *Provisioning Profile* - details about the application and who is allowed to execute it
@@ -184,7 +184,7 @@ You can then configure the 4 files in the IDE and start sending builds to the Co
 
 === Provisioning Profile & Certificates Visual Guide
 
-One of the hardest parts in developing for iOS is the  certificate & provisioning process. In this step by step guide we walk over the manual certificate generation process. Notice that the UI for the Apple website changes occasionally but the basic process remains the same...
+One of the hardest parts in developing for iOS is the certificate & provisioning process. In this step by step guide we walk over the manual certificate generation process. Notice that the UI for the Apple website changes occasionally but the basic process remains the same...
 
 Start by logging in to the iOS-provisioning portal
 
@@ -221,7 +221,7 @@ image::img/ios-create-prov-profile-1.png[Create provisioning profile step 1,scal
 .Create provisioning profile step 2
 image::img/ios-create-prov-profile-2.png[Create provisioning profile step 2,scaledwidth=30%]
 
-Refresh the screen to see the profile you just created and press the download button to download your development provisioning profile.
+Refresh the screen to see the profile you created and press the download button to download your development provisioning profile.
 
 .Create provisioning profile step 3
 image::img/ios-create-prov-profile-3.png[Create provisioning profile step 3,scaledwidth=30%]
@@ -236,17 +236,17 @@ Download the distribution provisioning profile.
 .Download distribution provisioning profile
 image::img/ios-download-dist-prov-profile.png[Download distribution provisioning profile,scaledwidth=30%]
 
-We can now import the cer files into the key chain tool on a Mac by double clicking the file, on Windows the process is slightly more elaborate
+You can now import the cer files into the key chain tool on a Mac by double clicking the file, on Windows the process is slightly more elaborate
 
 .Import cer files
 image::img/ios-import-cer-files.png[Import cer files,scaledwidth=30%]
 
-We can export the p12 files for the distribution and development profiles through the keychain tool
+You can export the p12 files for the distribution and development profiles through the keychain tool
 
 .Export p12 files
 image::img/ios-export-p12.png[Export p12 files,scaledwidth=30%]
 
-In the IDE we enter the project settings, configure our provisioning profile, the password we typed when exporting and the p12 certificates. It is now possible to send the build to the server.
+In the IDE we enter the project settings, configure our provisioning profile, the password we typed when exporting and the p12 certificates. it's now possible to send the build to the server.
 
 .IOS Project Settings
 image::img/ios-project-settings.png[IOS Project Settings,scaledwidth=30%]
@@ -277,11 +277,11 @@ Below is a list of common issues when singing and a set of suggestions for thing
 
 TIP: Most of these issues aren't applicable when using the wizard e.g. a Mac isn't required for the certificate wizard as it uses the Codename One cloud
 
--	*You must use a Mac to generate P12 certificates manually*. The only workaround we found is the certificate wizard!
+-	*You must use a Mac to generate P12 certificates manually*. The workaround we found is the certificate wizard!
 +
 Notice that this is something you need to do once a year (generate P12), you will also need a Mac to upload your final app to the store at this time.
 
--	When exporting the P12 certificate *make sure that you selected BOTH the public and the private keys* as illustrated here. If you only see one entry (no private key) then you created the CSR (singing request) on a different machine than the one where you imported the resulting CER file.
+-	When exporting the P12 certificate *make sure that you selected BOTH the public and the private keys* as illustrated here. If you see one entry (no private key) then you created the CSR (singing request) on a different machine than the one where you imported the resulting CER file.
 +
 .p12 export
 image::img/p12-export.png[P12 Export,scaledwidth=30%]
@@ -291,7 +291,7 @@ image::img/p12-export.png[P12 Export,scaledwidth=30%]
 .Package ID matching App ID
 image::img/package-id-app-id.png[Package ID matching App ID,scaledwidth=30%]
 
--	Make sure the prefix for the app id in the iOS section of the preferences matches the one you have from Apple
+-	Make sure the prefix for the app id in the iOS section of the preferences matches the one you've from Apple
 +
 .App prefix
 image::img/app-prefix.png[App prefix,scaledwidth=30%]
@@ -306,7 +306,7 @@ image::img/provisioning-profile-with-app-id.png[Provisioning Profile with app id
 
 -	Make sure the certificate and provisioning profile are from the same source (if you work with multiple accounts), notice that provisioning profiles and certificates expire so you will need to regenerate provisioning when your certificate expires or is revoked.
 
--	If you declare push in the provisioning profile then `ios.includePush` (in the build arguments) MUST be set to true, otherwise it *MUST* be set to false (see pictures below). Notice that this should be configured via the UI in the iOS section. The build server automatically enables the notification entitlement when your project uses `LocalNotification`, even if `ios.includePush` is false, so do not try to disable the entitlement manually to "fix" warning messages from App Store Connect.
+-	If you declare push in the provisioning profile then `ios.includePush` (in the build arguments) MUST be set to true, otherwise it *MUST* be set to false (see pictures below). Notice that this should be configured via the UI in the iOS section. The build server automatically enables the notification entitlement when your project uses `LocalNotification`, even if `ios.includePush` is false, so don't try to disable the entitlement manually to "fix" warning messages from App Store Connect.
 +
 .Include push build hint
 image::img/include-push-build-hint.png[Include push build hint,scaledwidth=30%]

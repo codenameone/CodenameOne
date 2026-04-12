@@ -1,6 +1,6 @@
 === Generate Legacy cn1lib (`cn1lib`)
 
-This goal generates a legacy .cn1lib file.  It is bound to the `package` phase of `cn1lib-archetype` projects so you generally will never need to run this goal directly.
+This goal generates a legacy.cn1lib file. it's bound to the `package` phase of `cn1lib-archetype` projects so you generally will never need to run this goal directly.
 
 ==== Output Location
 

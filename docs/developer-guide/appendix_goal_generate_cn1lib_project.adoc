@@ -2,15 +2,15 @@
 
 Generates a Maven cn1lib project (using the <<cn1lib-archetype, cn1lib-archetype>>) given an ANT cn1lib project as a template.
 
-This is to assist in migrating Ant projects to Maven projects.  This won't make any changes to the source Ant project.  It simply generates a new project using the <<cn1lib-archetype>> and copies all of files and configuration from the source project, into the new project.
+This is to assist in migrating Ant projects to Maven projects. This won't make any changes to the source Ant project. It simply generates a new project using the <<cn1lib-archetype>> and copies all of files and configuration from the source project, into the new project.
 
 ==== Usage Example
 
-IMPORTANT: This goal is not run in an existing maven project directory, therefore we need to include the absolute Maven coordinates for the goal.
+IMPORTANT: This goal isn't run in an existing maven project directory, therefore you need to include the absolute Maven coordinates for the goal.
 
-Suppose we have a Ant Codename One library project at `/path/to/MyLegacyAntLibraryProject` and we want to convert it to a Maven project.
+Suppose you've a Ant Codename One library project at `/path/to/MyLegacyAntLibraryProject` and we want to convert it to a Maven project.
 
-We can run the `generate-cn1lib-project` goal as follows:
+You can run the `generate-cn1lib-project` goal as follows:
 
 .Maven command to migrate an Ant project to Maven.
 [source,bash]
@@ -27,7 +27,7 @@ NOTE: Make sure you substitute the https://search.maven.org/search?q=a:codenameo
 
 Some notes about this command as shown above:
 
-. This command is formatted for Unix/Mac on multiple lines, using the `\` character to escape the new-lines.  On windows the command will need to be all one one line, and you should omit those `\` escape characters.
+. This command is formatted for Unix/Mac on multiple lines, using the `\` character to escape the new-lines. On windows the command will need to be all one one line, and you should omit those `\` escape characters.
 . The `-U` flag tells Maven to update its catalogs to ensure that it can find the `$CN1VERSION` that you specify.
 
 If all goes well, you should find a new maven project generated in the "my-maven-lib" directory (named after the `artifactId` that you specified).
@@ -54,7 +54,7 @@ After running the "install" command, you should be able to add your library as a
 </dependency>
 ----
 
-IMPORTANT: Notice that the `artifactId` has an extra "-lib" appended.  I.e. it is `<artifactId>my-maven-lib-lib</artifactId>` and not `<artifactId>my-maven-lib</artifactId>`.  This is because the `artifactId` that you specify in the `generate-cn1lib-project` goal is used for the "root" module of the multimodule maven project.  The actual "lib" project that you can use as a Maven dependency is the "lib" submodule, which uses the specified artifactId with a "-lib" suffix.
+IMPORTANT: Notice that the `artifactId` has an extra "-lib" appended. I.e. it's `<artifactId>my-maven-lib-lib</artifactId>` and not `<artifactId>my-maven-lib</artifactId>`. This is because the `artifactId` that you specify in the `generate-cn1lib-project` goal is used for the "root" module of the multimodule maven project. The actual "lib" project that you can use as a Maven dependency is the "lib" submodule, which uses the specified artifactId with a "-lib" suffix.
 
 See <<creating-cn1libs>> for more information about the resulting maven library project.
 
@@ -70,7 +70,7 @@ artifactId::
 The maven `artifactId` to use for the resulting project.
 
 version::
-The maven `version` to use for the resulting project.  Default "1.0-SNAPSHOT"
+The maven `version` to use for the resulting project. Default "1.0-SNAPSHOT"
 
 
 

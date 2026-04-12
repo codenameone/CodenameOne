@@ -16,5 +16,5 @@ This will open the gui builder to edit the form whose class is `com.example.MyFo
 
 className::
 
-The fully-qualified name to the form class that you wish to edit.  This must have been previously generated using <<create-gui-form>>.
+The fully-qualified name to the form class that you wish to edit. This must have been previously generated using <<create-gui-form>>.
 
