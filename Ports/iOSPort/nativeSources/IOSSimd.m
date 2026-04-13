@@ -963,7 +963,7 @@ JAVA_INT com_codename1_impl_ios_IOSSimd_base64Encode___byte_1ARRAY_int_int_byte_
 
     /* NEON fast path: process 48 input bytes -> 64 output bytes per iteration */
     int neonEnd = end3 - 48 + 1;
-    while (si <= neonEnd - 1) {
+    while (si < neonEnd) {
         /* Load 48 bytes and de-interleave into 3 registers of 16 */
         uint8x16x3_t in3 = vld3q_u8((const uint8_t*)(src + si));
         uint8x16_t b0 = in3.val[0];
@@ -1057,7 +1057,7 @@ static inline uint8x16_t neon_base64_decode_lut(uint8x16_t chars) {
     uint8x16_t ge0   = vcgeq_u8(chars, vdupq_n_u8(48));
     uint8x16_t le9   = vcleq_u8(chars, vdupq_n_u8(57));
     uint8x16_t isDigit = vandq_u8(ge0, le9);
-    result = vbslq_u8(isDigit, vsubq_u8(chars, vdupq_n_u8(252)), result); /* 48 - 252 = 52 mod 256 */
+    result = vbslq_u8(isDigit, vsubq_u8(chars, vdupq_n_u8(252)), result); /* chars - 252 wraps to chars + 4 mod 256 */
 
     /* '+' -> 62 */
     uint8x16_t isPlus = vceqq_u8(chars, vdupq_n_u8(43));
@@ -1104,7 +1104,7 @@ JAVA_INT com_codename1_impl_ios_IOSSimd_base64Decode___byte_1ARRAY_int_int_byte_
 
     /* NEON fast path: process 64 input bytes -> 48 output bytes per iteration */
     int neonEnd = fullEnd - 64 + 1;
-    while (si <= neonEnd - 1) {
+    while (si < neonEnd) {
         /* Load 64 bytes and de-interleave into 4 registers of 16 */
         uint8x16x4_t in4 = vld4q_u8((const uint8_t*)(src + si));
 
