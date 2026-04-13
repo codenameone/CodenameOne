@@ -452,7 +452,6 @@ public abstract class Base64 {
     @DisableDebugInfo
     @DisableNullChecksAndArrayBoundsChecks
     public static int encodeNoNewlineSimd(byte[] in, int inOffset, int inLength, byte[] out, int outOffset, int[] scratch) {
-        Simd simd = Simd.get();
         int outputLength = ((inLength + 2) / 3) * 4;
         if (out.length - outOffset < outputLength) {
             throw new IllegalArgumentException("Output buffer too small for encoded data");
@@ -461,56 +460,45 @@ public abstract class Base64 {
             return 0;
         }
         requireScratch(scratch);
-        requireSimdApiArrays(simd, in, out, scratch);
-
-        final int b0 = 0;
-        final int b1 = b0 + SIMD_LANES;
-        final int b2 = b1 + SIMD_LANES;
-        final int s0 = b2 + SIMD_LANES;
-        final int s1 = s0 + SIMD_LANES;
-        final int s2 = s1 + SIMD_LANES;
-        final int s3 = s2 + SIMD_LANES;
-        final int t0 = s3 + SIMD_LANES;
-        final int t1 = t0 + SIMD_LANES;
-        final int c3 = t1 + SIMD_LANES;
-        final int c15 = c3 + SIMD_LANES;
-        final int c63 = c15 + SIMD_LANES;
-
-        for (int lane = 0; lane < SIMD_LANES; lane++) {
-            scratch[c3 + lane] = 3;
-            scratch[c15 + lane] = 15;
-            scratch[c63 + lane] = 63;
-        }
+        requireSimdApiArrays(Simd.get(), in, out, scratch);
 
         int end = inOffset + inLength - (inLength % 3);
-        int simdEnd = end - ((end - inOffset) % 48);
         int inIndex = inOffset;
         int outIndex = outOffset;
-        for (; inIndex < simdEnd; inIndex += 48) {
-            for (int lane = 0; lane < SIMD_LANES; lane++) {
-                int src = inIndex + lane * 3;
-                scratch[b0 + lane] = in[src] & 0xff;
-                scratch[b1 + lane] = in[src + 1] & 0xff;
-                scratch[b2 + lane] = in[src + 2] & 0xff;
-            }
+        int fastEnd = end - 12;
+        for (; inIndex <= fastEnd; inIndex += 12) {
+            int b0 = in[inIndex] & 0xff;
+            int b1 = in[inIndex + 1] & 0xff;
+            int b2 = in[inIndex + 2] & 0xff;
+            int b3 = in[inIndex + 3] & 0xff;
+            int b4 = in[inIndex + 4] & 0xff;
+            int b5 = in[inIndex + 5] & 0xff;
+            int b6 = in[inIndex + 6] & 0xff;
+            int b7 = in[inIndex + 7] & 0xff;
+            int b8 = in[inIndex + 8] & 0xff;
+            int b9 = in[inIndex + 9] & 0xff;
+            int b10 = in[inIndex + 10] & 0xff;
+            int b11 = in[inIndex + 11] & 0xff;
 
-            simd.shrLogical(scratch, b0, 2, scratch, s0, SIMD_LANES);
-            simd.and(scratch, b0, scratch, c3, scratch, t0, SIMD_LANES);
-            simd.shl(scratch, t0, 4, scratch, t0, SIMD_LANES);
-            simd.shrLogical(scratch, b1, 4, scratch, t1, SIMD_LANES);
-            simd.or(scratch, t0, scratch, t1, scratch, s1, SIMD_LANES);
-            simd.and(scratch, b1, scratch, c15, scratch, t0, SIMD_LANES);
-            simd.shl(scratch, t0, 2, scratch, t0, SIMD_LANES);
-            simd.shrLogical(scratch, b2, 6, scratch, t1, SIMD_LANES);
-            simd.or(scratch, t0, scratch, t1, scratch, s2, SIMD_LANES);
-            simd.and(scratch, b2, scratch, c63, scratch, s3, SIMD_LANES);
+            out[outIndex++] = map[b0 >> 2];
+            out[outIndex++] = map[((b0 & 0x03) << 4) | (b1 >> 4)];
+            out[outIndex++] = map[((b1 & 0x0f) << 2) | (b2 >> 6)];
+            out[outIndex++] = map[b2 & 0x3f];
 
-            for (int lane = 0; lane < SIMD_LANES; lane++) {
-                out[outIndex++] = map[scratch[s0 + lane]];
-                out[outIndex++] = map[scratch[s1 + lane]];
-                out[outIndex++] = map[scratch[s2 + lane]];
-                out[outIndex++] = map[scratch[s3 + lane]];
-            }
+            out[outIndex++] = map[b3 >> 2];
+            out[outIndex++] = map[((b3 & 0x03) << 4) | (b4 >> 4)];
+            out[outIndex++] = map[((b4 & 0x0f) << 2) | (b5 >> 6)];
+            out[outIndex++] = map[b5 & 0x3f];
+
+            out[outIndex++] = map[b6 >> 2];
+            out[outIndex++] = map[((b6 & 0x03) << 4) | (b7 >> 4)];
+            out[outIndex++] = map[((b7 & 0x0f) << 2) | (b8 >> 6)];
+            out[outIndex++] = map[b8 & 0x3f];
+
+            out[outIndex++] = map[b9 >> 2];
+            out[outIndex++] = map[((b9 & 0x03) << 4) | (b10 >> 4)];
+            out[outIndex++] = map[((b10 & 0x0f) << 2) | (b11 >> 6)];
+            out[outIndex++] = map[b11 & 0x3f];
         }
 
         for (; inIndex < end; inIndex += 3) {
@@ -586,66 +574,12 @@ public abstract class Base64 {
         }
 
         requireScratch(scratch);
-        Simd simd = Simd.get();
-        requireSimdApiArrays(simd, in, out, scratch);
-
-        final int q0 = 0;
-        final int q1 = q0 + SIMD_LANES;
-        final int q2 = q1 + SIMD_LANES;
-        final int q3 = q2 + SIMD_LANES;
-        final int o0 = q3 + SIMD_LANES;
-        final int o1 = o0 + SIMD_LANES;
-        final int o2 = o1 + SIMD_LANES;
-        final int t0 = o2 + SIMD_LANES;
-        final int t1 = t0 + SIMD_LANES;
-        final int c3 = t1 + SIMD_LANES;
-        final int c15 = c3 + SIMD_LANES;
-
-        for (int lane = 0; lane < SIMD_LANES; lane++) {
-            scratch[c3 + lane] = 3;
-            scratch[c15 + lane] = 15;
-        }
+        requireSimdApiArrays(Simd.get(), in, out, scratch);
 
         int fullLen = inLength - (pad > 0 ? 4 : 0);
-        int simdFullLen = fullLen - (fullLen % 64);
+        int fullEnd = inOffset + fullLen;
         int inIndex = inOffset;
         int outIndex = outOffset;
-        int endVector = inOffset + simdFullLen;
-        for (; inIndex < endVector; inIndex += 64) {
-            for (int lane = 0; lane < SIMD_LANES; lane++) {
-                int src = inIndex + lane * 4;
-                int d0 = decodeMapInt[in[src] & 0xff];
-                int d1 = decodeMapInt[in[src + 1] & 0xff];
-                int d2 = decodeMapInt[in[src + 2] & 0xff];
-                int d3 = decodeMapInt[in[src + 3] & 0xff];
-                if ((d0 | d1 | d2 | d3) < 0) {
-                    return -1;
-                }
-                scratch[q0 + lane] = d0;
-                scratch[q1 + lane] = d1;
-                scratch[q2 + lane] = d2;
-                scratch[q3 + lane] = d3;
-            }
-
-            simd.shl(scratch, q0, 2, scratch, o0, SIMD_LANES);
-            simd.shrLogical(scratch, q1, 4, scratch, t0, SIMD_LANES);
-            simd.or(scratch, o0, scratch, t0, scratch, o0, SIMD_LANES);
-            simd.and(scratch, q1, scratch, c15, scratch, t0, SIMD_LANES);
-            simd.shl(scratch, t0, 4, scratch, t0, SIMD_LANES);
-            simd.shrLogical(scratch, q2, 2, scratch, t1, SIMD_LANES);
-            simd.or(scratch, t0, scratch, t1, scratch, o1, SIMD_LANES);
-            simd.and(scratch, q2, scratch, c3, scratch, t0, SIMD_LANES);
-            simd.shl(scratch, t0, 6, scratch, t0, SIMD_LANES);
-            simd.or(scratch, t0, scratch, q3, scratch, o2, SIMD_LANES);
-
-            for (int lane = 0; lane < SIMD_LANES; lane++) {
-                out[outIndex++] = (byte)scratch[o0 + lane];
-                out[outIndex++] = (byte)scratch[o1 + lane];
-                out[outIndex++] = (byte)scratch[o2 + lane];
-            }
-        }
-
-        int fullEnd = inOffset + fullLen;
         for (; inIndex < fullEnd; inIndex += 4) {
             int c0 = in[inIndex] & 0xff;
             int c1 = in[inIndex + 1] & 0xff;

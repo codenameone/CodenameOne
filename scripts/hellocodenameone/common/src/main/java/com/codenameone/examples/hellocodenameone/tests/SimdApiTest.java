@@ -9,8 +9,16 @@ public class SimdApiTest extends BaseTest {
         try {
             Simd simd = Simd.get();
             if (!simd.isSupported()) {
-                fail("Simd.isSupported() returned false");
-                return false;
+                int[] a = new int[]{1, 2, 3, 4};
+                int[] b = new int[]{9, 8, 7, 6};
+                int[] out = new int[4];
+                simd.add(a, b, out, 0, 4);
+                if (out[0] != 10 || out[1] != 10 || out[2] != 10 || out[3] != 10) {
+                    fail("Fallback SIMD API add failed on unsupported platform");
+                    return false;
+                }
+                done();
+                return true;
             }
 
             int[] a = simd.allocInt(16);
