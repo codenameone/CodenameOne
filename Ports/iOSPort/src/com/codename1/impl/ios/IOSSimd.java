@@ -200,6 +200,12 @@ public class IOSSimd extends Simd {
     @Override
     public native float dot(float[] srcA, float[] srcB, int offset, int length);
 
+    @Override
+    public native int base64Encode(byte[] src, int srcOffset, int srcLen, byte[] dst, int dstOffset);
+
+    @Override
+    public native int base64Decode(byte[] src, int srcOffset, int srcLen, byte[] dst, int dstOffset);
+
     private native byte[] allocByteNative(int size);
     private native int[] allocIntNative(int size);
     private native float[] allocFloatNative(int size);

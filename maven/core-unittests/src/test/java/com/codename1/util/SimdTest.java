@@ -110,4 +110,84 @@ class SimdTest extends UITestBase {
         assertEquals(20, permuted[2]);
         assertEquals(0, permuted[3]);
     }
+
+    @FormTest
+    void base64EncodeDecodeViaSimdFallback() {
+        Simd simd = new Simd();
+
+        // Test basic encoding
+        byte[] input = new byte[]{(byte)'H', (byte)'e', (byte)'l', (byte)'l', (byte)'o'};
+        int encodedLen = ((input.length + 2) / 3) * 4;
+        byte[] encoded = new byte[encodedLen];
+        int written = simd.base64Encode(input, 0, input.length, encoded, 0);
+        assertEquals(encodedLen, written);
+        String encodedStr = new String(encoded, 0, written);
+        assertEquals("SGVsbG8=", encodedStr);
+
+        // Test decoding
+        byte[] decoded = new byte[input.length];
+        int decodedLen = simd.base64Decode(encoded, 0, written, decoded, 0);
+        assertEquals(input.length, decodedLen);
+        for (int i = 0; i < input.length; i++) {
+            assertEquals(input[i], decoded[i]);
+        }
+
+        // Test round-trip with larger data
+        byte[] largeInput = new byte[256];
+        for (int i = 0; i < largeInput.length; i++) {
+            largeInput[i] = (byte) i;
+        }
+        int largeEncodedLen = ((largeInput.length + 2) / 3) * 4;
+        byte[] largeEncoded = new byte[largeEncodedLen];
+        int largeWritten = simd.base64Encode(largeInput, 0, largeInput.length, largeEncoded, 0);
+        assertEquals(largeEncodedLen, largeWritten);
+
+        byte[] largeDecoded = new byte[largeInput.length];
+        int largeDecodedLen = simd.base64Decode(largeEncoded, 0, largeWritten, largeDecoded, 0);
+        assertEquals(largeInput.length, largeDecodedLen);
+        for (int i = 0; i < largeInput.length; i++) {
+            assertEquals(largeInput[i], largeDecoded[i], "Mismatch at index " + i);
+        }
+    }
+
+    @FormTest
+    void base64SimdMethodsMatchScalar() {
+        Simd simd = Simd.get();
+        if (!simd.isSupported()) {
+            return;
+        }
+
+        // Test that SIMD encode matches scalar encode
+        byte[] input = new byte[8192];
+        for (int i = 0; i < input.length; i++) {
+            input[i] = (byte)(i * 31 + 17);
+        }
+
+        int encodedLen = ((input.length + 2) / 3) * 4;
+        byte[] scalarEncoded = new byte[encodedLen];
+        int scalarWritten = Base64.encodeNoNewline(input, scalarEncoded);
+
+        byte[] simdInput = simd.allocByte(input.length);
+        System.arraycopy(input, 0, simdInput, 0, input.length);
+        byte[] simdEncoded = simd.allocByte(encodedLen);
+        int[] scratch = simd.allocInt(192);
+        int simdWritten = Base64.encodeNoNewlineSimd(simdInput, 0, simdInput.length, simdEncoded, 0, scratch);
+
+        assertEquals(scalarWritten, simdWritten);
+        for (int i = 0; i < scalarWritten; i++) {
+            assertEquals(scalarEncoded[i], simdEncoded[i], "Encode mismatch at index " + i);
+        }
+
+        // Test that SIMD decode matches scalar decode
+        byte[] scalarDecoded = new byte[input.length];
+        int scalarDecLen = Base64.decode(scalarEncoded, scalarDecoded);
+
+        byte[] simdDecoded = simd.allocByte(input.length);
+        int simdDecLen = Base64.decodeNoWhitespaceSimd(simdEncoded, 0, simdWritten, simdDecoded, 0, scratch);
+
+        assertEquals(scalarDecLen, simdDecLen);
+        for (int i = 0; i < scalarDecLen; i++) {
+            assertEquals(scalarDecoded[i], simdDecoded[i], "Decode mismatch at index " + i);
+        }
+    }
 }

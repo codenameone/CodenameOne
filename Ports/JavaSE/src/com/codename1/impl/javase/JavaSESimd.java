@@ -450,6 +450,18 @@ public class JavaSESimd extends Simd {
         return super.dot(srcA, srcB, offset, length);
     }
 
+    @Override
+    public int base64Encode(byte[] src, int srcOffset, int srcLen, byte[] dst, int dstOffset) {
+        validateRegistered(src, dst);
+        return super.base64Encode(src, srcOffset, srcLen, dst, dstOffset);
+    }
+
+    @Override
+    public int base64Decode(byte[] src, int srcOffset, int srcLen, byte[] dst, int dstOffset) {
+        validateRegistered(src, dst);
+        return super.base64Decode(src, srcOffset, srcLen, dst, dstOffset);
+    }
+
     private void validateRegistered(Object... arrays) {
         for (int i = 0; i < arrays.length; i++) {
             Object arr = arrays[i];

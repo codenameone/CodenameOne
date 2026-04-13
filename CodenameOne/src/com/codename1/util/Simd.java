@@ -411,6 +411,42 @@ public class Simd {
         return out;
     }
 
+    /**
+     * Encodes binary data to Base64 without line breaks.
+     *
+     * <p>Both {@code src} and {@code dst} must be allocated with
+     * {@link #allocByte(int)}.  The destination must have room for at least
+     * {@code ((srcLen + 2) / 3) * 4} bytes starting at {@code dstOffset}.</p>
+     *
+     * @param src       source bytes
+     * @param srcOffset offset into {@code src}
+     * @param srcLen    number of bytes to encode
+     * @param dst       destination buffer for Base64 output
+     * @param dstOffset offset into {@code dst}
+     * @return number of Base64 bytes written
+     */
+    public int base64Encode(byte[] src, int srcOffset, int srcLen, byte[] dst, int dstOffset) {
+        return Base64.encodeNoNewline(src, srcOffset, srcLen, dst, dstOffset);
+    }
+
+    /**
+     * Decodes Base64 data (no whitespace) to binary.
+     *
+     * <p>Both {@code src} and {@code dst} must be allocated with
+     * {@link #allocByte(int)}.  {@code srcLen} must be a multiple of 4.
+     * The destination must have room for at least
+     * {@code (srcLen / 4) * 3} bytes starting at {@code dstOffset}.</p>
+     *
+     * @param src       Base64 bytes (no whitespace)
+     * @param srcOffset offset into {@code src}
+     * @param srcLen    number of bytes to decode (must be multiple of 4)
+     * @param dst       destination buffer for decoded output
+     * @param dstOffset offset into {@code dst}
+     * @return number of decoded bytes written, or -1 for invalid input
+     */
+    public int base64Decode(byte[] src, int srcOffset, int srcLen, byte[] dst, int dstOffset) {
+        return Base64.decodeNoWhitespace(src, srcOffset, srcLen, dst, dstOffset);
+    }
 
     protected final void validateBinaryByte(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length) {
         validateNotNull(srcA, "srcA");
