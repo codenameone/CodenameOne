@@ -1,0 +1,47 @@
+name: Material Icons Update
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/material-icons-update.yml'
+      - '.github/scripts/update_material_icons.py'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-material-icons:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Update Material Icons font and constants
+        run: python .github/scripts/update_material_icons.py
+
+      - name: Create pull request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          commit-message: "Update Material Icons font and FontImage constants"
+          title: "Update Material Icons font and FontImage constants"
+          body: |
+            ## Summary
+            - Updates `CodenameOne/src/material-design-font.ttf` from upstream Material Icons.
+            - Regenerates `FontImage.MATERIAL_*` constants from upstream codepoints.
+
+            This PR was created automatically by the weekly Material Icons update workflow.
+          branch: automation/material-icons-update
+          delete-branch: true
+          labels: |
+            dependencies
+            automation
