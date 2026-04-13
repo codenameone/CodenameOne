@@ -26,10 +26,12 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: Update Material Icons font and constants
+      - name: Update Material Icons font and constants (scheduled/manual)
+        if: github.event_name != 'pull_request'
         run: python .github/scripts/update_material_icons.py
 
       - name: Create pull request
+        if: github.event_name != 'pull_request'
         uses: peter-evans/create-pull-request@v7
         with:
           commit-message: "Update Material Icons font and FontImage constants"
@@ -40,8 +42,30 @@ jobs:
             - Regenerates `FontImage.MATERIAL_*` constants from upstream codepoints.
 
             This PR was created automatically by the weekly Material Icons update workflow.
+          base: master
           branch: automation/material-icons-update
           delete-branch: true
           labels: |
             dependencies
             automation
+
+      - name: Build update preview for PR validation
+        if: github.event_name == 'pull_request'
+        run: |
+          python .github/scripts/update_material_icons.py
+          if git diff --quiet; then
+            echo "Material icons are already up to date." > material-icons-update-summary.txt
+          else
+            echo "Material icons update detected; see attached patch artifact." > material-icons-update-summary.txt
+            git diff --binary > material-icons-update.patch
+          fi
+
+      - name: Upload PR validation artifacts
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: material-icons-update-preview
+          path: |
+            material-icons-update-summary.txt
+            material-icons-update.patch
+          if-no-files-found: error
