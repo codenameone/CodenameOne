@@ -154,9 +154,41 @@ public class Simd {
         }
     }
 
+    public void shl(byte[] src, int bits, byte[] dst, int offset, int length) {
+        int shift = bits & 7;
+        for (int i = offset, end = offset + length; i < end; i++) {
+            dst[i] = (byte)((src[i] & 0xff) << shift);
+        }
+    }
+
+    public void shrLogical(byte[] src, int bits, byte[] dst, int offset, int length) {
+        int shift = bits & 7;
+        for (int i = offset, end = offset + length; i < end; i++) {
+            dst[i] = (byte)((src[i] & 0xff) >>> shift);
+        }
+    }
+
+    public void addWrapping(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length) {
+        for (int i = offset, end = offset + length; i < end; i++) {
+            dst[i] = (byte)(srcA[i] + srcB[i]);
+        }
+    }
+
+    public void subWrapping(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length) {
+        for (int i = offset, end = offset + length; i < end; i++) {
+            dst[i] = (byte)(srcA[i] - srcB[i]);
+        }
+    }
+
     public void unpackUnsignedByteToInt(byte[] src, int[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dst[i] = src[i] & 0xff;
+        }
+    }
+
+    public void unpackUnsignedByteToInt(byte[] src, int srcOffset, int[] dst, int dstOffset, int length) {
+        for (int i = 0; i < length; i++) {
+            dst[dstOffset + i] = src[srcOffset + i] & 0xff;
         }
     }
 
@@ -188,6 +220,12 @@ public class Simd {
     public void add(int[] srcA, int[] srcB, int[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dst[i] = srcA[i] + srcB[i];
+        }
+    }
+
+    public void add(int[] srcA, int srcAOffset, int[] srcB, int srcBOffset, int[] dst, int dstOffset, int length) {
+        for (int i = 0; i < length; i++) {
+            dst[dstOffset + i] = srcA[srcAOffset + i] + srcB[srcBOffset + i];
         }
     }
 
@@ -312,9 +350,21 @@ public class Simd {
         }
     }
 
+    public void cmpEq(int[] srcA, int srcAOffset, int[] srcB, int srcBOffset, byte[] dstMask, int dstOffset, int length) {
+        for (int i = 0; i < length; i++) {
+            dstMask[dstOffset + i] = srcA[srcAOffset + i] == srcB[srcBOffset + i] ? (byte)-1 : (byte)0;
+        }
+    }
+
     public void cmpLt(int[] srcA, int[] srcB, byte[] dstMask, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dstMask[i] = srcA[i] < srcB[i] ? (byte)-1 : (byte)0;
+        }
+    }
+
+    public void cmpLt(int[] srcA, int srcAOffset, int[] srcB, int srcBOffset, byte[] dstMask, int dstOffset, int length) {
+        for (int i = 0; i < length; i++) {
+            dstMask[dstOffset + i] = srcA[srcAOffset + i] < srcB[srcBOffset + i] ? (byte)-1 : (byte)0;
         }
     }
 
@@ -327,6 +377,12 @@ public class Simd {
     public void select(byte[] mask, int[] trueValues, int[] falseValues, int[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dst[i] = mask[i] != 0 ? trueValues[i] : falseValues[i];
+        }
+    }
+
+    public void select(byte[] mask, int maskOffset, int[] trueValues, int trueOffset, int[] falseValues, int falseOffset, int[] dst, int dstOffset, int length) {
+        for (int i = 0; i < length; i++) {
+            dst[dstOffset + i] = mask[maskOffset + i] != 0 ? trueValues[trueOffset + i] : falseValues[falseOffset + i];
         }
     }
 
@@ -411,42 +467,6 @@ public class Simd {
         return out;
     }
 
-    /**
-     * Encodes binary data to Base64 without line breaks.
-     *
-     * <p>Both {@code src} and {@code dst} must be allocated with
-     * {@link #allocByte(int)}.  The destination must have room for at least
-     * {@code ((srcLen + 2) / 3) * 4} bytes starting at {@code dstOffset}.</p>
-     *
-     * @param src       source bytes
-     * @param srcOffset offset into {@code src}
-     * @param srcLen    number of bytes to encode
-     * @param dst       destination buffer for Base64 output
-     * @param dstOffset offset into {@code dst}
-     * @return number of Base64 bytes written
-     */
-    public int base64Encode(byte[] src, int srcOffset, int srcLen, byte[] dst, int dstOffset) {
-        return Base64.encodeNoNewline(src, srcOffset, srcLen, dst, dstOffset);
-    }
-
-    /**
-     * Decodes Base64 data (no whitespace) to binary.
-     *
-     * <p>Both {@code src} and {@code dst} must be allocated with
-     * {@link #allocByte(int)}.  {@code srcLen} must be a multiple of 4.
-     * The destination must have room for at least
-     * {@code (srcLen / 4) * 3} bytes starting at {@code dstOffset}.</p>
-     *
-     * @param src       Base64 bytes (no whitespace)
-     * @param srcOffset offset into {@code src}
-     * @param srcLen    number of bytes to decode (must be multiple of 4)
-     * @param dst       destination buffer for decoded output
-     * @param dstOffset offset into {@code dst}
-     * @return number of decoded bytes written, or -1 for invalid input
-     */
-    public int base64Decode(byte[] src, int srcOffset, int srcLen, byte[] dst, int dstOffset) {
-        return Base64.decodeNoWhitespace(src, srcOffset, srcLen, dst, dstOffset);
-    }
 
     protected final void validateBinaryByte(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length) {
         validateNotNull(srcA, "srcA");

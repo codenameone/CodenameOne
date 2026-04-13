@@ -201,10 +201,31 @@ public class IOSSimd extends Simd {
     public native float dot(float[] srcA, float[] srcB, int offset, int length);
 
     @Override
-    public native int base64Encode(byte[] src, int srcOffset, int srcLen, byte[] dst, int dstOffset);
+    public native void shl(byte[] src, int bits, byte[] dst, int offset, int length);
 
     @Override
-    public native int base64Decode(byte[] src, int srcOffset, int srcLen, byte[] dst, int dstOffset);
+    public native void shrLogical(byte[] src, int bits, byte[] dst, int offset, int length);
+
+    @Override
+    public native void addWrapping(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length);
+
+    @Override
+    public native void subWrapping(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length);
+
+    @Override
+    public native void unpackUnsignedByteToInt(byte[] src, int srcOffset, int[] dst, int dstOffset, int length);
+
+    @Override
+    public native void add(int[] srcA, int srcAOffset, int[] srcB, int srcBOffset, int[] dst, int dstOffset, int length);
+
+    @Override
+    public native void cmpEq(int[] srcA, int srcAOffset, int[] srcB, int srcBOffset, byte[] dstMask, int dstOffset, int length);
+
+    @Override
+    public native void cmpLt(int[] srcA, int srcAOffset, int[] srcB, int srcBOffset, byte[] dstMask, int dstOffset, int length);
+
+    @Override
+    public native void select(byte[] mask, int maskOffset, int[] trueValues, int trueOffset, int[] falseValues, int falseOffset, int[] dst, int dstOffset, int length);
 
     private native byte[] allocByteNative(int size);
     private native int[] allocIntNative(int size);
