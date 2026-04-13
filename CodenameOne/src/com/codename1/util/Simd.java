@@ -154,9 +154,41 @@ public class Simd {
         }
     }
 
+    public void shl(byte[] src, int bits, byte[] dst, int offset, int length) {
+        int shift = bits & 7;
+        for (int i = offset, end = offset + length; i < end; i++) {
+            dst[i] = (byte)((src[i] & 0xff) << shift);
+        }
+    }
+
+    public void shrLogical(byte[] src, int bits, byte[] dst, int offset, int length) {
+        int shift = bits & 7;
+        for (int i = offset, end = offset + length; i < end; i++) {
+            dst[i] = (byte)((src[i] & 0xff) >>> shift);
+        }
+    }
+
+    public void addWrapping(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length) {
+        for (int i = offset, end = offset + length; i < end; i++) {
+            dst[i] = (byte)(srcA[i] + srcB[i]);
+        }
+    }
+
+    public void subWrapping(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length) {
+        for (int i = offset, end = offset + length; i < end; i++) {
+            dst[i] = (byte)(srcA[i] - srcB[i]);
+        }
+    }
+
     public void unpackUnsignedByteToInt(byte[] src, int[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dst[i] = src[i] & 0xff;
+        }
+    }
+
+    public void unpackUnsignedByteToInt(byte[] src, int srcOffset, int[] dst, int dstOffset, int length) {
+        for (int i = 0; i < length; i++) {
+            dst[dstOffset + i] = src[srcOffset + i] & 0xff;
         }
     }
 
@@ -188,6 +220,12 @@ public class Simd {
     public void add(int[] srcA, int[] srcB, int[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dst[i] = srcA[i] + srcB[i];
+        }
+    }
+
+    public void add(int[] srcA, int srcAOffset, int[] srcB, int srcBOffset, int[] dst, int dstOffset, int length) {
+        for (int i = 0; i < length; i++) {
+            dst[dstOffset + i] = srcA[srcAOffset + i] + srcB[srcBOffset + i];
         }
     }
 
@@ -312,9 +350,21 @@ public class Simd {
         }
     }
 
+    public void cmpEq(int[] srcA, int srcAOffset, int[] srcB, int srcBOffset, byte[] dstMask, int dstOffset, int length) {
+        for (int i = 0; i < length; i++) {
+            dstMask[dstOffset + i] = srcA[srcAOffset + i] == srcB[srcBOffset + i] ? (byte)-1 : (byte)0;
+        }
+    }
+
     public void cmpLt(int[] srcA, int[] srcB, byte[] dstMask, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dstMask[i] = srcA[i] < srcB[i] ? (byte)-1 : (byte)0;
+        }
+    }
+
+    public void cmpLt(int[] srcA, int srcAOffset, int[] srcB, int srcBOffset, byte[] dstMask, int dstOffset, int length) {
+        for (int i = 0; i < length; i++) {
+            dstMask[dstOffset + i] = srcA[srcAOffset + i] < srcB[srcBOffset + i] ? (byte)-1 : (byte)0;
         }
     }
 
@@ -327,6 +377,12 @@ public class Simd {
     public void select(byte[] mask, int[] trueValues, int[] falseValues, int[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dst[i] = mask[i] != 0 ? trueValues[i] : falseValues[i];
+        }
+    }
+
+    public void select(byte[] mask, int maskOffset, int[] trueValues, int trueOffset, int[] falseValues, int falseOffset, int[] dst, int dstOffset, int length) {
+        for (int i = 0; i < length; i++) {
+            dst[dstOffset + i] = mask[maskOffset + i] != 0 ? trueValues[trueOffset + i] : falseValues[falseOffset + i];
         }
     }
 

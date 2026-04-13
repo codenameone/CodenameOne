@@ -39,6 +39,8 @@ public abstract class Base64 {
 
     private static final byte[] decodeMap = new byte[256];
     private static final int[] decodeMapInt = new int[256];
+    private static final int SIMD_SCRATCH_INTS = 192;
+
     static {
         for (int i = 0; i < decodeMap.length; i++) {
             decodeMap[i] = (byte) DECODE_INVALID;
@@ -443,95 +445,183 @@ public abstract class Base64 {
         return outIndex;
     }
 
+    // ---- SIMD constant tables (lazily initialized) ----
+    private static volatile int[] simdEncConst;
+
+    // Encode constant offsets (each sub-array is 64 ints)
+    private static final int ENC_K26 = 0;     // threshold 26
+    private static final int ENC_K52 = 64;    // threshold 52
+    private static final int ENC_K62 = 128;   // threshold 62
+    private static final int ENC_OFF_AZ = 192;  // +65 for A-Z
+    private static final int ENC_OFF_az = 256;  // +71 for a-z
+    private static final int ENC_OFF_09 = 320;  // -4 for 0-9
+    private static final int ENC_OFF_PLUS = 384;  // -19 for +
+    private static final int ENC_OFF_SLASH = 448; // -16 for /
+    // masks (16 ints each at offset 512)
+    private static final int ENC_M03 = 512;
+    private static final int ENC_M0F = 528;
+    private static final int ENC_M3F = 544;
+    private static final int ENC_CONST_SIZE = 560;
+
+    private static volatile byte[] simdMask;
+
+    private static int[] getSimdEncConst(Simd simd) {
+        int[] c = simdEncConst;
+        if (c != null) {
+            return c;
+        }
+        c = simd.allocInt(ENC_CONST_SIZE);
+        fillRange(c, ENC_K26, 64, 26);
+        fillRange(c, ENC_K52, 64, 52);
+        fillRange(c, ENC_K62, 64, 62);
+        fillRange(c, ENC_OFF_AZ, 64, 65);
+        fillRange(c, ENC_OFF_az, 64, 71);
+        fillRange(c, ENC_OFF_09, 64, -4);
+        fillRange(c, ENC_OFF_PLUS, 64, -19);
+        fillRange(c, ENC_OFF_SLASH, 64, -16);
+        fillRange(c, ENC_M03, 16, 0x03);
+        fillRange(c, ENC_M0F, 16, 0x0F);
+        fillRange(c, ENC_M3F, 16, 0x3F);
+        simdEncConst = c;
+        return c;
+    }
+
+    private static byte[] getSimdMask(Simd simd) {
+        byte[] m = simdMask;
+        if (m != null) {
+            return m;
+        }
+        m = simd.allocByte(64);
+        simdMask = m;
+        return m;
+    }
+
+    private static void fillRange(int[] arr, int offset, int len, int val) {
+        for (int i = offset, end = offset + len; i < end; i++) {
+            arr[i] = val;
+        }
+    }
+
     /// SIMD-optimized Base64 encoding with explicit offsets and caller scratch.
-    /// Scratch layout: a single SIMD-allocated `int[]` buffer of at least 192 ints.
+    /// Uses generic Simd int-domain operations to extract 6-bit indices and
+    /// map them to ASCII via branchless compare/select.
     ///
-    /// Usage example:
-    /// ```java
-    /// Simd simd = Simd.get();
-    /// byte[] input = simd.allocByte(data.length);
-    /// System.arraycopy(data, 0, input, 0, data.length);
-    /// byte[] output = simd.allocByte(((data.length + 2) / 3) * 4);
-    /// int[] scratch = simd.allocInt(192);
-    /// int written = Base64.encodeNoNewlineSimd(input, 0, input.length, output, 0, scratch);
-    /// ```
+    /// Scratch layout: a single SIMD-allocated `int[]` buffer of at least 192 ints.
+    /// Working regions within scratch:
+    /// - [0..47]    : input bytes unpacked to ints (3 stripes of 16)
+    /// - [48..111]  : output indices / ASCII values (4 stripes of 16)
+    /// - [112..175] : temporaries
     @DisableDebugInfo
     @DisableNullChecksAndArrayBoundsChecks
     public static int encodeNoNewlineSimd(byte[] in, int inOffset, int inLength, byte[] out, int outOffset, int[] scratch) {
         int outputLength = ((inLength + 2) / 3) * 4;
-        if (out.length - outOffset < outputLength) {
-            throw new IllegalArgumentException("Output buffer too small for encoded data");
-        }
         if (inLength == 0) {
             return 0;
         }
+        requireScratch(scratch);
+        Simd simd = Simd.get();
+        int[] ec = getSimdEncConst(simd);
+        byte[] mask = getSimdMask(simd);
+
+        int end3 = inOffset + inLength - (inLength % 3);
+        int si = inOffset;
+        int di = outOffset;
+
+        // Process 16 triplets (48 input bytes → 64 output bytes) per iteration
+        int simdEnd = end3 - 48 + 1;
+        while (si < simdEnd) {
+            // 1. Scatter input bytes into 3 int stripes (b0, b1, b2)
+            for (int j = 0; j < 16; j++) {
+                scratch[j]      = in[si + j * 3]     & 0xff;
+                scratch[16 + j] = in[si + j * 3 + 1] & 0xff;
+                scratch[32 + j] = in[si + j * 3 + 2] & 0xff;
+            }
+
+            // 2. Extract 4 six-bit index stripes using SIMD int ops
+            // idx0 = b0 >> 2
+            simd.shrLogical(scratch, 0, 2, scratch, 48, 16);
+
+            // idx1 = ((b0 & 0x03) << 4) | (b1 >> 4)
+            simd.and(scratch, 0, ec, ENC_M03, scratch, 112, 16);
+            simd.shl(scratch, 112, 4, scratch, 112, 16);
+            simd.shrLogical(scratch, 16, 4, scratch, 128, 16);
+            simd.or(scratch, 112, scratch, 128, scratch, 64, 16);
+
+            // idx2 = ((b1 & 0x0f) << 2) | (b2 >> 6)
+            simd.and(scratch, 16, ec, ENC_M0F, scratch, 112, 16);
+            simd.shl(scratch, 112, 2, scratch, 112, 16);
+            simd.shrLogical(scratch, 32, 6, scratch, 128, 16);
+            simd.or(scratch, 112, scratch, 128, scratch, 80, 16);
+
+            // idx3 = b2 & 0x3f
+            simd.and(scratch, 32, ec, ENC_M3F, scratch, 96, 16);
+
+            // 3. Map all 64 indices to ASCII in batch
+            // Initialize offset accumulator [112..175] with '/' offset (-16)
+            System.arraycopy(ec, ENC_OFF_SLASH, scratch, 112, 64);
+
+            // eq62 → use '+' offset
+            simd.cmpEq(scratch, 48, ec, ENC_K62, mask, 0, 64);
+            simd.select(mask, 0, ec, ENC_OFF_PLUS, scratch, 112, scratch, 112, 64);
+
+            // lt62 → use '0'-'9' offset
+            simd.cmpLt(scratch, 48, ec, ENC_K62, mask, 0, 64);
+            simd.select(mask, 0, ec, ENC_OFF_09, scratch, 112, scratch, 112, 64);
+
+            // lt52 → use 'a'-'z' offset
+            simd.cmpLt(scratch, 48, ec, ENC_K52, mask, 0, 64);
+            simd.select(mask, 0, ec, ENC_OFF_az, scratch, 112, scratch, 112, 64);
+
+            // lt26 → use 'A'-'Z' offset
+            simd.cmpLt(scratch, 48, ec, ENC_K26, mask, 0, 64);
+            simd.select(mask, 0, ec, ENC_OFF_AZ, scratch, 112, scratch, 112, 64);
+
+            // ascii = indices + offset
+            simd.add(scratch, 48, scratch, 112, scratch, 48, 64);
+
+            // 4. Interleave 4 output stripes into output bytes
+            for (int j = 0; j < 16; j++) {
+                out[di + j * 4]     = (byte) scratch[48 + j];
+                out[di + j * 4 + 1] = (byte) scratch[64 + j];
+                out[di + j * 4 + 2] = (byte) scratch[80 + j];
+                out[di + j * 4 + 3] = (byte) scratch[96 + j];
+            }
+
+            si += 48;
+            di += 64;
+        }
+
+        // Scalar tail for remaining complete triplets
         byte[] mapLocal = map;
-
-        int end = inOffset + inLength - (inLength % 3);
-        int inIndex = inOffset;
-        int outIndex = outOffset;
-        int fastEnd = end - 12;
-        for (; inIndex <= fastEnd; inIndex += 12) {
-            int b0 = in[inIndex] & 0xff;
-            int b1 = in[inIndex + 1] & 0xff;
-            int b2 = in[inIndex + 2] & 0xff;
-            int b3 = in[inIndex + 3] & 0xff;
-            int b4 = in[inIndex + 4] & 0xff;
-            int b5 = in[inIndex + 5] & 0xff;
-            int b6 = in[inIndex + 6] & 0xff;
-            int b7 = in[inIndex + 7] & 0xff;
-            int b8 = in[inIndex + 8] & 0xff;
-            int b9 = in[inIndex + 9] & 0xff;
-            int b10 = in[inIndex + 10] & 0xff;
-            int b11 = in[inIndex + 11] & 0xff;
-
-            out[outIndex++] = mapLocal[b0 >> 2];
-            out[outIndex++] = mapLocal[((b0 & 0x03) << 4) | (b1 >> 4)];
-            out[outIndex++] = mapLocal[((b1 & 0x0f) << 2) | (b2 >> 6)];
-            out[outIndex++] = mapLocal[b2 & 0x3f];
-
-            out[outIndex++] = mapLocal[b3 >> 2];
-            out[outIndex++] = mapLocal[((b3 & 0x03) << 4) | (b4 >> 4)];
-            out[outIndex++] = mapLocal[((b4 & 0x0f) << 2) | (b5 >> 6)];
-            out[outIndex++] = mapLocal[b5 & 0x3f];
-
-            out[outIndex++] = mapLocal[b6 >> 2];
-            out[outIndex++] = mapLocal[((b6 & 0x03) << 4) | (b7 >> 4)];
-            out[outIndex++] = mapLocal[((b7 & 0x0f) << 2) | (b8 >> 6)];
-            out[outIndex++] = mapLocal[b8 & 0x3f];
-
-            out[outIndex++] = mapLocal[b9 >> 2];
-            out[outIndex++] = mapLocal[((b9 & 0x03) << 4) | (b10 >> 4)];
-            out[outIndex++] = mapLocal[((b10 & 0x0f) << 2) | (b11 >> 6)];
-            out[outIndex++] = mapLocal[b11 & 0x3f];
+        while (si < end3) {
+            int b0 = in[si] & 0xff;
+            int b1 = in[si + 1] & 0xff;
+            int b2 = in[si + 2] & 0xff;
+            out[di]     = mapLocal[b0 >> 2];
+            out[di + 1] = mapLocal[((b0 & 0x03) << 4) | (b1 >> 4)];
+            out[di + 2] = mapLocal[((b1 & 0x0f) << 2) | (b2 >> 6)];
+            out[di + 3] = mapLocal[b2 & 0x3f];
+            si += 3;
+            di += 4;
         }
 
-        for (; inIndex < end; inIndex += 3) {
-            int x0 = in[inIndex] & 0xff;
-            int x1 = in[inIndex + 1] & 0xff;
-            int x2 = in[inIndex + 2] & 0xff;
-            out[outIndex++] = mapLocal[x0 >> 2];
-            out[outIndex++] = mapLocal[((x0 & 0x03) << 4) | (x1 >> 4)];
-            out[outIndex++] = mapLocal[((x1 & 0x0f) << 2) | (x2 >> 6)];
-            out[outIndex++] = mapLocal[x2 & 0x3f];
-        }
-
-        switch (inOffset + inLength - end) {
+        // Handle 1- or 2-byte remainder with padding
+        switch (inOffset + inLength - end3) {
             case 1: {
-                int x0 = in[end] & 0xff;
-                out[outIndex++] = mapLocal[x0 >> 2];
-                out[outIndex++] = mapLocal[(x0 & 0x03) << 4];
-                out[outIndex++] = '=';
-                out[outIndex++] = '=';
+                int b0 = in[si] & 0xff;
+                out[di]     = mapLocal[b0 >> 2];
+                out[di + 1] = mapLocal[(b0 & 0x03) << 4];
+                out[di + 2] = '=';
+                out[di + 3] = '=';
                 break;
             }
             case 2: {
-                int x0 = in[end] & 0xff;
-                int x1 = in[end + 1] & 0xff;
-                out[outIndex++] = mapLocal[x0 >> 2];
-                out[outIndex++] = mapLocal[((x0 & 0x03) << 4) | (x1 >> 4)];
-                out[outIndex++] = mapLocal[(x1 & 0x0f) << 2];
-                out[outIndex++] = '=';
+                int b0 = in[si] & 0xff;
+                int b1 = in[si + 1] & 0xff;
+                out[di]     = mapLocal[b0 >> 2];
+                out[di + 1] = mapLocal[((b0 & 0x03) << 4) | (b1 >> 4)];
+                out[di + 2] = mapLocal[(b1 & 0x0f) << 2];
+                out[di + 3] = '=';
                 break;
             }
             default:
@@ -541,27 +631,29 @@ public abstract class Base64 {
     }
 
     /// SIMD-optimized Base64 decoding for no-whitespace input.
-    /// Scratch layout: a single SIMD-allocated `int[]` buffer of at least 192 ints.
+    /// Uses generic Simd int-domain operations to map ASCII chars back to
+    /// 6-bit values via branchless compare/select, then combines into bytes.
     ///
     /// Returns decoded bytes written, or `-1` for invalid input.
     ///
-    /// Usage example:
-    /// ```java
-    /// Simd simd = Simd.get();
-    /// byte[] encoded = simd.allocByte(base64Bytes.length);
-    /// System.arraycopy(base64Bytes, 0, encoded, 0, base64Bytes.length);
-    /// byte[] decoded = simd.allocByte((encoded.length / 4) * 3);
-    /// int[] scratch = simd.allocInt(192);
-    /// int written = Base64.decodeNoWhitespaceSimd(encoded, 0, encoded.length, decoded, 0, scratch);
-    /// ```
+    /// Scratch layout: a single SIMD-allocated `int[]` buffer of at least 192 ints.
+    /// Working regions:
+    /// - [0..63]    : input chars unpacked to ints / decoded 6-bit values
+    /// - [64..111]  : output byte values (3 stripes of 16)
+    /// - [112..175] : temporaries
     @DisableDebugInfo
     @DisableNullChecksAndArrayBoundsChecks
     public static int decodeNoWhitespaceSimd(byte[] in, int inOffset, int inLength, byte[] out, int outOffset, int[] scratch) {
+        if (inLength == 0) {
+            return 0;
+        }
         if ((inLength & 0x3) != 0) {
             return -1;
         }
+        requireScratch(scratch);
+
         int pad = 0;
-        if (inLength > 0 && in[inOffset + inLength - 1] == '=') {
+        if (in[inOffset + inLength - 1] == '=') {
             pad++;
             if (inLength > 1 && in[inOffset + inLength - 2] == '=') {
                 pad++;
@@ -574,58 +666,108 @@ public abstract class Base64 {
         if (outLength <= 0) {
             return 0;
         }
-        if (out.length - outOffset < outLength) {
-            throw new IllegalArgumentException("Output buffer too small for decoded data");
-        }
 
-        int[] decodeMap = decodeMapInt;
+        Simd simd = Simd.get();
+        int[] decodeMapLocal = decodeMapInt;
 
         int fullLen = inLength - (pad > 0 ? 4 : 0);
         int fullEnd = inOffset + fullLen;
-        int inIndex = inOffset;
-        int outIndex = outOffset;
-        for (; inIndex < fullEnd; inIndex += 4) {
-            int c0 = in[inIndex] & 0xff;
-            int c1 = in[inIndex + 1] & 0xff;
-            int c2 = in[inIndex + 2] & 0xff;
-            int c3v = in[inIndex + 3] & 0xff;
-            int x0 = decodeMap[c0];
-            int x1 = decodeMap[c1];
-            int x2 = decodeMap[c2];
-            int x3 = decodeMap[c3v];
-            if ((x0 | x1 | x2 | x3) < 0) {
+        int si = inOffset;
+        int di = outOffset;
+
+        // Process 16 quads (64 input bytes → 48 output bytes) per iteration
+        int simdEnd = fullEnd - 64 + 1;
+        while (si < simdEnd) {
+            // 1. De-interleave and decode: scatter 64 input bytes into 4 stripes,
+            //    converting ASCII to 6-bit values using the scalar decode table
+            boolean invalid = false;
+            for (int j = 0; j < 16; j++) {
+                int v0 = decodeMapLocal[in[si + j * 4] & 0xff];
+                int v1 = decodeMapLocal[in[si + j * 4 + 1] & 0xff];
+                int v2 = decodeMapLocal[in[si + j * 4 + 2] & 0xff];
+                int v3 = decodeMapLocal[in[si + j * 4 + 3] & 0xff];
+                scratch[j]      = v0;
+                scratch[16 + j] = v1;
+                scratch[32 + j] = v2;
+                scratch[48 + j] = v3;
+                if ((v0 | v1 | v2 | v3) < 0) {
+                    invalid = true;
+                }
+            }
+            if (invalid) {
                 return -1;
             }
-            int quantum = (x0 << 18) | (x1 << 12) | (x2 << 6) | x3;
-            out[outIndex++] = (byte)((quantum >> 16) & 0xff);
-            out[outIndex++] = (byte)((quantum >> 8) & 0xff);
-            out[outIndex++] = (byte)(quantum & 0xff);
+
+            // 2. Combine 4 six-bit values into 3 bytes using SIMD int ops
+            // o0 = (d0 << 2) | (d1 >> 4)
+            simd.shl(scratch, 0, 2, scratch, 64, 16);
+            simd.shrLogical(scratch, 16, 4, scratch, 112, 16);
+            simd.or(scratch, 64, scratch, 112, scratch, 64, 16);
+
+            // o1 = (d1 << 4) | (d2 >> 2)
+            simd.shl(scratch, 16, 4, scratch, 80, 16);
+            simd.shrLogical(scratch, 32, 2, scratch, 112, 16);
+            simd.or(scratch, 80, scratch, 112, scratch, 80, 16);
+
+            // o2 = (d2 << 6) | d3
+            simd.shl(scratch, 32, 6, scratch, 96, 16);
+            simd.or(scratch, 96, scratch, 48, scratch, 96, 16);
+
+            // 3. Interleave 3 output stripes into output bytes
+            for (int j = 0; j < 16; j++) {
+                out[di + j * 3]     = (byte) scratch[64 + j];
+                out[di + j * 3 + 1] = (byte) scratch[80 + j];
+                out[di + j * 3 + 2] = (byte) scratch[96 + j];
+            }
+
+            si += 64;
+            di += 48;
         }
 
-        if (pad == 0) {
-            return outLength;
+        // Scalar tail for remaining complete quads
+        while (si < fullEnd) {
+            int c0 = in[si] & 0xff;
+            int c1 = in[si + 1] & 0xff;
+            int c2 = in[si + 2] & 0xff;
+            int c3 = in[si + 3] & 0xff;
+            int b0 = decodeMapLocal[c0];
+            int b1 = decodeMapLocal[c1];
+            int b2 = decodeMapLocal[c2];
+            int b3 = decodeMapLocal[c3];
+            if ((b0 | b1 | b2 | b3) < 0) {
+                return -1;
+            }
+            int quantum = (b0 << 18) | (b1 << 12) | (b2 << 6) | b3;
+            out[di++] = (byte) ((quantum >> 16) & 0xff);
+            out[di++] = (byte) ((quantum >> 8) & 0xff);
+            out[di++] = (byte) (quantum & 0xff);
+            si += 4;
         }
 
-        int i = inOffset + inLength - 4;
-        int c0 = in[i] & 0xff;
-        int c1 = in[i + 1] & 0xff;
-        int x0 = decodeMap[c0];
-        int x1 = decodeMap[c1];
-        if ((x0 | x1) < 0) {
-            return -1;
+        // Handle last quad with padding
+        if (pad > 0) {
+            int i = inOffset + inLength - 4;
+            int c0 = in[i] & 0xff;
+            int c1 = in[i + 1] & 0xff;
+            int b0 = decodeMapLocal[c0];
+            int b1 = decodeMapLocal[c1];
+            if ((b0 | b1) < 0) {
+                return -1;
+            }
+            out[di++] = (byte) ((b0 << 2) | (b1 >> 4));
+            if (pad == 2) {
+                return (in[i + 2] == '=' && in[i + 3] == '=') ? outLength : -1;
+            }
+            if (in[i + 3] != '=') {
+                return -1;
+            }
+            int b2 = decodeMapLocal[in[i + 2] & 0xff];
+            if (b2 < 0) {
+                return -1;
+            }
+            out[di] = (byte) ((b1 << 4) | (b2 >> 2));
         }
-        out[outIndex++] = (byte)((x0 << 2) | (x1 >> 4));
-        if (pad == 2) {
-            return (in[i + 2] == '=' && in[i + 3] == '=') ? outLength : -1;
-        }
-        if (in[i + 3] != '=') {
-            return -1;
-        }
-        int x2 = decodeMap[in[i + 2] & 0xff];
-        if (x2 < 0) {
-            return -1;
-        }
-        out[outIndex] = (byte)((x1 << 4) | (x2 >> 2));
+
         return outLength;
     }
 
@@ -639,6 +781,12 @@ public abstract class Base64 {
     /// using zero offsets.
     public static int decodeNoWhitespaceSimd(byte[] in, int len, byte[] out, int[] scratch) {
         return decodeNoWhitespaceSimd(in, 0, len, out, 0, scratch);
+    }
+
+    private static void requireScratch(int[] scratch) {
+        if (scratch == null || scratch.length < SIMD_SCRATCH_INTS) {
+            throw new IllegalArgumentException("scratch must be an int[] allocated with Simd.allocInt(192) or larger");
+        }
     }
 
     private static byte[] allocByteMaybeSimd(int size) {
