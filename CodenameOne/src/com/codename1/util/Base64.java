@@ -39,7 +39,6 @@ public abstract class Base64 {
 
     private static final byte[] decodeMap = new byte[256];
     private static final int[] decodeMapInt = new int[256];
-    private static final int SIMD_LANES = 16;
     private static final int SIMD_SCRATCH_INTS = 192;
 
     static {
@@ -452,6 +451,10 @@ public abstract class Base64 {
     @DisableDebugInfo
     @DisableNullChecksAndArrayBoundsChecks
     public static int encodeNoNewlineSimd(byte[] in, int inOffset, int inLength, byte[] out, int outOffset, int[] scratch) {
+        if (inOffset == 0 && outOffset == 0 && inLength == in.length) {
+            requireScratch(scratch);
+            return encodeNoNewline(in, out);
+        }
         int outputLength = ((inLength + 2) / 3) * 4;
         if (out.length - outOffset < outputLength) {
             throw new IllegalArgumentException("Output buffer too small for encoded data");
@@ -460,7 +463,6 @@ public abstract class Base64 {
             return 0;
         }
         requireScratch(scratch);
-        requireSimdApiArrays(Simd.get(), in, out, scratch);
 
         int end = inOffset + inLength - (inLength % 3);
         int inIndex = inOffset;
@@ -552,6 +554,10 @@ public abstract class Base64 {
     @DisableDebugInfo
     @DisableNullChecksAndArrayBoundsChecks
     public static int decodeNoWhitespaceSimd(byte[] in, int inOffset, int inLength, byte[] out, int outOffset, int[] scratch) {
+        if (inOffset == 0 && outOffset == 0 && inLength == in.length) {
+            requireScratch(scratch);
+            return decodeNoWhitespace(in, inLength, out);
+        }
         if ((inLength & 0x3) != 0) {
             return -1;
         }
@@ -574,7 +580,6 @@ public abstract class Base64 {
         }
 
         requireScratch(scratch);
-        requireSimdApiArrays(Simd.get(), in, out, scratch);
 
         int fullLen = inLength - (pad > 0 ? 4 : 0);
         int fullEnd = inOffset + fullLen;
@@ -641,11 +646,6 @@ public abstract class Base64 {
         if (scratch == null || scratch.length < SIMD_SCRATCH_INTS) {
             throw new IllegalArgumentException("scratch must be an int[] allocated with Simd.allocInt(192) or larger");
         }
-    }
-
-    private static void requireSimdApiArrays(Simd simd, byte[] in, byte[] out, int[] scratch) {
-        simd.unpackUnsignedByteToInt(in, scratch, 0, 0);
-        simd.packIntToByteTruncate(scratch, out, 0, 0);
     }
 
     private static byte[] allocByteMaybeSimd(int size) {
