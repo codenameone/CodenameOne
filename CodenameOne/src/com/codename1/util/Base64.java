@@ -39,8 +39,6 @@ public abstract class Base64 {
 
     private static final byte[] decodeMap = new byte[256];
     private static final int[] decodeMapInt = new int[256];
-    private static final int SIMD_SCRATCH_INTS = 192;
-
     static {
         for (int i = 0; i < decodeMap.length; i++) {
             decodeMap[i] = (byte) DECODE_INVALID;
@@ -451,10 +449,6 @@ public abstract class Base64 {
     @DisableDebugInfo
     @DisableNullChecksAndArrayBoundsChecks
     public static int encodeNoNewlineSimd(byte[] in, int inOffset, int inLength, byte[] out, int outOffset, int[] scratch) {
-        if (inOffset == 0 && outOffset == 0 && inLength == in.length) {
-            requireScratch(scratch);
-            return encodeNoNewline(in, out);
-        }
         int outputLength = ((inLength + 2) / 3) * 4;
         if (out.length - outOffset < outputLength) {
             throw new IllegalArgumentException("Output buffer too small for encoded data");
@@ -462,7 +456,7 @@ public abstract class Base64 {
         if (inLength == 0) {
             return 0;
         }
-        requireScratch(scratch);
+        byte[] mapLocal = map;
 
         int end = inOffset + inLength - (inLength % 3);
         int inIndex = inOffset;
@@ -482,42 +476,42 @@ public abstract class Base64 {
             int b10 = in[inIndex + 10] & 0xff;
             int b11 = in[inIndex + 11] & 0xff;
 
-            out[outIndex++] = map[b0 >> 2];
-            out[outIndex++] = map[((b0 & 0x03) << 4) | (b1 >> 4)];
-            out[outIndex++] = map[((b1 & 0x0f) << 2) | (b2 >> 6)];
-            out[outIndex++] = map[b2 & 0x3f];
+            out[outIndex++] = mapLocal[b0 >> 2];
+            out[outIndex++] = mapLocal[((b0 & 0x03) << 4) | (b1 >> 4)];
+            out[outIndex++] = mapLocal[((b1 & 0x0f) << 2) | (b2 >> 6)];
+            out[outIndex++] = mapLocal[b2 & 0x3f];
 
-            out[outIndex++] = map[b3 >> 2];
-            out[outIndex++] = map[((b3 & 0x03) << 4) | (b4 >> 4)];
-            out[outIndex++] = map[((b4 & 0x0f) << 2) | (b5 >> 6)];
-            out[outIndex++] = map[b5 & 0x3f];
+            out[outIndex++] = mapLocal[b3 >> 2];
+            out[outIndex++] = mapLocal[((b3 & 0x03) << 4) | (b4 >> 4)];
+            out[outIndex++] = mapLocal[((b4 & 0x0f) << 2) | (b5 >> 6)];
+            out[outIndex++] = mapLocal[b5 & 0x3f];
 
-            out[outIndex++] = map[b6 >> 2];
-            out[outIndex++] = map[((b6 & 0x03) << 4) | (b7 >> 4)];
-            out[outIndex++] = map[((b7 & 0x0f) << 2) | (b8 >> 6)];
-            out[outIndex++] = map[b8 & 0x3f];
+            out[outIndex++] = mapLocal[b6 >> 2];
+            out[outIndex++] = mapLocal[((b6 & 0x03) << 4) | (b7 >> 4)];
+            out[outIndex++] = mapLocal[((b7 & 0x0f) << 2) | (b8 >> 6)];
+            out[outIndex++] = mapLocal[b8 & 0x3f];
 
-            out[outIndex++] = map[b9 >> 2];
-            out[outIndex++] = map[((b9 & 0x03) << 4) | (b10 >> 4)];
-            out[outIndex++] = map[((b10 & 0x0f) << 2) | (b11 >> 6)];
-            out[outIndex++] = map[b11 & 0x3f];
+            out[outIndex++] = mapLocal[b9 >> 2];
+            out[outIndex++] = mapLocal[((b9 & 0x03) << 4) | (b10 >> 4)];
+            out[outIndex++] = mapLocal[((b10 & 0x0f) << 2) | (b11 >> 6)];
+            out[outIndex++] = mapLocal[b11 & 0x3f];
         }
 
         for (; inIndex < end; inIndex += 3) {
             int x0 = in[inIndex] & 0xff;
             int x1 = in[inIndex + 1] & 0xff;
             int x2 = in[inIndex + 2] & 0xff;
-            out[outIndex++] = map[x0 >> 2];
-            out[outIndex++] = map[((x0 & 0x03) << 4) | (x1 >> 4)];
-            out[outIndex++] = map[((x1 & 0x0f) << 2) | (x2 >> 6)];
-            out[outIndex++] = map[x2 & 0x3f];
+            out[outIndex++] = mapLocal[x0 >> 2];
+            out[outIndex++] = mapLocal[((x0 & 0x03) << 4) | (x1 >> 4)];
+            out[outIndex++] = mapLocal[((x1 & 0x0f) << 2) | (x2 >> 6)];
+            out[outIndex++] = mapLocal[x2 & 0x3f];
         }
 
         switch (inOffset + inLength - end) {
             case 1: {
                 int x0 = in[end] & 0xff;
-                out[outIndex++] = map[x0 >> 2];
-                out[outIndex++] = map[(x0 & 0x03) << 4];
+                out[outIndex++] = mapLocal[x0 >> 2];
+                out[outIndex++] = mapLocal[(x0 & 0x03) << 4];
                 out[outIndex++] = '=';
                 out[outIndex++] = '=';
                 break;
@@ -525,9 +519,9 @@ public abstract class Base64 {
             case 2: {
                 int x0 = in[end] & 0xff;
                 int x1 = in[end + 1] & 0xff;
-                out[outIndex++] = map[x0 >> 2];
-                out[outIndex++] = map[((x0 & 0x03) << 4) | (x1 >> 4)];
-                out[outIndex++] = map[(x1 & 0x0f) << 2];
+                out[outIndex++] = mapLocal[x0 >> 2];
+                out[outIndex++] = mapLocal[((x0 & 0x03) << 4) | (x1 >> 4)];
+                out[outIndex++] = mapLocal[(x1 & 0x0f) << 2];
                 out[outIndex++] = '=';
                 break;
             }
@@ -554,10 +548,6 @@ public abstract class Base64 {
     @DisableDebugInfo
     @DisableNullChecksAndArrayBoundsChecks
     public static int decodeNoWhitespaceSimd(byte[] in, int inOffset, int inLength, byte[] out, int outOffset, int[] scratch) {
-        if (inOffset == 0 && outOffset == 0 && inLength == in.length) {
-            requireScratch(scratch);
-            return decodeNoWhitespace(in, inLength, out);
-        }
         if ((inLength & 0x3) != 0) {
             return -1;
         }
@@ -579,7 +569,7 @@ public abstract class Base64 {
             throw new IllegalArgumentException("Output buffer too small for decoded data");
         }
 
-        requireScratch(scratch);
+        int[] decodeMap = decodeMapInt;
 
         int fullLen = inLength - (pad > 0 ? 4 : 0);
         int fullEnd = inOffset + fullLen;
@@ -590,10 +580,10 @@ public abstract class Base64 {
             int c1 = in[inIndex + 1] & 0xff;
             int c2 = in[inIndex + 2] & 0xff;
             int c3v = in[inIndex + 3] & 0xff;
-            int x0 = decodeMapInt[c0];
-            int x1 = decodeMapInt[c1];
-            int x2 = decodeMapInt[c2];
-            int x3 = decodeMapInt[c3v];
+            int x0 = decodeMap[c0];
+            int x1 = decodeMap[c1];
+            int x2 = decodeMap[c2];
+            int x3 = decodeMap[c3v];
             if ((x0 | x1 | x2 | x3) < 0) {
                 return -1;
             }
@@ -610,8 +600,8 @@ public abstract class Base64 {
         int i = inOffset + inLength - 4;
         int c0 = in[i] & 0xff;
         int c1 = in[i + 1] & 0xff;
-        int x0 = decodeMapInt[c0];
-        int x1 = decodeMapInt[c1];
+        int x0 = decodeMap[c0];
+        int x1 = decodeMap[c1];
         if ((x0 | x1) < 0) {
             return -1;
         }
@@ -622,7 +612,7 @@ public abstract class Base64 {
         if (in[i + 3] != '=') {
             return -1;
         }
-        int x2 = decodeMapInt[in[i + 2] & 0xff];
+        int x2 = decodeMap[in[i + 2] & 0xff];
         if (x2 < 0) {
             return -1;
         }
@@ -640,12 +630,6 @@ public abstract class Base64 {
     /// using zero offsets.
     public static int decodeNoWhitespaceSimd(byte[] in, int len, byte[] out, int[] scratch) {
         return decodeNoWhitespaceSimd(in, 0, len, out, 0, scratch);
-    }
-
-    private static void requireScratch(int[] scratch) {
-        if (scratch == null || scratch.length < SIMD_SCRATCH_INTS) {
-            throw new IllegalArgumentException("scratch must be an int[] allocated with Simd.allocInt(192) or larger");
-        }
     }
 
     private static byte[] allocByteMaybeSimd(int size) {

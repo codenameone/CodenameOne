@@ -96,11 +96,11 @@ public class Base64NativePerformanceTest extends BaseTest {
 
         if (!isIos()) {
             warmup(nativeBase64, payload, payloadBytes, nativeEncoded, cn1EncodedBytes, cn1DecodedBuffer,
-                    runSimdBenchmark, simdPayloadBytes, simdEncodedBytes, simdDecodedBuffer, simdScratch);
+                    runSimdBenchmark, simdPayloadBytes, simdEncodedBytes, simdDecodedBuffer, simdScratch, encodedLen);
         }
         if (runSimdBenchmark) {
             warmup(nativeBase64, payload, payloadBytes, nativeEncoded, cn1EncodedBytes, cn1DecodedBuffer,
-                    true, simdPayloadBytes, simdEncodedBytes, simdDecodedBuffer, simdScratch);
+                    true, simdPayloadBytes, simdEncodedBytes, simdDecodedBuffer, simdScratch, encodedLen);
         }
 
         long nativeEncodeMs = measureNativeEncode(nativeBase64, payload);
@@ -139,15 +139,27 @@ public class Base64NativePerformanceTest extends BaseTest {
 
     private static void warmup(Base64Native nativeBase64, String payload, byte[] payloadBytes, String nativeEncoded, byte[] cn1EncodedBytes,
                                byte[] cn1DecodedBuffer, boolean includeSimd, byte[] simdPayloadBytes, byte[] simdEncodedBytes,
-                               byte[] simdDecodedBuffer, int[] simdScratch) {
+                               byte[] simdDecodedBuffer, int[] simdScratch, int encodedLen) {
         for (int i = 0; i < 40; i++) {
             nativeBase64.encodeUtf8(payload);
-            Base64.encodeNoNewline(payloadBytes, cn1EncodedBytes);
+            int cn1EncodedWritten = Base64.encodeNoNewline(payloadBytes, cn1EncodedBytes);
+            if (cn1EncodedWritten != encodedLen) {
+                throw new IllegalStateException("Warmup CN1 encode length mismatch");
+            }
             nativeBase64.decodeToUtf8(nativeEncoded);
-            Base64.decode(cn1EncodedBytes, cn1DecodedBuffer);
+            int cn1DecodedWritten = Base64.decode(cn1EncodedBytes, cn1DecodedBuffer);
+            if (cn1DecodedWritten != payloadBytes.length || !byteArraysEqual(payloadBytes, cn1DecodedBuffer, payloadBytes.length)) {
+                throw new IllegalStateException("Warmup CN1 decode mismatch");
+            }
             if (includeSimd) {
-                Base64.encodeNoNewlineSimd(simdPayloadBytes, 0, simdPayloadBytes.length, simdEncodedBytes, 0, simdScratch);
-                Base64.decodeNoWhitespaceSimd(simdEncodedBytes, 0, simdEncodedBytes.length, simdDecodedBuffer, 0, simdScratch);
+                int simdEncodedWritten = Base64.encodeNoNewlineSimd(simdPayloadBytes, 0, simdPayloadBytes.length, simdEncodedBytes, 0, simdScratch);
+                if (simdEncodedWritten != encodedLen || !byteArraysEqual(cn1EncodedBytes, simdEncodedBytes, encodedLen)) {
+                    throw new IllegalStateException("Warmup SIMD encode mismatch");
+                }
+                int simdDecodedWritten = Base64.decodeNoWhitespaceSimd(simdEncodedBytes, 0, encodedLen, simdDecodedBuffer, 0, simdScratch);
+                if (simdDecodedWritten != payloadBytes.length || !byteArraysEqual(payloadBytes, simdDecodedBuffer, payloadBytes.length)) {
+                    throw new IllegalStateException("Warmup SIMD decode mismatch");
+                }
             }
         }
     }
