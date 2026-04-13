@@ -482,3 +482,436 @@ JAVA_FLOAT com_codename1_impl_ios_IOSSimd_dot___float_1ARRAY_float_1ARRAY_int_in
     }
     return (JAVA_FLOAT)total;
 }
+
+JAVA_VOID com_codename1_impl_ios_IOSSimd_and___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT srcA, JAVA_OBJECT srcB, JAVA_OBJECT dst, JAVA_INT offset, JAVA_INT length) {
+    JAVA_ARRAY_BYTE* a = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)srcA)->data;
+    JAVA_ARRAY_BYTE* b = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)srcB)->data;
+    JAVA_ARRAY_BYTE* d = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)dst)->data;
+    int i = offset;
+    int end = offset + length;
+    for (; i <= end - 16; i += 16) {
+        int8x16_t va = vld1q_s8((int8_t*)(a + i));
+        int8x16_t vb = vld1q_s8((int8_t*)(b + i));
+        vst1q_s8((int8_t*)(d + i), vandq_s8(va, vb));
+    }
+    for (; i < end; i++) {
+        d[i] = (JAVA_ARRAY_BYTE)(a[i] & b[i]);
+    }
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSSimd_or___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT srcA, JAVA_OBJECT srcB, JAVA_OBJECT dst, JAVA_INT offset, JAVA_INT length) {
+    JAVA_ARRAY_BYTE* a = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)srcA)->data;
+    JAVA_ARRAY_BYTE* b = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)srcB)->data;
+    JAVA_ARRAY_BYTE* d = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)dst)->data;
+    int i = offset;
+    int end = offset + length;
+    for (; i <= end - 16; i += 16) {
+        int8x16_t va = vld1q_s8((int8_t*)(a + i));
+        int8x16_t vb = vld1q_s8((int8_t*)(b + i));
+        vst1q_s8((int8_t*)(d + i), vorrq_s8(va, vb));
+    }
+    for (; i < end; i++) {
+        d[i] = (JAVA_ARRAY_BYTE)(a[i] | b[i]);
+    }
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSSimd_xor___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT srcA, JAVA_OBJECT srcB, JAVA_OBJECT dst, JAVA_INT offset, JAVA_INT length) {
+    JAVA_ARRAY_BYTE* a = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)srcA)->data;
+    JAVA_ARRAY_BYTE* b = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)srcB)->data;
+    JAVA_ARRAY_BYTE* d = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)dst)->data;
+    int i = offset;
+    int end = offset + length;
+    for (; i <= end - 16; i += 16) {
+        int8x16_t va = vld1q_s8((int8_t*)(a + i));
+        int8x16_t vb = vld1q_s8((int8_t*)(b + i));
+        vst1q_s8((int8_t*)(d + i), veorq_s8(va, vb));
+    }
+    for (; i < end; i++) {
+        d[i] = (JAVA_ARRAY_BYTE)(a[i] ^ b[i]);
+    }
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSSimd_not___byte_1ARRAY_byte_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT src, JAVA_OBJECT dst, JAVA_INT offset, JAVA_INT length) {
+    JAVA_ARRAY_BYTE* s = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)src)->data;
+    JAVA_ARRAY_BYTE* d = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)dst)->data;
+    int i = offset;
+    int end = offset + length;
+    for (; i <= end - 16; i += 16) {
+        int8x16_t vs = vld1q_s8((int8_t*)(s + i));
+        vst1q_s8((int8_t*)(d + i), vmvnq_s8(vs));
+    }
+    for (; i < end; i++) {
+        d[i] = (JAVA_ARRAY_BYTE)(~s[i]);
+    }
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSSimd_cmpEq___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT srcA, JAVA_OBJECT srcB, JAVA_OBJECT dstMask, JAVA_INT offset, JAVA_INT length) {
+    JAVA_ARRAY_BYTE* a = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)srcA)->data;
+    JAVA_ARRAY_BYTE* b = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)srcB)->data;
+    JAVA_ARRAY_BYTE* m = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)dstMask)->data;
+    int i = offset;
+    int end = offset + length;
+    for (; i <= end - 16; i += 16) {
+        int8x16_t va = vld1q_s8((int8_t*)(a + i));
+        int8x16_t vb = vld1q_s8((int8_t*)(b + i));
+        uint8x16_t cmp = vceqq_s8(va, vb);
+        vst1q_u8((uint8_t*)(m + i), cmp);
+    }
+    for (; i < end; i++) {
+        m[i] = a[i] == b[i] ? (JAVA_ARRAY_BYTE)-1 : (JAVA_ARRAY_BYTE)0;
+    }
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSSimd_cmpLt___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT srcA, JAVA_OBJECT srcB, JAVA_OBJECT dstMask, JAVA_INT offset, JAVA_INT length) {
+    JAVA_ARRAY_BYTE* a = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)srcA)->data;
+    JAVA_ARRAY_BYTE* b = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)srcB)->data;
+    JAVA_ARRAY_BYTE* m = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)dstMask)->data;
+    int i = offset;
+    int end = offset + length;
+    for (; i <= end - 16; i += 16) {
+        int8x16_t va = vld1q_s8((int8_t*)(a + i));
+        int8x16_t vb = vld1q_s8((int8_t*)(b + i));
+        uint8x16_t cmp = vcltq_s8(va, vb);
+        vst1q_u8((uint8_t*)(m + i), cmp);
+    }
+    for (; i < end; i++) {
+        m[i] = a[i] < b[i] ? (JAVA_ARRAY_BYTE)-1 : (JAVA_ARRAY_BYTE)0;
+    }
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSSimd_cmpGt___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT srcA, JAVA_OBJECT srcB, JAVA_OBJECT dstMask, JAVA_INT offset, JAVA_INT length) {
+    JAVA_ARRAY_BYTE* a = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)srcA)->data;
+    JAVA_ARRAY_BYTE* b = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)srcB)->data;
+    JAVA_ARRAY_BYTE* m = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)dstMask)->data;
+    int i = offset;
+    int end = offset + length;
+    for (; i <= end - 16; i += 16) {
+        int8x16_t va = vld1q_s8((int8_t*)(a + i));
+        int8x16_t vb = vld1q_s8((int8_t*)(b + i));
+        uint8x16_t cmp = vcgtq_s8(va, vb);
+        vst1q_u8((uint8_t*)(m + i), cmp);
+    }
+    for (; i < end; i++) {
+        m[i] = a[i] > b[i] ? (JAVA_ARRAY_BYTE)-1 : (JAVA_ARRAY_BYTE)0;
+    }
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSSimd_cmpRange___byte_1ARRAY_byte_byte_byte_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT src, JAVA_BYTE minValue, JAVA_BYTE maxValue, JAVA_OBJECT dstMask, JAVA_INT offset, JAVA_INT length) {
+    JAVA_ARRAY_BYTE* s = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)src)->data;
+    JAVA_ARRAY_BYTE* m = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)dstMask)->data;
+    int i = offset;
+    int end = offset + length;
+    int8x16_t vminv = vdupq_n_s8((int8_t)minValue);
+    int8x16_t vmaxv = vdupq_n_s8((int8_t)maxValue);
+    for (; i <= end - 16; i += 16) {
+        int8x16_t vs = vld1q_s8((int8_t*)(s + i));
+        uint8x16_t ge = vcgeq_s8(vs, vminv);
+        uint8x16_t le = vcleq_s8(vs, vmaxv);
+        vst1q_u8((uint8_t*)(m + i), vandq_u8(ge, le));
+    }
+    for (; i < end; i++) {
+        int v = s[i];
+        m[i] = v >= minValue && v <= maxValue ? (JAVA_ARRAY_BYTE)-1 : (JAVA_ARRAY_BYTE)0;
+    }
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSSimd_select___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT mask, JAVA_OBJECT trueValues, JAVA_OBJECT falseValues, JAVA_OBJECT dst, JAVA_INT offset, JAVA_INT length) {
+    JAVA_ARRAY_BYTE* m = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)mask)->data;
+    JAVA_ARRAY_BYTE* t = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)trueValues)->data;
+    JAVA_ARRAY_BYTE* f = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)falseValues)->data;
+    JAVA_ARRAY_BYTE* d = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)dst)->data;
+    int i = offset;
+    int end = offset + length;
+    int8x16_t zero = vdupq_n_s8(0);
+    for (; i <= end - 16; i += 16) {
+        int8x16_t vm = vld1q_s8((int8_t*)(m + i));
+        int8x16_t vt = vld1q_s8((int8_t*)(t + i));
+        int8x16_t vf = vld1q_s8((int8_t*)(f + i));
+        uint8x16_t isZero = vceqq_s8(vm, zero);
+        uint8x16_t out = vbslq_u8(isZero, vreinterpretq_u8_s8(vf), vreinterpretq_u8_s8(vt));
+        vst1q_s8((int8_t*)(d + i), vreinterpretq_s8_u8(out));
+    }
+    for (; i < end; i++) {
+        d[i] = m[i] != 0 ? t[i] : f[i];
+    }
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSSimd_unpackUnsignedByteToInt___byte_1ARRAY_int_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT src, JAVA_OBJECT dst, JAVA_INT offset, JAVA_INT length) {
+    JAVA_ARRAY_BYTE* s = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)src)->data;
+    JAVA_ARRAY_INT* d = (JAVA_ARRAY_INT*)((JAVA_ARRAY)dst)->data;
+    int i = offset;
+    int end = offset + length;
+    for (; i <= end - 16; i += 16) {
+        uint8x16_t v = vld1q_u8((uint8_t*)(s + i));
+        uint16x8_t lo16 = vmovl_u8(vget_low_u8(v));
+        uint16x8_t hi16 = vmovl_u8(vget_high_u8(v));
+        uint32x4_t x0 = vmovl_u16(vget_low_u16(lo16));
+        uint32x4_t x1 = vmovl_u16(vget_high_u16(lo16));
+        uint32x4_t x2 = vmovl_u16(vget_low_u16(hi16));
+        uint32x4_t x3 = vmovl_u16(vget_high_u16(hi16));
+        vst1q_s32((int32_t*)(d + i), vreinterpretq_s32_u32(x0));
+        vst1q_s32((int32_t*)(d + i + 4), vreinterpretq_s32_u32(x1));
+        vst1q_s32((int32_t*)(d + i + 8), vreinterpretq_s32_u32(x2));
+        vst1q_s32((int32_t*)(d + i + 12), vreinterpretq_s32_u32(x3));
+    }
+    for (; i < end; i++) {
+        d[i] = (JAVA_ARRAY_INT)(s[i] & 0xff);
+    }
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSSimd_packIntToByteSaturating___int_1ARRAY_byte_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT src, JAVA_OBJECT dst, JAVA_INT offset, JAVA_INT length) {
+    JAVA_ARRAY_INT* s = (JAVA_ARRAY_INT*)((JAVA_ARRAY)src)->data;
+    JAVA_ARRAY_BYTE* d = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)dst)->data;
+    int end = offset + length;
+    for (int i = offset; i < end; i++) {
+        int v = s[i];
+        if (v > 127) {
+            d[i] = 127;
+        } else if (v < -128) {
+            d[i] = -128;
+        } else {
+            d[i] = (JAVA_ARRAY_BYTE)v;
+        }
+    }
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSSimd_packIntToByteTruncate___int_1ARRAY_byte_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT src, JAVA_OBJECT dst, JAVA_INT offset, JAVA_INT length) {
+    JAVA_ARRAY_INT* s = (JAVA_ARRAY_INT*)((JAVA_ARRAY)src)->data;
+    JAVA_ARRAY_BYTE* d = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)dst)->data;
+    int end = offset + length;
+    for (int i = offset; i < end; i++) {
+        d[i] = (JAVA_ARRAY_BYTE)s[i];
+    }
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSSimd_packIntToByteTruncate___int_1ARRAY_int_byte_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT src, JAVA_INT srcOffset, JAVA_OBJECT dst, JAVA_INT dstOffset, JAVA_INT length) {
+    JAVA_ARRAY_INT* s = (JAVA_ARRAY_INT*)((JAVA_ARRAY)src)->data;
+    JAVA_ARRAY_BYTE* d = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)dst)->data;
+    int i = 0;
+    for (; i < length; i++) {
+        d[dstOffset + i] = (JAVA_ARRAY_BYTE)s[srcOffset + i];
+    }
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSSimd_permuteBytes___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT src, JAVA_OBJECT indices, JAVA_OBJECT dst, JAVA_INT offset, JAVA_INT length) {
+    JAVA_ARRAY_BYTE* s = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)src)->data;
+    int srcLen = ((JAVA_ARRAY)src)->length;
+    JAVA_ARRAY_BYTE* idx = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)indices)->data;
+    JAVA_ARRAY_BYTE* d = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)dst)->data;
+    int end = offset + length;
+    for (int i = offset; i < end; i++) {
+        int pos = idx[i];
+        d[i] = (pos >= 0 && pos < srcLen) ? s[pos] : 0;
+    }
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSSimd_and___int_1ARRAY_int_1ARRAY_int_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT srcA, JAVA_OBJECT srcB, JAVA_OBJECT dst, JAVA_INT offset, JAVA_INT length) {
+    JAVA_ARRAY_INT* a = (JAVA_ARRAY_INT*)((JAVA_ARRAY)srcA)->data;
+    JAVA_ARRAY_INT* b = (JAVA_ARRAY_INT*)((JAVA_ARRAY)srcB)->data;
+    JAVA_ARRAY_INT* d = (JAVA_ARRAY_INT*)((JAVA_ARRAY)dst)->data;
+    int i = offset;
+    int end = offset + length;
+    for (; i <= end - 4; i += 4) {
+        uint32x4_t va = vreinterpretq_u32_s32(vld1q_s32((int32_t*)(a + i)));
+        uint32x4_t vb = vreinterpretq_u32_s32(vld1q_s32((int32_t*)(b + i)));
+        vst1q_s32((int32_t*)(d + i), vreinterpretq_s32_u32(vandq_u32(va, vb)));
+    }
+    for (; i < end; i++) {
+        d[i] = (JAVA_ARRAY_INT)(a[i] & b[i]);
+    }
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSSimd_and___int_1ARRAY_int_int_1ARRAY_int_int_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT srcA, JAVA_INT srcAOffset, JAVA_OBJECT srcB, JAVA_INT srcBOffset, JAVA_OBJECT dst, JAVA_INT dstOffset, JAVA_INT length) {
+    JAVA_ARRAY_INT* a = (JAVA_ARRAY_INT*)((JAVA_ARRAY)srcA)->data;
+    JAVA_ARRAY_INT* b = (JAVA_ARRAY_INT*)((JAVA_ARRAY)srcB)->data;
+    JAVA_ARRAY_INT* d = (JAVA_ARRAY_INT*)((JAVA_ARRAY)dst)->data;
+    int i = 0;
+    for (; i <= length - 4; i += 4) {
+        uint32x4_t va = vreinterpretq_u32_s32(vld1q_s32((int32_t*)(a + srcAOffset + i)));
+        uint32x4_t vb = vreinterpretq_u32_s32(vld1q_s32((int32_t*)(b + srcBOffset + i)));
+        vst1q_s32((int32_t*)(d + dstOffset + i), vreinterpretq_s32_u32(vandq_u32(va, vb)));
+    }
+    for (; i < length; i++) {
+        d[dstOffset + i] = (JAVA_ARRAY_INT)(a[srcAOffset + i] & b[srcBOffset + i]);
+    }
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSSimd_or___int_1ARRAY_int_1ARRAY_int_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT srcA, JAVA_OBJECT srcB, JAVA_OBJECT dst, JAVA_INT offset, JAVA_INT length) {
+    JAVA_ARRAY_INT* a = (JAVA_ARRAY_INT*)((JAVA_ARRAY)srcA)->data;
+    JAVA_ARRAY_INT* b = (JAVA_ARRAY_INT*)((JAVA_ARRAY)srcB)->data;
+    JAVA_ARRAY_INT* d = (JAVA_ARRAY_INT*)((JAVA_ARRAY)dst)->data;
+    int i = offset;
+    int end = offset + length;
+    for (; i <= end - 4; i += 4) {
+        uint32x4_t va = vreinterpretq_u32_s32(vld1q_s32((int32_t*)(a + i)));
+        uint32x4_t vb = vreinterpretq_u32_s32(vld1q_s32((int32_t*)(b + i)));
+        vst1q_s32((int32_t*)(d + i), vreinterpretq_s32_u32(vorrq_u32(va, vb)));
+    }
+    for (; i < end; i++) {
+        d[i] = (JAVA_ARRAY_INT)(a[i] | b[i]);
+    }
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSSimd_or___int_1ARRAY_int_int_1ARRAY_int_int_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT srcA, JAVA_INT srcAOffset, JAVA_OBJECT srcB, JAVA_INT srcBOffset, JAVA_OBJECT dst, JAVA_INT dstOffset, JAVA_INT length) {
+    JAVA_ARRAY_INT* a = (JAVA_ARRAY_INT*)((JAVA_ARRAY)srcA)->data;
+    JAVA_ARRAY_INT* b = (JAVA_ARRAY_INT*)((JAVA_ARRAY)srcB)->data;
+    JAVA_ARRAY_INT* d = (JAVA_ARRAY_INT*)((JAVA_ARRAY)dst)->data;
+    int i = 0;
+    for (; i <= length - 4; i += 4) {
+        uint32x4_t va = vreinterpretq_u32_s32(vld1q_s32((int32_t*)(a + srcAOffset + i)));
+        uint32x4_t vb = vreinterpretq_u32_s32(vld1q_s32((int32_t*)(b + srcBOffset + i)));
+        vst1q_s32((int32_t*)(d + dstOffset + i), vreinterpretq_s32_u32(vorrq_u32(va, vb)));
+    }
+    for (; i < length; i++) {
+        d[dstOffset + i] = (JAVA_ARRAY_INT)(a[srcAOffset + i] | b[srcBOffset + i]);
+    }
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSSimd_xor___int_1ARRAY_int_1ARRAY_int_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT srcA, JAVA_OBJECT srcB, JAVA_OBJECT dst, JAVA_INT offset, JAVA_INT length) {
+    JAVA_ARRAY_INT* a = (JAVA_ARRAY_INT*)((JAVA_ARRAY)srcA)->data;
+    JAVA_ARRAY_INT* b = (JAVA_ARRAY_INT*)((JAVA_ARRAY)srcB)->data;
+    JAVA_ARRAY_INT* d = (JAVA_ARRAY_INT*)((JAVA_ARRAY)dst)->data;
+    int i = offset;
+    int end = offset + length;
+    for (; i <= end - 4; i += 4) {
+        uint32x4_t va = vreinterpretq_u32_s32(vld1q_s32((int32_t*)(a + i)));
+        uint32x4_t vb = vreinterpretq_u32_s32(vld1q_s32((int32_t*)(b + i)));
+        vst1q_s32((int32_t*)(d + i), vreinterpretq_s32_u32(veorq_u32(va, vb)));
+    }
+    for (; i < end; i++) {
+        d[i] = (JAVA_ARRAY_INT)(a[i] ^ b[i]);
+    }
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSSimd_not___int_1ARRAY_int_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT src, JAVA_OBJECT dst, JAVA_INT offset, JAVA_INT length) {
+    JAVA_ARRAY_INT* s = (JAVA_ARRAY_INT*)((JAVA_ARRAY)src)->data;
+    JAVA_ARRAY_INT* d = (JAVA_ARRAY_INT*)((JAVA_ARRAY)dst)->data;
+    int i = offset;
+    int end = offset + length;
+    for (; i <= end - 4; i += 4) {
+        uint32x4_t vs = vreinterpretq_u32_s32(vld1q_s32((int32_t*)(s + i)));
+        vst1q_s32((int32_t*)(d + i), vreinterpretq_s32_u32(vmvnq_u32(vs)));
+    }
+    for (; i < end; i++) {
+        d[i] = (JAVA_ARRAY_INT)(~s[i]);
+    }
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSSimd_shl___int_1ARRAY_int_int_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT src, JAVA_INT bits, JAVA_OBJECT dst, JAVA_INT offset, JAVA_INT length) {
+    JAVA_ARRAY_INT* s = (JAVA_ARRAY_INT*)((JAVA_ARRAY)src)->data;
+    JAVA_ARRAY_INT* d = (JAVA_ARRAY_INT*)((JAVA_ARRAY)dst)->data;
+    int shift = bits & 31;
+    int i = offset;
+    int end = offset + length;
+    int32x4_t vshift = vdupq_n_s32(shift);
+    for (; i <= end - 4; i += 4) {
+        int32x4_t vs = vld1q_s32((int32_t*)(s + i));
+        vst1q_s32((int32_t*)(d + i), vshlq_s32(vs, vshift));
+    }
+    for (; i < end; i++) {
+        d[i] = (JAVA_ARRAY_INT)(s[i] << shift);
+    }
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSSimd_shl___int_1ARRAY_int_int_int_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT src, JAVA_INT srcOffset, JAVA_INT bits, JAVA_OBJECT dst, JAVA_INT dstOffset, JAVA_INT length) {
+    JAVA_ARRAY_INT* s = (JAVA_ARRAY_INT*)((JAVA_ARRAY)src)->data;
+    JAVA_ARRAY_INT* d = (JAVA_ARRAY_INT*)((JAVA_ARRAY)dst)->data;
+    int shift = bits & 31;
+    int i = 0;
+    int32x4_t vshift = vdupq_n_s32(shift);
+    for (; i <= length - 4; i += 4) {
+        int32x4_t vs = vld1q_s32((int32_t*)(s + srcOffset + i));
+        vst1q_s32((int32_t*)(d + dstOffset + i), vshlq_s32(vs, vshift));
+    }
+    for (; i < length; i++) {
+        d[dstOffset + i] = (JAVA_ARRAY_INT)(s[srcOffset + i] << shift);
+    }
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSSimd_shrLogical___int_1ARRAY_int_int_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT src, JAVA_INT bits, JAVA_OBJECT dst, JAVA_INT offset, JAVA_INT length) {
+    JAVA_ARRAY_INT* s = (JAVA_ARRAY_INT*)((JAVA_ARRAY)src)->data;
+    JAVA_ARRAY_INT* d = (JAVA_ARRAY_INT*)((JAVA_ARRAY)dst)->data;
+    int shift = bits & 31;
+    int i = offset;
+    int end = offset + length;
+    int32x4_t vshift = vdupq_n_s32(-shift);
+    for (; i <= end - 4; i += 4) {
+        uint32x4_t vs = vreinterpretq_u32_s32(vld1q_s32((int32_t*)(s + i)));
+        vst1q_s32((int32_t*)(d + i), vreinterpretq_s32_u32(vshlq_u32(vs, vshift)));
+    }
+    for (; i < end; i++) {
+        d[i] = (JAVA_ARRAY_INT)(((uint32_t)s[i]) >> shift);
+    }
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSSimd_shrLogical___int_1ARRAY_int_int_int_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT src, JAVA_INT srcOffset, JAVA_INT bits, JAVA_OBJECT dst, JAVA_INT dstOffset, JAVA_INT length) {
+    JAVA_ARRAY_INT* s = (JAVA_ARRAY_INT*)((JAVA_ARRAY)src)->data;
+    JAVA_ARRAY_INT* d = (JAVA_ARRAY_INT*)((JAVA_ARRAY)dst)->data;
+    int shift = bits & 31;
+    int i = 0;
+    int32x4_t vshift = vdupq_n_s32(-shift);
+    for (; i <= length - 4; i += 4) {
+        uint32x4_t vs = vreinterpretq_u32_s32(vld1q_s32((int32_t*)(s + srcOffset + i)));
+        vst1q_s32((int32_t*)(d + dstOffset + i), vreinterpretq_s32_u32(vshlq_u32(vs, vshift)));
+    }
+    for (; i < length; i++) {
+        d[dstOffset + i] = (JAVA_ARRAY_INT)(((uint32_t)s[srcOffset + i]) >> shift);
+    }
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSSimd_shrArithmetic___int_1ARRAY_int_int_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT src, JAVA_INT bits, JAVA_OBJECT dst, JAVA_INT offset, JAVA_INT length) {
+    JAVA_ARRAY_INT* s = (JAVA_ARRAY_INT*)((JAVA_ARRAY)src)->data;
+    JAVA_ARRAY_INT* d = (JAVA_ARRAY_INT*)((JAVA_ARRAY)dst)->data;
+    int shift = bits & 31;
+    int i = offset;
+    int end = offset + length;
+    int32x4_t vshift = vdupq_n_s32(-shift);
+    for (; i <= end - 4; i += 4) {
+        int32x4_t vs = vld1q_s32((int32_t*)(s + i));
+        vst1q_s32((int32_t*)(d + i), vshlq_s32(vs, vshift));
+    }
+    for (; i < end; i++) {
+        d[i] = (JAVA_ARRAY_INT)(s[i] >> shift);
+    }
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSSimd_cmpEq___int_1ARRAY_int_1ARRAY_byte_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT srcA, JAVA_OBJECT srcB, JAVA_OBJECT dstMask, JAVA_INT offset, JAVA_INT length) {
+    JAVA_ARRAY_INT* a = (JAVA_ARRAY_INT*)((JAVA_ARRAY)srcA)->data;
+    JAVA_ARRAY_INT* b = (JAVA_ARRAY_INT*)((JAVA_ARRAY)srcB)->data;
+    JAVA_ARRAY_BYTE* m = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)dstMask)->data;
+    int end = offset + length;
+    for (int i = offset; i < end; i++) {
+        m[i] = a[i] == b[i] ? (JAVA_ARRAY_BYTE)-1 : (JAVA_ARRAY_BYTE)0;
+    }
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSSimd_cmpLt___int_1ARRAY_int_1ARRAY_byte_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT srcA, JAVA_OBJECT srcB, JAVA_OBJECT dstMask, JAVA_INT offset, JAVA_INT length) {
+    JAVA_ARRAY_INT* a = (JAVA_ARRAY_INT*)((JAVA_ARRAY)srcA)->data;
+    JAVA_ARRAY_INT* b = (JAVA_ARRAY_INT*)((JAVA_ARRAY)srcB)->data;
+    JAVA_ARRAY_BYTE* m = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)dstMask)->data;
+    int end = offset + length;
+    for (int i = offset; i < end; i++) {
+        m[i] = a[i] < b[i] ? (JAVA_ARRAY_BYTE)-1 : (JAVA_ARRAY_BYTE)0;
+    }
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSSimd_cmpGt___int_1ARRAY_int_1ARRAY_byte_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT srcA, JAVA_OBJECT srcB, JAVA_OBJECT dstMask, JAVA_INT offset, JAVA_INT length) {
+    JAVA_ARRAY_INT* a = (JAVA_ARRAY_INT*)((JAVA_ARRAY)srcA)->data;
+    JAVA_ARRAY_INT* b = (JAVA_ARRAY_INT*)((JAVA_ARRAY)srcB)->data;
+    JAVA_ARRAY_BYTE* m = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)dstMask)->data;
+    int end = offset + length;
+    for (int i = offset; i < end; i++) {
+        m[i] = a[i] > b[i] ? (JAVA_ARRAY_BYTE)-1 : (JAVA_ARRAY_BYTE)0;
+    }
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSSimd_select___byte_1ARRAY_int_1ARRAY_int_1ARRAY_int_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT mask, JAVA_OBJECT trueValues, JAVA_OBJECT falseValues, JAVA_OBJECT dst, JAVA_INT offset, JAVA_INT length) {
+    JAVA_ARRAY_BYTE* m = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)mask)->data;
+    JAVA_ARRAY_INT* t = (JAVA_ARRAY_INT*)((JAVA_ARRAY)trueValues)->data;
+    JAVA_ARRAY_INT* f = (JAVA_ARRAY_INT*)((JAVA_ARRAY)falseValues)->data;
+    JAVA_ARRAY_INT* d = (JAVA_ARRAY_INT*)((JAVA_ARRAY)dst)->data;
+    int end = offset + length;
+    for (int i = offset; i < end; i++) {
+        d[i] = m[i] != 0 ? t[i] : f[i];
+    }
+}
