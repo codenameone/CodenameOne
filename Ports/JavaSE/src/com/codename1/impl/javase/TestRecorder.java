@@ -60,7 +60,7 @@ public class TestRecorder extends javax.swing.JFrame {
     private static final String CLOSING_CODE = "        return true;\n" +
             "    }\n" +
             "}\n";
-    private String generatedCode = "";
+    private final TestRecorderScriptModel scriptModel = new TestRecorderScriptModel();
     
     /** Creates new form TestRecorder */
     public TestRecorder() {
@@ -99,7 +99,7 @@ public class TestRecorder extends javax.swing.JFrame {
                         Form newForm = Display.getInstance().getCurrent();
                         if(isRecording()) {
                             if(newForm.getName() != null && newForm.getName().length() > 0) {
-                                generatedCode += "        waitForFormName(\"" + newForm.getName() + "\");\n";
+                                appendGeneratedCode("        waitForFormName(\"" + newForm.getName() + "\");\n");
                             } else {
                                 String ft = getFormTitle(newForm);
                                 String oldT = "";
@@ -107,11 +107,11 @@ public class TestRecorder extends javax.swing.JFrame {
                                     oldT = getFormTitle(oldForm);
                                 }
                                 if(ft.equals(oldT) || ft.length() == 0) {
-                                    generatedCode += "        waitForUnnamedForm();\n";
+                                    appendGeneratedCode("        waitForUnnamedForm();\n");
                                 } else {
-                                    generatedCode += "        waitForFormTitle(\"" + ft + "\");\n";
+                                    appendGeneratedCode("        waitForFormTitle(\"" + ft + "\");\n");
                                 }
-                                generatedCode += "        Display.getInstance().getCurrent().setName(\"Form_"  + counter + "\");\n";
+                                appendGeneratedCode("        Display.getInstance().getCurrent().setName(\"Form_"  + counter + "\");\n");
                                 Display.getInstance().getCurrent().setName("Form_"  + counter);
                                 counter++;
                             }
@@ -133,7 +133,7 @@ public class TestRecorder extends javax.swing.JFrame {
         if(isRecording()) {
             long t = System.currentTimeMillis();
             long d = t - waitTimer;
-            generatedCode += "        waitFor(" + d + ");\n";
+            appendGeneratedCode("        waitFor(" + d + ");\n");
             waitTimer = t;
         }
     }
@@ -149,10 +149,14 @@ public class TestRecorder extends javax.swing.JFrame {
         waitTimer = System.currentTimeMillis();
     }
     
+    private void appendGeneratedCode(String snippet) {
+        scriptModel.appendToActiveBlock(snippet);
+    }
+
     private void updateTestCode() {
         script.setText((INITIAL_CODE.
                 replace("__PACKAGE_NAME__", testsPackage.getText()) + 
-                generatedCode + CLOSING_CODE).replace("__TEST_NAME__", testName.getText()));
+                scriptModel.getEnabledCode() + CLOSING_CODE).replace("__TEST_NAME__", testName.getText()));
     }
     
     private String toGameKeyConstant(int k) {
@@ -176,10 +180,10 @@ public class TestRecorder extends javax.swing.JFrame {
             resetWaitTimer();
             int g = Display.getInstance().getGameAction(k);
             if(g <= 0) {
-                generatedCode += "        keyPress(" + k + ");\n";
+                appendGeneratedCode("        keyPress(" + k + ");\n");
             } else {
 
-                generatedCode += "        gameKeyPress(" + toGameKeyConstant(g) + ");\n";
+                appendGeneratedCode("        gameKeyPress(" + toGameKeyConstant(g) + ");\n");
             }
             updateTestCode();
         }
@@ -191,9 +195,9 @@ public class TestRecorder extends javax.swing.JFrame {
             addWaitStatement();
             int g = Display.getInstance().getGameAction(k);
             if(g <= 0) {
-                generatedCode += "        keyPress(" + k + ");\n";
+                appendGeneratedCode("        keyPress(" + k + ");\n");
             } else {
-                generatedCode += "        gameKeyPress(" + toGameKeyConstant(g) + ");\n";
+                appendGeneratedCode("        gameKeyPress(" + toGameKeyConstant(g) + ");\n");
             }
             updateTestCode();
         }
@@ -260,11 +264,11 @@ public class TestRecorder extends javax.swing.JFrame {
                 dragged = true;
             } else {
                 if(!dragged) {
-                    generatedCode += "        pointerPress" + generatePointerEventArguments(pointerPressedX, pointerPressedY);
+                    appendGeneratedCode("        pointerPress" + generatePointerEventArguments(pointerPressedX, pointerPressedY));
                 }
                 dragged = true;
                 addWaitStatement();
-                generatedCode += "        pointerDrag" + generatePointerEventArguments(x, y);
+                appendGeneratedCode("        pointerDrag" + generatePointerEventArguments(x, y));
                 updateTestCode();
             }
         }
@@ -326,7 +330,7 @@ public class TestRecorder extends javax.swing.JFrame {
             cmp.putClientProperty("CN1$listenerBound", Boolean.TRUE);
             m.addSelectionListener(new SelectionListener() {
                 public void selectionChanged(int oldSelected, int newSelected) {
-                    generatedCode += "        selectInList(" + getPathOrName(cmp) + ", " + newSelected + ");\n";
+                    appendGeneratedCode("        selectInList(" + getPathOrName(cmp) + ", " + newSelected + ");\n");
                     updateTestCode();
                 }
             });
@@ -380,19 +384,19 @@ public class TestRecorder extends javax.swing.JFrame {
                     if(scrollTo != null && scrollTo != Display.getInstance().getCurrent() && scrollTo != Display.getInstance().getCurrent().getContentPane()) {
                         String name = scrollTo.getName();
                         if(name != null) {
-                            generatedCode += "        ensureVisible(\"" + name + "\");\n";
+                            appendGeneratedCode("        ensureVisible(\"" + name + "\");\n");
                         } else {
                             String pp = getPathToComponent(scrollTo);
                             if(pp == null) {
                                 return;
                             }
-                            generatedCode += "        ensureVisible(" + pp + ");\n";
+                            appendGeneratedCode("        ensureVisible(" + pp + ");\n");
                         }
                         updateTestCode();
                     }
                 } else {
                     addWaitStatement();
-                    generatedCode += "        pointerRelease" + generatePointerEventArguments(x, y);
+                    appendGeneratedCode("        pointerRelease" + generatePointerEventArguments(x, y));
                     updateTestCode();
                 }
             } else {
@@ -404,8 +408,8 @@ public class TestRecorder extends javax.swing.JFrame {
                             Command[] commands = TestUtils.getToolbarCommands();
                             for(Command c : commands) {
                                 if(c == cmd) {
-                                    generatedCode += "        assertEqual(getToolbarCommands().length, " + commands.length + ");\n";
-                                    generatedCode += "        executeToolbarCommandAtOffset(" + offset + ");\n";
+                                    appendGeneratedCode("        assertEqual(getToolbarCommands().length, " + commands.length + ");\n");
+                                    appendGeneratedCode("        executeToolbarCommandAtOffset(" + offset + ");\n");
                                     updateTestCode();
                                     return;
                                 }
@@ -414,7 +418,7 @@ public class TestRecorder extends javax.swing.JFrame {
                         } else {
                             if(cmp.getUIID().equals("MenuButton")) {
                                 // side menu button
-                                generatedCode += "        showSidemenu();\n";
+                                appendGeneratedCode("        showSidemenu();\n");
                                 updateTestCode();
                                 return;
                             }
@@ -427,19 +431,19 @@ public class TestRecorder extends javax.swing.JFrame {
                     
                     // special case for back command on iOS
                     if(btn.getCommand() != null && btn.getCommand() == Display.getInstance().getCurrent().getBackCommand()) {
-                        generatedCode += "        goBack();\n";
+                        appendGeneratedCode("        goBack();\n");
                     } else {
                         if(btn.getName() != null && btn.getName().length() > 0) {
-                            generatedCode += "        clickButtonByName(\"" + btn.getName() + "\");\n";
+                            appendGeneratedCode("        clickButtonByName(\"" + btn.getName() + "\");\n");
                         } else {
                             if(btn.getText() != null && btn.getText().length() > 0) {
-                                generatedCode += "        clickButtonByLabel(\"" + btn.getText() + "\");\n";
+                                appendGeneratedCode("        clickButtonByLabel(\"" + btn.getText() + "\");\n");
                             } else {
                                 String pp = getPathToComponent(cmp);
                                 if(pp == null || pp.equals("(String)null")) {
                                     return;
                                 }
-                                generatedCode += "        clickButtonByPath(" + pp + ");\n";
+                                appendGeneratedCode("        clickButtonByPath(" + pp + ");\n");
                             }
                         }
                     }
@@ -450,9 +454,9 @@ public class TestRecorder extends javax.swing.JFrame {
                     // ignore this, its probably initiating edit which we will capture soon
                     return;
                 }
-                generatedCode += "        pointerPress" + generatePointerEventArguments(pointerPressedX, pointerPressedY);
+                appendGeneratedCode("        pointerPress" + generatePointerEventArguments(pointerPressedX, pointerPressedY));
                 addWaitStatement();
-                generatedCode += "        pointerRelease" + generatePointerEventArguments(x, y);
+                appendGeneratedCode("        pointerRelease" + generatePointerEventArguments(x, y));
                 updateTestCode();
             }
         }
@@ -467,7 +471,7 @@ public class TestRecorder extends javax.swing.JFrame {
     }
     
     void editTextFieldCompleted(com.codename1.ui.Component cmp, String text) {
-        generatedCode += "        setText(" + getPathOrName(cmp) + ", \"" + text + "\");\n";
+        appendGeneratedCode("        setText(" + getPathOrName(cmp) + ", \"" + text + "\");\n");
     }
     
     private void bindForm(Form current) {
@@ -694,10 +698,10 @@ private void recordingActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIR
     if(isRecording()) {
         Form f = Display.getInstance().getCurrent();
         if(f.getName() != null && f.getTitle().length() > 0) {
-            generatedCode += "        waitForFormName(\"" + f.getName() + "\");\n";
+            appendGeneratedCode("        waitForFormName(\"" + f.getName() + "\");\n");
         } else {
             if(f.getTitle() != null && f.getTitle().length() > 0) {
-                generatedCode += "        waitForFormTitle(\"" + f.getTitle() + "\");\n";
+                appendGeneratedCode("        waitForFormTitle(\"" + f.getTitle() + "\");\n");
             }
         }
         updateTestCode();
@@ -706,7 +710,7 @@ private void recordingActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIR
 
 private void assertTitleActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_assertTitleActionPerformed
     Form f = Display.getInstance().getCurrent();
-    generatedCode += "        assertTitle(\"" + f.getTitle().replace("\n", "\\n") + "\");\n";    
+    appendGeneratedCode("        assertTitle(\"" + f.getTitle().replace("\n", "\\n") + "\");\n");
     updateTestCode();    
 }//GEN-LAST:event_assertTitleActionPerformed
 
@@ -721,9 +725,9 @@ private void assertLabelsActionPerformed(java.awt.event.ActionEvent evt) {//GEN-
                     labelText = "\"" + lbl.getText().replace("\n", "\\n") + "\"";
                 }
                 if(lbl.getName() != null) {
-                    generatedCode += "        assertLabel(" + getPathOrName(lbl) + ", " + labelText + ");\n";
+                    appendGeneratedCode("        assertLabel(" + getPathOrName(lbl) + ", " + labelText + ");\n");
                 } else {
-                    generatedCode += "        assertLabel(" + labelText + ");\n";                    
+                    appendGeneratedCode("        assertLabel(" + labelText + ");\n");
                 }
             }
         }
@@ -742,9 +746,9 @@ private void assertTextAreasActionPerformed(java.awt.event.ActionEvent evt) {//G
                     labelText = "\"" + lbl.getText().replace("\n", "\\n") + "\"";
                 }
                 if(lbl.getName() != null) {
-                    generatedCode += "        assertTextArea(" + getPathOrName(lbl) + ", " + labelText + ");\n";
+                    appendGeneratedCode("        assertTextArea(" + getPathOrName(lbl) + ", " + labelText + ");\n");
                 } else {
-                    generatedCode += "        assertTextArea(" + labelText + ");\n";
+                    appendGeneratedCode("        assertTextArea(" + labelText + ");\n");
                 }
             }
         }
@@ -754,7 +758,7 @@ private void assertTextAreasActionPerformed(java.awt.event.ActionEvent evt) {//G
 
 private void screenshotTestActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_screenshotTestActionPerformed
     screenshots++;
-    generatedCode += "        screenshotTest(\"__TEST_NAME___" + screenshots + "\");\n";
+    appendGeneratedCode("        screenshotTest(\"__TEST_NAME___" + screenshots + "\");\n");
     updateTestCode();    
 }//GEN-LAST:event_screenshotTestActionPerformed
 
