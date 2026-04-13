@@ -39,6 +39,8 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import javax.swing.JOptionPane;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 
 /**
  * The test recorder monitors Codename One and automatically creates a unit test
@@ -61,10 +63,16 @@ public class TestRecorder extends javax.swing.JFrame {
             "    }\n" +
             "}\n";
     private final TestRecorderScriptModel scriptModel = new TestRecorderScriptModel();
+    private javax.swing.JComboBox<String> blockSelector;
+    private javax.swing.JCheckBox blockEnabled;
+    private javax.swing.JButton addBlock;
+    private boolean updatingScriptText;
+    private boolean updatingBlockUi;
     
     /** Creates new form TestRecorder */
     public TestRecorder() {
         initComponents();
+        initBlockEditorUi();
         File f = new File("codenameone_settings.properties");
         if (!f.exists()) {
             saveRecording.setEnabled(false);
@@ -153,10 +161,128 @@ public class TestRecorder extends javax.swing.JFrame {
         scriptModel.appendToActiveBlock(snippet);
     }
 
+    private String[] getTemplateBoundaries() {
+        String start = (INITIAL_CODE.
+                replace("__PACKAGE_NAME__", testsPackage.getText())).replace("__TEST_NAME__", testName.getText());
+        return new String[]{start, CLOSING_CODE};
+    }
+
+    private String extractGeneratedCodeFromScriptText(String fullText) {
+        String[] boundaries = getTemplateBoundaries();
+        String start = boundaries[0];
+        String end = boundaries[1];
+        if (fullText.startsWith(start) && fullText.endsWith(end) && fullText.length() >= start.length() + end.length()) {
+            return fullText.substring(start.length(), fullText.length() - end.length());
+        }
+        return fullText;
+    }
+
+    private void syncEditedScriptToActiveBlock() {
+        scriptModel.setBlockCode(scriptModel.getActiveBlockIndex(), extractGeneratedCodeFromScriptText(script.getText()));
+    }
+
+    private void refreshBlockSelector() {
+        if (blockSelector == null || updatingBlockUi) {
+            return;
+        }
+        updatingBlockUi = true;
+        try {
+            blockSelector.removeAllItems();
+            for (TestRecorderScriptModel.ScriptBlock block : scriptModel.getBlocks()) {
+                blockSelector.addItem(block.getName());
+            }
+            int activeIndex = scriptModel.getActiveBlockIndex();
+            if (activeIndex >= 0) {
+                blockSelector.setSelectedIndex(activeIndex);
+                blockEnabled.setSelected(scriptModel.getBlocks().get(activeIndex).isEnabled());
+            }
+        } finally {
+            updatingBlockUi = false;
+        }
+    }
+
+    private void initBlockEditorUi() {
+        script.setEditable(true);
+        script.getDocument().addDocumentListener(new DocumentListener() {
+            public void insertUpdate(DocumentEvent e) {
+                if (!updatingScriptText) {
+                    syncEditedScriptToActiveBlock();
+                }
+            }
+
+            public void removeUpdate(DocumentEvent e) {
+                if (!updatingScriptText) {
+                    syncEditedScriptToActiveBlock();
+                }
+            }
+
+            public void changedUpdate(DocumentEvent e) {
+                if (!updatingScriptText) {
+                    syncEditedScriptToActiveBlock();
+                }
+            }
+        });
+        jToolBar1.addSeparator();
+        blockSelector = new javax.swing.JComboBox<String>();
+        blockSelector.setToolTipText("Script block");
+        blockSelector.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent e) {
+                if (blockSelector.getSelectedIndex() < 0) {
+                    return;
+                }
+                if (updatingBlockUi) {
+                    return;
+                }
+                syncEditedScriptToActiveBlock();
+                scriptModel.setActiveBlock(blockSelector.getSelectedIndex());
+                updateTestCode();
+                blockEnabled.setSelected(scriptModel.getActiveBlock().isEnabled());
+            }
+        });
+        jToolBar1.add(blockSelector);
+
+        blockEnabled = new javax.swing.JCheckBox("Enabled");
+        blockEnabled.setOpaque(false);
+        blockEnabled.setSelected(true);
+        blockEnabled.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent e) {
+                if (blockSelector.getSelectedIndex() < 0) {
+                    return;
+                }
+                if (updatingBlockUi) {
+                    return;
+                }
+                scriptModel.setBlockEnabled(blockSelector.getSelectedIndex(), blockEnabled.isSelected());
+                updateTestCode();
+            }
+        });
+        jToolBar1.add(blockEnabled);
+
+        addBlock = new javax.swing.JButton("+ Block");
+        addBlock.setFocusable(false);
+        addBlock.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent e) {
+                syncEditedScriptToActiveBlock();
+                scriptModel.createBlock("Block " + scriptModel.getBlocks().size());
+                refreshBlockSelector();
+                updateTestCode();
+            }
+        });
+        jToolBar1.add(addBlock);
+        refreshBlockSelector();
+        updateTestCode();
+    }
+
     private void updateTestCode() {
-        script.setText((INITIAL_CODE.
-                replace("__PACKAGE_NAME__", testsPackage.getText()) + 
-                scriptModel.getEnabledCode() + CLOSING_CODE).replace("__TEST_NAME__", testName.getText()));
+        updatingScriptText = true;
+        try {
+            script.setText((INITIAL_CODE.
+                    replace("__PACKAGE_NAME__", testsPackage.getText()) +
+                    scriptModel.getEnabledCode() + CLOSING_CODE).replace("__TEST_NAME__", testName.getText()));
+        } finally {
+            updatingScriptText = false;
+        }
+        refreshBlockSelector();
     }
     
     private String toGameKeyConstant(int k) {

@@ -47,4 +47,19 @@ class TestRecorderScriptModelTest {
         model.setBlockEnabled(0, false);
         assertFalse(model.getBlocks().get(0).isEnabled());
     }
+
+    @Test
+    void shouldSupportSwitchingActiveBlock() {
+        TestRecorderScriptModel model = new TestRecorderScriptModel();
+        model.appendToActiveBlock("first\n");
+        model.createBlock("Second");
+        model.appendToActiveBlock("second\n");
+
+        model.setActiveBlock(0);
+        model.appendToActiveBlock("again\n");
+
+        assertEquals(0, model.getActiveBlockIndex());
+        assertEquals("first\nagain\n", model.getBlocks().get(0).getCode());
+        assertEquals("second\n", model.getBlocks().get(1).getCode());
+    }
 }

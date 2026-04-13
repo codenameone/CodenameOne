@@ -61,6 +61,18 @@ class TestRecorderScriptModel {
         return out;
     }
 
+    int getActiveBlockIndex() {
+        return blocks.indexOf(activeBlock);
+    }
+
+    ScriptBlock getActiveBlock() {
+        return activeBlock;
+    }
+
+    void setActiveBlock(int index) {
+        activeBlock = blocks.get(index);
+    }
+
     void appendToActiveBlock(String snippet) {
         if (snippet == null || snippet.length() == 0) {
             return;
