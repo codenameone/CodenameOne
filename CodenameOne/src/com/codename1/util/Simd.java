@@ -99,6 +99,92 @@ public class Simd {
         }
     }
 
+    public void and(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length) {
+        for (int i = offset, end = offset + length; i < end; i++) {
+            dst[i] = (byte)(srcA[i] & srcB[i]);
+        }
+    }
+
+    public void or(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length) {
+        for (int i = offset, end = offset + length; i < end; i++) {
+            dst[i] = (byte)(srcA[i] | srcB[i]);
+        }
+    }
+
+    public void xor(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length) {
+        for (int i = offset, end = offset + length; i < end; i++) {
+            dst[i] = (byte)(srcA[i] ^ srcB[i]);
+        }
+    }
+
+    public void not(byte[] src, byte[] dst, int offset, int length) {
+        for (int i = offset, end = offset + length; i < end; i++) {
+            dst[i] = (byte)(~src[i]);
+        }
+    }
+
+    public void cmpEq(byte[] srcA, byte[] srcB, byte[] dstMask, int offset, int length) {
+        for (int i = offset, end = offset + length; i < end; i++) {
+            dstMask[i] = srcA[i] == srcB[i] ? (byte)-1 : (byte)0;
+        }
+    }
+
+    public void cmpLt(byte[] srcA, byte[] srcB, byte[] dstMask, int offset, int length) {
+        for (int i = offset, end = offset + length; i < end; i++) {
+            dstMask[i] = srcA[i] < srcB[i] ? (byte)-1 : (byte)0;
+        }
+    }
+
+    public void cmpGt(byte[] srcA, byte[] srcB, byte[] dstMask, int offset, int length) {
+        for (int i = offset, end = offset + length; i < end; i++) {
+            dstMask[i] = srcA[i] > srcB[i] ? (byte)-1 : (byte)0;
+        }
+    }
+
+    public void cmpRange(byte[] src, byte minValue, byte maxValue, byte[] dstMask, int offset, int length) {
+        for (int i = offset, end = offset + length; i < end; i++) {
+            int v = src[i];
+            dstMask[i] = v >= minValue && v <= maxValue ? (byte)-1 : (byte)0;
+        }
+    }
+
+    public void select(byte[] mask, byte[] trueValues, byte[] falseValues, byte[] dst, int offset, int length) {
+        for (int i = offset, end = offset + length; i < end; i++) {
+            dst[i] = mask[i] != 0 ? trueValues[i] : falseValues[i];
+        }
+    }
+
+    public void unpackUnsignedByteToInt(byte[] src, int[] dst, int offset, int length) {
+        for (int i = offset, end = offset + length; i < end; i++) {
+            dst[i] = src[i] & 0xff;
+        }
+    }
+
+    public void packIntToByteSaturating(int[] src, byte[] dst, int offset, int length) {
+        for (int i = offset, end = offset + length; i < end; i++) {
+            dst[i] = clampByte(src[i]);
+        }
+    }
+
+    public void packIntToByteTruncate(int[] src, byte[] dst, int offset, int length) {
+        for (int i = offset, end = offset + length; i < end; i++) {
+            dst[i] = (byte)src[i];
+        }
+    }
+
+    public void packIntToByteTruncate(int[] src, int srcOffset, byte[] dst, int dstOffset, int length) {
+        for (int i = 0; i < length; i++) {
+            dst[dstOffset + i] = (byte)src[srcOffset + i];
+        }
+    }
+
+    public void permuteBytes(byte[] src, byte[] indices, byte[] dst, int offset, int length) {
+        for (int i = offset, end = offset + length; i < end; i++) {
+            int idx = indices[i];
+            dst[i] = idx >= 0 && idx < src.length ? src[idx] : 0;
+        }
+    }
+
     public void add(int[] srcA, int[] srcB, int[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dst[i] = srcA[i] + srcB[i];
@@ -146,6 +232,101 @@ public class Simd {
             } else {
                 dst[i] = v;
             }
+        }
+    }
+
+    public void and(int[] srcA, int[] srcB, int[] dst, int offset, int length) {
+        for (int i = offset, end = offset + length; i < end; i++) {
+            dst[i] = srcA[i] & srcB[i];
+        }
+    }
+
+    public void and(int[] srcA, int srcAOffset, int[] srcB, int srcBOffset, int[] dst, int dstOffset, int length) {
+        for (int i = 0; i < length; i++) {
+            dst[dstOffset + i] = srcA[srcAOffset + i] & srcB[srcBOffset + i];
+        }
+    }
+
+    public void or(int[] srcA, int[] srcB, int[] dst, int offset, int length) {
+        for (int i = offset, end = offset + length; i < end; i++) {
+            dst[i] = srcA[i] | srcB[i];
+        }
+    }
+
+    public void or(int[] srcA, int srcAOffset, int[] srcB, int srcBOffset, int[] dst, int dstOffset, int length) {
+        for (int i = 0; i < length; i++) {
+            dst[dstOffset + i] = srcA[srcAOffset + i] | srcB[srcBOffset + i];
+        }
+    }
+
+    public void xor(int[] srcA, int[] srcB, int[] dst, int offset, int length) {
+        for (int i = offset, end = offset + length; i < end; i++) {
+            dst[i] = srcA[i] ^ srcB[i];
+        }
+    }
+
+    public void not(int[] src, int[] dst, int offset, int length) {
+        for (int i = offset, end = offset + length; i < end; i++) {
+            dst[i] = ~src[i];
+        }
+    }
+
+    public void shl(int[] src, int bits, int[] dst, int offset, int length) {
+        int shift = bits & 31;
+        for (int i = offset, end = offset + length; i < end; i++) {
+            dst[i] = src[i] << shift;
+        }
+    }
+
+    public void shl(int[] src, int srcOffset, int bits, int[] dst, int dstOffset, int length) {
+        int shift = bits & 31;
+        for (int i = 0; i < length; i++) {
+            dst[dstOffset + i] = src[srcOffset + i] << shift;
+        }
+    }
+
+    public void shrLogical(int[] src, int bits, int[] dst, int offset, int length) {
+        int shift = bits & 31;
+        for (int i = offset, end = offset + length; i < end; i++) {
+            dst[i] = src[i] >>> shift;
+        }
+    }
+
+    public void shrLogical(int[] src, int srcOffset, int bits, int[] dst, int dstOffset, int length) {
+        int shift = bits & 31;
+        for (int i = 0; i < length; i++) {
+            dst[dstOffset + i] = src[srcOffset + i] >>> shift;
+        }
+    }
+
+    public void shrArithmetic(int[] src, int bits, int[] dst, int offset, int length) {
+        int shift = bits & 31;
+        for (int i = offset, end = offset + length; i < end; i++) {
+            dst[i] = src[i] >> shift;
+        }
+    }
+
+    public void cmpEq(int[] srcA, int[] srcB, byte[] dstMask, int offset, int length) {
+        for (int i = offset, end = offset + length; i < end; i++) {
+            dstMask[i] = srcA[i] == srcB[i] ? (byte)-1 : (byte)0;
+        }
+    }
+
+    public void cmpLt(int[] srcA, int[] srcB, byte[] dstMask, int offset, int length) {
+        for (int i = offset, end = offset + length; i < end; i++) {
+            dstMask[i] = srcA[i] < srcB[i] ? (byte)-1 : (byte)0;
+        }
+    }
+
+    public void cmpGt(int[] srcA, int[] srcB, byte[] dstMask, int offset, int length) {
+        for (int i = offset, end = offset + length; i < end; i++) {
+            dstMask[i] = srcA[i] > srcB[i] ? (byte)-1 : (byte)0;
+        }
+    }
+
+    public void select(byte[] mask, int[] trueValues, int[] falseValues, int[] dst, int offset, int length) {
+        for (int i = offset, end = offset + length; i < end; i++) {
+            dst[i] = mask[i] != 0 ? trueValues[i] : falseValues[i];
         }
     }
 
@@ -230,12 +411,62 @@ public class Simd {
         return out;
     }
 
+
     protected final void validateBinaryByte(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length) {
         validateNotNull(srcA, "srcA");
         validateNotNull(srcB, "srcB");
         validateNotNull(dst, "dst");
         validateRange(srcA.length, offset, length, "srcA");
         validateRange(srcB.length, offset, length, "srcB");
+        validateRange(dst.length, offset, length, "dst");
+    }
+
+    protected final void validateMaskBinaryByte(byte[] srcA, byte[] srcB, byte[] dstMask, int offset, int length) {
+        validateNotNull(srcA, "srcA");
+        validateNotNull(srcB, "srcB");
+        validateNotNull(dstMask, "dstMask");
+        validateRange(srcA.length, offset, length, "srcA");
+        validateRange(srcB.length, offset, length, "srcB");
+        validateRange(dstMask.length, offset, length, "dstMask");
+    }
+
+    protected final void validateRangeMaskByte(byte[] src, byte[] dstMask, int offset, int length) {
+        validateNotNull(src, "src");
+        validateNotNull(dstMask, "dstMask");
+        validateRange(src.length, offset, length, "src");
+        validateRange(dstMask.length, offset, length, "dstMask");
+    }
+
+    protected final void validateSelectByte(byte[] mask, byte[] trueValues, byte[] falseValues, byte[] dst, int offset, int length) {
+        validateNotNull(mask, "mask");
+        validateNotNull(trueValues, "trueValues");
+        validateNotNull(falseValues, "falseValues");
+        validateNotNull(dst, "dst");
+        validateRange(mask.length, offset, length, "mask");
+        validateRange(trueValues.length, offset, length, "trueValues");
+        validateRange(falseValues.length, offset, length, "falseValues");
+        validateRange(dst.length, offset, length, "dst");
+    }
+
+    protected final void validateByteToInt(byte[] src, int[] dst, int offset, int length) {
+        validateNotNull(src, "src");
+        validateNotNull(dst, "dst");
+        validateRange(src.length, offset, length, "src");
+        validateRange(dst.length, offset, length, "dst");
+    }
+
+    protected final void validateIntToByte(int[] src, byte[] dst, int offset, int length) {
+        validateNotNull(src, "src");
+        validateNotNull(dst, "dst");
+        validateRange(src.length, offset, length, "src");
+        validateRange(dst.length, offset, length, "dst");
+    }
+
+    protected final void validatePermuteByte(byte[] src, byte[] indices, byte[] dst, int offset, int length) {
+        validateNotNull(src, "src");
+        validateNotNull(indices, "indices");
+        validateNotNull(dst, "dst");
+        validateRange(indices.length, offset, length, "indices");
         validateRange(dst.length, offset, length, "dst");
     }
 
@@ -259,6 +490,26 @@ public class Simd {
         validateNotNull(src, "src");
         validateNotNull(dst, "dst");
         validateRange(src.length, offset, length, "src");
+        validateRange(dst.length, offset, length, "dst");
+    }
+
+    protected final void validateMaskBinaryInt(int[] srcA, int[] srcB, byte[] dstMask, int offset, int length) {
+        validateNotNull(srcA, "srcA");
+        validateNotNull(srcB, "srcB");
+        validateNotNull(dstMask, "dstMask");
+        validateRange(srcA.length, offset, length, "srcA");
+        validateRange(srcB.length, offset, length, "srcB");
+        validateRange(dstMask.length, offset, length, "dstMask");
+    }
+
+    protected final void validateSelectInt(byte[] mask, int[] trueValues, int[] falseValues, int[] dst, int offset, int length) {
+        validateNotNull(mask, "mask");
+        validateNotNull(trueValues, "trueValues");
+        validateNotNull(falseValues, "falseValues");
+        validateNotNull(dst, "dst");
+        validateRange(mask.length, offset, length, "mask");
+        validateRange(trueValues.length, offset, length, "trueValues");
+        validateRange(falseValues.length, offset, length, "falseValues");
         validateRange(dst.length, offset, length, "dst");
     }
 
@@ -301,6 +552,7 @@ public class Simd {
         validateRange(srcA.length, offset, length, "srcA");
         validateRange(srcB.length, offset, length, "srcB");
     }
+
 
     protected final void validateNotNull(Object o, String name) {
         if (o == null) {
