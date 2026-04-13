@@ -3,7 +3,7 @@
 JavaScript Port Status (ParparVM)
 =================================
 
-Last updated: 2026-04-11
+Last updated: 2026-04-12
 
 Latest Investigation Snapshot (this round)
 ------------------------------------------
@@ -215,6 +215,42 @@ What Was Fixed In This Pass
      - Targets recurring per-test failure signature:
        - `Cannot read properties of null (reading '__classDef')`
      - This is now the highest-priority blocker after `.get` bridge repair.
+
+17. Fixed Worker-to-main-thread console forwarding for CN1SS output and System.out.println.
+   - Files:
+     - `vm/ByteCodeTranslator/src/javascript/parparvm_runtime.js`
+     - `Ports/JavaScriptPort/src/main/webapp/port.js`
+     - `vm/ByteCodeTranslator/src/javascript/browser_bridge.js`
+     - `scripts/run-javascript-headless-browser.mjs`
+   - Root cause:
+     - `System.out.println()` in the VM Worker maps to `printToConsole()` which only calls `console.log()` in the Worker context.
+     - Playwright `page.on('console')` does not reliably capture Web Worker console messages emitted during async VM execution (only synchronous module-load-time messages appear).
+     - Consequently, `CN1SS:SUITE:FINISHED` and all test chunk data never reach the log file, causing the shell harness to time out.
+   - Changes:
+     - `printToConsole()` now also calls `emitVmMessage({ type: 'log', message })` to forward `System.out.println` output to the main thread via `postMessage`.
+     - `emitDiagLine()` in port.js now also calls `postMessage({ type: 'log', message })` to forward CN1SS chunk data and diagnostic lines.
+     - `browser_bridge.js` detects app lifecycle start from worker log messages and sets `window.cn1Started = true` on the main thread.
+     - `run-javascript-headless-browser.mjs` now detects `CN1SS:SUITE:FINISHED` in console output and exits early instead of running to its full timeout.
+   - Expected effect:
+     - `CN1SS:SUITE:FINISHED` reliably appears in the browser log, resolving the CI timeout.
+     - All CN1SS chunk data reaches Playwright, enabling screenshot extraction.
+     - Playwright exits promptly after suite completion, saving CI time.
+
+18. Fixed screenshot hang caused by canvasToBlob async callback across worker boundary.
+    - File: `Ports/JavaScriptPort/src/main/webapp/port.js`
+    - Root cause:
+      - The translated screenshot method calls `ImageIO.save()` which calls
+        `BlobUtil.canvasToBlob()`.  That method uses the async
+        `HTMLCanvasElement.toBlob(BlobCallback)` browser API.  In the worker
+        architecture the BlobCallback is a Java object that cannot be invoked
+        from the host thread, so `canvasToBlob()` hangs forever in
+        `while (!complete) { lock.wait(200); }`.
+    - Fix:
+      - `emitCurrentFormScreenshotDom` now always uses the DOM-based host
+        bridge capture path (`__cn1_capture_canvas_png__`) instead of the
+        translated screenshot method.  This avoids async callbacks entirely.
+    - Also added `Uint8ClampedArray` to the JSO `inferFn` for proper type
+      recognition when wrapping typed arrays received from the host.
 
 Known Failing Symptoms (Latest CI Logs/Artifacts)
 -------------------------------------------------

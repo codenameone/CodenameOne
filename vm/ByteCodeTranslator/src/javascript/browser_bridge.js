@@ -340,18 +340,23 @@
       receiver[member] = args.length ? args[0] : null;
       value = null;
     } else {
-      var fn = receiver[member];
-      if (typeof fn === 'function') {
-        value = fn.apply(receiver, args);
-      } else if (member === 'get' && args.length === 1 && receiver && typeof receiver.length === 'number') {
+      // For array-like objects, prefer indexed get/set over native methods
+      // because TypedArray.prototype.set(array, offset) has different
+      // semantics than the JSO per-element set(index, value).
+      if (member === 'get' && args.length === 1 && receiver && typeof receiver.length === 'number') {
         value = receiver[args[0] | 0];
       } else if (member === 'set' && args.length === 2 && receiver && typeof receiver.length === 'number') {
         receiver[args[0] | 0] = args[1];
         value = null;
-      } else if (!args.length && Object.prototype.hasOwnProperty.call(receiver, member)) {
-        value = receiver[member];
       } else {
-        throw new Error('Missing JS member ' + member + ' for host receiver');
+        var fn = receiver[member];
+        if (typeof fn === 'function') {
+          value = fn.apply(receiver, args);
+        } else if (!args.length && Object.prototype.hasOwnProperty.call(receiver, member)) {
+          value = receiver[member];
+        } else {
+          throw new Error('Missing JS member ' + member + ' for host receiver');
+        }
       }
     }
     if (kind === 'getter' && member === 'data' && value && typeof value.length === 'number') {
@@ -815,6 +820,13 @@
       }
       if (String(data.message).indexOf('CN1SS:INFO:suite starting test=') >= 0) {
         diag('SCREENSHOT_START', 'source', 'vm_log');
+      }
+      // Detect app lifecycle start from worker-side log messages so the
+      // main-thread cn1Started flag is set even when @JSBody runs in the
+      // worker where window === self.
+      var msg = String(data.message);
+      if (!global.cn1Started && msg.indexOf('CN1JS:') >= 0 && msg.indexOf('.runApp') >= 0) {
+        global.cn1Started = true;
       }
     }
   }

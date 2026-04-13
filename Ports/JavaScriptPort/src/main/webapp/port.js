@@ -26,6 +26,9 @@
     if (typeof global.ArrayBuffer !== "undefined" && value instanceof global.ArrayBuffer) {
       return "com_codename1_html5_js_typedarrays_ArrayBuffer";
     }
+    if (typeof global.Uint8ClampedArray !== "undefined" && value instanceof global.Uint8ClampedArray) {
+      return "com_codename1_html5_js_typedarrays_Uint8ClampedArray";
+    }
     if (typeof global.Uint8Array !== "undefined" && value instanceof global.Uint8Array) {
       return "com_codename1_html5_js_typedarrays_Uint8Array";
     }
@@ -380,9 +383,29 @@ function emitDisplayInitDiag(marker) {
   emitDiagLine("PARPAR:DIAG:" + marker + ":displayClassExists=" + (state.displayClassExists ? "1" : "0")+ ":instance=" + (state.instance ? "present" : "null")+ ":edt=" + (state.edt ? "present" : "null") + (state.edtThreadName ? ":edtThreadName=" + state.edtThreadName : ""));
 }
 
+// Enable forwarding System.out.println output to the main thread via postMessage.
+// This is only needed in the browser JS port where Playwright cannot reliably
+// capture Worker console.log.  Detect the browser Worker context by checking
+// for the native importScripts function (not the polyfill used in Node.js
+// worker_threads test harnesses which uses vm.runInThisContext).
+global.__cn1ForwardConsoleToMain = (typeof WorkerGlobalScope !== "undefined"
+    || (typeof self !== "undefined" && typeof self.importScripts === "function" && typeof process === "undefined"));
+
 function emitDiagLine(line) {
   if (global.console && typeof global.console.log === "function") {
     global.console.log(line);
+  }
+  // Forward to main thread so Playwright (page.on('console')) can capture
+  // CN1SS output from the worker.  Worker console.log is not always
+  // observable from the page context.
+  if (typeof global.postMessage === "function") {
+    try {
+      global.postMessage({ type: "log", message: String(line) });
+    } catch (postErr) {
+      if (global.console && typeof global.console.warn === "function") {
+        global.console.warn("emitDiagLine:postMessage failed: " + String(postErr && postErr.message ? postErr.message : postErr));
+      }
+    }
   }
 }
 
@@ -971,6 +994,36 @@ bindNative([
   return jvm.wrapJsObject(new global.Uint8Array(jvm.unwrapJsValue(buffer), offset | 0, length | 0), "com_codename1_html5_js_typedarrays_Uint8Array");
 });
 
+// Uint8ClampedArray factory methods – needed by createImageData() in
+// HTML5Implementation which converts ARGB int[] pixels into canvas ImageData.
+bindNative([
+  "cn1_com_codename1_html5_js_typedarrays_Uint8ClampedArray_create_int_R_com_codename1_html5_js_typedarrays_Uint8ClampedArray",
+  "cn1_com_codename1_html5_js_typedarrays_Uint8ClampedArray_create___int_R_com_codename1_html5_js_typedarrays_Uint8ClampedArray"
+], function*(size) {
+  return jvm.wrapJsObject(new global.Uint8ClampedArray(size | 0), "com_codename1_html5_js_typedarrays_Uint8ClampedArray");
+});
+
+bindNative([
+  "cn1_com_codename1_html5_js_typedarrays_Uint8ClampedArray_create_com_codename1_html5_js_typedarrays_ArrayBuffer_R_com_codename1_html5_js_typedarrays_Uint8ClampedArray",
+  "cn1_com_codename1_html5_js_typedarrays_Uint8ClampedArray_create___com_codename1_html5_js_typedarrays_ArrayBuffer_R_com_codename1_html5_js_typedarrays_Uint8ClampedArray"
+], function*(buffer) {
+  return jvm.wrapJsObject(new global.Uint8ClampedArray(jvm.unwrapJsValue(buffer)), "com_codename1_html5_js_typedarrays_Uint8ClampedArray");
+});
+
+bindNative([
+  "cn1_com_codename1_html5_js_typedarrays_Uint8ClampedArray_create_com_codename1_html5_js_typedarrays_ArrayBuffer_int_R_com_codename1_html5_js_typedarrays_Uint8ClampedArray",
+  "cn1_com_codename1_html5_js_typedarrays_Uint8ClampedArray_create___com_codename1_html5_js_typedarrays_ArrayBuffer_int_R_com_codename1_html5_js_typedarrays_Uint8ClampedArray"
+], function*(buffer, offset) {
+  return jvm.wrapJsObject(new global.Uint8ClampedArray(jvm.unwrapJsValue(buffer), offset | 0), "com_codename1_html5_js_typedarrays_Uint8ClampedArray");
+});
+
+bindNative([
+  "cn1_com_codename1_html5_js_typedarrays_Uint8ClampedArray_create_com_codename1_html5_js_typedarrays_ArrayBuffer_int_int_R_com_codename1_html5_js_typedarrays_Uint8ClampedArray",
+  "cn1_com_codename1_html5_js_typedarrays_Uint8ClampedArray_create___com_codename1_html5_js_typedarrays_ArrayBuffer_int_int_R_com_codename1_html5_js_typedarrays_Uint8ClampedArray"
+], function*(buffer, offset, length) {
+  return jvm.wrapJsObject(new global.Uint8ClampedArray(jvm.unwrapJsValue(buffer), offset | 0, length | 0), "com_codename1_html5_js_typedarrays_Uint8ClampedArray");
+});
+
 bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_createCNOutboxEvent_java_lang_String_int_R_com_codename1_html5_js_dom_Event",
   "cn1_com_codename1_impl_html5_HTML5Implementation_createCNOutboxEvent___java_lang_String_int_R_com_codename1_html5_js_dom_Event"
@@ -1489,8 +1542,17 @@ bindCiFallback("HashMap.computeHashCodeNullKey", [
     emitDiagLine("PARPAR:DIAG:FALLBACK:hashMapComputeHashCode:nullKey=1");
     return 0;
   }
+  // Try the original captured at port.js load time first.
   if (typeof hashMapComputeHashCodeOriginal === "function") {
     return yield* hashMapComputeHashCodeOriginal(key);
+  }
+  // Original wasn't available yet (translated_app.js loads after port.js).
+  // computeHashCode(key) is just key.hashCode(), so call hashCode directly
+  // via virtual dispatch to avoid recursion back into computeHashCode.
+  var hashCodeMethod = jvm.resolveVirtual(key.__class || "java_lang_Object",
+    "cn1_java_lang_Object_hashCode_R_int");
+  if (typeof hashCodeMethod === "function") {
+    return yield* hashCodeMethod(key);
   }
   return 0;
 });
@@ -3112,6 +3174,9 @@ function emitCn1ssChunks(base64, testName, channelName) {
     emitDiagLine(prefix + ":" + test + ":" + index + ":");
     cn1ssChunkIndexByStream[streamKey] = nextIndex + 1;
   }
+  // Emit END marker matching the Java emitChannel convention so the
+  // downstream cn1ss_list_tests / cn1ss_decode helpers can detect the stream.
+  emitDiagLine(prefix + ":END:" + test);
 }
 
 const cn1ssEmitCurrentFormScreenshotMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerHelper_emitCurrentFormScreenshot_java_lang_String_java_lang_Runnable";
@@ -3168,31 +3233,16 @@ bindCiFallback("Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshotDom", [
     cn1ssEmitCurrentFormScreenshotMethodId + "__impl",
     cn1ssEmitCurrentFormScreenshotMethodId
   ], cn1ssHelperClassName, fallbackSymbol);
+  // In worker mode the translated screenshot path eventually calls
+  // BlobUtil.canvasToBlob() which uses HTMLCanvasElement.toBlob(callback).
+  // That callback is a Java object and cannot be invoked from the host
+  // thread, so the worker hangs forever in a wait-loop.  Always use the
+  // DOM-based capture via host bridge calls instead – this avoids async
+  // callbacks entirely and works reliably across the worker boundary.
   if (originalResolved && typeof originalResolved.fn === "function") {
-    if (cn1ssEmitCurrentFormScreenshotInvokeDepth > 0) {
-      emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:originalReentryBypass=1");
-      shouldUseDomFallback = true;
-    } else {
-      try {
-        cn1ssEmitCurrentFormScreenshotInvokeDepth++;
-        emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:originalResolved=" + originalResolved.source);
-        yield* originalResolved.fn(testName, completion);
-        return null;
-      } catch (originalErr) {
-        emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:originalInvokeErr="
-          + String(originalErr && originalErr.message ? originalErr.message : originalErr));
-        if (originalErr && originalErr.stack) {
-          emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:originalInvokeStack="
-            + String(originalErr.stack).split("\n").slice(0, 2).join(" | "));
-        }
-        shouldUseDomFallback = true;
-      } finally {
-        cn1ssEmitCurrentFormScreenshotInvokeDepth = Math.max(0, cn1ssEmitCurrentFormScreenshotInvokeDepth - 1);
-      }
-    }
+    emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:skipTranslated=canvasToBlob_hang");
   } else {
     emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:originalMissing=1");
-    shouldUseDomFallback = true;
   }
   const canvas = global.document && typeof global.document.querySelector === "function"
     ? global.document.querySelector("canvas")
@@ -3268,9 +3318,34 @@ bindCiFallback("Cn1ssDeviceRunnerHelper.emitChannelFastJs", [
   cn1ssEmitChannelMethodId,
   cn1ssEmitChannelMethodId + "__impl"
 ], function*(payloadBytes, testName, channelName) {
-  const base64 = byteArrayToBase64(payloadBytes);
   const test = resolveCn1ssTestName(toCn1StringValue(testName));
   const channel = toCn1StringValue(channelName);
+  // For the primary screenshot channel (empty channel name), the Java-side
+  // Display.screenshot() in the worker reads from OffscreenCanvas which
+  // may not reflect the main-thread visible canvas.  Replace the payload
+  // with a main-thread canvas capture via the host bridge when available.
+  if (!channel && jvm && typeof jvm.invokeHostNative === "function" && !cn1ssScreenshotEmitted[test]) {
+    try {
+      yield jvm.invokeHostNative("__cn1_wait_for_ui_settle__", [{
+        reason: "screenshot:" + test,
+        maxFrames: 18,
+        stableFrames: 2
+      }]);
+      const hostResult = yield jvm.invokeHostNative("__cn1_capture_canvas_png__", []);
+      const capturedDataUrl = hostResult == null ? "" : String(hostResult);
+      if (capturedDataUrl && capturedDataUrl.indexOf("data:image/") === 0) {
+        cn1ssScreenshotEmitted[test] = true;
+        const comma = capturedDataUrl.indexOf(",");
+        const hostBase64 = comma >= 0 ? capturedDataUrl.substring(comma + 1) : "";
+        emitDiagLine("PARPAR:DIAG:FALLBACK:emitChannelFastJs:hostCapture=1:test=" + test + ":len=" + hostBase64.length);
+        emitCn1ssChunks(hostBase64, test, channel);
+        return null;
+      }
+    } catch (_hostErr) {
+      emitDiagLine("PARPAR:DIAG:FALLBACK:emitChannelFastJs:hostCaptureErr=" + String(_hostErr && _hostErr.message ? _hostErr.message : _hostErr));
+    }
+  }
+  const base64 = byteArrayToBase64(payloadBytes);
   emitCn1ssChunks(base64, test, channel);
   return null;
 });

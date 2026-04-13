@@ -170,51 +170,25 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             log("CN1SS:INFO:suite finished test=" + testName);
             runNextTest(index + 1);
         };
-        boolean shouldEmitScreenshot = false;
         try {
             testClass.cleanup();
-            shouldEmitScreenshot = testClass.shouldTakeScreenshot();
             if (timedOut) {
                 log("CN1SS:ERR:suite test=" + testName + " failed due to timeout waiting for DONE");
             } else if (testClass.isFailed()) {
                 log("CN1SS:ERR:suite test=" + testName + " failed: " + testClass.getFailMessage());
-            } else if (!shouldEmitScreenshot) {
+            } else if (!testClass.shouldTakeScreenshot()) {
                 log("CN1SS:INFO:test=" + testName + " screenshot=none");
             }
         } catch (Throwable t) {
             log("CN1SS:ERR:suite test=" + testName + " finalize exception=" + t);
-            shouldEmitScreenshot = false;
         }
-        if (shouldEmitScreenshot) {
-            emitFallbackScreenshotChunk(testName);
-        }
+        // The real screenshot is captured by BaseTest.createForm() →
+        // onShowCompleted() → Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot().
+        // Do NOT emit a fallback placeholder here — it would create a duplicate
+        // CN1SS stream under the class simple name (e.g. "AffineScale") which
+        // doesn't match the reference screenshot name (e.g. "graphics-affine-scale")
+        // and breaks iOS/Android comparison results.
         continueToNext.run();
-    }
-
-    private void emitFallbackScreenshotChunk(String testName) {
-        String safeName = sanitizeMarkerName(testName);
-        final String tinyPngBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO5WZ8kAAAAASUVORK5CYII=";
-        log("CN1SS:" + safeName + ":000000:" + tinyPngBase64);
-        log("CN1SS:END:" + safeName);
-    }
-
-    private String sanitizeMarkerName(String testName) {
-        if (testName == null || testName.length() == 0) {
-            return "default";
-        }
-        StringBuilder out = new StringBuilder(testName.length());
-        for (int i = 0; i < testName.length(); i++) {
-            char c = testName.charAt(i);
-            boolean valid =
-                    (c >= 'A' && c <= 'Z')
-                    || (c >= 'a' && c <= 'z')
-                    || (c >= '0' && c <= '9')
-                    || c == '_'
-                    || c == '.'
-                    || c == '-';
-            out.append(valid ? c : '_');
-        }
-        return out.length() == 0 ? "default" : out.toString();
     }
 
     private void finishSuite() {

@@ -72,8 +72,12 @@ public class ProcessScreenshots {
             } else if (!Files.exists(expectedPath)) {
                 record.put("status", "missing_expected");
                 if (emitBase64) {
-                    CommentPayload payload = loadPreviewOrBuild(testName, actualPath, previewDir);
-                    recordPayload(record, payload, actualPath.getFileName().toString(), previewDir);
+                    try {
+                        CommentPayload payload = loadPreviewOrBuild(testName, actualPath, previewDir);
+                        recordPayload(record, payload, actualPath.getFileName().toString(), previewDir);
+                    } catch (Exception ex) {
+                        record.put("message", "Failed to load preview: " + ex.getMessage());
+                    }
                 }
             } else {
                 try {
