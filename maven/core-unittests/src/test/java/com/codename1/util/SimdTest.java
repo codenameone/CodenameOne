@@ -110,4 +110,137 @@ class SimdTest extends UITestBase {
         assertEquals(20, permuted[2]);
         assertEquals(0, permuted[3]);
     }
+
+    @FormTest
+    void base64SimdMethodsMatchScalar() {
+        Simd simd = Simd.get();
+        if (!simd.isSupported()) {
+            return;
+        }
+
+        // Test that SIMD encode matches scalar encode
+        byte[] input = new byte[8192];
+        for (int i = 0; i < input.length; i++) {
+            input[i] = (byte)(i * 31 + 17);
+        }
+
+        int encodedLen = ((input.length + 2) / 3) * 4;
+        byte[] scalarEncoded = new byte[encodedLen];
+        int scalarWritten = Base64.encodeNoNewline(input, scalarEncoded);
+
+        byte[] simdInput = simd.allocByte(input.length);
+        System.arraycopy(input, 0, simdInput, 0, input.length);
+        byte[] simdEncoded = simd.allocByte(encodedLen);
+        int[] scratch = simd.allocInt(192);
+        int simdWritten = Base64.encodeNoNewlineSimd(simdInput, 0, simdInput.length, simdEncoded, 0, scratch);
+
+        assertEquals(scalarWritten, simdWritten);
+        for (int i = 0; i < scalarWritten; i++) {
+            assertEquals(scalarEncoded[i], simdEncoded[i], "Encode mismatch at index " + i);
+        }
+
+        // Test that SIMD decode matches scalar decode
+        byte[] scalarDecoded = new byte[input.length];
+        int scalarDecLen = Base64.decode(scalarEncoded, scalarDecoded);
+
+        byte[] simdDecoded = simd.allocByte(input.length);
+        int simdDecLen = Base64.decodeNoWhitespaceSimd(simdEncoded, 0, simdWritten, simdDecoded, 0, scratch);
+
+        assertEquals(scalarDecLen, simdDecLen);
+        for (int i = 0; i < scalarDecLen; i++) {
+            assertEquals(scalarDecoded[i], simdDecoded[i], "Decode mismatch at index " + i);
+        }
+    }
+
+    @FormTest
+    void byteShlAndShrLogicalWork() {
+        Simd simd = new Simd();
+        byte[] src = new byte[]{(byte)0xAB, (byte)0x01, (byte)0xFF, (byte)0x80};
+        byte[] dst = new byte[4];
+
+        simd.shl(src, 4, dst, 0, 4);
+        assertEquals((byte)0xB0, dst[0]);
+        assertEquals((byte)0x10, dst[1]);
+        assertEquals((byte)0xF0, dst[2]);
+        assertEquals((byte)0x00, dst[3]);
+
+        simd.shrLogical(src, 4, dst, 0, 4);
+        assertEquals((byte)0x0A, dst[0]);
+        assertEquals((byte)0x00, dst[1]);
+        assertEquals((byte)0x0F, dst[2]);
+        assertEquals((byte)0x08, dst[3]);
+    }
+
+    @FormTest
+    void addWrappingAndSubWrappingWork() {
+        Simd simd = new Simd();
+        byte[] a = new byte[]{(byte)200, (byte)100, (byte)0, (byte)255};
+        byte[] b = new byte[]{(byte)100, (byte)200, (byte)1, (byte)1};
+        byte[] out = new byte[4];
+
+        simd.addWrapping(a, b, out, 0, 4);
+        assertEquals((byte)44, out[0]);   // 200+100=300 mod 256=44
+        assertEquals((byte)44, out[1]);   // 100+200=300 mod 256=44
+        assertEquals((byte)1, out[2]);    // 0+1=1
+        assertEquals((byte)0, out[3]);    // 255+1=256 mod 256=0
+
+        simd.subWrapping(a, b, out, 0, 4);
+        assertEquals((byte)100, out[0]);  // 200-100=100
+        assertEquals((byte)156, out[1]);  // 100-200=-100 mod 256=156
+        assertEquals((byte)255, out[2]);  // 0-1=-1 mod 256=255
+        assertEquals((byte)254, out[3]);  // 255-1=254
+    }
+
+    @FormTest
+    void offsetBasedIntOpsWork() {
+        Simd simd = new Simd();
+
+        // Test offset-based unpack
+        byte[] bytes = new byte[]{10, 20, (byte)200, (byte)255};
+        int[] ints = new int[8];
+        simd.unpackUnsignedByteToInt(bytes, 0, ints, 4, 4);
+        assertEquals(10, ints[4]);
+        assertEquals(20, ints[5]);
+        assertEquals(200, ints[6]);
+        assertEquals(255, ints[7]);
+
+        // Test offset-based add
+        int[] a = new int[]{0, 0, 5, 10, 15, 20};
+        int[] b = new int[]{1, 2, 3, 4, 5, 6};
+        int[] out = new int[6];
+        simd.add(a, 2, b, 0, out, 1, 4);
+        assertEquals(6, out[1]);   // a[2]+b[0] = 5+1
+        assertEquals(12, out[2]);  // a[3]+b[1] = 10+2
+        assertEquals(18, out[3]);  // a[4]+b[2] = 15+3
+        assertEquals(24, out[4]);  // a[5]+b[3] = 20+4
+
+        // Test offset-based cmpLt
+        int[] vals = new int[]{5, 15, 25, 35};
+        int[] thresh = new int[]{10, 10, 10, 10};
+        byte[] mask = new byte[4];
+        simd.cmpLt(vals, 0, thresh, 0, mask, 0, 4);
+        assertEquals((byte)-1, mask[0]);
+        assertEquals((byte)0, mask[1]);
+        assertEquals((byte)0, mask[2]);
+        assertEquals((byte)0, mask[3]);
+
+        // Test offset-based cmpEq
+        int[] vals2 = new int[]{10, 20, 10, 30};
+        simd.cmpEq(vals2, 0, thresh, 0, mask, 0, 4);
+        assertEquals((byte)-1, mask[0]);
+        assertEquals((byte)0, mask[1]);
+        assertEquals((byte)-1, mask[2]);
+        assertEquals((byte)0, mask[3]);
+
+        // Test offset-based select
+        int[] trueV = new int[]{100, 200, 300, 400};
+        int[] falseV = new int[]{-1, -2, -3, -4};
+        int[] result = new int[4];
+        mask[0] = -1; mask[1] = 0; mask[2] = -1; mask[3] = 0;
+        simd.select(mask, 0, trueV, 0, falseV, 0, result, 0, 4);
+        assertEquals(100, result[0]);
+        assertEquals(-2, result[1]);
+        assertEquals(300, result[2]);
+        assertEquals(-4, result[3]);
+    }
 }

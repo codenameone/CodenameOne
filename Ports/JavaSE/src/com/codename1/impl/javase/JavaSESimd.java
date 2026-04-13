@@ -450,6 +450,94 @@ public class JavaSESimd extends Simd {
         return super.dot(srcA, srcB, offset, length);
     }
 
+    @Override
+    public void shl(byte[] src, int bits, byte[] dst, int offset, int length) {
+        validateUnaryByte(src, dst, offset, length);
+        validateRegistered(src, dst);
+        super.shl(src, bits, dst, offset, length);
+    }
+
+    @Override
+    public void shrLogical(byte[] src, int bits, byte[] dst, int offset, int length) {
+        validateUnaryByte(src, dst, offset, length);
+        validateRegistered(src, dst);
+        super.shrLogical(src, bits, dst, offset, length);
+    }
+
+    @Override
+    public void addWrapping(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length) {
+        validateBinaryByte(srcA, srcB, dst, offset, length);
+        validateRegistered(srcA, srcB, dst);
+        super.addWrapping(srcA, srcB, dst, offset, length);
+    }
+
+    @Override
+    public void subWrapping(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length) {
+        validateBinaryByte(srcA, srcB, dst, offset, length);
+        validateRegistered(srcA, srcB, dst);
+        super.subWrapping(srcA, srcB, dst, offset, length);
+    }
+
+    @Override
+    public void unpackUnsignedByteToInt(byte[] src, int srcOffset, int[] dst, int dstOffset, int length) {
+        validateNotNull(src, "src");
+        validateNotNull(dst, "dst");
+        validateRange(src.length, srcOffset, length, "src");
+        validateRange(dst.length, dstOffset, length, "dst");
+        validateRegistered(src, dst);
+        super.unpackUnsignedByteToInt(src, srcOffset, dst, dstOffset, length);
+    }
+
+    @Override
+    public void add(int[] srcA, int srcAOffset, int[] srcB, int srcBOffset, int[] dst, int dstOffset, int length) {
+        validateNotNull(srcA, "srcA");
+        validateNotNull(srcB, "srcB");
+        validateNotNull(dst, "dst");
+        validateRange(srcA.length, srcAOffset, length, "srcA");
+        validateRange(srcB.length, srcBOffset, length, "srcB");
+        validateRange(dst.length, dstOffset, length, "dst");
+        validateRegistered(srcA, srcB, dst);
+        super.add(srcA, srcAOffset, srcB, srcBOffset, dst, dstOffset, length);
+    }
+
+    @Override
+    public void cmpEq(int[] srcA, int srcAOffset, int[] srcB, int srcBOffset, byte[] dstMask, int dstOffset, int length) {
+        validateNotNull(srcA, "srcA");
+        validateNotNull(srcB, "srcB");
+        validateNotNull(dstMask, "dstMask");
+        validateRange(srcA.length, srcAOffset, length, "srcA");
+        validateRange(srcB.length, srcBOffset, length, "srcB");
+        validateRange(dstMask.length, dstOffset, length, "dstMask");
+        validateRegistered(srcA, srcB, dstMask);
+        super.cmpEq(srcA, srcAOffset, srcB, srcBOffset, dstMask, dstOffset, length);
+    }
+
+    @Override
+    public void cmpLt(int[] srcA, int srcAOffset, int[] srcB, int srcBOffset, byte[] dstMask, int dstOffset, int length) {
+        validateNotNull(srcA, "srcA");
+        validateNotNull(srcB, "srcB");
+        validateNotNull(dstMask, "dstMask");
+        validateRange(srcA.length, srcAOffset, length, "srcA");
+        validateRange(srcB.length, srcBOffset, length, "srcB");
+        validateRange(dstMask.length, dstOffset, length, "dstMask");
+        validateRegistered(srcA, srcB, dstMask);
+        super.cmpLt(srcA, srcAOffset, srcB, srcBOffset, dstMask, dstOffset, length);
+    }
+
+    @Override
+    public void select(byte[] mask, int maskOffset, int[] trueValues, int trueOffset, int[] falseValues, int falseOffset, int[] dst, int dstOffset, int length) {
+        validateNotNull(mask, "mask");
+        validateNotNull(trueValues, "trueValues");
+        validateNotNull(falseValues, "falseValues");
+        validateNotNull(dst, "dst");
+        validateRange(mask.length, maskOffset, length, "mask");
+        validateRange(trueValues.length, trueOffset, length, "trueValues");
+        validateRange(falseValues.length, falseOffset, length, "falseValues");
+        validateRange(dst.length, dstOffset, length, "dst");
+        validateRegistered(mask, trueValues, falseValues, dst);
+        super.select(mask, maskOffset, trueValues, trueOffset, falseValues, falseOffset, dst, dstOffset, length);
+    }
+
     private void validateRegistered(Object... arrays) {
         for (int i = 0; i < arrays.length; i++) {
             Object arr = arrays[i];
