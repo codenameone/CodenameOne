@@ -3,7 +3,6 @@
  */
 package com.codename1.impl.javase;
 
-import com.codename1.ui.CN;
 import com.codename1.util.Simd;
 
 import java.util.Collections;
@@ -95,6 +94,110 @@ public class JavaSESimd extends Simd {
     }
 
     @Override
+    public void and(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length) {
+        validateBinaryByte(srcA, srcB, dst, offset, length);
+        validateRegistered(srcA, srcB, dst);
+        super.and(srcA, srcB, dst, offset, length);
+    }
+
+    @Override
+    public void or(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length) {
+        validateBinaryByte(srcA, srcB, dst, offset, length);
+        validateRegistered(srcA, srcB, dst);
+        super.or(srcA, srcB, dst, offset, length);
+    }
+
+    @Override
+    public void xor(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length) {
+        validateBinaryByte(srcA, srcB, dst, offset, length);
+        validateRegistered(srcA, srcB, dst);
+        super.xor(srcA, srcB, dst, offset, length);
+    }
+
+    @Override
+    public void not(byte[] src, byte[] dst, int offset, int length) {
+        validateUnaryByte(src, dst, offset, length);
+        validateRegistered(src, dst);
+        super.not(src, dst, offset, length);
+    }
+
+    @Override
+    public void cmpEq(byte[] srcA, byte[] srcB, byte[] dstMask, int offset, int length) {
+        validateMaskBinaryByte(srcA, srcB, dstMask, offset, length);
+        validateRegistered(srcA, srcB, dstMask);
+        super.cmpEq(srcA, srcB, dstMask, offset, length);
+    }
+
+    @Override
+    public void cmpLt(byte[] srcA, byte[] srcB, byte[] dstMask, int offset, int length) {
+        validateMaskBinaryByte(srcA, srcB, dstMask, offset, length);
+        validateRegistered(srcA, srcB, dstMask);
+        super.cmpLt(srcA, srcB, dstMask, offset, length);
+    }
+
+    @Override
+    public void cmpGt(byte[] srcA, byte[] srcB, byte[] dstMask, int offset, int length) {
+        validateMaskBinaryByte(srcA, srcB, dstMask, offset, length);
+        validateRegistered(srcA, srcB, dstMask);
+        super.cmpGt(srcA, srcB, dstMask, offset, length);
+    }
+
+    @Override
+    public void cmpRange(byte[] src, byte minValue, byte maxValue, byte[] dstMask, int offset, int length) {
+        if (minValue > maxValue) {
+            throw new IllegalArgumentException("minValue > maxValue");
+        }
+        validateRangeMaskByte(src, dstMask, offset, length);
+        validateRegistered(src, dstMask);
+        super.cmpRange(src, minValue, maxValue, dstMask, offset, length);
+    }
+
+    @Override
+    public void select(byte[] mask, byte[] trueValues, byte[] falseValues, byte[] dst, int offset, int length) {
+        validateSelectByte(mask, trueValues, falseValues, dst, offset, length);
+        validateRegistered(mask, trueValues, falseValues, dst);
+        super.select(mask, trueValues, falseValues, dst, offset, length);
+    }
+
+    @Override
+    public void unpackUnsignedByteToInt(byte[] src, int[] dst, int offset, int length) {
+        validateByteToInt(src, dst, offset, length);
+        validateRegistered(src, dst);
+        super.unpackUnsignedByteToInt(src, dst, offset, length);
+    }
+
+    @Override
+    public void packIntToByteSaturating(int[] src, byte[] dst, int offset, int length) {
+        validateIntToByte(src, dst, offset, length);
+        validateRegistered(src, dst);
+        super.packIntToByteSaturating(src, dst, offset, length);
+    }
+
+    @Override
+    public void packIntToByteTruncate(int[] src, byte[] dst, int offset, int length) {
+        validateIntToByte(src, dst, offset, length);
+        validateRegistered(src, dst);
+        super.packIntToByteTruncate(src, dst, offset, length);
+    }
+
+    @Override
+    public void packIntToByteTruncate(int[] src, int srcOffset, byte[] dst, int dstOffset, int length) {
+        validateNotNull(src, "src");
+        validateNotNull(dst, "dst");
+        validateRange(src.length, srcOffset, length, "src");
+        validateRange(dst.length, dstOffset, length, "dst");
+        validateRegistered(src, dst);
+        super.packIntToByteTruncate(src, srcOffset, dst, dstOffset, length);
+    }
+
+    @Override
+    public void permuteBytes(byte[] src, byte[] indices, byte[] dst, int offset, int length) {
+        validatePermuteByte(src, indices, dst, offset, length);
+        validateRegistered(src, indices, dst);
+        super.permuteBytes(src, indices, dst, offset, length);
+    }
+
+    @Override
     public void add(int[] srcA, int[] srcB, int[] dst, int offset, int length) {
         validateBinaryInt(srcA, srcB, dst, offset, length);
         validateRegistered(srcA, srcB, dst);
@@ -144,6 +247,127 @@ public class JavaSESimd extends Simd {
         validateUnaryInt(src, dst, offset, length);
         validateRegistered(src, dst);
         super.clamp(src, dst, minValue, maxValue, offset, length);
+    }
+
+    @Override
+    public void and(int[] srcA, int[] srcB, int[] dst, int offset, int length) {
+        validateBinaryInt(srcA, srcB, dst, offset, length);
+        validateRegistered(srcA, srcB, dst);
+        super.and(srcA, srcB, dst, offset, length);
+    }
+
+    @Override
+    public void and(int[] srcA, int srcAOffset, int[] srcB, int srcBOffset, int[] dst, int dstOffset, int length) {
+        validateNotNull(srcA, "srcA");
+        validateNotNull(srcB, "srcB");
+        validateNotNull(dst, "dst");
+        validateRange(srcA.length, srcAOffset, length, "srcA");
+        validateRange(srcB.length, srcBOffset, length, "srcB");
+        validateRange(dst.length, dstOffset, length, "dst");
+        validateRegistered(srcA, srcB, dst);
+        super.and(srcA, srcAOffset, srcB, srcBOffset, dst, dstOffset, length);
+    }
+
+    @Override
+    public void or(int[] srcA, int[] srcB, int[] dst, int offset, int length) {
+        validateBinaryInt(srcA, srcB, dst, offset, length);
+        validateRegistered(srcA, srcB, dst);
+        super.or(srcA, srcB, dst, offset, length);
+    }
+
+    @Override
+    public void or(int[] srcA, int srcAOffset, int[] srcB, int srcBOffset, int[] dst, int dstOffset, int length) {
+        validateNotNull(srcA, "srcA");
+        validateNotNull(srcB, "srcB");
+        validateNotNull(dst, "dst");
+        validateRange(srcA.length, srcAOffset, length, "srcA");
+        validateRange(srcB.length, srcBOffset, length, "srcB");
+        validateRange(dst.length, dstOffset, length, "dst");
+        validateRegistered(srcA, srcB, dst);
+        super.or(srcA, srcAOffset, srcB, srcBOffset, dst, dstOffset, length);
+    }
+
+    @Override
+    public void xor(int[] srcA, int[] srcB, int[] dst, int offset, int length) {
+        validateBinaryInt(srcA, srcB, dst, offset, length);
+        validateRegistered(srcA, srcB, dst);
+        super.xor(srcA, srcB, dst, offset, length);
+    }
+
+    @Override
+    public void not(int[] src, int[] dst, int offset, int length) {
+        validateUnaryInt(src, dst, offset, length);
+        validateRegistered(src, dst);
+        super.not(src, dst, offset, length);
+    }
+
+    @Override
+    public void shl(int[] src, int bits, int[] dst, int offset, int length) {
+        validateUnaryInt(src, dst, offset, length);
+        validateRegistered(src, dst);
+        super.shl(src, bits, dst, offset, length);
+    }
+
+    @Override
+    public void shl(int[] src, int srcOffset, int bits, int[] dst, int dstOffset, int length) {
+        validateNotNull(src, "src");
+        validateNotNull(dst, "dst");
+        validateRange(src.length, srcOffset, length, "src");
+        validateRange(dst.length, dstOffset, length, "dst");
+        validateRegistered(src, dst);
+        super.shl(src, srcOffset, bits, dst, dstOffset, length);
+    }
+
+    @Override
+    public void shrLogical(int[] src, int bits, int[] dst, int offset, int length) {
+        validateUnaryInt(src, dst, offset, length);
+        validateRegistered(src, dst);
+        super.shrLogical(src, bits, dst, offset, length);
+    }
+
+    @Override
+    public void shrLogical(int[] src, int srcOffset, int bits, int[] dst, int dstOffset, int length) {
+        validateNotNull(src, "src");
+        validateNotNull(dst, "dst");
+        validateRange(src.length, srcOffset, length, "src");
+        validateRange(dst.length, dstOffset, length, "dst");
+        validateRegistered(src, dst);
+        super.shrLogical(src, srcOffset, bits, dst, dstOffset, length);
+    }
+
+    @Override
+    public void shrArithmetic(int[] src, int bits, int[] dst, int offset, int length) {
+        validateUnaryInt(src, dst, offset, length);
+        validateRegistered(src, dst);
+        super.shrArithmetic(src, bits, dst, offset, length);
+    }
+
+    @Override
+    public void cmpEq(int[] srcA, int[] srcB, byte[] dstMask, int offset, int length) {
+        validateMaskBinaryInt(srcA, srcB, dstMask, offset, length);
+        validateRegistered(srcA, srcB, dstMask);
+        super.cmpEq(srcA, srcB, dstMask, offset, length);
+    }
+
+    @Override
+    public void cmpLt(int[] srcA, int[] srcB, byte[] dstMask, int offset, int length) {
+        validateMaskBinaryInt(srcA, srcB, dstMask, offset, length);
+        validateRegistered(srcA, srcB, dstMask);
+        super.cmpLt(srcA, srcB, dstMask, offset, length);
+    }
+
+    @Override
+    public void cmpGt(int[] srcA, int[] srcB, byte[] dstMask, int offset, int length) {
+        validateMaskBinaryInt(srcA, srcB, dstMask, offset, length);
+        validateRegistered(srcA, srcB, dstMask);
+        super.cmpGt(srcA, srcB, dstMask, offset, length);
+    }
+
+    @Override
+    public void select(byte[] mask, int[] trueValues, int[] falseValues, int[] dst, int offset, int length) {
+        validateSelectInt(mask, trueValues, falseValues, dst, offset, length);
+        validateRegistered(mask, trueValues, falseValues, dst);
+        super.select(mask, trueValues, falseValues, dst, offset, length);
     }
 
     @Override
@@ -227,9 +451,6 @@ public class JavaSESimd extends Simd {
     }
 
     private void validateRegistered(Object... arrays) {
-        if (!CN.isSimulator()) {
-            return;
-        }
         for (int i = 0; i < arrays.length; i++) {
             Object arr = arrays[i];
             Integer id = Integer.valueOf(System.identityHashCode(arr));

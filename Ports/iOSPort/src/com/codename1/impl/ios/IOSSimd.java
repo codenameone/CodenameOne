@@ -60,6 +60,48 @@ public class IOSSimd extends Simd {
     public native void clamp(byte[] src, byte[] dst, byte minValue, byte maxValue, int offset, int length);
 
     @Override
+    public native void and(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length);
+
+    @Override
+    public native void or(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length);
+
+    @Override
+    public native void xor(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length);
+
+    @Override
+    public native void not(byte[] src, byte[] dst, int offset, int length);
+
+    @Override
+    public native void cmpEq(byte[] srcA, byte[] srcB, byte[] dstMask, int offset, int length);
+
+    @Override
+    public native void cmpLt(byte[] srcA, byte[] srcB, byte[] dstMask, int offset, int length);
+
+    @Override
+    public native void cmpGt(byte[] srcA, byte[] srcB, byte[] dstMask, int offset, int length);
+
+    @Override
+    public native void cmpRange(byte[] src, byte minValue, byte maxValue, byte[] dstMask, int offset, int length);
+
+    @Override
+    public native void select(byte[] mask, byte[] trueValues, byte[] falseValues, byte[] dst, int offset, int length);
+
+    @Override
+    public native void unpackUnsignedByteToInt(byte[] src, int[] dst, int offset, int length);
+
+    @Override
+    public native void packIntToByteSaturating(int[] src, byte[] dst, int offset, int length);
+
+    @Override
+    public native void packIntToByteTruncate(int[] src, byte[] dst, int offset, int length);
+
+    @Override
+    public native void packIntToByteTruncate(int[] src, int srcOffset, byte[] dst, int dstOffset, int length);
+
+    @Override
+    public native void permuteBytes(byte[] src, byte[] indices, byte[] dst, int offset, int length);
+
+    @Override
     public native void add(int[] srcA, int[] srcB, int[] dst, int offset, int length);
 
     @Override
@@ -79,6 +121,51 @@ public class IOSSimd extends Simd {
 
     @Override
     public native void clamp(int[] src, int[] dst, int minValue, int maxValue, int offset, int length);
+
+    @Override
+    public native void and(int[] srcA, int[] srcB, int[] dst, int offset, int length);
+
+    @Override
+    public native void and(int[] srcA, int srcAOffset, int[] srcB, int srcBOffset, int[] dst, int dstOffset, int length);
+
+    @Override
+    public native void or(int[] srcA, int[] srcB, int[] dst, int offset, int length);
+
+    @Override
+    public native void or(int[] srcA, int srcAOffset, int[] srcB, int srcBOffset, int[] dst, int dstOffset, int length);
+
+    @Override
+    public native void xor(int[] srcA, int[] srcB, int[] dst, int offset, int length);
+
+    @Override
+    public native void not(int[] src, int[] dst, int offset, int length);
+
+    @Override
+    public native void shl(int[] src, int bits, int[] dst, int offset, int length);
+
+    @Override
+    public native void shl(int[] src, int srcOffset, int bits, int[] dst, int dstOffset, int length);
+
+    @Override
+    public native void shrLogical(int[] src, int bits, int[] dst, int offset, int length);
+
+    @Override
+    public native void shrLogical(int[] src, int srcOffset, int bits, int[] dst, int dstOffset, int length);
+
+    @Override
+    public native void shrArithmetic(int[] src, int bits, int[] dst, int offset, int length);
+
+    @Override
+    public native void cmpEq(int[] srcA, int[] srcB, byte[] dstMask, int offset, int length);
+
+    @Override
+    public native void cmpLt(int[] srcA, int[] srcB, byte[] dstMask, int offset, int length);
+
+    @Override
+    public native void cmpGt(int[] srcA, int[] srcB, byte[] dstMask, int offset, int length);
+
+    @Override
+    public native void select(byte[] mask, int[] trueValues, int[] falseValues, int[] dst, int offset, int length);
 
     @Override
     public native int sum(int[] src, int offset, int length);

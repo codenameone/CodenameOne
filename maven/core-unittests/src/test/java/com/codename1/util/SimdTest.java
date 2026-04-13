@@ -44,17 +44,70 @@ class SimdTest extends UITestBase {
             return;
         }
 
-        int[] regA = simd.allocInt(4);
-        int[] regB = simd.allocInt(4);
-        int[] regO = simd.allocInt(4);
-        simd.add(regA, regB, regO, 0, 4);
+        int[] regA = simd.allocInt(16);
+        int[] regB = simd.allocInt(16);
+        int[] regO = simd.allocInt(16);
+        simd.add(regA, regB, regO, 0, 16);
 
         if (CN.isSimulator()) {
-            int[] plainA = new int[4];
-            int[] plainB = new int[4];
-            int[] plainO = new int[4];
-            Throwable t = assertThrows(IllegalArgumentException.class, () -> simd.add(plainA, plainB, plainO, 0, 4));
+            int[] plainA = new int[16];
+            int[] plainB = new int[16];
+            int[] plainO = new int[16];
+            Throwable t = assertThrows(IllegalArgumentException.class, () -> simd.add(plainA, plainB, plainO, 0, 16));
             assertTrue(t.getMessage().indexOf("Simd.alloc") >= 0);
         }
+    }
+
+    @FormTest
+    void genericBitwiseShiftCompareSelectOpsWork() {
+        Simd simd = new Simd();
+
+        byte[] a = new byte[]{1, 2, 3, 4};
+        byte[] b = new byte[]{3, 2, 1, 4};
+        byte[] mask = new byte[4];
+        byte[] outB = new byte[4];
+        simd.cmpGt(a, b, mask, 0, 4);
+        simd.select(mask, a, b, outB, 0, 4);
+        assertEquals(3, outB[0]);
+        assertEquals(2, outB[1]);
+        assertEquals(3, outB[2]);
+        assertEquals(4, outB[3]);
+
+        int[] ia = new int[]{0x0f0f0f0f, 8, -16, 7};
+        int[] ib = new int[]{0x00ff00ff, 1, 2, 9};
+        int[] io = new int[4];
+        simd.and(ia, ib, io, 0, 4);
+        assertEquals(0x000f000f, io[0]);
+        simd.shrLogical(ia, 1, io, 0, 4);
+        assertEquals(4, io[1]);
+        simd.shrArithmetic(ia, 1, io, 0, 4);
+        assertEquals(-8, io[2]);
+
+        byte[] intMask = new byte[4];
+        simd.cmpLt(ia, ib, intMask, 0, 4);
+        simd.select(intMask, ia, ib, io, 0, 4);
+        assertEquals(0x00ff00ff, io[0]);
+        assertEquals(1, io[1]);
+        assertEquals(-16, io[2]);
+        assertEquals(7, io[3]);
+
+        int[] unpack = new int[4];
+        simd.unpackUnsignedByteToInt(new byte[]{-1, 0, 1, 127}, unpack, 0, 4);
+        assertEquals(255, unpack[0]);
+        assertEquals(127, unpack[3]);
+
+        byte[] packed = new byte[4];
+        simd.packIntToByteSaturating(new int[]{-129, -128, 127, 1000}, packed, 0, 4);
+        assertEquals(-128, packed[0]);
+        assertEquals(-128, packed[1]);
+        assertEquals(127, packed[2]);
+        assertEquals(127, packed[3]);
+
+        byte[] permuted = new byte[4];
+        simd.permuteBytes(new byte[]{10, 20, 30, 40}, new byte[]{3, 2, 1, -1}, permuted, 0, 4);
+        assertEquals(40, permuted[0]);
+        assertEquals(30, permuted[1]);
+        assertEquals(20, permuted[2]);
+        assertEquals(0, permuted[3]);
     }
 }
