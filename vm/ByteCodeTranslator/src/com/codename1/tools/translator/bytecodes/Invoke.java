@@ -146,6 +146,14 @@ public class Invoke extends Instruction {
         if (ownerClass == null || ownerClass.getConcreteClass() == null) {
             return null;
         }
+        if (getMethod() != null) {
+            String currentClass = getMethod().getClsName();
+            String ownerName = ownerClass.getClsName();
+            if (ownerName.equals(currentClass) || currentClass.startsWith(ownerName + "_")) {
+                ByteCodeClass fallbackOwner = ownerClass.findMethodOwner(name, desc);
+                return fallbackOwner != null ? fallbackOwner.getClsName() : null;
+            }
+        }
         ByteCodeClass concreteClass = Parser.getClassObject(ownerClass.getConcreteClass().replace('/', '_').replace('$', '_'));
         if (concreteClass == null) {
             System.err.println("WARNING: Failed to find concrete class object for " + ownerClass.getClsName() + ": " + ownerClass.getConcreteClass());
