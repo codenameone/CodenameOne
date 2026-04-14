@@ -89,10 +89,25 @@ public class Invoke extends Instruction {
     
     @Override
     public void addDependencies(List<String> dependencyList) {
+        String dependencyOwner = owner;
+        if (opcode == Opcodes.INVOKEVIRTUAL) {
+            ByteCodeClass bc = Parser.getClassObject(owner.replace('/', '_').replace('$', '_'));
+            String resolvedConcreteOwner = resolveConcreteInvokeOwner(bc);
+            if (resolvedConcreteOwner != null) {
+                dependencyOwner = resolvedConcreteOwner;
+            }
+        }
         String t = owner.replace('.', '_').replace('/', '_').replace('$', '_');
         t = unarray(t);
         if(t != null && !dependencyList.contains(t)) {
             dependencyList.add(t);
+        }
+        if (!owner.equals(dependencyOwner)) {
+            String concreteDependency = dependencyOwner.replace('.', '_').replace('/', '_').replace('$', '_');
+            concreteDependency = unarray(concreteDependency);
+            if (concreteDependency != null && !dependencyList.contains(concreteDependency)) {
+                dependencyList.add(concreteDependency);
+            }
         }
 
         StringBuilder bld = new StringBuilder();
@@ -133,6 +148,22 @@ public class Invoke extends Instruction {
         return findActualOwner(bc.getBaseClassObject());
     }
 
+    private String resolveConcreteInvokeOwner(ByteCodeClass ownerClass) {
+        if (ownerClass == null || ownerClass.getConcreteClass() == null || getMethod() == null) {
+            return null;
+        }
+        String currentClass = getMethod().getClsName();
+        String ownerName = ownerClass.getClsName();
+        if (ownerName.equals(currentClass) || currentClass.startsWith(ownerName + "_")) {
+            return null;
+        }
+        ByteCodeClass concreteClass = Parser.getClassObject(ownerClass.getConcreteClass().replace('/', '_').replace('$', '_'));
+        if (concreteClass != null && concreteClass.hasDeclaredNonAbstractMethod(name, desc)) {
+            return concreteClass.getClsName();
+        }
+        return null;
+    }
+
     @Override
     public void appendInstruction(StringBuilder b) {
         // special case for clone on an array which isn't a real method invocation
@@ -162,6 +193,12 @@ public class Invoke extends Instruction {
                 } else {
                     if (bc.isMethodPrivate(name, desc)) {
                         isVirtual = false;
+                    } else {
+                        String resolvedConcreteOwner = resolveConcreteInvokeOwner(bc);
+                        if (resolvedConcreteOwner != null) {
+                            invokeOwner = resolvedConcreteOwner;
+                            isVirtual = false;
+                        }
                     }
                 }
             }
