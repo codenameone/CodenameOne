@@ -58,6 +58,7 @@ jobs:
         env:
           DOCSTYLE_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
           DOCSTYLE_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          GITHUB_TOKEN: ${{ github.token }}
       - name: Set up Java
         run: |
           if [ "${{ matrix.java-version }}" = "8" ]; then
