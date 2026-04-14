@@ -1,11 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+
+if ! git -C "${REPO_ROOT}" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  echo "Unable to locate a git working tree at ${REPO_ROOT}" >&2
+  exit 1
+fi
+
 BASE_SHA="${DOCSTYLE_BASE_SHA:-}"
 HEAD_SHA="${DOCSTYLE_HEAD_SHA:-HEAD}"
 
 if [ -z "$BASE_SHA" ]; then
-  if git rev-parse HEAD^ >/dev/null 2>&1; then
+  if git -C "${REPO_ROOT}" rev-parse HEAD^ >/dev/null 2>&1; then
     BASE_SHA="HEAD^"
   else
     echo "Unable to determine base commit. Set DOCSTYLE_BASE_SHA." >&2
@@ -15,11 +23,27 @@ fi
 
 TARGET_DIRS=("CodenameOne" "Ports/CLDC11")
 
+if ! git -C "${REPO_ROOT}" cat-file -e "${BASE_SHA}^{commit}" >/dev/null 2>&1; then
+  echo "Base commit ${BASE_SHA} is not available locally. Attempting to fetch it." >&2
+  git -C "${REPO_ROOT}" fetch --no-tags --depth=200 origin "${BASE_SHA}" >/dev/null 2>&1 || true
+fi
+
+if ! git -C "${REPO_ROOT}" cat-file -e "${HEAD_SHA}^{commit}" >/dev/null 2>&1; then
+  echo "Head commit ${HEAD_SHA} is not available locally. Attempting to fetch it." >&2
+  git -C "${REPO_ROOT}" fetch --no-tags --depth=200 origin "${HEAD_SHA}" >/dev/null 2>&1 || true
+fi
+
+if ! git -C "${REPO_ROOT}" cat-file -e "${BASE_SHA}^{commit}" >/dev/null 2>&1 || \
+   ! git -C "${REPO_ROOT}" cat-file -e "${HEAD_SHA}^{commit}" >/dev/null 2>&1; then
+  echo "Unable to resolve commit range ${BASE_SHA}..${HEAD_SHA}." >&2
+  exit 1
+fi
+
 echo "Validating Java 25 markdown docs style in ${TARGET_DIRS[*]} between ${BASE_SHA}..${HEAD_SHA}"
 
-package_violations=$(git diff --name-status --diff-filter=AR "$BASE_SHA" "$HEAD_SHA" -- "${TARGET_DIRS[@]}" | awk '$2 ~ /package\.html$/ {print $0}')
+package_violations=$(git -C "${REPO_ROOT}" diff --name-status --diff-filter=AR "$BASE_SHA" "$HEAD_SHA" -- "${TARGET_DIRS[@]}" | awk '$2 ~ /package\.html$/ {print $0}')
 
-comment_violations=$(git diff -U0 "$BASE_SHA" "$HEAD_SHA" -- "${TARGET_DIRS[@]}" -- '*.java' | awk '
+comment_violations=$(git -C "${REPO_ROOT}" diff -U0 "$BASE_SHA" "$HEAD_SHA" -- "${TARGET_DIRS[@]}" -- '*.java' | awk '
   /^\+\+\+/ { next }
   /^\+/ && $0 ~ /^\+[[:space:]]*\/\*\*/ { print }
 ')
