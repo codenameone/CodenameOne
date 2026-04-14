@@ -149,12 +149,12 @@ public class Invoke extends Instruction {
     }
 
     private String resolveConcreteInvokeOwner(ByteCodeClass ownerClass) {
-        if (ownerClass == null || ownerClass.getConcreteClass() == null || getMethod() == null) {
+        if (ownerClass == null || ownerClass.getConcreteClass() == null) {
             return null;
         }
-        String currentClass = getMethod().getClsName();
+        String currentClass = getMethod() != null ? getMethod().getClsName() : null;
         String ownerName = ownerClass.getClsName();
-        if (ownerName.equals(currentClass) || currentClass.startsWith(ownerName + "_")) {
+        if (currentClass != null && (ownerName.equals(currentClass) || currentClass.startsWith(ownerName + "_"))) {
             return null;
         }
         ByteCodeClass concreteClass = Parser.getClassObject(ownerClass.getConcreteClass().replace('/', '_').replace('$', '_'));
