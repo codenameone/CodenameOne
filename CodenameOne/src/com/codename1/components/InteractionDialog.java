@@ -637,8 +637,11 @@ public class InteractionDialog extends Container implements AbstractDialog {
     ///
     /// - `c`: the context component which is used to position the dialog and can also be pointed at
     ///
-    /// - `bias`: @param bias biases the dialog to appear above/below or to the sides.
-    /// This is ignored if there isn't enough space
+    /// - `bias`: directional bias value. This parameter is not supported.
+    ///
+    /// #### Deprecated
+    ///
+    /// @deprecated The `bias` parameter is not supported for `InteractionDialog` popups. Use `#showPopupDialog(Component)` instead.
     public void showPopupDialog(Component c, boolean bias) {
         if (c == null) {
             throw new IllegalArgumentException("Component cannot be null");
@@ -653,7 +656,7 @@ public class InteractionDialog extends Container implements AbstractDialog {
         componentPos.setX(componentPos.getX() - c.getScrollX());
         componentPos.setY(componentPos.getY() - c.getScrollY());
         setOwner(c);
-        showPopupDialog(componentPos, bias);
+        showPopupDialog(componentPos);
     }
 
     /// A popup dialog is shown with the context of a component and  its selection. You should use `#setDisposeWhenPointerOutOfBounds(boolean)` to make it dispose
@@ -664,7 +667,7 @@ public class InteractionDialog extends Container implements AbstractDialog {
     ///
     /// - `rect`: the screen rectangle to which the popup should point
     public void showPopupDialog(Rectangle rect) {
-        showPopupDialog(rect, Display.getInstance().isPortrait());
+        showPopupDialogImpl(rect, Display.getInstance().isPortrait());
     }
 
     /// A popup dialog is shown with the context of a component and  its selection. You should use `#setDisposeWhenPointerOutOfBounds(boolean)` to make it dispose
@@ -675,9 +678,16 @@ public class InteractionDialog extends Container implements AbstractDialog {
     ///
     /// - `rect`: the screen rectangle to which the popup should point
     ///
-    /// - `bias`: @param bias biases the dialog to appear above/below or to the sides.
-    /// This is ignored if there isn't enough space
+    /// - `bias`: directional bias value. This parameter is not supported.
+    ///
+    /// #### Deprecated
+    ///
+    /// @deprecated The `bias` parameter is not supported for `InteractionDialog` popups. Use `#showPopupDialog(Rectangle)` instead.
     public void showPopupDialog(Rectangle rect, boolean bias) {
+        showPopupDialog(rect);
+    }
+
+    private void showPopupDialogImpl(Rectangle rect, boolean bias) {
         if (rect == null) {
             throw new IllegalArgumentException("rect cannot be null");
         }
