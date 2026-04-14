@@ -94,7 +94,7 @@ public class CustomInvoke extends Instruction {
         String dependencyOwner = owner;
         if (origOpcode == Opcodes.INVOKEVIRTUAL) {
             ByteCodeClass bc = Parser.getClassObject(owner.replace('/', '_').replace('$', '_'));
-            String resolvedConcreteOwner = resolveConcreteInvokeOwner(bc);
+            String resolvedConcreteOwner = resolveConcreteInvokeOwner(bc, true);
             if (resolvedConcreteOwner != null) {
                 dependencyOwner = resolvedConcreteOwner;
             }
@@ -150,11 +150,14 @@ public class CustomInvoke extends Instruction {
         return findActualOwner(bc.getBaseClassObject());
     }
 
-    private String resolveConcreteInvokeOwner(ByteCodeClass ownerClass) {
+    private String resolveConcreteInvokeOwner(ByteCodeClass ownerClass, boolean allowMissingMethodContext) {
         if (ownerClass == null || ownerClass.getConcreteClass() == null) {
             return null;
         }
         String currentClass = getMethod() != null ? getMethod().getClsName() : null;
+        if (currentClass == null && !allowMissingMethodContext) {
+            return null;
+        }
         String ownerName = ownerClass.getClsName();
         if (currentClass != null && (ownerName.equals(currentClass) || currentClass.startsWith(ownerName + "_"))) {
             return null;
@@ -209,7 +212,7 @@ public class CustomInvoke extends Instruction {
                     if (bc.isMethodPrivate(name, desc)) {
                         isVirtual = false;
                     } else {
-                        String resolvedConcreteOwner = resolveConcreteInvokeOwner(bc);
+                        String resolvedConcreteOwner = resolveConcreteInvokeOwner(bc, false);
                         if (resolvedConcreteOwner != null) {
                             invokeOwner = resolvedConcreteOwner;
                             isVirtual = false;
@@ -320,7 +323,7 @@ public class CustomInvoke extends Instruction {
                     if (bc.isMethodPrivate(name, desc)) {
                         isVirtual = false;
                     } else {
-                        String resolvedConcreteOwner = resolveConcreteInvokeOwner(bc);
+                        String resolvedConcreteOwner = resolveConcreteInvokeOwner(bc, false);
                         if (resolvedConcreteOwner != null) {
                             invokeOwner = resolvedConcreteOwner;
                             isVirtual = false;
