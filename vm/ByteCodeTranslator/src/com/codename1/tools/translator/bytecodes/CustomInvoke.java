@@ -100,17 +100,24 @@ public class CustomInvoke extends Instruction {
                 dependencyOwner = resolvedConcreteOwner;
             }
         }
-        String t = dependencyOwner.replace('.', '_').replace('/', '_').replace('$', '_');
+        String t = owner.replace('.', '_').replace('/', '_').replace('$', '_');
         t = unarray(t);
         if(t != null && !dependencyList.contains(t)) {
             dependencyList.add(t);
+        }
+        if (!owner.equals(dependencyOwner)) {
+            String concreteDependency = dependencyOwner.replace('.', '_').replace('/', '_').replace('$', '_');
+            concreteDependency = unarray(concreteDependency);
+            if (concreteDependency != null && !dependencyList.contains(concreteDependency)) {
+                dependencyList.add(concreteDependency);
+            }
         }
 
         StringBuilder bld = new StringBuilder();
         if(origOpcode != Opcodes.INVOKEINTERFACE && origOpcode != Opcodes.INVOKEVIRTUAL) {
             return;
         }         
-        bld.append(dependencyOwner.replace('/', '_').replace('$', '_'));
+        bld.append(owner.replace('/', '_').replace('$', '_'));
         bld.append("_");
         if(name.equals("<init>")) {
             bld.append("__INIT__");
