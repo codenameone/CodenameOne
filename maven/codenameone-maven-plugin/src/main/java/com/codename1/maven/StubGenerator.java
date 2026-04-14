@@ -30,6 +30,8 @@ import java.io.IOException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 
 import static com.codename1.maven.PathUtil.path;
 
@@ -163,11 +165,41 @@ public class StubGenerator {
      * Returns true if native files might need overwriting
      */
     public boolean isFilesExist(File destination) {
-        initFileNames(destination);
-        return androidFile.exists() || androidKotlinFile.exists() || iosHFile.exists() || iosMFile.exists() || iosSwiftFile.exists() ||
-                csFile.exists() || javaseFile.exists() || jsFile.exists();
+        return !getExistingFiles(destination).isEmpty();
     }
 
+    /**
+     * Returns all existing native implementation files for this interface.
+     */
+    public List<File> getExistingFiles(File destination) {
+        initFileNames(destination);
+        List<File> out = new ArrayList<>();
+        if (androidFile.exists()) {
+            out.add(androidFile);
+        }
+        if (androidKotlinFile.exists()) {
+            out.add(androidKotlinFile);
+        }
+        if (iosHFile.exists()) {
+            out.add(iosHFile);
+        }
+        if (iosMFile.exists()) {
+            out.add(iosMFile);
+        }
+        if (iosSwiftFile.exists()) {
+            out.add(iosSwiftFile);
+        }
+        if (csFile.exists()) {
+            out.add(csFile);
+        }
+        if (javaseFile.exists()) {
+            out.add(javaseFile);
+        }
+        if (jsFile.exists()) {
+            out.add(jsFile);
+        }
+        return out;
+    }
 
 
     /**

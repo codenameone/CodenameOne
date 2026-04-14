@@ -1,7 +1,7 @@
 package com.codename1.maven;
 
 
-import org.apache.maven.artifact.Artifact;
+import org.apache.maven.artifact.DependencyResolutionRequiredException;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.Execute;
@@ -32,6 +32,9 @@ public class GenerateNativeInterfaces extends AbstractCN1Mojo {
 
     @Parameter(property = "cn1.generateNativeInterfaces.kotlin", defaultValue = "false")
     private boolean generateAndroidKotlin;
+
+    @Parameter(property = "cn1.generateNativeInterfaces.overwrite", defaultValue = "false")
+    private boolean overwrite;
 
     @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
@@ -84,32 +87,9 @@ public class GenerateNativeInterfaces extends AbstractCN1Mojo {
 
         if (classFile.exists()) {
 
-            // Build a comprehensive classpath including all dependencies
-            List<URL> classpathUrls = new ArrayList<>();
-
-            // Add project output directory
-            classpathUrls.add(new File(project.getBuild().getOutputDirectory()).toURI().toURL());
-
-            // Add codenameone-core
-            File cn1CoreJar = getJar("com.codenameone", "codenameone-core");
-            if (cn1CoreJar != null) {
-                classpathUrls.add(cn1CoreJar.toURI().toURL());
-            }
-
-            // Add all project dependencies (including cn1libs with classifiers)
-            for (Artifact artifact : project.getArtifacts()) {
-                // Skip provided and test scoped dependencies
-                if ("provided".equals(artifact.getScope()) || "test".equals(artifact.getScope())) {
-                    continue;
-                }
-
-                File artifactFile = getJar(artifact);
-                if (artifactFile != null && artifactFile.exists()) {
-                    classpathUrls.add(artifactFile.toURI().toURL());
-                }
-            }
-
-            URLClassLoader cl = new URLClassLoader(classpathUrls.toArray(new URL[0]));
+            // Build classpath using compile classpath elements so class loading works
+            // for all project dependencies.
+            URLClassLoader cl = createProjectClassLoader();
             String classPath = relativePath
                     .replace("\\", ".")
                     .replace("/", ".")
@@ -128,9 +108,43 @@ public class GenerateNativeInterfaces extends AbstractCN1Mojo {
         }
 
 
-        g.generateCode(project.getBasedir().getCanonicalFile().getParentFile(), false);
+        File destination = project.getBasedir().getCanonicalFile().getParentFile();
+        if (!overwrite) {
+            List<File> existingFiles = g.getExistingFiles(destination);
+            if (!existingFiles.isEmpty()) {
+                getLog().warn("Native interface files already exist for " + c.getName() + ". Skipping generation.");
+                for (File existingFile : existingFiles) {
+                    getLog().warn("Existing file: " + existingFile.getAbsolutePath());
+                }
+                getLog().warn("To overwrite these files, run: mvn cn1:generate-native-interfaces -Dcn1.generateNativeInterfaces.overwrite=true");
+                return;
+            }
+        }
+
+        g.generateCode(destination, overwrite);
 
 
+    }
+
+    private URLClassLoader createProjectClassLoader() throws IOException {
+        List<URL> classpathUrls = new ArrayList<>();
+        try {
+            for (Object element : project.getCompileClasspathElements()) {
+                String pathElement = String.valueOf(element);
+                File file = new File(pathElement);
+                if (file.exists()) {
+                    classpathUrls.add(file.toURI().toURL());
+                }
+            }
+        } catch (DependencyResolutionRequiredException ex) {
+            throw new IOException("Failed to resolve compile classpath for native interface generation", ex);
+        }
+
+        if (classpathUrls.isEmpty()) {
+            classpathUrls.add(new File(project.getBuild().getOutputDirectory()).toURI().toURL());
+        }
+
+        return new URLClassLoader(classpathUrls.toArray(new URL[0]), this.getClass().getClassLoader());
     }
 
     private static interface ClassScanner {
