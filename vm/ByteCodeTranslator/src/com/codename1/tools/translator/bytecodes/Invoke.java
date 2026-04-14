@@ -24,7 +24,6 @@
 package com.codename1.tools.translator.bytecodes;
 
 import com.codename1.tools.translator.ByteCodeClass;
-import com.codename1.tools.translator.ByteCodeTranslator;
 import com.codename1.tools.translator.ByteCodeMethodArg;
 import com.codename1.tools.translator.BytecodeMethod;
 import com.codename1.tools.translator.Parser;
@@ -39,8 +38,6 @@ import org.objectweb.asm.Opcodes;
  * @author Shai Almog
  */
 public class Invoke extends Instruction {
-    private static final boolean ENABLE_CONCRETE_INVOKE_OPTIMIZATION =
-            Boolean.getBoolean("cn1.enableConcreteInvokeOptimization");
     private String owner;
     private final String name;
     private final String desc;
@@ -92,25 +89,10 @@ public class Invoke extends Instruction {
     
     @Override
     public void addDependencies(List<String> dependencyList) {
-        String dependencyOwner = owner;
-        if (ENABLE_CONCRETE_INVOKE_OPTIMIZATION && opcode == Opcodes.INVOKEVIRTUAL) {
-            ByteCodeClass bc = Parser.getClassObject(owner.replace('/', '_').replace('$', '_'));
-            String resolvedConcreteOwner = resolveConcreteInvokeOwner(bc);
-            if (resolvedConcreteOwner != null) {
-                dependencyOwner = resolvedConcreteOwner;
-            }
-        }
         String t = owner.replace('.', '_').replace('/', '_').replace('$', '_');
         t = unarray(t);
         if(t != null && !dependencyList.contains(t)) {
             dependencyList.add(t);
-        }
-        if (!owner.equals(dependencyOwner)) {
-            String concreteDependency = dependencyOwner.replace('.', '_').replace('/', '_').replace('$', '_');
-            concreteDependency = unarray(concreteDependency);
-            if (concreteDependency != null && !dependencyList.contains(concreteDependency)) {
-                dependencyList.add(concreteDependency);
-            }
         }
 
         StringBuilder bld = new StringBuilder();
@@ -151,35 +133,6 @@ public class Invoke extends Instruction {
         return findActualOwner(bc.getBaseClassObject());
     }
 
-    private String resolveConcreteInvokeOwner(ByteCodeClass ownerClass) {
-        if (ownerClass == null || ownerClass.getConcreteClass() == null) {
-            return null;
-        }
-        ByteCodeClass fallbackOwner = ownerClass.findMethodOwner(name, desc);
-        if (getMethod() == null) {
-            return fallbackOwner != null ? fallbackOwner.getClsName() : null;
-        }
-        if (getMethod() != null) {
-            String currentClass = getMethod().getClsName();
-            String ownerName = ownerClass.getClsName();
-            if (ownerName.equals(currentClass) || currentClass.startsWith(ownerName + "_")) {
-                return fallbackOwner != null ? fallbackOwner.getClsName() : null;
-            }
-        }
-        ByteCodeClass concreteClass = Parser.getClassObject(ownerClass.getConcreteClass().replace('/', '_').replace('$', '_'));
-        if (concreteClass == null) {
-            System.err.println("WARNING: Failed to find concrete class object for " + ownerClass.getClsName() + ": " + ownerClass.getConcreteClass());
-            return null;
-        }
-        if (concreteClass.hasDeclaredNonAbstractMethod(name, desc)) {
-            return concreteClass.getClsName();
-        }
-        if (fallbackOwner != null) {
-            return fallbackOwner.getClsName();
-        }
-        return null;
-    }
-    
     @Override
     public void appendInstruction(StringBuilder b) {
         // special case for clone on an array which isn't a real method invocation
@@ -209,13 +162,6 @@ public class Invoke extends Instruction {
                 } else {
                     if (bc.isMethodPrivate(name, desc)) {
                         isVirtual = false;
-                    } else if (ENABLE_CONCRETE_INVOKE_OPTIMIZATION
-                            && ByteCodeTranslator.output != ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT) {
-                        String resolvedConcreteOwner = resolveConcreteInvokeOwner(bc);
-                        if (resolvedConcreteOwner != null) {
-                            invokeOwner = resolvedConcreteOwner;
-                            isVirtual = false;
-                        }
                     }
                 }
             }
