@@ -91,6 +91,90 @@ mkdir -p "$ARTIFACTS_DIR"
 
 export CN1_BUILD_STATS_FILE="$ARTIFACTS_DIR/iphone-builder-stats.txt"
 
+copy_tree_contents() {
+  local src="$1"
+  local dest="$2"
+  mkdir -p "$dest"
+  if command -v rsync >/dev/null 2>&1; then
+    rsync -a "$src"/ "$dest"/
+  else
+    cp -R "$src"/. "$dest"/
+  fi
+}
+
+find_bytecode_translator_sources() {
+  local root="$1"
+  local best=""
+  local best_score=0
+  local dir score m_count c_count h_count
+
+  [ -d "$root" ] || return 1
+
+  while IFS= read -r dir; do
+    [ -d "$dir" ] || continue
+
+    score=0
+    [ -f "$dir/cn1_globals.m" ] && score=$((score + 100))
+    [ -f "$dir/xmlvm.h" ] && score=$((score + 100))
+
+    m_count="$(find "$dir" -maxdepth 1 -type f -name '*.m' 2>/dev/null | wc -l | tr -d ' ')"
+    c_count="$(find "$dir" -maxdepth 1 -type f -name '*.c' 2>/dev/null | wc -l | tr -d ' ')"
+    h_count="$(find "$dir" -maxdepth 1 -type f -name '*.h' 2>/dev/null | wc -l | tr -d ' ')"
+
+    score=$((score + m_count + c_count + h_count))
+
+    if [ "$score" -gt "$best_score" ]; then
+      best="$dir"
+      best_score="$score"
+    fi
+  done < <(
+    find "$root" -type d \
+      ! -path '*/Pods/*' \
+      ! -path '*/build/*' \
+      ! -path '*/Build/*' \
+      ! -path '*/DerivedData/*' \
+      ! -path '*/xcuserdata/*' \
+      2>/dev/null
+  )
+
+  [ -n "$best" ] || return 1
+  printf '%s\n' "$best"
+}
+
+stage_bytecode_translator_sources() {
+  local project_dir="$1"
+  local artifacts_dir="$2"
+
+  local bt_dir=""
+  local out_dir="$artifacts_dir/bytecode-translator-sources"
+  local zip_file="$artifacts_dir/bytecode-translator-sources.zip"
+  local listing_file="$artifacts_dir/bytecode-translator-files.txt"
+
+  bt_dir="$(find_bytecode_translator_sources "$project_dir" || true)"
+  if [ -z "$bt_dir" ]; then
+    bia_log "ByteCodeTranslator source directory not found under $project_dir"
+    return 0
+  fi
+
+  bia_log "Detected ByteCodeTranslator sources at $bt_dir"
+
+  rm -rf "$out_dir" "$zip_file"
+  mkdir -p "$out_dir"
+
+  copy_tree_contents "$bt_dir" "$out_dir"
+
+  find "$out_dir" -maxdepth 2 -type f \( -name '*.m' -o -name '*.c' -o -name '*.h' \) \
+    | sort > "$listing_file" || true
+
+  (
+    cd "$artifacts_dir"
+    zip -qry "$(basename "$zip_file")" "$(basename "$out_dir")"
+  )
+
+  bia_log "Staged ByteCodeTranslator sources in $out_dir"
+  bia_log "Created archive $zip_file"
+}
+
 bia_log "Running HelloCodenameOne Maven build with JAVA_HOME=$JAVA17_HOME"
 (
   export JAVA_HOME="$JAVA17_HOME"
@@ -161,6 +245,8 @@ if [ -z "$PROJECT_DIR" ]; then
   exit 1
 fi
 bia_log "Found generated iOS project at $PROJECT_DIR"
+
+stage_bytecode_translator_sources "$PROJECT_DIR" "$ARTIFACTS_DIR"
 
 if [ -f "$PROJECT_DIR/Podfile" ]; then
   if ! command -v pod >/dev/null 2>&1; then
