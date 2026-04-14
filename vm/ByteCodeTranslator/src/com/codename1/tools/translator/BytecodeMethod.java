@@ -1473,6 +1473,7 @@ public class BytecodeMethod implements SignatureSet {
     
     private void addInstruction(Instruction i) {
         instructions.add(i);
+        i.setMethod(this);
         i.addDependencies(dependentClasses);
         if (dependencyGraph != null) {
             String methodUsed = i.getMethodUsed();
