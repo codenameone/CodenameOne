@@ -9,11 +9,13 @@
  */
 package com.codename1.util;
 
+import com.codename1.annotations.Concrete;
 import com.codename1.ui.CN;
 
 /**
  * Portable SIMD API with Java fallback implementations.
  */
+@Concrete(name = "com.codename1.impl.ios.IOSSimd")
 public class Simd {
 
     public static Simd get() {
