@@ -343,6 +343,11 @@ public class ByteCodeClass {
         return null;
     }
 
+    public boolean hasDeclaredNonAbstractMethod(String name, String desc) {
+        BytecodeMethod declaredMethod = findDeclaredMethod(name, desc);
+        return declaredMethod != null && !declaredMethod.isAbstract();
+    }
+
     public void unmark() {
         marked = false;
     }

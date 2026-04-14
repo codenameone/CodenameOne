@@ -151,9 +151,8 @@ public class Invoke extends Instruction {
             System.err.println("WARNING: Failed to find concrete class object for " + ownerClass.getClsName() + ": " + ownerClass.getConcreteClass());
             return null;
         }
-        ByteCodeClass concreteOwner = concreteClass.findMethodOwner(name, desc);
-        if (concreteOwner != null) {
-            return concreteOwner.getClsName();
+        if (concreteClass.hasDeclaredNonAbstractMethod(name, desc)) {
+            return concreteClass.getClsName();
         }
         ByteCodeClass fallbackOwner = ownerClass.findMethodOwner(name, desc);
         if (fallbackOwner != null) {
