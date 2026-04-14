@@ -24,6 +24,7 @@
 package com.codename1.tools.translator.bytecodes;
 
 import com.codename1.tools.translator.ByteCodeClass;
+import com.codename1.tools.translator.ByteCodeTranslator;
 import com.codename1.tools.translator.ByteCodeMethodArg;
 import com.codename1.tools.translator.BytecodeMethod;
 import com.codename1.tools.translator.Parser;
@@ -144,6 +145,7 @@ public class Invoke extends Instruction {
             owner = Util.resolveInvokeSpecialOwner(owner, name, desc);
         }
         
+        String invokeOwner = owner;
         StringBuilder bld = new StringBuilder();
         boolean isVirtualCall = false;
         if(opcode == Opcodes.INVOKEINTERFACE || opcode == Opcodes.INVOKEVIRTUAL) {
@@ -161,6 +163,24 @@ public class Invoke extends Instruction {
                 } else {
                     if (bc.isMethodPrivate(name, desc)) {
                         isVirtual = false;
+                    } else if (ByteCodeTranslator.output != ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT
+                            && bc.getConcreteClass() != null) {
+                        ByteCodeClass concreteClass = Parser.getClassObject(bc.getConcreteClass().replace('/', '_').replace('$', '_'));
+                        if (concreteClass != null) {
+                            ByteCodeClass concreteOwner = concreteClass.findMethodOwner(name, desc);
+                            if (concreteOwner != null) {
+                                invokeOwner = concreteOwner.getClsName();
+                                isVirtual = false;
+                            } else {
+                                ByteCodeClass fallbackOwner = bc.findMethodOwner(name, desc);
+                                if (fallbackOwner != null) {
+                                    invokeOwner = fallbackOwner.getClsName();
+                                    isVirtual = false;
+                                }
+                            }
+                        } else {
+                            System.err.println("WARNING: Failed to find concrete class object for "+bc.getClsName()+": "+bc.getConcreteClass());
+                        }
                     }
                 }
             }
@@ -175,14 +195,14 @@ public class Invoke extends Instruction {
         if(opcode == Opcodes.INVOKESTATIC) {
             // find the actual class of the static method to work around javac not defining it correctly
             ByteCodeClass bc = Parser.getClassObject(owner.replace('/', '_').replace('$', '_'));
-            owner = findActualOwner(bc);
+            invokeOwner = findActualOwner(bc);
         }
-        if (owner.startsWith("[")) {
+        if (invokeOwner.startsWith("[")) {
             // Kotlin seems to generate calls to toString() on arrays using the array class
             // as an owner.  We'll just change this to java_lang_Object instead.
             bld.append("java_lang_Object");
         } else{
-            bld.append(owner.replace('/', '_').replace('$', '_'));
+            bld.append(invokeOwner.replace('/', '_').replace('$', '_'));
         }
         bld.append("_");
         if(name.equals("<init>")) {

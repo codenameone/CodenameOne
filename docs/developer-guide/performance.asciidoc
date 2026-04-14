@@ -61,6 +61,28 @@ For ParparVM-generated native code, we now support method-level optimization hin
 
 TIP: Use these on methods that are both performance-critical and well-covered by tests. These annotations intentionally trade runtime safety diagnostics for speed.
 
+===== Class-level concrete implementation hints
+
+For native ParparVM output (C/Objective-C), you can also provide a class-level hint that a base type always maps to a known concrete subclass at runtime:
+
+* `@Concrete(name="fully.qualified.ConcreteClassName")` +
+ Allows the translator to bypass virtual table lookup for `invokevirtual` calls on the annotated base class.
+ The translator first attempts a direct call on the concrete class; if the method is not implemented there, it falls back to the annotated base class implementation.
+
+This is useful for platform abstraction classes where one implementation is guaranteed in the native pipeline.
+
+For example, Codename One annotates:
+
+[source,java]
+----
+@Concrete(name = "com.codename1.impl.ios.IOSImplementation")
+public abstract class CodenameOneImplementation {
+    // ...
+}
+----
+
+NOTE: This hint is intended for ParparVM native translation and does not apply to the JavaScript backend.
+
 ===== Fast method-stack path
 
 The translator can emit a fast method-stack prologue/epilogue (`DEFINE_METHOD_STACK_FAST_*` and `CN1_FAST_RETURN_RELEASE`) for methods that meet strict safety criteria.

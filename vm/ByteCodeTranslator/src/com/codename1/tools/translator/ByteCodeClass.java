@@ -66,6 +66,7 @@ public class ByteCodeClass {
     private String clsName;
     private String originalClassName;
     private String baseClass;
+    private String concreteClass;
     private List<String> baseInterfaces;
     private boolean isInterface;
     private boolean isAbstract;
@@ -1889,6 +1890,14 @@ public class ByteCodeClass {
      */
     public String getBaseClass() {
         return baseClass;
+    }
+
+    public String getConcreteClass() {
+        return concreteClass;
+    }
+
+    public void setConcreteClass(String concreteClass) {
+        this.concreteClass = concreteClass;
     }
 
     public void setSourceFile(String sourceFile) {

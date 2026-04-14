@@ -23,6 +23,7 @@
 package com.codename1.tools.translator.bytecodes;
 
 import com.codename1.tools.translator.ByteCodeClass;
+import com.codename1.tools.translator.ByteCodeTranslator;
 import com.codename1.tools.translator.ByteCodeMethodArg;
 import com.codename1.tools.translator.BytecodeMethod;
 import com.codename1.tools.translator.Parser;
@@ -134,6 +135,26 @@ public class CustomInvoke extends Instruction {
         }
         return findActualOwner(bc.getBaseClassObject());
     }
+
+    private String resolveConcreteInvokeOwner(ByteCodeClass ownerClass) {
+        if (ownerClass == null || ownerClass.getConcreteClass() == null) {
+            return null;
+        }
+        ByteCodeClass concreteClass = Parser.getClassObject(ownerClass.getConcreteClass().replace('/', '_').replace('$', '_'));
+        if (concreteClass == null) {
+            System.err.println("WARNING: Failed to find concrete class object for " + ownerClass.getClsName() + ": " + ownerClass.getConcreteClass());
+            return null;
+        }
+        ByteCodeClass concreteOwner = concreteClass.findMethodOwner(name, desc);
+        if (concreteOwner != null) {
+            return concreteOwner.getClsName();
+        }
+        ByteCodeClass fallbackOwner = ownerClass.findMethodOwner(name, desc);
+        if (fallbackOwner != null) {
+            return fallbackOwner.getClsName();
+        }
+        return null;
+    }
     
     public boolean methodHasReturnValue() {
         return BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, new StringBuilder(), new ArrayList<>()) != null;
@@ -160,6 +181,7 @@ public class CustomInvoke extends Instruction {
             owner = Util.resolveInvokeSpecialOwner(owner, name, desc);
         }
         
+        String invokeOwner = owner;
         StringBuilder bld = new StringBuilder();
         boolean isVirtualCall = false;
         if(origOpcode == Opcodes.INVOKEINTERFACE || origOpcode == Opcodes.INVOKEVIRTUAL) {
@@ -176,6 +198,12 @@ public class CustomInvoke extends Instruction {
                 } else {
                     if (bc.isMethodPrivate(name, desc)) {
                         isVirtual = false;
+                    } else if (ByteCodeTranslator.output != ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT) {
+                        String resolvedConcreteOwner = resolveConcreteInvokeOwner(bc);
+                        if (resolvedConcreteOwner != null) {
+                            invokeOwner = resolvedConcreteOwner;
+                            isVirtual = false;
+                        }
                     }
                 }
                 
@@ -191,12 +219,12 @@ public class CustomInvoke extends Instruction {
         if(origOpcode == Opcodes.INVOKESTATIC) {
             // find the actual class of the static method to work around javac not defining it correctly
             ByteCodeClass bc = Parser.getClassObject(owner.replace('/', '_').replace('$', '_'));
-            owner = findActualOwner(bc);
+            invokeOwner = findActualOwner(bc);
         }
-        if (owner.startsWith("[")) {
+        if (invokeOwner.startsWith("[")) {
             bld.append("java_lang_Object");
         } else{
-            bld.append(owner.replace('/', '_').replace('$', '_'));
+            bld.append(invokeOwner.replace('/', '_').replace('$', '_'));
         }
         bld.append("_");
         if(name.equals("<init>")) {
@@ -264,7 +292,9 @@ public class CustomInvoke extends Instruction {
             owner = Util.resolveInvokeSpecialOwner(owner, name, desc);
         }
         
+        String invokeOwner = owner;
         StringBuilder bld = new StringBuilder();
+        boolean isVirtualCall = false;
         if(origOpcode == Opcodes.INVOKEINTERFACE || origOpcode == Opcodes.INVOKEVIRTUAL) {
             b.append("    ");
             
@@ -279,12 +309,19 @@ public class CustomInvoke extends Instruction {
                 } else {
                     if (bc.isMethodPrivate(name, desc)) {
                         isVirtual = false;
+                    } else if (ByteCodeTranslator.output != ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT) {
+                        String resolvedConcreteOwner = resolveConcreteInvokeOwner(bc);
+                        if (resolvedConcreteOwner != null) {
+                            invokeOwner = resolvedConcreteOwner;
+                            isVirtual = false;
+                        }
                     }
                 }
                 
             }
             if (isVirtual) {
                 bld.append("virtual_");
+                isVirtualCall = true;
             }
         } else {
             b.append("    ");
@@ -293,12 +330,12 @@ public class CustomInvoke extends Instruction {
         if(origOpcode == Opcodes.INVOKESTATIC) {
             // find the actual class of the static method to work around javac not defining it correctly
             ByteCodeClass bc = Parser.getClassObject(owner.replace('/', '_').replace('$', '_'));
-            owner = findActualOwner(bc);
+            invokeOwner = findActualOwner(bc);
         }
-        if (owner.startsWith("[")) {
+        if (invokeOwner.startsWith("[")) {
             bld.append("java_lang_Object");
         } else{
-            bld.append(owner.replace('/', '_').replace('$', '_'));
+            bld.append(invokeOwner.replace('/', '_').replace('$', '_'));
         }
         bld.append("_");
         if(name.equals("<init>")) {
@@ -313,6 +350,9 @@ public class CustomInvoke extends Instruction {
         bld.append("__");
         ArrayList<String> args = new ArrayList<>();
         String returnVal = BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, bld, args);
+        if (isVirtualCall) {
+            BytecodeMethod.addVirtualMethodsInvoked(bld.substring("virtual_".length()));
+        }
         int numLiteralArgs = this.getNumLiteralArgs();
         if (numLiteralArgs > 0) {
             b.append("/* CustomInvoke */");

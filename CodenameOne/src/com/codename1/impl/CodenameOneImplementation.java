@@ -23,6 +23,7 @@
  */
 package com.codename1.impl;
 
+import com.codename1.annotations.Concrete;
 import com.codename1.capture.VideoCaptureConstraints;
 import com.codename1.codescan.CodeScanner;
 import com.codename1.components.AudioRecorderComponent;
@@ -109,6 +110,7 @@ import java.util.Vector;
 /// Display specifically for key, pointer events and screen resolution.
 ///
 /// @author Shai Almog
+@Concrete(name = "com.codename1.impl.ios.IOSImplementation")
 public abstract class CodenameOneImplementation {
     /// Indicates the range of "hard" RTL bidi characters in unicode
     private static final int RTL_RANGE_BEGIN = 0x590;

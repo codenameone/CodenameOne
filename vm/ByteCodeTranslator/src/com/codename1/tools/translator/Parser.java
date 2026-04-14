@@ -51,6 +51,7 @@ public class Parser extends ClassVisitor {
     private static final String DISABLE_DEBUG_INFO_ANNOTATION = "Lcom/codename1/annotations/DisableDebugInfo;";
     private static final String DISABLE_NULL_AND_ARRAY_BOUNDS_CHECKS_ANNOTATION =
             "Lcom/codename1/annotations/DisableNullChecksAndArrayBoundsChecks;";
+    private static final String CONCRETE_ANNOTATION = "Lcom/codename1/annotations/Concrete;";
     private ByteCodeClass cls;
     private String clsName;
     private static String[] nativeSources;
@@ -699,6 +700,17 @@ public class Parser extends ClassVisitor {
 
     @Override
     public AnnotationVisitor visitAnnotation(String desc, boolean visible) {
+        if (CONCRETE_ANNOTATION.equals(desc)) {
+            return new AnnotationVisitorWrapper(super.visitAnnotation(desc, visible)) {
+                @Override
+                public void visit(String name, Object value) {
+                    if ("name".equals(name) && value instanceof String) {
+                        cls.setConcreteClass(((String)value).replace('.', '/'));
+                    }
+                    super.visit(name, value);
+                }
+            };
+        }
         return new AnnotationVisitorWrapper(super.visitAnnotation(desc, visible));
     }
 
