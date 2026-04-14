@@ -527,7 +527,7 @@ public abstract class Base64 {
         int si = inOffset;
         int di = outOffset;
 
-        // Process 16 triplets (48 input bytes → 64 output bytes) per iteration
+        // Process 16 triplets (48 input bytes -> 64 output bytes) per iteration
         int simdEnd = end3 - 48 + 1;
         while (si < simdEnd) {
             // 1. Scatter input bytes into 3 int stripes (b0, b1, b2)
@@ -560,19 +560,19 @@ public abstract class Base64 {
             // Initialize offset accumulator [112..175] with '/' offset (-16)
             System.arraycopy(ec, ENC_OFF_SLASH, scratch, 112, 64);
 
-            // eq62 → use '+' offset
+            // eq62 -> use '+' offset
             simd.cmpEq(scratch, 48, ec, ENC_K62, mask, 0, 64);
             simd.select(mask, 0, ec, ENC_OFF_PLUS, scratch, 112, scratch, 112, 64);
 
-            // lt62 → use '0'-'9' offset
+            // lt62 -> use '0'-'9' offset
             simd.cmpLt(scratch, 48, ec, ENC_K62, mask, 0, 64);
             simd.select(mask, 0, ec, ENC_OFF_09, scratch, 112, scratch, 112, 64);
 
-            // lt52 → use 'a'-'z' offset
+            // lt52 -> use 'a'-'z' offset
             simd.cmpLt(scratch, 48, ec, ENC_K52, mask, 0, 64);
             simd.select(mask, 0, ec, ENC_OFF_az, scratch, 112, scratch, 112, 64);
 
-            // lt26 → use 'A'-'Z' offset
+            // lt26 -> use 'A'-'Z' offset
             simd.cmpLt(scratch, 48, ec, ENC_K26, mask, 0, 64);
             simd.select(mask, 0, ec, ENC_OFF_AZ, scratch, 112, scratch, 112, 64);
 
@@ -675,7 +675,7 @@ public abstract class Base64 {
         int si = inOffset;
         int di = outOffset;
 
-        // Process 16 quads (64 input bytes → 48 output bytes) per iteration
+        // Process 16 quads (64 input bytes -> 48 output bytes) per iteration
         int simdEnd = fullEnd - 64 + 1;
         while (si < simdEnd) {
             // 1. De-interleave and decode: scatter 64 input bytes into 4 stripes,
