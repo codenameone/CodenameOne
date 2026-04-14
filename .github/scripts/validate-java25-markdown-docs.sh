@@ -5,7 +5,7 @@ cd "$(cd "$(dirname "$0")/../.." && pwd)"
 failed=0
 
 javadoc_hits="$(mktemp)" && package_hits="$(mktemp)"
-if find CodenameOne Ports/CLDC11 -type f -name '*.java' -print0 | xargs -0 grep -n -- '/\*\*' >"$javadoc_hits"; then
+if grep -R -nE --include='*.java' '^[[:space:]]*/\*\*' CodenameOne Ports/CLDC11 >"$javadoc_hits"; then
   cat "$javadoc_hits"; echo 'ERROR: Found classic Javadoc markers (/**). Use /// markdown comments.' >&2; failed=1
 else
   grep_status=$?
