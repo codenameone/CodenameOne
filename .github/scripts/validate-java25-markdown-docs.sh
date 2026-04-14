@@ -2,10 +2,23 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+REPO_ROOT=""
 
-if ! git -C "${REPO_ROOT}" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  echo "Unable to locate a git working tree at ${REPO_ROOT}" >&2
+if git rev-parse --show-toplevel >/dev/null 2>&1; then
+  REPO_ROOT="$(git rev-parse --show-toplevel)"
+elif git -C "${SCRIPT_DIR}" rev-parse --show-toplevel >/dev/null 2>&1; then
+  REPO_ROOT="$(git -C "${SCRIPT_DIR}" rev-parse --show-toplevel)"
+elif [ -n "${GITHUB_WORKSPACE:-}" ] && git -C "${GITHUB_WORKSPACE}" rev-parse --show-toplevel >/dev/null 2>&1; then
+  REPO_ROOT="$(git -C "${GITHUB_WORKSPACE}" rev-parse --show-toplevel)"
+else
+  CANDIDATE_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+  if [ -d "${CANDIDATE_ROOT}/.git" ] || [ -f "${CANDIDATE_ROOT}/.git" ]; then
+    REPO_ROOT="${CANDIDATE_ROOT}"
+  fi
+fi
+
+if [ -z "${REPO_ROOT}" ] || ! git -C "${REPO_ROOT}" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  echo "Unable to locate a git working tree. Script dir=${SCRIPT_DIR} GITHUB_WORKSPACE=${GITHUB_WORKSPACE:-<unset>}." >&2
   exit 1
 fi
 
