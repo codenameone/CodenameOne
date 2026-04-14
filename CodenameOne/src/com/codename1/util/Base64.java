@@ -437,7 +437,7 @@ public abstract class Base64 {
     }
 
     // ---- SIMD constant tables (lazily initialized) ----
-    private static volatile int[] simdEncConst;
+    private static int[] simdEncConst;
 
     // Encode constant offsets (each sub-array is 64 ints)
     private static final int ENC_K26 = 0;     // threshold 26
@@ -454,7 +454,7 @@ public abstract class Base64 {
     private static final int ENC_M3F = 544;
     private static final int ENC_CONST_SIZE = 560;
 
-    private static volatile byte[] simdMask;
+    private static byte[] simdMask;
 
     private static int[] getSimdEncConst(Simd simd) {
         int[] c = simdEncConst;
