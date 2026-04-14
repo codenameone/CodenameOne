@@ -146,11 +146,14 @@ public class Invoke extends Instruction {
         if (ownerClass == null || ownerClass.getConcreteClass() == null) {
             return null;
         }
+        ByteCodeClass fallbackOwner = ownerClass.findMethodOwner(name, desc);
+        if (getMethod() == null) {
+            return fallbackOwner != null ? fallbackOwner.getClsName() : null;
+        }
         if (getMethod() != null) {
             String currentClass = getMethod().getClsName();
             String ownerName = ownerClass.getClsName();
             if (ownerName.equals(currentClass) || currentClass.startsWith(ownerName + "_")) {
-                ByteCodeClass fallbackOwner = ownerClass.findMethodOwner(name, desc);
                 return fallbackOwner != null ? fallbackOwner.getClsName() : null;
             }
         }
@@ -162,7 +165,6 @@ public class Invoke extends Instruction {
         if (concreteClass.hasDeclaredNonAbstractMethod(name, desc)) {
             return concreteClass.getClsName();
         }
-        ByteCodeClass fallbackOwner = ownerClass.findMethodOwner(name, desc);
         if (fallbackOwner != null) {
             return fallbackOwner.getClsName();
         }
