@@ -6,6 +6,7 @@ on:
       - '.github/workflows/ios-packaging.yml'
       - 'maven/codenameone-maven-plugin/**'
       - 'vm/ByteCodeTranslator/**'
+      - 'Ports/iOSPort/**'
       - 'scripts/build-ios-app.sh'
       - 'scripts/run-ios-ui-tests.sh'
       - 'scripts/run-ios-native-tests.sh'
@@ -18,6 +19,7 @@ on:
       - '.github/workflows/ios-packaging.yml'
       - 'maven/codenameone-maven-plugin/**'
       - 'vm/ByteCodeTranslator/**'
+      - 'Ports/iOSPort/**'
       - 'scripts/build-ios-app.sh'
       - 'scripts/run-ios-ui-tests.sh'
       - 'scripts/run-ios-native-tests.sh'
@@ -68,7 +70,9 @@ jobs:
         id: setup_hash
         run: |
           set -euo pipefail
-          echo "hash=$(shasum -a 256 scripts/setup-workspace.sh | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+          SETUP_HASH=$(shasum -a 256 scripts/setup-workspace.sh | awk '{print $1}')
+          IOS_PORT_HASH=$(find Ports/iOSPort/src -type f -name '*.java' | sort | xargs shasum -a 256 | shasum -a 256 | awk '{print $1}')
+          echo "hash=${SETUP_HASH}-${IOS_PORT_HASH}" >> "$GITHUB_OUTPUT"
 
       - name: Set TMPDIR
         run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
