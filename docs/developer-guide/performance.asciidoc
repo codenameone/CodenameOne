@@ -82,6 +82,7 @@ public abstract class CodenameOneImplementation {
 ----
 
 NOTE: This hint is intended for ParparVM native translation and does not apply to the JavaScript backend.
+NOTE: Concrete invoke devirtualization is currently guarded by the `cn1.enableConcreteInvokeOptimization` system property in the translator so it can be enabled explicitly during staged rollout.
 
 ===== Fast method-stack path
 

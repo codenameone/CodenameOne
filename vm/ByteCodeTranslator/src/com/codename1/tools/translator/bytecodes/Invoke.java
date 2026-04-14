@@ -39,6 +39,8 @@ import org.objectweb.asm.Opcodes;
  * @author Shai Almog
  */
 public class Invoke extends Instruction {
+    private static final boolean ENABLE_CONCRETE_INVOKE_OPTIMIZATION =
+            Boolean.getBoolean("cn1.enableConcreteInvokeOptimization");
     private String owner;
     private final String name;
     private final String desc;
@@ -91,7 +93,7 @@ public class Invoke extends Instruction {
     @Override
     public void addDependencies(List<String> dependencyList) {
         String dependencyOwner = owner;
-        if (opcode == Opcodes.INVOKEVIRTUAL) {
+        if (ENABLE_CONCRETE_INVOKE_OPTIMIZATION && opcode == Opcodes.INVOKEVIRTUAL) {
             ByteCodeClass bc = Parser.getClassObject(owner.replace('/', '_').replace('$', '_'));
             String resolvedConcreteOwner = resolveConcreteInvokeOwner(bc);
             if (resolvedConcreteOwner != null) {
@@ -207,7 +209,8 @@ public class Invoke extends Instruction {
                 } else {
                     if (bc.isMethodPrivate(name, desc)) {
                         isVirtual = false;
-                    } else if (ByteCodeTranslator.output != ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT) {
+                    } else if (ENABLE_CONCRETE_INVOKE_OPTIMIZATION
+                            && ByteCodeTranslator.output != ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT) {
                         String resolvedConcreteOwner = resolveConcreteInvokeOwner(bc);
                         if (resolvedConcreteOwner != null) {
                             invokeOwner = resolvedConcreteOwner;
