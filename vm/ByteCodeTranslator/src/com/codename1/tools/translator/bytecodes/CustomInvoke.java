@@ -92,7 +92,15 @@ public class CustomInvoke extends Instruction {
     
     @Override
     public void addDependencies(List<String> dependencyList) {
-        String t = owner.replace('.', '_').replace('/', '_').replace('$', '_');
+        String dependencyOwner = owner;
+        if (origOpcode == Opcodes.INVOKEVIRTUAL) {
+            ByteCodeClass bc = Parser.getClassObject(owner.replace('/', '_').replace('$', '_'));
+            String resolvedConcreteOwner = resolveConcreteInvokeOwner(bc);
+            if (resolvedConcreteOwner != null) {
+                dependencyOwner = resolvedConcreteOwner;
+            }
+        }
+        String t = dependencyOwner.replace('.', '_').replace('/', '_').replace('$', '_');
         t = unarray(t);
         if(t != null && !dependencyList.contains(t)) {
             dependencyList.add(t);
@@ -102,7 +110,7 @@ public class CustomInvoke extends Instruction {
         if(origOpcode != Opcodes.INVOKEINTERFACE && origOpcode != Opcodes.INVOKEVIRTUAL) {
             return;
         }         
-        bld.append(owner.replace('/', '_').replace('$', '_'));
+        bld.append(dependencyOwner.replace('/', '_').replace('$', '_'));
         bld.append("_");
         if(name.equals("<init>")) {
             bld.append("__INIT__");

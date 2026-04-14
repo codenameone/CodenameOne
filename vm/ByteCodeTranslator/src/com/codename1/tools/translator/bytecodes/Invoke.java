@@ -90,7 +90,15 @@ public class Invoke extends Instruction {
     
     @Override
     public void addDependencies(List<String> dependencyList) {
-        String t = owner.replace('.', '_').replace('/', '_').replace('$', '_');
+        String dependencyOwner = owner;
+        if (opcode == Opcodes.INVOKEVIRTUAL) {
+            ByteCodeClass bc = Parser.getClassObject(owner.replace('/', '_').replace('$', '_'));
+            String resolvedConcreteOwner = resolveConcreteInvokeOwner(bc);
+            if (resolvedConcreteOwner != null) {
+                dependencyOwner = resolvedConcreteOwner;
+            }
+        }
+        String t = dependencyOwner.replace('.', '_').replace('/', '_').replace('$', '_');
         t = unarray(t);
         if(t != null && !dependencyList.contains(t)) {
             dependencyList.add(t);
@@ -100,7 +108,7 @@ public class Invoke extends Instruction {
         if(opcode != Opcodes.INVOKEINTERFACE && opcode != Opcodes.INVOKEVIRTUAL) {
             return;
         }         
-        bld.append(owner.replace('/', '_').replace('$', '_'));
+        bld.append(dependencyOwner.replace('/', '_').replace('$', '_'));
         bld.append("_");
         if(name.equals("<init>")) {
             bld.append("__INIT__");
@@ -133,6 +141,26 @@ public class Invoke extends Instruction {
         }
         return findActualOwner(bc.getBaseClassObject());
     }
+
+    private String resolveConcreteInvokeOwner(ByteCodeClass ownerClass) {
+        if (ownerClass == null || ownerClass.getConcreteClass() == null) {
+            return null;
+        }
+        ByteCodeClass concreteClass = Parser.getClassObject(ownerClass.getConcreteClass().replace('/', '_').replace('$', '_'));
+        if (concreteClass == null) {
+            System.err.println("WARNING: Failed to find concrete class object for " + ownerClass.getClsName() + ": " + ownerClass.getConcreteClass());
+            return null;
+        }
+        ByteCodeClass concreteOwner = concreteClass.findMethodOwner(name, desc);
+        if (concreteOwner != null) {
+            return concreteOwner.getClsName();
+        }
+        ByteCodeClass fallbackOwner = ownerClass.findMethodOwner(name, desc);
+        if (fallbackOwner != null) {
+            return fallbackOwner.getClsName();
+        }
+        return null;
+    }
     
     @Override
     public void appendInstruction(StringBuilder b) {
@@ -163,23 +191,11 @@ public class Invoke extends Instruction {
                 } else {
                     if (bc.isMethodPrivate(name, desc)) {
                         isVirtual = false;
-                    } else if (ByteCodeTranslator.output != ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT
-                            && bc.getConcreteClass() != null) {
-                        ByteCodeClass concreteClass = Parser.getClassObject(bc.getConcreteClass().replace('/', '_').replace('$', '_'));
-                        if (concreteClass != null) {
-                            ByteCodeClass concreteOwner = concreteClass.findMethodOwner(name, desc);
-                            if (concreteOwner != null) {
-                                invokeOwner = concreteOwner.getClsName();
-                                isVirtual = false;
-                            } else {
-                                ByteCodeClass fallbackOwner = bc.findMethodOwner(name, desc);
-                                if (fallbackOwner != null) {
-                                    invokeOwner = fallbackOwner.getClsName();
-                                    isVirtual = false;
-                                }
-                            }
-                        } else {
-                            System.err.println("WARNING: Failed to find concrete class object for "+bc.getClsName()+": "+bc.getConcreteClass());
+                    } else if (ByteCodeTranslator.output != ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT) {
+                        String resolvedConcreteOwner = resolveConcreteInvokeOwner(bc);
+                        if (resolvedConcreteOwner != null) {
+                            invokeOwner = resolvedConcreteOwner;
+                            isVirtual = false;
                         }
                     }
                 }
