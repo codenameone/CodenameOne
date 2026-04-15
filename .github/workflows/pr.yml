@@ -53,6 +53,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v1
+      - name: Validate Java 25 markdown docs style (CodenameOne + CLDC11)
+        run: ./.github/scripts/validate-java25-markdown-docs.sh
       - name: Set up Java
         run: |
           if [ "${{ matrix.java-version }}" = "8" ]; then

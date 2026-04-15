@@ -900,10 +900,8 @@ public class GroupLayout extends Layout {
     /*public float getLayoutAlignmentX(Container parent) {
         checkParent(parent);
         return .5f;
-    }*
-    
-    /**
-     * Returns the alignment along the y axis.  This specifies how
+    }*/
+    /* Returns the alignment along the y axis.  This specifies how
      * the component would like to be aligned relative to other
      * components.  The value should be a number between 0 and 1
      * where 0 represents alignment along the origin, 1 is aligned
