@@ -40,6 +40,7 @@ public abstract class Base64 {
     private static final byte[] decodeMap = new byte[256];
     private static final int[] decodeMapInt = new int[256];
     private static final int SIMD_SCRATCH_INTS = 192;
+    private static final int SIMD_BYTE_LANES = 16;
 
     static {
         for (int i = 0; i < decodeMap.length; i++) {
@@ -502,6 +503,111 @@ public abstract class Base64 {
         }
     }
 
+    private static void fillRange(byte[] arr, byte value) {
+        for (int i = 0; i < arr.length; i++) {
+            arr[i] = value;
+        }
+    }
+
+    private static final ThreadLocal<SimdByteScratch> simdByteScratch = new ThreadLocal<SimdByteScratch>();
+
+    private static final class SimdByteScratch {
+        final byte[] lane0;
+        final byte[] lane1;
+        final byte[] lane2;
+        final byte[] lane3;
+        final byte[] out0;
+        final byte[] out1;
+        final byte[] out2;
+        final byte[] out3;
+        final byte[] tmp;
+        final byte[] mask;
+        final byte[] valid;
+        final byte[] const03;
+        final byte[] const0F;
+        final byte[] const3F;
+
+        private SimdByteScratch(Simd simd) {
+            lane0 = simd.allocByte(SIMD_BYTE_LANES);
+            lane1 = simd.allocByte(SIMD_BYTE_LANES);
+            lane2 = simd.allocByte(SIMD_BYTE_LANES);
+            lane3 = simd.allocByte(SIMD_BYTE_LANES);
+            out0 = simd.allocByte(SIMD_BYTE_LANES);
+            out1 = simd.allocByte(SIMD_BYTE_LANES);
+            out2 = simd.allocByte(SIMD_BYTE_LANES);
+            out3 = simd.allocByte(SIMD_BYTE_LANES);
+            tmp = simd.allocByte(SIMD_BYTE_LANES);
+            mask = simd.allocByte(SIMD_BYTE_LANES);
+            valid = simd.allocByte(SIMD_BYTE_LANES);
+            const03 = simd.allocByte(SIMD_BYTE_LANES);
+            const0F = simd.allocByte(SIMD_BYTE_LANES);
+            const3F = simd.allocByte(SIMD_BYTE_LANES);
+            fillRange(const03, (byte) 0x03);
+            fillRange(const0F, (byte) 0x0F);
+            fillRange(const3F, (byte) 0x3F);
+        }
+    }
+
+    private static SimdByteScratch getSimdByteScratch(Simd simd) {
+        SimdByteScratch out = simdByteScratch.get();
+        if (out == null) {
+            out = new SimdByteScratch(simd);
+            simdByteScratch.set(out);
+        }
+        return out;
+    }
+
+    private static void mapSixBitValuesToAscii(Simd simd, byte[] indices, byte[] ascii, SimdByteScratch scratch) {
+        simd.subWrapping(indices, (byte) 16, ascii, 0, SIMD_BYTE_LANES);
+        simd.subWrapping(indices, (byte) 19, scratch.tmp, 0, SIMD_BYTE_LANES);
+        simd.cmpEq(indices, (byte) 62, scratch.mask, 0, SIMD_BYTE_LANES);
+        simd.select(scratch.mask, scratch.tmp, ascii, ascii, 0, SIMD_BYTE_LANES);
+
+        simd.subWrapping(indices, (byte) 4, scratch.tmp, 0, SIMD_BYTE_LANES);
+        simd.cmpLt(indices, (byte) 62, scratch.mask, 0, SIMD_BYTE_LANES);
+        simd.select(scratch.mask, scratch.tmp, ascii, ascii, 0, SIMD_BYTE_LANES);
+
+        simd.addWrapping(indices, (byte) 71, scratch.tmp, 0, SIMD_BYTE_LANES);
+        simd.cmpLt(indices, (byte) 52, scratch.mask, 0, SIMD_BYTE_LANES);
+        simd.select(scratch.mask, scratch.tmp, ascii, ascii, 0, SIMD_BYTE_LANES);
+
+        simd.addWrapping(indices, (byte) 65, scratch.tmp, 0, SIMD_BYTE_LANES);
+        simd.cmpLt(indices, (byte) 26, scratch.mask, 0, SIMD_BYTE_LANES);
+        simd.select(scratch.mask, scratch.tmp, ascii, ascii, 0, SIMD_BYTE_LANES);
+    }
+
+    private static boolean mapAsciiToSixBitValues(Simd simd, byte[] ascii, byte[] values, SimdByteScratch scratch) {
+        simd.subWrapping(ascii, (byte) 'A', values, 0, SIMD_BYTE_LANES);
+        simd.cmpRange(ascii, (byte) 'A', (byte) 'Z', scratch.valid, 0, SIMD_BYTE_LANES);
+
+        simd.subWrapping(ascii, (byte) 71, scratch.tmp, 0, SIMD_BYTE_LANES);
+        simd.cmpRange(ascii, (byte) 'a', (byte) 'z', scratch.mask, 0, SIMD_BYTE_LANES);
+        simd.select(scratch.mask, scratch.tmp, values, values, 0, SIMD_BYTE_LANES);
+        simd.or(scratch.valid, scratch.mask, scratch.valid, 0, SIMD_BYTE_LANES);
+
+        simd.addWrapping(ascii, (byte) 4, scratch.tmp, 0, SIMD_BYTE_LANES);
+        simd.cmpRange(ascii, (byte) '0', (byte) '9', scratch.mask, 0, SIMD_BYTE_LANES);
+        simd.select(scratch.mask, scratch.tmp, values, values, 0, SIMD_BYTE_LANES);
+        simd.or(scratch.valid, scratch.mask, scratch.valid, 0, SIMD_BYTE_LANES);
+
+        simd.addWrapping(ascii, (byte) 19, scratch.tmp, 0, SIMD_BYTE_LANES);
+        simd.cmpEq(ascii, (byte) '+', scratch.mask, 0, SIMD_BYTE_LANES);
+        simd.select(scratch.mask, scratch.tmp, values, values, 0, SIMD_BYTE_LANES);
+        simd.or(scratch.valid, scratch.mask, scratch.valid, 0, SIMD_BYTE_LANES);
+
+        simd.addWrapping(ascii, (byte) 16, scratch.tmp, 0, SIMD_BYTE_LANES);
+        simd.cmpEq(ascii, (byte) '/', scratch.mask, 0, SIMD_BYTE_LANES);
+        simd.select(scratch.mask, scratch.tmp, values, values, 0, SIMD_BYTE_LANES);
+        simd.or(scratch.valid, scratch.mask, scratch.valid, 0, SIMD_BYTE_LANES);
+
+        for (int i = 0; i < SIMD_BYTE_LANES; i++) {
+            if (scratch.valid[i] == 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /// SIMD-optimized Base64 encoding with explicit offsets and caller scratch.
     /// Uses generic Simd int-domain operations to extract 6-bit indices and
     /// map them to ASCII via branchless compare/select.
@@ -520,66 +626,39 @@ public abstract class Base64 {
         }
         requireScratch(scratch);
         Simd simd = Simd.get();
-        int[] ec = getSimdEncConst(simd);
-        byte[] mask = getSimdMask(simd);
+        SimdByteScratch bs = getSimdByteScratch(simd);
 
         int end3 = inOffset + inLength - (inLength % 3);
         int si = inOffset;
         int di = outOffset;
 
-        // Process 16 triplets (48 input bytes -> 64 output bytes) per iteration
-        int simdEnd = end3 - 48 + 1;
+        int simdEnd = end3 - SIMD_BYTE_LANES * 3 + 1;
         while (si < simdEnd) {
-            // 1. De-interleave input bytes into 3 int stripes (b0, b1, b2)
-            simd.unpackUnsignedByteToIntInterleaved3(in, si, scratch, 0, 16, 32, 16);
+            simd.unpackBytesInterleaved3(in, si, bs.lane0, bs.lane1, bs.lane2, SIMD_BYTE_LANES);
 
-            // 2. Extract 4 six-bit index stripes using SIMD int ops
-            // idx0 = b0 >> 2
-            simd.shrLogical(scratch, 0, 2, scratch, 48, 16);
+            simd.shrLogical(bs.lane0, 2, bs.out0, 0, SIMD_BYTE_LANES);
 
-            // idx1 = ((b0 & 0x03) << 4) | (b1 >> 4)
-            simd.and(scratch, 0, ec, ENC_M03, scratch, 112, 16);
-            simd.shl(scratch, 112, 4, scratch, 112, 16);
-            simd.shrLogical(scratch, 16, 4, scratch, 128, 16);
-            simd.or(scratch, 112, scratch, 128, scratch, 64, 16);
+            simd.and(bs.lane0, bs.const03, bs.tmp, 0, SIMD_BYTE_LANES);
+            simd.shl(bs.tmp, 4, bs.tmp, 0, SIMD_BYTE_LANES);
+            simd.shrLogical(bs.lane1, 4, bs.out1, 0, SIMD_BYTE_LANES);
+            simd.or(bs.tmp, bs.out1, bs.out1, 0, SIMD_BYTE_LANES);
 
-            // idx2 = ((b1 & 0x0f) << 2) | (b2 >> 6)
-            simd.and(scratch, 16, ec, ENC_M0F, scratch, 112, 16);
-            simd.shl(scratch, 112, 2, scratch, 112, 16);
-            simd.shrLogical(scratch, 32, 6, scratch, 128, 16);
-            simd.or(scratch, 112, scratch, 128, scratch, 80, 16);
+            simd.and(bs.lane1, bs.const0F, bs.tmp, 0, SIMD_BYTE_LANES);
+            simd.shl(bs.tmp, 2, bs.tmp, 0, SIMD_BYTE_LANES);
+            simd.shrLogical(bs.lane2, 6, bs.out2, 0, SIMD_BYTE_LANES);
+            simd.or(bs.tmp, bs.out2, bs.out2, 0, SIMD_BYTE_LANES);
 
-            // idx3 = b2 & 0x3f
-            simd.and(scratch, 32, ec, ENC_M3F, scratch, 96, 16);
+            simd.and(bs.lane2, bs.const3F, bs.out3, 0, SIMD_BYTE_LANES);
 
-            // 3. Map all 64 indices to ASCII in batch
-            // Initialize offset accumulator [112..175] with '/' offset (-16)
-            System.arraycopy(ec, ENC_OFF_SLASH, scratch, 112, 64);
+            mapSixBitValuesToAscii(simd, bs.out0, bs.lane0, bs);
+            mapSixBitValuesToAscii(simd, bs.out1, bs.lane1, bs);
+            mapSixBitValuesToAscii(simd, bs.out2, bs.lane2, bs);
+            mapSixBitValuesToAscii(simd, bs.out3, bs.lane3, bs);
 
-            // eq62 -> use '+' offset
-            simd.cmpEq(scratch, 48, ec, ENC_K62, mask, 0, 64);
-            simd.select(mask, 0, ec, ENC_OFF_PLUS, scratch, 112, scratch, 112, 64);
+            simd.packBytesInterleaved4(bs.lane0, bs.lane1, bs.lane2, bs.lane3, out, di, SIMD_BYTE_LANES);
 
-            // lt62 -> use '0'-'9' offset
-            simd.cmpLt(scratch, 48, ec, ENC_K62, mask, 0, 64);
-            simd.select(mask, 0, ec, ENC_OFF_09, scratch, 112, scratch, 112, 64);
-
-            // lt52 -> use 'a'-'z' offset
-            simd.cmpLt(scratch, 48, ec, ENC_K52, mask, 0, 64);
-            simd.select(mask, 0, ec, ENC_OFF_az, scratch, 112, scratch, 112, 64);
-
-            // lt26 -> use 'A'-'Z' offset
-            simd.cmpLt(scratch, 48, ec, ENC_K26, mask, 0, 64);
-            simd.select(mask, 0, ec, ENC_OFF_AZ, scratch, 112, scratch, 112, 64);
-
-            // ascii = indices + offset
-            simd.add(scratch, 48, scratch, 112, scratch, 48, 64);
-
-            // 4. Re-interleave the 4 output stripes into output bytes
-            simd.packIntToByteTruncateInterleaved4(scratch, 48, 64, 80, 96, out, di, 16);
-
-            si += 48;
-            di += 64;
+            si += SIMD_BYTE_LANES * 3;
+            di += SIMD_BYTE_LANES * 4;
         }
 
         // Scalar tail for remaining complete triplets
@@ -659,6 +738,7 @@ public abstract class Base64 {
         }
 
         Simd simd = Simd.get();
+        SimdByteScratch bs = getSimdByteScratch(simd);
         int[] decodeMapLocal = decodeMapInt;
 
         int fullLen = inLength - (pad > 0 ? 4 : 0);
@@ -666,53 +746,31 @@ public abstract class Base64 {
         int si = inOffset;
         int di = outOffset;
 
-        // Process 16 quads (64 input bytes -> 48 output bytes) per iteration
-        int simdEnd = fullEnd - 64 + 1;
+        int simdEnd = fullEnd - SIMD_BYTE_LANES * 4 + 1;
         while (si < simdEnd) {
-            // 1. De-interleave and decode: scatter 64 input bytes into 4 stripes,
-            //    converting ASCII to 6-bit values using the scalar decode table
-            boolean invalid = false;
-            for (int j = 0; j < 16; j++) {
-                int v0 = decodeMapLocal[in[si + j * 4] & 0xff];
-                int v1 = decodeMapLocal[in[si + j * 4 + 1] & 0xff];
-                int v2 = decodeMapLocal[in[si + j * 4 + 2] & 0xff];
-                int v3 = decodeMapLocal[in[si + j * 4 + 3] & 0xff];
-                scratch[j]      = v0;
-                scratch[16 + j] = v1;
-                scratch[32 + j] = v2;
-                scratch[48 + j] = v3;
-                if ((v0 | v1 | v2 | v3) < 0) {
-                    invalid = true;
-                }
-            }
-            if (invalid) {
+            simd.unpackBytesInterleaved4(in, si, bs.lane0, bs.lane1, bs.lane2, bs.lane3, SIMD_BYTE_LANES);
+            if (!mapAsciiToSixBitValues(simd, bs.lane0, bs.out0, bs)
+                    || !mapAsciiToSixBitValues(simd, bs.lane1, bs.out1, bs)
+                    || !mapAsciiToSixBitValues(simd, bs.lane2, bs.out2, bs)
+                    || !mapAsciiToSixBitValues(simd, bs.lane3, bs.out3, bs)) {
                 return -1;
             }
 
-            // 2. Combine 4 six-bit values into 3 bytes using SIMD int ops
-            // o0 = (d0 << 2) | (d1 >> 4)
-            simd.shl(scratch, 0, 2, scratch, 64, 16);
-            simd.shrLogical(scratch, 16, 4, scratch, 112, 16);
-            simd.or(scratch, 64, scratch, 112, scratch, 64, 16);
+            simd.shl(bs.out0, 2, bs.out0, 0, SIMD_BYTE_LANES);
+            simd.shrLogical(bs.out1, 4, bs.tmp, 0, SIMD_BYTE_LANES);
+            simd.or(bs.out0, bs.tmp, bs.out0, 0, SIMD_BYTE_LANES);
 
-            // o1 = (d1 << 4) | (d2 >> 2)
-            simd.shl(scratch, 16, 4, scratch, 80, 16);
-            simd.shrLogical(scratch, 32, 2, scratch, 112, 16);
-            simd.or(scratch, 80, scratch, 112, scratch, 80, 16);
+            simd.shl(bs.out1, 4, bs.out1, 0, SIMD_BYTE_LANES);
+            simd.shrLogical(bs.out2, 2, bs.tmp, 0, SIMD_BYTE_LANES);
+            simd.or(bs.out1, bs.tmp, bs.out1, 0, SIMD_BYTE_LANES);
 
-            // o2 = (d2 << 6) | d3
-            simd.shl(scratch, 32, 6, scratch, 96, 16);
-            simd.or(scratch, 96, scratch, 48, scratch, 96, 16);
+            simd.shl(bs.out2, 6, bs.out2, 0, SIMD_BYTE_LANES);
+            simd.or(bs.out2, bs.out3, bs.out2, 0, SIMD_BYTE_LANES);
 
-            // 3. Interleave 3 output stripes into output bytes
-            for (int j = 0; j < 16; j++) {
-                out[di + j * 3]     = (byte) scratch[64 + j];
-                out[di + j * 3 + 1] = (byte) scratch[80 + j];
-                out[di + j * 3 + 2] = (byte) scratch[96 + j];
-            }
+            simd.packBytesInterleaved3(bs.out0, bs.out1, bs.out2, out, di, SIMD_BYTE_LANES);
 
-            si += 64;
-            di += 48;
+            si += SIMD_BYTE_LANES * 4;
+            di += SIMD_BYTE_LANES * 3;
         }
 
         // Scalar tail for remaining complete quads

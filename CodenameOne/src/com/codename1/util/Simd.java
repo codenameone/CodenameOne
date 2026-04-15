@@ -269,6 +269,27 @@ public class Simd {
     }
 
     /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void unpackBytesInterleaved3(byte[] src, int srcOffset, byte[] dst0, byte[] dst1, byte[] dst2, int length) {
+        for (int i = 0; i < length; i++) {
+            int srcIndex = srcOffset + i * 3;
+            dst0[i] = src[srcIndex];
+            dst1[i] = src[srcIndex + 1];
+            dst2[i] = src[srcIndex + 2];
+        }
+    }
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void unpackBytesInterleaved4(byte[] src, int srcOffset, byte[] dst0, byte[] dst1, byte[] dst2, byte[] dst3, int length) {
+        for (int i = 0; i < length; i++) {
+            int srcIndex = srcOffset + i * 4;
+            dst0[i] = src[srcIndex];
+            dst1[i] = src[srcIndex + 1];
+            dst2[i] = src[srcIndex + 2];
+            dst3[i] = src[srcIndex + 3];
+        }
+    }
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void packIntToByteSaturating(int[] src, byte[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dst[i] = clampByte(src[i]);
@@ -297,6 +318,27 @@ public class Simd {
             dst[dstIndex + 1] = (byte)src[src1Offset + i];
             dst[dstIndex + 2] = (byte)src[src2Offset + i];
             dst[dstIndex + 3] = (byte)src[src3Offset + i];
+        }
+    }
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void packBytesInterleaved3(byte[] src0, byte[] src1, byte[] src2, byte[] dst, int dstOffset, int length) {
+        for (int i = 0; i < length; i++) {
+            int dstIndex = dstOffset + i * 3;
+            dst[dstIndex] = src0[i];
+            dst[dstIndex + 1] = src1[i];
+            dst[dstIndex + 2] = src2[i];
+        }
+    }
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void packBytesInterleaved4(byte[] src0, byte[] src1, byte[] src2, byte[] src3, byte[] dst, int dstOffset, int length) {
+        for (int i = 0; i < length; i++) {
+            int dstIndex = dstOffset + i * 4;
+            dst[dstIndex] = src0[i];
+            dst[dstIndex + 1] = src1[i];
+            dst[dstIndex + 2] = src2[i];
+            dst[dstIndex + 3] = src3[i];
         }
     }
 

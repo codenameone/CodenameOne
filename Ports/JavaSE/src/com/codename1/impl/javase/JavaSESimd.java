@@ -529,6 +529,36 @@ public class JavaSESimd extends Simd {
     }
 
     @Override
+    public void unpackBytesInterleaved3(byte[] src, int srcOffset, byte[] dst0, byte[] dst1, byte[] dst2, int length) {
+        validateNotNull(src, "src");
+        validateNotNull(dst0, "dst0");
+        validateNotNull(dst1, "dst1");
+        validateNotNull(dst2, "dst2");
+        validateRange(src.length, srcOffset, length * 3, "src");
+        validateRange(dst0.length, 0, length, "dst0");
+        validateRange(dst1.length, 0, length, "dst1");
+        validateRange(dst2.length, 0, length, "dst2");
+        validateRegistered(src, dst0, dst1, dst2);
+        super.unpackBytesInterleaved3(src, srcOffset, dst0, dst1, dst2, length);
+    }
+
+    @Override
+    public void unpackBytesInterleaved4(byte[] src, int srcOffset, byte[] dst0, byte[] dst1, byte[] dst2, byte[] dst3, int length) {
+        validateNotNull(src, "src");
+        validateNotNull(dst0, "dst0");
+        validateNotNull(dst1, "dst1");
+        validateNotNull(dst2, "dst2");
+        validateNotNull(dst3, "dst3");
+        validateRange(src.length, srcOffset, length * 4, "src");
+        validateRange(dst0.length, 0, length, "dst0");
+        validateRange(dst1.length, 0, length, "dst1");
+        validateRange(dst2.length, 0, length, "dst2");
+        validateRange(dst3.length, 0, length, "dst3");
+        validateRegistered(src, dst0, dst1, dst2, dst3);
+        super.unpackBytesInterleaved4(src, srcOffset, dst0, dst1, dst2, dst3, length);
+    }
+
+    @Override
     public void add(int[] srcA, int srcAOffset, int[] srcB, int srcBOffset, int[] dst, int dstOffset, int length) {
         validateNotNull(srcA, "srcA");
         validateNotNull(srcB, "srcB");
@@ -589,6 +619,36 @@ public class JavaSESimd extends Simd {
         validateRange(dst.length, dstOffset, length * 4, "dst");
         validateRegistered(src, dst);
         super.packIntToByteTruncateInterleaved4(src, src0Offset, src1Offset, src2Offset, src3Offset, dst, dstOffset, length);
+    }
+
+    @Override
+    public void packBytesInterleaved3(byte[] src0, byte[] src1, byte[] src2, byte[] dst, int dstOffset, int length) {
+        validateNotNull(src0, "src0");
+        validateNotNull(src1, "src1");
+        validateNotNull(src2, "src2");
+        validateNotNull(dst, "dst");
+        validateRange(src0.length, 0, length, "src0");
+        validateRange(src1.length, 0, length, "src1");
+        validateRange(src2.length, 0, length, "src2");
+        validateRange(dst.length, dstOffset, length * 3, "dst");
+        validateRegistered(src0, src1, src2, dst);
+        super.packBytesInterleaved3(src0, src1, src2, dst, dstOffset, length);
+    }
+
+    @Override
+    public void packBytesInterleaved4(byte[] src0, byte[] src1, byte[] src2, byte[] src3, byte[] dst, int dstOffset, int length) {
+        validateNotNull(src0, "src0");
+        validateNotNull(src1, "src1");
+        validateNotNull(src2, "src2");
+        validateNotNull(src3, "src3");
+        validateNotNull(dst, "dst");
+        validateRange(src0.length, 0, length, "src0");
+        validateRange(src1.length, 0, length, "src1");
+        validateRange(src2.length, 0, length, "src2");
+        validateRange(src3.length, 0, length, "src3");
+        validateRange(dst.length, dstOffset, length * 4, "dst");
+        validateRegistered(src0, src1, src2, src3, dst);
+        super.packBytesInterleaved4(src0, src1, src2, src3, dst, dstOffset, length);
     }
 
     private void validateRegistered(Object... arrays) {
