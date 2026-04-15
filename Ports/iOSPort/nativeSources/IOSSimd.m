@@ -1,5 +1,6 @@
 #include "xmlvm.h"
 #include <stdint.h>
+#include <string.h>
 #include <math.h>
 #include <arm_neon.h>
 
@@ -1012,13 +1013,10 @@ JAVA_VOID com_codename1_impl_ios_IOSSimd_select___byte_1ARRAY_int_1ARRAY_int_1AR
     int i = offset;
     int end = offset + length;
     for (; i <= end - 4; i += 4) {
-        uint32_t maskLanes[4] = {
-                m[i] != 0 ? UINT32_MAX : 0,
-                m[i + 1] != 0 ? UINT32_MAX : 0,
-                m[i + 2] != 0 ? UINT32_MAX : 0,
-                m[i + 3] != 0 ? UINT32_MAX : 0
-        };
-        uint32x4_t vm = vld1q_u32(maskLanes);
+        uint32_t packedMask;
+        memcpy(&packedMask, m + i, sizeof(packedMask));
+        uint8x8_t maskBytes = vreinterpret_u8_u32(vdup_n_u32(packedMask));
+        uint32x4_t vm = vcgtq_u32(vmovl_u16(vget_low_u16(vmovl_u8(maskBytes))), vdupq_n_u32(0));
         uint32x4_t vt = vreinterpretq_u32_s32(vld1q_s32((int32_t*)(t + i)));
         uint32x4_t vf = vreinterpretq_u32_s32(vld1q_s32((int32_t*)(f + i)));
         vst1q_s32((int32_t*)(d + i), vreinterpretq_s32_u32(vbslq_u32(vm, vt, vf)));
@@ -1217,13 +1215,10 @@ JAVA_VOID com_codename1_impl_ios_IOSSimd_select___byte_1ARRAY_int_int_1ARRAY_int
     int i = 0;
     int end = length;
     for (; i <= end - 4; i += 4) {
-        uint32_t maskLanes[4] = {
-                m[maskOffset + i] != 0 ? UINT32_MAX : 0,
-                m[maskOffset + i + 1] != 0 ? UINT32_MAX : 0,
-                m[maskOffset + i + 2] != 0 ? UINT32_MAX : 0,
-                m[maskOffset + i + 3] != 0 ? UINT32_MAX : 0
-        };
-        uint32x4_t vm = vld1q_u32(maskLanes);
+        uint32_t packedMask;
+        memcpy(&packedMask, m + maskOffset + i, sizeof(packedMask));
+        uint8x8_t maskBytes = vreinterpret_u8_u32(vdup_n_u32(packedMask));
+        uint32x4_t vm = vcgtq_u32(vmovl_u16(vget_low_u16(vmovl_u8(maskBytes))), vdupq_n_u32(0));
         uint32x4_t vt = vreinterpretq_u32_s32(vld1q_s32((int32_t*)(t + trueOffset + i)));
         uint32x4_t vf = vreinterpretq_u32_s32(vld1q_s32((int32_t*)(f + falseOffset + i)));
         vst1q_s32((int32_t*)(d + dstOffset + i), vreinterpretq_s32_u32(vbslq_u32(vm, vt, vf)));
