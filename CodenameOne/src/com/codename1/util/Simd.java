@@ -12,20 +12,26 @@ package com.codename1.util;
 import com.codename1.annotations.Concrete;
 import com.codename1.ui.CN;
 
-/**
- * Portable SIMD API with Java fallback implementations.
- */
+/// Portable SIMD API with Java fallback implementations.
 @Concrete(name = "com.codename1.impl.ios.IOSSimd")
 public class Simd {
 
+    /// Returns the singleton instance of the Simd class. Equivalent to `CN.getSimd();`
     public static Simd get() {
         return CN.getSimd();
     }
 
+    /// Returns true if SIMD instructions are natively supported
+    /// if this returns false the APIs in this class would still work
+    /// using fallback loop code
     public boolean isSupported() {
         return false;
     }
 
+    /// Allocates an aligned memory block for efficient SIMD
+    /// operations. All operations MUST be performed on aligned
+    /// arrays and shouldn't use arrays created with `new`. Operations
+    /// on unaligned arrays might produce undefined results.
     public byte[] allocByte(int size) {
         if (size < 16) {
             throw new IllegalArgumentException("size must be >= 16");
@@ -33,6 +39,10 @@ public class Simd {
         return new byte[size];
     }
 
+    /// Allocates an aligned memory block for efficient SIMD
+    /// operations. All operations MUST be performed on aligned
+    /// arrays and shouldn't use arrays created with `new`. Operations
+    /// on unaligned arrays might produce undefined results.
     public int[] allocInt(int size) {
         if (size < 16) {
             throw new IllegalArgumentException("size must be >= 16");
@@ -40,6 +50,10 @@ public class Simd {
         return new int[size];
     }
 
+    /// Allocates an aligned memory block for efficient SIMD
+    /// operations. All operations MUST be performed on aligned
+    /// arrays and shouldn't use arrays created with `new`. Operations
+    /// on unaligned arrays might produce undefined results.
     public float[] allocFloat(int size) {
         if (size < 16) {
             throw new IllegalArgumentException("size must be >= 16");
@@ -47,36 +61,42 @@ public class Simd {
         return new float[size];
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void add(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dst[i] = clampByte(srcA[i] + srcB[i]);
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void sub(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dst[i] = clampByte(srcA[i] - srcB[i]);
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void mul(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dst[i] = clampByte(srcA[i] * srcB[i]);
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void min(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dst[i] = srcA[i] < srcB[i] ? srcA[i] : srcB[i];
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void max(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dst[i] = srcA[i] > srcB[i] ? srcA[i] : srcB[i];
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void abs(byte[] src, byte[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             int v = src[i];
@@ -88,6 +108,7 @@ public class Simd {
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void clamp(byte[] src, byte[] dst, byte minValue, byte maxValue, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             int v = src[i];
@@ -101,48 +122,56 @@ public class Simd {
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void and(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dst[i] = (byte)(srcA[i] & srcB[i]);
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void or(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dst[i] = (byte)(srcA[i] | srcB[i]);
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void xor(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dst[i] = (byte)(srcA[i] ^ srcB[i]);
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void not(byte[] src, byte[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dst[i] = (byte)(~src[i]);
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void cmpEq(byte[] srcA, byte[] srcB, byte[] dstMask, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dstMask[i] = srcA[i] == srcB[i] ? (byte)-1 : (byte)0;
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void cmpLt(byte[] srcA, byte[] srcB, byte[] dstMask, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dstMask[i] = srcA[i] < srcB[i] ? (byte)-1 : (byte)0;
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void cmpGt(byte[] srcA, byte[] srcB, byte[] dstMask, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dstMask[i] = srcA[i] > srcB[i] ? (byte)-1 : (byte)0;
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void cmpRange(byte[] src, byte minValue, byte maxValue, byte[] dstMask, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             int v = src[i];
@@ -150,12 +179,14 @@ public class Simd {
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void select(byte[] mask, byte[] trueValues, byte[] falseValues, byte[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dst[i] = mask[i] != 0 ? trueValues[i] : falseValues[i];
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void shl(byte[] src, int bits, byte[] dst, int offset, int length) {
         int shift = bits & 7;
         for (int i = offset, end = offset + length; i < end; i++) {
@@ -163,6 +194,7 @@ public class Simd {
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void shrLogical(byte[] src, int bits, byte[] dst, int offset, int length) {
         int shift = bits & 7;
         for (int i = offset, end = offset + length; i < end; i++) {
@@ -170,48 +202,56 @@ public class Simd {
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void addWrapping(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dst[i] = (byte)(srcA[i] + srcB[i]);
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void subWrapping(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dst[i] = (byte)(srcA[i] - srcB[i]);
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void unpackUnsignedByteToInt(byte[] src, int[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dst[i] = src[i] & 0xff;
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void unpackUnsignedByteToInt(byte[] src, int srcOffset, int[] dst, int dstOffset, int length) {
         for (int i = 0; i < length; i++) {
             dst[dstOffset + i] = src[srcOffset + i] & 0xff;
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void packIntToByteSaturating(int[] src, byte[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dst[i] = clampByte(src[i]);
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void packIntToByteTruncate(int[] src, byte[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dst[i] = (byte)src[i];
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void packIntToByteTruncate(int[] src, int srcOffset, byte[] dst, int dstOffset, int length) {
         for (int i = 0; i < length; i++) {
             dst[dstOffset + i] = (byte)src[srcOffset + i];
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void permuteBytes(byte[] src, byte[] indices, byte[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             int idx = indices[i];
@@ -219,42 +259,49 @@ public class Simd {
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void add(int[] srcA, int[] srcB, int[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dst[i] = srcA[i] + srcB[i];
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void add(int[] srcA, int srcAOffset, int[] srcB, int srcBOffset, int[] dst, int dstOffset, int length) {
         for (int i = 0; i < length; i++) {
             dst[dstOffset + i] = srcA[srcAOffset + i] + srcB[srcBOffset + i];
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void sub(int[] srcA, int[] srcB, int[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dst[i] = srcA[i] - srcB[i];
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void mul(int[] srcA, int[] srcB, int[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dst[i] = srcA[i] * srcB[i];
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void min(int[] srcA, int[] srcB, int[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dst[i] = srcA[i] < srcB[i] ? srcA[i] : srcB[i];
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void max(int[] srcA, int[] srcB, int[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dst[i] = srcA[i] > srcB[i] ? srcA[i] : srcB[i];
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void abs(int[] src, int[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             int v = src[i];
@@ -262,6 +309,7 @@ public class Simd {
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void clamp(int[] src, int[] dst, int minValue, int maxValue, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             int v = src[i];
@@ -275,42 +323,49 @@ public class Simd {
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void and(int[] srcA, int[] srcB, int[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dst[i] = srcA[i] & srcB[i];
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void and(int[] srcA, int srcAOffset, int[] srcB, int srcBOffset, int[] dst, int dstOffset, int length) {
         for (int i = 0; i < length; i++) {
             dst[dstOffset + i] = srcA[srcAOffset + i] & srcB[srcBOffset + i];
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void or(int[] srcA, int[] srcB, int[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dst[i] = srcA[i] | srcB[i];
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void or(int[] srcA, int srcAOffset, int[] srcB, int srcBOffset, int[] dst, int dstOffset, int length) {
         for (int i = 0; i < length; i++) {
             dst[dstOffset + i] = srcA[srcAOffset + i] | srcB[srcBOffset + i];
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void xor(int[] srcA, int[] srcB, int[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dst[i] = srcA[i] ^ srcB[i];
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void not(int[] src, int[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dst[i] = ~src[i];
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void shl(int[] src, int bits, int[] dst, int offset, int length) {
         int shift = bits & 31;
         for (int i = offset, end = offset + length; i < end; i++) {
@@ -318,6 +373,7 @@ public class Simd {
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void shl(int[] src, int srcOffset, int bits, int[] dst, int dstOffset, int length) {
         int shift = bits & 31;
         for (int i = 0; i < length; i++) {
@@ -325,6 +381,7 @@ public class Simd {
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void shrLogical(int[] src, int bits, int[] dst, int offset, int length) {
         int shift = bits & 31;
         for (int i = offset, end = offset + length; i < end; i++) {
@@ -332,6 +389,7 @@ public class Simd {
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void shrLogical(int[] src, int srcOffset, int bits, int[] dst, int dstOffset, int length) {
         int shift = bits & 31;
         for (int i = 0; i < length; i++) {
@@ -339,6 +397,7 @@ public class Simd {
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void shrArithmetic(int[] src, int bits, int[] dst, int offset, int length) {
         int shift = bits & 31;
         for (int i = offset, end = offset + length; i < end; i++) {
@@ -346,48 +405,56 @@ public class Simd {
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void cmpEq(int[] srcA, int[] srcB, byte[] dstMask, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dstMask[i] = srcA[i] == srcB[i] ? (byte)-1 : (byte)0;
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void cmpEq(int[] srcA, int srcAOffset, int[] srcB, int srcBOffset, byte[] dstMask, int dstOffset, int length) {
         for (int i = 0; i < length; i++) {
             dstMask[dstOffset + i] = srcA[srcAOffset + i] == srcB[srcBOffset + i] ? (byte)-1 : (byte)0;
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void cmpLt(int[] srcA, int[] srcB, byte[] dstMask, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dstMask[i] = srcA[i] < srcB[i] ? (byte)-1 : (byte)0;
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void cmpLt(int[] srcA, int srcAOffset, int[] srcB, int srcBOffset, byte[] dstMask, int dstOffset, int length) {
         for (int i = 0; i < length; i++) {
             dstMask[dstOffset + i] = srcA[srcAOffset + i] < srcB[srcBOffset + i] ? (byte)-1 : (byte)0;
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void cmpGt(int[] srcA, int[] srcB, byte[] dstMask, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dstMask[i] = srcA[i] > srcB[i] ? (byte)-1 : (byte)0;
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void select(byte[] mask, int[] trueValues, int[] falseValues, int[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dst[i] = mask[i] != 0 ? trueValues[i] : falseValues[i];
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void select(byte[] mask, int maskOffset, int[] trueValues, int trueOffset, int[] falseValues, int falseOffset, int[] dst, int dstOffset, int length) {
         for (int i = 0; i < length; i++) {
             dst[dstOffset + i] = mask[maskOffset + i] != 0 ? trueValues[trueOffset + i] : falseValues[falseOffset + i];
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public int sum(int[] src, int offset, int length) {
         int out = 0;
         for (int i = offset, end = offset + length; i < end; i++) {
@@ -396,6 +463,7 @@ public class Simd {
         return out;
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public int dot(int[] srcA, int[] srcB, int offset, int length) {
         int out = 0;
         for (int i = offset, end = offset + length; i < end; i++) {
@@ -404,42 +472,49 @@ public class Simd {
         return out;
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void add(float[] srcA, float[] srcB, float[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dst[i] = srcA[i] + srcB[i];
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void sub(float[] srcA, float[] srcB, float[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dst[i] = srcA[i] - srcB[i];
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void mul(float[] srcA, float[] srcB, float[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dst[i] = srcA[i] * srcB[i];
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void min(float[] srcA, float[] srcB, float[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dst[i] = Math.min(srcA[i], srcB[i]);
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void max(float[] srcA, float[] srcB, float[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dst[i] = Math.max(srcA[i], srcB[i]);
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void abs(float[] src, float[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dst[i] = Math.abs(src[i]);
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void clamp(float[] src, float[] dst, float minValue, float maxValue, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             float v = src[i];
@@ -453,6 +528,7 @@ public class Simd {
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public float sum(float[] src, int offset, int length) {
         float out = 0f;
         for (int i = offset, end = offset + length; i < end; i++) {
@@ -461,6 +537,7 @@ public class Simd {
         return out;
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public float dot(float[] srcA, float[] srcB, int offset, int length) {
         float out = 0f;
         for (int i = offset, end = offset + length; i < end; i++) {
@@ -470,6 +547,8 @@ public class Simd {
     }
 
 
+    /// This API is used internally to verify valid array arguments in the simulator
+    /// notice that no validation occurs on the devices.
     protected final void validateBinaryByte(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length) {
         validateNotNull(srcA, "srcA");
         validateNotNull(srcB, "srcB");
@@ -479,6 +558,8 @@ public class Simd {
         validateRange(dst.length, offset, length, "dst");
     }
 
+    /// This API is used internally to verify valid array arguments in the simulator
+    /// notice that no validation occurs on the devices.
     protected final void validateMaskBinaryByte(byte[] srcA, byte[] srcB, byte[] dstMask, int offset, int length) {
         validateNotNull(srcA, "srcA");
         validateNotNull(srcB, "srcB");
@@ -488,6 +569,8 @@ public class Simd {
         validateRange(dstMask.length, offset, length, "dstMask");
     }
 
+    /// This API is used internally to verify valid array arguments in the simulator
+    /// notice that no validation occurs on the devices.
     protected final void validateRangeMaskByte(byte[] src, byte[] dstMask, int offset, int length) {
         validateNotNull(src, "src");
         validateNotNull(dstMask, "dstMask");
@@ -495,6 +578,8 @@ public class Simd {
         validateRange(dstMask.length, offset, length, "dstMask");
     }
 
+    /// This API is used internally to verify valid array arguments in the simulator
+    /// notice that no validation occurs on the devices.
     protected final void validateSelectByte(byte[] mask, byte[] trueValues, byte[] falseValues, byte[] dst, int offset, int length) {
         validateNotNull(mask, "mask");
         validateNotNull(trueValues, "trueValues");
@@ -506,6 +591,8 @@ public class Simd {
         validateRange(dst.length, offset, length, "dst");
     }
 
+    /// This API is used internally to verify valid array arguments in the simulator
+    /// notice that no validation occurs on the devices.
     protected final void validateByteToInt(byte[] src, int[] dst, int offset, int length) {
         validateNotNull(src, "src");
         validateNotNull(dst, "dst");
@@ -513,6 +600,8 @@ public class Simd {
         validateRange(dst.length, offset, length, "dst");
     }
 
+    /// This API is used internally to verify valid array arguments in the simulator
+    /// notice that no validation occurs on the devices.
     protected final void validateIntToByte(int[] src, byte[] dst, int offset, int length) {
         validateNotNull(src, "src");
         validateNotNull(dst, "dst");
@@ -520,6 +609,8 @@ public class Simd {
         validateRange(dst.length, offset, length, "dst");
     }
 
+    /// This API is used internally to verify valid array arguments in the simulator
+    /// notice that no validation occurs on the devices.
     protected final void validatePermuteByte(byte[] src, byte[] indices, byte[] dst, int offset, int length) {
         validateNotNull(src, "src");
         validateNotNull(indices, "indices");
@@ -528,6 +619,8 @@ public class Simd {
         validateRange(dst.length, offset, length, "dst");
     }
 
+    /// This API is used internally to verify valid array arguments in the simulator
+    /// notice that no validation occurs on the devices.
     protected final void validateUnaryByte(byte[] src, byte[] dst, int offset, int length) {
         validateNotNull(src, "src");
         validateNotNull(dst, "dst");
@@ -535,6 +628,8 @@ public class Simd {
         validateRange(dst.length, offset, length, "dst");
     }
 
+    /// This API is used internally to verify valid array arguments in the simulator
+    /// notice that no validation occurs on the devices.
     protected final void validateBinaryInt(int[] srcA, int[] srcB, int[] dst, int offset, int length) {
         validateNotNull(srcA, "srcA");
         validateNotNull(srcB, "srcB");
@@ -544,6 +639,8 @@ public class Simd {
         validateRange(dst.length, offset, length, "dst");
     }
 
+    /// This API is used internally to verify valid array arguments in the simulator
+    /// notice that no validation occurs on the devices.
     protected final void validateUnaryInt(int[] src, int[] dst, int offset, int length) {
         validateNotNull(src, "src");
         validateNotNull(dst, "dst");
@@ -551,6 +648,8 @@ public class Simd {
         validateRange(dst.length, offset, length, "dst");
     }
 
+    /// This API is used internally to verify valid array arguments in the simulator
+    /// notice that no validation occurs on the devices.
     protected final void validateMaskBinaryInt(int[] srcA, int[] srcB, byte[] dstMask, int offset, int length) {
         validateNotNull(srcA, "srcA");
         validateNotNull(srcB, "srcB");
@@ -560,6 +659,8 @@ public class Simd {
         validateRange(dstMask.length, offset, length, "dstMask");
     }
 
+    /// This API is used internally to verify valid array arguments in the simulator
+    /// notice that no validation occurs on the devices.
     protected final void validateSelectInt(byte[] mask, int[] trueValues, int[] falseValues, int[] dst, int offset, int length) {
         validateNotNull(mask, "mask");
         validateNotNull(trueValues, "trueValues");
@@ -571,11 +672,15 @@ public class Simd {
         validateRange(dst.length, offset, length, "dst");
     }
 
+    /// This API is used internally to verify valid array arguments in the simulator
+    /// notice that no validation occurs on the devices.
     protected final void validateReductionInt(int[] src, int offset, int length) {
         validateNotNull(src, "src");
         validateRange(src.length, offset, length, "src");
     }
 
+    /// This API is used internally to verify valid array arguments in the simulator
+    /// notice that no validation occurs on the devices.
     protected final void validateDotInt(int[] srcA, int[] srcB, int offset, int length) {
         validateNotNull(srcA, "srcA");
         validateNotNull(srcB, "srcB");
@@ -583,6 +688,8 @@ public class Simd {
         validateRange(srcB.length, offset, length, "srcB");
     }
 
+    /// This API is used internally to verify valid array arguments in the simulator
+    /// notice that no validation occurs on the devices.
     protected final void validateBinaryFloat(float[] srcA, float[] srcB, float[] dst, int offset, int length) {
         validateNotNull(srcA, "srcA");
         validateNotNull(srcB, "srcB");
@@ -592,6 +699,8 @@ public class Simd {
         validateRange(dst.length, offset, length, "dst");
     }
 
+    /// This API is used internally to verify valid array arguments in the simulator
+    /// notice that no validation occurs on the devices.
     protected final void validateUnaryFloat(float[] src, float[] dst, int offset, int length) {
         validateNotNull(src, "src");
         validateNotNull(dst, "dst");
@@ -599,11 +708,15 @@ public class Simd {
         validateRange(dst.length, offset, length, "dst");
     }
 
+    /// This API is used internally to verify valid array arguments in the simulator
+    /// notice that no validation occurs on the devices.
     protected final void validateReductionFloat(float[] src, int offset, int length) {
         validateNotNull(src, "src");
         validateRange(src.length, offset, length, "src");
     }
 
+    /// This API is used internally to verify valid array arguments in the simulator
+    /// notice that no validation occurs on the devices.
     protected final void validateDotFloat(float[] srcA, float[] srcB, int offset, int length) {
         validateNotNull(srcA, "srcA");
         validateNotNull(srcB, "srcB");
@@ -611,13 +724,16 @@ public class Simd {
         validateRange(srcB.length, offset, length, "srcB");
     }
 
-
+    /// This API is used internally to verify valid array arguments in the simulator
+    /// notice that no validation occurs on the devices.
     protected final void validateNotNull(Object o, String name) {
         if (o == null) {
             throw new NullPointerException(name + " is null");
         }
     }
 
+    /// This API is used internally to verify valid array arguments in the simulator
+    /// notice that no validation occurs on the devices.
     protected final void validateRange(int arrayLength, int offset, int length, String name) {
         if (offset < 0 || length < 0 || offset > arrayLength || arrayLength - offset < length) {
             throw new ArrayIndexOutOfBoundsException(name + " invalid range offset=" + offset + " length=" + length + " size=" + arrayLength);
