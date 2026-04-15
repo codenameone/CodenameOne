@@ -32,21 +32,24 @@ public class RenderScreenshotReport {
 
         CoverageSummary coverage = loadCoverage(arguments.coverageSummary, arguments.coverageHtmlUrl);
 
-        Map<String, String> extraStats = new LinkedHashMap<>();
+        Map<String, String> benchmarkStats = new LinkedHashMap<>();
+        Map<String, String> timingStats = new LinkedHashMap<>();
         if (arguments.extraStats != null) {
             for (Path p : arguments.extraStats) {
                 if (Files.isRegularFile(p)) {
-                    parseStatsFile(p, extraStats);
+                    parseStatsFile(p, benchmarkStats, timingStats);
                 }
             }
         }
 
-        SummaryAndComment output = buildSummaryAndComment(data, title, marker, successMessage, coverage, arguments.vmTime, arguments.compilationTime, extraStats);
+        SummaryAndComment output = buildSummaryAndComment(data, title, marker, successMessage, coverage,
+                arguments.vmTime, arguments.compilationTime, benchmarkStats, timingStats);
         writeLines(arguments.summaryOut, output.summaryLines);
         writeLines(arguments.commentOut, output.commentLines);
     }
 
-    private static void parseStatsFile(Path p, Map<String, String> extraStats) {
+    private static void parseStatsFile(Path p, Map<String, String> benchmarkStats, Map<String, String> timingStats) {
+        Map<String, String> target = isBenchmarkStatsFile(p) ? benchmarkStats : timingStats;
         try {
             List<String> lines = Files.readAllLines(p, StandardCharsets.UTF_8);
             for (String line : lines) {
@@ -58,12 +61,17 @@ public class RenderScreenshotReport {
                 if (colon > 0) {
                     String key = line.substring(0, colon).trim();
                     String val = line.substring(colon + 1).trim();
-                    extraStats.put(key, val);
+                    target.put(key, val);
                 }
             }
         } catch (IOException e) {
             System.err.println("Failed to read stats file " + p + ": " + e.getMessage());
         }
+    }
+
+    private static boolean isBenchmarkStatsFile(Path p) {
+        Path name = p.getFileName();
+        return name != null && "base64-performance-stats.txt".equals(name.toString());
     }
 
     private static void writeLines(Path path, List<String> lines) throws IOException {
@@ -80,7 +88,11 @@ public class RenderScreenshotReport {
         Files.writeString(path, sb.toString(), StandardCharsets.UTF_8);
     }
 
-    private static SummaryAndComment buildSummaryAndComment(Map<String, Object> data, String title, String marker, String successMessage, CoverageSummary coverage, Long vmTime, Long compilationTime, Map<String, String> extraStats) {
+    private static SummaryAndComment buildSummaryAndComment(Map<String, Object> data, String title, String marker,
+                                                            String successMessage, CoverageSummary coverage,
+                                                            Long vmTime, Long compilationTime,
+                                                            Map<String, String> benchmarkStats,
+                                                            Map<String, String> timingStats) {
         List<String> summaryLines = new ArrayList<>();
         List<String> commentLines = new ArrayList<>();
         Object resultsObj = data.get("results");
@@ -190,7 +202,7 @@ public class RenderScreenshotReport {
         }
 
         // Add benchmark results at the end
-        appendBenchmarkResults(commentLines, vmTime, compilationTime, extraStats);
+        appendBenchmarkResults(commentLines, vmTime, compilationTime, benchmarkStats, timingStats);
 
         if (commentLines.isEmpty() || (commentLines.size() == 1 && commentLines.get(0).isEmpty())) {
             // This fallback block might be redundant now, but kept for safety.
@@ -260,8 +272,11 @@ public class RenderScreenshotReport {
         }
     }
 
-    private static void appendBenchmarkResults(List<String> commentLines, Long vmTime, Long compilationTime, Map<String, String> extraStats) {
-        if (vmTime == null && compilationTime == null && (extraStats == null || extraStats.isEmpty())) {
+    private static void appendBenchmarkResults(List<String> commentLines, Long vmTime, Long compilationTime,
+                                               Map<String, String> benchmarkStats, Map<String, String> timingStats) {
+        if (vmTime == null && compilationTime == null
+                && (benchmarkStats == null || benchmarkStats.isEmpty())
+                && (timingStats == null || timingStats.isEmpty())) {
             return;
         }
         if (!commentLines.isEmpty() && !commentLines.get(commentLines.size() - 1).isEmpty()) {
@@ -275,12 +290,21 @@ public class RenderScreenshotReport {
         if (compilationTime != null) {
             commentLines.add(String.format("- **Compilation Time:** %d seconds", compilationTime));
         }
-        if (extraStats != null && !extraStats.isEmpty()) {
+        if (timingStats != null && !timingStats.isEmpty()) {
+            commentLines.add("");
+            commentLines.add("#### Build and Run Timing");
+            commentLines.add("| Metric | Duration |");
+            commentLines.add("| --- | --- |");
+            for (Map.Entry<String, String> entry : timingStats.entrySet()) {
+                commentLines.add(String.format("| %s | %s |", entry.getKey(), entry.getValue()));
+            }
+        }
+        if (benchmarkStats != null && !benchmarkStats.isEmpty()) {
             commentLines.add("");
             commentLines.add("#### Detailed Performance Metrics");
             commentLines.add("| Metric | Duration |");
             commentLines.add("| --- | --- |");
-            for (Map.Entry<String, String> entry : extraStats.entrySet()) {
+            for (Map.Entry<String, String> entry : benchmarkStats.entrySet()) {
                 commentLines.add(String.format("| %s | %s |", entry.getKey(), entry.getValue()));
             }
         }
