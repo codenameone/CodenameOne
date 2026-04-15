@@ -68,6 +68,7 @@
   }
 
   function createEditor() {
+    registerMonacoThemes();
     state.model = monaco.editor.createModel("", state.language || "java");
     state.editor = monaco.editor.create(document.getElementById("editor"), {
       model: state.model,
@@ -94,6 +95,41 @@
       state.version += 1;
       scheduleLocalLint();
       scheduleChangeNotification();
+    });
+  }
+
+  function registerMonacoThemes() {
+    monaco.editor.defineTheme("cn1-playground-light", {
+      base: "vs",
+      inherit: true,
+      rules: [],
+      colors: {
+        "editor.background": "#FAFAFC",
+        "editor.foreground": "#112247",
+        "editorLineNumber.foreground": "#7F8AA3",
+        "editorLineNumber.activeForeground": "#112247",
+        "editorCursor.foreground": "#2F6BFF",
+        "editor.selectionBackground": "#E8F0FF",
+        "editor.inactiveSelectionBackground": "#E8F0FFAA",
+        "editorIndentGuide.background1": "#D9DEE8",
+        "editorIndentGuide.activeBackground1": "#BFC7D6"
+      }
+    });
+    monaco.editor.defineTheme("cn1-playground-dark", {
+      base: "vs-dark",
+      inherit: true,
+      rules: [],
+      colors: {
+        "editor.background": "#112F70",
+        "editor.foreground": "#F5F8FF",
+        "editorLineNumber.foreground": "#A8B8DA",
+        "editorLineNumber.activeForeground": "#F5F8FF",
+        "editorCursor.foreground": "#4D86FF",
+        "editor.selectionBackground": "#4D86FF33",
+        "editor.inactiveSelectionBackground": "#4D86FF22",
+        "editorIndentGuide.background1": "#4C6EA8",
+        "editorIndentGuide.activeBackground1": "#7390C0"
+      }
     });
   }
 
@@ -791,7 +827,7 @@
     if (!state.monacoReady) {
       return;
     }
-    monaco.editor.setTheme(state.dark ? "vs-dark" : "vs");
+    monaco.editor.setTheme(state.dark ? "cn1-playground-dark" : "cn1-playground-light");
     renderInlineMessages();
   }
 

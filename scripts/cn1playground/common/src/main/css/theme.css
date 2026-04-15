@@ -19,59 +19,59 @@ Title {
 }
 
 TitleArea {
-    background: #e5e7eb;
+    background: #F3F4F7;
 }
 
 PlaygroundForm, PlaygroundContent {
-    background: #f5f7fb;
+    background: #F7F8FB;
 }
 
 PlaygroundFormDark, PlaygroundContentDark {
-    background: #111827;
+    background: #071B4D;
 }
 
 PlaygroundToolbar {
-    background: #e5e7eb;
+    background: #F3F4F7;
     padding: 1mm 2mm 1mm 2mm;
 }
 
 PlaygroundToolbarDark {
-    background: #111827;
+    background: #102B66;
     padding: 1mm 2mm 1mm 2mm;
 }
 
 PlaygroundTitle {
-    color: #111827;
-    background: #e5e7eb;
+    color: #112247;
+    background: #F3F4F7;
     font-family: "native:MainLight";
     font-size: 6mm;
 }
 
 PlaygroundTitleDark {
-    color: #f8fafc;
-    background: #111827;
+    color: #F5F8FF;
+    background: #102B66;
     font-family: "native:MainLight";
     font-size: 6mm;
 }
 
 PlaygroundPanel {
-    background: white;
+    background: #FFFFFF;
     margin: 1mm;
     padding: 1mm;
 }
 
 PlaygroundPanelDark {
-    background: #1f2937;
+    background: #102B66;
     margin: 1mm;
     padding: 1mm;
 }
 
 PlaygroundPreview {
-    background: white;
+    background: #FFFFFF;
 }
 
 PlaygroundPreviewDark {
-    background: #0f172a;
+    background: #112F70;
 }
 
 /** Style for Dialog body */
@@ -88,12 +88,12 @@ DialogTitle {
 
 /** Style for the side menu */
 SideNavigationPanel {
-    background: white;
+    background: #FFFFFF;
     padding: 2mm 1mm 1mm 1mm;
 }
 
 SideNavigationPanelDark {
-    background: #0f172a;
+    background: #071B4D;
     padding: 2mm 1mm 1mm 1mm;
 }
 
@@ -114,19 +114,19 @@ SideCommand {
     border: none;
     text-decoration: none;
     color: black;
-    background: white;
+    background: #FFFFFF;
     font-family: "native:MainLight";
     font-size: 4mm;
-    border-bottom: 2px solid #cccccc;
+    border-bottom: 2px solid #D9DEE8;
 }
 
 StatusBarSideMenu {
-    background: white;
+    background: #FFFFFF;
     padding: 0mm;
 }
 
 StatusBarSideMenuDark {
-    background: #0f172a;
+    background: #071B4D;
     padding: 0mm;
 }
 
@@ -134,34 +134,34 @@ PlaygroundSideCommand {
     padding: 1mm;
     border: none;
     text-decoration: none;
-    color: #111827;
-    background: white;
+    color: #112247;
+    background: #FFFFFF;
     font-family: "native:MainLight";
     font-size: 4mm;
-    border-bottom: 2px solid #cccccc;
+    border-bottom: 2px solid #D9DEE8;
 }
 
 PlaygroundSideCommandDark {
-    color: #e5e7eb;
-    background: #0f172a;
-    border-bottom: 2px solid #1f2937;
+    color: #F5F8FF;
+    background: #071B4D;
+    border-bottom: 2px solid #102B66;
 }
 
 PlaygroundMenuSection {
     padding: 2mm 1mm 0.5mm 1mm;
     margin: 1mm 0 0 0;
     border: none;
-    border-bottom: 1px solid #d1d5db;
-    background: white;
+    border-bottom: 1px solid #D9DEE8;
+    background: #FFFFFF;
 }
 
 PlaygroundMenuSectionDark {
-    border-bottom: 1px solid #334155;
-    background: #0f172a;
+    border-bottom: 1px solid #4C6EA8;
+    background: #071B4D;
 }
 
 PlaygroundMenuSectionTitle {
-    color: #6b7280;
+    color: #7F8AA3;
     font-family: "native:MainBold";
     font-size: 2.6mm;
     text-decoration: none;
@@ -169,138 +169,138 @@ PlaygroundMenuSectionTitle {
 }
 
 PlaygroundMenuSectionTitleDark {
-    color: #94a3b8;
+    color: #A8B8DA;
 }
 
 PlaygroundMenuEmpty {
-    color: #6b7280;
+    color: #7F8AA3;
     font-family: "native:MainLight";
     font-size: 3mm;
     padding: 1mm;
 }
 
 PlaygroundMenuEmptyDark {
-    color: #94a3b8;
-    background: #0f172a;
+    color: #A8B8DA;
+    background: #071B4D;
 }
 
 PlaygroundMenuContainer {
-    background: white;
+    background: #FFFFFF;
 }
 
 PlaygroundMenuContainerDark {
-    background: #0f172a;
+    background: #071B4D;
 }
 
 @media (prefers-color-scheme: dark) {
     SideNavigationPanel {
-        background: #0f172a;
+        background: #071B4D;
     }
     SideNavigationPanelDark {
-        background: #0f172a;
+        background: #071B4D;
     }
 
     SideCommand {
-        color: #e5e7eb;
-        background: #0f172a;
-        border-bottom: 2px solid #1f2937;
+        color: #F5F8FF;
+        background: #071B4D;
+        border-bottom: 2px solid #102B66;
     }
 
     StatusBarSideMenu {
-        background: #0f172a;
+        background: #071B4D;
     }
     StatusBarSideMenuDark {
-        background: #0f172a;
+        background: #071B4D;
     }
 
     PlaygroundSideCommand {
-        color: #e5e7eb;
-        background: #0f172a;
-        border-bottom: 2px solid #1f2937;
+        color: #F5F8FF;
+        background: #071B4D;
+        border-bottom: 2px solid #102B66;
     }
     PlaygroundSideCommandDark {
-        color: #e5e7eb;
-        background: #0f172a;
-        border-bottom: 2px solid #1f2937;
+        color: #F5F8FF;
+        background: #071B4D;
+        border-bottom: 2px solid #102B66;
     }
 
     PlaygroundSideCommandLine1 {
-        color: #f8fafc;
+        color: #F5F8FF;
     }
 
     PlaygroundSideCommandLine2 {
-        color: #94a3b8;
+        color: #A8B8DA;
     }
 
     PlaygroundMenuSection {
-        border-bottom: 1px solid #334155;
-        background: #0f172a;
+        border-bottom: 1px solid #4C6EA8;
+        background: #071B4D;
     }
     PlaygroundMenuSectionDark {
-        border-bottom: 1px solid #334155;
-        background: #0f172a;
+        border-bottom: 1px solid #4C6EA8;
+        background: #071B4D;
     }
 
     PlaygroundMenuSectionTitle {
-        color: #94a3b8;
+        color: #A8B8DA;
     }
     PlaygroundMenuSectionTitleDark {
-        color: #94a3b8;
+        color: #A8B8DA;
     }
 
     PlaygroundMenuEmpty {
-        color: #94a3b8;
-        background: #0f172a;
+        color: #A8B8DA;
+        background: #071B4D;
     }
     PlaygroundMenuEmptyDark {
-        color: #94a3b8;
-        background: #0f172a;
+        color: #A8B8DA;
+        background: #071B4D;
     }
 
     PlaygroundMenuContainer {
-        background: #0f172a;
+        background: #071B4D;
     }
     PlaygroundMenuContainerDark {
-        background: #0f172a;
+        background: #071B4D;
     }
 }
 
 PlaygroundEmbeddedForm {
-    background: #f5f7fb;
+    background: #F7F8FB;
 }
 
 PlaygroundEmbeddedFormDark {
-    background: #111827;
+    background: #112247;
 }
 
 PlaygroundEmbeddedTitleArea {
-    background: #e5e7eb;
+    background: #F3F4F7;
 }
 
 PlaygroundEmbeddedTitleAreaDark {
-    background: #1f2937;
+    background: #163575;
 }
 
 PlaygroundInspectorRoot {
-    background: white;
+    background: #FFFFFF;
     padding: 1mm;
 }
 
 PlaygroundInspectorRootDark {
-    background: #1f2937;
+    background: #102B66;
     padding: 1mm;
 }
 
 PlaygroundInspectorTree {
-    background: white;
-    color: #111827;
+    background: #FFFFFF;
+    color: #112247;
     margin: 0;
     padding: 0;
 }
 
 PlaygroundInspectorTreeDark {
-    background: #1f2937;
-    color: #e5e7eb;
+    background: #102B66;
+    color: #F5F8FF;
     margin: 0;
     padding: 0;
 }
@@ -312,19 +312,19 @@ PlaygroundPropRow {
 }
 
 PlaygroundPropUnit {
-    color: #111827;
-    background: white;
-    border: 1px solid #d1d5db;
+    color: #112247;
+    background: #FFFFFF;
+    border: 1px solid #D9DEE8;
 }
 
 PlaygroundPropUnitDark {
-    color: #e5e7eb;
-    background: #111827;
-    border: 1px solid #334155;
+    color: #F5F8FF;
+    background: #0E2A61;
+    border: 1px solid #4C6EA8;
 }
 
 PlaygroundPropEmpty {
-    color: #6b7280;
+    color: #7F8AA3;
     background: transparent;
     font-family: "native:MainLight";
     font-size: 3mm;
@@ -332,7 +332,7 @@ PlaygroundPropEmpty {
 }
 
 PlaygroundPropEmptyDark {
-    color: #94a3b8;
+    color: #A8B8DA;
     background: transparent;
     font-family: "native:MainLight";
     font-size: 3mm;
@@ -340,20 +340,20 @@ PlaygroundPropEmptyDark {
 }
 
 PlaygroundColorPreview {
-    background: #ffffff;
-    border: 1px solid #d1d5db;
+    background: #FFFFFF;
+    border: 1px solid #D9DEE8;
     padding: 0.5mm 1mm 0.5mm 1mm;
 }
 
 PlaygroundColorPreviewDark {
-    background: #111827;
-    border: 1px solid #334155;
+    background: #0E2A61;
+    border: 1px solid #4C6EA8;
     padding: 0.5mm 1mm 0.5mm 1mm;
 }
 
 PlaygroundInspectorTreeNode {
-    color: #111827;
-    background: white;
+    color: #112247;
+    background: #FFFFFF;
     border: none;
     text-decoration: none;
     font-family: "native:MainLight";
@@ -363,8 +363,8 @@ PlaygroundInspectorTreeNode {
 }
 
 PlaygroundInspectorTreeNodeDark {
-    color: #e5e7eb;
-    background: #1f2937;
+    color: #F5F8FF;
+    background: #102B66;
     border: none;
     text-decoration: none;
     font-family: "native:MainLight";
@@ -374,92 +374,92 @@ PlaygroundInspectorTreeNodeDark {
 }
 
 Tab {
-    background: #e5e7eb;
-    color: #111827;
-    border: 1px solid #d1d5db;
+    background: #F3F4F7;
+    color: #112247;
+    border: 1px solid #D9DEE8;
     font-family: "native:MainLight";
     font-size: 3mm;
     text-align: center;
 }
 
 PlaygroundEditorTabs {
-    background: #e5e7eb;
+    background: #F3F4F7;
 }
 
 PlaygroundEditorTabsDark {
-    background: #111827;
+    background: #112247;
 }
 
 TabDark {
-    background: #111827;
-    color: #e5e7eb;
-    border: 1px solid #334155;
+    background: #102B66;
+    color: #F5F8FF;
+    border: 1px solid #4C6EA8;
     font-family: "native:MainLight";
     font-size: 3mm;
     text-align: center;
 }
 
 TabSelected {
-    background: #ffffff;
-    color: #111827;
-    border: 1px solid #94a3b8;
+    background: #FFFFFF;
+    color: #112247;
+    border: 2px solid #2F6BFF;
 }
 
 TabSelectedDark {
-    background: #1f2937;
-    color: #f8fafc;
-    border: 1px solid #64748b;
+    background: #163575;
+    color: #F5F8FF;
+    border: 2px solid #4D86FF;
 }
 
 TabsContainer {
-    background: #e5e7eb;
+    background: #F3F4F7;
 }
 
 TabsContainerDark {
-    background: #111827;
+    background: #112247;
 }
 PlaygroundSideCommandLine1 {
-    color: #111827;
+    color: #112247;
     background: transparent;
     font-family: "native:MainLight";
     font-size: 4mm;
 }
 
 PlaygroundSideCommandLine1Dark {
-    color: #e5e7eb;
+    color: #F5F8FF;
     background: transparent;
     font-family: "native:MainLight";
     font-size: 4mm;
 }
 
 PlaygroundSideCommandLine2 {
-    color: #6b7280;
+    color: #7F8AA3;
     background: transparent;
     font-family: "native:MainLight";
     font-size: 2.6mm;
 }
 
 PlaygroundSideCommandLine2Dark {
-    color: #94a3b8;
+    color: #A8B8DA;
     background: transparent;
     font-family: "native:MainLight";
     font-size: 2.6mm;
 }
 
 PlaygroundInspectorProps {
-    background: white;
+    background: #FFFFFF;
     padding: 1mm;
     margin: 0;
 }
 
 PlaygroundInspectorPropsDark {
-    background: #1f2937;
+    background: #102B66;
     padding: 1mm;
     margin: 0;
 }
 
 PlaygroundPropName {
-    color: #6b7280;
+    color: #7F8AA3;
     font-family: "native:MainBold";
     font-size: 2.6mm;
     padding: 0.5mm 0mm 0.5mm 1.5mm;
@@ -467,7 +467,7 @@ PlaygroundPropName {
 }
 
 PlaygroundPropNameDark {
-    color: #94a3b8;
+    color: #A8B8DA;
     font-family: "native:MainBold";
     font-size: 2.6mm;
     padding: 0.5mm 0mm 0.5mm 1.5mm;
@@ -475,9 +475,9 @@ PlaygroundPropNameDark {
 }
 
 PlaygroundPropValue {
-    color: #111827;
-    background: white;
-    border: 1px solid #d1d5db;
+    color: #112247;
+    background: #FFFFFF;
+    border: 1px solid #D9DEE8;
     font-family: "native:MainLight";
     font-size: 2.8mm;
     padding: 0.5mm 1mm 0.5mm 1mm;
@@ -485,9 +485,9 @@ PlaygroundPropValue {
 }
 
 PlaygroundPropValueDark {
-    color: #e5e7eb;
-    background: #111827;
-    border: 1px solid #334155;
+    color: #F5F8FF;
+    background: #0E2A61;
+    border: 1px solid #4C6EA8;
     font-family: "native:MainLight";
     font-size: 2.8mm;
     padding: 0.5mm 1mm 0.5mm 1mm;
@@ -495,9 +495,9 @@ PlaygroundPropValueDark {
 }
 
 PlaygroundPropSmall {
-    color: #111827;
-    background: white;
-    border: 1px solid #d1d5db;
+    color: #112247;
+    background: #FFFFFF;
+    border: 1px solid #D9DEE8;
     font-family: "native:MainLight";
     font-size: 2.6mm;
     padding: 0.5mm;
@@ -505,9 +505,9 @@ PlaygroundPropSmall {
 }
 
 PlaygroundPropSmallDark {
-    color: #e5e7eb;
-    background: #111827;
-    border: 1px solid #334155;
+    color: #F5F8FF;
+    background: #0E2A61;
+    border: 1px solid #4C6EA8;
     font-family: "native:MainLight";
     font-size: 2.6mm;
     padding: 0.5mm;
