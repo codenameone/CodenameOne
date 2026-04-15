@@ -1661,14 +1661,6 @@ public class ByteCodeClass {
 
     private void appendMethodsToHeader(StringBuilder b) {        
         for(BytecodeMethod m : methods) {
-            // Native methods must always be declared in the header even if the
-            // optimizer marked them as eliminated, because their implementation
-            // lives in external native source files (.m/.c) and the bytecode
-            // translator can devirtualize calls directly to them via
-            // resolveConcreteInvokeOwner / hasDeclaredNonAbstractMethod.
-            if (m.isEliminated() && !m.isNative()) {
-                continue;
-            }
             m.appendMethodHeader(b);
             
             /*if(!m.isForceVirtual() && m.isVirtualBlockedDueToFinal() && !m.isVirtualOverriden()) {
