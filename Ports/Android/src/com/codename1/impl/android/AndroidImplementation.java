@@ -1404,6 +1404,26 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             int top = ((Integer) insetsClass.getField("top").get(insetsObject)).intValue();
             int right = ((Integer) insetsClass.getField("right").get(insetsObject)).intValue();
             int bottom = ((Integer) insetsClass.getField("bottom").get(insetsObject)).intValue();
+            // Include mandatory gesture insets (e.g. gesture navigation handle area).
+            // Some devices expose a larger interaction-protected bottom region here
+            // than in plain system bar insets.
+            try {
+                int mandatoryGesturesMask = ((Integer) typeClass
+                        .getMethod("mandatorySystemGestures")
+                        .invoke(null)).intValue();
+                Object mandatoryInsetsObject = insets.getClass()
+                        .getMethod("getInsets", new Class[]{int.class})
+                        .invoke(insets, new Object[]{mandatoryGesturesMask});
+                if (mandatoryInsetsObject != null) {
+                    Class mandatoryInsetsClass = mandatoryInsetsObject.getClass();
+                    left = Math.max(left, ((Integer) mandatoryInsetsClass.getField("left").get(mandatoryInsetsObject)).intValue());
+                    top = Math.max(top, ((Integer) mandatoryInsetsClass.getField("top").get(mandatoryInsetsObject)).intValue());
+                    right = Math.max(right, ((Integer) mandatoryInsetsClass.getField("right").get(mandatoryInsetsObject)).intValue());
+                    bottom = Math.max(bottom, ((Integer) mandatoryInsetsClass.getField("bottom").get(mandatoryInsetsObject)).intValue());
+                }
+            } catch (Throwable t) {
+                // Ignore if mandatory gesture insets are unavailable.
+            }
             result.set(left, top, right, bottom);
         } catch (Throwable t) {
             t.printStackTrace();  // Optional: log this or suppress if expected
