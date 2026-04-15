@@ -530,12 +530,8 @@ public abstract class Base64 {
         // Process 16 triplets (48 input bytes -> 64 output bytes) per iteration
         int simdEnd = end3 - 48 + 1;
         while (si < simdEnd) {
-            // 1. Scatter input bytes into 3 int stripes (b0, b1, b2)
-            for (int j = 0; j < 16; j++) {
-                scratch[j]      = in[si + j * 3]     & 0xff;
-                scratch[16 + j] = in[si + j * 3 + 1] & 0xff;
-                scratch[32 + j] = in[si + j * 3 + 2] & 0xff;
-            }
+            // 1. De-interleave input bytes into 3 int stripes (b0, b1, b2)
+            simd.unpackUnsignedByteToIntInterleaved3(in, si, scratch, 0, 16, 32, 16);
 
             // 2. Extract 4 six-bit index stripes using SIMD int ops
             // idx0 = b0 >> 2
@@ -579,13 +575,8 @@ public abstract class Base64 {
             // ascii = indices + offset
             simd.add(scratch, 48, scratch, 112, scratch, 48, 64);
 
-            // 4. Interleave 4 output stripes into output bytes
-            for (int j = 0; j < 16; j++) {
-                out[di + j * 4]     = (byte) scratch[48 + j];
-                out[di + j * 4 + 1] = (byte) scratch[64 + j];
-                out[di + j * 4 + 2] = (byte) scratch[80 + j];
-                out[di + j * 4 + 3] = (byte) scratch[96 + j];
-            }
+            // 4. Re-interleave the 4 output stripes into output bytes
+            simd.packIntToByteTruncateInterleaved4(scratch, 48, 64, 80, 96, out, di, 16);
 
             si += 48;
             di += 64;

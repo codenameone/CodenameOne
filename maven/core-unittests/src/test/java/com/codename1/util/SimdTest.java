@@ -242,5 +242,74 @@ class SimdTest extends UITestBase {
         assertEquals(-2, result[1]);
         assertEquals(300, result[2]);
         assertEquals(-4, result[3]);
+
+        byte[] maskOut = new byte[4];
+        simd.cmpEq(new byte[]{4, 5, 4, 6}, (byte)4, maskOut, 0, 4);
+        assertEquals((byte)-1, maskOut[0]);
+        assertEquals((byte)0, maskOut[1]);
+        assertEquals((byte)-1, maskOut[2]);
+        assertEquals((byte)0, maskOut[3]);
+
+        simd.cmpLt(new byte[]{1, 2, 3, 4}, (byte)3, maskOut, 0, 4);
+        assertEquals((byte)-1, maskOut[0]);
+        assertEquals((byte)-1, maskOut[1]);
+        assertEquals((byte)0, maskOut[2]);
+        assertEquals((byte)0, maskOut[3]);
+
+        byte[] wrapped = new byte[4];
+        simd.addWrapping(new byte[]{1, 2, (byte)255, (byte)128}, (byte)2, wrapped, 0, 4);
+        assertEquals((byte)3, wrapped[0]);
+        assertEquals((byte)4, wrapped[1]);
+        assertEquals((byte)1, wrapped[2]);
+        assertEquals((byte)130, wrapped[3]);
+
+        simd.subWrapping(new byte[]{1, 2, 0, (byte)128}, (byte)2, wrapped, 0, 4);
+        assertEquals((byte)255, wrapped[0]);
+        assertEquals((byte)0, wrapped[1]);
+        assertEquals((byte)254, wrapped[2]);
+        assertEquals((byte)126, wrapped[3]);
+
+        int[] interleavedInts = new int[48];
+        simd.unpackUnsignedByteToIntInterleaved3(
+                new byte[]{
+                        10, 11, 12,
+                        20, 21, 22,
+                        30, 31, 32,
+                        40, 41, 42
+                },
+                0,
+                interleavedInts,
+                0,
+                16,
+                32,
+                4);
+        assertEquals(10, interleavedInts[0]);
+        assertEquals(20, interleavedInts[1]);
+        assertEquals(41, interleavedInts[16 + 3]);
+        assertEquals(32, interleavedInts[32 + 2]);
+
+        byte[] interleavedBytes = new byte[16];
+        simd.packIntToByteTruncateInterleaved4(
+                new int[]{
+                        65, 66, 67, 68,
+                        69, 70, 71, 72,
+                        73, 74, 75, 76,
+                        77, 78, 79, 80
+                },
+                0,
+                4,
+                8,
+                12,
+                interleavedBytes,
+                0,
+                4);
+        assertEquals((byte)65, interleavedBytes[0]);
+        assertEquals((byte)69, interleavedBytes[1]);
+        assertEquals((byte)73, interleavedBytes[2]);
+        assertEquals((byte)77, interleavedBytes[3]);
+        assertEquals((byte)68, interleavedBytes[12]);
+        assertEquals((byte)72, interleavedBytes[13]);
+        assertEquals((byte)76, interleavedBytes[14]);
+        assertEquals((byte)80, interleavedBytes[15]);
     }
 }

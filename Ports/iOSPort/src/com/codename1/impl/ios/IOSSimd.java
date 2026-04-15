@@ -75,7 +75,13 @@ public class IOSSimd extends Simd {
     public native void cmpEq(byte[] srcA, byte[] srcB, byte[] dstMask, int offset, int length);
 
     @Override
+    public native void cmpEq(byte[] src, byte value, byte[] dstMask, int offset, int length);
+
+    @Override
     public native void cmpLt(byte[] srcA, byte[] srcB, byte[] dstMask, int offset, int length);
+
+    @Override
+    public native void cmpLt(byte[] src, byte value, byte[] dstMask, int offset, int length);
 
     @Override
     public native void cmpGt(byte[] srcA, byte[] srcB, byte[] dstMask, int offset, int length);
@@ -210,13 +216,25 @@ public class IOSSimd extends Simd {
     public native void addWrapping(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length);
 
     @Override
+    public native void addWrapping(byte[] src, byte value, byte[] dst, int offset, int length);
+
+    @Override
     public native void subWrapping(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length);
+
+    @Override
+    public native void subWrapping(byte[] src, byte value, byte[] dst, int offset, int length);
 
     @Override
     public native void unpackUnsignedByteToInt(byte[] src, int srcOffset, int[] dst, int dstOffset, int length);
 
     @Override
+    public native void unpackUnsignedByteToIntInterleaved3(byte[] src, int srcOffset, int[] dst, int dst0Offset, int dst1Offset, int dst2Offset, int length);
+
+    @Override
     public native void add(int[] srcA, int srcAOffset, int[] srcB, int srcBOffset, int[] dst, int dstOffset, int length);
+
+    @Override
+    public native void packIntToByteTruncateInterleaved4(int[] src, int src0Offset, int src1Offset, int src2Offset, int src3Offset, byte[] dst, int dstOffset, int length);
 
     @Override
     public native void cmpEq(int[] srcA, int srcAOffset, int[] srcB, int srcBOffset, byte[] dstMask, int dstOffset, int length);

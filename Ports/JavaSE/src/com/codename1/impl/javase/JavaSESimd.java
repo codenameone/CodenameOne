@@ -129,10 +129,24 @@ public class JavaSESimd extends Simd {
     }
 
     @Override
+    public void cmpEq(byte[] src, byte value, byte[] dstMask, int offset, int length) {
+        validateRangeMaskByte(src, dstMask, offset, length);
+        validateRegistered(src, dstMask);
+        super.cmpEq(src, value, dstMask, offset, length);
+    }
+
+    @Override
     public void cmpLt(byte[] srcA, byte[] srcB, byte[] dstMask, int offset, int length) {
         validateMaskBinaryByte(srcA, srcB, dstMask, offset, length);
         validateRegistered(srcA, srcB, dstMask);
         super.cmpLt(srcA, srcB, dstMask, offset, length);
+    }
+
+    @Override
+    public void cmpLt(byte[] src, byte value, byte[] dstMask, int offset, int length) {
+        validateRangeMaskByte(src, dstMask, offset, length);
+        validateRegistered(src, dstMask);
+        super.cmpLt(src, value, dstMask, offset, length);
     }
 
     @Override
@@ -472,10 +486,24 @@ public class JavaSESimd extends Simd {
     }
 
     @Override
+    public void addWrapping(byte[] src, byte value, byte[] dst, int offset, int length) {
+        validateUnaryByte(src, dst, offset, length);
+        validateRegistered(src, dst);
+        super.addWrapping(src, value, dst, offset, length);
+    }
+
+    @Override
     public void subWrapping(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length) {
         validateBinaryByte(srcA, srcB, dst, offset, length);
         validateRegistered(srcA, srcB, dst);
         super.subWrapping(srcA, srcB, dst, offset, length);
+    }
+
+    @Override
+    public void subWrapping(byte[] src, byte value, byte[] dst, int offset, int length) {
+        validateUnaryByte(src, dst, offset, length);
+        validateRegistered(src, dst);
+        super.subWrapping(src, value, dst, offset, length);
     }
 
     @Override
@@ -486,6 +514,18 @@ public class JavaSESimd extends Simd {
         validateRange(dst.length, dstOffset, length, "dst");
         validateRegistered(src, dst);
         super.unpackUnsignedByteToInt(src, srcOffset, dst, dstOffset, length);
+    }
+
+    @Override
+    public void unpackUnsignedByteToIntInterleaved3(byte[] src, int srcOffset, int[] dst, int dst0Offset, int dst1Offset, int dst2Offset, int length) {
+        validateNotNull(src, "src");
+        validateNotNull(dst, "dst");
+        validateRange(src.length, srcOffset, length * 3, "src");
+        validateRange(dst.length, dst0Offset, length, "dst");
+        validateRange(dst.length, dst1Offset, length, "dst");
+        validateRange(dst.length, dst2Offset, length, "dst");
+        validateRegistered(src, dst);
+        super.unpackUnsignedByteToIntInterleaved3(src, srcOffset, dst, dst0Offset, dst1Offset, dst2Offset, length);
     }
 
     @Override
@@ -536,6 +576,19 @@ public class JavaSESimd extends Simd {
         validateRange(dst.length, dstOffset, length, "dst");
         validateRegistered(mask, trueValues, falseValues, dst);
         super.select(mask, maskOffset, trueValues, trueOffset, falseValues, falseOffset, dst, dstOffset, length);
+    }
+
+    @Override
+    public void packIntToByteTruncateInterleaved4(int[] src, int src0Offset, int src1Offset, int src2Offset, int src3Offset, byte[] dst, int dstOffset, int length) {
+        validateNotNull(src, "src");
+        validateNotNull(dst, "dst");
+        validateRange(src.length, src0Offset, length, "src");
+        validateRange(src.length, src1Offset, length, "src");
+        validateRange(src.length, src2Offset, length, "src");
+        validateRange(src.length, src3Offset, length, "src");
+        validateRange(dst.length, dstOffset, length * 4, "dst");
+        validateRegistered(src, dst);
+        super.packIntToByteTruncateInterleaved4(src, src0Offset, src1Offset, src2Offset, src3Offset, dst, dstOffset, length);
     }
 
     private void validateRegistered(Object... arrays) {

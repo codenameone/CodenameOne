@@ -158,9 +158,23 @@ public class Simd {
     }
 
     /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void cmpEq(byte[] src, byte value, byte[] dstMask, int offset, int length) {
+        for (int i = offset, end = offset + length; i < end; i++) {
+            dstMask[i] = src[i] == value ? (byte)-1 : (byte)0;
+        }
+    }
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void cmpLt(byte[] srcA, byte[] srcB, byte[] dstMask, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dstMask[i] = srcA[i] < srcB[i] ? (byte)-1 : (byte)0;
+        }
+    }
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void cmpLt(byte[] src, byte value, byte[] dstMask, int offset, int length) {
+        for (int i = offset, end = offset + length; i < end; i++) {
+            dstMask[i] = src[i] < value ? (byte)-1 : (byte)0;
         }
     }
 
@@ -210,9 +224,23 @@ public class Simd {
     }
 
     /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void addWrapping(byte[] src, byte value, byte[] dst, int offset, int length) {
+        for (int i = offset, end = offset + length; i < end; i++) {
+            dst[i] = (byte)(src[i] + value);
+        }
+    }
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void subWrapping(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             dst[i] = (byte)(srcA[i] - srcB[i]);
+        }
+    }
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void subWrapping(byte[] src, byte value, byte[] dst, int offset, int length) {
+        for (int i = offset, end = offset + length; i < end; i++) {
+            dst[i] = (byte)(src[i] - value);
         }
     }
 
@@ -227,6 +255,16 @@ public class Simd {
     public void unpackUnsignedByteToInt(byte[] src, int srcOffset, int[] dst, int dstOffset, int length) {
         for (int i = 0; i < length; i++) {
             dst[dstOffset + i] = src[srcOffset + i] & 0xff;
+        }
+    }
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void unpackUnsignedByteToIntInterleaved3(byte[] src, int srcOffset, int[] dst, int dst0Offset, int dst1Offset, int dst2Offset, int length) {
+        for (int i = 0; i < length; i++) {
+            int srcIndex = srcOffset + i * 3;
+            dst[dst0Offset + i] = src[srcIndex] & 0xff;
+            dst[dst1Offset + i] = src[srcIndex + 1] & 0xff;
+            dst[dst2Offset + i] = src[srcIndex + 2] & 0xff;
         }
     }
 
@@ -248,6 +286,17 @@ public class Simd {
     public void packIntToByteTruncate(int[] src, int srcOffset, byte[] dst, int dstOffset, int length) {
         for (int i = 0; i < length; i++) {
             dst[dstOffset + i] = (byte)src[srcOffset + i];
+        }
+    }
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void packIntToByteTruncateInterleaved4(int[] src, int src0Offset, int src1Offset, int src2Offset, int src3Offset, byte[] dst, int dstOffset, int length) {
+        for (int i = 0; i < length; i++) {
+            int dstIndex = dstOffset + i * 4;
+            dst[dstIndex] = (byte)src[src0Offset + i];
+            dst[dstIndex + 1] = (byte)src[src1Offset + i];
+            dst[dstIndex + 2] = (byte)src[src2Offset + i];
+            dst[dstIndex + 3] = (byte)src[src3Offset + i];
         }
     }
 
