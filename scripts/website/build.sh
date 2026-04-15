@@ -22,6 +22,7 @@ WEBSITE_INCLUDE_JAVADOCS="${WEBSITE_INCLUDE_JAVADOCS:-false}"
 WEBSITE_INCLUDE_DEVGUIDE="${WEBSITE_INCLUDE_DEVGUIDE:-auto}"
 WEBSITE_INCLUDE_INITIALIZR="${WEBSITE_INCLUDE_INITIALIZR:-false}"
 WEBSITE_INCLUDE_PLAYGROUND="${WEBSITE_INCLUDE_PLAYGROUND:-false}"
+WEBSITE_INCLUDE_SKINDESIGNER="${WEBSITE_INCLUDE_SKINDESIGNER:-false}"
 WEBSITE_BOOTSTRAP_CN1_SNAPSHOTS="${WEBSITE_BOOTSTRAP_CN1_SNAPSHOTS:-auto}"
 WEBSITE_CN1_VERSION="${WEBSITE_CN1_VERSION:-auto}"
 CN1_USER="${CN1_USER:-}"
@@ -70,6 +71,14 @@ if [ "${WEBSITE_INCLUDE_PLAYGROUND}" = "auto" ]; then
     WEBSITE_INCLUDE_PLAYGROUND="true"
   else
     WEBSITE_INCLUDE_PLAYGROUND="false"
+  fi
+fi
+
+if [ "${WEBSITE_INCLUDE_SKINDESIGNER}" = "auto" ]; then
+  if [ -n "${CN1_USER}" ] && [ -n "${CN1_TOKEN}" ]; then
+    WEBSITE_INCLUDE_SKINDESIGNER="true"
+  else
+    WEBSITE_INCLUDE_SKINDESIGNER="false"
   fi
 fi
 
@@ -665,6 +674,64 @@ build_playground_for_site() {
   fi
 }
 
+
+build_skindesigner_for_site() {
+  if [ "${WEBSITE_INCLUDE_SKINDESIGNER}" != "true" ]; then
+    return
+  fi
+
+  bootstrap_local_cn1_snapshots
+
+  echo "Building Skin Designer JavaScript bundle for website..." >&2
+  (
+    cd "${REPO_ROOT}/scripts/skindesigner"
+    if [ "${WEBSITE_BOOTSTRAP_CN1_SNAPSHOTS}" = "true" ]; then
+      activate_bootstrapped_java17
+    fi
+
+    run_skindesigner_mvn() {
+      if command -v xvfb-run >/dev/null 2>&1; then
+        xvfb-run -a sh ./mvnw "$@"
+      else
+        sh ./mvnw "$@"
+      fi
+    }
+
+    set_cn1_user_token "Skin Designer"
+    local skindesigner_workspace_args=()
+    if [ "${WEBSITE_BOOTSTRAP_CN1_SNAPSHOTS}" = "true" ]; then
+      skindesigner_workspace_args+=(-Dcn1.localWorkspace=true)
+    fi
+
+    run_skindesigner_mvn -q -U -pl javascript -am \
+      "${skindesigner_workspace_args[@]}" \
+      -DskipTests \
+      -Dautomated=true \
+      -Dcodename1.platform=javascript \
+      package
+  )
+
+  local output_dir="${WEBSITE_DIR}/static/skindesigner-app"
+  local result_zip="${REPO_ROOT}/scripts/skindesigner/javascript/target/result.zip"
+  if [ ! -f "${result_zip}" ]; then
+    result_zip="$(ls -1 "${REPO_ROOT}"/scripts/skindesigner/javascript/target/skindesigner-javascript-*.zip 2>/dev/null | head -n1 || true)"
+  fi
+
+  if [ -z "${result_zip}" ] || [ ! -f "${result_zip}" ]; then
+    echo "Could not locate Skin Designer JavaScript build zip output in scripts/skindesigner/javascript/target." >&2
+    exit 1
+  fi
+
+  rm -rf "${output_dir}"
+  mkdir -p "${output_dir}"
+  unzip -q -o "${result_zip}" -d "${output_dir}"
+
+  if [ ! -f "${output_dir}/index.html" ]; then
+    echo "Skin Designer website bundle is missing index.html after extraction." >&2
+    exit 1
+  fi
+}
+
 if ! command -v "${HUGO_BIN}" >/dev/null 2>&1; then
   echo "Hugo binary not found. Install Hugo (extended) and retry." >&2
   exit 1
@@ -674,6 +741,7 @@ build_javadocs_for_site
 build_developer_guide_for_site
 build_initializr_for_site
 build_playground_for_site
+build_skindesigner_for_site
 
 cd "${WEBSITE_DIR}"
 
