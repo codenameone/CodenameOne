@@ -1,0 +1,51 @@
+name: Test JavaSE simulator integration scripts
+
+on:
+  pull_request:
+    paths:
+      - 'Ports/JavaSE/**'
+      - '!Ports/JavaSE/**/*.md'
+  push:
+    branches: [ master ]
+    paths:
+      - 'Ports/JavaSE/**'
+      - '!Ports/JavaSE/**/*.md'
+
+jobs:
+  javase-simulator-tests:
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+      GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set TMPDIR
+        run: echo "TMPDIR=${{ runner.temp }}" >> "$GITHUB_ENV"
+
+      - name: Cache codenameone-tools
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/codenameone-tools
+          key: ${{ runner.os }}-cn1-tools-${{ hashFiles('scripts/setup-workspace.sh') }}
+          restore-keys: |
+            ${{ runner.os }}-cn1-tools-
+
+      - name: Setup workspace
+        run: ./scripts/setup-workspace.sh -q -DskipTests
+
+      - name: Run JavaSE simulator integration screenshot tests
+        run: ./scripts/run-javase-simulator-integration-tests.sh
+
+      - name: Upload JavaSE simulator artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: javase-simulator-tests
+          path: artifacts/javase-simulator-tests
+          if-no-files-found: warn
+          retention-days: 14
