@@ -2750,7 +2750,7 @@ public final class FontImage extends Image {
     public static final char MATERIAL_GITE = '\uE58B';
     /// Material design icon font character code see
     /// https://www.material.io/resources/icons/ for full list
-    // public static final char MATERIAL_GOAT = '\u10FFFD';
+    // MATERIAL_GOAT omitted: U+10FFFD is outside the Java char range.
     /// Material design icon font character code see
     /// https://www.material.io/resources/icons/ for full list
     public static final char MATERIAL_GOLF_COURSE = '\uEB45';

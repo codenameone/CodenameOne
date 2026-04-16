@@ -28,6 +28,7 @@ CONSTANT_DOC = (
 )
 CONSTANT_RE = re.compile(r"^\s*public static final char MATERIAL_")
 SENTINEL = "    private static Font materialDesignFont;"
+MAX_JAVA_CHAR_CODEPOINT = 0xFFFF
 
 
 def download_text(url: str) -> str:
@@ -61,13 +62,28 @@ def parse_codepoints(codepoints_text: str) -> list[tuple[str, str]]:
     return out
 
 
-def generate_constants_block(entries: list[tuple[str, str]]) -> str:
+def java_char_literal(codepoint: str) -> str | None:
+    value = int(codepoint, 16)
+    if value > MAX_JAVA_CHAR_CODEPOINT:
+        return None
+    return f"\\u{value:04X}"
+
+
+def generate_constants_block(entries: list[tuple[str, str]]) -> tuple[str, list[tuple[str, str]]]:
     lines: list[str] = []
+    skipped: list[tuple[str, str]] = []
     for icon_name, codepoint in entries:
         const_name = material_constant_name(icon_name)
+        char_literal = java_char_literal(codepoint)
+        if char_literal is None:
+            skipped.append((const_name, codepoint.upper()))
+            lines.append(
+                f"    // {const_name} omitted: U+{codepoint.upper()} is outside the Java char range."
+            )
+            continue
         lines.append(CONSTANT_DOC.rstrip("\n"))
-        lines.append(f"    public static final char {const_name} = '\\u{codepoint.upper()}';")
-    return "\n".join(lines) + "\n"
+        lines.append(f"    public static final char {const_name} = '{char_literal}';")
+    return "\n".join(lines) + "\n", skipped
 
 
 def is_material_constant_doc_line(line: str) -> bool:
@@ -126,7 +142,15 @@ def main() -> int:
     remote_font = download_bytes(MATERIAL_FONT_URL)
     codepoints = download_text(MATERIAL_CODEPOINTS_URL)
     entries = parse_codepoints(codepoints)
-    constants_block = generate_constants_block(entries)
+    constants_block, skipped = generate_constants_block(entries)
+    if skipped:
+        skipped_names = ", ".join(
+            f"{const_name} (U+{codepoint})" for const_name, codepoint in skipped
+        )
+        print(
+            "Skipping Material icons that cannot be represented as Java char constants: "
+            f"{skipped_names}"
+        )
 
     font_changed = update_font(remote_font, check_only=args.check)
     constants_changed = update_fontimage(constants_block, check_only=args.check)
