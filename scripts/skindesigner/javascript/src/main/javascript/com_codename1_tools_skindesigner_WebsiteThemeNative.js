@@ -7,12 +7,22 @@ var o = {};
             var parentWindow = (window.parent && window.parent !== window) ? window.parent : null;
             var parentDoc = parentWindow && parentWindow.document ? parentWindow.document : null;
             var parentBody = parentDoc && parentDoc.body ? parentDoc.body : null;
+            var parentHtml = parentDoc && parentDoc.documentElement ? parentDoc.documentElement : null;
             var classes = parentBody && parentBody.classList ? parentBody.classList : null;
+            var htmlClasses = parentHtml && parentHtml.classList ? parentHtml.classList : null;
             if (classes) {
                 if (classes.contains("dark") || classes.contains("cn1-skindesigner-dark")) {
                     return true;
                 }
                 if (classes.contains("light") || classes.contains("cn1-skindesigner-light")) {
+                    return false;
+                }
+            }
+            if (htmlClasses) {
+                if (htmlClasses.contains("dark") || htmlClasses.contains("cn1-skindesigner-dark")) {
+                    return true;
+                }
+                if (htmlClasses.contains("light") || htmlClasses.contains("cn1-skindesigner-light")) {
                     return false;
                 }
             }
@@ -23,6 +33,15 @@ var o = {};
                     return true;
                 }
                 if (pref === "light") {
+                    return false;
+                }
+            }
+            if (window.localStorage) {
+                var localPref = window.localStorage.getItem("pref-theme");
+                if (localPref === "dark") {
+                    return true;
+                }
+                if (localPref === "light") {
                     return false;
                 }
             }

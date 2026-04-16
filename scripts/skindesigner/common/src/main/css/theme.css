@@ -22,6 +22,80 @@ SkinDesignerTabsContainerDark {
     border: none;
 }
 
+SkinDesignerTabBar {
+    background: #eef3ff;
+    border: none;
+    padding: 0.4mm;
+}
+
+SkinDesignerTabBarDark {
+    background: #0a111d;
+    border: none;
+    padding: 0.4mm;
+}
+
+SkinDesignerTabButton {
+    background: #f3f4f7;
+    color: #112247;
+    border: 1px solid #d9dee8;
+    margin: 0.2mm;
+    padding: 0.9mm;
+}
+
+SkinDesignerTabButtonDark {
+    background: #102b66;
+    color: #f5f8ff;
+    border: 1px solid #4c6ea8;
+    margin: 0.2mm;
+    padding: 0.9mm;
+}
+
+SkinDesignerTabButtonSelected {
+    background: #ffffff;
+    color: #112247;
+    border: 2px solid #2f6bff;
+    margin: 0.2mm;
+    padding: 0.9mm;
+}
+
+SkinDesignerTabButtonSelectedDark {
+    background: #163575;
+    color: #f5f8ff;
+    border: 2px solid #4d86ff;
+    margin: 0.2mm;
+    padding: 0.9mm;
+}
+
+Toolbar {
+    background: #eef3ff;
+}
+
+ToolbarDark {
+    background: #0a111d;
+}
+
+Title {
+    color: #112247;
+    background: #eef3ff;
+    font-family: "native:MainLight";
+}
+
+TitleDark {
+    color: #f5f8ff;
+    background: #0a111d;
+    font-family: "native:MainLight";
+}
+
+Command {
+    color: #112247;
+    background: transparent;
+}
+
+CommandDark {
+    color: #f5f8ff;
+    background: transparent;
+}
+
 Tab {
     background: #f3f4f7;
     color: #112247;

@@ -20,6 +20,7 @@ import com.codename1.system.NativeLookup;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.Button;
 import com.codename1.ui.Command;
+import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Graphics;
@@ -64,6 +65,7 @@ public class SkinDesigner extends Lifecycle {
         ImageSettings imPortrait = createImageSettings("/skin.png", "port", vl);
         ImageSettings imLandscape = createImageSettings("/skin_l.png", "lan", vl);
 
+        details.hideTabs();
         skinDesignerForm.add(BorderLayout.CENTER, details);
 
         Picker nativeTheme = new Picker();
@@ -166,6 +168,39 @@ public class SkinDesigner extends Lifecycle {
         details.setTabSelectedIcon(0, portraitIconSel);
         details.setTabSelectedIcon(1, landscapeIconSel);
         details.setTabSelectedIcon(2, settingsIconSel);
+        Button portraitTab = new Button(portraitIconSel);
+        portraitTab.setUIID("SkinDesignerTabButtonSelected");
+        Button landscapeTab = new Button(landscapeIcon);
+        landscapeTab.setUIID("SkinDesignerTabButton");
+        Button settingsTab = new Button(settingsIcon);
+        settingsTab.setUIID("SkinDesignerTabButton");
+        Container customTabBar = GridLayout.encloseIn(3, portraitTab, landscapeTab, settingsTab);
+        customTabBar.setUIID("SkinDesignerTabBar");
+        skinDesignerForm.add(BorderLayout.NORTH, customTabBar);
+
+        Runnable refreshCustomTabs = () -> {
+            int selectedIndex = details.getSelectedIndex();
+            portraitTab.setIcon(selectedIndex == 0 ? portraitIconSel : portraitIcon);
+            landscapeTab.setIcon(selectedIndex == 1 ? landscapeIconSel : landscapeIcon);
+            settingsTab.setIcon(selectedIndex == 2 ? settingsIconSel : settingsIcon);
+            portraitTab.setUIID(selectedIndex == 0 ? "SkinDesignerTabButtonSelected" : "SkinDesignerTabButton");
+            landscapeTab.setUIID(selectedIndex == 1 ? "SkinDesignerTabButtonSelected" : "SkinDesignerTabButton");
+            settingsTab.setUIID(selectedIndex == 2 ? "SkinDesignerTabButtonSelected" : "SkinDesignerTabButton");
+            portraitTab.getParent().revalidate();
+        };
+        portraitTab.addActionListener(e -> {
+            details.setSelectedIndex(0);
+            refreshCustomTabs.run();
+        });
+        landscapeTab.addActionListener(e -> {
+            details.setSelectedIndex(1);
+            refreshCustomTabs.run();
+        });
+        settingsTab.addActionListener(e -> {
+            details.setSelectedIndex(2);
+            refreshCustomTabs.run();
+        });
+        details.addSelectionListener((oldSelected, newSelected) -> refreshCustomTabs.run());
         vl.addConstraint(smallFontSize, new NumericConstraint(false, 5, 400, "Font size must be a valid integer in the 5-400 range")).
                 addConstraint(mediumFontSize, new NumericConstraint(false, 5, 400, "Font size must be a valid integer in the 5-400 range")).
                 addConstraint(largeFontSize, new NumericConstraint(false, 5, 400, "Font size must be a valid integer in the 5-400 range")).
@@ -224,6 +259,7 @@ public class SkinDesigner extends Lifecycle {
                     });
         }
 
+        refreshCustomTabs.run();
         initWebsiteThemeSync(skinDesignerForm);
         skinDesignerForm.show();
     }
@@ -263,7 +299,7 @@ public class SkinDesigner extends Lifecycle {
 
     private void applyWebsiteTheme(Container component, boolean dark) {
         for (int i = 0; i < component.getComponentCount(); i++) {
-            com.codename1.ui.Component child = component.getComponentAt(i);
+            Component child = component.getComponentAt(i);
             String uiid = child.getUIID();
             String themed = themedUiid(uiid, dark);
             if (uiid != null && !uiid.equals(themed)) {
@@ -294,6 +330,12 @@ public class SkinDesigner extends Lifecycle {
                 case "SkinDesignerCard":
                 case "SkinDesignerField":
                 case "SkinDesignerFieldLabel":
+                case "SkinDesignerTabBar":
+                case "SkinDesignerTabButton":
+                case "SkinDesignerTabButtonSelected":
+                case "Toolbar":
+                case "Title":
+                case "Command":
                 case "Tab":
                 case "TabSelected":
                 case "TabsContainer":
@@ -312,6 +354,12 @@ public class SkinDesigner extends Lifecycle {
             case "SkinDesignerCard":
             case "SkinDesignerField":
             case "SkinDesignerFieldLabel":
+            case "SkinDesignerTabBar":
+            case "SkinDesignerTabButton":
+            case "SkinDesignerTabButtonSelected":
+            case "Toolbar":
+            case "Title":
+            case "Command":
             case "Tab":
             case "TabSelected":
             case "TabsContainer":
