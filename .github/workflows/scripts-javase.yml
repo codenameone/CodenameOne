@@ -36,6 +36,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup JDK 8
+        uses: actions/setup-java@v4
+        with:
+          java-version: '8'
+          distribution: 'zulu'
+
       - name: Set TMPDIR
         run: echo "TMPDIR=${{ runner.temp }}" >> "$GITHUB_ENV"
 

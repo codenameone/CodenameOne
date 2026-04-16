@@ -34,6 +34,37 @@ if [ -z "$JAVAC_BIN" ] || [ ! -x "$JAVAC_BIN" ]; then
   exit 2
 fi
 
+detect_java8_home() {
+  local candidate="" version_raw="" major=""
+  for candidate in \
+    "${JAVA_HOME:-}" \
+    "${JAVA8_HOME:-}" \
+    "${JAVA_HOME_8_X64:-}" \
+    "${JAVA_HOME_8:-}" \
+    "/usr/lib/jvm/java-8-openjdk-amd64" \
+    "/usr/lib/jvm/temurin-8-jdk-amd64" \
+    "/usr/lib/jvm/zulu8-ca-amd64"; do
+    [ -n "$candidate" ] || continue
+    [ -x "$candidate/bin/javac" ] || continue
+    version_raw="$("$candidate/bin/javac" -version 2>&1 | head -n1 | sed -E 's/.* ([0-9]+(\.[0-9]+)*).*/\1/' || true)"
+    major="${version_raw%%.*}"
+    if [ "$major" = "1" ]; then
+      major="$(echo "$version_raw" | cut -d. -f2)"
+    fi
+    if [ "$major" = "8" ]; then
+      echo "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
+JAVA8_HOME_DETECTED="$(detect_java8_home || true)"
+if [ -z "$JAVA8_HOME_DETECTED" ]; then
+  js_log "Unable to locate a Java 8 JDK for ant build (required for source/target 6 modules)." >&2
+  exit 2
+fi
+
 cn1ss_setup "$JAVA_BIN" "$SCRIPT_DIR/common/java"
 
 ARTIFACTS_BASE="${ARTIFACTS_DIR:-${GITHUB_WORKSPACE:-$REPO_ROOT}/artifacts}"
@@ -48,7 +79,8 @@ SCREENSHOT_REF_DIR="$SCRIPT_DIR/javase/screenshots"
 ensure_dir "$SCREENSHOT_REF_DIR"
 
 js_log "Ensuring JavaSE port is built"
-ant -noinput -buildfile Ports/JavaSE/build.xml jar
+js_log "Using Java 8 for ant build: $JAVA8_HOME_DETECTED"
+JAVA_HOME="$JAVA8_HOME_DETECTED" PATH="$JAVA8_HOME_DETECTED/bin:$PATH" ant -noinput -buildfile Ports/JavaSE/build.xml jar
 
 CN1_CLASSPATH="CodenameOne/dist/CodenameOne.jar:Ports/JavaSE/dist/JavaSE.jar:Ports/CLDC11/dist/CLDC11.jar"
 if [ -d "Ports/JavaSE/dist/lib" ]; then
