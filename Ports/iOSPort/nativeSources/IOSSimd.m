@@ -1263,6 +1263,34 @@ JAVA_VOID com_codename1_impl_ios_IOSSimd_unpackBytesInterleaved4___byte_1ARRAY_i
     }
 }
 
+JAVA_INT com_codename1_impl_ios_IOSSimd_unpackLookupBytesInterleaved4___byte_1ARRAY_byte_1ARRAY_int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT table, JAVA_OBJECT src, JAVA_INT srcOffset, JAVA_OBJECT dst0, JAVA_OBJECT dst1, JAVA_OBJECT dst2, JAVA_OBJECT dst3, JAVA_INT length) {
+    JAVA_ARRAY_BYTE* t = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)table)->data;
+    JAVA_ARRAY_BYTE* s = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)src)->data;
+    JAVA_ARRAY_BYTE* d0 = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)dst0)->data;
+    JAVA_ARRAY_BYTE* d1 = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)dst1)->data;
+    JAVA_ARRAY_BYTE* d2 = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)dst2)->data;
+    JAVA_ARRAY_BYTE* d3 = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)dst3)->data;
+    int tableLen = ((JAVA_ARRAY)table)->length;
+    JAVA_INT orValue = 0;
+    for (int i = 0; i < length; i++) {
+        int srcIndex = srcOffset + i * 4;
+        int idx0 = s[srcIndex] & 0xff;
+        int idx1 = s[srcIndex + 1] & 0xff;
+        int idx2 = s[srcIndex + 2] & 0xff;
+        int idx3 = s[srcIndex + 3] & 0xff;
+        JAVA_ARRAY_BYTE v0 = idx0 < tableLen ? t[idx0] : 0;
+        JAVA_ARRAY_BYTE v1 = idx1 < tableLen ? t[idx1] : 0;
+        JAVA_ARRAY_BYTE v2 = idx2 < tableLen ? t[idx2] : 0;
+        JAVA_ARRAY_BYTE v3 = idx3 < tableLen ? t[idx3] : 0;
+        d0[i] = v0;
+        d1[i] = v1;
+        d2[i] = v2;
+        d3[i] = v3;
+        orValue |= v0 | v1 | v2 | v3;
+    }
+    return orValue;
+}
+
 JAVA_VOID com_codename1_impl_ios_IOSSimd_add___int_1ARRAY_int_int_1ARRAY_int_int_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT srcA, JAVA_INT srcAOffset, JAVA_OBJECT srcB, JAVA_INT srcBOffset, JAVA_OBJECT dst, JAVA_INT dstOffset, JAVA_INT length) {
     JAVA_ARRAY_INT* a = (JAVA_ARRAY_INT*)((JAVA_ARRAY)srcA)->data;
     JAVA_ARRAY_INT* b = (JAVA_ARRAY_INT*)((JAVA_ARRAY)srcB)->data;

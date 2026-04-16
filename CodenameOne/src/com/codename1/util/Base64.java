@@ -590,16 +590,6 @@ public abstract class Base64 {
         simd.lookupBytes(encodeMap, indices, ascii, 0, SIMD_BYTE_LANES);
     }
 
-    private static boolean mapAsciiToSixBitValues(Simd simd, byte[] ascii, byte[] values, byte[] decodeMap) {
-        simd.lookupBytes(decodeMap, ascii, values, 0, SIMD_BYTE_LANES);
-        for (int i = 0; i < SIMD_BYTE_LANES; i++) {
-            if (values[i] < 0) {
-                return false;
-            }
-        }
-        return true;
-    }
-
     /// SIMD-optimized Base64 encoding with explicit offsets and caller scratch.
     /// Uses generic Simd int-domain operations to extract 6-bit indices and
     /// map them to ASCII via branchless compare/select.
@@ -742,11 +732,7 @@ public abstract class Base64 {
 
         int simdEnd = fullEnd - SIMD_BYTE_LANES * 4 + 1;
         while (si < simdEnd) {
-            simd.unpackBytesInterleaved4(in, si, bs.lane0, bs.lane1, bs.lane2, bs.lane3, SIMD_BYTE_LANES);
-            if (!mapAsciiToSixBitValues(simd, bs.lane0, bs.out0, decodeMap)
-                    || !mapAsciiToSixBitValues(simd, bs.lane1, bs.out1, decodeMap)
-                    || !mapAsciiToSixBitValues(simd, bs.lane2, bs.out2, decodeMap)
-                    || !mapAsciiToSixBitValues(simd, bs.lane3, bs.out3, decodeMap)) {
+            if (simd.unpackLookupBytesInterleaved4(decodeMap, in, si, bs.out0, bs.out1, bs.out2, bs.out3, SIMD_BYTE_LANES) < 0) {
                 return -1;
             }
 

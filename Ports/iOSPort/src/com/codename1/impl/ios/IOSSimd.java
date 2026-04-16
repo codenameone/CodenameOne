@@ -240,6 +240,9 @@ public class IOSSimd extends Simd {
     public native void unpackBytesInterleaved4(byte[] src, int srcOffset, byte[] dst0, byte[] dst1, byte[] dst2, byte[] dst3, int length);
 
     @Override
+    public native int unpackLookupBytesInterleaved4(byte[] table, byte[] src, int srcOffset, byte[] dst0, byte[] dst1, byte[] dst2, byte[] dst3, int length);
+
+    @Override
     public native void add(int[] srcA, int srcAOffset, int[] srcB, int srcBOffset, int[] dst, int dstOffset, int length);
 
     @Override

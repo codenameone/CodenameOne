@@ -116,6 +116,29 @@ class SimdTest extends UITestBase {
         assertEquals(11, lookedUp[1]);
         assertEquals(33, lookedUp[2]);
         assertEquals(0, lookedUp[3]);
+
+        byte[] unpacked0 = new byte[2];
+        byte[] unpacked1 = new byte[2];
+        byte[] unpacked2 = new byte[2];
+        byte[] unpacked3 = new byte[2];
+        int lookupOr = simd.unpackLookupBytesInterleaved4(
+                new byte[]{10, 20, 30, 40, -1},
+                new byte[]{3, 1, 0, 2, 4, 0, 1, 2},
+                0,
+                unpacked0,
+                unpacked1,
+                unpacked2,
+                unpacked3,
+                2);
+        assertEquals(40, unpacked0[0]);
+        assertEquals(20, unpacked1[0]);
+        assertEquals(10, unpacked2[0]);
+        assertEquals(30, unpacked3[0]);
+        assertEquals(-1, unpacked0[1]);
+        assertEquals(10, unpacked1[1]);
+        assertEquals(20, unpacked2[1]);
+        assertEquals(30, unpacked3[1]);
+        assertTrue(lookupOr < 0);
     }
 
     @FormTest

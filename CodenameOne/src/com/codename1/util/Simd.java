@@ -296,6 +296,31 @@ public class Simd {
         }
     }
 
+    /// Unpacks interleaved bytes, looks each byte up in the provided table, stores the
+    /// looked-up values into separate lane arrays, and returns the bitwise OR of all
+    /// written values.
+    public int unpackLookupBytesInterleaved4(byte[] table, byte[] src, int srcOffset, byte[] dst0, byte[] dst1, byte[] dst2, byte[] dst3, int length) {
+        int or = 0;
+        int tableLength = table.length;
+        for (int i = 0; i < length; i++) {
+            int srcIndex = srcOffset + i * 4;
+            int idx0 = src[srcIndex] & 0xff;
+            int idx1 = src[srcIndex + 1] & 0xff;
+            int idx2 = src[srcIndex + 2] & 0xff;
+            int idx3 = src[srcIndex + 3] & 0xff;
+            byte v0 = idx0 < tableLength ? table[idx0] : 0;
+            byte v1 = idx1 < tableLength ? table[idx1] : 0;
+            byte v2 = idx2 < tableLength ? table[idx2] : 0;
+            byte v3 = idx3 < tableLength ? table[idx3] : 0;
+            dst0[i] = v0;
+            dst1[i] = v1;
+            dst2[i] = v2;
+            dst3[i] = v3;
+            or |= v0 | v1 | v2 | v3;
+        }
+        return or;
+    }
+
     /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void packIntToByteSaturating(int[] src, byte[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
