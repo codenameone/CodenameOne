@@ -11,7 +11,6 @@
     <iframe
       id="cn1-skindesigner-frame"
       class="cn1-skindesigner-frame"
-      data-base-src="/skindesigner-app/"
       title="Codename One Skin Designer"
       loading="eager">
     </iframe>
@@ -158,6 +157,7 @@ body.cn1-skindesigner-page-body .main {
   var loader = document.getElementById("cn1-skindesigner-loader");
   var siteHeader = document.querySelector(".header");
   var mediaQuery = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+  var skinDesignerBasePath = "/skindesigner-app/";
 
   function syncHeight() {
     var h = siteHeader ? siteHeader.offsetHeight : 76;
@@ -187,8 +187,7 @@ body.cn1-skindesigner-page-body .main {
     if (!frame) {
       return;
     }
-    var base = frame.getAttribute("data-base-src") || "/skindesigner-app/";
-    var target = base + (base.indexOf("?") >= 0 ? "&" : "?") + "theme=" + (dark ? "dark" : "light");
+    var target = skinDesignerBasePath + "?theme=" + (dark ? "dark" : "light");
     var current = frame.getAttribute("src");
     if (current !== target) {
       frame.setAttribute("src", target);
