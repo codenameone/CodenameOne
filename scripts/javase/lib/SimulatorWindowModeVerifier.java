@@ -37,6 +37,7 @@ public class SimulatorWindowModeVerifier {
 
         System.setProperty("cn1.javase.implementation", "jmf");
         prepareCodenameOneSettings();
+        SecurityManager originalSecurityManager = installNoExitSecurityManagerIfNeeded();
 
         Thread simulatorThread = new Thread(() -> {
             try {
@@ -71,6 +72,7 @@ public class SimulatorWindowModeVerifier {
 
         closeAllWindows();
         sleep(500);
+        restoreSecurityManager(originalSecurityManager);
     }
 
     private static void waitForVisibleFrames(long timeoutMs) throws Exception {
@@ -161,6 +163,38 @@ public class SimulatorWindowModeVerifier {
                 + "codename1.vendor=CodenameOne\n";
         Files.write(settings, content.getBytes(StandardCharsets.UTF_8));
         System.setProperty("user.dir", tempProject.toAbsolutePath().toString());
+    }
+
+    private static SecurityManager installNoExitSecurityManagerIfNeeded() {
+        try {
+            SecurityManager original = System.getSecurityManager();
+            if (original == null) {
+                System.setSecurityManager(new SecurityManager() {
+                    @Override
+                    public void checkPermission(java.security.Permission perm) {
+                    }
+
+                    @Override
+                    public void checkPermission(java.security.Permission perm, Object context) {
+                    }
+
+                    @Override
+                    public void checkExit(int status) {
+                        throw new SecurityException("Intercepted System.exit(" + status + ")");
+                    }
+                });
+            }
+            return original;
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    private static void restoreSecurityManager(SecurityManager original) {
+        try {
+            System.setSecurityManager(original);
+        } catch (Throwable ignored) {
+        }
     }
 
     private static final class Args {
