@@ -15,7 +15,6 @@ import com.codename1.ui.CN;
 /// Portable SIMD API with Java fallback implementations.
 @Concrete(name = "com.codename1.impl.ios.IOSSimd")
 public class Simd {
-
     /// Returns the singleton instance of the Simd class. Equivalent to `CN.getSimd();`
     public static Simd get() {
         return CN.getSimd();
@@ -59,6 +58,14 @@ public class Simd {
             throw new IllegalArgumentException("size must be >= 16");
         }
         return new float[size];
+    }
+
+    /// Looks up values from a table using unsigned byte indices.
+    public void lookupBytes(byte[] table, byte[] indices, byte[] dst, int offset, int length) {
+        for (int i = offset, end = offset + length; i < end; i++) {
+            int idx = indices[i] & 0xff;
+            dst[i] = idx < table.length ? table[idx] : 0;
+        }
     }
 
     /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**

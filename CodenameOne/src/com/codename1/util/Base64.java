@@ -464,7 +464,8 @@ public abstract class Base64 {
     private static final int ENC_M3F = 544;
     private static final int ENC_CONST_SIZE = 560;
 
-    private static byte[] simdMask;
+    private static byte[] simdEncodeMap;
+    private static byte[] simdDecodeMap;
 
     private static int[] getSimdEncConst(Simd simd) {
         int[] c = simdEncConst;
@@ -487,14 +488,29 @@ public abstract class Base64 {
         return c;
     }
 
-    private static byte[] getSimdMask(Simd simd) {
-        byte[] m = simdMask;
-        if (m != null) {
-            return m;
+    private static byte[] getSimdEncodeMap(Simd simd) {
+        byte[] out = simdEncodeMap;
+        if (out != null) {
+            return out;
         }
-        m = simd.allocByte(64);
-        simdMask = m;
-        return m;
+        out = simd.allocByte(64);
+        System.arraycopy(map, 0, out, 0, 64);
+        simdEncodeMap = out;
+        return out;
+    }
+
+    private static byte[] getSimdDecodeMap(Simd simd) {
+        byte[] out = simdDecodeMap;
+        if (out != null) {
+            return out;
+        }
+        out = simd.allocByte(256);
+        fillRange(out, (byte) -1);
+        for (int i = 0; i < 64; i++) {
+            out[map[i] & 0xff] = (byte) i;
+        }
+        simdDecodeMap = out;
+        return out;
     }
 
     private static void fillRange(int[] arr, int offset, int len, int val) {
@@ -570,51 +586,14 @@ public abstract class Base64 {
         }
     }
 
-    private static void mapSixBitValuesToAscii(Simd simd, byte[] indices, byte[] ascii, SimdByteScratch scratch) {
-        simd.subWrapping(indices, (byte) 16, ascii, 0, SIMD_BYTE_LANES);
-        simd.subWrapping(indices, (byte) 19, scratch.tmp, 0, SIMD_BYTE_LANES);
-        simd.cmpEq(indices, (byte) 62, scratch.mask, 0, SIMD_BYTE_LANES);
-        simd.select(scratch.mask, scratch.tmp, ascii, ascii, 0, SIMD_BYTE_LANES);
-
-        simd.subWrapping(indices, (byte) 4, scratch.tmp, 0, SIMD_BYTE_LANES);
-        simd.cmpLt(indices, (byte) 62, scratch.mask, 0, SIMD_BYTE_LANES);
-        simd.select(scratch.mask, scratch.tmp, ascii, ascii, 0, SIMD_BYTE_LANES);
-
-        simd.addWrapping(indices, (byte) 71, scratch.tmp, 0, SIMD_BYTE_LANES);
-        simd.cmpLt(indices, (byte) 52, scratch.mask, 0, SIMD_BYTE_LANES);
-        simd.select(scratch.mask, scratch.tmp, ascii, ascii, 0, SIMD_BYTE_LANES);
-
-        simd.addWrapping(indices, (byte) 65, scratch.tmp, 0, SIMD_BYTE_LANES);
-        simd.cmpLt(indices, (byte) 26, scratch.mask, 0, SIMD_BYTE_LANES);
-        simd.select(scratch.mask, scratch.tmp, ascii, ascii, 0, SIMD_BYTE_LANES);
+    private static void mapSixBitValuesToAscii(Simd simd, byte[] indices, byte[] ascii, byte[] encodeMap) {
+        simd.lookupBytes(encodeMap, indices, ascii, 0, SIMD_BYTE_LANES);
     }
 
-    private static boolean mapAsciiToSixBitValues(Simd simd, byte[] ascii, byte[] values, SimdByteScratch scratch) {
-        simd.subWrapping(ascii, (byte) 'A', values, 0, SIMD_BYTE_LANES);
-        simd.cmpRange(ascii, (byte) 'A', (byte) 'Z', scratch.valid, 0, SIMD_BYTE_LANES);
-
-        simd.subWrapping(ascii, (byte) 71, scratch.tmp, 0, SIMD_BYTE_LANES);
-        simd.cmpRange(ascii, (byte) 'a', (byte) 'z', scratch.mask, 0, SIMD_BYTE_LANES);
-        simd.select(scratch.mask, scratch.tmp, values, values, 0, SIMD_BYTE_LANES);
-        simd.or(scratch.valid, scratch.mask, scratch.valid, 0, SIMD_BYTE_LANES);
-
-        simd.addWrapping(ascii, (byte) 4, scratch.tmp, 0, SIMD_BYTE_LANES);
-        simd.cmpRange(ascii, (byte) '0', (byte) '9', scratch.mask, 0, SIMD_BYTE_LANES);
-        simd.select(scratch.mask, scratch.tmp, values, values, 0, SIMD_BYTE_LANES);
-        simd.or(scratch.valid, scratch.mask, scratch.valid, 0, SIMD_BYTE_LANES);
-
-        simd.addWrapping(ascii, (byte) 19, scratch.tmp, 0, SIMD_BYTE_LANES);
-        simd.cmpEq(ascii, (byte) '+', scratch.mask, 0, SIMD_BYTE_LANES);
-        simd.select(scratch.mask, scratch.tmp, values, values, 0, SIMD_BYTE_LANES);
-        simd.or(scratch.valid, scratch.mask, scratch.valid, 0, SIMD_BYTE_LANES);
-
-        simd.addWrapping(ascii, (byte) 16, scratch.tmp, 0, SIMD_BYTE_LANES);
-        simd.cmpEq(ascii, (byte) '/', scratch.mask, 0, SIMD_BYTE_LANES);
-        simd.select(scratch.mask, scratch.tmp, values, values, 0, SIMD_BYTE_LANES);
-        simd.or(scratch.valid, scratch.mask, scratch.valid, 0, SIMD_BYTE_LANES);
-
+    private static boolean mapAsciiToSixBitValues(Simd simd, byte[] ascii, byte[] values, byte[] decodeMap) {
+        simd.lookupBytes(decodeMap, ascii, values, 0, SIMD_BYTE_LANES);
         for (int i = 0; i < SIMD_BYTE_LANES; i++) {
-            if (scratch.valid[i] == 0) {
+            if (values[i] < 0) {
                 return false;
             }
         }
@@ -640,6 +619,7 @@ public abstract class Base64 {
         requireScratch(scratch);
         Simd simd = Simd.get();
         SimdByteScratch bs = getSimdByteScratch(simd);
+        byte[] encodeMap = getSimdEncodeMap(simd);
 
         int end3 = inOffset + inLength - (inLength % 3);
         int si = inOffset;
@@ -663,10 +643,10 @@ public abstract class Base64 {
 
             simd.and(bs.lane2, bs.const3F, bs.out3, 0, SIMD_BYTE_LANES);
 
-            mapSixBitValuesToAscii(simd, bs.out0, bs.lane0, bs);
-            mapSixBitValuesToAscii(simd, bs.out1, bs.lane1, bs);
-            mapSixBitValuesToAscii(simd, bs.out2, bs.lane2, bs);
-            mapSixBitValuesToAscii(simd, bs.out3, bs.lane3, bs);
+            mapSixBitValuesToAscii(simd, bs.out0, bs.lane0, encodeMap);
+            mapSixBitValuesToAscii(simd, bs.out1, bs.lane1, encodeMap);
+            mapSixBitValuesToAscii(simd, bs.out2, bs.lane2, encodeMap);
+            mapSixBitValuesToAscii(simd, bs.out3, bs.lane3, encodeMap);
 
             simd.packBytesInterleaved4(bs.lane0, bs.lane1, bs.lane2, bs.lane3, out, di, SIMD_BYTE_LANES);
 
@@ -734,6 +714,7 @@ public abstract class Base64 {
             return -1;
         }
         requireScratch(scratch);
+        Simd simd = Simd.get();
 
         int pad = 0;
         if (in[inOffset + inLength - 1] == '=') {
@@ -750,8 +731,8 @@ public abstract class Base64 {
             return 0;
         }
 
-        Simd simd = Simd.get();
         SimdByteScratch bs = getSimdByteScratch(simd);
+        byte[] decodeMap = getSimdDecodeMap(simd);
         int[] decodeMapLocal = decodeMapInt;
 
         int fullLen = inLength - (pad > 0 ? 4 : 0);
@@ -762,10 +743,10 @@ public abstract class Base64 {
         int simdEnd = fullEnd - SIMD_BYTE_LANES * 4 + 1;
         while (si < simdEnd) {
             simd.unpackBytesInterleaved4(in, si, bs.lane0, bs.lane1, bs.lane2, bs.lane3, SIMD_BYTE_LANES);
-            if (!mapAsciiToSixBitValues(simd, bs.lane0, bs.out0, bs)
-                    || !mapAsciiToSixBitValues(simd, bs.lane1, bs.out1, bs)
-                    || !mapAsciiToSixBitValues(simd, bs.lane2, bs.out2, bs)
-                    || !mapAsciiToSixBitValues(simd, bs.lane3, bs.out3, bs)) {
+            if (!mapAsciiToSixBitValues(simd, bs.lane0, bs.out0, decodeMap)
+                    || !mapAsciiToSixBitValues(simd, bs.lane1, bs.out1, decodeMap)
+                    || !mapAsciiToSixBitValues(simd, bs.lane2, bs.out2, decodeMap)
+                    || !mapAsciiToSixBitValues(simd, bs.lane3, bs.out3, decodeMap)) {
                 return -1;
             }
 

@@ -109,6 +109,13 @@ class SimdTest extends UITestBase {
         assertEquals(30, permuted[1]);
         assertEquals(20, permuted[2]);
         assertEquals(0, permuted[3]);
+
+        byte[] lookedUp = new byte[4];
+        simd.lookupBytes(new byte[]{11, 22, 33, 44}, new byte[]{3, 0, 2, 9}, lookedUp, 0, 4);
+        assertEquals(44, lookedUp[0]);
+        assertEquals(11, lookedUp[1]);
+        assertEquals(33, lookedUp[2]);
+        assertEquals(0, lookedUp[3]);
     }
 
     @FormTest

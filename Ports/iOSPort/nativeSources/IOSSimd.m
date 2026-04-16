@@ -50,6 +50,19 @@ JAVA_OBJECT com_codename1_impl_ios_IOSSimd_allocFloatNative___int_R_float_1ARRAY
     return allocArrayAligned(threadStateData, size, &class_array1__JAVA_FLOAT, sizeof(JAVA_ARRAY_FLOAT), 1, 16);
 }
 
+JAVA_VOID com_codename1_impl_ios_IOSSimd_lookupBytes___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT table, JAVA_OBJECT indices, JAVA_OBJECT dst, JAVA_INT offset, JAVA_INT length) {
+    JAVA_ARRAY_BYTE* t = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)table)->data;
+    JAVA_ARRAY_BYTE* idx = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)indices)->data;
+    JAVA_ARRAY_BYTE* d = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)dst)->data;
+    int tableLen = ((JAVA_ARRAY)table)->length;
+    int i = offset;
+    int end = offset + length;
+    for (; i < end; i++) {
+        int lookupIndex = idx[i] & 0xff;
+        d[i] = lookupIndex < tableLen ? t[lookupIndex] : 0;
+    }
+}
+
 JAVA_VOID com_codename1_impl_ios_IOSSimd_add___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT srcA, JAVA_OBJECT srcB, JAVA_OBJECT dst, JAVA_INT offset, JAVA_INT length) {
     JAVA_ARRAY_BYTE* a = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)srcA)->data;
     JAVA_ARRAY_BYTE* b = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)srcB)->data;

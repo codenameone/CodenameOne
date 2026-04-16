@@ -39,6 +39,9 @@ public class IOSSimd extends Simd {
     }
 
     @Override
+    public native void lookupBytes(byte[] table, byte[] indices, byte[] dst, int offset, int length);
+
+    @Override
     public native void add(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length);
 
     @Override
