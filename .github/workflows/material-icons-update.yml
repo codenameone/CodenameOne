@@ -2,6 +2,7 @@ name: Material Icons Update
 
 on:
   schedule:
+    # Weekly on Mondays at 06:00 UTC.
     - cron: '0 6 * * 1'
   workflow_dispatch:
   pull_request:
@@ -10,6 +11,7 @@ on:
       - '.github/scripts/update_material_icons.py'
 
 permissions:
+  actions: write
   contents: write
   pull-requests: write
 
@@ -32,6 +34,7 @@ jobs:
 
       - name: Create pull request
         if: github.event_name != 'pull_request'
+        id: create-pull-request
         uses: peter-evans/create-pull-request@v7
         with:
           commit-message: "Update Material Icons font and FontImage constants"
@@ -48,6 +51,18 @@ jobs:
           labels: |
             dependencies
             automation
+
+      - name: Trigger PR CI for generated branch
+        if: github.event_name != 'pull_request' && steps.create-pull-request.outputs.pull-request-number != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'pr.yml',
+              ref: 'automation/material-icons-update'
+            });
 
       - name: Build update preview for PR validation
         if: github.event_name == 'pull_request'

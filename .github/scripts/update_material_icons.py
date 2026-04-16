@@ -22,7 +22,10 @@ MATERIAL_CODEPOINTS_URL = (
 )
 MATERIAL_CSS_URL = "https://fonts.googleapis.com/icon?family=Material+Icons"
 
-CONSTANT_DOC = "    /// Material design icon font character code see\\n    /// https://www.material.io/resources/icons/ for full list\\n"
+CONSTANT_DOC = (
+    "    /// Material design icon font character code see\n"
+    "    /// https://www.material.io/resources/icons/ for full list\n"
+)
 CONSTANT_RE = re.compile(r"^\s*public static final char MATERIAL_")
 SENTINEL = "    private static Font materialDesignFont;"
 
@@ -67,6 +70,10 @@ def generate_constants_block(entries: list[tuple[str, str]]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def is_material_constant_doc_line(line: str) -> bool:
+    return line.lstrip().startswith("///")
+
+
 def update_fontimage(constants_block: str, check_only: bool) -> bool:
     source = FONT_IMAGE_PATH.read_text(encoding="utf-8")
     lines = source.splitlines(keepends=True)
@@ -76,6 +83,8 @@ def update_fontimage(constants_block: str, check_only: bool) -> bool:
     for i, line in enumerate(lines):
         if start_idx is None and CONSTANT_RE.match(line):
             start_idx = i
+            while start_idx > 0 and is_material_constant_doc_line(lines[start_idx - 1]):
+                start_idx -= 1
         if line.strip("\n") == SENTINEL:
             end_idx = i
             break
