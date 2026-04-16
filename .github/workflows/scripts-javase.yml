@@ -3,11 +3,23 @@ name: Test JavaSE simulator integration scripts
 on:
   pull_request:
     paths:
+      - '.github/workflows/scripts-javase.yml'
+      - 'scripts/run-javase-simulator-integration-tests.sh'
+      - 'scripts/lib/cn1ss.sh'
+      - 'scripts/common/java/**'
+      - 'scripts/javase/**'
+      - '!scripts/javase/**/*.md'
       - 'Ports/JavaSE/**'
       - '!Ports/JavaSE/**/*.md'
   push:
     branches: [ master ]
     paths:
+      - '.github/workflows/scripts-javase.yml'
+      - 'scripts/run-javase-simulator-integration-tests.sh'
+      - 'scripts/lib/cn1ss.sh'
+      - 'scripts/common/java/**'
+      - 'scripts/javase/**'
+      - '!scripts/javase/**/*.md'
       - 'Ports/JavaSE/**'
       - '!Ports/JavaSE/**/*.md'
 
