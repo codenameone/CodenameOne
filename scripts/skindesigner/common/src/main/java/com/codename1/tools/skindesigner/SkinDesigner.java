@@ -52,6 +52,7 @@ public class SkinDesigner extends Lifecycle {
     private static final String[] NATIVE_THEME_FILES = {"iOS7Theme.res", "iPhoneTheme.res",
             "android_holo_light.res","androidTheme.res", "winTheme.res"};
     private boolean websiteDarkMode;
+    private ShouldExecute nativeBridge;
 
     @Override
     public void runApp() {
@@ -65,7 +66,6 @@ public class SkinDesigner extends Lifecycle {
         ImageSettings imPortrait = createImageSettings("/skin.png", "port", vl);
         ImageSettings imLandscape = createImageSettings("/skin_l.png", "lan", vl);
 
-        details.hideTabs();
         skinDesignerForm.add(BorderLayout.CENTER, details);
 
         Picker nativeTheme = new Picker();
@@ -162,52 +162,18 @@ public class SkinDesigner extends Lifecycle {
         FontImage landscapeIconSel = FontImage.createMaterial(FontImage.MATERIAL_STAY_CURRENT_LANDSCAPE, tabSel, 4.5f);
         FontImage settingsIcon = FontImage.createMaterial(FontImage.MATERIAL_SETTINGS, tab, 3.5f);
         FontImage settingsIconSel = FontImage.createMaterial(FontImage.MATERIAL_SETTINGS, tabSel, 3.5f);
-        details.addTab("", portraitIcon, imPortrait.getContainer());
-        details.addTab("", landscapeIcon, imLandscape.getContainer());
-        details.addTab("", settingsIcon, settingsContainer);
+        details.addTab("Portrait", portraitIcon, imPortrait.getContainer());
+        details.addTab("Landscape", landscapeIcon, imLandscape.getContainer());
+        details.addTab("Settings", settingsIcon, settingsContainer);
         details.setTabSelectedIcon(0, portraitIconSel);
         details.setTabSelectedIcon(1, landscapeIconSel);
         details.setTabSelectedIcon(2, settingsIconSel);
-        Button portraitTab = new Button("Portrait", portraitIconSel);
-        portraitTab.setUIID("SkinDesignerTabButtonSelected");
-        Button landscapeTab = new Button("Landscape", landscapeIcon);
-        landscapeTab.setUIID("SkinDesignerTabButton");
-        Button settingsTab = new Button("Settings", settingsIcon);
-        settingsTab.setUIID("SkinDesignerTabButton");
-        Container customTabBar = GridLayout.encloseIn(3, portraitTab, landscapeTab, settingsTab);
-        customTabBar.setUIID("SkinDesignerTabBar");
-        skinDesignerForm.add(BorderLayout.NORTH, customTabBar);
-
-        Runnable refreshCustomTabs = () -> {
-            int selectedIndex = details.getSelectedIndex();
-            portraitTab.setIcon(selectedIndex == 0 ? portraitIconSel : portraitIcon);
-            landscapeTab.setIcon(selectedIndex == 1 ? landscapeIconSel : landscapeIcon);
-            settingsTab.setIcon(selectedIndex == 2 ? settingsIconSel : settingsIcon);
-            portraitTab.setUIID(selectedIndex == 0 ? "SkinDesignerTabButtonSelected" : "SkinDesignerTabButton");
-            landscapeTab.setUIID(selectedIndex == 1 ? "SkinDesignerTabButtonSelected" : "SkinDesignerTabButton");
-            settingsTab.setUIID(selectedIndex == 2 ? "SkinDesignerTabButtonSelected" : "SkinDesignerTabButton");
-            portraitTab.getParent().revalidate();
-        };
-        portraitTab.addActionListener(e -> {
-            details.setSelectedIndex(0);
-            refreshCustomTabs.run();
-        });
-        landscapeTab.addActionListener(e -> {
-            details.setSelectedIndex(1);
-            refreshCustomTabs.run();
-        });
-        settingsTab.addActionListener(e -> {
-            details.setSelectedIndex(2);
-            refreshCustomTabs.run();
-        });
-        details.addSelectionListener((oldSelected, newSelected) -> refreshCustomTabs.run());
         vl.addConstraint(smallFontSize, new NumericConstraint(false, 5, 400, "Font size must be a valid integer in the 5-400 range")).
                 addConstraint(mediumFontSize, new NumericConstraint(false, 5, 400, "Font size must be a valid integer in the 5-400 range")).
                 addConstraint(largeFontSize, new NumericConstraint(false, 5, 400, "Font size must be a valid integer in the 5-400 range")).
                 addConstraint(pixelRatio, new NumericConstraint(true, 0.1, 60, "PixelRatio is a positive decimal size in the range of 0.1 to 60")).
                 setShowErrorMessageForFocusedComponent(true);
 
-        ShouldExecute s = NativeLookup.create(ShouldExecute.class);
         Button helpAction = new Button("Help");
         helpAction.setUIID("SkinDesignerActionButton");
         FontImage.setMaterialIcon(helpAction, FontImage.MATERIAL_HELP);
@@ -236,7 +202,8 @@ public class SkinDesigner extends Lifecycle {
                     ToastBar.showErrorMessage("Error wring skin file " + err);
                 }
                 // in the JavaScript port this will trigger the download dialog
-                if(s != null && s.isSupported() && s.shouldExecute()) {
+                ShouldExecute bridge = resolveNativeBridgeQuietly();
+                if(bridge != null && bridge.isSupported() && bridge.shouldExecute()) {
                     Display.getInstance().execute(fs.getAppHomePath() + "skin-file.skin");
                 }
             }
@@ -268,9 +235,8 @@ public class SkinDesigner extends Lifecycle {
         actions.setUIID("SkinDesignerTabBar");
         settingsContainer.addComponent(0, actions);
 
-        refreshCustomTabs.run();
         skinDesignerForm.show();
-        initWebsiteThemeSync(skinDesignerForm, s);
+        initWebsiteThemeSync(skinDesignerForm);
     }
 
     private Label labeledFieldTitle(String text) {
@@ -285,17 +251,33 @@ public class SkinDesigner extends Lifecycle {
         }
     }
 
-    private void initWebsiteThemeSync(Form form, ShouldExecute nativeBridge) {
-        if (nativeBridge == null || !nativeBridge.isSupported()) {
-            return;
+    private ShouldExecute resolveNativeBridgeQuietly() {
+        if (nativeBridge != null) {
+            return nativeBridge;
         }
-        websiteDarkMode = nativeBridge.isDarkMode();
-        Display.getInstance().setDarkMode(websiteDarkMode);
-        applyWebsiteTheme(form, websiteDarkMode);
-        form.refreshTheme();
-        nativeBridge.notifyUiReady();
+        try {
+            nativeBridge = NativeLookup.create(ShouldExecute.class);
+        } catch (Throwable ignored) {
+            nativeBridge = null;
+        }
+        return nativeBridge;
+    }
+
+    private void initWebsiteThemeSync(Form form) {
+        ShouldExecute bridge = resolveNativeBridgeQuietly();
+        if (bridge != null && bridge.isSupported()) {
+            websiteDarkMode = bridge.isDarkMode();
+            Display.getInstance().setDarkMode(websiteDarkMode);
+            applyWebsiteTheme(form, websiteDarkMode);
+            form.refreshTheme();
+            bridge.notifyUiReady();
+        }
         UITimer.timer(900, true, form, () -> {
-            boolean dark = nativeBridge.isDarkMode();
+            ShouldExecute liveBridge = resolveNativeBridgeQuietly();
+            if (liveBridge == null || !liveBridge.isSupported()) {
+                return;
+            }
+            boolean dark = liveBridge.isDarkMode();
             if (dark != websiteDarkMode) {
                 websiteDarkMode = dark;
                 Display.getInstance().setDarkMode(dark);
