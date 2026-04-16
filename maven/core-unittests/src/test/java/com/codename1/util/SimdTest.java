@@ -146,6 +146,14 @@ class SimdTest extends UITestBase {
         assertEquals(11, offsetLookup[2]);
         assertEquals(33, offsetLookup[3]);
         assertEquals(0, offsetLookup[4]);
+
+        byte[] offsetBitwise = new byte[8];
+        simd.and(new byte[]{0, (byte)0xF3, (byte)0xCC, 0, 0}, 1, new byte[]{0, (byte)0x3F, (byte)0x0F, 0, 0}, 1, offsetBitwise, 2, 2);
+        assertEquals((byte)0x33, offsetBitwise[2]);
+        assertEquals((byte)0x0C, offsetBitwise[3]);
+        simd.or(new byte[]{0, (byte)0xF0, (byte)0xC0, 0, 0}, 1, new byte[]{0, (byte)0x0F, (byte)0x0C, 0, 0}, 1, offsetBitwise, 4, 2);
+        assertEquals((byte)0xFF, offsetBitwise[4]);
+        assertEquals((byte)0xCC, offsetBitwise[5]);
     }
 
     @FormTest
@@ -219,6 +227,19 @@ class SimdTest extends UITestBase {
         assertEquals((byte)0x00, dst[1]);
         assertEquals((byte)0x0F, dst[2]);
         assertEquals((byte)0x08, dst[3]);
+
+        byte[] offsetDst = new byte[8];
+        simd.shl(new byte[]{0, (byte)0xAB, (byte)0x01, (byte)0xFF, (byte)0x80, 0}, 1, 4, offsetDst, 2, 4);
+        assertEquals((byte)0xB0, offsetDst[2]);
+        assertEquals((byte)0x10, offsetDst[3]);
+        assertEquals((byte)0xF0, offsetDst[4]);
+        assertEquals((byte)0x00, offsetDst[5]);
+
+        simd.shrLogical(new byte[]{0, (byte)0xAB, (byte)0x01, (byte)0xFF, (byte)0x80, 0}, 1, 4, offsetDst, 0, 4);
+        assertEquals((byte)0x0A, offsetDst[0]);
+        assertEquals((byte)0x00, offsetDst[1]);
+        assertEquals((byte)0x0F, offsetDst[2]);
+        assertEquals((byte)0x08, offsetDst[3]);
     }
 
     @FormTest

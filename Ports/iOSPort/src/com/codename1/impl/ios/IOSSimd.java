@@ -42,6 +42,9 @@ public class IOSSimd extends Simd {
     public native void lookupBytes(byte[] table, byte[] indices, byte[] dst, int offset, int length);
 
     @Override
+    public native void lookupBytes(byte[] table, byte[] indices, int indicesOffset, byte[] dst, int dstOffset, int length);
+
+    @Override
     public native void add(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length);
 
     @Override
@@ -66,7 +69,13 @@ public class IOSSimd extends Simd {
     public native void and(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length);
 
     @Override
+    public native void and(byte[] srcA, int srcAOffset, byte[] srcB, int srcBOffset, byte[] dst, int dstOffset, int length);
+
+    @Override
     public native void or(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length);
+
+    @Override
+    public native void or(byte[] srcA, int srcAOffset, byte[] srcB, int srcBOffset, byte[] dst, int dstOffset, int length);
 
     @Override
     public native void xor(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length);
@@ -213,7 +222,13 @@ public class IOSSimd extends Simd {
     public native void shl(byte[] src, int bits, byte[] dst, int offset, int length);
 
     @Override
+    public native void shl(byte[] src, int srcOffset, int bits, byte[] dst, int dstOffset, int length);
+
+    @Override
     public native void shrLogical(byte[] src, int bits, byte[] dst, int offset, int length);
+
+    @Override
+    public native void shrLogical(byte[] src, int srcOffset, int bits, byte[] dst, int dstOffset, int length);
 
     @Override
     public native void addWrapping(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length);
@@ -237,10 +252,19 @@ public class IOSSimd extends Simd {
     public native void unpackBytesInterleaved3(byte[] src, int srcOffset, byte[] dst0, byte[] dst1, byte[] dst2, int length);
 
     @Override
+    public native void unpackBytesInterleaved3(byte[] src, int srcOffset, byte[] dst, int dst0Offset, int dst1Offset, int dst2Offset, int length);
+
+    @Override
     public native void unpackBytesInterleaved4(byte[] src, int srcOffset, byte[] dst0, byte[] dst1, byte[] dst2, byte[] dst3, int length);
 
     @Override
+    public native void unpackBytesInterleaved4(byte[] src, int srcOffset, byte[] dst, int dst0Offset, int dst1Offset, int dst2Offset, int dst3Offset, int length);
+
+    @Override
     public native int unpackLookupBytesInterleaved4(byte[] table, byte[] src, int srcOffset, byte[] dst0, byte[] dst1, byte[] dst2, byte[] dst3, int length);
+
+    @Override
+    public native int unpackLookupBytesInterleaved4(byte[] table, byte[] src, int srcOffset, byte[] dst, int dst0Offset, int dst1Offset, int dst2Offset, int dst3Offset, int length);
 
     @Override
     public native void add(int[] srcA, int srcAOffset, int[] srcB, int srcBOffset, int[] dst, int dstOffset, int length);
@@ -252,7 +276,13 @@ public class IOSSimd extends Simd {
     public native void packBytesInterleaved3(byte[] src0, byte[] src1, byte[] src2, byte[] dst, int dstOffset, int length);
 
     @Override
+    public native void packBytesInterleaved3(byte[] src, int src0Offset, int src1Offset, int src2Offset, byte[] dst, int dstOffset, int length);
+
+    @Override
     public native void packBytesInterleaved4(byte[] src0, byte[] src1, byte[] src2, byte[] src3, byte[] dst, int dstOffset, int length);
+
+    @Override
+    public native void packBytesInterleaved4(byte[] src, int src0Offset, int src1Offset, int src2Offset, int src3Offset, byte[] dst, int dstOffset, int length);
 
     @Override
     public native void cmpEq(int[] srcA, int srcAOffset, int[] srcB, int srcBOffset, byte[] dstMask, int dstOffset, int length);
