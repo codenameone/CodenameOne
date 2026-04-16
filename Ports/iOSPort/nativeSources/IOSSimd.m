@@ -59,7 +59,8 @@ JAVA_VOID com_codename1_impl_ios_IOSSimd_lookupBytes___byte_1ARRAY_byte_1ARRAY_b
     int end = offset + length;
     for (; i < end; i++) {
         // Java byte values are signed, but lookup-style consumers intentionally use
-        // them as unsigned indices into 64/256-byte tables.
+        // them as unsigned indices into byte tables. Indices beyond the table length
+        // resolve to 0 to mirror the generic Java fallback.
         int lookupIndex = idx[i] & 0xff;
         d[i] = lookupIndex < tableLen ? t[lookupIndex] : 0;
     }

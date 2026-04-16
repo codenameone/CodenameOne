@@ -586,8 +586,8 @@ public abstract class Base64 {
         }
     }
 
-    private static void mapSixBitValuesToAscii(Simd simd, byte[] indices, byte[] ascii, byte[] encodeMap) {
-        simd.lookupBytes(encodeMap, indices, ascii, 0, SIMD_BYTE_LANES);
+    private static void mapSixBitValuesToAscii(Simd simd, byte[] indices, byte[] dst, byte[] encodeMap) {
+        simd.lookupBytes(encodeMap, indices, dst, 0, SIMD_BYTE_LANES);
     }
 
     /// SIMD-optimized Base64 encoding with explicit offsets and caller scratch.
