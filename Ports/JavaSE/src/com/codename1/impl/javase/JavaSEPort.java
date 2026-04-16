@@ -51,6 +51,7 @@ import java.awt.Color;
 import java.awt.Cursor;
 import java.awt.Desktop;
 import java.awt.Dimension;
+import java.awt.EventQueue;
 import java.awt.FileDialog;
 import java.awt.FontFormatException;
 import javax.swing.JFrame;
@@ -60,6 +61,7 @@ import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.Toolkit;
+import java.awt.Window;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.event.*;
 import java.awt.font.FontRenderContext;
@@ -9198,6 +9200,16 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void exitApplication() {        
+        if (Boolean.getBoolean("cn1.javase.noExit")) {
+            EventQueue.invokeLater(() -> {
+                for (Window w : Window.getWindows()) {
+                    if (w != null && w.isDisplayable()) {
+                        w.dispose();
+                    }
+                }
+            });
+            return;
+        }
         // causes a simulator with a dialog open to freeze
         /*try {
             Executor.stopApp();

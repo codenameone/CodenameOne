@@ -34,10 +34,10 @@ public class SimulatorWindowModeVerifier {
         final boolean expectSingleWindow = "single".equals(parsed.mode);
         System.setProperty("cn1.simulator.useAppFrame", String.valueOf(expectSingleWindow));
         System.setProperty("cn1.test.window.mode", parsed.mode);
+        System.setProperty("cn1.javase.noExit", "true");
 
         System.setProperty("cn1.javase.implementation", "jmf");
         prepareCodenameOneSettings();
-        SecurityManager originalSecurityManager = installNoExitSecurityManagerIfNeeded();
 
         Thread simulatorThread = new Thread(() -> {
             try {
@@ -52,14 +52,14 @@ public class SimulatorWindowModeVerifier {
         waitForVisibleFrames(parsed.timeoutMs);
         sleep(1800);
 
-        boolean appFrameDetected = isAppFrameDetected();
-        if (expectSingleWindow && !appFrameDetected) {
+        boolean useAppFrameDetected = isUseAppFrameEnabled();
+        if (expectSingleWindow && !useAppFrameDetected) {
             closeAllWindows();
-            throw new AssertionError("Expected AppFrame in single-window mode but none was detected.");
+            throw new AssertionError("Expected single-window mode (useAppFrame=true) but it was false.");
         }
-        if (!expectSingleWindow && appFrameDetected) {
+        if (!expectSingleWindow && useAppFrameDetected) {
             closeAllWindows();
-            throw new AssertionError("Expected multi-window mode (no AppFrame) but AppFrame was detected.");
+            throw new AssertionError("Expected multi-window mode (useAppFrame=false) but it was true.");
         }
 
         BufferedImage image = captureDesktopScreenshot();
@@ -68,11 +68,11 @@ public class SimulatorWindowModeVerifier {
         Path screenshotPath = Path.of(parsed.screenshotPath);
         Files.createDirectories(screenshotPath.getParent());
         ImageIO.write(image, "png", screenshotPath.toFile());
-        System.out.println("[javase-verifier] screenshot=" + screenshotPath + " mode=" + parsed.mode + " appFrame=" + appFrameDetected);
+        System.out.println("[javase-verifier] screenshot=" + screenshotPath + " mode=" + parsed.mode + " useAppFrame=" + useAppFrameDetected);
 
         closeAllWindows();
         sleep(500);
-        restoreSecurityManager(originalSecurityManager);
+        System.exit(0);
     }
 
     private static void waitForVisibleFrames(long timeoutMs) throws Exception {
@@ -89,17 +89,15 @@ public class SimulatorWindowModeVerifier {
         throw new AssertionError("Timed out waiting for simulator windows.");
     }
 
-    private static boolean isAppFrameDetected() {
-        for (Frame frame : Frame.getFrames()) {
-            if (frame == null || !frame.isShowing()) {
-                continue;
-            }
-            String className = frame.getClass().getName();
-            if (className != null && className.endsWith("AppFrame")) {
-                return true;
-            }
+    private static boolean isUseAppFrameEnabled() {
+        try {
+            Class<?> portClass = Class.forName("com.codename1.impl.javase.JavaSEPort");
+            java.lang.reflect.Field field = portClass.getDeclaredField("useAppFrame");
+            field.setAccessible(true);
+            return field.getBoolean(null);
+        } catch (Exception ex) {
+            throw new RuntimeException("Failed to inspect JavaSEPort.useAppFrame", ex);
         }
-        return false;
     }
 
     private static BufferedImage captureDesktopScreenshot() throws Exception {
@@ -163,38 +161,6 @@ public class SimulatorWindowModeVerifier {
                 + "codename1.vendor=CodenameOne\n";
         Files.write(settings, content.getBytes(StandardCharsets.UTF_8));
         System.setProperty("user.dir", tempProject.toAbsolutePath().toString());
-    }
-
-    private static SecurityManager installNoExitSecurityManagerIfNeeded() {
-        try {
-            SecurityManager original = System.getSecurityManager();
-            if (original == null) {
-                System.setSecurityManager(new SecurityManager() {
-                    @Override
-                    public void checkPermission(java.security.Permission perm) {
-                    }
-
-                    @Override
-                    public void checkPermission(java.security.Permission perm, Object context) {
-                    }
-
-                    @Override
-                    public void checkExit(int status) {
-                        throw new SecurityException("Intercepted System.exit(" + status + ")");
-                    }
-                });
-            }
-            return original;
-        } catch (Throwable t) {
-            return null;
-        }
-    }
-
-    private static void restoreSecurityManager(SecurityManager original) {
-        try {
-            System.setSecurityManager(original);
-        } catch (Throwable ignored) {
-        }
     }
 
     private static final class Args {
