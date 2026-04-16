@@ -62,6 +62,7 @@ public class Base64NativePerformanceTest extends BaseTest {
                 return false;
             }
             byte[] cn1DecodedBuffer = new byte[payloadBytes.length];
+            boolean ios = isIos();
             Simd simd = Simd.get();
             boolean runSimdBenchmark = false;
             String simdStatus = null;
@@ -69,7 +70,7 @@ public class Base64NativePerformanceTest extends BaseTest {
             byte[] simdEncodedBytes = null;
             byte[] simdDecodedBuffer = null;
             int[] simdScratch = null;
-            if (isIos()) {
+            if (ios) {
                 if (simd == null) {
                     simdStatus = "unavailable (Simd.get() returned null)";
                 } else if (!simd.isSupported()) {
@@ -103,9 +104,9 @@ public class Base64NativePerformanceTest extends BaseTest {
                 }
             }
 
-            if (!isIos()) {
+            if (!ios) {
                 warmup(nativeBase64, payload, payloadBytes, nativeEncoded, cn1EncodedBytes, cn1DecodedBuffer,
-                        runSimdBenchmark, simdPayloadBytes, simdEncodedBytes, simdDecodedBuffer, simdScratch, encodedLen);
+                        false, simdPayloadBytes, simdEncodedBytes, simdDecodedBuffer, simdScratch, encodedLen);
             }
             if (runSimdBenchmark) {
                 warmup(nativeBase64, payload, payloadBytes, nativeEncoded, cn1EncodedBytes, cn1DecodedBuffer,
