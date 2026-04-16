@@ -681,6 +681,7 @@ build_skindesigner_for_site() {
   echo "Building Skin Designer JavaScript bundle for website..." >&2
   (
     cd "${REPO_ROOT}/scripts/skindesigner"
+    ./tools/sync-zipsupport-from-initializr.sh
     if [ "${WEBSITE_BOOTSTRAP_CN1_SNAPSHOTS}" = "true" ]; then
       activate_bootstrapped_java17
     fi
