@@ -66,6 +66,7 @@ public class Base64NativePerformanceTest extends BaseTest {
             Simd simd = Simd.get();
             boolean runSimdBenchmark = false;
             String simdStatus = null;
+            Throwable simdFailure = null;
             byte[] simdPayloadBytes = null;
             byte[] simdEncodedBytes = null;
             byte[] simdDecodedBuffer = null;
@@ -99,7 +100,9 @@ public class Base64NativePerformanceTest extends BaseTest {
                             }
                         }
                     } catch (Throwable t) {
-                        simdStatus = "unavailable (" + formatThrowable(t) + ")";
+                        simdFailure = t;
+                        simdStatus = "failed (" + formatThrowable(t) + ")";
+                        logThrowable("CN1SS:ERR:Base64 SIMD benchmark exception", t);
                     }
                 }
             }
@@ -145,10 +148,16 @@ public class Base64NativePerformanceTest extends BaseTest {
                 emitStat("Base64 SIMD benchmark status", simdStatus);
             }
 
+            if (simdFailure != null) {
+                fail("Base64 SIMD benchmark failed: " + formatThrowable(simdFailure));
+                return false;
+            }
+
             done();
             return true;
         } catch (Throwable t) {
             emitStat("Base64 benchmark status", "failed (" + formatThrowable(t) + ")");
+            logThrowable("CN1SS:ERR:Base64 benchmark exception", t);
             fail("Base64 benchmark failed: " + t);
             return false;
         }
@@ -302,6 +311,31 @@ public class Base64NativePerformanceTest extends BaseTest {
             return type;
         }
         return type + ": " + message;
+    }
+
+    private static void logThrowable(String prefix, Throwable t) {
+        if (t == null) {
+            System.out.println(prefix + "=unknown error");
+            return;
+        }
+        System.out.println(prefix + "=" + t);
+        StackTraceElement[] stack = t.getStackTrace();
+        if (stack == null) {
+            return;
+        }
+        for (StackTraceElement element : stack) {
+            System.out.println("CN1SS:ERR:Stack:" + element);
+        }
+        Throwable cause = t.getCause();
+        if (cause != null && cause != t) {
+            System.out.println("CN1SS:ERR:Cause=" + cause);
+            StackTraceElement[] causeStack = cause.getStackTrace();
+            if (causeStack != null) {
+                for (StackTraceElement element : causeStack) {
+                    System.out.println("CN1SS:ERR:CauseStack:" + element);
+                }
+            }
+        }
     }
 
     private static void emitStat(String metric, String value) {

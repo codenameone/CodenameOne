@@ -699,6 +699,11 @@ if [ -s "$BASE64_STATS_FILE" ]; then
   ri_log "Base64 benchmark stats captured at $BASE64_STATS_FILE"
 fi
 
+BASE64_BENCHMARK_FAILURE_LINE="$( (grep -h "CN1SS:ERR:suite test=Base64NativePerformanceTest failed" "$TEST_LOG" "$FALLBACK_LOG" || true) | tail -n 1 )"
+if [ -n "$BASE64_BENCHMARK_FAILURE_LINE" ]; then
+  ri_log "Detected Base64 benchmark failure line: $BASE64_BENCHMARK_FAILURE_LINE"
+fi
+
 SWIFT_DIAG_LINE="$( (grep -h "CN1SS:INFO:swift_diag_status=" "$TEST_LOG" "$FALLBACK_LOG" || true) | tail -n 1 )"
 if [ -n "$SWIFT_DIAG_LINE" ]; then
   ri_log "Detected swift diagnostic status line: $SWIFT_DIAG_LINE"
@@ -830,5 +835,10 @@ comment_rc=$?
 
 cp -f "$BUILD_LOG" "$ARTIFACTS_DIR/xcodebuild-build.log" 2>/dev/null || true
 cp -f "$TEST_LOG" "$ARTIFACTS_DIR/device-runner.log" 2>/dev/null || true
+
+if [ -n "$BASE64_BENCHMARK_FAILURE_LINE" ]; then
+  ri_log "STAGE:BENCHMARK_FAILED -> $BASE64_BENCHMARK_FAILURE_LINE"
+  exit 16
+fi
 
 exit $comment_rc
