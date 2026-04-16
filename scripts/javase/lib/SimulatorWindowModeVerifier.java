@@ -13,6 +13,7 @@ import java.awt.Toolkit;
 import java.awt.Window;
 import java.awt.event.WindowEvent;
 import java.awt.image.BufferedImage;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashSet;
@@ -35,6 +36,7 @@ public class SimulatorWindowModeVerifier {
         System.setProperty("cn1.test.window.mode", parsed.mode);
 
         System.setProperty("cn1.javase.implementation", "jmf");
+        prepareCodenameOneSettings();
 
         Thread simulatorThread = new Thread(() -> {
             try {
@@ -147,6 +149,18 @@ public class SimulatorWindowModeVerifier {
         } catch (InterruptedException ie) {
             Thread.currentThread().interrupt();
         }
+    }
+
+    private static void prepareCodenameOneSettings() throws Exception {
+        Path tempProject = Files.createTempDirectory("cn1-javase-sim-project");
+        Path settings = tempProject.resolve("codenameone_settings.properties");
+        String content = "codename1.displayName=JavaSESimulatorTest\n"
+                + "codename1.mainName=SimulatorModeTestApp\n"
+                + "codename1.packageName=com.codenameone.examples.javase.tests\n"
+                + "codename1.version=1.0\n"
+                + "codename1.vendor=CodenameOne\n";
+        Files.write(settings, content.getBytes(StandardCharsets.UTF_8));
+        System.setProperty("user.dir", tempProject.toAbsolutePath().toString());
     }
 
     private static final class Args {
