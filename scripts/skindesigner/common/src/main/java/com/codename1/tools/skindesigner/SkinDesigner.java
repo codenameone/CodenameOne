@@ -61,7 +61,6 @@ public class SkinDesigner extends Lifecycle {
         final Tabs details = new Tabs();
         details.getTabsContainer().setUIID("SkinDesignerTabsContainer");
         details.getTabsContainer().setScrollableX(false);
-        Style titleCommand = UIManager.getInstance().getComponentStyle("Command");
         ImageSettings imPortrait = createImageSettings("/skin.png", "port", vl);
         ImageSettings imLandscape = createImageSettings("/skin_l.png", "lan", vl);
 
@@ -208,30 +207,10 @@ public class SkinDesigner extends Lifecycle {
                 setShowErrorMessageForFocusedComponent(true);
 
         ShouldExecute s = NativeLookup.create(ShouldExecute.class);
-        if(s != null && s.isSupported()) {
-            Command saveCommand = skinDesignerForm.getToolbar().addCommandToRightBar("",
-                    FontImage.createMaterial(FontImage.MATERIAL_SAVE, titleCommand), e -> {
-                        byte[] data = createSkinFile(imPortrait, imLandscape, nativeTheme, platformName, tablet, systemFontFamily,
-                                proportionalFontFamily, monospaceFontFamily, smallFontSize, mediumFontSize, largeFontSize,
-                                pixelRatio, overrideNamePrimary, overrideNameSecondary, overrideNameLast);
-                        if(data != null) {
-                            FileSystemStorage fs = FileSystemStorage.getInstance();
-                            try(OutputStream os = fs.openOutputStream(fs.getAppHomePath() + "skin-file.skin")) {
-                                os.write(data);
-                            } catch(IOException err) {
-                                Log.e(err);
-                                ToastBar.showErrorMessage("Error wring skin file " + err);
-                            }
-                            // in the JavaScript port this will trigger the download dialog
-                            if(s.shouldExecute()) {
-                                Display.getInstance().execute(fs.getAppHomePath() + "skin-file.skin");
-                            }
-                        }
-                    });
-            vl.addSubmitButtons(skinDesignerForm.getToolbar().findCommandComponent(saveCommand));
-        }
-
-        skinDesignerForm.getToolbar().addMaterialCommandToLeftBar("", FontImage.MATERIAL_HELP, e -> {
+        Button helpAction = new Button("Help");
+        helpAction.setUIID("SkinDesignerActionButton");
+        FontImage.setMaterialIcon(helpAction, FontImage.MATERIAL_HELP);
+        helpAction.addActionListener(e -> {
             BrowserComponent help = new BrowserComponent();
             help.setURL("jar:///help.html");
             Form helpForm = new Form("Help", new BorderLayout());
@@ -240,28 +219,57 @@ public class SkinDesigner extends Lifecycle {
             helpForm.show();
         });
 
-        if(Display.getInstance().isNativeShareSupported()) {
-            skinDesignerForm.getToolbar().addCommandToRightBar("",
-                    FontImage.createMaterial(FontImage.MATERIAL_SHARE, titleCommand), e -> {
-                        byte[] data = createSkinFile(imPortrait, imLandscape, nativeTheme, platformName, tablet, systemFontFamily,
-                                proportionalFontFamily, monospaceFontFamily, smallFontSize, mediumFontSize, largeFontSize,
-                                pixelRatio, overrideNamePrimary, overrideNameSecondary, overrideNameLast);
-                        if(data != null) {
-                            FileSystemStorage fs = FileSystemStorage.getInstance();
-                            try(OutputStream os = fs.openOutputStream(fs.getAppHomePath() + "skin-file.skin")) {
-                                os.write(data);
-                            } catch(IOException err) {
-                                Log.e(err);
-                                ToastBar.showErrorMessage("Error wring skin file " + err);
-                            }
-                            Display.getInstance().share(null, fs.getAppHomePath() + "skin-file.skin", "application/vnd.codenameone-skin");
-                        }
-                    });
+        Button saveAction = new Button("Save");
+        saveAction.setUIID("SkinDesignerActionButton");
+        FontImage.setMaterialIcon(saveAction, FontImage.MATERIAL_SAVE);
+        saveAction.addActionListener(e -> {
+            byte[] data = createSkinFile(imPortrait, imLandscape, nativeTheme, platformName, tablet, systemFontFamily,
+                    proportionalFontFamily, monospaceFontFamily, smallFontSize, mediumFontSize, largeFontSize,
+                    pixelRatio, overrideNamePrimary, overrideNameSecondary, overrideNameLast);
+            if(data != null) {
+                FileSystemStorage fs = FileSystemStorage.getInstance();
+                try(OutputStream os = fs.openOutputStream(fs.getAppHomePath() + "skin-file.skin")) {
+                    os.write(data);
+                } catch(IOException err) {
+                    Log.e(err);
+                    ToastBar.showErrorMessage("Error wring skin file " + err);
+                }
+                // in the JavaScript port this will trigger the download dialog
+                if(s != null && s.isSupported() && s.shouldExecute()) {
+                    Display.getInstance().execute(fs.getAppHomePath() + "skin-file.skin");
+                }
+            }
+        });
+
+        Button shareAction = new Button("Share");
+        shareAction.setUIID("SkinDesignerActionButton");
+        FontImage.setMaterialIcon(shareAction, FontImage.MATERIAL_SHARE);
+        shareAction.addActionListener(e -> {
+            byte[] data = createSkinFile(imPortrait, imLandscape, nativeTheme, platformName, tablet, systemFontFamily,
+                    proportionalFontFamily, monospaceFontFamily, smallFontSize, mediumFontSize, largeFontSize,
+                    pixelRatio, overrideNamePrimary, overrideNameSecondary, overrideNameLast);
+            if(data != null) {
+                FileSystemStorage fs = FileSystemStorage.getInstance();
+                try(OutputStream os = fs.openOutputStream(fs.getAppHomePath() + "skin-file.skin")) {
+                    os.write(data);
+                } catch(IOException err) {
+                    Log.e(err);
+                    ToastBar.showErrorMessage("Error wring skin file " + err);
+                }
+                Display.getInstance().share(null, fs.getAppHomePath() + "skin-file.skin", "application/vnd.codenameone-skin");
+            }
+        });
+        if (!Display.getInstance().isNativeShareSupported()) {
+            shareAction.setHidden(true);
+            shareAction.setVisible(false);
         }
+        Container actions = GridLayout.encloseIn(3, helpAction, saveAction, shareAction);
+        actions.setUIID("SkinDesignerTabBar");
+        settingsContainer.addComponent(0, actions);
 
         refreshCustomTabs.run();
-        initWebsiteThemeSync(skinDesignerForm);
         skinDesignerForm.show();
+        initWebsiteThemeSync(skinDesignerForm);
     }
 
     private Label labeledFieldTitle(String text) {
