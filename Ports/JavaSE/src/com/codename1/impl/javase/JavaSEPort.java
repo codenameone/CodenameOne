@@ -9201,10 +9201,12 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     public void exitApplication() {        
         if (Boolean.getBoolean("cn1.javase.noExit")) {
-            EventQueue.invokeLater(() -> {
-                for (Window w : Window.getWindows()) {
-                    if (w != null && w.isDisplayable()) {
-                        w.dispose();
+            EventQueue.invokeLater(new Runnable() {
+                public void run() {
+                    for (Window w : Window.getWindows()) {
+                        if (w != null && w.isDisplayable()) {
+                            w.dispose();
+                        }
                     }
                 }
             });
