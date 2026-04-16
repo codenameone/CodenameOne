@@ -140,35 +140,12 @@ class SimdTest extends UITestBase {
         assertEquals(30, unpacked3[1]);
         assertTrue(lookupOr < 0);
 
-        byte[] encodeTable = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/".getBytes();
-        byte[] decodeTable = new byte[256];
-        for (int i = 0; i < decodeTable.length; i++) {
-            decodeTable[i] = -1;
-        }
-        for (int i = 0; i < encodeTable.length; i++) {
-            decodeTable[encodeTable[i] & 0xff] = (byte)i;
-        }
-        byte[] base64Out = new byte[8];
-        int encodedWritten = simd.encodeBase64Triplets(new byte[]{'M', 'a', 'n', 'M', 'a', 'n'}, 0, 6, encodeTable, base64Out, 0);
-        assertEquals(8, encodedWritten);
-        assertEquals((byte)'T', base64Out[0]);
-        assertEquals((byte)'W', base64Out[1]);
-        assertEquals((byte)'F', base64Out[2]);
-        assertEquals((byte)'u', base64Out[3]);
-        assertEquals((byte)'T', base64Out[4]);
-        assertEquals((byte)'W', base64Out[5]);
-        assertEquals((byte)'F', base64Out[6]);
-        assertEquals((byte)'u', base64Out[7]);
-
-        byte[] decodedBase64 = new byte[6];
-        int decodedWritten = simd.decodeBase64Quads(decodeTable, base64Out, 0, 8, decodedBase64, 0);
-        assertEquals(6, decodedWritten);
-        assertEquals((byte)'M', decodedBase64[0]);
-        assertEquals((byte)'a', decodedBase64[1]);
-        assertEquals((byte)'n', decodedBase64[2]);
-        assertEquals((byte)'M', decodedBase64[3]);
-        assertEquals((byte)'a', decodedBase64[4]);
-        assertEquals((byte)'n', decodedBase64[5]);
+        byte[] offsetLookup = new byte[8];
+        simd.lookupBytes(new byte[]{11, 22, 33, 44}, new byte[]{9, 9, 3, 0, 2, 9, 9, 9}, 2, offsetLookup, 1, 4);
+        assertEquals(44, offsetLookup[1]);
+        assertEquals(11, offsetLookup[2]);
+        assertEquals(33, offsetLookup[3]);
+        assertEquals(0, offsetLookup[4]);
     }
 
     @FormTest
@@ -425,6 +402,45 @@ class SimdTest extends UITestBase {
         assertEquals((byte)15, stripe2[3]);
         assertEquals((byte)16, stripe3[3]);
 
+        byte[] slab = new byte[20];
+        simd.unpackBytesInterleaved3(
+                new byte[]{
+                        10, 11, 12,
+                        20, 21, 22,
+                        30, 31, 32,
+                        40, 41, 42
+                },
+                0,
+                slab,
+                1,
+                6,
+                11,
+                4);
+        assertEquals((byte)10, slab[1]);
+        assertEquals((byte)20, slab[2]);
+        assertEquals((byte)31, slab[8]);
+        assertEquals((byte)42, slab[14]);
+
+        simd.unpackBytesInterleaved4(
+                new byte[]{
+                        1, 2, 3, 4,
+                        5, 6, 7, 8,
+                        9, 10, 11, 12,
+                        13, 14, 15, 16
+                },
+                0,
+                slab,
+                0,
+                4,
+                8,
+                12,
+                4);
+        assertEquals((byte)1, slab[0]);
+        assertEquals((byte)5, slab[1]);
+        assertEquals((byte)10, slab[6]);
+        assertEquals((byte)15, slab[11]);
+        assertEquals((byte)16, slab[15]);
+
         byte[] packed3 = new byte[12];
         simd.packBytesInterleaved3(
                 new byte[]{1, 5, 9, 13},
@@ -453,5 +469,43 @@ class SimdTest extends UITestBase {
         assertEquals((byte)4, packed4[3]);
         assertEquals((byte)9, packed4[8]);
         assertEquals((byte)16, packed4[15]);
+
+        byte[] packedFromSlab3 = new byte[12];
+        simd.packBytesInterleaved3(new byte[]{
+                        1, 5, 9, 13,
+                        2, 6, 10, 14,
+                        3, 7, 11, 15
+                },
+                0,
+                4,
+                8,
+                packedFromSlab3,
+                0,
+                4);
+        assertEquals((byte)1, packedFromSlab3[0]);
+        assertEquals((byte)2, packedFromSlab3[1]);
+        assertEquals((byte)3, packedFromSlab3[2]);
+        assertEquals((byte)13, packedFromSlab3[9]);
+        assertEquals((byte)14, packedFromSlab3[10]);
+        assertEquals((byte)15, packedFromSlab3[11]);
+
+        byte[] packedFromSlab4 = new byte[16];
+        simd.packBytesInterleaved4(new byte[]{
+                        1, 5, 9, 13,
+                        2, 6, 10, 14,
+                        3, 7, 11, 15,
+                        4, 8, 12, 16
+                },
+                0,
+                4,
+                8,
+                12,
+                packedFromSlab4,
+                0,
+                4);
+        assertEquals((byte)1, packedFromSlab4[0]);
+        assertEquals((byte)4, packedFromSlab4[3]);
+        assertEquals((byte)9, packedFromSlab4[8]);
+        assertEquals((byte)16, packedFromSlab4[15]);
     }
 }

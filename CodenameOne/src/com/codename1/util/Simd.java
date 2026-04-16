@@ -62,9 +62,54 @@ public class Simd {
 
     /// Looks up values from a table using unsigned byte indices.
     public void lookupBytes(byte[] table, byte[] indices, byte[] dst, int offset, int length) {
-        for (int i = offset, end = offset + length; i < end; i++) {
-            int idx = indices[i] & 0xff;
-            dst[i] = idx < table.length ? table[idx] : 0;
+        lookupBytes(table, indices, offset, dst, offset, length);
+    }
+
+    /// Looks up values from a table using unsigned byte indices.
+    public void lookupBytes(byte[] table, byte[] indices, int indicesOffset, byte[] dst, int dstOffset, int length) {
+        for (int i = 0; i < length; i++) {
+            int idx = indices[indicesOffset + i] & 0xff;
+            dst[dstOffset + i] = idx < table.length ? table[idx] : 0;
+        }
+    }
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void and(byte[] srcA, int srcAOffset, byte[] srcB, int srcBOffset, byte[] dst, int dstOffset, int length) {
+        for (int i = 0; i < length; i++) {
+            dst[dstOffset + i] = (byte)(srcA[srcAOffset + i] & srcB[srcBOffset + i]);
+        }
+    }
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void or(byte[] srcA, int srcAOffset, byte[] srcB, int srcBOffset, byte[] dst, int dstOffset, int length) {
+        for (int i = 0; i < length; i++) {
+            dst[dstOffset + i] = (byte)(srcA[srcAOffset + i] | srcB[srcBOffset + i]);
+        }
+    }
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void shl(byte[] src, int srcOffset, int bits, byte[] dst, int dstOffset, int length) {
+        int shift = bits & 7;
+        for (int i = 0; i < length; i++) {
+            dst[dstOffset + i] = (byte)((src[srcOffset + i] & 0xff) << shift);
+        }
+    }
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void shrLogical(byte[] src, int srcOffset, int bits, byte[] dst, int dstOffset, int length) {
+        int shift = bits & 7;
+        for (int i = 0; i < length; i++) {
+            dst[dstOffset + i] = (byte)((src[srcOffset + i] & 0xff) >>> shift);
+        }
+    }
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void unpackBytesInterleaved3(byte[] src, int srcOffset, byte[] dst, int dst0Offset, int dst1Offset, int dst2Offset, int length) {
+        for (int i = 0; i < length; i++) {
+            int srcIndex = srcOffset + i * 3;
+            dst[dst0Offset + i] = src[srcIndex];
+            dst[dst1Offset + i] = src[srcIndex + 1];
+            dst[dst2Offset + i] = src[srcIndex + 2];
         }
     }
 
@@ -131,16 +176,12 @@ public class Simd {
 
     /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void and(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length) {
-        for (int i = offset, end = offset + length; i < end; i++) {
-            dst[i] = (byte)(srcA[i] & srcB[i]);
-        }
+        and(srcA, offset, srcB, offset, dst, offset, length);
     }
 
     /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void or(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length) {
-        for (int i = offset, end = offset + length; i < end; i++) {
-            dst[i] = (byte)(srcA[i] | srcB[i]);
-        }
+        or(srcA, offset, srcB, offset, dst, offset, length);
     }
 
     /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
@@ -209,18 +250,12 @@ public class Simd {
 
     /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void shl(byte[] src, int bits, byte[] dst, int offset, int length) {
-        int shift = bits & 7;
-        for (int i = offset, end = offset + length; i < end; i++) {
-            dst[i] = (byte)((src[i] & 0xff) << shift);
-        }
+        shl(src, offset, bits, dst, offset, length);
     }
 
     /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void shrLogical(byte[] src, int bits, byte[] dst, int offset, int length) {
-        int shift = bits & 7;
-        for (int i = offset, end = offset + length; i < end; i++) {
-            dst[i] = (byte)((src[i] & 0xff) >>> shift);
-        }
+        shrLogical(src, offset, bits, dst, offset, length);
     }
 
     /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
@@ -296,6 +331,17 @@ public class Simd {
         }
     }
 
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void unpackBytesInterleaved4(byte[] src, int srcOffset, byte[] dst, int dst0Offset, int dst1Offset, int dst2Offset, int dst3Offset, int length) {
+        for (int i = 0; i < length; i++) {
+            int srcIndex = srcOffset + i * 4;
+            dst[dst0Offset + i] = src[srcIndex];
+            dst[dst1Offset + i] = src[srcIndex + 1];
+            dst[dst2Offset + i] = src[srcIndex + 2];
+            dst[dst3Offset + i] = src[srcIndex + 3];
+        }
+    }
+
     /// Unpacks interleaved bytes, looks each byte up in the provided table, stores the
     /// looked-up values into separate lane arrays, and returns the bitwise OR of all
     /// written values.
@@ -321,46 +367,29 @@ public class Simd {
         return or;
     }
 
-    /// Encodes complete Base64 triplets in a single fused pass.
-    /// `length` must be a multiple of 3.
-    public int encodeBase64Triplets(byte[] src, int srcOffset, int length, byte[] table, byte[] dst, int dstOffset) {
-        int di = dstOffset;
-        for (int i = srcOffset, end = srcOffset + length; i < end; i += 3) {
-            int b0 = src[i] & 0xff;
-            int b1 = src[i + 1] & 0xff;
-            int b2 = src[i + 2] & 0xff;
-            dst[di++] = table[b0 >> 2];
-            dst[di++] = table[((b0 & 0x03) << 4) | (b1 >> 4)];
-            dst[di++] = table[((b1 & 0x0f) << 2) | (b2 >> 6)];
-            dst[di++] = table[b2 & 0x3f];
-        }
-        return di - dstOffset;
-    }
-
-    /// Decodes complete Base64 quads without padding in a single fused pass.
-    /// `length` must be a multiple of 4. Returns decoded bytes written, or `-1`
-    /// if any symbol is invalid.
-    public int decodeBase64Quads(byte[] table, byte[] src, int srcOffset, int length, byte[] dst, int dstOffset) {
-        int di = dstOffset;
+    /// Unpacks interleaved bytes, looks each byte up in the provided table, stores the
+    /// looked-up values into virtual lane ranges in a destination array, and returns
+    /// the bitwise OR of all written values.
+    public int unpackLookupBytesInterleaved4(byte[] table, byte[] src, int srcOffset, byte[] dst, int dst0Offset, int dst1Offset, int dst2Offset, int dst3Offset, int length) {
+        int or = 0;
         int tableLength = table.length;
-        for (int i = srcOffset, end = srcOffset + length; i < end; i += 4) {
-            int c0 = src[i] & 0xff;
-            int c1 = src[i + 1] & 0xff;
-            int c2 = src[i + 2] & 0xff;
-            int c3 = src[i + 3] & 0xff;
-            int b0 = c0 < tableLength ? table[c0] : -1;
-            int b1 = c1 < tableLength ? table[c1] : -1;
-            int b2 = c2 < tableLength ? table[c2] : -1;
-            int b3 = c3 < tableLength ? table[c3] : -1;
-            if ((b0 | b1 | b2 | b3) < 0) {
-                return -1;
-            }
-            int quantum = (b0 << 18) | (b1 << 12) | (b2 << 6) | b3;
-            dst[di++] = (byte) ((quantum >> 16) & 0xff);
-            dst[di++] = (byte) ((quantum >> 8) & 0xff);
-            dst[di++] = (byte) (quantum & 0xff);
+        for (int i = 0; i < length; i++) {
+            int srcIndex = srcOffset + i * 4;
+            int idx0 = src[srcIndex] & 0xff;
+            int idx1 = src[srcIndex + 1] & 0xff;
+            int idx2 = src[srcIndex + 2] & 0xff;
+            int idx3 = src[srcIndex + 3] & 0xff;
+            byte v0 = idx0 < tableLength ? table[idx0] : 0;
+            byte v1 = idx1 < tableLength ? table[idx1] : 0;
+            byte v2 = idx2 < tableLength ? table[idx2] : 0;
+            byte v3 = idx3 < tableLength ? table[idx3] : 0;
+            dst[dst0Offset + i] = v0;
+            dst[dst1Offset + i] = v1;
+            dst[dst2Offset + i] = v2;
+            dst[dst3Offset + i] = v3;
+            or |= v0 | v1 | v2 | v3;
         }
-        return di - dstOffset;
+        return or;
     }
 
     /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
@@ -406,6 +435,16 @@ public class Simd {
     }
 
     /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void packBytesInterleaved3(byte[] src, int src0Offset, int src1Offset, int src2Offset, byte[] dst, int dstOffset, int length) {
+        for (int i = 0; i < length; i++) {
+            int dstIndex = dstOffset + i * 3;
+            dst[dstIndex] = src[src0Offset + i];
+            dst[dstIndex + 1] = src[src1Offset + i];
+            dst[dstIndex + 2] = src[src2Offset + i];
+        }
+    }
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void packBytesInterleaved4(byte[] src0, byte[] src1, byte[] src2, byte[] src3, byte[] dst, int dstOffset, int length) {
         for (int i = 0; i < length; i++) {
             int dstIndex = dstOffset + i * 4;
@@ -413,6 +452,17 @@ public class Simd {
             dst[dstIndex + 1] = src1[i];
             dst[dstIndex + 2] = src2[i];
             dst[dstIndex + 3] = src3[i];
+        }
+    }
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void packBytesInterleaved4(byte[] src, int src0Offset, int src1Offset, int src2Offset, int src3Offset, byte[] dst, int dstOffset, int length) {
+        for (int i = 0; i < length; i++) {
+            int dstIndex = dstOffset + i * 4;
+            dst[dstIndex] = src[src0Offset + i];
+            dst[dstIndex + 1] = src[src1Offset + i];
+            dst[dstIndex + 2] = src[src2Offset + i];
+            dst[dstIndex + 3] = src[src3Offset + i];
         }
     }
 
