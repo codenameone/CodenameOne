@@ -1362,7 +1362,7 @@ JAVA_INT com_codename1_impl_ios_IOSSimd_decodeBase64Quads___byte_1ARRAY_byte_1AR
         uint8_t b1[16];
         uint8_t b2[16];
         uint8_t b3[16];
-        int orValue = 0;
+        int invalid = 0;
         vst1q_u8(c0, in.val[0]);
         vst1q_u8(c1, in.val[1]);
         vst1q_u8(c2, in.val[2]);
@@ -1372,13 +1372,13 @@ JAVA_INT com_codename1_impl_ios_IOSSimd_decodeBase64Quads___byte_1ARRAY_byte_1AR
             int v1 = c1[j] < tableLen ? t[c1[j]] : -1;
             int v2 = c2[j] < tableLen ? t[c2[j]] : -1;
             int v3 = c3[j] < tableLen ? t[c3[j]] : -1;
-            orValue |= v0 | v1 | v2 | v3;
+            invalid |= ((v0 | v1 | v2 | v3) < 0);
             b0[j] = (uint8_t)v0;
             b1[j] = (uint8_t)v1;
             b2[j] = (uint8_t)v2;
             b3[j] = (uint8_t)v3;
         }
-        if (orValue < 0) {
+        if (invalid != 0) {
             return -1;
         }
         uint8x16x3_t out;
