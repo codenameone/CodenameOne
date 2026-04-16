@@ -699,6 +699,14 @@ build_skindesigner_for_site() {
       skindesigner_workspace_args+=(-Dcn1.localWorkspace=true)
     fi
 
+    # Ensure attached classifier artifact skindesigner-ZipSupport:jar:common
+    # is present in the local Maven repo before building skindesigner-common.
+    run_skindesigner_mvn -q -U -pl cn1libs/ZipSupport -am \
+      "${skindesigner_workspace_args[@]}" \
+      -DskipTests \
+      -Dcodename1.platform=javascript \
+      install
+
     run_skindesigner_mvn -q -U -pl javascript -am \
       "${skindesigner_workspace_args[@]}" \
       -DskipTests \
