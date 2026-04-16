@@ -510,6 +510,8 @@ public abstract class Base64 {
     }
 
     private static final ThreadLocal<SimdByteScratch> simdByteScratch = new ThreadLocal<SimdByteScratch>();
+    private static final int SIMD_BYTE_SCRATCH_CAPACITY = SIMD_BYTE_LANES * 2;
+    private static SimdByteScratch sharedSimdByteScratch;
 
     private static final class SimdByteScratch {
         final byte[] lane0;
@@ -528,20 +530,20 @@ public abstract class Base64 {
         final byte[] const3F;
 
         private SimdByteScratch(Simd simd) {
-            lane0 = simd.allocByte(SIMD_BYTE_LANES);
-            lane1 = simd.allocByte(SIMD_BYTE_LANES);
-            lane2 = simd.allocByte(SIMD_BYTE_LANES);
-            lane3 = simd.allocByte(SIMD_BYTE_LANES);
-            out0 = simd.allocByte(SIMD_BYTE_LANES);
-            out1 = simd.allocByte(SIMD_BYTE_LANES);
-            out2 = simd.allocByte(SIMD_BYTE_LANES);
-            out3 = simd.allocByte(SIMD_BYTE_LANES);
-            tmp = simd.allocByte(SIMD_BYTE_LANES);
-            mask = simd.allocByte(SIMD_BYTE_LANES);
-            valid = simd.allocByte(SIMD_BYTE_LANES);
-            const03 = simd.allocByte(SIMD_BYTE_LANES);
-            const0F = simd.allocByte(SIMD_BYTE_LANES);
-            const3F = simd.allocByte(SIMD_BYTE_LANES);
+            lane0 = simd.allocByte(SIMD_BYTE_SCRATCH_CAPACITY);
+            lane1 = simd.allocByte(SIMD_BYTE_SCRATCH_CAPACITY);
+            lane2 = simd.allocByte(SIMD_BYTE_SCRATCH_CAPACITY);
+            lane3 = simd.allocByte(SIMD_BYTE_SCRATCH_CAPACITY);
+            out0 = simd.allocByte(SIMD_BYTE_SCRATCH_CAPACITY);
+            out1 = simd.allocByte(SIMD_BYTE_SCRATCH_CAPACITY);
+            out2 = simd.allocByte(SIMD_BYTE_SCRATCH_CAPACITY);
+            out3 = simd.allocByte(SIMD_BYTE_SCRATCH_CAPACITY);
+            tmp = simd.allocByte(SIMD_BYTE_SCRATCH_CAPACITY);
+            mask = simd.allocByte(SIMD_BYTE_SCRATCH_CAPACITY);
+            valid = simd.allocByte(SIMD_BYTE_SCRATCH_CAPACITY);
+            const03 = simd.allocByte(SIMD_BYTE_SCRATCH_CAPACITY);
+            const0F = simd.allocByte(SIMD_BYTE_SCRATCH_CAPACITY);
+            const3F = simd.allocByte(SIMD_BYTE_SCRATCH_CAPACITY);
             fillRange(const03, (byte) 0x03);
             fillRange(const0F, (byte) 0x0F);
             fillRange(const3F, (byte) 0x3F);
@@ -549,12 +551,23 @@ public abstract class Base64 {
     }
 
     private static SimdByteScratch getSimdByteScratch(Simd simd) {
-        SimdByteScratch out = simdByteScratch.get();
-        if (out == null) {
-            out = new SimdByteScratch(simd);
-            simdByteScratch.set(out);
+        try {
+            SimdByteScratch out = simdByteScratch.get();
+            if (out == null) {
+                out = new SimdByteScratch(simd);
+                simdByteScratch.set(out);
+            }
+            return out;
+        } catch (Throwable t) {
+            synchronized (Base64.class) {
+                SimdByteScratch out = sharedSimdByteScratch;
+                if (out == null) {
+                    out = new SimdByteScratch(simd);
+                    sharedSimdByteScratch = out;
+                }
+                return out;
+            }
         }
-        return out;
     }
 
     private static void mapSixBitValuesToAscii(Simd simd, byte[] indices, byte[] ascii, SimdByteScratch scratch) {
