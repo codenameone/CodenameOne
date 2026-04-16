@@ -4,6 +4,4 @@ import com.codename1.system.NativeInterface;
 
 public interface ShouldExecute extends NativeInterface {
     boolean shouldExecute();
-    boolean isDarkMode();
-    void notifyUiReady();
 }

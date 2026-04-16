@@ -8,6 +8,7 @@ import com.codename1.components.ScaleImageLabel;
 import com.codename1.components.ToastBar;
 import com.codename1.io.FileSystemStorage;
 import com.codename1.ui.Display;
+import com.codename1.ui.CN;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.plaf.UIManager;
@@ -16,7 +17,6 @@ import com.codename1.io.Preferences;
 import com.codename1.io.Properties;
 import com.codename1.io.Storage;
 import com.codename1.io.Util;
-import com.codename1.system.NativeLookup;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.Button;
 import com.codename1.ui.Command;
@@ -52,7 +52,6 @@ public class SkinDesigner extends Lifecycle {
     private static final String[] NATIVE_THEME_FILES = {"iOS7Theme.res", "iPhoneTheme.res",
             "android_holo_light.res","androidTheme.res", "winTheme.res"};
     private boolean websiteDarkMode;
-    private ShouldExecute nativeBridge;
 
     @Override
     public void runApp() {
@@ -202,10 +201,7 @@ public class SkinDesigner extends Lifecycle {
                     ToastBar.showErrorMessage("Error wring skin file " + err);
                 }
                 // in the JavaScript port this will trigger the download dialog
-                ShouldExecute bridge = resolveNativeBridgeQuietly();
-                if(bridge != null && bridge.isSupported() && bridge.shouldExecute()) {
-                    Display.getInstance().execute(fs.getAppHomePath() + "skin-file.skin");
-                }
+                Display.getInstance().execute(fs.getAppHomePath() + "skin-file.skin");
             }
         });
 
@@ -236,7 +232,7 @@ public class SkinDesigner extends Lifecycle {
         settingsContainer.addComponent(0, actions);
 
         skinDesignerForm.show();
-        initWebsiteThemeSync(skinDesignerForm);
+        initThemeFromUrl(skinDesignerForm);
     }
 
     private Label labeledFieldTitle(String text) {
@@ -251,33 +247,13 @@ public class SkinDesigner extends Lifecycle {
         }
     }
 
-    private ShouldExecute resolveNativeBridgeQuietly() {
-        if (nativeBridge != null) {
-            return nativeBridge;
-        }
-        try {
-            nativeBridge = NativeLookup.create(ShouldExecute.class);
-        } catch (Throwable ignored) {
-            nativeBridge = null;
-        }
-        return nativeBridge;
-    }
-
-    private void initWebsiteThemeSync(Form form) {
-        ShouldExecute bridge = resolveNativeBridgeQuietly();
-        if (bridge != null && bridge.isSupported()) {
-            websiteDarkMode = bridge.isDarkMode();
-            Display.getInstance().setDarkMode(websiteDarkMode);
-            applyWebsiteTheme(form, websiteDarkMode);
-            form.refreshTheme();
-            bridge.notifyUiReady();
-        }
+    private void initThemeFromUrl(Form form) {
+        websiteDarkMode = readThemeFromUrl();
+        Display.getInstance().setDarkMode(websiteDarkMode);
+        applyWebsiteTheme(form, websiteDarkMode);
+        form.refreshTheme();
         UITimer.timer(900, true, form, () -> {
-            ShouldExecute liveBridge = resolveNativeBridgeQuietly();
-            if (liveBridge == null || !liveBridge.isSupported()) {
-                return;
-            }
-            boolean dark = liveBridge.isDarkMode();
+            boolean dark = readThemeFromUrl();
             if (dark != websiteDarkMode) {
                 websiteDarkMode = dark;
                 Display.getInstance().setDarkMode(dark);
@@ -285,6 +261,41 @@ public class SkinDesigner extends Lifecycle {
                 form.refreshTheme();
             }
         });
+    }
+
+    private boolean readThemeFromUrl() {
+        String href = CN.getProperty("browser.window.location.href", "");
+        String theme = queryParam(href, "theme");
+        if ("dark".equalsIgnoreCase(theme)) {
+            return true;
+        }
+        if ("light".equalsIgnoreCase(theme)) {
+            return false;
+        }
+        return Display.getInstance().isDarkMode();
+    }
+
+    private String queryParam(String href, String name) {
+        if (href == null || href.length() == 0) {
+            return null;
+        }
+        int queryStart = href.indexOf('?');
+        if (queryStart < 0 || queryStart == href.length() - 1) {
+            return null;
+        }
+        String query = href.substring(queryStart + 1);
+        int hash = query.indexOf('#');
+        if (hash >= 0) {
+            query = query.substring(0, hash);
+        }
+        String prefix = name + "=";
+        String[] pairs = Util.split(query, "&");
+        for (String pair : pairs) {
+            if (pair.startsWith(prefix) && pair.length() > prefix.length()) {
+                return pair.substring(prefix.length());
+            }
+        }
+        return null;
     }
 
     private void applyWebsiteTheme(Container component, boolean dark) {

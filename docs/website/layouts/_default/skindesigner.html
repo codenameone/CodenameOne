@@ -11,7 +11,7 @@
     <iframe
       id="cn1-skindesigner-frame"
       class="cn1-skindesigner-frame"
-      src="/skindesigner-app/"
+      data-base-src="/skindesigner-app/"
       title="Codename One Skin Designer"
       loading="eager">
     </iframe>
@@ -180,6 +180,19 @@ body.cn1-skindesigner-page-body .main {
       dark = body.classList.contains("dark") || !!(mediaQuery && mediaQuery.matches);
     }
     body.classList.toggle("cn1-skindesigner-dark", dark);
+    syncFrameTheme(dark);
+  }
+
+  function syncFrameTheme(dark) {
+    if (!frame) {
+      return;
+    }
+    var base = frame.getAttribute("data-base-src") || "/skindesigner-app/";
+    var target = base + (base.indexOf("?") >= 0 ? "&" : "?") + "theme=" + (dark ? "dark" : "light");
+    var current = frame.getAttribute("src");
+    if (current !== target) {
+      frame.setAttribute("src", target);
+    }
   }
 
   body.classList.add("cn1-skindesigner-page-body");
