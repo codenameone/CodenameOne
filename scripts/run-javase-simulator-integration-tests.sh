@@ -78,6 +78,10 @@ ensure_dir "$PREVIEW_DIR"
 SCREENSHOT_REF_DIR="$SCRIPT_DIR/javase/screenshots"
 ensure_dir "$SCREENSHOT_REF_DIR"
 
+js_log "Ensuring CLDC11 port is built (required bootclasspath for CodenameOne core)"
+js_log "Using Java 8 for ant build: $JAVA8_HOME_DETECTED"
+JAVA_HOME="$JAVA8_HOME_DETECTED" PATH="$JAVA8_HOME_DETECTED/bin:$PATH" ant -noinput -buildfile Ports/CLDC11/build.xml jar
+
 js_log "Ensuring JavaSE port is built"
 js_log "Using Java 8 for ant build: $JAVA8_HOME_DETECTED"
 JAVA_HOME="$JAVA8_HOME_DETECTED" PATH="$JAVA8_HOME_DETECTED/bin:$PATH" ant -noinput -buildfile Ports/JavaSE/build.xml jar
