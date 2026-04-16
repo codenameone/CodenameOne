@@ -139,6 +139,36 @@ class SimdTest extends UITestBase {
         assertEquals(20, unpacked2[1]);
         assertEquals(30, unpacked3[1]);
         assertTrue(lookupOr < 0);
+
+        byte[] encodeTable = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/".getBytes();
+        byte[] decodeTable = new byte[256];
+        for (int i = 0; i < decodeTable.length; i++) {
+            decodeTable[i] = -1;
+        }
+        for (int i = 0; i < encodeTable.length; i++) {
+            decodeTable[encodeTable[i] & 0xff] = (byte)i;
+        }
+        byte[] base64Out = new byte[8];
+        int encodedWritten = simd.encodeBase64Triplets(new byte[]{'M', 'a', 'n', 'M', 'a', 'n'}, 0, 6, encodeTable, base64Out, 0);
+        assertEquals(8, encodedWritten);
+        assertEquals((byte)'T', base64Out[0]);
+        assertEquals((byte)'W', base64Out[1]);
+        assertEquals((byte)'F', base64Out[2]);
+        assertEquals((byte)'u', base64Out[3]);
+        assertEquals((byte)'T', base64Out[4]);
+        assertEquals((byte)'W', base64Out[5]);
+        assertEquals((byte)'F', base64Out[6]);
+        assertEquals((byte)'u', base64Out[7]);
+
+        byte[] decodedBase64 = new byte[6];
+        int decodedWritten = simd.decodeBase64Quads(decodeTable, base64Out, 0, 8, decodedBase64, 0);
+        assertEquals(6, decodedWritten);
+        assertEquals((byte)'M', decodedBase64[0]);
+        assertEquals((byte)'a', decodedBase64[1]);
+        assertEquals((byte)'n', decodedBase64[2]);
+        assertEquals((byte)'M', decodedBase64[3]);
+        assertEquals((byte)'a', decodedBase64[4]);
+        assertEquals((byte)'n', decodedBase64[5]);
     }
 
     @FormTest
@@ -162,7 +192,7 @@ class SimdTest extends UITestBase {
         System.arraycopy(input, 0, simdInput, 0, input.length);
         byte[] simdEncoded = simd.allocByte(encodedLen);
         int[] scratch = simd.allocInt(192);
-        int simdWritten = Base64.encodeNoNewlineSimd(simdInput, 0, simdInput.length, simdEncoded, 0, scratch);
+        int simdWritten = Base64.encodeNoNewlineSimd(simdInput, 0, simdInput.length, simdEncoded, 0);
 
         assertEquals(scalarWritten, simdWritten);
         for (int i = 0; i < scalarWritten; i++) {
@@ -174,11 +204,24 @@ class SimdTest extends UITestBase {
         int scalarDecLen = Base64.decode(scalarEncoded, scalarDecoded);
 
         byte[] simdDecoded = simd.allocByte(input.length);
-        int simdDecLen = Base64.decodeNoWhitespaceSimd(simdEncoded, 0, simdWritten, simdDecoded, 0, scratch);
+        int simdDecLen = Base64.decodeNoWhitespaceSimd(simdEncoded, 0, simdWritten, simdDecoded, 0);
 
         assertEquals(scalarDecLen, simdDecLen);
         for (int i = 0; i < scalarDecLen; i++) {
             assertEquals(scalarDecoded[i], simdDecoded[i], "Decode mismatch at index " + i);
+        }
+
+        byte[] legacyEncoded = simd.allocByte(encodedLen);
+        byte[] legacyDecoded = simd.allocByte(input.length);
+        int legacyWritten = Base64.encodeNoNewlineSimd(simdInput, 0, simdInput.length, legacyEncoded, 0, scratch);
+        int legacyDecodedLen = Base64.decodeNoWhitespaceSimd(legacyEncoded, 0, legacyWritten, legacyDecoded, 0, scratch);
+        assertEquals(simdWritten, legacyWritten);
+        assertEquals(simdDecLen, legacyDecodedLen);
+        for (int i = 0; i < legacyWritten; i++) {
+            assertEquals(simdEncoded[i], legacyEncoded[i], "Legacy encode mismatch at index " + i);
+        }
+        for (int i = 0; i < legacyDecodedLen; i++) {
+            assertEquals(simdDecoded[i], legacyDecoded[i], "Legacy decode mismatch at index " + i);
         }
     }
 

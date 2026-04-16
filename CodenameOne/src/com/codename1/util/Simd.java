@@ -321,6 +321,48 @@ public class Simd {
         return or;
     }
 
+    /// Encodes complete Base64 triplets in a single fused pass.
+    /// `length` must be a multiple of 3.
+    public int encodeBase64Triplets(byte[] src, int srcOffset, int length, byte[] table, byte[] dst, int dstOffset) {
+        int di = dstOffset;
+        for (int i = srcOffset, end = srcOffset + length; i < end; i += 3) {
+            int b0 = src[i] & 0xff;
+            int b1 = src[i + 1] & 0xff;
+            int b2 = src[i + 2] & 0xff;
+            dst[di++] = table[b0 >> 2];
+            dst[di++] = table[((b0 & 0x03) << 4) | (b1 >> 4)];
+            dst[di++] = table[((b1 & 0x0f) << 2) | (b2 >> 6)];
+            dst[di++] = table[b2 & 0x3f];
+        }
+        return di - dstOffset;
+    }
+
+    /// Decodes complete Base64 quads without padding in a single fused pass.
+    /// `length` must be a multiple of 4. Returns decoded bytes written, or `-1`
+    /// if any symbol is invalid.
+    public int decodeBase64Quads(byte[] table, byte[] src, int srcOffset, int length, byte[] dst, int dstOffset) {
+        int di = dstOffset;
+        int tableLength = table.length;
+        for (int i = srcOffset, end = srcOffset + length; i < end; i += 4) {
+            int c0 = src[i] & 0xff;
+            int c1 = src[i + 1] & 0xff;
+            int c2 = src[i + 2] & 0xff;
+            int c3 = src[i + 3] & 0xff;
+            int b0 = c0 < tableLength ? table[c0] : -1;
+            int b1 = c1 < tableLength ? table[c1] : -1;
+            int b2 = c2 < tableLength ? table[c2] : -1;
+            int b3 = c3 < tableLength ? table[c3] : -1;
+            if ((b0 | b1 | b2 | b3) < 0) {
+                return -1;
+            }
+            int quantum = (b0 << 18) | (b1 << 12) | (b2 << 6) | b3;
+            dst[di++] = (byte) ((quantum >> 16) & 0xff);
+            dst[di++] = (byte) ((quantum >> 8) & 0xff);
+            dst[di++] = (byte) (quantum & 0xff);
+        }
+        return di - dstOffset;
+    }
+
     /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void packIntToByteSaturating(int[] src, byte[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {

@@ -559,6 +559,28 @@ public class JavaSESimd extends Simd {
     }
 
     @Override
+    public int encodeBase64Triplets(byte[] src, int srcOffset, int length, byte[] table, byte[] dst, int dstOffset) {
+        validateNotNull(src, "src");
+        validateNotNull(table, "table");
+        validateNotNull(dst, "dst");
+        validateRange(src.length, srcOffset, length, "src");
+        validateRange(dst.length, dstOffset, (length / 3) * 4, "dst");
+        validateRegistered(src, table, dst);
+        return super.encodeBase64Triplets(src, srcOffset, length, table, dst, dstOffset);
+    }
+
+    @Override
+    public int decodeBase64Quads(byte[] table, byte[] src, int srcOffset, int length, byte[] dst, int dstOffset) {
+        validateNotNull(table, "table");
+        validateNotNull(src, "src");
+        validateNotNull(dst, "dst");
+        validateRange(src.length, srcOffset, length, "src");
+        validateRange(dst.length, dstOffset, (length / 4) * 3, "dst");
+        validateRegistered(table, src, dst);
+        return super.decodeBase64Quads(table, src, srcOffset, length, dst, dstOffset);
+    }
+
+    @Override
     public void add(int[] srcA, int srcAOffset, int[] srcB, int srcBOffset, int[] dst, int dstOffset, int length) {
         validateNotNull(srcA, "srcA");
         validateNotNull(srcB, "srcB");

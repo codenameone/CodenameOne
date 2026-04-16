@@ -39,8 +39,6 @@ public abstract class Base64 {
 
     private static final byte[] decodeMap = new byte[256];
     private static final int[] decodeMapInt = new int[256];
-    private static final int SIMD_SCRATCH_INTS = 192;
-    private static final int SIMD_BYTE_LANES = 16;
 
     static {
         for (int i = 0; i < decodeMap.length; i++) {
@@ -446,47 +444,8 @@ public abstract class Base64 {
         return outIndex;
     }
 
-    // ---- SIMD constant tables (lazily initialized) ----
-    private static int[] simdEncConst;
-
-    // Encode constant offsets (each sub-array is 64 ints)
-    private static final int ENC_K26 = 0;     // threshold 26
-    private static final int ENC_K52 = 64;    // threshold 52
-    private static final int ENC_K62 = 128;   // threshold 62
-    private static final int ENC_OFF_AZ = 192;  // +65 for A-Z
-    private static final int ENC_OFF_az = 256;  // +71 for a-z
-    private static final int ENC_OFF_09 = 320;  // -4 for 0-9
-    private static final int ENC_OFF_PLUS = 384;  // -19 for +
-    private static final int ENC_OFF_SLASH = 448; // -16 for /
-    // masks (16 ints each at offset 512)
-    private static final int ENC_M03 = 512;
-    private static final int ENC_M0F = 528;
-    private static final int ENC_M3F = 544;
-    private static final int ENC_CONST_SIZE = 560;
-
     private static byte[] simdEncodeMap;
     private static byte[] simdDecodeMap;
-
-    private static int[] getSimdEncConst(Simd simd) {
-        int[] c = simdEncConst;
-        if (c != null) {
-            return c;
-        }
-        c = simd.allocInt(ENC_CONST_SIZE);
-        fillRange(c, ENC_K26, 64, 26);
-        fillRange(c, ENC_K52, 64, 52);
-        fillRange(c, ENC_K62, 64, 62);
-        fillRange(c, ENC_OFF_AZ, 64, 65);
-        fillRange(c, ENC_OFF_az, 64, 71);
-        fillRange(c, ENC_OFF_09, 64, -4);
-        fillRange(c, ENC_OFF_PLUS, 64, -19);
-        fillRange(c, ENC_OFF_SLASH, 64, -16);
-        fillRange(c, ENC_M03, 16, 0x03);
-        fillRange(c, ENC_M0F, 16, 0x0F);
-        fillRange(c, ENC_M3F, 16, 0x3F);
-        simdEncConst = c;
-        return c;
-    }
 
     private static byte[] getSimdEncodeMap(Simd simd) {
         byte[] out = simdEncodeMap;
@@ -513,152 +472,33 @@ public abstract class Base64 {
         return out;
     }
 
-    private static void fillRange(int[] arr, int offset, int len, int val) {
-        for (int i = offset, end = offset + len; i < end; i++) {
-            arr[i] = val;
-        }
-    }
-
     private static void fillRange(byte[] arr, byte value) {
         for (int i = 0; i < arr.length; i++) {
             arr[i] = value;
         }
     }
 
-    private static final ThreadLocal<SimdByteScratch> simdByteScratch = new ThreadLocal<SimdByteScratch>();
-    private static final int SIMD_BYTE_SCRATCH_CAPACITY = SIMD_BYTE_LANES * 2;
-    private static SimdByteScratch sharedSimdByteScratch;
-
-    private static final class SimdByteScratch {
-        final byte[] lane0;
-        final byte[] lane1;
-        final byte[] lane2;
-        final byte[] lane3;
-        final byte[] out0;
-        final byte[] out1;
-        final byte[] out2;
-        final byte[] out3;
-        final byte[] tmp;
-        final byte[] mask;
-        final byte[] valid;
-        final byte[] const03;
-        final byte[] const0F;
-        final byte[] const3F;
-
-        private SimdByteScratch(Simd simd) {
-            lane0 = simd.allocByte(SIMD_BYTE_SCRATCH_CAPACITY);
-            lane1 = simd.allocByte(SIMD_BYTE_SCRATCH_CAPACITY);
-            lane2 = simd.allocByte(SIMD_BYTE_SCRATCH_CAPACITY);
-            lane3 = simd.allocByte(SIMD_BYTE_SCRATCH_CAPACITY);
-            out0 = simd.allocByte(SIMD_BYTE_SCRATCH_CAPACITY);
-            out1 = simd.allocByte(SIMD_BYTE_SCRATCH_CAPACITY);
-            out2 = simd.allocByte(SIMD_BYTE_SCRATCH_CAPACITY);
-            out3 = simd.allocByte(SIMD_BYTE_SCRATCH_CAPACITY);
-            tmp = simd.allocByte(SIMD_BYTE_SCRATCH_CAPACITY);
-            mask = simd.allocByte(SIMD_BYTE_SCRATCH_CAPACITY);
-            valid = simd.allocByte(SIMD_BYTE_SCRATCH_CAPACITY);
-            const03 = simd.allocByte(SIMD_BYTE_SCRATCH_CAPACITY);
-            const0F = simd.allocByte(SIMD_BYTE_SCRATCH_CAPACITY);
-            const3F = simd.allocByte(SIMD_BYTE_SCRATCH_CAPACITY);
-            fillRange(const03, (byte) 0x03);
-            fillRange(const0F, (byte) 0x0F);
-            fillRange(const3F, (byte) 0x3F);
-        }
-    }
-
-    private static SimdByteScratch getSimdByteScratch(Simd simd) {
-        try {
-            SimdByteScratch out = simdByteScratch.get();
-            if (out == null) {
-                out = new SimdByteScratch(simd);
-                simdByteScratch.set(out);
-            }
-            return out;
-        } catch (Throwable t) {
-            synchronized (Base64.class) {
-                SimdByteScratch out = sharedSimdByteScratch;
-                if (out == null) {
-                    out = new SimdByteScratch(simd);
-                    sharedSimdByteScratch = out;
-                }
-                return out;
-            }
-        }
-    }
-
-    private static void mapSixBitValuesToAscii(Simd simd, byte[] indices, byte[] dst, byte[] encodeMap) {
-        simd.lookupBytes(encodeMap, indices, dst, 0, SIMD_BYTE_LANES);
-    }
-
-    /// SIMD-optimized Base64 encoding with explicit offsets and caller scratch.
-    /// Uses generic Simd int-domain operations to extract 6-bit indices and
-    /// map them to ASCII via branchless compare/select.
-    ///
-    /// Scratch layout: a single SIMD-allocated `int[]` buffer of at least 192 ints.
-    /// Working regions within scratch:
-    /// - [0..47]    : input bytes unpacked to ints (3 stripes of 16)
-    /// - [48..111]  : output indices / ASCII values (4 stripes of 16)
-    /// - [112..175] : temporaries
+    /// SIMD-optimized Base64 encoding with explicit offsets.
+    /// Full triplets are handled via a fused SIMD/native transform. Any 1- or
+    /// 2-byte tail remains scalar in Java for padding.
     @DisableDebugInfo
     @DisableNullChecksAndArrayBoundsChecks
-    public static int encodeNoNewlineSimd(byte[] in, int inOffset, int inLength, byte[] out, int outOffset, int[] scratch) {
+    public static int encodeNoNewlineSimd(byte[] in, int inOffset, int inLength, byte[] out, int outOffset) {
         int outputLength = ((inLength + 2) / 3) * 4;
         if (inLength == 0) {
             return 0;
         }
-        requireScratch(scratch);
         Simd simd = Simd.get();
-        SimdByteScratch bs = getSimdByteScratch(simd);
         byte[] encodeMap = getSimdEncodeMap(simd);
 
         int end3 = inOffset + inLength - (inLength % 3);
-        int si = inOffset;
         int di = outOffset;
-
-        int simdEnd = end3 - SIMD_BYTE_LANES * 3 + 1;
-        while (si < simdEnd) {
-            simd.unpackBytesInterleaved3(in, si, bs.lane0, bs.lane1, bs.lane2, SIMD_BYTE_LANES);
-
-            simd.shrLogical(bs.lane0, 2, bs.out0, 0, SIMD_BYTE_LANES);
-
-            simd.and(bs.lane0, bs.const03, bs.tmp, 0, SIMD_BYTE_LANES);
-            simd.shl(bs.tmp, 4, bs.tmp, 0, SIMD_BYTE_LANES);
-            simd.shrLogical(bs.lane1, 4, bs.out1, 0, SIMD_BYTE_LANES);
-            simd.or(bs.tmp, bs.out1, bs.out1, 0, SIMD_BYTE_LANES);
-
-            simd.and(bs.lane1, bs.const0F, bs.tmp, 0, SIMD_BYTE_LANES);
-            simd.shl(bs.tmp, 2, bs.tmp, 0, SIMD_BYTE_LANES);
-            simd.shrLogical(bs.lane2, 6, bs.out2, 0, SIMD_BYTE_LANES);
-            simd.or(bs.tmp, bs.out2, bs.out2, 0, SIMD_BYTE_LANES);
-
-            simd.and(bs.lane2, bs.const3F, bs.out3, 0, SIMD_BYTE_LANES);
-
-            mapSixBitValuesToAscii(simd, bs.out0, bs.lane0, encodeMap);
-            mapSixBitValuesToAscii(simd, bs.out1, bs.lane1, encodeMap);
-            mapSixBitValuesToAscii(simd, bs.out2, bs.lane2, encodeMap);
-            mapSixBitValuesToAscii(simd, bs.out3, bs.lane3, encodeMap);
-
-            simd.packBytesInterleaved4(bs.lane0, bs.lane1, bs.lane2, bs.lane3, out, di, SIMD_BYTE_LANES);
-
-            si += SIMD_BYTE_LANES * 3;
-            di += SIMD_BYTE_LANES * 4;
+        if (end3 > inOffset) {
+            di += simd.encodeBase64Triplets(in, inOffset, end3 - inOffset, encodeMap, out, outOffset);
         }
 
-        // Scalar tail for remaining complete triplets
         byte[] mapLocal = map;
-        while (si < end3) {
-            int b0 = in[si] & 0xff;
-            int b1 = in[si + 1] & 0xff;
-            int b2 = in[si + 2] & 0xff;
-            out[di]     = mapLocal[b0 >> 2];
-            out[di + 1] = mapLocal[((b0 & 0x03) << 4) | (b1 >> 4)];
-            out[di + 2] = mapLocal[((b1 & 0x0f) << 2) | (b2 >> 6)];
-            out[di + 3] = mapLocal[b2 & 0x3f];
-            si += 3;
-            di += 4;
-        }
-
-        // Handle 1- or 2-byte remainder with padding
+        int si = end3;
         switch (inOffset + inLength - end3) {
             case 1: {
                 int b0 = in[si] & 0xff;
@@ -683,27 +523,23 @@ public abstract class Base64 {
         return outputLength;
     }
 
+    /// Compatibility overload that ignores the legacy scratch parameter.
+    public static int encodeNoNewlineSimd(byte[] in, int inOffset, int inLength, byte[] out, int outOffset, int[] scratch) {
+        return encodeNoNewlineSimd(in, inOffset, inLength, out, outOffset);
+    }
+
     /// SIMD-optimized Base64 decoding for no-whitespace input.
-    /// Uses generic Simd int-domain operations to map ASCII chars back to
-    /// 6-bit values via branchless compare/select, then combines into bytes.
-    ///
-    /// Returns decoded bytes written, or `-1` for invalid input.
-    ///
-    /// Scratch layout: a single SIMD-allocated `int[]` buffer of at least 192 ints.
-    /// Working regions:
-    /// - [0..63]    : input chars unpacked to ints / decoded 6-bit values
-    /// - [64..111]  : output byte values (3 stripes of 16)
-    /// - [112..175] : temporaries
+    /// Full unpadded quads are decoded via a fused SIMD/native transform. The
+    /// last padded quad, when present, remains scalar in Java.
     @DisableDebugInfo
     @DisableNullChecksAndArrayBoundsChecks
-    public static int decodeNoWhitespaceSimd(byte[] in, int inOffset, int inLength, byte[] out, int outOffset, int[] scratch) {
+    public static int decodeNoWhitespaceSimd(byte[] in, int inOffset, int inLength, byte[] out, int outOffset) {
         if (inLength == 0) {
             return 0;
         }
         if ((inLength & 0x3) != 0) {
             return -1;
         }
-        requireScratch(scratch);
         Simd simd = Simd.get();
 
         int pad = 0;
@@ -721,59 +557,19 @@ public abstract class Base64 {
             return 0;
         }
 
-        SimdByteScratch bs = getSimdByteScratch(simd);
         byte[] decodeMap = getSimdDecodeMap(simd);
         int[] decodeMapLocal = decodeMapInt;
 
         int fullLen = inLength - (pad > 0 ? 4 : 0);
-        int fullEnd = inOffset + fullLen;
-        int si = inOffset;
         int di = outOffset;
-
-        int simdEnd = fullEnd - SIMD_BYTE_LANES * 4 + 1;
-        while (si < simdEnd) {
-            if (simd.unpackLookupBytesInterleaved4(decodeMap, in, si, bs.out0, bs.out1, bs.out2, bs.out3, SIMD_BYTE_LANES) < 0) {
+        if (fullLen > 0) {
+            int fusedDecoded = simd.decodeBase64Quads(decodeMap, in, inOffset, fullLen, out, outOffset);
+            if (fusedDecoded < 0) {
                 return -1;
             }
-
-            simd.shl(bs.out0, 2, bs.out0, 0, SIMD_BYTE_LANES);
-            simd.shrLogical(bs.out1, 4, bs.tmp, 0, SIMD_BYTE_LANES);
-            simd.or(bs.out0, bs.tmp, bs.out0, 0, SIMD_BYTE_LANES);
-
-            simd.shl(bs.out1, 4, bs.out1, 0, SIMD_BYTE_LANES);
-            simd.shrLogical(bs.out2, 2, bs.tmp, 0, SIMD_BYTE_LANES);
-            simd.or(bs.out1, bs.tmp, bs.out1, 0, SIMD_BYTE_LANES);
-
-            simd.shl(bs.out2, 6, bs.out2, 0, SIMD_BYTE_LANES);
-            simd.or(bs.out2, bs.out3, bs.out2, 0, SIMD_BYTE_LANES);
-
-            simd.packBytesInterleaved3(bs.out0, bs.out1, bs.out2, out, di, SIMD_BYTE_LANES);
-
-            si += SIMD_BYTE_LANES * 4;
-            di += SIMD_BYTE_LANES * 3;
+            di += fusedDecoded;
         }
 
-        // Scalar tail for remaining complete quads
-        while (si < fullEnd) {
-            int c0 = in[si] & 0xff;
-            int c1 = in[si + 1] & 0xff;
-            int c2 = in[si + 2] & 0xff;
-            int c3 = in[si + 3] & 0xff;
-            int b0 = decodeMapLocal[c0];
-            int b1 = decodeMapLocal[c1];
-            int b2 = decodeMapLocal[c2];
-            int b3 = decodeMapLocal[c3];
-            if ((b0 | b1 | b2 | b3) < 0) {
-                return -1;
-            }
-            int quantum = (b0 << 18) | (b1 << 12) | (b2 << 6) | b3;
-            out[di++] = (byte) ((quantum >> 16) & 0xff);
-            out[di++] = (byte) ((quantum >> 8) & 0xff);
-            out[di++] = (byte) (quantum & 0xff);
-            si += 4;
-        }
-
-        // Handle last quad with padding
         if (pad > 0) {
             int i = inOffset + inLength - 4;
             int c0 = in[i] & 0xff;
@@ -800,22 +596,33 @@ public abstract class Base64 {
         return outLength;
     }
 
-    /// Convenience overload for `encodeNoNewlineSimd(byte[], int, int, byte[], int, int[])`
+    /// Compatibility overload that ignores the legacy scratch parameter.
+    public static int decodeNoWhitespaceSimd(byte[] in, int inOffset, int inLength, byte[] out, int outOffset, int[] scratch) {
+        return decodeNoWhitespaceSimd(in, inOffset, inLength, out, outOffset);
+    }
+
+    /// Convenience overload for `encodeNoNewlineSimd(byte[], int, int, byte[], int)`
     /// using zero offsets.
+    public static int encodeNoNewlineSimd(byte[] in, byte[] out) {
+        return encodeNoNewlineSimd(in, 0, in.length, out, 0);
+    }
+
+    /// Convenience overload for `encodeNoNewlineSimd(byte[], int, int, byte[], int)`
+    /// that preserves the legacy scratch-bearing signature.
     public static int encodeNoNewlineSimd(byte[] in, byte[] out, int[] scratch) {
-        return encodeNoNewlineSimd(in, 0, in.length, out, 0, scratch);
+        return encodeNoNewlineSimd(in, 0, in.length, out, 0);
     }
 
-    /// Convenience overload for `decodeNoWhitespaceSimd(byte[], int, int, byte[], int, int[])`
-    /// using zero offsets.
+    /// Convenience overload for `decodeNoWhitespaceSimd(byte[], int, int, byte[], int)`
+    /// using zero input offset.
+    public static int decodeNoWhitespaceSimd(byte[] in, int len, byte[] out) {
+        return decodeNoWhitespaceSimd(in, 0, len, out, 0);
+    }
+
+    /// Convenience overload for `decodeNoWhitespaceSimd(byte[], int, int, byte[], int)`
+    /// that preserves the legacy scratch-bearing signature.
     public static int decodeNoWhitespaceSimd(byte[] in, int len, byte[] out, int[] scratch) {
-        return decodeNoWhitespaceSimd(in, 0, len, out, 0, scratch);
-    }
-
-    private static void requireScratch(int[] scratch) {
-        if (scratch == null || scratch.length < SIMD_SCRATCH_INTS) {
-            throw new IllegalArgumentException("scratch must be an int[] allocated with Simd.allocInt(192) or larger");
-        }
+        return decodeNoWhitespaceSimd(in, 0, len, out, 0);
     }
 
     private static byte[] allocByteMaybeSimd(int size) {
