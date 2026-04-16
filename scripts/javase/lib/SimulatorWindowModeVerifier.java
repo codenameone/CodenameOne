@@ -1,6 +1,6 @@
 package com.codenameone.examples.javase.tests;
 
-import com.codename1.impl.javase.Simulator;
+import com.codename1.impl.javase.Executor;
 
 import javax.imageio.ImageIO;
 import javax.swing.SwingUtilities;
@@ -34,9 +34,11 @@ public class SimulatorWindowModeVerifier {
         System.setProperty("cn1.simulator.useAppFrame", String.valueOf(expectSingleWindow));
         System.setProperty("cn1.test.window.mode", parsed.mode);
 
+        System.setProperty("cn1.javase.implementation", "jmf");
+
         Thread simulatorThread = new Thread(() -> {
             try {
-                Simulator.main(new String[]{APP_CLASS});
+                Executor.main(new String[]{APP_CLASS});
             } catch (Throwable t) {
                 t.printStackTrace(System.err);
             }
