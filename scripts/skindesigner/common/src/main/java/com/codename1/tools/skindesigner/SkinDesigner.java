@@ -56,6 +56,7 @@ public class SkinDesigner extends Lifecycle {
     @Override
     public void runApp() {
         Form skinDesignerForm = new Form("Skin Designer", new BorderLayout());
+        skinDesignerForm.setTitle("");
         skinDesignerForm.setUIID("SkinDesignerForm");
         Validator vl = new Validator();
         final Tabs details = new Tabs();
@@ -167,11 +168,11 @@ public class SkinDesigner extends Lifecycle {
         details.setTabSelectedIcon(0, portraitIconSel);
         details.setTabSelectedIcon(1, landscapeIconSel);
         details.setTabSelectedIcon(2, settingsIconSel);
-        Button portraitTab = new Button(portraitIconSel);
+        Button portraitTab = new Button("Portrait", portraitIconSel);
         portraitTab.setUIID("SkinDesignerTabButtonSelected");
-        Button landscapeTab = new Button(landscapeIcon);
+        Button landscapeTab = new Button("Landscape", landscapeIcon);
         landscapeTab.setUIID("SkinDesignerTabButton");
-        Button settingsTab = new Button(settingsIcon);
+        Button settingsTab = new Button("Settings", settingsIcon);
         settingsTab.setUIID("SkinDesignerTabButton");
         Container customTabBar = GridLayout.encloseIn(3, portraitTab, landscapeTab, settingsTab);
         customTabBar.setUIID("SkinDesignerTabBar");
@@ -269,7 +270,7 @@ public class SkinDesigner extends Lifecycle {
 
         refreshCustomTabs.run();
         skinDesignerForm.show();
-        initWebsiteThemeSync(skinDesignerForm);
+        initWebsiteThemeSync(skinDesignerForm, s);
     }
 
     private Label labeledFieldTitle(String text) {
@@ -284,18 +285,17 @@ public class SkinDesigner extends Lifecycle {
         }
     }
 
-    private void initWebsiteThemeSync(Form form) {
-        WebsiteThemeNative websiteThemeNative = NativeLookup.create(WebsiteThemeNative.class);
-        if (websiteThemeNative == null || !websiteThemeNative.isSupported()) {
+    private void initWebsiteThemeSync(Form form, ShouldExecute nativeBridge) {
+        if (nativeBridge == null || !nativeBridge.isSupported()) {
             return;
         }
-        websiteDarkMode = websiteThemeNative.isDarkMode();
+        websiteDarkMode = nativeBridge.isDarkMode();
         Display.getInstance().setDarkMode(websiteDarkMode);
         applyWebsiteTheme(form, websiteDarkMode);
         form.refreshTheme();
-        websiteThemeNative.notifyUiReady();
+        nativeBridge.notifyUiReady();
         UITimer.timer(900, true, form, () -> {
-            boolean dark = websiteThemeNative.isDarkMode();
+            boolean dark = nativeBridge.isDarkMode();
             if (dark != websiteDarkMode) {
                 websiteDarkMode = dark;
                 Display.getInstance().setDarkMode(dark);
