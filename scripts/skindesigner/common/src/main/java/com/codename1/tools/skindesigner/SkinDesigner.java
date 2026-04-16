@@ -28,6 +28,7 @@ import com.codename1.ui.Tabs;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
 import com.codename1.ui.Toolbar;
+import com.codename1.ui.UITimer;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
@@ -49,12 +50,16 @@ public class SkinDesigner extends Lifecycle {
     private static final String[] NATIVE_THEMES = {"iOS 7+", "iOS 6", "Android 4 +","Android 2.x", "Windows"};
     private static final String[] NATIVE_THEME_FILES = {"iOS7Theme.res", "iPhoneTheme.res",
             "android_holo_light.res","androidTheme.res", "winTheme.res"};
+    private boolean websiteDarkMode;
 
     @Override
     public void runApp() {
         Form skinDesignerForm = new Form("Skin Designer", new BorderLayout());
+        skinDesignerForm.setUIID("SkinDesignerForm");
         Validator vl = new Validator();
         final Tabs details = new Tabs();
+        details.getTabsContainer().setUIID("SkinDesignerTabsContainer");
+        details.getTabsContainer().setScrollableX(false);
         Style titleCommand = UIManager.getInstance().getComponentStyle("Command");
         ImageSettings imPortrait = createImageSettings("/skin.png", "port", vl);
         ImageSettings imLandscape = createImageSettings("/skin_l.png", "lan", vl);
@@ -62,24 +67,28 @@ public class SkinDesigner extends Lifecycle {
         skinDesignerForm.add(BorderLayout.CENTER, details);
 
         Picker nativeTheme = new Picker();
+        nativeTheme.setUIID("SkinDesignerField");
         nativeTheme.setStrings(NATIVE_THEMES);
         nativeTheme.setSelectedString(NATIVE_THEMES[0]);
         nativeTheme.setRenderingPrototype("XXXXXXXXXXXXXXXXXXX");
         autoSave(nativeTheme, "nativeTheme");
 
         Picker platformName = new Picker();
+        platformName.setUIID("SkinDesignerField");
         platformName.setStrings("ios", "and", "win","rim", "se");
         platformName.setSelectedString("ios");
         platformName.setRenderingPrototype("XXXX");
         autoSave(platformName, "platformName");
 
         OnOffSwitch tablet = new OnOffSwitch();
+        tablet.setUIID("SkinDesignerField");
         tablet.setValue(false);
         autoSave(tablet, "tablet");
 
         TextField systemFontFamily = new TextField("Helvetica", "System Font Family", 20, TextField.ANY);
         TextField proportionalFontFamily = new TextField("Helvetica", "Proportional Font Family", 20, TextField.ANY);
         TextField monospaceFontFamily = new TextField("Courier", "Monospace Font Family", 20, TextField.ANY);
+        styleFields(systemFontFamily, proportionalFontFamily, monospaceFontFamily);
         autoSave(systemFontFamily, "systemFontFamily");
         autoSave(proportionalFontFamily, "proportionalFontFamily");
         autoSave(monospaceFontFamily, "monospaceFontFamily");
@@ -87,26 +96,31 @@ public class SkinDesigner extends Lifecycle {
         TextField smallFontSize = new TextField("11", "Small Font Size", 20, TextField.NUMERIC);
         TextField mediumFontSize = new TextField("14", "Medium Font Size", 20, TextField.NUMERIC);
         TextField largeFontSize = new TextField("20", "Large Font Size", 20, TextField.NUMERIC);
+        styleFields(smallFontSize, mediumFontSize, largeFontSize);
         autoSave(smallFontSize, "smallFontSize");
         autoSave(mediumFontSize, "mediumFontSize");
         autoSave(largeFontSize, "largeFontSize");
 
         TextField pixelRatio = new TextField("6.4173236936575", "Pixel Ratio - pixels per millimeter", 20, TextField.DECIMAL);
+        pixelRatio.setUIID("SkinDesignerField");
         autoSave(pixelRatio, "pixelRatio");
 
         Picker overrideNamePrimary = new Picker();
+        overrideNamePrimary.setUIID("SkinDesignerField");
         overrideNamePrimary.setStrings("phone", "tablet", "desktop");
         overrideNamePrimary.setSelectedString("phone");
         overrideNamePrimary.setRenderingPrototype("XXXXXXXX");
         autoSave(overrideNamePrimary, "overrideNamePrimary");
 
         Picker overrideNameSecondary = new Picker();
+        overrideNameSecondary.setUIID("SkinDesignerField");
         overrideNameSecondary.setStrings("ios", "android", "windows");
         overrideNameSecondary.setSelectedString("ios");
         overrideNameSecondary.setRenderingPrototype("XXXXXXXX");
         autoSave(overrideNameSecondary, "overrideNameSecondary");
 
         Picker overrideNameLast = new Picker();
+        overrideNameLast.setUIID("SkinDesignerField");
         overrideNameLast.setStrings("iphone", "ipad", "android-phone", "android-tablet", "desktop");
         overrideNameLast.setSelectedString("iphone");
         overrideNameLast.setRenderingPrototype("XXXXXXXX");
@@ -114,27 +128,28 @@ public class SkinDesigner extends Lifecycle {
 
 
         Container settingsContainer = BoxLayout.encloseY(
-                new Label("Native Theme"),
+                labeledFieldTitle("Native Theme"),
                 nativeTheme,
-                new Label("Platform Name"),
+                labeledFieldTitle("Platform Name"),
                 platformName,
-                BorderLayout.center(new Label("Tablet")).add(BorderLayout.EAST, tablet),
-                new Label(systemFontFamily.getHint()),
+                BorderLayout.center(labeledFieldTitle("Tablet")).add(BorderLayout.EAST, tablet),
+                labeledFieldTitle(systemFontFamily.getHint()),
                 systemFontFamily,
-                new Label(proportionalFontFamily.getHint()),
+                labeledFieldTitle(proportionalFontFamily.getHint()),
                 proportionalFontFamily,
                 new FloatingHint(monospaceFontFamily),
-                new Label(smallFontSize.getHint()),
+                labeledFieldTitle(smallFontSize.getHint()),
                 smallFontSize,
-                new Label(mediumFontSize.getHint()),
+                labeledFieldTitle(mediumFontSize.getHint()),
                 mediumFontSize,
-                new Label(largeFontSize.getHint()),
+                labeledFieldTitle(largeFontSize.getHint()),
                 largeFontSize,
-                new Label(pixelRatio.getHint()),
+                labeledFieldTitle(pixelRatio.getHint()),
                 pixelRatio,
-                new Label("Platform Overrides"),
+                labeledFieldTitle("Platform Overrides"),
                 BoxLayout.encloseX(overrideNamePrimary, overrideNameSecondary, overrideNameLast)
         );
+        settingsContainer.setUIID("SkinDesignerCard");
         settingsContainer.setScrollableY(true);
 
         Style tab = UIManager.getInstance().getComponentStyle("Tab");
@@ -145,9 +160,9 @@ public class SkinDesigner extends Lifecycle {
         FontImage landscapeIconSel = FontImage.createMaterial(FontImage.MATERIAL_STAY_CURRENT_LANDSCAPE, tabSel, 4.5f);
         FontImage settingsIcon = FontImage.createMaterial(FontImage.MATERIAL_SETTINGS, tab, 3.5f);
         FontImage settingsIconSel = FontImage.createMaterial(FontImage.MATERIAL_SETTINGS, tabSel, 3.5f);
-        details.addTab("Portrait", portraitIcon, imPortrait.getContainer());
-        details.addTab("Landscape", landscapeIcon, imLandscape.getContainer());
-        details.addTab("Settings", settingsIcon, settingsContainer);
+        details.addTab("", portraitIcon, imPortrait.getContainer());
+        details.addTab("", landscapeIcon, imLandscape.getContainer());
+        details.addTab("", settingsIcon, settingsContainer);
         details.setTabSelectedIcon(0, portraitIconSel);
         details.setTabSelectedIcon(1, landscapeIconSel);
         details.setTabSelectedIcon(2, settingsIconSel);
@@ -209,7 +224,101 @@ public class SkinDesigner extends Lifecycle {
                     });
         }
 
+        initWebsiteThemeSync(skinDesignerForm);
         skinDesignerForm.show();
+    }
+
+    private Label labeledFieldTitle(String text) {
+        Label label = new Label(text);
+        label.setUIID("SkinDesignerFieldLabel");
+        return label;
+    }
+
+    private void styleFields(TextField... fields) {
+        for (TextField field : fields) {
+            field.setUIID("SkinDesignerField");
+        }
+    }
+
+    private void initWebsiteThemeSync(Form form) {
+        WebsiteThemeNative websiteThemeNative = NativeLookup.create(WebsiteThemeNative.class);
+        if (websiteThemeNative == null || !websiteThemeNative.isSupported()) {
+            return;
+        }
+        websiteDarkMode = websiteThemeNative.isDarkMode();
+        Display.getInstance().setDarkMode(websiteDarkMode);
+        applyWebsiteTheme(form, websiteDarkMode);
+        form.refreshTheme();
+        websiteThemeNative.notifyUiReady();
+        UITimer.timer(900, true, form, () -> {
+            boolean dark = websiteThemeNative.isDarkMode();
+            if (dark != websiteDarkMode) {
+                websiteDarkMode = dark;
+                Display.getInstance().setDarkMode(dark);
+                applyWebsiteTheme(form, dark);
+                form.refreshTheme();
+            }
+        });
+    }
+
+    private void applyWebsiteTheme(Container component, boolean dark) {
+        for (int i = 0; i < component.getComponentCount(); i++) {
+            com.codename1.ui.Component child = component.getComponentAt(i);
+            String uiid = child.getUIID();
+            String themed = themedUiid(uiid, dark);
+            if (uiid != null && !uiid.equals(themed)) {
+                child.setUIID(themed);
+            }
+            if (child instanceof Container) {
+                applyWebsiteTheme((Container) child, dark);
+            }
+        }
+        String containerUiid = component.getUIID();
+        String themedContainer = themedUiid(containerUiid, dark);
+        if (containerUiid != null && !containerUiid.equals(themedContainer)) {
+            component.setUIID(themedContainer);
+        }
+    }
+
+    private String themedUiid(String uiid, boolean dark) {
+        if (uiid == null || uiid.length() == 0) {
+            return uiid;
+        }
+        if (dark) {
+            if (uiid.endsWith("Dark")) {
+                return uiid;
+            }
+            switch (uiid) {
+                case "SkinDesignerForm":
+                case "SkinDesignerTabsContainer":
+                case "SkinDesignerCard":
+                case "SkinDesignerField":
+                case "SkinDesignerFieldLabel":
+                case "Tab":
+                case "TabSelected":
+                case "TabsContainer":
+                    return uiid + "Dark";
+                default:
+                    return uiid;
+            }
+        }
+        if (!uiid.endsWith("Dark")) {
+            return uiid;
+        }
+        String base = uiid.substring(0, uiid.length() - "Dark".length());
+        switch (base) {
+            case "SkinDesignerForm":
+            case "SkinDesignerTabsContainer":
+            case "SkinDesignerCard":
+            case "SkinDesignerField":
+            case "SkinDesignerFieldLabel":
+            case "Tab":
+            case "TabSelected":
+            case "TabsContainer":
+                return base;
+            default:
+                return uiid;
+        }
     }
 
     interface ImageSettings {
@@ -257,6 +366,7 @@ public class SkinDesigner extends Lifecycle {
         }
         ScaleImageLabel sl = new ScaleImageLabel(img);
         Button imagePicker = new Button("Select Image");
+        imagePicker.setUIID("SkinDesignerActionButton");
         imagePicker.addActionListener((e) -> {
             Display.getInstance().openGallery((ee) -> {
                 if(ee != null && ee.getSource() != null) {
@@ -284,6 +394,7 @@ public class SkinDesigner extends Lifecycle {
         final TextField screenHeightPixels = new TextField("480", "Height", 8, TextField.NUMERIC);
         final TextField screenPositionX = new TextField("40", "X", 8, TextField.NUMERIC);
         final TextField screenPositionY = new TextField("40", "Y", 8, TextField.NUMERIC);
+        styleFields(screenWidthPixels, screenHeightPixels, screenPositionX, screenPositionY);
         autoSave(screenWidthPixels, prefix + "Width");
         autoSave(screenHeightPixels, prefix + "Height");
         autoSave(screenPositionX, prefix + "X");
@@ -294,6 +405,7 @@ public class SkinDesigner extends Lifecycle {
                 addConstraint(screenPositionY, new NumericConstraint(false, 0, 5000, "Screen position must be a valid integer in the 0-5000 range"));
 
         Button aim = new Button();
+        aim.setUIID("SkinDesignerActionButton");
         FontImage.setMaterialIcon(aim, FontImage.MATERIAL_PAN_TOOL);
 
         aim.addActionListener(e ->
@@ -304,11 +416,11 @@ public class SkinDesigner extends Lifecycle {
                         screenHeightPixels.getAsInt(1024)));
 
         final Container cnt = BoxLayout.encloseY(imagePicker,
-                BorderLayout.center(
-                                new Label("Screen Position (X/Y/Width/Height)")).
+                BorderLayout.center(labeledFieldTitle("Screen Position (X/Y/Width/Height)")).
                         add(BorderLayout.EAST, aim),
                 GridLayout.encloseIn(4, screenPositionX, screenPositionY, screenWidthPixels, screenHeightPixels),
                 sl);
+        cnt.setUIID("SkinDesignerCard");
         cnt.setScrollableY(true);
         return new ImageSettings() {
             @Override

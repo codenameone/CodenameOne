@@ -1,55 +1,135 @@
-/** Define Theme Constants here */
 #Constants {
     includeNativeBool: true;
     defaultSourceDPIInt: "0";
     useLargerTextScaleBool: true;
 }
 
-/** Style for Button class */
-Button {
+SkinDesignerForm {
+    background: #eef3ff;
+}
+
+SkinDesignerFormDark {
+    background: #0a111d;
+}
+
+SkinDesignerTabsContainer {
+    background: #eef3ff;
+    border: none;
+}
+
+SkinDesignerTabsContainerDark {
+    background: #0a111d;
+    border: none;
+}
+
+Tab {
+    background: #f3f4f7;
+    color: #112247;
+    border: 1px solid #d9dee8;
+    font-family: "native:MainLight";
+    font-size: 2.8mm;
+    text-align: center;
+    margin: 0;
+    padding: 0.8mm;
+}
+
+TabDark {
+    background: #102b66;
+    color: #f5f8ff;
+    border: 1px solid #4c6ea8;
+    font-family: "native:MainLight";
+    font-size: 2.8mm;
+    text-align: center;
+    margin: 0;
+    padding: 0.8mm;
+}
+
+TabSelected {
+    background: #ffffff;
+    color: #112247;
+    border: 2px solid #2f6bff;
+}
+
+TabSelectedDark {
+    background: #163575;
+    color: #f5f8ff;
+    border: 2px solid #4d86ff;
+}
+
+TabsContainer {
+    background: #eef3ff;
+}
+
+TabsContainerDark {
+    background: #0a111d;
+}
+
+SkinDesignerCard {
+    background: #ffffff;
+    border: 1px solid #d9dee8;
+    border-radius: 2mm;
+    margin: 1mm;
+    padding: 1.2mm;
+}
+
+SkinDesignerCardDark {
+    background: #102b66;
+    border: 1px solid #4c6ea8;
+    border-radius: 2mm;
+    margin: 1mm;
+    padding: 1.2mm;
+}
+
+SkinDesignerFieldLabel {
+    color: #112247;
+    font-family: "native:MainLight";
+    font-size: 2.8mm;
+    margin: 0;
+    padding: 0.8mm 0.3mm 0.2mm 0.3mm;
+    background: transparent;
+}
+
+SkinDesignerFieldLabelDark {
+    color: #f5f8ff;
+    font-family: "native:MainLight";
+    font-size: 2.8mm;
+    margin: 0;
+    padding: 0.8mm 0.3mm 0.2mm 0.3mm;
+    background: transparent;
+}
+
+SkinDesignerField {
+    color: #112247;
+    background: #ffffff;
+    border: 1px solid #d9dee8;
+    padding: 1mm;
     font-family: "native:MainLight";
     font-size: 3mm;
 }
 
-/** Style for App Title Bar Text */
-Title {
-    font-family: "native:MainLight";
-    font-size: 6mm;
-}
-
-/** Style for Dialog body */
-DialogBody {
-    font-family: "native:MainLight";
-    font-size: 2.8mm;
-}
-
-/** Style for Dialog title bar text */
-DialogTitle {
-    font-family: "native:MainLight";
-    font-size: 4.5mm;
-}
-
-/** Style for the side menu */
-SideNavigationPanel {
-    background: white;
-    padding: 2mm 1mm 1mm 1mm;
-}
-
-@media platform-ios {
-    /** iOS Only styles for side menu. */
-    SideNavigationPanel {
-        /** Extra top padding to deal with notch on iPhoneX */
-        padding: 6mm 1mm 1mm 1mm;
-    }
-}
-
-/** Style for commands in side menu. */
-SideCommand {
+SkinDesignerFieldDark {
+    color: #f5f8ff;
+    background: #163575;
+    border: 1px solid #4c6ea8;
     padding: 1mm;
-    border: none;
-    text-decoration: none;
-    color: black;
     font-family: "native:MainLight";
-    font-size: 4mm;
-    border-bottom: 2px solid #cccccc;
+    font-size: 3mm;
+}
+
+SkinDesignerActionButton {
+    color: #ffffff;
+    background: #2f6bff;
+    border: none;
+    padding: 0.9mm 1.4mm;
+    font-family: "native:MainLight";
+    font-size: 2.7mm;
+}
+
+SkinDesignerActionButtonDark {
+    color: #f5f8ff;
+    background: #4d86ff;
+    border: none;
+    padding: 0.9mm 1.4mm;
+    font-family: "native:MainLight";
+    font-size: 2.7mm;
 }
