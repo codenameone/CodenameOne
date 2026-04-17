@@ -356,6 +356,10 @@ public class SkinDesigner extends Lifecycle {
         Container getContainer();
         Image createSkinOverlay();
         Image getSkinImage();
+        int getScreenX();
+        int getScreenY();
+        int getScreenWidth();
+        int getScreenHeight();
     }
 
     private void autoSave(TextArea ta, String preferencesKey) {
@@ -425,6 +429,18 @@ public class SkinDesigner extends Lifecycle {
         final TextField screenHeightPixels = new TextField("480", "Height", 8, TextField.NUMERIC);
         final TextField screenPositionX = new TextField("40", "X", 8, TextField.NUMERIC);
         final TextField screenPositionY = new TextField("40", "Y", 8, TextField.NUMERIC);
+        if("lan".equals(prefix) && Preferences.get("lanX", null) == null) {
+            String portraitX = Preferences.get("portX", null);
+            String portraitY = Preferences.get("portY", null);
+            String portraitWidth = Preferences.get("portWidth", null);
+            String portraitHeight = Preferences.get("portHeight", null);
+            if(portraitX != null && portraitY != null && portraitWidth != null && portraitHeight != null) {
+                screenPositionX.setText(portraitY);
+                screenPositionY.setText(portraitX);
+                screenWidthPixels.setText(portraitHeight);
+                screenHeightPixels.setText(portraitWidth);
+            }
+        }
         styleFields(screenWidthPixels, screenHeightPixels, screenPositionX, screenPositionY);
         autoSave(screenWidthPixels, prefix + "Width");
         autoSave(screenHeightPixels, prefix + "Height");
@@ -497,6 +513,26 @@ public class SkinDesigner extends Lifecycle {
                 g.fillRect(screenPositionX.getAsInt(0), screenPositionY.getAsInt(0),
                         screenWidthPixels.getAsInt(50), screenHeightPixels.getAsInt(50));
                 return m;
+            }
+
+            @Override
+            public int getScreenX() {
+                return screenPositionX.getAsInt(0);
+            }
+
+            @Override
+            public int getScreenY() {
+                return screenPositionY.getAsInt(0);
+            }
+
+            @Override
+            public int getScreenWidth() {
+                return screenWidthPixels.getAsInt(50);
+            }
+
+            @Override
+            public int getScreenHeight() {
+                return screenHeightPixels.getAsInt(50);
             }
         };
     }
@@ -753,6 +789,14 @@ public class SkinDesigner extends Lifecycle {
             props.put("overrideNames", overrideNamePrimary.getSelectedString() + "," +
                     overrideNameSecondary.getSelectedString() + "," +
                     overrideNameLast.getSelectedString());
+            props.put("safePortraitX", "" + imPortrait.getScreenX());
+            props.put("safePortraitY", "" + imPortrait.getScreenY());
+            props.put("safePortraitWidth", "" + imPortrait.getScreenWidth());
+            props.put("safePortraitHeight", "" + imPortrait.getScreenHeight());
+            props.put("safeLandscapeX", "" + imLandscape.getScreenX());
+            props.put("safeLandscapeY", "" + imLandscape.getScreenY());
+            props.put("safeLandscapeWidth", "" + imLandscape.getScreenWidth());
+            props.put("safeLandscapeHeight", "" + imLandscape.getScreenHeight());
 
             ze = new ZipEntry("skin.properties");
             zos.putNextEntry(ze);

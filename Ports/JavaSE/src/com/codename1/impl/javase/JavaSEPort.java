@@ -2729,7 +2729,17 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             landscapeSkinHotspots = new HashMap<Point, Integer>();
             landscapeScreenCoordinates = new Rectangle();
-            if(props.getProperty("roundScreen", "false").equalsIgnoreCase("true")) {
+            boolean roundScreen = props.getProperty("roundScreen", "false").equalsIgnoreCase("true");
+            boolean hasSafeAreaProps =
+                    props.getProperty("safePortraitX") != null ||
+                    props.getProperty("safePortraitY") != null ||
+                    props.getProperty("safePortraitWidth") != null ||
+                    props.getProperty("safePortraitHeight") != null ||
+                    props.getProperty("safeLandscapeX") != null ||
+                    props.getProperty("safeLandscapeY") != null ||
+                    props.getProperty("safeLandscapeWidth") != null ||
+                    props.getProperty("safeLandscapeHeight") != null;
+            if(roundScreen) {
                 safeAreaLandscape = new Rectangle();
                 safeAreaPortrait = new Rectangle();
 
@@ -2758,6 +2768,22 @@ public class JavaSEPort extends CodenameOneImplementation {
             } else {
                 initializeCoordinates(map, props, portraitSkinHotspots, portraitScreenCoordinates);
                 initializeCoordinates(landscapeMap, props, landscapeSkinHotspots, landscapeScreenCoordinates);
+                if (hasSafeAreaProps) {
+                    safeAreaPortrait = new Rectangle();
+                    safeAreaLandscape = new Rectangle();
+                    safeAreaPortrait.setBounds(
+                            Integer.parseInt(props.getProperty("safePortraitX", "" + portraitScreenCoordinates.x)),
+                            Integer.parseInt(props.getProperty("safePortraitY", "" + portraitScreenCoordinates.y)),
+                            Integer.parseInt(props.getProperty("safePortraitWidth", "" + portraitScreenCoordinates.width)),
+                            Integer.parseInt(props.getProperty("safePortraitHeight", "" + portraitScreenCoordinates.height))
+                    );
+                    safeAreaLandscape.setBounds(
+                            Integer.parseInt(props.getProperty("safeLandscapeX", "" + landscapeScreenCoordinates.x)),
+                            Integer.parseInt(props.getProperty("safeLandscapeY", "" + landscapeScreenCoordinates.y)),
+                            Integer.parseInt(props.getProperty("safeLandscapeWidth", "" + landscapeScreenCoordinates.width)),
+                            Integer.parseInt(props.getProperty("safeLandscapeHeight", "" + landscapeScreenCoordinates.height))
+                    );
+                }
             }
 
 
