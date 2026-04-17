@@ -104,6 +104,10 @@
   var hostRefNextId = 1;
   var hostRefById = {};
   var hostRefByObject = (typeof WeakMap === 'function') ? new WeakMap() : null;
+  var canvasMetaNextId = 1;
+  var canvasMetaByObject = (typeof WeakMap === 'function') ? new WeakMap() : null;
+  var canvasMetaById = {};
+  var canvasOpSeq = 1;
   var drawMethodNames = {
     clearRect: true,
     fillRect: true,
@@ -115,6 +119,90 @@
     fill: true,
     stroke: true
   };
+  var canvasStateMemberNames = {
+    fillStyle: true,
+    strokeStyle: true,
+    globalAlpha: true,
+    lineWidth: true,
+    globalCompositeOperation: true
+  };
+
+  function describeCanvasStateValue(value) {
+    if (value == null) {
+      return 'null';
+    }
+    if (typeof value === 'string') {
+      return value.length > 40 ? (value.substring(0, 40) + '...') : value;
+    }
+    if (typeof value === 'number' || typeof value === 'boolean') {
+      return String(value);
+    }
+    if (value && typeof value === 'object') {
+      if (typeof value.width === 'number' && typeof value.height === 'number') {
+        return '[canvas ' + String(value.width | 0) + 'x' + String(value.height | 0) + ']';
+      }
+      if (value.constructor && value.constructor.name) {
+        return '[' + String(value.constructor.name) + ']';
+      }
+    }
+    return String(value);
+  }
+
+  function getCanvasMeta(canvas) {
+    if (!isCanvasLike(canvas)) {
+      return null;
+    }
+    if (canvasMetaByObject && canvasMetaByObject.has(canvas)) {
+      return canvasMetaByObject.get(canvas);
+    }
+    var meta = {
+      id: canvasMetaNextId++,
+      opCount: 0,
+      setterCount: 0,
+      methodCount: 0,
+      paintCount: 0,
+      lastSeq: 0,
+      lastPaintSeq: 0,
+      lastKind: 'none',
+      lastMember: 'none',
+      fillStyle: 'unset',
+      strokeStyle: 'unset',
+      globalAlpha: 'unset',
+      lineWidth: 'unset',
+      globalCompositeOperation: 'unset'
+    };
+    canvasMetaById[meta.id] = meta;
+    if (canvasMetaByObject) {
+      canvasMetaByObject.set(canvas, meta);
+    }
+    return meta;
+  }
+
+  function noteCanvasOperation(canvas, kind, member, isPaint, assignedValue) {
+    var meta = getCanvasMeta(canvas);
+    if (!meta) {
+      return null;
+    }
+    meta.opCount++;
+    if (kind === 'setter') {
+      meta.setterCount++;
+    } else if (kind === 'method') {
+      meta.methodCount++;
+    }
+    meta.lastSeq = canvasOpSeq++;
+    meta.lastKind = String(kind || 'unknown');
+    meta.lastMember = String(member || 'unknown');
+    if (kind === 'setter' && canvasStateMemberNames[member]) {
+      meta[member] = describeCanvasStateValue(assignedValue);
+    }
+    if (isPaint) {
+      meta.paintCount++;
+      meta.lastPaintSeq = meta.lastSeq;
+      global.__cn1LastPaintCanvas = canvas;
+      global.__cn1LastPaintMember = meta.lastMember;
+    }
+    return meta;
+  }
 
   function isHostRefMarker(value) {
     return !!(value && typeof value === 'object'
@@ -232,7 +320,7 @@
       && typeof value.height === 'number');
   }
 
-  function noteDrawTarget(receiver, kind, member) {
+  function noteDrawTarget(receiver, kind, member, assignedValue) {
     if (!receiver || (kind !== 'method' && kind !== 'setter')) {
       return;
     }
@@ -245,9 +333,11 @@
     if (!canvas) {
       return;
     }
-    if (kind === 'method' && !drawMethodNames[member]) {
+    var isPaint = kind === 'method' && !!drawMethodNames[member];
+    if (kind === 'method' && !isPaint) {
       return;
     }
+    noteCanvasOperation(canvas, kind, member, isPaint, assignedValue);
     global.__cn1LastDrawCanvas = canvas;
     global.__cn1LastDrawMember = String(member || 'unknown');
   }
@@ -365,7 +455,7 @@
       }
       return Array.prototype.slice.call(value);
     }
-    noteDrawTarget(receiver, kind, member);
+    noteDrawTarget(receiver, kind, member, kind === 'setter' && args.length ? args[0] : null);
     if (isCanvasLike(receiver) && kind === 'method' && member === 'getContext') {
       global.__cn1LastDrawCanvas = receiver;
       global.__cn1LastDrawMember = 'getContext';
@@ -469,10 +559,13 @@
       [0.5, 0.2], [0.5, 0.8], [0.2, 0.5], [0.8, 0.5]
     ];
     var opaqueCount = 0;
-    var nonWhiteCount = 0;
     var signature = 'none';
     var sigHash = 2166136261 >>> 0;
     var sampled = 0;
+    var bucketMask = 0;
+    var transitionCount = 0;
+    var minLuma = 255;
+    var maxLuma = 0;
     for (var ri = 0; ri < regions.length; ri++) {
       var rx = regions[ri][0];
       var ry = regions[ri][1];
@@ -489,16 +582,28 @@
       }
       sampled++;
       var data = img.data;
+      var prevLuma = -1;
+      var prevAlpha = -1;
       for (var i = 0; i < data.length; i += 4) {
         var r = data[i] | 0;
         var g = data[i + 1] | 0;
         var b = data[i + 2] | 0;
         var a = data[i + 3] | 0;
         if (a > 12) {
+          var luma = (((r * 3) + (g * 4) + b) >> 3) | 0;
           opaqueCount++;
-          if (!(r >= 248 && g >= 248 && b >= 248)) {
-            nonWhiteCount++;
+          bucketMask |= (1 << ((luma >> 4) & 15));
+          if (luma < minLuma) {
+            minLuma = luma;
           }
+          if (luma > maxLuma) {
+            maxLuma = luma;
+          }
+          if (prevLuma >= 0 && (Math.abs(luma - prevLuma) > 12 || Math.abs(a - prevAlpha) > 12)) {
+            transitionCount++;
+          }
+          prevLuma = luma;
+          prevAlpha = a;
         }
         if ((i & 31) === 0) {
           sigHash ^= r;
@@ -516,13 +621,22 @@
       return null;
     }
     signature = String((sigHash >>> 0).toString(16));
+    var distinctBuckets = 0;
+    for (var bi = 0; bi < 16; bi++) {
+      if ((bucketMask & (1 << bi)) !== 0) {
+        distinctBuckets++;
+      }
+    }
+    var variation = maxLuma >= minLuma ? (maxLuma - minLuma) : 0;
     return {
-      score: (nonWhiteCount * 4) + opaqueCount,
+      score: (transitionCount * 8)
+        + (Math.max(0, distinctBuckets - 1) * 1024)
+        + (Math.max(0, variation - 8) * 4),
       signature: signature
     };
   }
 
-  function pickBestCanvasSnapshot(includeDataUrl) {
+  function pickBestCanvasSnapshot(includeDataUrl, previousSignature) {
     function pushCanvas(list, seen, canvas, source) {
       if (!canvas || !isCanvasLike(canvas)) {
         return;
@@ -533,28 +647,55 @@
       seen.push(canvas);
       list.push({ canvas: canvas, source: source });
     }
+    function sourcePriority(source) {
+      switch (source) {
+        case 'lastPaint':
+          return 5;
+        case 'lastDraw':
+          return 4;
+        case 'hostRefCanvas':
+          return 3;
+        case 'hostRef':
+          return 2;
+        case 'dom':
+          return 1;
+        default:
+          return 0;
+      }
+    }
+    function changedFromPrevious(signature, previous) {
+      if (!signature || signature === 'none') {
+        return 0;
+      }
+      if (!previous) {
+        return 1;
+      }
+      return signature !== previous ? 1 : 0;
+    }
+    var previous = previousSignature == null ? '' : String(previousSignature || '');
     var candidates = [];
     var seenCanvases = [];
+    pushCanvas(candidates, seenCanvases, global.__cn1LastPaintCanvas || null, 'lastPaint');
+    pushCanvas(candidates, seenCanvases, global.__cn1LastDrawCanvas || null, 'lastDraw');
+    if (hostRefById) {
+      var refKeys = Object.keys(hostRefById);
+      for (var rk = 0; rk < refKeys.length; rk++) {
+        var refVal = hostRefById[refKeys[rk]];
+        if (refVal && refVal.canvas && isCanvasLike(refVal.canvas)) {
+          pushCanvas(candidates, seenCanvases, refVal.canvas, 'hostRefCanvas');
+          continue;
+        }
+        if (isCanvasLike(refVal)) {
+          pushCanvas(candidates, seenCanvases, refVal, 'hostRef');
+        }
+      }
+    }
     var doc = global.document || (global.window && global.window.document) || null;
     if (doc && typeof doc.querySelectorAll === 'function') {
       var domCanvases = doc.querySelectorAll('canvas');
       if (domCanvases && domCanvases.length) {
         for (var di = 0; di < domCanvases.length; di++) {
           pushCanvas(candidates, seenCanvases, domCanvases[di], 'dom');
-        }
-      }
-    }
-    pushCanvas(candidates, seenCanvases, global.__cn1LastDrawCanvas || null, 'lastDraw');
-    if (hostRefById) {
-      var refKeys = Object.keys(hostRefById);
-      for (var rk = 0; rk < refKeys.length; rk++) {
-        var refVal = hostRefById[refKeys[rk]];
-        if (isCanvasLike(refVal)) {
-          pushCanvas(candidates, seenCanvases, refVal, 'hostRef');
-          continue;
-        }
-        if (refVal && refVal.canvas && isCanvasLike(refVal.canvas)) {
-          pushCanvas(candidates, seenCanvases, refVal.canvas, 'hostRefCanvas');
         }
       }
     }
@@ -572,15 +713,30 @@
       var h = (c.height | 0);
       var area = w * h;
       var scoreMeta = canvasContentScore(c);
+      var canvasMeta = getCanvasMeta(c);
       var score = scoreMeta && scoreMeta.score != null ? (scoreMeta.score | 0) : -1;
       var signature = scoreMeta && scoreMeta.signature ? String(scoreMeta.signature) : 'none';
       evaluated.push({
         canvas: c,
         index: i,
         source: candidates[i].source || 'unknown',
+        sourcePriority: sourcePriority(candidates[i].source || 'unknown'),
+        changedFromPrevious: changedFromPrevious(signature, previous),
         area: area,
         score: score,
         signature: signature,
+        canvasId: canvasMeta ? canvasMeta.id : -1,
+        opCount: canvasMeta ? (canvasMeta.opCount | 0) : 0,
+        paintCount: canvasMeta ? (canvasMeta.paintCount | 0) : 0,
+        lastSeq: canvasMeta ? (canvasMeta.lastSeq | 0) : 0,
+        lastPaintSeq: canvasMeta ? (canvasMeta.lastPaintSeq | 0) : 0,
+        lastMember: canvasMeta ? String(canvasMeta.lastMember || 'none') : 'none',
+        lastKind: canvasMeta ? String(canvasMeta.lastKind || 'none') : 'none',
+        fillStyle: canvasMeta ? String(canvasMeta.fillStyle || 'unset') : 'unset',
+        strokeStyle: canvasMeta ? String(canvasMeta.strokeStyle || 'unset') : 'unset',
+        globalAlpha: canvasMeta ? String(canvasMeta.globalAlpha || 'unset') : 'unset',
+        lineWidth: canvasMeta ? String(canvasMeta.lineWidth || 'unset') : 'unset',
+        globalCompositeOperation: canvasMeta ? String(canvasMeta.globalCompositeOperation || 'unset') : 'unset',
         width: w,
         height: h
       });
@@ -592,14 +748,57 @@
       return null;
     }
     var minLargeArea = Math.max(65536, Math.floor(maxArea * 0.45));
-    var pool = [];
+    var minMeaningfulArea = Math.max(4096, Math.floor(maxArea * 0.005));
+    var largePool = [];
     for (var p = 0; p < evaluated.length; p++) {
       if (evaluated[p].area >= minLargeArea) {
-        pool.push(evaluated[p]);
+        largePool.push(evaluated[p]);
+      }
+    }
+    var pool = largePool.slice();
+    for (var q = 0; q < evaluated.length; q++) {
+      var mediumCandidate = evaluated[q];
+      if (mediumCandidate.area >= minLargeArea) {
+        continue;
+      }
+      if (mediumCandidate.area < minMeaningfulArea) {
+        continue;
+      }
+      if ((mediumCandidate.score | 0) <= 128) {
+        continue;
+      }
+      pool.push(mediumCandidate);
+    }
+    if (!pool.length) {
+      for (var r = 0; r < evaluated.length; r++) {
+        if (evaluated[r].area >= minMeaningfulArea) {
+          pool.push(evaluated[r]);
+        }
       }
     }
     if (!pool.length) {
       pool = evaluated;
+    }
+    var candidateSummary = [];
+    for (var s = 0; s < evaluated.length && s < 8; s++) {
+      var summaryEntry = evaluated[s];
+      candidateSummary.push(
+        String(summaryEntry.index)
+        + ':id=' + String(summaryEntry.canvasId | 0)
+        + ':' + String(summaryEntry.source || 'unknown')
+        + ':' + String(summaryEntry.width | 0) + 'x' + String(summaryEntry.height | 0)
+        + ':score=' + String(summaryEntry.score | 0)
+        + ':sig=' + String(summaryEntry.signature || 'none')
+        + ':paint=' + String(summaryEntry.paintCount | 0)
+        + ':ops=' + String(summaryEntry.opCount | 0)
+        + ':last=' + String(summaryEntry.lastKind || 'none') + '.' + String(summaryEntry.lastMember || 'none')
+        + ':alpha=' + String(summaryEntry.globalAlpha || 'unset')
+        + ':fill=' + String(summaryEntry.fillStyle || 'unset')
+        + ':stroke=' + String(summaryEntry.strokeStyle || 'unset')
+        + ':changed=' + String(summaryEntry.changedFromPrevious | 0)
+        + ':large=' + String(summaryEntry.area >= minLargeArea ? 1 : 0)
+        + ':keep=' + String(pool.indexOf(summaryEntry) >= 0 ? 1 : 0)
+      );
     }
     var best = null;
     var bestArea = -1;
@@ -607,9 +806,31 @@
     var bestIndex = -1;
     var bestSource = 'none';
     var bestSignature = 'none';
+    var bestSourcePriority = -1;
+    var bestChangedFromPrevious = -1;
+    var bestMeaningful = -1;
+    var bestHasPaint = -1;
+    var bestPaintCount = -1;
+    var bestLastPaintSeq = -1;
     for (var j = 0; j < pool.length; j++) {
       var pick = pool[j];
-      if (pick.score > bestScore || (pick.score === bestScore && pick.area > bestArea)) {
+      var pickMeaningful = (pick.score | 0) > 128 ? 1 : 0;
+      var pickHasPaint = (pick.paintCount | 0) > 0 ? 1 : 0;
+      if (!best
+          || pickMeaningful > bestMeaningful
+          || (pickMeaningful === bestMeaningful && pickHasPaint > bestHasPaint)
+          || (pickMeaningful === bestMeaningful && pickHasPaint === bestHasPaint && pick.score > bestScore)
+          || (pickMeaningful === bestMeaningful && pickHasPaint === bestHasPaint && pick.score === bestScore && pick.paintCount > bestPaintCount)
+          || (pickMeaningful === bestMeaningful && pickHasPaint === bestHasPaint && pick.score === bestScore && pick.paintCount === bestPaintCount && pick.lastPaintSeq > bestLastPaintSeq)
+          || (pickMeaningful === bestMeaningful && pickHasPaint === bestHasPaint && pick.score === bestScore && pick.paintCount === bestPaintCount && pick.lastPaintSeq === bestLastPaintSeq && pick.changedFromPrevious > bestChangedFromPrevious)
+          || (pickMeaningful === bestMeaningful && pickHasPaint === bestHasPaint && pick.score === bestScore && pick.paintCount === bestPaintCount && pick.lastPaintSeq === bestLastPaintSeq && pick.changedFromPrevious === bestChangedFromPrevious && pick.sourcePriority > bestSourcePriority)
+          || (pickMeaningful === bestMeaningful && pickHasPaint === bestHasPaint && pick.score === bestScore && pick.paintCount === bestPaintCount && pick.lastPaintSeq === bestLastPaintSeq && pick.changedFromPrevious === bestChangedFromPrevious && pick.sourcePriority === bestSourcePriority && pick.area > bestArea)) {
+        bestMeaningful = pickMeaningful;
+        bestHasPaint = pickHasPaint;
+        bestChangedFromPrevious = pick.changedFromPrevious;
+        bestSourcePriority = pick.sourcePriority;
+        bestPaintCount = pick.paintCount | 0;
+        bestLastPaintSeq = pick.lastPaintSeq | 0;
         bestScore = pick.score;
         bestArea = pick.area;
         best = pick.canvas;
@@ -624,13 +845,20 @@
     var out = {
       canvasCount: candidates.length,
       canvasConsidered: evaluated.length,
-      canvasLargeCount: pool.length,
+      canvasLargeCount: largePool.length,
+      canvasSelectionCount: pool.length,
       canvasMinLargeArea: minLargeArea,
+      canvasMinMeaningfulArea: minMeaningfulArea,
       canvasPick: bestIndex,
       canvasArea: bestArea,
       canvasScore: bestScore,
       canvasSource: bestSource,
-      canvasSignature: bestSignature
+      canvasSignature: bestSignature,
+      canvasPaintCount: bestPaintCount,
+      canvasLastPaintSeq: bestLastPaintSeq,
+      canvasCandidatesSummary: candidateSummary.join('|'),
+      changedFromPrevious: bestChangedFromPrevious,
+      sourcePriority: bestSourcePriority
     };
     if (!includeDataUrl) {
       return out;
@@ -670,7 +898,7 @@
     }
     function runFrame(index) {
       return afterPaint(1).then(function() {
-        var sample = pickBestCanvasSnapshot(false);
+        var sample = pickBestCanvasSnapshot(false, previousSignature);
         best = chooseBetter(best, sample);
         if (sample && sample.canvasSignature && sample.canvasSignature !== 'none') {
           var sig = String(sample.canvasSignature);
@@ -721,7 +949,7 @@
 
   hostBridge.register('__cn1_capture_canvas_png__', function() {
     function captureNow() {
-      return pickBestCanvasSnapshot(true);
+      return pickBestCanvasSnapshot(true, previousSignature);
     }
     var previousSignature = String(global.__cn1LastScreenshotSignature || '');
     var attempts = 8;
@@ -769,12 +997,17 @@
       diag('SCREENSHOT_START', 'canvasCount', result.canvasCount);
       diag('SCREENSHOT_START', 'canvasConsidered', result.canvasConsidered | 0);
       diag('SCREENSHOT_START', 'canvasLargeCount', result.canvasLargeCount | 0);
+      diag('SCREENSHOT_START', 'canvasSelectionCount', result.canvasSelectionCount | 0);
       diag('SCREENSHOT_START', 'canvasMinLargeArea', result.canvasMinLargeArea | 0);
+      diag('SCREENSHOT_START', 'canvasMinMeaningfulArea', result.canvasMinMeaningfulArea | 0);
       diag('SCREENSHOT_START', 'canvasPick', result.canvasPick);
       diag('SCREENSHOT_START', 'canvasArea', result.canvasArea);
       diag('SCREENSHOT_START', 'canvasScore', result.canvasScore);
       diag('SCREENSHOT_START', 'canvasSource', result.canvasSource || 'unknown');
       diag('SCREENSHOT_START', 'canvasSig', result.canvasSignature || 'none');
+      diag('SCREENSHOT_START', 'canvasPaintCount', result.canvasPaintCount | 0);
+      diag('SCREENSHOT_START', 'canvasLastPaintSeq', result.canvasLastPaintSeq | 0);
+      diag('SCREENSHOT_START', 'canvasCandidates', result.canvasCandidatesSummary || 'none');
       diag('SCREENSHOT_START', 'attempt', result.attempt | 0);
       diag('SCREENSHOT_START', 'changed', result.changedFromPrevious ? 1 : 0);
       diag('SCREENSHOT_START', 'pngLen', String(result.dataUrl || '').length);

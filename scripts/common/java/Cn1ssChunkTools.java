@@ -5,6 +5,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.regex.Matcher;
@@ -161,6 +162,7 @@ public class Cn1ssChunkTools {
     private static Iterable<Chunk> iterateChunks(Path path, Optional<String> testFilter, Optional<String> channelFilter) throws IOException {
         String text = Files.readString(path, StandardCharsets.UTF_8);
         List<Chunk> result = new ArrayList<>();
+        HashSet<String> seen = new HashSet<>();
         String[] lines = text.split("\r?\n");
         for (String line : lines) {
             Matcher matcher = CHUNK_PATTERN.matcher(line);
@@ -178,7 +180,10 @@ public class Cn1ssChunkTools {
             int index = Integer.parseInt(matcher.group("index"));
             String payload = matcher.group("payload").replaceAll("[^A-Za-z0-9+/=]", "");
             if (!payload.isEmpty()) {
-                result.add(new Chunk(test, channel, index, payload));
+                String dedupeKey = test + '\u0000' + channel + '\u0000' + index + '\u0000' + payload;
+                if (seen.add(dedupeKey)) {
+                    result.add(new Chunk(test, channel, index, payload));
+                }
             }
         }
         return result;

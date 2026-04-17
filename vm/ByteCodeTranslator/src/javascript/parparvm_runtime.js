@@ -934,6 +934,10 @@ const jvm = {
     if (value.__class === "java_lang_String" || value.__nativeString != null) {
       return this.toNativeString(value);
     }
+    const boxedPrimitive = runtimeBoxedPrimitiveValue(value);
+    if (boxedPrimitive !== null) {
+      return boxedPrimitive;
+    }
     for (let i = 0; i < jsoRegistry.nativeArgConverters.length; i++) {
       const converted = jsoRegistry.nativeArgConverters[i](value, this);
       if (converted !== value) {
