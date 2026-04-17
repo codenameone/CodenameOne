@@ -86,7 +86,20 @@ if [ -z "$SIM_SKIN_PATH" ] || [ ! -f "$SIM_SKIN_PATH" ]; then
   SKIN_ARCHIVE="$SKIN_CACHE_DIR/skins.tar.gz"
   SKIN_EXTRACT_DIR="$SKIN_CACHE_DIR/extracted"
   if [ ! -s "$SKIN_ARCHIVE" ]; then
-    SKIN_URL="$(python3 - <<'PY'\nimport json, urllib.request\nwith urllib.request.urlopen('https://api.github.com/repos/codenameone/codenameone-skins/releases/latest') as r:\n    data = json.load(r)\nassets = data.get('assets') or []\nif not assets:\n    raise SystemExit('')\nprint(assets[0].get('browser_download_url', ''))\nPY\n)"
+    SKIN_URL="$(python3 - <<'PY'
+import json
+import urllib.request
+
+with urllib.request.urlopen('https://api.github.com/repos/codenameone/codenameone-skins/releases/latest') as response:
+    data = json.load(response)
+
+assets = data.get('assets') or []
+if not assets:
+    raise SystemExit('')
+
+print(assets[0].get('browser_download_url', ''))
+PY
+)"
     if [ -z "$SKIN_URL" ]; then
       js_log "Failed to resolve codenameone-skins release asset URL" >&2
       exit 2
