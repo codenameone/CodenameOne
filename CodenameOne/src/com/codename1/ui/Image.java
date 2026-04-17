@@ -84,7 +84,7 @@ public class Image implements ActionSource {
         simdOptimizationsInitialized = false;
     }
 
-    private static Simd getImageSimd(int length) {
+    static Simd getImageSimd(int length) {
         if (length < 16 || !Display.isInitialized() || !isSimdOptimizationsEnabled()) {
             return null;
         }
@@ -1502,7 +1502,7 @@ public class Image implements ActionSource {
             for (int iter = 0; iter < blockSize; iter++) {
                 scratch[maskOffset + iter] = 0xffffff;
                 scratch[alphaOffset + iter] = alphaInt;
-                scratch[removeColorOffset + iter] = removeColor;
+                scratch[removeColorOffset + iter] = removeColor & 0xffffff;
             }
             for (int offset = 0; offset < size; offset += blockSize) {
                 int length = Math.min(blockSize, size - offset);

@@ -142,8 +142,8 @@ public class RGBImage extends Image {
     public Image modifyAlpha(byte alpha) {
         int[] arr = new int[rgb.length];
         System.arraycopy(rgb, 0, arr, 0, rgb.length);
-        if (Image.isSimdOptimizationsEnabled() && Display.isInitialized() && arr.length >= 16) {
-            Simd simd = Simd.get();
+        Simd simd = Image.getImageSimd(arr.length);
+        if (simd != null) {
             int blockSize = Math.min(arr.length, 64);
             int srcOffset = 0;
             int workOffset = blockSize;
