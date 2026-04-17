@@ -23,6 +23,8 @@
  */
 package com.codename1.ui;
 
+import com.codename1.util.Simd;
+
 /// An image that stores its data as an integer RGB array internally,
 /// this image cannot be manipulated via Graphics primitives however its
 /// array is accessible and modifiable programmatically. This is very useful
@@ -138,10 +140,34 @@ public class RGBImage extends Image {
     /// {@inheritDoc}
     @Override
     public Image modifyAlpha(byte alpha) {
-        int[] arr = Image.modifyAlphaPixelsSimd(rgb, alpha);
-        if (arr == null) {
-            arr = new int[rgb.length];
-            System.arraycopy(rgb, 0, arr, 0, rgb.length);
+        int[] arr = new int[rgb.length];
+        System.arraycopy(rgb, 0, arr, 0, rgb.length);
+        if (Image.isSimdOptimizationsEnabled() && Display.isInitialized() && arr.length >= 16) {
+            Simd simd = Simd.get();
+            int blockSize = Math.min(arr.length, 64);
+            int srcOffset = 0;
+            int workOffset = blockSize;
+            int maskOffset = blockSize * 2;
+            int alphaOffset = blockSize * 3;
+            int zeroOffset = blockSize * 4;
+            int[] scratch = simd.allocInt(blockSize * 5);
+            byte[] scratchBytes = simd.allocByte(blockSize);
+            int alphaInt = (((int) alpha) << 24) & 0xff000000;
+            for (int iter = 0; iter < blockSize; iter++) {
+                scratch[maskOffset + iter] = 0xffffff;
+                scratch[alphaOffset + iter] = alphaInt;
+            }
+            for (int offset = 0; offset < arr.length; offset += blockSize) {
+                int length = Math.min(blockSize, arr.length - offset);
+                System.arraycopy(arr, offset, scratch, srcOffset, length);
+                simd.shrLogical(scratch, srcOffset, 24, scratch, workOffset, length);
+                simd.cmpEq(scratch, workOffset, scratch, zeroOffset, scratchBytes, 0, length);
+                simd.and(scratch, srcOffset, scratch, maskOffset, scratch, workOffset, length);
+                simd.or(scratch, workOffset, scratch, alphaOffset, scratch, workOffset, length);
+                simd.select(scratchBytes, 0, scratch, srcOffset, scratch, workOffset, scratch, srcOffset, length);
+                System.arraycopy(scratch, srcOffset, arr, offset, length);
+            }
+        } else {
             int alphaInt = (((int) alpha) << 24) & 0xff000000;
             int rlen = rgb.length;
             for (int iter = 0; iter < rlen; iter++) {
