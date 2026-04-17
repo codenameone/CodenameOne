@@ -29,6 +29,7 @@ import com.codename1.ui.TextField;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.spinner.Picker;
@@ -59,8 +60,8 @@ public class SkinDesigner extends Lifecycle {
         final Tabs details = new Tabs();
         details.getTabsContainer().setUIID("SkinDesignerTabsContainer");
         details.getTabsContainer().setScrollableX(false);
-        ImageSettings imPortrait = createImageSettings("/skin.png", "port", vl);
-        ImageSettings imLandscape = createImageSettings("/skin_l.png", "lan", vl);
+        final ImageSettings[] imPortraitRef = new ImageSettings[1];
+        final ImageSettings[] imLandscapeRef = new ImageSettings[1];
 
         skinDesignerForm.add(BorderLayout.CENTER, details);
 
@@ -159,21 +160,8 @@ public class SkinDesigner extends Lifecycle {
                 addConstraint(pixelRatio, new NumericConstraint(true, 0.1, 60, "PixelRatio is a positive decimal size in the range of 0.1 to 60")).
                 setShowErrorMessageForFocusedComponent(true);
 
-        Button helpAction = new Button("Help");
-        styleActionButton(helpAction, FontImage.MATERIAL_HELP);
-        helpAction.addActionListener(e -> {
-            BrowserComponent help = new BrowserComponent();
-            help.setURL("jar:///help.html");
-            Form helpForm = new Form("Help", new BorderLayout());
-            helpForm.add(BorderLayout.CENTER, help);
-            helpForm.getToolbar().setBackCommand("Back", ee -> skinDesignerForm.showBack());
-            helpForm.show();
-        });
-
-        Button saveAction = new Button("Save");
-        styleActionButton(saveAction, FontImage.MATERIAL_SAVE);
-        saveAction.addActionListener(e -> {
-            byte[] data = createSkinFile(imPortrait, imLandscape, nativeTheme, platformName, tablet, systemFontFamily,
+        Runnable saveAction = () -> {
+            byte[] data = createSkinFile(imPortraitRef[0], imLandscapeRef[0], nativeTheme, platformName, tablet, systemFontFamily,
                     proportionalFontFamily, monospaceFontFamily, smallFontSize, mediumFontSize, largeFontSize,
                     pixelRatio, overrideNamePrimary, overrideNameSecondary, overrideNameLast);
             if(data != null) {
@@ -187,32 +175,12 @@ public class SkinDesigner extends Lifecycle {
                 // in the JavaScript port this will trigger the download dialog
                 Display.getInstance().execute(fs.getAppHomePath() + "skin-file.skin");
             }
-        });
+        };
 
-        Button shareAction = new Button("Share");
-        styleActionButton(shareAction, FontImage.MATERIAL_SHARE);
-        shareAction.addActionListener(e -> {
-            byte[] data = createSkinFile(imPortrait, imLandscape, nativeTheme, platformName, tablet, systemFontFamily,
-                    proportionalFontFamily, monospaceFontFamily, smallFontSize, mediumFontSize, largeFontSize,
-                    pixelRatio, overrideNamePrimary, overrideNameSecondary, overrideNameLast);
-            if(data != null) {
-                FileSystemStorage fs = FileSystemStorage.getInstance();
-                try(OutputStream os = fs.openOutputStream(fs.getAppHomePath() + "skin-file.skin")) {
-                    os.write(data);
-                } catch(IOException err) {
-                    Log.e(err);
-                    ToastBar.showErrorMessage("Error wring skin file " + err);
-                }
-                Display.getInstance().share(null, fs.getAppHomePath() + "skin-file.skin", "application/vnd.codenameone-skin");
-            }
-        });
-        if (!Display.getInstance().isNativeShareSupported()) {
-            shareAction.setHidden(true);
-            shareAction.setVisible(false);
-        }
-        Container actions = GridLayout.encloseIn(3, helpAction, saveAction, shareAction);
-        actions.setUIID("SkinDesignerTabBar");
-        skinDesignerForm.add(BorderLayout.SOUTH, actions);
+        imPortraitRef[0] = createImageSettings("/skin.png", "port", vl, () -> showHelpForm(skinDesignerForm), saveAction);
+        imLandscapeRef[0] = createImageSettings("/skin_l.png", "lan", vl, () -> showHelpForm(skinDesignerForm), saveAction);
+        ImageSettings imPortrait = imPortraitRef[0];
+        ImageSettings imLandscape = imLandscapeRef[0];
 
         skinDesignerForm.show();
         initThemeFromUrl(skinDesignerForm, details);
@@ -235,6 +203,12 @@ public class SkinDesigner extends Lifecycle {
         FontImage.setMaterialIcon(button, materialIcon);
         button.getAllStyles().setAlignment(Component.CENTER);
         button.setGap(CN.convertToPixels(0.7f));
+    }
+
+    private void styleIconActionButton(Button button, char materialIcon) {
+        styleActionButton(button, materialIcon);
+        button.setText("");
+        button.setGap(0);
     }
 
     private void initThemeFromUrl(Form form, Tabs details) {
@@ -414,7 +388,7 @@ public class SkinDesigner extends Lifecycle {
         });
     }
 
-    private ImageSettings createImageSettings(String imageFile, String prefix, Validator vl) {
+    private ImageSettings createImageSettings(String imageFile, String prefix, Validator vl, Runnable helpCallback, Runnable saveCallback) {
         Image img = null;
         try {
             img = Image.createImage(Display.getInstance().getResourceAsStream(getClass(), imageFile));
@@ -462,8 +436,7 @@ public class SkinDesigner extends Lifecycle {
                 addConstraint(screenPositionY, new NumericConstraint(false, 0, 5000, "Screen position must be a valid integer in the 0-5000 range"));
 
         Button aim = new Button();
-        aim.setUIID("SkinDesignerActionButton");
-        FontImage.setMaterialIcon(aim, FontImage.MATERIAL_PAN_TOOL);
+        styleIconActionButton(aim, FontImage.MATERIAL_PAN_TOOL);
 
         aim.addActionListener(e ->
                 aimPosition(sl.getIcon(),
@@ -472,9 +445,17 @@ public class SkinDesigner extends Lifecycle {
                         screenWidthPixels.getAsInt(768),
                         screenHeightPixels.getAsInt(1024)));
 
+        Button helpButton = new Button();
+        styleIconActionButton(helpButton, FontImage.MATERIAL_HELP);
+        helpButton.addActionListener(e -> helpCallback.run());
+
+        Button saveButton = new Button();
+        styleIconActionButton(saveButton, FontImage.MATERIAL_SAVE);
+        saveButton.addActionListener(e -> saveCallback.run());
+
         final Container cnt = BoxLayout.encloseY(imagePicker,
                 BorderLayout.center(labeledFieldTitle("Screen Position (X/Y/Width/Height)")).
-                        add(BorderLayout.EAST, aim),
+                        add(BorderLayout.EAST, BoxLayout.encloseX(aim, helpButton, saveButton)),
                 GridLayout.encloseIn(4, screenPositionX, screenPositionY, screenWidthPixels, screenHeightPixels),
                 sl);
         cnt.setUIID("SkinDesignerCard");
@@ -518,6 +499,22 @@ public class SkinDesigner extends Lifecycle {
                 return m;
             }
         };
+    }
+
+    private void showHelpForm(Form backForm) {
+        BrowserComponent help = new BrowserComponent();
+        help.setURL("jar:///help.html");
+        Form helpForm = new Form("Help", new BorderLayout());
+        helpForm.setUIID("SkinDesignerForm");
+        helpForm.add(BorderLayout.CENTER, help);
+        Button back = new Button();
+        styleIconActionButton(back, FontImage.MATERIAL_ARROW_BACK);
+        back.addActionListener(ee -> backForm.showBack());
+        Container helpActions = FlowLayout.encloseRight(back);
+        helpActions.setUIID("SkinDesignerTabBar");
+        helpForm.add(BorderLayout.NORTH, helpActions);
+        applyWebsiteTheme(helpForm, websiteDarkMode);
+        helpForm.show();
     }
 
     private Image createMute(int x, int y, int w, int h, Image img) {
