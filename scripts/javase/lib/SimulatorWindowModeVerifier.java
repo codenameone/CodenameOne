@@ -50,6 +50,7 @@ public class SimulatorWindowModeVerifier {
             }
             if ("test-recorder".equals(parsed.scenario)) {
                 cmd.add("-Dcn1.simulator.autoTestRecorder=true");
+                cmd.add("-Dcn1.simulator.autoTestRecorderRecord=true");
             }
             if (parsed.skinPath != null && parsed.skinPath.length() > 0) {
                 cmd.add("-Dskin=" + parsed.skinPath);
@@ -68,8 +69,7 @@ public class SimulatorWindowModeVerifier {
 
             waitForSimulatorWarmup(Duration.ofSeconds("network-monitor".equals(parsed.scenario) ? 12 : 8));
 
-            BufferedImage raw = captureDesktop();
-            BufferedImage image = cropToNonBlack(raw);
+            BufferedImage image = captureDesktop();
             validateScreenshotContent(image);
 
             Path screenshotPath = Path.of(parsed.screenshotPath);
@@ -107,33 +107,6 @@ public class SimulatorWindowModeVerifier {
         Dimension size = Toolkit.getDefaultToolkit().getScreenSize();
         Rectangle bounds = new Rectangle(0, 0, Math.max(1, size.width), Math.max(1, size.height));
         return new Robot().createScreenCapture(bounds);
-    }
-
-    private static BufferedImage cropToNonBlack(BufferedImage src) {
-        int minX = src.getWidth();
-        int minY = src.getHeight();
-        int maxX = -1;
-        int maxY = -1;
-        for (int y = 0; y < src.getHeight(); y++) {
-            for (int x = 0; x < src.getWidth(); x++) {
-                int rgb = src.getRGB(x, y) & 0x00FFFFFF;
-                if (rgb != 0) {
-                    if (x < minX) minX = x;
-                    if (y < minY) minY = y;
-                    if (x > maxX) maxX = x;
-                    if (y > maxY) maxY = y;
-                }
-            }
-        }
-        if (maxX <= minX || maxY <= minY) {
-            return src;
-        }
-        int pad = 8;
-        minX = Math.max(0, minX - pad);
-        minY = Math.max(0, minY - pad);
-        maxX = Math.min(src.getWidth() - 1, maxX + pad);
-        maxY = Math.min(src.getHeight() - 1, maxY + pad);
-        return src.getSubimage(minX, minY, (maxX - minX + 1), (maxY - minY + 1));
     }
 
     private static void validateScreenshotContent(BufferedImage image) {

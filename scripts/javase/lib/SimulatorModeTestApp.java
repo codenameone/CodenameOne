@@ -50,6 +50,7 @@ public class SimulatorModeTestApp {
         if (Boolean.getBoolean("cn1.test.landscape")) {
             CN.callSerially(() -> {
                 try {
+                    CN.setWindowSize(900, 520);
                     CN.lockOrientation(false);
                     form.revalidate();
                 } catch (Throwable ignored) {

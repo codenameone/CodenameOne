@@ -5232,6 +5232,20 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+    private void selectAppFramePanel(String panelId) {
+        if (appFrame == null || panelId == null) {
+            return;
+        }
+        AppPanel panel = appFrame.getAppPanelById(panelId);
+        if (panel == null) {
+            return;
+        }
+        java.awt.Container parent = panel.getParent();
+        if (parent instanceof JTabbedPane) {
+            ((JTabbedPane) parent).setSelectedComponent(panel);
+        }
+    }
+
     private void showPerformanceMonitor() {
         if (perfMonitor == null) {
             perfMonitor = new PerformanceMonitor();
@@ -5508,13 +5522,28 @@ public class JavaSEPort extends CodenameOneImplementation {
             delayedTasks.add(new Runnable() {
                 public void run() {
                     showNetworkMonitor();
+                    selectAppFramePanel("NetworkMonitor");
                 }
             });
         }
         if (Boolean.getBoolean("cn1.simulator.autoComponentInspector") && appFrame == null) {
             delayedTasks.add(new Runnable() {
                 public void run() {
-                    getOrCreateComponentTreeInspector().showInFrame();
+                    final ComponentTreeInspector inspector = getOrCreateComponentTreeInspector();
+                    inspector.showInFrame();
+                    Display.getInstance().callSerially(new Runnable() {
+                        public void run() {
+                            Form current = Display.getInstance().getCurrent();
+                            if (current == null) {
+                                return;
+                            }
+                            com.codename1.ui.Component target = current;
+                            if (current.getContentPane() != null && current.getContentPane().getComponentCount() > 0) {
+                                target = current.getContentPane().getComponentAt(Math.max(1, current.getWidth() / 2), Math.max(1, current.getHeight() / 3));
+                            }
+                            inspector.inspectComponent(target);
+                        }
+                    });
                 }
             });
         }
@@ -5522,6 +5551,21 @@ public class JavaSEPort extends CodenameOneImplementation {
             delayedTasks.add(new Runnable() {
                 public void run() {
                     showTestRecorder();
+                    if (Boolean.getBoolean("cn1.simulator.autoTestRecorderRecord") && testRecorder != null) {
+                        testRecorder.startRecordingForAutomation();
+                        Display.getInstance().callSerially(new Runnable() {
+                            public void run() {
+                                Form current = Display.getInstance().getCurrent();
+                                if (current == null) {
+                                    return;
+                                }
+                                int x = Math.max(5, current.getWidth() / 2);
+                                int y = Math.max(5, current.getHeight() / 2);
+                                testRecorder.eventPointerPressed(x, y);
+                                testRecorder.eventPointerReleased(x, y);
+                            }
+                        });
+                    }
                 }
             });
         }
