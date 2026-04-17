@@ -26,7 +26,6 @@ import com.codename1.ui.Image;
 import com.codename1.ui.Tabs;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
-import com.codename1.ui.Toolbar;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
@@ -161,8 +160,7 @@ public class SkinDesigner extends Lifecycle {
                 setShowErrorMessageForFocusedComponent(true);
 
         Button helpAction = new Button("Help");
-        helpAction.setUIID("SkinDesignerActionButton");
-        FontImage.setMaterialIcon(helpAction, FontImage.MATERIAL_HELP);
+        styleActionButton(helpAction, FontImage.MATERIAL_HELP);
         helpAction.addActionListener(e -> {
             BrowserComponent help = new BrowserComponent();
             help.setURL("jar:///help.html");
@@ -173,8 +171,7 @@ public class SkinDesigner extends Lifecycle {
         });
 
         Button saveAction = new Button("Save");
-        saveAction.setUIID("SkinDesignerActionButton");
-        FontImage.setMaterialIcon(saveAction, FontImage.MATERIAL_SAVE);
+        styleActionButton(saveAction, FontImage.MATERIAL_SAVE);
         saveAction.addActionListener(e -> {
             byte[] data = createSkinFile(imPortrait, imLandscape, nativeTheme, platformName, tablet, systemFontFamily,
                     proportionalFontFamily, monospaceFontFamily, smallFontSize, mediumFontSize, largeFontSize,
@@ -193,8 +190,7 @@ public class SkinDesigner extends Lifecycle {
         });
 
         Button shareAction = new Button("Share");
-        shareAction.setUIID("SkinDesignerActionButton");
-        FontImage.setMaterialIcon(shareAction, FontImage.MATERIAL_SHARE);
+        styleActionButton(shareAction, FontImage.MATERIAL_SHARE);
         shareAction.addActionListener(e -> {
             byte[] data = createSkinFile(imPortrait, imLandscape, nativeTheme, platformName, tablet, systemFontFamily,
                     proportionalFontFamily, monospaceFontFamily, smallFontSize, mediumFontSize, largeFontSize,
@@ -216,7 +212,7 @@ public class SkinDesigner extends Lifecycle {
         }
         Container actions = GridLayout.encloseIn(3, helpAction, saveAction, shareAction);
         actions.setUIID("SkinDesignerTabBar");
-        skinDesignerForm.add(BorderLayout.NORTH, actions);
+        skinDesignerForm.add(BorderLayout.SOUTH, actions);
 
         skinDesignerForm.show();
         initThemeFromUrl(skinDesignerForm, details);
@@ -232,6 +228,13 @@ public class SkinDesigner extends Lifecycle {
         for (TextField field : fields) {
             field.setUIID("SkinDesignerField");
         }
+    }
+
+    private void styleActionButton(Button button, char materialIcon) {
+        button.setUIID("SkinDesignerActionButton");
+        FontImage.setMaterialIcon(button, materialIcon);
+        button.getAllStyles().setAlignment(Component.CENTER);
+        button.setGap(CN.convertToPixels(0.7f));
     }
 
     private void initThemeFromUrl(Form form, Tabs details) {
@@ -537,15 +540,20 @@ public class SkinDesigner extends Lifecycle {
         String originalX = x.getText();
         String originalY = y.getText();
         Form editPosition = new Form("", new BorderLayout());
-        Toolbar tb = new Toolbar(true);
-        editPosition.setToolbar(tb);
-        tb.setUIID("Container");
-        tb.addCommandToRightBar("", FontImage.createMaterial(FontImage.MATERIAL_CHECK, "Label", 4), e -> x.getComponentForm().showBack());
-        tb.addCommandToLeftBar("", FontImage.createMaterial(FontImage.MATERIAL_CANCEL, "Label", 4), e -> {
+        editPosition.setUIID("SkinDesignerForm");
+        Button done = new Button("Done");
+        styleActionButton(done, FontImage.MATERIAL_CHECK);
+        done.addActionListener(e -> x.getComponentForm().showBack());
+        Button cancel = new Button("Cancel");
+        styleActionButton(cancel, FontImage.MATERIAL_CANCEL);
+        cancel.addActionListener(e -> {
             x.setText(originalX);
             y.setText(originalY);
             x.getComponentForm().showBack();
         });
+        Container topActions = GridLayout.encloseIn(2, cancel, done);
+        topActions.setUIID("SkinDesignerTabBar");
+        editPosition.add(BorderLayout.NORTH, topActions);
 
         Image mute = createMute(x.getAsInt(0), y.getAsInt(0), w, h, img);
         class oo extends ImageViewer {
@@ -641,6 +649,7 @@ public class SkinDesigner extends Lifecycle {
 
         editPosition.add(BorderLayout.CENTER, LayeredLayout.encloseIn(iv, overlay,
                 BorderLayout.south(GridLayout.encloseIn(6, zoomIn, zoomOut, left, right, up, down))));
+        applyWebsiteTheme(editPosition, websiteDarkMode);
 
         editPosition.show();
     }
