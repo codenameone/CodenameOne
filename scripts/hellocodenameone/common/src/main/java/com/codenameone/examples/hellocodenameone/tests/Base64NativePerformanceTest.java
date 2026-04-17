@@ -2,14 +2,20 @@ package com.codenameone.examples.hellocodenameone.tests;
 
 import com.codename1.system.NativeLookup;
 import com.codename1.ui.Display;
+import com.codename1.ui.Image;
+import com.codename1.ui.util.ImageIO;
 import com.codenameone.examples.hellocodenameone.Base64Native;
 import com.codename1.util.Base64;
 import com.codename1.util.Simd;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 
 public class Base64NativePerformanceTest extends BaseTest {
     private static final int PAYLOAD_BYTES = 8192;
     private static final int ITERATIONS = 6000;
+    private static final int IMAGE_BENCHMARK_ITERATIONS = 250;
+    private static final int IMAGE_BENCHMARK_SIZE = 96;
 
     @Override
     public boolean shouldTakeScreenshot() {
@@ -146,6 +152,34 @@ public class Base64NativePerformanceTest extends BaseTest {
                 emitStat("Base64 SIMD benchmark status", simdStatus);
             }
 
+            if (simd != null && simd.isSupported()) {
+                ImageIO imageIo = ImageIO.getImageIO();
+                if (imageIo == null) {
+                    emitStat("Image encode benchmark status", "skipped (ImageIO unavailable)");
+                } else {
+                    Image benchmarkImage = buildBenchmarkImage(IMAGE_BENCHMARK_SIZE, IMAGE_BENCHMARK_SIZE, false);
+                    Image benchmarkMaskImage = buildBenchmarkImage(IMAGE_BENCHMARK_SIZE, IMAGE_BENCHMARK_SIZE, true);
+                    warmupImageEncode(imageIo, benchmarkImage, benchmarkMaskImage);
+                    long pngScalarMs = measureImageEncode(imageIo, benchmarkImage, benchmarkMaskImage, ImageIO.FORMAT_PNG, 1f, false);
+                    long pngSimdMs = measureImageEncode(imageIo, benchmarkImage, benchmarkMaskImage, ImageIO.FORMAT_PNG, 1f, true);
+                    emitStat("Image encode benchmark iterations", String.valueOf(IMAGE_BENCHMARK_ITERATIONS));
+                    emitStat("Image PNG encode (SIMD off)", formatMs(pngScalarMs));
+                    emitStat("Image PNG encode (SIMD on)", formatMs(pngSimdMs));
+                    emitStat("Image PNG encode ratio (SIMD on/off)", formatRatio(pngSimdMs / Math.max(1.0, (double) pngScalarMs)));
+                    if (imageIo.isFormatSupported(ImageIO.FORMAT_JPEG)) {
+                        long jpegScalarMs = measureImageEncode(imageIo, benchmarkImage, benchmarkMaskImage, ImageIO.FORMAT_JPEG, 0.82f, false);
+                        long jpegSimdMs = measureImageEncode(imageIo, benchmarkImage, benchmarkMaskImage, ImageIO.FORMAT_JPEG, 0.82f, true);
+                        emitStat("Image JPEG encode (SIMD off)", formatMs(jpegScalarMs));
+                        emitStat("Image JPEG encode (SIMD on)", formatMs(jpegSimdMs));
+                        emitStat("Image JPEG encode ratio (SIMD on/off)", formatRatio(jpegSimdMs / Math.max(1.0, (double) jpegScalarMs)));
+                    } else {
+                        emitStat("Image JPEG encode benchmark status", "skipped (JPEG unsupported)");
+                    }
+                }
+            } else {
+                emitStat("Image encode benchmark status", "skipped (SIMD unsupported)");
+            }
+
             if (simdFailure != null) {
                 fail("Base64 SIMD benchmark failed: " + formatThrowable(simdFailure));
                 return false;
@@ -234,6 +268,55 @@ public class Base64NativePerformanceTest extends BaseTest {
             Base64.decodeNoWhitespaceSimd(encoded, 0, encoded.length, outputBuffer, 0);
         }
         return System.currentTimeMillis() - start;
+    }
+
+    private static void warmupImageEncode(ImageIO imageIo, Image benchmarkImage, Image benchmarkMaskImage) throws IOException {
+        measureImageEncode(imageIo, benchmarkImage, benchmarkMaskImage, ImageIO.FORMAT_PNG, 1f, false, 20);
+        measureImageEncode(imageIo, benchmarkImage, benchmarkMaskImage, ImageIO.FORMAT_PNG, 1f, true, 20);
+    }
+
+    private static long measureImageEncode(ImageIO imageIo, Image benchmarkImage, Image benchmarkMaskImage,
+                                           String format, float quality, boolean enableSimd) throws IOException {
+        return measureImageEncode(imageIo, benchmarkImage, benchmarkMaskImage, format, quality, enableSimd, IMAGE_BENCHMARK_ITERATIONS);
+    }
+
+    private static long measureImageEncode(ImageIO imageIo, Image benchmarkImage, Image benchmarkMaskImage,
+                                           String format, float quality, boolean enableSimd, int iterations) throws IOException {
+        boolean originalSimd = Image.isSimdOptimizationsEnabled();
+        try {
+            Image.setSimdOptimizationsEnabled(enableSimd);
+            long start = System.currentTimeMillis();
+            for (int i = 0; i < iterations; i++) {
+                Image alphaAdjusted = benchmarkImage.modifyAlpha((byte) 0x90);
+                Object mask = benchmarkMaskImage.createMask();
+                Image masked = alphaAdjusted.applyMask(mask);
+                ByteArrayOutputStream out = new ByteArrayOutputStream(4096);
+                imageIo.save(masked, out, format, quality);
+            }
+            return System.currentTimeMillis() - start;
+        } finally {
+            Image.setSimdOptimizationsEnabled(originalSimd);
+        }
+    }
+
+    private static Image buildBenchmarkImage(int width, int height, boolean maskImage) {
+        int[] rgb = new int[width * height];
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                int offset = x + y * width;
+                int alpha;
+                if (maskImage) {
+                    alpha = 0xff;
+                } else {
+                    alpha = 80 + ((x * 17 + y * 29) & 0x7f);
+                }
+                int red = (x * 13 + y * 7) & 0xff;
+                int green = (x * 5 + y * 19) & 0xff;
+                int blue = (x * 23 + y * 11) & 0xff;
+                rgb[offset] = (alpha << 24) | (red << 16) | (green << 8) | blue;
+            }
+        }
+        return Image.createImage(rgb, width, height);
     }
 
     private static String decodeUtf8(String base64) {
