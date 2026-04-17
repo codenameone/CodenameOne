@@ -1,7 +1,6 @@
 package com.codename1.tools.skindesigner;
 
 import com.codename1.system.Lifecycle;
-import com.codename1.components.FloatingHint;
 import com.codename1.components.ImageViewer;
 import com.codename1.components.OnOffSwitch;
 import com.codename1.components.ScaleImageLabel;
@@ -125,6 +124,25 @@ public class SkinDesigner extends Lifecycle {
         overrideNameLast.setRenderingPrototype("XXXXXXXX");
         autoSave(overrideNameLast, "overrideNameLast");
 
+        TextField safePortraitX = new TextField("40", "Safe Portrait X", 8, TextField.NUMERIC);
+        TextField safePortraitY = new TextField("40", "Safe Portrait Y", 8, TextField.NUMERIC);
+        TextField safePortraitWidth = new TextField("320", "Safe Portrait Width", 8, TextField.NUMERIC);
+        TextField safePortraitHeight = new TextField("480", "Safe Portrait Height", 8, TextField.NUMERIC);
+        TextField safeLandscapeX = new TextField("40", "Safe Landscape X", 8, TextField.NUMERIC);
+        TextField safeLandscapeY = new TextField("40", "Safe Landscape Y", 8, TextField.NUMERIC);
+        TextField safeLandscapeWidth = new TextField("480", "Safe Landscape Width", 8, TextField.NUMERIC);
+        TextField safeLandscapeHeight = new TextField("320", "Safe Landscape Height", 8, TextField.NUMERIC);
+        styleFields(safePortraitX, safePortraitY, safePortraitWidth, safePortraitHeight,
+                safeLandscapeX, safeLandscapeY, safeLandscapeWidth, safeLandscapeHeight);
+        autoSave(safePortraitX, "safePortraitX");
+        autoSave(safePortraitY, "safePortraitY");
+        autoSave(safePortraitWidth, "safePortraitWidth");
+        autoSave(safePortraitHeight, "safePortraitHeight");
+        autoSave(safeLandscapeX, "safeLandscapeX");
+        autoSave(safeLandscapeY, "safeLandscapeY");
+        autoSave(safeLandscapeWidth, "safeLandscapeWidth");
+        autoSave(safeLandscapeHeight, "safeLandscapeHeight");
+
 
         Container settingsContainer = BoxLayout.encloseY(
                 labeledFieldTitle("Native Theme"),
@@ -136,7 +154,8 @@ public class SkinDesigner extends Lifecycle {
                 systemFontFamily,
                 labeledFieldTitle(proportionalFontFamily.getHint()),
                 proportionalFontFamily,
-                new FloatingHint(monospaceFontFamily),
+                labeledFieldTitle(monospaceFontFamily.getHint()),
+                monospaceFontFamily,
                 labeledFieldTitle(smallFontSize.getHint()),
                 smallFontSize,
                 labeledFieldTitle(mediumFontSize.getHint()),
@@ -146,7 +165,11 @@ public class SkinDesigner extends Lifecycle {
                 labeledFieldTitle(pixelRatio.getHint()),
                 pixelRatio,
                 labeledFieldTitle("Platform Overrides"),
-                BoxLayout.encloseX(overrideNamePrimary, overrideNameSecondary, overrideNameLast)
+                BoxLayout.encloseX(overrideNamePrimary, overrideNameSecondary, overrideNameLast),
+                labeledFieldTitle("Safe Area Portrait (X/Y/Width/Height)"),
+                GridLayout.encloseIn(4, safePortraitX, safePortraitY, safePortraitWidth, safePortraitHeight),
+                labeledFieldTitle("Safe Area Landscape (X/Y/Width/Height)"),
+                GridLayout.encloseIn(4, safeLandscapeX, safeLandscapeY, safeLandscapeWidth, safeLandscapeHeight)
         );
         settingsContainer.setUIID("SkinDesignerCard");
         settingsContainer.setScrollableY(true);
@@ -160,7 +183,9 @@ public class SkinDesigner extends Lifecycle {
         Runnable saveAction = () -> {
             byte[] data = createSkinFile(imPortraitRef[0], imLandscapeRef[0], nativeTheme, platformName, tablet, systemFontFamily,
                     proportionalFontFamily, monospaceFontFamily, smallFontSize, mediumFontSize, largeFontSize,
-                    pixelRatio, overrideNamePrimary, overrideNameSecondary, overrideNameLast);
+                    pixelRatio, overrideNamePrimary, overrideNameSecondary, overrideNameLast,
+                    safePortraitX, safePortraitY, safePortraitWidth, safePortraitHeight,
+                    safeLandscapeX, safeLandscapeY, safeLandscapeWidth, safeLandscapeHeight);
             if(data != null) {
                 FileSystemStorage fs = FileSystemStorage.getInstance();
                 try(OutputStream os = fs.openOutputStream(fs.getAppHomePath() + "skin-file.skin")) {
@@ -450,6 +475,20 @@ public class SkinDesigner extends Lifecycle {
                 addConstraint(screenHeightPixels, new NumericConstraint(false, 20, 5000, "Screen size must be a valid integer in the 20-5000 range")).
                 addConstraint(screenPositionX, new NumericConstraint(false, 0, 5000, "Screen position must be a valid integer in the 0-5000 range")).
                 addConstraint(screenPositionY, new NumericConstraint(false, 0, 5000, "Screen position must be a valid integer in the 0-5000 range"));
+        if("lan".equals(prefix)) {
+            String portraitX = Preferences.get("portX", null);
+            String portraitY = Preferences.get("portY", null);
+            String portraitWidth = Preferences.get("portWidth", null);
+            String portraitHeight = Preferences.get("portHeight", null);
+            if(portraitX != null && portraitY != null && portraitWidth != null && portraitHeight != null &&
+                    portraitX.equals(screenPositionX.getText()) && portraitY.equals(screenPositionY.getText()) &&
+                    portraitWidth.equals(screenWidthPixels.getText()) && portraitHeight.equals(screenHeightPixels.getText())) {
+                screenPositionX.setText(portraitY);
+                screenPositionY.setText(portraitX);
+                screenWidthPixels.setText(portraitHeight);
+                screenHeightPixels.setText(portraitWidth);
+            }
+        }
 
         Button aim = new Button();
         styleIconActionButton(aim, FontImage.MATERIAL_PAN_TOOL);
@@ -469,10 +508,39 @@ public class SkinDesigner extends Lifecycle {
         styleIconActionButton(saveButton, FontImage.MATERIAL_SAVE);
         saveButton.addActionListener(e -> saveCallback.run());
 
+        ScaleImageLabel maskLabel = new ScaleImageLabel();
+        Button maskPicker = new Button("Select Screen Mask (Optional)");
+        maskPicker.setUIID("SkinDesignerActionButton");
+        maskPicker.addActionListener((e) -> {
+            Display.getInstance().openGallery((ee) -> {
+                if(ee != null && ee.getSource() != null) {
+                    try {
+                        String fileName = (String)ee.getSource();
+                        Image mask = Image.createImage(fileName);
+                        maskLabel.setIcon(mask);
+                        maskLabel.getParent().revalidate();
+                        Util.copy(FileSystemStorage.getInstance().openInputStream(fileName),
+                                Storage.getInstance().createOutputStream(prefix + ".mask.png"));
+                    } catch(IOException err) {
+                        ToastBar.showErrorMessage("Error Loading Mask: " + err);
+                    }
+                }
+            }, Display.GALLERY_IMAGE);
+        });
+        if(Storage.getInstance().exists(prefix + ".mask.png")) {
+            try(InputStream is = Storage.getInstance().createInputStream(prefix + ".mask.png")) {
+                maskLabel.setIcon(Image.createImage(is));
+            } catch(IOException err) {
+                Log.e(err);
+            }
+        }
+
         final Container cnt = BoxLayout.encloseY(imagePicker,
                 BorderLayout.center(labeledFieldTitle("Screen Position (X/Y/Width/Height)")).
                         add(BorderLayout.EAST, BoxLayout.encloseX(aim, helpButton, saveButton)),
                 GridLayout.encloseIn(4, screenPositionX, screenPositionY, screenWidthPixels, screenHeightPixels),
+                maskPicker,
+                maskLabel,
                 sl);
         cnt.setUIID("SkinDesignerCard");
         cnt.setScrollableY(true);
@@ -488,12 +556,22 @@ public class SkinDesigner extends Lifecycle {
                 int[] data = img.getRGB();
                 int width = img.getWidth();
                 int height = img.getHeight();
-                Rectangle screen = new Rectangle(screenPositionX.getAsInt(0), screenPositionY.getAsInt(0),
-                        screenWidthPixels.getAsInt(50), screenHeightPixels.getAsInt(50));
-                for(int x = 0 ; x < width ; x++) {
-                    for(int y = 0 ; y < height ; y++) {
-                        if(screen.contains(x, y, 1, 1)) {
-                            data[y * width + x] = 0;
+                Image mask = maskLabel.getIcon();
+                if(mask != null && mask.getWidth() == width && mask.getHeight() == height) {
+                    int[] maskRgb = mask.getRGB();
+                    for(int i = 0 ; i < maskRgb.length ; i++) {
+                        if(maskRgb[i] != 0xff000000) {
+                            data[i] = 0;
+                        }
+                    }
+                } else {
+                    Rectangle screen = new Rectangle(screenPositionX.getAsInt(0), screenPositionY.getAsInt(0),
+                            screenWidthPixels.getAsInt(50), screenHeightPixels.getAsInt(50));
+                    for(int x = 0 ; x < width ; x++) {
+                        for(int y = 0 ; y < height ; y++) {
+                            if(screen.contains(x, y, 1, 1)) {
+                                data[y * width + x] = 0;
+                            }
                         }
                     }
                 }
@@ -510,8 +588,22 @@ public class SkinDesigner extends Lifecycle {
                 Image m = Image.createImage(skinImage.getWidth(), skinImage.getHeight(), 0);
                 Graphics g = m.getGraphics();
                 g.setColor(0);
-                g.fillRect(screenPositionX.getAsInt(0), screenPositionY.getAsInt(0),
-                        screenWidthPixels.getAsInt(50), screenHeightPixels.getAsInt(50));
+                Image mask = maskLabel.getIcon();
+                if(mask != null && mask.getWidth() == skinImage.getWidth() && mask.getHeight() == skinImage.getHeight()) {
+                    int[] maskRgb = mask.getRGB();
+                    int w = mask.getWidth();
+                    int h = mask.getHeight();
+                    for(int x = 0; x < w; x++) {
+                        for(int y = 0; y < h; y++) {
+                            if(maskRgb[y * w + x] == 0xff000000) {
+                                g.drawLine(x, y, x, y);
+                            }
+                        }
+                    }
+                } else {
+                    g.fillRect(screenPositionX.getAsInt(0), screenPositionY.getAsInt(0),
+                            screenWidthPixels.getAsInt(50), screenHeightPixels.getAsInt(50));
+                }
                 return m;
             }
 
@@ -688,11 +780,13 @@ public class SkinDesigner extends Lifecycle {
         zoomIn.addActionListener(e -> {
             iv.setZoom(iv.getZoom() + 1);
             overlay.setZoom(iv.getZoom());
+            overlay.setImageNoReposition(createMute(x.getAsInt(0), y.getAsInt(0), w, h, img));
         });
 
         zoomOut.addActionListener(e -> {
             iv.setZoom(iv.getZoom() - 1);
             overlay.setZoom(iv.getZoom());
+            overlay.setImageNoReposition(createMute(x.getAsInt(0), y.getAsInt(0), w, h, img));
         });
 
         left.addActionListener(e -> {
@@ -733,7 +827,7 @@ public class SkinDesigner extends Lifecycle {
         return bo.toByteArray();
     }
 
-    byte[] createSkinFile(ImageSettings imPortrait, ImageSettings imLandscape, Picker nativeTheme, Picker platformName, OnOffSwitch tablet, TextField systemFontFamily, TextField proportionalFontFamily, TextField monospaceFontFamily, TextField smallFontSize, TextField mediumFontSize, TextField largeFontSize, TextField pixelRatio, Picker overrideNamePrimary, Picker overrideNameSecondary, Picker overrideNameLast) {
+    byte[] createSkinFile(ImageSettings imPortrait, ImageSettings imLandscape, Picker nativeTheme, Picker platformName, OnOffSwitch tablet, TextField systemFontFamily, TextField proportionalFontFamily, TextField monospaceFontFamily, TextField smallFontSize, TextField mediumFontSize, TextField largeFontSize, TextField pixelRatio, Picker overrideNamePrimary, Picker overrideNameSecondary, Picker overrideNameLast, TextField safePortraitX, TextField safePortraitY, TextField safePortraitWidth, TextField safePortraitHeight, TextField safeLandscapeX, TextField safeLandscapeY, TextField safeLandscapeWidth, TextField safeLandscapeHeight) {
         Image portrait = imPortrait.getSkinImage();
         Image landscape = imLandscape.getSkinImage();
         if (portrait == null) {
@@ -789,14 +883,14 @@ public class SkinDesigner extends Lifecycle {
             props.put("overrideNames", overrideNamePrimary.getSelectedString() + "," +
                     overrideNameSecondary.getSelectedString() + "," +
                     overrideNameLast.getSelectedString());
-            props.put("safePortraitX", "" + imPortrait.getScreenX());
-            props.put("safePortraitY", "" + imPortrait.getScreenY());
-            props.put("safePortraitWidth", "" + imPortrait.getScreenWidth());
-            props.put("safePortraitHeight", "" + imPortrait.getScreenHeight());
-            props.put("safeLandscapeX", "" + imLandscape.getScreenX());
-            props.put("safeLandscapeY", "" + imLandscape.getScreenY());
-            props.put("safeLandscapeWidth", "" + imLandscape.getScreenWidth());
-            props.put("safeLandscapeHeight", "" + imLandscape.getScreenHeight());
+            props.put("safePortraitX", safePortraitX.getText());
+            props.put("safePortraitY", safePortraitY.getText());
+            props.put("safePortraitWidth", safePortraitWidth.getText());
+            props.put("safePortraitHeight", safePortraitHeight.getText());
+            props.put("safeLandscapeX", safeLandscapeX.getText());
+            props.put("safeLandscapeY", safeLandscapeY.getText());
+            props.put("safeLandscapeWidth", safeLandscapeWidth.getText());
+            props.put("safeLandscapeHeight", safeLandscapeHeight.getText());
 
             ze = new ZipEntry("skin.properties");
             zos.putNextEntry(ze);
