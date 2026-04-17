@@ -104,7 +104,7 @@ public class Image implements ActionSource {
     }
 
     private static int alignedSimdLength(int length) {
-        return Math.max(16, Math.min(SIMD_BLOCK_SIZE, Math.max(1, length)));
+        return Math.max(16, Math.min(SIMD_BLOCK_SIZE, length));
     }
 
     private static int[] newConstantIntArray(Simd simd, int length, int value) {
@@ -204,15 +204,15 @@ public class Image implements ActionSource {
         }
         int simdLength = alignedSimdLength(length);
         int[] sourceBlock = simd.allocInt(simdLength);
-        int[] maskedBlock = simd.allocInt(simdLength);
+        int[] extractedMaskBlock = simd.allocInt(simdLength);
         byte[] outputBlock = simd.allocByte(simdLength);
         int[] alphaMask = newConstantIntArray(simd, simdLength, 0xff);
         byte[] out = new byte[length];
         for (int offset = 0; offset < length; offset += simdLength) {
             int chunk = Math.min(simdLength, length - offset);
             System.arraycopy(rgb, offset, sourceBlock, 0, chunk);
-            simd.and(sourceBlock, 0, alphaMask, 0, maskedBlock, 0, chunk);
-            simd.packIntToByteTruncate(maskedBlock, 0, outputBlock, 0, chunk);
+            simd.and(sourceBlock, 0, alphaMask, 0, extractedMaskBlock, 0, chunk);
+            simd.packIntToByteTruncate(extractedMaskBlock, 0, outputBlock, 0, chunk);
             System.arraycopy(outputBlock, 0, out, offset, chunk);
         }
         return out;

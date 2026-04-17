@@ -156,6 +156,8 @@ public class Base64NativePerformanceTest extends BaseTest {
                 ImageIO imageIo = ImageIO.getImageIO();
                 if (imageIo == null) {
                     emitStat("Image encode benchmark status", "skipped (ImageIO unavailable)");
+                } else if (!imageIo.isFormatSupported(ImageIO.FORMAT_PNG)) {
+                    emitStat("Image encode benchmark status", "skipped (PNG unsupported)");
                 } else {
                     Image benchmarkImage = buildBenchmarkImage(IMAGE_BENCHMARK_SIZE, IMAGE_BENCHMARK_SIZE, false);
                     Image benchmarkMaskImage = buildBenchmarkImage(IMAGE_BENCHMARK_SIZE, IMAGE_BENCHMARK_SIZE, true);
@@ -165,13 +167,13 @@ public class Base64NativePerformanceTest extends BaseTest {
                     emitStat("Image encode benchmark iterations", String.valueOf(IMAGE_BENCHMARK_ITERATIONS));
                     emitStat("Image PNG encode (SIMD off)", formatMs(pngScalarMs));
                     emitStat("Image PNG encode (SIMD on)", formatMs(pngSimdMs));
-                    emitStat("Image PNG encode ratio (SIMD on/off)", formatRatio(pngSimdMs / Math.max(1.0, (double) pngScalarMs)));
+                    emitStat("Image PNG encode ratio (SIMD on/off)", formatRatio(pngSimdMs, pngScalarMs));
                     if (imageIo.isFormatSupported(ImageIO.FORMAT_JPEG)) {
                         long jpegScalarMs = measureImageEncode(imageIo, benchmarkImage, benchmarkMaskImage, ImageIO.FORMAT_JPEG, 0.82f, false);
                         long jpegSimdMs = measureImageEncode(imageIo, benchmarkImage, benchmarkMaskImage, ImageIO.FORMAT_JPEG, 0.82f, true);
                         emitStat("Image JPEG encode (SIMD off)", formatMs(jpegScalarMs));
                         emitStat("Image JPEG encode (SIMD on)", formatMs(jpegSimdMs));
-                        emitStat("Image JPEG encode ratio (SIMD on/off)", formatRatio(jpegSimdMs / Math.max(1.0, (double) jpegScalarMs)));
+                        emitStat("Image JPEG encode ratio (SIMD on/off)", formatRatio(jpegSimdMs, jpegScalarMs));
                     } else {
                         emitStat("Image JPEG encode benchmark status", "skipped (JPEG unsupported)");
                     }
@@ -362,6 +364,13 @@ public class Base64NativePerformanceTest extends BaseTest {
     private static String formatRatio(double ratio) {
         double slowerPct = (ratio - 1.0) * 100.0;
         return formatDecimal(ratio, 3) + "x (" + formatDecimal(Math.abs(slowerPct), 1) + "% " + (slowerPct >= 0 ? "slower" : "faster") + ")";
+    }
+
+    private static String formatRatio(long value, long reference) {
+        if (reference <= 0) {
+            return "N/A (reference time was 0ms)";
+        }
+        return formatRatio(value / (double) reference);
     }
 
     private static String formatDecimal(double value, int decimals) {
