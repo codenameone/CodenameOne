@@ -147,22 +147,34 @@ js_log "Compiling JavaSE simulator integration harness"
 MODES=(single multi)
 ACTUAL_ENTRIES=()
 for mode in "${MODES[@]}"; do
-  png="$RAW_DIR/javase-${mode}-window.png"
-  js_log "Running simulator verification for mode=$mode"
-  FULL_SIM_CLASSPATH="$CN1_CLASSPATH:$CLASS_DIR"
-  xvfb-run -a "$JAVA_BIN" -Djava.awt.headless=false \
-    -cp "$FULL_SIM_CLASSPATH" \
-    com.codenameone.examples.javase.tests.SimulatorWindowModeVerifier \
-    --mode "$mode" \
-    --sim-classpath "$FULL_SIM_CLASSPATH" \
-    --skin "$SIM_SKIN_PATH" \
-    --screenshot "$png"
-
-  if [ ! -s "$png" ]; then
-    js_log "Expected screenshot was not produced for mode=$mode" >&2
-    exit 11
+  if [ "$mode" = "single" ]; then
+    scenarios=(default landscape component-inspector network-monitor test-recorder)
+  else
+    scenarios=(default landscape)
   fi
-  ACTUAL_ENTRIES+=("javase-${mode}-window=$png")
+  for scenario in "${scenarios[@]}"; do
+    test_name="javase-${mode}-window"
+    if [ "$scenario" != "default" ]; then
+      test_name="javase-${mode}-${scenario}"
+    fi
+    png="$RAW_DIR/${test_name}.png"
+    js_log "Running simulator verification for mode=$mode scenario=$scenario"
+    FULL_SIM_CLASSPATH="$CN1_CLASSPATH:$CLASS_DIR"
+    xvfb-run -a "$JAVA_BIN" -Djava.awt.headless=false \
+      -cp "$FULL_SIM_CLASSPATH" \
+      com.codenameone.examples.javase.tests.SimulatorWindowModeVerifier \
+      --mode "$mode" \
+      --scenario "$scenario" \
+      --sim-classpath "$FULL_SIM_CLASSPATH" \
+      --skin "$SIM_SKIN_PATH" \
+      --screenshot "$png"
+
+    if [ ! -s "$png" ]; then
+      js_log "Expected screenshot was not produced for mode=$mode scenario=$scenario" >&2
+      exit 11
+    fi
+    ACTUAL_ENTRIES+=("${test_name}=$png")
+  done
 done
 
 COMPARE_JSON="$ARTIFACTS_DIR/screenshot-compare.json"

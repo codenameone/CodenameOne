@@ -38,6 +38,19 @@ public class SimulatorWindowModeVerifier {
             cmd.add("-Dcn1.simulator.useAppFrame=" + ("single".equals(parsed.mode)));
             cmd.add("-Dcn1.javase.implementation=jmf");
             cmd.add("-Dcn1.test.window.mode=" + parsed.mode);
+            if ("landscape".equals(parsed.scenario)) {
+                cmd.add("-Dcn1.test.landscape=true");
+            }
+            if ("component-inspector".equals(parsed.scenario)) {
+                cmd.add("-Dcn1.simulator.autoComponentInspector=true");
+            }
+            if ("network-monitor".equals(parsed.scenario)) {
+                cmd.add("-Dcn1.simulator.autoNetworkMonitor=true");
+                cmd.add("-Dcn1.test.doNetwork=true");
+            }
+            if ("test-recorder".equals(parsed.scenario)) {
+                cmd.add("-Dcn1.simulator.autoTestRecorder=true");
+            }
             if (parsed.skinPath != null && parsed.skinPath.length() > 0) {
                 cmd.add("-Dskin=" + parsed.skinPath);
                 cmd.add("-Ddskin=" + parsed.skinPath);
@@ -53,7 +66,7 @@ public class SimulatorWindowModeVerifier {
             pb.inheritIO();
             child = pb.start();
 
-            waitForSimulatorWarmup(Duration.ofSeconds(8));
+            waitForSimulatorWarmup(Duration.ofSeconds("network-monitor".equals(parsed.scenario) ? 12 : 8));
 
             BufferedImage raw = captureDesktop();
             BufferedImage image = cropToNonBlack(raw);
@@ -64,7 +77,7 @@ public class SimulatorWindowModeVerifier {
             if (!ImageIO.write(image, "png", screenshotPath.toFile())) {
                 throw new AssertionError("No PNG writer available; screenshot was not written");
             }
-            System.out.println("[javase-verifier] screenshot=" + screenshotPath + " mode=" + parsed.mode);
+            System.out.println("[javase-verifier] screenshot=" + screenshotPath + " mode=" + parsed.mode + " scenario=" + parsed.scenario);
             exitCode = 0;
         } catch (Throwable t) {
             t.printStackTrace(System.err);
@@ -157,12 +170,14 @@ public class SimulatorWindowModeVerifier {
         final String screenshotPath;
         final String simClasspath;
         final String skinPath;
+        final String scenario;
 
-        private Args(String mode, String screenshotPath, String simClasspath, String skinPath) {
+        private Args(String mode, String screenshotPath, String simClasspath, String skinPath, String scenario) {
             this.mode = mode;
             this.screenshotPath = screenshotPath;
             this.simClasspath = simClasspath;
             this.skinPath = skinPath;
+            this.scenario = scenario;
         }
 
         static Args parse(String[] args) {
@@ -170,6 +185,7 @@ public class SimulatorWindowModeVerifier {
             String screenshot = null;
             String simClasspath = null;
             String skinPath = null;
+            String scenario = "default";
             for (int i = 0; i < args.length; i++) {
                 String arg = args[i];
                 if ("--mode".equals(arg) && i + 1 < args.length) {
@@ -180,6 +196,8 @@ public class SimulatorWindowModeVerifier {
                     simClasspath = args[++i];
                 } else if ("--skin".equals(arg) && i + 1 < args.length) {
                     skinPath = args[++i];
+                } else if ("--scenario".equals(arg) && i + 1 < args.length) {
+                    scenario = args[++i];
                 }
             }
             if (!"single".equals(mode) && !"multi".equals(mode)) {
@@ -191,7 +209,7 @@ public class SimulatorWindowModeVerifier {
             if (simClasspath == null || simClasspath.trim().isEmpty()) {
                 throw new IllegalArgumentException("--sim-classpath is required");
             }
-            return new Args(mode, screenshot, simClasspath, skinPath);
+            return new Args(mode, screenshot, simClasspath, skinPath, scenario);
         }
     }
 }

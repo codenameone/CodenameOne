@@ -5504,6 +5504,27 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             });
         }
+        if (Boolean.getBoolean("cn1.simulator.autoNetworkMonitor")) {
+            delayedTasks.add(new Runnable() {
+                public void run() {
+                    showNetworkMonitor();
+                }
+            });
+        }
+        if (Boolean.getBoolean("cn1.simulator.autoComponentInspector") && appFrame == null) {
+            delayedTasks.add(new Runnable() {
+                public void run() {
+                    getOrCreateComponentTreeInspector().showInFrame();
+                }
+            });
+        }
+        if (Boolean.getBoolean("cn1.simulator.autoTestRecorder")) {
+            delayedTasks.add(new Runnable() {
+                public void run() {
+                    showTestRecorder();
+                }
+            });
+        }
         if (!blockMonitors && pref.getBoolean("PushSimulator", false)) {
             pushSimulation = new PushSimulator();
             pushSimulation.setVisible(true);

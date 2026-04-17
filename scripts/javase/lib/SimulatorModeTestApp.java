@@ -5,6 +5,8 @@ import com.codename1.ui.CN;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.NetworkManager;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.UIManager;
@@ -44,6 +46,25 @@ public class SimulatorModeTestApp {
 
         current = form;
         form.show();
+
+        if (Boolean.getBoolean("cn1.test.landscape")) {
+            CN.callSerially(() -> {
+                try {
+                    CN.lockOrientation(false);
+                    form.revalidate();
+                } catch (Throwable ignored) {
+                }
+            });
+        }
+
+        if (Boolean.getBoolean("cn1.test.doNetwork")) {
+            ConnectionRequest req = new ConnectionRequest();
+            req.setUrl("https://example.com");
+            req.setPost(false);
+            req.setFailSilently(true);
+            req.setHttpMethod("GET");
+            NetworkManager.getInstance().addToQueue(req);
+        }
 
         // Safety exit in case a harness forgets to close the simulator.
         CN.setTimeout(120000, () -> {
