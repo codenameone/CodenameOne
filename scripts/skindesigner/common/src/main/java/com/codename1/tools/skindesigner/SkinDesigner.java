@@ -11,7 +11,6 @@ import com.codename1.ui.Display;
 import com.codename1.ui.CN;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
-import com.codename1.ui.plaf.UIManager;
 import com.codename1.io.Log;
 import com.codename1.io.Preferences;
 import com.codename1.io.Properties;
@@ -19,7 +18,6 @@ import com.codename1.io.Storage;
 import com.codename1.io.Util;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.Button;
-import com.codename1.ui.Command;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.FontImage;
@@ -34,7 +32,6 @@ import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.layouts.LayeredLayout;
-import com.codename1.ui.plaf.Style;
 import com.codename1.ui.spinner.Picker;
 import com.codename1.ui.util.ImageIO;
 import com.codename1.ui.util.UITimer;
@@ -55,6 +52,7 @@ public class SkinDesigner extends Lifecycle {
 
     @Override
     public void runApp() {
+        CN.setProperty("platformHint.javascript.beforeUnloadMessage", null);
         Form skinDesignerForm = new Form("Skin Designer", new BorderLayout());
         skinDesignerForm.setTitle("");
         skinDesignerForm.setUIID("SkinDesignerForm");
@@ -153,20 +151,9 @@ public class SkinDesigner extends Lifecycle {
         settingsContainer.setUIID("SkinDesignerCard");
         settingsContainer.setScrollableY(true);
 
-        Style tab = UIManager.getInstance().getComponentStyle("Tab");
-        Style tabSel = UIManager.getInstance().getComponentSelectedStyle("Tab");
-        FontImage portraitIcon = FontImage.createMaterial(FontImage.MATERIAL_STAY_CURRENT_PORTRAIT, tab, 4.5f);
-        FontImage landscapeIcon = FontImage.createMaterial(FontImage.MATERIAL_STAY_CURRENT_LANDSCAPE, tab, 4.5f);
-        FontImage portraitIconSel = FontImage.createMaterial(FontImage.MATERIAL_STAY_CURRENT_PORTRAIT, tabSel, 4.5f);
-        FontImage landscapeIconSel = FontImage.createMaterial(FontImage.MATERIAL_STAY_CURRENT_LANDSCAPE, tabSel, 4.5f);
-        FontImage settingsIcon = FontImage.createMaterial(FontImage.MATERIAL_SETTINGS, tab, 3.5f);
-        FontImage settingsIconSel = FontImage.createMaterial(FontImage.MATERIAL_SETTINGS, tabSel, 3.5f);
-        details.addTab("Portrait", portraitIcon, imPortrait.getContainer());
-        details.addTab("Landscape", landscapeIcon, imLandscape.getContainer());
-        details.addTab("Settings", settingsIcon, settingsContainer);
-        details.setTabSelectedIcon(0, portraitIconSel);
-        details.setTabSelectedIcon(1, landscapeIconSel);
-        details.setTabSelectedIcon(2, settingsIconSel);
+        details.addTab("Portrait", FontImage.MATERIAL_STAY_CURRENT_PORTRAIT, 4.5f, imPortrait.getContainer());
+        details.addTab("Landscape", FontImage.MATERIAL_STAY_CURRENT_LANDSCAPE, 4.5f, imLandscape.getContainer());
+        details.addTab("Settings", FontImage.MATERIAL_SETTINGS, 3.5f, settingsContainer);
         vl.addConstraint(smallFontSize, new NumericConstraint(false, 5, 400, "Font size must be a valid integer in the 5-400 range")).
                 addConstraint(mediumFontSize, new NumericConstraint(false, 5, 400, "Font size must be a valid integer in the 5-400 range")).
                 addConstraint(largeFontSize, new NumericConstraint(false, 5, 400, "Font size must be a valid integer in the 5-400 range")).
@@ -229,10 +216,10 @@ public class SkinDesigner extends Lifecycle {
         }
         Container actions = GridLayout.encloseIn(3, helpAction, saveAction, shareAction);
         actions.setUIID("SkinDesignerTabBar");
-        settingsContainer.addComponent(0, actions);
+        skinDesignerForm.add(BorderLayout.NORTH, actions);
 
         skinDesignerForm.show();
-        initThemeFromUrl(skinDesignerForm);
+        initThemeFromUrl(skinDesignerForm, details);
     }
 
     private Label labeledFieldTitle(String text) {
@@ -247,10 +234,11 @@ public class SkinDesigner extends Lifecycle {
         }
     }
 
-    private void initThemeFromUrl(Form form) {
+    private void initThemeFromUrl(Form form, Tabs details) {
         websiteDarkMode = readThemeFromUrl();
         Display.getInstance().setDarkMode(websiteDarkMode);
         applyWebsiteTheme(form, websiteDarkMode);
+        applyTabsTheme(details, websiteDarkMode);
         form.refreshTheme();
         UITimer.timer(900, true, form, () -> {
             boolean dark = readThemeFromUrl();
@@ -258,9 +246,26 @@ public class SkinDesigner extends Lifecycle {
                 websiteDarkMode = dark;
                 Display.getInstance().setDarkMode(dark);
                 applyWebsiteTheme(form, dark);
+                applyTabsTheme(details, dark);
                 form.refreshTheme();
             }
         });
+    }
+
+    private void applyTabsTheme(Tabs tabs, boolean dark) {
+        if (tabs == null) {
+            return;
+        }
+        String tabsUiid = dark ? "SkinDesignerTabsContainerDark" : "SkinDesignerTabsContainer";
+        String tabUiid = dark ? "TabDark" : "Tab";
+        tabs.setUIID(tabsUiid);
+        tabs.setTabUIID(tabUiid);
+        Container tabsContainer = tabs.getTabsContainer();
+        for (int i = 0; i < tabsContainer.getComponentCount(); i++) {
+            tabsContainer.getComponentAt(i).setUIID(tabUiid);
+        }
+        tabs.refreshTheme();
+        tabs.revalidate();
     }
 
     private boolean readThemeFromUrl() {

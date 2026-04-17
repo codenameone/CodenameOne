@@ -197,6 +197,7 @@ SkinDesignerActionButton {
     padding: 0.9mm 1.4mm;
     font-family: "native:MainLight";
     font-size: 2.7mm;
+    text-align: center;
 }
 
 SkinDesignerActionButtonDark {
@@ -206,4 +207,5 @@ SkinDesignerActionButtonDark {
     padding: 0.9mm 1.4mm;
     font-family: "native:MainLight";
     font-size: 2.7mm;
+    text-align: center;
 }
