@@ -18,128 +18,152 @@ public class Base64NativePerformanceTest extends BaseTest {
 
     @Override
     public boolean runTest() {
-        Base64Native nativeBase64 = NativeLookup.create(Base64Native.class);
-        if (nativeBase64 == null || !nativeBase64.isSupported()) {
-            System.out.println("CN1SS:STAT:Base64 benchmark status: skipped (native base64 bridge unavailable)");
+        try {
+            Base64Native nativeBase64 = NativeLookup.create(Base64Native.class);
+            if (nativeBase64 == null || !nativeBase64.isSupported()) {
+                emitStat("Base64 benchmark status", "skipped (native base64 bridge unavailable)");
+                done();
+                return true;
+            }
+
+            String payload = buildPayload();
+            String nativeEncoded = nativeBase64.encodeUtf8(payload);
+            if (nativeEncoded == null || nativeEncoded.length() == 0) {
+                fail("Native Base64 encode returned empty result");
+                return false;
+            }
+
+            byte[] payloadBytes;
+            try {
+                payloadBytes = payload.getBytes("UTF-8");
+            } catch (Exception ex) {
+                fail("Failed to encode payload to UTF-8: " + ex);
+                return false;
+            }
+
+            String cn1Encoded = Base64.encodeNoNewline(payloadBytes);
+            String nativeDecoded = nativeBase64.decodeToUtf8(nativeEncoded);
+            if (!payload.equals(nativeDecoded)) {
+                fail("Native Base64 decode mismatch");
+                return false;
+            }
+
+            String cn1Decoded = decodeUtf8(cn1Encoded);
+            if (!payload.equals(cn1Decoded)) {
+                fail("CN1 Base64 decode mismatch");
+                return false;
+            }
+
+            int encodedLen = ((payloadBytes.length + 2) / 3) * 4;
+            byte[] cn1EncodedBytes = new byte[encodedLen];
+            int encodedWritten = Base64.encodeNoNewline(payloadBytes, cn1EncodedBytes);
+            if (encodedWritten != encodedLen) {
+                fail("CN1 preallocated Base64 encode returned unexpected length");
+                return false;
+            }
+            byte[] cn1DecodedBuffer = new byte[payloadBytes.length];
+            boolean ios = isIos();
+            Simd simd = Simd.get();
+            boolean runSimdBenchmark = false;
+            String simdStatus = null;
+            Throwable simdFailure = null;
+            byte[] simdPayloadBytes = null;
+            byte[] simdEncodedBytes = null;
+            byte[] simdDecodedBuffer = null;
+            if (ios) {
+                if (simd == null) {
+                    simdStatus = "unavailable (Simd.get() returned null)";
+                } else if (!simd.isSupported()) {
+                    simdStatus = "unsupported on this iOS runtime";
+                } else {
+                    try {
+                        simdPayloadBytes = simd.allocByte(payloadBytes.length);
+                        System.arraycopy(payloadBytes, 0, simdPayloadBytes, 0, payloadBytes.length);
+                        simdEncodedBytes = simd.allocByte(encodedLen);
+                        simdDecodedBuffer = simd.allocByte(payloadBytes.length);
+
+                        int simdEncodedWritten = Base64.encodeNoNewlineSimd(simdPayloadBytes, 0, simdPayloadBytes.length, simdEncodedBytes, 0);
+                        if (simdEncodedWritten != encodedLen) {
+                            simdStatus = "unavailable (unexpected SIMD encode length " + simdEncodedWritten + ")";
+                        } else if (!byteArraysEqual(cn1EncodedBytes, simdEncodedBytes, encodedLen)) {
+                            simdStatus = "unavailable (SIMD encode mismatch)";
+                        } else {
+                            int simdDecodedWritten = Base64.decodeNoWhitespaceSimd(simdEncodedBytes, 0, encodedLen, simdDecodedBuffer, 0);
+                            if (simdDecodedWritten != payloadBytes.length) {
+                                simdStatus = "unavailable (unexpected SIMD decode length " + simdDecodedWritten + ")";
+                            } else if (!byteArraysEqual(payloadBytes, simdDecodedBuffer, payloadBytes.length)) {
+                                simdStatus = "unavailable (SIMD decode mismatch)";
+                            } else {
+                                runSimdBenchmark = true;
+                            }
+                        }
+                    } catch (Throwable t) {
+                        simdFailure = t;
+                        simdStatus = "failed (" + formatThrowable(t) + ")";
+                        logThrowable("CN1SS:ERR:Base64 SIMD benchmark exception", t);
+                    }
+                }
+            }
+
+            if (!ios) {
+                warmup(nativeBase64, payload, payloadBytes, nativeEncoded, cn1EncodedBytes, cn1DecodedBuffer,
+                        false, simdPayloadBytes, simdEncodedBytes, simdDecodedBuffer, encodedLen);
+            }
+            if (runSimdBenchmark) {
+                warmup(nativeBase64, payload, payloadBytes, nativeEncoded, cn1EncodedBytes, cn1DecodedBuffer,
+                        true, simdPayloadBytes, simdEncodedBytes, simdDecodedBuffer, encodedLen);
+            }
+
+            long nativeEncodeMs = measureNativeEncode(nativeBase64, payload);
+            long cn1EncodeMs = measureCn1Encode(payloadBytes, cn1EncodedBytes);
+            long nativeDecodeMs = measureNativeDecode(nativeBase64, nativeEncoded);
+            long cn1DecodeMs = measureCn1Decode(cn1EncodedBytes, cn1DecodedBuffer);
+            long simdEncodeMs = runSimdBenchmark ? measureSimdEncode(simdPayloadBytes, simdEncodedBytes) : -1;
+            long simdDecodeMs = runSimdBenchmark ? measureSimdDecode(simdEncodedBytes, simdDecodedBuffer) : -1;
+
+            double encodeRatio = cn1EncodeMs / Math.max(1.0, (double) nativeEncodeMs);
+            double decodeRatio = cn1DecodeMs / Math.max(1.0, (double) nativeDecodeMs);
+            emitStat("Base64 payload size", payloadBytes.length + " bytes");
+            emitStat("Base64 benchmark iterations", String.valueOf(ITERATIONS));
+            emitStat("Base64 native encode", formatMs(nativeEncodeMs));
+            emitStat("Base64 CN1 encode", formatMs(cn1EncodeMs));
+            emitStat("Base64 encode ratio (CN1/native)", formatRatio(encodeRatio));
+            emitStat("Base64 native decode", formatMs(nativeDecodeMs));
+            emitStat("Base64 CN1 decode", formatMs(cn1DecodeMs));
+            emitStat("Base64 decode ratio (CN1/native)", formatRatio(decodeRatio));
+            if (runSimdBenchmark) {
+                double simdEncodeRatioVsNative = simdEncodeMs / Math.max(1.0, (double) nativeEncodeMs);
+                double simdDecodeRatioVsNative = simdDecodeMs / Math.max(1.0, (double) nativeDecodeMs);
+                double simdEncodeRatioVsCn1 = simdEncodeMs / Math.max(1.0, (double) cn1EncodeMs);
+                double simdDecodeRatioVsCn1 = simdDecodeMs / Math.max(1.0, (double) cn1DecodeMs);
+                emitStat("Base64 SIMD encode", formatMs(simdEncodeMs));
+                emitStat("Base64 encode ratio (SIMD/native)", formatRatio(simdEncodeRatioVsNative));
+                emitStat("Base64 encode ratio (SIMD/CN1)", formatRatio(simdEncodeRatioVsCn1));
+                emitStat("Base64 SIMD decode", formatMs(simdDecodeMs));
+                emitStat("Base64 decode ratio (SIMD/native)", formatRatio(simdDecodeRatioVsNative));
+                emitStat("Base64 decode ratio (SIMD/CN1)", formatRatio(simdDecodeRatioVsCn1));
+            } else if (simdStatus != null) {
+                emitStat("Base64 SIMD benchmark status", simdStatus);
+            }
+
+            if (simdFailure != null) {
+                fail("Base64 SIMD benchmark failed: " + formatThrowable(simdFailure));
+                return false;
+            }
+
             done();
             return true;
-        }
-
-        String payload = buildPayload();
-        String nativeEncoded = nativeBase64.encodeUtf8(payload);
-        if (nativeEncoded == null || nativeEncoded.length() == 0) {
-            fail("Native Base64 encode returned empty result");
+        } catch (Throwable t) {
+            emitStat("Base64 benchmark status", "failed (" + formatThrowable(t) + ")");
+            logThrowable("CN1SS:ERR:Base64 benchmark exception", t);
+            fail("Base64 benchmark failed: " + t);
             return false;
         }
-
-        byte[] payloadBytes;
-        try {
-            payloadBytes = payload.getBytes("UTF-8");
-        } catch (Exception ex) {
-            fail("Failed to encode payload to UTF-8: " + ex);
-            return false;
-        }
-
-        String cn1Encoded = Base64.encodeNoNewline(payloadBytes);
-        String nativeDecoded = nativeBase64.decodeToUtf8(nativeEncoded);
-        if (!payload.equals(nativeDecoded)) {
-            fail("Native Base64 decode mismatch");
-            return false;
-        }
-
-        String cn1Decoded = decodeUtf8(cn1Encoded);
-        if (!payload.equals(cn1Decoded)) {
-            fail("CN1 Base64 decode mismatch");
-            return false;
-        }
-
-        int encodedLen = ((payloadBytes.length + 2) / 3) * 4;
-        byte[] cn1EncodedBytes = new byte[encodedLen];
-        int encodedWritten = Base64.encodeNoNewline(payloadBytes, cn1EncodedBytes);
-        if (encodedWritten != encodedLen) {
-            fail("CN1 preallocated Base64 encode returned unexpected length");
-            return false;
-        }
-        byte[] cn1DecodedBuffer = new byte[payloadBytes.length];
-        Simd simd = Simd.get();
-        boolean runSimdBenchmark = isIos() && simd.isSupported();
-        byte[] simdPayloadBytes = null;
-        byte[] simdEncodedBytes = null;
-        byte[] simdDecodedBuffer = null;
-        int[] simdScratch = null;
-        if (runSimdBenchmark) {
-            simdPayloadBytes = simd.allocByte(payloadBytes.length);
-            System.arraycopy(payloadBytes, 0, simdPayloadBytes, 0, payloadBytes.length);
-            simdEncodedBytes = simd.allocByte(encodedLen);
-            simdDecodedBuffer = simd.allocByte(payloadBytes.length);
-            simdScratch = simd.allocInt(192);
-
-            int simdEncodedWritten = Base64.encodeNoNewlineSimd(simdPayloadBytes, 0, simdPayloadBytes.length, simdEncodedBytes, 0, simdScratch);
-            if (simdEncodedWritten != encodedLen) {
-                fail("SIMD Base64 encode returned unexpected length");
-                return false;
-            }
-            if (!byteArraysEqual(cn1EncodedBytes, simdEncodedBytes, encodedLen)) {
-                fail("SIMD Base64 encode mismatch");
-                return false;
-            }
-            int simdDecodedWritten = Base64.decodeNoWhitespaceSimd(simdEncodedBytes, 0, encodedLen, simdDecodedBuffer, 0, simdScratch);
-            if (simdDecodedWritten != payloadBytes.length) {
-                fail("SIMD Base64 decode returned unexpected length");
-                return false;
-            }
-            if (!byteArraysEqual(payloadBytes, simdDecodedBuffer, payloadBytes.length)) {
-                fail("SIMD Base64 decode mismatch");
-                return false;
-            }
-        }
-
-        if (!isIos()) {
-            warmup(nativeBase64, payload, payloadBytes, nativeEncoded, cn1EncodedBytes, cn1DecodedBuffer,
-                    runSimdBenchmark, simdPayloadBytes, simdEncodedBytes, simdDecodedBuffer, simdScratch, encodedLen);
-        }
-        if (runSimdBenchmark) {
-            warmup(nativeBase64, payload, payloadBytes, nativeEncoded, cn1EncodedBytes, cn1DecodedBuffer,
-                    true, simdPayloadBytes, simdEncodedBytes, simdDecodedBuffer, simdScratch, encodedLen);
-        }
-
-        long nativeEncodeMs = measureNativeEncode(nativeBase64, payload);
-        long cn1EncodeMs = measureCn1Encode(payloadBytes, cn1EncodedBytes);
-        long nativeDecodeMs = measureNativeDecode(nativeBase64, nativeEncoded);
-        long cn1DecodeMs = measureCn1Decode(cn1EncodedBytes, cn1DecodedBuffer);
-        long simdEncodeMs = runSimdBenchmark ? measureSimdEncode(simdPayloadBytes, simdEncodedBytes, simdScratch) : -1;
-        long simdDecodeMs = runSimdBenchmark ? measureSimdDecode(simdEncodedBytes, simdDecodedBuffer, simdScratch) : -1;
-
-        double encodeRatio = cn1EncodeMs / Math.max(1.0, (double) nativeEncodeMs);
-        double decodeRatio = cn1DecodeMs / Math.max(1.0, (double) nativeDecodeMs);
-        emitStat("Base64 payload size", payloadBytes.length + " bytes");
-        emitStat("Base64 benchmark iterations", String.valueOf(ITERATIONS));
-        emitStat("Base64 native encode", formatMs(nativeEncodeMs));
-        emitStat("Base64 CN1 encode", formatMs(cn1EncodeMs));
-        emitStat("Base64 encode ratio (CN1/native)", formatRatio(encodeRatio));
-        emitStat("Base64 native decode", formatMs(nativeDecodeMs));
-        emitStat("Base64 CN1 decode", formatMs(cn1DecodeMs));
-        emitStat("Base64 decode ratio (CN1/native)", formatRatio(decodeRatio));
-        if (runSimdBenchmark) {
-            double simdEncodeRatioVsNative = simdEncodeMs / Math.max(1.0, (double) nativeEncodeMs);
-            double simdDecodeRatioVsNative = simdDecodeMs / Math.max(1.0, (double) nativeDecodeMs);
-            double simdEncodeRatioVsCn1 = simdEncodeMs / Math.max(1.0, (double) cn1EncodeMs);
-            double simdDecodeRatioVsCn1 = simdDecodeMs / Math.max(1.0, (double) cn1DecodeMs);
-            emitStat("Base64 SIMD encode", formatMs(simdEncodeMs));
-            emitStat("Base64 encode ratio (SIMD/native)", formatRatio(simdEncodeRatioVsNative));
-            emitStat("Base64 encode ratio (SIMD/CN1)", formatRatio(simdEncodeRatioVsCn1));
-            emitStat("Base64 SIMD decode", formatMs(simdDecodeMs));
-            emitStat("Base64 decode ratio (SIMD/native)", formatRatio(simdDecodeRatioVsNative));
-            emitStat("Base64 decode ratio (SIMD/CN1)", formatRatio(simdDecodeRatioVsCn1));
-        }
-
-        done();
-        return true;
     }
 
     private static void warmup(Base64Native nativeBase64, String payload, byte[] payloadBytes, String nativeEncoded, byte[] cn1EncodedBytes,
                                byte[] cn1DecodedBuffer, boolean includeSimd, byte[] simdPayloadBytes, byte[] simdEncodedBytes,
-                               byte[] simdDecodedBuffer, int[] simdScratch, int encodedLen) {
+                               byte[] simdDecodedBuffer, int encodedLen) {
         for (int i = 0; i < 40; i++) {
             nativeBase64.encodeUtf8(payload);
             int cn1EncodedWritten = Base64.encodeNoNewline(payloadBytes, cn1EncodedBytes);
@@ -152,11 +176,11 @@ public class Base64NativePerformanceTest extends BaseTest {
                 throw new IllegalStateException("Warmup CN1 decode mismatch");
             }
             if (includeSimd) {
-                int simdEncodedWritten = Base64.encodeNoNewlineSimd(simdPayloadBytes, 0, simdPayloadBytes.length, simdEncodedBytes, 0, simdScratch);
+                int simdEncodedWritten = Base64.encodeNoNewlineSimd(simdPayloadBytes, 0, simdPayloadBytes.length, simdEncodedBytes, 0);
                 if (simdEncodedWritten != encodedLen || !byteArraysEqual(cn1EncodedBytes, simdEncodedBytes, encodedLen)) {
                     throw new IllegalStateException("Warmup SIMD encode mismatch");
                 }
-                int simdDecodedWritten = Base64.decodeNoWhitespaceSimd(simdEncodedBytes, 0, encodedLen, simdDecodedBuffer, 0, simdScratch);
+                int simdDecodedWritten = Base64.decodeNoWhitespaceSimd(simdEncodedBytes, 0, encodedLen, simdDecodedBuffer, 0);
                 if (simdDecodedWritten != payloadBytes.length || !byteArraysEqual(payloadBytes, simdDecodedBuffer, payloadBytes.length)) {
                     throw new IllegalStateException("Warmup SIMD decode mismatch");
                 }
@@ -196,18 +220,18 @@ public class Base64NativePerformanceTest extends BaseTest {
         return System.currentTimeMillis() - start;
     }
 
-    private static long measureSimdEncode(byte[] payloadBytes, byte[] outputBuffer, int[] scratch) {
+    private static long measureSimdEncode(byte[] payloadBytes, byte[] outputBuffer) {
         long start = System.currentTimeMillis();
         for (int i = 0; i < ITERATIONS; i++) {
-            Base64.encodeNoNewlineSimd(payloadBytes, 0, payloadBytes.length, outputBuffer, 0, scratch);
+            Base64.encodeNoNewlineSimd(payloadBytes, 0, payloadBytes.length, outputBuffer, 0);
         }
         return System.currentTimeMillis() - start;
     }
 
-    private static long measureSimdDecode(byte[] encoded, byte[] outputBuffer, int[] scratch) {
+    private static long measureSimdDecode(byte[] encoded, byte[] outputBuffer) {
         long start = System.currentTimeMillis();
         for (int i = 0; i < ITERATIONS; i++) {
-            Base64.decodeNoWhitespaceSimd(encoded, 0, encoded.length, outputBuffer, 0, scratch);
+            Base64.decodeNoWhitespaceSimd(encoded, 0, encoded.length, outputBuffer, 0);
         }
         return System.currentTimeMillis() - start;
     }
@@ -273,6 +297,43 @@ public class Base64NativePerformanceTest extends BaseTest {
         }
         String formatted = whole + (decimals > 0 ? "." + fractionStr : "");
         return negative ? "-" + formatted : formatted;
+    }
+
+    private static String formatThrowable(Throwable t) {
+        if (t == null) {
+            return "unknown error";
+        }
+        String type = t.getClass().getSimpleName();
+        String message = t.getMessage();
+        if (message == null || message.length() == 0) {
+            return type;
+        }
+        return type + ": " + message;
+    }
+
+    private static void logThrowable(String prefix, Throwable t) {
+        if (t == null) {
+            System.out.println(prefix + "=unknown error");
+            return;
+        }
+        System.out.println(prefix + "=" + t);
+        StackTraceElement[] stack = t.getStackTrace();
+        if (stack == null) {
+            return;
+        }
+        for (StackTraceElement element : stack) {
+            System.out.println("CN1SS:ERR:Stack:" + element);
+        }
+        Throwable cause = t.getCause();
+        if (cause != null && cause != t) {
+            System.out.println("CN1SS:ERR:Cause=" + cause);
+            StackTraceElement[] causeStack = cause.getStackTrace();
+            if (causeStack != null) {
+                for (StackTraceElement element : causeStack) {
+                    System.out.println("CN1SS:ERR:CauseStack:" + element);
+                }
+            }
+        }
     }
 
     private static void emitStat(String metric, String value) {
