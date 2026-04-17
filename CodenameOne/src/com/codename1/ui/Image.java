@@ -1074,7 +1074,7 @@ public class Image implements ActionSource {
         int[] rgb = getRGBCached();
         int rlen = rgb.length;
         byte[] mask;
-        if (simdOptimizationsEnabled && rlen >= 16) {
+        if (isSimdOptimizationsEnabled() && rlen >= 16) {
             Simd simd = Simd.get();
             mask = simd.allocByte(rlen);
             int blockSize = Math.min(rlen, SIMD_BLOCK_SIZE);
@@ -1189,7 +1189,7 @@ public class Image implements ActionSource {
         if (mWidth != getWidth() || mHeight != getHeight()) {
             throw new IllegalArgumentException("Mask and image sizes don't match");
         }
-        if (simdOptimizationsEnabled && maskData.length >= 16) {
+        if (isSimdOptimizationsEnabled() && maskData.length >= 16) {
             Simd simd = Simd.get();
             int blockSize = Math.min(maskData.length, SIMD_BLOCK_SIZE);
             int srcOffset = 0;
@@ -1362,7 +1362,7 @@ public class Image implements ActionSource {
         int h = getHeight();
         int size = w * h;
         int[] arr = getRGB();
-        if (simdOptimizationsEnabled && size >= 16) {
+        if (isSimdOptimizationsEnabled() && size >= 16) {
             Simd simd = Simd.get();
             int blockSize = Math.min(size, SIMD_BLOCK_SIZE);
             int srcOffset = 0;
@@ -1461,7 +1461,7 @@ public class Image implements ActionSource {
         int size = w * h;
         int[] arr = new int[size];
         getRGB(arr, 0, 0, 0, w, h);
-        if (simdOptimizationsEnabled && size >= 16) {
+        if (isSimdOptimizationsEnabled() && size >= 16) {
             Simd simd = Simd.get();
             int blockSize = Math.min(size, SIMD_BLOCK_SIZE);
             int srcOffset = 0;
