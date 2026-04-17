@@ -503,7 +503,7 @@ public class SkinDesigner extends Lifecycle {
 
     private void showHelpForm(Form backForm) {
         BrowserComponent help = new BrowserComponent();
-        help.setURL("jar:///help.html");
+        help.setURL("jar:///help.html?theme=" + (websiteDarkMode ? "dark" : "light"));
         Form helpForm = new Form("Help", new BorderLayout());
         helpForm.setUIID("SkinDesignerForm");
         helpForm.add(BorderLayout.CENTER, help);
@@ -554,12 +554,51 @@ public class SkinDesigner extends Lifecycle {
 
         Image mute = createMute(x.getAsInt(0), y.getAsInt(0), w, h, img);
         class oo extends ImageViewer {
+            private int lastDragX = -1;
+            private int lastDragY = -1;
+
             public oo(Image img) {
                 super(img);
             }
             @Override
             public boolean pinch(float scale) {
                 return super.pinch(scale);
+            }
+
+            @Override
+            public void pointerPressed(int xPos, int yPos) {
+                super.pointerPressed(xPos, yPos);
+                lastDragX = xPos;
+                lastDragY = yPos;
+            }
+
+            @Override
+            public void pointerDragged(int xPos, int yPos) {
+                if(lastDragX < 0 || lastDragY < 0) {
+                    lastDragX = xPos;
+                    lastDragY = yPos;
+                    return;
+                }
+                int dx = Math.round((xPos - lastDragX) / getZoom());
+                int dy = Math.round((yPos - lastDragY) / getZoom());
+                if(dx != 0 || dy != 0) {
+                    int maxX = Math.max(0, img.getWidth() - w);
+                    int maxY = Math.max(0, img.getHeight() - h);
+                    int newX = Math.min(maxX, Math.max(0, x.getAsInt(0) + dx));
+                    int newY = Math.min(maxY, Math.max(0, y.getAsInt(0) + dy));
+                    x.setText("" + newX);
+                    y.setText("" + newY);
+                    setImageNoReposition(createMute(newX, newY, w, h, img));
+                    lastDragX = xPos;
+                    lastDragY = yPos;
+                }
+            }
+
+            @Override
+            public void pointerReleased(int xPos, int yPos) {
+                super.pointerReleased(xPos, yPos);
+                lastDragX = -1;
+                lastDragY = -1;
             }
         }
         final oo overlay = new oo(mute);
