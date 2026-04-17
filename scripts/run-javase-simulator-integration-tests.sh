@@ -78,6 +78,37 @@ ensure_dir "$PREVIEW_DIR"
 SCREENSHOT_REF_DIR="$SCRIPT_DIR/javase/screenshots"
 ensure_dir "$SCREENSHOT_REF_DIR"
 
+SKIN_CACHE_DIR="${TMPDIR:-/tmp}/cn1-javase-skins"
+ensure_dir "$SKIN_CACHE_DIR"
+SIM_SKIN_PATH="${CN1_JAVASE_SKIN:-}"
+if [ -z "$SIM_SKIN_PATH" ] || [ ! -f "$SIM_SKIN_PATH" ]; then
+  js_log "Resolving simulator skin from codenameone-skins release"
+  SKIN_ARCHIVE="$SKIN_CACHE_DIR/skins.tar.gz"
+  SKIN_EXTRACT_DIR="$SKIN_CACHE_DIR/extracted"
+  if [ ! -s "$SKIN_ARCHIVE" ]; then
+    SKIN_URL="$(python3 - <<'PY'\nimport json, urllib.request\nwith urllib.request.urlopen('https://api.github.com/repos/codenameone/codenameone-skins/releases/latest') as r:\n    data = json.load(r)\nassets = data.get('assets') or []\nif not assets:\n    raise SystemExit('')\nprint(assets[0].get('browser_download_url', ''))\nPY\n)"
+    if [ -z "$SKIN_URL" ]; then
+      js_log "Failed to resolve codenameone-skins release asset URL" >&2
+      exit 2
+    fi
+    curl -fL --retry 3 --retry-delay 2 -o "$SKIN_ARCHIVE" "$SKIN_URL"
+  fi
+  if [ ! -d "$SKIN_EXTRACT_DIR" ]; then
+    mkdir -p "$SKIN_EXTRACT_DIR"
+    tar -xzf "$SKIN_ARCHIVE" -C "$SKIN_EXTRACT_DIR"
+  fi
+  PREFERRED_SKIN_NAME="${CN1_JAVASE_SKIN_NAME:-Nexus5X.skin}"
+  SIM_SKIN_PATH="$(find "$SKIN_EXTRACT_DIR" -type f -name "$PREFERRED_SKIN_NAME" | head -n 1 || true)"
+  if [ -z "$SIM_SKIN_PATH" ]; then
+    SIM_SKIN_PATH="$(find "$SKIN_EXTRACT_DIR" -type f -name '*.skin' | head -n 1 || true)"
+  fi
+fi
+if [ -z "$SIM_SKIN_PATH" ] || [ ! -f "$SIM_SKIN_PATH" ]; then
+  js_log "Unable to locate a simulator skin file for JavaSE integration tests" >&2
+  exit 2
+fi
+js_log "Using simulator skin: $SIM_SKIN_PATH"
+
 js_log "Ensuring CLDC11 port is built (required bootclasspath for CodenameOne core)"
 js_log "Using Java 8 for ant build: $JAVA8_HOME_DETECTED"
 JAVA_HOME="$JAVA8_HOME_DETECTED" PATH="$JAVA8_HOME_DETECTED/bin:$PATH" ant -noinput -buildfile Ports/CLDC11/build.xml jar
@@ -106,6 +137,7 @@ for mode in "${MODES[@]}"; do
   png="$RAW_DIR/javase-${mode}-window.png"
   js_log "Running simulator verification for mode=$mode"
   xvfb-run -a "$JAVA_BIN" -Djava.awt.headless=false \
+    -Dcn1.test.skin.path="$SIM_SKIN_PATH" \
     -cp "$CN1_CLASSPATH:$CLASS_DIR" \
     com.codenameone.examples.javase.tests.SimulatorWindowModeVerifier \
     --mode "$mode" \

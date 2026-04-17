@@ -37,6 +37,11 @@ public class SimulatorWindowModeVerifier {
             System.setProperty("cn1.simulator.useAppFrame", String.valueOf(expectSingleWindow));
             System.setProperty("cn1.test.window.mode", parsed.mode);
             System.setProperty("cn1.javase.noExit", "true");
+            String skinPath = System.getProperty("cn1.test.skin.path");
+            if (skinPath != null && skinPath.length() > 0) {
+                System.setProperty("dskin", skinPath);
+                System.setProperty("skin", skinPath);
+            }
 
             System.setProperty("cn1.javase.implementation", "jmf");
             prepareCodenameOneSettings();
