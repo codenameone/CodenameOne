@@ -107,10 +107,39 @@ public class SimulatorWindowModeVerifier {
     }
 
     private static BufferedImage captureDesktopScreenshot() throws Exception {
-        Dimension size = Toolkit.getDefaultToolkit().getScreenSize();
-        Rectangle bounds = new Rectangle(0, 0, Math.max(1, size.width), Math.max(1, size.height));
+        Rectangle bounds = computeCaptureBounds();
         Robot robot = new Robot();
         return robot.createScreenCapture(bounds);
+    }
+
+    private static Rectangle computeCaptureBounds() {
+        Rectangle bounds = null;
+        for (Window window : Window.getWindows()) {
+            if (window == null || !window.isShowing()) {
+                continue;
+            }
+            Rectangle wb = window.getBounds();
+            if (wb.width <= 1 || wb.height <= 1) {
+                continue;
+            }
+            bounds = bounds == null ? new Rectangle(wb) : bounds.union(wb);
+        }
+        if (bounds == null) {
+            Dimension size = Toolkit.getDefaultToolkit().getScreenSize();
+            bounds = new Rectangle(0, 0, Math.max(1, size.width), Math.max(1, size.height));
+        } else {
+            // Add a tiny border to include window decorations cleanly.
+            bounds.grow(8, 8);
+            if (bounds.x < 0) {
+                bounds.width += bounds.x;
+                bounds.x = 0;
+            }
+            if (bounds.y < 0) {
+                bounds.height += bounds.y;
+                bounds.y = 0;
+            }
+        }
+        return bounds;
     }
 
     private static void validateScreenshotContent(BufferedImage image) {
