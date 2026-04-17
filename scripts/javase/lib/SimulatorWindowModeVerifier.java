@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.prefs.Preferences;
 
 /**
  * Launches the Codename One simulator as an external process (same as end users),
@@ -30,11 +31,13 @@ public class SimulatorWindowModeVerifier {
         try {
             Args parsed = Args.parse(args);
             Path projectDir = prepareCodenameOneSettings();
+            Path prefsRoot = configureSimulatorPreferences(parsed, projectDir);
 
             List<String> cmd = new ArrayList<String>();
             String javaExec = System.getProperty("java.home") + File.separator + "bin" + File.separator + "java";
             cmd.add(javaExec);
             cmd.add("-Djava.awt.headless=false");
+            cmd.add("-Djava.util.prefs.userRoot=" + prefsRoot.toAbsolutePath());
             cmd.add("-Dcn1.simulator.useAppFrame=" + ("single".equals(parsed.mode)));
             cmd.add("-Dcn1.javase.implementation=jmf");
             cmd.add("-Dcn1.test.window.mode=" + parsed.mode);
@@ -136,6 +139,16 @@ public class SimulatorWindowModeVerifier {
                 + "codename1.vendor=CodenameOne\n";
         Files.write(settings, content.getBytes(StandardCharsets.UTF_8));
         return tempProject;
+    }
+
+    private static Path configureSimulatorPreferences(Args args, Path projectDir) throws Exception {
+        Path prefsRoot = projectDir.resolve("prefs");
+        Files.createDirectories(prefsRoot);
+        System.setProperty("java.util.prefs.userRoot", prefsRoot.toAbsolutePath().toString());
+        Preferences prefs = Preferences.userNodeForPackage(com.codename1.impl.javase.JavaSEPort.class);
+        prefs.putBoolean("Portrait", !"landscape".equals(args.scenario));
+        prefs.flush();
+        return prefsRoot;
     }
 
     private static final class Args {

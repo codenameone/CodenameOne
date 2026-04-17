@@ -160,7 +160,7 @@ for mode in "${MODES[@]}"; do
     png="$RAW_DIR/${test_name}.png"
     js_log "Running simulator verification for mode=$mode scenario=$scenario"
     FULL_SIM_CLASSPATH="$CN1_CLASSPATH:$CLASS_DIR"
-    xvfb-run -a "$JAVA_BIN" -Djava.awt.headless=false \
+    xvfb-run -a -s "-screen 0 2200x1400x24" "$JAVA_BIN" -Djava.awt.headless=false \
       -cp "$FULL_SIM_CLASSPATH" \
       com.codenameone.examples.javase.tests.SimulatorWindowModeVerifier \
       --mode "$mode" \
