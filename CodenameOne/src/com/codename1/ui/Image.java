@@ -46,8 +46,7 @@ import java.util.HashMap;
 /// @author Chen Fishbein
 public class Image implements ActionSource {
     private static final int SIMD_BLOCK_SIZE = 64;
-    private static boolean simdOptimizationsEnabled;
-    private static boolean simdOptimizationsInitialized;
+    private static boolean simdOptimizationsEnabled = Simd.get().isSupported();
     int transform;
     private EventDispatcher listeners;
     private Object rgbCache;
@@ -64,36 +63,18 @@ public class Image implements ActionSource {
     /// Indicates whether Image SIMD optimizations are enabled. When unset this defaults
     /// to the current platform SIMD support.
     public static boolean isSimdOptimizationsEnabled() {
-        if (!simdOptimizationsInitialized) {
-            simdOptimizationsInitialized = true;
-            simdOptimizationsEnabled = Display.isInitialized() && Simd.get().isSupported();
-        }
         return simdOptimizationsEnabled;
     }
 
     /// Enables or disables Image SIMD optimizations explicitly.
     public static void setSimdOptimizationsEnabled(boolean enabled) {
         simdOptimizationsEnabled = enabled;
-        simdOptimizationsInitialized = true;
     }
 
     /// Clears the explicit Image SIMD override and restores the default behavior of
     /// using SIMD whenever it is supported by the current platform.
     public static void resetSimdOptimizationsEnabled() {
-        simdOptimizationsEnabled = false;
-        simdOptimizationsInitialized = false;
-    }
-
-    static Simd getImageSimd(int length) {
-        if (length < 16 || !Display.isInitialized() || !isSimdOptimizationsEnabled()) {
-            return null;
-        }
-        try {
-            return Simd.get();
-        } catch (Throwable t) {
-            // Ignore and fall back to scalar code.
-            return null;
-        }
+        simdOptimizationsEnabled = Simd.get().isSupported();
     }
 
     /// Subclasses may use this and point to an underlying native image which might be
@@ -1092,26 +1073,19 @@ public class Image implements ActionSource {
     public Object createMask() {
         int[] rgb = getRGBCached();
         int rlen = rgb.length;
-        byte[] mask = new byte[rlen];
-        Simd simd = getImageSimd(rlen);
-        if (simd != null) {
+        byte[] mask;
+        if (simdOptimizationsEnabled && rlen >= 16) {
+            Simd simd = Simd.get();
+            mask = simd.allocByte(rlen);
             int blockSize = Math.min(rlen, SIMD_BLOCK_SIZE);
-            int srcOffset = 0;
-            int workOffset = blockSize;
-            int maskOffset = blockSize * 2;
-            int[] scratch = simd.allocInt(blockSize * 3);
-            byte[] scratchBytes = simd.allocByte(blockSize);
-            for (int iter = 0; iter < blockSize; iter++) {
-                scratch[maskOffset + iter] = 0xff;
-            }
+            int[] scratch = simd.allocInt(blockSize);
             for (int offset = 0; offset < rlen; offset += blockSize) {
                 int length = Math.min(blockSize, rlen - offset);
-                System.arraycopy(rgb, offset, scratch, srcOffset, length);
-                simd.and(scratch, srcOffset, scratch, maskOffset, scratch, workOffset, length);
-                simd.packIntToByteTruncate(scratch, workOffset, scratchBytes, 0, length);
-                System.arraycopy(scratchBytes, 0, mask, offset, length);
+                System.arraycopy(rgb, offset, scratch, 0, length);
+                simd.packIntToByteTruncate(scratch, 0, mask, offset, length);
             }
         } else {
+            mask = new byte[rlen];
             for (int iter = 0; iter < rlen; iter++) {
                 mask[iter] = (byte) (rgb[iter] & 0xff);
             }
@@ -1215,8 +1189,8 @@ public class Image implements ActionSource {
         if (mWidth != getWidth() || mHeight != getHeight()) {
             throw new IllegalArgumentException("Mask and image sizes don't match");
         }
-        Simd simd = getImageSimd(maskData.length);
-        if (simd != null) {
+        if (simdOptimizationsEnabled && maskData.length >= 16) {
+            Simd simd = Simd.get();
             int blockSize = Math.min(maskData.length, SIMD_BLOCK_SIZE);
             int srcOffset = 0;
             int alphaOffset = blockSize;
@@ -1388,8 +1362,8 @@ public class Image implements ActionSource {
         int h = getHeight();
         int size = w * h;
         int[] arr = getRGB();
-        Simd simd = getImageSimd(size);
-        if (simd != null) {
+        if (simdOptimizationsEnabled && size >= 16) {
+            Simd simd = Simd.get();
             int blockSize = Math.min(size, SIMD_BLOCK_SIZE);
             int srcOffset = 0;
             int workOffset = blockSize;
@@ -1487,8 +1461,8 @@ public class Image implements ActionSource {
         int size = w * h;
         int[] arr = new int[size];
         getRGB(arr, 0, 0, 0, w, h);
-        Simd simd = getImageSimd(size);
-        if (simd != null) {
+        if (simdOptimizationsEnabled && size >= 16) {
+            Simd simd = Simd.get();
             int blockSize = Math.min(size, SIMD_BLOCK_SIZE);
             int srcOffset = 0;
             int workOffset = blockSize;
