@@ -1,17 +1,17 @@
 == Video Capture Constraints API
 
-The new video capture constraints API allows you to specify "constraints" when capturing videos.  Constraints include:
+The new video capture constraints API allows you to specify "constraints" when capturing videos. Constraints include:
 
 1. Video Quality (High or Low)
 2. Maximum duration
 3. Maximum file size
 4. Video Resolution (i.e. width and height).
 
-Support for these constraints vary by platform and device, but the API allows you to check if your constraints are supported at runtime.  Essentially, you set your "preferred" constraints, and the API will give you its best attempt at meeting those constraints.  This is similar to setting a visual Component's preferred width and height.  The layout manager takes these preferred dimensions under advisement, but ultimately sets the size on its own.
+Support for these constraints vary by platform and device, but the API allows you to check if your constraints are supported at runtime. Essentially, you set your "preferred" constraints, and the API will give you its best attempt at meeting those constraints. This is similar to setting a visual Component's preferred width and height. The layout manager takes these preferred dimensions under advisement, but ultimately sets the size on its own.
 
 === Example 1: Capturing a Low-Quality 5-Second Clip
 
-Suppose we want to allow the user to capture a short (5 second) clip, in a low resolution, appropriate for sharing on a social media platform.  We create our `VideoCaptureConstraints` object as follows:
+Suppose we want to allow the user to capture a short (5 second) clip, in a low resolution, appropriate for sharing on a social media platform. We create our `VideoCaptureConstraints` object as follows:
 
 [source,java]
 ----
@@ -29,7 +29,7 @@ String videoPath = Capture.captureVideo(cnst);
 
 === Not all platforms support all constraints
 
-So how do we know if our constraints will be obeyed?  If the platform doesn't support the max length, constraint, we may want to do something different.  We can find out if a constraint is supported by simply asking out constraint object.
+So how do we know if our constraints will be obeyed? If the platform doesn't support the max length, constraint, we may want to do something different. You can find out if a constraint is supported by simply asking out constraint object.
 
 E.g.
 
@@ -43,10 +43,10 @@ if (cnst.isMaxLengthSupported()) {
     // supported
     int effectiveMaxLength = cnst.getMaxLength();
     if (effectiveMaxLength == 0) {
-        // Max length is not supported at all... the user will be able 
+        // Max length is not supported at all... the user will be able
         // to capture a video without duration restrictions
     } else {
-        // Max length was set to some different value than we set in our 
+        // Max length was set to some different value than we set in our
         // preferredMaxLength, but the platform is at least trying to accommodate us.
     }
 }
@@ -62,7 +62,7 @@ You can probe a constraint to see whether the entire constraint is supported (i.
 
 === Example 2: Specifying Explicit Width and Height
 
-Suppose we want to capture a video with resolution 320x240.  We would begin with this constraint:
+Suppose we want to capture a video with resolution 320x240. We would begin with this constraint:
 
 [source,java]
 ----
@@ -71,7 +71,7 @@ VideoCaptureConstraints cnst = new VideoCaptureConstraints()
     .preferredHeight(240);
 ----
 
-Explicit width and height constraints currently aren't well supported across platforms.  Android doesn't support them at all.  iOS supports only 3 specific sizes.  Javascript supports it when running on a desktop browser or on Android - but not on iOS.  Etc..
+Explicit width and height constraints currently aren't well supported across platforms. Android doesn't support them at all. iOS supports 3 specific sizes. Javascript supports it when running on a desktop browser or on Android - but not on iOS. Etc..
 
 So let's find out if this constraint will be obeyed.
 
@@ -105,13 +105,13 @@ if (cnst.isSizeSupported()) {
 
 [width="100%",options="header,footer"]
 |====================
-| Platform | Size  |  Quality | Max Length |  Max File Size
-| iOS | Limited | Yes | Yes |  No
-| Android | No*  | Yes | Yes | Yes  
-| Simulator/JavaSE | No | No | No |  No
-| Javascript (Desktop) | Yes | Yes | Yes |  No
-| Javascript (Android) | Yes | Yes | Yes |  No 
-| Javascript (iOS) | Yes | Yes | Yes |  No
+| Platform | Size | Quality | Max Length | Max File Size
+| iOS | Limited | Yes | Yes | No
+| Android | No* | Yes | Yes | Yes
+| Simulator/Java SE | No | No | No | No
+| Javascript (Desktop) | Yes | Yes | Yes | No
+| Javascript (Android) | Yes | Yes | Yes | No
+| Javascript (iOS) | Yes | Yes | Yes | No
 |====================
 `*` If size is specified, the platform will attempt to translate to the appropriate quality constraint.
 

@@ -91,10 +91,25 @@ public class CustomInvoke extends Instruction {
     
     @Override
     public void addDependencies(List<String> dependencyList) {
+        String dependencyOwner = owner;
+        if (origOpcode == Opcodes.INVOKEVIRTUAL) {
+            ByteCodeClass bc = Parser.getClassObject(owner.replace('/', '_').replace('$', '_'));
+            String resolvedConcreteOwner = resolveConcreteInvokeOwner(bc, true);
+            if (resolvedConcreteOwner != null) {
+                dependencyOwner = resolvedConcreteOwner;
+            }
+        }
         String t = owner.replace('.', '_').replace('/', '_').replace('$', '_');
         t = unarray(t);
         if(t != null && !dependencyList.contains(t)) {
             dependencyList.add(t);
+        }
+        if (!owner.equals(dependencyOwner)) {
+            String concreteDependency = dependencyOwner.replace('.', '_').replace('/', '_').replace('$', '_');
+            concreteDependency = unarray(concreteDependency);
+            if (concreteDependency != null && !dependencyList.contains(concreteDependency)) {
+                dependencyList.add(concreteDependency);
+            }
         }
 
         StringBuilder bld = new StringBuilder();
@@ -134,7 +149,26 @@ public class CustomInvoke extends Instruction {
         }
         return findActualOwner(bc.getBaseClassObject());
     }
-    
+
+    private String resolveConcreteInvokeOwner(ByteCodeClass ownerClass, boolean allowMissingMethodContext) {
+        if (ownerClass == null || ownerClass.getConcreteClass() == null) {
+            return null;
+        }
+        String currentClass = getMethod() != null ? getMethod().getClsName() : null;
+        if (currentClass == null && !allowMissingMethodContext) {
+            return null;
+        }
+        String ownerName = ownerClass.getClsName();
+        if (currentClass != null && (ownerName.equals(currentClass) || currentClass.startsWith(ownerName + "_"))) {
+            return null;
+        }
+        ByteCodeClass concreteClass = Parser.getClassObject(ownerClass.getConcreteClass().replace('/', '_').replace('$', '_'));
+        if (concreteClass != null && concreteClass.hasDeclaredNonAbstractMethod(name, desc)) {
+            return concreteClass.getClsName();
+        }
+        return null;
+    }
+
     public boolean methodHasReturnValue() {
         return BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, new StringBuilder(), new ArrayList<>()) != null;
     }
@@ -160,6 +194,7 @@ public class CustomInvoke extends Instruction {
             owner = Util.resolveInvokeSpecialOwner(owner, name, desc);
         }
         
+        String invokeOwner = owner;
         StringBuilder bld = new StringBuilder();
         boolean isVirtualCall = false;
         if(origOpcode == Opcodes.INVOKEINTERFACE || origOpcode == Opcodes.INVOKEVIRTUAL) {
@@ -176,6 +211,12 @@ public class CustomInvoke extends Instruction {
                 } else {
                     if (bc.isMethodPrivate(name, desc)) {
                         isVirtual = false;
+                    } else {
+                        String resolvedConcreteOwner = resolveConcreteInvokeOwner(bc, false);
+                        if (resolvedConcreteOwner != null) {
+                            invokeOwner = resolvedConcreteOwner;
+                            isVirtual = false;
+                        }
                     }
                 }
                 
@@ -191,12 +232,12 @@ public class CustomInvoke extends Instruction {
         if(origOpcode == Opcodes.INVOKESTATIC) {
             // find the actual class of the static method to work around javac not defining it correctly
             ByteCodeClass bc = Parser.getClassObject(owner.replace('/', '_').replace('$', '_'));
-            owner = findActualOwner(bc);
+            invokeOwner = findActualOwner(bc);
         }
-        if (owner.startsWith("[")) {
+        if (invokeOwner.startsWith("[")) {
             bld.append("java_lang_Object");
         } else{
-            bld.append(owner.replace('/', '_').replace('$', '_'));
+            bld.append(invokeOwner.replace('/', '_').replace('$', '_'));
         }
         bld.append("_");
         if(name.equals("<init>")) {
@@ -264,7 +305,9 @@ public class CustomInvoke extends Instruction {
             owner = Util.resolveInvokeSpecialOwner(owner, name, desc);
         }
         
+        String invokeOwner = owner;
         StringBuilder bld = new StringBuilder();
+        boolean isVirtualCall = false;
         if(origOpcode == Opcodes.INVOKEINTERFACE || origOpcode == Opcodes.INVOKEVIRTUAL) {
             b.append("    ");
             
@@ -279,12 +322,19 @@ public class CustomInvoke extends Instruction {
                 } else {
                     if (bc.isMethodPrivate(name, desc)) {
                         isVirtual = false;
+                    } else {
+                        String resolvedConcreteOwner = resolveConcreteInvokeOwner(bc, false);
+                        if (resolvedConcreteOwner != null) {
+                            invokeOwner = resolvedConcreteOwner;
+                            isVirtual = false;
+                        }
                     }
                 }
                 
             }
             if (isVirtual) {
                 bld.append("virtual_");
+                isVirtualCall = true;
             }
         } else {
             b.append("    ");
@@ -293,12 +343,12 @@ public class CustomInvoke extends Instruction {
         if(origOpcode == Opcodes.INVOKESTATIC) {
             // find the actual class of the static method to work around javac not defining it correctly
             ByteCodeClass bc = Parser.getClassObject(owner.replace('/', '_').replace('$', '_'));
-            owner = findActualOwner(bc);
+            invokeOwner = findActualOwner(bc);
         }
-        if (owner.startsWith("[")) {
+        if (invokeOwner.startsWith("[")) {
             bld.append("java_lang_Object");
         } else{
-            bld.append(owner.replace('/', '_').replace('$', '_'));
+            bld.append(invokeOwner.replace('/', '_').replace('$', '_'));
         }
         bld.append("_");
         if(name.equals("<init>")) {
@@ -313,6 +363,9 @@ public class CustomInvoke extends Instruction {
         bld.append("__");
         ArrayList<String> args = new ArrayList<>();
         String returnVal = BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, bld, args);
+        if (isVirtualCall) {
+            BytecodeMethod.addVirtualMethodsInvoked(bld.substring("virtual_".length()));
+        }
         int numLiteralArgs = this.getNumLiteralArgs();
         if (numLiteralArgs > 0) {
             b.append("/* CustomInvoke */");

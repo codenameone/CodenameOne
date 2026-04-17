@@ -66,6 +66,7 @@ public class ByteCodeClass {
     private String clsName;
     private String originalClassName;
     private String baseClass;
+    private String concreteClass;
     private List<String> baseInterfaces;
     private boolean isInterface;
     private boolean isAbstract;
@@ -352,6 +353,11 @@ public class ByteCodeClass {
         return null;
     }
 
+    public boolean hasDeclaredNonAbstractMethod(String name, String desc) {
+        BytecodeMethod declaredMethod = findDeclaredMethod(name, desc);
+        return declaredMethod != null && !declaredMethod.isAbstract();
+    }
+
     public void unmark() {
         marked = false;
     }
@@ -443,9 +449,24 @@ public class ByteCodeClass {
                     dependsClassesInterfaces.add(s);
                 }
             }
-            //for (String s : m.getExportedClasses()) {
-            //    exportsClassesInterfaces.add(s);
-            //}
+        }
+        
+        // Resolve concrete invoke dependencies.  Invoke.addDependencies runs at
+        // parse time when classes with @Concrete annotations may not yet be
+        // loaded, so the concrete target is missed.  Re-scan here — all classes
+        // have been parsed by the time updateAllDependencies is called.
+        List<String> concreteExtras = new ArrayList<String>();
+        for (String dep : dependsClassesInterfaces) {
+            ByteCodeClass depClass = Parser.getClassObject(dep);
+            if (depClass != null && depClass.getConcreteClass() != null) {
+                String concrete = depClass.getConcreteClass().replace('/', '_').replace('$', '_');
+                if (!dependsClassesInterfaces.contains(concrete) && !concreteExtras.contains(concrete)) {
+                    concreteExtras.add(concrete);
+                }
+            }
+        }
+        for (String c : concreteExtras) {
+            dependsClassesInterfaces.add(c);
         }
     }
     
@@ -1899,6 +1920,14 @@ public class ByteCodeClass {
      */
     public String getBaseClass() {
         return baseClass;
+    }
+
+    public String getConcreteClass() {
+        return concreteClass;
+    }
+
+    public void setConcreteClass(String concreteClass) {
+        this.concreteClass = concreteClass;
     }
 
     public void setSourceFile(String sourceFile) {

@@ -54,6 +54,9 @@ import com.codename1.ui.plaf.UIManager;
 
 import java.util.Calendar;
 import java.util.Date;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.ListIterator;
 
 import static com.codename1.ui.ComponentSelector.$;
@@ -115,6 +118,29 @@ public class Picker extends Button {
     private boolean useLightweightPopup;
     private Runnable stopEditingCallback;
     private boolean suppressPaint;
+    private final ArrayList<LightweightPopupButton> lightweightPopupButtons = new ArrayList<LightweightPopupButton>();
+
+    /// Placement options for custom lightweight popup buttons.
+    public static final class LightweightPopupButtonPlacement {
+        /// Place the custom button in the top button row between the `Cancel` and `Done` groups.
+        public static final int BETWEEN_CANCEL_AND_DONE = 0;
+        /// Place the custom button row directly above the spinner wheels.
+        public static final int ABOVE_SPINNER = 1;
+        /// Place the custom button row directly below the spinner wheels.
+        public static final int BELOW_SPINNER = 2;
+    }
+
+    private static final class LightweightPopupButton {
+        private final String text;
+        private final Runnable action;
+        private final int placement;
+
+        private LightweightPopupButton(String text, Runnable action, int placement) {
+            this.text = text;
+            this.action = action;
+            this.placement = placement;
+        }
+    }
 
     /// Default constructor
     public Picker() {
@@ -559,8 +585,21 @@ public class Picker extends Button {
                         .setBgTransparency(0)
                         .setMargin(0)
                         .setPaddingMillimeters(3f, 0);
-                //wrapper.add(BorderLayout.CENTER, spinnerC);
-                dlg.getContentPane().add(BorderLayout.CENTER, wrapper);
+                Container topCustomButtons = createLightweightPopupButtonRow(spinner, LightweightPopupButtonPlacement.ABOVE_SPINNER, isTablet);
+                Container bottomCustomButtons = createLightweightPopupButtonRow(spinner, LightweightPopupButtonPlacement.BELOW_SPINNER, isTablet);
+                if (topCustomButtons != null || bottomCustomButtons != null) {
+                    Container spinnerSection = new Container(new BorderLayout());
+                    spinnerSection.add(BorderLayout.CENTER, wrapper);
+                    if (topCustomButtons != null) {
+                        spinnerSection.add(BorderLayout.NORTH, topCustomButtons);
+                    }
+                    if (bottomCustomButtons != null) {
+                        spinnerSection.add(BorderLayout.SOUTH, bottomCustomButtons);
+                    }
+                    dlg.getContentPane().add(BorderLayout.CENTER, spinnerSection);
+                } else {
+                    dlg.getContentPane().add(BorderLayout.CENTER, wrapper);
+                }
 
 
                 Button doneButton = new Button("Done", isTablet ? "PickerButtonTablet" : "PickerButton");
@@ -643,7 +682,8 @@ public class Picker extends Button {
                     west.add(nextButton);
                 }
 
-                Container buttonBar = BorderLayout.centerEastWest(null, doneButton, west);
+                Container centerButtons = createLightweightPopupButtonRow(spinner, LightweightPopupButtonPlacement.BETWEEN_CANCEL_AND_DONE, isTablet);
+                Container buttonBar = BorderLayout.centerEastWest(centerButtons, doneButton, west);
                 buttonBar.setUIID(isTablet ? "PickerButtonBarTablet" : "PickerButtonBar");
                 dlg.getContentPane().add(BorderLayout.NORTH, buttonBar);
 
@@ -714,6 +754,73 @@ public class Picker extends Button {
             }
         });
         updateValue();
+    }
+
+    private Container createLightweightPopupButtonRow(final InternalPickerWidget spinner, int placement, boolean isTablet) {
+        Container row = null;
+        for (LightweightPopupButton entry : lightweightPopupButtons) {
+            if (entry.placement != placement) {
+                continue;
+            }
+            if (row == null) {
+                row = new Container(BoxLayout.x());
+                row.setUIID(isTablet ? "PickerButtonBarTablet" : "PickerButtonBar");
+                $(row).selectAllStyles().setMargin(0).setPadding(0).setBorder(Border.createEmpty()).setBgTransparency(0);
+            }
+            final LightweightPopupButton popupButton = entry;
+            Button button = new Button(popupButton.text, isTablet ? "PickerButtonTablet" : "PickerButton");
+            button.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+                    if (popupButton.action != null) {
+                        popupButton.action.run();
+                    }
+                    spinner.setValue(value);
+                    updateValue();
+                }
+            });
+            row.add(button);
+        }
+        return row;
+    }
+
+    /// Adds a custom button to the lightweight picker popup in the default placement
+    /// between the `Cancel` and `Done` areas.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: Button label.
+    /// - `action`: Action to run when the button is pressed.
+    public void addLightweightPopupButton(String text, Runnable action) {
+        addLightweightPopupButton(text, action, LightweightPopupButtonPlacement.BETWEEN_CANCEL_AND_DONE);
+    }
+
+    /// Adds a custom button to the lightweight picker popup.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: Button label.
+    /// - `action`: Action to run when the button is pressed.
+    /// - `placement`: One of `LightweightPopupButtonPlacement#BETWEEN_CANCEL_AND_DONE`,
+    ///   `LightweightPopupButtonPlacement#ABOVE_SPINNER`, or `LightweightPopupButtonPlacement#BELOW_SPINNER`.
+    public void addLightweightPopupButton(String text, Runnable action, int placement) {
+        lightweightPopupButtons.add(new LightweightPopupButton(text, action, placement));
+    }
+
+    /// Removes all custom lightweight popup buttons that were previously added with
+    /// `#addLightweightPopupButton`.
+    public void clearLightweightPopupButtons() {
+        lightweightPopupButtons.clear();
+    }
+
+    /// Returns an immutable list of custom button labels currently configured for
+    /// the lightweight popup.
+    public List<String> getLightweightPopupButtonLabels() {
+        ArrayList<String> out = new ArrayList<String>();
+        for (LightweightPopupButton b : lightweightPopupButtons) {
+            out.add(b.text);
+        }
+        return Collections.unmodifiableList(out);
     }
 
     /// Whether useLightweightPopup should default to true, this can be set via

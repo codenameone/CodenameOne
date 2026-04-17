@@ -3,9 +3,7 @@ package com.codename1.impl;
 import com.codename1.util.regex.RE;
 import com.codename1.util.regex.RESyntaxException;
 
-/**
- * Bridge methods used by bytecode rewrite rules for JDK APIs that are risky/unsupported on some targets.
- */
+/// Bridge methods used by bytecode rewrite rules for JDK APIs that are risky/unsupported on some targets.
 public final class JdkApiRewriteHelper {
     private JdkApiRewriteHelper() {
     }

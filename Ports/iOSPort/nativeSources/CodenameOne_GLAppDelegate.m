@@ -218,7 +218,16 @@ static void installSignalHandlers() {
     com_codename1_impl_ios_IOSImplementation_applicationWillEnterForeground__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
     CodenameOne_GLViewController* vc = [CodenameOne_GLViewController instance];
     if (vc != nil) {
-        [vc updateCanvas:YES];
+        // Defer updateCanvas by one run-loop cycle so that UIKit has a chance to
+        // settle the root view bounds after foreground transition.  Calling this
+        // too early can report the short edge for width/height on iPad, which
+        // causes a transient wrong screen-size event between stop/start.
+        dispatch_async(dispatch_get_main_queue(), ^{
+            CodenameOne_GLViewController* deferredVc = [CodenameOne_GLViewController instance];
+            if (deferredVc != nil) {
+                [deferredVc updateCanvas:YES];
+            }
+        });
     }
 }
 

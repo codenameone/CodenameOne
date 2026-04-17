@@ -1,0 +1,4 @@
+interface:
+  display_name: "Developer Guide Vale"
+  short_description: "Run Vale on the developer guide"
+  default_prompt: "Use $developer-guide-vale to run Vale on docs/developer-guide and summarize the remaining alerts."

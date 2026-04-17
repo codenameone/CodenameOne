@@ -1,121 +1,121 @@
 == Monetization
 
-Codename One tries to make the lives of software developers easier by integrating several forms of built-in monetization solutions such as ad network support, in-app-purchase etc.
+Codename One integrates many built-in monetization options such as ad network support and in-app purchases.
 
-A lot of the monetization options are available as 3rd party https://www.codenameone.com/cn1libs.html[cn1lib's] that you can install thru the Codename One website.
+Many monetization options are available as third-party https://www.codenameone.com/cn1libs.html[cn1libs] that you can install through the Codename One website.
 
-=== Google Play Ads
+=== Google Play ads
 
-The most effective network is the simplest banner ad support. To enable mobile ads just https://apps.admob.com/?pli=1#monetize/adunit:create[create an ad unit] in Admob's website, you should end up with the key similar to this:
+The simplest banner-ad support is often the easiest network to use. To enable mobile ads, create an ad unit in AdMob's website. You should end up with a key similar to this:
 
 `ca-app-pub-8610616152754010/3413603324`
 
-To enable this for Android just define the `android.googleAdUnitId=ca-app-pub-8610616152754010/3413603324` in the build arguments and for iOS use the same as in `ios.googleAdUnitId`. The rest is seamless, the right ad will be created for you at the bottom of the screen and the form should automatically shrink to fit the ad. This shrinking is implemented differently between iOS and Android due to some constraints but the result should be similar and this should work reasonably well with device rotation as well.
+To enable this for Android, define `android.googleAdUnitId=ca-app-pub-8610616152754010/3413603324` in the build arguments. For iOS, use the same value in `ios.googleAdUnitId`. The rest is automatic: the correct ad appears at the bottom of the screen, and the form shrinks to fit the ad. iOS and Android implement that shrinking differently because of platform constraints, but the result should work well with device rotation.
 
-.Google play ads
-image::img/google-play-ads.png[Google play ads,scaledwidth=20%]
+.Google Play ads
+image::img/google-play-ads.png[Google Play ads,scaledwidth=20%]
 
-There's a special ad unit id to use for test ads. If you specify `ca-app-pub-3940256099942544/6300978111`, you'll get test ads for your development phase. This is important because you're not allowed to click on your own ads. When it's time to create a production release, you should replace this with the real value you generated in adMob.
+There is a special ad unit ID for test ads. If you specify `ca-app-pub-3940256099942544/6300978111`, you get test ads during development. This matters because you aren't allowed to click your own ads. When it's time for a production release, replace it with the real value you generated in AdMob.
 
-=== In App Purchase
+=== In-app purchase
 
-In-app purchase is a helpful tool for making app development profitable. Codename One supports in-app purchases of consumable/non-consumable products on Android & iOS. It also features support for subscriptions. For such a seemingly simple task, in-app purchase involves a lot of moving parts - especially when it comes to subscriptions.
+In-app purchase is a helpful way to make app development profitable. Codename One supports in-app purchases of consumable and non-consumable products on Android and iOS. It also supports subscriptions. Even though the concept is simple, in-app purchase involves many moving parts, especially for subscriptions.
 
 ==== The SKU
 
-In-app purchase support centers around your set of SKUs that you want to sell.  Each product that you sell, whether it be a 1-month subscription, an upgrade to the "Pro" version, "10 disco credits", will have a SKU (stock-keeping-unit).  Ideally you will be able to use the same SKU across all the stores that you sell your app in.
+In-app purchase support centers around the set of SKUs you want to sell. Each product, whether it's a one-month subscription, an upgrade to the "Pro" version, or "10 disco credits", has a SKU (stock-keeping unit). Ideally, you can use the same SKU across every store that sells your app.
 
 ==== Types of Products
 
 There are generally 4 classifications for products:
 
-1. **Non-consumable Product** - This is a product that the user purchases once to "own".  They cannot re-purchase it.  One example is a product that upgrades your app to a "Pro" version.
-2. **Consumable Product** - This is a product that the user can buy more than once.  E.g. You might have a product for "10 Credits" that allows the user to buy items in a game.
-3. **Non-Renewable Subscription** - A subscription that you buy once, and will not be "auto-renewed" by the app store.  These are almost identical to consumable products, except that subscriptions need to be transferable across all the user's devices.  This means that non-renewable subscriptions require that you have a server that keeps track of the subscriptions.
-4. **Renewable Subscriptions** - A subscription that the app store manages.  The user will be automatically billed when the subscription period ends, and the subscription will renew.
+1. **Non-consumable Product** - This is a product that the user purchases once to "own". They can't re-purchase it. One example is a product that upgrades your app to a "Pro" version.
+2. **Consumable Product** - This is a product that the user can buy more than once. For example, you might have a product for "10 Credits" that lets the user buy items in a game.
+3. **Non-Renewable Subscription** - A subscription that you buy once, and won't be "auto-renewed" by the app store. These are almost identical to consumable products, except that subscriptions need to be transferable across all the user's devices. This means that non-renewable subscriptions require that you've a server that keeps track of the subscriptions.
+4. **Renewable Subscriptions** - A subscription that the app store manages. The user will be automatically billed when the subscription period ends, and the subscription will renew.
 
-NOTE:  These subscription categories may not be explicitly supported by a given store, or they may carry a different name.  You can integrate each product type in a cross platform way using Codename One. E.g. In Google Play there is no distinction between consumable products and non-renewable subscriptions, but in iTunes there is a distinction.
+NOTE: These subscription categories may not be explicitly supported by a given store, or they may use different names. You can integrate each product type in a cross-platform way using Codename One. For example, Google Play doesn't distinguish between consumable products and non-renewable subscriptions, but iTunes does.
 
-==== The "Hello World" of In-App Purchase
+==== The "Hello World" of in-app purchase
 
-Let's start with a simple example of an app that sells "Worlds".  The first thing we do is pick the SKU for our product.  I'll choose "com.codename1.world" for the SKU.
+Start with a simple example of an app that sells "Worlds". First, pick the SKU for the product. Here you use `com.codename1.world`.
 
 [source,java]
 ----
 public static final String SKU_WORLD = "com.codename1.world";
 ----
 
-TIP: While we chose to use the package name convention for an SKU you can use any name you want e.g `UA8879`
+TIP: Although this example uses the package-name convention for a SKU, you can use any name you want, for example `UA8879`.
 
-Next, our app's main class needs to implement the `PurchaseCallback` interface
+Next, the app's main class needs to implement the `PurchaseCallback` interface
 
 [source,java]
 ----
 public class HelloWorldIAP implements PurchaseCallback {
     ....
 
-    @Override
-    public void itemPurchased(String sku) {
-        ...
-    }
+ @Override
+ public void itemPurchased(String sku) {
+...
+ }
 
-    @Override
-    public void itemPurchaseError(String sku, String errorMessage) {
-        ...
-    }
+ @Override
+ public void itemPurchaseError(String sku, String errorMessage) {
+...
+ }
 
-    @Override
-    public void paymentFailed(String paymentCode, String failureReason) {
-       ...
-    }
+ @Override
+ public void paymentFailed(String paymentCode, String failureReason) {
+...
+ }
 
-    @Override
-    public void paymentSucceeded(String paymentCode, double amount, String currency) {
-        ...
-    }
+ @Override
+ public void paymentSucceeded(String paymentCode, double amount, String currency) {
+...
+ }
 
 }
 ----
 
-Using these callbacks, we'll be notified whenever something changes in our purchases.  For our simple app we're only interested in `itemPurchased()` and `itemPurchaseError()`.  The legacy `itemRefunded()`, `subscriptionStarted()`, and `subscriptionCanceled()` hooks have been deprecated in the core API and are no longer dispatched by the stores.  Instead of relying on callbacks for long-term entitlement state, query the current receipts at runtime using helpers such as `Purchase.wasPurchased(...)`, `Purchase.isSubscribed(...)`, or by iterating through `Purchase.getReceipts()` so that your UI always reflects the latest data provided by the underlying store.
+Using these callbacks, the app receives notifications whenever a purchase changes. For this simple app, only `itemPurchased()` and `itemPurchaseError()` matter. The legacy `itemRefunded()`, `subscriptionStarted()`, and `subscriptionCanceled()` hooks are deprecated in the core API and are no longer dispatched by the stores. Instead of relying on callbacks for long-term entitlement state, query the current receipts at runtime with helpers such as `Purchase.wasPurchased(...)`, `Purchase.isSubscribed(...)`, or `Purchase.getReceipts()`. That keeps the UI aligned with the latest data from the underlying store.
 
-Now in the start method, we'll add a button that allows the user to buy the world:
-
-[source,java]
-----
-    public void start() {
-        if(current != null){
-            current.show();
-            return;
-        }
-        Form hi = new Form("Hi World");
-        Button buyWorld = new Button("Buy World");
-        buyWorld.addActionListener(e->{
-            if (Purchase.getInAppPurchase().wasPurchased(SKU_WORLD)) {
-                Dialog.show("Can't Buy It", "You already Own It", "OK", null);
-            } else {
-                Purchase.getInAppPurchase().purchase(SKU_WORLD);
-            }
-        });
-
-        hi.addComponent(buyWorld);
-        hi.show();
-    }
-----
-
-At this point, we already have a functional app that will track the sale of the world.  To make it more interesting, let's add some feedback with the `ToastBar` to show when the purchase completes.
+Now in the `start()` method, add a button that lets the user buy the world:
 
 [source,java]
 ----
-    @Override
-    public void itemPurchased(String sku) {
-        ToastBar.showMessage("Thanks.  You now own the world", FontImage.MATERIAL_THUMB_UP);
-    }
+ public void start() {
+ if(current!= null){
+ current.show();
+ return;
+ }
+ Form hi = new Form("Hi World");
+ Button buyWorld = new Button("Buy World");
+ buyWorld.addActionListener(e->{
+ if (Purchase.getInAppPurchase().wasPurchased(SKU_WORLD)) {
+ Dialog.show("can't Buy It", "You already Own It", "OK", null);
+ } else {
+ Purchase.getInAppPurchase().purchase(SKU_WORLD);
+ }
+ });
 
-    @Override
-    public void itemPurchaseError(String sku, String errorMessage) {
-        ToastBar.showErrorMessage("Failure occurred: "+errorMessage);
-    }
+ hi.addComponent(buyWorld);
+ hi.show();
+ }
+----
+
+At this point, the app can track the sale of the world. To make it more useful, add `ToastBar` feedback for purchase completion.
+
+[source,java]
+----
+ @Override
+ public void itemPurchased(String sku) {
+ ToastBar.showMessage("Thanks. You now own the world", FontImage.MATERIAL_THUMB_UP);
+ }
+
+ @Override
+ public void itemPurchaseError(String sku, String errorMessage) {
+ ToastBar.showErrorMessage("Failure occurred: "+errorMessage);
+ }
 ----
 
 
@@ -146,26 +146,26 @@ We'll use storage to keep track of the number of worlds that the user purchased.
 ----
 private static final String NUM_WORLDS_KEY = "NUM_WORLDS.dat";
 public int getNumWorlds() {
-    synchronized (NUM_WORLDS_KEY) {
-        Storage s = Storage.getInstance();
-        if (s.exists(NUM_WORLDS_KEY)) {
-            return (Integer)s.readObject(NUM_WORLDS_KEY);
-        } else {
-            return 0;
-        }
-    }
+ synchronized (NUM_WORLDS_KEY) {
+ Storage s = Storage.getInstance();
+ if (s.exists(NUM_WORLDS_KEY)) {
+ return (Integer)s.readObject(NUM_WORLDS_KEY);
+ } else {
+ return 0;
+ }
+ }
 }
 
 public void addWorld() {
-    synchronized (NUM_WORLDS_KEY) {
-        Storage s = Storage.getInstance();
-        int count = 0;
-        if (s.exists(NUM_WORLDS_KEY)) {
-            count = (Integer)s.readObject(NUM_WORLDS_KEY);
-        }
-        count++;
-        s.writeObject(NUM_WORLDS_KEY, new Integer(count));
-    }
+ synchronized (NUM_WORLDS_KEY) {
+ Storage s = Storage.getInstance();
+ int count = 0;
+ if (s.exists(NUM_WORLDS_KEY)) {
+ count = (Integer)s.readObject(NUM_WORLDS_KEY);
+ }
+ count++;
+ s.writeObject(NUM_WORLDS_KEY, new Integer(count));
+ }
 }
 ----
 
@@ -174,10 +174,10 @@ Now we'll change our purchase code as follows:
 [source,java]
 ----
 buyWorld.addActionListener(e->{
-    if (Dialog.show("Confirm", "You own "+getNumWorlds()+
-           " worlds.  Do you want to buy another one?", "Yes", "No")) {
-        Purchase.getInAppPurchase().purchase(SKU_WORLD);
-    }
+ if (Dialog.show("Confirm", "You own "+getNumWorlds()+
+ " worlds. Do you want to buy another one?", "Yes", "No")) {
+ Purchase.getInAppPurchase().purchase(SKU_WORLD);
+ }
 });
 ----
 
@@ -187,8 +187,8 @@ And our `itemPurchased()` callback will need to add a world:
 ----
 @Override
 public void itemPurchased(String sku) {
-    addWorld();
-    ToastBar.showMessage("Thanks.  You now own "+getNumWorlds()+" worlds", FontImage.MATERIAL_THUMB_UP);
+ addWorld();
+ ToastBar.showMessage("Thanks. You now own "+getNumWorlds()+" worlds", FontImage.MATERIAL_THUMB_UP);
 }
 ----
 
@@ -278,8 +278,8 @@ public static final String SKU_WORLD_1_MONTH = "com.codename1.world.subscribe.1m
 public static final String SKU_WORLD_1_YEAR = "com.codename1.world.subscribe.1year";
 
 public static final String[] PRODUCTS = {
-    SKU_WORLD_1_MONTH,
-    SKU_WORLD_1_YEAR
+ SKU_WORLD_1_MONTH,
+ SKU_WORLD_1_YEAR
 };
 ----
 
@@ -308,20 +308,20 @@ Generally we'll register it in our app's init() method so that it's always avail
 [source,java]
 ----
 public void init(Object context) {
-    ...
+...
 
-    Purchase.getInAppPurchase().setReceiptStore(new ReceiptStore() {
+ Purchase.getInAppPurchase().setReceiptStore(new ReceiptStore() {
 
-        @Override
-        public void fetchReceipts(SuccessCallback<Receipt[]> callback) {
-            // Fetch receipts from storage and pass them to the callback
-        }
+ @Override
+ public void fetchReceipts(SuccessCallback<Receipt[]> callback) {
+ // Fetch receipts from storage and pass them to the callback
+ }
 
-        @Override
-        public void submitReceipt(Receipt receipt, SuccessCallback<Boolean> callback) {
-            // Save a receipt to storage.  Make sure to call callback when done.
-        }
-    });
+ @Override
+ public void submitReceipt(Receipt receipt, SuccessCallback<Boolean> callback) {
+ // Save a receipt to storage. Make sure to call callback when done.
+ }
+ });
 }
 ----
 
@@ -338,18 +338,18 @@ private static final String RECEIPTS_KEY = "RECEIPTS.dat";
 
 @Override
 public void fetchReceipts(SuccessCallback<Receipt[]> callback) {
-    Storage s = Storage.getInstance();
-    Receipt[] found;
-    synchronized(RECEIPTS_KEY) {
-        if (s.exists(RECEIPTS_KEY)) {
-            List<Receipt> receipts = (List<Receipt>)s.readObject(RECEIPTS_KEY);
-            found = receipts.toArray(new Receipt[receipts.size()]);
-        } else {
-            found = new Receipt[0];
-        }
-    }
-    // Make sure this is outside the synchronized block
-    callback.onSucess(found);
+ Storage s = Storage.getInstance();
+ Receipt[] found;
+ synchronized(RECEIPTS_KEY) {
+ if (s.exists(RECEIPTS_KEY)) {
+ List<Receipt> receipts = (List<Receipt>)s.readObject(RECEIPTS_KEY);
+ found = receipts.toArray(new Receipt[receipts.size()]);
+ } else {
+ found = new Receipt[0];
+ }
+ }
+ // Make sure this is outside the synchronized block
+ callback.onSucess(found);
 }
 ----
 
@@ -363,63 +363,63 @@ The `submitReceipt()` method is a little more complex, as it needs to calculate 
 ----
 @Override
 public void submitReceipt(Receipt receipt, SuccessCallback<Boolean> callback) {
-    Storage s = Storage.getInstance();
-    synchronized(RECEIPTS_KEY) {
-        List<Receipt> receipts;
-        if (s.exists(RECEIPTS_KEY)) {
-            receipts = (List<Receipt>)s.readObject(RECEIPTS_KEY);
-        } else {
-            receipts = new ArrayList<Receipt>();
-        }
-        // Check to see if this receipt already exists
-        // This probably won't ever happen (that we'll be asked to submit an
-        // existing receipt, but better safe than sorry
-        for (Receipt r : receipts) {
-            if (r.getStoreCode().equals(receipt.getStoreCode()) &&
-                    r.getTransactionId().equals(receipt.getTransactionId())) {
-                // If we've already got this receipt, we'll just this submission.
-                return;
-            }
-        }
+ Storage s = Storage.getInstance();
+ synchronized(RECEIPTS_KEY) {
+ List<Receipt> receipts;
+ if (s.exists(RECEIPTS_KEY)) {
+ receipts = (List<Receipt>)s.readObject(RECEIPTS_KEY);
+ } else {
+ receipts = new ArrayList<Receipt>();
+ }
+ // Check to see if this receipt already exists
+ // This probably won't ever happen (that you will be asked to submit an
+ // existing receipt, but better safe than sorry
+ for (Receipt r : receipts) {
+ if (r.getStoreCode().equals(receipt.getStoreCode()) &&
+ r.getTransactionId().equals(receipt.getTransactionId())) {
+ // If you've already got this receipt, you will this submission.
+ return;
+ }
+ }
 
-        // Now try to find the current expiry date
-        Date currExpiry = new Date();
-        List<String> lProducts = Arrays.asList(PRODUCTS);
-        for (Receipt r : receipts) {
-            if (!lProducts.contains(receipt.getSku())) {
-                continue;
-            }
-            if (r.getCancellationDate() != null) {
-                continue;
-            }
-            if (r.getExpiryDate() == null) {
-                continue;
-            }
-            if (r.getExpiryDate().getTime() > currExpiry.getTime()) {
-                currExpiry = r.getExpiryDate();
-            }
-        }
+ // Now try to find the current expiry date
+ Date currExpiry = new Date();
+ List<String> lProducts = Arrays.asList(PRODUCTS);
+ for (Receipt r : receipts) {
+ if (!lProducts.contains(receipt.getSku())) {
+ continue;
+ }
+ if (r.getCancellationDate()!= null) {
+ continue;
+ }
+ if (r.getExpiryDate() == null) {
+ continue;
+ }
+ if (r.getExpiryDate().getTime() > currExpiry.getTime()) {
+ currExpiry = r.getExpiryDate();
+ }
+ }
 
-        // Now set the appropriate expiry date by adding time onto
-        // the end of the current expiry date
-        Calendar cal = Calendar.getInstance();
-        cal.setTime(currExpiry);
-        switch (receipt.getSku()) {
-            case SKU_WORLD_1_MONTH:
-                cal.add(Calendar.MONTH, 1);
-                break;
-            case SKU_WORLD_1_YEAR:
-                cal.add(Calendar.YEAR, 1);
-        }
-        Date newExpiry = cal.getTime();
+ // Now set the appropriate expiry date by adding time onto
+ // the end of the current expiry date
+ Calendar cal = Calendar.getInstance();
+ cal.setTime(currExpiry);
+ switch (receipt.getSku()) {
+ case SKU_WORLD_1_MONTH:
+ cal.add(Calendar.MONTH, 1);
+ break;
+ case SKU_WORLD_1_YEAR:
+ cal.add(Calendar.YEAR, 1);
+ }
+ Date newExpiry = cal.getTime();
 
-        receipt.setExpiryDate(newExpiry);
-        receipts.add(receipt);
-        s.writeObject(RECEIPTS_KEY, receipts);
+ receipt.setExpiryDate(newExpiry);
+ receipts.add(receipt);
+ s.writeObject(RECEIPTS_KEY, receipts);
 
-    }
-    // Make sure this is outside the synchronized block
-    callback.onSucess(Boolean.TRUE);
+ }
+ // Make sure this is outside the synchronized block
+ callback.onSucess(Boolean.TRUE);
 }
 ----
 
@@ -448,13 +448,13 @@ At the end of the `start()` method:
 ----
 public void start() {
 
-   ...
+...
 
-    // Now synchronize the receipts
-    iap.synchronizeReceipts(0, res->{
-        // Update the UI as necessary to reflect
+ // Now synchronize the receipts
+ iap.synchronizeReceipts(0, res->{
+ // Update the UI as necessary to reflect
 
-    });
+ });
 }
 ----
 
@@ -466,9 +466,9 @@ Button syncReceipts = new Button("Synchronize Receipts");
 
 syncReceipts.addActionListener(e->{
 
-    iap.synchronizeReceipts(0, res->{
-        // Update the UI
-    });
+ iap.synchronizeReceipts(0, res->{
+ // Update the UI
+ });
 });
 ----
 
@@ -486,21 +486,21 @@ In the hello world app we'll use this information in a few different places.  On
 
 [source,java]
 ----
-// ...
+//...
 
 SpanLabel rentalStatus = new SpanLabel("Loading rental details...");
 Button syncReceipts = new Button("Synchronize Receipts");
 
 syncReceipts.addActionListener(e->{
 
-    iap.synchronizeReceipts(0, res->{
-        if (iap.isSubscribed(PRODUCTS)) {
-            rentalStatus.setText("World rental expires "+iap.getExpiryDate(PRODUCTS));
-        } else {
-            rentalStatus.setText("You don't currently have a subscription to the world");
-        }
-        hi.revalidate();
-    });
+ iap.synchronizeReceipts(0, res->{
+ if (iap.isSubscribed(PRODUCTS)) {
+ rentalStatus.setText("World rental expires "+iap.getExpiryDate(PRODUCTS));
+ } else {
+ rentalStatus.setText("You don't currently have a subscription to the world");
+ }
+ hi.revalidate();
+ });
 });
 ----
 
@@ -513,43 +513,43 @@ In the main form, we want two buttons to subscribe to the "World", for one month
 [source,java]
 ----
 Purchase iap = Purchase.getInAppPurchase();
-// ...
+//...
 Button rentWorld1M = new Button("Rent World 1 Month");
 rentWorld1M.addActionListener(e->{
-    String msg = null;
-    if (iap.isSubscribed(PRODUCTS)) {  // <1>
-        msg = "You are already renting the world until "
-             +iap.getExpiryDate(PRODUCTS)  // <2>
-             +".  Extend it for one more month?";
-    } else {
-        msg = "Rent the world for 1 month?";
-    }
-    if (Dialog.show("Confirm", msg, "Yes", "No")) {
-        Purchase.getInAppPurchase().purchase(SKU_WORLD_1_MONTH); // <3>
-        // Note: since this is a non-renewable subscription it is just a regular
-        // product in the play store - therefore we use the purchase() method.
-        // If it were a "subscription" product in the play store, then we
-        // would use subscribe() instead.
-    }
+ String msg = null;
+ if (iap.isSubscribed(PRODUCTS)) { // <1>
+ msg = "you're already renting the world until "
+ +iap.getExpiryDate(PRODUCTS) // <2>
+ +". Extend it for one more month?";
+ } else {
+ msg = "Rent the world for 1 month?";
+ }
+ if (Dialog.show("Confirm", msg, "Yes", "No")) {
+ Purchase.getInAppPurchase().purchase(SKU_WORLD_1_MONTH); // <3>
+ // Note: since this is a non-renewable subscription it's a regular
+ // product in the play store - therefore you use the purchase() method.
+ // If it were a "subscription" product in the play store, then you
+ // would use subscribe() instead.
+ }
 });
 
 Button rentWorld1Y = new Button("Rent World 1 Year");
 rentWorld1Y.addActionListener(e->{
-    String msg = null;
-    if (iap.isSubscribed(PRODUCTS)) {
-        msg = "You are already renting the world until "+
-               iap.getExpiryDate(PRODUCTS)+
-              ".  Extend it for one more year?";
-    } else {
-        msg = "Rent the world for 1 year?";
-    }
-    if (Dialog.show("Confirm", msg, "Yes", "No")) {
-        Purchase.getInAppPurchase().purchase(SKU_WORLD_1_YEAR);
-        // Note: since this is a non-renewable subscription it is just a regular
-        // product in the play store - therefore we use the purchase() method.
-        // If it were a "subscription" product in the play store, then we
-        // would use subscribe() instead.
-    }
+ String msg = null;
+ if (iap.isSubscribed(PRODUCTS)) {
+ msg = "you're already renting the world until "+
+ iap.getExpiryDate(PRODUCTS)+
+ ". Extend it for one more year?";
+ } else {
+ msg = "Rent the world for 1 year?";
+ }
+ if (Dialog.show("Confirm", msg, "Yes", "No")) {
+ Purchase.getInAppPurchase().purchase(SKU_WORLD_1_YEAR);
+ // Note: since this is a non-renewable subscription it's a regular
+ // product in the play store - therefore you use the purchase() method.
+ // If it were a "subscription" product in the play store, then you
+ // would use subscribe() instead.
+ }
 });
 ----
 <1> In the event handler we check if the user is subscribed by calling `isSubscribed(PRODUCTS)`.  Notice that we check it against the array of both the one month and one year subscription SKUs.
@@ -574,16 +574,16 @@ The purchase callbacks are very similar to the ones that we implemented in the r
 ----
 @Override
 public void itemPurchased(String sku) {
-    Purchase iap = Purchase.getInAppPurchase();
+ Purchase iap = Purchase.getInAppPurchase();
 
-    // Force us to reload the receipts from the store.
-    iap.synchronizeReceiptsSync(0);
-    ToastBar.showMessage("Your subscription has been extended to "+iap.getExpiryDate(PRODUCTS), FontImage.MATERIAL_THUMB_UP);
+ // Force you to reload the receipts from the store.
+ iap.synchronizeReceiptsSync(0);
+ ToastBar.showMessage("Your subscription has been extended to "+iap.getExpiryDate(PRODUCTS), FontImage.MATERIAL_THUMB_UP);
 }
 
 @Override
 public void itemPurchaseError(String sku, String errorMessage) {
-    ToastBar.showErrorMessage("Failure occurred: "+errorMessage);
+ ToastBar.showErrorMessage("Failure occurred: "+errorMessage);
 }
 ----
 
@@ -759,57 +759,57 @@ The source for my ReceiptStore is as follows:
 [source,java]
 ----
 private ReceiptStore createReceiptStore() {
-    return new ReceiptStore() {
+ return new ReceiptStore() {
 
-        RESTfulWebServiceClient client = createRESTClient(receiptsEndpoint);
+ RESTfulWebServiceClient client = createRESTClient(receiptsEndpoint);
 
-        @Override
-        public void fetchReceipts(SuccessCallback<Receipt[]> callback) {
-            RESTfulWebServiceClient.Query query = new RESTfulWebServiceClient.Query() {
+ @Override
+ public void fetchReceipts(SuccessCallback<Receipt[]> callback) {
+ RESTfulWebServiceClient.Query query = new RESTfulWebServiceClient.Query() {
 
-                @Override
-                protected void setupConnectionRequest(RESTfulWebServiceClient client, ConnectionRequest req) {
-                    super.setupConnectionRequest(client, req);
-                    req.setUrl(receiptsEndpoint);
-                }
+ @Override
+ protected void setupConnectionRequest(RESTfulWebServiceClient client, ConnectionRequest req) {
+ super.setupConnectionRequest(client, req);
+ req.setUrl(receiptsEndpoint);
+ }
 
-            };
-            client.find(query, rowset->{
-                List<Receipt> out = new ArrayList<Receipt>();
-                for (Map m : rowset) {
-                    Result res = Result.fromContent(m);
-                    Receipt r = new Receipt();
-                    r.setTransactionId(res.getAsString("transactionId"));
-                    r.setPurchaseDate(new Date(res.getAsLong("purchaseDate")));
-                    r.setQuantity(1);
-                    r.setStoreCode(m.getAsString("storeCode"));
-                    r.setSku(res.getAsString("sku"));
+ };
+ client.find(query, rowset->{
+ List<Receipt> out = new ArrayList<Receipt>();
+ for (Map m : rowset) {
+ Result res = Result.fromContent(m);
+ Receipt r = new Receipt();
+ r.setTransactionId(res.getAsString("transactionId"));
+ r.setPurchaseDate(new Date(res.getAsLong("purchaseDate")));
+ r.setQuantity(1);
+ r.setStoreCode(m.getAsString("storeCode"));
+ r.setSku(res.getAsString("sku"));
 
-                    if (m.containsKey("cancellationDate") && m.get("cancellationDate") != null) {
-                        r.setCancellationDate(new Date(res.getAsLong("cancellationDate")));
-                    }
-                    if (m.containsKey("expiryDate") && m.get("expiryDate") != null) {
-                        r.setExpiryDate(new Date(res.getAsLong("expiryDate")));
-                    }
-                    out.add(r);
+ if (m.containsKey("cancellationDate") && m.get("cancellationDate")!= null) {
+ r.setCancellationDate(new Date(res.getAsLong("cancellationDate")));
+ }
+ if (m.containsKey("expiryDate") && m.get("expiryDate")!= null) {
+ r.setExpiryDate(new Date(res.getAsLong("expiryDate")));
+ }
+ out.add(r);
 
-                }
-                callback.onSucess(out.toArray(new Receipt[out.size()]));
-            });
-        }
+ }
+ callback.onSucess(out.toArray(new Receipt[out.size()]));
+ });
+ }
 
-        @Override
-        public void submitReceipt(Receipt r, SuccessCallback<Boolean> callback) {
-            Map m = new HashMap();
-            m.put("transactionId", r.getTransactionId());
-            m.put("sku", r.getSku());
-            m.put("purchaseDate", r.getPurchaseDate().getTime());
-            m.put("orderData", r.getOrderData());
-            m.put("storeCode", r.getStoreCode());
-            client.create(m, callback);
-        }
+ @Override
+ public void submitReceipt(Receipt r, SuccessCallback<Boolean> callback) {
+ Map m = new HashMap();
+ m.put("transactionId", r.getTransactionId());
+ m.put("sku", r.getSku());
+ m.put("purchaseDate", r.getPurchaseDate().getTime());
+ m.put("orderData", r.getOrderData());
+ m.put("storeCode", r.getStoreCode());
+ client.create(m, callback);
+ }
 
-    };
+ };
 }
 ----
 
@@ -820,23 +820,23 @@ The `createRESTClient()` method shown there simply creates a `RESTfulWebServiceC
 [source,java]
 ----
 /**
- * Creates a REST client to connect to a particular endpoint.  The REST client
+ * Creates a REST client to connect to a particular endpoint. The REST client
  * generated here will automatically add the Authorization header
- * which tells the service what platform we are on.
+ * which tells the service what platform you're on.
  * @param url The url of the endpoint.
  * @return
  */
 private RESTfulWebServiceClient createRESTClient(String url) {
-    return new RESTfulWebServiceClient(url) {
+ return new RESTfulWebServiceClient(url) {
 
-        @Override
-        protected void setupConnectionRequest(ConnectionRequest req) {
-            try {
-                req.addRequestHeader("Authorization", "Basic " + Base64.encode((getUsername()+":"+getPassword()).getBytes("UTF-8")));
-            } catch (Exception ex) {}
-        }
+ @Override
+ protected void setupConnectionRequest(ConnectionRequest req) {
+ try {
+ req.addRequestHeader("Authorization", "Basic " + Base64.encode((getUsername()+":"+getPassword()).getBytes("UTF-8")));
+ } catch (Exception ex) {}
+ }
 
-    };
+ };
 }
 ----
 
@@ -850,35 +850,35 @@ On the server-side, our REST controller is a standard JAX-RS REST interface.  I 
 @Path("com.codename1.demos.iapserver.receipts")
 public class ReceiptsFacadeREST extends AbstractFacade<Receipts> {
 
-    // ...
+ //...
 
-    @POST
-    @Consumes({"application/xml", "application/json"})
-    public void create(Receipts entity) {
+ @POST
+ @Consumes({"application/xml", "application/json"})
+ public void create(Receipts entity) {
 
-        String username = credentialsWithBasicAuthentication(request).getName();
-        entity.setUsername(username);
+ String username = credentialsWithBasicAuthentication(request).getName();
+ entity.setUsername(username);
 
-        // Save the receipt first in case something goes wrong in the validation stage
-        super.create(entity);
+ // Save the receipt first in case something goes wrong in the validation stage
+ super.create(entity);
 
-        // Let's validate the receipt
-        validateAndSaveReceipt(entity);
-            // validates the receipt against appropriate web service
-            // and updates database if expiry date has changed.
-    }
+ // Let you validate the receipt
+ validateAndSaveReceipt(entity);
+ // validates the receipt against appropriate web service
+ // and updates database if expiry date has changed.
+ }
 
-    // ...
-    @GET
-    @Override
-    @Produces({"application/xml", "application/json"})
-    public List<Receipts> findAll() {
-        String username = credentialsWithBasicAuthentication(request).getName();
-        return getEntityManager()
-                .createNamedQuery("Receipts.findByUsername")
-                .setParameter("username", username)
-                .getResultList();
-    }
+ //...
+ @GET
+ @Override
+ @Produces({"application/xml", "application/json"})
+ public List<Receipts> findAll() {
+ String username = credentialsWithBasicAuthentication(request).getName();
+ return getEntityManager()
+.createNamedQuery("Receipts.findByUsername")
+.setParameter("username", username)
+.getResultList();
+ }
 }
 ----
 
@@ -894,27 +894,27 @@ private static final long ONE_DAY = 24 * 60 * 60 * 1000;
 private static final long ONE_DAY_SANDBOX = 10 * 1000;
 @Schedule(hour="*", minute="*")
 public void validateSubscriptionsCron() {
-    System.out.println("----------- DOING TIMED TASK ---------");
-    List<Receipts> res = null;
-    final Set<String> completedTransactionIds = new HashSet<String>();
-    for (String storeCode : new String[]{Receipt.STORE_CODE_ITUNES, Receipt.STORE_CODE_PLAY}) {
-        while (!(res = getEntityManager().createNamedQuery("Receipts.findNextToValidate")
-                .setParameter("threshold", System.currentTimeMillis() - ONE_DAY_SANDBOX)
-                .setParameter("storeCode", storeCode)
-                .setMaxResults(1)
-                .getResultList()).isEmpty() &&
-                !completedTransactionIds.contains(res.get(0).getTransactionId())) {
+ System.out.println("----------- DOING TIMED TASK ---------");
+ List<Receipts> res = null;
+ final Set<String> completedTransactionIds = new HashSet<String>();
+ for (String storeCode : new String[]{Receipt.STORE_CODE_ITUNES, Receipt.STORE_CODE_PLAY}) {
+ while (!(res = getEntityManager().createNamedQuery("Receipts.findNextToValidate")
+.setParameter("threshold", System.currentTimeMillis() - ONE_DAY_SANDBOX)
+.setParameter("storeCode", storeCode)
+.setMaxResults(1)
+.getResultList()).isEmpty() &&
+!completedTransactionIds.contains(res.get(0).getTransactionId())) {
 
-            final Receipts curr = res.get(0);
-            completedTransactionIds.add(curr.getTransactionId());
-            Receipts[] validatedReceipts =  validateAndSaveReceipt(curr);
-            em.flush();
-            for (Receipts r : validatedReceipts) {
-                completedTransactionIds.add(r.getTransactionId());
-            }
+ final Receipts curr = res.get(0);
+ completedTransactionIds.add(curr.getTransactionId());
+ Receipts[] validatedReceipts = validateAndSaveReceipt(curr);
+ em.flush();
+ for (Receipts r : validatedReceipts) {
+ completedTransactionIds.add(r.getTransactionId());
+ }
 
-        }
-    }
+ }
+ }
 }
 ----
 
@@ -932,14 +932,14 @@ The general usage is as follows:
 ----
 IAPValidator validator = IAPValidator.getValidatorForPlatform(receipt.getStoreCode());
 if (validator == null) {
-   // no validators were found for this store
-   // Do custom validation
+ // no validators were found for this store
+ // Do custom validation
 } else {
-    validator.setAppleSecret(APPLE_SECRET);
-    validator.setGoogleClientId(GOOGLE_DEVELOPER_API_CLIENT_ID);
-    validator.setGooglePrivateKey(GOOGLE_DEVELOPER_PRIVATE_KEY);
-    Receipt[] result = validator.validate(receipt);
-    ...
+ validator.setAppleSecret(APPLE_SECRET);
+ validator.setGoogleClientId(GOOGLE_DEVELOPER_API_CLIENT_ID);
+ validator.setGooglePrivateKey(GOOGLE_DEVELOPER_PRIVATE_KEY);
+ Receipt[] result = validator.validate(receipt);
+...
 }
 ----
 
@@ -963,128 +963,128 @@ You are now ready to see the full magic of the `validateAndSaveReceipt()` method
  * @param forInsert If true, then an expiry date will be calculated even if there is no validator.
  */
 private Receipts[] validateAndSaveReceipt(Receipts receipt) {
-    EntityManager em = getEntityManager();
-    Receipts managedReceipt = getManagedReceipt(receipt);
-        // managedReceipt == receipt if receipt is in database or null otherwise
+ EntityManager em = getEntityManager();
+ Receipts managedReceipt = getManagedReceipt(receipt);
+ // managedReceipt == receipt if receipt is in database or null otherwise
 
-    if (Receipt.STORE_CODE_SIMULATOR.equals(receipt.getStoreCode())) { // <1>
-        if (receipt.getExpiryDate() == null && managedReceipt == null) {
-            //Not inserted yet and no expiry date set yet
-            Date dt = calculateExpiryDate(receipt.getSku(), true);
-            if (dt != null) {
-                receipt.setExpiryDate(dt.getTime());
-            }
-        }
-        if (managedReceipt == null) {
-            // Receipt is not in the database yet.  Add it
-            em.persist(receipt);
-            return new Receipts[]{receipt};
-        } else {
-            // The receipt is already in the database.  Update it.
-            em.merge(managedReceipt);
-            return new Receipts[]{managedReceipt};
-        }
-    } else {
-        // It's not a simulator receipt
-        IAPValidator validator = IAPValidator.getValidatorForPlatform(receipt.getStoreCode());
-        if (validator == null) {
-            // Receipt must have come from a platform other than iTunes or Play
-            // Because there is no validator
+ if (Receipt.STORE_CODE_SIMULATOR.equals(receipt.getStoreCode())) { // <1>
+ if (receipt.getExpiryDate() == null && managedReceipt == null) {
+ //Not inserted yet and no expiry date set yet
+ Date dt = calculateExpiryDate(receipt.getSku(), true);
+ if (dt!= null) {
+ receipt.setExpiryDate(dt.getTime());
+ }
+ }
+ if (managedReceipt == null) {
+ // Receipt isn't in the database yet. Add it
+ em.persist(receipt);
+ return new Receipts[]{receipt};
+ } else {
+ // The receipt is already in the database. Update it.
+ em.merge(managedReceipt);
+ return new Receipts[]{managedReceipt};
+ }
+ } else {
+ // It isn't a simulator receipt
+ IAPValidator validator = IAPValidator.getValidatorForPlatform(receipt.getStoreCode());
+ if (validator == null) {
+ // Receipt must have come from a platform other than iTunes or Play
+ // Because there is no validator
 
-            if (receipt.getExpiryDate() == null && managedReceipt == null) {
-                // No expiry date.
-                // Generate one.
-                Date dt = calculateExpiryDate(receipt.getSku(), false);
-                if (dt != null) {
-                    receipt.setExpiryDate(dt.getTime());
-                }
+ if (receipt.getExpiryDate() == null && managedReceipt == null) {
+ // No expiry date.
+ // Generate one.
+ Date dt = calculateExpiryDate(receipt.getSku(), false);
+ if (dt!= null) {
+ receipt.setExpiryDate(dt.getTime());
+ }
 
-            }
-            if (managedReceipt == null) {
-                em.persist(receipt);
-                return new Receipts[]{receipt};
-            } else {
-                em.merge(managedReceipt);
-                return new Receipts[]{managedReceipt};
-            }
+ }
+ if (managedReceipt == null) {
+ em.persist(receipt);
+ return new Receipts[]{receipt};
+ } else {
+ em.merge(managedReceipt);
+ return new Receipts[]{managedReceipt};
+ }
 
-        }
+ }
 
-        // Set credentials for the validator
-        validator.setAppleSecret(APPLE_SECRET);
-        validator.setGoogleClientId(GOOGLE_DEVELOPER_API_CLIENT_ID);
-        validator.setGooglePrivateKey(GOOGLE_DEVELOPER_PRIVATE_KEY);
+ // Set credentials for the validator
+ validator.setAppleSecret(APPLE_SECRET);
+ validator.setGoogleClientId(GOOGLE_DEVELOPER_API_CLIENT_ID);
+ validator.setGooglePrivateKey(GOOGLE_DEVELOPER_PRIVATE_KEY);
 
-        // Create a dummy receipt with only transaction ID and order data to pass
-        // to the validator.  Really all it needs is order data to be able to validate
-        Receipt r2 = Receipt();
-        r2.setTransactionId(receipt.getTransactionId());
-        r2.setOrderData(receipt.getOrderData());
-        try {
-            Receipt[] result = validator.validate(r2);
-            // Depending on the platform, result may contain many receipts or a single receipt
-            // matching our receipt.  In the case of iTunes, none of the receipt transaction IDs
-            // might match the original receipt's transactionId because the validator
-            // will set the transaction ID to the *original* receipt's transaction ID.
-            // If none match, then we should remove our receipt, and update each of the returned
-            // receipts in the database.
-             Receipt matchingValidatedReceipt = null;
-            for (Receipt r3 : result) {
-                if (r3.getTransactionId().equals(receipt.getTransactionId())) {
-                    matchingValidatedReceipt = r3;
-                    break;
-                }
-            }
+ // Create a dummy receipt with transaction ID and order data to pass
+ // to the validator. Really all it needs is order data to be able to validate
+ Receipt r2 = Receipt();
+ r2.setTransactionId(receipt.getTransactionId());
+ r2.setOrderData(receipt.getOrderData());
+ try {
+ Receipt[] result = validator.validate(r2);
+ // Depending on the platform, result may contain many receipts or a single receipt
+ // matching your receipt. In the case of iTunes, none of the receipt transaction IDs
+ // might match the original receipt's transactionId because the validator
+ // will set the transaction ID to the *original* receipt's transaction ID.
+ // If none match, then you should remove your receipt, and update each of the returned
+ // receipts in the database.
+ Receipt matchingValidatedReceipt = null;
+ for (Receipt r3 : result) {
+ if (r3.getTransactionId().equals(receipt.getTransactionId())) {
+ matchingValidatedReceipt = r3;
+ break;
+ }
+ }
 
-            if (matchingValidatedReceipt == null) {
-                // Since the validator didn't find our receipt,
-                // we should remove the receipt.  The equivalent
-                // is stored under the original receipt's transaction ID
-                if (managedReceipt != null) {
-                    em.remove(managedReceipt);
-                    managedReceipt = null;
-                }
-            }
-            List<Receipts> out = new ArrayList<Receipts>();
-            // Now go through and
-            for (Receipt r3 : result) {
-                if (r3.getOrderData() == null) {
-                    // No order data found in receipt.  Setting it to the original order data
-                    r3.setOrderData(receipt.getOrderData());
-                }
-                Receipts eReceipt = new Receipts();
-                eReceipt.setTransactionId(r3.getTransactionId());
-                eReceipt.setStoreCode(receipt.getStoreCode());
-                Receipts eManagedReceipt = getManagedReceipt(eReceipt);
-                if (eManagedReceipt == null) {
-                    copy(eReceipt, r3);
-                    eReceipt.setUsername(receipt.getUsername());
-                    eReceipt.setLastValidated(System.currentTimeMillis());
-                    em.persist(eReceipt);
-                    out.add(eReceipt);
-                } else {
+ if (matchingValidatedReceipt == null) {
+ // Since the validator didn't find your receipt,
+ // you should remove the receipt. The equivalent
+ // is stored under the original receipt's transaction ID
+ if (managedReceipt!= null) {
+ em.remove(managedReceipt);
+ managedReceipt = null;
+ }
+ }
+ List<Receipts> out = new ArrayList<Receipts>();
+ // Now go through and
+ for (Receipt r3 : result) {
+ if (r3.getOrderData() == null) {
+ // No order data found in receipt. Setting it to the original order data
+ r3.setOrderData(receipt.getOrderData());
+ }
+ Receipts eReceipt = new Receipts();
+ eReceipt.setTransactionId(r3.getTransactionId());
+ eReceipt.setStoreCode(receipt.getStoreCode());
+ Receipts eManagedReceipt = getManagedReceipt(eReceipt);
+ if (eManagedReceipt == null) {
+ copy(eReceipt, r3);
+ eReceipt.setUsername(receipt.getUsername());
+ eReceipt.setLastValidated(System.currentTimeMillis());
+ em.persist(eReceipt);
+ out.add(eReceipt);
+ } else {
 
-                    copy(eManagedReceipt, r3);
-                    eManagedReceipt.setUsername(receipt.getUsername());
-                    eManagedReceipt.setLastValidated(System.currentTimeMillis());
-                    em.merge(eManagedReceipt);
-                    out.add(eManagedReceipt);
-                }
-            }
+ copy(eManagedReceipt, r3);
+ eManagedReceipt.setUsername(receipt.getUsername());
+ eManagedReceipt.setLastValidated(System.currentTimeMillis());
+ em.merge(eManagedReceipt);
+ out.add(eManagedReceipt);
+ }
+ }
 
-            return out.toArray(new Receipts[out.size()]);
+ return out.toArray(new Receipts[out.size()]);
 
-        } catch (Exception ex) {
-            // We should probably store some info about the failure in the
-            // database to make it easier to find receipts that aren't validating,
-            // but for now we'll just log it.
-            Log.p("Failed to validate receipt "+r2);
-            Log.p("Reason: "+ex.getMessage());
-            Log.e(ex);
-            return new Receipts[]{receipt};
+ } catch (Exception ex) {
+ // You should probably store some info about the failure in the
+ // database to make it easier to find receipts that aren't validating,
+ // but for now you will log it.
+ Log.p("Failed to validate receipt "+r2);
+ Log.p("Reason: "+ex.getMessage());
+ Log.e(ex);
+ return new Receipts[]{receipt};
 
-        }
-    }
+ }
+ }
 }
 ----
 <1> We need to handle the case where the app is being used in the CN1 simulator.  We'll treat this
@@ -1202,16 +1202,16 @@ This should prompt the download of a JSON file that will have contents similar t
 [source,json]
 ----
 {
-  "type": "service_account",
-  "project_id": "iapdemo-152500",
-  "private_key_id": "1b1d39************7d839826b8a",
-  "private_key": "-----BEGIN PRIVATE KEY----- ... some private key string -----END PRIVATE KEY-----\n",
-  "client_email": "iapdemo@iapdemo-152500.iam.gserviceaccount.com",
-  "client_id": "117601572633333082772",
-  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-  "token_uri": "https://accounts.google.com/o/oauth2/token",
-  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/iapdemo%40iapdemo-152500.iam.gserviceaccount.com"
+ "type": "service_account",
+ "project_id": "iapdemo-152500",
+ "private_key_id": "1b1d39************7d839826b8a",
+ "private_key": "-----BEGIN PRIVATE KEY-----... some private key string -----END PRIVATE KEY-----\n",
+ "client_email": "iapdemo@iapdemo-152500.iam.gserviceaccount.com",
+ "client_id": "117601572633333082772",
+ "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+ "token_uri": "https://accounts.google.com/o/oauth2/token",
+ "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+ "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/iapdemo%40iapdemo-152500.iam.gserviceaccount.com"
 }
 ----
 
@@ -1224,7 +1224,7 @@ We'll set these in our constants:
 [source,java]
 ----
 public static final String GOOGLE_DEVELOPER_API_CLIENT_ID="iapdemo@iapdemo-152500.iam.gserviceaccount.com";
-public static final String GOOGLE_DEVELOPER_PRIVATE_KEY="-----BEGIN PRIVATE KEY----- ... -----END PRIVATE KEY-----\n";
+public static final String GOOGLE_DEVELOPER_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----... -----END PRIVATE KEY-----\n";
 
 ...
 

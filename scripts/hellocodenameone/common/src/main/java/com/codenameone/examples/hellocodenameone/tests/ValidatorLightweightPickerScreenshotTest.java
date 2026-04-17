@@ -9,6 +9,8 @@ import com.codename1.ui.util.UITimer;
 import com.codename1.ui.validation.LengthConstraint;
 import com.codename1.ui.validation.Validator;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -17,6 +19,7 @@ public class ValidatorLightweightPickerScreenshotTest extends BaseTest {
     private Picker picker;
     private final List<TextField> fields = new ArrayList<>();
     private boolean originalValidateOnEveryKey;
+    private Date fixedBirthDate;
 
     @Override
     public boolean runTest() {
@@ -24,7 +27,13 @@ public class ValidatorLightweightPickerScreenshotTest extends BaseTest {
         originalValidateOnEveryKey = Validator.isValidateOnEveryKey();
         Validator.setValidateOnEveryKey(true);
 
-        PickerComponent birthDate = PickerComponent.createDate(new Date()).label("Birthdate");
+        fixedBirthDate = new Date(
+                LocalDate.of(2026, 4, 11)
+                        .atStartOfDay(ZoneId.systemDefault())
+                        .toInstant()
+                        .toEpochMilli()
+        );
+        PickerComponent birthDate = PickerComponent.createDate(fixedBirthDate).label("Birthdate");
         picker = birthDate.getPicker();
         picker.setUseLightweightPopup(true);
         form.add(birthDate);
@@ -50,6 +59,7 @@ public class ValidatorLightweightPickerScreenshotTest extends BaseTest {
         for (TextField field : fields) {
             field.setText("x");
         }
+        picker.setDate(fixedBirthDate);
         picker.startEditingAsync();
         UITimer.timer(1000, false, parent, run);
     }

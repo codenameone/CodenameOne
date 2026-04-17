@@ -95,11 +95,11 @@ SideCommandDark {
 }
 
 InitializrForm {
-    background-color: #f3f6fb;
+    background-color: #F3F4F7;
 }
 
 InitializrFormDark {
-    background-color: #0f172a;
+    background-color: #071B4D;
 }
 
 InitializrRoot {
@@ -111,13 +111,13 @@ InitializrRootDark {
 }
 
 InitializrHeaderCard {
-    background-color: #eaf2ff;
+    background-color: #F7F8FB;
     padding: 2.5mm;
     margin: 1.2mm;
 }
 
 InitializrHeaderCardDark {
-    background-color: #1e293b;
+    background-color: #163575;
     padding: 2.5mm;
     margin: 1.2mm;
 }
@@ -129,81 +129,81 @@ InitializrCard {
 }
 
 InitializrCardDark {
-    background-color: #111827;
+    background-color: #102B66;
     padding: 2.5mm;
     margin: 1.2mm;
 }
 
 InitializrHeroTitle {
-    color: #0d1b2a;
+    color: #112247;
     font-family: "native:MainBold";
     font-size: 4.5mm;
     padding: 0 0 1mm 0;
 }
 
 InitializrHeroTitleDark {
-    color: #e2e8f0;
+    color: #F5F8FF;
     font-family: "native:MainBold";
     font-size: 4.5mm;
     padding: 0 0 1mm 0;
 }
 
 InitializrHeroSubtitle {
-    color: #4a5568;
+    color: #7F8AA3;
     font-family: "native:MainRegular";
     font-size: 2.8mm;
 }
 
 InitializrHeroSubtitleDark {
-    color: #94a3b8;
+    color: #A8B8DA;
     font-family: "native:MainRegular";
     font-size: 2.8mm;
 }
 
 InitializrSectionTitle {
-    color: #1f2937;
+    color: #112247;
     font-family: "native:MainBold";
     font-size: 3.4mm;
     padding: 0 0 1.2mm 0;
 }
 
 InitializrSectionTitleDark {
-    color: #e2e8f0;
+    color: #F5F8FF;
     font-family: "native:MainBold";
     font-size: 3.4mm;
     padding: 0 0 1.2mm 0;
 }
 
 InitializrFieldLabel {
-    color: #475569;
+    color: #7F8AA3;
     font-family: "native:MainRegular";
     font-size: 2.4mm;
     padding: 0.4mm 0;
 }
 
 InitializrFieldLabelDark {
-    color: #cbd5e1;
+    color: #A8B8DA;
     font-family: "native:MainRegular";
     font-size: 2.4mm;
     padding: 0.4mm 0;
 }
 
 InitializrField, InitializrFieldHint {
-    color: #1f2937;
+    color: #112247;
     font-family: "native:MainRegular";
     font-size: 2.8mm;
     background-color: #ffffff;
-    border: 1px solid #d0dae6;
+    border: 1px solid #D9DEE8;
     padding: 1.1mm;
     margin: 0 0 1.4mm 0;
 }
 
 InitializrFieldDark, InitializrFieldHintDark {
-    color: #e2e8f0;
+    color: #F5F8FF;
     font-family: "native:MainRegular";
     font-size: 2.8mm;
-    background-color: #0f172a;
-    border: 1px solid #334155;
+    background-color: #0E2A61;
+    border: 1px solid #4C6EA8;
     padding: 1.1mm;
     margin: 0 0 1.4mm 0;
 }
@@ -214,45 +214,45 @@ InitializrChoicesGrid {
 
 AccordionItemDark {
     cn1-derive: Button;
-    color: #e2e8f0;
-    background-color: #1f2937;
-    border: 1px solid #334155;
+    color: #F5F8FF;
+    background-color: #163575;
+    border: 1px solid #4C6EA8;
     margin: 0.6mm 0;
     padding: 1.2mm;
 }
 
 AccordionItemDark.pressed {
     cn1-derive: Button;
-    color: #f8fafc;
-    background-color: #334155;
-    border: 1px solid #475569;
+    color: #F5F8FF;
+    background-color: #112F70;
+    border: 1px solid #7390C0;
 }
 
 AccordionContentDark {
     cn1-derive: Container;
-    background-color: #111827;
-    border: 1px solid #334155;
+    background-color: #102B66;
+    border: 1px solid #4C6EA8;
     padding: 1.2mm;
 }
 
 AccordionArrowDark {
     cn1-derive: AccordionArrow;
-    color: #e2e8f0;
-    background-color: #1f2937;
+    color: #F5F8FF;
+    background-color: #163575;
 }
 
 AccordionOpenCloseIconDark {
     cn1-derive: AccordionOpenCloseIcon;
-    color: #cbd5e1;
+    color: #A8B8DA;
     background-color: transparent;
 }
 
 InitializrChoice {
-    color: #1f2937;
-    background-color: #eef4ff;
+    color: #112247;
+    background-color: #E8F0FF;
     font-family: "native:MainRegular";
     font-size: 2.6mm;
-    border: 1px solid #c5d6ee;
+    border: 1px solid #D9DEE8;
     margin: 0.7mm;
     padding: 1.1mm;
     text-align: center;
@@ -260,17 +260,17 @@ InitializrChoice {
 
 InitializrChoice.pressed {
     color: #ffffff;
-    background-color: #0f766e;
-    border: 1px solid #0f766e;
+    background-color: #2F6BFF;
+    border: 1px solid #2F6BFF;
     text-align: center;
 }
 
 InitializrChoiceDark {
-    color: #e2e8f0;
-    background-color: #1f2937;
+    color: #F5F8FF;
+    background-color: #163575;
     font-family: "native:MainRegular";
     font-size: 2.6mm;
-    border: 1px solid #334155;
+    border: 1px solid #4C6EA8;
     margin: 0.7mm;
     padding: 1.1mm;
     text-align: center;
@@ -278,40 +278,40 @@ InitializrChoiceDark {
 
 InitializrChoiceDark.pressed {
     color: #ffffff;
-    background-color: #0f766e;
-    border: 1px solid #0f766e;
+    background-color: #4D86FF;
+    border: 1px solid #4D86FF;
     text-align: center;
 }
 
 InitializrSummary {
-    color: #1f2937;
+    color: #112247;
     font-family: "native:MainRegular";
     font-size: 2.7mm;
-    background-color: #f8fbff;
-    border: 1px solid #dbe7f5;
+    background-color: #FAFAFC;
+    border: 1px solid #D9DEE8;
     padding: 1.4mm;
     margin: 0 0 1.4mm 0;
 }
 
 InitializrSummaryDark {
-    color: #e2e8f0;
+    color: #F5F8FF;
     font-family: "native:MainRegular";
     font-size: 2.7mm;
-    background-color: #0f172a;
-    border: 1px solid #334155;
+    background-color: #112F70;
+    border: 1px solid #4C6EA8;
     padding: 1.4mm;
     margin: 0 0 1.4mm 0;
 }
 
 InitializrTip {
-    color: #5f6b7a;
+    color: #7F8AA3;
     font-family: "native:MainRegular";
     font-size: 2.4mm;
     padding: 0 0 1.2mm 0;
 }
 
 InitializrTipDark {
-    color: #94a3b8;
+    color: #A8B8DA;
     font-family: "native:MainRegular";
     font-size: 2.4mm;
     padding: 0 0 1.2mm 0;
@@ -333,7 +333,7 @@ InitializrValidationErrorDark {
 
 InitializrHelpButton {
     cn1-derive: Button;
-    color: #64748b;
+    color: #7F8AA3;
     background-color: transparent;
     border: none;
     margin: 0;
@@ -342,7 +342,7 @@ InitializrHelpButton {
 
 InitializrHelpButtonDark {
     cn1-derive: Button;
-    color: #94a3b8;
+    color: #A8B8DA;
     background-color: transparent;
     border: none;
     margin: 0;
@@ -356,7 +356,7 @@ Images {
 
 InitializrPrimaryButton {
     color: #ffffff;
-    background-color: #0f766e;
+    background-color: #B8D532;
     font-family: "native:MainBold";
     font-size: 2.9mm;
     padding: 1.7mm;
@@ -367,69 +367,69 @@ InitializrPrimaryButton {
 
 InitializrPrimaryButton.pressed {
     color: #ffffff;
-    background-color: #0f766e;
-    border: 1px solid #0f766e;
+    background-color: #A2BF2C;
+    border: 1px solid #A2BF2C;
     text-align: center;
 }
 
 InitializrSecondaryButton {
-    color: #0f3b6c;
-    background-color: #e8f0ff;
+    color: #112247;
+    background-color: #F7F8FB;
     font-family: "native:MainRegular";
     font-size: 2.6mm;
     padding: 1.3mm;
     margin: 0.8mm 0 0 0;
-    border: 1px solid #bfd3ef;
+    border: 1px solid #D9DEE8;
 }
 
 InitializrLiveFrame {
     margin: 0 0 1.2mm 0;
-    border: 1px solid #d2dbe8;
+    border: 1px solid #D9DEE8;
     padding: 2mm;
 }
 
 InitializrLiveContentDark {
     cn1-derive: Container;
-    background-color: #0f172a;
-    color: #e2e8f0;
+    background-color: #071B4D;
+    color: #F5F8FF;
 }
 
 InitializrLiveToolbarDark {
     cn1-derive: Toolbar;
-    background: #0f172a;
+    background: #102B66;
     border: none;
 }
 
 InitializrLiveTitleDark {
     cn1-derive: Title;
-    color: #e2e8f0;
+    color: #F5F8FF;
 }
 
 InitializrLiveMenuDark {
     cn1-derive: Command;
-    color: #e2e8f0;
+    color: #F5F8FF;
 }
 
 InitializrLiveButtonDarkClean {
     cn1-derive: Button;
-    color: #e2e8f0;
-    background-color: #1f2937;
-    border: 1px solid #475569;
+    color: #F5F8FF;
+    background-color: #163575;
+    border: 1px solid #4C6EA8;
     border-radius: 0;
 }
 
 InitializrLiveButtonDarkClean.pressed {
-    color: #e2e8f0;
-    background-color: #334155;
-    border: 1px solid #64748b;
+    color: #F5F8FF;
+    background-color: #112F70;
+    border: 1px solid #7390C0;
 }
 
 InitializrLiveButtonLightTealRound, InitializrLiveButtonLightTealSquare,
 InitializrLiveButtonDarkTealRound, InitializrLiveButtonDarkTealSquare {
     cn1-derive: Button;
     color: #ffffff;
-    background-color: #0f766e;
-    border: 1px solid #0f766e;
+    background-color: #2F6BFF;
+    border: 1px solid #2F6BFF;
 }
 
 InitializrLiveButtonLightTealRound, InitializrLiveButtonDarkTealRound {
@@ -443,16 +443,16 @@ InitializrLiveButtonLightTealSquare, InitializrLiveButtonDarkTealSquare {
 InitializrLiveButtonLightTealRound.pressed, InitializrLiveButtonLightTealSquare.pressed,
 InitializrLiveButtonDarkTealRound.pressed, InitializrLiveButtonDarkTealSquare.pressed {
     color: #ffffff;
-    background-color: #0b5f59;
-    border: 1px solid #0b5f59;
+    background-color: #1F56D9;
+    border: 1px solid #1F56D9;
 }
 
 InitializrLiveButtonLightBlueRound, InitializrLiveButtonLightBlueSquare,
 InitializrLiveButtonDarkBlueRound, InitializrLiveButtonDarkBlueSquare {
     cn1-derive: Button;
     color: #ffffff;
-    background-color: #1d4ed8;
-    border: 1px solid #1d4ed8;
+    background-color: #2F6BFF;
+    border: 1px solid #2F6BFF;
 }
 
 InitializrLiveButtonLightBlueRound, InitializrLiveButtonDarkBlueRound {
@@ -466,16 +466,16 @@ InitializrLiveButtonLightBlueSquare, InitializrLiveButtonDarkBlueSquare {
 InitializrLiveButtonLightBlueRound.pressed, InitializrLiveButtonLightBlueSquare.pressed,
 InitializrLiveButtonDarkBlueRound.pressed, InitializrLiveButtonDarkBlueSquare.pressed {
     color: #ffffff;
-    background-color: #1e40af;
-    border: 1px solid #1e40af;
+    background-color: #1F56D9;
+    border: 1px solid #1F56D9;
 }
 
 InitializrLiveButtonLightOrangeRound, InitializrLiveButtonLightOrangeSquare,
 InitializrLiveButtonDarkOrangeRound, InitializrLiveButtonDarkOrangeSquare {
     cn1-derive: Button;
     color: #ffffff;
-    background-color: #ea580c;
-    border: 1px solid #ea580c;
+    background-color: #4D86FF;
+    border: 1px solid #4D86FF;
 }
 
 InitializrLiveButtonLightOrangeRound, InitializrLiveButtonDarkOrangeRound {
@@ -489,6 +489,6 @@ InitializrLiveButtonLightOrangeSquare, InitializrLiveButtonDarkOrangeSquare {
 InitializrLiveButtonLightOrangeRound.pressed, InitializrLiveButtonLightOrangeSquare.pressed,
 InitializrLiveButtonDarkOrangeRound.pressed, InitializrLiveButtonDarkOrangeSquare.pressed {
     color: #ffffff;
-    background-color: #c2410c;
-    border: 1px solid #c2410c;
+    background-color: #2F6BFF;
+    border: 1px solid #2F6BFF;
 }

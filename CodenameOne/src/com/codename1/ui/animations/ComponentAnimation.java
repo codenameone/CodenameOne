@@ -126,24 +126,35 @@ public abstract class ComponentAnimation {
     public final void updateAnimationState() {
         updateState();
         if (!isInProgress()) {
-            if (!completed) {
-                completed = true;
-                if (notifyLock != null) {
-                    synchronized (notifyLock) {
-                        notifyLock.notifyAll();
-                    }
-                }
-                if (onCompletion != null) {
-                    onCompletion.run();
-                }
-                if (post != null) {
-                    for (Runnable p : post) {
-                        p.run();
-                    }
-                }
-            }
+            completeIfNeeded();
         } else { //ensure completed would be set to false if animation has been restarted
             completed = false;
+        }
+    }
+    
+    /// Completes the animation if needed, without forcing an additional updateState() call.
+    public final void completeAnimation() {
+        if (!isInProgress()) {
+            completeIfNeeded();
+        }
+    }
+    
+    private void completeIfNeeded() {
+        if (!completed) {
+            completed = true;
+            if (notifyLock != null) {
+                synchronized (notifyLock) {
+                    notifyLock.notifyAll();
+                }
+            }
+            if (onCompletion != null) {
+                onCompletion.run();
+            }
+            if (post != null) {
+                for (Runnable p : post) {
+                    p.run();
+                }
+            }
         }
     }
 

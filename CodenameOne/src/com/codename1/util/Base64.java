@@ -92,14 +92,19 @@ public abstract class Base64 {
         return trimmed;
     }
 
-    /**
-     * Decodes Base64 input into a caller-provided output buffer.
-     *
-     * @param in Base64 bytes
-     * @param len bytes from {@code in} to decode
-     * @param out destination buffer
-     * @return decoded length, or {@code -1} for invalid Base64
-     */
+    /// Decodes Base64 input into a caller-provided output buffer.
+    ///
+    /// #### Parameters
+    ///
+    /// - `in`: Base64 bytes
+    ///
+    /// - `len`: bytes from `in` to decode
+    ///
+    /// - `out`: destination buffer
+    ///
+    /// #### Returns
+    ///
+    /// decoded length, or `-1` for invalid Base64
     @DisableDebugInfo
     @DisableNullChecksAndArrayBoundsChecks
     public static int decode(byte[] in, int len, byte[] out) {
@@ -342,13 +347,17 @@ public abstract class Base64 {
         return com.codename1.util.StringUtil.newString(out, 0, outputLength);
     }
 
-    /**
-     * Encodes input into a caller-provided output buffer without line breaks.
-     *
-     * @param in input bytes
-     * @param out destination buffer
-     * @return number of bytes written to {@code out}
-     */
+    /// Encodes input into a caller-provided output buffer without line breaks.
+    ///
+    /// #### Parameters
+    ///
+    /// - `in`: input bytes
+    ///
+    /// - `out`: destination buffer
+    ///
+    /// #### Returns
+    ///
+    /// number of bytes written to `out`
     @DisableDebugInfo
     @DisableNullChecksAndArrayBoundsChecks
     public static int encodeNoNewline(byte[] in, byte[] out) {

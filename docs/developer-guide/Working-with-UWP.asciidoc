@@ -2,7 +2,7 @@
 
 [IMPORTANT]
 ====
-The Codename One UWP (Universal Windows Platform) target was discontinued in release 7.0.229. This chapter is retained only to document historical context for legacy projects and older blog posts. New projects should target the currently supported Codename One platforms instead.
+The Codename One UWP (Universal Windows Platform) target was discontinued in release 7.0.229. This chapter is retained to document historical context for legacy projects and older blog posts. New projects should target the currently supported Codename One platforms instead.
 ====
 
-If you are maintaining an older codebase or reading archived material that mentions UWP, treat those instructions as historical only. The current Maven build templates, initializr output, and IDE shortcuts no longer include a UWP target.
+If you're maintaining an older codebase or reading archived material that mentions UWP, treat those instructions as historical. The current Maven build templates, initializr output, and IDE shortcuts no longer include a UWP target.

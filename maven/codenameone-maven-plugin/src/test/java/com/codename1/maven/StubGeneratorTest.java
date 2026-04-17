@@ -6,7 +6,9 @@ import org.junit.jupiter.api.Test;
 
 import java.io.File;
 import java.nio.file.Files;
+import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -27,6 +29,22 @@ class StubGeneratorTest {
             enabledGenerator.generateCode(tempDir, false);
             assertTrue(iosSwift.exists());
             assertTrue(androidKotlin.exists());
+        } finally {
+            deleteTree(tempDir);
+        }
+    }
+
+    @Test
+    void existingFilesAreReportedForWarnMode() throws Exception {
+        File tempDir = Files.createTempDirectory("cn1-stubgen-existing").toFile();
+        try {
+            StubGenerator generator = StubGenerator.create(new SystemStreamLog(), TestNativeInterface.class, true, true);
+            generator.generateCode(tempDir, false);
+
+            StubGenerator checker = StubGenerator.create(new SystemStreamLog(), TestNativeInterface.class, true, true);
+            List<File> existing = checker.getExistingFiles(tempDir);
+            assertEquals(8, existing.size());
+            assertTrue(checker.isFilesExist(tempDir));
         } finally {
             deleteTree(tempDir);
         }

@@ -3,19 +3,19 @@ toc::[]
 [preface]
 == Preface
 
-This developer guide is sourced directly from the `docs` directory of the https://github.com/codenameone/CodenameOne/[Codename One Git repository]. The documentation is written in AsciiDoc, reviewed through pull requests, and published from the main branch to multiple targets.
+This developer guide comes directly from the `docs` directory of the https://github.com/codenameone/CodenameOne/[Codename One Git repository]. The documentation is written in AsciiDoc, reviewed through pull requests, and published from the main branch to several targets.
 
-=== How to Contribute Updates
+=== How to contribute updates
 
-To contribute updates, clone the repository, create a feature branch, and edit the AsciiDoc files in `docs/developer-guide`. Follow the steps in the link:https://github.com/codenameone/CodenameOne/blob/master/CONTRIBUTING.md[CONTRIBUTING guidelines] to open a GitHub pull request (PR) instead of using the deprecated community wiki. Each PR is automatically linted and built by continuous integration, then reviewed by a maintainer before it is merged. Once merged, the content is rendered to the web manual at https://www.codenameone.com/manual/ and to the downloadable PDF at https://www.codenameone.com/files/developer-guide.pdf[https://www.codenameone.com/files/developer-guide.pdf]. Periodically, major revisions are collected for print-on-demand distribution.
+To contribute updates, clone the repository, create a feature branch, and edit the AsciiDoc files in `docs/developer-guide`. Follow the steps in the link:https://github.com/codenameone/CodenameOne/blob/master/CONTRIBUTING.md[CONTRIBUTING guidelines] to open a GitHub pull request (PR) instead of using the deprecated community wiki. Continuous integration lints and builds each PR automatically. A maintainer then reviews the PR before merging it. After the merge, the content appears in the web manual at https://www.codenameone.com/manual/ and in the downloadable PDF at https://www.codenameone.com/files/developer-guide.pdf[https://www.codenameone.com/files/developer-guide.pdf]. From time to time, major revisions are collected for print-on-demand distribution.
 
-While this guide focuses on tutorial and conceptual material, the complete API reference remains available in the https://www.codenameone.com/javadoc/[Codename One JavaDoc]. The source code for the framework and this manual lives alongside each other in Git, so improvements to documentation and code can evolve together through the same contribution workflow.
+This guide focuses on tutorial and conceptual material. The complete API reference is available in the https://www.codenameone.com/javadoc/[Codename One Javadoc]. The framework source code and this manual live side by side in Git, so documentation and code improvements follow the same contribution workflow.
 
 <<<
 
 **Authors**
 
-This document includes content from multiple authors and community wiki edits. If you edit pages within the guide feel free to add your name here alphabetized by surname:
+This document includes content from contributors and community wiki edits. If you edit pages in the guide, add your name here in alphabetical order by surname:
 
 - https://github.com/shai-almog[Shai Almog]
 - https://github.com/Isborg[Ismael Baum]
@@ -28,22 +28,21 @@ This document includes content from multiple authors and community wiki edits. I
 
 **Rights & Licensing**
 
-You may copy/redistribute/print this document without prior permission from Codename One. However, you may not charge for the document itself although charging for costs such as printing is permitted.
+You may copy, redistribute, or print this document without prior permission from Codename One. You may not charge for the document itself, but charging for printing costs remains permitted.
 
-Notice that while you can print and reproduce sections arbitrarily such changes must explicitly and clearly state that this is a modified copy and link to the original source at https://www.codenameone.com/manual/ in a clear way!
+If you print or reproduce sections and make changes, state that the result is a modified copy. Also link to the original source at https://www.codenameone.com/developer-guide/.
 
 <<<<
 
 **Conventions**
 
-This guide uses some notations to provide tips and further guidance.
+This guide uses several notations for tips and further guidance.
 
-In case of further information that breaks from the current tutorial
-flow we use a sidebar as such:
+When additional information breaks from the current tutorial flow, use a sidebar like this:
 
 .Sidebar
 ****
-Dig deeper into some details that don't quite fit into the current flow. We use sidebars for things that are an important detour, you can skip them while reading but you might want to come back and read them later.
+Dig deeper into details that don't quite fit the current flow. Sidebars cover important detours. You can skip them while reading and return to them later.
 ****
 
 Here are common conventions for highlighting notes:
@@ -52,18 +51,18 @@ IMPORTANT: This is an important note
 
 TIP: This is a helpful tip
 
-NOTE: This is a general informational note, something interesting but not crucial
+NOTE: This is a general informational note. It may be interesting, but it isn't crucial.
 
-WARNING: This is a warning something we should pay attention to
+WARNING: This is a warning. Pay attention to it.
 
-#This# convention is used when we refer to a button or a widget to press in the UI. E.g. press the button labeled #Press Here#.
+#This# convention is used when referring to a button or widget to press in the UI. For example, press the button labeled #Press Here#.
 
-Quotes are presented as:
+Quotes appear as follows:
 [quote,By Author]
 ____
 This is a quote
 ____
 
-*Bold* is used for light emphasis on a specific word or two within a sentence.
+*Bold* provides light emphasis for a specific word or two within a sentence.
 
-<<<<
+<<<

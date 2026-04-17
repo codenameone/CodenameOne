@@ -138,6 +138,41 @@ class TextAreaTest extends UITestBase {
     }
 
     @FormTest
+    void testGrowByContentRevalidatesParentWhenRowsGrowDuringEditing() {
+        TextArea textArea = new TextArea();
+        textArea.setRows(1);
+        textArea.setSingleLineTextArea(false);
+        textArea.setGrowByContent(true);
+        TrackingContainer parent = new TrackingContainer();
+        parent.add(textArea);
+        parent.revalidatedLater = false;
+        Display.impl.setFocusedEditingText(textArea);
+        try {
+            textArea.setText("Line 1");
+            parent.revalidatedLater = false;
+            textArea.setText("Line 1\nLine 2");
+            assertTrue(parent.revalidatedLater, "Parent should be revalidated when growByContent row count increases");
+        } finally {
+            Display.impl.setFocusedEditingText(null);
+        }
+    }
+
+    @FormTest
+    void testGrowByContentDoesNotRevalidateWhenNotEditing() {
+        TextArea textArea = new TextArea();
+        textArea.setRows(2);
+        textArea.setGrowByContent(true);
+        TrackingContainer parent = new TrackingContainer();
+        parent.add(textArea);
+        parent.revalidatedLater = false;
+
+        Display.impl.setFocusedEditingText(null);
+        textArea.setText("Line 1");
+
+        assertFalse(parent.revalidatedLater, "Parent should not be revalidated when text changes outside active editing");
+    }
+
+    @FormTest
     void testEndsWith3Points() {
         TextArea textArea = new TextArea();
 
@@ -412,5 +447,18 @@ class TextAreaTest extends UITestBase {
         sample.setEditable(false);
         sample.setVerticalAlignment(valign);
         return sample;
+    }
+
+    private static class TrackingContainer extends Container {
+        private boolean revalidatedLater;
+
+        TrackingContainer() {
+            super(BoxLayout.y());
+        }
+
+        @Override
+        public void revalidateLater() {
+            revalidatedLater = true;
+        }
     }
 }

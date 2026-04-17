@@ -12,6 +12,8 @@ import com.codename1.ui.geom.Dimension;
 import org.junit.jupiter.api.Assertions;
 
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.Calendar;
+import java.util.Date;
 
 public class PickerCoverageTest extends UITestBase {
 
@@ -423,5 +425,74 @@ public class PickerCoverageTest extends UITestBase {
         f.setSize(new Dimension(500, 500));
         DisplayTest.flushEdt();
         f.animate();
+    }
+
+    @FormTest
+    public void testLightweightPopupCustomButtonsInButtonBar() {
+        cleanup();
+        Form form = new Form("Custom Buttons", new BoxLayout(BoxLayout.Y_AXIS));
+        Picker picker = new Picker();
+        picker.setType(Display.PICKER_TYPE_DATE);
+        picker.setUseLightweightPopup(true);
+        picker.setDate(new Date(126, Calendar.JANUARY, 10));
+        picker.addLightweightPopupButton("Today", new Runnable() {
+            @Override
+            public void run() {
+                picker.setDate(new Date(126, Calendar.JANUARY, 1));
+            }
+        });
+        form.add(picker);
+        form.show();
+        waitForForm(form);
+
+        picker.pressed();
+        picker.released();
+        DisplayTest.flushEdt();
+        runAnimations(form);
+
+        InteractionDialog dlg = findInteractionDialog(form);
+        Assertions.assertNotNull(dlg, "Dialog should be open");
+        Button today = findButtonWithText(dlg, "Today");
+        Assertions.assertNotNull(today, "Custom button should be present in picker popup");
+
+        today.pressed();
+        today.released();
+        DisplayTest.flushEdt();
+        runAnimations(form);
+
+        Date selected = picker.getDate();
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(selected);
+        Assertions.assertEquals(1, cal.get(Calendar.DAY_OF_MONTH), "Custom action should update picker date");
+    }
+
+    @FormTest
+    public void testLightweightPopupCustomButtonPlacements() {
+        cleanup();
+        Form form = new Form("Custom Placement", new BoxLayout(BoxLayout.Y_AXIS));
+        Picker picker = new Picker();
+        picker.setType(Display.PICKER_TYPE_DATE);
+        picker.setUseLightweightPopup(true);
+        picker.addLightweightPopupButton("Top", new Runnable() {
+            @Override
+            public void run() {}
+        }, Picker.LightweightPopupButtonPlacement.ABOVE_SPINNER);
+        picker.addLightweightPopupButton("Bottom", new Runnable() {
+            @Override
+            public void run() {}
+        }, Picker.LightweightPopupButtonPlacement.BELOW_SPINNER);
+        form.add(picker);
+        form.show();
+        waitForForm(form);
+
+        picker.pressed();
+        picker.released();
+        DisplayTest.flushEdt();
+        runAnimations(form);
+
+        InteractionDialog dlg = findInteractionDialog(form);
+        Assertions.assertNotNull(dlg, "Dialog should be open");
+        Assertions.assertNotNull(findButtonWithText(dlg, "Top"), "Top custom button should be rendered");
+        Assertions.assertNotNull(findButtonWithText(dlg, "Bottom"), "Bottom custom button should be rendered");
     }
 }

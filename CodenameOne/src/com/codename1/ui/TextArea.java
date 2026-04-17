@@ -597,6 +597,13 @@ public class TextArea extends Component implements ActionSource, TextHolder {
             //zero the ArrayList in order to initialize it on the next paint
             rowStrings = null;
         }
+        if (growByContent
+                && !Objects.equals(text, old)
+                && getParent() != null
+                && Display.getInstance().isTextEditing(this)
+                && textMightGrowByContent(old, text)) {
+            getParent().revalidateLater();
+        }
         if (!Objects.equals(text, old)) {
             fireDataChanged(DataChangedListener.CHANGED, -1);
         }
@@ -608,6 +615,53 @@ public class TextArea extends Component implements ActionSource, TextHolder {
             return;
         }
         repaint();
+    }
+
+    private boolean textMightGrowByContent(String oldText, String newText) {
+        int oldNewLines = countNewLines(oldText);
+        int newNewLines = countNewLines(newText);
+        if (newNewLines > oldNewLines) {
+            return true;
+        }
+        if (newText == null || oldText == null || newText.length() <= oldText.length()) {
+            return false;
+        }
+        int cols = getColumns();
+        if (cols > 1) {
+            return estimateLineCount(newText, cols) > estimateLineCount(oldText, cols);
+        }
+        return false;
+    }
+
+    private int countNewLines(String value) {
+        if (value == null || value.length() == 0) {
+            return 0;
+        }
+        int count = 0;
+        for (int i = 0; i < value.length(); i++) {
+            if (value.charAt(i) == '\n') {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private int estimateLineCount(String value, int cols) {
+        if (value == null || value.length() == 0) {
+            return 1;
+        }
+        int lines = 0;
+        int segmentLength = 0;
+        for (int i = 0; i < value.length(); i++) {
+            if (value.charAt(i) == '\n') {
+                lines += Math.max(1, (segmentLength + cols - 1) / cols);
+                segmentLength = 0;
+            } else {
+                segmentLength++;
+            }
+        }
+        lines += Math.max(1, (segmentLength + cols - 1) / cols);
+        return lines;
     }
 
     /// Convenience method for numeric text fields, returns the value as a number or invalid if the value in the

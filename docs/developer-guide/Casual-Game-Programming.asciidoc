@@ -1,14 +1,14 @@
-While game developers have traditionally used C/OpenGL to get every bit of performance out of a device, Java offers a unique opportunity for casual game developers. In this section we will build a simple card game in Java that can run unchanged on iOS, Android etc.
+While game developers have traditionally used C/OpenGL to get every bit of performance out of a device, Java offers a unique opportunity for casual game developers. In this section you will build a simple card game in Java that can run unchanged on iOS, Android etc.
 
-Casual games are often the most influential games of all, they cross demographics such as the ubiquitous solitaire or even the chart topping Angry birds. Putting them in the same game category as 3D FPS games doesn’t always make sense.
+Casual games are often the most influential games of all, they cross demographics such as the ubiquitous solitaire or even the chart topping Angry birds. Putting them in the same game category as 3D FPS games doesn't always make sense.
 
 Yes, framerates are important but ubiquity, social connectivity & gameplay are even more important for this sub genre of the game industry. The mobile aspect highlights this point further, the way app stores are built releasing often puts your game at an advantage over its competitor’s. Yet releasing to all platforms and all screen sizes becomes an issue soon enough.
 
-Typically a game is comprised of a game loop which updates UI status based on game time and renders the UI. However, with casual games constantly rendering is redundant and with mobile games it could put a major drain on the battery life. Instead we will use components to build the game elements and let Codename One do the rendering for us.
+Typically a game is comprised of a game loop which updates UI status based on game time and renders the UI. However, with casual games constantly rendering is redundant and with mobile games it could put a major drain on the battery life. Instead you will use components to build the game elements and let Codename One do the rendering for us.
 
 === The Game
 
-We will create a poker game for 1 player that doesn’t include the betting process or any of the complexities such as AI, card evaluation or validation. This allows us to fit the whole source code in 270 lines of code (more due to comments). I also chose to simplify the UI for touch devices only, technically it would be pretty easy to add keypad support but it would complicate the code and require additional designs (for focus states).
+You will create a poker game for 1 player that doesn't include the betting process or any of the complexities such as AI, card evaluation or validation. This allows us to fit the whole source code in 270 lines of code (more due to comments). I also chose to simplify the UI for touch devices, technically it would be pretty easy to add keypad support but it would complicate the code and require additional designs (for focus states).
 
 TIP: You can see the game running on the simulator at http://www.youtube.com/watch?v=4IQGBT3VsSQ[http://www.youtube.com/watch?v=4IQGBT3VsSQ]
 
@@ -16,17 +16,17 @@ The game consists of two forms: Splash screen and the main game UI.
 
 ==== Handling Multiple Device Resolutions
 
-In mobile device programming every pixel is crucial because of the small size of the screen, however we can’t shrink down our graphics too much because it needs to be "finger friendly" (big enough for a finger) and readable. There is great disparity in the device world, even within the iOS family the retina iPad has more than twice the screen density of the iPad mini. This means that an image that looks good on the iPad mini will seem either small or very pixelated on an iPad, on the other hand an image that looks good on the iPad would look huge (and take up too much RAM) on the iPad mini. The situation is even worse when dealing with phones and Android devices.
+In mobile device programming every pixel is crucial because of the small size of the screen, however you can’t shrink down our graphics too much because it needs to be "finger friendly" (big enough for a finger) and readable. There is great disparity in the device world, even within the iOS family the retina iPad has more than twice the screen density of the iPad mini. This means that an image that looks good on the iPad mini will seem either small or pixelated on an iPad, on the other hand an image that looks good on the iPad would look huge (and take up too much RAM) on the iPad mini. The situation is even worse when dealing with phones and Android devices.
 
 Thankfully there are solutions, such as using multiple images for every density (DPI). However, this is tedious for developers who need to scale the image and copy it every time for every resolution. Codename One has a feature called `MultiImage` which implicitly scales the images to all the resolutions on the desktop and places them within the res file, in runtime you will get the image that matches your devices density.
 
 There is a catch though... `MultiImage` is designed for applications where we want the density to determine the size. So an iPad will have the same density as an iPhone since both share the same amount of pixels per inch. This makes sense for an app since the images will be big enough to touch and clear. Furthermore, since the iPad screen is larger more data will fit on the screen!
 
-However, game developers have a different constraint when it comes to game elements. In the case of a game we want the images to match the device resolution and take up as much screen real estate as possible, otherwise our game would be constrained to a small portion of the tablet and look small. There is a solution though, we can determine our own DPI level when loading resources and effectively force a DPI based on screen resolution only when working with game images!
+However, game developers have a different constraint when it comes to game elements. In the case of a game we want the images to match the device resolution and take up as much screen real estate as possible, otherwise our game would be constrained to a small portion of the tablet and look small. There is a solution though, you can determine our own DPI level when loading resources and effectively force a DPI based on screen resolution when working with game images!
 
-To work with such varied resolutions/DPI’s and potential screen orientation changes we need another tool in our arsenal: layout managers.
+To work with such varied resolutions/DPI’s and potential screen orientation changes you need another tool in our arsenal: layout managers.
 
-If you are familiar with AWT/Swing this should be pretty easy, Codename One allows you to codify the logic that flows Components within the UI. We will use the layout managers to facilitate that logic and preserve the UI flow when the device is rotated.
+If you're familiar with AWT/Swing this should be pretty easy, Codename One allows you to codify the logic that flows Components within the UI. You will use the layout managers to facilitate that logic and preserve the UI flow when the device is rotated.
 
 ==== Resources
 
@@ -34,9 +34,9 @@ To save some time/effort we suggest using the ready made resource files linked i
 
 You will need a gamedata.res file that contains all the 52 cards as multi images using the naming convention of ‘rank suite.png’ example: 10c.png (10 of clubs) or ad.png (Ace of diamonds).
 
-To accomplish this we can create 52 images of roughly 153x217 pixels for all the cards then use the designer tool and select "Quick Add MultiImages" from the menu. When prompted select HD resolution. This effectively created 52 multi-images for all relevant resolutions.
+To accomplish this you can create 52 images of roughly 153x217 pixels for all the cards then use the designer tool and select "Quick Add MultiImages" from the menu. When prompted select HD resolution. This effectively created 52 multi-images for all relevant resolutions.
 
-You can also modify the default theme that ships with the  application in small ways to create the white over green color scheme. Open it in the designer tool by double clicking it and select the theme.
+You can also modify the default theme that ships with the application in small ways to create the white over green color scheme. Open it in the designer tool by double clicking it and select the theme.
 
 Then press Add and select the `Form` entry with background `NONE`, background color `6600` and transparency `255`.
 
@@ -52,32 +52,32 @@ The first step is creating the splash animation as you can see in the screenshot
 .Animation stages for the splash screen opening animation
 image::img/gaming-fig2.png[Figure 2,scaledwidth=40%]
 
-The animation in the splash screen and most of the following animations are achieved using the simple tool of layout animations. In Codename One components are automatically arranged into position using layout managers, however this isn’t implicit unless the device is rotated. A layout animation relies on this fact, it allows you to place components in a position (whether by using a layout manager or by using `setX`/`setY`) then invoke the layout animation code so they will slide into their "proper" position based on the layout manager rules.
+The animation in the splash screen and most of the following animations are achieved using the simple tool of layout animations. In Codename One components are automatically arranged into position using layout managers, however this isn't implicit unless the device is rotated. A layout animation relies on this fact, it allows you to place components in a position (whether by using a layout manager or by using `setX`/`setY`) then invoke the layout animation code so they will slide into their "proper" position based on the layout manager rules.
 
-You can see how we achieved the splash screen animation of the cards sliding into place in Listing 1 within the `showSplashScreen()` method. After we change the layout to a box X layout we just invoke animateHierarchy to animate the cards into place.
+You can see how we achieved the splash screen animation of the cards sliding into place in Listing 1 within the `showSplashScreen()` method. After we change the layout to a box X layout we invoke animateHierarchy to animate the cards into place.
 
-Notice that we use the `callSerially` method to start the actual animation. This call might not seem necessary at first until you try running the code on iOS. The first screen of the UI is very important for the iOS port which uses a screenshot to speed startup. If we won’t have this callSerially invocation the screenshot rendering process will not succeed and the animation will stutter.
+Notice that you use the `callSerially` method to start the actual animation. This call might not seem necessary at first until you try running the code on iOS. The first screen of the UI is important for the iOS port which uses a screenshot to speed startup. If we won’t have this callSerially invocation the screenshot rendering process won't succeed and the animation will stutter.
 
-We also have a cover transition defined here; it’s just a simple overlay when moving from one form to another.
+We also have a cover transition defined here; it’s a simple overlay when moving from one form to another.
 
 ==== The Game UI
 
-Initially when entering the game form we have another animation where all the cards are laid out as you can see in <<game-figure-3>>. We then have a long sequence of animation where the cards unify into place to form a pile (with a cover background falling on top) after which dealing begins and cards animate to the rival (with back only showing) or to you with the face showing. Then the instructions to swap cards fade into place.
+Initially when entering the game form you've another animation where all the cards are laid out as you can see in <<game-figure-3>>. We then have a long sequence of animation where the cards unify into place to form a pile (with a cover background falling on top) after which dealing begins and cards animate to the rival (with back showing) or to you with the face showing. Then the instructions to swap cards fade into place.
 
 [[game-figure-3]]
 .Game form startup animation and deal animation
 image::img/game-figure-3.png[Game UI,scaledwidth=40%]
 
 
-This animation is really easy to accomplish although it does have several stages. In the first stage we layout the cards within a grid layout (13x4), then when the animation starts (see the https://www.codenameone.com/javadoc/com/codename1/ui/util/UITimer.html[UITimer] code within `showGameUI()`) we just change the layout to a layered layout, add the back card (so it will come out on top based on z-ordering) and invoke animate layout.
+This animation is easy to accomplish although it does have several stages. In the first stage we layout the cards within a grid layout (13x4), then when the animation starts (see the https://www.codenameone.com/javadoc/com/codename1/ui/util/UITimer.html[UITimer] code within `showGameUI()`) we change the layout to a layered layout, add the back card (so it will come out on top based on z-ordering) and invoke animate layout.
 
-Notice that here we use `animateLayoutAndWait`, which effectively blocks the calling thread until the animation is completed. This is a VERY important and tricky subject!
+Notice that here you use `animateLayoutAndWait`, which effectively blocks the calling thread until the animation is completed. This is a VERY important and tricky subject!
 
-Codename One is for the most part a single threaded API, it supports working on other threads but it is your responsibility to invoke everything on the EDT (Event Dispatch Thread). Since the EDT does the entire rendering, events etc. if you block it you will effectively stop Codename One in its place! However, there is a trick: invokeAndBlock is a feature that allows you to stop the EDT and do stuff then restore the EDT without "really" stopping it. Its tricky, I won’t get into this in this article (this subject deserves an article of its own) but the gist of it is that you can’t just invoke Thread.sleep() in a Codename One application (at least not on the EDT) but you can use clever methods such as `Dialog.show()`, `animateLayoutAndWait` etc. and they will block the EDT for you. This is really convenient since you can just write code serially without requiring event handling for every single feature.
+Codename One is for the most part a single threaded API, it supports working on other threads but it's your responsibility to invoke everything on the EDT (Event Dispatch Thread). Since the EDT does the entire rendering, events etc. if you block it you will effectively stop Codename One in its place! However, there is a trick: invokeAndBlock is a feature that allows you to stop the EDT and do stuff then restore the EDT without "" stopping it. Its tricky, I won’t get into this in this article (this subject deserves an article of its own) but the gist of it's that you can’t invoke Thread.sleep() in a Codename One application (at least not on the EDT) but you can use clever methods such as `Dialog.show()`, `animateLayoutAndWait` etc. and they will block the EDT for you. This is convenient since you can write code serially without requiring event handling for every single feature.
 
-Now that we got that out of the way, the rest of the code is clearer. Now we understand that `animateLayoutAndWait` will literally wait for the animation to complete and the next lines can do the next animation. Indeed after that we invoke the `dealCard` method that hands the cards to the players. This method is also blocking (using and `wait` methods internally) it also marks the cards as draggable and adds that drag and drop logic which we will later use to swap cards.
+Now that we got that out of the way, the rest of the code is clearer. Now we understand that `animateLayoutAndWait` will literally wait for the animation to complete and the next lines can do the next animation. Indeed after that we invoke the `dealCard` method that hands the cards to the players. This method is also blocking (using and `wait` methods internally) it also marks the cards as draggable and adds that drag and drop logic which you will later use to swap cards.
 
-Last but not least in the animation department, we use a method called replace to fade in a component using a transition.
+Last but not least in the animation department, you use a method called replace to fade in a component using a transition.
 
 To handle the dealing we added an action listener to the deck button, this action listener is invoked when the cards are dealt and that completes the game.
 
