@@ -151,9 +151,6 @@ public class SkinDesigner extends Lifecycle {
         settingsContainer.setUIID("SkinDesignerCard");
         settingsContainer.setScrollableY(true);
 
-        details.addTab("Portrait", FontImage.MATERIAL_STAY_CURRENT_PORTRAIT, 4.5f, imPortrait.getContainer());
-        details.addTab("Landscape", FontImage.MATERIAL_STAY_CURRENT_LANDSCAPE, 4.5f, imLandscape.getContainer());
-        details.addTab("Settings", FontImage.MATERIAL_SETTINGS, 3.5f, settingsContainer);
         vl.addConstraint(smallFontSize, new NumericConstraint(false, 5, 400, "Font size must be a valid integer in the 5-400 range")).
                 addConstraint(mediumFontSize, new NumericConstraint(false, 5, 400, "Font size must be a valid integer in the 5-400 range")).
                 addConstraint(largeFontSize, new NumericConstraint(false, 5, 400, "Font size must be a valid integer in the 5-400 range")).
@@ -181,6 +178,9 @@ public class SkinDesigner extends Lifecycle {
         imLandscapeRef[0] = createImageSettings("/skin_l.png", "lan", vl, () -> showHelpForm(skinDesignerForm), saveAction);
         ImageSettings imPortrait = imPortraitRef[0];
         ImageSettings imLandscape = imLandscapeRef[0];
+        details.addTab("Portrait", FontImage.MATERIAL_STAY_CURRENT_PORTRAIT, 4.5f, imPortrait.getContainer());
+        details.addTab("Landscape", FontImage.MATERIAL_STAY_CURRENT_LANDSCAPE, 4.5f, imLandscape.getContainer());
+        details.addTab("Settings", FontImage.MATERIAL_SETTINGS, 3.5f, settingsContainer);
 
         skinDesignerForm.show();
         initThemeFromUrl(skinDesignerForm, details);
