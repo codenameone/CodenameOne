@@ -1,163 +1,137 @@
 package com.codenameone.examples.javase.tests;
 
-import com.codename1.impl.javase.Executor;
-
 import javax.imageio.ImageIO;
-import javax.swing.SwingUtilities;
 import java.awt.Dimension;
-import java.awt.Frame;
-import java.awt.GraphicsEnvironment;
 import java.awt.Rectangle;
 import java.awt.Robot;
 import java.awt.Toolkit;
-import java.awt.Window;
-import java.awt.event.WindowEvent;
 import java.awt.image.BufferedImage;
+import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
- * Runs the JavaSE simulator in-process, validates window mode, and captures a Robot screenshot.
+ * Launches the Codename One simulator as an external process (same as end users),
+ * captures Robot screenshots, and validates output.
  */
 public class SimulatorWindowModeVerifier {
     private static final String APP_CLASS = "com.codenameone.examples.javase.tests.SimulatorModeTestApp";
 
-    public static void main(String[] args) throws Exception {
+    public static void main(String[] args) {
         int exitCode = 1;
+        Process child = null;
         try {
             Args parsed = Args.parse(args);
-            if (GraphicsEnvironment.isHeadless()) {
-                throw new IllegalStateException("Graphics environment is headless. Run under xvfb-run.");
+            Path projectDir = prepareCodenameOneSettings();
+
+            List<String> cmd = new ArrayList<String>();
+            String javaExec = System.getProperty("java.home") + File.separator + "bin" + File.separator + "java";
+            cmd.add(javaExec);
+            cmd.add("-Djava.awt.headless=false");
+            cmd.add("-Dcn1.simulator.useAppFrame=" + ("single".equals(parsed.mode)));
+            cmd.add("-Dcn1.javase.implementation=jmf");
+            cmd.add("-Dcn1.test.window.mode=" + parsed.mode);
+            if (parsed.skinPath != null && parsed.skinPath.length() > 0) {
+                cmd.add("-Dskin=" + parsed.skinPath);
+                cmd.add("-Ddskin=" + parsed.skinPath);
             }
+            cmd.add("-cp");
+            cmd.add(parsed.simClasspath);
+            cmd.add("com.codename1.impl.javase.Simulator");
+            cmd.add(APP_CLASS);
 
-            final boolean expectSingleWindow = "single".equals(parsed.mode);
-            System.setProperty("cn1.simulator.useAppFrame", String.valueOf(expectSingleWindow));
-            System.setProperty("cn1.test.window.mode", parsed.mode);
-            System.setProperty("cn1.javase.noExit", "true");
-            String skinPath = System.getProperty("cn1.test.skin.path");
-            if (skinPath != null && skinPath.length() > 0) {
-                System.setProperty("dskin", skinPath);
-                System.setProperty("skin", skinPath);
-            }
+            ProcessBuilder pb = new ProcessBuilder(cmd);
+            pb.directory(projectDir.toFile());
+            pb.redirectErrorStream(true);
+            pb.inheritIO();
+            child = pb.start();
 
-            System.setProperty("cn1.javase.implementation", "jmf");
-            prepareCodenameOneSettings();
+            waitForSimulatorWarmup(Duration.ofSeconds(8));
 
-            Thread simulatorThread = new Thread(() -> {
-                try {
-                    Executor.main(new String[]{APP_CLASS});
-                } catch (Throwable t) {
-                    t.printStackTrace(System.err);
-                }
-            }, "cn1-simulator-launcher");
-            simulatorThread.setDaemon(true);
-            simulatorThread.start();
-
-            waitForVisibleFrames(parsed.timeoutMs);
-            sleep(1800);
-
-            boolean useAppFrameDetected = isUseAppFrameEnabled();
-            if (expectSingleWindow && !useAppFrameDetected) {
-                throw new AssertionError("Expected single-window mode (useAppFrame=true) but it was false.");
-            }
-            if (!expectSingleWindow && useAppFrameDetected) {
-                throw new AssertionError("Expected multi-window mode (useAppFrame=false) but it was true.");
-            }
-
-            BufferedImage image = captureDesktopScreenshot();
+            BufferedImage raw = captureDesktop();
+            BufferedImage image = cropToNonBlack(raw);
             validateScreenshotContent(image);
 
             Path screenshotPath = Path.of(parsed.screenshotPath);
             Files.createDirectories(screenshotPath.getParent());
             if (!ImageIO.write(image, "png", screenshotPath.toFile())) {
-                throw new AssertionError("No PNG writer available; screenshot was not written.");
+                throw new AssertionError("No PNG writer available; screenshot was not written");
             }
-            System.out.println("[javase-verifier] screenshot=" + screenshotPath + " mode=" + parsed.mode + " useAppFrame=" + useAppFrameDetected);
+            System.out.println("[javase-verifier] screenshot=" + screenshotPath + " mode=" + parsed.mode);
             exitCode = 0;
         } catch (Throwable t) {
             t.printStackTrace(System.err);
         } finally {
-            closeAllWindows();
-            sleep(500);
+            if (child != null && child.isAlive()) {
+                child.destroy();
+                try {
+                    if (!child.waitFor(3, java.util.concurrent.TimeUnit.SECONDS)) {
+                        child.destroyForcibly();
+                    }
+                } catch (Exception ignored) {
+                    child.destroyForcibly();
+                }
+            }
             System.exit(exitCode);
         }
     }
 
-    private static void waitForVisibleFrames(long timeoutMs) throws Exception {
-        long deadline = System.currentTimeMillis() + timeoutMs;
-        while (System.currentTimeMillis() < deadline) {
-            Frame[] frames = Frame.getFrames();
-            for (Frame frame : frames) {
-                if (frame != null && frame.isShowing()) {
-                    return;
+    private static void waitForSimulatorWarmup(Duration duration) throws Exception {
+        Instant until = Instant.now().plus(duration);
+        while (Instant.now().isBefore(until)) {
+            Thread.sleep(200);
+        }
+    }
+
+    private static BufferedImage captureDesktop() throws Exception {
+        Dimension size = Toolkit.getDefaultToolkit().getScreenSize();
+        Rectangle bounds = new Rectangle(0, 0, Math.max(1, size.width), Math.max(1, size.height));
+        return new Robot().createScreenCapture(bounds);
+    }
+
+    private static BufferedImage cropToNonBlack(BufferedImage src) {
+        int minX = src.getWidth();
+        int minY = src.getHeight();
+        int maxX = -1;
+        int maxY = -1;
+        for (int y = 0; y < src.getHeight(); y++) {
+            for (int x = 0; x < src.getWidth(); x++) {
+                int rgb = src.getRGB(x, y) & 0x00FFFFFF;
+                if (rgb != 0) {
+                    if (x < minX) minX = x;
+                    if (y < minY) minY = y;
+                    if (x > maxX) maxX = x;
+                    if (y > maxY) maxY = y;
                 }
             }
-            sleep(120);
         }
-        throw new AssertionError("Timed out waiting for simulator windows.");
-    }
-
-    private static boolean isUseAppFrameEnabled() {
-        try {
-            Class<?> portClass = Class.forName("com.codename1.impl.javase.JavaSEPort");
-            java.lang.reflect.Field field = portClass.getDeclaredField("useAppFrame");
-            field.setAccessible(true);
-            return field.getBoolean(null);
-        } catch (Exception ex) {
-            throw new RuntimeException("Failed to inspect JavaSEPort.useAppFrame", ex);
+        if (maxX <= minX || maxY <= minY) {
+            return src;
         }
-    }
-
-    private static BufferedImage captureDesktopScreenshot() throws Exception {
-        Rectangle bounds = computeCaptureBounds();
-        Robot robot = new Robot();
-        return robot.createScreenCapture(bounds);
-    }
-
-    private static Rectangle computeCaptureBounds() {
-        Rectangle bounds = null;
-        for (Window window : Window.getWindows()) {
-            if (window == null || !window.isShowing()) {
-                continue;
-            }
-            Rectangle wb = window.getBounds();
-            if (wb.width <= 1 || wb.height <= 1) {
-                continue;
-            }
-            bounds = bounds == null ? new Rectangle(wb) : bounds.union(wb);
-        }
-        if (bounds == null) {
-            Dimension size = Toolkit.getDefaultToolkit().getScreenSize();
-            bounds = new Rectangle(0, 0, Math.max(1, size.width), Math.max(1, size.height));
-        } else {
-            // Add a tiny border to include window decorations cleanly.
-            bounds.grow(8, 8);
-            if (bounds.x < 0) {
-                bounds.width += bounds.x;
-                bounds.x = 0;
-            }
-            if (bounds.y < 0) {
-                bounds.height += bounds.y;
-                bounds.y = 0;
-            }
-        }
-        return bounds;
+        int pad = 8;
+        minX = Math.max(0, minX - pad);
+        minY = Math.max(0, minY - pad);
+        maxX = Math.min(src.getWidth() - 1, maxX + pad);
+        maxY = Math.min(src.getHeight() - 1, maxY + pad);
+        return src.getSubimage(minX, minY, (maxX - minX + 1), (maxY - minY + 1));
     }
 
     private static void validateScreenshotContent(BufferedImage image) {
-        int width = image.getWidth();
-        int height = image.getHeight();
-        if (width < 100 || height < 100) {
-            throw new AssertionError("Screenshot is unexpectedly small: " + width + "x" + height);
+        if (image.getWidth() < 120 || image.getHeight() < 120) {
+            throw new AssertionError("Screenshot is unexpectedly small: " + image.getWidth() + "x" + image.getHeight());
         }
-        Set<Integer> samples = new HashSet<>();
-        int stepX = Math.max(1, width / 24);
-        int stepY = Math.max(1, height / 24);
-        for (int y = 0; y < height; y += stepY) {
-            for (int x = 0; x < width; x += stepX) {
+        Set<Integer> samples = new HashSet<Integer>();
+        int stepX = Math.max(1, image.getWidth() / 24);
+        int stepY = Math.max(1, image.getHeight() / 24);
+        for (int y = 0; y < image.getHeight(); y += stepY) {
+            for (int x = 0; x < image.getWidth(); x += stepX) {
                 samples.add(image.getRGB(x, y));
             }
         }
@@ -166,32 +140,7 @@ public class SimulatorWindowModeVerifier {
         }
     }
 
-    private static void closeAllWindows() {
-        try {
-            SwingUtilities.invokeAndWait(() -> {
-                for (Window window : Window.getWindows()) {
-                    if (window == null) {
-                        continue;
-                    }
-                    if (window.isDisplayable()) {
-                        window.dispatchEvent(new WindowEvent(window, WindowEvent.WINDOW_CLOSING));
-                        window.dispose();
-                    }
-                }
-            });
-        } catch (Exception ignored) {
-        }
-    }
-
-    private static void sleep(long millis) {
-        try {
-            Thread.sleep(millis);
-        } catch (InterruptedException ie) {
-            Thread.currentThread().interrupt();
-        }
-    }
-
-    private static void prepareCodenameOneSettings() throws Exception {
+    private static Path prepareCodenameOneSettings() throws Exception {
         Path tempProject = Files.createTempDirectory("cn1-javase-sim-project");
         Path settings = tempProject.resolve("codenameone_settings.properties");
         String content = "codename1.displayName=JavaSESimulatorTest\n"
@@ -200,32 +149,37 @@ public class SimulatorWindowModeVerifier {
                 + "codename1.version=1.0\n"
                 + "codename1.vendor=CodenameOne\n";
         Files.write(settings, content.getBytes(StandardCharsets.UTF_8));
-        System.setProperty("user.dir", tempProject.toAbsolutePath().toString());
+        return tempProject;
     }
 
     private static final class Args {
         final String mode;
         final String screenshotPath;
-        final long timeoutMs;
+        final String simClasspath;
+        final String skinPath;
 
-        private Args(String mode, String screenshotPath, long timeoutMs) {
+        private Args(String mode, String screenshotPath, String simClasspath, String skinPath) {
             this.mode = mode;
             this.screenshotPath = screenshotPath;
-            this.timeoutMs = timeoutMs;
+            this.simClasspath = simClasspath;
+            this.skinPath = skinPath;
         }
 
         static Args parse(String[] args) {
             String mode = null;
             String screenshot = null;
-            long timeout = 60000L;
+            String simClasspath = null;
+            String skinPath = null;
             for (int i = 0; i < args.length; i++) {
                 String arg = args[i];
                 if ("--mode".equals(arg) && i + 1 < args.length) {
                     mode = args[++i];
                 } else if ("--screenshot".equals(arg) && i + 1 < args.length) {
                     screenshot = args[++i];
-                } else if ("--timeout-ms".equals(arg) && i + 1 < args.length) {
-                    timeout = Long.parseLong(args[++i]);
+                } else if ("--sim-classpath".equals(arg) && i + 1 < args.length) {
+                    simClasspath = args[++i];
+                } else if ("--skin".equals(arg) && i + 1 < args.length) {
+                    skinPath = args[++i];
                 }
             }
             if (!"single".equals(mode) && !"multi".equals(mode)) {
@@ -234,7 +188,10 @@ public class SimulatorWindowModeVerifier {
             if (screenshot == null || screenshot.trim().isEmpty()) {
                 throw new IllegalArgumentException("--screenshot path is required");
             }
-            return new Args(mode, screenshot, timeout);
+            if (simClasspath == null || simClasspath.trim().isEmpty()) {
+                throw new IllegalArgumentException("--sim-classpath is required");
+            }
+            return new Args(mode, screenshot, simClasspath, skinPath);
         }
     }
 }

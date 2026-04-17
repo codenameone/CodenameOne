@@ -137,11 +137,11 @@ for mode in "${MODES[@]}"; do
   png="$RAW_DIR/javase-${mode}-window.png"
   js_log "Running simulator verification for mode=$mode"
   xvfb-run -a "$JAVA_BIN" -Djava.awt.headless=false \
-    -Dcn1.test.skin.path="$SIM_SKIN_PATH" \
     -cp "$CN1_CLASSPATH:$CLASS_DIR" \
     com.codenameone.examples.javase.tests.SimulatorWindowModeVerifier \
     --mode "$mode" \
-    --timeout-ms "90000" \
+    --sim-classpath "$CN1_CLASSPATH:$CLASS_DIR" \
+    --skin "$SIM_SKIN_PATH" \
     --screenshot "$png"
 
   if [ ! -s "$png" ]; then
