@@ -19,8 +19,8 @@
 <module>common</module>
 </modules>
   <properties>
-    <cn1.version>7.0.229</cn1.version>
-    <cn1.plugin.version>7.0.229</cn1.plugin.version>
+    <cn1.version>7.0.233</cn1.version>
+    <cn1.plugin.version>7.0.233</cn1.plugin.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <java.version>1.8</java.version>
     <java-tests.version>11</java-tests.version>
@@ -118,7 +118,7 @@
         </property>
       </activation>
       <properties>
-        <cn1.version>7.0.229</cn1.version>
+        <cn1.version>7.0.233</cn1.version>
       </properties>
     </profile>
     <profile>
