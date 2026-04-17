@@ -130,9 +130,9 @@ js_log "Ensuring JavaSE port is built"
 js_log "Using Java 8 for ant build: $JAVA8_HOME_DETECTED"
 JAVA_HOME="$JAVA8_HOME_DETECTED" PATH="$JAVA8_HOME_DETECTED/bin:$PATH" ant -noinput -buildfile Ports/JavaSE/build.xml jar
 
-CN1_CLASSPATH="CodenameOne/dist/CodenameOne.jar:Ports/JavaSE/dist/JavaSE.jar:Ports/CLDC11/dist/CLDC11.jar"
+CN1_CLASSPATH="$REPO_ROOT/CodenameOne/dist/CodenameOne.jar:$REPO_ROOT/Ports/JavaSE/dist/JavaSE.jar:$REPO_ROOT/Ports/CLDC11/dist/CLDC11.jar"
 if [ -d "Ports/JavaSE/dist/lib" ]; then
-  CN1_CLASSPATH+="$(printf ':%s' Ports/JavaSE/dist/lib/*)"
+  CN1_CLASSPATH+="$(printf ':%s' "$REPO_ROOT"/Ports/JavaSE/dist/lib/*)"
 fi
 
 BUILD_DIR="$(mktemp -d "${TMPDIR:-/tmp}/cn1-javase-sim-tests-XXXXXX")"
@@ -149,11 +149,12 @@ ACTUAL_ENTRIES=()
 for mode in "${MODES[@]}"; do
   png="$RAW_DIR/javase-${mode}-window.png"
   js_log "Running simulator verification for mode=$mode"
+  FULL_SIM_CLASSPATH="$CN1_CLASSPATH:$CLASS_DIR"
   xvfb-run -a "$JAVA_BIN" -Djava.awt.headless=false \
-    -cp "$CN1_CLASSPATH:$CLASS_DIR" \
+    -cp "$FULL_SIM_CLASSPATH" \
     com.codenameone.examples.javase.tests.SimulatorWindowModeVerifier \
     --mode "$mode" \
-    --sim-classpath "$CN1_CLASSPATH:$CLASS_DIR" \
+    --sim-classpath "$FULL_SIM_CLASSPATH" \
     --skin "$SIM_SKIN_PATH" \
     --screenshot "$png"
 
