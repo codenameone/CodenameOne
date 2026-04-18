@@ -307,6 +307,8 @@ class BytecodeComplianceMojoTest {
         assertFalse(((Boolean) method.invoke(null, "com/codename1/util/Simd", "alloca", "(I)[B")).booleanValue());
         assertFalse(((Boolean) method.invoke(null, "com/codename1/util/Simd", "allocate", "(I)[B")).booleanValue());
         assertFalse(((Boolean) method.invoke(null, "com/codename1/util/Simd", "allocation", "(I)[B")).booleanValue());
+        assertFalse(((Boolean) method.invoke(null, "com/codename1/util/Simd", "allocaByteZeroed", "(I)I")).booleanValue());
+        assertFalse(((Boolean) method.invoke(null, "com/codename1/util/Simd", "allocaIntFilled", "(II)Ljava/lang/Object;")).booleanValue());
         assertFalse(((Boolean) method.invoke(null, "com/codename1/util/Simd", "allocByte", "(I)[B")).booleanValue());
         assertFalse(((Boolean) method.invoke(null, "app/Other", "allocaByte", "(I)[B")).booleanValue());
     }

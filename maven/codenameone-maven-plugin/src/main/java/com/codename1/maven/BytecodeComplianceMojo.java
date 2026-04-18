@@ -106,7 +106,21 @@ public class BytecodeComplianceMojo extends AbstractCN1Mojo {
         return name != null
                 && name.startsWith("alloca")
                 && name.length() > "alloca".length()
-                && Character.isUpperCase(name.charAt("alloca".length()));
+                && Character.isUpperCase(name.charAt("alloca".length()))
+                && isSimdAllocaDescriptor(descriptor);
+    }
+
+    private static boolean isSimdAllocaDescriptor(String descriptor) {
+        if (descriptor == null) {
+            return false;
+        }
+        Type returnType = Type.getReturnType(descriptor);
+        if (returnType == null || returnType.getSort() != Type.ARRAY || returnType.getDimensions() != 1) {
+            return false;
+        }
+        Type elementType = returnType.getElementType();
+        int elementSort = elementType.getSort();
+        return elementSort == Type.BYTE || elementSort == Type.INT || elementSort == Type.FLOAT;
     }
 
     @Override

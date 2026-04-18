@@ -16,6 +16,7 @@ public class Base64NativePerformanceTest extends BaseTest {
     private static final int ITERATIONS = 6000;
     private static final int IMAGE_BENCHMARK_ITERATIONS = 250;
     private static final int IMAGE_BENCHMARK_SIZE = 96;
+    private static final byte IMAGE_BENCHMARK_ALPHA = (byte)0x90;
 
     @Override
     public boolean shouldTakeScreenshot() {
@@ -354,7 +355,7 @@ public class Base64NativePerformanceTest extends BaseTest {
             Image.setSimdOptimizationsEnabled(enableSimd);
             long start = System.currentTimeMillis();
             for (int i = 0; i < iterations; i++) {
-                image.modifyAlpha((byte)0x90);
+                image.modifyAlpha(IMAGE_BENCHMARK_ALPHA);
             }
             return System.currentTimeMillis() - start;
         } finally {
@@ -372,7 +373,7 @@ public class Base64NativePerformanceTest extends BaseTest {
             Image.setSimdOptimizationsEnabled(enableSimd);
             long start = System.currentTimeMillis();
             for (int i = 0; i < iterations; i++) {
-                image.modifyAlpha((byte)0x90, removeColor);
+                image.modifyAlpha(IMAGE_BENCHMARK_ALPHA, removeColor);
             }
             return System.currentTimeMillis() - start;
         } finally {
