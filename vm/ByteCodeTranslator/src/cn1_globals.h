@@ -1099,6 +1099,7 @@ extern JAVA_OBJECT allocMultiArray(int* lengths, struct clazz* type, int primiti
             __cn1RequestedAlignment = 16; \
         } \
         int __cn1ActualSize = __cn1StackLength * (primitiveSize); \
+        /* header + embedded data pointer slot + payload + alignment slack for the payload start */ \
         char* __cn1StackMem = (char*)__builtin_alloca(sizeof(struct JavaArrayPrototype) + sizeof(void*) + __cn1ActualSize + __cn1RequestedAlignment - 1); \
         JAVA_ARRAY __cn1StackArray = (JAVA_ARRAY)__cn1StackMem; \
         memset(__cn1StackArray, 0, sizeof(struct JavaArrayPrototype)); \

@@ -59,7 +59,7 @@ class SimdTest extends UITestBase {
     }
 
     @FormTest
-    void allocaFallbackAndRegistryBehaviorWork() {
+    void testAllocaFallbackAndSimdOperations() {
         Simd fallback = new Simd();
         assertEquals(16, fallback.allocaByte(16).length);
         assertEquals(16, fallback.allocaInt(16).length);
@@ -77,17 +77,23 @@ class SimdTest extends UITestBase {
         int[] regB = simd.allocaInt(16);
         int[] regO = simd.allocaInt(16);
         regA[0] = 3;
+        regA[1] = -2;
         regB[0] = 4;
-        simd.add(regA, regB, regO, 0, 1);
+        regB[1] = 5;
+        simd.add(regA, regB, regO, 0, 2);
         assertEquals(7, regO[0]);
+        assertEquals(3, regO[1]);
 
         byte[] bytesA = simd.allocaByte(16);
         byte[] bytesB = simd.allocaByte(16);
         byte[] bytesO = simd.allocaByte(16);
         bytesA[0] = 120;
+        bytesA[1] = 1;
         bytesB[0] = 20;
-        simd.add(bytesA, bytesB, bytesO, 0, 1);
+        bytesB[1] = 2;
+        simd.add(bytesA, bytesB, bytesO, 0, 2);
         assertEquals(127, bytesO[0]);
+        assertEquals(3, bytesO[1]);
     }
 
     @FormTest
