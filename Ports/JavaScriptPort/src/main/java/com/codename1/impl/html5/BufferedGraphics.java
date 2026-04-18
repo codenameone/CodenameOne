@@ -37,9 +37,7 @@ import com.codename1.ui.geom.GeneralPath;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.geom.Shape;
 import java.util.ArrayList;
-import java.util.LinkedList;
 import java.util.List;
-import java.util.Queue;
 import com.codename1.html5.js.JSBody;
 import com.codename1.html5.js.JSObject;
 import com.codename1.html5.js.dom.HTMLCanvasElement;
@@ -50,8 +48,9 @@ import com.codename1.html5.js.dom.HTMLCanvasElement;
  */
 public class BufferedGraphics extends HTML5Graphics {
     private static int drawImageDebugLogCount;
+    private static int queueDebugLogCount;
 
-    Queue<ExecutableOp> upcoming = new LinkedList<ExecutableOp>();
+    ArrayList<ExecutableOp> upcoming = new ArrayList<ExecutableOp>();
     private Rectangle clipRect;
     private Rectangle clip=new Rectangle();
     private Rectangle clipBounds=new Rectangle();
@@ -66,6 +65,7 @@ public class BufferedGraphics extends HTML5Graphics {
                     new JavaScriptPrimitiveRenderAdapter.OperationSink<ExecutableOp>() {
                         @Override
                         public void submit(ExecutableOp operation) {
+                            debugQueueEvent("primitiveSubmit", operation, upcoming.size());
                             upcoming.add(operation);
                         }
                     }, JavaScriptExecutableOpFactory.INSTANCE);
@@ -74,6 +74,7 @@ public class BufferedGraphics extends HTML5Graphics {
                     new JavaScriptImageTransformRenderAdapter.OperationSink<ExecutableOp>() {
                         @Override
                         public void submit(ExecutableOp operation) {
+                            debugQueueEvent("imageSubmit", operation, upcoming.size());
                             upcoming.add(operation);
                         }
                     }, JavaScriptExecutableOpFactory.INSTANCE);
@@ -82,6 +83,7 @@ public class BufferedGraphics extends HTML5Graphics {
                     new JavaScriptShapeGradientRenderAdapter.OperationSink<ExecutableOp>() {
                         @Override
                         public void submit(ExecutableOp operation) {
+                            debugQueueEvent("shapeSubmit", operation, upcoming.size());
                             upcoming.add(operation);
                         }
                     }, JavaScriptExecutableOpFactory.INSTANCE);
@@ -301,11 +303,72 @@ public class BufferedGraphics extends HTML5Graphics {
     List<ExecutableOp> flush(int x, int y, int width, int height){
         List<ExecutableOp> current;
         synchronized(upcoming){
+            if (queueDebugLogCount < 80) {
+                queueDebugLogCount++;
+                System.out.println("CN1JS:BufferedGraphics.flushUpcoming size=" + upcoming.size()
+                        + " sample=" + sampleOps(upcoming, 6));
+                System.out.println("CN1JS:BufferedGraphics.flushUpcomingIndexed size=" + upcoming.size()
+                        + " sample=" + sampleOpsByIndex(upcoming, 6));
+            }
             current = new ArrayList<ExecutableOp>(upcoming.size());
-            current.addAll(upcoming);
+            for (int i = 0; i < upcoming.size(); i++) {
+                current.add(upcoming.get(i));
+            }
             upcoming.clear();
+            if (queueDebugLogCount < 80) {
+                queueDebugLogCount++;
+                System.out.println("CN1JS:BufferedGraphics.flushCurrent size=" + current.size()
+                        + " sample=" + sampleOps(current, 6));
+                System.out.println("CN1JS:BufferedGraphics.flushCurrentIndexed size=" + current.size()
+                        + " sample=" + sampleOpsByIndex(current, 6));
+            }
         }
         return current;
+    }
+
+    private static void debugQueueEvent(String event, ExecutableOp operation, int sizeBefore) {
+        if (queueDebugLogCount >= 80) {
+            return;
+        }
+        queueDebugLogCount++;
+        System.out.println("CN1JS:BufferedGraphics." + event
+                + " sizeBefore=" + sizeBefore
+                + " op=" + (operation == null ? "null" : operation.getClass().getName()));
+    }
+
+    private static String sampleOps(Iterable<ExecutableOp> ops, int limit) {
+        StringBuilder out = new StringBuilder();
+        int count = 0;
+        for (ExecutableOp op : ops) {
+            if (count > 0) {
+                out.append(',');
+            }
+            out.append(op == null ? "null" : op.getClass().getSimpleName());
+            count++;
+            if (count >= limit) {
+                break;
+            }
+        }
+        if (count == 0) {
+            return "none";
+        }
+        return out.toString();
+    }
+
+    private static String sampleOpsByIndex(List<ExecutableOp> ops, int limit) {
+        int count = Math.min(limit, ops.size());
+        if (count == 0) {
+            return "none";
+        }
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < count; i++) {
+            if (i > 0) {
+                out.append(',');
+            }
+            ExecutableOp op = ops.get(i);
+            out.append(op == null ? "null" : op.getClass().getSimpleName());
+        }
+        return out.toString();
     }
 
     private Transform getInverseTransform() {

@@ -161,6 +161,39 @@ class JavascriptRuntimeSemanticsTest {
 
     @ParameterizedTest
     @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void preservesInterfaceObjectBridgeDispatchInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsInterfaceObjectBridgeApp.java", "JsInterfaceObjectBridgeApp");
+
+        assertEquals(511, result.result,
+                "Translated runtime should preserve object-returning interface bridge dispatch used by the HTML5 render adapters. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void preservesGenericSinkBridgeDispatchInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsGenericSinkBridgeApp.java", "JsGenericSinkBridgeApp");
+
+        assertEquals(2047, result.result,
+                "Translated runtime should preserve generic sink bridge dispatch used by the HTML5 buffered render queue. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void preservesAnonymousCapturedSinkDispatchInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsAnonymousSinkCaptureApp.java", "JsAnonymousSinkCaptureApp");
+
+        assertEquals(2047, result.result,
+                "Translated runtime should preserve anonymous captured sink dispatch used by BufferedGraphics. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
     void executesHostCallbacksThroughWorkerProtocol(CompilerHelper.CompilerConfig config) throws Exception {
         Parser.cleanup();
 

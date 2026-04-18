@@ -151,6 +151,8 @@ import com.codename1.html5.js.typedarrays.Uint8ClampedArray;
  */
 public class HTML5Implementation extends CodenameOneImplementation {
     private static int implDrawImageDebugLogCount;
+    private static int implDrawStringDebugLogCount;
+    private static int implTransformDebugLogCount;
     private static int renderQueueDebugLogCount;
 
     private L10NManager l10n;
@@ -5752,6 +5754,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @Override
     public void drawString(Object graphics, String str, int x, int y) {
+        if (implDrawStringDebugLogCount < 80) {
+            implDrawStringDebugLogCount++;
+            System.out.println("CN1JS:HTML5Implementation.drawString text=" + str
+                    + " dst=" + x + "," + y
+                    + " graphics=" + (graphics == null ? "null" : graphics.getClass().getName()));
+        }
         g(graphics).drawString(str, x, y);
     }
 
@@ -5906,6 +5914,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
     
     @Override
     public void setTransform(Object graphics, Transform transform) {
+        if (implTransformDebugLogCount < 80) {
+            implTransformDebugLogCount++;
+            System.out.println("CN1JS:HTML5Implementation.setTransform transform="
+                    + (transform == null ? "null" : transform.getClass().getName())
+                    + " graphics=" + (graphics == null ? "null" : graphics.getClass().getName()));
+        }
         Transform existing = ((HTML5Graphics)graphics).getTransform();
         if (existing == null) {
             existing = transform==null ? Transform.makeIdentity() : transform.copy();
@@ -5966,6 +5980,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @Override
     public void scale(Object nativeGraphics, float x, float y) {
+        if (implTransformDebugLogCount < 80) {
+            implTransformDebugLogCount++;
+            System.out.println("CN1JS:HTML5Implementation.scale x=" + x + " y=" + y
+                    + " graphics=" + (nativeGraphics == null ? "null" : nativeGraphics.getClass().getName()));
+        }
         ((HTML5Graphics)nativeGraphics).scale(x, y);
     }
 
@@ -6011,6 +6030,14 @@ public class HTML5Implementation extends CodenameOneImplementation {
     // so leaving it for now.
     @Override
     public void tileImage(Object graphics, Object img, int x, int y, int w, int h) {
+        if (implDrawImageDebugLogCount < 80) {
+            implDrawImageDebugLogCount++;
+            NativeImage image = (NativeImage)img;
+            System.out.println("CN1JS:HTML5Implementation.tileImage src="
+                    + image.getWidth() + "x" + image.getHeight()
+                    + " dst=" + x + "," + y + " " + w + "x" + h
+                    + " graphics=" + (graphics == null ? "null" : graphics.getClass().getName()));
+        }
         g(graphics).tileImage(img, x, y, w, h);
     }
 

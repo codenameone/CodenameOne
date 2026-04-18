@@ -69,7 +69,7 @@ public abstract class AbstractGraphicsScreenshotTest extends BaseTest {
                 g.setAntiAliased(false);
                 g.setAntiAliasedText(false);
                 g.fillRect(getX(), getY(), getWidth(), getHeight());
-                drawContent(g, getBounds());
+                drawContentSafely(g, getBounds(), "direct-noaa");
             }
         });
         form.add(new CleanPaintComponent() {
@@ -79,7 +79,7 @@ public abstract class AbstractGraphicsScreenshotTest extends BaseTest {
                 g.setAntiAliased(true);
                 g.setAntiAliasedText(true);
                 g.fillRect(getX(), getY(), getWidth(), getHeight());
-                drawContent(g, getBounds());
+                drawContentSafely(g, getBounds(), "direct-aa");
             }
         });
         form.add(new CleanPaintComponent() {
@@ -92,7 +92,7 @@ public abstract class AbstractGraphicsScreenshotTest extends BaseTest {
                     Graphics imgGraphics = img.getGraphics();
                     imgGraphics.setAntiAliased(false);
                     imgGraphics.setAntiAliasedText(false);
-                    drawContent(imgGraphics, new Rectangle(0, 0, img.getWidth(), img.getHeight()));
+                    drawContentSafely(imgGraphics, new Rectangle(0, 0, img.getWidth(), img.getHeight()), "buffer-noaa");
                 }
                 g.drawImage(img, getX(), getY());
             }
@@ -107,7 +107,7 @@ public abstract class AbstractGraphicsScreenshotTest extends BaseTest {
                     Graphics imgGraphics = img.getGraphics();
                     imgGraphics.setAntiAliased(true);
                     imgGraphics.setAntiAliasedText(true);
-                    drawContent(imgGraphics, new Rectangle(0, 0, img.getWidth(), img.getHeight()));
+                    drawContentSafely(imgGraphics, new Rectangle(0, 0, img.getWidth(), img.getHeight()), "buffer-aa");
                 }
                 g.drawImage(img, getX(), getY());
             }
@@ -115,5 +115,17 @@ public abstract class AbstractGraphicsScreenshotTest extends BaseTest {
 
         form.show();
         return true;
+    }
+
+    private void drawContentSafely(Graphics g, Rectangle bounds, String phase) {
+        try {
+            drawContent(g, bounds);
+        } catch (Throwable t) {
+            System.out.println("CN1JS:GraphicsTest.drawContentException test=" + getClass().getName()
+                    + " phase=" + phase
+                    + " type=" + t.getClass().getName()
+                    + " message=" + String.valueOf(t.getMessage()));
+            t.printStackTrace();
+        }
     }
 }

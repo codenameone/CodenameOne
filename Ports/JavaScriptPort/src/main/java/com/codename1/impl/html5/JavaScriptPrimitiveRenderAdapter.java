@@ -9,6 +9,8 @@ package com.codename1.impl.html5;
 import com.codename1.impl.html5.graphics.ClipState;
 
 public final class JavaScriptPrimitiveRenderAdapter<F, O> {
+    private static int debugLogCount;
+
     public interface OperationSink<O> {
         void submit(O operation);
     }
@@ -33,26 +35,47 @@ public final class JavaScriptPrimitiveRenderAdapter<F, O> {
     }
 
     public void fillRect(int x, int y, int width, int height) {
-        sink.submit(factory.createFillRect(x, y, width, height, state.getColor(), state.getAlpha()));
+        O operation = factory.createFillRect(x, y, width, height, state.getColor(), state.getAlpha());
+        debugSubmit("fillRect", operation);
+        sink.submit(operation);
     }
 
     public void clearRect(int x, int y, int width, int height) {
-        sink.submit(factory.createClearRect(x, y, width, height));
+        O operation = factory.createClearRect(x, y, width, height);
+        debugSubmit("clearRect", operation);
+        sink.submit(operation);
     }
 
     public void drawRect(int x, int y, int width, int height) {
-        sink.submit(factory.createDrawRect(x, y, width, height, state.getColor(), state.getAlpha()));
+        O operation = factory.createDrawRect(x, y, width, height, state.getColor(), state.getAlpha());
+        debugSubmit("drawRect", operation);
+        sink.submit(operation);
     }
 
     public void drawLine(int x1, int y1, int x2, int y2) {
-        sink.submit(factory.createDrawLine(x1, y1, x2, y2, state.getColor(), state.getAlpha()));
+        O operation = factory.createDrawLine(x1, y1, x2, y2, state.getColor(), state.getAlpha());
+        debugSubmit("drawLine", operation);
+        sink.submit(operation);
     }
 
     public void drawString(String str, int x, int y) {
-        sink.submit(factory.createDrawString(str, x, y, state.getColor(), state.getAlpha(), state.getFont()));
+        O operation = factory.createDrawString(str, x, y, state.getColor(), state.getAlpha(), state.getFont());
+        debugSubmit("drawString", operation);
+        sink.submit(operation);
     }
 
     public void setClipRect(int x, int y, int width, int height) {
-        sink.submit(factory.createClipRect(x, y, width, height, state.getClipState()));
+        O operation = factory.createClipRect(x, y, width, height, state.getClipState());
+        debugSubmit("setClipRect", operation);
+        sink.submit(operation);
+    }
+
+    private static void debugSubmit(String operationName, Object operation) {
+        if (debugLogCount >= 80) {
+            return;
+        }
+        debugLogCount++;
+        System.out.println("CN1JS:PrimitiveAdapter." + operationName + " op="
+                + (operation == null ? "null" : operation.getClass().getName()));
     }
 }

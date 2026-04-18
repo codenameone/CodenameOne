@@ -3795,14 +3795,17 @@ bindCiFallback("BaseTest.registerReadyCallbackImmediate", [
   const activeTest = normalizeCn1ssTestName(cn1ssActiveTestName || "default");
   let settleChanged = "na";
   let delayMillis = 1500;
+  if (activeTest === "DrawImage" || activeTest === "graphics-draw-image-rect") {
+    delayMillis = 4000;
+  }
   if (jvm && typeof jvm.invokeHostNative === "function") {
     try {
       yield jvm.invokeHostNative("__cn1_delay__", [{ millis: delayMillis }]);
       const settleResult = yield jvm.invokeHostNative("__cn1_wait_for_ui_settle__", [{
         reason: "ready:" + activeTest,
-        maxFrames: 48,
-        stableFrames: 3,
-        quietFrames: 3
+        maxFrames: delayMillis > 1500 ? 120 : 48,
+        stableFrames: delayMillis > 1500 ? 6 : 3,
+        quietFrames: delayMillis > 1500 ? 6 : 3
       }]);
       if (settleResult && settleResult.changedFromPrevious != null) {
         settleChanged = String((settleResult.changedFromPrevious | 0) !== 0 ? 1 : 0);

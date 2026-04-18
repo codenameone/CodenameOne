@@ -5,6 +5,124 @@ JavaScript Port Status (ParparVM)
 
 Last updated: 2026-04-18
 
+Latest Investigation Snapshot (current isolated matrix)
+------------------------------------------------------
+
+- Current fastest repro remains the single-case browser run:
+  - `?cn1ssTest=DrawImage&parparDiag=1`
+  - latest artifacts:
+    - `/tmp/js-fallbackfix2-DrawImage`
+    - `/tmp/js-control-DrawArc`
+- Important correction from this round:
+  - `RenderQueue.flush ... sample=null,...` is not by itself proof that queued ops are missing.
+  - Control run `DrawArc` still renders correctly even though the sample path reports `null` entries:
+    - `/tmp/js-control-DrawArc/graphics-draw-arc.png`
+    - hash: `d37b93e854b36aa26f67e7c5acbe18792b58afa2`
+  - implication:
+    - the translated list/get/sample path is misleading for diagnostics,
+    - but it is not the root cause of the white `DrawImage` screenshot.
+- Current `DrawImage` boundary:
+  - even after forcing the HTML5 CI fallback `BaseTest.registerReadyCallbackImmediate` delay from `1500ms` to `4000ms`,
+    the isolated `DrawImage` screenshot is still the same white frame:
+    - hash: `7813464830feae81792a54e0b9d05e07a7ee2d61`
+  - browser log confirms the fallback override is active:
+    - `PARPAR:DIAG:FALLBACK:baseTestRegisterReady:afterUiSettle=1:test=DrawImage:delayMs=4000:changed=1`
+  - but the flushed frame still contains only six background ops:
+    - `CN1JS:RenderQueue.flush ops=6 ...`
+    - repeated `PrimitiveAdapter.fillRect`
+    - no `BufferedGraphics.drawImage`
+    - no `ImageTransformAdapter.drawImage`
+- Meaning of the current evidence:
+  - this is not just an early screenshot/timer issue.
+  - for the `DrawImage` test, the screenshot harness is capturing a form that never reaches the image draw path at all.
+  - the next root-cause target is the `DrawImage` test/component paint dispatch path:
+    - why `AbstractGraphicsScreenshotTest` components paint in `DrawArc`,
+    - but `DrawImage` still reaches only the form/background fill path.
+
+- The user-referenced CI inputs are not currently present under `~/Downloads` in this workspace:
+  - `~/Downloads/job-logs.txt`
+  - `~/Downloads/javascript-ui-tests`
+- For this pass, local isolated browser artifacts are the ground truth:
+  - `/tmp/js-isolated-TabsScreenshotTest`
+  - `/tmp/js-isolated-DrawStringDecorated`
+  - `/tmp/js-isolated-DrawImage`
+  - `/tmp/js-isolated-TileImage`
+  - `/tmp/js-isolated-Scale`
+  - `/tmp/js-isolated-TransformTranslation`
+  - `/tmp/js-isolated-DrawShape`
+
+- Current isolated outcome matrix on the rebuilt bundle:
+  - `DrawShape`
+    - now renders non-white output.
+    - screenshot hash: `806f13547b981cf5e312f16b27cdfb580e63211a`
+    - browser log shows `canvasScore=12544`, `canvasSig=78c3b86d`
+  - `DrawImage`
+    - completes but screenshot is still the old white frame.
+    - screenshot hash: `7813464830feae81792a54e0b9d05e07a7ee2d61`
+    - browser log shows:
+      - `CN1JS:RenderQueue.flush ops=6 ... sample=null,null,null,null,null,null`
+      - `canvasScore=0`
+      - `canvasSig=7263bb45`
+    - important observation:
+      - there are no `CN1JS:HTML5Implementation.drawImage ...` logs in this isolated run.
+      - this suggests the failure is occurring before image draw ops reach the HTML5 implementation logging path.
+  - `TileImage`
+    - completes but screenshot is still white.
+    - screenshot hash: `7813464830feae81792a54e0b9d05e07a7ee2d61`
+    - browser log shows:
+      - `CN1JS:RenderQueue.flush ops=24 ... sample=null,null,null,null,null,null`
+      - `canvasScore=0`
+      - `canvasSig=7263bb45`
+      - only the final blits of `640x450` intermediates are logged.
+    - implication:
+      - the intermediate tiled surfaces are already white before they are copied to the main canvas.
+  - `DrawStringDecorated`
+    - completes but screenshot is still white.
+    - screenshot hash: `7813464830feae81792a54e0b9d05e07a7ee2d61`
+    - browser log shows:
+      - `CN1JS:RenderQueue.flush ops=24 ... sample=null,null,null,null,null,null`
+      - `canvasScore=0`
+      - `canvasSig=7263bb45`
+      - no `fillText` evidence in the failing frame.
+    - implication:
+      - plain text rendering is already fixed elsewhere, but the decorated-string path still does not produce visible text ops.
+  - `Scale`
+    - completes but screenshot is still white.
+    - screenshot hash: `7813464830feae81792a54e0b9d05e07a7ee2d61`
+    - browser log shows:
+      - `CN1JS:RenderQueue.flush ops=6 ... sample=null,null,null,null,null,null`
+      - `canvasScore=0`
+      - `canvasSig=7263bb45`
+  - `TransformTranslation`
+    - completes but screenshot is still white.
+    - screenshot hash: `7813464830feae81792a54e0b9d05e07a7ee2d61`
+    - browser log shows:
+      - `CN1JS:RenderQueue.flush ops=6 ... sample=null,null,null,null,null,null`
+      - `canvasScore=0`
+      - `canvasSig=7263bb45`
+  - `TabsScreenshotTest`
+    - still fails before screenshot emission.
+    - browser log shows:
+      - `CN1SS:TABS:step=createTab1Button`
+      - `CN1SS:TABS:step=addTab1`
+      - then `java_lang_IllegalArgumentException`
+    - current failure boundary:
+      - first failing statement is still the first material-icon tab add.
+
+- Generated bundle inspection shows the emitted JS for the affected call sites is structurally present:
+  - `Graphics.drawImage(Image,...)`
+  - `Image.drawImage(Graphics,Object,int,int)`
+  - `Graphics.drawString(String,int,int,int)`
+  - `Graphics.setTransform(Transform)`
+  - `Graphics.scale(float,float)`
+  - `HTML5Implementation.drawImage(...)`
+  - `HTML5Implementation.setTransform(...)`
+  - `HTML5Implementation.scale(...)`
+- Current strongest hypothesis:
+  - the remaining failures are still in VM/glue/runtime behavior, not in Codename One test code.
+  - The important new clue is that some bad cases never emit the expected HTML5 implementation logs even though the generated JS contains the correct-looking call paths.
+  - The next step is to prove whether runtime virtual dispatch is bypassing HTML5 overrides for these affected methods, or whether the failure occurs even earlier in image/font/object state before the override is reached.
+
 Latest Investigation Snapshot (current round)
 ---------------------------------------------
 
