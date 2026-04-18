@@ -58,6 +58,7 @@ import static com.codename1.maven.PathUtil.path;
 public class BytecodeComplianceMojo extends AbstractCN1Mojo {
 
     private static final Map<String, String> SUGGESTED_REPLACEMENTS;
+    private static final Set<String> SIMD_OWNER_NAMES;
 
     static {
         Map<String, String> m = new HashMap<String, String>();
@@ -66,6 +67,11 @@ public class BytecodeComplianceMojo extends AbstractCN1Mojo {
         m.put("java/lang/Thread#sleep(JI)V", "Use com.codename1.ui.util.UITimer or Display.callSerially() instead of blocking sleeps.");
         m.put("java/lang/Runtime#getRuntime()Ljava/lang/Runtime;", "Use Codename One platform services instead of raw java.lang.Runtime access.");
         SUGGESTED_REPLACEMENTS = Collections.unmodifiableMap(m);
+        Set<String> simdOwners = new HashSet<String>();
+        simdOwners.add("com/codename1/util/Simd");
+        simdOwners.add("com/codename1/impl/ios/IOSSimd");
+        simdOwners.add("com/codename1/impl/javase/JavaSESimd");
+        SIMD_OWNER_NAMES = Collections.unmodifiableSet(simdOwners);
     }
 
     private static final int MAX_CLASS_MAJOR_VERSION = Opcodes.V17;
@@ -90,10 +96,7 @@ public class BytecodeComplianceMojo extends AbstractCN1Mojo {
     }
 
     private static boolean isSimdOwner(String owner) {
-        return owner != null
-                && ("com/codename1/util/Simd".equals(owner)
-                || "com/codename1/impl/ios/IOSSimd".equals(owner)
-                || "com/codename1/impl/javase/JavaSESimd".equals(owner));
+        return owner != null && SIMD_OWNER_NAMES.contains(owner);
     }
 
     private static boolean isSimdAllocaMethod(String owner, String name, String descriptor) {

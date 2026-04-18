@@ -1091,10 +1091,10 @@ extern JAVA_OBJECT allocMultiArray(int* lengths, struct clazz* type, int primiti
 #define CN1_SIMD_STACK_PRIMITIVE_ARRAY(length, arrayClass, primitiveSize) \
     __extension__ ({ \
         int __cn1StackLength = (length); \
-        const int __cn1RequestedAlignment = 16; \
+        const int __cn1Alignment = 16; \
         int __cn1ActualSize = __cn1StackLength * (primitiveSize); \
         /* header + embedded data pointer slot + payload + alignment slack for the payload start */ \
-        char* __cn1StackMem = (char*)__builtin_alloca(sizeof(struct JavaArrayPrototype) + sizeof(void*) + __cn1ActualSize + __cn1RequestedAlignment - 1); \
+        char* __cn1StackMem = (char*)__builtin_alloca(sizeof(struct JavaArrayPrototype) + sizeof(void*) + __cn1ActualSize + __cn1Alignment - 1); \
         JAVA_ARRAY __cn1StackArray = (JAVA_ARRAY)__cn1StackMem; \
         memset(__cn1StackArray, 0, sizeof(struct JavaArrayPrototype)); \
         __cn1StackArray->__codenameOneParentClsReference = (arrayClass); \
@@ -1105,7 +1105,7 @@ extern JAVA_OBJECT allocMultiArray(int* lengths, struct clazz* type, int primiti
             char* __cn1Data = (char*)(&(__cn1StackArray->data)); \
             __cn1Data += sizeof(void*); \
             /* round the payload start up by adding alignment-1 then masking off the low bits */ \
-            uintptr_t __cn1Aligned = (((uintptr_t)__cn1Data) + ((uintptr_t)__cn1RequestedAlignment - 1)) & ~((uintptr_t)__cn1RequestedAlignment - 1); \
+            uintptr_t __cn1Aligned = (((uintptr_t)__cn1Data) + ((uintptr_t)__cn1Alignment - 1)) & ~((uintptr_t)__cn1Alignment - 1); \
             __cn1StackArray->data = (void*)__cn1Aligned; \
         } else { \
             __cn1StackArray->data = 0; \
