@@ -33,6 +33,7 @@ import com.codename1.ui.events.ActionSource;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.util.EventDispatcher;
 import com.codename1.ui.util.ImageIO;
+import com.codename1.util.Simd;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -44,6 +45,8 @@ import java.util.HashMap;
 ///
 /// @author Chen Fishbein
 public class Image implements ActionSource {
+    private static final int SIMD_BLOCK_SIZE = 64;
+    private static boolean simdOptimizationsEnabled = Simd.get().isSupported();
     int transform;
     private EventDispatcher listeners;
     private Object rgbCache;
@@ -56,6 +59,23 @@ public class Image implements ActionSource {
     private String svgBaseURL;
     private byte[] svgData;
     private String imageName;
+
+    /// Indicates whether Image SIMD optimizations are enabled. When unset this defaults
+    /// to the current platform SIMD support.
+    public static boolean isSimdOptimizationsEnabled() {
+        return simdOptimizationsEnabled;
+    }
+
+    /// Enables or disables Image SIMD optimizations explicitly.
+    public static void setSimdOptimizationsEnabled(boolean enabled) {
+        simdOptimizationsEnabled = enabled;
+    }
+
+    /// Clears the explicit Image SIMD override and restores the default behavior of
+    /// using SIMD whenever it is supported by the current platform.
+    public static void resetSimdOptimizationsEnabled() {
+        simdOptimizationsEnabled = Simd.get().isSupported();
+    }
 
     /// Subclasses may use this and point to an underlying native image which might be
     /// null for a case of an image that doesn't use native drawing
@@ -1053,9 +1073,22 @@ public class Image implements ActionSource {
     public Object createMask() {
         int[] rgb = getRGBCached();
         int rlen = rgb.length;
-        byte[] mask = new byte[rlen];
-        for (int iter = 0; iter < rlen; iter++) {
-            mask[iter] = (byte) (rgb[iter] & 0xff);
+        byte[] mask;
+        if (isSimdOptimizationsEnabled() && rlen >= 16) {
+            Simd simd = Simd.get();
+            mask = simd.allocByte(rlen);
+            int blockSize = Math.min(rlen, SIMD_BLOCK_SIZE);
+            int[] scratch = simd.allocInt(blockSize);
+            for (int offset = 0; offset < rlen; offset += blockSize) {
+                int length = Math.min(blockSize, rlen - offset);
+                System.arraycopy(rgb, offset, scratch, 0, length);
+                simd.packIntToByteTruncate(scratch, 0, mask, offset, length);
+            }
+        } else {
+            mask = new byte[rlen];
+            for (int iter = 0; iter < rlen; iter++) {
+                mask[iter] = (byte) (rgb[iter] & 0xff);
+            }
         }
         return new IndexedImage(getWidth(), getHeight(), null, mask);
     }
@@ -1156,11 +1189,34 @@ public class Image implements ActionSource {
         if (mWidth != getWidth() || mHeight != getHeight()) {
             throw new IllegalArgumentException("Mask and image sizes don't match");
         }
-        int mdlen = maskData.length;
-        for (int iter = 0; iter < mdlen; iter++) {
-            int maskAlpha = maskData[iter] & 0xff;
-            maskAlpha = (maskAlpha << 24) & 0xff000000;
-            rgb[iter] = (rgb[iter] & 0xffffff) | maskAlpha;
+        if (isSimdOptimizationsEnabled() && maskData.length >= 16) {
+            Simd simd = Simd.get();
+            int blockSize = Math.min(maskData.length, SIMD_BLOCK_SIZE);
+            int srcOffset = 0;
+            int alphaOffset = blockSize;
+            int maskOffset = blockSize * 2;
+            int[] scratch = simd.allocInt(blockSize * 3);
+            byte[] scratchBytes = simd.allocByte(blockSize);
+            for (int iter = 0; iter < blockSize; iter++) {
+                scratch[maskOffset + iter] = 0xffffff;
+            }
+            for (int offset = 0; offset < maskData.length; offset += blockSize) {
+                int length = Math.min(blockSize, maskData.length - offset);
+                System.arraycopy(rgb, offset, scratch, srcOffset, length);
+                System.arraycopy(maskData, offset, scratchBytes, 0, length);
+                simd.and(scratch, srcOffset, scratch, maskOffset, scratch, srcOffset, length);
+                simd.unpackUnsignedByteToInt(scratchBytes, 0, scratch, alphaOffset, length);
+                simd.shl(scratch, alphaOffset, 24, scratch, alphaOffset, length);
+                simd.or(scratch, srcOffset, scratch, alphaOffset, scratch, srcOffset, length);
+                System.arraycopy(scratch, srcOffset, rgb, offset, length);
+            }
+        } else {
+            int mdlen = maskData.length;
+            for (int iter = 0; iter < mdlen; iter++) {
+                int maskAlpha = maskData[iter] & 0xff;
+                maskAlpha = (maskAlpha << 24) & 0xff000000;
+                rgb[iter] = (rgb[iter] & 0xffffff) | maskAlpha;
+            }
         }
         return createImage(rgb, mWidth, mHeight);
     }
@@ -1306,11 +1362,38 @@ public class Image implements ActionSource {
         int h = getHeight();
         int size = w * h;
         int[] arr = getRGB();
-        int alphaInt = (((int) alpha) << 24) & 0xff000000;
-        for (int iter = 0; iter < size; iter++) {
-            int currentAlpha = (arr[iter] >> 24) & 0xff;
-            if (currentAlpha != 0) {
-                arr[iter] = (arr[iter] & 0xffffff) | alphaInt;
+        if (isSimdOptimizationsEnabled() && size >= 16) {
+            Simd simd = Simd.get();
+            int blockSize = Math.min(size, SIMD_BLOCK_SIZE);
+            int srcOffset = 0;
+            int workOffset = blockSize;
+            int maskOffset = blockSize * 2;
+            int alphaOffset = blockSize * 3;
+            int zeroOffset = blockSize * 4;
+            int[] scratch = simd.allocInt(blockSize * 5);
+            byte[] scratchBytes = simd.allocByte(blockSize);
+            int alphaInt = (((int) alpha) << 24) & 0xff000000;
+            for (int iter = 0; iter < blockSize; iter++) {
+                scratch[maskOffset + iter] = 0xffffff;
+                scratch[alphaOffset + iter] = alphaInt;
+            }
+            for (int offset = 0; offset < size; offset += blockSize) {
+                int length = Math.min(blockSize, size - offset);
+                System.arraycopy(arr, offset, scratch, srcOffset, length);
+                simd.shrLogical(scratch, srcOffset, 24, scratch, workOffset, length);
+                simd.cmpEq(scratch, workOffset, scratch, zeroOffset, scratchBytes, 0, length);
+                simd.and(scratch, srcOffset, scratch, maskOffset, scratch, workOffset, length);
+                simd.or(scratch, workOffset, scratch, alphaOffset, scratch, workOffset, length);
+                simd.select(scratchBytes, 0, scratch, srcOffset, scratch, workOffset, scratch, srcOffset, length);
+                System.arraycopy(scratch, srcOffset, arr, offset, length);
+            }
+        } else {
+            int alphaInt = (((int) alpha) << 24) & 0xff000000;
+            for (int iter = 0; iter < size; iter++) {
+                int currentAlpha = (arr[iter] >> 24) & 0xff;
+                if (currentAlpha != 0) {
+                    arr[iter] = (arr[iter] & 0xffffff) | alphaInt;
+                }
             }
         }
         Image i = new Image(arr, w, h);
@@ -1378,12 +1461,44 @@ public class Image implements ActionSource {
         int size = w * h;
         int[] arr = new int[size];
         getRGB(arr, 0, 0, 0, w, h);
-        int alphaInt = (((int) alpha) << 24) & 0xff000000;
-        for (int iter = 0; iter < size; iter++) {
-            if ((arr[iter] & 0xff000000) != 0) {
-                arr[iter] = (arr[iter] & 0xffffff) | alphaInt;
-                if (removeColor == (0xffffff & arr[iter])) {
-                    arr[iter] = 0;
+        if (isSimdOptimizationsEnabled() && size >= 16) {
+            Simd simd = Simd.get();
+            int blockSize = Math.min(size, SIMD_BLOCK_SIZE);
+            int srcOffset = 0;
+            int workOffset = blockSize;
+            int maskOffset = blockSize * 2;
+            int alphaOffset = blockSize * 3;
+            int zeroOffset = blockSize * 4;
+            int removeColorOffset = blockSize * 5;
+            int[] scratch = simd.allocInt(blockSize * 6);
+            byte[] scratchBytes = simd.allocByte(blockSize);
+            int alphaInt = (((int) alpha) << 24) & 0xff000000;
+            for (int iter = 0; iter < blockSize; iter++) {
+                scratch[maskOffset + iter] = 0xffffff;
+                scratch[alphaOffset + iter] = alphaInt;
+                scratch[removeColorOffset + iter] = removeColor & 0xffffff;
+            }
+            for (int offset = 0; offset < size; offset += blockSize) {
+                int length = Math.min(blockSize, size - offset);
+                System.arraycopy(arr, offset, scratch, srcOffset, length);
+                simd.shrLogical(scratch, srcOffset, 24, scratch, workOffset, length);
+                simd.cmpEq(scratch, workOffset, scratch, zeroOffset, scratchBytes, 0, length);
+                simd.and(scratch, srcOffset, scratch, maskOffset, scratch, workOffset, length);
+                simd.or(scratch, workOffset, scratch, alphaOffset, scratch, workOffset, length);
+                simd.select(scratchBytes, 0, scratch, srcOffset, scratch, workOffset, scratch, srcOffset, length);
+                simd.and(scratch, srcOffset, scratch, maskOffset, scratch, workOffset, length);
+                simd.cmpEq(scratch, workOffset, scratch, removeColorOffset, scratchBytes, 0, length);
+                simd.select(scratchBytes, 0, scratch, zeroOffset, scratch, srcOffset, scratch, srcOffset, length);
+                System.arraycopy(scratch, srcOffset, arr, offset, length);
+            }
+        } else {
+            int alphaInt = (((int) alpha) << 24) & 0xff000000;
+            for (int iter = 0; iter < size; iter++) {
+                if ((arr[iter] & 0xff000000) != 0) {
+                    arr[iter] = (arr[iter] & 0xffffff) | alphaInt;
+                    if (removeColor == (0xffffff & arr[iter])) {
+                        arr[iter] = 0;
+                    }
                 }
             }
         }
