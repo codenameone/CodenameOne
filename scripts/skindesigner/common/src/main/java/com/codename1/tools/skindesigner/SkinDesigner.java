@@ -45,9 +45,8 @@ import net.sf.zipme.ZipEntry;
 import net.sf.zipme.ZipOutputStream;
 
 public class SkinDesigner extends Lifecycle {
-    private static final String[] NATIVE_THEMES = {"iOS 7+", "iOS 6", "Android 4 +","Android 2.x", "Windows"};
-    private static final String[] NATIVE_THEME_FILES = {"iOS7Theme.res", "iPhoneTheme.res",
-            "android_holo_light.res","androidTheme.res", "winTheme.res"};
+    private static final String[] NATIVE_THEMES = {"iOS", "Android", "Windows"};
+    private static final String[] NATIVE_THEME_FILES = {"iOS7Theme.res", "android_holo_light.res", "winTheme.res"};
     private boolean websiteDarkMode;
 
     @Override
@@ -589,7 +588,7 @@ public class SkinDesigner extends Lifecycle {
         preview.setUIID("SkinDesignerCard");
         preview.setScrollableY(true);
 
-        int splitType = Display.getInstance().isPortrait() ? SplitPane.HORIZONTAL_SPLIT : SplitPane.VERTICAL_SPLIT;
+        int splitType = "lan".equals(prefix) ? SplitPane.VERTICAL_SPLIT : SplitPane.HORIZONTAL_SPLIT;
         Component split = new SplitPane(splitType, controls, preview, "35%", "45%", "55%");
         final Container cnt = BorderLayout.center(split);
         cnt.setUIID("SkinDesignerCard");
@@ -716,13 +715,17 @@ public class SkinDesigner extends Lifecycle {
         int tail = 0;
         int seedIdx = seedY * width + seedX;
         int seedColor = src[seedIdx];
+        if(((seedColor >>> 24) & 0xff) < 16) {
+            ToastBar.showErrorMessage("Detected seed point is transparent. Adjust screen position first.");
+            return null;
+        }
         queue[tail++] = seedIdx;
         visited[seedIdx] = true;
         while(head < tail) {
             int idx = queue[head++];
             int px = idx % width;
             int py = idx / width;
-            if(colorDistance(src[idx], seedColor) <= tolerance) {
+            if(colorMatch(src[idx], seedColor, tolerance)) {
                 mask[idx] = 0xff000000;
                 if(px > 0) {
                     int n = idx - 1;
@@ -757,17 +760,22 @@ public class SkinDesigner extends Lifecycle {
         return Image.createImage(mask, width, height);
     }
 
-    private int colorDistance(int c1, int c2) {
+    private boolean colorMatch(int c1, int c2, int tolerance) {
+        int a1 = (c1 >>> 24) & 0xff;
+        int a2 = (c2 >>> 24) & 0xff;
+        if(a1 < 16) {
+            return false;
+        }
         int r1 = (c1 >> 16) & 0xff;
         int g1 = (c1 >> 8) & 0xff;
         int b1 = c1 & 0xff;
         int r2 = (c2 >> 16) & 0xff;
         int g2 = (c2 >> 8) & 0xff;
         int b2 = c2 & 0xff;
-        int dr = r1 - r2;
-        int dg = g1 - g2;
-        int db = b1 - b2;
-        return (int)Math.sqrt(dr * dr + dg * dg + db * db);
+        return Math.abs(a1 - a2) <= tolerance &&
+                Math.abs(r1 - r2) <= tolerance &&
+                Math.abs(g1 - g2) <= tolerance &&
+                Math.abs(b1 - b2) <= tolerance;
     }
 
     private void showHelpForm(Form backForm) {
