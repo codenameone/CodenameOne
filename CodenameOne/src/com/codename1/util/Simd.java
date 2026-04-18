@@ -60,26 +60,29 @@ public class Simd {
         return new float[size];
     }
 
-    /// @deprecated This is a special scratch-allocation API. On ParparVM this may
-    /// be lowered to a stack-backed faux array, so callers MUST keep it method-local
-    /// and MUST be extremely cautious when using it.
-    /// Use `allocByte()` for heap-backed arrays.
+    /**
+     * @deprecated This is a special scratch-allocation API. On ParparVM this may be lowered to a
+     * stack-backed faux array, so callers MUST keep it method-local and MUST be extremely cautious
+     * when using it. Use {@link #allocByte(int)} for heap-backed arrays.
+     */
     public byte[] allocaByte(int size) {
         return allocByte(size);
     }
 
-    /// @deprecated This is a special scratch-allocation API. On ParparVM this may
-    /// be lowered to a stack-backed faux array, so callers MUST keep it method-local
-    /// and MUST be extremely cautious when using it.
-    /// Use `allocInt()` for heap-backed arrays.
+    /**
+     * @deprecated This is a special scratch-allocation API. On ParparVM this may be lowered to a
+     * stack-backed faux array, so callers MUST keep it method-local and MUST be extremely cautious
+     * when using it. Use {@link #allocInt(int)} for heap-backed arrays.
+     */
     public int[] allocaInt(int size) {
         return allocInt(size);
     }
 
-    /// @deprecated This is a special scratch-allocation API. On ParparVM this may
-    /// be lowered to a stack-backed faux array, so callers MUST keep it method-local
-    /// and MUST be extremely cautious when using it.
-    /// Use `allocFloat()` for heap-backed arrays.
+    /**
+     * @deprecated This is a special scratch-allocation API. On ParparVM this may be lowered to a
+     * stack-backed faux array, so callers MUST keep it method-local and MUST be extremely cautious
+     * when using it. Use {@link #allocFloat(int)} for heap-backed arrays.
+     */
     public float[] allocaFloat(int size) {
         return allocFloat(size);
     }
