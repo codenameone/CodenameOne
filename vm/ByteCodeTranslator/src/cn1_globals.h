@@ -1088,10 +1088,11 @@ extern void gcReleaseObj(JAVA_OBJECT o);
 extern JAVA_OBJECT allocArray(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type, int primitiveSize, int dim);
 extern JAVA_OBJECT allocArrayAligned(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type, int primitiveSize, int dim, int alignment);
 extern JAVA_OBJECT allocMultiArray(int* lengths, struct clazz* type, int primitiveSize, int dim);
+#define CN1_SIMD_ALIGNMENT 16
 #define CN1_SIMD_STACK_PRIMITIVE_ARRAY(length, arrayClass, primitiveSize) \
     __extension__ ({ \
         int __cn1StackLength = (length); \
-        const int __cn1Alignment = 16; \
+        const int __cn1Alignment = CN1_SIMD_ALIGNMENT; \
         int __cn1ActualSize = __cn1StackLength * (primitiveSize); \
         /* header + embedded data pointer slot + payload + alignment slack for the payload start */ \
         char* __cn1StackMem = (char*)__builtin_alloca(sizeof(struct JavaArrayPrototype) + sizeof(void*) + __cn1ActualSize + __cn1Alignment - 1); \

@@ -29,8 +29,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
 class BytecodeComplianceMojoTest {
-    private static final String NON_SIMD_CONSUMER_REFERENCE = "SIMD alloca value passed to non-Simd method app/Helper#consume([B)V";
-
     @Test
     void detectsForbiddenMethodReferenceWithSourceDetails(@TempDir Path tempDir) throws Exception {
         Path outputDir = tempDir.resolve("classes");
@@ -274,7 +272,7 @@ class BytecodeComplianceMojoTest {
         Map<String, ?> projectIndex = buildClassIndex(mojo, Collections.singletonList(outputDir.toFile()));
         List<?> violations = scanProjectClasses(mojo, outputDir, allowedIndex, projectIndex);
 
-        assertTrue(hasViolationForReferencePrefix(violations, NON_SIMD_CONSUMER_REFERENCE),
+        assertTrue(hasViolationForReferencePrefix(violations, "SIMD alloca value passed to non-Simd method app/Helper#consume([B)V"),
                 "Expected SIMD alloca verifier to reject non-Simd method calls");
     }
 

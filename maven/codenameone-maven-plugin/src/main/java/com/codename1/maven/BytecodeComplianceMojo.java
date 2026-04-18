@@ -432,6 +432,7 @@ public class BytecodeComplianceMojo extends AbstractCN1Mojo {
                             break;
                         }
                     }
+                    // Non-static calls also consume the receiver object from the stack.
                     if (!usesAlloca && opcode != Opcodes.INVOKESTATIC
                             && isAllocaValue(frame.getStack(frame.getStackSize() - 1 - argumentCount))) {
                         usesAlloca = true;
