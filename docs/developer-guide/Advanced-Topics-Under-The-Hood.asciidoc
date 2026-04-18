@@ -1888,26 +1888,27 @@ Keep `codename1.arg.android.activity.launchMode=singleTask` on your main CN1 act
 A minimal bridge activity should:
 
 . Receive and parse the incoming intent.
-. Capture caller identity (`getCallingPackage()` / referrer fallback).
+. Capture caller identity using `getCallingPackage()`.
 . Launch or resume the CN1 app activity.
 . Hold contract state until CN1 completes verification.
 . Return `setResult(...)` and `finish()`.
 
+IMPORTANT: For payment/wallet trust decisions, treat only `getCallingPackage()` as verified identity.
+Do not rely on referrer extras for caller authentication because callers can spoof those values.
+This implies the contract should be launched with `startActivityForResult(...)` so caller identity is available.
+
 [source,java]
 ----
 public class WalletBridgeActivity extends Activity {
-    private static WeakReference<WalletBridgeActivity> active;
+    private static WalletBridgeActivity active;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        active = new WeakReference<>(this);
+        active = this;
 
         Intent in = getIntent();
         String caller = getCallingPackage();
-        if (caller == null && Build.VERSION.SDK_INT >= 22 && getReferrer() != null) {
-            caller = getReferrer().getHost();
-        }
 
         Intent launch = getPackageManager().getLaunchIntentForPackage(getPackageName());
         launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
@@ -1917,8 +1918,16 @@ public class WalletBridgeActivity extends Activity {
         // Do not finish yet. CN1 will finish this activity via native callback once verification completes.
     }
 
+    @Override
+    protected void onDestroy() {
+        if (active == this) {
+            active = null;
+        }
+        super.onDestroy();
+    }
+
     public static WalletBridgeActivity getActive() {
-        return active == null ? null : active.get();
+        return active;
     }
 }
 ----
@@ -1956,6 +1965,7 @@ public void start() {
 Implement a small native interface method (Android implementation) that:
 
 . gets `WalletBridgeActivity.getActive()`,
+. verifies `getActive()` is non-null and fails closed if the bridge timed out/canceled,
 . builds caller-specific result extras,
 . calls `setResult(Activity.RESULT_OK, resultIntent)`,
 . calls `finish()` on the bridge activity.

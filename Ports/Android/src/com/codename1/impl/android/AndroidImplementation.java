@@ -1065,6 +1065,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private static final String INTENT_PROPERTY_PREFIX = "android.intent.";
     private static final String INTENT_EXTRA_PROPERTY_PREFIX = "android.intent.extra.";
     private static final Set<String> intentPropertyKeys = new HashSet<String>();
+    private static final Object intentPropertyLock = new Object();
+    private static Intent lastPublishedIntent;
 
     public static AndroidImplementation getInstance() {
         return instance;
@@ -1077,54 +1079,66 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
 
-    private static void setIntentProperty(String key, String value) {
-        if (!Display.isInitialized()) {
-            return;
-        }
-        Display.getInstance().setProperty(key, value);
-        if (value == null) {
-            intentPropertyKeys.remove(key);
-        } else {
-            intentPropertyKeys.add(key);
-        }
-    }
-
     private static void clearIntentProperties() {
-        if (!Display.isInitialized()) {
+        synchronized (intentPropertyLock) {
+            if (Display.isInitialized()) {
+                for (String key : new ArrayList<String>(intentPropertyKeys)) {
+                    Display.getInstance().setProperty(key, null);
+                }
+            }
             intentPropertyKeys.clear();
-            return;
+            lastPublishedIntent = null;
         }
-        for (String key : new ArrayList<String>(intentPropertyKeys)) {
-            Display.getInstance().setProperty(key, null);
-        }
-        intentPropertyKeys.clear();
     }
 
     private static void publishIntentProperties(Activity activity, Intent intent) {
-        clearIntentProperties();
         if (intent == null) {
             return;
         }
 
-        setIntentProperty(INTENT_PROPERTY_PREFIX + "action", intent.getAction());
-        setIntentProperty(INTENT_PROPERTY_PREFIX + "data", intent.getDataString());
-        setIntentProperty(INTENT_PROPERTY_PREFIX + "type", intent.getType());
-
-        String caller = activity.getCallingPackage();
-        if (caller == null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
-            Uri referrer = activity.getReferrer();
-            if (referrer != null) {
-                caller = referrer.getHost();
+        synchronized (intentPropertyLock) {
+            if (intent == lastPublishedIntent) {
+                return;
             }
-        }
-        setIntentProperty(INTENT_PROPERTY_PREFIX + "caller", caller);
 
-        Bundle extras = intent.getExtras();
-        if (extras != null) {
-            for (String key : extras.keySet()) {
-                Object value = extras.get(key);
-                setIntentProperty(INTENT_EXTRA_PROPERTY_PREFIX + key, value == null ? null : String.valueOf(value));
+            Map<String, String> nextProperties = new HashMap<String, String>();
+            nextProperties.put(INTENT_PROPERTY_PREFIX + "action", intent.getAction());
+            nextProperties.put(INTENT_PROPERTY_PREFIX + "data", intent.getDataString());
+            nextProperties.put(INTENT_PROPERTY_PREFIX + "type", intent.getType());
+
+            // Only getCallingPackage() is a verified caller identity.  Referrer values are caller-controlled.
+            nextProperties.put(INTENT_PROPERTY_PREFIX + "caller", activity.getCallingPackage());
+
+            Bundle extras = intent.getExtras();
+            if (extras != null) {
+                for (String key : extras.keySet()) {
+                    Object value = extras.get(key);
+                    String propertyKey = key.startsWith(INTENT_EXTRA_PROPERTY_PREFIX) ? key : INTENT_EXTRA_PROPERTY_PREFIX + key;
+                    nextProperties.put(propertyKey, value == null ? null : String.valueOf(value));
+                }
             }
+
+            if (Display.isInitialized()) {
+                ArrayList<String> keysToRemove = new ArrayList<String>();
+                for (String key : intentPropertyKeys) {
+                    if (!nextProperties.containsKey(key)) {
+                        keysToRemove.add(key);
+                    }
+                }
+                for (String key : keysToRemove) {
+                    Display.getInstance().setProperty(key, null);
+                    intentPropertyKeys.remove(key);
+                }
+                for (Map.Entry<String, String> entry : nextProperties.entrySet()) {
+                    Display.getInstance().setProperty(entry.getKey(), entry.getValue());
+                    intentPropertyKeys.add(entry.getKey());
+                }
+            } else {
+                intentPropertyKeys.clear();
+                intentPropertyKeys.addAll(nextProperties.keySet());
+            }
+
+            lastPublishedIntent = intent;
         }
     }
 
