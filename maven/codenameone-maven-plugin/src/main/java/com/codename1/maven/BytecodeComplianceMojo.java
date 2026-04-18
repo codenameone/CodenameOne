@@ -103,7 +103,10 @@ public class BytecodeComplianceMojo extends AbstractCN1Mojo {
         if (!isSimdOwner(owner)) {
             return false;
         }
-        return name != null && name.startsWith("alloca");
+        return name != null
+                && name.startsWith("alloca")
+                && name.length() > "alloca".length()
+                && Character.isUpperCase(name.charAt("alloca".length()));
     }
 
     @Override
