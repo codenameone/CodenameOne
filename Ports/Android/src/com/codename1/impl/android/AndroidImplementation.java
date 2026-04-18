@@ -1107,7 +1107,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             nextProperties.put(INTENT_PROPERTY_PREFIX + "type", intent.getType());
 
             // Only getCallingPackage() is a verified caller identity.  Referrer values are caller-controlled.
-            nextProperties.put(INTENT_PROPERTY_PREFIX + "caller", activity.getCallingPackage());
+            String callerPackage = activity.getCallingPackage();
+            nextProperties.put(INTENT_PROPERTY_PREFIX + "caller", callerPackage);
+            nextProperties.put(INTENT_PROPERTY_PREFIX + "caller.verified", callerPackage != null ? "true" : "false");
 
             Bundle extras = intent.getExtras();
             if (extras != null) {

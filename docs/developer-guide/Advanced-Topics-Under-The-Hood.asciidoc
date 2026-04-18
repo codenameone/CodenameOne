@@ -1897,6 +1897,20 @@ IMPORTANT: For payment/wallet trust decisions, treat only `getCallingPackage()` 
 Do not rely on referrer extras for caller authentication because callers can spoof those values.
 This implies the contract should be launched with `startActivityForResult(...)` so caller identity is available.
 
+[sidebar]
+.Wallet Contract Security Guidelines
+****
+Use this checklist when the integration can activate payment credentials or accounts:
+
+. **Fail closed on missing verified caller**. If `android.intent.caller` is empty (or `android.intent.caller.verified` is not `true`), reject the request and return a failure/cancel result.
+. **Use an allow-list** of trusted caller package names and reject everything else.
+. **Verify signing certificate fingerprints natively** for each allowed package. Package name checks alone are not sufficient in high-trust wallet scenarios.
+. **Validate payload freshness** (nonce/timestamp/challenge) on your backend before approving.
+. **Bind response to request** (request id / correlation id) and reject mismatched or replayed responses.
+. **Time-box bridge activity state** and fail closed on timeout, process death, or missing bridge instance.
+. **Audit log** caller package, request id, decision, and failure reason (without storing full PAN/token data).
+****
+
 [source,java]
 ----
 public class WalletBridgeActivity extends Activity {
@@ -1941,6 +1955,7 @@ Codename One exposes launch metadata through `AppArg` and `Display` properties. 
 - `android.intent.data`
 - `android.intent.type`
 - `android.intent.caller`
+- `android.intent.caller.verified`
 - `android.intent.extra.<KEY>`
 
 [source,java]
@@ -1950,8 +1965,14 @@ public void start() {
     Display d = Display.getInstance();
     String action = d.getProperty("android.intent.action", null);
     if ("com.example.wallet.ACTION_VERIFY".equals(action)) {
+        boolean callerVerified = "true".equals(d.getProperty("android.intent.caller.verified", "false"));
         String payload = d.getProperty("android.intent.extra.wallet_payload", d.getProperty("AppArg", null));
         String caller = d.getProperty("android.intent.caller", "");
+
+        if (!callerVerified || !isAllowedCaller(caller)) {
+            failClosed(); // return declined/canceled via bridge completion API
+            return;
+        }
 
         // Run authentication + backend verification, then call native bridge completion API.
         return;
