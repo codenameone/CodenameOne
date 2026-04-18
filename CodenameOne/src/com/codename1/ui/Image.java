@@ -59,6 +59,7 @@ public class Image implements ActionSource {
     private String svgBaseURL;
     private byte[] svgData;
     private String imageName;
+    private static int[] simdRgbMaskCache;
 
     /// Indicates whether Image SIMD optimizations are enabled. When unset this defaults
     /// to the current platform SIMD support.
@@ -91,6 +92,25 @@ public class Image implements ActionSource {
     /// Creates a new instance of ImageImpl
     Image(int[] imageArray, int w, int h) {
         this(Display.impl.createImage(imageArray, w, h));
+    }
+
+    private static Image createCachedImage(int[] imageArray, int w, int h) {
+        Image out = new Image(imageArray, w, h);
+        out.rgbCache = Display.getInstance().createSoftWeakRef(imageArray);
+        return out;
+    }
+
+    private static int[] getSimdRgbMask(Simd simd) {
+        int[] out = simdRgbMaskCache;
+        if (out != null) {
+            return out;
+        }
+        out = simd.allocInt(SIMD_BLOCK_SIZE);
+        for (int i = 0; i < SIMD_BLOCK_SIZE; i++) {
+            out[i] = 0xffffff;
+        }
+        simdRgbMaskCache = out;
+        return out;
     }
 
     /// Indicates whether the underlying platform supports creating an SVG Image
@@ -1163,7 +1183,7 @@ public class Image implements ActionSource {
 
             }
         }
-        return createImage(rgb, imgWidth, getHeight());
+        return createCachedImage(rgb, imgWidth, getHeight());
     }
 
     /// Applies the given alpha mask onto this image and returns the resulting image
@@ -1195,7 +1215,7 @@ public class Image implements ActionSource {
             int workOffset = 0;
             int alphaOffset = blockSize;
             int[] scratch = simd.allocaInt(blockSize * 2);
-            int[] rgbMask = simd.allocaIntFilled(blockSize, 0xffffff);
+            int[] rgbMask = getSimdRgbMask(simd);
             for (int offset = 0; offset < maskData.length; offset += blockSize) {
                 int length = Math.min(blockSize, maskData.length - offset);
                 simd.and(rgb, offset, rgbMask, 0, scratch, workOffset, length);
@@ -1211,7 +1231,7 @@ public class Image implements ActionSource {
                 rgb[iter] = (rgb[iter] & 0xffffff) | maskAlpha;
             }
         }
-        return createImage(rgb, mWidth, mHeight);
+        return createCachedImage(rgb, mWidth, mHeight);
     }
 
     /// Applies the given alpha mask onto this image and returns the resulting image
@@ -1363,7 +1383,7 @@ public class Image implements ActionSource {
             int[] scratch = simd.allocaIntZeroed(blockSize * 2);
             byte[] scratchBytes = simd.allocaByteZeroed(blockSize);
             int alphaInt = (((int) alpha) << 24) & 0xff000000;
-            int[] rgbMask = simd.allocaIntFilled(blockSize, 0xffffff);
+            int[] rgbMask = getSimdRgbMask(simd);
             int[] alphaValues = simd.allocaIntFilled(blockSize, alphaInt);
             for (int offset = 0; offset < size; offset += blockSize) {
                 int length = Math.min(blockSize, size - offset);
@@ -1382,7 +1402,7 @@ public class Image implements ActionSource {
                 }
             }
         }
-        Image i = new Image(arr, w, h);
+        Image i = createCachedImage(arr, w, h);
         i.opaqueTested = true;
         i.opaque = false;
         return i;
@@ -1420,7 +1440,7 @@ public class Image implements ActionSource {
                 }
             }
         }
-        Image i = new Image(arr, w, h);
+        Image i = createCachedImage(arr, w, h);
         i.opaqueTested = true;
         i.opaque = false;
         return i;
@@ -1455,7 +1475,7 @@ public class Image implements ActionSource {
             int[] scratch = simd.allocaIntZeroed(blockSize * 2);
             byte[] scratchBytes = simd.allocaByteZeroed(blockSize);
             int alphaInt = (((int) alpha) << 24) & 0xff000000;
-            int[] rgbMask = simd.allocaIntFilled(blockSize, 0xffffff);
+            int[] rgbMask = getSimdRgbMask(simd);
             int[] alphaValues = simd.allocaIntFilled(blockSize, alphaInt);
             int[] removeColorValues = simd.allocaIntFilled(blockSize, removeColor);
             for (int offset = 0; offset < size; offset += blockSize) {
@@ -1483,7 +1503,7 @@ public class Image implements ActionSource {
                 }
             }
         }
-        Image i = new Image(arr, w, h);
+        Image i = createCachedImage(arr, w, h);
         i.opaqueTested = true;
         i.opaque = false;
         return i;
