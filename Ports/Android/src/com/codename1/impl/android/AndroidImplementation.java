@@ -1062,6 +1062,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     private static AndroidImplementation instance;
+    private static final String INTENT_PROPERTY_PREFIX = "android.intent.";
+    private static final String INTENT_EXTRA_PROPERTY_PREFIX = "android.intent.extra.";
+    private static final Set<String> intentPropertyKeys = new HashSet<String>();
 
     public static AndroidImplementation getInstance() {
         return instance;
@@ -1070,6 +1073,58 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public static void clearAppArg() {
         if (instance != null) {
             instance.setAppArg(null);
+            clearIntentProperties();
+        }
+    }
+
+    private static void setIntentProperty(String key, String value) {
+        if (!Display.isInitialized()) {
+            return;
+        }
+        Display.getInstance().setProperty(key, value);
+        if (value == null) {
+            intentPropertyKeys.remove(key);
+        } else {
+            intentPropertyKeys.add(key);
+        }
+    }
+
+    private static void clearIntentProperties() {
+        if (!Display.isInitialized()) {
+            intentPropertyKeys.clear();
+            return;
+        }
+        for (String key : new ArrayList<String>(intentPropertyKeys)) {
+            Display.getInstance().setProperty(key, null);
+        }
+        intentPropertyKeys.clear();
+    }
+
+    private static void publishIntentProperties(Activity activity, Intent intent) {
+        clearIntentProperties();
+        if (intent == null) {
+            return;
+        }
+
+        setIntentProperty(INTENT_PROPERTY_PREFIX + "action", intent.getAction());
+        setIntentProperty(INTENT_PROPERTY_PREFIX + "data", intent.getDataString());
+        setIntentProperty(INTENT_PROPERTY_PREFIX + "type", intent.getType());
+
+        String caller = activity.getCallingPackage();
+        if (caller == null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
+            Uri referrer = activity.getReferrer();
+            if (referrer != null) {
+                caller = referrer.getHost();
+            }
+        }
+        setIntentProperty(INTENT_PROPERTY_PREFIX + "caller", caller);
+
+        Bundle extras = intent.getExtras();
+        if (extras != null) {
+            for (String key : extras.keySet()) {
+                Object value = extras.get(key);
+                setIntentProperty(INTENT_EXTRA_PROPERTY_PREFIX + key, value == null ? null : String.valueOf(value));
+            }
         }
     }
 
@@ -2926,6 +2981,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         android.content.Intent intent = getActivity().getIntent();
         if (intent != null) {
+            publishIntentProperties(getActivity(), intent);
             String sharedText = intent.getStringExtra(Intent.EXTRA_TEXT);
             intent.removeExtra(Intent.EXTRA_TEXT);
             Uri u = intent.getData();
