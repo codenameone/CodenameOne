@@ -59,7 +59,9 @@ public class Image implements ActionSource {
     private String svgBaseURL;
     private byte[] svgData;
     private String imageName;
-    private static int[] simdRgbMaskCache;
+    private static final Object SIMD_RGB_MASK_CACHE_LOCK = new Object();
+    // Published through a volatile reference after one-time initialization and never mutated afterwards.
+    private static volatile int[] simdRgbMaskCache;
 
     /// Indicates whether Image SIMD optimizations are enabled. When unset this defaults
     /// to the current platform SIMD support.
@@ -94,22 +96,33 @@ public class Image implements ActionSource {
         this(Display.impl.createImage(imageArray, w, h));
     }
 
-    private static Image createCachedImage(int[] imageArray, int w, int h) {
+    /// Creates an image while preserving the supplied RGB array in the weak RGB cache
+    /// so follow-up SIMD image operations can reuse it without extracting pixels again.
+    private static Image createImageWithRgbCache(int[] imageArray, int w, int h) {
         Image out = new Image(imageArray, w, h);
         out.rgbCache = Display.getInstance().createSoftWeakRef(imageArray);
         return out;
     }
 
+    /// Returns the shared SIMD RGB mask block (all lanes set to `0xffffff`).
+    /// Callers MUST treat the returned array as immutable.
     private static int[] getSimdRgbMask(Simd simd) {
         int[] out = simdRgbMaskCache;
         if (out != null) {
             return out;
         }
-        out = simd.allocInt(SIMD_BLOCK_SIZE);
-        for (int i = 0; i < SIMD_BLOCK_SIZE; i++) {
-            out[i] = 0xffffff;
+        synchronized (SIMD_RGB_MASK_CACHE_LOCK) {
+            out = simdRgbMaskCache;
+            if (out != null) {
+                return out;
+            }
+            int[] mask = simd.allocInt(SIMD_BLOCK_SIZE);
+            for (int i = 0; i < SIMD_BLOCK_SIZE; i++) {
+                mask[i] = 0xffffff;
+            }
+            simdRgbMaskCache = mask;
+            out = mask;
         }
-        simdRgbMaskCache = out;
         return out;
     }
 
@@ -1183,7 +1196,7 @@ public class Image implements ActionSource {
 
             }
         }
-        return createCachedImage(rgb, imgWidth, getHeight());
+        return createImageWithRgbCache(rgb, imgWidth, getHeight());
     }
 
     /// Applies the given alpha mask onto this image and returns the resulting image
@@ -1231,7 +1244,7 @@ public class Image implements ActionSource {
                 rgb[iter] = (rgb[iter] & 0xffffff) | maskAlpha;
             }
         }
-        return createCachedImage(rgb, mWidth, mHeight);
+        return createImageWithRgbCache(rgb, mWidth, mHeight);
     }
 
     /// Applies the given alpha mask onto this image and returns the resulting image
@@ -1402,7 +1415,7 @@ public class Image implements ActionSource {
                 }
             }
         }
-        Image i = createCachedImage(arr, w, h);
+        Image i = createImageWithRgbCache(arr, w, h);
         i.opaqueTested = true;
         i.opaque = false;
         return i;
@@ -1440,7 +1453,7 @@ public class Image implements ActionSource {
                 }
             }
         }
-        Image i = createCachedImage(arr, w, h);
+        Image i = createImageWithRgbCache(arr, w, h);
         i.opaqueTested = true;
         i.opaque = false;
         return i;
@@ -1503,7 +1516,7 @@ public class Image implements ActionSource {
                 }
             }
         }
-        Image i = createCachedImage(arr, w, h);
+        Image i = createImageWithRgbCache(arr, w, h);
         i.opaqueTested = true;
         i.opaque = false;
         return i;
