@@ -1110,6 +1110,7 @@ extern JAVA_OBJECT allocMultiArray(int* lengths, struct clazz* type, int primiti
         if (__cn1ActualSize > 0) { \
             char* __cn1Data = (char*)(&(__cn1StackArray->data)); \
             __cn1Data += sizeof(void*); \
+            /* round the payload start up to the requested SIMD alignment */ \
             uintptr_t __cn1Aligned = (((uintptr_t)__cn1Data) + ((uintptr_t)__cn1RequestedAlignment - 1)) & ~((uintptr_t)__cn1RequestedAlignment - 1); \
             __cn1StackArray->data = (void*)__cn1Aligned; \
         } else { \
