@@ -1902,14 +1902,62 @@ This implies the contract should be launched with `startActivityForResult(...)` 
 ****
 Use this checklist when the integration can activate payment credentials or accounts:
 
-. **Fail closed on missing verified caller**. If `android.intent.caller` is empty (or `android.intent.caller.verified` is not `true`), reject the request and return a failure/cancel result.
-. **Use an allow-list** of trusted caller package names and reject everything else.
-. **Verify signing certificate fingerprints natively** for each allowed package. Package name checks alone are not sufficient in high-trust wallet scenarios.
-. **Validate payload freshness** (nonce/timestamp/challenge) on your backend before approving.
-. **Bind response to request** (request id / correlation id) and reject mismatched or replayed responses.
-. **Time-box bridge activity state** and fail closed on timeout, process death, or missing bridge instance.
-. **Audit log** caller package, request id, decision, and failure reason (without storing full PAN/token data).
+. **Fail closed on missing verified caller**. If `android.intent.caller` is empty (or `android.intent.caller.verified` is not `true`), reject the request and return a failure/cancel result. +
+  _Where_: CN1 `start()` guard before any business logic.
+. **Use an allow-list** of trusted caller package names and reject everything else. +
+  _Where_: CN1 `start()` (or native bridge) before network calls.
+. **Verify signing certificate fingerprints natively** for each allowed package. Package name checks alone are not sufficient in high-trust wallet scenarios. +
+  _Where_: native Android code (bridge activity/native interface), because this requires Android `PackageManager` APIs.
+. **Validate payload freshness** (nonce/timestamp/challenge) before approving. +
+  _Where_: backend/API service as the source of truth.
+. **Bind response to request** (request id / correlation id) and reject mismatched or replayed responses. +
+  _Where_: backend first, then enforce in CN1/native completion flow.
+. **Time-box bridge activity state** and fail closed on timeout, process death, or missing bridge instance. +
+  _Where_: native Android bridge + CN1 timeout handling.
+. **Audit log** caller package, request id, decision, and failure reason (without storing full PAN/token data). +
+  _Where_: backend and security telemetry pipeline.
 ****
+
+Optional native Android example for certificate fingerprint verification (called from bridge/native layer before trusting caller):
+
+[source,java]
+----
+private static boolean isTrustedCallerSignature(Context ctx, String packageName, Set<String> allowedSha256) {
+    if (packageName == null || packageName.isEmpty()) return false;
+    try {
+        PackageManager pm = ctx.getPackageManager();
+        PackageInfo info;
+        if (Build.VERSION.SDK_INT >= 28) {
+            info = pm.getPackageInfo(packageName, PackageManager.GET_SIGNING_CERTIFICATES);
+            Signature[] sigs = info.signingInfo != null
+                    ? info.signingInfo.getApkContentsSigners()
+                    : null;
+            return hasAllowedFingerprint(sigs, allowedSha256);
+        } else {
+            info = pm.getPackageInfo(packageName, PackageManager.GET_SIGNATURES);
+            return hasAllowedFingerprint(info.signatures, allowedSha256);
+        }
+    } catch (Exception ex) {
+        return false;
+    }
+}
+
+private static boolean hasAllowedFingerprint(Signature[] sigs, Set<String> allowedSha256) throws Exception {
+    if (sigs == null) return false;
+    MessageDigest md = MessageDigest.getInstance("SHA-256");
+    for (Signature s : sigs) {
+        String fp = toHex(md.digest(s.toByteArray()));
+        if (allowedSha256.contains(fp)) return true;
+    }
+    return false;
+}
+
+private static String toHex(byte[] data) {
+    StringBuilder out = new StringBuilder(data.length * 2);
+    for (byte b : data) out.append(String.format("%02X", b));
+    return out.toString();
+}
+----
 
 [source,java]
 ----
