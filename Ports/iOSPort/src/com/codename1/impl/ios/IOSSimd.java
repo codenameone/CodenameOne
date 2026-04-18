@@ -293,6 +293,15 @@ public class IOSSimd extends Simd {
     @Override
     public native void select(byte[] mask, int maskOffset, int[] trueValues, int trueOffset, int[] falseValues, int falseOffset, int[] dst, int dstOffset, int length);
 
+    @Override
+    public native void applyByteAlphaMaskToInts(int[] rgb, int rgbOffset, byte[] mask, int maskOffset, int length);
+
+    @Override
+    public native void replaceAlphaPreserveTransparent(int[] rgb, int rgbOffset, int alphaInt, int length);
+
+    @Override
+    public native void replaceAlphaPreserveTransparentRemoveColor(int[] rgb, int rgbOffset, int alphaInt, int removeColor, int length);
+
     private native byte[] allocByteNative(int size);
     private native int[] allocIntNative(int size);
     private native float[] allocFloatNative(int size);

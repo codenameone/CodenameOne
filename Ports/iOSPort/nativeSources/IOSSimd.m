@@ -1533,3 +1533,91 @@ JAVA_VOID com_codename1_impl_ios_IOSSimd_select___byte_1ARRAY_int_int_1ARRAY_int
         d[dstOffset + i] = m[maskOffset + i] != 0 ? t[trueOffset + i] : f[falseOffset + i];
     }
 }
+
+JAVA_VOID com_codename1_impl_ios_IOSSimd_applyByteAlphaMaskToInts___int_1ARRAY_int_byte_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT rgb, JAVA_INT rgbOffset, JAVA_OBJECT mask, JAVA_INT maskOffset, JAVA_INT length) {
+    JAVA_ARRAY_INT* r = (JAVA_ARRAY_INT*)((JAVA_ARRAY)rgb)->data;
+    JAVA_ARRAY_BYTE* m = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)mask)->data;
+    uint32_t* rp = (uint32_t*)(r + rgbOffset);
+    uint8_t* mp = (uint8_t*)(m + maskOffset);
+    int i = 0;
+    uint32x4_t rgb24mask = vdupq_n_u32(0x00FFFFFFu);
+    for (; i <= length - 16; i += 16) {
+        uint8x16_t mb = vld1q_u8(mp + i);
+        uint16x8_t mlo = vmovl_u8(vget_low_u8(mb));
+        uint16x8_t mhi = vmovl_u8(vget_high_u8(mb));
+        uint32x4_t a0 = vshlq_n_u32(vmovl_u16(vget_low_u16(mlo)), 24);
+        uint32x4_t a1 = vshlq_n_u32(vmovl_u16(vget_high_u16(mlo)), 24);
+        uint32x4_t a2 = vshlq_n_u32(vmovl_u16(vget_low_u16(mhi)), 24);
+        uint32x4_t a3 = vshlq_n_u32(vmovl_u16(vget_high_u16(mhi)), 24);
+        uint32x4_t v0 = vandq_u32(vld1q_u32(rp + i), rgb24mask);
+        uint32x4_t v1 = vandq_u32(vld1q_u32(rp + i + 4), rgb24mask);
+        uint32x4_t v2 = vandq_u32(vld1q_u32(rp + i + 8), rgb24mask);
+        uint32x4_t v3 = vandq_u32(vld1q_u32(rp + i + 12), rgb24mask);
+        vst1q_u32(rp + i, vorrq_u32(v0, a0));
+        vst1q_u32(rp + i + 4, vorrq_u32(v1, a1));
+        vst1q_u32(rp + i + 8, vorrq_u32(v2, a2));
+        vst1q_u32(rp + i + 12, vorrq_u32(v3, a3));
+    }
+    for (; i < length; i++) {
+        r[rgbOffset + i] = (r[rgbOffset + i] & 0x00FFFFFF) | (((JAVA_INT)(m[maskOffset + i] & 0xff)) << 24);
+    }
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSSimd_replaceAlphaPreserveTransparent___int_1ARRAY_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT rgb, JAVA_INT rgbOffset, JAVA_INT alphaInt, JAVA_INT length) {
+    JAVA_ARRAY_INT* r = (JAVA_ARRAY_INT*)((JAVA_ARRAY)rgb)->data;
+    uint32_t* rp = (uint32_t*)(r + rgbOffset);
+    uint32_t alphaMask = ((uint32_t)alphaInt) & 0xFF000000u;
+    uint32x4_t vAlphaMask = vdupq_n_u32(alphaMask);
+    uint32x4_t vAlphaTopMask = vdupq_n_u32(0xFF000000u);
+    uint32x4_t vRgb24Mask = vdupq_n_u32(0x00FFFFFFu);
+    uint32x4_t vZero = vdupq_n_u32(0);
+    int i = 0;
+    for (; i <= length - 4; i += 4) {
+        uint32x4_t v = vld1q_u32(rp + i);
+        uint32x4_t alphaTop = vandq_u32(v, vAlphaTopMask);
+        uint32x4_t nonzero = vcgtq_u32(alphaTop, vZero);
+        uint32x4_t replaced = vorrq_u32(vandq_u32(v, vRgb24Mask), vAlphaMask);
+        vst1q_u32(rp + i, vbslq_u32(nonzero, replaced, v));
+    }
+    for (; i < length; i++) {
+        JAVA_INT v = r[rgbOffset + i];
+        if ((v & 0xFF000000) != 0) {
+            r[rgbOffset + i] = (v & 0x00FFFFFF) | (JAVA_INT)alphaMask;
+        }
+    }
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSSimd_replaceAlphaPreserveTransparentRemoveColor___int_1ARRAY_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT rgb, JAVA_INT rgbOffset, JAVA_INT alphaInt, JAVA_INT removeColor, JAVA_INT length) {
+    JAVA_ARRAY_INT* r = (JAVA_ARRAY_INT*)((JAVA_ARRAY)rgb)->data;
+    uint32_t* rp = (uint32_t*)(r + rgbOffset);
+    uint32_t alphaMask = ((uint32_t)alphaInt) & 0xFF000000u;
+    uint32_t rgbOnly = ((uint32_t)removeColor) & 0x00FFFFFFu;
+    uint32x4_t vAlphaMask = vdupq_n_u32(alphaMask);
+    uint32x4_t vAlphaTopMask = vdupq_n_u32(0xFF000000u);
+    uint32x4_t vRgb24Mask = vdupq_n_u32(0x00FFFFFFu);
+    uint32x4_t vRemoveColor = vdupq_n_u32(rgbOnly);
+    uint32x4_t vZero = vdupq_n_u32(0);
+    int i = 0;
+    for (; i <= length - 4; i += 4) {
+        uint32x4_t v = vld1q_u32(rp + i);
+        uint32x4_t alphaTop = vandq_u32(v, vAlphaTopMask);
+        uint32x4_t nonzero = vcgtq_u32(alphaTop, vZero);
+        uint32x4_t rgb24 = vandq_u32(v, vRgb24Mask);
+        uint32x4_t replaced = vorrq_u32(rgb24, vAlphaMask);
+        uint32x4_t isRemove = vceqq_u32(rgb24, vRemoveColor);
+        // newVal = isRemove ? 0 : replaced  →  vbicq clears bits in `replaced` where `isRemove` is set
+        uint32x4_t newVal = vbicq_u32(replaced, isRemove);
+        vst1q_u32(rp + i, vbslq_u32(nonzero, newVal, v));
+    }
+    for (; i < length; i++) {
+        JAVA_INT v = r[rgbOffset + i];
+        if ((v & 0xFF000000) != 0) {
+            JAVA_INT updated = (v & 0x00FFFFFF) | (JAVA_INT)alphaMask;
+            if ((updated & 0x00FFFFFF) == (JAVA_INT)rgbOnly) {
+                r[rgbOffset + i] = 0;
+            } else {
+                r[rgbOffset + i] = updated;
+            }
+        }
+    }
+}
