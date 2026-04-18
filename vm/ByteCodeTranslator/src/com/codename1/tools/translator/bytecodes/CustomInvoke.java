@@ -178,9 +178,44 @@ public class CustomInvoke extends Instruction {
         StringBuilder sb = new StringBuilder();
         return BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, sb, args);
     }
+
+    private String getSimdAllocaMacro() {
+        boolean simdOwner =
+                "com/codename1/util/Simd".equals(owner) ||
+                "com/codename1/impl/ios/IOSSimd".equals(owner) ||
+                "com/codename1/impl/javase/JavaSESimd".equals(owner);
+        if (!simdOwner) {
+            return null;
+        }
+        if (desc.equals("(I)[B") && name.equals("allocaByte")) {
+            return "CN1_SIMD_ALLOCA_BYTE";
+        }
+        if (desc.equals("(I)[I") && name.equals("allocaInt")) {
+            return "CN1_SIMD_ALLOCA_INT";
+        }
+        if (desc.equals("(I)[F") && name.equals("allocaFloat")) {
+            return "CN1_SIMD_ALLOCA_FLOAT";
+        }
+        return null;
+    }
+
+    private boolean appendSimdAllocaExpression(StringBuilder b) {
+        String macro = getSimdAllocaMacro();
+        if (macro == null) {
+            return false;
+        }
+        if (literalArgs == null || literalArgs.length != 1 || literalArgs[0] == null) {
+            return false;
+        }
+        b.append(macro).append("(").append(literalArgs[0]).append(")");
+        return true;
+    }
     
     
     public boolean appendExpression(StringBuilder b) {
+        if (appendSimdAllocaExpression(b)) {
+            return true;
+        }
         // special case for clone on an array which isn't a real method invocation
         if(name.equals("clone") && owner.indexOf('[') > -1) {
             if (targetObjectLiteral != null) {
@@ -292,6 +327,13 @@ public class CustomInvoke extends Instruction {
     
     @Override
     public void appendInstruction(StringBuilder b) {
+        if (getSimdAllocaMacro() != null) {
+            StringBuilder expr = new StringBuilder();
+            if (appendSimdAllocaExpression(expr)) {
+                b.append("    PUSH_OBJ(").append(expr).append(");\n");
+                return;
+            }
+        }
         // special case for clone on an array which isn't a real method invocation
         if(name.equals("clone") && owner.indexOf('[') > -1) {
             if (targetObjectLiteral != null) {

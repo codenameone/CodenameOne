@@ -60,6 +60,30 @@ public class Simd {
         return new float[size];
     }
 
+    /// Allocates a scratch byte array for temporary SIMD work.
+    /// On ParparVM this may be lowered to a stack-backed faux array, so callers
+    /// should keep it method-local and avoid returning or storing it beyond the
+    /// current method.
+    public byte[] allocaByte(int size) {
+        return allocByte(size);
+    }
+
+    /// Allocates a scratch int array for temporary SIMD work.
+    /// On ParparVM this may be lowered to a stack-backed faux array, so callers
+    /// should keep it method-local and avoid returning or storing it beyond the
+    /// current method.
+    public int[] allocaInt(int size) {
+        return allocInt(size);
+    }
+
+    /// Allocates a scratch float array for temporary SIMD work.
+    /// On ParparVM this may be lowered to a stack-backed faux array, so callers
+    /// should keep it method-local and avoid returning or storing it beyond the
+    /// current method.
+    public float[] allocaFloat(int size) {
+        return allocFloat(size);
+    }
+
     /// Looks up values from a table using unsigned byte indices.
     public void lookupBytes(byte[] table, byte[] indices, byte[] dst, int offset, int length) {
         lookupBytes(table, indices, offset, dst, offset, length);

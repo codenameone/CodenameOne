@@ -150,8 +150,8 @@ public class RGBImage extends Image {
             int maskOffset = blockSize * 2;
             int alphaOffset = blockSize * 3;
             int zeroOffset = blockSize * 4;
-            int[] scratch = simd.allocInt(blockSize * 5);
-            byte[] scratchBytes = simd.allocByte(blockSize);
+            int[] scratch = simd.allocaInt(blockSize * 5);
+            byte[] scratchBytes = simd.allocaByte(blockSize);
             int alphaInt = (((int) alpha) << 24) & 0xff000000;
             for (int iter = 0; iter < blockSize; iter++) {
                 scratch[maskOffset + iter] = 0xffffff;

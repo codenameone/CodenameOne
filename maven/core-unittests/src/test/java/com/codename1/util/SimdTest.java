@@ -59,6 +59,38 @@ class SimdTest extends UITestBase {
     }
 
     @FormTest
+    void allocaFallbackAndRegistryBehaviorWork() {
+        Simd fallback = new Simd();
+        assertEquals(16, fallback.allocaByte(16).length);
+        assertEquals(16, fallback.allocaInt(16).length);
+        assertEquals(16, fallback.allocaFloat(16).length);
+        assertThrows(IllegalArgumentException.class, () -> fallback.allocaByte(15));
+        assertThrows(IllegalArgumentException.class, () -> fallback.allocaInt(15));
+        assertThrows(IllegalArgumentException.class, () -> fallback.allocaFloat(15));
+
+        Simd simd = Simd.get();
+        if (!simd.isSupported()) {
+            return;
+        }
+
+        int[] regA = simd.allocaInt(16);
+        int[] regB = simd.allocaInt(16);
+        int[] regO = simd.allocaInt(16);
+        regA[0] = 3;
+        regB[0] = 4;
+        simd.add(regA, regB, regO, 0, 1);
+        assertEquals(7, regO[0]);
+
+        byte[] bytesA = simd.allocaByte(16);
+        byte[] bytesB = simd.allocaByte(16);
+        byte[] bytesO = simd.allocaByte(16);
+        bytesA[0] = 120;
+        bytesB[0] = 20;
+        simd.add(bytesA, bytesB, bytesO, 0, 1);
+        assertEquals(127, bytesO[0]);
+    }
+
+    @FormTest
     void genericBitwiseShiftCompareSelectOpsWork() {
         Simd simd = new Simd();
 
