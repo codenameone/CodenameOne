@@ -45,7 +45,6 @@ import java.util.HashMap;
 ///
 /// @author Chen Fishbein
 public class Image implements ActionSource {
-    private static final int SIMD_BLOCK_SIZE = 64;
     private static boolean simdOptimizationsEnabled = Simd.get().isSupported();
     int transform;
     private EventDispatcher listeners;
@@ -1085,13 +1084,11 @@ public class Image implements ActionSource {
         if (isSimdOptimizationsEnabled() && rlen >= 16) {
             Simd simd = Simd.get();
             mask = simd.allocByte(rlen);
-            int blockSize = Math.min(rlen, SIMD_BLOCK_SIZE);
-            int[] scratch = simd.allocaInt(blockSize);
-            for (int offset = 0; offset < rlen; offset += blockSize) {
-                int length = Math.min(blockSize, rlen - offset);
-                System.arraycopy(rgb, offset, scratch, 0, length);
-                simd.packIntToByteTruncate(scratch, 0, mask, offset, length);
-            }
+            // Single-pass: copy rgb into a registered scratch once and pack the
+            // whole array in one native call to amortize dispatch/validation cost.
+            int[] scratch = simd.allocaInt(rlen);
+            System.arraycopy(rgb, 0, scratch, 0, rlen);
+            simd.packIntToByteTruncate(scratch, 0, mask, 0, rlen);
         } else {
             mask = new byte[rlen];
             for (int iter = 0; iter < rlen; iter++) {
@@ -1200,22 +1197,19 @@ public class Image implements ActionSource {
         if (isSimdOptimizationsEnabled() && maskData.length >= 16) {
             Simd simd = Simd.get();
             int total = maskData.length;
-            int blockSize = Math.min(total, SIMD_BLOCK_SIZE);
-            int[] scratchRgb = simd.allocaInt(blockSize);
-            int[] scratchAlpha = simd.allocaInt(blockSize);
-            byte[] scratchMask = simd.allocaByte(blockSize);
-            for (int offset = 0; offset < total; offset += blockSize) {
-                int length = Math.min(blockSize, total - offset);
-                System.arraycopy(maskData, offset, scratchMask, 0, length);
-                System.arraycopy(rgb, offset, scratchRgb, 0, length);
-                // scratchAlpha[i] = (mask[i] & 0xff) << 24
-                simd.unpackUnsignedByteToInt(scratchMask, 0, scratchAlpha, 0, length);
-                simd.shl(scratchAlpha, 0, 24, scratchAlpha, 0, length);
-                // scratchRgb[i] = (scratchRgb[i] & 0x00ffffff) | scratchAlpha[i]
-                simd.and(scratchRgb, 0, 0xffffff, scratchRgb, 0, length);
-                simd.or(scratchRgb, 0, scratchAlpha, 0, scratchRgb, 0, length);
-                System.arraycopy(scratchRgb, 0, rgb, offset, length);
-            }
+            // `rgb` came from getRGB() / allocateRgbArray() and is therefore a
+            // Simd-registered array, so we can operate on it in place. Mask data
+            // may have been produced outside of createMask (e.g. deserialized
+            // IndexedImage), so copy it once into a registered scratch.
+            int[] tmp = simd.allocaInt(total);
+            byte[] maskBuf = simd.allocaByte(total);
+            System.arraycopy(maskData, 0, maskBuf, 0, total);
+            // tmp[i] = (mask[i] & 0xff) << 24
+            simd.unpackUnsignedByteToInt(maskBuf, 0, tmp, 0, total);
+            simd.shl(tmp, 0, 24, tmp, 0, total);
+            // rgb[i] = (rgb[i] & 0x00ffffff) | tmp[i]
+            simd.and(rgb, 0, 0xffffff, rgb, 0, total);
+            simd.or(rgb, 0, tmp, 0, rgb, 0, total);
         } else {
             int mdlen = maskData.length;
             for (int iter = 0; iter < mdlen; iter++) {
@@ -1683,8 +1677,14 @@ public class Image implements ActionSource {
         return rgbData;
     }
 
+    /// Allocates an ARGB pixel array. The returned array is always a Simd-registered
+    /// buffer (allocated via `Simd.allocInt`) regardless of whether SIMD optimizations
+    /// are currently enabled — heap allocation cost is essentially the same and this
+    /// lets downstream Simd-using code skip defensive working copies. For very small
+    /// images that fall under the Simd minimum size (16) we fall back to a plain
+    /// `int[]` since `Simd.allocInt` requires `size >= 16`.
     static int[] allocateRgbArray(int size) {
-        if (isSimdOptimizationsEnabled() && size >= 16) {
+        if (size >= 16) {
             return Simd.get().allocInt(size);
         }
         return new int[size];
@@ -1692,64 +1692,57 @@ public class Image implements ActionSource {
 
     /// Replaces the alpha (top byte) of every non-fully-transparent pixel in `arr`
     /// with the alpha bits in `alphaInt`, leaving fully-transparent pixels unchanged.
-    /// Composes the operation from generic Simd primitives, processing the input in
-    /// chunks of `SIMD_BLOCK_SIZE` through registered scratch buffers.
+    /// Composes the operation from generic Simd primitives, processed in a single pass
+    /// per primitive to amortize per-call dispatch/validation overhead.
+    ///
+    /// `arr` MUST be a Simd-registered int array (i.e. obtained via
+    /// `allocateRgbArray` / `Simd.allocInt`); the helper operates on it directly without
+    /// an intermediate working copy.
     static void replaceAlphaPreserveTransparentSimd(int[] arr, int arrOffset, int alphaInt, int length) {
         Simd simd = Simd.get();
         int alphaMask = alphaInt & 0xff000000;
-        int blockSize = Math.min(length, SIMD_BLOCK_SIZE);
-        int[] scratchRgb = simd.allocaInt(blockSize);
-        int[] scratchTmp = simd.allocaInt(blockSize);
-        byte[] scratchKeep = simd.allocaByte(blockSize);
-        for (int offset = 0; offset < length; offset += blockSize) {
-            int len = Math.min(blockSize, length - offset);
-            System.arraycopy(arr, arrOffset + offset, scratchRgb, 0, len);
-            // scratchTmp[i] = scratchRgb[i] & 0xff000000
-            simd.and(scratchRgb, 0, 0xff000000, scratchTmp, 0, len);
-            // scratchKeep[i] = (scratchTmp[i] != 0)  →  build via cmpEq+not
-            simd.cmpEq(scratchTmp, 0, 0, scratchKeep, 0, len);
-            simd.not(scratchKeep, 0, scratchKeep, 0, len);
-            // scratchTmp[i] = (scratchRgb[i] & 0x00ffffff) | alphaMask
-            simd.and(scratchRgb, 0, 0xffffff, scratchTmp, 0, len);
-            simd.or(scratchTmp, 0, alphaMask, scratchTmp, 0, len);
-            // scratchRgb[i] = scratchKeep[i] ? scratchTmp[i] : scratchRgb[i]
-            simd.select(scratchKeep, 0, scratchTmp, 0, scratchRgb, 0, scratchRgb, 0, len);
-            System.arraycopy(scratchRgb, 0, arr, arrOffset + offset, len);
-        }
+        int[] tmp = simd.allocaInt(length);
+        byte[] keepMask = simd.allocaByte(length);
+        // tmp[i] = arr[i] & 0xff000000  (extract original alpha)
+        simd.and(arr, arrOffset, 0xff000000, tmp, 0, length);
+        // keepMask[i] = (alpha != 0)  →  cmpEq(alpha, 0) then invert
+        simd.cmpEq(tmp, 0, 0, keepMask, 0, length);
+        simd.not(keepMask, 0, keepMask, 0, length);
+        // tmp[i] = (arr[i] & 0x00ffffff) | alphaMask  (splice in new alpha)
+        simd.and(arr, arrOffset, 0xffffff, tmp, 0, length);
+        simd.or(tmp, 0, alphaMask, tmp, 0, length);
+        // arr[i] = keepMask[i] ? tmp[i] : arr[i]
+        simd.select(keepMask, 0, tmp, 0, arr, arrOffset, arr, arrOffset, length);
     }
 
     /// Replaces the alpha of every non-fully-transparent pixel with `alphaInt`
     /// and additionally zeroes any pixel whose RGB component matches `removeColor`
-    /// (low 24 bits) after the alpha replacement. Composed from generic Simd primitives.
+    /// (low 24 bits) after the alpha replacement. Composed from generic Simd primitives,
+    /// processed in a single pass per primitive.
+    ///
+    /// `arr` MUST be a Simd-registered int array (see
+    /// `replaceAlphaPreserveTransparentSimd`).
     static void replaceAlphaPreserveTransparentRemoveColorSimd(int[] arr, int arrOffset, int alphaInt, int removeColor, int length) {
         Simd simd = Simd.get();
         int alphaMask = alphaInt & 0xff000000;
         int rgbOnly = removeColor & 0xffffff;
-        int blockSize = Math.min(length, SIMD_BLOCK_SIZE);
-        int[] scratchRgb = simd.allocaInt(blockSize);
-        int[] scratchRgb24 = simd.allocaInt(blockSize);
-        int[] scratchNew = simd.allocaInt(blockSize);
-        byte[] scratchKeep = simd.allocaByte(blockSize);
-        byte[] scratchRemove = simd.allocaByte(blockSize);
-        for (int offset = 0; offset < length; offset += blockSize) {
-            int len = Math.min(blockSize, length - offset);
-            System.arraycopy(arr, arrOffset + offset, scratchRgb, 0, len);
-            // scratchRgb24[i] = scratchRgb[i] & 0xffffff
-            simd.and(scratchRgb, 0, 0xffffff, scratchRgb24, 0, len);
-            // scratchNew[i] = scratchRgb24[i] | alphaMask
-            simd.or(scratchRgb24, 0, alphaMask, scratchNew, 0, len);
-            // scratchRemove[i] = (scratchRgb24[i] == rgbOnly)
-            simd.cmpEq(scratchRgb24, 0, rgbOnly, scratchRemove, 0, len);
-            // scratchNew[i] = scratchRemove[i] ? 0 : scratchNew[i]
-            simd.select(scratchRemove, 0, 0, scratchNew, 0, scratchNew, 0, len);
-            // scratchKeep[i] = ((scratchRgb[i] & 0xff000000) != 0)
-            simd.and(scratchRgb, 0, 0xff000000, scratchRgb24, 0, len); // reuse scratchRgb24 as tmp
-            simd.cmpEq(scratchRgb24, 0, 0, scratchKeep, 0, len);
-            simd.not(scratchKeep, 0, scratchKeep, 0, len);
-            // scratchRgb[i] = scratchKeep[i] ? scratchNew[i] : scratchRgb[i]
-            simd.select(scratchKeep, 0, scratchNew, 0, scratchRgb, 0, scratchRgb, 0, len);
-            System.arraycopy(scratchRgb, 0, arr, arrOffset + offset, len);
-        }
+        int[] tmp = simd.allocaInt(length);
+        byte[] keepMask = simd.allocaByte(length);
+        byte[] removeMask = simd.allocaByte(length);
+        // keepMask[i] = ((arr[i] & 0xff000000) != 0)
+        simd.and(arr, arrOffset, 0xff000000, tmp, 0, length);
+        simd.cmpEq(tmp, 0, 0, keepMask, 0, length);
+        simd.not(keepMask, 0, keepMask, 0, length);
+        // tmp[i] = arr[i] & 0x00ffffff
+        simd.and(arr, arrOffset, 0xffffff, tmp, 0, length);
+        // removeMask[i] = (tmp[i] == rgbOnly)
+        simd.cmpEq(tmp, 0, rgbOnly, removeMask, 0, length);
+        // tmp[i] |= alphaMask  (new pixel value before remove-color suppression)
+        simd.or(tmp, 0, alphaMask, tmp, 0, length);
+        // tmp[i] = removeMask[i] ? 0 : tmp[i]
+        simd.select(removeMask, 0, 0, tmp, 0, tmp, 0, length);
+        // arr[i] = keepMask[i] ? tmp[i] : arr[i]
+        simd.select(keepMask, 0, tmp, 0, arr, arrOffset, arr, arrOffset, length);
     }
 
     /// Scales the image to the given width while updating the height based on the
