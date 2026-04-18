@@ -156,6 +156,7 @@ public class RGBImage extends Image {
             for (int iter = 0; iter < blockSize; iter++) {
                 scratch[maskOffset + iter] = 0xffffff;
                 scratch[alphaOffset + iter] = alphaInt;
+                scratch[zeroOffset + iter] = 0;
             }
             for (int offset = 0; offset < arr.length; offset += blockSize) {
                 int length = Math.min(blockSize, arr.length - offset);

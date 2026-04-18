@@ -1382,6 +1382,7 @@ public class Image implements ActionSource {
             for (int iter = 0; iter < blockSize; iter++) {
                 scratch[maskOffset + iter] = 0xffffff;
                 scratch[alphaOffset + iter] = alphaInt;
+                scratch[zeroOffset + iter] = 0;
             }
             for (int offset = 0; offset < size; offset += blockSize) {
                 int length = Math.min(blockSize, size - offset);
@@ -1486,6 +1487,7 @@ public class Image implements ActionSource {
             for (int iter = 0; iter < blockSize; iter++) {
                 scratch[maskOffset + iter] = 0xffffff;
                 scratch[alphaOffset + iter] = alphaInt;
+                scratch[zeroOffset + iter] = 0;
                 scratch[removeColorOffset + iter] = removeColor & 0xffffff;
             }
             for (int offset = 0; offset < size; offset += blockSize) {
