@@ -17,6 +17,7 @@ import com.codename1.html5.js.canvas.CanvasRenderingContext2D;
  * @author shannah
  */
 public class DrawImage implements ExecutableOp {
+    private static int debugLogCount;
 
     final NativeImage img;
     final int x, y, w, h, alpha;
@@ -39,6 +40,18 @@ public class DrawImage implements ExecutableOp {
     }
     @Override
     public void execute(CanvasRenderingContext2D context) {
+        if (debugLogCount < 80) {
+            debugLogCount++;
+            String surfaceKind = img.getImg() != null ? "loaded" : (img.getMutableGraphics() != null ? "mutable" : "none");
+            int sourceWidth = img.getWidth();
+            int sourceHeight = img.getHeight();
+            int targetWidth = w == -1 ? sourceWidth : w;
+            int targetHeight = h == -1 ? sourceHeight : h;
+            System.out.println("CN1JS:DrawImage.execute kind=" + surfaceKind
+                    + " src=" + sourceWidth + "x" + sourceHeight
+                    + " dst=" + x + "," + y + " " + targetWidth + "x" + targetHeight
+                    + " alpha=" + alpha);
+        }
         context.save();
         context.setGlobalAlpha(((double)alpha)/255.0);
         if (w==-1 || h==-1){

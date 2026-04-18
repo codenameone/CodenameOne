@@ -98,14 +98,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
         CN.callSerially(() -> {
             Display.getInstance().addEdtErrorHandler(e -> {
                 log("CN1SS:ERR:exception caught in EDT " + e.getSource());
-                String stack = Display.getInstance().getStackTrace(Thread.currentThread(), (Throwable)e.getSource());
-                log("CN1SS:ERR:exception stack of length: " + stack.length());
-                for(String s : StringUtil.tokenize(stack, '\n')) {
-                    if(s.length() > 200) {
-                        s = s.substring(0, 200);
-                    }
-                    log("CN1SS:ERR:Stack:" + s);
-                }
+                logThrowable("EDT", (Throwable)e.getSource());
             });
         });
         runNextTest(0);
@@ -133,6 +126,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             } catch (Throwable t) {
                 log("CN1SS:ERR:suite test=" + testName + " failed=" + t);
                 t.printStackTrace();
+                logThrowable("runTest:" + testName, t);
                 testClass.fail(String.valueOf(t));
             }
             awaitTestCompletion(index, testClass, testName, System.currentTimeMillis() + TEST_TIMEOUT_MS);
@@ -203,6 +197,27 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
 
     private static void log(String msg) {
         System.out.println(msg);
+    }
+
+    private static void logThrowable(String context, Throwable t) {
+        if (t == null) {
+            log("CN1SS:ERR:throwable context=" + context + " value=null");
+            return;
+        }
+        log("CN1SS:ERR:throwable context=" + context + " type=" + t.getClass().getName());
+        log("CN1SS:ERR:throwable context=" + context + " message=" + String.valueOf(t.getMessage()));
+        String stack = Display.getInstance().getStackTrace(Thread.currentThread(), t);
+        if (stack == null) {
+            log("CN1SS:ERR:throwable context=" + context + " stack=null");
+            return;
+        }
+        log("CN1SS:ERR:throwable context=" + context + " stackLength=" + stack.length());
+        for (String line : StringUtil.tokenize(stack, '\n')) {
+            if (line.length() > 200) {
+                line = line.substring(0, 200);
+            }
+            log("CN1SS:ERR:throwable context=" + context + " stack=" + line);
+        }
     }
 
     @Override

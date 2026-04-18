@@ -129,10 +129,11 @@ function shouldEnableDiag() {
     return !!global.__parparDiagEnabled;
   }
   const loc = (global.window || global).location;
-  if (!loc || !loc.search) {
+  const rawSearch = (loc && loc.search) ? String(loc.search) : String(global.__cn1LocationSearch || "");
+  if (!rawSearch) {
     return false;
   }
-  const search = String(loc.search).charAt(0) === "?" ? String(loc.search).substring(1) : String(loc.search);
+  const search = rawSearch.charAt(0) === "?" ? rawSearch.substring(1) : rawSearch;
   if (!search) {
     return false;
   }
@@ -578,11 +579,6 @@ const jvm = {
     if (cached) {
       return cached;
     }
-    const nativeOverride = this.nativeMethods[methodId];
-    if (typeof nativeOverride === "function") {
-      this.resolvedVirtualCache[cacheKey] = nativeOverride;
-      return nativeOverride;
-    }
     if (String(className).endsWith("[]") && this.isArrayCloneMethodId(methodId)) {
       const arrayCloneOverride = (function*(__cn1ThisObject) {
         return jvm.cloneArrayObject(__cn1ThisObject);
@@ -666,6 +662,11 @@ const jvm = {
           pendingInterfaces.push(iface.interfaces[i]);
         }
       }
+    }
+    const nativeOverride = this.nativeMethods[methodId];
+    if (typeof nativeOverride === "function") {
+      this.resolvedVirtualCache[cacheKey] = nativeOverride;
+      return nativeOverride;
     }
     if (this.isJsoBridgeClass(className)) {
       cached = this.createJsoBridgeMethod(className, methodId);

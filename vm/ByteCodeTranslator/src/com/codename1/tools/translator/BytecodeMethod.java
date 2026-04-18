@@ -1633,8 +1633,6 @@ public class BytecodeMethod implements SignatureSet {
 
 
     private int varCounter = 0;
-    
-    
     boolean optimize() {
         int instructionCount = instructions.size();
         

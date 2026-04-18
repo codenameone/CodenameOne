@@ -191,6 +191,49 @@ public class ByteCodeField {
     public String getType() {
         return type;
     }
+
+    public String getRuntimeDescriptor() {
+        if (arrayDimensions > 0) {
+            StringBuilder out = new StringBuilder();
+            if (type != null) {
+                out.append(type);
+            } else if (primitiveType != null) {
+                out.append(Util.getCType(primitiveType));
+            }
+            for (int i = 0; i < arrayDimensions; i++) {
+                out.append("[]");
+            }
+            return out.toString();
+        }
+        if (primitiveType == null) {
+            return type;
+        }
+        if (primitiveType == Integer.TYPE) {
+            return "I";
+        }
+        if (primitiveType == Long.TYPE) {
+            return "J";
+        }
+        if (primitiveType == Byte.TYPE) {
+            return "B";
+        }
+        if (primitiveType == Short.TYPE) {
+            return "S";
+        }
+        if (primitiveType == Float.TYPE) {
+            return "F";
+        }
+        if (primitiveType == Double.TYPE) {
+            return "D";
+        }
+        if (primitiveType == Boolean.TYPE) {
+            return "Z";
+        }
+        if (primitiveType == Character.TYPE) {
+            return "C";
+        }
+        return null;
+    }
     
     public boolean isPrivate() {
         return privateField;

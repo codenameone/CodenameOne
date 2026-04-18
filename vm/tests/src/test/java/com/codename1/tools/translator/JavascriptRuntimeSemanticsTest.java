@@ -51,6 +51,116 @@ class JavascriptRuntimeSemanticsTest {
 
     @ParameterizedTest
     @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void preservesSuperInvokeInsideConstructorInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsSuperInvokeInCtorApp.java", "JsSuperInvokeInCtorApp");
+
+        assertEquals(1209, result.result,
+                "Translated runtime should preserve constructor-time super invokes without routing through the override. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void preservesFieldInitializersAlongsideSuperInvokeInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsFieldInitializerAndSuperInvokeApp.java", "JsFieldInitializerAndSuperInvokeApp");
+
+        assertEquals(111, result.result,
+                "Translated runtime should preserve both field initializers and constructor-time super invokes. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void preservesFormLikeSuperAddPathInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsFormLikeSuperAddApp.java", "JsFormLikeSuperAddApp");
+
+        assertEquals(15, result.result,
+                "Translated runtime should preserve the Form-like super-add path, including virtual callbacks during the superclass add flow. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void preservesIteratorDispatchSemanticsInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsIteratorDispatchApp.java", "JsIteratorDispatchApp");
+
+        assertEquals(63, result.result,
+                "Translated runtime should preserve iterator segment ordering and coordinates through interface dispatch. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void preservesIteratorTypeDispatchWithoutCoordinateCopyInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsIteratorTypeDispatchApp.java", "JsIteratorTypeDispatchApp");
+
+        assertEquals(63, result.result,
+                "Translated runtime should preserve iterator segment types through interface dispatch even without coordinate copy. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void preservesPrimitiveArrayLiteralAndCopySemanticsInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsPrimitiveArraySemanticsApp.java", "JsPrimitiveArraySemanticsApp");
+
+        assertEquals(255, result.result,
+                "Translated runtime should preserve primitive byte[]/float[] literals and System.arraycopy semantics. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void preservesIteratorCoordinateCopyWithHardcodedSegmentCountsInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsIteratorCoordinateCopyApp.java", "JsIteratorCoordinateCopyApp");
+
+        assertEquals(63, result.result,
+                "Translated runtime should preserve coordinate copying through interface dispatch when segment counts are hardcoded. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void preservesIteratorPointShiftLookupInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsIteratorPointShiftDispatchApp.java", "JsIteratorPointShiftDispatchApp");
+
+        assertEquals(63, result.result,
+                "Translated runtime should preserve POINT_SHIFT[type] lookup through interface dispatch. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void preservesGeneralPathQuadSegmentTypesInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsGeneralPathQuadIteratorApp.java", "JsGeneralPathQuadIteratorApp");
+
+        assertEquals(127, result.result,
+                "Translated runtime should preserve real GeneralPath quad segment types and coordinates. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void preservesGeneralPathArcSegmentsInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsGeneralPathArcIteratorApp.java", "JsGeneralPathArcIteratorApp");
+
+        assertEquals(511, result.result,
+                "Translated runtime should preserve GeneralPath.arc() segment types and endpoints. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
     void executesHostCallbacksThroughWorkerProtocol(CompilerHelper.CompilerConfig config) throws Exception {
         Parser.cleanup();
 

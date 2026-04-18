@@ -20,6 +20,7 @@ import com.codename1.impl.html5.graphics.ExecutableOp;
 import com.codename1.impl.html5.graphics.FillRect;
 import com.codename1.impl.html5.graphics.FillLinearGradient;
 import com.codename1.impl.html5.graphics.FillRadialGradient;
+import com.codename1.impl.html5.graphics.FillRectRadialGradient;
 import com.codename1.impl.html5.graphics.FillShape;
 import com.codename1.impl.html5.graphics.DrawShape;
 import com.codename1.impl.html5.graphics.SetTransform;
@@ -109,5 +110,10 @@ public final class JavaScriptExecutableOpFactory implements JavaScriptPrimitiveR
     @Override
     public ExecutableOp createFillRadialGradient(int x, int y, int width, int height, int startColor, int endColor, int alpha, int startAngle, int arcAngle) {
         return new FillRadialGradient(x, y, width, height, startColor, endColor, alpha, startAngle, arcAngle);
+    }
+
+    @Override
+    public ExecutableOp createFillRectRadialGradient(int x, int y, int width, int height, int startColor, int endColor, float relativeX, float relativeY, float relativeSize, int alpha) {
+        return new FillRectRadialGradient(x, y, width, height, startColor, endColor, relativeX, relativeY, relativeSize, alpha);
     }
 }

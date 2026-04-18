@@ -3,7 +3,144 @@
 JavaScript Port Status (ParparVM)
 =================================
 
-Last updated: 2026-04-12
+Last updated: 2026-04-18
+
+Latest Investigation Snapshot (current round)
+---------------------------------------------
+
+- `DrawGradient` is fixed in the real browser path:
+  - the HTML5 port now overrides `fillRectRadialGradient()` natively instead of falling back through `createMutableImage()` and `drawImage()`,
+  - isolated `?cn1ssTest=DrawGradient` now emits `CN1SS:END:graphics-draw-gradient`.
+- The next CI artifact blocker was `DrawString`:
+  - `~/Downloads/javascript-ui-tests/browser.log` showed `Assert failed on: Expected native font instances to be equal.`
+  - after the port-side `NativeFont.equals()/hashCode()` implementation landed, the failure moved from equality to hash/lookup semantics in local isolated runs.
+- Root cause for the remaining `DrawString` failure was in the VM runtime, not CN1 UI code:
+  - generated `Font.hashCode()` dispatches through the virtual slot `cn1_java_lang_Object_hashCode_R_int`,
+  - `parparvm_runtime.js:resolveVirtual()` returned the native `Object.hashCode()` identity implementation before attempting class-tail remapping,
+  - so `HTML5Implementation.NativeFont.hashCode()` never overrode `Object.hashCode()` in translated runs.
+- VM/runtime fix:
+  - moved the native-method fallback in `vm/ByteCodeTranslator/src/javascript/parparvm_runtime.js` to run after class/interface exact+remapped virtual lookup,
+  - this preserves native fallbacks for methods with no override, while allowing real subclass overrides like `NativeFont.hashCode()` to win.
+- Isolated validation after rebuilding the actual app bundle:
+  - `?cn1ssTest=DrawString` now completes and emits `CN1SS:END:graphics-draw-string`.
+  - artifact: `/tmp/javascript-browser-artifacts-drawstring-current10/graphics-draw-string.png`
+  - hash: `374fa894552acb06be6ab21ba682b17cdd4eeabb`
+  - size: `26053` bytes
+- Current next step:
+  - run the full browser screenshot suite again against the rebuilt bundle,
+  - confirm the first remaining blocker after `DrawArc`, `DrawGradient`, and `DrawString` are all fixed.
+
+- CI artifact boundary moved past the original `DrawArc` issue:
+  - `~/Downloads/javascript-ui-tests/browser.log` shows `DrawArc`, `DrawImage`, and `DrawStringDecorated` completing.
+  - The suite then starts `DrawGradient` and stalls before `CN1SS:SUITE:FINISHED`.
+- Isolated local replay with `?cn1ssTest=DrawGradient` confirmed the same boundary:
+  - the test reaches `PARPAR:DIAG:SCREENSHOT_START:settleReason=ready:DrawGradient`,
+  - then never emits `CN1SS:END:graphics-draw-gradient`.
+- The important implementation gap in the HTML5 port was:
+  - `HTML5Implementation` overrides `fillLinearGradient()` and `fillRadialGradient()`,
+  - but did not override `fillRectRadialGradient()`,
+  - so `DrawGradient` fell back to the generic `CodenameOneImplementation.fillRectRadialGradient()` path using:
+    - `createMutableImage()`
+    - `getNativeGraphics()`
+    - `fillRadialGradientImpl()`
+    - `drawImage()`
+- That generic fallback is exactly the kind of cross-layer path the JavaScript port should avoid.
+- Current port-side fix in progress:
+  - added a native HTML5 `fillRectRadialGradient()` implementation that renders directly with a canvas radial gradient clipped to the target rect,
+  - wired through `HTML5Implementation`, `HTML5Graphics`, `BufferedGraphics`, and the executable-op adapter/factory.
+- Immediate next validation:
+  - rebuild the actual `parparvm` compiler bundle + HelloCodenameOne JS zip,
+  - rerun only `DrawGradient`,
+  - confirm screenshot emission and suite completion before touching broader suite behavior.
+
+- Staged isolation confirmed that screenshot capture itself was already sound:
+  1. pure JavaScript canvas capture worked,
+  2. pure JavaScript arc-approximation capture worked,
+  3. translated single-case `DrawLine` rendered non-white output,
+  4. translated single-case `DrawArc` still rendered all-white output.
+- The actual remaining bug was in the VM/emitter path, not in Codename One UI code:
+  - the straight-line JavaScript lowering for `dup*` opcodes reused mutable stack-slot names instead of snapshotting duplicated values,
+  - that corrupted JVM stack shapes such as `types[typeSize++] = ...` / `points[pointSize++] = ...`,
+  - and emitted broken writes equivalent to:
+    - `oldValue["typeSize"] = newValue`
+    - `oldValue["pointSize"] = newValue`
+  - in practice, `GeneralPath` segment counters never advanced in the affected emitted code path, so arc/quad segments were not recorded.
+- Minimal staged repros added under `vm/tests`:
+  - `JsGeneralPathQuadIteratorApp`
+  - `JsGeneralPathArcIteratorApp`
+- What those repros proved:
+  1. before the `dup*` fix, translated worker runtime left `typeSize=0` and `pointSize=0`,
+  2. after the `dup*` fix, the same worker fixtures recorded the expected segment counts,
+  3. the arc fixture initially still failed because its expected control/endpoints were wrong,
+  4. the corrected fixture now matches plain JVM behavior and the targeted worker suite passes.
+- Translator fix applied:
+  - File: `vm/ByteCodeTranslator/src/com/codename1/tools/translator/JavascriptMethodGenerator.java`
+  - Change:
+    - snapshot duplicated operand-stack values into temps in straight-line `DUP`, `DUP_X1`, `DUP_X2`, `DUP2`, `DUP2_X1`, and `DUP2_X2` lowering.
+- Important integration finding:
+  - rebuilding `vm/ByteCodeTranslator` alone was not enough for browser bundles.
+  - `scripts/build-javascript-port-hellocodenameone.sh` consumes:
+    - `maven/parparvm/target/bundle/parparvm-compiler.jar`
+  - until that Maven bundle was rebuilt, HelloCodenameOne browser bundles still emitted stale broken `GeneralPath` code.
+- Required rebuild chain for real browser validation:
+  1. `mvn -B -f maven/pom.xml -pl parparvm -am -DskipTests -Dmaven.javadoc.skip=true package`
+  2. `SKIP_MAVEN_BUILD=1 scripts/build-javascript-port-hellocodenameone.sh /tmp/hellocodenameone-javascript-port-current.zip`
+- Decisive single-case browser proof after the proper rebuild chain:
+  - command:
+    - `ARTIFACTS_DIR=/tmp/javascript-browser-artifacts-drawarc-current CN1_JS_DEBUG_OUT_DIR=/tmp/javascript-drawarc-current CN1_JS_URL_QUERY='cn1ssTest=DrawArc' BROWSER_CMD='node scripts/run-javascript-canvas-debug.mjs' ./scripts/run-javascript-browser-tests.sh /tmp/hellocodenameone-javascript-port-current.zip`
+  - result:
+    - browser log now shows repeated host `quadraticCurveTo` calls,
+    - screenshot hash changed from the old white-frame hash `7813464830feae81792a54e0b9d05e07a7ee2d61`
+      to `d37b93e854b36aa26f67e7c5acbe18792b58afa2`,
+    - `graphics-draw-arc.png` now contains non-white pixels:
+      - `241356` non-white pixels at `1280x900`
+    - the captured screenshot matches the painted main canvas, not an offscreen buffer:
+      - `/tmp/javascript-browser-artifacts-drawarc-current/graphics-draw-arc.png`
+      - `/tmp/javascript-drawarc-current/canvas-2.png`
+- Current state:
+  - the `DrawArc` screenshot path is working in the real browser harness after rebuilding the actual compiler bundle used by the app build.
+  - a broader full-suite browser pass is still being validated separately because the default 120s harness timeout was too short for the heavier diagnostic runner.
+
+- Strategy change:
+  - Stopped treating repeated full-suite browser reruns as the debugging loop.
+  - Switched to staged isolation:
+    1. validate browser-side canvas capture with pure JavaScript + Playwright,
+    2. validate a port-like arc path in pure JavaScript,
+    3. isolate a single translated CN1SS test in the worker runtime,
+    4. only then inspect the failing translated render path.
+- New stage harness:
+  - File: `scripts/run-javascript-stage-harness.mjs`
+  - Purpose:
+    - renders a known-good arc scene in plain canvas JS,
+    - renders a second scene using a pure-JS approximation mirroring the port's ellipse-to-path decomposition,
+    - captures both via the same host screenshot bridge used by the JavaScript port.
+  - Result:
+    - both stages render visible non-white screenshots and capture successfully.
+  - Implication:
+    - screenshot transport/capture is no longer the root cause,
+    - and the basic arc approximation math is not the immediate blocker.
+- Current failure boundary:
+  - The remaining bug is in the translated/runtime/app path, not in PNG chunking or the host screenshot bridge.
+- Single-test isolation attempt:
+  - Added `?cn1ssTest=...` filtering support in `port.js` and URL-query passthrough in `scripts/run-javascript-browser-tests.sh`.
+  - First filtered DrawArc run still executed the full suite.
+  - Root cause identified:
+    - the worker runtime was not receiving page query parameters,
+    - so `cn1ssTest` filtering inside the worker never activated.
+- New in-progress fix:
+  - Worker bootstrap now forwards `location.search` from `browser_bridge.js` to `worker.js`.
+  - Worker-side query readers (`port.js`, `parparvm_runtime.js`) now fall back to the forwarded search string.
+  - Expected effect:
+    - `cn1ssTest=DrawArc` should become a true single-case execution path for fast iteration.
+
+Immediate Next Step
+-------------------
+
+- Rebuild once and run exactly one filtered `DrawArc` browser pass.
+- If single-case isolation works:
+  - keep iteration on that path only,
+  - trace the translated render queue / path emission for `DrawArc`,
+  - then fix the VM/glue layer and the emitter there instead of continuing broad suite retries.
 
 Latest Investigation Snapshot (this round)
 ------------------------------------------

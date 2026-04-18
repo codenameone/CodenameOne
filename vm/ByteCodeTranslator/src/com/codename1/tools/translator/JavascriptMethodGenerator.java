@@ -87,9 +87,10 @@ final class JavascriptMethodGenerator {
                 out.append(", ");
             }
             first = false;
+            String desc = field.getRuntimeDescriptor();
             out.append("{ owner: \"").append(field.getClsName()).append("\", name: \"")
                     .append(field.getFieldName()).append("\", desc: \"")
-                    .append(JavascriptNameUtil.escapeJs(field.getType() == null ? "" : field.getType())).append("\", prop: \"")
+                    .append(JavascriptNameUtil.escapeJs(desc == null ? "" : desc)).append("\", prop: \"")
                     .append(JavascriptNameUtil.fieldProperty(field.getClsName(), field.getFieldName())).append("\" }");
         }
         out.append("],\n");
@@ -186,14 +187,14 @@ final class JavascriptMethodGenerator {
         if (value instanceof Number) {
             return value.toString();
         }
-        return JavascriptNameUtil.defaultValue(field.getType());
+        return JavascriptNameUtil.defaultValue(field.getRuntimeDescriptor());
     }
 
     private static String renderStaticFieldInitialValue(ByteCodeField field) {
         if (requiresDeferredStaticInitialization(field)) {
-            return JavascriptNameUtil.defaultValue(field.getType());
+            return JavascriptNameUtil.defaultValue(field.getRuntimeDescriptor());
         }
-        return field.getValue() == null ? JavascriptNameUtil.defaultValue(field.getType()) : renderStaticConstant(field);
+        return field.getValue() == null ? JavascriptNameUtil.defaultValue(field.getRuntimeDescriptor()) : renderStaticConstant(field);
     }
 
     private static boolean requiresDeferredStaticInitialization(ByteCodeField field) {
@@ -583,45 +584,67 @@ final class JavascriptMethodGenerator {
                 return true;
             case Opcodes.DUP: {
                 String value = ctx.peek(0);
-                out.append("  ").append(ctx.push(value)).append(";\n");
+                String temp = ctx.nextTemp("__dup");
+                out.append("  const ").append(temp).append(" = ").append(value).append(";\n");
+                out.append("  ").append(ctx.push(temp)).append(";\n");
                 return true;
             }
             case Opcodes.DUP_X1: {
                 String v1 = ctx.pop();
                 String v2 = ctx.pop();
-                out.append("  ").append(ctx.push(v1)).append(";\n");
-                out.append("  ").append(ctx.push(v2)).append(";\n");
-                out.append("  ").append(ctx.push(v1)).append(";\n");
+                String t1 = ctx.nextTemp("__dup");
+                String t2 = ctx.nextTemp("__dup");
+                out.append("  const ").append(t1).append(" = ").append(v1).append(";\n");
+                out.append("  const ").append(t2).append(" = ").append(v2).append(";\n");
+                out.append("  ").append(ctx.push(t1)).append(";\n");
+                out.append("  ").append(ctx.push(t2)).append(";\n");
+                out.append("  ").append(ctx.push(t1)).append(";\n");
                 return true;
             }
             case Opcodes.DUP_X2: {
                 String v1 = ctx.pop();
                 String v2 = ctx.pop();
                 String v3 = ctx.pop();
-                out.append("  ").append(ctx.push(v1)).append(";\n");
-                out.append("  ").append(ctx.push(v3)).append(";\n");
-                out.append("  ").append(ctx.push(v2)).append(";\n");
-                out.append("  ").append(ctx.push(v1)).append(";\n");
+                String t1 = ctx.nextTemp("__dup");
+                String t2 = ctx.nextTemp("__dup");
+                String t3 = ctx.nextTemp("__dup");
+                out.append("  const ").append(t1).append(" = ").append(v1).append(";\n");
+                out.append("  const ").append(t2).append(" = ").append(v2).append(";\n");
+                out.append("  const ").append(t3).append(" = ").append(v3).append(";\n");
+                out.append("  ").append(ctx.push(t1)).append(";\n");
+                out.append("  ").append(ctx.push(t3)).append(";\n");
+                out.append("  ").append(ctx.push(t2)).append(";\n");
+                out.append("  ").append(ctx.push(t1)).append(";\n");
                 return true;
             }
             case Opcodes.DUP2: {
                 String v1 = ctx.pop();
                 String v2 = ctx.pop();
-                out.append("  ").append(ctx.push(v2)).append(";\n");
-                out.append("  ").append(ctx.push(v1)).append(";\n");
-                out.append("  ").append(ctx.push(v2)).append(";\n");
-                out.append("  ").append(ctx.push(v1)).append(";\n");
+                String t1 = ctx.nextTemp("__dup");
+                String t2 = ctx.nextTemp("__dup");
+                out.append("  const ").append(t1).append(" = ").append(v1).append(";\n");
+                out.append("  const ").append(t2).append(" = ").append(v2).append(";\n");
+                out.append("  ").append(ctx.push(t2)).append(";\n");
+                out.append("  ").append(ctx.push(t1)).append(";\n");
+                out.append("  ").append(ctx.push(t2)).append(";\n");
+                out.append("  ").append(ctx.push(t1)).append(";\n");
                 return true;
             }
             case Opcodes.DUP2_X1: {
                 String v1 = ctx.pop();
                 String v2 = ctx.pop();
                 String v3 = ctx.pop();
-                out.append("  ").append(ctx.push(v2)).append(";\n");
-                out.append("  ").append(ctx.push(v1)).append(";\n");
-                out.append("  ").append(ctx.push(v3)).append(";\n");
-                out.append("  ").append(ctx.push(v2)).append(";\n");
-                out.append("  ").append(ctx.push(v1)).append(";\n");
+                String t1 = ctx.nextTemp("__dup");
+                String t2 = ctx.nextTemp("__dup");
+                String t3 = ctx.nextTemp("__dup");
+                out.append("  const ").append(t1).append(" = ").append(v1).append(";\n");
+                out.append("  const ").append(t2).append(" = ").append(v2).append(";\n");
+                out.append("  const ").append(t3).append(" = ").append(v3).append(";\n");
+                out.append("  ").append(ctx.push(t2)).append(";\n");
+                out.append("  ").append(ctx.push(t1)).append(";\n");
+                out.append("  ").append(ctx.push(t3)).append(";\n");
+                out.append("  ").append(ctx.push(t2)).append(";\n");
+                out.append("  ").append(ctx.push(t1)).append(";\n");
                 return true;
             }
             case Opcodes.DUP2_X2: {
@@ -629,12 +652,20 @@ final class JavascriptMethodGenerator {
                 String v2 = ctx.pop();
                 String v3 = ctx.pop();
                 String v4 = ctx.pop();
-                out.append("  ").append(ctx.push(v2)).append(";\n");
-                out.append("  ").append(ctx.push(v1)).append(";\n");
-                out.append("  ").append(ctx.push(v4)).append(";\n");
-                out.append("  ").append(ctx.push(v3)).append(";\n");
-                out.append("  ").append(ctx.push(v2)).append(";\n");
-                out.append("  ").append(ctx.push(v1)).append(";\n");
+                String t1 = ctx.nextTemp("__dup");
+                String t2 = ctx.nextTemp("__dup");
+                String t3 = ctx.nextTemp("__dup");
+                String t4 = ctx.nextTemp("__dup");
+                out.append("  const ").append(t1).append(" = ").append(v1).append(";\n");
+                out.append("  const ").append(t2).append(" = ").append(v2).append(";\n");
+                out.append("  const ").append(t3).append(" = ").append(v3).append(";\n");
+                out.append("  const ").append(t4).append(" = ").append(v4).append(";\n");
+                out.append("  ").append(ctx.push(t2)).append(";\n");
+                out.append("  ").append(ctx.push(t1)).append(";\n");
+                out.append("  ").append(ctx.push(t4)).append(";\n");
+                out.append("  ").append(ctx.push(t3)).append(";\n");
+                out.append("  ").append(ctx.push(t2)).append(";\n");
+                out.append("  ").append(ctx.push(t1)).append(";\n");
                 return true;
             }
             case Opcodes.SWAP: {

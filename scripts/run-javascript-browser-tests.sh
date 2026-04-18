@@ -155,6 +155,15 @@ if [ ! -s "$URL_FILE" ]; then
 fi
 
 URL="$(cat "$URL_FILE")"
+EXTRA_QUERY="${CN1_JS_URL_QUERY:-}"
+if [ -n "$EXTRA_QUERY" ]; then
+  EXTRA_QUERY="${EXTRA_QUERY#\?}"
+  if [[ "$URL" == *\?* ]]; then
+    URL="${URL}&${EXTRA_QUERY}"
+  else
+    URL="${URL}?${EXTRA_QUERY}"
+  fi
+fi
 if [ "$PARPAR_DIAG_ENABLED" != "0" ]; then
   if [[ "$URL" == *\?* ]]; then
     URL="${URL}&parparDiag=1"

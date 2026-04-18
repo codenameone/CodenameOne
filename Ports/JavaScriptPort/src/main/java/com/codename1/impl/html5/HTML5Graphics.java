@@ -55,6 +55,7 @@ import com.codename1.html5.js.dom.HTMLCanvasElement;
  * Bundle one canvas and two paints to get one graphics object.
  */
 public class HTML5Graphics {
+    private static int drawImageDebugLogCount;
 
     private final JavaScriptRenderState<NativeFont> renderState = new JavaScriptRenderState<NativeFont>();
     private Runnable mutationListener;
@@ -219,6 +220,13 @@ public class HTML5Graphics {
 
 
     public void drawImage(Object img, int x, int y) {
+        if (drawImageDebugLogCount < 80) {
+            drawImageDebugLogCount++;
+            NativeImage image = (NativeImage)img;
+            System.out.println("CN1JS:HTML5Graphics.drawImage simple src="
+                    + image.getWidth() + "x" + image.getHeight()
+                    + " dst=" + x + "," + y);
+        }
         imageTransformRenderAdapter.drawImage((NativeImage)img, x, y);
         
     }
@@ -316,6 +324,13 @@ public class HTML5Graphics {
     }
     
     public void drawImage(Object img, int x, int y, int w, int h) {
+        if (drawImageDebugLogCount < 80) {
+            drawImageDebugLogCount++;
+            NativeImage image = (NativeImage)img;
+            System.out.println("CN1JS:HTML5Graphics.drawImage scaled src="
+                    + image.getWidth() + "x" + image.getHeight()
+                    + " dst=" + x + "," + y + " " + w + "x" + h);
+        }
         imageTransformRenderAdapter.drawImage((NativeImage)img, x, y, w, h);
     }
 
@@ -669,6 +684,11 @@ public class HTML5Graphics {
 
     public void fillRadialGradient(int startColor, int endColor, int x, int y, int width, int height) {
        fillRadialGradient(startColor, endColor, x, y, width, height, 0, 360);
+    }
+
+    public void fillRectRadialGradient(int startColor, int endColor, int x, int y, int width, int height,
+            float relativeX, float relativeY, float relativeSize) {
+        shapeGradientRenderAdapter.fillRectRadialGradient(x, y, width, height, startColor, endColor, relativeX, relativeY, relativeSize);
     }
 
     

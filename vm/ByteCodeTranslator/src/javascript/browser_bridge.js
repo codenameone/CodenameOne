@@ -157,6 +157,7 @@
     }
     var meta = {
       id: canvasMetaNextId++,
+      canvas: canvas,
       opCount: 0,
       setterCount: 0,
       methodCount: 0,
@@ -176,6 +177,33 @@
       canvasMetaByObject.set(canvas, meta);
     }
     return meta;
+  }
+
+  function debugCanvasSummary(canvas, source) {
+    if (!isCanvasLike(canvas)) {
+      return null;
+    }
+    var meta = getCanvasMeta(canvas);
+    var scoreMeta = canvasContentScore(canvas);
+    return {
+      id: meta ? (meta.id | 0) : -1,
+      source: source || 'debug',
+      width: (canvas.width | 0),
+      height: (canvas.height | 0),
+      score: scoreMeta && scoreMeta.score != null ? (scoreMeta.score | 0) : -1,
+      signature: scoreMeta && scoreMeta.signature ? String(scoreMeta.signature) : 'none',
+      opCount: meta ? (meta.opCount | 0) : 0,
+      paintCount: meta ? (meta.paintCount | 0) : 0,
+      lastSeq: meta ? (meta.lastSeq | 0) : 0,
+      lastPaintSeq: meta ? (meta.lastPaintSeq | 0) : 0,
+      lastKind: meta ? String(meta.lastKind || 'none') : 'none',
+      lastMember: meta ? String(meta.lastMember || 'none') : 'none',
+      fillStyle: meta ? String(meta.fillStyle || 'unset') : 'unset',
+      strokeStyle: meta ? String(meta.strokeStyle || 'unset') : 'unset',
+      globalAlpha: meta ? String(meta.globalAlpha || 'unset') : 'unset',
+      lineWidth: meta ? String(meta.lineWidth || 'unset') : 'unset',
+      globalCompositeOperation: meta ? String(meta.globalCompositeOperation || 'unset') : 'unset'
+    };
   }
 
   function noteCanvasOperation(canvas, kind, member, isPaint, assignedValue) {
@@ -636,6 +664,107 @@
     };
   }
 
+  function getViewportMeta(doc) {
+    var win = global.window || global;
+    var width = 0;
+    var height = 0;
+    if (win) {
+      width = Math.max(width, win.innerWidth | 0);
+      height = Math.max(height, win.innerHeight | 0);
+    }
+    if (doc) {
+      var root = doc.documentElement || null;
+      var body = doc.body || null;
+      if (root) {
+        width = Math.max(width, root.clientWidth | 0);
+        height = Math.max(height, root.clientHeight | 0);
+      }
+      if (body) {
+        width = Math.max(width, body.clientWidth | 0);
+        height = Math.max(height, body.clientHeight | 0);
+      }
+    }
+    return {
+      width: Math.max(0, width | 0),
+      height: Math.max(0, height | 0)
+    };
+  }
+
+  function getCanvasDisplayMeta(canvas, doc, viewportMeta) {
+    var meta = {
+      domAttached: 0,
+      domVisible: 0,
+      rootMatch: 0,
+      viewportFit: 0,
+      rectWidth: 0,
+      rectHeight: 0,
+      domId: 'none',
+      displayAffinity: 0
+    };
+    if (!canvas || !doc || canvas.nodeType !== 1) {
+      return meta;
+    }
+    var attached = !!(canvas.isConnected || (doc.documentElement && typeof doc.documentElement.contains === 'function' && doc.documentElement.contains(canvas)));
+    meta.domAttached = attached ? 1 : 0;
+    if (canvas.id) {
+      meta.domId = String(canvas.id);
+    }
+    meta.rootMatch = meta.domId === 'codenameone-canvas' ? 1 : 0;
+    var rect = null;
+    if (typeof canvas.getBoundingClientRect === 'function') {
+      try {
+        rect = canvas.getBoundingClientRect();
+      } catch (_err) {
+        rect = null;
+      }
+    }
+    var rectWidth = rect && isFinite(rect.width) ? Math.max(0, Math.round(rect.width)) : 0;
+    var rectHeight = rect && isFinite(rect.height) ? Math.max(0, Math.round(rect.height)) : 0;
+    meta.rectWidth = rectWidth;
+    meta.rectHeight = rectHeight;
+    var visible = attached && rectWidth > 1 && rectHeight > 1;
+    if (visible && typeof global.getComputedStyle === 'function') {
+      try {
+        var style = global.getComputedStyle(canvas);
+        if (style) {
+          if (style.display === 'none' || style.visibility === 'hidden' || String(style.opacity || '1') === '0') {
+            visible = false;
+          }
+        }
+      } catch (_err2) {
+        // Ignore style lookup failures in non-DOM hosts.
+      }
+    }
+    meta.domVisible = visible ? 1 : 0;
+    var viewportWidth = viewportMeta ? (viewportMeta.width | 0) : 0;
+    var viewportHeight = viewportMeta ? (viewportMeta.height | 0) : 0;
+    if (viewportWidth > 0 && viewportHeight > 0) {
+      var scaleX = rectWidth > 0 ? (rectWidth / viewportWidth) : ((canvas.width | 0) / viewportWidth);
+      var scaleY = rectHeight > 0 ? (rectHeight / viewportHeight) : ((canvas.height | 0) / viewportHeight);
+      if (scaleX > 0 && scaleY > 0) {
+        var scaleBalance = Math.abs(Math.log(scaleX / scaleY));
+        var minScale = Math.min(scaleX, scaleY);
+        var maxScale = Math.max(scaleX, scaleY);
+        if (scaleBalance < 0.35 && minScale >= 0.45 && maxScale <= 4.5) {
+          meta.viewportFit = Math.max(1, 1000 - Math.round(scaleBalance * 1200));
+        }
+      }
+    }
+    var affinity = 0;
+    if (meta.domAttached) {
+      affinity += 2000;
+    }
+    if (meta.domVisible) {
+      affinity += 2000;
+    }
+    if (meta.rootMatch) {
+      affinity += 4000;
+    }
+    affinity += meta.viewportFit | 0;
+    meta.displayAffinity = affinity;
+    return meta;
+  }
+
   function pickBestCanvasSnapshot(includeDataUrl, previousSignature) {
     function pushCanvas(list, seen, canvas, source) {
       if (!canvas || !isCanvasLike(canvas)) {
@@ -702,6 +831,7 @@
     if (!candidates.length) {
       return null;
     }
+    var viewportMeta = getViewportMeta(doc);
     var evaluated = [];
     var maxArea = -1;
     for (var i = 0; i < candidates.length; i++) {
@@ -714,6 +844,7 @@
       var area = w * h;
       var scoreMeta = canvasContentScore(c);
       var canvasMeta = getCanvasMeta(c);
+      var displayMeta = getCanvasDisplayMeta(c, doc, viewportMeta);
       var score = scoreMeta && scoreMeta.score != null ? (scoreMeta.score | 0) : -1;
       var signature = scoreMeta && scoreMeta.signature ? String(scoreMeta.signature) : 'none';
       evaluated.push({
@@ -737,6 +868,14 @@
         globalAlpha: canvasMeta ? String(canvasMeta.globalAlpha || 'unset') : 'unset',
         lineWidth: canvasMeta ? String(canvasMeta.lineWidth || 'unset') : 'unset',
         globalCompositeOperation: canvasMeta ? String(canvasMeta.globalCompositeOperation || 'unset') : 'unset',
+        domAttached: displayMeta ? (displayMeta.domAttached | 0) : 0,
+        domVisible: displayMeta ? (displayMeta.domVisible | 0) : 0,
+        rootMatch: displayMeta ? (displayMeta.rootMatch | 0) : 0,
+        viewportFit: displayMeta ? (displayMeta.viewportFit | 0) : 0,
+        displayAffinity: displayMeta ? (displayMeta.displayAffinity | 0) : 0,
+        domId: displayMeta ? String(displayMeta.domId || 'none') : 'none',
+        rectWidth: displayMeta ? (displayMeta.rectWidth | 0) : 0,
+        rectHeight: displayMeta ? (displayMeta.rectHeight | 0) : 0,
         width: w,
         height: h
       });
@@ -796,6 +935,11 @@
         + ':fill=' + String(summaryEntry.fillStyle || 'unset')
         + ':stroke=' + String(summaryEntry.strokeStyle || 'unset')
         + ':changed=' + String(summaryEntry.changedFromPrevious | 0)
+        + ':aff=' + String(summaryEntry.displayAffinity | 0)
+        + ':dom=' + String(summaryEntry.domAttached | 0)
+        + ':vis=' + String(summaryEntry.domVisible | 0)
+        + ':root=' + String(summaryEntry.rootMatch | 0)
+        + ':fit=' + String(summaryEntry.viewportFit | 0)
         + ':large=' + String(summaryEntry.area >= minLargeArea ? 1 : 0)
         + ':keep=' + String(pool.indexOf(summaryEntry) >= 0 ? 1 : 0)
       );
@@ -812,19 +956,22 @@
     var bestHasPaint = -1;
     var bestPaintCount = -1;
     var bestLastPaintSeq = -1;
+    var bestDisplayAffinity = -1;
     for (var j = 0; j < pool.length; j++) {
       var pick = pool[j];
       var pickMeaningful = (pick.score | 0) > 128 ? 1 : 0;
       var pickHasPaint = (pick.paintCount | 0) > 0 ? 1 : 0;
       if (!best
-          || pickMeaningful > bestMeaningful
-          || (pickMeaningful === bestMeaningful && pickHasPaint > bestHasPaint)
-          || (pickMeaningful === bestMeaningful && pickHasPaint === bestHasPaint && pick.score > bestScore)
-          || (pickMeaningful === bestMeaningful && pickHasPaint === bestHasPaint && pick.score === bestScore && pick.paintCount > bestPaintCount)
-          || (pickMeaningful === bestMeaningful && pickHasPaint === bestHasPaint && pick.score === bestScore && pick.paintCount === bestPaintCount && pick.lastPaintSeq > bestLastPaintSeq)
-          || (pickMeaningful === bestMeaningful && pickHasPaint === bestHasPaint && pick.score === bestScore && pick.paintCount === bestPaintCount && pick.lastPaintSeq === bestLastPaintSeq && pick.changedFromPrevious > bestChangedFromPrevious)
-          || (pickMeaningful === bestMeaningful && pickHasPaint === bestHasPaint && pick.score === bestScore && pick.paintCount === bestPaintCount && pick.lastPaintSeq === bestLastPaintSeq && pick.changedFromPrevious === bestChangedFromPrevious && pick.sourcePriority > bestSourcePriority)
-          || (pickMeaningful === bestMeaningful && pickHasPaint === bestHasPaint && pick.score === bestScore && pick.paintCount === bestPaintCount && pick.lastPaintSeq === bestLastPaintSeq && pick.changedFromPrevious === bestChangedFromPrevious && pick.sourcePriority === bestSourcePriority && pick.area > bestArea)) {
+          || pick.displayAffinity > bestDisplayAffinity
+          || (pick.displayAffinity === bestDisplayAffinity && pickMeaningful > bestMeaningful)
+          || (pick.displayAffinity === bestDisplayAffinity && pickMeaningful === bestMeaningful && pickHasPaint > bestHasPaint)
+          || (pick.displayAffinity === bestDisplayAffinity && pickMeaningful === bestMeaningful && pickHasPaint === bestHasPaint && pick.changedFromPrevious > bestChangedFromPrevious)
+          || (pick.displayAffinity === bestDisplayAffinity && pickMeaningful === bestMeaningful && pickHasPaint === bestHasPaint && pick.changedFromPrevious === bestChangedFromPrevious && pick.score > bestScore)
+          || (pick.displayAffinity === bestDisplayAffinity && pickMeaningful === bestMeaningful && pickHasPaint === bestHasPaint && pick.changedFromPrevious === bestChangedFromPrevious && pick.score === bestScore && pick.paintCount > bestPaintCount)
+          || (pick.displayAffinity === bestDisplayAffinity && pickMeaningful === bestMeaningful && pickHasPaint === bestHasPaint && pick.changedFromPrevious === bestChangedFromPrevious && pick.score === bestScore && pick.paintCount === bestPaintCount && pick.lastPaintSeq > bestLastPaintSeq)
+          || (pick.displayAffinity === bestDisplayAffinity && pickMeaningful === bestMeaningful && pickHasPaint === bestHasPaint && pick.changedFromPrevious === bestChangedFromPrevious && pick.score === bestScore && pick.paintCount === bestPaintCount && pick.lastPaintSeq === bestLastPaintSeq && pick.sourcePriority > bestSourcePriority)
+          || (pick.displayAffinity === bestDisplayAffinity && pickMeaningful === bestMeaningful && pickHasPaint === bestHasPaint && pick.changedFromPrevious === bestChangedFromPrevious && pick.score === bestScore && pick.paintCount === bestPaintCount && pick.lastPaintSeq === bestLastPaintSeq && pick.sourcePriority === bestSourcePriority && pick.area > bestArea)) {
+        bestDisplayAffinity = pick.displayAffinity | 0;
         bestMeaningful = pickMeaningful;
         bestHasPaint = pickHasPaint;
         bestChangedFromPrevious = pick.changedFromPrevious;
@@ -854,12 +1001,30 @@
       canvasScore: bestScore,
       canvasSource: bestSource,
       canvasSignature: bestSignature,
+      canvasDisplayAffinity: bestDisplayAffinity,
       canvasPaintCount: bestPaintCount,
       canvasLastPaintSeq: bestLastPaintSeq,
       canvasCandidatesSummary: candidateSummary.join('|'),
       changedFromPrevious: bestChangedFromPrevious,
       sourcePriority: bestSourcePriority
     };
+    var bestEntry = evaluated[bestIndex] || null;
+    if (bestEntry) {
+      out.canvasPickSummary = String(bestEntry.index)
+        + ':id=' + String(bestEntry.canvasId | 0)
+        + ':' + String(bestEntry.source || 'unknown')
+        + ':' + String(bestEntry.width | 0) + 'x' + String(bestEntry.height | 0)
+        + ':score=' + String(bestEntry.score | 0)
+        + ':sig=' + String(bestEntry.signature || 'none')
+        + ':paint=' + String(bestEntry.paintCount | 0)
+        + ':aff=' + String(bestEntry.displayAffinity | 0)
+        + ':dom=' + String(bestEntry.domAttached | 0)
+        + ':vis=' + String(bestEntry.domVisible | 0)
+        + ':root=' + String(bestEntry.rootMatch | 0)
+        + ':fit=' + String(bestEntry.viewportFit | 0)
+        + ':domId=' + String(bestEntry.domId || 'none')
+        + ':rect=' + String(bestEntry.rectWidth | 0) + 'x' + String(bestEntry.rectHeight | 0);
+    }
     if (!includeDataUrl) {
       return out;
     }
@@ -874,19 +1039,30 @@
   hostBridge.register('__cn1_wait_for_ui_settle__', function(request) {
     var payload = request || {};
     var reason = payload.reason == null ? 'unknown' : String(payload.reason);
-    var maxFrames = Math.max(1, Math.min(48, (payload.maxFrames | 0) || 14));
+    var maxFrames = Math.max(1, Math.min(96, (payload.maxFrames | 0) || 14));
     var stableFrames = Math.max(1, Math.min(6, (payload.stableFrames | 0) || 2));
+    var quietFramesRequired = Math.max(1, Math.min(12, (payload.quietFrames | 0) || stableFrames));
     var previousSignature = String(global.__cn1LastScreenshotSignature || '');
     var changed = false;
     var stableCount = 0;
     var lastSignature = '';
     var best = null;
+    var startRenderSeq = global.__cn1RenderQueueSeq | 0;
+    var seenRenderSeq = startRenderSeq;
+    var renderAdvanced = false;
+    var quietFrames = 0;
     function chooseBetter(a, b) {
       if (!a) {
         return b;
       }
       if (!b) {
         return a;
+      }
+      if (!!b.paintedSinceStart !== !!a.paintedSinceStart) {
+        return b.paintedSinceStart ? b : a;
+      }
+      if ((b.canvasDisplayAffinity | 0) !== (a.canvasDisplayAffinity | 0)) {
+        return (b.canvasDisplayAffinity | 0) > (a.canvasDisplayAffinity | 0) ? b : a;
       }
       if ((b.canvasScore | 0) !== (a.canvasScore | 0)) {
         return (b.canvasScore | 0) > (a.canvasScore | 0) ? b : a;
@@ -898,6 +1074,16 @@
     }
     function runFrame(index) {
       return afterPaint(1).then(function() {
+        var currentRenderSeq = global.__cn1RenderQueueSeq | 0;
+        if ((currentRenderSeq | 0) !== (seenRenderSeq | 0)) {
+          renderAdvanced = true;
+          seenRenderSeq = currentRenderSeq | 0;
+          quietFrames = 0;
+          stableCount = 0;
+          lastSignature = '';
+        } else {
+          quietFrames++;
+        }
         var sample = pickBestCanvasSnapshot(false, previousSignature);
         best = chooseBetter(best, sample);
         if (sample && sample.canvasSignature && sample.canvasSignature !== 'none') {
@@ -911,7 +1097,9 @@
             stableCount = 1;
             lastSignature = sig;
           }
-          if (changed && stableCount >= stableFrames) {
+          if ((sample.canvasScore | 0) > 0
+              && quietFrames >= quietFramesRequired
+              && stableCount >= stableFrames) {
             return sample;
           }
         }
@@ -933,33 +1121,69 @@
       diag('SCREENSHOT_START', 'settleReason', reason);
       diag('SCREENSHOT_START', 'settleFrames', maxFrames);
       diag('SCREENSHOT_START', 'settleStableFrames', stableFrames);
+      diag('SCREENSHOT_START', 'settleQuietFrames', quietFramesRequired);
       diag('SCREENSHOT_START', 'settleChanged', changed ? 1 : 0);
       diag('SCREENSHOT_START', 'settleSig', meta.canvasSignature || 'none');
       diag('SCREENSHOT_START', 'settleScore', meta.canvasScore | 0);
+      diag('SCREENSHOT_START', 'settleRenderStartSeq', startRenderSeq | 0);
+      diag('SCREENSHOT_START', 'settleRenderEndSeq', seenRenderSeq | 0);
+      diag('SCREENSHOT_START', 'settleRenderAdvanced', renderAdvanced ? 1 : 0);
+      diag('SCREENSHOT_START', 'settleQuietObserved', quietFrames | 0);
       return {
         changedFromPrevious: changed ? 1 : 0,
         canvasSignature: meta.canvasSignature || 'none',
         canvasScore: meta.canvasScore | 0,
         canvasArea: meta.canvasArea | 0,
         canvasCount: meta.canvasCount | 0,
-        canvasPick: meta.canvasPick | 0
+        canvasPick: meta.canvasPick | 0,
+        renderStartSeq: startRenderSeq | 0,
+        renderEndSeq: seenRenderSeq | 0,
+        renderAdvanced: renderAdvanced ? 1 : 0
       };
     });
   });
 
-  hostBridge.register('__cn1_capture_canvas_png__', function() {
+  hostBridge.register('__cn1_delay__', function(request) {
+    var millis = 0;
+    if (request && typeof request === 'object' && request.millis != null) {
+      millis = request.millis | 0;
+    } else if (request != null) {
+      millis = request | 0;
+    }
+    millis = Math.max(0, Math.min(10000, millis));
+    return new Promise(function(resolve) {
+      setTimeout(function() {
+        resolve(millis);
+      }, millis);
+    });
+  });
+
+  hostBridge.register('__cn1_capture_canvas_png__', function(request) {
+    var payload = request || {};
+    var includeMeta = !!(payload && payload.includeMeta);
     function captureNow() {
       return pickBestCanvasSnapshot(true, previousSignature);
     }
     var previousSignature = String(global.__cn1LastScreenshotSignature || '');
-    var attempts = 8;
+    var baseline = pickBestCanvasSnapshot(false, previousSignature) || null;
+    var baselinePaintSeq = baseline ? (baseline.canvasLastPaintSeq | 0) : 0;
+    var baselinePaintCount = baseline ? (baseline.canvasPaintCount | 0) : 0;
+    var attempts = 24;
     var best = null;
+    var startRenderSeq = global.__cn1RenderQueueSeq | 0;
+    var seenRenderSeq = startRenderSeq;
+    var renderAdvanced = false;
+    var quietFrames = 0;
+    var quietFramesRequired = 3;
     function chooseBetter(a, b) {
       if (!a) {
         return b;
       }
       if (!b) {
         return a;
+      }
+      if ((b.canvasDisplayAffinity | 0) !== (a.canvasDisplayAffinity | 0)) {
+        return (b.canvasDisplayAffinity | 0) > (a.canvasDisplayAffinity | 0) ? b : a;
       }
       if (!!b.changedFromPrevious !== !!a.changedFromPrevious) {
         return b.changedFromPrevious ? b : a;
@@ -974,13 +1198,30 @@
     }
     function runAttempt(index) {
       return afterPaint(index === 0 ? 2 : 1).then(function() {
+        var currentRenderSeq = global.__cn1RenderQueueSeq | 0;
+        if ((currentRenderSeq | 0) !== (seenRenderSeq | 0)) {
+          renderAdvanced = true;
+          seenRenderSeq = currentRenderSeq | 0;
+          quietFrames = 0;
+        } else {
+          quietFrames++;
+        }
         var sample = captureNow();
         if (sample) {
           sample.attempt = index;
           sample.changedFromPrevious = !!(sample.canvasSignature && sample.canvasSignature !== previousSignature);
+          sample.paintedSinceStart =
+            ((sample.canvasLastPaintSeq | 0) > (baselinePaintSeq | 0))
+            || ((sample.canvasPaintCount | 0) > (baselinePaintCount | 0));
           best = chooseBetter(best, sample);
-          if (sample.changedFromPrevious && (sample.canvasScore | 0) > 0) {
+          if (quietFrames >= quietFramesRequired
+              && (sample.canvasScore | 0) > 0
+              && (sample.paintedSinceStart || renderAdvanced || sample.changedFromPrevious)) {
             return sample;
+          }
+          if ((sample.canvasScore | 0) <= 0 && !sample.paintedSinceStart) {
+            // Keep waiting when we are still looking at the same blank frame.
+            sample = null;
           }
         }
         if (index + 1 >= attempts) {
@@ -991,7 +1232,13 @@
     }
     return runAttempt(0).then(function(result) {
       if (!result || !result.dataUrl) {
-        return '';
+        global.__cn1LastCaptureMeta = null;
+        return includeMeta ? {
+          dataUrl: '',
+          canvasScore: -1,
+          canvasLastPaintSeq: baselinePaintSeq | 0,
+          canvasPaintedSinceStart: 0
+        } : '';
       }
       global.__cn1LastScreenshotSignature = result.canvasSignature || '';
       diag('SCREENSHOT_START', 'canvasCount', result.canvasCount);
@@ -1003,16 +1250,67 @@
       diag('SCREENSHOT_START', 'canvasPick', result.canvasPick);
       diag('SCREENSHOT_START', 'canvasArea', result.canvasArea);
       diag('SCREENSHOT_START', 'canvasScore', result.canvasScore);
+      diag('SCREENSHOT_START', 'canvasDisplayAffinity', result.canvasDisplayAffinity | 0);
       diag('SCREENSHOT_START', 'canvasSource', result.canvasSource || 'unknown');
       diag('SCREENSHOT_START', 'canvasSig', result.canvasSignature || 'none');
+      diag('SCREENSHOT_START', 'canvasBaselinePaintSeq', baselinePaintSeq | 0);
+      diag('SCREENSHOT_START', 'canvasBaselinePaintCount', baselinePaintCount | 0);
       diag('SCREENSHOT_START', 'canvasPaintCount', result.canvasPaintCount | 0);
       diag('SCREENSHOT_START', 'canvasLastPaintSeq', result.canvasLastPaintSeq | 0);
+      diag('SCREENSHOT_START', 'canvasPaintedSinceStart', result.paintedSinceStart ? 1 : 0);
       diag('SCREENSHOT_START', 'canvasCandidates', result.canvasCandidatesSummary || 'none');
+      diag('SCREENSHOT_START', 'canvasPickSummary', result.canvasPickSummary || 'none');
+      diag('SCREENSHOT_START', 'canvasRenderStartSeq', startRenderSeq | 0);
+      diag('SCREENSHOT_START', 'canvasRenderEndSeq', seenRenderSeq | 0);
+      diag('SCREENSHOT_START', 'canvasRenderAdvanced', renderAdvanced ? 1 : 0);
+      diag('SCREENSHOT_START', 'canvasQuietObserved', quietFrames | 0);
       diag('SCREENSHOT_START', 'attempt', result.attempt | 0);
       diag('SCREENSHOT_START', 'changed', result.changedFromPrevious ? 1 : 0);
       diag('SCREENSHOT_START', 'pngLen', String(result.dataUrl || '').length);
+      global.__cn1LastCaptureMeta = {
+        dataUrl: String(result.dataUrl || ''),
+        canvasScore: result.canvasScore | 0,
+        canvasLastPaintSeq: result.canvasLastPaintSeq | 0,
+        canvasPaintedSinceStart: result.paintedSinceStart ? 1 : 0,
+        canvasSignature: result.canvasSignature || 'none'
+      };
+      if (includeMeta) {
+        return global.__cn1LastCaptureMeta;
+      }
       return String(result.dataUrl || '');
     });
+  });
+
+  hostBridge.register('__cn1_debug_list_canvases__', function() {
+    var out = [];
+    var keys = Object.keys(canvasMetaById);
+    for (var i = 0; i < keys.length; i++) {
+      var meta = canvasMetaById[keys[i]];
+      if (!meta || !meta.canvas || !isCanvasLike(meta.canvas)) {
+        continue;
+      }
+      var summary = debugCanvasSummary(meta.canvas, 'meta');
+      if (summary) {
+        out.push(summary);
+      }
+    }
+    out.sort(function(a, b) {
+      return (a.id | 0) - (b.id | 0);
+    });
+    return out;
+  });
+
+  hostBridge.register('__cn1_debug_capture_canvas_by_id__', function(request) {
+    var id = request;
+    if (request && typeof request === 'object' && request.id != null) {
+      id = request.id;
+    }
+    id = id | 0;
+    var meta = canvasMetaById[id];
+    if (!meta || !meta.canvas || !isCanvasLike(meta.canvas) || typeof meta.canvas.toDataURL !== 'function') {
+      return '';
+    }
+    return String(meta.canvas.toDataURL('image/png') || '');
   });
 
   global.__parparMessages = [];
@@ -1058,6 +1356,15 @@
       // main-thread cn1Started flag is set even when @JSBody runs in the
       // worker where window === self.
       var msg = String(data.message);
+      if (msg.indexOf('CN1JS:RenderQueue.flush ops=') >= 0) {
+        global.__cn1RenderQueueSeq = (global.__cn1RenderQueueSeq | 0) + 1;
+        global.__cn1RenderQueueLastType = 'flush';
+        global.__cn1RenderQueueLastLog = msg;
+      } else if (msg.indexOf('CN1JS:RenderQueue.drain ops=') >= 0) {
+        global.__cn1RenderQueueSeq = (global.__cn1RenderQueueSeq | 0) + 1;
+        global.__cn1RenderQueueLastType = 'drain';
+        global.__cn1RenderQueueLastLog = msg;
+      }
       if (!global.cn1Started && msg.indexOf('CN1JS:') >= 0 && msg.indexOf('.runApp') >= 0) {
         global.cn1Started = true;
       }
@@ -1067,7 +1374,11 @@
   function installWorkerMode() {
     log('worker-mode');
     diag('BOOT', 'bridgeMode', 'worker');
-    var worker = new Worker('worker.js');
+    var workerUrl = 'worker.js';
+    if (global.location && global.location.search) {
+      workerUrl += String(global.location.search);
+    }
+    var worker = new Worker(workerUrl);
     global.__parparWorker = worker;
     worker.onmessage = function(event) {
       handleVmMessage(event.data, worker);
@@ -1104,7 +1415,10 @@
   }
   var worker = installWorkerMode();
   appStarter = function() {
-    worker.postMessage({ type: 'start' });
+    worker.postMessage({
+      type: 'start',
+      locationSearch: (global.location && global.location.search) ? String(global.location.search) : ''
+    });
   };
 
   if (document.readyState === 'loading') {

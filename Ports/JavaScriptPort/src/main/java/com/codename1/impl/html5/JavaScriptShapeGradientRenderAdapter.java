@@ -16,6 +16,7 @@ public final class JavaScriptShapeGradientRenderAdapter<S, K, O> {
         O createFillShape(S shape, int color, int alpha);
         O createFillLinearGradient(int x, int y, int width, int height, int startColor, int endColor, boolean horizontal, int alpha);
         O createFillRadialGradient(int x, int y, int width, int height, int startColor, int endColor, int alpha, int startAngle, int arcAngle);
+        O createFillRectRadialGradient(int x, int y, int width, int height, int startColor, int endColor, float relativeX, float relativeY, float relativeSize, int alpha);
     }
 
     private final JavaScriptRenderState<?> state;
@@ -42,5 +43,9 @@ public final class JavaScriptShapeGradientRenderAdapter<S, K, O> {
 
     public void fillRadialGradient(int x, int y, int width, int height, int startColor, int endColor, int startAngle, int arcAngle) {
         sink.submit(factory.createFillRadialGradient(x, y, width, height, startColor, endColor, state.getAlpha(), startAngle, arcAngle));
+    }
+
+    public void fillRectRadialGradient(int x, int y, int width, int height, int startColor, int endColor, float relativeX, float relativeY, float relativeSize) {
+        sink.submit(factory.createFillRectRadialGradient(x, y, width, height, startColor, endColor, relativeX, relativeY, relativeSize, state.getAlpha()));
     }
 }

@@ -10,6 +10,7 @@ self.onmessage = function(event) {
   }
   const protocol = jvm.protocol.messages;
   if (event.data.type === protocol.START) {
+    self.__cn1LocationSearch = event.data.locationSearch ? String(event.data.locationSearch) : '';
     jvm.start();
   } else if (event.data.type === protocol.PROTOCOL_INFO
           || event.data.type === protocol.UI_EVENT

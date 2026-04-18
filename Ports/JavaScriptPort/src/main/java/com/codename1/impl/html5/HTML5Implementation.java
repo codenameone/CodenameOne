@@ -150,6 +150,8 @@ import com.codename1.html5.js.typedarrays.Uint8ClampedArray;
  * @author shannah
  */
 public class HTML5Implementation extends CodenameOneImplementation {
+    private static int implDrawImageDebugLogCount;
+    private static int renderQueueDebugLogCount;
 
     private L10NManager l10n;
     private int density;
@@ -2165,6 +2167,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
         }
 
+        drainPendingDisplayFrame();
+        scheduleAnimationFrame();
+
+    }
+
+    private boolean drainPendingDisplayFrame() {
         JavaScriptRenderQueueState.FrameSnapshot<ExecutableOp> frame =
                 JavaScriptRenderQueueCoordinator.beginFrame(new JavaScriptRenderQueueCoordinator.GraphicsLock() {
                     @Override
@@ -2173,21 +2181,28 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     }
                 }, pendingDisplay);
 
-        if (!frame.isEmpty()){
-            CanvasRenderingContext2D context = (CanvasRenderingContext2D)outputCanvas.getContext("2d");
-            context.save();
-            context.beginPath();
-            context.rect(frame.getCropX(), frame.getCropY(), frame.getCropW(), frame.getCropH());
-            context.clip();
-
-            for (ExecutableOp op : frame.getOps()){
-                op.execute(context);
-            }
-            ClipRect.resetClip(context, graphics.getClipState());
-            context.restore();
+        if (frame.isEmpty()) {
+            return false;
         }
-        scheduleAnimationFrame();
+        if (renderQueueDebugLogCount < 60) {
+            renderQueueDebugLogCount++;
+            System.out.println("CN1JS:RenderQueue.drain ops=" + frame.getOps().size()
+                    + " crop=" + frame.getCropX() + "," + frame.getCropY()
+                    + " " + frame.getCropW() + "x" + frame.getCropH()
+                    + " sample=" + sampleExecutableOps(frame.getOps(), 6));
+        }
+        CanvasRenderingContext2D context = (CanvasRenderingContext2D)outputCanvas.getContext("2d");
+        context.save();
+        context.beginPath();
+        context.rect(frame.getCropX(), frame.getCropY(), frame.getCropW(), frame.getCropH());
+        context.clip();
 
+        for (ExecutableOp op : frame.getOps()){
+            op.execute(context);
+        }
+        ClipRect.resetClip(context, graphics.getClipState());
+        context.restore();
+        return true;
     }
 
     private void scheduleAnimationFrame() {
@@ -4777,6 +4792,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             }
         }, pendingDisplay);
         
+        List<ExecutableOp> flushedOps;
         synchronized(pendingDisplay){
             /*
             CanvasRenderingContext2D context = (CanvasRenderingContext2D)outputCanvas.getContext("2d");
@@ -4785,13 +4801,21 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 op.execute(context);
             }
             */
+            flushedOps = graphics.flush(x, y, width, height);
+            if (renderQueueDebugLogCount < 60) {
+                renderQueueDebugLogCount++;
+                System.out.println("CN1JS:RenderQueue.flush ops=" + flushedOps.size()
+                        + " region=" + x + "," + y + " " + width + "x" + height
+                        + " sample=" + sampleExecutableOps(flushedOps, 6));
+            }
             JavaScriptRenderQueueCoordinator.queueFlush(new JavaScriptRenderQueueCoordinator.GraphicsLock() {
                 @Override
                 public void setGraphicsLocked(boolean locked) {
                     graphicsLocked = locked;
                 }
-            }, pendingDisplay, graphics.flush(x, y, width, height), x, y, width, height);
+            }, pendingDisplay, flushedOps, x, y, width, height);
         }
+        drainPendingDisplayFrame();
         if (isEditing) {
             resizeNativeEditor();
         }
@@ -4824,6 +4848,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             super.screenshot(callback);
             return;
         }
+        drainPendingDisplayFrame();
         final CanvasRenderingContext2D context = (CanvasRenderingContext2D) outputCanvas.getContext("2d");
         final ImageData imageData = context.getImageData(0, 0, width, height);
         final Uint8ClampedArray data = imageData.getData();
@@ -4840,6 +4865,22 @@ public class HTML5Implementation extends CodenameOneImplementation {
             }
         }, rgb, 0);
         callback.onSucess(Image.createImage(rgb, width, height));
+    }
+
+    private static String sampleExecutableOps(List<ExecutableOp> ops, int limit) {
+        if (ops == null || ops.isEmpty()) {
+            return "none";
+        }
+        StringBuilder out = new StringBuilder();
+        int max = Math.min(limit, ops.size());
+        for (int i = 0; i < max; i++) {
+            if (i > 0) {
+                out.append(',');
+            }
+            ExecutableOp op = ops.get(i);
+            out.append(op == null ? "null" : op.getClass().getSimpleName());
+        }
+        return out.toString();
     }
 
     @Override
@@ -5695,6 +5736,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
     public void fillRadialGradient(Object graphics, int startColor, int endColor, int x, int y, int width, int height, int startAngle, int arcAngle) {
         g(graphics).fillRadialGradient(startColor, endColor, x, y, width, height, startAngle, arcAngle);
     }
+
+    @Override
+    public void fillRectRadialGradient(Object graphics, int startColor, int endColor, int x, int y, int width, int height,
+            float relativeX, float relativeY, float relativeSize) {
+        g(graphics).fillRectRadialGradient(startColor, endColor, x, y, width, height, relativeX, relativeY, relativeSize);
+    }
     
     
 
@@ -5936,11 +5983,27 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @Override
     public void drawImage(Object graphics, Object img, int x, int y) {
+        if (implDrawImageDebugLogCount < 80) {
+            implDrawImageDebugLogCount++;
+            NativeImage image = (NativeImage)img;
+            System.out.println("CN1JS:HTML5Implementation.drawImage simple src="
+                    + image.getWidth() + "x" + image.getHeight()
+                    + " dst=" + x + "," + y
+                    + " graphics=" + (graphics == null ? "null" : graphics.getClass().getName()));
+        }
         g(graphics).drawImage(img, x, y);
     }
 
     @Override
     public void drawImage(Object graphics, Object img, int x, int y, int w, int h) {
+        if (implDrawImageDebugLogCount < 80) {
+            implDrawImageDebugLogCount++;
+            NativeImage image = (NativeImage)img;
+            System.out.println("CN1JS:HTML5Implementation.drawImage scaled src="
+                    + image.getWidth() + "x" + image.getHeight()
+                    + " dst=" + x + "," + y + " " + w + "x" + h
+                    + " graphics=" + (graphics == null ? "null" : graphics.getClass().getName()));
+        }
         g(graphics).drawImage(img, x, y, w, h);
     }
 
@@ -8173,7 +8236,37 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
         
         public String toString(){
-            return getCSS()+" (Face: "+face+" style "+style+" size "+size;
+            return getCSS()+" (Face: "+face+" style "+style+" size "+size+")";
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (!(obj instanceof NativeFont)) {
+                return false;
+            }
+            NativeFont other = (NativeFont)obj;
+            return face == other.face
+                    && style == other.style
+                    && size == other.size
+                    && Double.doubleToLongBits(height) == Double.doubleToLongBits(other.height)
+                    && java.util.Objects.equals(fileName, other.fileName)
+                    && java.util.Objects.equals(fontName, other.fontName);
+        }
+
+        @Override
+        public int hashCode() {
+            int hash = 17;
+            hash = 31 * hash + face;
+            hash = 31 * hash + style;
+            hash = 31 * hash + size;
+            long heightBits = Double.doubleToLongBits(height);
+            hash = 31 * hash + (int)(heightBits ^ (heightBits >>> 32));
+            hash = 31 * hash + (fileName != null ? fileName.hashCode() : 0);
+            hash = 31 * hash + (fontName != null ? fontName.hashCode() : 0);
+            return hash;
         }
         
         
