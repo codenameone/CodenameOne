@@ -851,51 +851,73 @@ public class Simd {
         return out;
     }
 
-    /// Replaces the alpha (top) byte of each int in `rgb` with the corresponding unsigned
-    /// byte from `mask`, preserving the lower 24 RGB bits. Equivalent to
-    /// `rgb[i] = (rgb[i] & 0xffffff) | ((mask[i] & 0xff) << 24)` for each pixel in the
-    /// requested range. Provided as a fused SIMD-friendly op so platform implementations
-    /// can vectorize the entire pass and Java callers avoid per-block method overhead.
-    public void applyByteAlphaMaskToInts(int[] rgb, int rgbOffset, byte[] mask, int maskOffset, int length) {
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void and(int[] src, int srcOffset, int constant, int[] dst, int dstOffset, int length) {
         for (int i = 0; i < length; i++) {
-            int rgbIdx = rgbOffset + i;
-            rgb[rgbIdx] = (rgb[rgbIdx] & 0xffffff) | ((mask[maskOffset + i] & 0xff) << 24);
+            dst[dstOffset + i] = src[srcOffset + i] & constant;
         }
     }
 
-    /// Replaces the alpha (top) byte of every non-fully-transparent pixel in `rgb` with the
-    /// alpha bits in `alphaInt`. Pixels whose existing alpha byte is zero are left unchanged.
-    /// Provided as a fused SIMD-friendly op so platform implementations can vectorize the
-    /// entire pass and Java callers avoid per-block method overhead.
-    public void replaceAlphaPreserveTransparent(int[] rgb, int rgbOffset, int alphaInt, int length) {
-        int alphaMask = alphaInt & 0xff000000;
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void or(int[] src, int srcOffset, int constant, int[] dst, int dstOffset, int length) {
         for (int i = 0; i < length; i++) {
-            int idx = rgbOffset + i;
-            int v = rgb[idx];
-            if ((v & 0xff000000) != 0) {
-                rgb[idx] = (v & 0xffffff) | alphaMask;
-            }
+            dst[dstOffset + i] = src[srcOffset + i] | constant;
         }
     }
 
-    /// Like `replaceAlphaPreserveTransparent` but additionally zeroes any pixel whose RGB
-    /// component matches `removeColor` (low 24 bits) after the alpha replacement. Provided
-    /// as a fused SIMD-friendly op so platform implementations can vectorize the entire
-    /// pass and Java callers avoid per-block method overhead.
-    public void replaceAlphaPreserveTransparentRemoveColor(int[] rgb, int rgbOffset, int alphaInt, int removeColor, int length) {
-        int alphaMask = alphaInt & 0xff000000;
-        int rgbOnly = removeColor & 0xffffff;
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void xor(int[] src, int srcOffset, int constant, int[] dst, int dstOffset, int length) {
         for (int i = 0; i < length; i++) {
-            int idx = rgbOffset + i;
-            int v = rgb[idx];
-            if ((v & 0xff000000) != 0) {
-                int updated = (v & 0xffffff) | alphaMask;
-                if ((updated & 0xffffff) == rgbOnly) {
-                    rgb[idx] = 0;
-                } else {
-                    rgb[idx] = updated;
-                }
-            }
+            dst[dstOffset + i] = src[srcOffset + i] ^ constant;
+        }
+    }
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void cmpEq(int[] src, int srcOffset, int constant, byte[] dstMask, int dstOffset, int length) {
+        for (int i = 0; i < length; i++) {
+            dstMask[dstOffset + i] = src[srcOffset + i] == constant ? (byte)-1 : (byte)0;
+        }
+    }
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void cmpLt(int[] src, int srcOffset, int constant, byte[] dstMask, int dstOffset, int length) {
+        for (int i = 0; i < length; i++) {
+            dstMask[dstOffset + i] = src[srcOffset + i] < constant ? (byte)-1 : (byte)0;
+        }
+    }
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void cmpGt(int[] src, int srcOffset, int constant, byte[] dstMask, int dstOffset, int length) {
+        for (int i = 0; i < length; i++) {
+            dstMask[dstOffset + i] = src[srcOffset + i] > constant ? (byte)-1 : (byte)0;
+        }
+    }
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void not(byte[] src, int srcOffset, byte[] dst, int dstOffset, int length) {
+        for (int i = 0; i < length; i++) {
+            dst[dstOffset + i] = (byte)(~src[srcOffset + i]);
+        }
+    }
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void select(byte[] mask, int maskOffset, int trueConstant, int falseConstant, int[] dst, int dstOffset, int length) {
+        for (int i = 0; i < length; i++) {
+            dst[dstOffset + i] = mask[maskOffset + i] != 0 ? trueConstant : falseConstant;
+        }
+    }
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void select(byte[] mask, int maskOffset, int[] trueValues, int trueOffset, int falseConstant, int[] dst, int dstOffset, int length) {
+        for (int i = 0; i < length; i++) {
+            dst[dstOffset + i] = mask[maskOffset + i] != 0 ? trueValues[trueOffset + i] : falseConstant;
+        }
+    }
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void select(byte[] mask, int maskOffset, int trueConstant, int[] falseValues, int falseOffset, int[] dst, int dstOffset, int length) {
+        for (int i = 0; i < length; i++) {
+            dst[dstOffset + i] = mask[maskOffset + i] != 0 ? trueConstant : falseValues[falseOffset + i];
         }
     }
 

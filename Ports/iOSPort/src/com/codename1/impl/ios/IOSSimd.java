@@ -294,13 +294,34 @@ public class IOSSimd extends Simd {
     public native void select(byte[] mask, int maskOffset, int[] trueValues, int trueOffset, int[] falseValues, int falseOffset, int[] dst, int dstOffset, int length);
 
     @Override
-    public native void applyByteAlphaMaskToInts(int[] rgb, int rgbOffset, byte[] mask, int maskOffset, int length);
+    public native void and(int[] src, int srcOffset, int constant, int[] dst, int dstOffset, int length);
 
     @Override
-    public native void replaceAlphaPreserveTransparent(int[] rgb, int rgbOffset, int alphaInt, int length);
+    public native void or(int[] src, int srcOffset, int constant, int[] dst, int dstOffset, int length);
 
     @Override
-    public native void replaceAlphaPreserveTransparentRemoveColor(int[] rgb, int rgbOffset, int alphaInt, int removeColor, int length);
+    public native void xor(int[] src, int srcOffset, int constant, int[] dst, int dstOffset, int length);
+
+    @Override
+    public native void cmpEq(int[] src, int srcOffset, int constant, byte[] dstMask, int dstOffset, int length);
+
+    @Override
+    public native void cmpLt(int[] src, int srcOffset, int constant, byte[] dstMask, int dstOffset, int length);
+
+    @Override
+    public native void cmpGt(int[] src, int srcOffset, int constant, byte[] dstMask, int dstOffset, int length);
+
+    @Override
+    public native void not(byte[] src, int srcOffset, byte[] dst, int dstOffset, int length);
+
+    @Override
+    public native void select(byte[] mask, int maskOffset, int trueConstant, int falseConstant, int[] dst, int dstOffset, int length);
+
+    @Override
+    public native void select(byte[] mask, int maskOffset, int[] trueValues, int trueOffset, int falseConstant, int[] dst, int dstOffset, int length);
+
+    @Override
+    public native void select(byte[] mask, int maskOffset, int trueConstant, int[] falseValues, int falseOffset, int[] dst, int dstOffset, int length);
 
     private native byte[] allocByteNative(int size);
     private native int[] allocIntNative(int size);

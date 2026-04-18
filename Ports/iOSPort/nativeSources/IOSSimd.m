@@ -1534,90 +1534,158 @@ JAVA_VOID com_codename1_impl_ios_IOSSimd_select___byte_1ARRAY_int_int_1ARRAY_int
     }
 }
 
-JAVA_VOID com_codename1_impl_ios_IOSSimd_applyByteAlphaMaskToInts___int_1ARRAY_int_byte_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT rgb, JAVA_INT rgbOffset, JAVA_OBJECT mask, JAVA_INT maskOffset, JAVA_INT length) {
-    JAVA_ARRAY_INT* r = (JAVA_ARRAY_INT*)((JAVA_ARRAY)rgb)->data;
-    JAVA_ARRAY_BYTE* m = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)mask)->data;
-    uint32_t* rp = (uint32_t*)(r + rgbOffset);
-    uint8_t* mp = (uint8_t*)(m + maskOffset);
+JAVA_VOID com_codename1_impl_ios_IOSSimd_and___int_1ARRAY_int_int_int_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT src, JAVA_INT srcOffset, JAVA_INT constant, JAVA_OBJECT dst, JAVA_INT dstOffset, JAVA_INT length) {
+    JAVA_ARRAY_INT* s = (JAVA_ARRAY_INT*)((JAVA_ARRAY)src)->data;
+    JAVA_ARRAY_INT* d = (JAVA_ARRAY_INT*)((JAVA_ARRAY)dst)->data;
+    int32x4_t vc = vdupq_n_s32(constant);
     int i = 0;
-    uint32x4_t rgb24mask = vdupq_n_u32(0x00FFFFFFu);
+    for (; i <= length - 4; i += 4) {
+        int32x4_t vs = vld1q_s32((int32_t*)(s + srcOffset + i));
+        vst1q_s32((int32_t*)(d + dstOffset + i), vandq_s32(vs, vc));
+    }
+    for (; i < length; i++) {
+        d[dstOffset + i] = (JAVA_ARRAY_INT)(s[srcOffset + i] & constant);
+    }
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSSimd_or___int_1ARRAY_int_int_int_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT src, JAVA_INT srcOffset, JAVA_INT constant, JAVA_OBJECT dst, JAVA_INT dstOffset, JAVA_INT length) {
+    JAVA_ARRAY_INT* s = (JAVA_ARRAY_INT*)((JAVA_ARRAY)src)->data;
+    JAVA_ARRAY_INT* d = (JAVA_ARRAY_INT*)((JAVA_ARRAY)dst)->data;
+    int32x4_t vc = vdupq_n_s32(constant);
+    int i = 0;
+    for (; i <= length - 4; i += 4) {
+        int32x4_t vs = vld1q_s32((int32_t*)(s + srcOffset + i));
+        vst1q_s32((int32_t*)(d + dstOffset + i), vorrq_s32(vs, vc));
+    }
+    for (; i < length; i++) {
+        d[dstOffset + i] = (JAVA_ARRAY_INT)(s[srcOffset + i] | constant);
+    }
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSSimd_xor___int_1ARRAY_int_int_int_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT src, JAVA_INT srcOffset, JAVA_INT constant, JAVA_OBJECT dst, JAVA_INT dstOffset, JAVA_INT length) {
+    JAVA_ARRAY_INT* s = (JAVA_ARRAY_INT*)((JAVA_ARRAY)src)->data;
+    JAVA_ARRAY_INT* d = (JAVA_ARRAY_INT*)((JAVA_ARRAY)dst)->data;
+    int32x4_t vc = vdupq_n_s32(constant);
+    int i = 0;
+    for (; i <= length - 4; i += 4) {
+        int32x4_t vs = vld1q_s32((int32_t*)(s + srcOffset + i));
+        vst1q_s32((int32_t*)(d + dstOffset + i), veorq_s32(vs, vc));
+    }
+    for (; i < length; i++) {
+        d[dstOffset + i] = (JAVA_ARRAY_INT)(s[srcOffset + i] ^ constant);
+    }
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSSimd_cmpEq___int_1ARRAY_int_int_byte_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT src, JAVA_INT srcOffset, JAVA_INT constant, JAVA_OBJECT dstMask, JAVA_INT dstOffset, JAVA_INT length) {
+    JAVA_ARRAY_INT* s = (JAVA_ARRAY_INT*)((JAVA_ARRAY)src)->data;
+    JAVA_ARRAY_BYTE* m = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)dstMask)->data;
+    int32x4_t vc = vdupq_n_s32(constant);
+    int i = 0;
+    for (; i <= length - 8; i += 8) {
+        uint16x4_t lo16 = vmovn_u32(vceqq_s32(vld1q_s32((int32_t*)(s + srcOffset + i)), vc));
+        uint16x4_t hi16 = vmovn_u32(vceqq_s32(vld1q_s32((int32_t*)(s + srcOffset + i + 4)), vc));
+        vst1_u8((uint8_t*)(m + dstOffset + i), vmovn_u16(vcombine_u16(lo16, hi16)));
+    }
+    for (; i < length; i++) {
+        m[dstOffset + i] = s[srcOffset + i] == constant ? (JAVA_ARRAY_BYTE)-1 : (JAVA_ARRAY_BYTE)0;
+    }
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSSimd_cmpLt___int_1ARRAY_int_int_byte_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT src, JAVA_INT srcOffset, JAVA_INT constant, JAVA_OBJECT dstMask, JAVA_INT dstOffset, JAVA_INT length) {
+    JAVA_ARRAY_INT* s = (JAVA_ARRAY_INT*)((JAVA_ARRAY)src)->data;
+    JAVA_ARRAY_BYTE* m = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)dstMask)->data;
+    int32x4_t vc = vdupq_n_s32(constant);
+    int i = 0;
+    for (; i <= length - 8; i += 8) {
+        uint16x4_t lo16 = vmovn_u32(vreinterpretq_u32_s32(vcltq_s32(vld1q_s32((int32_t*)(s + srcOffset + i)), vc)));
+        uint16x4_t hi16 = vmovn_u32(vreinterpretq_u32_s32(vcltq_s32(vld1q_s32((int32_t*)(s + srcOffset + i + 4)), vc)));
+        vst1_u8((uint8_t*)(m + dstOffset + i), vmovn_u16(vcombine_u16(lo16, hi16)));
+    }
+    for (; i < length; i++) {
+        m[dstOffset + i] = s[srcOffset + i] < constant ? (JAVA_ARRAY_BYTE)-1 : (JAVA_ARRAY_BYTE)0;
+    }
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSSimd_cmpGt___int_1ARRAY_int_int_byte_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT src, JAVA_INT srcOffset, JAVA_INT constant, JAVA_OBJECT dstMask, JAVA_INT dstOffset, JAVA_INT length) {
+    JAVA_ARRAY_INT* s = (JAVA_ARRAY_INT*)((JAVA_ARRAY)src)->data;
+    JAVA_ARRAY_BYTE* m = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)dstMask)->data;
+    int32x4_t vc = vdupq_n_s32(constant);
+    int i = 0;
+    for (; i <= length - 8; i += 8) {
+        uint16x4_t lo16 = vmovn_u32(vreinterpretq_u32_s32(vcgtq_s32(vld1q_s32((int32_t*)(s + srcOffset + i)), vc)));
+        uint16x4_t hi16 = vmovn_u32(vreinterpretq_u32_s32(vcgtq_s32(vld1q_s32((int32_t*)(s + srcOffset + i + 4)), vc)));
+        vst1_u8((uint8_t*)(m + dstOffset + i), vmovn_u16(vcombine_u16(lo16, hi16)));
+    }
+    for (; i < length; i++) {
+        m[dstOffset + i] = s[srcOffset + i] > constant ? (JAVA_ARRAY_BYTE)-1 : (JAVA_ARRAY_BYTE)0;
+    }
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSSimd_not___byte_1ARRAY_int_byte_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT src, JAVA_INT srcOffset, JAVA_OBJECT dst, JAVA_INT dstOffset, JAVA_INT length) {
+    JAVA_ARRAY_BYTE* s = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)src)->data;
+    JAVA_ARRAY_BYTE* d = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)dst)->data;
+    int i = 0;
     for (; i <= length - 16; i += 16) {
-        uint8x16_t mb = vld1q_u8(mp + i);
-        uint16x8_t mlo = vmovl_u8(vget_low_u8(mb));
-        uint16x8_t mhi = vmovl_u8(vget_high_u8(mb));
-        uint32x4_t a0 = vshlq_n_u32(vmovl_u16(vget_low_u16(mlo)), 24);
-        uint32x4_t a1 = vshlq_n_u32(vmovl_u16(vget_high_u16(mlo)), 24);
-        uint32x4_t a2 = vshlq_n_u32(vmovl_u16(vget_low_u16(mhi)), 24);
-        uint32x4_t a3 = vshlq_n_u32(vmovl_u16(vget_high_u16(mhi)), 24);
-        uint32x4_t v0 = vandq_u32(vld1q_u32(rp + i), rgb24mask);
-        uint32x4_t v1 = vandq_u32(vld1q_u32(rp + i + 4), rgb24mask);
-        uint32x4_t v2 = vandq_u32(vld1q_u32(rp + i + 8), rgb24mask);
-        uint32x4_t v3 = vandq_u32(vld1q_u32(rp + i + 12), rgb24mask);
-        vst1q_u32(rp + i, vorrq_u32(v0, a0));
-        vst1q_u32(rp + i + 4, vorrq_u32(v1, a1));
-        vst1q_u32(rp + i + 8, vorrq_u32(v2, a2));
-        vst1q_u32(rp + i + 12, vorrq_u32(v3, a3));
+        int8x16_t vs = vld1q_s8((int8_t*)(s + srcOffset + i));
+        vst1q_s8((int8_t*)(d + dstOffset + i), vmvnq_s8(vs));
     }
     for (; i < length; i++) {
-        r[rgbOffset + i] = (r[rgbOffset + i] & 0x00FFFFFF) | (((JAVA_INT)(m[maskOffset + i] & 0xff)) << 24);
+        d[dstOffset + i] = (JAVA_ARRAY_BYTE)(~s[srcOffset + i]);
     }
 }
 
-JAVA_VOID com_codename1_impl_ios_IOSSimd_replaceAlphaPreserveTransparent___int_1ARRAY_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT rgb, JAVA_INT rgbOffset, JAVA_INT alphaInt, JAVA_INT length) {
-    JAVA_ARRAY_INT* r = (JAVA_ARRAY_INT*)((JAVA_ARRAY)rgb)->data;
-    uint32_t* rp = (uint32_t*)(r + rgbOffset);
-    uint32_t alphaMask = ((uint32_t)alphaInt) & 0xFF000000u;
-    uint32x4_t vAlphaMask = vdupq_n_u32(alphaMask);
-    uint32x4_t vAlphaTopMask = vdupq_n_u32(0xFF000000u);
-    uint32x4_t vRgb24Mask = vdupq_n_u32(0x00FFFFFFu);
-    uint32x4_t vZero = vdupq_n_u32(0);
+JAVA_VOID com_codename1_impl_ios_IOSSimd_select___byte_1ARRAY_int_int_int_int_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT mask, JAVA_INT maskOffset, JAVA_INT trueConstant, JAVA_INT falseConstant, JAVA_OBJECT dst, JAVA_INT dstOffset, JAVA_INT length) {
+    JAVA_ARRAY_BYTE* m = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)mask)->data;
+    JAVA_ARRAY_INT* d = (JAVA_ARRAY_INT*)((JAVA_ARRAY)dst)->data;
+    int32x4_t vt = vdupq_n_s32(trueConstant);
+    int32x4_t vf = vdupq_n_s32(falseConstant);
     int i = 0;
     for (; i <= length - 4; i += 4) {
-        uint32x4_t v = vld1q_u32(rp + i);
-        uint32x4_t alphaTop = vandq_u32(v, vAlphaTopMask);
-        uint32x4_t nonzero = vcgtq_u32(alphaTop, vZero);
-        uint32x4_t replaced = vorrq_u32(vandq_u32(v, vRgb24Mask), vAlphaMask);
-        vst1q_u32(rp + i, vbslq_u32(nonzero, replaced, v));
+        uint32_t packedMask;
+        memcpy(&packedMask, m + maskOffset + i, sizeof(packedMask));
+        uint8x8_t maskBytes = vreinterpret_u8_u32(vdup_n_u32(packedMask));
+        uint32x4_t vm = vcgtq_u32(vmovl_u16(vget_low_u16(vmovl_u8(maskBytes))), vdupq_n_u32(0));
+        vst1q_s32((int32_t*)(d + dstOffset + i), vreinterpretq_s32_u32(vbslq_u32(vm, vreinterpretq_u32_s32(vt), vreinterpretq_u32_s32(vf))));
     }
     for (; i < length; i++) {
-        JAVA_INT v = r[rgbOffset + i];
-        if ((v & 0xFF000000) != 0) {
-            r[rgbOffset + i] = (v & 0x00FFFFFF) | (JAVA_INT)alphaMask;
-        }
+        d[dstOffset + i] = m[maskOffset + i] != 0 ? trueConstant : falseConstant;
     }
 }
 
-JAVA_VOID com_codename1_impl_ios_IOSSimd_replaceAlphaPreserveTransparentRemoveColor___int_1ARRAY_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT rgb, JAVA_INT rgbOffset, JAVA_INT alphaInt, JAVA_INT removeColor, JAVA_INT length) {
-    JAVA_ARRAY_INT* r = (JAVA_ARRAY_INT*)((JAVA_ARRAY)rgb)->data;
-    uint32_t* rp = (uint32_t*)(r + rgbOffset);
-    uint32_t alphaMask = ((uint32_t)alphaInt) & 0xFF000000u;
-    uint32_t rgbOnly = ((uint32_t)removeColor) & 0x00FFFFFFu;
-    uint32x4_t vAlphaMask = vdupq_n_u32(alphaMask);
-    uint32x4_t vAlphaTopMask = vdupq_n_u32(0xFF000000u);
-    uint32x4_t vRgb24Mask = vdupq_n_u32(0x00FFFFFFu);
-    uint32x4_t vRemoveColor = vdupq_n_u32(rgbOnly);
-    uint32x4_t vZero = vdupq_n_u32(0);
+JAVA_VOID com_codename1_impl_ios_IOSSimd_select___byte_1ARRAY_int_int_1ARRAY_int_int_int_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT mask, JAVA_INT maskOffset, JAVA_OBJECT trueValues, JAVA_INT trueOffset, JAVA_INT falseConstant, JAVA_OBJECT dst, JAVA_INT dstOffset, JAVA_INT length) {
+    JAVA_ARRAY_BYTE* m = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)mask)->data;
+    JAVA_ARRAY_INT* t = (JAVA_ARRAY_INT*)((JAVA_ARRAY)trueValues)->data;
+    JAVA_ARRAY_INT* d = (JAVA_ARRAY_INT*)((JAVA_ARRAY)dst)->data;
+    int32x4_t vf = vdupq_n_s32(falseConstant);
     int i = 0;
     for (; i <= length - 4; i += 4) {
-        uint32x4_t v = vld1q_u32(rp + i);
-        uint32x4_t alphaTop = vandq_u32(v, vAlphaTopMask);
-        uint32x4_t nonzero = vcgtq_u32(alphaTop, vZero);
-        uint32x4_t rgb24 = vandq_u32(v, vRgb24Mask);
-        uint32x4_t replaced = vorrq_u32(rgb24, vAlphaMask);
-        uint32x4_t isRemove = vceqq_u32(rgb24, vRemoveColor);
-        // newVal = isRemove ? 0 : replaced  →  vbicq clears bits in `replaced` where `isRemove` is set
-        uint32x4_t newVal = vbicq_u32(replaced, isRemove);
-        vst1q_u32(rp + i, vbslq_u32(nonzero, newVal, v));
+        uint32_t packedMask;
+        memcpy(&packedMask, m + maskOffset + i, sizeof(packedMask));
+        uint8x8_t maskBytes = vreinterpret_u8_u32(vdup_n_u32(packedMask));
+        uint32x4_t vm = vcgtq_u32(vmovl_u16(vget_low_u16(vmovl_u8(maskBytes))), vdupq_n_u32(0));
+        uint32x4_t vt = vreinterpretq_u32_s32(vld1q_s32((int32_t*)(t + trueOffset + i)));
+        vst1q_s32((int32_t*)(d + dstOffset + i), vreinterpretq_s32_u32(vbslq_u32(vm, vt, vreinterpretq_u32_s32(vf))));
     }
     for (; i < length; i++) {
-        JAVA_INT v = r[rgbOffset + i];
-        if ((v & 0xFF000000) != 0) {
-            JAVA_INT updated = (v & 0x00FFFFFF) | (JAVA_INT)alphaMask;
-            if ((updated & 0x00FFFFFF) == (JAVA_INT)rgbOnly) {
-                r[rgbOffset + i] = 0;
-            } else {
-                r[rgbOffset + i] = updated;
-            }
-        }
+        d[dstOffset + i] = m[maskOffset + i] != 0 ? t[trueOffset + i] : falseConstant;
+    }
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSSimd_select___byte_1ARRAY_int_int_int_1ARRAY_int_int_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT mask, JAVA_INT maskOffset, JAVA_INT trueConstant, JAVA_OBJECT falseValues, JAVA_INT falseOffset, JAVA_OBJECT dst, JAVA_INT dstOffset, JAVA_INT length) {
+    JAVA_ARRAY_BYTE* m = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)mask)->data;
+    JAVA_ARRAY_INT* f = (JAVA_ARRAY_INT*)((JAVA_ARRAY)falseValues)->data;
+    JAVA_ARRAY_INT* d = (JAVA_ARRAY_INT*)((JAVA_ARRAY)dst)->data;
+    int32x4_t vt = vdupq_n_s32(trueConstant);
+    int i = 0;
+    for (; i <= length - 4; i += 4) {
+        uint32_t packedMask;
+        memcpy(&packedMask, m + maskOffset + i, sizeof(packedMask));
+        uint8x8_t maskBytes = vreinterpret_u8_u32(vdup_n_u32(packedMask));
+        uint32x4_t vm = vcgtq_u32(vmovl_u16(vget_low_u16(vmovl_u8(maskBytes))), vdupq_n_u32(0));
+        uint32x4_t vf = vreinterpretq_u32_s32(vld1q_s32((int32_t*)(f + falseOffset + i)));
+        vst1q_s32((int32_t*)(d + dstOffset + i), vreinterpretq_s32_u32(vbslq_u32(vm, vreinterpretq_u32_s32(vt), vf)));
+    }
+    for (; i < length; i++) {
+        d[dstOffset + i] = m[maskOffset + i] != 0 ? trueConstant : f[falseOffset + i];
     }
 }

@@ -23,8 +23,6 @@
  */
 package com.codename1.ui;
 
-import com.codename1.util.Simd;
-
 /// An image that stores its data as an integer RGB array internally,
 /// this image cannot be manipulated via Graphics primitives however its
 /// array is accessible and modifiable programmatically. This is very useful
@@ -144,7 +142,7 @@ public class RGBImage extends Image {
         System.arraycopy(rgb, 0, arr, 0, rgb.length);
         if (Image.isSimdOptimizationsEnabled() && arr.length >= 16) {
             int alphaInt = (((int) alpha) << 24) & 0xff000000;
-            Simd.get().replaceAlphaPreserveTransparent(arr, 0, alphaInt, arr.length);
+            Image.replaceAlphaPreserveTransparentSimd(arr, 0, alphaInt, arr.length);
         } else {
             int alphaInt = (((int) alpha) << 24) & 0xff000000;
             int rlen = rgb.length;

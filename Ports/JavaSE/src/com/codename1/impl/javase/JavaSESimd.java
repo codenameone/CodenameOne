@@ -770,6 +770,110 @@ public class JavaSESimd extends Simd {
         super.packBytesInterleaved4(src, src0Offset, src1Offset, src2Offset, src3Offset, dst, dstOffset, length);
     }
 
+    @Override
+    public void and(int[] src, int srcOffset, int constant, int[] dst, int dstOffset, int length) {
+        validateNotNull(src, "src");
+        validateNotNull(dst, "dst");
+        validateRange(src.length, srcOffset, length, "src");
+        validateRange(dst.length, dstOffset, length, "dst");
+        validateRegistered(src, dst);
+        super.and(src, srcOffset, constant, dst, dstOffset, length);
+    }
+
+    @Override
+    public void or(int[] src, int srcOffset, int constant, int[] dst, int dstOffset, int length) {
+        validateNotNull(src, "src");
+        validateNotNull(dst, "dst");
+        validateRange(src.length, srcOffset, length, "src");
+        validateRange(dst.length, dstOffset, length, "dst");
+        validateRegistered(src, dst);
+        super.or(src, srcOffset, constant, dst, dstOffset, length);
+    }
+
+    @Override
+    public void xor(int[] src, int srcOffset, int constant, int[] dst, int dstOffset, int length) {
+        validateNotNull(src, "src");
+        validateNotNull(dst, "dst");
+        validateRange(src.length, srcOffset, length, "src");
+        validateRange(dst.length, dstOffset, length, "dst");
+        validateRegistered(src, dst);
+        super.xor(src, srcOffset, constant, dst, dstOffset, length);
+    }
+
+    @Override
+    public void cmpEq(int[] src, int srcOffset, int constant, byte[] dstMask, int dstOffset, int length) {
+        validateNotNull(src, "src");
+        validateNotNull(dstMask, "dstMask");
+        validateRange(src.length, srcOffset, length, "src");
+        validateRange(dstMask.length, dstOffset, length, "dstMask");
+        validateRegistered(src, dstMask);
+        super.cmpEq(src, srcOffset, constant, dstMask, dstOffset, length);
+    }
+
+    @Override
+    public void cmpLt(int[] src, int srcOffset, int constant, byte[] dstMask, int dstOffset, int length) {
+        validateNotNull(src, "src");
+        validateNotNull(dstMask, "dstMask");
+        validateRange(src.length, srcOffset, length, "src");
+        validateRange(dstMask.length, dstOffset, length, "dstMask");
+        validateRegistered(src, dstMask);
+        super.cmpLt(src, srcOffset, constant, dstMask, dstOffset, length);
+    }
+
+    @Override
+    public void cmpGt(int[] src, int srcOffset, int constant, byte[] dstMask, int dstOffset, int length) {
+        validateNotNull(src, "src");
+        validateNotNull(dstMask, "dstMask");
+        validateRange(src.length, srcOffset, length, "src");
+        validateRange(dstMask.length, dstOffset, length, "dstMask");
+        validateRegistered(src, dstMask);
+        super.cmpGt(src, srcOffset, constant, dstMask, dstOffset, length);
+    }
+
+    @Override
+    public void not(byte[] src, int srcOffset, byte[] dst, int dstOffset, int length) {
+        validateNotNull(src, "src");
+        validateNotNull(dst, "dst");
+        validateRange(src.length, srcOffset, length, "src");
+        validateRange(dst.length, dstOffset, length, "dst");
+        validateRegistered(src, dst);
+        super.not(src, srcOffset, dst, dstOffset, length);
+    }
+
+    @Override
+    public void select(byte[] mask, int maskOffset, int trueConstant, int falseConstant, int[] dst, int dstOffset, int length) {
+        validateNotNull(mask, "mask");
+        validateNotNull(dst, "dst");
+        validateRange(mask.length, maskOffset, length, "mask");
+        validateRange(dst.length, dstOffset, length, "dst");
+        validateRegistered(mask, dst);
+        super.select(mask, maskOffset, trueConstant, falseConstant, dst, dstOffset, length);
+    }
+
+    @Override
+    public void select(byte[] mask, int maskOffset, int[] trueValues, int trueOffset, int falseConstant, int[] dst, int dstOffset, int length) {
+        validateNotNull(mask, "mask");
+        validateNotNull(trueValues, "trueValues");
+        validateNotNull(dst, "dst");
+        validateRange(mask.length, maskOffset, length, "mask");
+        validateRange(trueValues.length, trueOffset, length, "trueValues");
+        validateRange(dst.length, dstOffset, length, "dst");
+        validateRegistered(mask, trueValues, dst);
+        super.select(mask, maskOffset, trueValues, trueOffset, falseConstant, dst, dstOffset, length);
+    }
+
+    @Override
+    public void select(byte[] mask, int maskOffset, int trueConstant, int[] falseValues, int falseOffset, int[] dst, int dstOffset, int length) {
+        validateNotNull(mask, "mask");
+        validateNotNull(falseValues, "falseValues");
+        validateNotNull(dst, "dst");
+        validateRange(mask.length, maskOffset, length, "mask");
+        validateRange(falseValues.length, falseOffset, length, "falseValues");
+        validateRange(dst.length, dstOffset, length, "dst");
+        validateRegistered(mask, falseValues, dst);
+        super.select(mask, maskOffset, trueConstant, falseValues, falseOffset, dst, dstOffset, length);
+    }
+
     private void validateRegistered(Object... arrays) {
         for (int i = 0; i < arrays.length; i++) {
             Object arr = arrays[i];
