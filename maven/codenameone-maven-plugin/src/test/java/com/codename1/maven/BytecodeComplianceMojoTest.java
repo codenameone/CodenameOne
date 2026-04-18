@@ -295,6 +295,19 @@ class BytecodeComplianceMojoTest {
                 "Expected SIMD alloca verifier to reject returning scratch arrays");
     }
 
+    @Test
+    void recognizesAllSimdAllocaHelperNames() throws Exception {
+        Method method = BytecodeComplianceMojo.class.getDeclaredMethod("isSimdAllocaMethod", String.class, String.class, String.class);
+        method.setAccessible(true);
+
+        assertTrue(((Boolean) method.invoke(null, "com/codename1/util/Simd", "allocaByteZeroed", "(I)[B")).booleanValue());
+        assertTrue(((Boolean) method.invoke(null, "com/codename1/util/Simd", "allocaByteFilled", "(IB)[B")).booleanValue());
+        assertTrue(((Boolean) method.invoke(null, "com/codename1/util/Simd", "allocaIntFilled", "(II)[I")).booleanValue());
+        assertTrue(((Boolean) method.invoke(null, "com/codename1/util/Simd", "allocaFloatZeroed", "(I)[F")).booleanValue());
+        assertFalse(((Boolean) method.invoke(null, "com/codename1/util/Simd", "allocByte", "(I)[B")).booleanValue());
+        assertFalse(((Boolean) method.invoke(null, "app/Other", "allocaByte", "(I)[B")).booleanValue());
+    }
+
     @SuppressWarnings("unchecked")
     private Map<String, ?> buildClassIndex(BytecodeComplianceMojo mojo, List<java.io.File> roots) throws Exception {
         Method method = BytecodeComplianceMojo.class.getDeclaredMethod("buildClassIndex", List.class);

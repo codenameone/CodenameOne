@@ -103,9 +103,7 @@ public class BytecodeComplianceMojo extends AbstractCN1Mojo {
         if (!isSimdOwner(owner)) {
             return false;
         }
-        return ("allocaByte".equals(name) && "(I)[B".equals(descriptor))
-                || ("allocaInt".equals(name) && "(I)[I".equals(descriptor))
-                || ("allocaFloat".equals(name) && "(I)[F".equals(descriptor));
+        return name != null && name.startsWith("alloca");
     }
 
     @Override
