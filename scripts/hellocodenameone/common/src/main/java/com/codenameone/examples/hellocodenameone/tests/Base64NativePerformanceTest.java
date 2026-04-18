@@ -192,11 +192,8 @@ public class Base64NativePerformanceTest extends BaseTest {
                     emitStat("Image PNG encode (SIMD on)", formatMs(pngSimdMs));
                     emitStat("Image PNG encode ratio (SIMD on/off)", formatRatio(pngSimdMs, pngScalarMs));
                     if (imageIo.isFormatSupported(ImageIO.FORMAT_JPEG)) {
-                        long jpegScalarMs = measureImageEncode(imageIo, benchmarkImage, benchmarkMaskImage, ImageIO.FORMAT_JPEG, 0.82f, false);
-                        long jpegSimdMs = measureImageEncode(imageIo, benchmarkImage, benchmarkMaskImage, ImageIO.FORMAT_JPEG, 0.82f, true);
-                        emitStat("Image JPEG encode (SIMD off)", formatMs(jpegScalarMs));
-                        emitStat("Image JPEG encode (SIMD on)", formatMs(jpegSimdMs));
-                        emitStat("Image JPEG encode ratio (SIMD on/off)", formatRatio(jpegSimdMs, jpegScalarMs));
+                        long jpegMs = measureImageEncode(imageIo, benchmarkImage, benchmarkMaskImage, ImageIO.FORMAT_JPEG, 0.82f, false);
+                        emitStat("Image JPEG encode", formatMs(jpegMs));
                     } else {
                         emitStat("Image JPEG encode benchmark status", "skipped (JPEG unsupported)");
                     }

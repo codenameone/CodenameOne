@@ -1192,23 +1192,19 @@ public class Image implements ActionSource {
         if (isSimdOptimizationsEnabled() && maskData.length >= 16) {
             Simd simd = Simd.get();
             int blockSize = Math.min(maskData.length, SIMD_BLOCK_SIZE);
-            int srcOffset = 0;
+            int workOffset = 0;
             int alphaOffset = blockSize;
             int maskOffset = blockSize * 2;
             int[] scratch = simd.allocaInt(blockSize * 3);
-            byte[] scratchBytes = simd.allocaByteZeroed(blockSize);
             for (int iter = 0; iter < blockSize; iter++) {
                 scratch[maskOffset + iter] = 0xffffff;
             }
             for (int offset = 0; offset < maskData.length; offset += blockSize) {
                 int length = Math.min(blockSize, maskData.length - offset);
-                System.arraycopy(rgb, offset, scratch, srcOffset, length);
-                System.arraycopy(maskData, offset, scratchBytes, 0, length);
-                simd.and(scratch, srcOffset, scratch, maskOffset, scratch, srcOffset, length);
-                simd.unpackUnsignedByteToInt(scratchBytes, 0, scratch, alphaOffset, length);
+                simd.and(rgb, offset, scratch, maskOffset, scratch, workOffset, length);
+                simd.unpackUnsignedByteToInt(maskData, offset, scratch, alphaOffset, length);
                 simd.shl(scratch, alphaOffset, 24, scratch, alphaOffset, length);
-                simd.or(scratch, srcOffset, scratch, alphaOffset, scratch, srcOffset, length);
-                System.arraycopy(scratch, srcOffset, rgb, offset, length);
+                simd.or(scratch, workOffset, scratch, alphaOffset, rgb, offset, length);
             }
         } else {
             int mdlen = maskData.length;
@@ -1365,8 +1361,7 @@ public class Image implements ActionSource {
         if (isSimdOptimizationsEnabled() && size >= 16) {
             Simd simd = Simd.get();
             int blockSize = Math.min(size, SIMD_BLOCK_SIZE);
-            int srcOffset = 0;
-            int workOffset = blockSize;
+            int workOffset = 0;
             int maskOffset = blockSize * 2;
             int alphaOffset = blockSize * 3;
             int zeroOffset = blockSize * 4;
@@ -1379,13 +1374,11 @@ public class Image implements ActionSource {
             }
             for (int offset = 0; offset < size; offset += blockSize) {
                 int length = Math.min(blockSize, size - offset);
-                System.arraycopy(arr, offset, scratch, srcOffset, length);
-                simd.shrLogical(scratch, srcOffset, 24, scratch, workOffset, length);
+                simd.shrLogical(arr, offset, 24, scratch, workOffset, length);
                 simd.cmpEq(scratch, workOffset, scratch, zeroOffset, scratchBytes, 0, length);
-                simd.and(scratch, srcOffset, scratch, maskOffset, scratch, workOffset, length);
+                simd.and(arr, offset, scratch, maskOffset, scratch, workOffset, length);
                 simd.or(scratch, workOffset, scratch, alphaOffset, scratch, workOffset, length);
-                simd.select(scratchBytes, 0, scratch, srcOffset, scratch, workOffset, scratch, srcOffset, length);
-                System.arraycopy(scratch, srcOffset, arr, offset, length);
+                simd.select(scratchBytes, 0, arr, offset, scratch, workOffset, arr, offset, length);
             }
         } else {
             int alphaInt = (((int) alpha) << 24) & 0xff000000;
@@ -1459,13 +1452,12 @@ public class Image implements ActionSource {
         int w = getWidth();
         int h = getHeight();
         int size = w * h;
-        int[] arr = new int[size];
+        int[] arr = allocateRgbArray(size);
         getRGB(arr, 0, 0, 0, w, h);
         if (isSimdOptimizationsEnabled() && size >= 16) {
             Simd simd = Simd.get();
             int blockSize = Math.min(size, SIMD_BLOCK_SIZE);
-            int srcOffset = 0;
-            int workOffset = blockSize;
+            int workOffset = 0;
             int maskOffset = blockSize * 2;
             int alphaOffset = blockSize * 3;
             int zeroOffset = blockSize * 4;
@@ -1480,16 +1472,17 @@ public class Image implements ActionSource {
             }
             for (int offset = 0; offset < size; offset += blockSize) {
                 int length = Math.min(blockSize, size - offset);
-                System.arraycopy(arr, offset, scratch, srcOffset, length);
-                simd.shrLogical(scratch, srcOffset, 24, scratch, workOffset, length);
+                simd.shrLogical(arr, offset, 24, scratch, workOffset, length);
                 simd.cmpEq(scratch, workOffset, scratch, zeroOffset, scratchBytes, 0, length);
-                simd.and(scratch, srcOffset, scratch, maskOffset, scratch, workOffset, length);
+                simd.and(arr, offset, scratch, maskOffset, scratch, workOffset, length);
                 simd.or(scratch, workOffset, scratch, alphaOffset, scratch, workOffset, length);
-                simd.select(scratchBytes, 0, scratch, srcOffset, scratch, workOffset, scratch, srcOffset, length);
-                simd.and(scratch, srcOffset, scratch, maskOffset, scratch, workOffset, length);
+                simd.select(scratchBytes, 0, arr, offset, scratch, workOffset, arr, offset, length);
+            }
+            for (int offset = 0; offset < size; offset += blockSize) {
+                int length = Math.min(blockSize, size - offset);
+                simd.and(arr, offset, scratch, maskOffset, scratch, workOffset, length);
                 simd.cmpEq(scratch, workOffset, scratch, removeColorOffset, scratchBytes, 0, length);
-                simd.select(scratchBytes, 0, scratch, zeroOffset, scratch, srcOffset, scratch, srcOffset, length);
-                System.arraycopy(scratch, srcOffset, arr, offset, length);
+                simd.select(scratchBytes, 0, scratch, zeroOffset, arr, offset, arr, offset, length);
             }
         } else {
             int alphaInt = (((int) alpha) << 24) & 0xff000000;
@@ -1721,9 +1714,16 @@ public class Image implements ActionSource {
     int[] getRGBImpl() {
         int width = getWidth();
         int height = getHeight();
-        int[] rgbData = new int[width * height];
+        int[] rgbData = allocateRgbArray(width * height);
         getRGB(rgbData, 0, 0, 0, width, height);
         return rgbData;
+    }
+
+    static int[] allocateRgbArray(int size) {
+        if (isSimdOptimizationsEnabled() && size >= 16) {
+            return Simd.get().allocInt(size);
+        }
+        return new int[size];
     }
 
     /// Scales the image to the given width while updating the height based on the
