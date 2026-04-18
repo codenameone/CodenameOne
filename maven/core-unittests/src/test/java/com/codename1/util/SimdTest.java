@@ -93,6 +93,7 @@ class SimdTest extends UITestBase {
         bytesB[0] = 20;
         bytesB[1] = 2;
         bytesB[2] = 1;
+        // Validate saturated byte addition for both near-limit and overflow inputs.
         simd.add(bytesA, bytesB, bytesO, 0, 3);
         assertEquals(127, bytesO[0]);
         assertEquals(3, bytesO[1]);
