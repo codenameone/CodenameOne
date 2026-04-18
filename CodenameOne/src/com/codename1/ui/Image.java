@@ -1196,7 +1196,7 @@ public class Image implements ActionSource {
             int alphaOffset = blockSize;
             int maskOffset = blockSize * 2;
             int[] scratch = simd.allocaInt(blockSize * 3);
-            byte[] scratchBytes = simd.allocaByte(blockSize);
+            byte[] scratchBytes = simd.allocaByteZeroed(blockSize);
             for (int iter = 0; iter < blockSize; iter++) {
                 scratch[maskOffset + iter] = 0xffffff;
             }
@@ -1371,7 +1371,7 @@ public class Image implements ActionSource {
             int alphaOffset = blockSize * 3;
             int zeroOffset = blockSize * 4;
             int[] scratch = simd.allocaIntZeroed(blockSize * 5);
-            byte[] scratchBytes = simd.allocaByte(blockSize);
+            byte[] scratchBytes = simd.allocaByteZeroed(blockSize);
             int alphaInt = (((int) alpha) << 24) & 0xff000000;
             for (int iter = 0; iter < blockSize; iter++) {
                 scratch[maskOffset + iter] = 0xffffff;
@@ -1471,7 +1471,7 @@ public class Image implements ActionSource {
             int zeroOffset = blockSize * 4;
             int removeColorOffset = blockSize * 5;
             int[] scratch = simd.allocaIntZeroed(blockSize * 6);
-            byte[] scratchBytes = simd.allocaByte(blockSize);
+            byte[] scratchBytes = simd.allocaByteZeroed(blockSize);
             int alphaInt = (((int) alpha) << 24) & 0xff000000;
             for (int iter = 0; iter < blockSize; iter++) {
                 scratch[maskOffset + iter] = 0xffffff;
