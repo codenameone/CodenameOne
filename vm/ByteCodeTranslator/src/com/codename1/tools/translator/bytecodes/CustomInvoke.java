@@ -225,13 +225,11 @@ public class CustomInvoke extends Instruction {
         if (literalArgs == null || literalArgs.length == 0) {
             return false;
         }
-        for (String literalArg : literalArgs) {
-            if (literalArg == null) {
-                return false;
-            }
-        }
         b.append(macro).append("(");
         for (int i = 0; i < literalArgs.length; i++) {
+            if (literalArgs[i] == null) {
+                return false;
+            }
             if (i > 0) {
                 b.append(", ");
             }

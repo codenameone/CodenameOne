@@ -1154,8 +1154,12 @@ extern JAVA_OBJECT allocMultiArray(int* lengths, struct clazz* type, int primiti
         JAVA_ARRAY_INT __cn1InitValue = (value); \
         JAVA_ARRAY __cn1StackArray = (JAVA_ARRAY)CN1_SIMD_ALLOCA_INT(__cn1InitLength); \
         JAVA_ARRAY_INT* __cn1Data = (JAVA_ARRAY_INT*)__cn1StackArray->data; \
-        for (int __cn1FillIndex = 0; __cn1FillIndex < __cn1InitLength; __cn1FillIndex++) { \
-            __cn1Data[__cn1FillIndex] = __cn1InitValue; \
+        if (__cn1InitValue == 0 && __cn1InitLength > 0) { \
+            memset(__cn1StackArray->data, 0, (size_t)__cn1InitLength * sizeof(JAVA_ARRAY_INT)); \
+        } else { \
+            for (int __cn1FillIndex = 0; __cn1FillIndex < __cn1InitLength; __cn1FillIndex++) { \
+                __cn1Data[__cn1FillIndex] = __cn1InitValue; \
+            } \
         } \
         (JAVA_OBJECT)__cn1StackArray; \
     })
@@ -1165,8 +1169,12 @@ extern JAVA_OBJECT allocMultiArray(int* lengths, struct clazz* type, int primiti
         JAVA_ARRAY_FLOAT __cn1InitValue = (value); \
         JAVA_ARRAY __cn1StackArray = (JAVA_ARRAY)CN1_SIMD_ALLOCA_FLOAT(__cn1InitLength); \
         JAVA_ARRAY_FLOAT* __cn1Data = (JAVA_ARRAY_FLOAT*)__cn1StackArray->data; \
-        for (int __cn1FillIndex = 0; __cn1FillIndex < __cn1InitLength; __cn1FillIndex++) { \
-            __cn1Data[__cn1FillIndex] = __cn1InitValue; \
+        if (__cn1InitValue == 0.0f && __cn1InitLength > 0) { \
+            memset(__cn1StackArray->data, 0, (size_t)__cn1InitLength * sizeof(JAVA_ARRAY_FLOAT)); \
+        } else { \
+            for (int __cn1FillIndex = 0; __cn1FillIndex < __cn1InitLength; __cn1FillIndex++) { \
+                __cn1Data[__cn1FillIndex] = __cn1InitValue; \
+            } \
         } \
         (JAVA_OBJECT)__cn1StackArray; \
     })
