@@ -4,6 +4,7 @@ import com.codename1.system.Lifecycle;
 import com.codename1.components.ImageViewer;
 import com.codename1.components.OnOffSwitch;
 import com.codename1.components.ScaleImageLabel;
+import com.codename1.components.SplitPane;
 import com.codename1.components.ToastBar;
 import com.codename1.io.FileSystemStorage;
 import com.codename1.ui.Display;
@@ -436,7 +437,7 @@ public class SkinDesigner extends Lifecycle {
         final TextField safeY = new TextField("40", "Safe Y", 8, TextField.NUMERIC);
         final TextField safeWidth = new TextField("320", "Safe Width", 8, TextField.NUMERIC);
         final TextField safeHeight = new TextField("480", "Safe Height", 8, TextField.NUMERIC);
-        final TextField floodTolerance = new TextField("24", "Tolerance", 4, TextField.NUMERIC);
+        final TextField floodTolerance = new TextField("24", "Color Tol (0-441)", 4, TextField.NUMERIC);
         if("lan".equals(prefix) && Preferences.get("lanX", null) == null) {
             String portraitX = Preferences.get("portX", null);
             String portraitY = Preferences.get("portY", null);
@@ -523,9 +524,11 @@ public class SkinDesigner extends Lifecycle {
                 ToastBar.showErrorMessage("Please select a skin image first");
                 return;
             }
+            int seedX = screenPositionX.getAsInt(0) + (screenWidthPixels.getAsInt(0) / 2);
+            int seedY = screenPositionY.getAsInt(0) + (screenHeightPixels.getAsInt(0) / 2);
             Image generatedMask = createFloodFillMask(source,
-                    screenPositionX.getAsInt(0),
-                    screenPositionY.getAsInt(0),
+                    seedX,
+                    seedY,
                     floodTolerance.getAsInt(24));
             if(generatedMask != null) {
                 maskLabel.setIcon(generatedMask);
@@ -565,18 +568,31 @@ public class SkinDesigner extends Lifecycle {
             }
         }
 
-        final Container cnt = BoxLayout.encloseY(imagePicker,
-                BorderLayout.center(labeledFieldTitle("Screen Position (X/Y/Width/Height)")).
-                        add(BorderLayout.EAST, BoxLayout.encloseX(aim, helpButton, saveButton)),
+        Container actionButtons = FlowLayout.encloseCenter(aim, helpButton, saveButton);
+        Container detectionButtons = FlowLayout.encloseCenter(detectScreenButton, floodTolerance, maskPicker);
+        Label detectionHint = new Label("Uses flood-fill from the screen center");
+        detectionHint.setUIID("SkinDesignerFieldLabel");
+        Container controls = BoxLayout.encloseY(
+                imagePicker,
+                labeledFieldTitle("Screen Position (X/Y/Width/Height)"),
                 GridLayout.encloseIn(4, screenPositionX, screenPositionY, screenWidthPixels, screenHeightPixels),
                 labeledFieldTitle("Safe Area (X/Y/Width/Height)"),
                 GridLayout.encloseIn(4, safeX, safeY, safeWidth, safeHeight),
-                BorderLayout.center(detectScreenButton).add(BorderLayout.EAST, floodTolerance),
-                maskPicker,
-                maskLabel,
-                sl);
+                labeledFieldTitle("Screen Detection"),
+                detectionHint,
+                detectionButtons,
+                actionButtons
+        );
+        controls.setUIID("SkinDesignerCard");
+        controls.setScrollableY(true);
+        Container preview = BoxLayout.encloseY(maskLabel, sl);
+        preview.setUIID("SkinDesignerCard");
+        preview.setScrollableY(true);
+
+        int splitType = Display.getInstance().isPortrait() ? SplitPane.HORIZONTAL_SPLIT : SplitPane.VERTICAL_SPLIT;
+        Component split = new SplitPane(splitType, controls, preview, "35%", "45%", "55%");
+        final Container cnt = BorderLayout.center(split);
         cnt.setUIID("SkinDesignerCard");
-        cnt.setScrollableY(true);
         return new ImageSettings() {
             @Override
             public Container getContainer() {
