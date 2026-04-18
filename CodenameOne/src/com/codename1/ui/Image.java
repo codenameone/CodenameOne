@@ -1223,19 +1223,7 @@ public class Image implements ActionSource {
             throw new IllegalArgumentException("Mask and image sizes don't match");
         }
         if (isSimdOptimizationsEnabled() && maskData.length >= 16) {
-            Simd simd = Simd.get();
-            int blockSize = Math.min(maskData.length, SIMD_BLOCK_SIZE);
-            int workOffset = 0;
-            int alphaOffset = blockSize;
-            int[] scratch = simd.allocaInt(blockSize * 2);
-            int[] rgbMask = getSimdRgbMask(simd);
-            for (int offset = 0; offset < maskData.length; offset += blockSize) {
-                int length = Math.min(blockSize, maskData.length - offset);
-                simd.and(rgb, offset, rgbMask, 0, scratch, workOffset, length);
-                simd.unpackUnsignedByteToInt(maskData, offset, scratch, alphaOffset, length);
-                simd.shl(scratch, alphaOffset, 24, scratch, alphaOffset, length);
-                simd.or(scratch, workOffset, scratch, alphaOffset, rgb, offset, length);
-            }
+            Simd.get().applyByteAlphaMaskToInts(rgb, 0, maskData, 0, maskData.length);
         } else {
             int mdlen = maskData.length;
             for (int iter = 0; iter < mdlen; iter++) {
@@ -1389,23 +1377,8 @@ public class Image implements ActionSource {
         int size = w * h;
         int[] arr = getRGB();
         if (isSimdOptimizationsEnabled() && size >= 16) {
-            Simd simd = Simd.get();
-            int blockSize = Math.min(size, SIMD_BLOCK_SIZE);
-            int workOffset = 0;
-            int zeroOffset = blockSize;
-            int[] scratch = simd.allocaIntZeroed(blockSize * 2);
-            byte[] scratchBytes = simd.allocaByteZeroed(blockSize);
             int alphaInt = (((int) alpha) << 24) & 0xff000000;
-            int[] rgbMask = getSimdRgbMask(simd);
-            int[] alphaValues = simd.allocaIntFilled(blockSize, alphaInt);
-            for (int offset = 0; offset < size; offset += blockSize) {
-                int length = Math.min(blockSize, size - offset);
-                simd.shrLogical(arr, offset, 24, scratch, workOffset, length);
-                simd.cmpEq(scratch, workOffset, scratch, zeroOffset, scratchBytes, 0, length);
-                simd.and(arr, offset, rgbMask, 0, scratch, workOffset, length);
-                simd.or(scratch, workOffset, alphaValues, 0, scratch, workOffset, length);
-                simd.select(scratchBytes, 0, arr, offset, scratch, workOffset, arr, offset, length);
-            }
+            Simd.get().replaceAlphaPreserveTransparent(arr, 0, alphaInt, size);
         } else {
             int alphaInt = (((int) alpha) << 24) & 0xff000000;
             for (int iter = 0; iter < size; iter++) {
@@ -1481,30 +1454,8 @@ public class Image implements ActionSource {
         int[] arr = allocateRgbArray(size);
         getRGB(arr, 0, 0, 0, w, h);
         if (isSimdOptimizationsEnabled() && size >= 16) {
-            Simd simd = Simd.get();
-            int blockSize = Math.min(size, SIMD_BLOCK_SIZE);
-            int workOffset = 0;
-            int zeroOffset = blockSize;
-            int[] scratch = simd.allocaIntZeroed(blockSize * 2);
-            byte[] scratchBytes = simd.allocaByteZeroed(blockSize);
             int alphaInt = (((int) alpha) << 24) & 0xff000000;
-            int[] rgbMask = getSimdRgbMask(simd);
-            int[] alphaValues = simd.allocaIntFilled(blockSize, alphaInt);
-            int[] removeColorValues = simd.allocaIntFilled(blockSize, removeColor);
-            for (int offset = 0; offset < size; offset += blockSize) {
-                int length = Math.min(blockSize, size - offset);
-                simd.shrLogical(arr, offset, 24, scratch, workOffset, length);
-                simd.cmpEq(scratch, workOffset, scratch, zeroOffset, scratchBytes, 0, length);
-                simd.and(arr, offset, rgbMask, 0, scratch, workOffset, length);
-                simd.or(scratch, workOffset, alphaValues, 0, scratch, workOffset, length);
-                simd.select(scratchBytes, 0, arr, offset, scratch, workOffset, arr, offset, length);
-            }
-            for (int offset = 0; offset < size; offset += blockSize) {
-                int length = Math.min(blockSize, size - offset);
-                simd.and(arr, offset, rgbMask, 0, scratch, workOffset, length);
-                simd.cmpEq(scratch, workOffset, removeColorValues, 0, scratchBytes, 0, length);
-                simd.select(scratchBytes, 0, scratch, zeroOffset, arr, offset, arr, offset, length);
-            }
+            Simd.get().replaceAlphaPreserveTransparentRemoveColor(arr, 0, alphaInt, removeColor, size);
         } else {
             int alphaInt = (((int) alpha) << 24) & 0xff000000;
             for (int iter = 0; iter < size; iter++) {

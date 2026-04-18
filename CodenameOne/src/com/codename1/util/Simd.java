@@ -851,6 +851,54 @@ public class Simd {
         return out;
     }
 
+    /// Replaces the alpha (top) byte of each int in `rgb` with the corresponding unsigned
+    /// byte from `mask`, preserving the lower 24 RGB bits. Equivalent to
+    /// `rgb[i] = (rgb[i] & 0xffffff) | ((mask[i] & 0xff) << 24)` for each pixel in the
+    /// requested range. Provided as a fused SIMD-friendly op so platform implementations
+    /// can vectorize the entire pass and Java callers avoid per-block method overhead.
+    public void applyByteAlphaMaskToInts(int[] rgb, int rgbOffset, byte[] mask, int maskOffset, int length) {
+        for (int i = 0; i < length; i++) {
+            int rgbIdx = rgbOffset + i;
+            rgb[rgbIdx] = (rgb[rgbIdx] & 0xffffff) | ((mask[maskOffset + i] & 0xff) << 24);
+        }
+    }
+
+    /// Replaces the alpha (top) byte of every non-fully-transparent pixel in `rgb` with the
+    /// alpha bits in `alphaInt`. Pixels whose existing alpha byte is zero are left unchanged.
+    /// Provided as a fused SIMD-friendly op so platform implementations can vectorize the
+    /// entire pass and Java callers avoid per-block method overhead.
+    public void replaceAlphaPreserveTransparent(int[] rgb, int rgbOffset, int alphaInt, int length) {
+        int alphaMask = alphaInt & 0xff000000;
+        for (int i = 0; i < length; i++) {
+            int idx = rgbOffset + i;
+            int v = rgb[idx];
+            if ((v & 0xff000000) != 0) {
+                rgb[idx] = (v & 0xffffff) | alphaMask;
+            }
+        }
+    }
+
+    /// Like `replaceAlphaPreserveTransparent` but additionally zeroes any pixel whose RGB
+    /// component matches `removeColor` (low 24 bits) after the alpha replacement. Provided
+    /// as a fused SIMD-friendly op so platform implementations can vectorize the entire
+    /// pass and Java callers avoid per-block method overhead.
+    public void replaceAlphaPreserveTransparentRemoveColor(int[] rgb, int rgbOffset, int alphaInt, int removeColor, int length) {
+        int alphaMask = alphaInt & 0xff000000;
+        int rgbOnly = removeColor & 0xffffff;
+        for (int i = 0; i < length; i++) {
+            int idx = rgbOffset + i;
+            int v = rgb[idx];
+            if ((v & 0xff000000) != 0) {
+                int updated = (v & 0xffffff) | alphaMask;
+                if ((updated & 0xffffff) == rgbOnly) {
+                    rgb[idx] = 0;
+                } else {
+                    rgb[idx] = updated;
+                }
+            }
+        }
+    }
+
 
     /// This API is used internally to verify valid array arguments in the simulator
     /// notice that no validation occurs on the devices.

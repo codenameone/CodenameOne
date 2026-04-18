@@ -143,27 +143,8 @@ public class RGBImage extends Image {
         int[] arr = Image.allocateRgbArray(rgb.length);
         System.arraycopy(rgb, 0, arr, 0, rgb.length);
         if (Image.isSimdOptimizationsEnabled() && arr.length >= 16) {
-            Simd simd = Simd.get();
-            int blockSize = Math.min(arr.length, 64);
-            int workOffset = 0;
-            int maskOffset = blockSize * 2;
-            int alphaOffset = blockSize * 3;
-            int zeroOffset = blockSize * 4;
-            int[] scratch = simd.allocaIntZeroed(blockSize * 5);
-            byte[] scratchBytes = simd.allocaByteZeroed(blockSize);
             int alphaInt = (((int) alpha) << 24) & 0xff000000;
-            for (int iter = 0; iter < blockSize; iter++) {
-                scratch[maskOffset + iter] = 0xffffff;
-                scratch[alphaOffset + iter] = alphaInt;
-            }
-            for (int offset = 0; offset < arr.length; offset += blockSize) {
-                int length = Math.min(blockSize, arr.length - offset);
-                simd.shrLogical(arr, offset, 24, scratch, workOffset, length);
-                simd.cmpEq(scratch, workOffset, scratch, zeroOffset, scratchBytes, 0, length);
-                simd.and(arr, offset, scratch, maskOffset, scratch, workOffset, length);
-                simd.or(scratch, workOffset, scratch, alphaOffset, scratch, workOffset, length);
-                simd.select(scratchBytes, 0, arr, offset, scratch, workOffset, arr, offset, length);
-            }
+            Simd.get().replaceAlphaPreserveTransparent(arr, 0, alphaInt, arr.length);
         } else {
             int alphaInt = (((int) alpha) << 24) & 0xff000000;
             int rlen = rgb.length;
