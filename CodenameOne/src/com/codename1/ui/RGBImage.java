@@ -150,27 +150,22 @@ public class RGBImage extends Image {
             int maskOffset = blockSize * 2;
             int alphaOffset = blockSize * 3;
             int zeroOffset = blockSize * 4;
-            int[] scratch = simd.allocaInt(blockSize * 5);
-            byte[] scratchBytes = simd.allocaByte(blockSize);
+            int[] scratch = simd.allocInt(blockSize * 5);
+            byte[] scratchBytes = simd.allocByte(blockSize);
             int alphaInt = (((int) alpha) << 24) & 0xff000000;
             for (int iter = 0; iter < blockSize; iter++) {
                 scratch[maskOffset + iter] = 0xffffff;
                 scratch[alphaOffset + iter] = alphaInt;
-                scratch[zeroOffset + iter] = 0;
             }
             for (int offset = 0; offset < arr.length; offset += blockSize) {
                 int length = Math.min(blockSize, arr.length - offset);
-                for (int i = 0; i < length; i++) {
-                    scratch[srcOffset + i] = arr[offset + i];
-                }
+                System.arraycopy(arr, offset, scratch, srcOffset, length);
                 simd.shrLogical(scratch, srcOffset, 24, scratch, workOffset, length);
                 simd.cmpEq(scratch, workOffset, scratch, zeroOffset, scratchBytes, 0, length);
                 simd.and(scratch, srcOffset, scratch, maskOffset, scratch, workOffset, length);
                 simd.or(scratch, workOffset, scratch, alphaOffset, scratch, workOffset, length);
                 simd.select(scratchBytes, 0, scratch, srcOffset, scratch, workOffset, scratch, srcOffset, length);
-                for (int i = 0; i < length; i++) {
-                    arr[offset + i] = scratch[srcOffset + i];
-                }
+                System.arraycopy(scratch, srcOffset, arr, offset, length);
             }
         } else {
             int alphaInt = (((int) alpha) << 24) & 0xff000000;

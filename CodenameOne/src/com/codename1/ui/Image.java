@@ -1078,12 +1078,10 @@ public class Image implements ActionSource {
             Simd simd = Simd.get();
             mask = simd.allocByte(rlen);
             int blockSize = Math.min(rlen, SIMD_BLOCK_SIZE);
-            int[] scratch = simd.allocaInt(blockSize);
+            int[] scratch = simd.allocInt(blockSize);
             for (int offset = 0; offset < rlen; offset += blockSize) {
                 int length = Math.min(blockSize, rlen - offset);
-                for (int i = 0; i < length; i++) {
-                    scratch[i] = rgb[offset + i];
-                }
+                System.arraycopy(rgb, offset, scratch, 0, length);
                 simd.packIntToByteTruncate(scratch, 0, mask, offset, length);
             }
         } else {
@@ -1197,24 +1195,20 @@ public class Image implements ActionSource {
             int srcOffset = 0;
             int alphaOffset = blockSize;
             int maskOffset = blockSize * 2;
-            int[] scratch = simd.allocaInt(blockSize * 3);
-            byte[] scratchBytes = simd.allocaByte(blockSize);
+            int[] scratch = simd.allocInt(blockSize * 3);
+            byte[] scratchBytes = simd.allocByte(blockSize);
             for (int iter = 0; iter < blockSize; iter++) {
                 scratch[maskOffset + iter] = 0xffffff;
             }
             for (int offset = 0; offset < maskData.length; offset += blockSize) {
                 int length = Math.min(blockSize, maskData.length - offset);
-                for (int i = 0; i < length; i++) {
-                    scratch[srcOffset + i] = rgb[offset + i];
-                    scratchBytes[i] = maskData[offset + i];
-                }
+                System.arraycopy(rgb, offset, scratch, srcOffset, length);
+                System.arraycopy(maskData, offset, scratchBytes, 0, length);
                 simd.and(scratch, srcOffset, scratch, maskOffset, scratch, srcOffset, length);
                 simd.unpackUnsignedByteToInt(scratchBytes, 0, scratch, alphaOffset, length);
                 simd.shl(scratch, alphaOffset, 24, scratch, alphaOffset, length);
                 simd.or(scratch, srcOffset, scratch, alphaOffset, scratch, srcOffset, length);
-                for (int i = 0; i < length; i++) {
-                    rgb[offset + i] = scratch[srcOffset + i];
-                }
+                System.arraycopy(scratch, srcOffset, rgb, offset, length);
             }
         } else {
             int mdlen = maskData.length;
@@ -1376,27 +1370,22 @@ public class Image implements ActionSource {
             int maskOffset = blockSize * 2;
             int alphaOffset = blockSize * 3;
             int zeroOffset = blockSize * 4;
-            int[] scratch = simd.allocaInt(blockSize * 5);
-            byte[] scratchBytes = simd.allocaByte(blockSize);
+            int[] scratch = simd.allocInt(blockSize * 5);
+            byte[] scratchBytes = simd.allocByte(blockSize);
             int alphaInt = (((int) alpha) << 24) & 0xff000000;
             for (int iter = 0; iter < blockSize; iter++) {
                 scratch[maskOffset + iter] = 0xffffff;
                 scratch[alphaOffset + iter] = alphaInt;
-                scratch[zeroOffset + iter] = 0;
             }
             for (int offset = 0; offset < size; offset += blockSize) {
                 int length = Math.min(blockSize, size - offset);
-                for (int i = 0; i < length; i++) {
-                    scratch[srcOffset + i] = arr[offset + i];
-                }
+                System.arraycopy(arr, offset, scratch, srcOffset, length);
                 simd.shrLogical(scratch, srcOffset, 24, scratch, workOffset, length);
                 simd.cmpEq(scratch, workOffset, scratch, zeroOffset, scratchBytes, 0, length);
                 simd.and(scratch, srcOffset, scratch, maskOffset, scratch, workOffset, length);
                 simd.or(scratch, workOffset, scratch, alphaOffset, scratch, workOffset, length);
                 simd.select(scratchBytes, 0, scratch, srcOffset, scratch, workOffset, scratch, srcOffset, length);
-                for (int i = 0; i < length; i++) {
-                    arr[offset + i] = scratch[srcOffset + i];
-                }
+                System.arraycopy(scratch, srcOffset, arr, offset, length);
             }
         } else {
             int alphaInt = (((int) alpha) << 24) & 0xff000000;
@@ -1481,20 +1470,17 @@ public class Image implements ActionSource {
             int alphaOffset = blockSize * 3;
             int zeroOffset = blockSize * 4;
             int removeColorOffset = blockSize * 5;
-            int[] scratch = simd.allocaInt(blockSize * 6);
-            byte[] scratchBytes = simd.allocaByte(blockSize);
+            int[] scratch = simd.allocInt(blockSize * 6);
+            byte[] scratchBytes = simd.allocByte(blockSize);
             int alphaInt = (((int) alpha) << 24) & 0xff000000;
             for (int iter = 0; iter < blockSize; iter++) {
                 scratch[maskOffset + iter] = 0xffffff;
                 scratch[alphaOffset + iter] = alphaInt;
-                scratch[zeroOffset + iter] = 0;
                 scratch[removeColorOffset + iter] = removeColor & 0xffffff;
             }
             for (int offset = 0; offset < size; offset += blockSize) {
                 int length = Math.min(blockSize, size - offset);
-                for (int i = 0; i < length; i++) {
-                    scratch[srcOffset + i] = arr[offset + i];
-                }
+                System.arraycopy(arr, offset, scratch, srcOffset, length);
                 simd.shrLogical(scratch, srcOffset, 24, scratch, workOffset, length);
                 simd.cmpEq(scratch, workOffset, scratch, zeroOffset, scratchBytes, 0, length);
                 simd.and(scratch, srcOffset, scratch, maskOffset, scratch, workOffset, length);
@@ -1503,9 +1489,7 @@ public class Image implements ActionSource {
                 simd.and(scratch, srcOffset, scratch, maskOffset, scratch, workOffset, length);
                 simd.cmpEq(scratch, workOffset, scratch, removeColorOffset, scratchBytes, 0, length);
                 simd.select(scratchBytes, 0, scratch, zeroOffset, scratch, srcOffset, scratch, srcOffset, length);
-                for (int i = 0; i < length; i++) {
-                    arr[offset + i] = scratch[srcOffset + i];
-                }
+                System.arraycopy(scratch, srcOffset, arr, offset, length);
             }
         } else {
             int alphaInt = (((int) alpha) << 24) & 0xff000000;
