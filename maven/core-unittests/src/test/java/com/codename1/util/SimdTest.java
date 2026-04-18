@@ -64,6 +64,12 @@ class SimdTest extends UITestBase {
         assertEquals(16, fallback.allocaByte(16).length);
         assertEquals(16, fallback.allocaInt(16).length);
         assertEquals(16, fallback.allocaFloat(16).length);
+        assertEquals(0, fallback.allocaByteZeroed(16)[3]);
+        assertEquals(0, fallback.allocaIntZeroed(16)[3]);
+        assertEquals(0.0f, fallback.allocaFloatZeroed(16)[3], 0.0f);
+        assertEquals(7, fallback.allocaByteFilled(16, (byte)7)[3]);
+        assertEquals(7, fallback.allocaIntFilled(16, 7)[3]);
+        assertEquals(7.5f, fallback.allocaFloatFilled(16, 7.5f)[3], 0.0f);
         assertThrows(IllegalArgumentException.class, () -> fallback.allocaByte(15));
         assertThrows(IllegalArgumentException.class, () -> fallback.allocaInt(15));
         assertThrows(IllegalArgumentException.class, () -> fallback.allocaFloat(15));
@@ -84,6 +90,11 @@ class SimdTest extends UITestBase {
         assertEquals(7, regO[0]);
         assertEquals(3, regO[1]);
 
+        int[] zeroed = simd.allocaIntZeroed(16);
+        int[] filled = simd.allocaIntFilled(16, 9);
+        assertEquals(0, zeroed[5]);
+        assertEquals(9, filled[5]);
+
         byte[] bytesA = simd.allocaByte(16);
         byte[] bytesB = simd.allocaByte(16);
         byte[] bytesO = simd.allocaByte(16);
@@ -98,6 +109,7 @@ class SimdTest extends UITestBase {
         assertEquals(127, bytesO[0]);
         assertEquals(3, bytesO[1]);
         assertEquals(127, bytesO[2]);
+        assertEquals(11, simd.allocaByteFilled(16, (byte)11)[4]);
     }
 
     @FormTest

@@ -1078,7 +1078,7 @@ public class Image implements ActionSource {
             Simd simd = Simd.get();
             mask = simd.allocByte(rlen);
             int blockSize = Math.min(rlen, SIMD_BLOCK_SIZE);
-            int[] scratch = simd.allocInt(blockSize);
+            int[] scratch = simd.allocaInt(blockSize);
             for (int offset = 0; offset < rlen; offset += blockSize) {
                 int length = Math.min(blockSize, rlen - offset);
                 System.arraycopy(rgb, offset, scratch, 0, length);
@@ -1195,8 +1195,8 @@ public class Image implements ActionSource {
             int srcOffset = 0;
             int alphaOffset = blockSize;
             int maskOffset = blockSize * 2;
-            int[] scratch = simd.allocInt(blockSize * 3);
-            byte[] scratchBytes = simd.allocByte(blockSize);
+            int[] scratch = simd.allocaInt(blockSize * 3);
+            byte[] scratchBytes = simd.allocaByte(blockSize);
             for (int iter = 0; iter < blockSize; iter++) {
                 scratch[maskOffset + iter] = 0xffffff;
             }
@@ -1370,8 +1370,8 @@ public class Image implements ActionSource {
             int maskOffset = blockSize * 2;
             int alphaOffset = blockSize * 3;
             int zeroOffset = blockSize * 4;
-            int[] scratch = simd.allocInt(blockSize * 5);
-            byte[] scratchBytes = simd.allocByte(blockSize);
+            int[] scratch = simd.allocaIntZeroed(blockSize * 5);
+            byte[] scratchBytes = simd.allocaByte(blockSize);
             int alphaInt = (((int) alpha) << 24) & 0xff000000;
             for (int iter = 0; iter < blockSize; iter++) {
                 scratch[maskOffset + iter] = 0xffffff;
@@ -1470,8 +1470,8 @@ public class Image implements ActionSource {
             int alphaOffset = blockSize * 3;
             int zeroOffset = blockSize * 4;
             int removeColorOffset = blockSize * 5;
-            int[] scratch = simd.allocInt(blockSize * 6);
-            byte[] scratchBytes = simd.allocByte(blockSize);
+            int[] scratch = simd.allocaIntZeroed(blockSize * 6);
+            byte[] scratchBytes = simd.allocaByte(blockSize);
             int alphaInt = (((int) alpha) << 24) & 0xff000000;
             for (int iter = 0; iter < blockSize; iter++) {
                 scratch[maskOffset + iter] = 0xffffff;

@@ -84,6 +84,72 @@ public class Simd {
         return allocFloat(size);
     }
 
+    /// Special scratch-allocation API that guarantees a zero-initialized byte array while retaining
+    /// the same method-local constraints as `allocaByte(int)`.
+    public byte[] allocaByteZeroed(int size) {
+        byte[] out = allocaByte(size);
+        fillByte(out, (byte)0);
+        return out;
+    }
+
+    /// Special scratch-allocation API that guarantees a zero-initialized int array while retaining
+    /// the same method-local constraints as `allocaInt(int)`.
+    public int[] allocaIntZeroed(int size) {
+        int[] out = allocaInt(size);
+        fillInt(out, 0);
+        return out;
+    }
+
+    /// Special scratch-allocation API that guarantees a zero-initialized float array while retaining
+    /// the same method-local constraints as `allocaFloat(int)`.
+    public float[] allocaFloatZeroed(int size) {
+        float[] out = allocaFloat(size);
+        fillFloat(out, 0.0f);
+        return out;
+    }
+
+    /// Special scratch-allocation API that guarantees every byte starts with the same value while
+    /// retaining the same method-local constraints as `allocaByte(int)`.
+    public byte[] allocaByteFilled(int size, byte value) {
+        byte[] out = allocaByte(size);
+        fillByte(out, value);
+        return out;
+    }
+
+    /// Special scratch-allocation API that guarantees every int starts with the same value while
+    /// retaining the same method-local constraints as `allocaInt(int)`.
+    public int[] allocaIntFilled(int size, int value) {
+        int[] out = allocaInt(size);
+        fillInt(out, value);
+        return out;
+    }
+
+    /// Special scratch-allocation API that guarantees every float starts with the same value while
+    /// retaining the same method-local constraints as `allocaFloat(int)`.
+    public float[] allocaFloatFilled(int size, float value) {
+        float[] out = allocaFloat(size);
+        fillFloat(out, value);
+        return out;
+    }
+
+    private static void fillByte(byte[] arr, byte value) {
+        for (int i = 0; i < arr.length; i++) {
+            arr[i] = value;
+        }
+    }
+
+    private static void fillInt(int[] arr, int value) {
+        for (int i = 0; i < arr.length; i++) {
+            arr[i] = value;
+        }
+    }
+
+    private static void fillFloat(float[] arr, float value) {
+        for (int i = 0; i < arr.length; i++) {
+            arr[i] = value;
+        }
+    }
+
     /// Looks up values from a table using unsigned byte indices.
     public void lookupBytes(byte[] table, byte[] indices, byte[] dst, int offset, int length) {
         lookupBytes(table, indices, offset, dst, offset, length);

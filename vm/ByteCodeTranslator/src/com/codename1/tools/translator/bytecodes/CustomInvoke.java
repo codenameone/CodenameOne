@@ -196,6 +196,24 @@ public class CustomInvoke extends Instruction {
         if (desc.equals("(I)[F") && name.equals("allocaFloat")) {
             return "CN1_SIMD_ALLOCA_FLOAT";
         }
+        if (desc.equals("(I)[B") && name.equals("allocaByteZeroed")) {
+            return "CN1_SIMD_ALLOCA_BYTE_ZEROED";
+        }
+        if (desc.equals("(I)[I") && name.equals("allocaIntZeroed")) {
+            return "CN1_SIMD_ALLOCA_INT_ZEROED";
+        }
+        if (desc.equals("(I)[F") && name.equals("allocaFloatZeroed")) {
+            return "CN1_SIMD_ALLOCA_FLOAT_ZEROED";
+        }
+        if (desc.equals("(IB)[B") && name.equals("allocaByteFilled")) {
+            return "CN1_SIMD_ALLOCA_BYTE_FILLED";
+        }
+        if (desc.equals("(II)[I") && name.equals("allocaIntFilled")) {
+            return "CN1_SIMD_ALLOCA_INT_FILLED";
+        }
+        if (desc.equals("(IF)[F") && name.equals("allocaFloatFilled")) {
+            return "CN1_SIMD_ALLOCA_FLOAT_FILLED";
+        }
         return null;
     }
 
@@ -204,10 +222,22 @@ public class CustomInvoke extends Instruction {
         if (macro == null) {
             return false;
         }
-        if (literalArgs == null || literalArgs.length != 1 || literalArgs[0] == null) {
+        if (literalArgs == null || literalArgs.length == 0) {
             return false;
         }
-        b.append(macro).append("(").append(literalArgs[0]).append(")");
+        for (String literalArg : literalArgs) {
+            if (literalArg == null) {
+                return false;
+            }
+        }
+        b.append(macro).append("(");
+        for (int i = 0; i < literalArgs.length; i++) {
+            if (i > 0) {
+                b.append(", ");
+            }
+            b.append(literalArgs[i]);
+        }
+        b.append(")");
         return true;
     }
     
