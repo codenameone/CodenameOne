@@ -515,6 +515,10 @@ public class SkinDesigner extends Lifecycle {
         saveButton.addActionListener(e -> saveCallback.run());
 
         ScaleImageLabel maskLabel = new ScaleImageLabel();
+        OnOffSwitch useMask = new OnOffSwitch();
+        useMask.setValue(false);
+        useMask.setUIID("SkinDesignerField");
+        autoSave(useMask, prefix + "UseMask");
         Button detectScreenButton = new Button("Detect Screen by Color");
         detectScreenButton.setUIID("SkinDesignerActionButton");
         detectScreenButton.addActionListener(e -> {
@@ -531,6 +535,7 @@ public class SkinDesigner extends Lifecycle {
                     floodTolerance.getAsInt(24));
             if(generatedMask != null) {
                 maskLabel.setIcon(generatedMask);
+                useMask.setValue(true);
                 maskLabel.getParent().revalidate();
                 try(OutputStream os = Storage.getInstance().createOutputStream(prefix + ".mask.png")) {
                     ImageIO.getImageIO().save(generatedMask, os, ImageIO.FORMAT_PNG, 1);
@@ -550,6 +555,7 @@ public class SkinDesigner extends Lifecycle {
                         String fileName = (String)ee.getSource();
                         Image mask = Image.createImage(fileName);
                         maskLabel.setIcon(mask);
+                        useMask.setValue(true);
                         maskLabel.getParent().revalidate();
                         Util.copy(FileSystemStorage.getInstance().openInputStream(fileName),
                                 Storage.getInstance().createOutputStream(prefix + ".mask.png"));
@@ -566,9 +572,19 @@ public class SkinDesigner extends Lifecycle {
                 Log.e(err);
             }
         }
+        Button clearMask = new Button("Clear Mask");
+        clearMask.setUIID("SkinDesignerActionButton");
+        clearMask.addActionListener(e -> {
+            maskLabel.setIcon(null);
+            useMask.setValue(false);
+            Storage.getInstance().deleteStorageFile(prefix + ".mask.png");
+            if(maskLabel.getParent() != null) {
+                maskLabel.getParent().revalidate();
+            }
+        });
 
         Container actionButtons = FlowLayout.encloseCenter(aim, helpButton, saveButton);
-        Container detectionButtons = FlowLayout.encloseCenter(detectScreenButton, floodTolerance, maskPicker);
+        Container detectionButtons = FlowLayout.encloseCenter(detectScreenButton, floodTolerance, maskPicker, clearMask);
         Label detectionHint = new Label("Uses flood-fill from the screen center");
         detectionHint.setUIID("SkinDesignerFieldLabel");
         Container controls = BoxLayout.encloseY(
@@ -580,6 +596,7 @@ public class SkinDesigner extends Lifecycle {
                 labeledFieldTitle("Screen Detection"),
                 detectionHint,
                 detectionButtons,
+                BorderLayout.center(labeledFieldTitle("Use Screen Mask")).add(BorderLayout.EAST, useMask),
                 actionButtons
         );
         controls.setUIID("SkinDesignerCard");
@@ -605,7 +622,7 @@ public class SkinDesigner extends Lifecycle {
                 int width = img.getWidth();
                 int height = img.getHeight();
                 Image mask = maskLabel.getIcon();
-                if(mask != null && mask.getWidth() == width && mask.getHeight() == height) {
+                if(useMask.isValue() && mask != null && mask.getWidth() == width && mask.getHeight() == height) {
                     int[] maskRgb = mask.getRGB();
                     for(int i = 0 ; i < maskRgb.length ; i++) {
                         if(maskRgb[i] != 0xff000000) {
@@ -637,7 +654,7 @@ public class SkinDesigner extends Lifecycle {
                 Graphics g = m.getGraphics();
                 g.setColor(0);
                 Image mask = maskLabel.getIcon();
-                if(mask != null && mask.getWidth() == skinImage.getWidth() && mask.getHeight() == skinImage.getHeight()) {
+                if(useMask.isValue() && mask != null && mask.getWidth() == skinImage.getWidth() && mask.getHeight() == skinImage.getHeight()) {
                     int[] maskRgb = mask.getRGB();
                     int w = mask.getWidth();
                     int h = mask.getHeight();
@@ -715,10 +732,6 @@ public class SkinDesigner extends Lifecycle {
         int tail = 0;
         int seedIdx = seedY * width + seedX;
         int seedColor = src[seedIdx];
-        if(((seedColor >>> 24) & 0xff) < 16) {
-            ToastBar.showErrorMessage("Detected seed point is transparent. Adjust screen position first.");
-            return null;
-        }
         queue[tail++] = seedIdx;
         visited[seedIdx] = true;
         while(head < tail) {
@@ -763,8 +776,8 @@ public class SkinDesigner extends Lifecycle {
     private boolean colorMatch(int c1, int c2, int tolerance) {
         int a1 = (c1 >>> 24) & 0xff;
         int a2 = (c2 >>> 24) & 0xff;
-        if(a1 < 16) {
-            return false;
+        if(a2 < 16) {
+            return a1 < 16;
         }
         int r1 = (c1 >> 16) & 0xff;
         int g1 = (c1 >> 8) & 0xff;
