@@ -1117,7 +1117,7 @@ extern JAVA_OBJECT allocMultiArray(int* lengths, struct clazz* type, int primiti
         int __cn1InitLength = (length); \
         JAVA_ARRAY __cn1StackArray = (JAVA_ARRAY)CN1_SIMD_ALLOCA_BYTE(__cn1InitLength); \
         if (__cn1InitLength > 0) { \
-            memset(__cn1StackArray->data, 0, (size_t)__cn1InitLength * sizeof(JAVA_ARRAY_BYTE)); \
+            memset(__cn1StackArray->data, 0, (size_t)__cn1InitLength); \
         } \
         (JAVA_OBJECT)__cn1StackArray; \
     })
@@ -1144,7 +1144,7 @@ extern JAVA_OBJECT allocMultiArray(int* lengths, struct clazz* type, int primiti
         int __cn1InitLength = (length); \
         JAVA_ARRAY __cn1StackArray = (JAVA_ARRAY)CN1_SIMD_ALLOCA_BYTE(__cn1InitLength); \
         if (__cn1InitLength > 0) { \
-            memset(__cn1StackArray->data, (value), (size_t)__cn1InitLength * sizeof(JAVA_ARRAY_BYTE)); \
+            memset(__cn1StackArray->data, (value), (size_t)__cn1InitLength); \
         } \
         (JAVA_OBJECT)__cn1StackArray; \
     })
