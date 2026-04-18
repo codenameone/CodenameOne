@@ -1088,16 +1088,10 @@ extern void gcReleaseObj(JAVA_OBJECT o);
 extern JAVA_OBJECT allocArray(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type, int primitiveSize, int dim);
 extern JAVA_OBJECT allocArrayAligned(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type, int primitiveSize, int dim, int alignment);
 extern JAVA_OBJECT allocMultiArray(int* lengths, struct clazz* type, int primitiveSize, int dim);
-#define CN1_SIMD_STACK_ARRAY(length, arrayClass, primitiveSize, dim, alignment) \
+#define CN1_SIMD_STACK_PRIMITIVE_ARRAY(length, arrayClass, primitiveSize) \
     __extension__ ({ \
         int __cn1StackLength = (length); \
-        int __cn1RequestedAlignment = (alignment); \
-        if (__cn1RequestedAlignment < (int)sizeof(void*)) { \
-            __cn1RequestedAlignment = (int)sizeof(void*); \
-        } \
-        if ((__cn1RequestedAlignment & (__cn1RequestedAlignment - 1)) != 0) { \
-            __cn1RequestedAlignment = 16; \
-        } \
+        const int __cn1RequestedAlignment = 16; \
         int __cn1ActualSize = __cn1StackLength * (primitiveSize); \
         /* header + embedded data pointer slot + payload + alignment slack for the payload start */ \
         char* __cn1StackMem = (char*)__builtin_alloca(sizeof(struct JavaArrayPrototype) + sizeof(void*) + __cn1ActualSize + __cn1RequestedAlignment - 1); \
@@ -1105,7 +1099,7 @@ extern JAVA_OBJECT allocMultiArray(int* lengths, struct clazz* type, int primiti
         memset(__cn1StackArray, 0, sizeof(struct JavaArrayPrototype)); \
         __cn1StackArray->__codenameOneParentClsReference = (arrayClass); \
         __cn1StackArray->length = __cn1StackLength; \
-        __cn1StackArray->dimensions = (dim); \
+        __cn1StackArray->dimensions = 1; \
         __cn1StackArray->primitiveSize = (primitiveSize); \
         if (__cn1ActualSize > 0) { \
             char* __cn1Data = (char*)(&(__cn1StackArray->data)); \
@@ -1118,9 +1112,9 @@ extern JAVA_OBJECT allocMultiArray(int* lengths, struct clazz* type, int primiti
         } \
         (JAVA_OBJECT)__cn1StackArray; \
     })
-#define CN1_SIMD_ALLOCA_BYTE(length) CN1_SIMD_STACK_ARRAY((length), &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1, 16)
-#define CN1_SIMD_ALLOCA_INT(length) CN1_SIMD_STACK_ARRAY((length), &class_array1__JAVA_INT, sizeof(JAVA_ARRAY_INT), 1, 16)
-#define CN1_SIMD_ALLOCA_FLOAT(length) CN1_SIMD_STACK_ARRAY((length), &class_array1__JAVA_FLOAT, sizeof(JAVA_ARRAY_FLOAT), 1, 16)
+#define CN1_SIMD_ALLOCA_BYTE(length) CN1_SIMD_STACK_PRIMITIVE_ARRAY((length), &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE))
+#define CN1_SIMD_ALLOCA_INT(length) CN1_SIMD_STACK_PRIMITIVE_ARRAY((length), &class_array1__JAVA_INT, sizeof(JAVA_ARRAY_INT))
+#define CN1_SIMD_ALLOCA_FLOAT(length) CN1_SIMD_STACK_PRIMITIVE_ARRAY((length), &class_array1__JAVA_FLOAT, sizeof(JAVA_ARRAY_FLOAT))
 extern JAVA_OBJECT alloc2DArray(CODENAME_ONE_THREAD_STATE, int length1, int length2, struct clazz* parentType, struct clazz* childType, int primitiveSize);
 extern JAVA_OBJECT alloc3DArray(CODENAME_ONE_THREAD_STATE, int length1, int length2, int length3, struct clazz* parentType, struct clazz* childType, struct clazz* grandChildType, int primitiveSize);
 

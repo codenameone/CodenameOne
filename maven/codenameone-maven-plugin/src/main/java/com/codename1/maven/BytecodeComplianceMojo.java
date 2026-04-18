@@ -13,7 +13,18 @@ import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.FieldVisitor;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Type;
 import org.objectweb.asm.util.CheckClassAdapter;
+import org.objectweb.asm.tree.AbstractInsnNode;
+import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.InvokeDynamicInsnNode;
+import org.objectweb.asm.tree.MethodInsnNode;
+import org.objectweb.asm.tree.MethodNode;
+import org.objectweb.asm.tree.analysis.Analyzer;
+import org.objectweb.asm.tree.analysis.AnalyzerException;
+import org.objectweb.asm.tree.analysis.BasicInterpreter;
+import org.objectweb.asm.tree.analysis.BasicValue;
+import org.objectweb.asm.tree.analysis.Frame;
 
 import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
@@ -59,6 +70,7 @@ public class BytecodeComplianceMojo extends AbstractCN1Mojo {
 
     private static final int MAX_CLASS_MAJOR_VERSION = Opcodes.V17;
     private static final String JDK_API_REWRITE_HELPER_INTERNAL_NAME = "com/codename1/impl/JdkApiRewriteHelper";
+    private static final String SIMD_INTERNAL_NAME = "com/codename1/util/Simd";
     private static final Map<MethodRef, MethodRef> INVOCATION_REWRITE_RULES = createInvocationRewriteRules();
 
     private File complianceOutputFile;
@@ -75,6 +87,22 @@ public class BytecodeComplianceMojo extends AbstractCN1Mojo {
                 MethodRef.staticRef(JDK_API_REWRITE_HELPER_INTERNAL_NAME, "split", "(Ljava/lang/String;Ljava/lang/String;I)[Ljava/lang/String;")
         );
         return Collections.unmodifiableMap(rules);
+    }
+
+    private static boolean isSimdOwner(String owner) {
+        return owner != null
+                && ("com/codename1/util/Simd".equals(owner)
+                || "com/codename1/impl/ios/IOSSimd".equals(owner)
+                || "com/codename1/impl/javase/JavaSESimd".equals(owner));
+    }
+
+    private static boolean isSimdAllocaMethod(String owner, String name, String descriptor) {
+        if (!isSimdOwner(owner)) {
+            return false;
+        }
+        return ("allocaByte".equals(name) && "(I)[B".equals(descriptor))
+                || ("allocaInt".equals(name) && "(I)[I".equals(descriptor))
+                || ("allocaFloat".equals(name) && "(I)[F".equals(descriptor));
     }
 
     @Override
@@ -335,6 +363,7 @@ public class BytecodeComplianceMojo extends AbstractCN1Mojo {
                 try {
                     ClassReader reader = new ClassReader(inputStream);
                     reader.accept(new ComplianceScanner(classFile, outputDir, allowedIndex, projectAndDependencyIndex, violations), ClassReader.SKIP_FRAMES);
+                    addSimdAllocaViolations(classFile, outputDir, reader, violations);
                 } finally {
                     inputStream.close();
                 }
@@ -343,6 +372,207 @@ public class BytecodeComplianceMojo extends AbstractCN1Mojo {
             }
         }
         return violations;
+    }
+
+    private void addSimdAllocaViolations(File classFile, File outputDir, ClassReader reader, List<Violation> violations) throws IOException, MojoExecutionException {
+        ClassNode classNode = new ClassNode();
+        reader.accept(classNode, ClassReader.EXPAND_FRAMES);
+        for (MethodNode method : classNode.methods) {
+            if (method.instructions == null || method.instructions.size() == 0) {
+                continue;
+            }
+            Frame<BasicValue>[] frames;
+            try {
+                Analyzer<BasicValue> analyzer = new Analyzer<BasicValue>(new SimdAllocaInterpreter());
+                frames = analyzer.analyze(classNode.name, method);
+            } catch (AnalyzerException ex) {
+                throw new MojoExecutionException("Failed to analyze SIMD alloca usage for " + classFile + " in " + classNode.name + "#" + method.name + method.desc, ex);
+            }
+            for (AbstractInsnNode instruction = method.instructions.getFirst(); instruction != null; instruction = instruction.getNext()) {
+                int index = method.instructions.indexOf(instruction);
+                Frame<BasicValue> frame = frames[index];
+                if (frame == null) {
+                    continue;
+                }
+                int opcode = instruction.getOpcode();
+                if (opcode == Opcodes.ARETURN) {
+                    if (isAllocaValue(frame.getStack(frame.getStackSize() - 1))) {
+                        addViolation(violations, classFile, outputDir, classNode.name, method, "SIMD alloca value returned from method");
+                    }
+                    continue;
+                }
+                if (opcode == Opcodes.PUTSTATIC) {
+                    if (isAllocaValue(frame.getStack(frame.getStackSize() - 1))) {
+                        addViolation(violations, classFile, outputDir, classNode.name, method, "SIMD alloca value stored into static field");
+                    }
+                    continue;
+                }
+                if (opcode == Opcodes.PUTFIELD) {
+                    if (isAllocaValue(frame.getStack(frame.getStackSize() - 1))) {
+                        addViolation(violations, classFile, outputDir, classNode.name, method, "SIMD alloca value stored into instance field");
+                    }
+                    continue;
+                }
+                if (opcode == Opcodes.AASTORE) {
+                    if (isAllocaValue(frame.getStack(frame.getStackSize() - 1))) {
+                        addViolation(violations, classFile, outputDir, classNode.name, method, "SIMD alloca value stored into object array");
+                    }
+                    continue;
+                }
+                if (instruction instanceof MethodInsnNode) {
+                    MethodInsnNode methodInsn = (MethodInsnNode) instruction;
+                    int argumentCount = Type.getArgumentTypes(methodInsn.desc).length;
+                    boolean usesAlloca = false;
+                    for (int i = 0; i < argumentCount; i++) {
+                        if (isAllocaValue(frame.getStack(frame.getStackSize() - 1 - i))) {
+                            usesAlloca = true;
+                            break;
+                        }
+                    }
+                    if (!usesAlloca && opcode != Opcodes.INVOKESTATIC
+                            && isAllocaValue(frame.getStack(frame.getStackSize() - 1 - argumentCount))) {
+                        usesAlloca = true;
+                    }
+                    if (usesAlloca && !isSimdOwner(methodInsn.owner)) {
+                        addViolation(violations, classFile, outputDir, classNode.name, method,
+                                "SIMD alloca value passed to non-Simd method " + methodInsn.owner + "#" + methodInsn.name + methodInsn.desc);
+                    }
+                    continue;
+                }
+                if (instruction instanceof InvokeDynamicInsnNode) {
+                    Type[] args = Type.getArgumentTypes(((InvokeDynamicInsnNode) instruction).desc);
+                    for (int i = 0; i < args.length; i++) {
+                        if (isAllocaValue(frame.getStack(frame.getStackSize() - 1 - i))) {
+                            addViolation(violations, classFile, outputDir, classNode.name, method, "SIMD alloca value passed to invokedynamic");
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private void addViolation(List<Violation> violations, File classFile, File outputDir, String sourceClass, MethodNode method, String referencedMember) {
+        String relativePath = classFile.getAbsolutePath().replace(outputDir.getAbsolutePath(), "");
+        if (relativePath.startsWith(File.separator)) {
+            relativePath = relativePath.substring(1);
+        }
+        violations.add(new Violation(sourceClass, method.name + method.desc, referencedMember,
+                "Keep SIMD alloca scratch arrays method-local and only pass them to Simd methods.", relativePath));
+    }
+
+    private static boolean isAllocaValue(BasicValue value) {
+        return value instanceof SimdAllocaValue && ((SimdAllocaValue) value).alloca;
+    }
+
+    private static final class SimdAllocaValue extends BasicValue {
+        private final boolean alloca;
+
+        private SimdAllocaValue(Type type, boolean alloca) {
+            super(type);
+            this.alloca = alloca;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (!(obj instanceof SimdAllocaValue)) {
+                return false;
+            }
+            SimdAllocaValue other = (SimdAllocaValue) obj;
+            Type type = getType();
+            Type otherType = other.getType();
+            if (type == null ? otherType != null : !type.equals(otherType)) {
+                return false;
+            }
+            return alloca == other.alloca;
+        }
+
+        @Override
+        public int hashCode() {
+            Type type = getType();
+            return 31 * (type != null ? type.hashCode() : 0) + (alloca ? 1 : 0);
+        }
+    }
+
+    private static final class SimdAllocaInterpreter extends BasicInterpreter {
+        private SimdAllocaInterpreter() {
+            super(Opcodes.ASM9);
+        }
+
+        @Override
+        public BasicValue newValue(Type type) {
+            BasicValue base = super.newValue(type);
+            if (base == null || base == BasicValue.UNINITIALIZED_VALUE) {
+                return base;
+            }
+            return new SimdAllocaValue(base.getType(), false);
+        }
+
+        @Override
+        public BasicValue copyOperation(AbstractInsnNode insn, BasicValue value) throws AnalyzerException {
+            return value;
+        }
+
+        @Override
+        public BasicValue unaryOperation(AbstractInsnNode insn, BasicValue value) throws AnalyzerException {
+            BasicValue base = super.unaryOperation(insn, value);
+            if (base == null) {
+                return null;
+            }
+            return new SimdAllocaValue(base.getType(), isAllocaValue(value));
+        }
+
+        @Override
+        public BasicValue binaryOperation(AbstractInsnNode insn, BasicValue value1, BasicValue value2) throws AnalyzerException {
+            BasicValue base = super.binaryOperation(insn, value1, value2);
+            if (base == null) {
+                return null;
+            }
+            return new SimdAllocaValue(base.getType(), isAllocaValue(value1) || isAllocaValue(value2));
+        }
+
+        @Override
+        public BasicValue ternaryOperation(AbstractInsnNode insn, BasicValue value1, BasicValue value2, BasicValue value3) throws AnalyzerException {
+            BasicValue base = super.ternaryOperation(insn, value1, value2, value3);
+            if (base == null) {
+                return null;
+            }
+            return new SimdAllocaValue(base.getType(), isAllocaValue(value1) || isAllocaValue(value2) || isAllocaValue(value3));
+        }
+
+        @Override
+        public BasicValue naryOperation(AbstractInsnNode insn, List<? extends BasicValue> values) throws AnalyzerException {
+            if (insn instanceof MethodInsnNode) {
+                MethodInsnNode methodInsn = (MethodInsnNode) insn;
+                if (isSimdAllocaMethod(methodInsn.owner, methodInsn.name, methodInsn.desc)) {
+                    return new SimdAllocaValue(Type.getReturnType(methodInsn.desc), true);
+                }
+            }
+            BasicValue base = super.naryOperation(insn, values);
+            if (base == null) {
+                return null;
+            }
+            boolean alloca = false;
+            for (BasicValue value : values) {
+                if (isAllocaValue(value)) {
+                    alloca = true;
+                    break;
+                }
+            }
+            return new SimdAllocaValue(base.getType(), alloca);
+        }
+
+        @Override
+        public BasicValue merge(BasicValue value1, BasicValue value2) {
+            BasicValue base = super.merge(value1, value2);
+            if (base == null) {
+                return null;
+            }
+            return new SimdAllocaValue(base.getType(), isAllocaValue(value1) || isAllocaValue(value2));
+        }
     }
 
     private void collectClassFiles(File file, List<File> out) {

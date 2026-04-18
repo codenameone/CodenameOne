@@ -60,26 +60,23 @@ public class Simd {
         return new float[size];
     }
 
-    /// Allocates a scratch byte array for temporary SIMD work.
-    /// On ParparVM this may be lowered to a stack-backed faux array, so callers
-    /// should keep it method-local and avoid returning or storing it beyond the
-    /// current method.
+    /// @deprecated This is a special scratch-allocation API. On ParparVM this may
+    /// be lowered to a stack-backed faux array, so callers MUST keep it method-local
+    /// and MUST be extremely cautious when using it.
     public byte[] allocaByte(int size) {
         return allocByte(size);
     }
 
-    /// Allocates a scratch int array for temporary SIMD work.
-    /// On ParparVM this may be lowered to a stack-backed faux array, so callers
-    /// should keep it method-local and avoid returning or storing it beyond the
-    /// current method.
+    /// @deprecated This is a special scratch-allocation API. On ParparVM this may
+    /// be lowered to a stack-backed faux array, so callers MUST keep it method-local
+    /// and MUST be extremely cautious when using it.
     public int[] allocaInt(int size) {
         return allocInt(size);
     }
 
-    /// Allocates a scratch float array for temporary SIMD work.
-    /// On ParparVM this may be lowered to a stack-backed faux array, so callers
-    /// should keep it method-local and avoid returning or storing it beyond the
-    /// current method.
+    /// @deprecated This is a special scratch-allocation API. On ParparVM this may
+    /// be lowered to a stack-backed faux array, so callers MUST keep it method-local
+    /// and MUST be extremely cautious when using it.
     public float[] allocaFloat(int size) {
         return allocFloat(size);
     }

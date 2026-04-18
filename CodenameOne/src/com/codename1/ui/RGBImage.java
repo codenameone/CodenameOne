@@ -159,13 +159,17 @@ public class RGBImage extends Image {
             }
             for (int offset = 0; offset < arr.length; offset += blockSize) {
                 int length = Math.min(blockSize, arr.length - offset);
-                System.arraycopy(arr, offset, scratch, srcOffset, length);
+                for (int i = 0; i < length; i++) {
+                    scratch[srcOffset + i] = arr[offset + i];
+                }
                 simd.shrLogical(scratch, srcOffset, 24, scratch, workOffset, length);
                 simd.cmpEq(scratch, workOffset, scratch, zeroOffset, scratchBytes, 0, length);
                 simd.and(scratch, srcOffset, scratch, maskOffset, scratch, workOffset, length);
                 simd.or(scratch, workOffset, scratch, alphaOffset, scratch, workOffset, length);
                 simd.select(scratchBytes, 0, scratch, srcOffset, scratch, workOffset, scratch, srcOffset, length);
-                System.arraycopy(scratch, srcOffset, arr, offset, length);
+                for (int i = 0; i < length; i++) {
+                    arr[offset + i] = scratch[srcOffset + i];
+                }
             }
         } else {
             int alphaInt = (((int) alpha) << 24) & 0xff000000;
