@@ -409,23 +409,27 @@ public final class PlaygroundSyntaxMatrixHarness {
     // ------------------------------------------------------------------
     private static void addMethodReferences(List<Case> cases) {
         String cat = "method_ref";
-        cases.add(new Case(cat, "static_type", ui(""
+        // Method refs are rewritten to one-arg lambdas before the parser sees
+        // them. This handles bound-instance and "instance-looking class"
+        // receivers used with known SAM call sites; unbound instance refs
+        // and zero-arg targets like Supplier still fail.
+        cases.add(new Case(cat, "bound_known_sam_static", ui(""
                 + "Button b = new Button(\"Go\");\n"
                 + "b.addActionListener(System.out::println);\n"
-                + "root.add(b);"), ExpectedOutcome.PARSE_ERROR, "Parse error:"));
+                + "root.add(b);"), ExpectedOutcome.SUCCESS, null));
         cases.add(new Case(cat, "bound_instance", ui(""
                 + "String prefix = \"X:\";\n"
                 + "Button b = new Button(\"Go\");\n"
                 + "b.addActionListener(prefix::concat);\n"
-                + "root.add(b);"), ExpectedOutcome.PARSE_ERROR, "Parse error:"));
-        cases.add(new Case(cat, "constructor_ref", ui(""
+                + "root.add(b);"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "constructor_ref_zero_arg_unsupported", ui(""
                 + "import java.util.function.*;\n"
                 + "Supplier<StringBuilder> ctor = StringBuilder::new;\n"
-                + "root.add(new Label(ctor.get().toString()));"), ExpectedOutcome.PARSE_ERROR, "Parse error:"));
-        cases.add(new Case(cat, "unbound_instance", ui(""
+                + "root.add(new Label(ctor.get().toString()));"), ExpectedOutcome.EVAL_ERROR, null));
+        cases.add(new Case(cat, "unbound_instance_unsupported", ui(""
                 + "import java.util.function.*;\n"
                 + "Function<String, Integer> len = String::length;\n"
-                + "root.add(new Label(\"n=\" + len.apply(\"abc\")));"), ExpectedOutcome.PARSE_ERROR, "Parse error:"));
+                + "root.add(new Label(\"n=\" + len.apply(\"abc\")));"), ExpectedOutcome.EVAL_ERROR, null));
     }
 
     // ------------------------------------------------------------------

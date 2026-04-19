@@ -182,12 +182,85 @@ final class PlaygroundRunner {
 
     private String rewriteClassModel(String script) {
         String rewritten = rewriteInlineAutoCloseableClasses(script);
+        // Method references must be rewritten BEFORE the lambda passes so the
+        // resulting lambdas get the SAM-binding treatment.
+        rewritten = rewriteMethodReferences(rewritten);
         rewritten = rewriteKnownSamCalls(rewritten);
         rewritten = rewriteLambdaArguments(rewritten);
         rewritten = rewriteTopLevelLambdas(rewritten);
         rewritten = rewriteSwitchExpressions(rewritten);
         rewritten = rewriteArrowSwitchStatements(rewritten);
         return rewritten;
+    }
+
+    /**
+     * Rewrites Java 8 method references to equivalent single-arg lambdas
+     * before BSH parses the script. The lexer does not tokenise {@code ::}
+     * so without this rewrite any method-reference site parse-errors.
+     *
+     * <p>We can't infer the target SAM's arity from syntax alone (e.g.
+     * {@code Supplier<X> s = X::new} wants zero args, {@code Function<X,Y>}
+     * wants one). We emit a one-arg lambda which suits the common cases —
+     * {@code addActionListener(obj::method)}, {@code stream.forEach(obj::m)},
+     * etc. Zero-arg targets like {@code Supplier} still parse-error today.
+     */
+    private String rewriteMethodReferences(String script) {
+        StringBuilder out = new StringBuilder();
+        int i = 0;
+        int last = 0;
+        while (i + 1 < script.length()) {
+            char ch = script.charAt(i);
+            if (ch == '"' || ch == '\'') { i = skipQuoted(script, i) + 1; continue; }
+            if (startsLineComment(script, i)) { i = skipLineComment(script, i) + 1; continue; }
+            if (startsBlockComment(script, i)) { i = skipBlockComment(script, i) + 1; continue; }
+            if (!(ch == ':' && script.charAt(i + 1) == ':')) { i++; continue; }
+            int receiverStart = findMethodRefReceiverStart(script, i);
+            if (receiverStart < 0) { i += 2; continue; }
+            int targetStart = i + 2;
+            int targetEnd = targetStart;
+            while (targetEnd < script.length() && isIdentifierPart(script.charAt(targetEnd))) targetEnd++;
+            if (targetStart == targetEnd) { i += 2; continue; }
+            String receiver = script.substring(receiverStart, i).trim();
+            String target = script.substring(targetStart, targetEnd);
+            if (receiver.isEmpty()) { i += 2; continue; }
+            String replacement;
+            if ("new".equals(target)) {
+                replacement = "((__mref_a) -> new " + receiver + "(__mref_a))";
+            } else {
+                replacement = "((__mref_a) -> " + receiver + "." + target + "(__mref_a))";
+            }
+            out.append(script, last, receiverStart).append(replacement);
+            last = targetEnd;
+            i = last;
+        }
+        out.append(script.substring(last));
+        return out.toString();
+    }
+
+    /** Walks back from a {@code ::} position to find the receiver expression
+     * start. A receiver may be a dotted class name (System.out), a single
+     * identifier, or — eventually — a parenthesised expression. */
+    private int findMethodRefReceiverStart(String script, int doubleColonPos) {
+        int j = doubleColonPos - 1;
+        while (j >= 0 && Character.isWhitespace(script.charAt(j))) j--;
+        if (j < 0) return -1;
+        // Receiver is a chain of identifiers separated by dots, or a single
+        // identifier. We don't yet support parenthesised receivers.
+        if (!isIdentifierPart(script.charAt(j))) return -1;
+        int end = j + 1;
+        while (j >= 0) {
+            while (j >= 0 && isIdentifierPart(script.charAt(j))) j--;
+            int wordStart = j + 1;
+            if (wordStart >= end) return -1;
+            if (j < 0 || script.charAt(j) != '.') {
+                // boundary — receiver starts at wordStart
+                if (!isIdentifierStart(script.charAt(wordStart))) return -1;
+                return wordStart;
+            }
+            // include the dot and continue back
+            j--;
+        }
+        return -1;
     }
 
     /**
