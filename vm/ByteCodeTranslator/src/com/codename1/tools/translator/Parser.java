@@ -971,13 +971,21 @@ public class Parser extends ClassVisitor {
                 // ... assign fields ...
                 // RETURN
 
-                ctor.addInstruction(Opcodes.ALOAD); // 25
+                // NOTE: do NOT also emit `addInstruction(Opcodes.ALOAD)` here.
+                // `addVariableOperation(Opcodes.ALOAD, 0)` is the canonical aload_0.
+                // Emitting both produces a BasicInstruction with opcode=ALOAD and value=0
+                // that the C backend (iOS) silently ignores but the JavaScript backend
+                // translates as a real `push locals[0]`. The extra push corrupts the
+                // operand stack simulation: invokespecial/putfield/invokevirtual then
+                // pop from the wrong positions, producing method calls with the wrong
+                // target and shifted arguments (e.g. lambda `run()` ending up invoking
+                // its captured method on the captured Form rather than on the
+                // enclosing `this`, surfacing as VIRTUAL_FAIL missing_interface_default_method).
                 ctor.addVariableOperation(Opcodes.ALOAD, 0);
                 ctor.addInvoke(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
 
                 int varIndex = 1;
                 for (int i = 0; i < capturedArgs.length; i++) {
-                    ctor.addInstruction(Opcodes.ALOAD);
                     ctor.addVariableOperation(Opcodes.ALOAD, 0); // this
 
                     Type t = capturedArgs[i];
@@ -1016,8 +1024,8 @@ public class Parser extends ClassVisitor {
                 }
 
                 // Load captured args
+                // Same caveat as the constructor: do not also emit addInstruction(Opcodes.ALOAD).
                 for (int i = 0; i < capturedArgs.length; i++) {
-                    interfaceMethod.addInstruction(Opcodes.ALOAD);
                     interfaceMethod.addVariableOperation(Opcodes.ALOAD, 0);
                     String fieldName = "arg$" + (i + 1);
                     interfaceMethod.addField(lambdaClass, Opcodes.GETFIELD, lambdaClassName, fieldName, capturedArgs[i].getDescriptor());

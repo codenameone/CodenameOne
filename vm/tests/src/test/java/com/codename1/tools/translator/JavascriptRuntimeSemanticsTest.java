@@ -128,6 +128,22 @@ class JavascriptRuntimeSemanticsTest {
 
     @ParameterizedTest
     @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void preservesCapturingLambdaDispatchInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsCapturingLambdaDispatchApp.java", "JsCapturingLambdaDispatchApp");
+
+        // base(11) + seed(7)*3 + "sheet".length()(5) = 37. If the lambda synthesis
+        // emits spurious aload_0 BasicInstructions (the pre-fix Parser bug), the
+        // lambda's run() method dispatches on the wrong captured field and either
+        // throws a VIRTUAL_FAIL or records the wrong value in out[0].
+        assertEquals(37, result.result,
+                "Translated lambda run() must dispatch on its first capture (enclosing this), "
+                        + "not shift down to subsequent captures. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
     void preservesIteratorCoordinateCopyWithHardcodedSegmentCountsInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
         WorkerRunResult result = translateAndRunFixture(config, "JsIteratorCoordinateCopyApp.java", "JsIteratorCoordinateCopyApp");
 
