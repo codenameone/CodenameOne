@@ -640,12 +640,9 @@ public final class PlaygroundSyntaxMatrixHarness {
     // Category: Records (Java 14+)
     // ------------------------------------------------------------------
     private static void addRecords(List<Case> cases) {
-        // `record Point(...)` clashes with auto-imported com.codename1.ui.geom.Point
-        // when assigned to a `Point p` variable; Java-class typing wins. Use a
-        // non-conflicting name for general record use.
-        cases.add(new Case("record", "name_collides_with_cn1_type",
+        cases.add(new Case("record", "shadow_imported_cn1_type",
                 ui("record Point(int x, int y) {} Point p = new Point(1,2); root.add(new Label(\"x=\" + p.x()));"),
-                ExpectedOutcome.EVAL_ERROR, "Cannot cast"));
+                ExpectedOutcome.SUCCESS, null));
         cases.add(new Case("record", "single_component",
                 ui("record Named(String n) {} Named o = new Named(\"hello\"); root.add(new Label(o.n()));"),
                 ExpectedOutcome.SUCCESS, null));

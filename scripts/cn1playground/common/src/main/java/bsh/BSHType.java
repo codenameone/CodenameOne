@@ -149,6 +149,14 @@ class BSHType extends SimpleNode implements BshClassManager.Listener {
         Node node = getTypeNode();
         if ( node instanceof BSHPrimitiveType )
             baseType = ((BSHPrimitiveType)node).getType();
+        else if (resolvesToScriptedClass(node, callstack)) {
+            // A locally-declared scripted class shadows any imported Java
+            // class of the same simple name (e.g. a user-declared
+            // `record Point(...)` should win over com.codename1.ui.geom.Point).
+            // We use Object.class so the assignment is loose; runtime checks
+            // happen at method-call sites.
+            baseType = Object.class;
+        }
         else
             try {
             baseType = ((BSHAmbiguousName)node).toClass(
@@ -157,12 +165,6 @@ class BSHType extends SimpleNode implements BshClassManager.Listener {
                 // Assuming generics raw type
                 if (node.getText().trim().length() == 1
                         && e.getCause() instanceof ClassNotFoundException)
-                    baseType = Object.class;
-                else if (resolvesToScriptedClass(node, callstack))
-                    // Typed declarations against a script-declared class
-                    // (e.g. "Pair<String> p = ...") fall back to Object so
-                    // the assignment proceeds — the value will be a
-                    // ScriptedInstance which is assignable to Object.
                     baseType = Object.class;
                 else
                     throw e; // roll up unhandled error
