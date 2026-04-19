@@ -990,6 +990,20 @@ class Name implements java.io.Serializable
             return meth.invoke( args, interpreter, callstack, callerInfo, overrideChild );
         }
 
+        // super(args) inside a scripted-class constructor: forward to the
+        // matching ctor on the parent ScriptedClass.
+        if ("super".equals(methodName)) {
+            ScriptedInstance scriptedThis = findScriptedThis(callstack);
+            if (scriptedThis != null && scriptedThis.getScriptedClass().getParent() != null) {
+                ScriptedClass parent = scriptedThis.getScriptedClass().getParent();
+                ScriptedClass.MethodTemplate ctor = parent.findConstructorTemplate(args);
+                if (ctor != null) {
+                    BshMethod bound = ctor.bind(scriptedThis.getInstanceNameSpace());
+                    return bound.invoke(args, interpreter, callstack, callerInfo, false);
+                }
+            }
+        }
+
         // Look for a BeanShell command
         return namespace.invokeCommand(methodName, args, interpreter, callstack, callerInfo);
     }

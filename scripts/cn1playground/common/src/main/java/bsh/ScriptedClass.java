@@ -353,6 +353,11 @@ public final class ScriptedClass {
     }
 
     private MethodTemplate pickConstructor(Object[] args) {
+        return findConstructorTemplate(args);
+    }
+
+    /** Public lookup so super(args) dispatch can reach a parent ctor. */
+    public MethodTemplate findConstructorTemplate(Object[] args) {
         int arity = args == null ? 0 : args.length;
         for (MethodTemplate c : constructors) {
             if (c.paramCount == arity) return c;

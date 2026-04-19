@@ -83,6 +83,7 @@ import bsh.cn1.gen.GeneratedAccess_java_time_temporal;
 import bsh.cn1.gen.GeneratedAccess_java_util;
 import bsh.cn1.gen.GeneratedAccess_java_util_concurrent;
 import bsh.cn1.gen.GeneratedAccess_java_util_function;
+import bsh.cn1.gen.GeneratedAccess_java_util_stream;
 
 /**
  * Generated registry. Re-run tools/generate-cn1-access-registry.sh after updating the CN1 sources.
@@ -808,7 +809,11 @@ public final class GeneratedCN1Access implements CN1Access {
         "java.util.function.Function",
         "java.util.function.Predicate",
         "java.util.function.Supplier",
-        "java.util.function.UnaryOperator"
+        "java.util.function.UnaryOperator",
+        "java.util.stream.BaseStream",
+        "java.util.stream.Collector",
+        "java.util.stream.Collectors",
+        "java.util.stream.Stream"
     };
 
     private static final Map<String, Class<?>> CLASS_INDEX = buildClassIndex();
@@ -1584,6 +1589,10 @@ public final class GeneratedCN1Access implements CN1Access {
         index.put("java.util.function.Predicate", java.util.function.Predicate.class);
         index.put("java.util.function.Supplier", java.util.function.Supplier.class);
         index.put("java.util.function.UnaryOperator", java.util.function.UnaryOperator.class);
+        index.put("java.util.stream.BaseStream", java.util.stream.BaseStream.class);
+        index.put("java.util.stream.Collector", java.util.stream.Collector.class);
+        index.put("java.util.stream.Collectors", java.util.stream.Collectors.class);
+        index.put("java.util.stream.Stream", java.util.stream.Stream.class);
     }
 
     private static Map<String, String[]> buildMethodIndex() {
@@ -2353,6 +2362,10 @@ public final class GeneratedCN1Access implements CN1Access {
         index.put("java.util.function.Predicate", splitMembers(""));
         index.put("java.util.function.Supplier", splitMembers(""));
         index.put("java.util.function.UnaryOperator", splitMembers(""));
+        index.put("java.util.stream.BaseStream", splitMembers(""));
+        index.put("java.util.stream.Collector", splitMembers(""));
+        index.put("java.util.stream.Collectors", splitMembers(""));
+        index.put("java.util.stream.Stream", splitMembers(""));
     }
 
     private static Map<String, String[]> buildFieldIndex() {
@@ -3122,6 +3135,10 @@ public final class GeneratedCN1Access implements CN1Access {
         index.put("java.util.function.Predicate", splitMembers(""));
         index.put("java.util.function.Supplier", splitMembers(""));
         index.put("java.util.function.UnaryOperator", splitMembers(""));
+        index.put("java.util.stream.BaseStream", splitMembers(""));
+        index.put("java.util.stream.Collector", splitMembers(""));
+        index.put("java.util.stream.Collectors", splitMembers(""));
+        index.put("java.util.stream.Stream", splitMembers(""));
     }
 
     private GeneratedCN1Access() {
@@ -3387,6 +3404,9 @@ public final class GeneratedCN1Access implements CN1Access {
         if ("java.util.function".equals(packageName)) {
             return GeneratedAccess_java_util_function.construct(type, args);
         }
+        if ("java.util.stream".equals(packageName)) {
+            return GeneratedAccess_java_util_stream.construct(type, args);
+        }
         throw unsupportedConstruct(type, args);
     }
 
@@ -3629,6 +3649,9 @@ public final class GeneratedCN1Access implements CN1Access {
         }
         if ("java.util.function".equals(packageName)) {
             return GeneratedAccess_java_util_function.invokeStatic(type, name, args);
+        }
+        if ("java.util.stream".equals(packageName)) {
+            return GeneratedAccess_java_util_stream.invokeStatic(type, name, args);
         }
         throw unsupportedStatic(type, name, args);
     }
@@ -4034,6 +4057,11 @@ public final class GeneratedCN1Access implements CN1Access {
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
+        try {
+            return GeneratedAccess_java_util_stream.invoke(target, name, args);
+        } catch (CN1AccessException ex) {
+            unsupported = ex;
+        }
         if (unsupported != null) {
             throw unsupported;
         }
@@ -4291,6 +4319,9 @@ public final class GeneratedCN1Access implements CN1Access {
         }
         if ("java.util.function".equals(packageName)) {
             return GeneratedAccess_java_util_function.getStaticField(type, name);
+        }
+        if ("java.util.stream".equals(packageName)) {
+            return GeneratedAccess_java_util_stream.getStaticField(type, name);
         }
         throw unsupportedStaticField(type, name);
     }
@@ -4693,6 +4724,11 @@ public final class GeneratedCN1Access implements CN1Access {
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
+        try {
+            return GeneratedAccess_java_util_stream.getField(target, name);
+        } catch (CN1AccessException ex) {
+            unsupported = ex;
+        }
         if (unsupported != null) {
             throw unsupported;
         }
@@ -5016,6 +5052,10 @@ public final class GeneratedCN1Access implements CN1Access {
         }
         if ("java.util.function".equals(packageName)) {
             GeneratedAccess_java_util_function.setStaticField(type, name, value);
+            return;
+        }
+        if ("java.util.stream".equals(packageName)) {
+            GeneratedAccess_java_util_stream.setStaticField(type, name, value);
             return;
         }
         throw unsupportedStaticFieldWrite(type, name, value);
@@ -5494,6 +5534,12 @@ public final class GeneratedCN1Access implements CN1Access {
         }
         try {
             GeneratedAccess_java_util_function.setField(target, name, value);
+            return;
+        } catch (CN1AccessException ex) {
+            unsupported = ex;
+        }
+        try {
+            GeneratedAccess_java_util_stream.setField(target, name, value);
             return;
         } catch (CN1AccessException ex) {
             unsupported = ex;

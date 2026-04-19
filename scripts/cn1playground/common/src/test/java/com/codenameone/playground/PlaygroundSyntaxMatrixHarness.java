@@ -174,6 +174,14 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "class C { String label(int x) { String s = switch (x) { case 1 -> \"one\"; default -> \"?\"; }; return s; } }\n"
                 + "C c = new C();\n"
                 + "root.add(new Label(c.label(1)));"), ExpectedOutcome.SUCCESS, null));
+        // Streams aren't viable: CN1's java.util.Collection backport doesn't
+        // expose stream(), so even with java.util.stream.* in the registry
+        // there's no `.stream()` entry point. Documented as out-of-scope.
+        cases.add(new Case(cat, "stream_unsupported", ui(""
+                + "import java.util.*;\n"
+                + "List<String> items = new ArrayList<>();\n"
+                + "items.add(\"a\");\n"
+                + "items.stream().count();"), ExpectedOutcome.EVAL_ERROR, "stream"));
         cases.add(new Case(cat, "lambda_method_ref_combo", ui(""
                 + "import java.util.function.*;\n"
                 + "Predicate<String> nonEmpty = s -> s.length() > 0;\n"
@@ -614,6 +622,11 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "class Derived extends Base { int v() { return super.v() + 5; } }\n"
                 + "Derived d = new Derived();\n"
                 + "root.add(new Label(\"v=\" + d.v()));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "super_constructor_call", ui(""
+                + "class Base { int x; Base(int v) { x = v; } }\n"
+                + "class Derived extends Base { int y; Derived(int v) { super(v); y = v * 2; } }\n"
+                + "Derived d = new Derived(7);\n"
+                + "root.add(new Label(\"x=\" + d.x + \" y=\" + d.y));"), ExpectedOutcome.SUCCESS, null));
         cases.add(new Case(cat, "two_instances_independent", ui(""
                 + "class C { int x; C(int v) { x = v; } int get() { return x; } }\n"
                 + "C a = new C(1);\n"

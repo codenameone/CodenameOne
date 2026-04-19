@@ -1056,8 +1056,7 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
     private static boolean isSupportedJavaDispatchPackage(String packageName) {
         return packageName.startsWith("java.")
                 && !isPackageOrChild(packageName, "java.lang.annotation")
-                && !isPackageOrChild(packageName, "java.lang.invoke")
-                && !isPackageOrChild(packageName, "java.util.stream");
+                && !isPackageOrChild(packageName, "java.lang.invoke");
     }
 
     private static boolean isSupportedType(ApiType type) {
@@ -1085,8 +1084,7 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
                 && !name.startsWith("java.net.")
                 && !name.startsWith("java.nio.")
                 && !name.startsWith("java.security.")
-                && !name.startsWith("java.util.concurrent.")
-                && !name.startsWith("java.util.stream.");
+                && !name.startsWith("java.util.concurrent.");
     }
 
     private static boolean isPublicRuntimeType(String className) {
