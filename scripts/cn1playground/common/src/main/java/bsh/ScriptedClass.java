@@ -118,6 +118,22 @@ public final class ScriptedClass {
                     } else {
                         instanceMethods.add(new MethodTemplate(mdecl));
                     }
+                } else if (child instanceof BSHClassDeclaration) {
+                    // Nested static class declaration. We build it eagerly
+                    // and bind it in the parent's static namespace so that
+                    // `Outer.Inner` resolution finds it. Only `static` nested
+                    // classes are supported — non-static inner classes need
+                    // an enclosing-instance reference which we don't model.
+                    BSHClassDeclaration nested = (BSHClassDeclaration) child;
+                    if (nested.modifiers != null
+                            && nested.modifiers.hasModifier("static")) {
+                        callstack.push(staticNs);
+                        try {
+                            child.eval(callstack, interpreter);
+                        } finally {
+                            callstack.pop();
+                        }
+                    }
                 } else if (child instanceof BSHTypedVariableDeclaration) {
                     BSHTypedVariableDeclaration fdecl = (BSHTypedVariableDeclaration) child;
                     boolean isStatic = fdecl.modifiers != null

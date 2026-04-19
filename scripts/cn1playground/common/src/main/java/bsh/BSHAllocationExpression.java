@@ -143,17 +143,39 @@ class BSHAllocationExpression extends SimpleNode
         String simpleName = rawName;
         int lt = simpleName.indexOf('<');
         if (lt >= 0) simpleName = simpleName.substring(0, lt);
-        // Names like "Outer.Inner" are not yet supported by the scripted class
-        // runtime; fall through to Java-class resolution.
-        if (simpleName.indexOf('.') >= 0) return null;
-        try {
-            NameSpace ns = callstack.top();
-            Object v = ns.getVariable(simpleName);
-            if (v instanceof ScriptedClass) return v;
-        } catch (UtilEvalError ex) {
-            // not found — caller falls back to Java class resolution
+        // Dotted names like "Outer.Inner": resolve the head as a
+        // ScriptedClass and walk through nested classes via the static
+        // namespace of each enclosing class. We split manually because
+        // String.split(regex) is not available on CN1's restricted String.
+        java.util.List<String> partsList = new java.util.ArrayList<String>();
+        int from = 0;
+        for (int j = 0; j < simpleName.length(); j++) {
+            if (simpleName.charAt(j) == '.') {
+                partsList.add(simpleName.substring(from, j));
+                from = j + 1;
+            }
         }
-        return null;
+        partsList.add(simpleName.substring(from));
+        String[] parts = partsList.toArray(new String[partsList.size()]);
+        if (parts.length == 0) return null;
+        ScriptedClass current;
+        try {
+            Object v = callstack.top().getVariable(parts[0]);
+            if (!(v instanceof ScriptedClass)) return null;
+            current = (ScriptedClass) v;
+        } catch (UtilEvalError ex) {
+            return null;
+        }
+        for (int i = 1; i < parts.length; i++) {
+            try {
+                Object next = current.getStaticNameSpace().getVariable(parts[i]);
+                if (!(next instanceof ScriptedClass)) return null;
+                current = (ScriptedClass) next;
+            } catch (UtilEvalError ex) {
+                return null;
+            }
+        }
+        return current;
     }
 
     Object constructFromEnclosingInstance(Object obj, CallStack callstack,

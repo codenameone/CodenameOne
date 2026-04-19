@@ -530,7 +530,7 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "root.add(new Label(c.get()));"), ExpectedOutcome.SUCCESS, null));
         cases.add(new Case(cat, "static_inner", ui(""
                 + "class Outer { static class Inner { String label() { return \"ok\"; } } }\n"
-                + "root.add(new Label(new Outer.Inner().label()));"), ExpectedOutcome.EVAL_ERROR, null));
+                + "root.add(new Label(new Outer.Inner().label()));"), ExpectedOutcome.SUCCESS, null));
         cases.add(new Case(cat, "generic_class_usage", ui(""
                 + "class Pair<T> { private final T value; Pair(T value) { this.value = value; } T get() { return value; } }\n"
                 + "Pair<String> p = new Pair<String>(\"generic-ok\");\n"
@@ -590,7 +590,7 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "root.add(b);"), ExpectedOutcome.SUCCESS, null));
         cases.add(new Case(cat, "inner_anonymous_runnable", ui(""
                 + "Runnable r = new Runnable() { public void run() {} };\n"
-                + "root.add(new Label(\"ok\"));"), ExpectedOutcome.EVAL_ERROR, null));
+                + "root.add(new Label(\"ok\"));"), ExpectedOutcome.SUCCESS, null));
     }
 
     // ------------------------------------------------------------------

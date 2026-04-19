@@ -195,6 +195,7 @@ final class PlaygroundRunner {
         rewritten = rewriteKnownSamCalls(rewritten);
         rewritten = rewriteLambdaArguments(rewritten);
         rewritten = rewriteTopLevelLambdas(rewritten);
+        rewritten = rewriteTopLevelAnonSams(rewritten);
         rewritten = rewriteSwitchExpressions(rewritten);
         rewritten = rewriteArrowSwitchStatements(rewritten);
         return rewritten;
@@ -402,6 +403,84 @@ final class PlaygroundRunner {
         }
         out.append(script.substring(last));
         return out.toString();
+    }
+
+    private static final java.util.Set<String> KNOWN_LAMBDA_SAM_TYPES;
+    static {
+        java.util.Set<String> s = new java.util.HashSet<String>();
+        // Mirror the list of SAMs implemented by CN1LambdaSupport.LambdaValue.
+        s.add("Runnable");
+        s.add("Supplier");
+        s.add("Consumer");
+        s.add("BiConsumer");
+        s.add("Function");
+        s.add("Predicate");
+        s.add("Comparator");
+        KNOWN_LAMBDA_SAM_TYPES = java.util.Collections.unmodifiableSet(s);
+    }
+
+    /**
+     * Rewrites statement-level {@code new SamType() { method bodies }}
+     * expressions to {@code __lambdaSupport.lambda(params, body)} so the
+     * resulting LambdaValue (which implements common SAMs directly) can be
+     * assigned to {@code Runnable}, {@code Function}, etc. Without this,
+     * `Runnable r = new Runnable() { public void run() {} }` hits BSH's
+     * legacy "Anonymous interface implementations are not supported" path.
+     */
+    private String rewriteTopLevelAnonSams(String script) {
+        StringBuilder out = new StringBuilder();
+        int i = 0;
+        int last = 0;
+        while (i + 4 < script.length()) {
+            char ch = script.charAt(i);
+            if (ch == '"' || ch == '\'') { i = skipQuoted(script, i) + 1; continue; }
+            if (startsLineComment(script, i)) { i = skipLineComment(script, i) + 1; continue; }
+            if (startsBlockComment(script, i)) { i = skipBlockComment(script, i) + 1; continue; }
+            if (!startsWithWord(script, i, "new")) { i++; continue; }
+            int afterNew = i + 3;
+            int typeEnd = afterNew;
+            while (typeEnd < script.length() && Character.isWhitespace(script.charAt(typeEnd))) typeEnd++;
+            int parenStart = findTopLevelChar(script, '(', typeEnd);
+            if (parenStart < 0) { i++; continue; }
+            // Only consider single-identifier types here (no dots/generics)
+            // to avoid colliding with regular constructor calls.
+            String typeName = script.substring(typeEnd, parenStart).trim();
+            if (typeName.isEmpty() || !isSimpleIdentifier(typeName)) { i++; continue; }
+            // Restrict to types LambdaValue actually implements. For
+            // user-declared scripted interfaces, the anon-class path on
+            // BSHAllocationExpression handles the body; we mustn't intercept
+            // those here or the resulting LambdaValue won't have the user's
+            // method.
+            if (!KNOWN_LAMBDA_SAM_TYPES.contains(typeName)) { i++; continue; }
+            int closeParen = findMatchingParen(script, parenStart);
+            if (closeParen < 0) break;
+            // Args inside `()` must be empty for anon-SAM construction.
+            if (containsNonWhitespace(script.substring(parenStart + 1, closeParen))) {
+                i++; continue;
+            }
+            int braceStart = skipWhitespace(script, closeParen + 1);
+            if (braceStart >= script.length() || script.charAt(braceStart) != '{') {
+                i++; continue;
+            }
+            int braceEnd = findMatchingBrace(script, braceStart);
+            if (braceEnd < 0) break;
+            String segment = script.substring(i, braceEnd + 1);
+            String rewritten = rewriteAnonymousSamExpression(segment);
+            if (rewritten == null) { i++; continue; }
+            out.append(script, last, i).append(rewritten);
+            last = braceEnd + 1;
+            i = last;
+        }
+        out.append(script.substring(last));
+        return out.toString();
+    }
+
+    private boolean isSimpleIdentifier(String s) {
+        if (s.isEmpty() || !isIdentifierStart(s.charAt(0))) return false;
+        for (int j = 1; j < s.length(); j++) {
+            if (!isIdentifierPart(s.charAt(j))) return false;
+        }
+        return true;
     }
 
     /** Heuristic: a receiver is "class-like" if it's a single identifier
