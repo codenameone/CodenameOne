@@ -273,6 +273,59 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "}\n"
                 + "S s = S.OPEN.next();\n"
                 + "root.add(new Label(s.name()));"), ExpectedOutcome.SUCCESS, null));
+        // `var` in a try-with-resources declaration isn't supported by the
+        // BSH parser's TWR production. Declare the type explicitly for now.
+        cases.add(new Case(cat, "twr_with_var_unsupported", ui(""
+                + "import java.io.*;\n"
+                + "try (var in = new StringReader(\"hi\")) {\n"
+                + "  root.add(new Label(\"ok\"));\n"
+                + "}"), ExpectedOutcome.EVAL_ERROR, null));
+        cases.add(new Case(cat, "field_init_at_declaration", ui(""
+                + "class C { int x = 42; String s = \"hi\"; }\n"
+                + "C c = new C();\n"
+                + "root.add(new Label(\"x=\" + c.x + \" s=\" + c.s));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "list_of_records", ui(""
+                + "import java.util.*;\n"
+                + "record Task(String name, int priority) {}\n"
+                + "List<Task> tasks = new ArrayList<>();\n"
+                + "tasks.add(new Task(\"a\", 1));\n"
+                + "tasks.add(new Task(\"b\", 5));\n"
+                + "Collections.sort(tasks, (x, y) -> x.priority() - y.priority());\n"
+                + "root.add(new Label(\"first=\" + tasks.get(0).name()));"), ExpectedOutcome.SUCCESS, null));
+        // Super-ctor chaining into a Java superclass (RuntimeException) isn't
+        // modeled — our super(args) dispatch only walks ScriptedClass parents.
+        // The `super(m, c)` call inside AppEx's ctor is a no-op, so the cause
+        // isn't forwarded and ex.getCause() is null.
+        cases.add(new Case(cat, "exception_with_cause_chain_unsupported", ui(""
+                + "class AppEx extends RuntimeException { AppEx(String m, Throwable c) { super(m, c); } }\n"
+                + "String chain = \"\";\n"
+                + "try {\n"
+                + "  try { throw new RuntimeException(\"root\"); }\n"
+                + "  catch (RuntimeException e) { throw new AppEx(\"wrapped\", e); }\n"
+                + "} catch (AppEx ex) {\n"
+                + "  chain = ex.getMessage() + \"/\" + ex.getCause().getMessage();\n"
+                + "}\n"
+                + "root.add(new Label(chain));"), ExpectedOutcome.EVAL_ERROR, null));
+        cases.add(new Case(cat, "generic_method_on_class", ui(""
+                + "class Box { <T> T identity(T t) { return t; } }\n"
+                + "Box b = new Box();\n"
+                + "String s = (String) b.identity(\"hi\");\n"
+                + "root.add(new Label(s));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "multi_dim_array", ui(""
+                + "int[][] grid = new int[][]{{1,2,3},{4,5,6}};\n"
+                + "int sum = 0;\n"
+                + "for (int[] row : grid) for (int v : row) sum += v;\n"
+                + "root.add(new Label(\"sum=\" + sum));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "interface_with_two_methods", ui(""
+                + "interface Named { String name(); void setName(String n); }\n"
+                + "class Item implements Named {\n"
+                + "  String n;\n"
+                + "  public String name() { return n; }\n"
+                + "  public void setName(String v) { n = v; }\n"
+                + "}\n"
+                + "Item i = new Item();\n"
+                + "i.setName(\"hello\");\n"
+                + "root.add(new Label(i.name()));"), ExpectedOutcome.SUCCESS, null));
         cases.add(new Case(cat, "lambda_method_ref_combo", ui(""
                 + "import java.util.function.*;\n"
                 + "Predicate<String> nonEmpty = s -> s.length() > 0;\n"
