@@ -700,12 +700,10 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "String[] r = new String[]{\"\"};\n"
                 + "switch (x) { case 1 -> r[0] = \"one\"; case 2 -> r[0] = \"two\"; default -> r[0] = \"?\"; }\n"
                 + "root.add(new Label(r[0]));"), ExpectedOutcome.SUCCESS, null));
-        // yield form remains unsupported — needs proper switch-expression
-        // parser support, which the current source-rewrite path cannot produce.
-        cases.add(new Case(cat, "yield_form_unsupported", ui(""
+        cases.add(new Case(cat, "yield_form", ui(""
                 + "int x = 2;\n"
                 + "String s = switch (x) { case 1: yield \"one\"; case 2: yield \"two\"; default: yield \"?\"; };\n"
-                + "root.add(new Label(s));"), ExpectedOutcome.PARSE_ERROR, null));
+                + "root.add(new Label(s));"), ExpectedOutcome.SUCCESS, null));
     }
 
     // ------------------------------------------------------------------

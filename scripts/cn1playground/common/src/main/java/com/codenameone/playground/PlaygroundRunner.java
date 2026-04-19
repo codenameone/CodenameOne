@@ -649,9 +649,45 @@ final class PlaygroundRunner {
     }
 
     /** Body is "case A -> X; case B -> Y; default -> Z;" — produce
-     * "case A: var = X; break; case B: var = Y; break; default: var = Z; break;" */
+     * "case A: var = X; break; case B: var = Y; break; default: var = Z; break;"
+     * Also handles the yield form: "case A: yield X; default: yield Z;" by
+     * substituting `yield X;` with `var = X; break;`. */
     private String rewriteSwitchExprBodyToAssignments(String body, String varName) {
-        return rewriteSwitchBody(body, varName);
+        if (containsArrowCase(body)) {
+            return rewriteSwitchBody(body, varName);
+        }
+        // Yield form: leave the case-label structure intact and rewrite each
+        // `yield <expr>;` into `<varName> = <expr>; break;`.
+        return rewriteYieldStatements(body, varName);
+    }
+
+    private String rewriteYieldStatements(String body, String varName) {
+        StringBuilder out = new StringBuilder();
+        int i = 0;
+        int last = 0;
+        int depth = 0;
+        while (i < body.length()) {
+            char ch = body.charAt(i);
+            if (ch == '"' || ch == '\'') { i = skipQuoted(body, i) + 1; continue; }
+            if (startsLineComment(body, i)) { i = skipLineComment(body, i) + 1; continue; }
+            if (startsBlockComment(body, i)) { i = skipBlockComment(body, i) + 1; continue; }
+            if (ch == '(' || ch == '[' || ch == '{') { depth++; i++; continue; }
+            if (ch == ')' || ch == ']' || ch == '}') { depth--; i++; continue; }
+            if (depth == 0 && startsWithWord(body, i, "yield")) {
+                int exprStart = skipWhitespace(body, i + "yield".length());
+                int semi = findTopLevelSemicolon(body, exprStart);
+                if (semi < 0) { i++; continue; }
+                String expr = body.substring(exprStart, semi).trim();
+                out.append(body, last, i);
+                out.append(varName).append(" = ").append(expr).append("; break;");
+                last = semi + 1;
+                i = last;
+                continue;
+            }
+            i++;
+        }
+        out.append(body.substring(last));
+        return out.toString();
     }
 
     private String rewriteSwitchStmtBodyArrowToColon(String body) {
