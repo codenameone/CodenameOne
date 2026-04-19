@@ -45,6 +45,23 @@ class RGBImageTest extends UITestBase {
     }
 
     @FormTest
+    void testRgbImageModifyAlphaSimdMatchesScalar() {
+        RGBImage image = new RGBImage(new int[]{
+                0x00FF0000, 0xFFFF0000,
+                0x8000FF00, 0xFF0000FF
+        }, 2, 2);
+        try {
+            Image.setSimdOptimizationsEnabled(false);
+            RGBImage scalar = (RGBImage) image.modifyAlpha((byte) 0x40);
+            Image.setSimdOptimizationsEnabled(true);
+            RGBImage simd = (RGBImage) image.modifyAlpha((byte) 0x40);
+            assertArrayEquals(scalar.getRGB(), simd.getRGB());
+        } finally {
+            Image.resetSimdOptimizationsEnabled();
+        }
+    }
+
+    @FormTest
     void testDrawImageAndGetRGB() {
         RGBImage image = createSampleImage();
         int[] dest = new int[4];

@@ -51,6 +51,7 @@ import java.awt.Color;
 import java.awt.Cursor;
 import java.awt.Desktop;
 import java.awt.Dimension;
+import java.awt.EventQueue;
 import java.awt.FileDialog;
 import java.awt.FontFormatException;
 import javax.swing.JFrame;
@@ -60,6 +61,7 @@ import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.Toolkit;
+import java.awt.Window;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.event.*;
 import java.awt.font.FontRenderContext;
@@ -118,6 +120,7 @@ import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.UITimer;
 import com.codename1.util.AsyncResource;
 import com.codename1.util.Callback;
+import com.codename1.util.Simd;
 import com.jhlabs.image.GaussianFilter;
 import java.awt.*;
 import java.awt.datatransfer.Clipboard;
@@ -5230,6 +5233,20 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+    private void selectAppFramePanel(String panelId) {
+        if (appFrame == null || panelId == null) {
+            return;
+        }
+        AppPanel panel = appFrame.getAppPanelById(panelId);
+        if (panel == null) {
+            return;
+        }
+        java.awt.Container parent = panel.getParent();
+        if (parent instanceof JTabbedPane) {
+            ((JTabbedPane) parent).setSelectedComponent(panel);
+        }
+    }
+
     private void showPerformanceMonitor() {
         if (perfMonitor == null) {
             perfMonitor = new PerformanceMonitor();
@@ -5500,6 +5517,57 @@ public class JavaSEPort extends CodenameOneImplementation {
                     showNetworkMonitor();
                 }
 
+            });
+        }
+        if (Boolean.getBoolean("cn1.simulator.autoNetworkMonitor")) {
+            delayedTasks.add(new Runnable() {
+                public void run() {
+                    showNetworkMonitor();
+                    selectAppFramePanel("NetworkMonitor");
+                }
+            });
+        }
+        if (Boolean.getBoolean("cn1.simulator.autoComponentInspector") && appFrame == null) {
+            delayedTasks.add(new Runnable() {
+                public void run() {
+                    final ComponentTreeInspector inspector = getOrCreateComponentTreeInspector();
+                    inspector.showInFrame();
+                    Display.getInstance().callSerially(new Runnable() {
+                        public void run() {
+                            Form current = Display.getInstance().getCurrent();
+                            if (current == null) {
+                                return;
+                            }
+                            com.codename1.ui.Component target = current;
+                            if (current.getContentPane() != null && current.getContentPane().getComponentCount() > 0) {
+                                target = current.getContentPane().getComponentAt(Math.max(1, current.getWidth() / 2), Math.max(1, current.getHeight() / 3));
+                            }
+                            inspector.inspectComponent(target);
+                        }
+                    });
+                }
+            });
+        }
+        if (Boolean.getBoolean("cn1.simulator.autoTestRecorder")) {
+            delayedTasks.add(new Runnable() {
+                public void run() {
+                    showTestRecorder();
+                    if (Boolean.getBoolean("cn1.simulator.autoTestRecorderRecord") && testRecorder != null) {
+                        testRecorder.startRecordingForAutomation();
+                        Display.getInstance().callSerially(new Runnable() {
+                            public void run() {
+                                Form current = Display.getInstance().getCurrent();
+                                if (current == null) {
+                                    return;
+                                }
+                                int x = Math.max(5, current.getWidth() / 2);
+                                int y = Math.max(5, current.getHeight() / 2);
+                                testRecorder.eventPointerPressed(x, y);
+                                testRecorder.eventPointerReleased(x, y);
+                            }
+                        });
+                    }
+                }
             });
         }
         if (!blockMonitors && pref.getBoolean("PushSimulator", false)) {
@@ -9198,6 +9266,18 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void exitApplication() {        
+        if (Boolean.getBoolean("cn1.javase.noExit")) {
+            EventQueue.invokeLater(new Runnable() {
+                public void run() {
+                    for (Window w : Window.getWindows()) {
+                        if (w != null && w.isDisplayable()) {
+                            w.dispose();
+                        }
+                    }
+                }
+            });
+            return;
+        }
         // causes a simulator with a dialog open to freeze
         /*try {
             Executor.stopApp();
@@ -10751,6 +10831,11 @@ public class JavaSEPort extends CodenameOneImplementation {
             return "win";
         }
         return platformName;
+    }
+
+    @Override
+    public Simd createSimd() {
+        return new JavaSESimd();
     }
 
     /**

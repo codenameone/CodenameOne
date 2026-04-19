@@ -138,13 +138,18 @@ public class RGBImage extends Image {
     /// {@inheritDoc}
     @Override
     public Image modifyAlpha(byte alpha) {
-        int[] arr = new int[rgb.length];
+        int[] arr = Image.allocateRgbArray(rgb.length);
         System.arraycopy(rgb, 0, arr, 0, rgb.length);
-        int alphaInt = (((int) alpha) << 24) & 0xff000000;
-        int rlen = rgb.length;
-        for (int iter = 0; iter < rlen; iter++) {
-            if ((arr[iter] & 0xff000000) != 0) {
-                arr[iter] = (arr[iter] & 0xffffff) | alphaInt;
+        if (Image.isSimdOptimizationsEnabled() && arr.length >= 16) {
+            int alphaInt = (((int) alpha) << 24) & 0xff000000;
+            Image.replaceAlphaPreserveTransparentSimd(arr, 0, alphaInt, arr.length);
+        } else {
+            int alphaInt = (((int) alpha) << 24) & 0xff000000;
+            int rlen = rgb.length;
+            for (int iter = 0; iter < rlen; iter++) {
+                if ((arr[iter] & 0xff000000) != 0) {
+                    arr[iter] = (arr[iter] & 0xffffff) | alphaInt;
+                }
             }
         }
         return new RGBImage(arr, width, height);

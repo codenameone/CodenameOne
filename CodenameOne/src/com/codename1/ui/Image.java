@@ -33,6 +33,7 @@ import com.codename1.ui.events.ActionSource;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.util.EventDispatcher;
 import com.codename1.ui.util.ImageIO;
+import com.codename1.util.Simd;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -44,6 +45,7 @@ import java.util.HashMap;
 ///
 /// @author Chen Fishbein
 public class Image implements ActionSource {
+    private static boolean simdOptimizationsEnabled = Simd.get().isSupported();
     int transform;
     private EventDispatcher listeners;
     private Object rgbCache;
@@ -56,6 +58,23 @@ public class Image implements ActionSource {
     private String svgBaseURL;
     private byte[] svgData;
     private String imageName;
+
+    /// Indicates whether Image SIMD optimizations are enabled. When unset this defaults
+    /// to the current platform SIMD support.
+    public static boolean isSimdOptimizationsEnabled() {
+        return simdOptimizationsEnabled;
+    }
+
+    /// Enables or disables Image SIMD optimizations explicitly.
+    public static void setSimdOptimizationsEnabled(boolean enabled) {
+        simdOptimizationsEnabled = enabled;
+    }
+
+    /// Clears the explicit Image SIMD override and restores the default behavior of
+    /// using SIMD whenever it is supported by the current platform.
+    public static void resetSimdOptimizationsEnabled() {
+        simdOptimizationsEnabled = Simd.get().isSupported();
+    }
 
     /// Subclasses may use this and point to an underlying native image which might be
     /// null for a case of an image that doesn't use native drawing
@@ -71,6 +90,14 @@ public class Image implements ActionSource {
     /// Creates a new instance of ImageImpl
     Image(int[] imageArray, int w, int h) {
         this(Display.impl.createImage(imageArray, w, h));
+    }
+
+    /// Creates an image while preserving the supplied RGB array in the weak RGB cache
+    /// so follow-up SIMD image operations can reuse it without extracting pixels again.
+    private static Image createImageWithRgbCache(int[] imageArray, int w, int h) {
+        Image out = new Image(imageArray, w, h);
+        out.rgbCache = Display.getInstance().createSoftWeakRef(imageArray);
+        return out;
     }
 
     /// Indicates whether the underlying platform supports creating an SVG Image
@@ -1053,9 +1080,20 @@ public class Image implements ActionSource {
     public Object createMask() {
         int[] rgb = getRGBCached();
         int rlen = rgb.length;
-        byte[] mask = new byte[rlen];
-        for (int iter = 0; iter < rlen; iter++) {
-            mask[iter] = (byte) (rgb[iter] & 0xff);
+        byte[] mask;
+        if (isSimdOptimizationsEnabled() && rlen >= 16) {
+            Simd simd = Simd.get();
+            mask = simd.allocByte(rlen);
+            // Single-pass: copy rgb into a registered scratch once and pack the
+            // whole array in one native call to amortize dispatch/validation cost.
+            int[] scratch = simd.allocaInt(rlen);
+            System.arraycopy(rgb, 0, scratch, 0, rlen);
+            simd.packIntToByteTruncate(scratch, 0, mask, 0, rlen);
+        } else {
+            mask = new byte[rlen];
+            for (int iter = 0; iter < rlen; iter++) {
+                mask[iter] = (byte) (rgb[iter] & 0xff);
+            }
         }
         return new IndexedImage(getWidth(), getHeight(), null, mask);
     }
@@ -1130,7 +1168,7 @@ public class Image implements ActionSource {
 
             }
         }
-        return createImage(rgb, imgWidth, getHeight());
+        return createImageWithRgbCache(rgb, imgWidth, getHeight());
     }
 
     /// Applies the given alpha mask onto this image and returns the resulting image
@@ -1156,13 +1194,26 @@ public class Image implements ActionSource {
         if (mWidth != getWidth() || mHeight != getHeight()) {
             throw new IllegalArgumentException("Mask and image sizes don't match");
         }
-        int mdlen = maskData.length;
-        for (int iter = 0; iter < mdlen; iter++) {
-            int maskAlpha = maskData[iter] & 0xff;
-            maskAlpha = (maskAlpha << 24) & 0xff000000;
-            rgb[iter] = (rgb[iter] & 0xffffff) | maskAlpha;
+        if (isSimdOptimizationsEnabled() && maskData.length >= 16) {
+            Simd simd = Simd.get();
+            int total = maskData.length;
+            // `rgb` came from getRGB() / allocateRgbArray() and is therefore a
+            // Simd-registered array, so we can operate on it in place. Mask data
+            // may have been produced outside of createMask (e.g. deserialized
+            // IndexedImage), so copy it once into a registered scratch.
+            byte[] maskBuf = simd.allocaByte(total);
+            System.arraycopy(maskData, 0, maskBuf, 0, total);
+            // rgb[i] = (rgb[i] & 0x00ffffff) | ((maskBuf[i] & 0xff) << 24)
+            simd.replaceTopByteFromUnsignedBytes(rgb, 0, maskBuf, 0, rgb, 0, total);
+        } else {
+            int mdlen = maskData.length;
+            for (int iter = 0; iter < mdlen; iter++) {
+                int maskAlpha = maskData[iter] & 0xff;
+                maskAlpha = (maskAlpha << 24) & 0xff000000;
+                rgb[iter] = (rgb[iter] & 0xffffff) | maskAlpha;
+            }
         }
-        return createImage(rgb, mWidth, mHeight);
+        return createImageWithRgbCache(rgb, mWidth, mHeight);
     }
 
     /// Applies the given alpha mask onto this image and returns the resulting image
@@ -1306,14 +1357,19 @@ public class Image implements ActionSource {
         int h = getHeight();
         int size = w * h;
         int[] arr = getRGB();
-        int alphaInt = (((int) alpha) << 24) & 0xff000000;
-        for (int iter = 0; iter < size; iter++) {
-            int currentAlpha = (arr[iter] >> 24) & 0xff;
-            if (currentAlpha != 0) {
-                arr[iter] = (arr[iter] & 0xffffff) | alphaInt;
+        if (isSimdOptimizationsEnabled() && size >= 16) {
+            int alphaInt = (((int) alpha) << 24) & 0xff000000;
+            replaceAlphaPreserveTransparentSimd(arr, 0, alphaInt, size);
+        } else {
+            int alphaInt = (((int) alpha) << 24) & 0xff000000;
+            for (int iter = 0; iter < size; iter++) {
+                int currentAlpha = (arr[iter] >> 24) & 0xff;
+                if (currentAlpha != 0) {
+                    arr[iter] = (arr[iter] & 0xffffff) | alphaInt;
+                }
             }
         }
-        Image i = new Image(arr, w, h);
+        Image i = createImageWithRgbCache(arr, w, h);
         i.opaqueTested = true;
         i.opaque = false;
         return i;
@@ -1351,7 +1407,7 @@ public class Image implements ActionSource {
                 }
             }
         }
-        Image i = new Image(arr, w, h);
+        Image i = createImageWithRgbCache(arr, w, h);
         i.opaqueTested = true;
         i.opaque = false;
         return i;
@@ -1376,18 +1432,23 @@ public class Image implements ActionSource {
         int w = getWidth();
         int h = getHeight();
         int size = w * h;
-        int[] arr = new int[size];
+        int[] arr = allocateRgbArray(size);
         getRGB(arr, 0, 0, 0, w, h);
-        int alphaInt = (((int) alpha) << 24) & 0xff000000;
-        for (int iter = 0; iter < size; iter++) {
-            if ((arr[iter] & 0xff000000) != 0) {
-                arr[iter] = (arr[iter] & 0xffffff) | alphaInt;
-                if (removeColor == (0xffffff & arr[iter])) {
-                    arr[iter] = 0;
+        if (isSimdOptimizationsEnabled() && size >= 16) {
+            int alphaInt = (((int) alpha) << 24) & 0xff000000;
+            replaceAlphaPreserveTransparentRemoveColorSimd(arr, 0, alphaInt, removeColor, size);
+        } else {
+            int alphaInt = (((int) alpha) << 24) & 0xff000000;
+            for (int iter = 0; iter < size; iter++) {
+                if ((arr[iter] & 0xff000000) != 0) {
+                    arr[iter] = (arr[iter] & 0xffffff) | alphaInt;
+                    if (removeColor == (0xffffff & arr[iter])) {
+                        arr[iter] = 0;
+                    }
                 }
             }
         }
-        Image i = new Image(arr, w, h);
+        Image i = createImageWithRgbCache(arr, w, h);
         i.opaqueTested = true;
         i.opaque = false;
         return i;
@@ -1606,9 +1667,60 @@ public class Image implements ActionSource {
     int[] getRGBImpl() {
         int width = getWidth();
         int height = getHeight();
-        int[] rgbData = new int[width * height];
+        int[] rgbData = allocateRgbArray(width * height);
         getRGB(rgbData, 0, 0, 0, width, height);
         return rgbData;
+    }
+
+    /// Allocates an ARGB pixel array. The returned array is always a Simd-registered
+    /// buffer (allocated via `Simd.allocInt`) regardless of whether SIMD optimizations
+    /// are currently enabled - heap allocation cost is essentially the same and this
+    /// lets downstream Simd-using code skip defensive working copies. For very small
+    /// images that fall under the Simd minimum size (16) we fall back to a plain
+    /// `int[]` since `Simd.allocInt` requires `size >= 16`.
+    static int[] allocateRgbArray(int size) {
+        if (size >= 16) {
+            return Simd.get().allocInt(size);
+        }
+        return new int[size];
+    }
+
+    /// Replaces the alpha (top byte) of every non-fully-transparent pixel in `arr`
+    /// with the alpha bits in `alphaInt`, leaving fully-transparent pixels unchanged.
+    /// Implemented as a single fused pass via `Simd.blendByMaskTestNonzero`, which is
+    /// equivalent to `arr[i] = (arr[i] & 0xff000000) != 0 ? (arr[i] & 0x00ffffff) | alphaMask : arr[i]`.
+    ///
+    /// `arr` MUST be a Simd-registered int array (i.e. obtained via
+    /// `allocateRgbArray` / `Simd.allocInt`); the helper operates on it directly without
+    /// an intermediate working copy.
+    static void replaceAlphaPreserveTransparentSimd(int[] arr, int arrOffset, int alphaInt, int length) {
+        int alphaMask = alphaInt & 0xff000000;
+        Simd.get().blendByMaskTestNonzero(arr, arrOffset, 0xff000000, 0x00ffffff, alphaMask, arr, arrOffset, length);
+    }
+
+    /// Replaces the alpha of every non-fully-transparent pixel with `alphaInt`
+    /// and additionally zeroes any pixel whose RGB component matches `removeColor`
+    /// (low 24 bits) after the alpha replacement. Implemented as a single fused pass via
+    /// `Simd.blendByMaskTestNonzeroSubstituteOnKeepEq`, equivalent to:
+    /// ```
+    /// arr[i] = (arr[i] & 0xff000000) == 0 ? arr[i]
+    ///        : (arr[i] & 0x00ffffff) == removeColor ? 0
+    ///        : (arr[i] & 0x00ffffff) | alphaMask
+    /// ```
+    ///
+    /// `arr` MUST be a Simd-registered int array (see
+    /// `replaceAlphaPreserveTransparentSimd`).
+    static void replaceAlphaPreserveTransparentRemoveColorSimd(int[] arr, int arrOffset, int alphaInt, int removeColor, int length) {
+        int alphaMask = alphaInt & 0xff000000;
+        int rgbOnly = removeColor & 0x00ffffff;
+        Simd.get().blendByMaskTestNonzeroSubstituteOnKeepEq(
+                arr, arrOffset,
+                0xff000000,   // testMask: select pixels whose alpha was non-zero
+                0x00ffffff,   // trueKeepMask: keep the RGB bits
+                alphaMask,    // trueOrValue: splice in the new alpha
+                rgbOnly,      // removeMatch: kept-bits == removeColor
+                0,            // removeValue: zero out matching pixels
+                arr, arrOffset, length);
     }
 
     /// Scales the image to the given width while updating the height based on the

@@ -36,6 +36,7 @@ import com.codename1.ui.events.MessageEvent;
 import com.codename1.ui.events.WindowEvent;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
+import com.codename1.util.Simd;
 import com.codename1.util.RunnableWithResultSync;
 
 import java.io.IOException;
@@ -1030,6 +1031,11 @@ public class CN extends CN1Constants {
     /// the name of the platform e.g. ios, rim, win, and, me, HTML5
     public static String getPlatformName() {
         return Display.impl.getPlatformName();
+    }
+
+    /// Returns the SIMD API for the current platform.
+    public static Simd getSimd() {
+        return Display.getInstance().getSimd();
     }
 
 

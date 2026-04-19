@@ -7,21 +7,29 @@ ri_log() { echo "[run-ios-ui-tests] $1"; }
 ensure_dir() { mkdir -p "$1" 2>/dev/null || true; }
 
 extract_base64_stats() {
-  local log_file="$1"
-  local out_file="$2"
-  [ -f "$log_file" ] || return 0
+  local out_file="$1"
+  shift
 
-  local lines
-  lines="$(grep 'CN1SS:STAT:' "$log_file" 2>/dev/null | sed -E 's/^.*CN1SS:STAT://')" || true
-  if [ -z "${lines:-}" ]; then
-    return 0
-  fi
-
+  local log_file lines found=0
   : > "$out_file"
-  while IFS= read -r line; do
-    [ -n "$line" ] || continue
-    echo "$line" >> "$out_file"
-  done <<< "$lines"
+  for log_file in "$@"; do
+    [ -f "$log_file" ] || continue
+    lines="$(grep 'CN1SS:STAT:' "$log_file" 2>/dev/null | sed -E 's/^.*CN1SS:STAT://')" || true
+    if [ -z "${lines:-}" ]; then
+      continue
+    fi
+    found=1
+    while IFS= read -r line; do
+      [ -n "$line" ] || continue
+      echo "$line" >> "$out_file"
+    done <<< "$lines"
+  done
+
+  if [ "$found" -eq 1 ] && [ -f "$out_file" ]; then
+    awk '!seen[$0]++' "$out_file" > "$out_file.tmp" && mv "$out_file.tmp" "$out_file"
+  else
+    rm -f "$out_file"
+  fi
 }
 
 if [ $# -lt 1 ]; then
@@ -672,11 +680,6 @@ while true; do
 done
 END_TIME=$(date +%s)
 echo "Test Execution : $(( (END_TIME - START_TIME) * 1000 )) ms" >> "$ARTIFACTS_DIR/ios-test-stats.txt"
-BASE64_STATS_FILE="$ARTIFACTS_DIR/base64-performance-stats.txt"
-extract_base64_stats "$TEST_LOG" "$BASE64_STATS_FILE"
-if [ -s "$BASE64_STATS_FILE" ]; then
-  ri_log "Base64 benchmark stats captured at $BASE64_STATS_FILE"
-fi
 
 sleep 3
 
@@ -689,6 +692,17 @@ xcrun simctl spawn "$SIM_DEVICE_ID" \
   log show --style syslog --last 30m \
   --predicate '(composedMessage CONTAINS "CN1SS") OR (eventMessage CONTAINS "CN1SS")' \
   > "$FALLBACK_LOG" 2>/dev/null || true
+
+BASE64_STATS_FILE="$ARTIFACTS_DIR/base64-performance-stats.txt"
+extract_base64_stats "$BASE64_STATS_FILE" "$TEST_LOG" "$FALLBACK_LOG"
+if [ -s "$BASE64_STATS_FILE" ]; then
+  ri_log "Base64 benchmark stats captured at $BASE64_STATS_FILE"
+fi
+
+BASE64_BENCHMARK_FAILURE_LINE="$( (grep -h "CN1SS:ERR:suite test=Base64NativePerformanceTest failed" "$TEST_LOG" "$FALLBACK_LOG" || true) | tail -n 1 )"
+if [ -n "$BASE64_BENCHMARK_FAILURE_LINE" ]; then
+  ri_log "Detected Base64 benchmark failure line: $BASE64_BENCHMARK_FAILURE_LINE"
+fi
 
 SWIFT_DIAG_LINE="$( (grep -h "CN1SS:INFO:swift_diag_status=" "$TEST_LOG" "$FALLBACK_LOG" || true) | tail -n 1 )"
 if [ -n "$SWIFT_DIAG_LINE" ]; then
@@ -821,5 +835,10 @@ comment_rc=$?
 
 cp -f "$BUILD_LOG" "$ARTIFACTS_DIR/xcodebuild-build.log" 2>/dev/null || true
 cp -f "$TEST_LOG" "$ARTIFACTS_DIR/device-runner.log" 2>/dev/null || true
+
+if [ -n "$BASE64_BENCHMARK_FAILURE_LINE" ]; then
+  ri_log "STAGE:BENCHMARK_FAILED -> $BASE64_BENCHMARK_FAILURE_LINE"
+  exit 16
+fi
 
 exit $comment_rc

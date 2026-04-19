@@ -4,6 +4,7 @@ import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.util.Simd;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -369,6 +370,55 @@ class ImageTest extends UITestBase {
         assertNotNull(masked);
         assertEquals(50, masked.getWidth());
         assertEquals(50, masked.getHeight());
+    }
+
+    @FormTest
+    void testImageSimdToggleDefaultsToPlatformSupport() {
+        boolean supported = Display.isInitialized() && Simd.get() != null && Simd.get().isSupported();
+        Image.resetSimdOptimizationsEnabled();
+        assertEquals(supported, Image.isSimdOptimizationsEnabled());
+    }
+
+    @FormTest
+    void testImageSimdToggleOverrideAndReset() {
+        Image.setSimdOptimizationsEnabled(false);
+        assertFalse(Image.isSimdOptimizationsEnabled());
+        Image.setSimdOptimizationsEnabled(true);
+        assertTrue(Image.isSimdOptimizationsEnabled());
+        Image.resetSimdOptimizationsEnabled();
+        boolean supported = Display.isInitialized() && Simd.get() != null && Simd.get().isSupported();
+        assertEquals(supported, Image.isSimdOptimizationsEnabled());
+    }
+
+    @FormTest
+    void testImageSimdAndScalarPathsMatch() {
+        int[] rgb = new int[]{
+                0x00FF0000, 0xFFFF0000, 0x8000FF00, 0xFF0000FF,
+                0xFFFFFFFF, 0x7F123456, 0x00000000, 0xFFABCDEF,
+                0x800000FF, 0xFF00FFFF, 0x40010203, 0xFFFFFFFF,
+                0x11223344, 0xFF445566, 0xFF0000FF, 0x00FFFFFF
+        };
+        Image source = Image.createImage(rgb, 4, 4);
+        try {
+            Image.setSimdOptimizationsEnabled(false);
+            Object scalarMask = source.createMask();
+            Image scalarApplied = source.applyMask(scalarMask);
+            Image scalarAlpha = source.modifyAlpha((byte) 0x66);
+            Image scalarAlphaRemoveColor = source.modifyAlpha((byte) 0x66, 0xFF0000FF);
+
+            Image.setSimdOptimizationsEnabled(true);
+            Object simdMask = source.createMask();
+            Image simdApplied = source.applyMask(simdMask);
+            Image simdAlpha = source.modifyAlpha((byte) 0x66);
+            Image simdAlphaRemoveColor = source.modifyAlpha((byte) 0x66, 0xFF0000FF);
+
+            assertArrayEquals(((IndexedImage) scalarMask).getImageDataByte(), ((IndexedImage) simdMask).getImageDataByte());
+            assertArrayEquals(scalarApplied.getRGB(), simdApplied.getRGB());
+            assertArrayEquals(scalarAlpha.getRGB(), simdAlpha.getRGB());
+            assertArrayEquals(scalarAlphaRemoveColor.getRGB(), simdAlphaRemoveColor.getRGB());
+        } finally {
+            Image.resetSimdOptimizationsEnabled();
+        }
     }
 
     @FormTest

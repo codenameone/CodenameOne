@@ -1062,6 +1062,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     private static AndroidImplementation instance;
+    private static final String INTENT_PROPERTY_PREFIX = "android.intent.";
+    private static final String INTENT_EXTRA_PROPERTY_PREFIX = "android.intent.extra.";
+    private static final Set<String> intentPropertyKeys = new HashSet<String>();
+    private static final Object intentPropertyLock = new Object();
+    private static Intent lastPublishedIntent;
 
     public static AndroidImplementation getInstance() {
         return instance;
@@ -1070,6 +1075,72 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public static void clearAppArg() {
         if (instance != null) {
             instance.setAppArg(null);
+            clearIntentProperties();
+        }
+    }
+
+    private static void clearIntentProperties() {
+        synchronized (intentPropertyLock) {
+            if (Display.isInitialized()) {
+                for (String key : new ArrayList<String>(intentPropertyKeys)) {
+                    Display.getInstance().setProperty(key, null);
+                }
+            }
+            intentPropertyKeys.clear();
+            lastPublishedIntent = null;
+        }
+    }
+
+    private static void publishIntentProperties(Activity activity, Intent intent) {
+        if (intent == null) {
+            return;
+        }
+
+        synchronized (intentPropertyLock) {
+            if (intent == lastPublishedIntent) {
+                return;
+            }
+
+            Map<String, String> nextProperties = new HashMap<String, String>();
+            nextProperties.put(INTENT_PROPERTY_PREFIX + "action", intent.getAction());
+            nextProperties.put(INTENT_PROPERTY_PREFIX + "data", intent.getDataString());
+            nextProperties.put(INTENT_PROPERTY_PREFIX + "type", intent.getType());
+
+            // Only getCallingPackage() is a verified caller identity.  Referrer values are caller-controlled.
+            String callerPackage = activity.getCallingPackage();
+            nextProperties.put(INTENT_PROPERTY_PREFIX + "caller", callerPackage);
+            nextProperties.put(INTENT_PROPERTY_PREFIX + "caller.verified", callerPackage != null ? "true" : "false");
+
+            Bundle extras = intent.getExtras();
+            if (extras != null) {
+                for (String key : extras.keySet()) {
+                    Object value = extras.get(key);
+                    String propertyKey = key.startsWith(INTENT_EXTRA_PROPERTY_PREFIX) ? key : INTENT_EXTRA_PROPERTY_PREFIX + key;
+                    nextProperties.put(propertyKey, value == null ? null : String.valueOf(value));
+                }
+            }
+
+            if (Display.isInitialized()) {
+                ArrayList<String> keysToRemove = new ArrayList<String>();
+                for (String key : intentPropertyKeys) {
+                    if (!nextProperties.containsKey(key)) {
+                        keysToRemove.add(key);
+                    }
+                }
+                for (String key : keysToRemove) {
+                    Display.getInstance().setProperty(key, null);
+                    intentPropertyKeys.remove(key);
+                }
+                for (Map.Entry<String, String> entry : nextProperties.entrySet()) {
+                    Display.getInstance().setProperty(entry.getKey(), entry.getValue());
+                    intentPropertyKeys.add(entry.getKey());
+                }
+            } else {
+                intentPropertyKeys.clear();
+                intentPropertyKeys.addAll(nextProperties.keySet());
+            }
+
+            lastPublishedIntent = intent;
         }
     }
 
@@ -2926,6 +2997,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         android.content.Intent intent = getActivity().getIntent();
         if (intent != null) {
+            publishIntentProperties(getActivity(), intent);
             String sharedText = intent.getStringExtra(Intent.EXTRA_TEXT);
             intent.removeExtra(Intent.EXTRA_TEXT);
             Uri u = intent.getData();

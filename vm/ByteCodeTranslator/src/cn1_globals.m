@@ -1221,6 +1221,31 @@ JAVA_OBJECT allocArray(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type
     return (JAVA_OBJECT)array;
 }
 
+JAVA_OBJECT allocArrayAligned(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type, int primitiveSize, int dim, int alignment) {
+    int actualSize = length * primitiveSize;
+    int requestedAlignment = alignment;
+    if (requestedAlignment < (int)sizeof(void*)) {
+        requestedAlignment = (int)sizeof(void*);
+    }
+    if ((requestedAlignment & (requestedAlignment - 1)) != 0) {
+        requestedAlignment = 16;
+    }
+    int extraPadding = requestedAlignment - 1;
+    JAVA_ARRAY array = (JAVA_ARRAY)codenameOneGcMalloc(threadStateData, sizeof(struct JavaArrayPrototype) + actualSize + sizeof(void*) + extraPadding, type);
+    (*array).length = length;
+    (*array).dimensions = dim;
+    (*array).primitiveSize = primitiveSize;
+    if (actualSize > 0) {
+        char* arr = (char*)(&(array->data));
+        arr += sizeof(void*);
+        uintptr_t aligned = (((uintptr_t)arr) + ((uintptr_t)requestedAlignment - 1)) & ~((uintptr_t)requestedAlignment - 1);
+        (*array).data = (void*)aligned;
+    } else {
+        (*array).data = 0;
+    }
+    return (JAVA_OBJECT)array;
+}
+
 JAVA_OBJECT alloc2DArray(CODENAME_ONE_THREAD_STATE, int length2, int length1, struct clazz* parentType, struct clazz* childType, int primitiveSize) {
     JAVA_ARRAY base = (JAVA_ARRAY)allocArray(threadStateData, length1, parentType, sizeof(JAVA_OBJECT), 2);
     JAVA_ARRAY_OBJECT* objs = base->data;

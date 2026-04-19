@@ -704,6 +704,12 @@ private void recordingActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIR
     }
 }//GEN-LAST:event_recordingActionPerformed
 
+void startRecordingForAutomation() {
+    if(!isRecording()) {
+        recording.doClick();
+    }
+}
+
 private void assertTitleActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_assertTitleActionPerformed
     Form f = Display.getInstance().getCurrent();
     generatedCode += "        assertTitle(\"" + f.getTitle().replace("\n", "\\n") + "\");\n";    
