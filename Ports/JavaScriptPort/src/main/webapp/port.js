@@ -2658,10 +2658,12 @@ const html5HideSplashMethodId = "cn1_com_codename1_impl_html5_HTML5Implementatio
 const cn1ssRunnerClassId = "com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner";
 const cn1ssRunnerRunNextTestMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_runNextTest_int";
 const cn1ssRunnerAwaitTestCompletionMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_awaitTestCompletion_int_com_codenameone_examples_hellocodenameone_tests_BaseTest_java_lang_String_long";
-// Mirrors Cn1ssDeviceRunner.TEST_TIMEOUT_MS in Java. Must match that constant so
-// awaitTestCompletion's deadline behaves the same way whether dispatch goes via
-// the Java runSuite path or the JS runCn1ssResolvedTest shortcut.
-const cn1ssTestTimeoutMs = 30000;
+// Mirrors Cn1ssDeviceRunner.TEST_TIMEOUT_MS in Java (10s). Must match that constant
+// so awaitTestCompletion's deadline behaves the same way whether dispatch goes via
+// the Java runSuite path or the JS runCn1ssResolvedTest shortcut. Stuck UI tests
+// finalize at this deadline; with 48 tests and a 150s browser lifetime budget a
+// longer deadline cannot fit.
+const cn1ssTestTimeoutMs = 10000;
 const cn1ssRunnerFinalizeTestMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_finalizeTest_int_com_codenameone_examples_hellocodenameone_tests_BaseTest_java_lang_String_boolean";
 const cn1ssRunnerFinishSuiteMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_finishSuite";
 const cn1ssRunnerFinalizeLambda4MethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_finalizeTest_4_java_lang_String_int";
