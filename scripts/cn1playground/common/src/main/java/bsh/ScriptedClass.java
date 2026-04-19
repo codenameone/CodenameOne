@@ -214,7 +214,21 @@ public final class ScriptedClass {
             Object[] args = ec.hasArguments(callstack, interpreter)
                     ? ec.getArguments(callstack, interpreter)
                     : new Object[0];
-            ScriptedInstance constant = newInstance(args, callstack, interpreter);
+            // If the constant has a body block (per-constant method
+            // overrides like `ADD { public int apply(...) {...} }`), build
+            // an anonymous subclass with this enum as parent and instantiate
+            // it; otherwise instantiate the enum class directly.
+            BSHBlock constBody = findConstantBody(ec);
+            ScriptedInstance constant;
+            if (constBody != null) {
+                ScriptedClass anon = ScriptedClass.build(
+                        name + "$" + constantName,
+                        declaringNameSpace, constBody, this,
+                        callstack, interpreter);
+                constant = anon.newInstance(args, callstack, interpreter);
+            } else {
+                constant = newInstance(args, callstack, interpreter);
+            }
             try {
                 constant.getInstanceNameSpace().setVariable("__enumName__",
                         constantName, false);
@@ -228,6 +242,14 @@ public final class ScriptedClass {
 
     public List<ScriptedInstance> getEnumConstants() {
         return enumConstants;
+    }
+
+    private static BSHBlock findConstantBody(BSHEnumConstant ec) {
+        for (int i = 0; i < ec.jjtGetNumChildren(); i++) {
+            Node c = ec.jjtGetChild(i);
+            if (c instanceof BSHBlock) return (BSHBlock) c;
+        }
+        return null;
     }
 
     NameSpace getDeclaringNameSpace() {
