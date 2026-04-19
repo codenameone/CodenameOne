@@ -202,69 +202,75 @@ The playground uses a customized version of [BeanShell](https://github.com/beans
 - **Variable capture**: Lambdas capture variables from enclosing scopes
 - **Nested lambdas**: Inner lambdas are rewritten before outer lambdas execute
 
-### Limitations
+### Class, Interface, Enum, and Record Support
 
-#### Class Declarations Have Limited Support
+The playground includes a CN1-safe scripted-class runtime so user-declared
+types work without runtime bytecode generation or reflection. The
+`PlaygroundSyntaxMatrixHarness` (in `common/src/test/java/...`) is a
+table-driven matrix that pins exactly what is supported — every entry
+either reaches `SUCCESS` or documents a known gap with its diagnostic.
 
-BeanShell's class generation is disabled in this playground, but single top-level classes are automatically unwrapped:
+What works:
 
-```java
-// This works - playground unwraps the class:
-public class DemoApp {
-    private Label status;  // Becomes script variable: status = null;
-    
-    public void start() {
-        status = new Label("Ready");
-        // ...
-    }
-}
-```
+- **Classes** with fields, constructors (overloaded), methods (overloaded),
+  generic type parameters (`class Pair<T>`), inheritance with method
+  overrides, and `super.method()` / `super(args)` dispatch.
+- **Static nested classes** (`Outer.Inner`) with `Outer.Inner.staticField` /
+  `new Outer.Inner()` access.
+- **Interfaces** with static methods, default methods, and anonymous
+  implementations (`new Greeter() { public String greet() { ... } }`).
+- **Enums** with simple constants, constants taking constructor args,
+  per-constant method bodies, and built-in `name()` / `ordinal()` /
+  `values()` / `valueOf()`.
+- **Records** (`record Point(int x, int y) {}`) with auto-generated
+  accessors and an optional body block.
+- **Sealed / non-sealed / permits** modifiers parse cleanly (the permit
+  list is not enforced at runtime — best-effort syntactic support).
 
-**What doesn't work**:
-- Nested classes
-- Multiple top-level classes
-- Interfaces or enums
-- Static fields or methods that reference instance fields
+What still doesn't work:
 
-For complex state management, consider using loose methods with script-level variables instead of class fields.
+- Non-static inner classes that need an enclosing-instance reference.
+- Reflection APIs (`java.lang.reflect.*`, `Class.forName`) — forbidden in
+  CN1 and out of scope.
+- Streams via `Collection.stream()` — CN1's `java.util.Collection` backport
+  doesn't expose `stream()`.
 
-#### Instance Field Access in Lambdas
+### Lambdas and Method References
 
-Variables from enclosing scopes work in lambdas, but instance field references without `this` may not resolve correctly:
+- Lambdas in any context: assignment (`Runnable r = () -> {};`), return
+  expressions, method-call arguments, and as fields.
+- Lambdas implement common SAM types directly: `Runnable`, `Supplier`,
+  `Consumer`, `BiConsumer`, `Function`, `Predicate`, `Comparator`. Other
+  CN1-specific listener interfaces are wrapped via `PlaygroundListenerBridge`.
+- Method references for static (`System.out::println`), bound-instance
+  (`prefix::concat`), unbound-instance (`String::length` →
+  `(s) -> s.length()`), and constructor (`ArrayList::new`) forms.
 
-```java
-// Works:
-String prefix = "Hello ";
-button.addActionListener(e -> status.setText(prefix + "World"));
+### Switch and Pattern Matching
 
-// May not work as expected if 'status' is an instance field:
-// Use 'this.status' or move the field to script scope
-```
+- Classic switch statements (int, String, fall-through with explicit break).
+- Switch expression arrow form: `String s = switch (x) { case 1 -> "one"; default -> "?"; };`.
+- Switch expression yield form: `case 1: yield "one"; default: yield "?";`.
+- Arrow-form switch statements (no result value).
+- Pattern matching for instanceof: `if (o instanceof String s) { use(s); }`.
 
-#### Generic Type Parameters Are Erased
+### Try-with-resources, Multi-catch, var
 
-Generic type parameters are erased at runtime. Methods that rely on specific generic types may require casting:
+- `try (Reader r = ...)` with single, multiple, and trailing-semicolon
+  resource lists.
+- Multi-catch `catch (E1 | E2 e)`.
+- Local variable type inference with `var` (BSH already treats `var` as a
+  loose type).
+
+### Generic Type Parameters Are Erased
+
+Generic type parameters are not enforced at runtime. Methods that rely on
+specific generic types may require casting:
 
 ```java
 // Generic types are erased, so explicit casting may be needed:
 List<String> items = (List<String>) someMethod();
 ```
-
-#### Some Java Syntax Is Unsupported
-
-- **Enhanced for-each with arrays**: BeanShell's for-each works for `Collection` types but not for arrays when using the generated access registry. Use traditional `for (int i = 0; i < arr.length; i++)` loops for arrays, or convert to a List first:
-  ```java
-  // Doesn't work with arrays:
-  String[] arr = {"a", "b", "c"};
-  for (String s : arr) { }  // May fail
-  
-  // Workaround:
-  for (int i = 0; i < arr.length; i++) { String s = arr[i]; }
-  // Or convert to List:
-  for (String s : java.util.Arrays.asList(arr)) { }
-  ```
-- **Method references**: `Object::toString` syntax is not supported; use lambdas instead
-- **Try-with-resources**: Use try/finally blocks manually
 
 ## JavaScript Port Considerations
 

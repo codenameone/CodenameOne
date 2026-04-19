@@ -199,6 +199,17 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "int sum = 0;\n"
                 + "while (it.hasNext()) sum += (Integer) it.next();\n"
                 + "root.add(new Label(\"sum=\" + sum));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "class_implements_scripted_interface", ui(""
+                + "interface Greeter { String greet(); }\n"
+                + "class Hello implements Greeter { public String greet() { return \"hi\"; } }\n"
+                + "Hello h = new Hello();\n"
+                + "root.add(new Label(h.greet()));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "comparator_natural_order", ui(""
+                + "import java.util.*;\n"
+                + "List<String> items = new ArrayList<>();\n"
+                + "items.add(\"c\"); items.add(\"a\"); items.add(\"b\");\n"
+                + "Collections.sort(items, (a, b) -> a.compareTo(b));\n"
+                + "root.add(new Label(items.toString()));"), ExpectedOutcome.SUCCESS, null));
         cases.add(new Case(cat, "lambda_method_ref_combo", ui(""
                 + "import java.util.function.*;\n"
                 + "Predicate<String> nonEmpty = s -> s.length() > 0;\n"
