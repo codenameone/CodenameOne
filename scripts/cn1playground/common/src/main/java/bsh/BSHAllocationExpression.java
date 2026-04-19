@@ -77,7 +77,19 @@ class BSHAllocationExpression extends SimpleNode
         if ( args == null)
             throw new EvalError( "Null args in new.", this, callstack );
 
-        // Lookup class
+        // Lookup class. Try a regular variable lookup first so that names
+        // bound to a ScriptedClass (declared earlier in the same script)
+        // resolve before we force a Java class lookup.
+        Object scripted = lookupScriptedClass(nameNode.text, callstack);
+        if (scripted != null) {
+            ScriptedClass sc = (ScriptedClass) scripted;
+            if (sc.isInterface()) {
+                throw new EvalError("Cannot instantiate scripted interface "
+                        + sc.getName() + " directly; use a class that implements it.",
+                        this, callstack);
+            }
+            return sc.newInstance(args, callstack, interpreter);
+        }
         Object obj = nameNode.toObject(
             callstack, interpreter, true /*force class*/ );
 
@@ -110,6 +122,26 @@ class BSHAllocationExpression extends SimpleNode
                     type, args, body, callstack, interpreter );
         } else
             return constructObject( type, args, callstack, interpreter );
+    }
+
+    private static Object lookupScriptedClass(String rawName, CallStack callstack) {
+        if (rawName == null || rawName.length() == 0) return null;
+        // Strip a generic suffix like "Pair<String>" — type arguments are
+        // erased at runtime in our scripted-class model.
+        String simpleName = rawName;
+        int lt = simpleName.indexOf('<');
+        if (lt >= 0) simpleName = simpleName.substring(0, lt);
+        // Names like "Outer.Inner" are not yet supported by the scripted class
+        // runtime; fall through to Java-class resolution.
+        if (simpleName.indexOf('.') >= 0) return null;
+        try {
+            NameSpace ns = callstack.top();
+            Object v = ns.getVariable(simpleName);
+            if (v instanceof ScriptedClass) return v;
+        } catch (UtilEvalError ex) {
+            // not found — caller falls back to Java class resolution
+        }
+        return null;
     }
 
     Object constructFromEnclosingInstance(Object obj, CallStack callstack,

@@ -48,24 +48,79 @@ class BSHClassDeclaration extends SimpleNode
     int numInterfaces;
     boolean extend;
     Type type;
-    private Class<?> generatedClass;
+    private ScriptedClass scriptedClass;
 
     BSHClassDeclaration(int id) { super(id); }
 
     /**
-    */
-    public synchronized Object eval(final CallStack callstack, final Interpreter interpreter ) throws EvalError {
-        if (generatedClass == null) {
-            generatedClass = generateClass(callstack, interpreter);
+     * Evaluates the class declaration by building a {@link ScriptedClass}
+     * descriptor and binding it into the enclosing namespace under the
+     * declared name. Subsequent {@code new ClassName(...)} expressions
+     * resolve to a {@link ScriptedInstance} via {@link
+     * BSHAllocationExpression}.
+     *
+     * <p>Interfaces and enums are still rejected — they require richer
+     * runtime support (SAM binding, singleton instances) that is layered
+     * on top of the basic scripted-class core.
+     */
+    public synchronized Object eval(final CallStack callstack, final Interpreter interpreter) throws EvalError {
+        if (scriptedClass == null) {
+            BSHBlock body = findBody();
+            ScriptedClass parent = extend ? resolveParentScriptedClass(callstack) : null;
+            // Interfaces share the ScriptedClass machinery — they can declare
+            // static methods (callable as Iface.foo()) and default methods
+            // (inherited by implementing classes). They cannot be instantiated
+            // directly with `new Iface()`. Enums use the same machinery with
+            // a marker plus per-constant ScriptedInstances populated at build.
+            scriptedClass = ScriptedClass.build(name, callstack.top(), body, parent,
+                    callstack, interpreter);
+            scriptedClass.markInterface(type == Type.INTERFACE);
+            scriptedClass.markEnum(type == Type.ENUM);
+            if (type == Type.ENUM) {
+                scriptedClass.populateEnumConstants(body, callstack, interpreter);
+            }
+            try {
+                callstack.top().setVariable(name, scriptedClass, false);
+            } catch (UtilEvalError ex) {
+                throw ex.toEvalError(this, callstack);
+            }
         }
-        return generatedClass;
+        return scriptedClass;
     }
 
+    private BSHBlock findBody() {
+        for (int i = 0; i < jjtGetNumChildren(); i++) {
+            Node child = jjtGetChild(i);
+            if (child instanceof BSHBlock) {
+                return (BSHBlock) child;
+            }
+        }
+        return null;
+    }
 
-    private Class<?> generateClass(final CallStack callstack, final Interpreter interpreter) throws EvalError {
-        throw new EvalError(
-                "Class, interface, and enum declarations are not supported in the Codename One BeanShell runtime.",
-                this, callstack);
+    /** Look up the extends-named class in the namespace. Only ScriptedClass
+     * parents are inherited at runtime — extending a Java class is treated as
+     * "no inheritance" since we cannot reflect into Java class internals
+     * without breaking the CN1 no-reflection invariant. */
+    private ScriptedClass resolveParentScriptedClass(CallStack callstack) {
+        for (int i = 0; i < jjtGetNumChildren(); i++) {
+            Node child = jjtGetChild(i);
+            if (child instanceof BSHAmbiguousName) {
+                String parentName = ((BSHAmbiguousName) child).text;
+                if (parentName == null || parentName.length() == 0) return null;
+                int lt = parentName.indexOf('<');
+                if (lt >= 0) parentName = parentName.substring(0, lt);
+                if (parentName.indexOf('.') >= 0) return null;
+                try {
+                    Object v = callstack.top().getVariable(parentName);
+                    if (v instanceof ScriptedClass) return (ScriptedClass) v;
+                } catch (UtilEvalError ex) {
+                    // not bound — caller falls back to no-inheritance
+                }
+                return null;
+            }
+        }
+        return null;
     }
 
     public String toString() {

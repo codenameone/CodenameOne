@@ -123,6 +123,21 @@ class BSHType extends SimpleNode implements BshClassManager.Listener {
         return descriptor;
     }
 
+    private static boolean resolvesToScriptedClass(Node node, CallStack callstack) {
+        try {
+            String text = node.getText();
+            if (text == null) return false;
+            text = text.trim();
+            int lt = text.indexOf('<');
+            if (lt >= 0) text = text.substring(0, lt).trim();
+            if (text.length() == 0 || text.indexOf('.') >= 0) return false;
+            Object v = callstack.top().getVariable(text);
+            return v instanceof ScriptedClass;
+        } catch (UtilEvalError ex) {
+            return false;
+        }
+    }
+
     public Class<?> getType( CallStack callstack, Interpreter interpreter )
         throws EvalError
     {
@@ -142,6 +157,12 @@ class BSHType extends SimpleNode implements BshClassManager.Listener {
                 // Assuming generics raw type
                 if (node.getText().trim().length() == 1
                         && e.getCause() instanceof ClassNotFoundException)
+                    baseType = Object.class;
+                else if (resolvesToScriptedClass(node, callstack))
+                    // Typed declarations against a script-declared class
+                    // (e.g. "Pair<String> p = ...") fall back to Object so
+                    // the assignment proceeds — the value will be a
+                    // ScriptedInstance which is assignable to Object.
                     baseType = Object.class;
                 else
                     throw e; // roll up unhandled error

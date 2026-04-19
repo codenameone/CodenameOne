@@ -171,6 +171,32 @@ class BSHPrimarySuffix extends SimpleNode
                 // Validate if can get this field
                 Interpreter.mainSecurityGuard.canGetField(obj, field);
 
+                // Scripted-class field access goes through the instance namespace.
+                if (obj instanceof ScriptedInstance) {
+                    ScriptedInstance si = (ScriptedInstance) obj;
+                    if (toLHS) {
+                        return new LHS(si.getInstanceNameSpace(), field);
+                    }
+                    Object v = si.getField(field);
+                    return v == Primitive.VOID ? Primitive.VOID : v;
+                }
+                // Static field/constant access on a scripted class or enum.
+                if (obj instanceof ScriptedClass) {
+                    ScriptedClass sc = (ScriptedClass) obj;
+                    NameSpace staticNs = sc.getStaticNameSpace();
+                    if (toLHS) {
+                        return new LHS(staticNs, field);
+                    }
+                    try {
+                        Object v = staticNs.getVariable(field);
+                        if (v != Primitive.VOID) return v;
+                    } catch (UtilEvalError ex) {
+                        // fall through
+                    }
+                    throw new EvalError("No static field " + sc.getName()
+                            + "." + field, this, callstack);
+                }
+
                 if ( toLHS ) try {
                     return Reflect.getLHSObjectField(obj, field);
                 } catch (Throwable t) {
@@ -194,6 +220,25 @@ class BSHPrimarySuffix extends SimpleNode
 
             // Validate if can invoke this method
             Interpreter.mainSecurityGuard.canInvokeMethod(obj, field, oa);
+
+            // Scripted-class method dispatch.
+            if (obj instanceof ScriptedInstance) {
+                return ((ScriptedInstance) obj).invokeMethod(
+                        field, oa, interpreter, callstack, this);
+            }
+            // Static-method dispatch on a scripted class/interface/enum.
+            if (obj instanceof ScriptedClass) {
+                ScriptedClass sc = (ScriptedClass) obj;
+                BshMethod m = sc.findStaticMethod(field, oa);
+                if (m != null) {
+                    return m.invoke(oa, interpreter, callstack, this, false);
+                }
+                Object builtin = sc.invokeEnumBuiltinStatic(field, oa);
+                if (builtin != null) return builtin;
+                throw new EvalError("No static method " + sc.getName()
+                        + "." + field + "/"
+                        + (oa == null ? 0 : oa.length), this, callstack);
+            }
 
             return Reflect.invokeObjectMethod(
                 obj, field, oa, interpreter, callstack, this );

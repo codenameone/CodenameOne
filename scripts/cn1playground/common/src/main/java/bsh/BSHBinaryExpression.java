@@ -34,6 +34,11 @@ package bsh;
 */
 class BSHBinaryExpression extends SimpleNode implements ParserConstants {
     public int kind;
+    /** For pattern-matching `instanceof Type binding`, the binding identifier
+     * captured at parse time. When non-null, a positive instanceof test binds
+     * the lhs value to this name in the current namespace before returning
+     * true. */
+    public String instanceofBinding;
 
     BSHBinaryExpression(int id) { super(id); }
 
@@ -68,8 +73,15 @@ class BSHBinaryExpression extends SimpleNode implements ParserConstants {
                     lhs = Primitive.unwrap(lhs);
 
             // General case - perform the instanceof based on assignable
-            return Types.isJavaBaseAssignable( rhs, lhs.getClass() )
-                    ? Primitive.TRUE : Primitive.FALSE;
+            boolean matches = Types.isJavaBaseAssignable(rhs, lhs.getClass());
+            if (matches && instanceofBinding != null) {
+                try {
+                    callstack.top().setVariable(instanceofBinding, lhs, false);
+                } catch (UtilEvalError ex) {
+                    throw ex.toEvalError(this, callstack);
+                }
+            }
+            return matches ? Primitive.TRUE : Primitive.FALSE;
         }
 
         /*

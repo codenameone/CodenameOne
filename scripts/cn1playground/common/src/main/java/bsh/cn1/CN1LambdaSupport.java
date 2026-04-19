@@ -112,7 +112,7 @@ public final class CN1LambdaSupport {
         return null;
     }
 
-    public static final class LambdaValue {
+    public static final class LambdaValue implements Runnable {
         private final Interpreter interpreter;
         private final NameSpace parentNameSpace;
         private final String[] parameterNames;
@@ -123,6 +123,16 @@ public final class CN1LambdaSupport {
             this.parentNameSpace = parentNameSpace;
             this.parameterNames = parameterNames;
             this.bodySource = bodySource;
+        }
+
+        /** Runnable adapter — any zero-arg lambda can be assigned to a Runnable
+         * directly. Other SAM interfaces still need a listener-bridge factory. */
+        public void run() {
+            try {
+                invoke(new Object[0]);
+            } catch (EvalError ex) {
+                throw new RuntimeException(ex.getMessage(), ex);
+            }
         }
 
         public Object invoke(Object[] args) throws EvalError {

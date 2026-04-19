@@ -436,6 +436,26 @@ class Name implements java.io.Serializable
             return completeRound( field, suffix(evalName), obj );
         }
 
+        // Scripted-class instances expose fields via their backing namespace.
+        if (evalBaseObject instanceof ScriptedInstance) {
+            Object obj = ((ScriptedInstance) evalBaseObject).getField(field);
+            if (obj != Primitive.VOID) {
+                return completeRound( field, suffix(evalName), obj );
+            }
+        }
+        // Static fields / enum constants on a scripted class.
+        if (evalBaseObject instanceof ScriptedClass) {
+            try {
+                Object obj = ((ScriptedClass) evalBaseObject)
+                        .getStaticNameSpace().getVariable(field);
+                if (obj != Primitive.VOID) {
+                    return completeRound( field, suffix(evalName), obj );
+                }
+            } catch (UtilEvalError ex) {
+                // fall through to error path
+            }
+        }
+
         // Check for field on object
         // Note: could eliminate throwing the exception somehow
         try {
@@ -829,6 +849,26 @@ class Name implements java.io.Serializable
                     throw new UtilTargetError( new NullPointerException(
                         "Null Pointer in Method Invocation of " +methodName
                             +"() on variable: "+targetName) );
+
+            // Scripted-class instances dispatch through their own descriptor,
+            // not through the CN1 access registry.
+            if ( obj instanceof ScriptedInstance ) {
+                return ((ScriptedInstance) obj).invokeMethod(
+                        methodName, args, interpreter, callstack, callerInfo);
+            }
+            // Static-method dispatch on a scripted class or interface or enum.
+            if ( obj instanceof ScriptedClass ) {
+                ScriptedClass sc = (ScriptedClass) obj;
+                BshMethod m = sc.findStaticMethod(methodName, args);
+                if (m != null) {
+                    return m.invoke(args, interpreter, callstack, callerInfo);
+                }
+                Object builtin = sc.invokeEnumBuiltinStatic(methodName, args);
+                if (builtin != null) return builtin;
+                throw new UtilEvalError("No static method " + sc.getName()
+                        + "." + methodName + "/"
+                        + (args == null ? 0 : args.length));
+            }
 
             // enum block members will be in namespace only
             if ( obj.getClass().isEnum() ) {

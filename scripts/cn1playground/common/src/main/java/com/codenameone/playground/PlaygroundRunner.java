@@ -184,6 +184,7 @@ final class PlaygroundRunner {
         String rewritten = rewriteInlineAutoCloseableClasses(script);
         rewritten = rewriteKnownSamCalls(rewritten);
         rewritten = rewriteLambdaArguments(rewritten);
+        rewritten = rewriteTopLevelLambdas(rewritten);
         return rewritten;
     }
 
@@ -1456,6 +1457,151 @@ final class PlaygroundRunner {
 
     private String lambdaPlaceholder(String[] params, String body) {
         return "__lambdaSupport.lambda(" + toStringArrayLiteral(params) + ", " + toJavaStringLiteral(body) + ")";
+    }
+
+    /**
+     * Rewrites lambdas that appear outside a method-argument list (e.g.
+     * {@code Runnable r = () -> {};} or {@code return x -> x + 1;}). BeanShell's
+     * parser does not recognise the lambda syntax itself, so any lambda we
+     * don't pre-rewrite produces a parse error. {@link #rewriteLambdaArguments}
+     * handles lambdas inside {@code (...)} call sites; this pass covers the
+     * remaining statement-level occurrences.
+     */
+    private String rewriteTopLevelLambdas(String script) {
+        while (true) {
+            int arrow = findTopLevelArrow(script);
+            if (arrow < 0) {
+                return script;
+            }
+            int paramStart = findLambdaParamStart(script, arrow);
+            if (paramStart < 0) {
+                return script;
+            }
+            int bodyEnd = findLambdaBodyEnd(script, arrow + 2);
+            if (bodyEnd < 0) {
+                return script;
+            }
+            String params = script.substring(paramStart, arrow);
+            String body = script.substring(arrow + 2, bodyEnd);
+            String[] paramNames = parseLambdaParameters(params);
+            if (paramNames == null) {
+                return script;
+            }
+            String bodyText = normalizeLambdaBody(body);
+            if (bodyText == null) {
+                return script;
+            }
+            String rewrittenBody = rewriteKnownSamCalls(
+                    rewriteLambdaSegments(rewriteLambdaArguments(bodyText)));
+            String placeholder = lambdaPlaceholder(paramNames, rewrittenBody);
+            script = script.substring(0, paramStart) + placeholder + script.substring(bodyEnd);
+        }
+    }
+
+    private int findLambdaParamStart(String script, int arrow) {
+        int i = arrow - 1;
+        while (i >= 0 && Character.isWhitespace(script.charAt(i))) {
+            i--;
+        }
+        if (i < 0) {
+            return -1;
+        }
+        if (script.charAt(i) == ')') {
+            int depth = 1;
+            int j = i - 1;
+            while (j >= 0 && depth > 0) {
+                char ch = script.charAt(j);
+                if (ch == '"' || ch == '\'') {
+                    int openQuote = findOpeningQuote(script, j, ch);
+                    if (openQuote < 0) {
+                        return -1;
+                    }
+                    j = openQuote - 1;
+                    continue;
+                }
+                if (ch == ')') {
+                    depth++;
+                } else if (ch == '(') {
+                    depth--;
+                    if (depth == 0) {
+                        return j;
+                    }
+                }
+                j--;
+            }
+            return -1;
+        }
+        int end = i + 1;
+        int start = i;
+        while (start > 0 && isIdentifierPart(script.charAt(start - 1))) {
+            start--;
+        }
+        if (start >= end) {
+            return -1;
+        }
+        if (!isIdentifierStart(script.charAt(start))) {
+            return -1;
+        }
+        return start;
+    }
+
+    /** Body terminates at the next top-level statement/expression boundary. */
+    private int findLambdaBodyEnd(String script, int bodyStart) {
+        int i = skipWhitespace(script, bodyStart);
+        if (i >= script.length()) {
+            return -1;
+        }
+        if (script.charAt(i) == '{') {
+            int close = findMatchingBrace(script, i);
+            return close < 0 ? -1 : close + 1;
+        }
+        int depth = 0;
+        while (i < script.length()) {
+            char ch = script.charAt(i);
+            if (ch == '"' || ch == '\'') {
+                i = skipQuoted(script, i) + 1;
+                continue;
+            }
+            if (startsLineComment(script, i)) {
+                i = skipLineComment(script, i) + 1;
+                continue;
+            }
+            if (startsBlockComment(script, i)) {
+                i = skipBlockComment(script, i) + 1;
+                continue;
+            }
+            if (ch == '(' || ch == '[' || ch == '{') {
+                depth++;
+            } else if (ch == ')' || ch == ']' || ch == '}') {
+                if (depth == 0) {
+                    return i;
+                }
+                depth--;
+            } else if (depth == 0 && (ch == ';' || ch == ',')) {
+                return i;
+            }
+            i++;
+        }
+        return i;
+    }
+
+    private int findOpeningQuote(String script, int closeIndex, char quote) {
+        int i = closeIndex - 1;
+        while (i >= 0) {
+            if (script.charAt(i) == quote) {
+                int escapes = 0;
+                int k = i - 1;
+                while (k >= 0 && script.charAt(k) == '\\') {
+                    escapes++;
+                    k--;
+                }
+                if ((escapes % 2) == 0) {
+                    return i;
+                }
+            }
+            i--;
+        }
+        return -1;
     }
 
     private int findTopLevelArrow(String text) {
