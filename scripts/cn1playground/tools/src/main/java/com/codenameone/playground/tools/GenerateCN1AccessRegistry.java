@@ -2714,7 +2714,27 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
             if (wildcard != null) {
                 return wildcard;
             }
+            // Method-level type parameters (e.g. `<T>` on `Arrays.asList`)
+            // aren't in the class-level typeParameterBounds. By convention
+            // such names are a single uppercase letter (or letter plus
+            // digits). Treat them as java.lang.Object so the method is
+            // emitted with erased types rather than dropped entirely.
+            if (looksLikeMethodTypeParameter(simpleName)) {
+                return "java.lang.Object";
+            }
             return null;
+        }
+
+        private static boolean looksLikeMethodTypeParameter(String name) {
+            if (name == null || name.isEmpty()) return false;
+            char c = name.charAt(0);
+            if (!Character.isUpperCase(c)) return false;
+            if (name.length() > 3) return false;
+            for (int i = 0; i < name.length(); i++) {
+                char k = name.charAt(i);
+                if (!(Character.isUpperCase(k) || Character.isDigit(k))) return false;
+            }
+            return true;
         }
 
         private String resolveWildcard(String simpleName) {

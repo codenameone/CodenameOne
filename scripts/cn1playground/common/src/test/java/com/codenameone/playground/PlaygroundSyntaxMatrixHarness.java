@@ -365,14 +365,12 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "String s = \"\";\n"
                 + "for (int i = 0; i < 3; i++) s += \"x\";\n"
                 + "root.add(new Label(s));"), ExpectedOutcome.SUCCESS, null));
-        // Arrays.asList is varargs; the registry's generic-vararg dispatch
-        // for Arrays.asList isn't wired. Build a List explicitly instead.
-        cases.add(new Case(cat, "arrays_aslist_unsupported", ui(""
+        cases.add(new Case(cat, "arrays_aslist", ui(""
                 + "import java.util.*;\n"
                 + "List<String> items = Arrays.asList(\"a\",\"b\",\"c\");\n"
                 + "String txt = \"\";\n"
                 + "for (String s : items) txt += s;\n"
-                + "root.add(new Label(txt));"), ExpectedOutcome.EVAL_ERROR, null));
+                + "root.add(new Label(txt));"), ExpectedOutcome.SUCCESS, null));
         cases.add(new Case(cat, "record_equals_and_tostring", ui(""
                 + "record K(int a, int b) {}\n"
                 + "K x = new K(1, 2);\n"

@@ -179,6 +179,12 @@ public final class GeneratedAccess_java_util_stream {
                 typedTarget.close(); return null;
             }
         }
+        if ("collect".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.util.stream.Collector.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.stream.Collector.class}, false);
+                return typedTarget.collect((java.util.stream.Collector) adaptedArgs[0]);
+            }
+        }
         if ("count".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.count();

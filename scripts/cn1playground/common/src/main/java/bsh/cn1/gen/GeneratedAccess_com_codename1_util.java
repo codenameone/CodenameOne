@@ -1396,6 +1396,10 @@ public final class GeneratedAccess_com_codename1_util {
             }
         }
         if ("run".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.util.RunnableWithResultSync.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.util.RunnableWithResultSync.class}, false);
+                return typedTarget.run((com.codename1.util.RunnableWithResultSync) adaptedArgs[0]);
+            }
             if (matches(safeArgs, new Class<?>[]{java.lang.Runnable.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Runnable.class}, false);
                 typedTarget.run((java.lang.Runnable) adaptedArgs[0]); return null;

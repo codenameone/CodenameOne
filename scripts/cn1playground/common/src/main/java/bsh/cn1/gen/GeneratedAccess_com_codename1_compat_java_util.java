@@ -41,6 +41,12 @@ public final class GeneratedAccess_com_codename1_compat_java_util {
     }
 
     private static Object invokeStatic0(String name, Object[] safeArgs) throws Exception {
+        if ("compare".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class, java.util.Comparator.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class, java.util.Comparator.class}, false);
+                return com.codename1.compat.java.util.Objects.compare((java.lang.Object) adaptedArgs[0], (java.lang.Object) adaptedArgs[1], (java.util.Comparator) adaptedArgs[2]);
+            }
+        }
         if ("deepEquals".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class}, false);
@@ -73,6 +79,16 @@ public final class GeneratedAccess_com_codename1_compat_java_util {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
                 return com.codename1.compat.java.util.Objects.nonNull((java.lang.Object) adaptedArgs[0]);
+            }
+        }
+        if ("requireNonNull".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return com.codename1.compat.java.util.Objects.requireNonNull((java.lang.Object) adaptedArgs[0]);
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.String.class}, false);
+                return com.codename1.compat.java.util.Objects.requireNonNull((java.lang.Object) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
             }
         }
         if ("toString".equals(name)) {

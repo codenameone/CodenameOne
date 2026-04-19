@@ -153,8 +153,9 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
         if (type == com.codename1.ui.layouts.mig.ConstraintParser.class) return invokeStatic0(name, safeArgs);
         if (type == com.codename1.ui.layouts.mig.LayoutUtil.class) return invokeStatic1(name, safeArgs);
         if (type == com.codename1.ui.layouts.mig.LinkHandler.class) return invokeStatic2(name, safeArgs);
-        if (type == com.codename1.ui.layouts.mig.PlatformDefaults.class) return invokeStatic3(name, safeArgs);
-        if (type == com.codename1.ui.layouts.mig.UnitValue.class) return invokeStatic4(name, safeArgs);
+        if (type == com.codename1.ui.layouts.mig.MigLayout.class) return invokeStatic3(name, safeArgs);
+        if (type == com.codename1.ui.layouts.mig.PlatformDefaults.class) return invokeStatic4(name, safeArgs);
+        if (type == com.codename1.ui.layouts.mig.UnitValue.class) return invokeStatic5(name, safeArgs);
         throw unsupportedStatic(type, name, safeArgs);
     }
 
@@ -317,6 +318,16 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
     }
 
     private static Object invokeStatic3(String name, Object[] safeArgs) throws Exception {
+        if ("findType".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Class.class, com.codename1.ui.Component.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Class.class, com.codename1.ui.Component.class}, false);
+                return com.codename1.ui.layouts.mig.MigLayout.findType((java.lang.Class) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1]);
+            }
+        }
+        throw unsupportedStatic(com.codename1.ui.layouts.mig.MigLayout.class, name, safeArgs);
+    }
+
+    private static Object invokeStatic4(String name, Object[] safeArgs) throws Exception {
         if ("getButtonOrder".equals(name)) {
             if (safeArgs.length == 0) {
                 return com.codename1.ui.layouts.mig.PlatformDefaults.getButtonOrder();
@@ -556,7 +567,7 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
         throw unsupportedStatic(com.codename1.ui.layouts.mig.PlatformDefaults.class, name, safeArgs);
     }
 
-    private static Object invokeStatic4(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic5(String name, Object[] safeArgs) throws Exception {
         if ("addGlobalUnitConverter".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.layouts.mig.UnitConverter.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.layouts.mig.UnitConverter.class}, false);

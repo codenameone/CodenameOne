@@ -85,6 +85,12 @@ public final class GeneratedAccess_com_codename1_util_promise {
                 return com.codename1.util.promise.Promise.reject((java.lang.Throwable) adaptedArgs[0]);
             }
         }
+        if ("resolve".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return com.codename1.util.promise.Promise.resolve((java.lang.Object) adaptedArgs[0]);
+            }
+        }
         throw unsupportedStatic(com.codename1.util.promise.Promise.class, name, safeArgs);
     }
 
