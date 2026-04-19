@@ -138,6 +138,49 @@ public final class PlaygroundSyntaxMatrixHarness {
         addPatternMatching(cases);
         addTextBlocks(cases);
         addVarInference(cases);
+        addIntegrationCases(cases);
+    }
+
+    // ------------------------------------------------------------------
+    // Category: Integration — exercises multiple features together.
+    // ------------------------------------------------------------------
+    private static void addIntegrationCases(List<Case> cases) {
+        String cat = "integration";
+        cases.add(new Case(cat, "lambda_to_collections_sort", ui(""
+                + "import java.util.*;\n"
+                + "List<String> items = new ArrayList<>();\n"
+                + "items.add(\"bb\"); items.add(\"a\"); items.add(\"ccc\");\n"
+                + "Collections.sort(items, (a, b) -> a.length() - b.length());\n"
+                + "root.add(new Label(items.toString()));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "record_in_list", ui(""
+                + "import java.util.*;\n"
+                + "record Pt(int x, int y) {}\n"
+                + "List<Pt> pts = new ArrayList<>();\n"
+                + "pts.add(new Pt(1,2)); pts.add(new Pt(3,4));\n"
+                + "int sum = 0;\n"
+                + "for (Pt p : pts) sum += p.x() + p.y();\n"
+                + "root.add(new Label(\"sum=\" + sum));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "two_level_inheritance", ui(""
+                + "class A { int v() { return 1; } }\n"
+                + "class B extends A { int extra() { return v() * 10; } }\n"
+                + "class C extends B { int v() { return 5; } }\n"
+                + "C c = new C();\n"
+                + "root.add(new Label(\"v=\" + c.v() + \" extra=\" + c.extra()));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "interface_with_default_used", ui(""
+                + "interface Greeter { default String greet() { return \"hello \" + name(); } String name(); }\n"
+                + "Greeter g = new Greeter() { public String name() { return \"world\"; } };\n"
+                + "root.add(new Label(g.greet()));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "switch_expr_in_method_return", ui(""
+                + "class C { String label(int x) { String s = switch (x) { case 1 -> \"one\"; default -> \"?\"; }; return s; } }\n"
+                + "C c = new C();\n"
+                + "root.add(new Label(c.label(1)));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "lambda_method_ref_combo", ui(""
+                + "import java.util.function.*;\n"
+                + "Predicate<String> nonEmpty = s -> s.length() > 0;\n"
+                + "Function<String, Integer> len = String::length;\n"
+                + "boolean ok = nonEmpty.test(\"hi\");\n"
+                + "int n = len.apply(\"hello\");\n"
+                + "root.add(new Label(\"ok=\" + ok + \" n=\" + n));"), ExpectedOutcome.SUCCESS, null));
     }
 
     // ------------------------------------------------------------------

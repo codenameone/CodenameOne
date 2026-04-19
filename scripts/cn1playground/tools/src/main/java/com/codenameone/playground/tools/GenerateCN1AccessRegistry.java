@@ -1949,6 +1949,11 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
         writer.write("        if (!(value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue)) {\n");
         writer.write("            return value;\n");
         writer.write("        }\n");
+        writer.write("        // Direct fit when LambdaValue already implements the target SAM\n");
+        writer.write("        // (Runnable, Function, Comparator, ...).\n");
+        writer.write("        if (type.isInstance(value)) {\n");
+        writer.write("            return value;\n");
+        writer.write("        }\n");
         writer.write("        return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);\n");
         writer.write("    }\n\n");
         writer.write("    private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {\n");
@@ -2005,7 +2010,10 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
         writer.write("            return value instanceof Number;\n");
         writer.write("        }\n");
         writer.write("        if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {\n");
-        writer.write("            return isSamInterface(type);\n");
+        writer.write("            // LambdaValue implements common SAMs directly (Runnable,\n");
+        writer.write("            // Function, Predicate, Comparator, ...). Also accept any\n");
+        writer.write("            // CN1 SAM the listener-bridge knows how to wrap.\n");
+        writer.write("            return type.isInstance(value) || isSamInterface(type);\n");
         writer.write("        }\n");
         writer.write("        return type.isInstance(value);\n");
         writer.write("    }\n\n");
