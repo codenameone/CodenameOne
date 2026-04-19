@@ -181,7 +181,10 @@ final class PlaygroundRunner {
     }
 
     private String rewriteClassModel(String script) {
-        String rewritten = rewriteInlineAutoCloseableClasses(script);
+        // Records desugar into a class declaration before any other pass —
+        // downstream rewrites then treat them as regular scripted classes.
+        String rewritten = rewriteRecords(script);
+        rewritten = rewriteInlineAutoCloseableClasses(rewritten);
         // Method references must be rewritten BEFORE the lambda passes so the
         // resulting lambdas get the SAM-binding treatment.
         rewritten = rewriteMethodReferences(rewritten);
@@ -191,6 +194,99 @@ final class PlaygroundRunner {
         rewritten = rewriteSwitchExpressions(rewritten);
         rewritten = rewriteArrowSwitchStatements(rewritten);
         return rewritten;
+    }
+
+    /**
+     * Desugars Java 14+ records of the form {@code record Name(t1 a, t2 b) {
+     * ... }} into an equivalent class with final fields, a canonical
+     * constructor, and accessor methods named after each component. The
+     * optional body block is included verbatim after the synthetic members,
+     * so users can declare extra static methods or override an accessor.
+     */
+    private String rewriteRecords(String script) {
+        StringBuilder out = new StringBuilder();
+        int i = 0;
+        int last = 0;
+        while (i < script.length()) {
+            char ch = script.charAt(i);
+            if (ch == '"' || ch == '\'') { i = skipQuoted(script, i) + 1; continue; }
+            if (startsLineComment(script, i)) { i = skipLineComment(script, i) + 1; continue; }
+            if (startsBlockComment(script, i)) { i = skipBlockComment(script, i) + 1; continue; }
+            if (!startsWithWord(script, i, "record")) { i++; continue; }
+            int nameStart = skipWhitespace(script, i + "record".length());
+            int nameEnd = nameStart;
+            while (nameEnd < script.length() && isIdentifierPart(script.charAt(nameEnd))) nameEnd++;
+            if (nameStart == nameEnd) { i += "record".length(); continue; }
+            int parenStart = skipWhitespace(script, nameEnd);
+            if (parenStart >= script.length() || script.charAt(parenStart) != '(') {
+                i += "record".length();
+                continue;
+            }
+            int parenEnd = findMatchingParen(script, parenStart);
+            if (parenEnd < 0) break;
+            int braceStart = skipWhitespace(script, parenEnd + 1);
+            if (braceStart >= script.length() || script.charAt(braceStart) != '{') {
+                i += "record".length();
+                continue;
+            }
+            int braceEnd = findMatchingBrace(script, braceStart);
+            if (braceEnd < 0) break;
+            String recordName = script.substring(nameStart, nameEnd);
+            String params = script.substring(parenStart + 1, parenEnd).trim();
+            String body = script.substring(braceStart + 1, braceEnd).trim();
+            String desugar = desugarRecord(recordName, params, body);
+            if (desugar == null) { i = braceEnd + 1; continue; }
+            out.append(script, last, i).append(desugar);
+            last = braceEnd + 1;
+            i = last;
+        }
+        out.append(script.substring(last));
+        return out.toString();
+    }
+
+    private String desugarRecord(String name, String params, String body) {
+        String[] componentDecls = splitTopLevel(params, ',');
+        StringBuilder fields = new StringBuilder();
+        StringBuilder ctorAssigns = new StringBuilder();
+        StringBuilder accessors = new StringBuilder();
+        StringBuilder ctorParams = new StringBuilder();
+        for (int i = 0; i < componentDecls.length; i++) {
+            String c = componentDecls[i].trim();
+            if (c.isEmpty()) continue;
+            // Each component is "<type> <name>". Split on last whitespace
+            // boundary that isn't inside angle brackets (for generic types).
+            int split = lastTopLevelWhitespace(c);
+            if (split < 0) return null;
+            String type = c.substring(0, split).trim();
+            String comp = c.substring(split).trim();
+            if (type.isEmpty() || comp.isEmpty()) return null;
+            fields.append("private final ").append(type).append(' ').append(comp).append(';');
+            ctorAssigns.append("this.").append(comp).append('=').append(comp).append(';');
+            accessors.append("public ").append(type).append(' ').append(comp)
+                    .append("(){return this.").append(comp).append(";}");
+            if (ctorParams.length() > 0) ctorParams.append(',');
+            ctorParams.append(type).append(' ').append(comp);
+        }
+        StringBuilder out = new StringBuilder();
+        out.append("class ").append(name).append('{');
+        out.append(fields);
+        out.append(name).append('(').append(ctorParams).append("){").append(ctorAssigns).append('}');
+        out.append(accessors);
+        if (!body.isEmpty()) out.append(body);
+        out.append('}');
+        return out.toString();
+    }
+
+    private int lastTopLevelWhitespace(String s) {
+        int depth = 0;
+        int last = -1;
+        for (int j = 0; j < s.length(); j++) {
+            char ch = s.charAt(j);
+            if (ch == '<') depth++;
+            else if (ch == '>') depth--;
+            else if (depth == 0 && Character.isWhitespace(ch)) last = j;
+        }
+        return last;
     }
 
     /**

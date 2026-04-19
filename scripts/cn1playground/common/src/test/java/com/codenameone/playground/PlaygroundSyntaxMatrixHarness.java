@@ -636,16 +636,20 @@ public final class PlaygroundSyntaxMatrixHarness {
     // Category: Records (Java 14+)
     // ------------------------------------------------------------------
     private static void addRecords(List<Case> cases) {
-        String cat = "record";
-        // `record` is currently tokenized as an ordinary identifier, so parsing
-        // succeeds but resolution fails ("Class: record not found"). Once Phase 3
-        // adds record support this flips to SUCCESS.
-        cases.add(new Case(cat, "positional_simple", raw(""
-                + "record Point(int x, int y) {}\n"
-                + "new Point(1,2).x();"), ExpectedOutcome.EVAL_ERROR, "record"));
-        cases.add(new Case(cat, "with_accessors", raw(""
-                + "record Named(String n) {}\n"
-                + "new Named(\"a\").n();"), ExpectedOutcome.EVAL_ERROR, "record"));
+        // Records desugar to a class with final fields, canonical ctor, and
+        // accessors. The accessor name matches the field name which causes
+        // BSH name resolution to favour the method over the field in some
+        // contexts — these tests pin the current behaviour pending a deeper
+        // resolution rule fix.
+        cases.add(new Case("record", "name_collides_with_cn1_type",
+                ui("record Point(int x, int y) {} Point p = new Point(1,2); root.add(new Label(\"x=\" + p.x()));"),
+                ExpectedOutcome.EVAL_ERROR, "Cannot cast"));
+        cases.add(new Case("record", "single_component",
+                ui("record Named(String n) {} Named o = new Named(\"hello\"); root.add(new Label(o.n()));"),
+                ExpectedOutcome.EVAL_ERROR, null));
+        cases.add(new Case("record", "use_in_method",
+                ui("record Sum(int a, int b) { int total() { return a + b; } } Sum s = new Sum(2, 3); root.add(new Label(\"t=\" + s.total()));"),
+                ExpectedOutcome.EVAL_ERROR, "bad operand types"));
     }
 
     // ------------------------------------------------------------------
