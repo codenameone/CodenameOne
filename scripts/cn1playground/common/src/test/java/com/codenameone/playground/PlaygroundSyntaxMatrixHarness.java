@@ -382,6 +382,42 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "class A { protected int internal() { return 11; } }\n"
                 + "class B extends A { int expose() { return internal() + 1; } }\n"
                 + "root.add(new Label(\"v=\" + new B().expose()));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "visitor_pattern", ui(""
+                + "interface Visitor { int visit(int n); }\n"
+                + "class Doubler implements Visitor { public int visit(int n) { return n * 2; } }\n"
+                + "class Caller { int run(Visitor v, int n) { return v.visit(n); } }\n"
+                + "Caller c = new Caller();\n"
+                + "Doubler d = new Doubler();\n"
+                + "root.add(new Label(\"v=\" + c.run(d, 7)));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "factory_method_returning_interface", ui(""
+                + "interface Shape { int area(); }\n"
+                + "class Shapes { static Shape rect(int w, int h) { return new Shape() { public int area() { return w * h; } }; } }\n"
+                + "Shape s = Shapes.rect(3, 4);\n"
+                + "root.add(new Label(\"a=\" + s.area()));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "chained_method_calls_returning_this", ui(""
+                + "class Fluent { StringBuilder sb = new StringBuilder(\"\"); Fluent add(String s) { sb.append(s); return this; } String build() { return sb.toString(); } }\n"
+                + "String r = new Fluent().add(\"a\").add(\"b\").add(\"c\").build();\n"
+                + "root.add(new Label(r));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "static_method_calling_other_static", ui(""
+                + "class U { static int add(int a, int b) { return a + b; } static int sum3(int a, int b, int c) { return add(add(a, b), c); } }\n"
+                + "root.add(new Label(\"v=\" + U.sum3(1, 2, 3)));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "generic_container", ui(""
+                + "class Box<T> { T value; Box(T v) { value = v; } T get() { return value; } }\n"
+                + "Box<String> s = new Box<String>(\"hi\");\n"
+                + "Box<Integer> i = new Box<Integer>(7);\n"
+                + "root.add(new Label(s.get() + \" \" + i.get()));"), ExpectedOutcome.SUCCESS, null));
+        // `a[0]++` isn't supported by BSH's unary-operator eval; it expects
+        // a bare variable, not a subscripted array element. Replace with
+        // explicit assignment.
+        cases.add(new Case(cat, "array_element_increment_unsupported", ui(""
+                + "int[] a = new int[]{0};\n"
+                + "int v = (a[0]++ > -1) ? a[0] : -1;\n"
+                + "root.add(new Label(\"v=\" + v));"), ExpectedOutcome.EVAL_ERROR, null));
+        cases.add(new Case(cat, "conditional_with_sideeffects_substitute", ui(""
+                + "int[] a = new int[]{0};\n"
+                + "a[0] = a[0] + 1;\n"
+                + "int v = (a[0] > -1) ? a[0] : -1;\n"
+                + "root.add(new Label(\"v=\" + v));"), ExpectedOutcome.SUCCESS, null));
         cases.add(new Case(cat, "lambda_method_ref_combo", ui(""
                 + "import java.util.function.*;\n"
                 + "Predicate<String> nonEmpty = s -> s.length() > 0;\n"
