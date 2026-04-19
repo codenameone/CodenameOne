@@ -181,9 +181,13 @@ final class PlaygroundRunner {
     }
 
     private String rewriteClassModel(String script) {
+        // sealed/non-sealed/permits are stripped first so the underlying
+        // class declaration parses cleanly. The permit list is not enforced
+        // at runtime — this is documented as a known limitation.
+        String rewritten = rewriteSealedModifiers(script);
         // Records desugar into a class declaration before any other pass —
         // downstream rewrites then treat them as regular scripted classes.
-        String rewritten = rewriteRecords(script);
+        rewritten = rewriteRecords(rewritten);
         rewritten = rewriteInlineAutoCloseableClasses(rewritten);
         // Method references must be rewritten BEFORE the lambda passes so the
         // resulting lambdas get the SAM-binding treatment.
@@ -194,6 +198,54 @@ final class PlaygroundRunner {
         rewritten = rewriteSwitchExpressions(rewritten);
         rewritten = rewriteArrowSwitchStatements(rewritten);
         return rewritten;
+    }
+
+    /**
+     * Strips Java 17 sealed/non-sealed/permits modifiers from class
+     * declarations so they parse with the existing grammar. The permit list
+     * is discarded — runtime does not enforce that subclasses are declared
+     * in the permit clause. This matches the playground's overall posture
+     * of "best-effort syntactic support" rather than full Java semantics.
+     */
+    private String rewriteSealedModifiers(String script) {
+        StringBuilder out = new StringBuilder();
+        int i = 0;
+        int last = 0;
+        while (i < script.length()) {
+            char ch = script.charAt(i);
+            if (ch == '"' || ch == '\'') { i = skipQuoted(script, i) + 1; continue; }
+            if (startsLineComment(script, i)) { i = skipLineComment(script, i) + 1; continue; }
+            if (startsBlockComment(script, i)) { i = skipBlockComment(script, i) + 1; continue; }
+            if (startsWithWord(script, i, "sealed")) {
+                out.append(script, last, i);
+                last = i + "sealed".length();
+                i = last;
+                continue;
+            }
+            if (startsWithWord(script, i, "non-sealed")) {
+                out.append(script, last, i);
+                last = i + "non-sealed".length();
+                i = last;
+                continue;
+            }
+            if (startsWithWord(script, i, "permits")) {
+                int end = i + "permits".length();
+                // Consume identifiers and commas up to '{' or end-of-input.
+                int j = end;
+                while (j < script.length()) {
+                    char k = script.charAt(j);
+                    if (k == '{' || k == ';') break;
+                    j++;
+                }
+                out.append(script, last, i);
+                last = j;
+                i = j;
+                continue;
+            }
+            i++;
+        }
+        out.append(script.substring(last));
+        return out.toString();
     }
 
     /**
@@ -260,7 +312,13 @@ final class PlaygroundRunner {
             String type = c.substring(0, split).trim();
             String comp = c.substring(split).trim();
             if (type.isEmpty() || comp.isEmpty()) return null;
-            fields.append("private final ").append(type).append(' ').append(comp).append(';');
+            // We deliberately drop `private final` here: the playground's
+            // BSH layer treats `final` as immutable and would reject the
+            // canonical ctor's `this.<comp> = <comp>` assignment, leaving the
+            // field at its default value. Records are still effectively
+            // immutable from the user's perspective because the desugar emits
+            // no setters.
+            fields.append(type).append(' ').append(comp).append(';');
             ctorAssigns.append("this.").append(comp).append('=').append(comp).append(';');
             accessors.append("public ").append(type).append(' ').append(comp)
                     .append("(){return this.").append(comp).append(";}");

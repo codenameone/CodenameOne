@@ -604,10 +604,18 @@ public final class PlaygroundSyntaxMatrixHarness {
         cases.add(new Case(cat, "cannot_instantiate", raw(""
                 + "interface Greet { String hello(); }\n"
                 + "new Greet();"), ExpectedOutcome.EVAL_ERROR, "Cannot instantiate scripted interface"));
-        cases.add(new Case(cat, "anonymous_impl_not_supported", raw(""
+        cases.add(new Case(cat, "anonymous_impl_method", ui(""
                 + "interface Greet { String hello(); }\n"
                 + "Object g = new Greet(){public String hello(){return \"hi\";}};\n"
-                + "g.toString();"), ExpectedOutcome.EVAL_ERROR, null));
+                + "root.add(new Label(g.hello()));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "anonymous_impl_default_inherited", ui(""
+                + "interface Greet { default String hello() { return \"hi\"; } }\n"
+                + "Object g = new Greet(){};\n"
+                + "root.add(new Label(g.hello()));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "anonymous_impl_override", ui(""
+                + "interface Greet { default String hello() { return \"base\"; } }\n"
+                + "Object g = new Greet(){public String hello(){return \"override\";}};\n"
+                + "root.add(new Label(g.hello()));"), ExpectedOutcome.SUCCESS, null));
     }
 
     // ------------------------------------------------------------------
@@ -636,20 +644,21 @@ public final class PlaygroundSyntaxMatrixHarness {
     // Category: Records (Java 14+)
     // ------------------------------------------------------------------
     private static void addRecords(List<Case> cases) {
-        // Records desugar to a class with final fields, canonical ctor, and
-        // accessors. The accessor name matches the field name which causes
-        // BSH name resolution to favour the method over the field in some
-        // contexts — these tests pin the current behaviour pending a deeper
-        // resolution rule fix.
+        // `record Point(...)` clashes with auto-imported com.codename1.ui.geom.Point
+        // when assigned to a `Point p` variable; Java-class typing wins. Use a
+        // non-conflicting name for general record use.
         cases.add(new Case("record", "name_collides_with_cn1_type",
                 ui("record Point(int x, int y) {} Point p = new Point(1,2); root.add(new Label(\"x=\" + p.x()));"),
                 ExpectedOutcome.EVAL_ERROR, "Cannot cast"));
         cases.add(new Case("record", "single_component",
                 ui("record Named(String n) {} Named o = new Named(\"hello\"); root.add(new Label(o.n()));"),
-                ExpectedOutcome.EVAL_ERROR, null));
+                ExpectedOutcome.SUCCESS, null));
         cases.add(new Case("record", "use_in_method",
                 ui("record Sum(int a, int b) { int total() { return a + b; } } Sum s = new Sum(2, 3); root.add(new Label(\"t=\" + s.total()));"),
-                ExpectedOutcome.EVAL_ERROR, "bad operand types"));
+                ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case("record", "two_components",
+                ui("record Pt(int x, int y) {} Pt p = new Pt(3,4); root.add(new Label(\"x=\" + p.x() + \" y=\" + p.y()));"),
+                ExpectedOutcome.SUCCESS, null));
     }
 
     // ------------------------------------------------------------------
@@ -657,11 +666,17 @@ public final class PlaygroundSyntaxMatrixHarness {
     // ------------------------------------------------------------------
     private static void addSealed(List<Case> cases) {
         String cat = "sealed";
-        cases.add(new Case(cat, "sealed_with_permits", raw(""
+        cases.add(new Case(cat, "sealed_with_permits", ui(""
                 + "sealed interface Shape permits Circle, Square {}\n"
                 + "final class Circle implements Shape {}\n"
                 + "final class Square implements Shape {}\n"
-                + "new Circle();"), ExpectedOutcome.PARSE_ERROR, null));
+                + "Circle c = new Circle();\n"
+                + "root.add(new Label(\"created\"));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "non_sealed", ui(""
+                + "sealed class Animal permits Dog {}\n"
+                + "non-sealed class Dog extends Animal {}\n"
+                + "Dog d = new Dog();\n"
+                + "root.add(new Label(\"d=\" + (d != null)));"), ExpectedOutcome.SUCCESS, null));
     }
 
     // ------------------------------------------------------------------

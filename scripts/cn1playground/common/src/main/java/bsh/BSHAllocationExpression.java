@@ -83,6 +83,18 @@ class BSHAllocationExpression extends SimpleNode
         Object scripted = lookupScriptedClass(nameNode.text, callstack);
         if (scripted != null) {
             ScriptedClass sc = (ScriptedClass) scripted;
+            // Anonymous-class style: `new Iface() { method bodies }` —
+            // synthesise a one-off subclass whose instance methods come from
+            // the body, then construct it. Works for both interfaces and
+            // regular classes.
+            boolean hasBody = jjtGetNumChildren() > 2;
+            if (hasBody) {
+                BSHBlock body = (BSHBlock) jjtGetChild(2);
+                ScriptedClass anonClass = ScriptedClass.build(
+                        sc.getName() + "$anon", callstack.top(), body, sc,
+                        callstack, interpreter);
+                return anonClass.newInstance(args, callstack, interpreter);
+            }
             if (sc.isInterface()) {
                 throw new EvalError("Cannot instantiate scripted interface "
                         + sc.getName() + " directly; use a class that implements it.",
