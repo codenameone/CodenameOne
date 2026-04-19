@@ -323,6 +323,9 @@ public class IOSSimd extends Simd {
     @Override
     public native void select(byte[] mask, int maskOffset, int trueConstant, int[] falseValues, int falseOffset, int[] dst, int dstOffset, int length);
 
+    @Override
+    public native void blendByMaskTestNonzero(int[] src, int srcOffset, int testMask, int trueKeepMask, int trueOrValue, int[] dst, int dstOffset, int length);
+
     private native byte[] allocByteNative(int size);
     private native int[] allocIntNative(int size);
     private native float[] allocFloatNative(int size);

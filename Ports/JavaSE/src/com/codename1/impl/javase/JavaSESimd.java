@@ -874,6 +874,16 @@ public class JavaSESimd extends Simd {
         super.select(mask, maskOffset, trueConstant, falseValues, falseOffset, dst, dstOffset, length);
     }
 
+    @Override
+    public void blendByMaskTestNonzero(int[] src, int srcOffset, int testMask, int trueKeepMask, int trueOrValue, int[] dst, int dstOffset, int length) {
+        validateNotNull(src, "src");
+        validateNotNull(dst, "dst");
+        validateRange(src.length, srcOffset, length, "src");
+        validateRange(dst.length, dstOffset, length, "dst");
+        validateRegistered(src, dst);
+        super.blendByMaskTestNonzero(src, srcOffset, testMask, trueKeepMask, trueOrValue, dst, dstOffset, length);
+    }
+
     private void validateRegistered(Object... arrays) {
         for (int i = 0; i < arrays.length; i++) {
             Object arr = arrays[i];

@@ -1689,3 +1689,25 @@ JAVA_VOID com_codename1_impl_ios_IOSSimd_select___byte_1ARRAY_int_int_int_1ARRAY
         d[dstOffset + i] = m[maskOffset + i] != 0 ? trueConstant : f[falseOffset + i];
     }
 }
+
+JAVA_VOID com_codename1_impl_ios_IOSSimd_blendByMaskTestNonzero___int_1ARRAY_int_int_int_int_int_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT src, JAVA_INT srcOffset, JAVA_INT testMask, JAVA_INT trueKeepMask, JAVA_INT trueOrValue, JAVA_OBJECT dst, JAVA_INT dstOffset, JAVA_INT length) {
+    JAVA_ARRAY_INT* s = (JAVA_ARRAY_INT*)((JAVA_ARRAY)src)->data;
+    JAVA_ARRAY_INT* d = (JAVA_ARRAY_INT*)((JAVA_ARRAY)dst)->data;
+    int32x4_t vTest = vdupq_n_s32(testMask);
+    int32x4_t vKeep = vdupq_n_s32(trueKeepMask);
+    int32x4_t vOr = vdupq_n_s32(trueOrValue);
+    int32x4_t vZero = vdupq_n_s32(0);
+    int i = 0;
+    for (; i <= length - 4; i += 4) {
+        int32x4_t vs = vld1q_s32((int32_t*)(s + srcOffset + i));
+        int32x4_t vAnded = vandq_s32(vs, vTest);
+        // selectMask: lanes where (src & testMask) != 0
+        uint32x4_t vSelectMask = vmvnq_u32(vceqq_s32(vAnded, vZero));
+        int32x4_t vTrue = vorrq_s32(vandq_s32(vs, vKeep), vOr);
+        vst1q_s32((int32_t*)(d + dstOffset + i), vbslq_s32(vSelectMask, vTrue, vs));
+    }
+    for (; i < length; i++) {
+        JAVA_INT v = s[srcOffset + i];
+        d[dstOffset + i] = (v & testMask) != 0 ? (v & trueKeepMask) | trueOrValue : v;
+    }
+}

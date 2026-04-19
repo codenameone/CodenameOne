@@ -14,8 +14,12 @@ import java.io.IOException;
 public class Base64NativePerformanceTest extends BaseTest {
     private static final int PAYLOAD_BYTES = 8192;
     private static final int ITERATIONS = 6000;
-    private static final int IMAGE_BENCHMARK_ITERATIONS = 250;
-    private static final int IMAGE_BENCHMARK_SIZE = 96;
+    // The image benchmarks now exercise a 256×256 pixel buffer (~262 KB) which is
+    // representative of common avatar/photo sizes used in real CN1 apps and large enough
+    // to stress memory bandwidth (much larger than L1, comfortably within L2). Iteration
+    // counts are sized so each measurement still runs in a reasonable amount of wall time.
+    private static final int IMAGE_BENCHMARK_ITERATIONS = 100;
+    private static final int IMAGE_BENCHMARK_SIZE = 256;
     private static final byte IMAGE_BENCHMARK_ALPHA = (byte)0x90;
 
     @Override

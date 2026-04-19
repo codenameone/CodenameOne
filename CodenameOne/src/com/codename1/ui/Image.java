@@ -1692,57 +1692,43 @@ public class Image implements ActionSource {
 
     /// Replaces the alpha (top byte) of every non-fully-transparent pixel in `arr`
     /// with the alpha bits in `alphaInt`, leaving fully-transparent pixels unchanged.
-    /// Composes the operation from generic Simd primitives, processed in a single pass
-    /// per primitive to amortize per-call dispatch/validation overhead.
+    /// Implemented as a single fused pass via `Simd.blendByMaskTestNonzero`, which is
+    /// equivalent to `arr[i] = (arr[i] & 0xff000000) != 0 ? (arr[i] & 0x00ffffff) | alphaMask : arr[i]`.
     ///
     /// `arr` MUST be a Simd-registered int array (i.e. obtained via
     /// `allocateRgbArray` / `Simd.allocInt`); the helper operates on it directly without
     /// an intermediate working copy.
     static void replaceAlphaPreserveTransparentSimd(int[] arr, int arrOffset, int alphaInt, int length) {
-        Simd simd = Simd.get();
         int alphaMask = alphaInt & 0xff000000;
-        int[] tmp = simd.allocaInt(length);
-        byte[] keepMask = simd.allocaByte(length);
-        // tmp[i] = arr[i] & 0xff000000  (extract original alpha)
-        simd.and(arr, arrOffset, 0xff000000, tmp, 0, length);
-        // keepMask[i] = (alpha != 0)  →  cmpEq(alpha, 0) then invert
-        simd.cmpEq(tmp, 0, 0, keepMask, 0, length);
-        simd.not(keepMask, 0, keepMask, 0, length);
-        // tmp[i] = (arr[i] & 0x00ffffff) | alphaMask  (splice in new alpha)
-        simd.and(arr, arrOffset, 0xffffff, tmp, 0, length);
-        simd.or(tmp, 0, alphaMask, tmp, 0, length);
-        // arr[i] = keepMask[i] ? tmp[i] : arr[i]
-        simd.select(keepMask, 0, tmp, 0, arr, arrOffset, arr, arrOffset, length);
+        Simd.get().blendByMaskTestNonzero(arr, arrOffset, 0xff000000, 0x00ffffff, alphaMask, arr, arrOffset, length);
     }
 
     /// Replaces the alpha of every non-fully-transparent pixel with `alphaInt`
     /// and additionally zeroes any pixel whose RGB component matches `removeColor`
-    /// (low 24 bits) after the alpha replacement. Composed from generic Simd primitives,
-    /// processed in a single pass per primitive.
+    /// (low 24 bits) after the alpha replacement. Composed of three Simd passes:
+    /// (1) a fused alpha-replace into a scratch buffer via `blendByMaskTestNonzero`,
+    /// (2) a constant `cmpEq` against the post-replacement value that flags pixels we
+    /// must zero (originally non-transparent AND matching removeColor), and
+    /// (3) a `select` that writes either 0 or the scratch value back into `arr`.
     ///
     /// `arr` MUST be a Simd-registered int array (see
     /// `replaceAlphaPreserveTransparentSimd`).
     static void replaceAlphaPreserveTransparentRemoveColorSimd(int[] arr, int arrOffset, int alphaInt, int removeColor, int length) {
         Simd simd = Simd.get();
         int alphaMask = alphaInt & 0xff000000;
-        int rgbOnly = removeColor & 0xffffff;
+        int rgbOnly = removeColor & 0x00ffffff;
+        // The post-replacement encoding of a "must remove" pixel: alpha was non-zero (so it got
+        // alphaMask spliced in) and its low 24 bits equal removeColor.
+        int removedSentinel = alphaMask | rgbOnly;
         int[] tmp = simd.allocaInt(length);
-        byte[] keepMask = simd.allocaByte(length);
         byte[] removeMask = simd.allocaByte(length);
-        // keepMask[i] = ((arr[i] & 0xff000000) != 0)
-        simd.and(arr, arrOffset, 0xff000000, tmp, 0, length);
-        simd.cmpEq(tmp, 0, 0, keepMask, 0, length);
-        simd.not(keepMask, 0, keepMask, 0, length);
-        // tmp[i] = arr[i] & 0x00ffffff
-        simd.and(arr, arrOffset, 0xffffff, tmp, 0, length);
-        // removeMask[i] = (tmp[i] == rgbOnly)
-        simd.cmpEq(tmp, 0, rgbOnly, removeMask, 0, length);
-        // tmp[i] |= alphaMask  (new pixel value before remove-color suppression)
-        simd.or(tmp, 0, alphaMask, tmp, 0, length);
-        // tmp[i] = removeMask[i] ? 0 : tmp[i]
-        simd.select(removeMask, 0, 0, tmp, 0, tmp, 0, length);
-        // arr[i] = keepMask[i] ? tmp[i] : arr[i]
-        simd.select(keepMask, 0, tmp, 0, arr, arrOffset, arr, arrOffset, length);
+        // tmp[i] = (arr[i] & 0xff000000) != 0 ? (arr[i] & 0x00ffffff) | alphaMask : arr[i]
+        simd.blendByMaskTestNonzero(arr, arrOffset, 0xff000000, 0x00ffffff, alphaMask, tmp, 0, length);
+        // removeMask[i] = (tmp[i] == removedSentinel)
+        // (Originally-transparent pixels still have alpha 0 in tmp, so they cannot match.)
+        simd.cmpEq(tmp, 0, removedSentinel, removeMask, 0, length);
+        // arr[i] = removeMask[i] ? 0 : tmp[i]
+        simd.select(removeMask, 0, 0, tmp, 0, arr, arrOffset, length);
     }
 
     /// Scales the image to the given width while updating the height based on the

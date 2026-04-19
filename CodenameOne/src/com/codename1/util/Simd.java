@@ -921,6 +921,22 @@ public class Simd {
         }
     }
 
+    /// Fused single-pass conditional bit-blend driven by a masked-non-zero test of `src` against
+    /// `testMask`. For every element:
+    ///
+    /// `dst[i] = (src[i] & testMask) != 0 ? (src[i] & trueKeepMask) | trueOrValue : src[i]`
+    ///
+    /// This collapses a "test-then-modify-or-keep-source" pattern that would otherwise require
+    /// three or more separate primitive calls (and three or more passes over `src`) into a single
+    /// pass. It maps directly to one NEON / SSE vector loop on platforms that ship a vectorized
+    /// implementation. **All arrays MUST be aligned/registered arrays.**
+    public void blendByMaskTestNonzero(int[] src, int srcOffset, int testMask, int trueKeepMask, int trueOrValue, int[] dst, int dstOffset, int length) {
+        for (int i = 0; i < length; i++) {
+            int v = src[srcOffset + i];
+            dst[dstOffset + i] = (v & testMask) != 0 ? (v & trueKeepMask) | trueOrValue : v;
+        }
+    }
+
 
     /// This API is used internally to verify valid array arguments in the simulator
     /// notice that no validation occurs on the devices.

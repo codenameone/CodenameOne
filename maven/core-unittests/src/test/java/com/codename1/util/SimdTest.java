@@ -583,4 +583,44 @@ class SimdTest extends UITestBase {
         assertEquals((byte)9, packedFromSlab4[8]);
         assertEquals((byte)16, packedFromSlab4[15]);
     }
+
+    @FormTest
+    void blendByMaskTestNonzeroFusesAlphaReplace() {
+        // Verify the fallback semantics on raw int[]s.
+        Simd fallback = new Simd();
+        int alphaMask = 0x80000000;
+        int[] src = new int[]{
+                0x00112233, // alpha 0  → unchanged
+                0xff445566, // alpha non-zero → (& 0x00ffffff) | alphaMask
+                0x12345678, // alpha non-zero → splice
+                0x00000000  // alpha 0  → unchanged (and remains 0)
+        };
+        int[] dst = new int[4];
+        fallback.blendByMaskTestNonzero(src, 0, 0xff000000, 0x00ffffff, alphaMask, dst, 0, 4);
+        assertEquals(0x00112233, dst[0]);
+        assertEquals(alphaMask | 0x00445566, dst[1]);
+        assertEquals(alphaMask | 0x00345678, dst[2]);
+        assertEquals(0x00000000, dst[3]);
+
+        // Run the same test against the platform Simd (registered arrays where required).
+        Simd simd = Simd.get();
+        if (!simd.isSupported()) {
+            return;
+        }
+        int n = 32; // exercise the vector loop and a tail
+        int[] regSrc = simd.allocInt(n);
+        int[] regDst = simd.allocInt(n);
+        for (int i = 0; i < n; i++) {
+            // Alternate transparent / opaque pixels with varied RGB content.
+            regSrc[i] = ((i & 1) == 0 ? 0 : 0xff000000) | ((i * 0x010203) & 0x00ffffff);
+        }
+        simd.blendByMaskTestNonzero(regSrc, 0, 0xff000000, 0x00ffffff, alphaMask, regDst, 0, n);
+        for (int i = 0; i < n; i++) {
+            int v = regSrc[i];
+            int expected = ((v & 0xff000000) != 0)
+                    ? (v & 0x00ffffff) | alphaMask
+                    : v;
+            assertEquals(expected, regDst[i], "mismatch at index " + i);
+        }
+    }
 }
