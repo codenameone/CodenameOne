@@ -638,9 +638,9 @@ public final class PlaygroundSyntaxMatrixHarness {
         cases.add(new Case(cat, "ordinal", ui(""
                 + "enum Color { RED, GREEN, BLUE }\n"
                 + "root.add(new Label(\"o=\" + Color.GREEN.ordinal()));"), ExpectedOutcome.SUCCESS, null));
-        cases.add(new Case(cat, "with_fields_unsupported", raw(""
-                + "enum Prio { LOW(1), HIGH(10); final int v; Prio(int v){this.v=v;} }\n"
-                + "Prio.LOW.v;"), ExpectedOutcome.EVAL_ERROR, null));
+        cases.add(new Case(cat, "with_fields", ui(""
+                + "enum Prio { LOW(1), HIGH(10); int v; Prio(int v){this.v=v;} }\n"
+                + "root.add(new Label(\"low=\" + Prio.LOW.v + \" high=\" + Prio.HIGH.v));"), ExpectedOutcome.SUCCESS, null));
         cases.add(new Case(cat, "with_method_per_constant_unsupported", raw(""
                 + "enum Op { ADD { public int apply(int a, int b){return a+b;} }; public abstract int apply(int a, int b); }\n"
                 + "Op.ADD.apply(1,2);"), ExpectedOutcome.EVAL_ERROR, null));

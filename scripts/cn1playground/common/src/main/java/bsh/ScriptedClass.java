@@ -193,9 +193,14 @@ public final class ScriptedClass {
     }
 
     /** Populate enum constants from the class body. Each constant becomes a
-     * ScriptedInstance with a single internal {@code __enumName__} field; the
-     * constant is bound as a static variable and added to {@link
-     * #getEnumConstants()} for {@code values()} dispatch. */
+     * ScriptedInstance constructed via the standard newInstance flow so
+     * field initializers and the ctor (if any) run normally. The constant
+     * is bound in the static namespace under its declared name and added to
+     * {@link #getEnumConstants()} for {@code values()} dispatch.
+     *
+     * <p>Constants with a body block (per-constant method bodies) are not
+     * yet supported — those would need a per-constant subclass.
+     */
     void populateEnumConstants(BSHBlock body, CallStack callstack,
             Interpreter interpreter) throws EvalError {
         enumConstants = new ArrayList<ScriptedInstance>();
@@ -204,13 +209,15 @@ public final class ScriptedClass {
         for (int i = 0; i < n; i++) {
             Node child = body.jjtGetChild(i);
             if (!(child instanceof BSHEnumConstant)) continue;
-            String constantName = ((BSHEnumConstant) child).getName();
-            NameSpace constNs = new NameSpace(staticNameSpace,
-                    interpreter.getClassManager(), name + "." + constantName);
-            ScriptedInstance constant = new ScriptedInstance(this, constNs);
+            BSHEnumConstant ec = (BSHEnumConstant) child;
+            String constantName = ec.getName();
+            Object[] args = ec.hasArguments(callstack, interpreter)
+                    ? ec.getArguments(callstack, interpreter)
+                    : new Object[0];
+            ScriptedInstance constant = newInstance(args, callstack, interpreter);
             try {
-                constNs.setVariable("this", constant, false);
-                constNs.setVariable("__enumName__", constantName, false);
+                constant.getInstanceNameSpace().setVariable("__enumName__",
+                        constantName, false);
                 staticNameSpace.setVariable(constantName, constant, false);
             } catch (UtilEvalError ex) {
                 throw ex.toEvalError(child, callstack);
