@@ -404,18 +404,14 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "Box<String> s = new Box<String>(\"hi\");\n"
                 + "Box<Integer> i = new Box<Integer>(7);\n"
                 + "root.add(new Label(s.get() + \" \" + i.get()));"), ExpectedOutcome.SUCCESS, null));
-        // `a[0]++` isn't supported by BSH's unary-operator eval; it expects
-        // a bare variable, not a subscripted array element. Replace with
-        // explicit assignment.
-        cases.add(new Case(cat, "array_element_increment_unsupported", ui(""
+        cases.add(new Case(cat, "array_element_increment", ui(""
                 + "int[] a = new int[]{0};\n"
                 + "int v = (a[0]++ > -1) ? a[0] : -1;\n"
-                + "root.add(new Label(\"v=\" + v));"), ExpectedOutcome.EVAL_ERROR, null));
-        cases.add(new Case(cat, "conditional_with_sideeffects_substitute", ui(""
-                + "int[] a = new int[]{0};\n"
-                + "a[0] = a[0] + 1;\n"
-                + "int v = (a[0] > -1) ? a[0] : -1;\n"
                 + "root.add(new Label(\"v=\" + v));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "array_element_postfix_decrement", ui(""
+                + "int[] a = new int[]{3};\n"
+                + "int before = a[0]--;\n"
+                + "root.add(new Label(\"before=\" + before + \" after=\" + a[0]));"), ExpectedOutcome.SUCCESS, null));
         cases.add(new Case(cat, "lambda_method_ref_combo", ui(""
                 + "import java.util.function.*;\n"
                 + "Predicate<String> nonEmpty = s -> s.length() > 0;\n"
