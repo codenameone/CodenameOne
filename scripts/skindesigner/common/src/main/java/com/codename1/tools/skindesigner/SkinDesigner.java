@@ -546,25 +546,6 @@ public class SkinDesigner extends Lifecycle {
             }
         });
 
-        Button maskPicker = new Button("Select Screen Mask (Optional)");
-        maskPicker.setUIID("SkinDesignerActionButton");
-        maskPicker.addActionListener((e) -> {
-            Display.getInstance().openGallery((ee) -> {
-                if(ee != null && ee.getSource() != null) {
-                    try {
-                        String fileName = (String)ee.getSource();
-                        Image mask = Image.createImage(fileName);
-                        maskLabel.setIcon(mask);
-                        useMask.setValue(true);
-                        maskLabel.getParent().revalidate();
-                        Util.copy(FileSystemStorage.getInstance().openInputStream(fileName),
-                                Storage.getInstance().createOutputStream(prefix + ".mask.png"));
-                    } catch(IOException err) {
-                        ToastBar.showErrorMessage("Error Loading Mask: " + err);
-                    }
-                }
-            }, Display.GALLERY_IMAGE);
-        });
         if(Storage.getInstance().exists(prefix + ".mask.png")) {
             try(InputStream is = Storage.getInstance().createInputStream(prefix + ".mask.png")) {
                 maskLabel.setIcon(Image.createImage(is));
@@ -572,36 +553,22 @@ public class SkinDesigner extends Lifecycle {
                 Log.e(err);
             }
         }
-        Button clearMask = new Button("Clear Mask");
-        clearMask.setUIID("SkinDesignerActionButton");
-        clearMask.addActionListener(e -> {
-            maskLabel.setIcon(null);
-            useMask.setValue(false);
-            Storage.getInstance().deleteStorageFile(prefix + ".mask.png");
-            if(maskLabel.getParent() != null) {
-                maskLabel.getParent().revalidate();
-            }
-        });
 
         Container actionButtons = FlowLayout.encloseCenter(aim, helpButton, saveButton);
-        Container detectionButtons = FlowLayout.encloseCenter(detectScreenButton, floodTolerance, maskPicker, clearMask);
-        Label detectionHint = new Label("Uses flood-fill from the screen center");
-        detectionHint.setUIID("SkinDesignerFieldLabel");
+        Container detectionButtons = FlowLayout.encloseCenter(detectScreenButton, floodTolerance, useMask);
         Container controls = BoxLayout.encloseY(
                 imagePicker,
                 labeledFieldTitle("Screen Position (X/Y/Width/Height)"),
                 GridLayout.encloseIn(4, screenPositionX, screenPositionY, screenWidthPixels, screenHeightPixels),
                 labeledFieldTitle("Safe Area (X/Y/Width/Height)"),
                 GridLayout.encloseIn(4, safeX, safeY, safeWidth, safeHeight),
-                labeledFieldTitle("Screen Detection"),
-                detectionHint,
+                labeledFieldTitle("Screen Mask Detection"),
                 detectionButtons,
-                BorderLayout.center(labeledFieldTitle("Use Screen Mask")).add(BorderLayout.EAST, useMask),
                 actionButtons
         );
         controls.setUIID("SkinDesignerCard");
         controls.setScrollableY(true);
-        Container preview = BoxLayout.encloseY(maskLabel, sl);
+        Container preview = BoxLayout.encloseY(sl);
         preview.setUIID("SkinDesignerCard");
         preview.setScrollableY(true);
 
@@ -904,9 +871,17 @@ public class SkinDesigner extends Lifecycle {
                     int maxY = Math.max(0, img.getHeight() - h);
                     int newX = Math.min(maxX, Math.max(0, x.getAsInt(0) + dx));
                     int newY = Math.min(maxY, Math.max(0, y.getAsInt(0) + dy));
+                    int safeWidthValue = safeW.getAsInt(w);
+                    int safeHeightValue = safeH.getAsInt(h);
+                    int safeMaxX = Math.max(0, img.getWidth() - safeWidthValue);
+                    int safeMaxY = Math.max(0, img.getHeight() - safeHeightValue);
+                    int newSafeX = Math.min(safeMaxX, Math.max(0, safeX.getAsInt(newX) + dx));
+                    int newSafeY = Math.min(safeMaxY, Math.max(0, safeY.getAsInt(newY) + dy));
                     x.setText("" + newX);
                     y.setText("" + newY);
-                    setImageNoReposition(createMute(newX, newY, w, h, safeX.getAsInt(newX), safeY.getAsInt(newY), safeW.getAsInt(w), safeH.getAsInt(h), img));
+                    safeX.setText("" + newSafeX);
+                    safeY.setText("" + newSafeY);
+                    setImageNoReposition(createMute(newX, newY, w, h, newSafeX, newSafeY, safeWidthValue, safeHeightValue, img));
                     lastDragX = xPos;
                     lastDragY = yPos;
                 }
@@ -980,26 +955,34 @@ public class SkinDesigner extends Lifecycle {
         });
 
         left.addActionListener(e -> {
-            int newX = x.getAsInt(0) - 1;
+            int newX = Math.max(0, x.getAsInt(0) - 1);
             x.setText("" + newX);
+            int safeMaxX = Math.max(0, img.getWidth() - safeW.getAsInt(w));
+            safeX.setText("" + Math.max(0, Math.min(safeMaxX, safeX.getAsInt(0) - 1)));
             overlay.setImageNoReposition(createMute(x.getAsInt(0), y.getAsInt(0), w, h, safeX.getAsInt(x.getAsInt(0)), safeY.getAsInt(y.getAsInt(0)), safeW.getAsInt(w), safeH.getAsInt(h), img));
         });
 
         right.addActionListener(e -> {
-            int newX = x.getAsInt(0) + 1;
+            int newX = Math.min(Math.max(0, img.getWidth() - w), x.getAsInt(0) + 1);
             x.setText("" + newX);
+            int safeMaxX = Math.max(0, img.getWidth() - safeW.getAsInt(w));
+            safeX.setText("" + Math.max(0, Math.min(safeMaxX, safeX.getAsInt(0) + 1)));
             overlay.setImageNoReposition(createMute(x.getAsInt(0), y.getAsInt(0), w, h, safeX.getAsInt(x.getAsInt(0)), safeY.getAsInt(y.getAsInt(0)), safeW.getAsInt(w), safeH.getAsInt(h), img));
         });
 
         up.addActionListener(e -> {
-            int newY = y.getAsInt(0) - 1;
+            int newY = Math.max(0, y.getAsInt(0) - 1);
             y.setText("" + newY);
+            int safeMaxY = Math.max(0, img.getHeight() - safeH.getAsInt(h));
+            safeY.setText("" + Math.max(0, Math.min(safeMaxY, safeY.getAsInt(0) - 1)));
             overlay.setImageNoReposition(createMute(x.getAsInt(0), y.getAsInt(0), w, h, safeX.getAsInt(x.getAsInt(0)), safeY.getAsInt(y.getAsInt(0)), safeW.getAsInt(w), safeH.getAsInt(h), img));
         });
 
         down.addActionListener(e -> {
-            int newY = y.getAsInt(0) + 1;
+            int newY = Math.min(Math.max(0, img.getHeight() - h), y.getAsInt(0) + 1);
             y.setText("" + newY);
+            int safeMaxY = Math.max(0, img.getHeight() - safeH.getAsInt(h));
+            safeY.setText("" + Math.max(0, Math.min(safeMaxY, safeY.getAsInt(0) + 1)));
             overlay.setImageNoReposition(createMute(x.getAsInt(0), y.getAsInt(0), w, h, safeX.getAsInt(x.getAsInt(0)), safeY.getAsInt(y.getAsInt(0)), safeW.getAsInt(w), safeH.getAsInt(h), img));
         });
 
