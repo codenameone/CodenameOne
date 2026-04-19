@@ -1452,12 +1452,6 @@ public final class GeneratedAccess_com_codename1_util {
                 typedTarget.onError((java.lang.Object) adaptedArgs[0], (java.lang.Throwable) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue(), (java.lang.String) adaptedArgs[3]); return null;
             }
         }
-        if ("onSucess".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
-                typedTarget.onSucess((java.lang.Object) adaptedArgs[0]); return null;
-            }
-        }
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 

@@ -387,12 +387,6 @@ public final class GeneratedAccess_com_codename1_contacts {
                 typedTarget.addItem((java.lang.Object) adaptedArgs[0]); return null;
             }
         }
-        if ("addItemAtIndex".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class}, false);
-                typedTarget.addItemAtIndex((java.lang.Object) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
-            }
-        }
         if ("addSelectedIndices".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{int[].class}, true)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class}, true);
@@ -471,12 +465,6 @@ public final class GeneratedAccess_com_codename1_contacts {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.SelectionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.SelectionListener.class}, false);
                 typedTarget.removeSelectionListener((com.codename1.ui.events.SelectionListener) adaptedArgs[0]); return null;
-            }
-        }
-        if ("setItem".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Object.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Object.class}, false);
-                typedTarget.setItem(((Number) adaptedArgs[0]).intValue(), (java.lang.Object) adaptedArgs[1]); return null;
             }
         }
         if ("setMultiSelectionMode".equals(name)) {

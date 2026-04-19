@@ -1846,16 +1846,23 @@ public final class GeneratedAccess_java_lang {
                 unsupported = ex;
             }
         }
+        if (target instanceof java.lang.Comparable) {
+            try {
+                return invoke52((java.lang.Comparable) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
         if (target instanceof java.lang.Iterable) {
             try {
-                return invoke52((java.lang.Iterable) target, name, safeArgs);
+                return invoke53((java.lang.Iterable) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof java.lang.Runnable) {
             try {
-                return invoke53((java.lang.Runnable) target, name, safeArgs);
+                return invoke54((java.lang.Runnable) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
@@ -3922,6 +3929,12 @@ public final class GeneratedAccess_java_lang {
                 typedTarget.remove(); return null;
             }
         }
+        if ("set".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                typedTarget.set((java.lang.Object) adaptedArgs[0]); return null;
+            }
+        }
         if ("toString".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.toString();
@@ -4753,7 +4766,17 @@ public final class GeneratedAccess_java_lang {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke52(java.lang.Iterable typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke52(java.lang.Comparable typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("compareTo".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.compareTo((java.lang.Object) adaptedArgs[0]);
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke53(java.lang.Iterable typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("iterator".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.iterator();
@@ -4762,7 +4785,7 @@ public final class GeneratedAccess_java_lang {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke53(java.lang.Runnable typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke54(java.lang.Runnable typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("run".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.run(); return null;

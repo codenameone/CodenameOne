@@ -59,6 +59,24 @@ else
   RUNTIME_SRC_DIR="$(download_source_jar java-runtime)"
   JAVASE_SRC_DIR="$(download_source_jar codenameone-javase)"
   CN1_SOURCE_ROOTS_VALUE="${CORE_SRC_DIR}:${RUNTIME_SRC_DIR}:${JAVASE_SRC_DIR}"
+
+  # Download the matching binary jars too. Having them on the generator's
+  # runtime classpath lets it reflectively validate inherited methods on CN1
+  # types (e.g. com.codename1.io.Properties extends HashMap<String,String>),
+  # which is otherwise skipped when the runtime class can't be loaded.
+  download_jar() {
+    artifact="$1"
+    jar="$SOURCES_BASE/${artifact}-${CN1_VERSION}.jar"
+    if [ ! -f "$jar" ]; then
+      url="https://repo.maven.apache.org/maven2/com/codenameone/${artifact}/${CN1_VERSION}/${artifact}-${CN1_VERSION}.jar"
+      if ! curl -fsSL "$url" -o "$jar"; then
+        echo "Failed to download jar: $url" >&2
+        exit 1
+      fi
+    fi
+    printf '%s' "$jar"
+  }
+  CN1_BINARY_JARS="$(download_jar codenameone-core):$(download_jar java-runtime):$(download_jar codenameone-javase)"
 fi
 
 mkdir -p "$BUILD_DIR"
@@ -77,6 +95,9 @@ fi
 RUNTIME_CP="$BUILD_DIR"
 if [ -n "$EXTRA_CP" ]; then
   RUNTIME_CP="$BUILD_DIR:$EXTRA_CP"
+fi
+if [ -n "${CN1_BINARY_JARS:-}" ]; then
+  RUNTIME_CP="$RUNTIME_CP:$CN1_BINARY_JARS"
 fi
 
 if [ -n "$CN1_SOURCE_ROOTS_VALUE" ]; then

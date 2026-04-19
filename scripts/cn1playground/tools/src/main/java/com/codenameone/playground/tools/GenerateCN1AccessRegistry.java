@@ -750,30 +750,56 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
             return false;
         }
         try {
-            Method runtimeMethod = runtimeClass.getMethod(method.name, paramTypes);
+            Method runtimeMethod;
+            try {
+                runtimeMethod = runtimeClass.getMethod(method.name, paramTypes);
+            } catch (NoClassDefFoundError ex) {
+                // Some CN1 classes reference optional dependencies (e.g.
+                // JavaFX in the desktop simulator). When that class isn't on
+                // the classpath, conservatively skip the method.
+                return false;
+            }
             if (java.lang.reflect.Modifier.isStatic(runtimeMethod.getModifiers()) != method.isStatic) {
                 return false;
             }
             if (runtimeMethod.isBridge()) {
                 return false;
             }
-            if (hasGenericTypeParameters(runtimeMethod, paramTypes)) {
+            // We used to drop every method with a TypeVariable parameter to
+            // avoid emitting a `(Object)` cast that would fail to compile
+            // against narrowed-generic subclasses (e.g. com.codename1.io.
+            // Properties extends HashMap<String,String> overrides put's K,V
+            // to String,String — emitting `typedTarget.put((Object) a, ...)`
+            // fails the type check because Properties is seen as
+            // HashMap<String,String>). Now we only skip when the inherited
+            // method actually crosses a narrowed-generic boundary; for
+            // methods declared directly on the runtimeClass we keep them so
+            // that ArrayList.add, HashMap.put, etc. are dispatched.
+            if (isNarrowedInheritedGenericMethod(runtimeClass, runtimeMethod, paramTypes)) {
                 return false;
             }
-            return (returnType == null || runtimeMethod.getReturnType() == returnType)
-                    && throwsOnlySupportedExceptions(runtimeMethod.getExceptionTypes());
+            try {
+                return (returnType == null || runtimeMethod.getReturnType() == returnType)
+                        && throwsOnlySupportedExceptions(runtimeMethod.getExceptionTypes());
+            } catch (NoClassDefFoundError ex) {
+                return false;
+            }
         } catch (NoSuchMethodException ex) {
             return false;
         }
     }
 
-    private static boolean hasGenericTypeParameters(Method method, Class<?>[] paramTypes) {
+    private static boolean isNarrowedInheritedGenericMethod(Class<?> runtimeClass, Method method, Class<?>[] paramTypes) {
+        if (runtimeClass == method.getDeclaringClass()) {
+            return false;
+        }
         java.lang.reflect.Type[] genericParamTypes = method.getGenericParameterTypes();
         if (genericParamTypes.length != paramTypes.length) {
             return false;
         }
         for (int i = 0; i < paramTypes.length; i++) {
-            if (paramTypes[i] == Object.class && genericParamTypes[i] instanceof java.lang.reflect.TypeVariable) {
+            if (paramTypes[i] == Object.class
+                    && genericParamTypes[i] instanceof java.lang.reflect.TypeVariable) {
                 return true;
             }
         }

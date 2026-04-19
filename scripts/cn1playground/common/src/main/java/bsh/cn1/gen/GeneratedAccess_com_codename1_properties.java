@@ -554,12 +554,6 @@ public final class GeneratedAccess_com_codename1_properties {
                 typedTarget.removeChangeListener((com.codename1.properties.PropertyChangeListener) adaptedArgs[0]); return null;
             }
         }
-        if ("set".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
-                return typedTarget.set((java.lang.Object) adaptedArgs[0]);
-            }
-        }
         if ("setLabel".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -649,12 +643,6 @@ public final class GeneratedAccess_com_codename1_properties {
             if (matches(safeArgs, new Class<?>[]{com.codename1.properties.PropertyChangeListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.properties.PropertyChangeListener.class}, false);
                 typedTarget.removeChangeListener((com.codename1.properties.PropertyChangeListener) adaptedArgs[0]); return null;
-            }
-        }
-        if ("set".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
-                return typedTarget.set((java.lang.Object) adaptedArgs[0]);
             }
         }
         if ("setLabel".equals(name)) {
@@ -748,12 +736,6 @@ public final class GeneratedAccess_com_codename1_properties {
                 typedTarget.removeChangeListener((com.codename1.properties.PropertyChangeListener) adaptedArgs[0]); return null;
             }
         }
-        if ("set".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
-                return typedTarget.set((java.lang.Object) adaptedArgs[0]);
-            }
-        }
         if ("setLabel".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -843,12 +825,6 @@ public final class GeneratedAccess_com_codename1_properties {
             if (matches(safeArgs, new Class<?>[]{com.codename1.properties.PropertyChangeListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.properties.PropertyChangeListener.class}, false);
                 typedTarget.removeChangeListener((com.codename1.properties.PropertyChangeListener) adaptedArgs[0]); return null;
-            }
-        }
-        if ("set".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
-                return typedTarget.set((java.lang.Object) adaptedArgs[0]);
             }
         }
         if ("setLabel".equals(name)) {
@@ -942,12 +918,6 @@ public final class GeneratedAccess_com_codename1_properties {
                 typedTarget.removeChangeListener((com.codename1.properties.PropertyChangeListener) adaptedArgs[0]); return null;
             }
         }
-        if ("set".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
-                return typedTarget.set((java.lang.Object) adaptedArgs[0]);
-            }
-        }
         if ("setLabel".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -1039,12 +1009,6 @@ public final class GeneratedAccess_com_codename1_properties {
                 typedTarget.removeChangeListener((com.codename1.properties.PropertyChangeListener) adaptedArgs[0]); return null;
             }
         }
-        if ("set".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
-                return typedTarget.set((java.lang.Object) adaptedArgs[0]);
-            }
-        }
         if ("setLabel".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -1129,12 +1093,6 @@ public final class GeneratedAccess_com_codename1_properties {
             if (matches(safeArgs, new Class<?>[]{com.codename1.properties.PropertyChangeListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.properties.PropertyChangeListener.class}, false);
                 typedTarget.removeChangeListener((com.codename1.properties.PropertyChangeListener) adaptedArgs[0]); return null;
-            }
-        }
-        if ("set".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
-                return typedTarget.set((java.lang.Object) adaptedArgs[0]);
             }
         }
         if ("setLabel".equals(name)) {

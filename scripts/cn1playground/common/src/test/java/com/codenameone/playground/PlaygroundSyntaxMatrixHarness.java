@@ -343,33 +343,30 @@ public final class PlaygroundSyntaxMatrixHarness {
     // ------------------------------------------------------------------
     private static void addGenerics(List<Case> cases) {
         String cat = "generics";
-        // Collections currently hit a registry gap (ArrayList.add etc. not dispatched).
-        // These will flip to SUCCESS when Phase 4 expands the access registry.
         cases.add(new Case(cat, "list_explicit_type", ui(""
                 + "List<String> items = new ArrayList<String>();\n"
                 + "items.add(\"a\"); items.add(\"b\");\n"
-                + "root.add(new Label(\"n=\" + items.size()));"), ExpectedOutcome.EVAL_ERROR, "Generated instance dispatch not implemented"));
+                + "root.add(new Label(\"n=\" + items.size()));"), ExpectedOutcome.SUCCESS, null));
         cases.add(new Case(cat, "list_diamond", ui(""
                 + "List<String> items = new ArrayList<>();\n"
                 + "items.add(\"a\"); items.add(\"b\");\n"
-                + "root.add(new Label(\"n=\" + items.size()));"), ExpectedOutcome.EVAL_ERROR, "Generated instance dispatch not implemented"));
+                + "root.add(new Label(\"n=\" + items.size()));"), ExpectedOutcome.SUCCESS, null));
         cases.add(new Case(cat, "map_nested_generics", ui(""
                 + "Map<String, List<Integer>> m = new HashMap<String, List<Integer>>();\n"
                 + "m.put(\"a\", new ArrayList<Integer>());\n"
                 + "m.get(\"a\").add(1);\n"
-                + "root.add(new Label(\"n=\" + m.get(\"a\").size()));"), ExpectedOutcome.EVAL_ERROR, "Generated instance dispatch not implemented"));
-        // size() is dispatched through a different path than add(), so this already works.
+                + "root.add(new Label(\"n=\" + m.get(\"a\").size()));"), ExpectedOutcome.SUCCESS, null));
         cases.add(new Case(cat, "wildcard_extends", ui(""
                 + "List<? extends Number> nums = new ArrayList<Integer>();\n"
                 + "root.add(new Label(\"n=\" + nums.size()));"), ExpectedOutcome.SUCCESS, null));
         cases.add(new Case(cat, "wildcard_super", ui(""
                 + "List<? super Integer> sink = new ArrayList<Number>();\n"
                 + "sink.add(1);\n"
-                + "root.add(new Label(\"ok\"));"), ExpectedOutcome.EVAL_ERROR, "Generated instance dispatch not implemented"));
+                + "root.add(new Label(\"ok\"));"), ExpectedOutcome.SUCCESS, null));
         cases.add(new Case(cat, "raw_type_mix", ui(""
                 + "List items = new ArrayList();\n"
                 + "items.add(\"a\");\n"
-                + "root.add(new Label(\"n=\" + items.size()));"), ExpectedOutcome.EVAL_ERROR, "Generated instance dispatch not implemented"));
+                + "root.add(new Label(\"n=\" + items.size()));"), ExpectedOutcome.SUCCESS, null));
     }
 
     // ------------------------------------------------------------------
@@ -445,13 +442,12 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "String txt = \"\";\n"
                 + "for (String v : new String[]{\"a\",\"b\"}) txt += v;\n"
                 + "root.add(new Label(txt));"), ExpectedOutcome.SUCCESS, null));
-        // List iteration hits the same registry gap as other collections today.
         cases.add(new Case(cat, "list_iteration", ui(""
                 + "List<String> items = new ArrayList<String>();\n"
                 + "items.add(\"a\"); items.add(\"b\");\n"
                 + "String txt = \"\";\n"
                 + "for (String v : items) txt += v;\n"
-                + "root.add(new Label(txt));"), ExpectedOutcome.EVAL_ERROR, "Generated instance dispatch not implemented"));
+                + "root.add(new Label(txt));"), ExpectedOutcome.SUCCESS, null));
         cases.add(new Case(cat, "nested", ui(""
                 + "int count = 0;\n"
                 + "for (int row : new int[]{1,2}) for (int col : new int[]{3,4}) count += row + col;\n"
