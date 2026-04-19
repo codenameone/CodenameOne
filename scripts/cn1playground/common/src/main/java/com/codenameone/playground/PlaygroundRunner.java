@@ -2114,7 +2114,12 @@ final class PlaygroundRunner {
             if (paramNames == null) {
                 return script;
             }
-            String bodyText = normalizeLambdaBody(body);
+            // Rewrite lambdas that appear in the body BEFORE normalization
+            // (which prepends `return`, creating non-param prefix text that
+            // would confuse rewriteLambdaExpression). This handles nested
+            // top-level lambdas like `a -> b -> a + b`.
+            String recursedBody = rewriteTopLevelLambdas(body);
+            String bodyText = normalizeLambdaBody(recursedBody);
             if (bodyText == null) {
                 return script;
             }

@@ -412,6 +412,35 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "int[] a = new int[]{3};\n"
                 + "int before = a[0]--;\n"
                 + "root.add(new Label(\"before=\" + before + \" after=\" + a[0]));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "nested_lambdas", ui(""
+                + "import java.util.function.*;\n"
+                + "Function<Integer, Function<Integer, Integer>> adder = a -> b -> a + b;\n"
+                + "root.add(new Label(\"v=\" + adder.apply(3).apply(4)));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "array_access_in_ternary", ui(""
+                + "int[] arr = new int[]{1,2,3};\n"
+                + "int pick = 2;\n"
+                + "int v = pick >= 0 && pick < arr.length ? arr[pick] : -1;\n"
+                + "root.add(new Label(\"v=\" + v));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "class_with_static_field_used_via_instance", ui(""
+                + "class Counter { static int total = 0; void tick() { total = total + 1; } }\n"
+                + "Counter a = new Counter();\n"
+                + "a.tick(); a.tick(); a.tick();\n"
+                + "root.add(new Label(\"total=\" + Counter.total));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "method_ref_in_sort", ui(""
+                + "import java.util.*;\n"
+                + "List<String> items = new ArrayList<>();\n"
+                + "items.add(\"bbb\"); items.add(\"a\"); items.add(\"cc\");\n"
+                + "Collections.sort(items, (a, b) -> Integer.compare(a.length(), b.length()));\n"
+                + "root.add(new Label(items.toString()));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "long_chain_calls", ui(""
+                + "import java.util.*;\n"
+                + "String s = new ArrayList<String>().toString();\n"
+                + "root.add(new Label(s));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "cast_of_scripted_instance", ui(""
+                + "class A { int v() { return 5; } }\n"
+                + "Object o = new A();\n"
+                + "A a = (A) o;\n"
+                + "root.add(new Label(\"v=\" + a.v()));"), ExpectedOutcome.SUCCESS, null));
         cases.add(new Case(cat, "lambda_method_ref_combo", ui(""
                 + "import java.util.function.*;\n"
                 + "Predicate<String> nonEmpty = s -> s.length() > 0;\n"
