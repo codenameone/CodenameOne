@@ -937,6 +937,50 @@ public class Simd {
         }
     }
 
+    /// Fused single-pass extension of `blendByMaskTestNonzero` that additionally substitutes
+    /// `removeValue` whenever the post-mask result would equal `removeMatch`. For every element:
+    ///
+    /// ```
+    /// v = src[i]
+    /// if ((v & testMask) == 0)            dst[i] = v
+    /// else if ((v & trueKeepMask) == removeMatch) dst[i] = removeValue
+    /// else                                dst[i] = (v & trueKeepMask) | trueOrValue
+    /// ```
+    ///
+    /// This collapses a `blendByMaskTestNonzero` + `cmpEq` + `select` chain (three passes over the
+    /// buffer plus two scratch allocations) into a single vector pass. It maps to one NEON / SSE
+    /// loop on platforms that ship a vectorized implementation. **All arrays MUST be aligned /
+    /// registered arrays.**
+    public void blendByMaskTestNonzeroSubstituteOnKeepEq(int[] src, int srcOffset, int testMask, int trueKeepMask, int trueOrValue, int removeMatch, int removeValue, int[] dst, int dstOffset, int length) {
+        for (int i = 0; i < length; i++) {
+            int v = src[srcOffset + i];
+            if ((v & testMask) == 0) {
+                dst[dstOffset + i] = v;
+            } else {
+                int kept = v & trueKeepMask;
+                dst[dstOffset + i] = (kept == removeMatch) ? removeValue : kept | trueOrValue;
+            }
+        }
+    }
+
+    /// Fused single-pass replacement of the top byte of every int in `rgbSrc` with the
+    /// corresponding unsigned byte from `alphaSrc`. For every element:
+    ///
+    /// `dst[i] = (rgbSrc[i] & 0x00ffffff) | ((alphaSrc[i] & 0xff) << 24)`
+    ///
+    /// Designed for the `Image.applyMask` hot path, which previously required four separate
+    /// primitive calls (`unpackUnsignedByteToInt`, `shl`, `and`, `or`) and two scratch
+    /// allocations. Maps to a single NEON / SSE vector loop (`vmovl_u8` ⇒ `vshlq_n_u32(24)`
+    /// ⇒ `vorrq(vandq, …)`) on platforms that ship a vectorized implementation.
+    /// **All arrays MUST be aligned / registered arrays.**
+    public void replaceTopByteFromUnsignedBytes(int[] rgbSrc, int rgbSrcOffset, byte[] alphaSrc, int alphaSrcOffset, int[] dst, int dstOffset, int length) {
+        for (int i = 0; i < length; i++) {
+            int rgb = rgbSrc[rgbSrcOffset + i] & 0x00ffffff;
+            int alpha = (alphaSrc[alphaSrcOffset + i] & 0xff) << 24;
+            dst[dstOffset + i] = rgb | alpha;
+        }
+    }
+
 
     /// This API is used internally to verify valid array arguments in the simulator
     /// notice that no validation occurs on the devices.

@@ -1201,15 +1201,10 @@ public class Image implements ActionSource {
             // Simd-registered array, so we can operate on it in place. Mask data
             // may have been produced outside of createMask (e.g. deserialized
             // IndexedImage), so copy it once into a registered scratch.
-            int[] tmp = simd.allocaInt(total);
             byte[] maskBuf = simd.allocaByte(total);
             System.arraycopy(maskData, 0, maskBuf, 0, total);
-            // tmp[i] = (mask[i] & 0xff) << 24
-            simd.unpackUnsignedByteToInt(maskBuf, 0, tmp, 0, total);
-            simd.shl(tmp, 0, 24, tmp, 0, total);
-            // rgb[i] = (rgb[i] & 0x00ffffff) | tmp[i]
-            simd.and(rgb, 0, 0xffffff, rgb, 0, total);
-            simd.or(rgb, 0, tmp, 0, rgb, 0, total);
+            // rgb[i] = (rgb[i] & 0x00ffffff) | ((maskBuf[i] & 0xff) << 24)
+            simd.replaceTopByteFromUnsignedBytes(rgb, 0, maskBuf, 0, rgb, 0, total);
         } else {
             int mdlen = maskData.length;
             for (int iter = 0; iter < mdlen; iter++) {
@@ -1705,30 +1700,27 @@ public class Image implements ActionSource {
 
     /// Replaces the alpha of every non-fully-transparent pixel with `alphaInt`
     /// and additionally zeroes any pixel whose RGB component matches `removeColor`
-    /// (low 24 bits) after the alpha replacement. Composed of three Simd passes:
-    /// (1) a fused alpha-replace into a scratch buffer via `blendByMaskTestNonzero`,
-    /// (2) a constant `cmpEq` against the post-replacement value that flags pixels we
-    /// must zero (originally non-transparent AND matching removeColor), and
-    /// (3) a `select` that writes either 0 or the scratch value back into `arr`.
+    /// (low 24 bits) after the alpha replacement. Implemented as a single fused pass via
+    /// `Simd.blendByMaskTestNonzeroSubstituteOnKeepEq`, equivalent to:
+    /// ```
+    /// arr[i] = (arr[i] & 0xff000000) == 0 ? arr[i]
+    ///        : (arr[i] & 0x00ffffff) == removeColor ? 0
+    ///        : (arr[i] & 0x00ffffff) | alphaMask
+    /// ```
     ///
     /// `arr` MUST be a Simd-registered int array (see
     /// `replaceAlphaPreserveTransparentSimd`).
     static void replaceAlphaPreserveTransparentRemoveColorSimd(int[] arr, int arrOffset, int alphaInt, int removeColor, int length) {
-        Simd simd = Simd.get();
         int alphaMask = alphaInt & 0xff000000;
         int rgbOnly = removeColor & 0x00ffffff;
-        // The post-replacement encoding of a "must remove" pixel: alpha was non-zero (so it got
-        // alphaMask spliced in) and its low 24 bits equal removeColor.
-        int removedSentinel = alphaMask | rgbOnly;
-        int[] tmp = simd.allocaInt(length);
-        byte[] removeMask = simd.allocaByte(length);
-        // tmp[i] = (arr[i] & 0xff000000) != 0 ? (arr[i] & 0x00ffffff) | alphaMask : arr[i]
-        simd.blendByMaskTestNonzero(arr, arrOffset, 0xff000000, 0x00ffffff, alphaMask, tmp, 0, length);
-        // removeMask[i] = (tmp[i] == removedSentinel)
-        // (Originally-transparent pixels still have alpha 0 in tmp, so they cannot match.)
-        simd.cmpEq(tmp, 0, removedSentinel, removeMask, 0, length);
-        // arr[i] = removeMask[i] ? 0 : tmp[i]
-        simd.select(removeMask, 0, 0, tmp, 0, arr, arrOffset, length);
+        Simd.get().blendByMaskTestNonzeroSubstituteOnKeepEq(
+                arr, arrOffset,
+                0xff000000,   // testMask: select pixels whose alpha was non-zero
+                0x00ffffff,   // trueKeepMask: keep the RGB bits
+                alphaMask,    // trueOrValue: splice in the new alpha
+                rgbOnly,      // removeMatch: kept-bits == removeColor
+                0,            // removeValue: zero out matching pixels
+                arr, arrOffset, length);
     }
 
     /// Scales the image to the given width while updating the height based on the

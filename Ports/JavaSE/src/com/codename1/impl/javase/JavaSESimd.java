@@ -884,6 +884,28 @@ public class JavaSESimd extends Simd {
         super.blendByMaskTestNonzero(src, srcOffset, testMask, trueKeepMask, trueOrValue, dst, dstOffset, length);
     }
 
+    @Override
+    public void blendByMaskTestNonzeroSubstituteOnKeepEq(int[] src, int srcOffset, int testMask, int trueKeepMask, int trueOrValue, int removeMatch, int removeValue, int[] dst, int dstOffset, int length) {
+        validateNotNull(src, "src");
+        validateNotNull(dst, "dst");
+        validateRange(src.length, srcOffset, length, "src");
+        validateRange(dst.length, dstOffset, length, "dst");
+        validateRegistered(src, dst);
+        super.blendByMaskTestNonzeroSubstituteOnKeepEq(src, srcOffset, testMask, trueKeepMask, trueOrValue, removeMatch, removeValue, dst, dstOffset, length);
+    }
+
+    @Override
+    public void replaceTopByteFromUnsignedBytes(int[] rgbSrc, int rgbSrcOffset, byte[] alphaSrc, int alphaSrcOffset, int[] dst, int dstOffset, int length) {
+        validateNotNull(rgbSrc, "rgbSrc");
+        validateNotNull(alphaSrc, "alphaSrc");
+        validateNotNull(dst, "dst");
+        validateRange(rgbSrc.length, rgbSrcOffset, length, "rgbSrc");
+        validateRange(alphaSrc.length, alphaSrcOffset, length, "alphaSrc");
+        validateRange(dst.length, dstOffset, length, "dst");
+        validateRegistered(rgbSrc, alphaSrc, dst);
+        super.replaceTopByteFromUnsignedBytes(rgbSrc, rgbSrcOffset, alphaSrc, alphaSrcOffset, dst, dstOffset, length);
+    }
+
     private void validateRegistered(Object... arrays) {
         for (int i = 0; i < arrays.length; i++) {
             Object arr = arrays[i];
