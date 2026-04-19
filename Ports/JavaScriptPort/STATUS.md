@@ -135,6 +135,55 @@ pushing. Going forward, every iteration must include:
 - a clear hypothesis for what should change in the next CI log before suggesting the
   user run CI again.
 
+Local Verification of Parser Fix (2026-04-19, live)
+---------------------------------------------------
+
+Verified locally after the translator fix + `TEST_TIMEOUT_MS=10000` reduction:
+
+1. Rebuilt `maven/parparvm` + `codenameone-core` + `hellocodenameone-common` with fresh
+   Parser.java, then `scripts/build-javascript-port-hellocodenameone.sh` produced a
+   30 MB bundle at `/tmp/hello-js-local.zip`.
+2. Inspected `SheetScreenshotTest_lambda_0_run` in the rebuilt `translated_app.js`:
+   now emits the canonical 6-op sequence (3 × `s_i = l0; s_i = s_i[arg_n]`) with
+   `__target = s0` and `method(__target, s1, s2)` — exactly what Java bytecode should
+   produce. Lambda fix landed.
+3. Ran the browser harness locally with a generous 270 s browser lifetime:
+   - **32 distinct screenshot streams emitted** (vs 2 at the start of this pass, 28
+     after the earlier cleanup, 30 after the lambda fix before the timeout tweak).
+   - SheetScreenshotTest, TabsScreenshotTest, ImageViewerNavigationScreenshotTest,
+     TextAreaAlignmentScreenshotTest — all completing with screenshots now.
+   - 33 tests finish in order; test #34 (`ValidatorLightweightPickerScreenshotTest`)
+     blocks suite completion.
+4. Isolated the new blocker from the `__parparError` state dump at end of log:
+   ```
+   TypeError: Cannot read properties of null (reading '__classDef')
+     at cn1_..._HTML5Implementation_transformPoint_java_lang_Object_float_1ARRAY_float_1ARRAY (translated_app.js:279497:33)
+     at cn1_..._ui_Transform_transformPoint_float_1ARRAY_float_1ARRAY
+     at cn1_..._ui_scene_Node_getBoundsInScene
+     at cn1_..._ui_spinner_SpinnerNode_render
+     at cn1_..._ui_scene_Scene_paint
+   ```
+   `HTML5Implementation.transformPoint(nativeTransform, in, out)` casts the first arg
+   to `JSAffineTransform` without a null check (neither iOS nor Android check there
+   either, but on those platforms the value is never null). Something up the stack —
+   likely the picker's popup `SpinnerNode` — is constructing a `Transform` whose
+   native backing is null in the JS port. Out of scope for this pass; needs its own
+   investigation. It crashes the worker and keeps the suite from reaching
+   `CN1SS:SUITE:FINISHED`.
+
+Summary of the pass:
+- **Parser.java lambda-synthesis fix** is a root-cause translator fix; SheetScreenshotTest
+  and every other multi-capture-lambda test now completes. Regression test
+  (`preservesCapturingLambdaDispatchInWorkerRuntime`) locks it in.
+- **Test timeout 30s → 10s** keeps genuinely stuck UI tests from eating the CI budget
+  so later tests get their turn. Well-behaved tests unaffected (their UITimer chain
+  runs in ~1500 ms).
+- **Screenshots on a local run**: 32 distinct streams covering all the graphics
+  primitive tests, plus the composite tests that use multi-capture lambdas.
+- **New remaining blocker surfaced, not yet fixed**: ValidatorLightweightPickerScreenshotTest's
+  null-nativeTransform TypeError in the spinner render path. Addressing this is the
+  right focus for the next pass, not more patchwork at the port-js layer.
+
 
 
 Latest Investigation Snapshot (current CI unblock chain)
