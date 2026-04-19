@@ -71,6 +71,34 @@ public final class ScriptedClass {
         return parent.findInstanceMethodTemplate(methodName, args);
     }
 
+    /** Stack of classes currently being dispatched through, per thread.
+     * When we enter a method via super.foo(), we push the parent class here
+     * so that a nested super.foo() inside that method resolves relative to
+     * the PARENT's parent (i.e. grandparent), not the actual instance's
+     * parent. Without this, multi-level inheritance super chains loop. */
+    private static final ThreadLocal<java.util.ArrayDeque<ScriptedClass>> DISPATCH_STACK =
+            new ThreadLocal<java.util.ArrayDeque<ScriptedClass>>() {
+                @Override protected java.util.ArrayDeque<ScriptedClass> initialValue() {
+                    return new java.util.ArrayDeque<ScriptedClass>();
+                }
+            };
+
+    public static void pushDispatchClass(ScriptedClass c) {
+        DISPATCH_STACK.get().push(c);
+    }
+
+    public static void popDispatchClass() {
+        java.util.ArrayDeque<ScriptedClass> s = DISPATCH_STACK.get();
+        if (!s.isEmpty()) s.pop();
+    }
+
+    /** Class whose super we should consult for a super.x() call in the
+     * current dispatch frame, if any. */
+    public static ScriptedClass currentDispatchClass() {
+        java.util.ArrayDeque<ScriptedClass> s = DISPATCH_STACK.get();
+        return s.isEmpty() ? null : s.peek();
+    }
+
     /** Build a ScriptedClass from a class-declaration body, evaluating
      * static initializers eagerly. The optional {@code parent} is a
      * previously-declared ScriptedClass whose instance methods and field
@@ -221,10 +249,16 @@ public final class ScriptedClass {
             BSHBlock constBody = findConstantBody(ec);
             ScriptedInstance constant;
             if (constBody != null) {
+                // Declare the anon subclass against this enum's static
+                // namespace so the anon's methods can refer to sibling
+                // constants (e.g. `return CLOSED;` from OPEN's body).
                 ScriptedClass anon = ScriptedClass.build(
                         name + "$" + constantName,
-                        declaringNameSpace, constBody, this,
+                        staticNameSpace, constBody, this,
                         callstack, interpreter);
+                // Propagate the enum marker so built-in name()/ordinal()
+                // dispatch still works on per-constant anonymous subclasses.
+                anon.markEnum(true);
                 constant = anon.newInstance(args, callstack, interpreter);
             } else {
                 constant = newInstance(args, callstack, interpreter);

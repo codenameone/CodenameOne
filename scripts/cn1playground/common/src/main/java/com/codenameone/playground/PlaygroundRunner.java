@@ -522,11 +522,25 @@ final class PlaygroundRunner {
     /**
      * Rewrites Java 14+ switch expressions of the form
      * {@code <Type> <name> = switch (<expr>) { case <v> -> <r>; ...; default -> <rd>; };}
-     * into a declaration plus a traditional switch statement. Only the
-     * single-expression assignment shape is handled; nested switch
-     * expressions used inline (e.g. as a method argument) still parse-error.
+     * into a declaration plus a traditional switch statement. Runs
+     * iteratively so that nested switch expressions (a switch produced as
+     * the right-hand-side of a case body from an outer rewrite) are also
+     * handled. Switch expressions used inline (as a method argument) still
+     * parse-error.
      */
     private String rewriteSwitchExpressions(String script) {
+        String prev = null;
+        String cur = script;
+        int iterations = 0;
+        while (!cur.equals(prev) && iterations < 16) {
+            prev = cur;
+            cur = rewriteSwitchExpressionsOnce(cur);
+            iterations++;
+        }
+        return cur;
+    }
+
+    private String rewriteSwitchExpressionsOnce(String script) {
         StringBuilder out = new StringBuilder();
         int i = 0;
         int last = 0;

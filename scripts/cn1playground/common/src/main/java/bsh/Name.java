@@ -839,14 +839,27 @@ class Name implements java.io.Serializable
         if ( prefix.equals("super") && Name.countParts(value) == 2 ) {
             // Scripted-class super dispatch: walk up the callstack to find the
             // bound ScriptedInstance and invoke the parent's method template.
+            // The "current dispatch class" override is consulted first so
+            // that chained super calls through multi-level inheritance
+            // advance up the chain instead of looping on the same parent.
             ScriptedInstance scriptedThis = findScriptedThis(callstack);
             if (scriptedThis != null) {
-                ScriptedClass.MethodTemplate parentTpl =
-                        scriptedThis.getScriptedClass()
-                                .findParentInstanceMethodTemplate(methodName, args);
+                ScriptedClass dispatchClass = ScriptedClass.currentDispatchClass();
+                if (dispatchClass == null) {
+                    dispatchClass = scriptedThis.getScriptedClass();
+                }
+                ScriptedClass parentClass = dispatchClass.getParent();
+                ScriptedClass.MethodTemplate parentTpl = parentClass == null
+                        ? null
+                        : parentClass.findInstanceMethodTemplate(methodName, args);
                 if (parentTpl != null) {
                     BshMethod bound = parentTpl.bind(scriptedThis.getInstanceNameSpace());
-                    return bound.invoke(args, interpreter, callstack, callerInfo, false);
+                    ScriptedClass.pushDispatchClass(parentClass);
+                    try {
+                        return bound.invoke(args, interpreter, callstack, callerInfo, false);
+                    } finally {
+                        ScriptedClass.popDispatchClass();
+                    }
                 }
                 throw new UtilEvalError("No super method "
                         + scriptedThis.getScriptedClass().getName()
