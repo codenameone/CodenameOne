@@ -785,6 +785,23 @@ class Name implements java.io.Serializable
             java.lang.Integer.getInteger("foo");
         </pre>
     */
+    /** Walk up the callstack to find a NameSpace whose `this` binding is a
+     * ScriptedInstance. Used to back-out the receiver for `super.foo()`
+     * dispatch from inside a scripted-class method body. */
+    private static ScriptedInstance findScriptedThis(CallStack callstack) {
+        if (callstack == null) return null;
+        for (int i = 0; i < callstack.depth(); i++) {
+            NameSpace ns = callstack.get(i);
+            try {
+                Object t = ns.getVariable("this");
+                if (t instanceof ScriptedInstance) return (ScriptedInstance) t;
+            } catch (UtilEvalError ex) {
+                // continue walking
+            }
+        }
+        return null;
+    }
+
     public Object invokeMethod(
         Interpreter interpreter, Object[] args, CallStack callstack,
         Node callerInfo
@@ -820,6 +837,22 @@ class Name implements java.io.Serializable
 
         // Superclass method invocation? (e.g. super.foo())
         if ( prefix.equals("super") && Name.countParts(value) == 2 ) {
+            // Scripted-class super dispatch: walk up the callstack to find the
+            // bound ScriptedInstance and invoke the parent's method template.
+            ScriptedInstance scriptedThis = findScriptedThis(callstack);
+            if (scriptedThis != null) {
+                ScriptedClass.MethodTemplate parentTpl =
+                        scriptedThis.getScriptedClass()
+                                .findParentInstanceMethodTemplate(methodName, args);
+                if (parentTpl != null) {
+                    BshMethod bound = parentTpl.bind(scriptedThis.getInstanceNameSpace());
+                    return bound.invoke(args, interpreter, callstack, callerInfo, false);
+                }
+                throw new UtilEvalError("No super method "
+                        + scriptedThis.getScriptedClass().getName()
+                        + "." + methodName + "/"
+                        + (args == null ? 0 : args.length));
+            }
             // Allow getThis() to work through block namespaces first
             This ths = namespace.getThis( interpreter );
             NameSpace thisNameSpace = ths.getNameSpace();

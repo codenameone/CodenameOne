@@ -556,6 +556,11 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "class Derived extends Base { int sum() { return x + 1; } }\n"
                 + "Derived d = new Derived();\n"
                 + "root.add(new Label(\"v=\" + d.sum()));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "super_method_dispatch", ui(""
+                + "class Base { int v() { return 10; } }\n"
+                + "class Derived extends Base { int v() { return super.v() + 5; } }\n"
+                + "Derived d = new Derived();\n"
+                + "root.add(new Label(\"v=\" + d.v()));"), ExpectedOutcome.SUCCESS, null));
         cases.add(new Case(cat, "two_instances_independent", ui(""
                 + "class C { int x; C(int v) { x = v; } int get() { return x; } }\n"
                 + "C a = new C(1);\n"
@@ -659,8 +664,19 @@ public final class PlaygroundSyntaxMatrixHarness {
         cases.add(new Case(cat, "arrow_int", ui(""
                 + "int x = 2;\n"
                 + "String s = switch (x) { case 1 -> \"one\"; case 2 -> \"two\"; default -> \"?\"; };\n"
-                + "root.add(new Label(s));"), ExpectedOutcome.PARSE_ERROR, null));
-        cases.add(new Case(cat, "yield_form", ui(""
+                + "root.add(new Label(s));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "arrow_string", ui(""
+                + "String x = \"b\";\n"
+                + "String s = switch (x) { case \"a\" -> \"A\"; case \"b\" -> \"B\"; default -> \"?\"; };\n"
+                + "root.add(new Label(s));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "arrow_statement", ui(""
+                + "int x = 1;\n"
+                + "String[] r = new String[]{\"\"};\n"
+                + "switch (x) { case 1 -> r[0] = \"one\"; case 2 -> r[0] = \"two\"; default -> r[0] = \"?\"; }\n"
+                + "root.add(new Label(r[0]));"), ExpectedOutcome.SUCCESS, null));
+        // yield form remains unsupported — needs proper switch-expression
+        // parser support, which the current source-rewrite path cannot produce.
+        cases.add(new Case(cat, "yield_form_unsupported", ui(""
                 + "int x = 2;\n"
                 + "String s = switch (x) { case 1: yield \"one\"; case 2: yield \"two\"; default: yield \"?\"; };\n"
                 + "root.add(new Label(s));"), ExpectedOutcome.PARSE_ERROR, null));

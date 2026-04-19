@@ -36,6 +36,7 @@ public final class ScriptedClass {
     private final List<MethodTemplate> constructors;
     private final List<BSHTypedVariableDeclaration> instanceFieldDecls;
     private final NameSpace staticNameSpace;
+    private final ScriptedClass parent;
     private boolean isInterface;
     private boolean isEnum;
     private List<ScriptedInstance> enumConstants;
@@ -43,6 +44,7 @@ public final class ScriptedClass {
     private ScriptedClass(
             String name,
             NameSpace declaringNameSpace,
+            ScriptedClass parent,
             List<MethodTemplate> instanceMethods,
             List<BshMethod> staticMethods,
             List<MethodTemplate> constructors,
@@ -50,11 +52,23 @@ public final class ScriptedClass {
             NameSpace staticNameSpace) {
         this.name = name;
         this.declaringNameSpace = declaringNameSpace;
+        this.parent = parent;
         this.instanceMethods = instanceMethods;
         this.staticMethods = staticMethods;
         this.constructors = constructors;
         this.instanceFieldDecls = instanceFieldDecls;
         this.staticNameSpace = staticNameSpace;
+    }
+
+    public ScriptedClass getParent() {
+        return parent;
+    }
+
+    /** Look up an instance method declared on the *parent* class only, used
+     * by `super.foo()` dispatch to bypass this class's override. */
+    MethodTemplate findParentInstanceMethodTemplate(String methodName, Object[] args) {
+        if (parent == null) return null;
+        return parent.findInstanceMethodTemplate(methodName, args);
     }
 
     /** Build a ScriptedClass from a class-declaration body, evaluating
@@ -138,7 +152,7 @@ public final class ScriptedClass {
             }
         }
 
-        return new ScriptedClass(name, declaringNameSpace, instanceMethods,
+        return new ScriptedClass(name, declaringNameSpace, parent, instanceMethods,
                 staticMethods, ctors, fieldDecls, staticNs);
     }
 

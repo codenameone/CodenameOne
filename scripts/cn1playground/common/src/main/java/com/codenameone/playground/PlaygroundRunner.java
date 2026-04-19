@@ -185,7 +185,255 @@ final class PlaygroundRunner {
         rewritten = rewriteKnownSamCalls(rewritten);
         rewritten = rewriteLambdaArguments(rewritten);
         rewritten = rewriteTopLevelLambdas(rewritten);
+        rewritten = rewriteSwitchExpressions(rewritten);
+        rewritten = rewriteArrowSwitchStatements(rewritten);
         return rewritten;
+    }
+
+    /**
+     * Rewrites Java 14+ switch expressions of the form
+     * {@code <Type> <name> = switch (<expr>) { case <v> -> <r>; ...; default -> <rd>; };}
+     * into a declaration plus a traditional switch statement. Only the
+     * single-expression assignment shape is handled; nested switch
+     * expressions used inline (e.g. as a method argument) still parse-error.
+     */
+    private String rewriteSwitchExpressions(String script) {
+        StringBuilder out = new StringBuilder();
+        int i = 0;
+        int last = 0;
+        while (i < script.length()) {
+            char ch = script.charAt(i);
+            if (ch == '"' || ch == '\'') { i = skipQuoted(script, i) + 1; continue; }
+            if (startsLineComment(script, i)) { i = skipLineComment(script, i) + 1; continue; }
+            if (startsBlockComment(script, i)) { i = skipBlockComment(script, i) + 1; continue; }
+            if (!startsWithWord(script, i, "switch")) { i++; continue; }
+            // Walk back to see if this is an expression-context switch
+            // (preceded by `=`). If not, leave it for the statement rewrite.
+            int back = i - 1;
+            while (back >= 0 && Character.isWhitespace(script.charAt(back))) back--;
+            if (back < 0 || script.charAt(back) != '=') { i += "switch".length(); continue; }
+            // Find the lhs (declaration or bare name). Walk back to the
+            // statement start (top-level `;` or `{` or beginning).
+            int stmtStart = findSwitchStmtStart(script, back);
+            String lhs = script.substring(stmtStart, back).trim();
+            if (lhs.length() == 0) { i += "switch".length(); continue; }
+            String varName = extractVarName(lhs);
+            if (varName == null) { i += "switch".length(); continue; }
+            int parenStart = skipWhitespace(script, i + "switch".length());
+            if (parenStart >= script.length() || script.charAt(parenStart) != '(') {
+                i += "switch".length();
+                continue;
+            }
+            int parenEnd = findMatchingParen(script, parenStart);
+            if (parenEnd < 0) break;
+            int braceStart = skipWhitespace(script, parenEnd + 1);
+            if (braceStart >= script.length() || script.charAt(braceStart) != '{') {
+                i += "switch".length();
+                continue;
+            }
+            int braceEnd = findMatchingBrace(script, braceStart);
+            if (braceEnd < 0) break;
+            int semi = skipWhitespace(script, braceEnd + 1);
+            if (semi >= script.length() || script.charAt(semi) != ';') {
+                i += "switch".length();
+                continue;
+            }
+            String discriminant = script.substring(parenStart + 1, parenEnd);
+            String body = script.substring(braceStart + 1, braceEnd);
+            String rewrittenBody = rewriteSwitchExprBodyToAssignments(body, varName);
+            if (rewrittenBody == null) { i += "switch".length(); continue; }
+            out.append(script, last, stmtStart);
+            out.append(lhs).append(';');
+            out.append("switch(").append(discriminant).append(") {")
+                    .append(rewrittenBody).append('}');
+            last = semi + 1;
+            i = last;
+        }
+        out.append(script.substring(last));
+        return out.toString();
+    }
+
+    /**
+     * Rewrites arrow-form switch *statements* (no result value):
+     * {@code switch (x) { case 1 -> doA(); default -> doB(); }} into
+     * traditional case-label form with explicit breaks.
+     */
+    private String rewriteArrowSwitchStatements(String script) {
+        StringBuilder out = new StringBuilder();
+        int i = 0;
+        int last = 0;
+        while (i < script.length()) {
+            char ch = script.charAt(i);
+            if (ch == '"' || ch == '\'') { i = skipQuoted(script, i) + 1; continue; }
+            if (startsLineComment(script, i)) { i = skipLineComment(script, i) + 1; continue; }
+            if (startsBlockComment(script, i)) { i = skipBlockComment(script, i) + 1; continue; }
+            if (!startsWithWord(script, i, "switch")) { i++; continue; }
+            int parenStart = skipWhitespace(script, i + "switch".length());
+            if (parenStart >= script.length() || script.charAt(parenStart) != '(') {
+                i += "switch".length(); continue;
+            }
+            int parenEnd = findMatchingParen(script, parenStart);
+            if (parenEnd < 0) break;
+            int braceStart = skipWhitespace(script, parenEnd + 1);
+            if (braceStart >= script.length() || script.charAt(braceStart) != '{') {
+                i += "switch".length(); continue;
+            }
+            int braceEnd = findMatchingBrace(script, braceStart);
+            if (braceEnd < 0) break;
+            String body = script.substring(braceStart + 1, braceEnd);
+            if (!containsArrowCase(body)) { i = braceEnd + 1; continue; }
+            String rewrittenBody = rewriteSwitchStmtBodyArrowToColon(body);
+            if (rewrittenBody == null) { i = braceEnd + 1; continue; }
+            out.append(script, last, braceStart + 1);
+            out.append(rewrittenBody);
+            last = braceEnd;
+            i = braceEnd;
+        }
+        out.append(script.substring(last));
+        return out.toString();
+    }
+
+    private int findSwitchStmtStart(String script, int from) {
+        int depth = 0;
+        for (int j = from; j >= 0; j--) {
+            char ch = script.charAt(j);
+            if (ch == ')' || ch == ']' || ch == '}') depth++;
+            else if (ch == '(' || ch == '[' || ch == '{') {
+                if (depth == 0) return j + 1;
+                depth--;
+            } else if (depth == 0 && ch == ';') {
+                return j + 1;
+            }
+        }
+        return 0;
+    }
+
+    /** Extract the variable name from an LHS like {@code int x} or {@code x}. */
+    private String extractVarName(String lhs) {
+        String s = lhs.trim();
+        int end = s.length();
+        int start = end;
+        while (start > 0 && (isIdentifierPart(s.charAt(start - 1)))) start--;
+        if (start >= end) return null;
+        if (!isIdentifierStart(s.charAt(start))) return null;
+        return s.substring(start, end);
+    }
+
+    /** Body is "case A -> X; case B -> Y; default -> Z;" — produce
+     * "case A: var = X; break; case B: var = Y; break; default: var = Z; break;" */
+    private String rewriteSwitchExprBodyToAssignments(String body, String varName) {
+        return rewriteSwitchBody(body, varName);
+    }
+
+    private String rewriteSwitchStmtBodyArrowToColon(String body) {
+        return rewriteSwitchBody(body, null);
+    }
+
+    private boolean containsArrowCase(String body) {
+        // Crude but sufficient: look for `->` at depth 0 within this body.
+        int depth = 0;
+        for (int j = 0; j < body.length(); j++) {
+            char ch = body.charAt(j);
+            if (ch == '"' || ch == '\'') { j = skipQuoted(body, j); continue; }
+            if (startsLineComment(body, j)) { j = skipLineComment(body, j); continue; }
+            if (startsBlockComment(body, j)) { j = skipBlockComment(body, j); continue; }
+            if (ch == '(' || ch == '[' || ch == '{') depth++;
+            else if (ch == ')' || ch == ']' || ch == '}') depth--;
+            else if (depth == 0 && ch == '-' && j + 1 < body.length() && body.charAt(j + 1) == '>') {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Walks the switch body and rewrites each {@code case <e> -> <body>;}
+     * into {@code case <e>: <body or assignment>; break;}. When {@code
+     * varName} is non-null, single-expression bodies become assignments to
+     * that variable; otherwise they stay as expression statements.
+     * Returns null if any case shape is unrecognised.
+     */
+    private String rewriteSwitchBody(String body, String varName) {
+        StringBuilder out = new StringBuilder();
+        int i = 0;
+        int n = body.length();
+        while (i < n) {
+            i = skipWhitespace(body, i);
+            if (i >= n) break;
+            String labelKw;
+            if (startsWithWord(body, i, "case")) labelKw = "case";
+            else if (startsWithWord(body, i, "default")) labelKw = "default";
+            else return null;
+            int afterKw = i + labelKw.length();
+            int arrow = -1;
+            int depth = 0;
+            int labelEnd = -1;
+            // Find the arrow `->` at depth 0.
+            for (int j = afterKw; j + 1 < n; j++) {
+                char ch = body.charAt(j);
+                if (ch == '"' || ch == '\'') { j = skipQuoted(body, j); continue; }
+                if (ch == '(' || ch == '[' || ch == '{') depth++;
+                else if (ch == ')' || ch == ']' || ch == '}') depth--;
+                else if (depth == 0 && ch == '-' && body.charAt(j + 1) == '>') {
+                    arrow = j;
+                    labelEnd = j;
+                    break;
+                }
+            }
+            if (arrow < 0) return null;
+            String label = body.substring(afterKw, labelEnd).trim();
+            int bodyStart = skipWhitespace(body, arrow + 2);
+            int bodyEnd;
+            String caseBody;
+            if (bodyStart < n && body.charAt(bodyStart) == '{') {
+                int close = findMatchingBrace(body, bodyStart);
+                if (close < 0) return null;
+                caseBody = body.substring(bodyStart + 1, close);
+                bodyEnd = close + 1;
+                int semi = skipWhitespace(body, bodyEnd);
+                if (semi < n && body.charAt(semi) == ';') bodyEnd = semi + 1;
+            } else {
+                int semi = findTopLevelSemicolon(body, bodyStart);
+                if (semi < 0) return null;
+                caseBody = body.substring(bodyStart, semi);
+                bodyEnd = semi + 1;
+            }
+            out.append(' ').append(labelKw);
+            if ("case".equals(labelKw)) {
+                out.append(' ').append(label).append(':');
+            } else {
+                out.append(':');
+            }
+            out.append(' ');
+            String trimmedBody = caseBody.trim();
+            if (varName != null && !trimmedBody.endsWith(";")) {
+                out.append(varName).append(" = ").append(trimmedBody).append(';');
+            } else if (varName != null) {
+                // block body — assume last expression-statement is the
+                // implicit yield. Keep body as-is.
+                out.append(caseBody).append(';');
+            } else {
+                out.append(caseBody);
+                if (!caseBody.trim().endsWith(";") && !caseBody.trim().endsWith("}")) out.append(';');
+            }
+            out.append(" break;");
+            i = bodyEnd;
+        }
+        return out.toString();
+    }
+
+    private int findTopLevelSemicolon(String text, int from) {
+        int depth = 0;
+        for (int j = from; j < text.length(); j++) {
+            char ch = text.charAt(j);
+            if (ch == '"' || ch == '\'') { j = skipQuoted(text, j); continue; }
+            if (startsLineComment(text, j)) { j = skipLineComment(text, j); continue; }
+            if (startsBlockComment(text, j)) { j = skipBlockComment(text, j); continue; }
+            if (ch == '(' || ch == '[' || ch == '{') depth++;
+            else if (ch == ')' || ch == ']' || ch == '}') depth--;
+            else if (depth == 0 && ch == ';') return j;
+        }
+        return -1;
     }
 
     private String rewriteInlineAutoCloseableClasses(String script) {
