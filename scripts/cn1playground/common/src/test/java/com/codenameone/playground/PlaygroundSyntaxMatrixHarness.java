@@ -419,14 +419,24 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "Button b = new Button(\"Go\");\n"
                 + "b.addActionListener(prefix::concat);\n"
                 + "root.add(b);"), ExpectedOutcome.SUCCESS, null));
-        cases.add(new Case(cat, "constructor_ref_zero_arg_unsupported", ui(""
+        cases.add(new Case(cat, "constructor_ref", ui(""
                 + "import java.util.function.*;\n"
-                + "Supplier<StringBuilder> ctor = StringBuilder::new;\n"
-                + "root.add(new Label(ctor.get().toString()));"), ExpectedOutcome.EVAL_ERROR, null));
-        cases.add(new Case(cat, "unbound_instance_unsupported", ui(""
+                + "Supplier<ArrayList> ctor = ArrayList::new;\n"
+                + "root.add(new Label(\"size=\" + ctor.get().size()));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "unbound_instance", ui(""
                 + "import java.util.function.*;\n"
                 + "Function<String, Integer> len = String::length;\n"
-                + "root.add(new Label(\"n=\" + len.apply(\"abc\")));"), ExpectedOutcome.EVAL_ERROR, null));
+                + "root.add(new Label(\"n=\" + len.apply(\"abc\")));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "predicate", ui(""
+                + "import java.util.function.*;\n"
+                + "Predicate<String> p = s -> s.length() > 2;\n"
+                + "root.add(new Label(\"p=\" + p.test(\"abcd\") + \" \" + p.test(\"a\")));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "consumer", ui(""
+                + "import java.util.function.*;\n"
+                + "String[] sink = new String[]{\"\"};\n"
+                + "Consumer<String> c = s -> sink[0] = s;\n"
+                + "c.accept(\"hello\");\n"
+                + "root.add(new Label(sink[0]));"), ExpectedOutcome.SUCCESS, null));
     }
 
     // ------------------------------------------------------------------

@@ -379,7 +379,20 @@ final class PlaygroundRunner {
             if (receiver.isEmpty()) { i += 2; continue; }
             String replacement;
             if ("new".equals(target)) {
-                replacement = "((__mref_a) -> new " + receiver + "(__mref_a))";
+                // Both zero- and one-arg constructor refs are common; emit a
+                // zero-arg lambda since most are passed to Supplier-style
+                // SAMs. One-arg constructor refs (Consumer<T> applying new
+                // Wrapper(T)) remain a documented limitation.
+                replacement = "(() -> new " + receiver + "())";
+            } else if (looksLikeClassName(receiver)) {
+                // Class-like receiver: could be either static (`Math::abs`)
+                // or unbound instance (`String::length`). Java disambiguates
+                // via target SAM info; we emit the unbound-instance shape
+                // because the method name is more often an instance method.
+                // Static refs in known-SAM call sites (System.out::println)
+                // are unaffected — `System.out` is not a single uppercase
+                // identifier, so this branch doesn't fire there.
+                replacement = "((__mref_a) -> __mref_a." + target + "())";
             } else {
                 replacement = "((__mref_a) -> " + receiver + "." + target + "(__mref_a))";
             }
@@ -389,6 +402,16 @@ final class PlaygroundRunner {
         }
         out.append(script.substring(last));
         return out.toString();
+    }
+
+    /** Heuristic: a receiver is "class-like" if it's a single identifier
+     * starting with an uppercase letter — likely a Java class name rather
+     * than a field/local variable. */
+    private boolean looksLikeClassName(String receiver) {
+        if (receiver == null || receiver.isEmpty()) return false;
+        if (receiver.indexOf('.') >= 0) return false;
+        char c = receiver.charAt(0);
+        return Character.isUpperCase(c);
     }
 
     /** Walks back from a {@code ::} position to find the receiver expression

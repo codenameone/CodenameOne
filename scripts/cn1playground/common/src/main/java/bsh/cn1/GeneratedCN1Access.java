@@ -82,6 +82,7 @@ import bsh.cn1.gen.GeneratedAccess_java_time_format;
 import bsh.cn1.gen.GeneratedAccess_java_time_temporal;
 import bsh.cn1.gen.GeneratedAccess_java_util;
 import bsh.cn1.gen.GeneratedAccess_java_util_concurrent;
+import bsh.cn1.gen.GeneratedAccess_java_util_function;
 
 /**
  * Generated registry. Re-run tools/generate-cn1-access-registry.sh after updating the CN1 sources.
@@ -800,7 +801,14 @@ public final class GeneratedCN1Access implements CN1Access {
         "java.util.TreeMap",
         "java.util.TreeSet",
         "java.util.Vector",
-        "java.util.concurrent.ThreadLocalRandom"
+        "java.util.concurrent.ThreadLocalRandom",
+        "java.util.function.BiConsumer",
+        "java.util.function.BinaryOperator",
+        "java.util.function.Consumer",
+        "java.util.function.Function",
+        "java.util.function.Predicate",
+        "java.util.function.Supplier",
+        "java.util.function.UnaryOperator"
     };
 
     private static final Map<String, Class<?>> CLASS_INDEX = buildClassIndex();
@@ -1569,6 +1577,13 @@ public final class GeneratedCN1Access implements CN1Access {
         index.put("java.util.TreeSet", java.util.TreeSet.class);
         index.put("java.util.Vector", java.util.Vector.class);
         index.put("java.util.concurrent.ThreadLocalRandom", java.util.concurrent.ThreadLocalRandom.class);
+        index.put("java.util.function.BiConsumer", java.util.function.BiConsumer.class);
+        index.put("java.util.function.BinaryOperator", java.util.function.BinaryOperator.class);
+        index.put("java.util.function.Consumer", java.util.function.Consumer.class);
+        index.put("java.util.function.Function", java.util.function.Function.class);
+        index.put("java.util.function.Predicate", java.util.function.Predicate.class);
+        index.put("java.util.function.Supplier", java.util.function.Supplier.class);
+        index.put("java.util.function.UnaryOperator", java.util.function.UnaryOperator.class);
     }
 
     private static Map<String, String[]> buildMethodIndex() {
@@ -2331,6 +2346,13 @@ public final class GeneratedCN1Access implements CN1Access {
         index.put("java.util.TreeSet", splitMembers(""));
         index.put("java.util.Vector", splitMembers(""));
         index.put("java.util.concurrent.ThreadLocalRandom", splitMembers(""));
+        index.put("java.util.function.BiConsumer", splitMembers(""));
+        index.put("java.util.function.BinaryOperator", splitMembers(""));
+        index.put("java.util.function.Consumer", splitMembers(""));
+        index.put("java.util.function.Function", splitMembers(""));
+        index.put("java.util.function.Predicate", splitMembers(""));
+        index.put("java.util.function.Supplier", splitMembers(""));
+        index.put("java.util.function.UnaryOperator", splitMembers(""));
     }
 
     private static Map<String, String[]> buildFieldIndex() {
@@ -3093,6 +3115,13 @@ public final class GeneratedCN1Access implements CN1Access {
         index.put("java.util.TreeSet", splitMembers(""));
         index.put("java.util.Vector", splitMembers(""));
         index.put("java.util.concurrent.ThreadLocalRandom", splitMembers(""));
+        index.put("java.util.function.BiConsumer", splitMembers(""));
+        index.put("java.util.function.BinaryOperator", splitMembers(""));
+        index.put("java.util.function.Consumer", splitMembers(""));
+        index.put("java.util.function.Function", splitMembers(""));
+        index.put("java.util.function.Predicate", splitMembers(""));
+        index.put("java.util.function.Supplier", splitMembers(""));
+        index.put("java.util.function.UnaryOperator", splitMembers(""));
     }
 
     private GeneratedCN1Access() {
@@ -3355,6 +3384,9 @@ public final class GeneratedCN1Access implements CN1Access {
         if ("java.util.concurrent".equals(packageName)) {
             return GeneratedAccess_java_util_concurrent.construct(type, args);
         }
+        if ("java.util.function".equals(packageName)) {
+            return GeneratedAccess_java_util_function.construct(type, args);
+        }
         throw unsupportedConstruct(type, args);
     }
 
@@ -3594,6 +3626,9 @@ public final class GeneratedCN1Access implements CN1Access {
         }
         if ("java.util.concurrent".equals(packageName)) {
             return GeneratedAccess_java_util_concurrent.invokeStatic(type, name, args);
+        }
+        if ("java.util.function".equals(packageName)) {
+            return GeneratedAccess_java_util_function.invokeStatic(type, name, args);
         }
         throw unsupportedStatic(type, name, args);
     }
@@ -3994,6 +4029,11 @@ public final class GeneratedCN1Access implements CN1Access {
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
+        try {
+            return GeneratedAccess_java_util_function.invoke(target, name, args);
+        } catch (CN1AccessException ex) {
+            unsupported = ex;
+        }
         if (unsupported != null) {
             throw unsupported;
         }
@@ -4248,6 +4288,9 @@ public final class GeneratedCN1Access implements CN1Access {
         }
         if ("java.util.concurrent".equals(packageName)) {
             return GeneratedAccess_java_util_concurrent.getStaticField(type, name);
+        }
+        if ("java.util.function".equals(packageName)) {
+            return GeneratedAccess_java_util_function.getStaticField(type, name);
         }
         throw unsupportedStaticField(type, name);
     }
@@ -4645,6 +4688,11 @@ public final class GeneratedCN1Access implements CN1Access {
         } catch (CN1AccessException ex) {
             unsupported = ex;
         }
+        try {
+            return GeneratedAccess_java_util_function.getField(target, name);
+        } catch (CN1AccessException ex) {
+            unsupported = ex;
+        }
         if (unsupported != null) {
             throw unsupported;
         }
@@ -4964,6 +5012,10 @@ public final class GeneratedCN1Access implements CN1Access {
         }
         if ("java.util.concurrent".equals(packageName)) {
             GeneratedAccess_java_util_concurrent.setStaticField(type, name, value);
+            return;
+        }
+        if ("java.util.function".equals(packageName)) {
+            GeneratedAccess_java_util_function.setStaticField(type, name, value);
             return;
         }
         throw unsupportedStaticFieldWrite(type, name, value);
@@ -5436,6 +5488,12 @@ public final class GeneratedCN1Access implements CN1Access {
         }
         try {
             GeneratedAccess_java_util_concurrent.setField(target, name, value);
+            return;
+        } catch (CN1AccessException ex) {
+            unsupported = ex;
+        }
+        try {
+            GeneratedAccess_java_util_function.setField(target, name, value);
             return;
         } catch (CN1AccessException ex) {
             unsupported = ex;
