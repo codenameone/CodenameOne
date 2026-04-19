@@ -21,11 +21,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import com.codename1.html5.js.JSBody;
-import com.codename1.html5.js.browser.Window;
 
 import com.codename1.html5.js.JSFunctor;
 import com.codename1.html5.js.JSObject;
-import com.codename1.html5.js.JSProperty;
 import com.codename1.html5.js.core.JSArray;
 import com.codename1.html5.js.core.JSString;
 import com.codename1.html5.js.dom.Event;
@@ -48,21 +46,8 @@ public class BlobUtil {
     private native static Blob _toType(Blob blob, String type);
     
     
-    private static interface BlobCreator extends JSObject {
-        @JSBody(params={"parts","options"}, script="return new Blob(parts,options)")
-        Blob createBlob(JSArray parts, CreateBlobOptions options);
-        
-        @JSBody(params={}, script="return new Object()")
-        CreateBlobOptions newCreateBlobOptions();
-        
-        interface CreateBlobOptions extends JSObject {
-            @JSProperty
-            String getType();
-            
-            @JSProperty
-            void setType(String type);
-        }
-    }
+    @JSBody(params={"parts", "type"}, script="return new Blob(parts, {type:type})")
+    private native static Blob createBlobNative(JSArray parts, String type);
     
     private static class FileType {
         private final String mimeType;
@@ -119,11 +104,7 @@ public class BlobUtil {
         
         JSArray arr = JSArray.create(0);
         arr.push(buf);
-        
-        BlobCreator.CreateBlobOptions opts = ((BlobCreator)Window.current()).newCreateBlobOptions();
-        opts.setType(type);
-        Blob blob = ((BlobCreator)Window.current()).createBlob(arr, opts);
-        return blob;
+        return createBlobNative(arr, type);
     }
     
     public static Blob createBlob(byte[] bytes, String type) {
@@ -137,12 +118,14 @@ public class BlobUtil {
     }
     
     public static String createObjectURL(Blob blob){
-        URLBuilderFactory factory = (URLBuilderFactory)Window.current();
-        URLBuilder urlBuilder = factory.getURL();
-
-        JSObject objUrl = urlBuilder.createObjectURL(blob);
-        return ((JSString)objUrl).stringValue();
+        return createObjectURLNative(blob);
     }
+    
+    @JSBody(
+            params={"blob"},
+            script="var url = (typeof URL !== 'undefined' && URL) ? URL : ((typeof window !== 'undefined' && window.webkitURL) ? window.webkitURL : null);"
+                    + "return url ? url.createObjectURL(blob) : null;")
+    private native static String createObjectURLNative(Blob blob);
     
     public static interface BlobToFileCallback extends JSObject {
         public void complete(String fileName);
@@ -247,7 +230,7 @@ public class BlobUtil {
         final Uint8Array[] bufs = new Uint8Array[1];
         final boolean[] complete = new boolean[1];
         final String[] errors = new String[1];
-        final FileReader reader = ((FileReader.Factory)Window.current()).createFileReader();
+        final FileReader reader = createFileReader();
         reader.setOnloadend(new EventListener(){
 
             @Override
@@ -317,21 +300,6 @@ public class BlobUtil {
         public void onBlob(Blob blob);
     }
     
-    private static interface URLBuilderFactory extends JSObject {
-        @JSProperty
-        URLBuilder getURL();
-        
-        @JSProperty 
-        URLBuilder getWebkitURL();
-        
-        
-    }
-    
-    private static interface URLBuilder extends JSObject {
-        JSObject createObjectURL(Blob blob);
-    }
-    
-    
     @JSBody(params={"data"}, script="return window.Base64ToBlob(data)")
     private native static Blob base64ToBlob_(String data);
     
@@ -344,7 +312,7 @@ public class BlobUtil {
         final String[] out = new String[1];
         final boolean[] complete = new boolean[1];
         final Object lock = new Object();
-        ((JSOImplementations.WindowExt)Window.current()).BlobToBase64(blob, new JSOImplementations.DataURLCallback(){
+        blobToBase64Native(blob, new JSOImplementations.DataURLCallback(){
 
             @Override
             public void callback(final JSString str) {
@@ -375,4 +343,10 @@ public class BlobUtil {
         }
         return out[0];
     }
+    
+    @JSBody(params={}, script="return new FileReader()")
+    private native static FileReader createFileReader();
+    
+    @JSBody(params={"blob", "callback"}, script="window.BlobToBase64(blob, callback)")
+    private native static void blobToBase64Native(Blob blob, JSOImplementations.DataURLCallback callback);
 }

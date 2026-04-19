@@ -3,7 +3,89 @@
 JavaScript Port Status (ParparVM)
 =================================
 
-Last updated: 2026-04-18
+Last updated: 2026-04-19
+
+Latest Investigation Snapshot (current CI unblock chain)
+--------------------------------------------------------
+
+- Current priority remains the real CI/browser suite, not isolated per-test retries.
+- User-provided CI artifacts under `~/Downloads/javascript-ui-tests` were useful for the first broad boundary:
+  - only 28 screenshots were emitted,
+  - most missing component/text screenshots were not caused by screenshot capture,
+  - the suite was dying late in shared runtime/port glue.
+- The current shared-fix chain that moved the suite forward is:
+  1. `scripts/build-javascript-port-hellocodenameone.sh`
+     - fixed bundle composition so `parparvm-java-api.jar` is extracted last.
+     - before this, stale `codenameone-core` / `java-runtime` classes overwrote ParparVM-targeted `java.*` classes.
+  2. `HTML5Implementation.getBuildVersion_()`
+     - removed early `jQuery('html')...` dependency in worker startup.
+  3. `HTML5BrowserComponent.documentContains()` and `HTML5Peer.documentContains()`
+     - made DOM attachment checks worker/host-safe.
+  4. `BlobUtil`
+     - removed fragile JS interface casts for blob creation, object URLs, file readers, and blob-to-base64 bridging.
+  5. `JavascriptMethodGenerator.appendDirectCheckCast(...)`
+     - `CHECKCAST` now enhances wrapped JS host objects before failing.
+  6. `HTML5Implementation.NativeImage.load()`
+     - removed synchronous image-load waiting that deadlocked worker progress.
+  7. worker-safe font metrics:
+     - `determineFontHeight()`
+     - `determineFontLeading()`
+     - `measureAscent()` / `measureDescent()`
+  8. `port.js` CI fallbacks:
+     - `BlobUtil.canvasToBlobDirect` now handles host-bridged canvases via `__cn1_jso_bridge__`.
+     - this removed the late null-blob crash in image save.
+  9. rebuilt local `codenameone-core` snapshot and reinstalled it into `~/.m2`
+     - required because the JS bundle build stages `codenameone-core` from the Maven snapshot jar, not directly from `CodenameOne/src`.
+  10. `RGBImage.drawImage(..., w, h)`
+      - added scaled draw override so RGB images no longer fall back to `Image.drawImageWH(image, ...)` with a null native backing image.
+  11. `JSAffineTransform`
+      - replaced `goog.graphics.AffineTransform` factory use with an internal affine-transform shim.
+
+- What the latest full-suite runs proved:
+  - all screenshot tests now reach `CN1SS:INFO:suite finished test=...`, including:
+    - `DrawString`
+    - `DrawImage`
+    - `DrawStringDecorated`
+    - component screenshots like `TabsScreenshotTest`, `TextAreaAlignmentScreenshotTest`, picker tests, etc.
+  - the suite still times out after all tests finish because a late shared runtime path crashes before `CN1SS:SUITE:FINISHED`.
+
+- Latest blocker progression:
+  1. `TypeError: (fontStyle || '').indexOf is not a function`
+     - fixed by coercing translated Java strings in font helpers.
+  2. `TypeError: window.measureTextAscent is not a function`
+     - fixed with worker-safe ascent/descent fallbacks.
+  3. null blob / `BlobUtil.openInputStream(...)`
+     - fixed by host-bridge-aware `canvasToBlobDirect`.
+  4. null native image in scaled `RGBImage` draw path
+     - fixed by rebuilding/installing `codenameone-core` with `RGBImage.drawImage(..., w, h)` override.
+  5. `ReferenceError: goog is not defined`
+     - fixed by replacing `goog.graphics.AffineTransform`.
+  6. current boundary:
+     - `TypeError: context.setTransform is not a function`
+     - stack:
+       - `JSAffineTransform.JSOFactory.setTransform(...)`
+       - `SetTransform.execute(...)`
+     - meaning:
+       - affine values are now local and valid,
+       - but direct JSBody calls on host-bridged `CanvasRenderingContext2D` still need to route through the host bridge.
+     - current in-progress fix:
+       - `port.js` native fallbacks for:
+         - `JSAffineTransform.JSOFactory.setTransform(...)`
+         - `JSAffineTransform.JSOFactory.transform(...)`
+       - these call `__cn1_jso_bridge__` when the canvas context is a host ref.
+
+- Important note:
+  - the recurring diagnostic
+    - `PARPAR:DIAG:FIRST_FAILURE:category=unresolved_remap_tail`
+    - `methodId=cn1_java_util_List_get_int_R_java_lang_Object`
+    - `receiverClass=com_codenameone_examples_hellocodenameone_tests_BaseTest[]`
+  - is still present in logs but has not matched the actual blocking failure in the latest runs.
+
+- Current next step:
+  - rebuild with the new affine-context host-bridge fallbacks,
+  - rerun the full browser suite,
+  - confirm `CN1SS:SUITE:FINISHED`,
+  - then inspect the real `screenshot-compare.json` output instead of browser logs.
 
 Latest Investigation Snapshot (current isolated matrix)
 ------------------------------------------------------

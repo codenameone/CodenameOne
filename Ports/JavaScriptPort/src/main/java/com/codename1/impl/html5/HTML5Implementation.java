@@ -7570,7 +7570,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
     
     private String buildVersion;
     
-    @JSBody(script="return jQuery('html').attr('data-cn1-app-version')")
+    @JSBody(script="return (typeof document !== 'undefined' && document.documentElement) ? document.documentElement.getAttribute('data-cn1-app-version') : null")
     private native static String getBuildVersion_();
     
     public String getBuildVersion() {
@@ -7895,15 +7895,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
                         
                     }, false);
                 }
-                while (JavaScriptAsyncImageLoadCoordinator.shouldWait(loadState)){
-                    synchronized(lock){
-                        try {
-                            lock.wait(200);
-                        } catch (InterruptedException ex) {
-                            //Log.e(ex);
-                        }
-                    }
-                }
                 loaded = loadState.isLoaded();
                 error = loadState.isError();
                
@@ -8007,61 +7998,33 @@ public class HTML5Implementation extends CodenameOneImplementation {
     // Note that we use a special case for the font height of Material fonts to
     // try to optimize the result for FontImages and rotation.
     // https://github.com/codenameone/CodenameOne/issues/2631
-    @JSBody(params={"fontStyle"}, script="if (fontStyle.indexOf('Material') != -1) {\n"
-            + "try {\n" +
-"        var out =  parseInt(/[0-9.]+(?=pt|px)/.exec(fontStyle));\n" +
-"        return out;\n" +
-"    } catch (e){}\n"
+    @JSBody(params={"fontStyle"}, script="window.cn1_font_height_cache = window.cn1_font_height_cache || {};\n"
+            + "var style = String(fontStyle == null ? '' : fontStyle);\n"
+            + "var result = window.cn1_font_height_cache[style];\n"
+            + "if (result == null) {\n"
+            + "  var match = /([0-9.]+)(?=pt|px)/.exec(style);\n"
+            + "  var fontSize = match ? parseFloat(match[1]) : 16;\n"
+            + "  if (style.indexOf('Material') !== -1) {\n"
+            + "    result = fontSize;\n"
+            + "  } else {\n"
+            + "    result = Math.ceil(fontSize * 1.2);\n"
+            + "  }\n"
+            + "  window.cn1_font_height_cache[style] = result;\n"
             + "}\n"
-            + "window.cn1_font_height_cache = window.cn1_font_height_cache || {};\n" +
-"var result = window.cn1_font_height_cache[fontStyle];\n" +
-            "var dummy = window.cn1_font_height_dummy;\n" +
-            "if (!dummy) {\n"+
-            "   dummy = document.createElement('div');\n" +
-            "   var dummyText = document.createTextNode('M');\n"+
-            "   dummy.appendChild(dummyText);\n"+
-            "   window.cn1_font_height_dummy=dummy;\n"+
-            "   document.getElementsByTagName('body')[0].appendChild(dummy);\n"+
-            "}\n"+
-            
-"\n" +
-"if (!result)\n" +
-"{\n" +
-            "dummy.style.display='';\n" +
-" dummy.setAttribute('style', 'font:' + fontStyle + ';position:absolute;top:0;left:0;padding:0;border:none;line-height:1.2');\n" +
-" result = dummy.offsetHeight;\n" +
-"\n" +
-" window.cn1_font_height_cache[fontStyle] = result;\n" +
-" dummy.style.display='none'; document.getElementById('codenameone-canvas').setAttribute('tabindex', '0');  document.getElementById('codenameone-canvas').focus();\n" +
-"}\n" +
-"\n" +
-"return result;")
+            + "return result;")
     private native static double determineFontHeight(String fontStyle);
     
-    @JSBody(params={"fontStyle"}, script="window.cn1_font_leading_cache = window.cn1_font_leading_cache || {};\n" +
-"var result = window.cn1_font_leading_cache[fontStyle];\n" +
-            "var dummy = window.cn1_font_height_dummy;\n" +
-            "if (!dummy) {\n"+
-            "   dummy = document.createElement('div');\n" +
-            "   var dummyText = document.createTextNode('M');\n"+
-            "   dummy.appendChild(dummyText);\n"+
-            "   window.cn1_font_height_dummy=dummy;\n"+
-            "   document.getElementsByTagName('body')[0].appendChild(dummy);\n"+
-            "}\n"+
-            
-"\n" +
-"if (!result)\n" +
-"{\n" +
-            "dummy.style.display='';\n" +
-" dummy.setAttribute('style', 'font:' + fontStyle + ';position:absolute;top:0;left:0;padding:0;border:none;line-height:1.2');\n" +
-" var fontSize = parseFloat(window.getComputedStyle(dummy, null).getPropertyValue('font-size'));\n"
-+ "result = dummy.offsetHeight - fontSize;\n" +
-"\n" +
-" window.cn1_font_leading_cache[fontStyle] = result;\n" +
-" dummy.style.display='none'; document.getElementById('codenameone-canvas').setAttribute('tabindex', '0');  document.getElementById('codenameone-canvas').focus();\n" +
-"}\n" +
-"\n" +
-"return result;")
+    @JSBody(params={"fontStyle"}, script="window.cn1_font_leading_cache = window.cn1_font_leading_cache || {};\n"
+            + "var style = String(fontStyle == null ? '' : fontStyle);\n"
+            + "var result = window.cn1_font_leading_cache[style];\n"
+            + "if (result == null) {\n"
+            + "  var match = /([0-9.]+)(?=pt|px)/.exec(style);\n"
+            + "  var fontSize = match ? parseFloat(match[1]) : 16;\n"
+            + "  var fontHeight = (style.indexOf('Material') !== -1) ? fontSize : Math.ceil(fontSize * 1.2);\n"
+            + "  result = Math.max(0, fontHeight - fontSize);\n"
+            + "  window.cn1_font_leading_cache[style] = result;\n"
+            + "}\n"
+            + "return result;")
     private native static double determineFontLeading(String fontStyle);
     
     @JSBody(params={}, script="return window.cn1_use_baseline_text_rendering || false;")
@@ -8370,9 +8333,23 @@ public class HTML5Implementation extends CodenameOneImplementation {
         
     }
     
-    @JSBody(params={"fontFamily"}, script="return window.measureTextAscent(fontFamily);")
+    @JSBody(params={"fontFamily"}, script="var family = String(fontFamily == null ? '' : fontFamily);\n"
+            + "if (typeof window.measureTextAscent === 'function') {\n"
+            + "  return window.measureTextAscent(family);\n"
+            + "}\n"
+            + "if (family.indexOf('Material') !== -1) {\n"
+            + "  return 0.86;\n"
+            + "}\n"
+            + "return 0.8;")
     native static double measureAscent(String fontFamily);
-    @JSBody(params={"fontFamily"}, script="return window.measureTextDescent(fontFamily);")
+    @JSBody(params={"fontFamily"}, script="var family = String(fontFamily == null ? '' : fontFamily);\n"
+            + "if (typeof window.measureTextDescent === 'function') {\n"
+            + "  return window.measureTextDescent(family);\n"
+            + "}\n"
+            + "if (family.indexOf('Material') !== -1) {\n"
+            + "  return 0.14;\n"
+            + "}\n"
+            + "return 0.2;")
     native static double measureDescent(String fontFamily);
     
     static void _log(String str){

@@ -102,9 +102,13 @@ mkdir -p "$STAGE_CLASSES" "$PORT_CLASSES" "$TRANSLATOR_OUT"
 bj_log "Staging JavaAPI and application classes"
 (
   cd "$STAGE_CLASSES"
-  "$JAR_BIN" xf "$PARPARVM_JAVA_API"
   "$JAR_BIN" xf "$CN1_CORE_JAR"
   "$JAR_BIN" xf "$JAVA_RUNTIME_JAR"
+  # The ParparVM Java API jar contains the browser-targeted java.* classes
+  # that must override any stale snapshot copies from codenameone-core or
+  # java-runtime in ~/.m2.  Extract it last so the staged classes match the
+  # intended JS runtime surface.
+  "$JAR_BIN" xf "$PARPARVM_JAVA_API"
 )
 cp -R "$COMMON_CLASSES"/. "$STAGE_CLASSES"/
 

@@ -1282,19 +1282,36 @@ bindCiFallback("BlobUtil.canvasToBlobDirect", [
   "cn1_com_codename1_teavm_io_BlobUtil_canvasToBlob_com_codename1_html5_js_dom_HTMLCanvasElement_java_lang_String_double_R_com_codename1_teavm_jso_io_Blob__impl"
 ], function*(canvas, mimeType, quality) {
   const nativeCanvas = jvm.unwrapJsValue(canvas) || canvas;
-  if (!nativeCanvas || typeof nativeCanvas.toDataURL !== "function") {
-    emitDiagLine("PARPAR:DIAG:FALLBACK:blobUtilCanvasToBlob:missingCanvas=1");
-    return null;
-  }
   const mime = mimeType && mimeType.__class === "java_lang_String"
     ? jvm.toNativeString(mimeType)
     : (typeof mimeType === "string" ? mimeType : "image/png");
   const q = typeof quality === "number" ? quality : 0.92;
   let dataUrl = "";
-  try {
-    dataUrl = nativeCanvas.toDataURL(mime || "image/png", q);
-  } catch (_err) {
-    dataUrl = nativeCanvas.toDataURL("image/png");
+  if (nativeCanvas && nativeCanvas.__cn1HostRef != null && typeof jvm.invokeHostNative === "function") {
+    try {
+      dataUrl = yield jvm.invokeHostNative("__cn1_jso_bridge__", [{
+        receiver: nativeCanvas,
+        kind: "method",
+        member: "toDataURL",
+        args: [mime || "image/png", q]
+      }]);
+    } catch (_err) {
+      dataUrl = yield jvm.invokeHostNative("__cn1_jso_bridge__", [{
+        receiver: nativeCanvas,
+        kind: "method",
+        member: "toDataURL",
+        args: ["image/png"]
+      }]);
+    }
+  } else if (!nativeCanvas || typeof nativeCanvas.toDataURL !== "function") {
+    emitDiagLine("PARPAR:DIAG:FALLBACK:blobUtilCanvasToBlob:missingCanvas=1");
+    return null;
+  } else {
+    try {
+      dataUrl = nativeCanvas.toDataURL(mime || "image/png", q);
+    } catch (_err) {
+      dataUrl = nativeCanvas.toDataURL("image/png");
+    }
   }
   const comma = dataUrl.indexOf(",");
   if (comma < 0) {
@@ -1362,6 +1379,60 @@ bindCiFallback("Display.setProperty", [
   } else {
     map[k] = jvm.toNativeString(value);
   }
+  return null;
+});
+
+bindCiFallback("JSAffineTransform.setTransformHostBridge", [
+  "cn1_com_codename1_teavm_geom_JSAffineTransform_JSOFactory_setTransform_com_codename1_html5_js_canvas_CanvasRenderingContext2D_com_codename1_teavm_geom_JSAffineTransform_JSOAffineTransform",
+  "cn1_com_codename1_teavm_geom_JSAffineTransform_JSOFactory_setTransform_com_codename1_html5_js_canvas_CanvasRenderingContext2D_com_codename1_teavm_geom_JSAffineTransform_JSOAffineTransform__impl"
+], function*(context, transform) {
+  const nativeContext = jvm.unwrapJsValue(context) || context;
+  const nativeTransform = jvm.unwrapJsValue(transform) || transform;
+  const args = [
+    nativeTransform.getScaleX(),
+    nativeTransform.getShearY(),
+    nativeTransform.getShearX(),
+    nativeTransform.getScaleY(),
+    nativeTransform.getTranslateX(),
+    nativeTransform.getTranslateY()
+  ];
+  if (nativeContext && nativeContext.__cn1HostRef != null && typeof jvm.invokeHostNative === "function") {
+    yield jvm.invokeHostNative("__cn1_jso_bridge__", [{
+      receiver: nativeContext,
+      kind: "method",
+      member: "setTransform",
+      args
+    }]);
+    return null;
+  }
+  nativeContext.setTransform.apply(nativeContext, args);
+  return null;
+});
+
+bindCiFallback("JSAffineTransform.transformHostBridge", [
+  "cn1_com_codename1_teavm_geom_JSAffineTransform_JSOFactory_transform_com_codename1_html5_js_canvas_CanvasRenderingContext2D_com_codename1_teavm_geom_JSAffineTransform_JSOAffineTransform",
+  "cn1_com_codename1_teavm_geom_JSAffineTransform_JSOFactory_transform_com_codename1_html5_js_canvas_CanvasRenderingContext2D_com_codename1_teavm_geom_JSAffineTransform_JSOAffineTransform__impl"
+], function*(context, transform) {
+  const nativeContext = jvm.unwrapJsValue(context) || context;
+  const nativeTransform = jvm.unwrapJsValue(transform) || transform;
+  const args = [
+    nativeTransform.getScaleX(),
+    nativeTransform.getShearY(),
+    nativeTransform.getShearX(),
+    nativeTransform.getScaleY(),
+    nativeTransform.getTranslateX(),
+    nativeTransform.getTranslateY()
+  ];
+  if (nativeContext && nativeContext.__cn1HostRef != null && typeof jvm.invokeHostNative === "function") {
+    yield jvm.invokeHostNative("__cn1_jso_bridge__", [{
+      receiver: nativeContext,
+      kind: "method",
+      member: "transform",
+      args
+    }]);
+    return null;
+  }
+  nativeContext.transform.apply(nativeContext, args);
   return null;
 });
 

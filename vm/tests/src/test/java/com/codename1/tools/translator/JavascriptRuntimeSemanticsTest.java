@@ -84,6 +84,17 @@ class JavascriptRuntimeSemanticsTest {
 
     @ParameterizedTest
     @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void preservesInvokeSpecialOwnerResolutionAcrossInheritedMethodGapsInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsInvokeSpecialInheritedOwnerApp.java", "JsInvokeSpecialInheritedOwnerApp");
+
+        assertEquals(110, result.result,
+                "Translated runtime should resolve invokespecial owners to the actual declaring class when the direct superclass inherits the method. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
     void preservesIteratorDispatchSemanticsInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
         WorkerRunResult result = translateAndRunFixture(config, "JsIteratorDispatchApp.java", "JsIteratorDispatchApp");
 

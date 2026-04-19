@@ -534,7 +534,17 @@ public class HTML5BrowserComponent extends HTML5Peer {
         setURL(getURL());
     }
 
-    @JSBody(params={"el"}, script="return el.ownerDocument.contains(el)")
+    @JSBody(
+            params={"el"},
+            script="var doc = el ? el.ownerDocument : null;"
+                    + "if (!doc) { return false; }"
+                    + "if (doc.documentElement && typeof doc.documentElement.contains === 'function') {"
+                    + "  return doc.documentElement.contains(el);"
+                    + "}"
+                    + "if (doc.body && typeof doc.body.contains === 'function') {"
+                    + "  return doc.body.contains(el);"
+                    + "}"
+                    + "return !!el.isConnected;")
     private native static boolean documentContains(HTMLElement el);
     
     

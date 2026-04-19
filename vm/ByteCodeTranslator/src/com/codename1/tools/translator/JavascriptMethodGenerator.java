@@ -17,6 +17,7 @@ import com.codename1.tools.translator.bytecodes.TypeInstruction;
 import com.codename1.tools.translator.bytecodes.VarOp;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -38,6 +39,7 @@ final class JavascriptMethodGenerator {
             }
             appendMethod(out, cls, method);
         }
+        appendInheritedMethodAliases(out, cls);
         for (BytecodeMethod method : cls.getMethods()) {
             if (!method.isNative() || method.isEliminated()) {
                 continue;
@@ -391,6 +393,72 @@ final class JavascriptMethodGenerator {
             first = false;
             out.append("__cn1Arg").append(i + 1);
         }
+    }
+
+    private static void appendInheritedMethodAliases(StringBuilder out, ByteCodeClass cls) {
+        Map<String, BytecodeMethod> inherited = new LinkedHashMap<String, BytecodeMethod>();
+        collectInheritedMethodAliases(cls.getBaseClassObject(), inherited, new HashSet<ByteCodeClass>());
+        List<ByteCodeClass> baseInterfaces = cls.getBaseInterfacesObject();
+        if (baseInterfaces != null) {
+            for (ByteCodeClass iface : baseInterfaces) {
+                collectInheritedMethodAliases(iface, inherited, new HashSet<ByteCodeClass>());
+            }
+        }
+        for (BytecodeMethod method : inherited.values()) {
+            if (method == null || method.isConstructor() || method.isAbstract() || method.isEliminated()) {
+                continue;
+            }
+            if (declaresMethod(cls, method.getMethodName(), method.getSignature())) {
+                continue;
+            }
+            String aliasName = JavascriptNameUtil.methodIdentifier(cls.getClsName(), method.getMethodName(), method.getSignature());
+            String targetName = JavascriptNameUtil.methodIdentifier(method.getClsName(), method.getMethodName(), method.getSignature());
+            if (aliasName.equals(targetName)) {
+                continue;
+            }
+            out.append("function* ").append(aliasName).append("(");
+            appendMethodParameters(out, method);
+            out.append("){\n");
+            out.append("  return yield* ").append(targetName).append("(");
+            appendMethodParameterArguments(out, method);
+            out.append(");\n");
+            out.append("}\n");
+            if (!method.isStatic()) {
+                out.append("jvm.addVirtualMethod(\"").append(cls.getClsName()).append("\", \"")
+                        .append(aliasName).append("\", ").append(aliasName).append(");\n");
+            }
+        }
+    }
+
+    private static void collectInheritedMethodAliases(ByteCodeClass owner, Map<String, BytecodeMethod> out, Set<ByteCodeClass> visited) {
+        if (owner == null || !visited.add(owner)) {
+            return;
+        }
+        for (BytecodeMethod method : owner.getMethods()) {
+            if (method == null || method.isConstructor() || method.isAbstract() || method.isEliminated()) {
+                continue;
+            }
+            String key = method.getMethodName() + method.getSignature();
+            if (!out.containsKey(key)) {
+                out.put(key, method);
+            }
+        }
+        collectInheritedMethodAliases(owner.getBaseClassObject(), out, visited);
+        List<ByteCodeClass> baseInterfaces = owner.getBaseInterfacesObject();
+        if (baseInterfaces != null) {
+            for (ByteCodeClass iface : baseInterfaces) {
+                collectInheritedMethodAliases(iface, out, visited);
+            }
+        }
+    }
+
+    private static boolean declaresMethod(ByteCodeClass cls, String name, String signature) {
+        for (BytecodeMethod method : cls.getMethods()) {
+            if (method.getMethodName().equals(name) && signature.equals(method.getSignature())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean appendStraightLineMethodBody(StringBuilder out, ByteCodeClass cls, BytecodeMethod method,
@@ -964,9 +1032,14 @@ final class JavascriptMethodGenerator {
     }
 
     private static boolean appendStraightLineInvokeInstruction(StringBuilder out, Invoke invoke, StraightLineContext ctx) {
-        String owner = JavascriptNameUtil.sanitizeClassName(invoke.getOwner());
-        String methodId = JavascriptNameUtil.methodIdentifier(invoke.getOwner(), invoke.getName(), invoke.getDesc());
-        String methodBodyId = jsStaticMethodBodyIdentifier(invoke.getOwner(), invoke.getName(), invoke.getDesc());
+        String declaredOwner = invoke.getOwner();
+        String directOwner = resolveDirectInvokeOwner(invoke);
+        String owner = JavascriptNameUtil.sanitizeClassName(directOwner);
+        String methodOwner = (invoke.getOpcode() == Opcodes.INVOKEVIRTUAL || invoke.getOpcode() == Opcodes.INVOKEINTERFACE)
+                ? declaredOwner
+                : directOwner;
+        String methodId = JavascriptNameUtil.methodIdentifier(methodOwner, invoke.getName(), invoke.getDesc());
+        String methodBodyId = jsStaticMethodBodyIdentifier(methodOwner, invoke.getName(), invoke.getDesc());
         List<String> args = JavascriptNameUtil.argumentTypes(invoke.getDesc());
         boolean hasReturn = invoke.getDesc().charAt(invoke.getDesc().length() - 1) != 'V';
         String[] argValues = new String[args.size()];
@@ -1784,7 +1857,15 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
         out.append(indent).append("if (").append(valueExpression).append(" != null) { const __classDef = ").append(valueExpression)
                 .append(".__classDef; if (").append(valueExpression).append(".__class !== \"").append(typeName)
                 .append("\" && !(__classDef && __classDef.assignableTo && __classDef.assignableTo[\"").append(typeName)
-                .append("\"])) ").append(failureStatement).append("; }\n");
+                .append("\"])) {")
+                .append(" if (").append(valueExpression).append(".__jsValue !== undefined) {")
+                .append(" jvm.enhanceJsWrapper(").append(valueExpression).append(", \"").append(typeName).append("\");")
+                .append(" const __enhancedClassDef = ").append(valueExpression).append(".__classDef;")
+                .append(" if (").append(valueExpression).append(".__class !== \"").append(typeName)
+                .append("\" && !(__enhancedClassDef && __enhancedClassDef.assignableTo && __enhancedClassDef.assignableTo[\"").append(typeName)
+                .append("\"])) ").append(failureStatement).append(";")
+                .append(" } else ").append(failureStatement).append(";")
+                .append(" } }\n");
     }
 
     private static String directInstanceOfExpression(String valueExpression, String typeName) {
@@ -1921,9 +2002,14 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
 
     private static void appendInvokeInstruction(StringBuilder out, Invoke invoke, int index, boolean usesClassInitCache,
             boolean usesVirtualDispatchCache) {
-        String owner = JavascriptNameUtil.sanitizeClassName(invoke.getOwner());
-        String methodId = JavascriptNameUtil.methodIdentifier(invoke.getOwner(), invoke.getName(), invoke.getDesc());
-        String methodBodyId = jsStaticMethodBodyIdentifier(invoke.getOwner(), invoke.getName(), invoke.getDesc());
+        String declaredOwner = invoke.getOwner();
+        String directOwner = resolveDirectInvokeOwner(invoke);
+        String owner = JavascriptNameUtil.sanitizeClassName(directOwner);
+        String methodOwner = (invoke.getOpcode() == Opcodes.INVOKEVIRTUAL || invoke.getOpcode() == Opcodes.INVOKEINTERFACE)
+                ? declaredOwner
+                : directOwner;
+        String methodId = JavascriptNameUtil.methodIdentifier(methodOwner, invoke.getName(), invoke.getDesc());
+        String methodBodyId = jsStaticMethodBodyIdentifier(methodOwner, invoke.getName(), invoke.getDesc());
         List<String> args = JavascriptNameUtil.argumentTypes(invoke.getDesc());
         boolean hasReturn = invoke.getDesc().charAt(invoke.getDesc().length() - 1) != 'V';
         int argCount = args.size();
@@ -2019,5 +2105,41 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
 
     private static String staticInvocationTargetExpression(String methodId, String methodBodyId) {
         return "typeof " + methodBodyId + " === \"function\" ? " + methodBodyId + " : " + methodId;
+    }
+
+    private static String resolveDirectInvokeOwner(Invoke invoke) {
+        String owner = invoke.getOwner();
+        if (owner == null) {
+            return null;
+        }
+        if (invoke.getOpcode() == Opcodes.INVOKESTATIC) {
+            ByteCodeClass ownerClass = Parser.getClassObject(owner.replace('/', '_').replace('$', '_'));
+            String resolvedOwner = findActualStaticOwner(ownerClass, invoke.getName(), invoke.getDesc());
+            return resolvedOwner != null ? resolvedOwner : owner;
+        }
+        if (invoke.getOpcode() == Opcodes.INVOKESPECIAL
+                && !"<init>".equals(invoke.getName())
+                && !"<clinit>".equals(invoke.getName())) {
+            String resolvedOwner = Util.resolveInvokeSpecialOwner(owner, invoke.getName(), invoke.getDesc());
+            return resolvedOwner != null ? resolvedOwner : owner;
+        }
+        return owner;
+    }
+
+    private static String findActualStaticOwner(ByteCodeClass ownerClass, String name, String desc) {
+        if (ownerClass == null) {
+            return null;
+        }
+        List<BytecodeMethod> methods = ownerClass.getMethods();
+        if (methods != null) {
+            for (BytecodeMethod method : methods) {
+                if (method.isStatic()
+                        && method.getMethodName().equals(name)
+                        && desc.equals(method.getSignature())) {
+                    return ownerClass.getOriginalClassName();
+                }
+            }
+        }
+        return findActualStaticOwner(ownerClass.getBaseClassObject(), name, desc);
     }
 }
