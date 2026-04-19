@@ -353,19 +353,14 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "Function<Integer, Integer> times2 = x -> x * 2;\n"
                 + "int v = times2.apply(plus1.apply(3));\n"
                 + "root.add(new Label(\"v=\" + v));"), ExpectedOutcome.SUCCESS, null));
-        // StringBuilder's no-arg constructor isn't in the registry (the
-        // generator filters it for reasons still under investigation).
-        // Workaround: construct with an initial value.
-        cases.add(new Case(cat, "stringbuilder_builder_unsupported", ui(""
+        cases.add(new Case(cat, "stringbuilder_no_arg", ui(""
                 + "StringBuilder sb = new StringBuilder();\n"
                 + "for (int i = 0; i < 3; i++) sb.append(\"x\");\n"
-                + "root.add(new Label(sb.toString()));"), ExpectedOutcome.EVAL_ERROR, null));
-        // All StringBuilder ctors are missing from the registry — any
-        // construction fails. Workaround: concatenate with `+` on strings.
-        cases.add(new Case(cat, "stringbuilder_with_initial_unsupported", ui(""
-                + "StringBuilder sb = new StringBuilder(\"\");\n"
+                + "root.add(new Label(sb.toString()));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "stringbuilder_with_initial", ui(""
+                + "StringBuilder sb = new StringBuilder(\"start-\");\n"
                 + "for (int i = 0; i < 3; i++) sb.append(\"x\");\n"
-                + "root.add(new Label(sb.toString()));"), ExpectedOutcome.EVAL_ERROR, null));
+                + "root.add(new Label(sb.toString()));"), ExpectedOutcome.SUCCESS, null));
         cases.add(new Case(cat, "string_concat_loop_substitute", ui(""
                 + "String s = \"\";\n"
                 + "for (int i = 0; i < 3; i++) s += \"x\";\n"

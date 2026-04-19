@@ -2919,7 +2919,11 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
         }
 
         boolean isLookupOnly() {
-            return "java.lang.StringBuilder".equals(qualifiedName);
+            // Historically StringBuilder was lookup-only because the old
+            // registry emitter couldn't express its final varargs append
+            // overloads. The current emitter handles those — allow full
+            // dispatch so `new StringBuilder()` / `.append(...)` work.
+            return false;
         }
     }
 
