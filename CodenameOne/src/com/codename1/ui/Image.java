@@ -1674,7 +1674,7 @@ public class Image implements ActionSource {
 
     /// Allocates an ARGB pixel array. The returned array is always a Simd-registered
     /// buffer (allocated via `Simd.allocInt`) regardless of whether SIMD optimizations
-    /// are currently enabled — heap allocation cost is essentially the same and this
+    /// are currently enabled - heap allocation cost is essentially the same and this
     /// lets downstream Simd-using code skip defensive working copies. For very small
     /// images that fall under the Simd minimum size (16) we fall back to a plain
     /// `int[]` since `Simd.allocInt` requires `size >= 16`.

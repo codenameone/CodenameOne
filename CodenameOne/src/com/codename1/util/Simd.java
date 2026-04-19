@@ -970,8 +970,8 @@ public class Simd {
     ///
     /// Designed for the `Image.applyMask` hot path, which previously required four separate
     /// primitive calls (`unpackUnsignedByteToInt`, `shl`, `and`, `or`) and two scratch
-    /// allocations. Maps to a single NEON / SSE vector loop (`vmovl_u8` ⇒ `vshlq_n_u32(24)`
-    /// ⇒ `vorrq(vandq, …)`) on platforms that ship a vectorized implementation.
+    /// allocations. Maps to a single NEON / SSE vector loop (`vmovl_u8` =&gt; `vshlq_n_u32(24)`
+    /// =&gt; `vorrq(vandq, ...)`) on platforms that ship a vectorized implementation.
     /// **All arrays MUST be aligned / registered arrays.**
     public void replaceTopByteFromUnsignedBytes(int[] rgbSrc, int rgbSrcOffset, byte[] alphaSrc, int alphaSrcOffset, int[] dst, int dstOffset, int length) {
         for (int i = 0; i < length; i++) {
