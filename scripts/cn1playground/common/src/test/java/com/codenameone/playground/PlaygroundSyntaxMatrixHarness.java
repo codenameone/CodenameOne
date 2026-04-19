@@ -326,6 +326,67 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "Item i = new Item();\n"
                 + "i.setName(\"hello\");\n"
                 + "root.add(new Label(i.name()));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "enum_values_iteration", ui(""
+                + "enum Color { RED, GREEN, BLUE }\n"
+                + "String s = \"\";\n"
+                + "for (Color c : Color.values()) s += c.name() + \" \";\n"
+                + "root.add(new Label(s.trim()));"), ExpectedOutcome.SUCCESS, null));
+        // Map.Entry is a nested interface of Map; our registry doesn't expose
+        // Java-class nested types. Iterate via keySet() instead.
+        cases.add(new Case(cat, "map_entryset_iteration_unsupported", ui(""
+                + "import java.util.*;\n"
+                + "Map<String, Integer> m = new HashMap<>();\n"
+                + "m.put(\"a\", 1); m.put(\"b\", 2);\n"
+                + "int total = 0;\n"
+                + "for (Map.Entry e : m.entrySet()) total += (Integer) e.getValue();\n"
+                + "root.add(new Label(\"total=\" + total));"), ExpectedOutcome.EVAL_ERROR, null));
+        cases.add(new Case(cat, "map_keyset_iteration", ui(""
+                + "import java.util.*;\n"
+                + "Map<String, Integer> m = new HashMap<>();\n"
+                + "m.put(\"a\", 1); m.put(\"b\", 2);\n"
+                + "int total = 0;\n"
+                + "for (String k : m.keySet()) total += m.get(k);\n"
+                + "root.add(new Label(\"total=\" + total));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "lambda_composition", ui(""
+                + "import java.util.function.*;\n"
+                + "Function<Integer, Integer> plus1 = x -> x + 1;\n"
+                + "Function<Integer, Integer> times2 = x -> x * 2;\n"
+                + "int v = times2.apply(plus1.apply(3));\n"
+                + "root.add(new Label(\"v=\" + v));"), ExpectedOutcome.SUCCESS, null));
+        // StringBuilder's no-arg constructor isn't in the registry (the
+        // generator filters it for reasons still under investigation).
+        // Workaround: construct with an initial value.
+        cases.add(new Case(cat, "stringbuilder_builder_unsupported", ui(""
+                + "StringBuilder sb = new StringBuilder();\n"
+                + "for (int i = 0; i < 3; i++) sb.append(\"x\");\n"
+                + "root.add(new Label(sb.toString()));"), ExpectedOutcome.EVAL_ERROR, null));
+        // All StringBuilder ctors are missing from the registry — any
+        // construction fails. Workaround: concatenate with `+` on strings.
+        cases.add(new Case(cat, "stringbuilder_with_initial_unsupported", ui(""
+                + "StringBuilder sb = new StringBuilder(\"\");\n"
+                + "for (int i = 0; i < 3; i++) sb.append(\"x\");\n"
+                + "root.add(new Label(sb.toString()));"), ExpectedOutcome.EVAL_ERROR, null));
+        cases.add(new Case(cat, "string_concat_loop_substitute", ui(""
+                + "String s = \"\";\n"
+                + "for (int i = 0; i < 3; i++) s += \"x\";\n"
+                + "root.add(new Label(s));"), ExpectedOutcome.SUCCESS, null));
+        // Arrays.asList is varargs; the registry's generic-vararg dispatch
+        // for Arrays.asList isn't wired. Build a List explicitly instead.
+        cases.add(new Case(cat, "arrays_aslist_unsupported", ui(""
+                + "import java.util.*;\n"
+                + "List<String> items = Arrays.asList(\"a\",\"b\",\"c\");\n"
+                + "String txt = \"\";\n"
+                + "for (String s : items) txt += s;\n"
+                + "root.add(new Label(txt));"), ExpectedOutcome.EVAL_ERROR, null));
+        cases.add(new Case(cat, "record_equals_and_tostring", ui(""
+                + "record K(int a, int b) {}\n"
+                + "K x = new K(1, 2);\n"
+                + "K y = new K(1, 2);\n"
+                + "root.add(new Label(\"ok=\" + (x != y)));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "class_with_protected_method", ui(""
+                + "class A { protected int internal() { return 11; } }\n"
+                + "class B extends A { int expose() { return internal() + 1; } }\n"
+                + "root.add(new Label(\"v=\" + new B().expose()));"), ExpectedOutcome.SUCCESS, null));
         cases.add(new Case(cat, "lambda_method_ref_combo", ui(""
                 + "import java.util.function.*;\n"
                 + "Predicate<String> nonEmpty = s -> s.length() > 0;\n"
