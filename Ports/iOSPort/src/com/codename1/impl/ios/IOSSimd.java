@@ -293,6 +293,45 @@ public class IOSSimd extends Simd {
     @Override
     public native void select(byte[] mask, int maskOffset, int[] trueValues, int trueOffset, int[] falseValues, int falseOffset, int[] dst, int dstOffset, int length);
 
+    @Override
+    public native void and(int[] src, int srcOffset, int constant, int[] dst, int dstOffset, int length);
+
+    @Override
+    public native void or(int[] src, int srcOffset, int constant, int[] dst, int dstOffset, int length);
+
+    @Override
+    public native void xor(int[] src, int srcOffset, int constant, int[] dst, int dstOffset, int length);
+
+    @Override
+    public native void cmpEq(int[] src, int srcOffset, int constant, byte[] dstMask, int dstOffset, int length);
+
+    @Override
+    public native void cmpLt(int[] src, int srcOffset, int constant, byte[] dstMask, int dstOffset, int length);
+
+    @Override
+    public native void cmpGt(int[] src, int srcOffset, int constant, byte[] dstMask, int dstOffset, int length);
+
+    @Override
+    public native void not(byte[] src, int srcOffset, byte[] dst, int dstOffset, int length);
+
+    @Override
+    public native void select(byte[] mask, int maskOffset, int trueConstant, int falseConstant, int[] dst, int dstOffset, int length);
+
+    @Override
+    public native void select(byte[] mask, int maskOffset, int[] trueValues, int trueOffset, int falseConstant, int[] dst, int dstOffset, int length);
+
+    @Override
+    public native void select(byte[] mask, int maskOffset, int trueConstant, int[] falseValues, int falseOffset, int[] dst, int dstOffset, int length);
+
+    @Override
+    public native void blendByMaskTestNonzero(int[] src, int srcOffset, int testMask, int trueKeepMask, int trueOrValue, int[] dst, int dstOffset, int length);
+
+    @Override
+    public native void blendByMaskTestNonzeroSubstituteOnKeepEq(int[] src, int srcOffset, int testMask, int trueKeepMask, int trueOrValue, int removeMatch, int removeValue, int[] dst, int dstOffset, int length);
+
+    @Override
+    public native void replaceTopByteFromUnsignedBytes(int[] rgbSrc, int rgbSrcOffset, byte[] alphaSrc, int alphaSrcOffset, int[] dst, int dstOffset, int length);
+
     private native byte[] allocByteNative(int size);
     private native int[] allocIntNative(int size);
     private native float[] allocFloatNative(int size);

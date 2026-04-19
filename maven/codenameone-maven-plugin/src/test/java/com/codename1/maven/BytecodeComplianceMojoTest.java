@@ -29,7 +29,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
 class BytecodeComplianceMojoTest {
-
     @Test
     void detectsForbiddenMethodReferenceWithSourceDetails(@TempDir Path tempDir) throws Exception {
         Path outputDir = tempDir.resolve("classes");
@@ -237,6 +236,83 @@ class BytecodeComplianceMojoTest {
         assertTrue(index.containsKey("dep/NestedApi"), "Expected class in nested cn1lib archive to be indexed");
     }
 
+    @Test
+    void allowsSimdAllocaValuePassedToSimdMethod(@TempDir Path tempDir) throws Exception {
+        Path outputDir = tempDir.resolve("classes");
+        Path allowedDir = tempDir.resolve("allowed");
+        Files.createDirectories(outputDir);
+        Files.createDirectories(allowedDir);
+
+        writeJavaLangObject(allowedDir);
+        writeSimdApi(allowedDir);
+        writeAllocaCaller(outputDir, "app/AllocaOk", AllocaUsage.SIMD_METHOD);
+
+        BytecodeComplianceMojo mojo = new BytecodeComplianceMojo();
+        Map<String, ?> allowedIndex = buildClassIndex(mojo, Collections.singletonList(allowedDir.toFile()));
+        List<?> violations = scanProjectClasses(mojo, outputDir, allowedIndex, Collections.<String, Object>emptyMap());
+
+        assertFalse(hasViolationForReferencePrefix(violations, "SIMD alloca value"),
+                "Expected no SIMD alloca violations when scratch arrays stay within Simd calls");
+    }
+
+    @Test
+    void rejectsSimdAllocaValuePassedToNonSimdMethod(@TempDir Path tempDir) throws Exception {
+        Path outputDir = tempDir.resolve("classes");
+        Path allowedDir = tempDir.resolve("allowed");
+        Files.createDirectories(outputDir);
+        Files.createDirectories(allowedDir);
+
+        writeJavaLangObject(allowedDir);
+        writeSimdApi(allowedDir);
+        writeAllocaCaller(outputDir, "app/AllocaBadCall", AllocaUsage.NON_SIMD_METHOD);
+        writeByteArrayConsumer(outputDir, "app/Helper");
+
+        BytecodeComplianceMojo mojo = new BytecodeComplianceMojo();
+        Map<String, ?> allowedIndex = buildClassIndex(mojo, Collections.singletonList(allowedDir.toFile()));
+        Map<String, ?> projectIndex = buildClassIndex(mojo, Collections.singletonList(outputDir.toFile()));
+        List<?> violations = scanProjectClasses(mojo, outputDir, allowedIndex, projectIndex);
+
+        assertTrue(hasViolationForReferencePrefix(violations, "SIMD alloca value passed to non-Simd method app/Helper#consume([B)V"),
+                "Expected SIMD alloca verifier to reject non-Simd method calls");
+    }
+
+    @Test
+    void rejectsSimdAllocaValueReturnedFromMethod(@TempDir Path tempDir) throws Exception {
+        Path outputDir = tempDir.resolve("classes");
+        Path allowedDir = tempDir.resolve("allowed");
+        Files.createDirectories(outputDir);
+        Files.createDirectories(allowedDir);
+
+        writeJavaLangObject(allowedDir);
+        writeSimdApi(allowedDir);
+        writeAllocaCaller(outputDir, "app/AllocaBadReturn", AllocaUsage.RETURN_VALUE);
+
+        BytecodeComplianceMojo mojo = new BytecodeComplianceMojo();
+        Map<String, ?> allowedIndex = buildClassIndex(mojo, Collections.singletonList(allowedDir.toFile()));
+        List<?> violations = scanProjectClasses(mojo, outputDir, allowedIndex, Collections.<String, Object>emptyMap());
+
+        assertTrue(hasViolationForReferencePrefix(violations, "SIMD alloca value returned from method"),
+                "Expected SIMD alloca verifier to reject returning scratch arrays");
+    }
+
+    @Test
+    void recognizesAllSimdAllocaHelperNames() throws Exception {
+        Method method = BytecodeComplianceMojo.class.getDeclaredMethod("isSimdAllocaMethod", String.class, String.class, String.class);
+        method.setAccessible(true);
+
+        assertTrue(((Boolean) method.invoke(null, "com/codename1/util/Simd", "allocaByteZeroed", "(I)[B")).booleanValue());
+        assertTrue(((Boolean) method.invoke(null, "com/codename1/util/Simd", "allocaByteFilled", "(IB)[B")).booleanValue());
+        assertTrue(((Boolean) method.invoke(null, "com/codename1/util/Simd", "allocaIntFilled", "(II)[I")).booleanValue());
+        assertTrue(((Boolean) method.invoke(null, "com/codename1/util/Simd", "allocaFloatZeroed", "(I)[F")).booleanValue());
+        assertFalse(((Boolean) method.invoke(null, "com/codename1/util/Simd", "alloca", "(I)[B")).booleanValue());
+        assertFalse(((Boolean) method.invoke(null, "com/codename1/util/Simd", "allocate", "(I)[B")).booleanValue());
+        assertFalse(((Boolean) method.invoke(null, "com/codename1/util/Simd", "allocation", "(I)[B")).booleanValue());
+        assertFalse(((Boolean) method.invoke(null, "com/codename1/util/Simd", "allocaByteZeroed", "(I)I")).booleanValue());
+        assertFalse(((Boolean) method.invoke(null, "com/codename1/util/Simd", "allocaIntFilled", "(II)Ljava/lang/Object;")).booleanValue());
+        assertFalse(((Boolean) method.invoke(null, "com/codename1/util/Simd", "allocByte", "(I)[B")).booleanValue());
+        assertFalse(((Boolean) method.invoke(null, "app/Other", "allocaByte", "(I)[B")).booleanValue());
+    }
+
     @SuppressWarnings("unchecked")
     private Map<String, ?> buildClassIndex(BytecodeComplianceMojo mojo, List<java.io.File> roots) throws Exception {
         Method method = BytecodeComplianceMojo.class.getDeclaredMethod("buildClassIndex", List.class);
@@ -408,6 +484,52 @@ class BytecodeComplianceMojoTest {
         writeBytes(root, className, writer.toByteArray());
     }
 
+    private void writeAllocaCaller(Path root, String className, AllocaUsage usage) throws Exception {
+        ClassWriter writer = new ClassWriter(0);
+        writer.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, className, null, "java/lang/Object", null);
+
+        MethodVisitor init = writer.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
+        init.visitCode();
+        init.visitVarInsn(Opcodes.ALOAD, 0);
+        init.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
+        init.visitInsn(Opcodes.RETURN);
+        init.visitMaxs(1, 1);
+        init.visitEnd();
+
+        MethodVisitor run = writer.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "run", usage == AllocaUsage.RETURN_VALUE ? "()[B" : "()V", null, null);
+        run.visitCode();
+        run.visitTypeInsn(Opcodes.NEW, "com/codename1/util/Simd");
+        run.visitInsn(Opcodes.DUP);
+        run.visitMethodInsn(Opcodes.INVOKESPECIAL, "com/codename1/util/Simd", "<init>", "()V", false);
+        run.visitVarInsn(Opcodes.ASTORE, 0);
+        run.visitVarInsn(Opcodes.ALOAD, 0);
+        run.visitIntInsn(Opcodes.BIPUSH, 16);
+        run.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "com/codename1/util/Simd", "allocaByte", "(I)[B", false);
+        if (usage == AllocaUsage.RETURN_VALUE) {
+            run.visitInsn(Opcodes.ARETURN);
+            run.visitMaxs(2, 1);
+            run.visitEnd();
+            writer.visitEnd();
+            writeBytes(root, className, writer.toByteArray());
+            return;
+        }
+        run.visitVarInsn(Opcodes.ASTORE, 1);
+        if (usage == AllocaUsage.SIMD_METHOD) {
+            run.visitVarInsn(Opcodes.ALOAD, 0);
+            run.visitVarInsn(Opcodes.ALOAD, 1);
+            run.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "com/codename1/util/Simd", "consume", "([B)V", false);
+        } else {
+            run.visitVarInsn(Opcodes.ALOAD, 1);
+            run.visitMethodInsn(Opcodes.INVOKESTATIC, "app/Helper", "consume", "([B)V", false);
+        }
+        run.visitInsn(Opcodes.RETURN);
+        run.visitMaxs(2, 2);
+        run.visitEnd();
+
+        writer.visitEnd();
+        writeBytes(root, className, writer.toByteArray());
+    }
+
 
     private void writeSubclass(Path root, String className, String superName) throws Exception {
         ClassWriter writer = new ClassWriter(0);
@@ -443,6 +565,47 @@ class BytecodeComplianceMojoTest {
         api.visitMaxs(0, 0);
         api.visitEnd();
 
+        writer.visitEnd();
+        writeBytes(root, className, writer.toByteArray());
+    }
+
+    private void writeSimdApi(Path root) throws Exception {
+        ClassWriter writer = new ClassWriter(0);
+        writer.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, "com/codename1/util/Simd", null, "java/lang/Object", null);
+
+        MethodVisitor init = writer.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
+        init.visitCode();
+        init.visitVarInsn(Opcodes.ALOAD, 0);
+        init.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
+        init.visitInsn(Opcodes.RETURN);
+        init.visitMaxs(1, 1);
+        init.visitEnd();
+
+        MethodVisitor alloca = writer.visitMethod(Opcodes.ACC_PUBLIC, "allocaByte", "(I)[B", null, null);
+        alloca.visitCode();
+        alloca.visitInsn(Opcodes.ACONST_NULL);
+        alloca.visitInsn(Opcodes.ARETURN);
+        alloca.visitMaxs(1, 2);
+        alloca.visitEnd();
+
+        MethodVisitor consume = writer.visitMethod(Opcodes.ACC_PUBLIC, "consume", "([B)V", null, null);
+        consume.visitCode();
+        consume.visitInsn(Opcodes.RETURN);
+        consume.visitMaxs(0, 2);
+        consume.visitEnd();
+
+        writer.visitEnd();
+        writeBytes(root, "com/codename1/util/Simd", writer.toByteArray());
+    }
+
+    private void writeByteArrayConsumer(Path root, String className) throws Exception {
+        ClassWriter writer = new ClassWriter(0);
+        writer.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, className, null, "java/lang/Object", null);
+        MethodVisitor consume = writer.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "consume", "([B)V", null, null);
+        consume.visitCode();
+        consume.visitInsn(Opcodes.RETURN);
+        consume.visitMaxs(0, 1);
+        consume.visitEnd();
         writer.visitEnd();
         writeBytes(root, className, writer.toByteArray());
     }
@@ -505,5 +668,11 @@ class BytecodeComplianceMojoTest {
             this.path = path;
             this.bytes = bytes;
         }
+    }
+
+    private enum AllocaUsage {
+        SIMD_METHOD,
+        NON_SIMD_METHOD,
+        RETURN_VALUE
     }
 }

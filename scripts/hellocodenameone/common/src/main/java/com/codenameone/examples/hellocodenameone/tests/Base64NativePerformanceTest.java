@@ -14,8 +14,13 @@ import java.io.IOException;
 public class Base64NativePerformanceTest extends BaseTest {
     private static final int PAYLOAD_BYTES = 8192;
     private static final int ITERATIONS = 6000;
-    private static final int IMAGE_BENCHMARK_ITERATIONS = 250;
-    private static final int IMAGE_BENCHMARK_SIZE = 96;
+    // The image benchmarks now exercise a 256×256 pixel buffer (~262 KB) which is
+    // representative of common avatar/photo sizes used in real CN1 apps and large enough
+    // to stress memory bandwidth (much larger than L1, comfortably within L2). Iteration
+    // counts are sized so each measurement still runs in a reasonable amount of wall time.
+    private static final int IMAGE_BENCHMARK_ITERATIONS = 100;
+    private static final int IMAGE_BENCHMARK_SIZE = 256;
+    private static final byte IMAGE_BENCHMARK_ALPHA = (byte)0x90;
 
     @Override
     public boolean shouldTakeScreenshot() {
@@ -161,19 +166,38 @@ public class Base64NativePerformanceTest extends BaseTest {
                 } else {
                     Image benchmarkImage = buildBenchmarkImage(IMAGE_BENCHMARK_SIZE, IMAGE_BENCHMARK_SIZE, false);
                     Image benchmarkMaskImage = buildBenchmarkImage(IMAGE_BENCHMARK_SIZE, IMAGE_BENCHMARK_SIZE, true);
-                    warmupImageEncode(imageIo, benchmarkImage, benchmarkMaskImage);
+                    Object benchmarkMask = benchmarkMaskImage.createMask();
+                    int removeColor = benchmarkImage.getRGB()[0] & 0xffffff;
+                    warmupImageBenchmarks(imageIo, benchmarkImage, benchmarkMaskImage, benchmarkMask, removeColor);
+                    long createMaskScalarMs = measureCreateMask(benchmarkImage, false);
+                    long createMaskSimdMs = measureCreateMask(benchmarkImage, true);
+                    long applyMaskScalarMs = measureApplyMask(benchmarkImage, benchmarkMask, false);
+                    long applyMaskSimdMs = measureApplyMask(benchmarkImage, benchmarkMask, true);
+                    long modifyAlphaScalarMs = measureModifyAlpha(benchmarkImage, false);
+                    long modifyAlphaSimdMs = measureModifyAlpha(benchmarkImage, true);
+                    long modifyAlphaRemoveColorScalarMs = measureModifyAlphaRemoveColor(benchmarkImage, removeColor, false);
+                    long modifyAlphaRemoveColorSimdMs = measureModifyAlphaRemoveColor(benchmarkImage, removeColor, true);
                     long pngScalarMs = measureImageEncode(imageIo, benchmarkImage, benchmarkMaskImage, ImageIO.FORMAT_PNG, 1f, false);
                     long pngSimdMs = measureImageEncode(imageIo, benchmarkImage, benchmarkMaskImage, ImageIO.FORMAT_PNG, 1f, true);
                     emitStat("Image encode benchmark iterations", String.valueOf(IMAGE_BENCHMARK_ITERATIONS));
+                    emitStat("Image createMask (SIMD off)", formatMs(createMaskScalarMs));
+                    emitStat("Image createMask (SIMD on)", formatMs(createMaskSimdMs));
+                    emitStat("Image createMask ratio (SIMD on/off)", formatRatio(createMaskSimdMs, createMaskScalarMs));
+                    emitStat("Image applyMask (SIMD off)", formatMs(applyMaskScalarMs));
+                    emitStat("Image applyMask (SIMD on)", formatMs(applyMaskSimdMs));
+                    emitStat("Image applyMask ratio (SIMD on/off)", formatRatio(applyMaskSimdMs, applyMaskScalarMs));
+                    emitStat("Image modifyAlpha (SIMD off)", formatMs(modifyAlphaScalarMs));
+                    emitStat("Image modifyAlpha (SIMD on)", formatMs(modifyAlphaSimdMs));
+                    emitStat("Image modifyAlpha ratio (SIMD on/off)", formatRatio(modifyAlphaSimdMs, modifyAlphaScalarMs));
+                    emitStat("Image modifyAlpha removeColor (SIMD off)", formatMs(modifyAlphaRemoveColorScalarMs));
+                    emitStat("Image modifyAlpha removeColor (SIMD on)", formatMs(modifyAlphaRemoveColorSimdMs));
+                    emitStat("Image modifyAlpha removeColor ratio (SIMD on/off)", formatRatio(modifyAlphaRemoveColorSimdMs, modifyAlphaRemoveColorScalarMs));
                     emitStat("Image PNG encode (SIMD off)", formatMs(pngScalarMs));
                     emitStat("Image PNG encode (SIMD on)", formatMs(pngSimdMs));
                     emitStat("Image PNG encode ratio (SIMD on/off)", formatRatio(pngSimdMs, pngScalarMs));
                     if (imageIo.isFormatSupported(ImageIO.FORMAT_JPEG)) {
-                        long jpegScalarMs = measureImageEncode(imageIo, benchmarkImage, benchmarkMaskImage, ImageIO.FORMAT_JPEG, 0.82f, false);
-                        long jpegSimdMs = measureImageEncode(imageIo, benchmarkImage, benchmarkMaskImage, ImageIO.FORMAT_JPEG, 0.82f, true);
-                        emitStat("Image JPEG encode (SIMD off)", formatMs(jpegScalarMs));
-                        emitStat("Image JPEG encode (SIMD on)", formatMs(jpegSimdMs));
-                        emitStat("Image JPEG encode ratio (SIMD on/off)", formatRatio(jpegSimdMs, jpegScalarMs));
+                        long jpegMs = measureImageEncode(imageIo, benchmarkImage, benchmarkMaskImage, ImageIO.FORMAT_JPEG, 0.82f, false);
+                        emitStat("Image JPEG encode", formatMs(jpegMs));
                     } else {
                         emitStat("Image JPEG encode benchmark status", "skipped (JPEG unsupported)");
                     }
@@ -272,9 +296,90 @@ public class Base64NativePerformanceTest extends BaseTest {
         return System.currentTimeMillis() - start;
     }
 
-    private static void warmupImageEncode(ImageIO imageIo, Image benchmarkImage, Image benchmarkMaskImage) throws IOException {
+    private static void warmupImageBenchmarks(ImageIO imageIo, Image benchmarkImage, Image benchmarkMaskImage,
+                                              Object benchmarkMask, int removeColor) throws IOException {
+        measureCreateMask(benchmarkImage, false, 20);
+        measureCreateMask(benchmarkImage, true, 20);
+        measureApplyMask(benchmarkImage, benchmarkMask, false, 20);
+        measureApplyMask(benchmarkImage, benchmarkMask, true, 20);
+        measureModifyAlpha(benchmarkImage, false, 20);
+        measureModifyAlpha(benchmarkImage, true, 20);
+        measureModifyAlphaRemoveColor(benchmarkImage, removeColor, false, 20);
+        measureModifyAlphaRemoveColor(benchmarkImage, removeColor, true, 20);
         measureImageEncode(imageIo, benchmarkImage, benchmarkMaskImage, ImageIO.FORMAT_PNG, 1f, false, 20);
         measureImageEncode(imageIo, benchmarkImage, benchmarkMaskImage, ImageIO.FORMAT_PNG, 1f, true, 20);
+    }
+
+    private static long measureCreateMask(Image image, boolean enableSimd) {
+        return measureCreateMask(image, enableSimd, IMAGE_BENCHMARK_ITERATIONS);
+    }
+
+    private static long measureCreateMask(Image image, boolean enableSimd, int iterations) {
+        boolean originalSimd = Image.isSimdOptimizationsEnabled();
+        try {
+            Image.setSimdOptimizationsEnabled(enableSimd);
+            long start = System.currentTimeMillis();
+            for (int i = 0; i < iterations; i++) {
+                image.createMask();
+            }
+            return System.currentTimeMillis() - start;
+        } finally {
+            Image.setSimdOptimizationsEnabled(originalSimd);
+        }
+    }
+
+    private static long measureApplyMask(Image image, Object mask, boolean enableSimd) {
+        return measureApplyMask(image, mask, enableSimd, IMAGE_BENCHMARK_ITERATIONS);
+    }
+
+    private static long measureApplyMask(Image image, Object mask, boolean enableSimd, int iterations) {
+        boolean originalSimd = Image.isSimdOptimizationsEnabled();
+        try {
+            Image.setSimdOptimizationsEnabled(enableSimd);
+            long start = System.currentTimeMillis();
+            for (int i = 0; i < iterations; i++) {
+                image.applyMask(mask);
+            }
+            return System.currentTimeMillis() - start;
+        } finally {
+            Image.setSimdOptimizationsEnabled(originalSimd);
+        }
+    }
+
+    private static long measureModifyAlpha(Image image, boolean enableSimd) {
+        return measureModifyAlpha(image, enableSimd, IMAGE_BENCHMARK_ITERATIONS);
+    }
+
+    private static long measureModifyAlpha(Image image, boolean enableSimd, int iterations) {
+        boolean originalSimd = Image.isSimdOptimizationsEnabled();
+        try {
+            Image.setSimdOptimizationsEnabled(enableSimd);
+            long start = System.currentTimeMillis();
+            for (int i = 0; i < iterations; i++) {
+                image.modifyAlpha(IMAGE_BENCHMARK_ALPHA);
+            }
+            return System.currentTimeMillis() - start;
+        } finally {
+            Image.setSimdOptimizationsEnabled(originalSimd);
+        }
+    }
+
+    private static long measureModifyAlphaRemoveColor(Image image, int removeColor, boolean enableSimd) {
+        return measureModifyAlphaRemoveColor(image, removeColor, enableSimd, IMAGE_BENCHMARK_ITERATIONS);
+    }
+
+    private static long measureModifyAlphaRemoveColor(Image image, int removeColor, boolean enableSimd, int iterations) {
+        boolean originalSimd = Image.isSimdOptimizationsEnabled();
+        try {
+            Image.setSimdOptimizationsEnabled(enableSimd);
+            long start = System.currentTimeMillis();
+            for (int i = 0; i < iterations; i++) {
+                image.modifyAlpha(IMAGE_BENCHMARK_ALPHA, removeColor);
+            }
+            return System.currentTimeMillis() - start;
+        } finally {
+            Image.setSimdOptimizationsEnabled(originalSimd);
+        }
     }
 
     private static long measureImageEncode(ImageIO imageIo, Image benchmarkImage, Image benchmarkMaskImage,

@@ -60,6 +60,96 @@ public class Simd {
         return new float[size];
     }
 
+    /// @deprecated This is a special scratch-allocation API. On ParparVM this may be lowered to a
+    /// stack-backed faux array, so callers MUST keep it method-local, MUST be extremely cautious
+    /// when using it, and MUST treat its contents as undefined until written. Use `allocByte(int)`
+    /// for heap-backed arrays.
+    public byte[] allocaByte(int size) {
+        return allocByte(size);
+    }
+
+    /// @deprecated This is a special scratch-allocation API. On ParparVM this may be lowered to a
+    /// stack-backed faux array, so callers MUST keep it method-local, MUST be extremely cautious
+    /// when using it, and MUST treat its contents as undefined until written. Use `allocInt(int)`
+    /// for heap-backed arrays.
+    public int[] allocaInt(int size) {
+        return allocInt(size);
+    }
+
+    /// @deprecated This is a special scratch-allocation API. On ParparVM this may be lowered to a
+    /// stack-backed faux array, so callers MUST keep it method-local, MUST be extremely cautious
+    /// when using it, and MUST treat its contents as undefined until written. Use `allocFloat(int)`
+    /// for heap-backed arrays.
+    public float[] allocaFloat(int size) {
+        return allocFloat(size);
+    }
+
+    /// Special scratch-allocation API that guarantees a zero-initialized byte array while retaining
+    /// the same method-local constraints as `allocaByte(int)`.
+    public byte[] allocaByteZeroed(int size) {
+        byte[] out = allocaByte(size);
+        fillByte(out, (byte)0);
+        return out;
+    }
+
+    /// Special scratch-allocation API that guarantees a zero-initialized int array while retaining
+    /// the same method-local constraints as `allocaInt(int)`.
+    public int[] allocaIntZeroed(int size) {
+        int[] out = allocaInt(size);
+        fillInt(out, 0);
+        return out;
+    }
+
+    /// Special scratch-allocation API that guarantees a zero-initialized float array while retaining
+    /// the same method-local constraints as `allocaFloat(int)`.
+    public float[] allocaFloatZeroed(int size) {
+        float[] out = allocaFloat(size);
+        fillFloat(out, 0.0f);
+        return out;
+    }
+
+    /// Special scratch-allocation API that guarantees every byte starts with the same value while
+    /// retaining the same method-local constraints as `allocaByte(int)`.
+    public byte[] allocaByteFilled(int size, byte value) {
+        byte[] out = allocaByte(size);
+        fillByte(out, value);
+        return out;
+    }
+
+    /// Special scratch-allocation API that guarantees every int starts with the same value while
+    /// retaining the same method-local constraints as `allocaInt(int)`.
+    public int[] allocaIntFilled(int size, int value) {
+        int[] out = allocaInt(size);
+        fillInt(out, value);
+        return out;
+    }
+
+    /// Special scratch-allocation API that guarantees every float starts with the same value while
+    /// retaining the same method-local constraints as `allocaFloat(int)`.
+    public float[] allocaFloatFilled(int size, float value) {
+        float[] out = allocaFloat(size);
+        fillFloat(out, value);
+        return out;
+    }
+
+    private static void fillByte(byte[] arr, byte value) {
+        for (int i = 0; i < arr.length; i++) {
+            arr[i] = value;
+        }
+    }
+
+    private static void fillInt(int[] arr, int value) {
+        for (int i = 0; i < arr.length; i++) {
+            arr[i] = value;
+        }
+    }
+
+    private static void fillFloat(float[] arr, float value) {
+        for (int i = 0; i < arr.length; i++) {
+            arr[i] = value;
+        }
+    }
+
     /// Looks up values from a table using unsigned byte indices.
     public void lookupBytes(byte[] table, byte[] indices, byte[] dst, int offset, int length) {
         lookupBytes(table, indices, offset, dst, offset, length);
@@ -759,6 +849,136 @@ public class Simd {
             out += srcA[i] * srcB[i];
         }
         return out;
+    }
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void and(int[] src, int srcOffset, int constant, int[] dst, int dstOffset, int length) {
+        for (int i = 0; i < length; i++) {
+            dst[dstOffset + i] = src[srcOffset + i] & constant;
+        }
+    }
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void or(int[] src, int srcOffset, int constant, int[] dst, int dstOffset, int length) {
+        for (int i = 0; i < length; i++) {
+            dst[dstOffset + i] = src[srcOffset + i] | constant;
+        }
+    }
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void xor(int[] src, int srcOffset, int constant, int[] dst, int dstOffset, int length) {
+        for (int i = 0; i < length; i++) {
+            dst[dstOffset + i] = src[srcOffset + i] ^ constant;
+        }
+    }
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void cmpEq(int[] src, int srcOffset, int constant, byte[] dstMask, int dstOffset, int length) {
+        for (int i = 0; i < length; i++) {
+            dstMask[dstOffset + i] = src[srcOffset + i] == constant ? (byte)-1 : (byte)0;
+        }
+    }
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void cmpLt(int[] src, int srcOffset, int constant, byte[] dstMask, int dstOffset, int length) {
+        for (int i = 0; i < length; i++) {
+            dstMask[dstOffset + i] = src[srcOffset + i] < constant ? (byte)-1 : (byte)0;
+        }
+    }
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void cmpGt(int[] src, int srcOffset, int constant, byte[] dstMask, int dstOffset, int length) {
+        for (int i = 0; i < length; i++) {
+            dstMask[dstOffset + i] = src[srcOffset + i] > constant ? (byte)-1 : (byte)0;
+        }
+    }
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void not(byte[] src, int srcOffset, byte[] dst, int dstOffset, int length) {
+        for (int i = 0; i < length; i++) {
+            dst[dstOffset + i] = (byte)(~src[srcOffset + i]);
+        }
+    }
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void select(byte[] mask, int maskOffset, int trueConstant, int falseConstant, int[] dst, int dstOffset, int length) {
+        for (int i = 0; i < length; i++) {
+            dst[dstOffset + i] = mask[maskOffset + i] != 0 ? trueConstant : falseConstant;
+        }
+    }
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void select(byte[] mask, int maskOffset, int[] trueValues, int trueOffset, int falseConstant, int[] dst, int dstOffset, int length) {
+        for (int i = 0; i < length; i++) {
+            dst[dstOffset + i] = mask[maskOffset + i] != 0 ? trueValues[trueOffset + i] : falseConstant;
+        }
+    }
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void select(byte[] mask, int maskOffset, int trueConstant, int[] falseValues, int falseOffset, int[] dst, int dstOffset, int length) {
+        for (int i = 0; i < length; i++) {
+            dst[dstOffset + i] = mask[maskOffset + i] != 0 ? trueConstant : falseValues[falseOffset + i];
+        }
+    }
+
+    /// Fused single-pass conditional bit-blend driven by a masked-non-zero test of `src` against
+    /// `testMask`. For every element:
+    ///
+    /// `dst[i] = (src[i] & testMask) != 0 ? (src[i] & trueKeepMask) | trueOrValue : src[i]`
+    ///
+    /// This collapses a "test-then-modify-or-keep-source" pattern that would otherwise require
+    /// three or more separate primitive calls (and three or more passes over `src`) into a single
+    /// pass. It maps directly to one NEON / SSE vector loop on platforms that ship a vectorized
+    /// implementation. **All arrays MUST be aligned/registered arrays.**
+    public void blendByMaskTestNonzero(int[] src, int srcOffset, int testMask, int trueKeepMask, int trueOrValue, int[] dst, int dstOffset, int length) {
+        for (int i = 0; i < length; i++) {
+            int v = src[srcOffset + i];
+            dst[dstOffset + i] = (v & testMask) != 0 ? (v & trueKeepMask) | trueOrValue : v;
+        }
+    }
+
+    /// Fused single-pass extension of `blendByMaskTestNonzero` that additionally substitutes
+    /// `removeValue` whenever the post-mask result would equal `removeMatch`. For every element:
+    ///
+    /// ```
+    /// v = src[i]
+    /// if ((v & testMask) == 0)            dst[i] = v
+    /// else if ((v & trueKeepMask) == removeMatch) dst[i] = removeValue
+    /// else                                dst[i] = (v & trueKeepMask) | trueOrValue
+    /// ```
+    ///
+    /// This collapses a `blendByMaskTestNonzero` + `cmpEq` + `select` chain (three passes over the
+    /// buffer plus two scratch allocations) into a single vector pass. It maps to one NEON / SSE
+    /// loop on platforms that ship a vectorized implementation. **All arrays MUST be aligned /
+    /// registered arrays.**
+    public void blendByMaskTestNonzeroSubstituteOnKeepEq(int[] src, int srcOffset, int testMask, int trueKeepMask, int trueOrValue, int removeMatch, int removeValue, int[] dst, int dstOffset, int length) {
+        for (int i = 0; i < length; i++) {
+            int v = src[srcOffset + i];
+            if ((v & testMask) == 0) {
+                dst[dstOffset + i] = v;
+            } else {
+                int kept = v & trueKeepMask;
+                dst[dstOffset + i] = (kept == removeMatch) ? removeValue : kept | trueOrValue;
+            }
+        }
+    }
+
+    /// Fused single-pass replacement of the top byte of every int in `rgbSrc` with the
+    /// corresponding unsigned byte from `alphaSrc`. For every element:
+    ///
+    /// `dst[i] = (rgbSrc[i] & 0x00ffffff) | ((alphaSrc[i] & 0xff) << 24)`
+    ///
+    /// Designed for the `Image.applyMask` hot path, which previously required four separate
+    /// primitive calls (`unpackUnsignedByteToInt`, `shl`, `and`, `or`) and two scratch
+    /// allocations. Maps to a single NEON / SSE vector loop (`vmovl_u8` ⇒ `vshlq_n_u32(24)`
+    /// ⇒ `vorrq(vandq, …)`) on platforms that ship a vectorized implementation.
+    /// **All arrays MUST be aligned / registered arrays.**
+    public void replaceTopByteFromUnsignedBytes(int[] rgbSrc, int rgbSrcOffset, byte[] alphaSrc, int alphaSrcOffset, int[] dst, int dstOffset, int length) {
+        for (int i = 0; i < length; i++) {
+            int rgb = rgbSrc[rgbSrcOffset + i] & 0x00ffffff;
+            int alpha = (alphaSrc[alphaSrcOffset + i] & 0xff) << 24;
+            dst[dstOffset + i] = rgb | alpha;
+        }
     }
 
 

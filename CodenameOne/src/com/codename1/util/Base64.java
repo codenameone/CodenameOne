@@ -550,7 +550,7 @@ public abstract class Base64 {
         int si = inOffset;
         int di = outOffset;
         int simdEnd = end3 - SIMD_BYTE_LANES * 3 + 1;
-        byte[] scratch = simdEnd > si ? simd.allocByte(SIMD_ENCODE_SCRATCH_BYTES) : null;
+        byte[] scratch = simdEnd > si ? simd.allocaByte(SIMD_ENCODE_SCRATCH_BYTES) : null;
 
         while (si < simdEnd) {
             simd.unpackBytesInterleaved3(in, si, scratch, SIMD_ENC_LANE0, SIMD_ENC_LANE1, SIMD_ENC_LANE2, SIMD_BYTE_LANES);
@@ -656,7 +656,7 @@ public abstract class Base64 {
         int si = inOffset;
         int di = outOffset;
         int simdEnd = fullEnd - SIMD_BYTE_LANES * 4 + 1;
-        byte[] scratch = simdEnd > si ? simd.allocByte(SIMD_DECODE_SCRATCH_BYTES) : null;
+        byte[] scratch = simdEnd > si ? simd.allocaByte(SIMD_DECODE_SCRATCH_BYTES) : null;
         while (si < simdEnd) {
             if (simd.unpackLookupBytesInterleaved4(decodeMap, in, si, scratch, SIMD_DEC_OUT0, SIMD_DEC_OUT1, SIMD_DEC_OUT2, SIMD_DEC_OUT3, SIMD_BYTE_LANES) < 0) {
                 return -1;

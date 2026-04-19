@@ -59,6 +59,60 @@ class SimdTest extends UITestBase {
     }
 
     @FormTest
+    void testAllocaFallbackAndSimdOperations() {
+        Simd fallback = new Simd();
+        assertEquals(16, fallback.allocaByte(16).length);
+        assertEquals(16, fallback.allocaInt(16).length);
+        assertEquals(16, fallback.allocaFloat(16).length);
+        assertEquals(0, fallback.allocaByteZeroed(16)[3]);
+        assertEquals(0, fallback.allocaIntZeroed(16)[3]);
+        assertEquals(0.0f, fallback.allocaFloatZeroed(16)[3], 0.0f);
+        assertEquals(7, fallback.allocaByteFilled(16, (byte)7)[3]);
+        assertEquals(7, fallback.allocaIntFilled(16, 7)[3]);
+        assertEquals(7.5f, fallback.allocaFloatFilled(16, 7.5f)[3], 0.0f);
+        assertThrows(IllegalArgumentException.class, () -> fallback.allocaByte(15));
+        assertThrows(IllegalArgumentException.class, () -> fallback.allocaInt(15));
+        assertThrows(IllegalArgumentException.class, () -> fallback.allocaFloat(15));
+
+        Simd simd = Simd.get();
+        if (!simd.isSupported()) {
+            return;
+        }
+
+        int[] regA = simd.allocaInt(16);
+        int[] regB = simd.allocaInt(16);
+        int[] regO = simd.allocaInt(16);
+        regA[0] = 3;
+        regA[1] = -2;
+        regB[0] = 4;
+        regB[1] = 5;
+        simd.add(regA, regB, regO, 0, 2);
+        assertEquals(7, regO[0]);
+        assertEquals(3, regO[1]);
+
+        int[] zeroed = simd.allocaIntZeroed(16);
+        int[] filled = simd.allocaIntFilled(16, 9);
+        assertEquals(0, zeroed[5]);
+        assertEquals(9, filled[5]);
+
+        byte[] bytesA = simd.allocaByte(16);
+        byte[] bytesB = simd.allocaByte(16);
+        byte[] bytesO = simd.allocaByte(16);
+        bytesA[0] = 120;
+        bytesA[1] = 1;
+        bytesA[2] = 127;
+        bytesB[0] = 20;
+        bytesB[1] = 2;
+        bytesB[2] = 1;
+        // Validate saturated byte addition for both near-limit and overflow inputs.
+        simd.add(bytesA, bytesB, bytesO, 0, 3);
+        assertEquals(127, bytesO[0]);
+        assertEquals(3, bytesO[1]);
+        assertEquals(127, bytesO[2]);
+        assertEquals(11, simd.allocaByteFilled(16, (byte)11)[4]);
+    }
+
+    @FormTest
     void genericBitwiseShiftCompareSelectOpsWork() {
         Simd simd = new Simd();
 
@@ -528,5 +582,128 @@ class SimdTest extends UITestBase {
         assertEquals((byte)4, packedFromSlab4[3]);
         assertEquals((byte)9, packedFromSlab4[8]);
         assertEquals((byte)16, packedFromSlab4[15]);
+    }
+
+    @FormTest
+    void blendByMaskTestNonzeroFusesAlphaReplace() {
+        // Verify the fallback semantics on raw int[]s.
+        Simd fallback = new Simd();
+        int alphaMask = 0x80000000;
+        int[] src = new int[]{
+                0x00112233, // alpha 0  → unchanged
+                0xff445566, // alpha non-zero → (& 0x00ffffff) | alphaMask
+                0x12345678, // alpha non-zero → splice
+                0x00000000  // alpha 0  → unchanged (and remains 0)
+        };
+        int[] dst = new int[4];
+        fallback.blendByMaskTestNonzero(src, 0, 0xff000000, 0x00ffffff, alphaMask, dst, 0, 4);
+        assertEquals(0x00112233, dst[0]);
+        assertEquals(alphaMask | 0x00445566, dst[1]);
+        assertEquals(alphaMask | 0x00345678, dst[2]);
+        assertEquals(0x00000000, dst[3]);
+
+        // Run the same test against the platform Simd (registered arrays where required).
+        Simd simd = Simd.get();
+        if (!simd.isSupported()) {
+            return;
+        }
+        int n = 32; // exercise the vector loop and a tail
+        int[] regSrc = simd.allocInt(n);
+        int[] regDst = simd.allocInt(n);
+        for (int i = 0; i < n; i++) {
+            // Alternate transparent / opaque pixels with varied RGB content.
+            regSrc[i] = ((i & 1) == 0 ? 0 : 0xff000000) | ((i * 0x010203) & 0x00ffffff);
+        }
+        simd.blendByMaskTestNonzero(regSrc, 0, 0xff000000, 0x00ffffff, alphaMask, regDst, 0, n);
+        for (int i = 0; i < n; i++) {
+            int v = regSrc[i];
+            int expected = ((v & 0xff000000) != 0)
+                    ? (v & 0x00ffffff) | alphaMask
+                    : v;
+            assertEquals(expected, regDst[i], "mismatch at index " + i);
+        }
+    }
+
+    @FormTest
+    void blendByMaskTestNonzeroSubstituteOnKeepEqFusesRemoveColor() {
+        // Verify the fallback semantics on raw int[]s.
+        Simd fallback = new Simd();
+        int alphaMask = 0x80000000;
+        int removeColor = 0x00abcdef; // RGB to be wiped to 0 after alpha replacement
+        int[] src = new int[]{
+                0x00abcdef, // alpha 0  → unchanged (even though RGB matches removeColor)
+                0xff445566, // alpha non-zero, RGB no match → splice alpha
+                0x12abcdef, // alpha non-zero, RGB matches → must become 0
+                0x00000000  // alpha 0  → unchanged (and remains 0)
+        };
+        int[] dst = new int[4];
+        fallback.blendByMaskTestNonzeroSubstituteOnKeepEq(
+                src, 0, 0xff000000, 0x00ffffff, alphaMask, removeColor, 0, dst, 0, 4);
+        assertEquals(0x00abcdef, dst[0]);
+        assertEquals(alphaMask | 0x00445566, dst[1]);
+        assertEquals(0, dst[2]);
+        assertEquals(0x00000000, dst[3]);
+
+        // Run the same test against the platform Simd (registered arrays where required).
+        Simd simd = Simd.get();
+        if (!simd.isSupported()) {
+            return;
+        }
+        int n = 32; // exercise the vector loop and a tail
+        int[] regSrc = simd.allocInt(n);
+        int[] regDst = simd.allocInt(n);
+        for (int i = 0; i < n; i++) {
+            // Mix transparent / opaque pixels, with every 5th opaque pixel matching removeColor.
+            int alpha = (i & 1) == 0 ? 0 : 0xff000000;
+            int rgb = (i % 5 == 0) ? removeColor : ((i * 0x010203) & 0x00ffffff);
+            regSrc[i] = alpha | rgb;
+        }
+        simd.blendByMaskTestNonzeroSubstituteOnKeepEq(
+                regSrc, 0, 0xff000000, 0x00ffffff, alphaMask, removeColor, 0, regDst, 0, n);
+        for (int i = 0; i < n; i++) {
+            int v = regSrc[i];
+            int expected;
+            if ((v & 0xff000000) == 0) {
+                expected = v;
+            } else if ((v & 0x00ffffff) == removeColor) {
+                expected = 0;
+            } else {
+                expected = (v & 0x00ffffff) | alphaMask;
+            }
+            assertEquals(expected, regDst[i], "mismatch at index " + i);
+        }
+    }
+
+    @FormTest
+    void replaceTopByteFromUnsignedBytesFusesApplyMask() {
+        // Verify the fallback semantics on raw arrays.
+        Simd fallback = new Simd();
+        int[] rgb = new int[]{0xdeadbeef, 0x12345678, 0x00112233, 0xffffffff};
+        byte[] alpha = new byte[]{(byte)0x00, (byte)0x80, (byte)0xff, (byte)0x7f};
+        int[] dst = new int[4];
+        fallback.replaceTopByteFromUnsignedBytes(rgb, 0, alpha, 0, dst, 0, 4);
+        assertEquals(0x00adbeef, dst[0]);
+        assertEquals(0x80345678, dst[1]);
+        assertEquals(0xff112233, dst[2]);
+        assertEquals(0x7fffffff, dst[3]);
+
+        // Run the same test against the platform Simd (registered arrays where required).
+        Simd simd = Simd.get();
+        if (!simd.isSupported()) {
+            return;
+        }
+        int n = 35; // exercise the 16-wide vector loop and a non-trivial tail
+        int[] regRgb = simd.allocInt(n);
+        byte[] regAlpha = simd.allocByte(n);
+        int[] regDst = simd.allocInt(n);
+        for (int i = 0; i < n; i++) {
+            regRgb[i] = (i << 16) | ((i * 7) & 0xff) | (((i * 13) & 0xff) << 8) | (0x42 << 24);
+            regAlpha[i] = (byte) (i * 11);
+        }
+        simd.replaceTopByteFromUnsignedBytes(regRgb, 0, regAlpha, 0, regDst, 0, n);
+        for (int i = 0; i < n; i++) {
+            int expected = (regRgb[i] & 0x00ffffff) | ((regAlpha[i] & 0xff) << 24);
+            assertEquals(expected, regDst[i], "mismatch at index " + i);
+        }
     }
 }

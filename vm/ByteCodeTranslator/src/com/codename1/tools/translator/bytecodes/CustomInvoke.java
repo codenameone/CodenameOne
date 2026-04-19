@@ -178,9 +178,72 @@ public class CustomInvoke extends Instruction {
         StringBuilder sb = new StringBuilder();
         return BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, sb, args);
     }
+
+    private String getSimdAllocaMacro() {
+        boolean simdOwner =
+                "com/codename1/util/Simd".equals(owner) ||
+                "com/codename1/impl/ios/IOSSimd".equals(owner) ||
+                "com/codename1/impl/javase/JavaSESimd".equals(owner);
+        if (!simdOwner) {
+            return null;
+        }
+        if (desc.equals("(I)[B") && name.equals("allocaByte")) {
+            return "CN1_SIMD_ALLOCA_BYTE";
+        }
+        if (desc.equals("(I)[I") && name.equals("allocaInt")) {
+            return "CN1_SIMD_ALLOCA_INT";
+        }
+        if (desc.equals("(I)[F") && name.equals("allocaFloat")) {
+            return "CN1_SIMD_ALLOCA_FLOAT";
+        }
+        if (desc.equals("(I)[B") && name.equals("allocaByteZeroed")) {
+            return "CN1_SIMD_ALLOCA_BYTE_ZEROED";
+        }
+        if (desc.equals("(I)[I") && name.equals("allocaIntZeroed")) {
+            return "CN1_SIMD_ALLOCA_INT_ZEROED";
+        }
+        if (desc.equals("(I)[F") && name.equals("allocaFloatZeroed")) {
+            return "CN1_SIMD_ALLOCA_FLOAT_ZEROED";
+        }
+        if (desc.equals("(IB)[B") && name.equals("allocaByteFilled")) {
+            return "CN1_SIMD_ALLOCA_BYTE_FILLED";
+        }
+        if (desc.equals("(II)[I") && name.equals("allocaIntFilled")) {
+            return "CN1_SIMD_ALLOCA_INT_FILLED";
+        }
+        if (desc.equals("(IF)[F") && name.equals("allocaFloatFilled")) {
+            return "CN1_SIMD_ALLOCA_FLOAT_FILLED";
+        }
+        return null;
+    }
+
+    private boolean appendSimdAllocaExpression(StringBuilder b) {
+        String macro = getSimdAllocaMacro();
+        if (macro == null) {
+            return false;
+        }
+        if (literalArgs == null || literalArgs.length == 0) {
+            return false;
+        }
+        b.append(macro).append("(");
+        for (int i = 0; i < literalArgs.length; i++) {
+            if (literalArgs[i] == null) {
+                return false;
+            }
+            if (i > 0) {
+                b.append(", ");
+            }
+            b.append(literalArgs[i]);
+        }
+        b.append(")");
+        return true;
+    }
     
     
     public boolean appendExpression(StringBuilder b) {
+        if (appendSimdAllocaExpression(b)) {
+            return true;
+        }
         // special case for clone on an array which isn't a real method invocation
         if(name.equals("clone") && owner.indexOf('[') > -1) {
             if (targetObjectLiteral != null) {
@@ -292,6 +355,13 @@ public class CustomInvoke extends Instruction {
     
     @Override
     public void appendInstruction(StringBuilder b) {
+        if (getSimdAllocaMacro() != null) {
+            StringBuilder expr = new StringBuilder();
+            if (appendSimdAllocaExpression(expr)) {
+                b.append("    PUSH_OBJ(").append(expr).append(");\n");
+                return;
+            }
+        }
         // special case for clone on an array which isn't a real method invocation
         if(name.equals("clone") && owner.indexOf('[') > -1) {
             if (targetObjectLiteral != null) {
