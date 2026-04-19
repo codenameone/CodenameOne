@@ -187,9 +187,22 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     }
 
     private void finishSuite() {
-        log("CN1SS:INFO:swift_diag_status=" + NativeInterfaceLanguageValidator.getLastStatus());
-        log("CN1SS:SUITE:FINISHED");
-        TestReporting.getInstance().testExecutionFinished(getClass().getName());
+        try {
+            String status;
+            try {
+                status = NativeInterfaceLanguageValidator.getLastStatus();
+            } catch (Throwable t) {
+                status = "error:" + t;
+            }
+            log("CN1SS:INFO:swift_diag_status=" + status);
+        } finally {
+            log("CN1SS:SUITE:FINISHED");
+        }
+        try {
+            TestReporting.getInstance().testExecutionFinished(getClass().getName());
+        } catch (Throwable t) {
+            log("CN1SS:ERR:testExecutionFinished exception=" + t);
+        }
         if (CN.isSimulator()) {
             Display.getInstance().exitApplication();
         }

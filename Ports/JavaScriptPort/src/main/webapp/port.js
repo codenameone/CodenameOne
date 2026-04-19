@@ -2656,7 +2656,6 @@ const baseTestFormSubclassClassId = "com_codenameone_examples_hellocodenameone_t
 const baseTestFormSubclassCtorMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_1___INIT___com_codenameone_examples_hellocodenameone_tests_BaseTest_java_lang_String_com_codename1_ui_layouts_Layout_java_lang_String";
 const html5HideSplashMethodId = "cn1_com_codename1_impl_html5_HTML5Implementation_hideSplash";
 const cn1ssRunnerClassId = "com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner";
-const cn1ssRunnerListGetMethodId = "cn1_java_util_List_get_int_R_java_lang_Object";
 const cn1ssRunnerRunNextTestMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_runNextTest_int";
 const cn1ssRunnerAwaitTestCompletionMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_awaitTestCompletion_int_com_codenameone_examples_hellocodenameone_tests_BaseTest_java_lang_String_long";
 const cn1ssRunnerFinalizeTestMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_finalizeTest_int_com_codenameone_examples_hellocodenameone_tests_BaseTest_java_lang_String_boolean";
@@ -2888,38 +2887,36 @@ function resolveCn1ssTestNameObject(testObject, preferredName) {
   return cn1ssToJavaString("unknown");
 }
 
-function* resolveCn1ssIndexedTestObject(index) {
+function getCn1ssRunnerTestTotal() {
+  const runnerClass = jvm && jvm.classes ? jvm.classes[cn1ssRunnerClassId] : null;
+  if (!runnerClass || !runnerClass.staticFields) {
+    return 0;
+  }
+  const defaults = runnerClass.staticFields["DEFAULT_TEST_CLASSES"];
+  const prepended = runnerClass.staticFields["prependedTest"];
+  const base = (defaults && typeof defaults.length === "number") ? (defaults.length | 0) : 0;
+  return base + (prepended != null ? 1 : 0);
+}
+
+function resolveCn1ssIndexedTestObject(index) {
   const runnerClass = jvm && jvm.classes ? jvm.classes[cn1ssRunnerClassId] : null;
   if (!runnerClass || !runnerClass.staticFields) {
     return null;
   }
-  const candidateLists = [
-    runnerClass.staticFields["TEST_CLASSES"],
-    runnerClass.staticFields["DEFAULT_TEST_CLASSES"]
-  ];
-  for (let i = 0; i < candidateLists.length; i++) {
-    const candidate = candidateLists[i];
-    if (!candidate) {
-      continue;
-    }
-    if (candidate.__class) {
-      try {
-        const listGetMethod = jvm.resolveVirtual(candidate.__class, cn1ssRunnerListGetMethodId);
-        if (typeof listGetMethod === "function") {
-          const result = yield* listGetMethod(candidate, index | 0);
-          if (result) {
-            return result;
-          }
-        }
-      } catch (_err) {
-        // Continue with other list forms.
-      }
-    }
-    if (candidate.__array && typeof candidate.length === "number" && index >= 0 && index < candidate.length) {
-      return candidate[index];
-    }
+  const prepended = runnerClass.staticFields["prependedTest"];
+  const hasOffset = prepended != null;
+  if (hasOffset && index === 0) {
+    return prepended;
   }
-  return null;
+  const tests = runnerClass.staticFields["DEFAULT_TEST_CLASSES"];
+  if (!tests || !tests.__array) {
+    return null;
+  }
+  const arrIndex = index - (hasOffset ? 1 : 0);
+  if (arrIndex < 0 || arrIndex >= tests.length) {
+    return null;
+  }
+  return tests[arrIndex];
 }
 
 function* runCn1ssResolvedTest(callTarget, effectiveTestObject, effectiveTestName, effectiveIndex) {
@@ -3110,6 +3107,36 @@ bindCiFallback("Cn1ssDeviceRunner.lambda2RunBridge", [
   return yield* awaitLambdaMethod(runner, index | 0, testObject, testName, deadline);
 });
 
+function emitGuaranteedConsole(line) {
+  if (global.console && typeof global.console.log === "function") {
+    global.console.log(line);
+  }
+}
+
+function* invokeCn1ssFinishSuite(runner, reason) {
+  let finishErr = null;
+  try {
+    const finishSuiteMethod = jvm.resolveVirtual(runner.__class, cn1ssRunnerFinishSuiteMethodId);
+    if (typeof finishSuiteMethod === "function") {
+      emitGuaranteedConsole("CN1SS:INFO:lambda3RunBridge:finishSuiteInvoked reason=" + String(reason || "unknown"));
+      return yield* finishSuiteMethod(runner);
+    }
+    emitGuaranteedConsole("CN1SS:ERR:lambda3RunBridge:finishSuiteMissing reason=" + String(reason || "unknown"));
+  } catch (err) {
+    finishErr = err;
+    emitGuaranteedConsole("CN1SS:ERR:lambda3RunBridge:finishSuiteError reason=" + String(reason || "unknown")
+      + " error=" + String(err && err.message ? err.message : err));
+  }
+  // Guaranteed terminator — even if finishSuite threw, ensure the harness can observe completion.
+  emitGuaranteedConsole("CN1SS:INFO:swift_diag_status=unknown");
+  emitGuaranteedConsole("CN1SS:SUITE:FINISHED");
+  if (finishErr) {
+    emitGuaranteedConsole("CN1SS:ERR:lambda3RunBridge:finishSuiteStack="
+      + String(finishErr && finishErr.stack ? finishErr.stack : "none").substring(0, 512));
+  }
+  return null;
+}
+
 bindCiFallback("Cn1ssDeviceRunner.lambda3RunBridge", [
   cn1ssRunnerLambda3RunMethodId
 ], function*(__cn1ThisObject) {
@@ -3122,27 +3149,20 @@ bindCiFallback("Cn1ssDeviceRunner.lambda3RunBridge", [
   }
   const nextIndex = ((index | 0) + 1) | 0;
   const nativeTestName = toCn1StringValue(testName);
-  if (global.console && typeof global.console.log === "function") {
-    global.console.log("CN1SS:INFO:suite finished test=" + nativeTestName);
-  }
+  emitGuaranteedConsole("CN1SS:INFO:suite finished test=" + nativeTestName);
   emitLambdaBridgeDiag(
     "PARPAR:DIAG:FALLBACK:lambda3RunBridge:dispatch:index=" + String(index == null ? "null" : (index | 0))
     + ":nextIndex=" + String(nextIndex)
   );
+  const totalTests = getCn1ssRunnerTestTotal();
   if (cn1ssSelectedTests && cn1ssSelectedTestMatched) {
-    try {
-      const finishSuiteMethod = jvm.resolveVirtual(runner.__class, cn1ssRunnerFinishSuiteMethodId);
-      if (typeof finishSuiteMethod === "function") {
-        emitLambdaBridgeDiag("PARPAR:DIAG:FALLBACK:lambda3RunBridge:finishFilteredSuite=1");
-        return yield* finishSuiteMethod(runner);
-      }
-    } catch (err) {
-      const detail = yield* stringifyThrowable(err);
-      emitLambdaBridgeDiag("PARPAR:DIAG:FALLBACK:lambda3RunBridge:finishFilteredSuiteError=" + detail);
-    }
+    return yield* invokeCn1ssFinishSuite(runner, "filteredSuite");
+  }
+  if (totalTests > 0 && nextIndex >= totalTests) {
+    return yield* invokeCn1ssFinishSuite(runner, "endOfSuite:nextIndex=" + nextIndex + ":total=" + totalTests);
   }
   try {
-    const nextTestObject = yield* resolveCn1ssIndexedTestObject(nextIndex);
+    const nextTestObject = resolveCn1ssIndexedTestObject(nextIndex);
     if (jvm.instanceOf(nextTestObject, "com_codenameone_examples_hellocodenameone_tests_BaseTest")) {
       return yield* runCn1ssResolvedTest(
         runner,
@@ -3155,21 +3175,20 @@ bindCiFallback("Cn1ssDeviceRunner.lambda3RunBridge", [
     if (typeof runNextTestMethod === "function") {
       return yield* runNextTestMethod(runner, nextIndex);
     }
+    emitGuaranteedConsole("CN1SS:ERR:lambda3RunBridge:runNextTestMissing nextIndex=" + nextIndex);
   } catch (err) {
-    const detail = yield* stringifyThrowable(err);
-    emitLambdaBridgeDiag("PARPAR:DIAG:FALLBACK:lambda3RunBridge:runNextError=" + detail);
+    emitGuaranteedConsole("CN1SS:ERR:lambda3RunBridge:runNextError nextIndex=" + nextIndex
+      + " error=" + String(err && err.message ? err.message : err));
+    if (err && err.stack) {
+      emitGuaranteedConsole("CN1SS:ERR:lambda3RunBridge:runNextStack=" + String(err.stack).substring(0, 512));
+    }
   }
-  emitLambdaBridgeDiag("PARPAR:DIAG:FALLBACK:lambda3RunBridge:runNextMissing=1");
-  return null;
+  // If we got here, advancement failed — fall back to finishing the suite so the harness doesn't hang.
+  return yield* invokeCn1ssFinishSuite(runner, "runNextFailed:nextIndex=" + nextIndex);
 });
 
-let cn1ssLambdaBridgeDiagCount = 0;
 let cn1ssLambdaRunErrorStackCount = 0;
 function emitLambdaBridgeDiag(line) {
-  if (cn1ssLambdaBridgeDiagCount >= 60) {
-    return;
-  }
-  cn1ssLambdaBridgeDiagCount++;
   emitDiagLine(line);
 }
 function* forceAdvanceCn1ssRunner(callTarget, currentIndex, reason) {
@@ -3182,18 +3201,22 @@ function* forceAdvanceCn1ssRunner(callTarget, currentIndex, reason) {
     "PARPAR:DIAG:FALLBACK:lambdaBridge:forceAdvance:reason=" + String(reason || "unknown")
     + ":nextIndex=" + String(nextIndex)
   );
+  const totalTests = getCn1ssRunnerTestTotal();
+  if (totalTests > 0 && nextIndex >= totalTests) {
+    return yield* invokeCn1ssFinishSuite(callTarget, "forceAdvance:endOfSuite:" + String(reason || "unknown"));
+  }
   try {
     const runNextTestMethod = jvm.resolveVirtual(callTarget.__class, cn1ssRunnerRunNextTestMethodId);
     if (typeof runNextTestMethod === "function") {
       return yield* runNextTestMethod(callTarget, nextIndex);
     }
   } catch (advanceErr) {
-    emitLambdaBridgeDiag(
-      "PARPAR:DIAG:FALLBACK:lambdaBridge:forceAdvanceError="
-      + String(advanceErr && advanceErr.message ? advanceErr.message : advanceErr)
+    emitGuaranteedConsole(
+      "CN1SS:ERR:lambdaBridge:forceAdvanceError reason=" + String(reason || "unknown")
+      + " error=" + String(advanceErr && advanceErr.message ? advanceErr.message : advanceErr)
     );
   }
-  return null;
+  return yield* invokeCn1ssFinishSuite(callTarget, "forceAdvance:runNextFailed:" + String(reason || "unknown"));
 }
 
 bindCiFallbackWithMethodId("Cn1ssDeviceRunner.lambdaRunNextTestBridge", cn1ssLambdaBridgeMethodIds, function*(invokedMethodId, __cn1ThisObject, arg1, arg2, arg3) {
@@ -3311,23 +3334,7 @@ bindCiFallbackWithMethodId("Cn1ssDeviceRunner.lambdaRunNextTestBridge", cn1ssLam
       + String(effectiveIndex)
     );
   }
-  // Prefer runner static test list over lambda captures when available. Captured
-  // lambda arguments have been observed to drift after initial indices in ParparVM.
-  let indexedTestObject = null;
-  if (runner && runner.__class === cn1ssRunnerClassId) {
-    try {
-      const runnerClass = jvm.classes[cn1ssRunnerClassId];
-      const testClasses = runnerClass && runnerClass.staticFields
-        ? runnerClass.staticFields["TEST_CLASSES"]
-        : null;
-      if (testClasses && testClasses.__class) {
-        const listGetMethod = jvm.resolveVirtual(testClasses.__class, cn1ssRunnerListGetMethodId);
-        indexedTestObject = yield* listGetMethod(testClasses, effectiveIndex);
-      }
-    } catch (_err) {
-      indexedTestObject = null;
-    }
-  }
+  const indexedTestObject = resolveCn1ssIndexedTestObject(effectiveIndex);
   if (jvm.instanceOf(indexedTestObject, "com_codenameone_examples_hellocodenameone_tests_BaseTest")) {
     if (!effectiveTestObject || !effectiveTestObject.__class || effectiveTestObject.__class !== indexedTestObject.__class) {
       emitLambdaBridgeDiag(

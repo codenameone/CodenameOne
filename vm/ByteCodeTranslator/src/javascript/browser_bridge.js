@@ -30,6 +30,38 @@
   }
 
   var diagEnabled = shouldEnableDiag();
+  // Per-canvas-op bridge diagnostics are gated separately from the generic diag flag
+  // because they can grow to 100× the size of the rest of the log (one entry per canvas
+  // call). Enable with ?parparBridgeDiag=1 or global.__parparBridgeDiagEnabled=true.
+  var bridgeDiagEnabled = (function() {
+    if (global.__parparBridgeDiagEnabled != null) {
+      return !!global.__parparBridgeDiagEnabled;
+    }
+    var loc = (global.window || global).location;
+    if (!loc || !loc.search) {
+      return false;
+    }
+    var search = String(loc.search).charAt(0) === '?' ? String(loc.search).substring(1) : String(loc.search);
+    if (!search) {
+      return false;
+    }
+    var pairs = search.split('&');
+    for (var i = 0; i < pairs.length; i++) {
+      var entry = pairs[i];
+      if (!entry) {
+        continue;
+      }
+      var eq = entry.indexOf('=');
+      var key = decodeURIComponent((eq >= 0 ? entry.substring(0, eq) : entry).replace(/\+/g, ' '));
+      if (key !== 'parparBridgeDiag') {
+        continue;
+      }
+      var rawValue = decodeURIComponent((eq >= 0 ? entry.substring(eq + 1) : '1').replace(/\+/g, ' '));
+      var normalized = String(rawValue).toLowerCase();
+      return !(normalized === '0' || normalized === 'false' || normalized === 'off' || normalized === 'no');
+    }
+    return false;
+  })();
 
   function diagValue(value) {
     if (value == null) {
@@ -45,6 +77,11 @@
   }
   function diag(phase, key, value) {
     if (!diagEnabled) {
+      return;
+    }
+    // Suppress per-op HOST bridge diagnostics unless explicitly enabled via
+    // parparBridgeDiag=1. These outweigh everything else by a huge margin.
+    if (phase === 'HOST' && typeof key === 'string' && key.indexOf('jsoBridge') === 0 && !bridgeDiagEnabled) {
       return;
     }
     log('DIAG:' + phase + ':' + key + '=' + diagValue(value));

@@ -195,6 +195,16 @@ while true; do
     cp -f "$LOG_FILE" "$ARTIFACTS_DIR/browser.log" 2>/dev/null || true
     write_top_blocker "$ARTIFACTS_DIR/browser.log"
     rjb_log "Top blocker: $(cat "$ARTIFACTS_DIR/top-blocker.txt" 2>/dev/null || echo 'TOP_BLOCKER=unavailable|none|none')"
+    # Dump tail diagnostics so root cause is visible without downloading the 80MB browser log.
+    {
+      echo "=== LAST 200 CN1SS lines ==="
+      grep -E 'CN1SS:' "$ARTIFACTS_DIR/browser.log" 2>/dev/null | tail -200
+      echo "=== LAST 50 PARPAR FALLBACK lines ==="
+      grep -E 'PARPAR:DIAG:FALLBACK:' "$ARTIFACTS_DIR/browser.log" 2>/dev/null | tail -50
+      echo "=== LAST 30 VIRTUAL_FAIL lines ==="
+      grep -E 'PARPAR:DIAG:VIRTUAL_FAIL' "$ARTIFACTS_DIR/browser.log" 2>/dev/null | tail -30
+    } >"$ARTIFACTS_DIR/timeout-tail.log" 2>&1 || true
+    rjb_log "Timeout tail diagnostics written to $ARTIFACTS_DIR/timeout-tail.log"
     exit 5
   fi
   sleep 1
