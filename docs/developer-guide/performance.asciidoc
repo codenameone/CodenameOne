@@ -121,6 +121,274 @@ If you're using the integration test harness, make sure CMake is configured with
 
 Without this setting, comparison between Java and ParparVM native output is often noisy and can lead to incorrect optimization conclusions.
 
+=== SIMD: Data-Parallel Primitives
+
+SIMD stands for *Single Instruction, Multiple Data*. It is a family of CPU
+instructions that apply the same arithmetic or logical operation to several
+values at once, packed together into a single wide register. On a 128-bit
+NEON or SSE register you can hold sixteen bytes, eight 16-bit integers, four
+32-bit integers, or four 32-bit floats, and a single instruction such as
+`VADD` or `PADDD` then operates on every lane in parallel. For data-parallel
+workloads — Base64 encode/decode, pixel blending, alpha-mask compositing,
+colour-channel manipulation, table lookups — SIMD typically delivers a 3× to
+10× speedup over scalar code.
+
+Modern mobile and desktop CPUs expose several SIMD instruction sets:
+
+* x86/x64 — MMX, SSE, SSE2/3/4, AVX, AVX2, AVX-512
+* ARM/ARM64 — NEON (Advanced SIMD) and SVE
+
+Codename One exposes those primitives as portable Java method calls on
+https://www.codenameone.com/javadoc/com/codename1/util/Simd.html[`com.codename1.util.Simd`].
+On ParparVM (iOS) the translator lowers them to NEON intrinsics; on Android
+and the JavaSE simulator a pure-Java fallback in `JavaSESimd` provides the
+same semantics so code written against `Simd` runs everywhere and simply
+performs better where native SIMD is available.
+
+==== When to Use SIMD
+
+SIMD is worth reaching for when *all* of the following hold:
+
+* You are processing a buffer of at least dozens of elements at a time.
+* The operation per element is simple (add, min, blend, table lookup,
+  interleave/unpack) and identical across elements.
+* Control flow is regular — no per-element early exit, no data-dependent
+  branches that differ across lanes.
+* Data is contiguous in a primitive array (`byte[]`, `int[]`, `float[]`).
+
+Classic fits are image pixel passes, codecs (Base64, UTF-8 validation,
+hex encoding), checksums, audio mixing, and vector arithmetic. Poor fits
+are tight loops with pointer chasing, per-element branching on complex
+state, or buffers smaller than a single SIMD register.
+
+If you are not sure whether your platform has a vectorized implementation
+available, call `Simd.get().isSupported()`. The fallback path still returns
+correct results; `isSupported()` only tells you whether you will see the
+speedup.
+
+==== Getting an Instance
+
+`Simd` is accessed as a singleton:
+
+[source,java]
+----
+Simd simd = Simd.get(); // equivalent to CN.getSimd()
+if (simd.isSupported()) {
+    // native SIMD is wired up on this platform
+}
+----
+
+The returned object is safe to cache in a field as long as the cache is
+refreshed across simulator restarts (the simulator may swap the backing
+implementation).
+
+==== Allocation: Alignment and Provenance
+
+SIMD load/store instructions prefer — and on some architectures require —
+that the memory address they read from or write to be a multiple of the
+register width (16 bytes on NEON and SSE). Misaligned access either throws
+a hardware fault on strict platforms or silently costs extra cycles because
+the CPU has to split the transaction across two cache lines. A JVM offers
+no guarantee that `new byte[64]` is aligned to anything beyond the
+platform's object-header convention, so the framework forbids passing
+arbitrary `new`-allocated arrays to `Simd` primitives.
+
+Every buffer used with a `Simd` primitive must therefore come from one of
+the allocation helpers on `Simd`:
+
+[source,java]
+----
+byte[]  bytes  = simd.allocByte(64);   // heap, 16-byte aligned, registered
+int[]   ints   = simd.allocInt(32);    // heap, 16-byte aligned, registered
+float[] floats = simd.allocFloat(32);  // heap, 16-byte aligned, registered
+----
+
+All three methods enforce a minimum size of 16 elements and throw
+`IllegalArgumentException` for anything smaller; the minimum keeps each
+buffer large enough to hold a full SIMD register and leaves room for
+alignment padding.
+
+WARNING: Do not construct SIMD buffers with `new byte[64]` and pass them
+to `Simd`. The simulator enforces this at runtime (see _Simulator
+Tracking_ below) and the iOS native path assumes alignment. Passing an
+unregistered array yields either an `IllegalArgumentException` in the
+simulator or undefined results on device.
+
+==== A Minimal End-to-End Example
+
+[source,java]
+----
+Simd simd = Simd.get();
+
+byte[] a   = simd.allocByte(64);
+byte[] b   = simd.allocByte(64);
+byte[] out = simd.allocByte(64);
+
+// fill a and b with your data (plain array writes are fine)
+for (int i = 0; i < 64; i++) {
+    a[i] = (byte) i;
+    b[i] = (byte) (64 - i);
+}
+
+// saturating byte add, one vector instruction per 16 bytes on NEON
+simd.add(a, b, out, 0, 64);
+----
+
+All `Simd` ops take explicit `offset` / `length` pairs so callers can
+chunk a large buffer through a small scratch array without reallocating.
+Many methods have interleaved variants — `unpackBytesInterleaved3/4`,
+`packBytesInterleaved3/4` — designed for packed pixel formats (RGB, RGBA)
+and fused operations like `blendByMaskTestNonzero` and
+`replaceTopByteFromUnsignedBytes` that collapse common three- or
+four-pass pixel pipelines into a single vector pass.
+
+==== Scratch Allocations: `alloca*`
+
+A SIMD primitive often needs a short-lived working buffer: somewhere to
+stage intermediate lanes, hold a temporary mask, or accumulate partial
+results. Allocating a new `byte[]` per call via `allocByte` would dominate
+the runtime of the primitive it was trying to accelerate — heap
+allocation, zero-fill, and eventual GC reclamation all add up. The natural
+solution is to let the compiler place these buffers on the call stack
+where they cost nothing to create and are reclaimed for free when the
+method returns. This is what the `alloca*` family exposes:
+
+[source,java]
+----
+byte[]  scratchB = simd.allocaByte(64);
+int[]   scratchI = simd.allocaInt(32);
+float[] scratchF = simd.allocaFloat(32);
+
+// Deterministic initial contents:
+byte[]  zeroed   = simd.allocaByteZeroed(64);
+int[]   filled   = simd.allocaIntFilled(32, -1);
+----
+
+On the simulator (and on Android) these behave like heap allocations with
+registration. On ParparVM the translator intercepts each `alloca*` call
+and rewrites it into a C-level `__builtin_alloca` that carves a faux
+`JavaArrayPrototype` out of the current C stack frame. The resulting
+pointer masquerades as an ordinary Java array for the lifetime of the
+enclosing method and is reclaimed on return.
+
+The distinction between `allocByte` and `allocaByte` mirrors the
+distinction between `new byte[N]` and C's `alloca(N)`:
+
+[cols="1,3,3", options="header"]
+|===
+| | `alloc*` (heap) | `alloca*` (stack on ParparVM)
+| Cost to allocate | object header + zero fill + GC bookkeeping | register adjust, essentially free
+| Lifetime | until last reference dropped | until enclosing method returns
+| Can be stored in a field | yes | *no — use-after-free on device*
+| Can be returned from the method | yes | *no*
+| Can be passed to non-`Simd` methods | yes | *no*
+| Initial contents | zero | undefined (use `*Zeroed` / `*Filled`)
+| Size limit | heap | bounded by remaining stack
+|===
+
+NOTE: `alloca*` memory, like any stack memory, starts out containing
+whatever the previous frame left behind. Callers that require predictable
+initial contents should use `allocaByteZeroed` / `allocaIntZeroed` /
+`allocaFloatZeroed`, or the `*Filled` variants that accept an explicit
+initial value, rather than rolling their own loop.
+
+==== Rules for `alloca*` Scratch Arrays
+
+Because `alloca*` memory cannot safely outlive its defining method on
+ParparVM, the array it returns must be treated as strictly method-local.
+The framework enforces four rules at build and run time:
+
+. Do not *return* an `alloca*` array from the method that allocated it.
+. Do not *store* an `alloca*` array in an instance or static *field*, or
+  into an *object array*.
+. Do not pass an `alloca*` array to a method whose owner is not `Simd`,
+  `IOSSimd`, or `JavaSESimd`. Helper methods outside the SIMD package
+  might themselves violate one of the other rules.
+. Do not pass an `alloca*` array through `invokedynamic`; dynamic dispatch
+  cannot be analysed statically.
+
+Inside the defining method you are free to pass the array to any number
+of `Simd` primitives, copy values into and out of it, combine it with
+other buffers, and so on.
+
+==== Build-Time Verification
+
+The Maven plugin ships a bytecode-compliance goal (`compliance-check`)
+that walks every method in the application's compiled classes and
+performs a dataflow pass whose only job is to track whether each value
+on the operand stack or in a local variable was produced by an `alloca*`
+call. The pass is an ASM `BasicInterpreter` subclass that taints every
+value returned from a method on `Simd`, `IOSSimd`, or `JavaSESimd` whose
+name begins with `alloca` followed by an upper-case letter. The taint
+propagates through `DUP`, `ASTORE`/`ALOAD`, `CHECKCAST`, and every
+control-flow merge, so a value keeps its provenance through any amount
+of local plumbing.
+
+The verifier fails the build if a tainted value reaches any of:
+
+* `ARETURN` — "SIMD alloca value returned from method"
+* `PUTFIELD` / `PUTSTATIC` — "SIMD alloca value stored into instance/static field"
+* `AASTORE` — "SIMD alloca value stored into object array"
+* `INVOKE*` whose owner is not `Simd`, `IOSSimd`, or `JavaSESimd`
+* `INVOKEDYNAMIC` — refused unconditionally
+
+Every violation is reported with the offending class, method, and the
+hint "Keep SIMD alloca scratch arrays method-local and only pass them to
+Simd methods." Because this is wired into the Maven build, code that
+would dereference freed stack memory on device cannot ship.
+
+A complementary guard lives inside the translator itself:
+`CustomInvoke.appendSimdAllocaExpression` only performs stack lowering
+when the length argument is a *compile-time constant*. A call like
+`simd.allocaByte(n)` with a variable `n` falls through to the default
+codegen and becomes a normal heap allocation, which avoids both
+unbounded stack growth and an alloca whose size the translator cannot
+inspect.
+
+==== Simulator Tracking of Aligned Arrays
+
+The JavaSE simulator runs on the desktop where there is no NEON, no
+`__builtin_alloca`, and no guarantee that a given `byte[]` is 16-byte
+aligned. To keep developer bugs from hiding on the desktop and
+reappearing only on device, the simulator takes a strict stance: *only
+arrays obtained from `Simd.alloc*` / `Simd.alloca*` are accepted as
+inputs to SIMD primitives.*
+
+Internally this is an identity-based registry. Every allocation helper
+routes its result through a registration call that stores the array's
+`System.identityHashCode` — the JVM's per-object identity hash, stable
+for the object's lifetime regardless of GC movement. Every SIMD entry
+point validates its array arguments against the same set and throws
+`IllegalArgumentException` if a caller hands it a plain `new byte[64]`:
+
+[source,text]
+----
+java.lang.IllegalArgumentException: SIMD array argument was not
+allocated using Simd.alloc*(). objectId=…
+----
+
+Combined with the build-time verifier, both static analysis and dynamic
+execution refuse to accept arrays that would not be 16-byte aligned on
+device. On the device itself no such validation occurs — by that point
+the build has already proved the invariant.
+
+==== Built-In SIMD Paths
+
+You usually benefit from SIMD without touching the API directly.
+`com.codename1.util.Base64` detects `Simd.isSupported()` at encode/decode
+entry points and routes the hot loop through `unpackLookupBytesInterleaved4`,
+`lookupBytes`, `or`, and `shl` with cached per-call constant tables; the
+bodies of `Image.applyMask`, `Image.modifyAlpha`, and `Image.removeColor`
+use fused primitives like `replaceTopByteFromUnsignedBytes` and
+`blendByMaskTestNonzero` to collapse multi-pass pixel pipelines into a
+single vector loop.
+
+If you are writing your own hot loop on a primitive buffer and the data
+is already contiguous and aligned in a `Simd.alloc*` array, reach for the
+`Simd` API before optimizing further with the ParparVM annotations
+described above — vectorization and annotation hints compose, but
+vectorization is usually the larger win.
+
 === Performance Monitor
 
 The Performance Monitor tool can be accessible via the #Simulator# -> #Performance Monitor# menu option in the simulator. This launches the following UI that can help you improve application performance:
