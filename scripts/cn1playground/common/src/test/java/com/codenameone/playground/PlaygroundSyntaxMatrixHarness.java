@@ -182,6 +182,23 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "List<String> items = new ArrayList<>();\n"
                 + "items.add(\"a\");\n"
                 + "items.stream().count();"), ExpectedOutcome.EVAL_ERROR, "stream"));
+        cases.add(new Case(cat, "method_overloading", ui(""
+                + "class M { String fmt(int n) { return \"int:\" + n; } String fmt(String s) { return \"str:\" + s; } }\n"
+                + "M m = new M();\n"
+                + "root.add(new Label(m.fmt(5) + \" \" + m.fmt(\"hi\")));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "ctor_overloading", ui(""
+                + "class P { int v; P() { v = 0; } P(int x) { v = x; } }\n"
+                + "P a = new P();\n"
+                + "P b = new P(7);\n"
+                + "root.add(new Label(\"a=\" + a.v + \" b=\" + b.v));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "iterator_walk", ui(""
+                + "import java.util.*;\n"
+                + "List<Integer> items = new ArrayList<>();\n"
+                + "items.add(1); items.add(2); items.add(3);\n"
+                + "Iterator it = items.iterator();\n"
+                + "int sum = 0;\n"
+                + "while (it.hasNext()) sum += (Integer) it.next();\n"
+                + "root.add(new Label(\"sum=\" + sum));"), ExpectedOutcome.SUCCESS, null));
         cases.add(new Case(cat, "lambda_method_ref_combo", ui(""
                 + "import java.util.function.*;\n"
                 + "Predicate<String> nonEmpty = s -> s.length() > 0;\n"

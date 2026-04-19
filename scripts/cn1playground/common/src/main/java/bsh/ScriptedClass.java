@@ -307,18 +307,68 @@ public final class ScriptedClass {
         return instance;
     }
 
-    /** Look up an instance method template by name. Overload resolution is
-     * arity-only for now (matching BSH's loose-typed dispatch).
-     * The caller binds the template to its instance namespace. */
+    /** Look up an instance method template by name with simple overload
+     * resolution. Same-arity templates are scored against the actual
+     * argument types — exact type match scores highest, then assignable,
+     * then Object (fallback). The template with the highest score wins;
+     * ties resolve to the first declared. The caller binds the template
+     * to its instance namespace. */
     MethodTemplate findInstanceMethodTemplate(String methodName, Object[] args) {
         int arity = args == null ? 0 : args.length;
+        MethodTemplate best = null;
+        int bestScore = Integer.MIN_VALUE;
         MethodTemplate varArgsMatch = null;
         for (MethodTemplate t : instanceMethods) {
             if (!t.name.equals(methodName)) continue;
-            if (t.paramCount == arity) return t;
-            if (t.isVarArgs && t.paramCount - 1 <= arity) varArgsMatch = t;
+            if (t.paramCount == arity) {
+                int score = scoreMatch(t, args);
+                if (score > bestScore) {
+                    bestScore = score;
+                    best = t;
+                }
+            } else if (t.isVarArgs && t.paramCount - 1 <= arity) {
+                varArgsMatch = t;
+            }
         }
-        return varArgsMatch;
+        return best != null ? best : varArgsMatch;
+    }
+
+    private static int scoreMatch(MethodTemplate t, Object[] args) {
+        if (args == null || args.length == 0) return 0;
+        Class<?>[] paramTypes = t.paramTypes();
+        int score = 0;
+        for (int i = 0; i < args.length; i++) {
+            Class<?> declared = paramTypes != null && i < paramTypes.length ? paramTypes[i] : null;
+            if (declared == null) {
+                // loose-typed parameter — neutral score
+                continue;
+            }
+            Object arg = args[i];
+            if (arg == null) {
+                score += declared.isPrimitive() ? -10 : 1;
+            } else if (declared == arg.getClass()) {
+                score += 3;
+            } else if (declared.isInstance(arg)) {
+                score += 2;
+            } else if (declared.isPrimitive() && isCompatiblePrimitive(declared, arg)) {
+                score += 2;
+            } else if (declared == Object.class) {
+                score += 1;
+            } else {
+                score -= 5;
+            }
+        }
+        return score;
+    }
+
+    private static boolean isCompatiblePrimitive(Class<?> primitive, Object value) {
+        // CN1 doesn't have Boolean.TYPE / Character.TYPE static fields, so
+        // we identify primitive variants by class name.
+        String n = primitive.getName();
+        if (value instanceof Number && !"boolean".equals(n) && !"char".equals(n)) return true;
+        if (value instanceof Character && "char".equals(n)) return true;
+        if (value instanceof Boolean && "boolean".equals(n)) return true;
+        return false;
     }
 
     BshMethod findStaticMethod(String methodName, Object[] args) {
@@ -386,6 +436,10 @@ public final class ScriptedClass {
         BshMethod bind(NameSpace declaringNameSpace) {
             return new BshMethod(decl, declaringNameSpace,
                     decl.modifiers, false);
+        }
+
+        Class<?>[] paramTypes() {
+            return decl.paramsNode == null ? null : decl.paramsNode.paramTypes;
         }
     }
 
