@@ -192,16 +192,6 @@ public class RGBImage extends Image {
         g.drawRGB(rgb, 0, x, y, width, height, !opaque);
     }
 
-    @Override
-    protected void drawImage(Graphics g, Object nativeGraphics, int x, int y, int w, int h) {
-        if (w == width && h == height) {
-            g.drawRGB(rgb, 0, x, y, width, height, !opaque);
-            return;
-        }
-        RGBImage scaledImage = (RGBImage)scaled(w, h);
-        g.drawRGB(scaledImage.rgb, 0, x, y, w, h, !scaledImage.opaque);
-    }
-
     /// Indicates if an image should be treated as opaque, this can improve support
     /// for fast drawing of RGB images without alpha support.
     @Override

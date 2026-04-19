@@ -2658,6 +2658,10 @@ const html5HideSplashMethodId = "cn1_com_codename1_impl_html5_HTML5Implementatio
 const cn1ssRunnerClassId = "com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner";
 const cn1ssRunnerRunNextTestMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_runNextTest_int";
 const cn1ssRunnerAwaitTestCompletionMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_awaitTestCompletion_int_com_codenameone_examples_hellocodenameone_tests_BaseTest_java_lang_String_long";
+// Mirrors Cn1ssDeviceRunner.TEST_TIMEOUT_MS in Java. Must match that constant so
+// awaitTestCompletion's deadline behaves the same way whether dispatch goes via
+// the Java runSuite path or the JS runCn1ssResolvedTest shortcut.
+const cn1ssTestTimeoutMs = 30000;
 const cn1ssRunnerFinalizeTestMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_finalizeTest_int_com_codenameone_examples_hellocodenameone_tests_BaseTest_java_lang_String_boolean";
 const cn1ssRunnerFinishSuiteMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_finishSuite";
 const cn1ssRunnerFinalizeLambda4MethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_finalizeTest_4_java_lang_String_int";
@@ -3028,25 +3032,29 @@ function* runCn1ssResolvedTest(callTarget, effectiveTestObject, effectiveTestNam
       // Best effort only.
     }
   }
-  if (runErrored) {
-    try {
-      const finalizeMethod = jvm.resolveVirtual(callTarget.__class, cn1ssRunnerFinalizeTestMethodId);
-      if (typeof finalizeMethod === "function") {
-        return yield* finalizeMethod(
-          callTarget,
-          effectiveIndex,
-          effectiveTestObject,
-          normalizedTestName,
-          0
-        );
-      }
-    } catch (_finalizeAfterRunErr) {
-      const finalizeErrDetail = yield* stringifyThrowable(_finalizeAfterRunErr);
-      emitLambdaBridgeDiag("PARPAR:DIAG:FALLBACK:lambdaBridge:runErrorFinalizeError=" + finalizeErrDetail);
-      return yield* forceAdvanceCn1ssRunner(callTarget, effectiveIndex, "runErrorFinalizeFailed");
+  // Mirror Java's runNextTest lambda: after prepare()+runTest() (or catch),
+  // delegate to awaitTestCompletion which polls isDone() and handles the
+  // finalize+timeout logic. Skipping this step finalizes the test before
+  // onShowCompleted→UITimer→emitCurrentFormScreenshot→done() can run, so no
+  // screenshot is ever emitted for tests routed through this helper.
+  try {
+    const awaitMethod = jvm.resolveVirtual(callTarget.__class, cn1ssRunnerAwaitTestCompletionMethodId);
+    if (typeof awaitMethod === "function") {
+      const deadline = Date.now() + cn1ssTestTimeoutMs;
+      return yield* awaitMethod(
+        callTarget,
+        effectiveIndex,
+        effectiveTestObject,
+        normalizedTestName,
+        deadline
+      );
     }
-    return yield* forceAdvanceCn1ssRunner(callTarget, effectiveIndex, "runErrorFinalizeMissing");
+    emitLambdaBridgeDiag("PARPAR:DIAG:FALLBACK:lambdaBridge:awaitTestCompletionMissing=1");
+  } catch (_awaitErr) {
+    const awaitErrDetail = yield* stringifyThrowable(_awaitErr);
+    emitLambdaBridgeDiag("PARPAR:DIAG:FALLBACK:lambdaBridge:awaitTestCompletionError=" + awaitErrDetail);
   }
+  // Fallback to direct finalize if awaitTestCompletion isn't available.
   try {
     const finalizeMethod = jvm.resolveVirtual(callTarget.__class, cn1ssRunnerFinalizeTestMethodId);
     if (typeof finalizeMethod === "function") {
