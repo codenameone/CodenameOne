@@ -9,8 +9,6 @@ package com.codename1.impl.html5;
 import com.codename1.impl.html5.graphics.ClipState;
 
 public final class JavaScriptImageTransformRenderAdapter<I, S, T, O> {
-    private static int debugLogCount;
-
     public interface OperationSink<O> {
         void submit(O operation);
     }
@@ -34,41 +32,22 @@ public final class JavaScriptImageTransformRenderAdapter<I, S, T, O> {
     }
 
     public void drawImage(I image, int x, int y) {
-        O operation = factory.createDrawImage(image, x, y, state.getAlpha());
-        debugSubmit("drawImage", operation);
-        sink.submit(operation);
+        sink.submit(factory.createDrawImage(image, x, y, state.getAlpha()));
     }
 
     public void drawImage(I image, int x, int y, int width, int height) {
-        O operation = factory.createDrawImage(image, x, y, width, height, state.getAlpha());
-        debugSubmit("drawImageScaled", operation);
-        sink.submit(operation);
+        sink.submit(factory.createDrawImage(image, x, y, width, height, state.getAlpha()));
     }
 
     public void tileImage(I image, int x, int y, int width, int height) {
-        O operation = factory.createTileImage(image, x, y, width, height, state.getAlpha());
-        debugSubmit("tileImage", operation);
-        sink.submit(operation);
+        sink.submit(factory.createTileImage(image, x, y, width, height, state.getAlpha()));
     }
 
     public void applyTransform(T transform, boolean replace) {
-        O operation = factory.createTransform(transform, replace);
-        debugSubmit("applyTransform", operation);
-        sink.submit(operation);
+        sink.submit(factory.createTransform(transform, replace));
     }
 
     public void setClipShape(S shape, T transform) {
-        O operation = factory.createClipShape(shape, transform, state.getClipState());
-        debugSubmit("setClipShape", operation);
-        sink.submit(operation);
-    }
-
-    private static void debugSubmit(String operationName, Object operation) {
-        if (debugLogCount >= 80) {
-            return;
-        }
-        debugLogCount++;
-        System.out.println("CN1JS:ImageTransformAdapter." + operationName + " op="
-                + (operation == null ? "null" : operation.getClass().getName()));
+        sink.submit(factory.createClipShape(shape, transform, state.getClipState()));
     }
 }

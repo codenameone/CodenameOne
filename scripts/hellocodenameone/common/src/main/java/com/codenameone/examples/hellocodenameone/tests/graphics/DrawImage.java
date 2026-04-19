@@ -9,7 +9,6 @@ import com.codename1.ui.geom.Rectangle;
 import com.codenameone.examples.hellocodenameone.tests.AbstractGraphicsScreenshotTest;
 
 public class DrawImage extends AbstractGraphicsScreenshotTest {
-    private static int debugLogCount;
     private Image mutable;
     private Image mutableWithAlpha;
     private EncodedImage encoded;
@@ -36,27 +35,15 @@ public class DrawImage extends AbstractGraphicsScreenshotTest {
             fromBytes = Image.createImage(encoded.getImageData(), 0, encoded.getImageData().length);
             fontImage = FontImage.createFixed("" + FontImage.MATERIAL_ALARM_ON, FontImage.getMaterialDesignFont(), 0xff0000, size, size, 2);
             scaled = mutable.scaled(size * 2, size * 2).scaled(size, size);
-            debugImage("mutable", mutable);
-            debugImage("mutableWithAlpha", mutableWithAlpha);
-            debugImage("encoded", encoded);
-            debugImage("rgbImage", rgbImage);
-            debugImage("fromRgba", fromRgba);
-            debugImage("fromBytes", fromBytes);
-            debugImage("fontImage", fontImage);
-            debugImage("scaled", scaled);
         }
         int yBound = bounds.getY();
-        debugDraw("mutable", mutable, bounds.getX(), yBound);
         g.drawImage(mutable, bounds.getX(), yBound);
 
         g.setColor(0xff);
         g.drawArc(bounds.getX() + size, yBound, size, size, 0, 360);
-        debugDraw("mutableWithAlpha", mutableWithAlpha, bounds.getX() + size, yBound);
         g.drawImage(mutableWithAlpha, bounds.getX() + size, yBound);
 
-        debugDraw("encoded", encoded, bounds.getX() + size * 2, yBound);
         g.drawImage(encoded, bounds.getX() + size * 2, yBound);
-        debugDraw("fontImage", fontImage, bounds.getX() + size * 3, yBound);
         g.drawImage(fontImage, bounds.getX() + size * 3, yBound);
 
         yBound = bounds.getY() + size;
@@ -102,33 +89,5 @@ public class DrawImage extends AbstractGraphicsScreenshotTest {
     @Override
     protected String screenshotName() {
         return "graphics-draw-image-rect";
-    }
-
-    private static void debugImage(String label, Image image) {
-        if (debugLogCount >= 32) {
-            return;
-        }
-        debugLogCount++;
-        System.out.println("CN1JS:DrawImageTest.image label=" + label
-                + " imageClass=" + className(image)
-                + " nativeClass=" + className(image == null ? null : image.getImage())
-                + " requiresDrawImage=" + (image != null && image.requiresDrawImage())
-                + " size=" + (image == null ? "null" : image.getWidth() + "x" + image.getHeight()));
-    }
-
-    private static void debugDraw(String label, Image image, int x, int y) {
-        if (debugLogCount >= 64) {
-            return;
-        }
-        debugLogCount++;
-        System.out.println("CN1JS:DrawImageTest.draw label=" + label
-                + " imageClass=" + className(image)
-                + " nativeClass=" + className(image == null ? null : image.getImage())
-                + " requiresDrawImage=" + (image != null && image.requiresDrawImage())
-                + " dst=" + x + "," + y);
-    }
-
-    private static String className(Object value) {
-        return value == null ? "null" : value.getClass().getName();
     }
 }

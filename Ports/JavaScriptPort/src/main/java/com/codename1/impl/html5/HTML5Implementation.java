@@ -150,7 +150,6 @@ import com.codename1.html5.js.typedarrays.Uint8ClampedArray;
  * @author shannah
  */
 public class HTML5Implementation extends CodenameOneImplementation {
-    private static int implDrawImageDebugLogCount;
     private static int implDrawStringDebugLogCount;
     private static int implTransformDebugLogCount;
     private static int renderQueueDebugLogCount;
@@ -6002,27 +6001,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @Override
     public void drawImage(Object graphics, Object img, int x, int y) {
-        if (implDrawImageDebugLogCount < 80) {
-            implDrawImageDebugLogCount++;
-            NativeImage image = (NativeImage)img;
-            System.out.println("CN1JS:HTML5Implementation.drawImage simple src="
-                    + image.getWidth() + "x" + image.getHeight()
-                    + " dst=" + x + "," + y
-                    + " graphics=" + (graphics == null ? "null" : graphics.getClass().getName()));
-        }
+        if (img == null) return;
         g(graphics).drawImage(img, x, y);
     }
 
     @Override
     public void drawImage(Object graphics, Object img, int x, int y, int w, int h) {
-        if (implDrawImageDebugLogCount < 80) {
-            implDrawImageDebugLogCount++;
-            NativeImage image = (NativeImage)img;
-            System.out.println("CN1JS:HTML5Implementation.drawImage scaled src="
-                    + image.getWidth() + "x" + image.getHeight()
-                    + " dst=" + x + "," + y + " " + w + "x" + h
-                    + " graphics=" + (graphics == null ? "null" : graphics.getClass().getName()));
-        }
+        if (img == null) return;
         g(graphics).drawImage(img, x, y, w, h);
     }
 
@@ -6030,14 +6015,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
     // so leaving it for now.
     @Override
     public void tileImage(Object graphics, Object img, int x, int y, int w, int h) {
-        if (implDrawImageDebugLogCount < 80) {
-            implDrawImageDebugLogCount++;
-            NativeImage image = (NativeImage)img;
-            System.out.println("CN1JS:HTML5Implementation.tileImage src="
-                    + image.getWidth() + "x" + image.getHeight()
-                    + " dst=" + x + "," + y + " " + w + "x" + h
-                    + " graphics=" + (graphics == null ? "null" : graphics.getClass().getName()));
-        }
+        if (img == null) return;
         g(graphics).tileImage(img, x, y, w, h);
     }
 
