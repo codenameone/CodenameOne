@@ -873,6 +873,46 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "interface Config { String DEFAULT_NAME = \"world\"; String greet(); }\n"
                 + "class Greeter implements Config { public String greet() { return \"hi \" + Config.DEFAULT_NAME; } }\n"
                 + "root.add(new Label(new Greeter().greet()));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "boolean_short_circuit_and", ui(""
+                + "String[] log = new String[]{\"\"};\n"
+                + "boolean result = false && (log[0] = \"touched\") != null;\n"
+                + "root.add(new Label(\"r=\" + result + \" log=\" + log[0]));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "boolean_short_circuit_or", ui(""
+                + "boolean r = true || (1/0 > 0);\n"
+                + "root.add(new Label(\"r=\" + r));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "scripted_class_returned_from_method", ui(""
+                + "class Factory { Holder make(String s) { return new Holder(s); } }\n"
+                + "class Holder { String text; Holder(String t) { text = t; } }\n"
+                + "Holder h = new Factory().make(\"hello\");\n"
+                + "root.add(new Label(h.text));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "nested_enhanced_for_with_continue", ui(""
+                + "int[][] g = new int[][]{{1,2,3},{4,5,6}};\n"
+                + "int sum = 0;\n"
+                + "for (int[] row : g) {\n"
+                + "  for (int v : row) { if (v % 2 == 0) continue; sum += v; }\n"
+                + "}\n"
+                + "root.add(new Label(\"sum=\" + sum));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "complex_predicate_with_and_or", ui(""
+                + "import java.util.function.*;\n"
+                + "Predicate<Integer> isPositive = n -> n > 0;\n"
+                + "Predicate<Integer> isEven = n -> n % 2 == 0;\n"
+                + "int count = 0;\n"
+                + "for (int n : new int[]{-2,-1,0,1,2,3,4}) {\n"
+                + "  if (isPositive.test(n) && isEven.test(n)) count++;\n"
+                + "}\n"
+                + "root.add(new Label(\"n=\" + count));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "enum_with_multiple_fields", ui(""
+                + "enum Axis { X(1,0), Y(0,1); int dx; int dy; Axis(int x, int y) { dx = x; dy = y; } }\n"
+                + "Axis a = Axis.X;\n"
+                + "root.add(new Label(\"dx=\" + a.dx + \" dy=\" + a.dy));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "enum_method_returning_self", ui(""
+                + "enum State { OPEN, CLOSED; public State flip() { return this == OPEN ? CLOSED : OPEN; } }\n"
+                + "State s = State.OPEN.flip();\n"
+                + "root.add(new Label(s.name()));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "method_parameter_shadowing_field", ui(""
+                + "class C { int x = 10; int add(int x) { return this.x + x; } }\n"
+                + "C c = new C();\n"
+                + "root.add(new Label(\"v=\" + c.add(5)));"), ExpectedOutcome.SUCCESS, null));
         cases.add(new Case(cat, "lambda_method_ref_combo", ui(""
                 + "import java.util.function.*;\n"
                 + "Predicate<String> nonEmpty = s -> s.length() > 0;\n"
