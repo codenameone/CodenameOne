@@ -3,10 +3,76 @@
 JavaScript Port Status (ParparVM)
 =================================
 
-Last updated: 2026-04-19
+Last updated: 2026-04-20
 
-Current Pass — Progress Log (2026-04-19, live)
-----------------------------------------------
+Current Pass — Rendering correctness (2026-04-20)
+-------------------------------------------------
+
+Full-suite run on post-lambda-fix bundle revealed that all 48 tests complete,
+all 49 suite lifecycle events fire, zero `__parparError`, zero
+`Cannot read properties of null`, zero `VIRTUAL_FAIL`, zero
+`Button_initLaf is not defined`, zero `document is not defined`. Screenshots
+are emitted but most were visually wrong: toolbar region showed stacked titles
+from multiple previous tests (e.g. MainActivity toolbar read
+"Kotlin Kotlin Main Screen Kotlin Main Screen Main Screen Main Screen"),
+and component bodies (Sheet, ValidatorLightweightPicker, ToastBar) rendered
+as all-black or blank fields.
+
+Two fixes landed this pass:
+
+1. **Guard null native transforms across HTML5Implementation** (commit
+   `0d473b922`). `HTML5Implementation.transformPoint`,
+   `transformEqualsImpl`, `setTransformTranslation`, `makeTransformInverse`,
+   `setTransformInverse`, `transformTranslate`, `transformScale`,
+   `transformRotate` all raw-cast `nativeTransform` to `JSAffineTransform`.
+   The JS port reaches these with a null native from the SpinnerNode/Scene
+   render path in picker tests (iOS/Android never do, because their
+   Transforms always carry a non-null native). Treat null as an identity
+   no-op / pass-through. Removed leftover `System.out.println` blocks in
+   `setTransform`/`scale` that deref'd null graphics on teardown. Locked
+   the contract in `JavaScriptRuntimeFacadeTest.transformMethodsGuardNullNativeTransform`.
+
+2. **Clear drain region before executing ops in drainPendingDisplayFrame**
+   (commit `3892a83a1`). Single-test runs were clean; full-suite runs
+   showed pixel bleed in the toolbar area because the clip-then-render
+   sequence left the previous drain's pixels under any region the new
+   ops didn't explicitly cover. Added
+   `context.clearRect(cropX, cropY, cropW, cropH)` right after the clip is
+   established. Clear respects the active clip, so partial-region drains
+   (`crop=0,36 1280x18` for the toast bar, etc.) only wipe their own strip
+   and leave the rest of the canvas intact.
+
+Post-fix full-suite state (48 UI + 13 API/timeout tests):
+- 49/49 tests complete cleanly.
+- 36 PNGs emit at 1280x900 (the other 13 are API/benchmark/timeout tests
+  that don't produce screenshots by design:
+  AccessibilityTest, BackgroundThreadUiAccessTest, Base64NativePerformanceTest,
+  BrowserComponentScreenshotTest, BytecodeTranslatorRegressionTest,
+  CallDetectionAPITest, InPlaceEditViewTest, Java17Tests,
+  LocalNotificationOverrideTest, MediaPlaybackScreenshotTest, SimdApiTest,
+  StreamApiTest, TimeApiTest, VPNDetectionAPITest).
+- Zero null-pointer crashes, zero VIRTUAL_FAIL, zero unresolved symbols.
+- Toolbar/title bars now render cleanly, no accumulation across tests.
+- Component bodies now visible that were previously black/blank (Sheet,
+  ToastBarTopPosition, ValidatorLightweightPicker, TextAreaAlignmentStates,
+  MainActivity, graphics-fill-rect, etc.).
+
+Remaining component-specific rendering issues (component-local, not systemic):
+- **TabsScreenshotTest**: tab strip (header row with tab labels/icons) does
+  not paint; only the active tab's content area is visible. No errors
+  logged. Likely a Tabs-specific paint or layout path.
+- **ValidatorLightweightPickerScreenshotTest / LightweightPickerButtonsScreenshotTest**:
+  title and toolbar render correctly; the picker wheel itself does not
+  paint. Likely a scene/node rendering path for spinner components.
+- **SheetScreenshotTest**: sheet content visible behind a gray overlay;
+  expected for a semi-modal Sheet, but the overlay darkness/opacity may
+  differ from iOS/Android reference.
+
+These are the right scope for the next pass — narrow per-component
+investigations rather than broad VM/port-layer fixes.
+
+Earlier Passes — Progress Log (2026-04-19, live)
+------------------------------------------------
 
 Starting baseline (commit `d56af7636`, PR before this pass):
 - CI hangs late, only 2 screenshot streams emitted (`bootstrap_placeholder`, `kotlin`).
