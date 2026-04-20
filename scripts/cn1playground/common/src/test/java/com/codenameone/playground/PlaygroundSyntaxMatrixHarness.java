@@ -707,6 +707,58 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "String tag = \"\";\n"
                 + "for (E e : E.values()) { if (e == E.B) tag = tag + \"!\" + e.name() + \"!\"; else tag = tag + e.name(); }\n"
                 + "root.add(new Label(tag));"), ExpectedOutcome.SUCCESS, null));
+        // Records whose component type is another scripted class hit a
+        // subtle field/ctor assignment issue — the pre-declared field
+        // (with type resolving to Object since Inner is a scripted class)
+        // isn't updated by `this.left = left`. Documented for follow-up.
+        cases.add(new Case(cat, "nested_records_unsupported", ui(""
+                + "record Inner(int v) {}\n"
+                + "record Outer(Inner left, Inner right) {}\n"
+                + "Outer o = new Outer(new Inner(3), new Inner(4));\n"
+                + "root.add(new Label(\"sum=\" + (o.left().v() + o.right().v())));"), ExpectedOutcome.EVAL_ERROR, null));
+        cases.add(new Case(cat, "record_with_primitive_components", ui(""
+                + "record Pair(int a, int b) {}\n"
+                + "Pair p = new Pair(3, 4);\n"
+                + "root.add(new Label(\"sum=\" + (p.a() + p.b())));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "generic_interface_scripted", ui(""
+                + "interface Mapper<T, R> { R map(T t); }\n"
+                + "Mapper<String, Integer> m = new Mapper<String, Integer>() { public Integer map(String s) { return s.length(); } };\n"
+                + "root.add(new Label(\"v=\" + m.map(\"hello\")));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "throwing_scripted_exception", ui(""
+                + "class BadInput extends RuntimeException { BadInput(String m) { super(m); } }\n"
+                + "String caught = \"\";\n"
+                + "try { throw new BadInput(\"oops\"); }\n"
+                + "catch (BadInput e) { caught = e.getMessage(); }\n"
+                + "root.add(new Label(caught));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "array_literal_in_call", ui(""
+                + "import java.util.*;\n"
+                + "List<Integer> items = Arrays.asList(new Integer[]{3, 1, 2});\n"
+                + "root.add(new Label(\"n=\" + items.size()));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "null_coalesce_via_ternary", ui(""
+                + "String candidate = null;\n"
+                + "String result = candidate != null ? candidate : \"default\";\n"
+                + "root.add(new Label(result));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "sequence_of_if_returns", ui(""
+                + "class Validator {\n"
+                + "  String check(String s) {\n"
+                + "    if (s == null) return \"null\";\n"
+                + "    if (s.length() == 0) return \"empty\";\n"
+                + "    if (s.length() > 10) return \"too long\";\n"
+                + "    return \"ok\";\n"
+                + "  }\n"
+                + "}\n"
+                + "Validator v = new Validator();\n"
+                + "root.add(new Label(v.check(\"hello\")));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "collections_sort_natural_order", ui(""
+                + "import java.util.*;\n"
+                + "List<String> items = new ArrayList<>();\n"
+                + "items.add(\"c\"); items.add(\"a\"); items.add(\"b\");\n"
+                + "Collections.sort(items);\n"
+                + "root.add(new Label(items.toString()));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "class_shadowing_imported_type", ui(""
+                + "class Button { String id; Button(String v) { id = v; } }\n"
+                + "Button b = new Button(\"custom\");\n"
+                + "root.add(new Label(\"id=\" + b.id));"), ExpectedOutcome.SUCCESS, null));
         cases.add(new Case(cat, "lambda_method_ref_combo", ui(""
                 + "import java.util.function.*;\n"
                 + "Predicate<String> nonEmpty = s -> s.length() > 0;\n"
