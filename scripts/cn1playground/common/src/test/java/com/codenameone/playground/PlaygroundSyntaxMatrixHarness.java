@@ -853,14 +853,10 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "class V { int sum(int... xs) { int s = 0; for (int x : xs) s += x; return s; } }\n"
                 + "V v = new V();\n"
                 + "root.add(new Label(\"s=\" + v.sum(1, 2, 3, 4)));"), ExpectedOutcome.SUCCESS, null));
-        // Interface constants aren't visible from an implementing class's
-        // method body (the implementor's method lookup doesn't walk the
-        // implemented interfaces' static namespaces). Qualify with the
-        // interface name as a workaround.
-        cases.add(new Case(cat, "interface_constant_unqualified_unsupported", ui(""
+        cases.add(new Case(cat, "interface_constant_unqualified", ui(""
                 + "interface Config { String DEFAULT_NAME = \"world\"; String greet(); }\n"
                 + "class Greeter implements Config { public String greet() { return \"hi \" + DEFAULT_NAME; } }\n"
-                + "root.add(new Label(new Greeter().greet()));"), ExpectedOutcome.EVAL_ERROR, null));
+                + "root.add(new Label(new Greeter().greet()));"), ExpectedOutcome.SUCCESS, null));
         cases.add(new Case(cat, "interface_constant_qualified", ui(""
                 + "interface Config { String DEFAULT_NAME = \"world\"; String greet(); }\n"
                 + "class Greeter implements Config { public String greet() { return \"hi \" + Config.DEFAULT_NAME; } }\n"

@@ -222,15 +222,35 @@ public final class ScriptedClass {
         // Merge default methods from implemented interfaces. Classes in the
         // chain before interfaces win (parent > interface); within the
         // interface list, earlier-declared interfaces win.
+        // Also copy the interfaces' static fields into this class's static
+        // namespace so unqualified references (e.g. `DEFAULT_NAME` inside
+        // an implementor's method body) resolve.
         if (implementedInterfaces != null) {
             for (ScriptedClass iface : implementedInterfaces) {
                 if (iface == null) continue;
                 mergeNonShadowed(instanceMethods, iface.instanceMethods);
+                copyStaticVariables(iface.staticNameSpace, staticNs);
             }
         }
 
         return new ScriptedClass(name, declaringNameSpace, parent, instanceMethods,
                 staticMethods, ctors, fieldDecls, staticNs);
+    }
+
+    private static void copyStaticVariables(NameSpace source, NameSpace target) {
+        if (source == null || target == null) return;
+        String[] names = source.getVariableNames();
+        if (names == null) return;
+        for (String n : names) {
+            if ("this".equals(n)) continue;
+            try {
+                if (target.getVariable(n) != Primitive.VOID) continue;
+                Object v = source.getVariable(n);
+                if (v != Primitive.VOID) target.setVariable(n, v, false);
+            } catch (UtilEvalError ignore) {
+                // skip if either namespace rejects
+            }
+        }
     }
 
     private static void mergeNonShadowed(java.util.List<MethodTemplate> target,
