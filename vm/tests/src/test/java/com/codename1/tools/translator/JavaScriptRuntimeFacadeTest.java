@@ -1383,4 +1383,64 @@ class JavaScriptRuntimeFacadeTest {
         assertEquals(true, stateClass.getMethod("isError").invoke(state));
         assertEquals(false, coordinatorClass.getMethod("shouldWait", stateClass).invoke(null, state));
     }
+
+    @Test
+    void transformMethodsGuardNullNativeTransform() throws Exception {
+        String html5Source = new String(Files.readAllBytes(HTML5_SOURCE), StandardCharsets.UTF_8);
+
+        // transformPoint must pass inputs through as an identity when the native
+        // backing is null — the JS port reaches this path from SpinnerNode/Scene
+        // during picker render where the Transform native hasn't materialized.
+        assertTrue(html5Source.contains("public void transformPoint(Object nativeTransform, float[] in, float[] out)"),
+                "HTML5Implementation should expose transformPoint(Object,float[],float[])");
+        int tpIdx = html5Source.indexOf("public void transformPoint(Object nativeTransform, float[] in, float[] out)");
+        int tpBodyEnd = html5Source.indexOf("Float64Array jsIn = Float64Array.create(2);", tpIdx);
+        assertTrue(tpIdx >= 0 && tpBodyEnd > tpIdx,
+                "transformPoint body should still delegate to Float64Array for the non-null path");
+        String tpGuard = html5Source.substring(tpIdx, tpBodyEnd);
+        assertTrue(tpGuard.contains("if (nativeTransform == null)"),
+                "transformPoint should guard null nativeTransform before casting to JSAffineTransform");
+        assertTrue(tpGuard.contains("out[0] = in[0]") && tpGuard.contains("out[1] = in[1]"),
+                "transformPoint null guard should pass coordinates through as identity");
+
+        // Sibling transform mutators must also guard null so the scene/picker paths
+        // don't raise a JS TypeError on the cast.
+        String[] guardedSignatures = new String[]{
+                "public void setTransformTranslation(Object nativeTransform, float translateX, float translateY, float translateZ)",
+                "public Object makeTransformInverse(Object nativeTransform)",
+                "public void setTransformInverse(Object nativeTransform)",
+                "public void transformTranslate(Object nativeTransform, float x, float y, float z)",
+                "public void transformScale(Object nativeTransform, float x, float y, float z)",
+                "public void transformRotate(Object nativeTransform, float angle, float x, float y, float z)"
+        };
+        for (String signature : guardedSignatures) {
+            int start = html5Source.indexOf(signature);
+            assertTrue(start >= 0, "HTML5Implementation should declare " + signature);
+            int bodyEnd = html5Source.indexOf("}\n", start);
+            assertTrue(bodyEnd > start, "Method " + signature + " should have a body");
+            String body = html5Source.substring(start, bodyEnd);
+            assertTrue(body.contains("if (nativeTransform == null)"),
+                    signature + " should guard null nativeTransform before casting to JSAffineTransform");
+        }
+
+        // transformEqualsImpl must tolerate null native backings on either side
+        // (Transform instances can exist before their native is materialized).
+        int teIdx = html5Source.indexOf("public boolean transformEqualsImpl(Transform t1, Transform t2)");
+        assertTrue(teIdx >= 0, "HTML5Implementation should expose transformEqualsImpl(Transform,Transform)");
+        int teEnd = html5Source.indexOf("return at1.isEqualTo(at2);", teIdx);
+        assertTrue(teEnd > teIdx, "transformEqualsImpl should still fall through to JSAffineTransform.isEqualTo for the non-null path");
+        String teBody = html5Source.substring(teIdx, teEnd);
+        assertTrue(teBody.contains("if (at1 == null || at2 == null)"),
+                "transformEqualsImpl should short-circuit when either native transform is null");
+
+        // The noisy transform debug logging added during earlier render debugging
+        // must stay out — it writes through a null native graphics on teardown and
+        // turned the null-safe no-op into a TypeError (STATUS.md pass item #10).
+        assertTrue(!html5Source.contains("implTransformDebugLogCount"),
+                "HTML5Implementation should no longer carry the transform debug log counter");
+        assertTrue(!html5Source.contains("CN1JS:HTML5Implementation.setTransform transform="),
+                "HTML5Implementation.setTransform should not println its inputs on every call");
+        assertTrue(!html5Source.contains("CN1JS:HTML5Implementation.scale x="),
+                "HTML5Implementation.scale should not println its inputs on every call");
+    }
 }

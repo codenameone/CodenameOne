@@ -151,7 +151,6 @@ import com.codename1.html5.js.typedarrays.Uint8ClampedArray;
  */
 public class HTML5Implementation extends CodenameOneImplementation {
     private static int implDrawStringDebugLogCount;
-    private static int implTransformDebugLogCount;
     private static int renderQueueDebugLogCount;
 
     private L10NManager l10n;
@@ -5852,41 +5851,40 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @Override
     public void setTransformTranslation(Object nativeTransform, float translateX, float translateY, float translateZ) {
+        if (nativeTransform == null) return;
         ((JSAffineTransform)nativeTransform).setToTranslation(translateX, translateY);
     }
-    
-    
+
+
 
     @Override
     public Object makeTransformInverse(Object nativeTransform) {
+        if (nativeTransform == null) return null;
         return ((JSAffineTransform)nativeTransform).createInverse();
     }
 
     @Override
     public void setTransformInverse(Object nativeTransform) throws Transform.NotInvertibleException {
+        if (nativeTransform == null) return;
         ((JSAffineTransform)nativeTransform).copyFrom((JSAffineTransform)makeTransformInverse(nativeTransform));
     }
 
     @Override
     public void transformTranslate(Object nativeTransform, float x, float y, float z) {
+        if (nativeTransform == null) return;
         ((JSAffineTransform)nativeTransform).translate(x, y);
     }
 
     @Override
     public void transformScale(Object nativeTransform, float x, float y, float z) {
+        if (nativeTransform == null) return;
         ((JSAffineTransform)nativeTransform).scale(x, y);
     }
 
     @Override
     public void transformRotate(Object nativeTransform, float angle, float x, float y, float z) {
-        JSAffineTransform t = (JSAffineTransform)nativeTransform;
-        //if (x != 0 || y != 0) {
-        //    t.translate(x, y);
-        //}
-        t.rotate(angle, x, y);
-        //if (x != 0 || y != 0) {
-        //    t.translate(-x, -y);
-        //}
+        if (nativeTransform == null) return;
+        ((JSAffineTransform)nativeTransform).rotate(angle, x, y);
     }
 
     @Override
@@ -5896,6 +5894,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
         JSAffineTransform at1 = (JSAffineTransform)t1.getNativeTransform();
         JSAffineTransform at2 = (JSAffineTransform)t2.getNativeTransform();
+        if (at1 == null || at2 == null) {
+            return at1 == at2;
+        }
         return at1.isEqualTo(at2);
     }
     
@@ -5927,12 +5928,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
     
     @Override
     public void setTransform(Object graphics, Transform transform) {
-        if (implTransformDebugLogCount < 80) {
-            implTransformDebugLogCount++;
-            System.out.println("CN1JS:HTML5Implementation.setTransform transform="
-                    + (transform == null ? "null" : transform.getClass().getName())
-                    + " graphics=" + (graphics == null ? "null" : graphics.getClass().getName()));
-        }
         Transform existing = ((HTML5Graphics)graphics).getTransform();
         if (existing == null) {
             existing = transform==null ? Transform.makeIdentity() : transform.copy();
@@ -5993,11 +5988,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @Override
     public void scale(Object nativeGraphics, float x, float y) {
-        if (implTransformDebugLogCount < 80) {
-            implTransformDebugLogCount++;
-            System.out.println("CN1JS:HTML5Implementation.scale x=" + x + " y=" + y
-                    + " graphics=" + (nativeGraphics == null ? "null" : nativeGraphics.getClass().getName()));
-        }
         ((HTML5Graphics)nativeGraphics).scale(x, y);
     }
 
