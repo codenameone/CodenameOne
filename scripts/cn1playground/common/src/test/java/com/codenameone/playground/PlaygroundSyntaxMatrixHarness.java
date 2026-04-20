@@ -707,13 +707,11 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "String tag = \"\";\n"
                 + "for (E e : E.values()) { if (e == E.B) tag = tag + \"!\" + e.name() + \"!\"; else tag = tag + e.name(); }\n"
                 + "root.add(new Label(tag));"), ExpectedOutcome.SUCCESS, null));
-        // Record components of another scripted-class type hit a subtle
-        // field/ctor assignment issue. Documented for follow-up.
-        cases.add(new Case(cat, "nested_records_unsupported", ui(""
+        cases.add(new Case(cat, "nested_records", ui(""
                 + "record Inner(int v) {}\n"
                 + "record Outer(Inner left, Inner right) {}\n"
                 + "Outer o = new Outer(new Inner(3), new Inner(4));\n"
-                + "root.add(new Label(\"sum=\" + (o.left().v() + o.right().v())));"), ExpectedOutcome.EVAL_ERROR, null));
+                + "root.add(new Label(\"sum=\" + (o.left().v() + o.right().v())));"), ExpectedOutcome.SUCCESS, null));
         cases.add(new Case(cat, "record_with_primitive_components", ui(""
                 + "record Pair(int a, int b) {}\n"
                 + "Pair p = new Pair(3, 4);\n"
@@ -765,28 +763,22 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "import java.util.function.*;\n"
                 + "Function<Integer, String> f = n -> { String s = switch (n) { case 1 -> \"one\"; default -> \"other\"; }; return s; };\n"
                 + "root.add(new Label(f.apply(1) + \"-\" + f.apply(9)));"), ExpectedOutcome.SUCCESS, null));
-        // Two scripted classes referencing each other through a field of
-        // the other's type hits a subtle callstack issue during field
-        // resolution; documented for follow-up. Workaround: use Object
-        // field types (see next case).
-        cases.add(new Case(cat, "two_classes_typed_cross_ref_unsupported", ui(""
+        cases.add(new Case(cat, "two_classes_typed_cross_ref", ui(""
                 + "class Pair { Box first; Box second; }\n"
                 + "class Box { int v; Box(int n) { v = n; } }\n"
                 + "Pair p = new Pair();\n"
                 + "p.first = new Box(1);\n"
                 + "p.second = new Box(2);\n"
-                + "root.add(new Label(\"sum=\" + (p.first.v + p.second.v)));"), ExpectedOutcome.EVAL_ERROR, null));
-        // External assignment to a scripted-class field (p.first = ...)
-        // where the field value is another ScriptedInstance hits a
-        // callstack issue in BSH's LHS dispatch; documented gap.
-        cases.add(new Case(cat, "external_field_assignment_unsupported", ui(""
+                + "root.add(new Label(\"sum=\" + (p.first.v + p.second.v)));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "external_field_assignment", ui(""
                 + "class Pair { Object first; Object second; }\n"
                 + "class Box { int v; Box(int n) { v = n; } }\n"
                 + "Pair p = new Pair();\n"
                 + "p.first = new Box(1);\n"
-                + "root.add(new Label(\"ok\"));"), ExpectedOutcome.EVAL_ERROR, null));
-        // Internal assignment (inside a method body) works fine —
-        // the workaround is to wrap external mutation in a setter.
+                + "p.second = new Box(2);\n"
+                + "Box f = (Box) p.first;\n"
+                + "Box s = (Box) p.second;\n"
+                + "root.add(new Label(\"sum=\" + (f.v + s.v)));"), ExpectedOutcome.SUCCESS, null));
         cases.add(new Case(cat, "internal_field_assignment_via_setter", ui(""
                 + "class Pair { Object first; Object second; void setFirst(Object o) { first = o; } void setSecond(Object o) { second = o; } }\n"
                 + "class Box { int v; Box(int n) { v = n; } }\n"

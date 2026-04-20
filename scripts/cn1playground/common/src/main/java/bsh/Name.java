@@ -727,6 +727,27 @@ class Name implements java.io.Serializable
                     "Can't assign to special variable: "+evalName );
 
             Interpreter.debug("found This reference evaluating LHS");
+            // Scripted-class `this.x = v` inside an instance method:
+            // BSH's resolveThisFieldReference returns the innermost This
+            // (the method's local-scope This), so a plain VARIABLE LHS
+            // ends up mutating a local variable rather than the instance
+            // field. Walk the namespace chain for a user-bound
+            // ScriptedInstance and target its instance namespace instead.
+            NameSpace thisNs = ((This) obj).namespace;
+            NameSpace walk = thisNs;
+            while (walk != null) {
+                try {
+                    Object inner = walk.getVariable("this");
+                    if (inner instanceof ScriptedInstance) {
+                        return new LHS(
+                                ((ScriptedInstance) inner).getInstanceNameSpace(),
+                                evalName, true);
+                    }
+                } catch (UtilEvalError ignore) {
+                    // try the parent namespace
+                }
+                walk = walk.getParent();
+            }
             /*
                 If this was a literal "super" reference then we allow recursion
                 in setting the variable to get the normal effect of finding the
@@ -743,6 +764,34 @@ class Name implements java.io.Serializable
 
         if ( evalName != null )
         {
+            // Scripted-class field LHS: route through the instance's
+            // namespace as a VARIABLE LHS so assignment updates the field
+            // value without falling to Reflect.setObjectProperty (which
+            // invokes getter/setter methods on a null callstack).
+            if ( obj instanceof ScriptedInstance ) {
+                return new LHS(((ScriptedInstance) obj).getInstanceNameSpace(),
+                        evalName, true);
+            }
+            if ( obj instanceof ScriptedClass ) {
+                return new LHS(((ScriptedClass) obj).getStaticNameSpace(),
+                        evalName, true);
+            }
+            // When `this` resolves through BSH's builtin (returning a
+            // bsh.This whose namespace contains a user-bound ScriptedInstance
+            // under the variable name "this"), route the assignment to the
+            // ScriptedInstance's instance namespace too.
+            if ( obj instanceof This ) {
+                try {
+                    Object inner = ((This) obj).namespace.getVariable("this");
+                    if ( inner instanceof ScriptedInstance ) {
+                        return new LHS(
+                                ((ScriptedInstance) inner).getInstanceNameSpace(),
+                                evalName, true);
+                    }
+                } catch (UtilEvalError ex) {
+                    // fall through
+                }
+            }
             try {
                 if ( obj instanceof ClassIdentifier )
                 {
