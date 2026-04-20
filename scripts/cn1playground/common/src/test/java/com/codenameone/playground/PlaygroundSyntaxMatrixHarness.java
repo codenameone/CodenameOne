@@ -707,10 +707,8 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "String tag = \"\";\n"
                 + "for (E e : E.values()) { if (e == E.B) tag = tag + \"!\" + e.name() + \"!\"; else tag = tag + e.name(); }\n"
                 + "root.add(new Label(tag));"), ExpectedOutcome.SUCCESS, null));
-        // Records whose component type is another scripted class hit a
-        // subtle field/ctor assignment issue — the pre-declared field
-        // (with type resolving to Object since Inner is a scripted class)
-        // isn't updated by `this.left = left`. Documented for follow-up.
+        // Record components of another scripted-class type hit a subtle
+        // field/ctor assignment issue. Documented for follow-up.
         cases.add(new Case(cat, "nested_records_unsupported", ui(""
                 + "record Inner(int v) {}\n"
                 + "record Outer(Inner left, Inner right) {}\n"

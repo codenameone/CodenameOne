@@ -175,7 +175,12 @@ class BSHPrimarySuffix extends SimpleNode
                 if (obj instanceof ScriptedInstance) {
                     ScriptedInstance si = (ScriptedInstance) obj;
                     if (toLHS) {
-                        return new LHS(si.getInstanceNameSpace(), field);
+                        // Use VARIABLE LHS (setVariable) so an assignment
+                        // updates a pre-declared field's value without
+                        // re-typing it. LOOSETYPE_FIELD calls setTypedVariable
+                        // which can fail to overwrite an Object-typed field
+                        // with a concrete ScriptedInstance.
+                        return new LHS(si.getInstanceNameSpace(), field, true);
                     }
                     Object v = si.getField(field);
                     return v == Primitive.VOID ? Primitive.VOID : v;
