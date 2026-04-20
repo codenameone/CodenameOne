@@ -2196,6 +2196,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
         context.beginPath();
         context.rect(frame.getCropX(), frame.getCropY(), frame.getCropW(), frame.getCropH());
         context.clip();
+        // Wipe the drain region before the ops repaint it. Each drain carries a full
+        // paint for its crop (form/body/toolbar/overlay), so stale pixels must not
+        // bleed through from the previous drain. Without this, title bars from prior
+        // forms accumulated across tests because the new form's paint did not always
+        // cover every pixel in the toolbar region.
+        context.clearRect(frame.getCropX(), frame.getCropY(), frame.getCropW(), frame.getCropH());
 
         for (ExecutableOp op : frame.getOps()){
             op.execute(context);
