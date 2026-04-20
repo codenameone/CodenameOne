@@ -562,6 +562,40 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "c.setup(b);\n"
                 + "root.add(b);\n"
                 + "root.add(new Label(c.tag[0]));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "triple_nested_enhanced_for", ui(""
+                + "int[][][] cube = new int[][][]{{{1,2},{3,4}},{{5,6},{7,8}}};\n"
+                + "int total = 0;\n"
+                + "for (int[][] plane : cube) for (int[] row : plane) for (int v : row) total += v;\n"
+                + "root.add(new Label(\"total=\" + total));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "labeled_outer_break_with_search", ui(""
+                + "int[][] grid = new int[][]{{1,2,3},{4,5,6},{7,8,9}};\n"
+                + "int found = -1;\n"
+                + "outer: for (int[] row : grid) {\n"
+                + "  for (int v : row) { if (v == 5) { found = v; break outer; } }\n"
+                + "}\n"
+                + "root.add(new Label(\"found=\" + found));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "try_finally_side_effect", ui(""
+                + "String[] log = new String[]{\"\"};\n"
+                + "try {\n"
+                + "  log[0] = log[0] + \"body \";\n"
+                + "} finally {\n"
+                + "  log[0] = log[0] + \"fin\";\n"
+                + "}\n"
+                + "root.add(new Label(log[0]));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "null_check_then_use", ui(""
+                + "String s = null;\n"
+                + "s = \"hello\";\n"
+                + "String msg = s != null ? s.toUpperCase() : \"(none)\";\n"
+                + "root.add(new Label(msg));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "abstract_template_method", ui(""
+                + "abstract class Base { public abstract int getNum(); public int doubled() { return getNum() * 2; } }\n"
+                + "class Five extends Base { public int getNum() { return 5; } }\n"
+                + "Five f = new Five();\n"
+                + "root.add(new Label(\"v=\" + f.doubled()));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "chained_ternary", ui(""
+                + "int n = 0;\n"
+                + "String sign = n < 0 ? \"-\" : n == 0 ? \"0\" : \"+\";\n"
+                + "root.add(new Label(sign));"), ExpectedOutcome.SUCCESS, null));
         cases.add(new Case(cat, "lambda_method_ref_combo", ui(""
                 + "import java.util.function.*;\n"
                 + "Predicate<String> nonEmpty = s -> s.length() > 0;\n"
