@@ -203,6 +203,23 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "import com.codename1.charts.compat.Paint;\n"
                 + "int align = Paint.Align.CENTER;\n"
                 + "root.add(new Label(\"align=\" + align));"), ExpectedOutcome.SUCCESS, null));
+        // End-to-end Picker script — inherited static field via subclass,
+        // Runnable lambdas, and nested-class enum reference all in one.
+        cases.add(new Case(cat, "picker_lightweight_popup_script", ui(""
+                + "import com.codename1.ui.spinner.Picker;\n"
+                + "import java.util.Calendar;\n"
+                + "import java.util.Date;\n"
+                + "Picker picker = new Picker();\n"
+                + "picker.setType(Display.PICKER_TYPE_DATE);\n"
+                + "picker.setUseLightweightPopup(true);\n"
+                + "picker.setDate(new Date());\n"
+                + "picker.addLightweightPopupButton(\"Today\", () -> picker.setDate(new Date()));\n"
+                + "picker.addLightweightPopupButton(\"+7 Days\", () -> {\n"
+                + "    Calendar cal = Calendar.getInstance();\n"
+                + "    cal.add(Calendar.DAY_OF_MONTH, 7);\n"
+                + "    picker.setDate(cal.getTime());\n"
+                + "}, Picker.LightweightPopupButtonPlacement.BELOW_SPINNER);\n"
+                + "root.add(picker);"), ExpectedOutcome.SUCCESS, null));
         cases.add(new Case(cat, "method_overloading", ui(""
                 + "class M { String fmt(int n) { return \"int:\" + n; } String fmt(String s) { return \"str:\" + s; } }\n"
                 + "M m = new M();\n"

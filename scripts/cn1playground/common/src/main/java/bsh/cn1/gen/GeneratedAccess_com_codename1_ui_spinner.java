@@ -42,6 +42,9 @@ public final class GeneratedAccess_com_codename1_ui_spinner {
         if ("Picker".equals(simpleName)) {
             return com.codename1.ui.spinner.Picker.class;
         }
+        if ("LightweightPopupButtonPlacement".equals(simpleName)) {
+            return com.codename1.ui.spinner.Picker.LightweightPopupButtonPlacement.class;
+        }
         if ("TimeSpinner".equals(simpleName)) {
             return com.codename1.ui.spinner.TimeSpinner.class;
         }
@@ -11909,6 +11912,16 @@ public final class GeneratedAccess_com_codename1_ui_spinner {
                 typedTarget.addFocusListener((com.codename1.ui.events.FocusListener) adaptedArgs[0]); return null;
             }
         }
+        if ("addLightweightPopupButton".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Runnable.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Runnable.class}, false);
+                typedTarget.addLightweightPopupButton((java.lang.String) adaptedArgs[0], (java.lang.Runnable) adaptedArgs[1]); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Runnable.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Runnable.class, java.lang.Integer.class}, false);
+                typedTarget.addLightweightPopupButton((java.lang.String) adaptedArgs[0], (java.lang.Runnable) adaptedArgs[1], toIntValue(adaptedArgs[2])); return null;
+            }
+        }
         if ("addLongPressListener".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
@@ -11982,6 +11995,11 @@ public final class GeneratedAccess_com_codename1_ui_spinner {
         if ("clearClientProperties".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.clearClientProperties(); return null;
+            }
+        }
+        if ("clearLightweightPopupButtons".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.clearLightweightPopupButtons(); return null;
             }
         }
         if ("contains".equals(name)) {
@@ -12300,6 +12318,11 @@ public final class GeneratedAccess_com_codename1_ui_spinner {
         if ("getLabelForComponent".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getLabelForComponent();
+            }
+        }
+        if ("getLightweightPopupButtonLabels".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getLightweightPopupButtonLabels();
             }
         }
         if ("getListeners".equals(name)) {
@@ -14068,7 +14091,8 @@ public final class GeneratedAccess_com_codename1_ui_spinner {
         if (type == com.codename1.ui.spinner.GenericSpinner.class) return getStaticField3(name);
         if (type == com.codename1.ui.spinner.NumericSpinner.class) return getStaticField4(name);
         if (type == com.codename1.ui.spinner.Picker.class) return getStaticField5(name);
-        if (type == com.codename1.ui.spinner.TimeSpinner.class) return getStaticField6(name);
+        if (type == com.codename1.ui.spinner.Picker.LightweightPopupButtonPlacement.class) return getStaticField6(name);
+        if (type == com.codename1.ui.spinner.TimeSpinner.class) return getStaticField7(name);
         throw unsupportedStaticField(type, name);
     }
 
@@ -14304,6 +14328,13 @@ public final class GeneratedAccess_com_codename1_ui_spinner {
     }
 
     private static Object getStaticField6(String name) throws Exception {
+        if ("ABOVE_SPINNER".equals(name)) return com.codename1.ui.spinner.Picker.LightweightPopupButtonPlacement.ABOVE_SPINNER;
+        if ("BELOW_SPINNER".equals(name)) return com.codename1.ui.spinner.Picker.LightweightPopupButtonPlacement.BELOW_SPINNER;
+        if ("BETWEEN_CANCEL_AND_DONE".equals(name)) return com.codename1.ui.spinner.Picker.LightweightPopupButtonPlacement.BETWEEN_CANCEL_AND_DONE;
+        throw unsupportedStaticField(com.codename1.ui.spinner.Picker.LightweightPopupButtonPlacement.class, name);
+    }
+
+    private static Object getStaticField7(String name) throws Exception {
         if ("BASELINE".equals(name)) return com.codename1.ui.spinner.TimeSpinner.BASELINE;
         if ("BOTTOM".equals(name)) return com.codename1.ui.spinner.TimeSpinner.BOTTOM;
         if ("BRB_CENTER_OFFSET".equals(name)) return com.codename1.ui.spinner.TimeSpinner.BRB_CENTER_OFFSET;

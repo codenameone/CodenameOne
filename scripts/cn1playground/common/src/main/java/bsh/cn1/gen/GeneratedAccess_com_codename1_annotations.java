@@ -33,6 +33,15 @@ public final class GeneratedAccess_com_codename1_annotations {
         if ("Schedule".equals(simpleName)) {
             return com.codename1.annotations.Async.Schedule.class;
         }
+        if ("Concrete".equals(simpleName)) {
+            return com.codename1.annotations.Concrete.class;
+        }
+        if ("DisableDebugInfo".equals(simpleName)) {
+            return com.codename1.annotations.DisableDebugInfo.class;
+        }
+        if ("DisableNullChecksAndArrayBoundsChecks".equals(simpleName)) {
+            return com.codename1.annotations.DisableNullChecksAndArrayBoundsChecks.class;
+        }
         return null;
     }
     public static Object construct(Class<?> type, Object[] args) throws Exception {
@@ -48,10 +57,26 @@ public final class GeneratedAccess_com_codename1_annotations {
     public static Object invoke(Object target, String name, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         CN1AccessException unsupported = null;
+        if (target instanceof com.codename1.annotations.Concrete) {
+            try {
+                return invoke0((com.codename1.annotations.Concrete) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
         if (unsupported != null) {
             throw unsupported;
         }
         throw unsupportedInstance(target, name, safeArgs);
+    }
+
+    private static Object invoke0(com.codename1.annotations.Concrete typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("name".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.name();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {

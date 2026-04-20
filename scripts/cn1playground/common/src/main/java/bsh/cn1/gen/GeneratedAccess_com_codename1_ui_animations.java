@@ -794,6 +794,11 @@ public final class GeneratedAccess_com_codename1_ui_animations {
                 typedTarget.addOnCompleteCall((java.lang.Runnable) adaptedArgs[0]); return null;
             }
         }
+        if ("completeAnimation".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.completeAnimation(); return null;
+            }
+        }
         if ("flush".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.flush(); return null;

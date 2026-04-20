@@ -33,22 +33,18 @@ latest_plugin_version_from_maven() {
 
 RAW_VERSION="${1:-}"
 VERSION=""
-TAG_VERSION=""
 if [ -n "$RAW_VERSION" ]; then
-  TAG_VERSION="$(extract_version "$RAW_VERSION")"
-  if [ -z "$TAG_VERSION" ]; then
+  # An explicit tag/argument is authoritative. Maven Central metadata
+  # can lag behind a just-pushed release, which used to leave the
+  # initializr pinned one version behind whenever the workflow fired
+  # before Central had indexed the new artifact.
+  VERSION="$(extract_version "$RAW_VERSION")"
+  if [ -z "$VERSION" ]; then
     echo "Invalid Codename One version/tag: $RAW_VERSION" >&2
     exit 1
   fi
-  VERSION="$TAG_VERSION"
-fi
-
-MAVEN_VERSION="$(latest_plugin_version_from_maven || true)"
-if [ -n "$MAVEN_VERSION" ]; then
-  if [ -n "$TAG_VERSION" ] && [ "$TAG_VERSION" != "$MAVEN_VERSION" ]; then
-    echo "Tag version ($TAG_VERSION) differs from Maven Central release ($MAVEN_VERSION). Using Maven Central release." >&2
-  fi
-  VERSION="$MAVEN_VERSION"
+else
+  VERSION="$(latest_plugin_version_from_maven || true)"
 fi
 
 if [ -z "$VERSION" ]; then
