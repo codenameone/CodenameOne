@@ -111,6 +111,12 @@ public final class GeneratedAccess_com_codename1_system {
     }
 
     private static Object invokeStatic1(String name, Object[] safeArgs) throws Exception {
+        if ("create".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Class.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Class.class}, false);
+                return com.codename1.system.NativeLookup.create((java.lang.Class) adaptedArgs[0]);
+            }
+        }
         if ("isVerbose".equals(name)) {
             if (safeArgs.length == 0) {
                 return com.codename1.system.NativeLookup.isVerbose();

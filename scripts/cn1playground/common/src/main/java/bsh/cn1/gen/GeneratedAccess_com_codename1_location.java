@@ -33,6 +33,9 @@ public final class GeneratedAccess_com_codename1_location {
         if ("GeofenceManager".equals(simpleName)) {
             return com.codename1.location.GeofenceManager.class;
         }
+        if ("Listener".equals(simpleName)) {
+            return com.codename1.location.GeofenceManager.Listener.class;
+        }
         if ("Location".equals(simpleName)) {
             return com.codename1.location.Location.class;
         }
@@ -139,37 +142,44 @@ public final class GeneratedAccess_com_codename1_location {
                 unsupported = ex;
             }
         }
+        if (target instanceof com.codename1.location.GeofenceManager.Listener) {
+            try {
+                return invoke2((com.codename1.location.GeofenceManager.Listener) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
         if (target instanceof com.codename1.location.Location) {
             try {
-                return invoke2((com.codename1.location.Location) target, name, safeArgs);
+                return invoke3((com.codename1.location.Location) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.location.LocationManager) {
             try {
-                return invoke3((com.codename1.location.LocationManager) target, name, safeArgs);
+                return invoke4((com.codename1.location.LocationManager) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.location.LocationRequest) {
             try {
-                return invoke4((com.codename1.location.LocationRequest) target, name, safeArgs);
+                return invoke5((com.codename1.location.LocationRequest) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.location.GeofenceListener) {
             try {
-                return invoke5((com.codename1.location.GeofenceListener) target, name, safeArgs);
+                return invoke6((com.codename1.location.GeofenceListener) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.location.LocationListener) {
             try {
-                return invoke6((com.codename1.location.LocationListener) target, name, safeArgs);
+                return invoke7((com.codename1.location.LocationListener) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
@@ -343,7 +353,35 @@ public final class GeneratedAccess_com_codename1_location {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke2(com.codename1.location.Location typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke2(com.codename1.location.GeofenceManager.Listener typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("locationUpdated".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.location.Location.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.location.Location.class}, false);
+                typedTarget.locationUpdated((com.codename1.location.Location) adaptedArgs[0]); return null;
+            }
+        }
+        if ("onEntered".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.onEntered((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("onExit".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.onExit((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("providerStateChanged".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.providerStateChanged(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke3(com.codename1.location.Location typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("createDistanceCompartor".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.createDistanceCompartor();
@@ -462,7 +500,7 @@ public final class GeneratedAccess_com_codename1_location {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke3(com.codename1.location.LocationManager typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke4(com.codename1.location.LocationManager typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addGeoFencing".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Class.class, com.codename1.location.Geofence.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Class.class, com.codename1.location.Geofence.class}, false);
@@ -538,7 +576,7 @@ public final class GeneratedAccess_com_codename1_location {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke4(com.codename1.location.LocationRequest typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke5(com.codename1.location.LocationRequest typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getInterval".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getInterval();
@@ -552,7 +590,7 @@ public final class GeneratedAccess_com_codename1_location {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke5(com.codename1.location.GeofenceListener typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke6(com.codename1.location.GeofenceListener typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("onEntered".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -568,7 +606,7 @@ public final class GeneratedAccess_com_codename1_location {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke6(com.codename1.location.LocationListener typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke7(com.codename1.location.LocationListener typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("locationUpdated".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.location.Location.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.location.Location.class}, false);

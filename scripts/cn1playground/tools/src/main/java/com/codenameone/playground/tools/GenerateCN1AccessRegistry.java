@@ -233,15 +233,52 @@ public final class GenerateCN1AccessRegistry {
             List<String> superTypes = resolveSuperTypes(unresolved);
             topLevelClasses.add(new SourceClass(packageName, simpleName, qualifiedName, classTree,
                     explicitImports, wildcardImports, nestedTypes, typeParameterBounds, superTypes));
+            // Also emit nested public classes as first-class ApiClass
+            // entries. Callers reach them as `Outer.Inner` and expect
+            // the static fields / methods declared there to dispatch
+            // through the registry.
+            collectNestedSourceClasses(classTree, packageName, qualifiedName, explicitImports,
+                    wildcardImports, nestedTypes, topLevelClasses);
         }
         return new SourceUnit(packageName, topLevelClasses);
+    }
+
+    private static void collectNestedSourceClasses(ClassTree enclosing, String packageName, String enclosingQualifiedName,
+            Map<String, String> explicitImports, List<String> wildcardImports, Map<String, String> enclosingNestedTypes,
+            List<SourceClass> sink) {
+        for (Tree member : enclosing.getMembers()) {
+            if (!(member instanceof ClassTree)) continue;
+            ClassTree nested = (ClassTree) member;
+            if (!isNestedPublicType(nested, enclosing)) continue;
+            // Only static nested types can be constructed and have static
+            // members accessible by Outer.Inner name. Inner (non-static)
+            // classes require an enclosing instance, so flattening them
+            // would produce uncompilable `new Outer.Inner(...)` callsites.
+            if (!isNestedStaticType(nested)) continue;
+            String nestedSimpleName = nested.getSimpleName().toString();
+            String nestedQualifiedName = enclosingQualifiedName + "." + nestedSimpleName;
+            Map<String, String> nestedNestedTypes = new LinkedHashMap<String, String>(enclosingNestedTypes);
+            collectNestedTypes(nested, nestedQualifiedName, nestedNestedTypes);
+            Map<String, String> nestedTypeParameterBounds = resolveTypeParameterBounds(packageName, nestedSimpleName,
+                    nestedQualifiedName, nested, explicitImports, wildcardImports, nestedNestedTypes);
+            SourceClass unresolved = new SourceClass(packageName, nestedSimpleName, nestedQualifiedName, nested,
+                    explicitImports, wildcardImports, nestedNestedTypes, nestedTypeParameterBounds,
+                    Collections.<String>emptyList());
+            List<String> nestedSuperTypes = resolveSuperTypes(unresolved);
+            sink.add(new SourceClass(packageName, nestedSimpleName, nestedQualifiedName, nested,
+                    explicitImports, wildcardImports, nestedNestedTypes, nestedTypeParameterBounds, nestedSuperTypes));
+            collectNestedSourceClasses(nested, packageName, nestedQualifiedName, explicitImports, wildcardImports,
+                    nestedNestedTypes, sink);
+        }
     }
 
     private static Map<String, String> resolveTypeParameterBounds(String packageName, String simpleName, String qualifiedName,
             ClassTree classTree, Map<String, String> explicitImports, List<String> wildcardImports,
             Map<String, String> nestedTypes) {
         if (classTree.getTypeParameters().isEmpty()) {
-            return Collections.emptyMap();
+            // Return a mutable map — parseMethod needs to push transient
+            // method-level type parameter bounds here.
+            return new LinkedHashMap<String, String>();
         }
         SourceClass sourceClass = new SourceClass(packageName, simpleName, qualifiedName, classTree,
                 explicitImports, wildcardImports, nestedTypes, Collections.<String, String>emptyMap(),
@@ -968,16 +1005,47 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
         if (!isPublicMethod(methodTree, enclosingInterface) || isBlacklistedMethod(methodTree.getName().toString())) {
             return null;
         }
-        ApiType returnType = resolver.resolveType(methodTree.getReturnType().toString());
-        if (!isSupportedType(returnType)) {
-            return null;
+        // Push method-level type parameter bounds into the resolver
+        // so that `<C extends Component> void foo(C c)` resolves `C`
+        // to Component (and not Object) in the parameter types. Class-
+        // level parameters remain visible where they aren't shadowed.
+        Map<String, String> savedBounds = new LinkedHashMap<String, String>();
+        List<String> pushedKeys = new ArrayList<String>();
+        for (TypeParameterTree tp : methodTree.getTypeParameters()) {
+            String name = tp.getName().toString();
+            String bound = "java.lang.Object";
+            if (!tp.getBounds().isEmpty()) {
+                ApiType resolvedBound = resolver.resolveType(tp.getBounds().get(0).toString());
+                if (resolvedBound != null && resolvedBound.baseName != null) {
+                    bound = resolvedBound.baseName;
+                }
+            }
+            if (sourceClass.typeParameterBounds.containsKey(name)) {
+                savedBounds.put(name, sourceClass.typeParameterBounds.get(name));
+            }
+            sourceClass.typeParameterBounds.put(name, bound);
+            pushedKeys.add(name);
         }
-        ApiSignature signature = resolveSignature(methodTree.getParameters(), resolver);
-        if (signature == null) {
-            return null;
+        try {
+            ApiType returnType = resolver.resolveType(methodTree.getReturnType().toString());
+            if (!isSupportedType(returnType)) {
+                return null;
+            }
+            ApiSignature signature = resolveSignature(methodTree.getParameters(), resolver);
+            if (signature == null) {
+                return null;
+            }
+            boolean isStatic = methodTree.getModifiers().getFlags().contains(Modifier.STATIC);
+            return new ApiMethod(methodTree.getName().toString(), returnType, signature.paramTypes, signature.varArgs, isStatic);
+        } finally {
+            for (String key : pushedKeys) {
+                if (savedBounds.containsKey(key)) {
+                    sourceClass.typeParameterBounds.put(key, savedBounds.get(key));
+                } else {
+                    sourceClass.typeParameterBounds.remove(key);
+                }
+            }
         }
-        boolean isStatic = methodTree.getModifiers().getFlags().contains(Modifier.STATIC);
-        return new ApiMethod(methodTree.getName().toString(), returnType, signature.paramTypes, signature.varArgs, isStatic);
     }
 
     private static ApiField parseField(SourceClass sourceClass, VariableTree variableTree, Resolver resolver,
@@ -1034,6 +1102,16 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
             return true;
         }
         return enclosing.getKind() == Tree.Kind.INTERFACE || enclosing.getKind() == Tree.Kind.ANNOTATION_TYPE;
+    }
+
+    /** Static context: explicit `static`, enum, interface, or annotation
+     * member. Enums, interfaces, and annotations are implicitly static. */
+    private static boolean isNestedStaticType(ClassTree nested) {
+        if (nested.getKind() == Tree.Kind.ENUM || nested.getKind() == Tree.Kind.INTERFACE
+                || nested.getKind() == Tree.Kind.ANNOTATION_TYPE) {
+            return true;
+        }
+        return nested.getModifiers().getFlags().contains(Modifier.STATIC);
     }
 
     private static boolean isNamedType(ClassTree classTree) {

@@ -39,6 +39,9 @@ public final class GeneratedAccess_com_codename1_ui_animations {
         if ("ComponentAnimation".equals(simpleName)) {
             return com.codename1.ui.animations.ComponentAnimation.class;
         }
+        if ("UIMutation".equals(simpleName)) {
+            return com.codename1.ui.animations.ComponentAnimation.UIMutation.class;
+        }
         if ("FlipTransition".equals(simpleName)) {
             return com.codename1.ui.animations.FlipTransition.class;
         }
@@ -70,6 +73,12 @@ public final class GeneratedAccess_com_codename1_ui_animations {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class}, false);
                 return new com.codename1.ui.animations.BubbleTransition(toIntValue(adaptedArgs[0]), (java.lang.String) adaptedArgs[1]);
+            }
+        }
+        if (type == com.codename1.ui.animations.ComponentAnimation.UIMutation.class) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Container.class, com.codename1.ui.animations.ComponentAnimation.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Container.class, com.codename1.ui.animations.ComponentAnimation.class}, false);
+                return new com.codename1.ui.animations.ComponentAnimation.UIMutation((com.codename1.ui.Container) adaptedArgs[0], (com.codename1.ui.animations.ComponentAnimation) adaptedArgs[1]);
             }
         }
         if (type == com.codename1.ui.animations.FlipTransition.class) {
@@ -365,30 +374,37 @@ public final class GeneratedAccess_com_codename1_ui_animations {
                 unsupported = ex;
             }
         }
+        if (target instanceof com.codename1.ui.animations.ComponentAnimation.UIMutation) {
+            try {
+                return invoke6((com.codename1.ui.animations.ComponentAnimation.UIMutation) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
         if (target instanceof com.codename1.ui.animations.Motion) {
             try {
-                return invoke6((com.codename1.ui.animations.Motion) target, name, safeArgs);
+                return invoke7((com.codename1.ui.animations.Motion) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.animations.Timeline) {
             try {
-                return invoke7((com.codename1.ui.animations.Timeline) target, name, safeArgs);
+                return invoke8((com.codename1.ui.animations.Timeline) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.animations.Transition) {
             try {
-                return invoke8((com.codename1.ui.animations.Transition) target, name, safeArgs);
+                return invoke9((com.codename1.ui.animations.Transition) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.animations.Animation) {
             try {
-                return invoke9((com.codename1.ui.animations.Animation) target, name, safeArgs);
+                return invoke10((com.codename1.ui.animations.Animation) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
@@ -829,7 +845,22 @@ public final class GeneratedAccess_com_codename1_ui_animations {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke6(com.codename1.ui.animations.Motion typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke6(com.codename1.ui.animations.ComponentAnimation.UIMutation typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("add".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Container.class, com.codename1.ui.animations.ComponentAnimation.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Container.class, com.codename1.ui.animations.ComponentAnimation.class}, false);
+                return typedTarget.add((com.codename1.ui.Container) adaptedArgs[0], (com.codename1.ui.animations.ComponentAnimation) adaptedArgs[1]);
+            }
+        }
+        if ("isLocked".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isLocked();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke7(com.codename1.ui.animations.Motion typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("countAvailableVelocitySamplingPoints".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.countAvailableVelocitySamplingPoints();
@@ -906,7 +937,7 @@ public final class GeneratedAccess_com_codename1_ui_animations {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke7(com.codename1.ui.animations.Timeline typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke8(com.codename1.ui.animations.Timeline typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addActionListener".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
@@ -1247,7 +1278,7 @@ public final class GeneratedAccess_com_codename1_ui_animations {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke8(com.codename1.ui.animations.Transition typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke9(com.codename1.ui.animations.Transition typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("animate".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.animate();
@@ -1294,7 +1325,7 @@ public final class GeneratedAccess_com_codename1_ui_animations {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke9(com.codename1.ui.animations.Animation typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke10(com.codename1.ui.animations.Animation typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("animate".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.animate();

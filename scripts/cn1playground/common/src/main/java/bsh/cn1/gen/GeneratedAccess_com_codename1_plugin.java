@@ -65,6 +65,12 @@ public final class GeneratedAccess_com_codename1_plugin {
                 typedTarget.deregisterPlugin((com.codename1.plugin.Plugin) adaptedArgs[0]); return null;
             }
         }
+        if ("firePluginEvent".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.plugin.event.PluginEvent.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.plugin.event.PluginEvent.class}, false);
+                return typedTarget.firePluginEvent((com.codename1.plugin.event.PluginEvent) adaptedArgs[0]);
+            }
+        }
         if ("registerPlugin".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.plugin.Plugin.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.plugin.Plugin.class}, false);

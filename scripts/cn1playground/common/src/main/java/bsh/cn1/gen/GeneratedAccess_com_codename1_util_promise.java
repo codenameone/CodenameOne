@@ -33,6 +33,9 @@ public final class GeneratedAccess_com_codename1_util_promise {
         if ("Promise".equals(simpleName)) {
             return com.codename1.util.promise.Promise.class;
         }
+        if ("State".equals(simpleName)) {
+            return com.codename1.util.promise.Promise.State.class;
+        }
         return null;
     }
     public static Object construct(Class<?> type, Object[] args) throws Exception {
@@ -215,7 +218,15 @@ public final class GeneratedAccess_com_codename1_util_promise {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
+        if (type == com.codename1.util.promise.Promise.State.class) return getStaticField0(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("Fulfilled".equals(name)) return com.codename1.util.promise.Promise.State.Fulfilled;
+        if ("Pending".equals(name)) return com.codename1.util.promise.Promise.State.Pending;
+        if ("Rejected".equals(name)) return com.codename1.util.promise.Promise.State.Rejected;
+        throw unsupportedStaticField(com.codename1.util.promise.Promise.State.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

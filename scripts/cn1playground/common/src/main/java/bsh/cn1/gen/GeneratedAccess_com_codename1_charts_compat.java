@@ -30,8 +30,23 @@ public final class GeneratedAccess_com_codename1_charts_compat {
         if ("GradientDrawable".equals(simpleName)) {
             return com.codename1.charts.compat.GradientDrawable.class;
         }
+        if ("Orientation".equals(simpleName)) {
+            return com.codename1.charts.compat.GradientDrawable.Orientation.class;
+        }
         if ("Paint".equals(simpleName)) {
             return com.codename1.charts.compat.Paint.class;
+        }
+        if ("Align".equals(simpleName)) {
+            return com.codename1.charts.compat.Paint.Align.class;
+        }
+        if ("Cap".equals(simpleName)) {
+            return com.codename1.charts.compat.Paint.Cap.class;
+        }
+        if ("Join".equals(simpleName)) {
+            return com.codename1.charts.compat.Paint.Join.class;
+        }
+        if ("Style".equals(simpleName)) {
+            return com.codename1.charts.compat.Paint.Style.class;
         }
         if ("PathMeasure".equals(simpleName)) {
             return com.codename1.charts.compat.PathMeasure.class;
@@ -380,7 +395,52 @@ public final class GeneratedAccess_com_codename1_charts_compat {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
+        if (type == com.codename1.charts.compat.GradientDrawable.Orientation.class) return getStaticField0(name);
+        if (type == com.codename1.charts.compat.Paint.Align.class) return getStaticField1(name);
+        if (type == com.codename1.charts.compat.Paint.Cap.class) return getStaticField2(name);
+        if (type == com.codename1.charts.compat.Paint.Join.class) return getStaticField3(name);
+        if (type == com.codename1.charts.compat.Paint.Style.class) return getStaticField4(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("BL_TR".equals(name)) return com.codename1.charts.compat.GradientDrawable.Orientation.BL_TR;
+        if ("BOTTOM_TOP".equals(name)) return com.codename1.charts.compat.GradientDrawable.Orientation.BOTTOM_TOP;
+        if ("BR_TL".equals(name)) return com.codename1.charts.compat.GradientDrawable.Orientation.BR_TL;
+        if ("LEFT_RIGHT".equals(name)) return com.codename1.charts.compat.GradientDrawable.Orientation.LEFT_RIGHT;
+        if ("RIGHT_LEFT".equals(name)) return com.codename1.charts.compat.GradientDrawable.Orientation.RIGHT_LEFT;
+        if ("TL_BR".equals(name)) return com.codename1.charts.compat.GradientDrawable.Orientation.TL_BR;
+        if ("TOP_BOTTOM".equals(name)) return com.codename1.charts.compat.GradientDrawable.Orientation.TOP_BOTTOM;
+        if ("TR_BL".equals(name)) return com.codename1.charts.compat.GradientDrawable.Orientation.TR_BL;
+        throw unsupportedStaticField(com.codename1.charts.compat.GradientDrawable.Orientation.class, name);
+    }
+
+    private static Object getStaticField1(String name) throws Exception {
+        if ("CENTER".equals(name)) return com.codename1.charts.compat.Paint.Align.CENTER;
+        if ("LEFT".equals(name)) return com.codename1.charts.compat.Paint.Align.LEFT;
+        if ("RIGHT".equals(name)) return com.codename1.charts.compat.Paint.Align.RIGHT;
+        throw unsupportedStaticField(com.codename1.charts.compat.Paint.Align.class, name);
+    }
+
+    private static Object getStaticField2(String name) throws Exception {
+        if ("BUTT".equals(name)) return com.codename1.charts.compat.Paint.Cap.BUTT;
+        if ("ROUND".equals(name)) return com.codename1.charts.compat.Paint.Cap.ROUND;
+        if ("SQUARE".equals(name)) return com.codename1.charts.compat.Paint.Cap.SQUARE;
+        throw unsupportedStaticField(com.codename1.charts.compat.Paint.Cap.class, name);
+    }
+
+    private static Object getStaticField3(String name) throws Exception {
+        if ("BEVEL".equals(name)) return com.codename1.charts.compat.Paint.Join.BEVEL;
+        if ("MITER".equals(name)) return com.codename1.charts.compat.Paint.Join.MITER;
+        if ("ROUND".equals(name)) return com.codename1.charts.compat.Paint.Join.ROUND;
+        throw unsupportedStaticField(com.codename1.charts.compat.Paint.Join.class, name);
+    }
+
+    private static Object getStaticField4(String name) throws Exception {
+        if ("FILL".equals(name)) return com.codename1.charts.compat.Paint.Style.FILL;
+        if ("FILL_AND_STROKE".equals(name)) return com.codename1.charts.compat.Paint.Style.FILL_AND_STROKE;
+        if ("STROKE".equals(name)) return com.codename1.charts.compat.Paint.Style.STROKE;
+        throw unsupportedStaticField(com.codename1.charts.compat.Paint.Style.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

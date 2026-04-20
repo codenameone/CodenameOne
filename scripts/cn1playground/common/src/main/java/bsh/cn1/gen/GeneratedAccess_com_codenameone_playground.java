@@ -30,6 +30,9 @@ public final class GeneratedAccess_com_codenameone_playground {
         if ("PlaygroundContext".equals(simpleName)) {
             return com.codenameone.playground.PlaygroundContext.class;
         }
+        if ("Logger".equals(simpleName)) {
+            return com.codenameone.playground.PlaygroundContext.Logger.class;
+        }
         if ("PlaygroundLambdaBridge".equals(simpleName)) {
             return com.codenameone.playground.PlaygroundLambdaBridge.class;
         }
@@ -110,9 +113,16 @@ public final class GeneratedAccess_com_codenameone_playground {
                 unsupported = ex;
             }
         }
+        if (target instanceof com.codenameone.playground.PlaygroundContext.Logger) {
+            try {
+                return invoke4((com.codenameone.playground.PlaygroundContext.Logger) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
         if (target instanceof com.codenameone.playground.WebsiteThemeNative) {
             try {
-                return invoke4((com.codenameone.playground.WebsiteThemeNative) target, name, safeArgs);
+                return invoke5((com.codenameone.playground.WebsiteThemeNative) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
@@ -257,7 +267,17 @@ public final class GeneratedAccess_com_codenameone_playground {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke4(com.codenameone.playground.WebsiteThemeNative typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke4(com.codenameone.playground.PlaygroundContext.Logger typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("log".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.log((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke5(com.codenameone.playground.WebsiteThemeNative typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("isDarkMode".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.isDarkMode();

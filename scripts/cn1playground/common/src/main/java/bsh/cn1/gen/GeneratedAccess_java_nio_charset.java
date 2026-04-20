@@ -27,6 +27,9 @@ public final class GeneratedAccess_java_nio_charset {
         if ("Charset".equals(simpleName)) {
             return java.nio.charset.Charset.class;
         }
+        if ("StandardCharsets".equals(simpleName)) {
+            return java.nio.charset.StandardCharsets.class;
+        }
         return null;
     }
     public static Object construct(Class<?> type, Object[] args) throws Exception {

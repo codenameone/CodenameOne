@@ -39,6 +39,9 @@ public final class GeneratedAccess_com_codename1_ui_table {
         if ("TableLayout".equals(simpleName)) {
             return com.codename1.ui.table.TableLayout.class;
         }
+        if ("Constraint".equals(simpleName)) {
+            return com.codename1.ui.table.TableLayout.Constraint.class;
+        }
         if ("TableModel".equals(simpleName)) {
             return com.codename1.ui.table.TableModel.class;
         }
@@ -184,9 +187,16 @@ public final class GeneratedAccess_com_codename1_ui_table {
                 unsupported = ex;
             }
         }
+        if (target instanceof com.codename1.ui.table.TableLayout.Constraint) {
+            try {
+                return invoke5((com.codename1.ui.table.TableLayout.Constraint) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
         if (target instanceof com.codename1.ui.table.TableModel) {
             try {
-                return invoke5((com.codename1.ui.table.TableModel) target, name, safeArgs);
+                return invoke6((com.codename1.ui.table.TableModel) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
@@ -2699,7 +2709,164 @@ public final class GeneratedAccess_com_codename1_ui_table {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke5(com.codename1.ui.table.TableModel typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke5(com.codename1.ui.table.TableLayout.Constraint typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("getColumn".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getColumn();
+            }
+        }
+        if ("getHeightPercentage".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getHeightPercentage();
+            }
+        }
+        if ("getHorizontalAlign".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getHorizontalAlign();
+            }
+        }
+        if ("getHorizontalSpan".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getHorizontalSpan();
+            }
+        }
+        if ("getRow".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getRow();
+            }
+        }
+        if ("getVerticalAlign".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getVerticalAlign();
+            }
+        }
+        if ("getVerticalSpan".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getVerticalSpan();
+            }
+        }
+        if ("getWidthPercentage".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getWidthPercentage();
+            }
+        }
+        if ("ha".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.ha(toIntValue(adaptedArgs[0]));
+            }
+        }
+        if ("heightPercentage".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.heightPercentage(toIntValue(adaptedArgs[0]));
+            }
+        }
+        if ("horizontalAlign".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.horizontalAlign(toIntValue(adaptedArgs[0]));
+            }
+        }
+        if ("horizontalSpan".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.horizontalSpan(toIntValue(adaptedArgs[0]));
+            }
+        }
+        if ("hp".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.hp(toIntValue(adaptedArgs[0]));
+            }
+        }
+        if ("hs".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.hs(toIntValue(adaptedArgs[0]));
+            }
+        }
+        if ("setHeightPercentage".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setHeightPercentage(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        if ("setHorizontalAlign".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setHorizontalAlign(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        if ("setHorizontalSpan".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setHorizontalSpan(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        if ("setVerticalAlign".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setVerticalAlign(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        if ("setVerticalSpan".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setVerticalSpan(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        if ("setWidthPercentage".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setWidthPercentage(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        if ("toString".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.toString();
+            }
+        }
+        if ("va".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.va(toIntValue(adaptedArgs[0]));
+            }
+        }
+        if ("verticalAlign".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.verticalAlign(toIntValue(adaptedArgs[0]));
+            }
+        }
+        if ("verticalSpan".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.verticalSpan(toIntValue(adaptedArgs[0]));
+            }
+        }
+        if ("vs".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.vs(toIntValue(adaptedArgs[0]));
+            }
+        }
+        if ("widthPercentage".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.widthPercentage(toIntValue(adaptedArgs[0]));
+            }
+        }
+        if ("wp".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.wp(toIntValue(adaptedArgs[0]));
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke6(com.codename1.ui.table.TableModel typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addDataChangeListener".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.DataChangedListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.DataChangedListener.class}, false);

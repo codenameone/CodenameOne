@@ -27,6 +27,9 @@ public final class GeneratedAccess_com_codename1_ui_tree {
         if ("Tree".equals(simpleName)) {
             return com.codename1.ui.tree.Tree.class;
         }
+        if ("TreeState".equals(simpleName)) {
+            return com.codename1.ui.tree.Tree.TreeState.class;
+        }
         if ("TreeModel".equals(simpleName)) {
             return com.codename1.ui.tree.TreeModel.class;
         }

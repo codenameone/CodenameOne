@@ -195,6 +195,14 @@ public final class PlaygroundSyntaxMatrixHarness {
         cases.add(new Case(cat, "inherited_static_field_via_subclass", ui(""
                 + "int t = Display.PICKER_TYPE_DATE;\n"
                 + "root.add(new Label(\"t=\" + t));"), ExpectedOutcome.SUCCESS, null));
+        // Nested public static class static-field access: the registry
+        // now flattens Outer.Inner nested classes so that static fields
+        // like Paint.Align.CENTER dispatch through the generated
+        // getStaticField tables.
+        cases.add(new Case(cat, "nested_static_class_field", ui(""
+                + "import com.codename1.charts.compat.Paint;\n"
+                + "int align = Paint.Align.CENTER;\n"
+                + "root.add(new Label(\"align=\" + align));"), ExpectedOutcome.SUCCESS, null));
         cases.add(new Case(cat, "method_overloading", ui(""
                 + "class M { String fmt(int n) { return \"int:\" + n; } String fmt(String s) { return \"str:\" + s; } }\n"
                 + "M m = new M();\n"

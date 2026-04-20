@@ -84,11 +84,62 @@ public final class GeneratedAccess_com_codename1_properties {
         if ("SQLMap".equals(simpleName)) {
             return com.codename1.properties.SQLMap.class;
         }
+        if ("SqlType".equals(simpleName)) {
+            return com.codename1.properties.SQLMap.SqlType.class;
+        }
         if ("SetProperty".equals(simpleName)) {
             return com.codename1.properties.SetProperty.class;
         }
         if ("UiBinding".equals(simpleName)) {
             return com.codename1.properties.UiBinding.class;
+        }
+        if ("BooleanConverter".equals(simpleName)) {
+            return com.codename1.properties.UiBinding.BooleanConverter.class;
+        }
+        if ("BoundTableModel".equals(simpleName)) {
+            return com.codename1.properties.UiBinding.BoundTableModel.class;
+        }
+        if ("CheckBoxRadioSelectionAdapter".equals(simpleName)) {
+            return com.codename1.properties.UiBinding.CheckBoxRadioSelectionAdapter.class;
+        }
+        if ("ComponentAdapter".equals(simpleName)) {
+            return com.codename1.properties.UiBinding.ComponentAdapter.class;
+        }
+        if ("DateConverter".equals(simpleName)) {
+            return com.codename1.properties.UiBinding.DateConverter.class;
+        }
+        if ("DoubleConverter".equals(simpleName)) {
+            return com.codename1.properties.UiBinding.DoubleConverter.class;
+        }
+        if ("FloatConverter".equals(simpleName)) {
+            return com.codename1.properties.UiBinding.FloatConverter.class;
+        }
+        if ("IntegerConverter".equals(simpleName)) {
+            return com.codename1.properties.UiBinding.IntegerConverter.class;
+        }
+        if ("LongConverter".equals(simpleName)) {
+            return com.codename1.properties.UiBinding.LongConverter.class;
+        }
+        if ("MappingConverter".equals(simpleName)) {
+            return com.codename1.properties.UiBinding.MappingConverter.class;
+        }
+        if ("ObjectConverter".equals(simpleName)) {
+            return com.codename1.properties.UiBinding.ObjectConverter.class;
+        }
+        if ("PickerAdapter".equals(simpleName)) {
+            return com.codename1.properties.UiBinding.PickerAdapter.class;
+        }
+        if ("RadioListAdapter".equals(simpleName)) {
+            return com.codename1.properties.UiBinding.RadioListAdapter.class;
+        }
+        if ("StringConverter".equals(simpleName)) {
+            return com.codename1.properties.UiBinding.StringConverter.class;
+        }
+        if ("TextAreaAdapter".equals(simpleName)) {
+            return com.codename1.properties.UiBinding.TextAreaAdapter.class;
+        }
+        if ("TextComponentAdapter".equals(simpleName)) {
+            return com.codename1.properties.UiBinding.TextComponentAdapter.class;
         }
         return null;
     }
@@ -244,6 +295,68 @@ public final class GeneratedAccess_com_codename1_properties {
                     varArgs[i - 2] = (java.lang.Object) adaptedArgs[i];
                 }
                 return new com.codename1.properties.SetProperty((java.lang.String) adaptedArgs[0], (java.lang.Class) adaptedArgs[1], varArgs);
+            }
+        }
+        if (type == com.codename1.properties.UiBinding.BoundTableModel.class) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.properties.CollectionProperty.class, com.codename1.properties.PropertyBusinessObject.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.properties.CollectionProperty.class, com.codename1.properties.PropertyBusinessObject.class}, false);
+                return new com.codename1.properties.UiBinding.BoundTableModel((com.codename1.properties.CollectionProperty) adaptedArgs[0], (com.codename1.properties.PropertyBusinessObject) adaptedArgs[1]);
+            }
+            if (matches(safeArgs, new Class<?>[]{java.util.List.class, com.codename1.properties.PropertyBusinessObject.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.List.class, com.codename1.properties.PropertyBusinessObject.class}, false);
+                return new com.codename1.properties.UiBinding.BoundTableModel((java.util.List) adaptedArgs[0], (com.codename1.properties.PropertyBusinessObject) adaptedArgs[1]);
+            }
+        }
+        if (type == com.codename1.properties.UiBinding.CheckBoxRadioSelectionAdapter.class) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.properties.UiBinding.ObjectConverter.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.properties.UiBinding.ObjectConverter.class}, false);
+                return new com.codename1.properties.UiBinding.CheckBoxRadioSelectionAdapter((com.codename1.properties.UiBinding.ObjectConverter) adaptedArgs[0]);
+            }
+        }
+        if (type == com.codename1.properties.UiBinding.MappingConverter.class) {
+            if (matches(safeArgs, new Class<?>[]{java.util.Map.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Map.class}, false);
+                return new com.codename1.properties.UiBinding.MappingConverter((java.util.Map) adaptedArgs[0]);
+            }
+        }
+        if (type == com.codename1.properties.UiBinding.PickerAdapter.class) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.properties.UiBinding.MappingConverter.class, com.codename1.properties.UiBinding.MappingConverter.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.properties.UiBinding.MappingConverter.class, com.codename1.properties.UiBinding.MappingConverter.class}, false);
+                return new com.codename1.properties.UiBinding.PickerAdapter((com.codename1.properties.UiBinding.MappingConverter) adaptedArgs[0], (com.codename1.properties.UiBinding.MappingConverter) adaptedArgs[1]);
+            }
+            if (matches(safeArgs, new Class<?>[]{com.codename1.properties.UiBinding.ObjectConverter.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.properties.UiBinding.ObjectConverter.class, java.lang.Integer.class}, false);
+                return new com.codename1.properties.UiBinding.PickerAdapter((com.codename1.properties.UiBinding.ObjectConverter) adaptedArgs[0], toIntValue(adaptedArgs[1]));
+            }
+        }
+        if (type == com.codename1.properties.UiBinding.RadioListAdapter.class) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.properties.UiBinding.ObjectConverter.class, java.lang.Object[].class}, true)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.properties.UiBinding.ObjectConverter.class, java.lang.Object[].class}, true);
+                java.lang.Object[] varArgs = new java.lang.Object[adaptedArgs.length - 1];
+                for (int i = 1; i < adaptedArgs.length; i++) {
+                    varArgs[i - 1] = (java.lang.Object) adaptedArgs[i];
+                }
+                return new com.codename1.properties.UiBinding.RadioListAdapter((com.codename1.properties.UiBinding.ObjectConverter) adaptedArgs[0], varArgs);
+            }
+        }
+        if (type == com.codename1.properties.UiBinding.TextAreaAdapter.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.properties.UiBinding.TextAreaAdapter();
+            }
+            if (matches(safeArgs, new Class<?>[]{com.codename1.properties.UiBinding.ObjectConverter.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.properties.UiBinding.ObjectConverter.class}, false);
+                return new com.codename1.properties.UiBinding.TextAreaAdapter((com.codename1.properties.UiBinding.ObjectConverter) adaptedArgs[0]);
+            }
+        }
+        if (type == com.codename1.properties.UiBinding.TextComponentAdapter.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.properties.UiBinding.TextComponentAdapter();
+            }
+            if (matches(safeArgs, new Class<?>[]{com.codename1.properties.UiBinding.ObjectConverter.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.properties.UiBinding.ObjectConverter.class}, false);
+                return new com.codename1.properties.UiBinding.TextComponentAdapter((com.codename1.properties.UiBinding.ObjectConverter) adaptedArgs[0]);
             }
         }
         throw unsupportedConstruct(type, safeArgs);
@@ -419,65 +532,177 @@ public final class GeneratedAccess_com_codename1_properties {
                 unsupported = ex;
             }
         }
+        if (target instanceof com.codename1.properties.UiBinding.BooleanConverter) {
+            try {
+                return invoke13((com.codename1.properties.UiBinding.BooleanConverter) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.properties.UiBinding.CheckBoxRadioSelectionAdapter) {
+            try {
+                return invoke14((com.codename1.properties.UiBinding.CheckBoxRadioSelectionAdapter) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.properties.UiBinding.DateConverter) {
+            try {
+                return invoke15((com.codename1.properties.UiBinding.DateConverter) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.properties.UiBinding.DoubleConverter) {
+            try {
+                return invoke16((com.codename1.properties.UiBinding.DoubleConverter) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.properties.UiBinding.FloatConverter) {
+            try {
+                return invoke17((com.codename1.properties.UiBinding.FloatConverter) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.properties.UiBinding.IntegerConverter) {
+            try {
+                return invoke18((com.codename1.properties.UiBinding.IntegerConverter) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.properties.UiBinding.LongConverter) {
+            try {
+                return invoke19((com.codename1.properties.UiBinding.LongConverter) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.properties.UiBinding.MappingConverter) {
+            try {
+                return invoke20((com.codename1.properties.UiBinding.MappingConverter) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.properties.UiBinding.PickerAdapter) {
+            try {
+                return invoke21((com.codename1.properties.UiBinding.PickerAdapter) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.properties.UiBinding.RadioListAdapter) {
+            try {
+                return invoke22((com.codename1.properties.UiBinding.RadioListAdapter) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.properties.UiBinding.StringConverter) {
+            try {
+                return invoke23((com.codename1.properties.UiBinding.StringConverter) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.properties.UiBinding.TextAreaAdapter) {
+            try {
+                return invoke24((com.codename1.properties.UiBinding.TextAreaAdapter) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.properties.UiBinding.TextComponentAdapter) {
+            try {
+                return invoke25((com.codename1.properties.UiBinding.TextComponentAdapter) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
         if (target instanceof com.codename1.properties.InstantUI) {
             try {
-                return invoke13((com.codename1.properties.InstantUI) target, name, safeArgs);
+                return invoke26((com.codename1.properties.InstantUI) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.properties.MapAdapter) {
             try {
-                return invoke14((com.codename1.properties.MapAdapter) target, name, safeArgs);
+                return invoke27((com.codename1.properties.MapAdapter) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.properties.PreferencesObject) {
             try {
-                return invoke15((com.codename1.properties.PreferencesObject) target, name, safeArgs);
+                return invoke28((com.codename1.properties.PreferencesObject) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.properties.PropertyBase) {
             try {
-                return invoke16((com.codename1.properties.PropertyBase) target, name, safeArgs);
+                return invoke29((com.codename1.properties.PropertyBase) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.properties.PropertyIndex) {
             try {
-                return invoke17((com.codename1.properties.PropertyIndex) target, name, safeArgs);
+                return invoke30((com.codename1.properties.PropertyIndex) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.properties.SQLMap) {
             try {
-                return invoke18((com.codename1.properties.SQLMap) target, name, safeArgs);
+                return invoke31((com.codename1.properties.SQLMap) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.properties.UiBinding) {
             try {
-                return invoke19((com.codename1.properties.UiBinding) target, name, safeArgs);
+                return invoke32((com.codename1.properties.UiBinding) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.properties.UiBinding.BoundTableModel) {
+            try {
+                return invoke33((com.codename1.properties.UiBinding.BoundTableModel) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.properties.UiBinding.ComponentAdapter) {
+            try {
+                return invoke34((com.codename1.properties.UiBinding.ComponentAdapter) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.properties.UiBinding.ObjectConverter) {
+            try {
+                return invoke35((com.codename1.properties.UiBinding.ObjectConverter) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.properties.PropertyBusinessObject) {
             try {
-                return invoke20((com.codename1.properties.PropertyBusinessObject) target, name, safeArgs);
+                return invoke36((com.codename1.properties.PropertyBusinessObject) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.properties.PropertyChangeListener) {
             try {
-                return invoke21((com.codename1.properties.PropertyChangeListener) target, name, safeArgs);
+                return invoke37((com.codename1.properties.PropertyChangeListener) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
@@ -1851,7 +2076,227 @@ public final class GeneratedAccess_com_codename1_properties {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke13(com.codename1.properties.InstantUI typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke13(com.codename1.properties.UiBinding.BooleanConverter typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("convert".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.convert((java.lang.Object) adaptedArgs[0]);
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke14(com.codename1.properties.UiBinding.CheckBoxRadioSelectionAdapter typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("assignTo".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, com.codename1.ui.Button.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, com.codename1.ui.Button.class}, false);
+                typedTarget.assignTo((java.lang.Object) adaptedArgs[0], (com.codename1.ui.Button) adaptedArgs[1]); return null;
+            }
+        }
+        if ("bindListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Button.class, com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Button.class, com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.bindListener((com.codename1.ui.Button) adaptedArgs[0], (com.codename1.ui.events.ActionListener) adaptedArgs[1]); return null;
+            }
+        }
+        if ("getFrom".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Button.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Button.class}, false);
+                return typedTarget.getFrom((com.codename1.ui.Button) adaptedArgs[0]);
+            }
+        }
+        if ("removeListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Button.class, com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Button.class, com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.removeListener((com.codename1.ui.Button) adaptedArgs[0], (com.codename1.ui.events.ActionListener) adaptedArgs[1]); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke15(com.codename1.properties.UiBinding.DateConverter typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("convert".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.convert((java.lang.Object) adaptedArgs[0]);
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke16(com.codename1.properties.UiBinding.DoubleConverter typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("convert".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.convert((java.lang.Object) adaptedArgs[0]);
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke17(com.codename1.properties.UiBinding.FloatConverter typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("convert".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.convert((java.lang.Object) adaptedArgs[0]);
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke18(com.codename1.properties.UiBinding.IntegerConverter typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("convert".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.convert((java.lang.Object) adaptedArgs[0]);
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke19(com.codename1.properties.UiBinding.LongConverter typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("convert".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.convert((java.lang.Object) adaptedArgs[0]);
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke20(com.codename1.properties.UiBinding.MappingConverter typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("convert".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.convert((java.lang.Object) adaptedArgs[0]);
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke21(com.codename1.properties.UiBinding.PickerAdapter typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("assignTo".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, com.codename1.ui.spinner.Picker.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, com.codename1.ui.spinner.Picker.class}, false);
+                typedTarget.assignTo((java.lang.Object) adaptedArgs[0], (com.codename1.ui.spinner.Picker) adaptedArgs[1]); return null;
+            }
+        }
+        if ("bindListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.spinner.Picker.class, com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.spinner.Picker.class, com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.bindListener((com.codename1.ui.spinner.Picker) adaptedArgs[0], (com.codename1.ui.events.ActionListener) adaptedArgs[1]); return null;
+            }
+        }
+        if ("getFrom".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.spinner.Picker.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.spinner.Picker.class}, false);
+                return typedTarget.getFrom((com.codename1.ui.spinner.Picker) adaptedArgs[0]);
+            }
+        }
+        if ("removeListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.spinner.Picker.class, com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.spinner.Picker.class, com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.removeListener((com.codename1.ui.spinner.Picker) adaptedArgs[0], (com.codename1.ui.events.ActionListener) adaptedArgs[1]); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke22(com.codename1.properties.UiBinding.RadioListAdapter typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("assignTo".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, com.codename1.ui.RadioButton[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, com.codename1.ui.RadioButton[].class}, false);
+                typedTarget.assignTo((java.lang.Object) adaptedArgs[0], (com.codename1.ui.RadioButton[]) adaptedArgs[1]); return null;
+            }
+        }
+        if ("bindListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.RadioButton[].class, com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.RadioButton[].class, com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.bindListener((com.codename1.ui.RadioButton[]) adaptedArgs[0], (com.codename1.ui.events.ActionListener) adaptedArgs[1]); return null;
+            }
+        }
+        if ("getFrom".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.RadioButton[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.RadioButton[].class}, false);
+                return typedTarget.getFrom((com.codename1.ui.RadioButton[]) adaptedArgs[0]);
+            }
+        }
+        if ("removeListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.RadioButton[].class, com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.RadioButton[].class, com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.removeListener((com.codename1.ui.RadioButton[]) adaptedArgs[0], (com.codename1.ui.events.ActionListener) adaptedArgs[1]); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke23(com.codename1.properties.UiBinding.StringConverter typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("convert".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.convert((java.lang.Object) adaptedArgs[0]);
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke24(com.codename1.properties.UiBinding.TextAreaAdapter typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("assignTo".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, com.codename1.ui.TextArea.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, com.codename1.ui.TextArea.class}, false);
+                typedTarget.assignTo((java.lang.Object) adaptedArgs[0], (com.codename1.ui.TextArea) adaptedArgs[1]); return null;
+            }
+        }
+        if ("bindListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.TextArea.class, com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.TextArea.class, com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.bindListener((com.codename1.ui.TextArea) adaptedArgs[0], (com.codename1.ui.events.ActionListener) adaptedArgs[1]); return null;
+            }
+        }
+        if ("getFrom".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.TextArea.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.TextArea.class}, false);
+                return typedTarget.getFrom((com.codename1.ui.TextArea) adaptedArgs[0]);
+            }
+        }
+        if ("removeListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.TextArea.class, com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.TextArea.class, com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.removeListener((com.codename1.ui.TextArea) adaptedArgs[0], (com.codename1.ui.events.ActionListener) adaptedArgs[1]); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke25(com.codename1.properties.UiBinding.TextComponentAdapter typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("assignTo".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, com.codename1.ui.TextComponent.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, com.codename1.ui.TextComponent.class}, false);
+                typedTarget.assignTo((java.lang.Object) adaptedArgs[0], (com.codename1.ui.TextComponent) adaptedArgs[1]); return null;
+            }
+        }
+        if ("bindListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.TextComponent.class, com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.TextComponent.class, com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.bindListener((com.codename1.ui.TextComponent) adaptedArgs[0], (com.codename1.ui.events.ActionListener) adaptedArgs[1]); return null;
+            }
+        }
+        if ("getFrom".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.TextComponent.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.TextComponent.class}, false);
+                return typedTarget.getFrom((com.codename1.ui.TextComponent) adaptedArgs[0]);
+            }
+        }
+        if ("removeListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.TextComponent.class, com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.TextComponent.class, com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.removeListener((com.codename1.ui.TextComponent) adaptedArgs[0], (com.codename1.ui.events.ActionListener) adaptedArgs[1]); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke26(com.codename1.properties.InstantUI typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("createEditUI".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.properties.PropertyBusinessObject.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.properties.PropertyBusinessObject.class, java.lang.Boolean.class}, false);
@@ -1942,7 +2387,7 @@ public final class GeneratedAccess_com_codename1_properties {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke14(com.codename1.properties.MapAdapter typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke27(com.codename1.properties.MapAdapter typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("placeInMap".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.properties.PropertyBase.class, java.util.Map.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.properties.PropertyBase.class, java.util.Map.class}, false);
@@ -1964,7 +2409,7 @@ public final class GeneratedAccess_com_codename1_properties {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke15(com.codename1.properties.PreferencesObject typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke28(com.codename1.properties.PreferencesObject typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("bind".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.bind();
@@ -1985,7 +2430,7 @@ public final class GeneratedAccess_com_codename1_properties {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke16(com.codename1.properties.PropertyBase typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke29(com.codename1.properties.PropertyBase typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addChangeListener".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.properties.PropertyChangeListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.properties.PropertyChangeListener.class}, false);
@@ -2055,7 +2500,7 @@ public final class GeneratedAccess_com_codename1_properties {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke17(com.codename1.properties.PropertyIndex typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke30(com.codename1.properties.PropertyIndex typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("asElement".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.asElement();
@@ -2254,7 +2699,7 @@ public final class GeneratedAccess_com_codename1_properties {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke18(com.codename1.properties.SQLMap typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke31(com.codename1.properties.SQLMap typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("createTable".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.properties.PropertyBusinessObject.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.properties.PropertyBusinessObject.class}, false);
@@ -2359,7 +2804,7 @@ public final class GeneratedAccess_com_codename1_properties {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke19(com.codename1.properties.UiBinding typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke32(com.codename1.properties.UiBinding typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("bind".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.properties.PropertyBase.class, com.codename1.ui.Component.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.properties.PropertyBase.class, com.codename1.ui.Component.class}, false);
@@ -2420,7 +2865,174 @@ public final class GeneratedAccess_com_codename1_properties {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke20(com.codename1.properties.PropertyBusinessObject typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke33(com.codename1.properties.UiBinding.BoundTableModel typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("addDataChangeListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.DataChangedListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.DataChangedListener.class}, false);
+                typedTarget.addDataChangeListener((com.codename1.ui.events.DataChangedListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("addRow".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, com.codename1.properties.PropertyBusinessObject.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, com.codename1.properties.PropertyBusinessObject.class}, false);
+                typedTarget.addRow(toIntValue(adaptedArgs[0]), (com.codename1.properties.PropertyBusinessObject) adaptedArgs[1]); return null;
+            }
+        }
+        if ("excludeProperty".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.properties.PropertyBase.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.properties.PropertyBase.class}, false);
+                typedTarget.excludeProperty((com.codename1.properties.PropertyBase) adaptedArgs[0]); return null;
+            }
+        }
+        if ("getCellType".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
+                return typedTarget.getCellType(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
+            }
+        }
+        if ("getColumnCount".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getColumnCount();
+            }
+        }
+        if ("getColumnName".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getColumnName(toIntValue(adaptedArgs[0]));
+            }
+        }
+        if ("getMultipleChoiceOptions".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
+                return typedTarget.getMultipleChoiceOptions(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
+            }
+        }
+        if ("getRowCount".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getRowCount();
+            }
+        }
+        if ("getValidationConstraint".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
+                return typedTarget.getValidationConstraint(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
+            }
+        }
+        if ("getValidator".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getValidator();
+            }
+        }
+        if ("getValueAt".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
+                return typedTarget.getValueAt(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
+            }
+        }
+        if ("isCellEditable".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
+                return typedTarget.isCellEditable(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
+            }
+        }
+        if ("removeDataChangeListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.DataChangedListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.DataChangedListener.class}, false);
+                typedTarget.removeDataChangeListener((com.codename1.ui.events.DataChangedListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("removeRow".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.removeRow(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        if ("setColumnOrder".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.properties.PropertyBase[].class}, true)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.properties.PropertyBase[].class}, true);
+                com.codename1.properties.PropertyBase[] varArgs = new com.codename1.properties.PropertyBase[adaptedArgs.length - 0];
+                for (int i = 0; i < adaptedArgs.length; i++) {
+                    varArgs[i - 0] = (com.codename1.properties.PropertyBase) adaptedArgs[i];
+                }
+                typedTarget.setColumnOrder(varArgs); return null;
+            }
+        }
+        if ("setEditable".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.properties.PropertyBase.class, java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.properties.PropertyBase.class, java.lang.Boolean.class}, false);
+                typedTarget.setEditable((com.codename1.properties.PropertyBase) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue()); return null;
+            }
+        }
+        if ("setMultipleChoiceOptions".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.properties.PropertyBase.class, java.lang.String[].class}, true)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.properties.PropertyBase.class, java.lang.String[].class}, true);
+                java.lang.String[] varArgs = new java.lang.String[adaptedArgs.length - 1];
+                for (int i = 1; i < adaptedArgs.length; i++) {
+                    varArgs[i - 1] = (java.lang.String) adaptedArgs[i];
+                }
+                typedTarget.setMultipleChoiceOptions((com.codename1.properties.PropertyBase) adaptedArgs[0], varArgs); return null;
+            }
+        }
+        if ("setValidationConstraint".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.properties.PropertyBase.class, com.codename1.ui.validation.Constraint.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.properties.PropertyBase.class, com.codename1.ui.validation.Constraint.class}, false);
+                typedTarget.setValidationConstraint((com.codename1.properties.PropertyBase) adaptedArgs[0], (com.codename1.ui.validation.Constraint) adaptedArgs[1]); return null;
+            }
+        }
+        if ("setValidator".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.validation.Validator.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.validation.Validator.class}, false);
+                typedTarget.setValidator((com.codename1.ui.validation.Validator) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setValueAt".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Object.class}, false);
+                typedTarget.setValueAt(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), (java.lang.Object) adaptedArgs[2]); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke34(com.codename1.properties.UiBinding.ComponentAdapter typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("assignTo".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class}, false);
+                typedTarget.assignTo((java.lang.Object) adaptedArgs[0], (java.lang.Object) adaptedArgs[1]); return null;
+            }
+        }
+        if ("bindListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.bindListener((java.lang.Object) adaptedArgs[0], (com.codename1.ui.events.ActionListener) adaptedArgs[1]); return null;
+            }
+        }
+        if ("getFrom".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.getFrom((java.lang.Object) adaptedArgs[0]);
+            }
+        }
+        if ("removeListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.removeListener((java.lang.Object) adaptedArgs[0], (com.codename1.ui.events.ActionListener) adaptedArgs[1]); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke35(com.codename1.properties.UiBinding.ObjectConverter typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("convert".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.convert((java.lang.Object) adaptedArgs[0]);
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke36(com.codename1.properties.PropertyBusinessObject typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getPropertyIndex".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getPropertyIndex();
@@ -2429,7 +3041,7 @@ public final class GeneratedAccess_com_codename1_properties {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke21(com.codename1.properties.PropertyChangeListener typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke37(com.codename1.properties.PropertyChangeListener typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("propertyChanged".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.properties.PropertyBase.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.properties.PropertyBase.class}, false);
@@ -2440,7 +3052,22 @@ public final class GeneratedAccess_com_codename1_properties {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
+        if (type == com.codename1.properties.SQLMap.SqlType.class) return getStaticField0(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("SQL_BLOB".equals(name)) return com.codename1.properties.SQLMap.SqlType.SQL_BLOB;
+        if ("SQL_BOOLEAN".equals(name)) return com.codename1.properties.SQLMap.SqlType.SQL_BOOLEAN;
+        if ("SQL_DATE".equals(name)) return com.codename1.properties.SQLMap.SqlType.SQL_DATE;
+        if ("SQL_DOUBLE".equals(name)) return com.codename1.properties.SQLMap.SqlType.SQL_DOUBLE;
+        if ("SQL_EXCLUDE".equals(name)) return com.codename1.properties.SQLMap.SqlType.SQL_EXCLUDE;
+        if ("SQL_FLOAT".equals(name)) return com.codename1.properties.SQLMap.SqlType.SQL_FLOAT;
+        if ("SQL_INTEGER".equals(name)) return com.codename1.properties.SQLMap.SqlType.SQL_INTEGER;
+        if ("SQL_LONG".equals(name)) return com.codename1.properties.SQLMap.SqlType.SQL_LONG;
+        if ("SQL_SHORT".equals(name)) return com.codename1.properties.SQLMap.SqlType.SQL_SHORT;
+        if ("SQL_TEXT".equals(name)) return com.codename1.properties.SQLMap.SqlType.SQL_TEXT;
+        throw unsupportedStaticField(com.codename1.properties.SQLMap.SqlType.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

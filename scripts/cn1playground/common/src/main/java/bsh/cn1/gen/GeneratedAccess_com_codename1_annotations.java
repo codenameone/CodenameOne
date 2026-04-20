@@ -27,6 +27,12 @@ public final class GeneratedAccess_com_codename1_annotations {
         if ("Async".equals(simpleName)) {
             return com.codename1.annotations.Async.class;
         }
+        if ("Execute".equals(simpleName)) {
+            return com.codename1.annotations.Async.Execute.class;
+        }
+        if ("Schedule".equals(simpleName)) {
+            return com.codename1.annotations.Async.Schedule.class;
+        }
         return null;
     }
     public static Object construct(Class<?> type, Object[] args) throws Exception {

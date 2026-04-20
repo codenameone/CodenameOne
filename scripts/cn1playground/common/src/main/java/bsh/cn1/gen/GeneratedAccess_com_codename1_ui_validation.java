@@ -48,6 +48,9 @@ public final class GeneratedAccess_com_codename1_ui_validation {
         if ("Validator".equals(simpleName)) {
             return com.codename1.ui.validation.Validator.class;
         }
+        if ("HighlightMode".equals(simpleName)) {
+            return com.codename1.ui.validation.Validator.HighlightMode.class;
+        }
         return null;
     }
     public static Object construct(Class<?> type, Object[] args) throws Exception {
@@ -507,7 +510,16 @@ public final class GeneratedAccess_com_codename1_ui_validation {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
+        if (type == com.codename1.ui.validation.Validator.HighlightMode.class) return getStaticField0(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("EMBLEM".equals(name)) return com.codename1.ui.validation.Validator.HighlightMode.EMBLEM;
+        if ("NONE".equals(name)) return com.codename1.ui.validation.Validator.HighlightMode.NONE;
+        if ("UIID".equals(name)) return com.codename1.ui.validation.Validator.HighlightMode.UIID;
+        if ("UIID_AND_EMBLEM".equals(name)) return com.codename1.ui.validation.Validator.HighlightMode.UIID_AND_EMBLEM;
+        throw unsupportedStaticField(com.codename1.ui.validation.Validator.HighlightMode.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

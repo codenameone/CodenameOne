@@ -30,8 +30,17 @@ public final class GeneratedAccess_com_codename1_media {
         if ("AsyncMedia".equals(simpleName)) {
             return com.codename1.media.AsyncMedia.class;
         }
+        if ("MediaErrorType".equals(simpleName)) {
+            return com.codename1.media.AsyncMedia.MediaErrorType.class;
+        }
+        if ("State".equals(simpleName)) {
+            return com.codename1.media.AsyncMedia.State.class;
+        }
         if ("AudioBuffer".equals(simpleName)) {
             return com.codename1.media.AudioBuffer.class;
+        }
+        if ("AudioBufferCallback".equals(simpleName)) {
+            return com.codename1.media.AudioBuffer.AudioBufferCallback.class;
         }
         if ("Media".equals(simpleName)) {
             return com.codename1.media.Media.class;
@@ -235,9 +244,16 @@ public final class GeneratedAccess_com_codename1_media {
                 unsupported = ex;
             }
         }
+        if (target instanceof com.codename1.media.AudioBuffer.AudioBufferCallback) {
+            try {
+                return invoke7((com.codename1.media.AudioBuffer.AudioBufferCallback) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
         if (target instanceof com.codename1.media.Media) {
             try {
-                return invoke7((com.codename1.media.Media) target, name, safeArgs);
+                return invoke8((com.codename1.media.Media) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
@@ -845,7 +861,17 @@ public final class GeneratedAccess_com_codename1_media {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke7(com.codename1.media.Media typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke7(com.codename1.media.AudioBuffer.AudioBufferCallback typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("frameReceived".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.media.AudioBuffer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.media.AudioBuffer.class}, false);
+                typedTarget.frameReceived((com.codename1.media.AudioBuffer) adaptedArgs[0]); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke8(com.codename1.media.Media typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("cleanup".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.cleanup(); return null;
@@ -948,11 +974,14 @@ public final class GeneratedAccess_com_codename1_media {
     public static Object getStaticField(Class<?> type, String name) throws Exception {
         if (type == com.codename1.media.AbstractMedia.class) return getStaticField0(name);
         if (type == com.codename1.media.AsyncMedia.class) return getStaticField1(name);
-        if (type == com.codename1.media.Media.class) return getStaticField2(name);
+        if (type == com.codename1.media.AsyncMedia.MediaErrorType.class) return getStaticField2(name);
+        if (type == com.codename1.media.AsyncMedia.State.class) return getStaticField3(name);
+        if (type == com.codename1.media.Media.class) return getStaticField4(name);
         throw unsupportedStaticField(type, name);
     }
 
     private static Object getStaticField0(String name) throws Exception {
+        if ("VARIABLE_ANDROID_SEEK_PREVIEW_WORKAROUND".equals(name)) return com.codename1.media.AbstractMedia.VARIABLE_ANDROID_SEEK_PREVIEW_WORKAROUND;
         if ("VARIABLE_BACKGROUND_ALBUM_COVER".equals(name)) return com.codename1.media.AbstractMedia.VARIABLE_BACKGROUND_ALBUM_COVER;
         if ("VARIABLE_BACKGROUND_ARTIST".equals(name)) return com.codename1.media.AbstractMedia.VARIABLE_BACKGROUND_ARTIST;
         if ("VARIABLE_BACKGROUND_DURATION".equals(name)) return com.codename1.media.AbstractMedia.VARIABLE_BACKGROUND_DURATION;
@@ -964,6 +993,7 @@ public final class GeneratedAccess_com_codename1_media {
     }
 
     private static Object getStaticField1(String name) throws Exception {
+        if ("VARIABLE_ANDROID_SEEK_PREVIEW_WORKAROUND".equals(name)) return com.codename1.media.AsyncMedia.VARIABLE_ANDROID_SEEK_PREVIEW_WORKAROUND;
         if ("VARIABLE_BACKGROUND_ALBUM_COVER".equals(name)) return com.codename1.media.AsyncMedia.VARIABLE_BACKGROUND_ALBUM_COVER;
         if ("VARIABLE_BACKGROUND_ARTIST".equals(name)) return com.codename1.media.AsyncMedia.VARIABLE_BACKGROUND_ARTIST;
         if ("VARIABLE_BACKGROUND_DURATION".equals(name)) return com.codename1.media.AsyncMedia.VARIABLE_BACKGROUND_DURATION;
@@ -975,6 +1005,24 @@ public final class GeneratedAccess_com_codename1_media {
     }
 
     private static Object getStaticField2(String name) throws Exception {
+        if ("Aborted".equals(name)) return com.codename1.media.AsyncMedia.MediaErrorType.Aborted;
+        if ("Decode".equals(name)) return com.codename1.media.AsyncMedia.MediaErrorType.Decode;
+        if ("Encode".equals(name)) return com.codename1.media.AsyncMedia.MediaErrorType.Encode;
+        if ("LineUnavailable".equals(name)) return com.codename1.media.AsyncMedia.MediaErrorType.LineUnavailable;
+        if ("Network".equals(name)) return com.codename1.media.AsyncMedia.MediaErrorType.Network;
+        if ("SrcNotSupported".equals(name)) return com.codename1.media.AsyncMedia.MediaErrorType.SrcNotSupported;
+        if ("Unknown".equals(name)) return com.codename1.media.AsyncMedia.MediaErrorType.Unknown;
+        throw unsupportedStaticField(com.codename1.media.AsyncMedia.MediaErrorType.class, name);
+    }
+
+    private static Object getStaticField3(String name) throws Exception {
+        if ("Paused".equals(name)) return com.codename1.media.AsyncMedia.State.Paused;
+        if ("Playing".equals(name)) return com.codename1.media.AsyncMedia.State.Playing;
+        throw unsupportedStaticField(com.codename1.media.AsyncMedia.State.class, name);
+    }
+
+    private static Object getStaticField4(String name) throws Exception {
+        if ("VARIABLE_ANDROID_SEEK_PREVIEW_WORKAROUND".equals(name)) return com.codename1.media.Media.VARIABLE_ANDROID_SEEK_PREVIEW_WORKAROUND;
         if ("VARIABLE_BACKGROUND_ALBUM_COVER".equals(name)) return com.codename1.media.Media.VARIABLE_BACKGROUND_ALBUM_COVER;
         if ("VARIABLE_BACKGROUND_ARTIST".equals(name)) return com.codename1.media.Media.VARIABLE_BACKGROUND_ARTIST;
         if ("VARIABLE_BACKGROUND_DURATION".equals(name)) return com.codename1.media.Media.VARIABLE_BACKGROUND_DURATION;

@@ -748,15 +748,16 @@ public final class GeneratedAccess_java_lang {
         if (type == java.lang.Class.class) return invokeStatic3(name, safeArgs);
         if (type == java.lang.ClassLoader.class) return invokeStatic4(name, safeArgs);
         if (type == java.lang.Double.class) return invokeStatic5(name, safeArgs);
-        if (type == java.lang.Float.class) return invokeStatic6(name, safeArgs);
-        if (type == java.lang.Integer.class) return invokeStatic7(name, safeArgs);
-        if (type == java.lang.Long.class) return invokeStatic8(name, safeArgs);
-        if (type == java.lang.Math.class) return invokeStatic9(name, safeArgs);
-        if (type == java.lang.Runtime.class) return invokeStatic10(name, safeArgs);
-        if (type == java.lang.Short.class) return invokeStatic11(name, safeArgs);
-        if (type == java.lang.String.class) return invokeStatic12(name, safeArgs);
-        if (type == java.lang.System.class) return invokeStatic13(name, safeArgs);
-        if (type == java.lang.Thread.class) return invokeStatic14(name, safeArgs);
+        if (type == java.lang.Enum.class) return invokeStatic6(name, safeArgs);
+        if (type == java.lang.Float.class) return invokeStatic7(name, safeArgs);
+        if (type == java.lang.Integer.class) return invokeStatic8(name, safeArgs);
+        if (type == java.lang.Long.class) return invokeStatic9(name, safeArgs);
+        if (type == java.lang.Math.class) return invokeStatic10(name, safeArgs);
+        if (type == java.lang.Runtime.class) return invokeStatic11(name, safeArgs);
+        if (type == java.lang.Short.class) return invokeStatic12(name, safeArgs);
+        if (type == java.lang.String.class) return invokeStatic13(name, safeArgs);
+        if (type == java.lang.System.class) return invokeStatic14(name, safeArgs);
+        if (type == java.lang.Thread.class) return invokeStatic15(name, safeArgs);
         throw unsupportedStatic(type, name, safeArgs);
     }
 
@@ -1060,6 +1061,16 @@ public final class GeneratedAccess_java_lang {
     }
 
     private static Object invokeStatic6(String name, Object[] safeArgs) throws Exception {
+        if ("valueOf".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Class.class, java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Class.class, java.lang.String.class}, false);
+                return java.lang.Enum.valueOf((java.lang.Class) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
+            }
+        }
+        throw unsupportedStatic(java.lang.Enum.class, name, safeArgs);
+    }
+
+    private static Object invokeStatic7(String name, Object[] safeArgs) throws Exception {
         if ("compare".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class}, false);
@@ -1115,7 +1126,7 @@ public final class GeneratedAccess_java_lang {
         throw unsupportedStatic(java.lang.Float.class, name, safeArgs);
     }
 
-    private static Object invokeStatic7(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic8(String name, Object[] safeArgs) throws Exception {
         if ("compare".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
@@ -1189,7 +1200,7 @@ public final class GeneratedAccess_java_lang {
         throw unsupportedStatic(java.lang.Integer.class, name, safeArgs);
     }
 
-    private static Object invokeStatic8(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic9(String name, Object[] safeArgs) throws Exception {
         if ("compare".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Long.class, java.lang.Long.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Long.class, java.lang.Long.class}, false);
@@ -1225,7 +1236,7 @@ public final class GeneratedAccess_java_lang {
         throw unsupportedStatic(java.lang.Long.class, name, safeArgs);
     }
 
-    private static Object invokeStatic9(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic10(String name, Object[] safeArgs) throws Exception {
         if ("abs".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class}, false);
@@ -1357,7 +1368,7 @@ public final class GeneratedAccess_java_lang {
         throw unsupportedStatic(java.lang.Math.class, name, safeArgs);
     }
 
-    private static Object invokeStatic10(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic11(String name, Object[] safeArgs) throws Exception {
         if ("getRuntime".equals(name)) {
             if (safeArgs.length == 0) {
                 return java.lang.Runtime.getRuntime();
@@ -1366,7 +1377,7 @@ public final class GeneratedAccess_java_lang {
         throw unsupportedStatic(java.lang.Runtime.class, name, safeArgs);
     }
 
-    private static Object invokeStatic11(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic12(String name, Object[] safeArgs) throws Exception {
         if ("compare".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Short.class, java.lang.Short.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Short.class, java.lang.Short.class}, false);
@@ -1392,7 +1403,7 @@ public final class GeneratedAccess_java_lang {
         throw unsupportedStatic(java.lang.Short.class, name, safeArgs);
     }
 
-    private static Object invokeStatic12(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic13(String name, Object[] safeArgs) throws Exception {
         if ("copyValueOf".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{char[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{char[].class}, false);
@@ -1401,6 +1412,16 @@ public final class GeneratedAccess_java_lang {
             if (matches(safeArgs, new Class<?>[]{char[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{char[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
                 return java.lang.String.copyValueOf((char[]) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]));
+            }
+        }
+        if ("format".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object[].class}, true)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object[].class}, true);
+                java.lang.Object[] varArgs = new java.lang.Object[adaptedArgs.length - 1];
+                for (int i = 1; i < adaptedArgs.length; i++) {
+                    varArgs[i - 1] = (java.lang.Object) adaptedArgs[i];
+                }
+                return java.lang.String.format((java.lang.String) adaptedArgs[0], varArgs);
             }
         }
         if ("valueOf".equals(name)) {
@@ -1440,7 +1461,7 @@ public final class GeneratedAccess_java_lang {
         throw unsupportedStatic(java.lang.String.class, name, safeArgs);
     }
 
-    private static Object invokeStatic13(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic14(String name, Object[] safeArgs) throws Exception {
         if ("arraycopy".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class, java.lang.Object.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class, java.lang.Object.class, java.lang.Integer.class, java.lang.Integer.class}, false);
@@ -1472,7 +1493,7 @@ public final class GeneratedAccess_java_lang {
         throw unsupportedStatic(java.lang.System.class, name, safeArgs);
     }
 
-    private static Object invokeStatic14(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic15(String name, Object[] safeArgs) throws Exception {
         if ("activeCount".equals(name)) {
             if (safeArgs.length == 0) {
                 return java.lang.Thread.activeCount();

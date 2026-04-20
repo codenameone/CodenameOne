@@ -27,10 +27,23 @@ public final class GeneratedAccess_com_codename1_ui_css {
         if ("CSSThemeCompiler".equals(simpleName)) {
             return com.codename1.ui.css.CSSThemeCompiler.class;
         }
+        if ("CSSSyntaxException".equals(simpleName)) {
+            return com.codename1.ui.css.CSSThemeCompiler.CSSSyntaxException.class;
+        }
         return null;
     }
     public static Object construct(Class<?> type, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
+        if (type == com.codename1.ui.css.CSSThemeCompiler.CSSSyntaxException.class) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return new com.codename1.ui.css.CSSThemeCompiler.CSSSyntaxException((java.lang.String) adaptedArgs[0]);
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Throwable.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Throwable.class}, false);
+                return new com.codename1.ui.css.CSSThemeCompiler.CSSSyntaxException((java.lang.String) adaptedArgs[0], (java.lang.Throwable) adaptedArgs[1]);
+            }
+        }
         throw unsupportedConstruct(type, safeArgs);
     }
 

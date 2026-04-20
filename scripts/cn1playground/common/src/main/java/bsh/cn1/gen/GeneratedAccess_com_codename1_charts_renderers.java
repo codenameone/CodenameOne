@@ -33,14 +33,26 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
         if ("DialRenderer".equals(simpleName)) {
             return com.codename1.charts.renderers.DialRenderer.class;
         }
+        if ("Type".equals(simpleName)) {
+            return com.codename1.charts.renderers.DialRenderer.Type.class;
+        }
         if ("SimpleSeriesRenderer".equals(simpleName)) {
             return com.codename1.charts.renderers.SimpleSeriesRenderer.class;
         }
         if ("XYMultipleSeriesRenderer".equals(simpleName)) {
             return com.codename1.charts.renderers.XYMultipleSeriesRenderer.class;
         }
+        if ("Orientation".equals(simpleName)) {
+            return com.codename1.charts.renderers.XYMultipleSeriesRenderer.Orientation.class;
+        }
         if ("XYSeriesRenderer".equals(simpleName)) {
             return com.codename1.charts.renderers.XYSeriesRenderer.class;
+        }
+        if ("FillOutsideLine".equals(simpleName)) {
+            return com.codename1.charts.renderers.XYSeriesRenderer.FillOutsideLine.class;
+        }
+        if ("Type".equals(simpleName)) {
+            return com.codename1.charts.renderers.XYSeriesRenderer.FillOutsideLine.Type.class;
         }
         return null;
     }
@@ -60,6 +72,12 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return new com.codename1.charts.renderers.XYMultipleSeriesRenderer(toIntValue(adaptedArgs[0]));
+            }
+        }
+        if (type == com.codename1.charts.renderers.XYSeriesRenderer.FillOutsideLine.class) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.charts.renderers.XYSeriesRenderer.FillOutsideLine.Type.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.renderers.XYSeriesRenderer.FillOutsideLine.Type.class}, false);
+                return new com.codename1.charts.renderers.XYSeriesRenderer.FillOutsideLine((com.codename1.charts.renderers.XYSeriesRenderer.FillOutsideLine.Type) adaptedArgs[0]);
             }
         }
         throw unsupportedConstruct(type, safeArgs);
@@ -111,6 +129,20 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
         if (target instanceof com.codename1.charts.renderers.SimpleSeriesRenderer) {
             try {
                 return invoke5((com.codename1.charts.renderers.SimpleSeriesRenderer) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.charts.renderers.XYMultipleSeriesRenderer.Orientation) {
+            try {
+                return invoke6((com.codename1.charts.renderers.XYMultipleSeriesRenderer.Orientation) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.charts.renderers.XYSeriesRenderer.FillOutsideLine) {
+            try {
+                return invoke7((com.codename1.charts.renderers.XYSeriesRenderer.FillOutsideLine) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
@@ -2655,11 +2687,54 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
+    private static Object invoke6(com.codename1.charts.renderers.XYMultipleSeriesRenderer.Orientation typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("getAngle".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getAngle();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke7(com.codename1.charts.renderers.XYSeriesRenderer.FillOutsideLine typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("getColor".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getColor();
+            }
+        }
+        if ("getFillRange".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getFillRange();
+            }
+        }
+        if ("getType".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getType();
+            }
+        }
+        if ("setColor".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setColor(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        if ("setFillRange".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{int[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class}, false);
+                typedTarget.setFillRange((int[]) adaptedArgs[0]); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
     public static Object getStaticField(Class<?> type, String name) throws Exception {
         if (type == com.codename1.charts.renderers.BasicStroke.class) return getStaticField0(name);
         if (type == com.codename1.charts.renderers.DefaultRenderer.class) return getStaticField1(name);
         if (type == com.codename1.charts.renderers.DialRenderer.class) return getStaticField2(name);
-        if (type == com.codename1.charts.renderers.XYMultipleSeriesRenderer.class) return getStaticField3(name);
+        if (type == com.codename1.charts.renderers.DialRenderer.Type.class) return getStaticField3(name);
+        if (type == com.codename1.charts.renderers.XYMultipleSeriesRenderer.class) return getStaticField4(name);
+        if (type == com.codename1.charts.renderers.XYMultipleSeriesRenderer.Orientation.class) return getStaticField5(name);
+        if (type == com.codename1.charts.renderers.XYSeriesRenderer.FillOutsideLine.Type.class) return getStaticField6(name);
         throw unsupportedStaticField(type, name);
     }
 
@@ -2685,10 +2760,32 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
     }
 
     private static Object getStaticField3(String name) throws Exception {
+        if ("ARROW".equals(name)) return com.codename1.charts.renderers.DialRenderer.Type.ARROW;
+        if ("NEEDLE".equals(name)) return com.codename1.charts.renderers.DialRenderer.Type.NEEDLE;
+        throw unsupportedStaticField(com.codename1.charts.renderers.DialRenderer.Type.class, name);
+    }
+
+    private static Object getStaticField4(String name) throws Exception {
         if ("BACKGROUND_COLOR".equals(name)) return com.codename1.charts.renderers.XYMultipleSeriesRenderer.BACKGROUND_COLOR;
         if ("NO_COLOR".equals(name)) return com.codename1.charts.renderers.XYMultipleSeriesRenderer.NO_COLOR;
         if ("TEXT_COLOR".equals(name)) return com.codename1.charts.renderers.XYMultipleSeriesRenderer.TEXT_COLOR;
         throw unsupportedStaticField(com.codename1.charts.renderers.XYMultipleSeriesRenderer.class, name);
+    }
+
+    private static Object getStaticField5(String name) throws Exception {
+        if ("HORIZONTAL".equals(name)) return com.codename1.charts.renderers.XYMultipleSeriesRenderer.Orientation.HORIZONTAL;
+        if ("VERTICAL".equals(name)) return com.codename1.charts.renderers.XYMultipleSeriesRenderer.Orientation.VERTICAL;
+        throw unsupportedStaticField(com.codename1.charts.renderers.XYMultipleSeriesRenderer.Orientation.class, name);
+    }
+
+    private static Object getStaticField6(String name) throws Exception {
+        if ("ABOVE".equals(name)) return com.codename1.charts.renderers.XYSeriesRenderer.FillOutsideLine.Type.ABOVE;
+        if ("BELOW".equals(name)) return com.codename1.charts.renderers.XYSeriesRenderer.FillOutsideLine.Type.BELOW;
+        if ("BOUNDS_ABOVE".equals(name)) return com.codename1.charts.renderers.XYSeriesRenderer.FillOutsideLine.Type.BOUNDS_ABOVE;
+        if ("BOUNDS_ALL".equals(name)) return com.codename1.charts.renderers.XYSeriesRenderer.FillOutsideLine.Type.BOUNDS_ALL;
+        if ("BOUNDS_BELOW".equals(name)) return com.codename1.charts.renderers.XYSeriesRenderer.FillOutsideLine.Type.BOUNDS_BELOW;
+        if ("NONE".equals(name)) return com.codename1.charts.renderers.XYSeriesRenderer.FillOutsideLine.Type.NONE;
+        throw unsupportedStaticField(com.codename1.charts.renderers.XYSeriesRenderer.FillOutsideLine.Type.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

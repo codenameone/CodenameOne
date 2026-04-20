@@ -25,6 +25,26 @@ if [ "$USE_LOCAL_SOURCES" = "true" ]; then
     exit 1
   fi
   echo "Using local Codename One sources for registry generation." >&2
+  CN1_SOURCE_ROOTS_VALUE="${LOCAL_CORE_SRC}:${LOCAL_CLDC_SRC}"
+  # Use the locally-installed SNAPSHOT binary jars so runtime
+  # validation (inherited-method filtering, generic erasure checks)
+  # works the same as release-jar mode. Falls back gracefully if the
+  # snapshot isn't installed.
+  LOCAL_VERSION="${CN1_LOCAL_VERSION:-8.0-SNAPSHOT}"
+  LOCAL_M2="$HOME/.m2/repository/com/codenameone"
+  LOCAL_JARS=""
+  for artifact in codenameone-core java-runtime codenameone-javase; do
+    candidate="$LOCAL_M2/$artifact/$LOCAL_VERSION/${artifact}-${LOCAL_VERSION}.jar"
+    if [ -f "$candidate" ]; then
+      LOCAL_JARS="${LOCAL_JARS:+$LOCAL_JARS:}$candidate"
+    fi
+  done
+  if [ -n "$LOCAL_JARS" ]; then
+    CN1_BINARY_JARS="$LOCAL_JARS"
+    echo "Runtime validation against local $LOCAL_VERSION binaries." >&2
+  else
+    echo "Warning: local $LOCAL_VERSION jars not found in $LOCAL_M2 — runtime validation will be skipped." >&2
+  fi
 else
   CN1_VERSION="${CN1_VERSION:-$(read_cn1_version)}"
   if [ -z "$CN1_VERSION" ]; then

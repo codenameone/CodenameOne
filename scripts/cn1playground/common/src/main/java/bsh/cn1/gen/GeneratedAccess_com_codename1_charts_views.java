@@ -30,6 +30,9 @@ public final class GeneratedAccess_com_codename1_charts_views {
         if ("BarChart".equals(simpleName)) {
             return com.codename1.charts.views.BarChart.class;
         }
+        if ("Type".equals(simpleName)) {
+            return com.codename1.charts.views.BarChart.Type.class;
+        }
         if ("BubbleChart".equals(simpleName)) {
             return com.codename1.charts.views.BubbleChart.class;
         }
@@ -38,6 +41,9 @@ public final class GeneratedAccess_com_codename1_charts_views {
         }
         if ("CombinedXYChart".equals(simpleName)) {
             return com.codename1.charts.views.CombinedXYChart.class;
+        }
+        if ("XYCombinedChartDef".equals(simpleName)) {
+            return com.codename1.charts.views.CombinedXYChart.XYCombinedChartDef.class;
         }
         if ("CubicLineChart".equals(simpleName)) {
             return com.codename1.charts.views.CubicLineChart.class;
@@ -110,6 +116,16 @@ public final class GeneratedAccess_com_codename1_charts_views {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.models.XYMultipleSeriesDataset.class, com.codename1.charts.renderers.XYMultipleSeriesRenderer.class, com.codename1.charts.views.CombinedXYChart.XYCombinedChartDef[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.models.XYMultipleSeriesDataset.class, com.codename1.charts.renderers.XYMultipleSeriesRenderer.class, com.codename1.charts.views.CombinedXYChart.XYCombinedChartDef[].class}, false);
                 return new com.codename1.charts.views.CombinedXYChart((com.codename1.charts.models.XYMultipleSeriesDataset) adaptedArgs[0], (com.codename1.charts.renderers.XYMultipleSeriesRenderer) adaptedArgs[1], (com.codename1.charts.views.CombinedXYChart.XYCombinedChartDef[]) adaptedArgs[2]);
+            }
+        }
+        if (type == com.codename1.charts.views.CombinedXYChart.XYCombinedChartDef.class) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, int[].class}, true)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, int[].class}, true);
+                int[] varArgs = new int[adaptedArgs.length - 1];
+                for (int i = 1; i < adaptedArgs.length; i++) {
+                    varArgs[i - 1] = toIntValue(adaptedArgs[i]);
+                }
+                return new com.codename1.charts.views.CombinedXYChart.XYCombinedChartDef((java.lang.String) adaptedArgs[0], varArgs);
             }
         }
         if (type == com.codename1.charts.views.CubicLineChart.class) {
@@ -317,23 +333,30 @@ public final class GeneratedAccess_com_codename1_charts_views {
                 unsupported = ex;
             }
         }
+        if (target instanceof com.codename1.charts.views.CombinedXYChart.XYCombinedChartDef) {
+            try {
+                return invoke17((com.codename1.charts.views.CombinedXYChart.XYCombinedChartDef) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
         if (target instanceof com.codename1.charts.views.PieMapper) {
             try {
-                return invoke17((com.codename1.charts.views.PieMapper) target, name, safeArgs);
+                return invoke18((com.codename1.charts.views.PieMapper) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.charts.views.PieSegment) {
             try {
-                return invoke18((com.codename1.charts.views.PieSegment) target, name, safeArgs);
+                return invoke19((com.codename1.charts.views.PieSegment) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.charts.views.PointStyle) {
             try {
-                return invoke19((com.codename1.charts.views.PointStyle) target, name, safeArgs);
+                return invoke20((com.codename1.charts.views.PointStyle) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
@@ -1930,7 +1953,33 @@ public final class GeneratedAccess_com_codename1_charts_views {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke17(com.codename1.charts.views.PieMapper typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke17(com.codename1.charts.views.CombinedXYChart.XYCombinedChartDef typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("containsSeries".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.containsSeries(toIntValue(adaptedArgs[0]));
+            }
+        }
+        if ("getChartSeriesIndex".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getChartSeriesIndex(toIntValue(adaptedArgs[0]));
+            }
+        }
+        if ("getSeriesIndex".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getSeriesIndex();
+            }
+        }
+        if ("getType".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getType();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke18(com.codename1.charts.views.PieMapper typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addPieSegment".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class}, false);
@@ -1981,7 +2030,7 @@ public final class GeneratedAccess_com_codename1_charts_views {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke18(com.codename1.charts.views.PieSegment typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke19(com.codename1.charts.views.PieSegment typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getShape".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Float.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Float.class}, false);
@@ -2002,7 +2051,7 @@ public final class GeneratedAccess_com_codename1_charts_views {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke19(com.codename1.charts.views.PointStyle typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke20(com.codename1.charts.views.PointStyle typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getName".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getName();
@@ -2017,12 +2066,20 @@ public final class GeneratedAccess_com_codename1_charts_views {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == com.codename1.charts.views.PointStyle.class) return getStaticField0(name);
-        if (type == com.codename1.charts.views.TimeChart.class) return getStaticField1(name);
+        if (type == com.codename1.charts.views.BarChart.Type.class) return getStaticField0(name);
+        if (type == com.codename1.charts.views.PointStyle.class) return getStaticField1(name);
+        if (type == com.codename1.charts.views.TimeChart.class) return getStaticField2(name);
         throw unsupportedStaticField(type, name);
     }
 
     private static Object getStaticField0(String name) throws Exception {
+        if ("DEFAULT".equals(name)) return com.codename1.charts.views.BarChart.Type.DEFAULT;
+        if ("HEAPED".equals(name)) return com.codename1.charts.views.BarChart.Type.HEAPED;
+        if ("STACKED".equals(name)) return com.codename1.charts.views.BarChart.Type.STACKED;
+        throw unsupportedStaticField(com.codename1.charts.views.BarChart.Type.class, name);
+    }
+
+    private static Object getStaticField1(String name) throws Exception {
         if ("CIRCLE".equals(name)) return com.codename1.charts.views.PointStyle.CIRCLE;
         if ("DIAMOND".equals(name)) return com.codename1.charts.views.PointStyle.DIAMOND;
         if ("POINT".equals(name)) return com.codename1.charts.views.PointStyle.POINT;
@@ -2032,7 +2089,7 @@ public final class GeneratedAccess_com_codename1_charts_views {
         throw unsupportedStaticField(com.codename1.charts.views.PointStyle.class, name);
     }
 
-    private static Object getStaticField1(String name) throws Exception {
+    private static Object getStaticField2(String name) throws Exception {
         if ("DAY".equals(name)) return com.codename1.charts.views.TimeChart.DAY;
         throw unsupportedStaticField(com.codename1.charts.views.TimeChart.class, name);
     }

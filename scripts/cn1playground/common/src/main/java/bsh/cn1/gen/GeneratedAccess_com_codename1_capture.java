@@ -30,6 +30,9 @@ public final class GeneratedAccess_com_codename1_capture {
         if ("VideoCaptureConstraints".equals(simpleName)) {
             return com.codename1.capture.VideoCaptureConstraints.class;
         }
+        if ("Compiler".equals(simpleName)) {
+            return com.codename1.capture.VideoCaptureConstraints.Compiler.class;
+        }
         return null;
     }
     public static Object construct(Class<?> type, Object[] args) throws Exception {
@@ -134,6 +137,13 @@ public final class GeneratedAccess_com_codename1_capture {
         if (target instanceof com.codename1.capture.VideoCaptureConstraints) {
             try {
                 return invoke0((com.codename1.capture.VideoCaptureConstraints) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.capture.VideoCaptureConstraints.Compiler) {
+            try {
+                return invoke1((com.codename1.capture.VideoCaptureConstraints.Compiler) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
@@ -269,6 +279,16 @@ public final class GeneratedAccess_com_codename1_capture {
         if ("toString".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.toString();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke1(com.codename1.capture.VideoCaptureConstraints.Compiler typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("compile".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.capture.VideoCaptureConstraints.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.capture.VideoCaptureConstraints.class}, false);
+                return typedTarget.compile((com.codename1.capture.VideoCaptureConstraints) adaptedArgs[0]);
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);

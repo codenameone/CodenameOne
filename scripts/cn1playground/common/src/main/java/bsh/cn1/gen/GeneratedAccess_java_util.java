@@ -33,6 +33,12 @@ public final class GeneratedAccess_java_util {
         if ("AbstractMap".equals(simpleName)) {
             return java.util.AbstractMap.class;
         }
+        if ("SimpleEntry".equals(simpleName)) {
+            return java.util.AbstractMap.SimpleEntry.class;
+        }
+        if ("SimpleImmutableEntry".equals(simpleName)) {
+            return java.util.AbstractMap.SimpleImmutableEntry.class;
+        }
         if ("AbstractQueue".equals(simpleName)) {
             return java.util.AbstractQueue.class;
         }
@@ -123,6 +129,9 @@ public final class GeneratedAccess_java_util {
         if ("Map".equals(simpleName)) {
             return java.util.Map.class;
         }
+        if ("Entry".equals(simpleName)) {
+            return java.util.Map.Entry.class;
+        }
         if ("NavigableMap".equals(simpleName)) {
             return java.util.NavigableMap.class;
         }
@@ -190,6 +199,26 @@ public final class GeneratedAccess_java_util {
     }
     public static Object construct(Class<?> type, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
+        if (type == java.util.AbstractMap.SimpleEntry.class) {
+            if (matches(safeArgs, new Class<?>[]{java.util.Map.Entry.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Map.Entry.class}, false);
+                return new java.util.AbstractMap.SimpleEntry((java.util.Map.Entry) adaptedArgs[0]);
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class}, false);
+                return new java.util.AbstractMap.SimpleEntry((java.lang.Object) adaptedArgs[0], (java.lang.Object) adaptedArgs[1]);
+            }
+        }
+        if (type == java.util.AbstractMap.SimpleImmutableEntry.class) {
+            if (matches(safeArgs, new Class<?>[]{java.util.Map.Entry.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Map.Entry.class}, false);
+                return new java.util.AbstractMap.SimpleImmutableEntry((java.util.Map.Entry) adaptedArgs[0]);
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class}, false);
+                return new java.util.AbstractMap.SimpleImmutableEntry((java.lang.Object) adaptedArgs[0], (java.lang.Object) adaptedArgs[1]);
+            }
+        }
         if (type == java.util.ArrayDeque.class) {
             if (matches(safeArgs, new Class<?>[0], false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
@@ -1475,198 +1504,219 @@ public final class GeneratedAccess_java_util {
                 unsupported = ex;
             }
         }
+        if (target instanceof java.util.AbstractMap.SimpleEntry) {
+            try {
+                return invoke20((java.util.AbstractMap.SimpleEntry) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof java.util.AbstractMap.SimpleImmutableEntry) {
+            try {
+                return invoke21((java.util.AbstractMap.SimpleImmutableEntry) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
         if (target instanceof java.util.BitSet) {
             try {
-                return invoke20((java.util.BitSet) target, name, safeArgs);
+                return invoke22((java.util.BitSet) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof java.util.Calendar) {
             try {
-                return invoke21((java.util.Calendar) target, name, safeArgs);
+                return invoke23((java.util.Calendar) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof java.util.Date) {
             try {
-                return invoke22((java.util.Date) target, name, safeArgs);
+                return invoke24((java.util.Date) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof java.util.Dictionary) {
             try {
-                return invoke23((java.util.Dictionary) target, name, safeArgs);
+                return invoke25((java.util.Dictionary) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof java.util.EmptyStackException) {
             try {
-                return invoke24((java.util.EmptyStackException) target, name, safeArgs);
+                return invoke26((java.util.EmptyStackException) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof java.util.Locale) {
             try {
-                return invoke25((java.util.Locale) target, name, safeArgs);
+                return invoke27((java.util.Locale) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof java.util.NoSuchElementException) {
             try {
-                return invoke26((java.util.NoSuchElementException) target, name, safeArgs);
+                return invoke28((java.util.NoSuchElementException) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof java.util.Observable) {
             try {
-                return invoke27((java.util.Observable) target, name, safeArgs);
+                return invoke29((java.util.Observable) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof java.util.Random) {
             try {
-                return invoke28((java.util.Random) target, name, safeArgs);
+                return invoke30((java.util.Random) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof java.util.StringTokenizer) {
             try {
-                return invoke29((java.util.StringTokenizer) target, name, safeArgs);
+                return invoke31((java.util.StringTokenizer) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof java.util.TimeZone) {
             try {
-                return invoke30((java.util.TimeZone) target, name, safeArgs);
+                return invoke32((java.util.TimeZone) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof java.util.Timer) {
             try {
-                return invoke31((java.util.Timer) target, name, safeArgs);
+                return invoke33((java.util.Timer) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof java.util.TimerTask) {
             try {
-                return invoke32((java.util.TimerTask) target, name, safeArgs);
+                return invoke34((java.util.TimerTask) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof java.util.Collection) {
             try {
-                return invoke33((java.util.Collection) target, name, safeArgs);
+                return invoke35((java.util.Collection) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof java.util.Comparator) {
             try {
-                return invoke34((java.util.Comparator) target, name, safeArgs);
+                return invoke36((java.util.Comparator) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof java.util.Deque) {
             try {
-                return invoke35((java.util.Deque) target, name, safeArgs);
+                return invoke37((java.util.Deque) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof java.util.Enumeration) {
             try {
-                return invoke36((java.util.Enumeration) target, name, safeArgs);
+                return invoke38((java.util.Enumeration) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof java.util.Iterator) {
             try {
-                return invoke37((java.util.Iterator) target, name, safeArgs);
+                return invoke39((java.util.Iterator) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof java.util.List) {
             try {
-                return invoke38((java.util.List) target, name, safeArgs);
+                return invoke40((java.util.List) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof java.util.ListIterator) {
             try {
-                return invoke39((java.util.ListIterator) target, name, safeArgs);
+                return invoke41((java.util.ListIterator) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof java.util.Map) {
             try {
-                return invoke40((java.util.Map) target, name, safeArgs);
+                return invoke42((java.util.Map) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof java.util.Map.Entry) {
+            try {
+                return invoke43((java.util.Map.Entry) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof java.util.NavigableMap) {
             try {
-                return invoke41((java.util.NavigableMap) target, name, safeArgs);
+                return invoke44((java.util.NavigableMap) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof java.util.NavigableSet) {
             try {
-                return invoke42((java.util.NavigableSet) target, name, safeArgs);
+                return invoke45((java.util.NavigableSet) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof java.util.Observer) {
             try {
-                return invoke43((java.util.Observer) target, name, safeArgs);
+                return invoke46((java.util.Observer) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof java.util.Queue) {
             try {
-                return invoke44((java.util.Queue) target, name, safeArgs);
+                return invoke47((java.util.Queue) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof java.util.Set) {
             try {
-                return invoke45((java.util.Set) target, name, safeArgs);
+                return invoke48((java.util.Set) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof java.util.SortedMap) {
             try {
-                return invoke46((java.util.SortedMap) target, name, safeArgs);
+                return invoke49((java.util.SortedMap) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof java.util.SortedSet) {
             try {
-                return invoke47((java.util.SortedSet) target, name, safeArgs);
+                return invoke50((java.util.SortedSet) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
@@ -4427,7 +4477,79 @@ public final class GeneratedAccess_java_util {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke20(java.util.BitSet typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke20(java.util.AbstractMap.SimpleEntry typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("equals".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.equals((java.lang.Object) adaptedArgs[0]);
+            }
+        }
+        if ("getKey".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getKey();
+            }
+        }
+        if ("getValue".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getValue();
+            }
+        }
+        if ("hashCode".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.hashCode();
+            }
+        }
+        if ("setValue".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.setValue((java.lang.Object) adaptedArgs[0]);
+            }
+        }
+        if ("toString".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.toString();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke21(java.util.AbstractMap.SimpleImmutableEntry typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("equals".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.equals((java.lang.Object) adaptedArgs[0]);
+            }
+        }
+        if ("getKey".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getKey();
+            }
+        }
+        if ("getValue".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getValue();
+            }
+        }
+        if ("hashCode".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.hashCode();
+            }
+        }
+        if ("setValue".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.setValue((java.lang.Object) adaptedArgs[0]);
+            }
+        }
+        if ("toString".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.toString();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke22(java.util.BitSet typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("and".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.util.BitSet.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.BitSet.class}, false);
@@ -4560,7 +4682,7 @@ public final class GeneratedAccess_java_util {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke21(java.util.Calendar typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke23(java.util.Calendar typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("add".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
@@ -4622,7 +4744,7 @@ public final class GeneratedAccess_java_util {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke22(java.util.Date typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke24(java.util.Date typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("compareTo".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.util.Date.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Date.class}, false);
@@ -4659,7 +4781,7 @@ public final class GeneratedAccess_java_util {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke23(java.util.Dictionary typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke25(java.util.Dictionary typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("elements".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.elements();
@@ -4701,7 +4823,7 @@ public final class GeneratedAccess_java_util {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke24(java.util.EmptyStackException typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke26(java.util.EmptyStackException typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addSuppressed".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false);
@@ -4758,7 +4880,7 @@ public final class GeneratedAccess_java_util {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke25(java.util.Locale typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke27(java.util.Locale typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getCountry".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getCountry();
@@ -4772,7 +4894,7 @@ public final class GeneratedAccess_java_util {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke26(java.util.NoSuchElementException typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke28(java.util.NoSuchElementException typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addSuppressed".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false);
@@ -4829,7 +4951,7 @@ public final class GeneratedAccess_java_util {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke27(java.util.Observable typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke29(java.util.Observable typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addObserver".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.util.Observer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Observer.class}, false);
@@ -4869,7 +4991,7 @@ public final class GeneratedAccess_java_util {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke28(java.util.Random typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke30(java.util.Random typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("nextBoolean".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.nextBoolean();
@@ -4914,7 +5036,7 @@ public final class GeneratedAccess_java_util {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke29(java.util.StringTokenizer typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke31(java.util.StringTokenizer typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("countTokens".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.countTokens();
@@ -4947,7 +5069,7 @@ public final class GeneratedAccess_java_util {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke30(java.util.TimeZone typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke32(java.util.TimeZone typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getID".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getID();
@@ -4972,7 +5094,7 @@ public final class GeneratedAccess_java_util {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke31(java.util.Timer typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke33(java.util.Timer typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("cancel".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.cancel(); return null;
@@ -5009,7 +5131,7 @@ public final class GeneratedAccess_java_util {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke32(java.util.TimerTask typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke34(java.util.TimerTask typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("cancel".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.cancel();
@@ -5018,7 +5140,7 @@ public final class GeneratedAccess_java_util {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke33(java.util.Collection typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke35(java.util.Collection typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("add".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
@@ -5104,7 +5226,7 @@ public final class GeneratedAccess_java_util {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke34(java.util.Comparator typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke36(java.util.Comparator typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("compare".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class}, false);
@@ -5120,7 +5242,7 @@ public final class GeneratedAccess_java_util {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke35(java.util.Deque typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke37(java.util.Deque typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("add".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
@@ -5322,7 +5444,7 @@ public final class GeneratedAccess_java_util {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke36(java.util.Enumeration typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke38(java.util.Enumeration typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("hasMoreElements".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.hasMoreElements();
@@ -5336,7 +5458,7 @@ public final class GeneratedAccess_java_util {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke37(java.util.Iterator typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke39(java.util.Iterator typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("hasNext".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.hasNext();
@@ -5355,7 +5477,7 @@ public final class GeneratedAccess_java_util {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke38(java.util.List typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke40(java.util.List typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("add".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
@@ -5488,7 +5610,7 @@ public final class GeneratedAccess_java_util {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke39(java.util.ListIterator typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke41(java.util.ListIterator typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("add".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
@@ -5539,7 +5661,7 @@ public final class GeneratedAccess_java_util {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke40(java.util.Map typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke42(java.util.Map typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("clear".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.clear(); return null;
@@ -5620,7 +5742,38 @@ public final class GeneratedAccess_java_util {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke41(java.util.NavigableMap typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke43(java.util.Map.Entry typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("equals".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.equals((java.lang.Object) adaptedArgs[0]);
+            }
+        }
+        if ("getKey".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getKey();
+            }
+        }
+        if ("getValue".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getValue();
+            }
+        }
+        if ("hashCode".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.hashCode();
+            }
+        }
+        if ("setValue".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.setValue((java.lang.Object) adaptedArgs[0]);
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke44(java.util.NavigableMap typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("ceilingEntry".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
@@ -5823,7 +5976,7 @@ public final class GeneratedAccess_java_util {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke42(java.util.NavigableSet typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke45(java.util.NavigableSet typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addAll".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.util.Collection.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Collection.class}, false);
@@ -5992,7 +6145,7 @@ public final class GeneratedAccess_java_util {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke43(java.util.Observer typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke46(java.util.Observer typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("update".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.util.Observable.class, java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Observable.class, java.lang.Object.class}, false);
@@ -6002,7 +6155,7 @@ public final class GeneratedAccess_java_util {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke44(java.util.Queue typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke47(java.util.Queue typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("add".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
@@ -6112,7 +6265,7 @@ public final class GeneratedAccess_java_util {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke45(java.util.Set typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke48(java.util.Set typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("add".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
@@ -6198,7 +6351,7 @@ public final class GeneratedAccess_java_util {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke46(java.util.SortedMap typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke49(java.util.SortedMap typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("clear".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.clear(); return null;
@@ -6306,7 +6459,7 @@ public final class GeneratedAccess_java_util {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke47(java.util.SortedSet typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke50(java.util.SortedSet typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addAll".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.util.Collection.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Collection.class}, false);
