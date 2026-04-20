@@ -403,6 +403,7 @@ public class SkinDesigner extends Lifecycle {
         ScaleImageLabel sl = new ScaleImageLabel(img);
         Button imagePicker = new Button("Select Image");
         imagePicker.setUIID("SkinDesignerActionButton");
+        imagePicker.setTooltip("Choose a skin image from your gallery");
         imagePicker.addActionListener((e) -> {
             Display.getInstance().openGallery((ee) -> {
                 if(ee != null && ee.getSource() != null) {
@@ -490,8 +491,47 @@ public class SkinDesigner extends Lifecycle {
             }
         }
 
+        final OnOffSwitch useSafeArea = new OnOffSwitch();
+        useSafeArea.setUIID("SkinDesignerField");
+        useSafeArea.setValue(false);
+        useSafeArea.setTooltip("Enable a separate safe area inside the screen");
+        autoSave(useSafeArea, prefix + "UseSafeArea");
+        Runnable applySafeEnabled = () -> {
+            boolean enabled = useSafeArea.isValue();
+            safeX.setEnabled(enabled);
+            safeY.setEnabled(enabled);
+            safeWidth.setEnabled(enabled);
+            safeHeight.setEnabled(enabled);
+        };
+        applySafeEnabled.run();
+        useSafeArea.addActionListener(e -> {
+            boolean enabled = useSafeArea.isValue();
+            if (enabled) {
+                int sx = screenPositionX.getAsInt(0);
+                int sy = screenPositionY.getAsInt(0);
+                int sw = screenWidthPixels.getAsInt(0);
+                int sh = screenHeightPixels.getAsInt(0);
+                int curX = safeX.getAsInt(sx);
+                int curY = safeY.getAsInt(sy);
+                int curW = safeWidth.getAsInt(sw);
+                int curH = safeHeight.getAsInt(sh);
+                if (curW < 1 || curW > sw) { curW = sw; }
+                if (curH < 1 || curH > sh) { curH = sh; }
+                if (curX < sx) { curX = sx; }
+                if (curY < sy) { curY = sy; }
+                if (curX + curW > sx + sw) { curX = sx + sw - curW; }
+                if (curY + curH > sy + sh) { curY = sy + sh - curH; }
+                safeX.setText("" + curX);
+                safeY.setText("" + curY);
+                safeWidth.setText("" + curW);
+                safeHeight.setText("" + curH);
+            }
+            applySafeEnabled.run();
+        });
+
         Button aim = new Button();
         styleIconActionButton(aim, FontImage.MATERIAL_PAN_TOOL);
+        aim.setTooltip("Visually position the screen and safe area");
 
         aim.addActionListener(e ->
                 aimPosition(sl.getIcon(),
@@ -502,23 +542,28 @@ public class SkinDesigner extends Lifecycle {
                         safeWidth,
                         safeHeight,
                         screenWidthPixels.getAsInt(768),
-                        screenHeightPixels.getAsInt(1024)));
+                        screenHeightPixels.getAsInt(1024),
+                        useSafeArea));
 
         Button helpButton = new Button();
         styleIconActionButton(helpButton, FontImage.MATERIAL_HELP);
+        helpButton.setTooltip("Open help");
         helpButton.addActionListener(e -> helpCallback.run());
 
         Button saveButton = new Button();
         styleIconActionButton(saveButton, FontImage.MATERIAL_SAVE);
+        saveButton.setTooltip("Save the skin file");
         saveButton.addActionListener(e -> saveCallback.run());
 
         ScaleImageLabel maskLabel = new ScaleImageLabel();
         OnOffSwitch useMask = new OnOffSwitch();
         useMask.setValue(false);
         useMask.setUIID("SkinDesignerField");
+        useMask.setTooltip("Use the detected mask instead of a simple rectangle");
         autoSave(useMask, prefix + "UseMask");
         Button detectScreenButton = new Button("Detect Screen by Color");
         detectScreenButton.setUIID("SkinDesignerActionButton");
+        detectScreenButton.setTooltip("Auto-detect the screen area via flood-fill from the center pixel");
         detectScreenButton.addActionListener(e -> {
             Image source = sl.getIcon();
             if(source == null) {
@@ -554,11 +599,13 @@ public class SkinDesigner extends Lifecycle {
 
         Container actionButtons = FlowLayout.encloseCenter(aim, helpButton, saveButton);
         Container detectionButtons = FlowLayout.encloseCenter(detectScreenButton, floodTolerance, useMask);
+        Container safeAreaHeader = BorderLayout.center(labeledFieldTitle("Safe Area (X/Y/Width/Height)"))
+                .add(BorderLayout.EAST, useSafeArea);
         Container controls = BoxLayout.encloseY(
                 imagePicker,
                 labeledFieldTitle("Screen Position (X/Y/Width/Height)"),
                 GridLayout.encloseIn(4, screenPositionX, screenPositionY, screenWidthPixels, screenHeightPixels),
-                labeledFieldTitle("Safe Area (X/Y/Width/Height)"),
+                safeAreaHeader,
                 GridLayout.encloseIn(4, safeX, safeY, safeWidth, safeHeight),
                 labeledFieldTitle("Screen Mask Detection"),
                 detectionButtons,
@@ -659,22 +706,22 @@ public class SkinDesigner extends Lifecycle {
 
             @Override
             public int getSafeX() {
-                return safeX.getAsInt(getScreenX());
+                return useSafeArea.isValue() ? safeX.getAsInt(getScreenX()) : getScreenX();
             }
 
             @Override
             public int getSafeY() {
-                return safeY.getAsInt(getScreenY());
+                return useSafeArea.isValue() ? safeY.getAsInt(getScreenY()) : getScreenY();
             }
 
             @Override
             public int getSafeWidth() {
-                return safeWidth.getAsInt(getScreenWidth());
+                return useSafeArea.isValue() ? safeWidth.getAsInt(getScreenWidth()) : getScreenWidth();
             }
 
             @Override
             public int getSafeHeight() {
-                return safeHeight.getAsInt(getScreenHeight());
+                return useSafeArea.isValue() ? safeHeight.getAsInt(getScreenHeight()) : getScreenHeight();
             }
         };
     }
@@ -788,6 +835,7 @@ public class SkinDesigner extends Lifecycle {
         private final TextField safeYField;
         private final TextField safeWField;
         private final TextField safeHField;
+        private final OnOffSwitch useSafeArea;
         private int mode = AIM_MODE_SCREEN;
         private float zoomMul = 1f;
         private float panNX = 0.5f;
@@ -796,7 +844,7 @@ public class SkinDesigner extends Lifecycle {
         private int lastPY = -1;
 
         AimView(Image img, TextField xField, TextField yField, TextField safeXField, TextField safeYField,
-                TextField safeWField, TextField safeHField, int screenW, int screenH) {
+                TextField safeWField, TextField safeHField, int screenW, int screenH, OnOffSwitch useSafeArea) {
             this.img = img;
             this.imgW = img.getWidth();
             this.imgH = img.getHeight();
@@ -808,8 +856,13 @@ public class SkinDesigner extends Lifecycle {
             this.safeHField = safeHField;
             this.screenW = screenW;
             this.screenH = screenH;
+            this.useSafeArea = useSafeArea;
             setUIID("SkinDesignerCard");
             setFocusable(true);
+        }
+
+        boolean isSafeAreaEnabled() {
+            return useSafeArea != null && useSafeArea.isValue();
         }
 
         void setMode(int mode) {
@@ -909,12 +962,17 @@ public class SkinDesigner extends Lifecycle {
                 return;
             }
             if (mode == AIM_MODE_SAFE) {
-                int saw = safeWField.getAsInt(screenW);
-                int sah = safeHField.getAsInt(screenH);
-                int curX = safeXField.getAsInt(0);
-                int curY = safeYField.getAsInt(0);
-                int newX = clamp(curX + dImgX, 0, imgW - saw);
-                int newY = clamp(curY + dImgY, 0, imgH - sah);
+                if (!isSafeAreaEnabled()) {
+                    return;
+                }
+                int sx = xField.getAsInt(0);
+                int sy = yField.getAsInt(0);
+                int saw = Math.min(safeWField.getAsInt(screenW), screenW);
+                int sah = Math.min(safeHField.getAsInt(screenH), screenH);
+                int curX = safeXField.getAsInt(sx);
+                int curY = safeYField.getAsInt(sy);
+                int newX = clamp(curX + dImgX, sx, sx + screenW - saw);
+                int newY = clamp(curY + dImgY, sy, sy + screenH - sah);
                 if (newX != curX) {
                     safeXField.setText("" + newX);
                 }
@@ -935,13 +993,13 @@ public class SkinDesigner extends Lifecycle {
             if (actualDy != 0) {
                 yField.setText("" + newY);
             }
-            if (actualDx != 0 || actualDy != 0) {
-                int saw = safeWField.getAsInt(screenW);
-                int sah = safeHField.getAsInt(screenH);
+            if ((actualDx != 0 || actualDy != 0) && isSafeAreaEnabled()) {
+                int saw = Math.min(safeWField.getAsInt(screenW), screenW);
+                int sah = Math.min(safeHField.getAsInt(screenH), screenH);
                 int curSafeX = safeXField.getAsInt(curX);
                 int curSafeY = safeYField.getAsInt(curY);
-                int newSafeX = clamp(curSafeX + actualDx, 0, imgW - saw);
-                int newSafeY = clamp(curSafeY + actualDy, 0, imgH - sah);
+                int newSafeX = clamp(curSafeX + actualDx, newX, newX + screenW - saw);
+                int newSafeY = clamp(curSafeY + actualDy, newY, newY + screenH - sah);
                 if (newSafeX != curSafeX) {
                     safeXField.setText("" + newSafeX);
                 }
@@ -1009,10 +1067,11 @@ public class SkinDesigner extends Lifecycle {
 
             int screenImgX = xField.getAsInt(0);
             int screenImgY = yField.getAsInt(0);
-            int safeImgX = safeXField.getAsInt(screenImgX);
-            int safeImgY = safeYField.getAsInt(screenImgY);
-            int safeImgW = safeWField.getAsInt(screenW);
-            int safeImgH = safeHField.getAsInt(screenH);
+            boolean safeOn = isSafeAreaEnabled();
+            int safeImgX = safeOn ? safeXField.getAsInt(screenImgX) : screenImgX;
+            int safeImgY = safeOn ? safeYField.getAsInt(screenImgY) : screenImgY;
+            int safeImgW = safeOn ? safeWField.getAsInt(screenW) : screenW;
+            int safeImgH = safeOn ? safeHField.getAsInt(screenH) : screenH;
 
             int sx = drawX + Math.round(screenImgX * scale);
             int sy = drawY + Math.round(screenImgY * scale);
@@ -1042,30 +1101,34 @@ public class SkinDesigner extends Lifecycle {
                 }
             }
 
-            g.setAlpha(150);
-            g.setColor(0xff0000);
-            int safeRight = fx + fw;
-            int safeBottom = fy + fh;
-            int screenRight = sx + sw;
-            int screenBottom = sy + sh;
-            if (fy > sy) {
-                g.fillRect(sx, sy, sw, Math.max(0, fy - sy));
-            }
-            if (fx > sx) {
-                g.fillRect(sx, fy, Math.max(0, fx - sx), Math.max(0, fh));
-            }
-            if (safeRight < screenRight) {
-                g.fillRect(safeRight, fy, Math.max(0, screenRight - safeRight), Math.max(0, fh));
-            }
-            if (safeBottom < screenBottom) {
-                g.fillRect(sx, safeBottom, sw, Math.max(0, screenBottom - safeBottom));
+            if (safeOn) {
+                g.setAlpha(150);
+                g.setColor(0xff0000);
+                int safeRight = fx + fw;
+                int safeBottom = fy + fh;
+                int screenRight = sx + sw;
+                int screenBottom = sy + sh;
+                if (fy > sy) {
+                    g.fillRect(sx, sy, sw, Math.max(0, fy - sy));
+                }
+                if (fx > sx) {
+                    g.fillRect(sx, fy, Math.max(0, fx - sx), Math.max(0, fh));
+                }
+                if (safeRight < screenRight) {
+                    g.fillRect(safeRight, fy, Math.max(0, screenRight - safeRight), Math.max(0, fh));
+                }
+                if (safeBottom < screenBottom) {
+                    g.fillRect(sx, safeBottom, sw, Math.max(0, screenBottom - safeBottom));
+                }
             }
 
             g.setAlpha(255);
             g.setColor(mode == AIM_MODE_SCREEN ? 0x2f6bff : 0x00ffff);
             g.drawRect(sx, sy, sw, sh);
-            g.setColor(mode == AIM_MODE_SAFE ? 0xffaa00 : 0xff0000);
-            g.drawRect(fx, fy, fw, fh);
+            if (safeOn) {
+                g.setColor(mode == AIM_MODE_SAFE ? 0xffaa00 : 0xff0000);
+                g.drawRect(fx, fy, fw, fh);
+            }
 
             g.setAlpha(oldAlpha);
             g.setColor(oldColor);
@@ -1074,7 +1137,7 @@ public class SkinDesigner extends Lifecycle {
         }
     }
 
-    void aimPosition(final Image img, final TextField x, final TextField y, final TextField safeX, final TextField safeY, final TextField safeW, final TextField safeH, final int w, final int h) {
+    void aimPosition(final Image img, final TextField x, final TextField y, final TextField safeX, final TextField safeY, final TextField safeW, final TextField safeH, final int w, final int h, final OnOffSwitch useSafeArea) {
         if(img == null) {
             ToastBar.showErrorMessage("You need to pick a skin image first");
             return;
@@ -1083,29 +1146,49 @@ public class SkinDesigner extends Lifecycle {
         final String originalY = y.getText();
         final String originalSafeX = safeX.getText();
         final String originalSafeY = safeY.getText();
-        final Form editPosition = new Form("", new BorderLayout());
+        final Form editPosition = new Form("Positioning", new BorderLayout());
         editPosition.setUIID("SkinDesignerForm");
+
+        final AimView view = new AimView(img, x, y, safeX, safeY, safeW, safeH, w, h, useSafeArea);
+
         Button done = new Button("Done");
         styleActionButton(done, FontImage.MATERIAL_CHECK);
+        done.setTooltip("Keep changes and return");
         done.addActionListener(e -> editPosition.showBack());
         Button cancel = new Button("Cancel");
         styleActionButton(cancel, FontImage.MATERIAL_CANCEL);
-        cancel.addActionListener(e -> {
+        cancel.setTooltip("Discard changes and return");
+        Runnable cancelAction = () -> {
             x.setText(originalX);
             y.setText(originalY);
             safeX.setText(originalSafeX);
             safeY.setText(originalSafeY);
             editPosition.showBack();
+        };
+        cancel.addActionListener(e -> cancelAction.run());
+        editPosition.setBackCommand(new com.codename1.ui.Command("Cancel") {
+            @Override
+            public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                cancelAction.run();
+            }
         });
+
         Container topActions = GridLayout.encloseIn(2, cancel, done);
         topActions.setUIID("SkinDesignerTabBar");
         editPosition.add(BorderLayout.NORTH, topActions);
 
-        final AimView view = new AimView(img, x, y, safeX, safeY, safeW, safeH, w, h);
-
+        final boolean safeEnabled = useSafeArea != null && useSafeArea.isValue();
         Button modeScreen = new Button("Screen");
         Button modeSafe = new Button("Safe");
         Button modePan = new Button("Pan");
+        modeScreen.setTooltip("Drag to reposition the screen area");
+        modeSafe.setTooltip(safeEnabled
+                ? "Drag to adjust the safe area within the screen"
+                : "Enable 'Use Safe Area' on the previous screen to edit safe area");
+        modePan.setTooltip("Drag to scroll the zoomed view");
+        if (!safeEnabled) {
+            modeSafe.setEnabled(false);
+        }
         final Button[] modeButtons = { modeScreen, modeSafe, modePan };
         final int[] modeValues = { AIM_MODE_SCREEN, AIM_MODE_SAFE, AIM_MODE_PAN };
         updateModeButtons(modeButtons, view.getMode());
@@ -1114,6 +1197,16 @@ public class SkinDesigner extends Lifecycle {
             modeButtons[i].addActionListener(e -> {
                 view.setMode(target);
                 updateModeButtons(modeButtons, target);
+                if (target == AIM_MODE_PAN) {
+                    ToastBar.showMessage("Pan mode: zoom in and drag to scroll the view",
+                            FontImage.MATERIAL_PAN_TOOL, 2500);
+                } else if (target == AIM_MODE_SAFE) {
+                    ToastBar.showMessage("Safe mode: drag to adjust the safe area inside the screen",
+                            FontImage.MATERIAL_CROP_FREE, 2500);
+                } else if (target == AIM_MODE_SCREEN) {
+                    ToastBar.showMessage("Screen mode: drag to reposition the screen area",
+                            FontImage.MATERIAL_STAY_CURRENT_PORTRAIT, 2000);
+                }
                 view.repaint();
             });
         }
@@ -1126,12 +1219,18 @@ public class SkinDesigner extends Lifecycle {
         Button right = new Button();
         Button up = new Button();
         Button down = new Button();
-        FontImage.setMaterialIcon(zoomIn, FontImage.MATERIAL_ZOOM_IN, 3);
-        FontImage.setMaterialIcon(zoomOut, FontImage.MATERIAL_ZOOM_OUT, 3);
-        FontImage.setMaterialIcon(left, FontImage.MATERIAL_KEYBOARD_ARROW_LEFT, 3);
-        FontImage.setMaterialIcon(right, FontImage.MATERIAL_KEYBOARD_ARROW_RIGHT, 3);
-        FontImage.setMaterialIcon(up, FontImage.MATERIAL_KEYBOARD_ARROW_UP, 3);
-        FontImage.setMaterialIcon(down, FontImage.MATERIAL_KEYBOARD_ARROW_DOWN, 3);
+        styleIconActionButton(zoomIn, FontImage.MATERIAL_ZOOM_IN);
+        styleIconActionButton(zoomOut, FontImage.MATERIAL_ZOOM_OUT);
+        styleIconActionButton(left, FontImage.MATERIAL_KEYBOARD_ARROW_LEFT);
+        styleIconActionButton(right, FontImage.MATERIAL_KEYBOARD_ARROW_RIGHT);
+        styleIconActionButton(up, FontImage.MATERIAL_KEYBOARD_ARROW_UP);
+        styleIconActionButton(down, FontImage.MATERIAL_KEYBOARD_ARROW_DOWN);
+        zoomIn.setTooltip("Zoom in");
+        zoomOut.setTooltip("Zoom out");
+        left.setTooltip("Nudge left (1 px)");
+        right.setTooltip("Nudge right (1 px)");
+        up.setTooltip("Nudge up (1 px)");
+        down.setTooltip("Nudge down (1 px)");
 
         zoomIn.addActionListener(e -> view.zoomIn());
         zoomOut.addActionListener(e -> view.zoomOut());
