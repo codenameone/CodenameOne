@@ -537,12 +537,12 @@ public class SkinDesigner extends Lifecycle {
                 aimPosition(sl.getIcon(),
                         screenPositionX,
                         screenPositionY,
+                        screenWidthPixels,
+                        screenHeightPixels,
                         safeX,
                         safeY,
                         safeWidth,
                         safeHeight,
-                        screenWidthPixels.getAsInt(768),
-                        screenHeightPixels.getAsInt(1024),
                         useSafeArea));
 
         Button helpButton = new Button();
@@ -821,44 +821,74 @@ public class SkinDesigner extends Lifecycle {
 
     static final int AIM_MODE_SCREEN = 0;
     static final int AIM_MODE_SAFE = 1;
-    static final int AIM_MODE_PAN = 2;
+
+    static final int DRAG_NONE = 0;
+    static final int DRAG_MOVE = 1;
+    static final int DRAG_N = 1 << 1;
+    static final int DRAG_S = 1 << 2;
+    static final int DRAG_W = 1 << 3;
+    static final int DRAG_E = 1 << 4;
+    static final int MIN_SAFE_SIZE = 10;
 
     final class AimView extends Component {
         private final Image img;
         private final int imgW;
         private final int imgH;
-        private final int screenW;
-        private final int screenH;
         private final TextField xField;
         private final TextField yField;
+        private final TextField screenWField;
+        private final TextField screenHField;
         private final TextField safeXField;
         private final TextField safeYField;
         private final TextField safeWField;
         private final TextField safeHField;
         private final OnOffSwitch useSafeArea;
+        private Runnable onChange;
         private int mode = AIM_MODE_SCREEN;
         private float zoomMul = 1f;
         private float panNX = 0.5f;
         private float panNY = 0.5f;
         private int lastPX = -1;
         private int lastPY = -1;
+        private int dragOp = DRAG_NONE;
 
-        AimView(Image img, TextField xField, TextField yField, TextField safeXField, TextField safeYField,
-                TextField safeWField, TextField safeHField, int screenW, int screenH, OnOffSwitch useSafeArea) {
+        AimView(Image img, TextField xField, TextField yField,
+                TextField screenWField, TextField screenHField,
+                TextField safeXField, TextField safeYField,
+                TextField safeWField, TextField safeHField,
+                OnOffSwitch useSafeArea) {
             this.img = img;
             this.imgW = img.getWidth();
             this.imgH = img.getHeight();
             this.xField = xField;
             this.yField = yField;
+            this.screenWField = screenWField;
+            this.screenHField = screenHField;
             this.safeXField = safeXField;
             this.safeYField = safeYField;
             this.safeWField = safeWField;
             this.safeHField = safeHField;
-            this.screenW = screenW;
-            this.screenH = screenH;
             this.useSafeArea = useSafeArea;
             setUIID("SkinDesignerCard");
             setFocusable(true);
+        }
+
+        void setOnChange(Runnable onChange) {
+            this.onChange = onChange;
+        }
+
+        private void notifyChanged() {
+            if (onChange != null) {
+                onChange.run();
+            }
+        }
+
+        int screenW() {
+            return Math.max(1, screenWField.getAsInt(1));
+        }
+
+        int screenH() {
+            return Math.max(1, screenHField.getAsInt(1));
         }
 
         boolean isSafeAreaEnabled() {
@@ -877,6 +907,7 @@ public class SkinDesigner extends Lifecycle {
             float nz = Math.min(8f, zoomMul * 1.5f);
             if (nz != zoomMul) {
                 zoomMul = nz;
+                centerOnActiveRect();
                 repaint();
             }
         }
@@ -888,13 +919,35 @@ public class SkinDesigner extends Lifecycle {
                 if (zoomMul <= 1f) {
                     panNX = 0.5f;
                     panNY = 0.5f;
+                } else {
+                    centerOnActiveRect();
                 }
                 repaint();
             }
         }
 
+        private void centerOnActiveRect() {
+            int cx, cy;
+            if (mode == AIM_MODE_SAFE && isSafeAreaEnabled()) {
+                cx = safeXField.getAsInt(0) + safeWField.getAsInt(screenW()) / 2;
+                cy = safeYField.getAsInt(0) + safeHField.getAsInt(screenH()) / 2;
+            } else {
+                cx = xField.getAsInt(0) + screenW() / 2;
+                cy = yField.getAsInt(0) + screenH() / 2;
+            }
+            if (imgW > 0) {
+                panNX = Math.max(0f, Math.min(1f, ((float) cx) / imgW));
+            }
+            if (imgH > 0) {
+                panNY = Math.max(0f, Math.min(1f, ((float) cy) / imgH));
+            }
+        }
+
         void nudge(int dx, int dy) {
+            int savedOp = dragOp;
+            dragOp = DRAG_MOVE;
             applyDelta(dx, dy);
+            dragOp = savedOp;
             repaint();
         }
 
@@ -940,85 +993,133 @@ public class SkinDesigner extends Lifecycle {
         }
 
         private void applyDelta(int dImgX, int dImgY) {
-            if (dImgX == 0 && dImgY == 0) {
+            if (dImgX == 0 && dImgY == 0 || dragOp == DRAG_NONE) {
                 return;
             }
-            if (mode == AIM_MODE_PAN) {
-                if (zoomMul > 1f) {
-                    float scale = currentScale();
-                    if (scale > 0f) {
-                        float drawW = imgW * scale;
-                        float drawH = imgH * scale;
-                        float vw = getWidth();
-                        float vh = getHeight();
-                        if (drawW > vw) {
-                            panNX = Math.max(0f, Math.min(1f, panNX - (dImgX * scale) / (drawW - vw)));
-                        }
-                        if (drawH > vh) {
-                            panNY = Math.max(0f, Math.min(1f, panNY - (dImgY * scale) / (drawH - vh)));
-                        }
-                    }
-                }
-                return;
-            }
+            int sW = screenW();
+            int sH = screenH();
             if (mode == AIM_MODE_SAFE) {
                 if (!isSafeAreaEnabled()) {
                     return;
                 }
-                int sx = xField.getAsInt(0);
-                int sy = yField.getAsInt(0);
-                int saw = Math.min(safeWField.getAsInt(screenW), screenW);
-                int sah = Math.min(safeHField.getAsInt(screenH), screenH);
-                int curX = safeXField.getAsInt(sx);
-                int curY = safeYField.getAsInt(sy);
-                int newX = clamp(curX + dImgX, sx, sx + screenW - saw);
-                int newY = clamp(curY + dImgY, sy, sy + screenH - sah);
-                if (newX != curX) {
-                    safeXField.setText("" + newX);
-                }
-                if (newY != curY) {
-                    safeYField.setText("" + newY);
-                }
+                int boundsX = xField.getAsInt(0);
+                int boundsY = yField.getAsInt(0);
+                int boundsW = sW;
+                int boundsH = sH;
+                int curX = safeXField.getAsInt(boundsX);
+                int curY = safeYField.getAsInt(boundsY);
+                int curW = Math.min(safeWField.getAsInt(boundsW), boundsW);
+                int curH = Math.min(safeHField.getAsInt(boundsH), boundsH);
+                int[] rect = applyResize(curX, curY, curW, curH, dImgX, dImgY,
+                        boundsX, boundsY, boundsW, boundsH);
+                boolean changed = false;
+                if (rect[0] != curX) { safeXField.setText("" + rect[0]); changed = true; }
+                if (rect[1] != curY) { safeYField.setText("" + rect[1]); changed = true; }
+                if (rect[2] != curW) { safeWField.setText("" + rect[2]); changed = true; }
+                if (rect[3] != curH) { safeHField.setText("" + rect[3]); changed = true; }
+                if (changed) { notifyChanged(); }
                 return;
             }
             int curX = xField.getAsInt(0);
             int curY = yField.getAsInt(0);
-            int newX = clamp(curX + dImgX, 0, imgW - screenW);
-            int newY = clamp(curY + dImgY, 0, imgH - screenH);
+            int newX = clamp(curX + dImgX, 0, imgW - sW);
+            int newY = clamp(curY + dImgY, 0, imgH - sH);
             int actualDx = newX - curX;
             int actualDy = newY - curY;
-            if (actualDx != 0) {
-                xField.setText("" + newX);
-            }
-            if (actualDy != 0) {
-                yField.setText("" + newY);
-            }
+            boolean changed = false;
+            if (actualDx != 0) { xField.setText("" + newX); changed = true; }
+            if (actualDy != 0) { yField.setText("" + newY); changed = true; }
             if ((actualDx != 0 || actualDy != 0) && isSafeAreaEnabled()) {
-                int saw = Math.min(safeWField.getAsInt(screenW), screenW);
-                int sah = Math.min(safeHField.getAsInt(screenH), screenH);
+                int saw = Math.min(safeWField.getAsInt(sW), sW);
+                int sah = Math.min(safeHField.getAsInt(sH), sH);
                 int curSafeX = safeXField.getAsInt(curX);
                 int curSafeY = safeYField.getAsInt(curY);
-                int newSafeX = clamp(curSafeX + actualDx, newX, newX + screenW - saw);
-                int newSafeY = clamp(curSafeY + actualDy, newY, newY + screenH - sah);
-                if (newSafeX != curSafeX) {
-                    safeXField.setText("" + newSafeX);
-                }
-                if (newSafeY != curSafeY) {
-                    safeYField.setText("" + newSafeY);
-                }
+                int newSafeX = clamp(curSafeX + actualDx, newX, newX + sW - saw);
+                int newSafeY = clamp(curSafeY + actualDy, newY, newY + sH - sah);
+                if (newSafeX != curSafeX) { safeXField.setText("" + newSafeX); changed = true; }
+                if (newSafeY != curSafeY) { safeYField.setText("" + newSafeY); changed = true; }
             }
+            if (changed) { notifyChanged(); }
+        }
+
+        private int[] applyResize(int curX, int curY, int curW, int curH, int dx, int dy,
+                                  int boundsX, int boundsY, int boundsW, int boundsH) {
+            boolean moveLeft = (dragOp & DRAG_W) != 0 || dragOp == DRAG_MOVE;
+            boolean moveRight = (dragOp & DRAG_E) != 0 || dragOp == DRAG_MOVE;
+            boolean moveTop = (dragOp & DRAG_N) != 0 || dragOp == DRAG_MOVE;
+            boolean moveBottom = (dragOp & DRAG_S) != 0 || dragOp == DRAG_MOVE;
+            int left = curX;
+            int right = curX + curW;
+            int top = curY;
+            int bottom = curY + curH;
+            if (moveLeft) { left += dx; }
+            if (moveRight) { right += dx; }
+            if (moveTop) { top += dy; }
+            if (moveBottom) { bottom += dy; }
+            int minX = boundsX;
+            int minY = boundsY;
+            int maxX = boundsX + boundsW;
+            int maxY = boundsY + boundsH;
+            if (left < minX) { left = minX; if (moveLeft && !moveRight && right < left + MIN_SAFE_SIZE) right = left + MIN_SAFE_SIZE; }
+            if (right > maxX) { right = maxX; if (moveRight && !moveLeft && left > right - MIN_SAFE_SIZE) left = right - MIN_SAFE_SIZE; }
+            if (top < minY) { top = minY; if (moveTop && !moveBottom && bottom < top + MIN_SAFE_SIZE) bottom = top + MIN_SAFE_SIZE; }
+            if (bottom > maxY) { bottom = maxY; if (moveBottom && !moveTop && top > bottom - MIN_SAFE_SIZE) top = bottom - MIN_SAFE_SIZE; }
+            if (right - left < MIN_SAFE_SIZE) {
+                if (moveLeft && !moveRight) { left = right - MIN_SAFE_SIZE; }
+                else if (moveRight && !moveLeft) { right = left + MIN_SAFE_SIZE; }
+            }
+            if (bottom - top < MIN_SAFE_SIZE) {
+                if (moveTop && !moveBottom) { top = bottom - MIN_SAFE_SIZE; }
+                else if (moveBottom && !moveTop) { bottom = top + MIN_SAFE_SIZE; }
+            }
+            if (dragOp == DRAG_MOVE) {
+                int w = right - left;
+                int h = bottom - top;
+                left = clamp(left, minX, maxX - w);
+                top = clamp(top, minY, maxY - h);
+                right = left + w;
+                bottom = top + h;
+            }
+            return new int[] { left, top, right - left, bottom - top };
         }
 
         @Override
         public void pointerPressed(int x, int y) {
             lastPX = x;
             lastPY = y;
+            dragOp = hitTestDragOp(x, y);
         }
 
         @Override
         public void pointerReleased(int x, int y) {
             lastPX = -1;
             lastPY = -1;
+            dragOp = DRAG_NONE;
+        }
+
+        private int hitTestDragOp(int px, int py) {
+            if (mode == AIM_MODE_SAFE && isSafeAreaEnabled()) {
+                float scale = currentScale();
+                if (scale <= 0f) { return DRAG_MOVE; }
+                int drawX = drawOriginX(scale);
+                int drawY = drawOriginY(scale);
+                int sX = drawX + Math.round(safeXField.getAsInt(0) * scale);
+                int sY = drawY + Math.round(safeYField.getAsInt(0) * scale);
+                int sW = Math.max(1, Math.round(safeWField.getAsInt(screenW()) * scale));
+                int sH = Math.max(1, Math.round(safeHField.getAsInt(screenH()) * scale));
+                int zone = Math.max(8, Display.getInstance().convertToPixels(2.5f));
+                boolean nearLeft = px >= sX - zone && px <= sX + zone;
+                boolean nearRight = px >= sX + sW - zone && px <= sX + sW + zone;
+                boolean nearTop = py >= sY - zone && py <= sY + zone;
+                boolean nearBottom = py >= sY + sH - zone && py <= sY + sH + zone;
+                int op = 0;
+                if (nearLeft) { op |= DRAG_W; }
+                if (nearRight) { op |= DRAG_E; }
+                if (nearTop) { op |= DRAG_N; }
+                if (nearBottom) { op |= DRAG_S; }
+                if (op != 0) { return op; }
+            }
+            return DRAG_MOVE;
         }
 
         @Override
@@ -1065,18 +1166,20 @@ public class SkinDesigner extends Lifecycle {
 
             g.drawImage(img, drawX, drawY, drawW, drawH);
 
+            int sW = screenW();
+            int sH = screenH();
             int screenImgX = xField.getAsInt(0);
             int screenImgY = yField.getAsInt(0);
             boolean safeOn = isSafeAreaEnabled();
             int safeImgX = safeOn ? safeXField.getAsInt(screenImgX) : screenImgX;
             int safeImgY = safeOn ? safeYField.getAsInt(screenImgY) : screenImgY;
-            int safeImgW = safeOn ? safeWField.getAsInt(screenW) : screenW;
-            int safeImgH = safeOn ? safeHField.getAsInt(screenH) : screenH;
+            int safeImgW = safeOn ? safeWField.getAsInt(sW) : sW;
+            int safeImgH = safeOn ? safeHField.getAsInt(sH) : sH;
 
             int sx = drawX + Math.round(screenImgX * scale);
             int sy = drawY + Math.round(screenImgY * scale);
-            int sw = Math.max(1, Math.round(screenW * scale));
-            int sh = Math.max(1, Math.round(screenH * scale));
+            int sw = Math.max(1, Math.round(sW * scale));
+            int sh = Math.max(1, Math.round(sH * scale));
             int fx = drawX + Math.round(safeImgX * scale);
             int fy = drawY + Math.round(safeImgY * scale);
             int fw = Math.max(1, Math.round(safeImgW * scale));
@@ -1128,6 +1231,18 @@ public class SkinDesigner extends Lifecycle {
             if (safeOn) {
                 g.setColor(mode == AIM_MODE_SAFE ? 0xffaa00 : 0xff0000);
                 g.drawRect(fx, fy, fw, fh);
+                if (mode == AIM_MODE_SAFE) {
+                    int handle = Math.max(6, Display.getInstance().convertToPixels(2f));
+                    int half = handle / 2;
+                    g.fillRect(fx - half, fy - half, handle, handle);
+                    g.fillRect(fx + fw - half, fy - half, handle, handle);
+                    g.fillRect(fx - half, fy + fh - half, handle, handle);
+                    g.fillRect(fx + fw - half, fy + fh - half, handle, handle);
+                    g.fillRect(fx + fw / 2 - half, fy - half, handle, handle);
+                    g.fillRect(fx + fw / 2 - half, fy + fh - half, handle, handle);
+                    g.fillRect(fx - half, fy + fh / 2 - half, handle, handle);
+                    g.fillRect(fx + fw - half, fy + fh / 2 - half, handle, handle);
+                }
             }
 
             g.setAlpha(oldAlpha);
@@ -1137,33 +1252,84 @@ public class SkinDesigner extends Lifecycle {
         }
     }
 
-    void aimPosition(final Image img, final TextField x, final TextField y, final TextField safeX, final TextField safeY, final TextField safeW, final TextField safeH, final int w, final int h, final OnOffSwitch useSafeArea) {
+    void aimPosition(final Image img,
+                    final TextField screenX, final TextField screenY,
+                    final TextField screenW, final TextField screenH,
+                    final TextField safeX, final TextField safeY,
+                    final TextField safeW, final TextField safeH,
+                    final OnOffSwitch useSafeArea) {
         if(img == null) {
             ToastBar.showErrorMessage("You need to pick a skin image first");
             return;
         }
-        final String originalX = x.getText();
-        final String originalY = y.getText();
-        final String originalSafeX = safeX.getText();
-        final String originalSafeY = safeY.getText();
+        final Form previousForm = Display.getInstance().getCurrent();
+        final boolean safeEnabled = useSafeArea != null && useSafeArea.isValue();
         final Form editPosition = new Form("Positioning", new BorderLayout());
         editPosition.setUIID("SkinDesignerForm");
 
-        final AimView view = new AimView(img, x, y, safeX, safeY, safeW, safeH, w, h, useSafeArea);
+        final AimView view = new AimView(img, screenX, screenY, screenW, screenH,
+                safeX, safeY, safeW, safeH, useSafeArea);
+
+        final TextField aimScreenX = numericMirror(screenX);
+        final TextField aimScreenY = numericMirror(screenY);
+        final TextField aimScreenW = numericMirror(screenW);
+        final TextField aimScreenH = numericMirror(screenH);
+        final TextField aimSafeX = numericMirror(safeX);
+        final TextField aimSafeY = numericMirror(safeY);
+        final TextField aimSafeW = numericMirror(safeW);
+        final TextField aimSafeH = numericMirror(safeH);
+        if (!safeEnabled) {
+            aimSafeX.setEnabled(false);
+            aimSafeY.setEnabled(false);
+            aimSafeW.setEnabled(false);
+            aimSafeH.setEnabled(false);
+        }
+        Runnable refreshAimFields = () -> {
+            syncMirror(aimScreenX, screenX);
+            syncMirror(aimScreenY, screenY);
+            syncMirror(aimScreenW, screenW);
+            syncMirror(aimScreenH, screenH);
+            syncMirror(aimSafeX, safeX);
+            syncMirror(aimSafeY, safeY);
+            syncMirror(aimSafeW, safeW);
+            syncMirror(aimSafeH, safeH);
+        };
+        view.setOnChange(refreshAimFields);
+        bindAimToMain(aimScreenX, screenX, view);
+        bindAimToMain(aimScreenY, screenY, view);
+        bindAimToMain(aimScreenW, screenW, view);
+        bindAimToMain(aimScreenH, screenH, view);
+        bindAimToMain(aimSafeX, safeX, view);
+        bindAimToMain(aimSafeY, safeY, view);
+        bindAimToMain(aimSafeW, safeW, view);
+        bindAimToMain(aimSafeH, safeH, view);
+
+        final String originalScreenX = screenX.getText();
+        final String originalScreenY = screenY.getText();
+        final String originalScreenW = screenW.getText();
+        final String originalScreenH = screenH.getText();
+        final String originalSafeX = safeX.getText();
+        final String originalSafeY = safeY.getText();
+        final String originalSafeW = safeW.getText();
+        final String originalSafeH = safeH.getText();
 
         Button done = new Button("Done");
         styleActionButton(done, FontImage.MATERIAL_CHECK);
         done.setTooltip("Keep changes and return");
-        done.addActionListener(e -> editPosition.showBack());
+        done.addActionListener(e -> previousForm.showBack());
         Button cancel = new Button("Cancel");
         styleActionButton(cancel, FontImage.MATERIAL_CANCEL);
         cancel.setTooltip("Discard changes and return");
         Runnable cancelAction = () -> {
-            x.setText(originalX);
-            y.setText(originalY);
+            screenX.setText(originalScreenX);
+            screenY.setText(originalScreenY);
+            screenW.setText(originalScreenW);
+            screenH.setText(originalScreenH);
             safeX.setText(originalSafeX);
             safeY.setText(originalSafeY);
-            editPosition.showBack();
+            safeW.setText(originalSafeW);
+            safeH.setText(originalSafeH);
+            previousForm.showBack();
         };
         cancel.addActionListener(e -> cancelAction.run());
         editPosition.setBackCommand(new com.codename1.ui.Command("Cancel") {
@@ -1177,74 +1343,95 @@ public class SkinDesigner extends Lifecycle {
         topActions.setUIID("SkinDesignerTabBar");
         editPosition.add(BorderLayout.NORTH, topActions);
 
-        final boolean safeEnabled = useSafeArea != null && useSafeArea.isValue();
-        Button modeScreen = new Button("Screen");
-        Button modeSafe = new Button("Safe");
-        Button modePan = new Button("Pan");
-        modeScreen.setTooltip("Drag to reposition the screen area");
-        modeSafe.setTooltip(safeEnabled
-                ? "Drag to adjust the safe area within the screen"
-                : "Enable 'Use Safe Area' on the previous screen to edit safe area");
-        modePan.setTooltip("Drag to scroll the zoomed view");
-        if (!safeEnabled) {
-            modeSafe.setEnabled(false);
+        Container south = new Container(new BoxLayout(BoxLayout.Y_AXIS));
+        if (safeEnabled) {
+            Button modeScreen = new Button("Screen");
+            Button modeSafe = new Button("Safe");
+            modeScreen.setTooltip("Drag to reposition the screen area");
+            modeSafe.setTooltip("Drag inside to move the safe area; drag its edges or corners to resize");
+            final Button[] modeButtons = { modeScreen, modeSafe };
+            final int[] modeValues = { AIM_MODE_SCREEN, AIM_MODE_SAFE };
+            updateModeButtons(modeButtons, view.getMode());
+            for (int i = 0; i < modeButtons.length; i++) {
+                final int target = modeValues[i];
+                modeButtons[i].addActionListener(e -> {
+                    view.setMode(target);
+                    updateModeButtons(modeButtons, target);
+                    view.repaint();
+                });
+            }
+            Container modeBar = GridLayout.encloseIn(2, modeScreen, modeSafe);
+            modeBar.setUIID("SkinDesignerTabBar");
+            south.add(modeBar);
         }
-        final Button[] modeButtons = { modeScreen, modeSafe, modePan };
-        final int[] modeValues = { AIM_MODE_SCREEN, AIM_MODE_SAFE, AIM_MODE_PAN };
-        updateModeButtons(modeButtons, view.getMode());
-        for (int i = 0; i < modeButtons.length; i++) {
-            final int target = modeValues[i];
-            modeButtons[i].addActionListener(e -> {
-                view.setMode(target);
-                updateModeButtons(modeButtons, target);
-                if (target == AIM_MODE_PAN) {
-                    ToastBar.showMessage("Pan mode: zoom in and drag to scroll the view",
-                            FontImage.MATERIAL_PAN_TOOL, 2500);
-                } else if (target == AIM_MODE_SAFE) {
-                    ToastBar.showMessage("Safe mode: drag to adjust the safe area inside the screen",
-                            FontImage.MATERIAL_CROP_FREE, 2500);
-                } else if (target == AIM_MODE_SCREEN) {
-                    ToastBar.showMessage("Screen mode: drag to reposition the screen area",
-                            FontImage.MATERIAL_STAY_CURRENT_PORTRAIT, 2000);
-                }
-                view.repaint();
-            });
+
+        south.add(labeledFieldTitle("Screen (X / Y / W / H)"));
+        south.add(GridLayout.encloseIn(4, aimScreenX, aimScreenY, aimScreenW, aimScreenH));
+        if (safeEnabled) {
+            south.add(labeledFieldTitle("Safe (X / Y / W / H)"));
+            south.add(GridLayout.encloseIn(4, aimSafeX, aimSafeY, aimSafeW, aimSafeH));
         }
-        Container modeBar = GridLayout.encloseIn(3, modeScreen, modeSafe, modePan);
-        modeBar.setUIID("SkinDesignerTabBar");
 
         Button zoomIn = new Button();
         Button zoomOut = new Button();
-        Button left = new Button();
-        Button right = new Button();
-        Button up = new Button();
-        Button down = new Button();
+        Button leftBtn = new Button();
+        Button rightBtn = new Button();
+        Button upBtn = new Button();
+        Button downBtn = new Button();
         styleIconActionButton(zoomIn, FontImage.MATERIAL_ZOOM_IN);
         styleIconActionButton(zoomOut, FontImage.MATERIAL_ZOOM_OUT);
-        styleIconActionButton(left, FontImage.MATERIAL_KEYBOARD_ARROW_LEFT);
-        styleIconActionButton(right, FontImage.MATERIAL_KEYBOARD_ARROW_RIGHT);
-        styleIconActionButton(up, FontImage.MATERIAL_KEYBOARD_ARROW_UP);
-        styleIconActionButton(down, FontImage.MATERIAL_KEYBOARD_ARROW_DOWN);
-        zoomIn.setTooltip("Zoom in");
+        styleIconActionButton(leftBtn, FontImage.MATERIAL_KEYBOARD_ARROW_LEFT);
+        styleIconActionButton(rightBtn, FontImage.MATERIAL_KEYBOARD_ARROW_RIGHT);
+        styleIconActionButton(upBtn, FontImage.MATERIAL_KEYBOARD_ARROW_UP);
+        styleIconActionButton(downBtn, FontImage.MATERIAL_KEYBOARD_ARROW_DOWN);
+        zoomIn.setTooltip("Zoom in (centers on the active rectangle)");
         zoomOut.setTooltip("Zoom out");
-        left.setTooltip("Nudge left (1 px)");
-        right.setTooltip("Nudge right (1 px)");
-        up.setTooltip("Nudge up (1 px)");
-        down.setTooltip("Nudge down (1 px)");
+        leftBtn.setTooltip("Nudge the active rectangle 1 px left");
+        rightBtn.setTooltip("Nudge the active rectangle 1 px right");
+        upBtn.setTooltip("Nudge the active rectangle 1 px up");
+        downBtn.setTooltip("Nudge the active rectangle 1 px down");
 
         zoomIn.addActionListener(e -> view.zoomIn());
         zoomOut.addActionListener(e -> view.zoomOut());
-        left.addActionListener(e -> view.nudge(-1, 0));
-        right.addActionListener(e -> view.nudge(1, 0));
-        up.addActionListener(e -> view.nudge(0, -1));
-        down.addActionListener(e -> view.nudge(0, 1));
+        leftBtn.addActionListener(e -> { view.nudge(-1, 0); refreshAimFields.run(); });
+        rightBtn.addActionListener(e -> { view.nudge(1, 0); refreshAimFields.run(); });
+        upBtn.addActionListener(e -> { view.nudge(0, -1); refreshAimFields.run(); });
+        downBtn.addActionListener(e -> { view.nudge(0, 1); refreshAimFields.run(); });
 
-        Container navBar = GridLayout.encloseIn(6, zoomIn, zoomOut, left, right, up, down);
-        Container south = BoxLayout.encloseY(modeBar, navBar);
+        Container navBar = GridLayout.encloseIn(6, zoomOut, zoomIn, leftBtn, rightBtn, upBtn, downBtn);
+        south.add(navBar);
+
         editPosition.add(BorderLayout.CENTER, view);
         editPosition.add(BorderLayout.SOUTH, south);
         applyWebsiteTheme(editPosition, websiteDarkMode);
         editPosition.show();
+
+        String intro = safeEnabled
+                ? "Drag the screen or safe rectangle to move it. Drag safe-area edges or corners to resize. Use the fields below for exact values."
+                : "Drag the screen rectangle to move it. Use the X / Y / W / H fields below for exact values.";
+        ToastBar.showMessage(intro, FontImage.MATERIAL_INFO, 6000);
+    }
+
+    private TextField numericMirror(TextField source) {
+        TextField t = new TextField(source.getText(), source.getHint(), 6, TextField.NUMERIC);
+        t.setUIID("SkinDesignerField");
+        return t;
+    }
+
+    private void syncMirror(TextField mirror, TextField source) {
+        if (!source.getText().equals(mirror.getText())) {
+            mirror.setText(source.getText());
+        }
+    }
+
+    private void bindAimToMain(final TextField mirror, final TextField main, final AimView view) {
+        mirror.addActionListener(e -> {
+            String text = mirror.getText();
+            if (!main.getText().equals(text)) {
+                main.setText(text);
+            }
+            view.repaint();
+        });
     }
 
     private void updateModeButtons(Button[] buttons, int selectedMode) {
