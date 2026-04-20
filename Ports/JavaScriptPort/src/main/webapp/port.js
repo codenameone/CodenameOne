@@ -965,6 +965,25 @@ bindNative([
   return jvm.wrapJsObject(new global.Uint8Array(size | 0), "com_codename1_html5_js_typedarrays_Uint8Array");
 });
 
+// Float64Array factory methods — needed by HTML5Implementation.transformPoint /
+// transformPoints and anywhere scene-graph / spinner rendering converts float[] to
+// a typed array for native matrix math. Without these the `static create(int)` in
+// Float64Array.java returns its stub `null`, crashing the worker with
+// `TypeError: Cannot read properties of null (reading '__classDef')`.
+bindNative([
+  "cn1_com_codename1_html5_js_typedarrays_Float64Array_create_int_R_com_codename1_html5_js_typedarrays_Float64Array",
+  "cn1_com_codename1_html5_js_typedarrays_Float64Array_create___int_R_com_codename1_html5_js_typedarrays_Float64Array"
+], function*(size) {
+  return jvm.wrapJsObject(new global.Float64Array(size | 0), "com_codename1_html5_js_typedarrays_Float64Array");
+});
+
+bindNative([
+  "cn1_com_codename1_html5_js_typedarrays_Float64Array_create_com_codename1_html5_js_typedarrays_ArrayBuffer_R_com_codename1_html5_js_typedarrays_Float64Array",
+  "cn1_com_codename1_html5_js_typedarrays_Float64Array_create___com_codename1_html5_js_typedarrays_ArrayBuffer_R_com_codename1_html5_js_typedarrays_Float64Array"
+], function*(buffer) {
+  return jvm.wrapJsObject(new global.Float64Array(jvm.unwrapJsValue(buffer)), "com_codename1_html5_js_typedarrays_Float64Array");
+});
+
 bindNative([
   "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create_com_codename1_html5_js_typedarrays_ArrayBuffer_R_com_codename1_html5_js_typedarrays_Uint8Array",
   "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create___com_codename1_html5_js_typedarrays_ArrayBuffer_R_com_codename1_html5_js_typedarrays_Uint8Array"

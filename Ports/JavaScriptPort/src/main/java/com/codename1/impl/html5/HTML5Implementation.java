@@ -5901,6 +5901,20 @@ public class HTML5Implementation extends CodenameOneImplementation {
     
     @Override
     public void transformPoint(Object nativeTransform, float[] in, float[] out) {
+        if (nativeTransform == null) {
+            // The JS port can reach this method with a null native backing in scene/
+            // Node/SpinnerNode paths where Transform.getNativeTransform() hasn't been
+            // materialized. iOS/Android never arrive here because their equivalent
+            // Transform paths always keep a non-null native. Treat null as identity
+            // (pass-through) so the spinner render path in ValidatorLightweightPicker
+            // et al. doesn't crash the worker with a TypeError and block the suite.
+            out[0] = in[0];
+            out[1] = in[1];
+            if (out.length > 2) {
+                out[2] = in.length > 2 ? in[2] : 0;
+            }
+            return;
+        }
         Float64Array jsIn = Float64Array.create(2);
         jsIn.set(0, in[0]);
         jsIn.set(1, in[1]);
@@ -5908,7 +5922,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         ((JSAffineTransform)nativeTransform).transform(jsIn, 0, jsOut, 0, 1);
         out[0] = (float)jsOut.get(0);
         out[1] = (float)jsOut.get(1);
-        
+
     }
     
     @Override
@@ -7132,13 +7146,21 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 
                 @Override
                 public String getLongMonthName(Date date) {
-                    java.text.SimpleDateFormat fmt = new java.text.SimpleDateFormat("MMMM", Locale.getDefault());
+                    // The ParparVM Java API in vm/JavaAPI/src/java/text/SimpleDateFormat.java
+                    // only exposes the no-arg and single-String constructors; the
+                    // `(String, Locale)` overload isn't present in the minimal runtime
+                    // and trying to use it produces a ReferenceError at worker runtime.
+                    // Locale-sensitivity for month names flows through the getLocaleStr()
+                    // path above via JSDateFormat, so dropping the locale here only
+                    // affects the month-name fallback (English labels, matching the
+                    // default locale everywhere these tests run).
+                    java.text.SimpleDateFormat fmt = new java.text.SimpleDateFormat("MMMM");
                     return fmt.format(date);
                 }
 
                 @Override
                 public String getShortMonthName(Date date) {
-                    java.text.SimpleDateFormat fmt = new java.text.SimpleDateFormat("MMM", Locale.getDefault());
+                    java.text.SimpleDateFormat fmt = new java.text.SimpleDateFormat("MMM");
                     return fmt.format(date);
                 }
                 
@@ -8550,10 +8572,15 @@ public class HTML5Implementation extends CodenameOneImplementation {
     
     }
     
-    @JSBody(params={}, script="return document.fullscreenElement ? true:false")
+    // These run in the ParparVM worker context where `document` is undefined.
+    // Guard against ReferenceError before reading document.* — OrientationLockScreenshotTest
+    // invokes CN.lockOrientation(...) → HTML5Implementation.canForceOrientation() →
+    // isInFullScreenMode() → isFullScreen_(), which otherwise crashes the worker and
+    // blocks the rest of the suite.
+    @JSBody(params={}, script="return (typeof document !== 'undefined' && document.fullscreenElement) ? true : false")
     private native static boolean isFullScreen_();
-    
-    @JSBody(params={}, script="return document.body.requestFullscreen ? true : false")
+
+    @JSBody(params={}, script="return (typeof document !== 'undefined' && document.body && document.body.requestFullscreen) ? true : false")
     private native static boolean isFullScreenSupported_();
 
     @Override
