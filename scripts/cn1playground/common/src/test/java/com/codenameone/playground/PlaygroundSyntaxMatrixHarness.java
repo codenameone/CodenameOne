@@ -174,14 +174,21 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "class C { String label(int x) { String s = switch (x) { case 1 -> \"one\"; default -> \"?\"; }; return s; } }\n"
                 + "C c = new C();\n"
                 + "root.add(new Label(c.label(1)));"), ExpectedOutcome.SUCCESS, null));
-        // Streams aren't viable: CN1's java.util.Collection backport doesn't
-        // expose stream(), so even with java.util.stream.* in the registry
-        // there's no `.stream()` entry point. Documented as out-of-scope.
-        cases.add(new Case(cat, "stream_unsupported", ui(""
+        // CN1's Collection backport doesn't expose stream() natively, so
+        // the playground installs a minimal CN1StreamBridge shim that
+        // supports filter / map / forEach / count / collect / reduce.
+        cases.add(new Case(cat, "stream_filter_count", ui(""
                 + "import java.util.*;\n"
                 + "List<String> items = new ArrayList<>();\n"
-                + "items.add(\"a\");\n"
-                + "items.stream().count();"), ExpectedOutcome.EVAL_ERROR, "stream"));
+                + "items.add(\"aa\"); items.add(\"b\"); items.add(\"ccc\");\n"
+                + "long n = items.stream().filter(s -> ((String) s).length() > 1).count();\n"
+                + "root.add(new Label(\"n=\" + n));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "stream_map_collect", ui(""
+                + "import java.util.*;\n"
+                + "List<String> items = new ArrayList<>();\n"
+                + "items.add(\"a\"); items.add(\"bb\"); items.add(\"ccc\");\n"
+                + "List lens = items.stream().map(s -> ((String) s).length()).toList();\n"
+                + "root.add(new Label(\"lens=\" + lens));"), ExpectedOutcome.SUCCESS, null));
         cases.add(new Case(cat, "method_overloading", ui(""
                 + "class M { String fmt(int n) { return \"int:\" + n; } String fmt(String s) { return \"str:\" + s; } }\n"
                 + "M m = new M();\n"

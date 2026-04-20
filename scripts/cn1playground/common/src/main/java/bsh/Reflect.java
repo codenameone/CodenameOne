@@ -118,7 +118,9 @@ public final class Reflect {
      * don't have a registry entry on the concrete type. Covers the
      * common case of java.util.Map.Entry (implementation is
      * HashMap$Node / TreeMap$Entry / etc., none of which are in the
-     * registry). Only uses direct virtual calls — no reflection. */
+     * registry) and Collection.stream() (CN1's Collection backport
+     * doesn't expose stream — we route to a minimal CN1StreamBridge
+     * shim). Only uses direct virtual calls — no reflection. */
     @SuppressWarnings("unchecked")
     private static Object invokeWellKnownInterfaceMethod(
             Object object, String methodName, Object[] args) {
@@ -129,6 +131,40 @@ public final class Reflect {
                 if ("getValue".equals(methodName)) return entry.getValue();
             } else if (args.length == 1 && "setValue".equals(methodName)) {
                 return entry.setValue(unwrapArgs(args)[0]);
+            }
+        }
+        if (object instanceof java.util.Collection
+                && "stream".equals(methodName)
+                && (args == null || args.length == 0)) {
+            return new bsh.cn1.CN1StreamBridge((java.util.Collection<?>) object);
+        }
+        if (object instanceof bsh.cn1.CN1StreamBridge) {
+            bsh.cn1.CN1StreamBridge sb = (bsh.cn1.CN1StreamBridge) object;
+            Object[] unwrapped = unwrapArgs(args);
+            if ("filter".equals(methodName) && unwrapped.length == 1
+                    && unwrapped[0] instanceof java.util.function.Predicate) {
+                return sb.filter((java.util.function.Predicate<Object>) unwrapped[0]);
+            }
+            if ("map".equals(methodName) && unwrapped.length == 1
+                    && unwrapped[0] instanceof java.util.function.Function) {
+                return sb.map((java.util.function.Function<Object, Object>) unwrapped[0]);
+            }
+            if ("forEach".equals(methodName) && unwrapped.length == 1
+                    && unwrapped[0] instanceof java.util.function.Consumer) {
+                sb.forEach((java.util.function.Consumer<Object>) unwrapped[0]);
+                return null;
+            }
+            if ("count".equals(methodName) && unwrapped.length == 0) {
+                return Long.valueOf(sb.count());
+            }
+            if ("toList".equals(methodName) && unwrapped.length == 0) {
+                return sb.toList();
+            }
+            if ("collect".equals(methodName) && unwrapped.length == 1) {
+                return sb.collect(unwrapped[0]);
+            }
+            if ("iterator".equals(methodName) && unwrapped.length == 0) {
+                return sb.iterator();
             }
         }
         return FALLBACK_MISS;
