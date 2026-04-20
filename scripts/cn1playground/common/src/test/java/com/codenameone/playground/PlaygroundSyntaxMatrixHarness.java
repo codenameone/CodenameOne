@@ -479,6 +479,48 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "int sum = 0;\n"
                 + "for (int n : nums) sum += n;\n"
                 + "root.add(new Label(\"sum=\" + sum));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "bounded_generic_type", ui(""
+                + "class NumberBox<T extends Number> { T val; NumberBox(T v) { val = v; } double asDouble() { return val.doubleValue(); } }\n"
+                + "NumberBox<Integer> b = new NumberBox<Integer>(42);\n"
+                + "root.add(new Label(\"v=\" + b.asDouble()));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "string_equals", ui(""
+                + "String a = \"hello\";\n"
+                + "String b = \"hel\" + \"lo\";\n"
+                + "root.add(new Label(\"eq=\" + a.equals(b)));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "string_substring_indexof", ui(""
+                + "String s = \"hello world\";\n"
+                + "int sp = s.indexOf(\" \");\n"
+                + "String first = s.substring(0, sp);\n"
+                + "root.add(new Label(first));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "integer_parse_and_format", ui(""
+                + "int v = Integer.parseInt(\"42\");\n"
+                + "String s = Integer.toString(v * 2);\n"
+                + "root.add(new Label(s));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "container_with_multiple_buttons", ui(""
+                + "for (int i = 0; i < 3; i++) {\n"
+                + "  int n = i;\n"
+                + "  Button b = new Button(\"b\" + n);\n"
+                + "  b.addActionListener(e -> {});\n"
+                + "  root.add(b);\n"
+                + "}\n"
+                + "root.add(new Label(\"count=\" + root.getComponentCount()));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "form_layout_switching", ui(""
+                + "Container c = new Container(new FlowLayout());\n"
+                + "c.add(new Label(\"a\"));\n"
+                + "c.add(new Label(\"b\"));\n"
+                + "c.setLayout(new BoxLayout(BoxLayout.Y_AXIS));\n"
+                + "root.add(c);"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "hashset_basic", ui(""
+                + "import java.util.*;\n"
+                + "Set<String> s = new HashSet<>();\n"
+                + "s.add(\"a\"); s.add(\"b\"); s.add(\"a\");\n"
+                + "root.add(new Label(\"n=\" + s.size()));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "linked_list_as_queue", ui(""
+                + "import java.util.*;\n"
+                + "LinkedList<String> q = new LinkedList<>();\n"
+                + "q.add(\"a\"); q.add(\"b\"); q.add(\"c\");\n"
+                + "String first = q.removeFirst();\n"
+                + "root.add(new Label(\"first=\" + first + \" left=\" + q.size()));"), ExpectedOutcome.SUCCESS, null));
         cases.add(new Case(cat, "lambda_method_ref_combo", ui(""
                 + "import java.util.function.*;\n"
                 + "Predicate<String> nonEmpty = s -> s.length() > 0;\n"
