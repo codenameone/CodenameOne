@@ -74,7 +74,7 @@ class BSHClassDeclaration extends SimpleNode
             // directly with `new Iface()`. Enums use the same machinery with
             // a marker plus per-constant ScriptedInstances populated at build.
             scriptedClass = ScriptedClass.build(name, callstack.top(), body, parent,
-                    interfaces, callstack, interpreter);
+                    interfaces, type == Type.INTERFACE, callstack, interpreter);
             scriptedClass.markInterface(type == Type.INTERFACE);
             scriptedClass.markEnum(type == Type.ENUM);
             if (type == Type.ENUM) {

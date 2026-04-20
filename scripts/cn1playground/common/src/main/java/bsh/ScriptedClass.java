@@ -108,7 +108,20 @@ public final class ScriptedClass {
             CallStack callstack,
             Interpreter interpreter) throws EvalError {
         return build(name, declaringNameSpace, body, parent,
-                java.util.Collections.<ScriptedClass>emptyList(), callstack, interpreter);
+                java.util.Collections.<ScriptedClass>emptyList(), false,
+                callstack, interpreter);
+    }
+
+    static ScriptedClass build(
+            String name,
+            NameSpace declaringNameSpace,
+            BSHBlock body,
+            ScriptedClass parent,
+            java.util.List<ScriptedClass> implementedInterfaces,
+            CallStack callstack,
+            Interpreter interpreter) throws EvalError {
+        return build(name, declaringNameSpace, body, parent,
+                implementedInterfaces, false, callstack, interpreter);
     }
 
     /** Build a ScriptedClass from a class-declaration body, evaluating
@@ -116,13 +129,17 @@ public final class ScriptedClass {
      * previously-declared ScriptedClass whose instance methods and field
      * declarations are inherited (overridden by name+arity in this class).
      * {@code implementedInterfaces} is a list of scripted interfaces whose
-     * default methods are also merged. */
+     * default methods are also merged. When {@code treatFieldsAsStatic}
+     * is true (declarations of interfaces) every field is evaluated into
+     * the static namespace, matching the implicit `public static final`
+     * semantics of interface fields. */
     static ScriptedClass build(
             String name,
             NameSpace declaringNameSpace,
             BSHBlock body,
             ScriptedClass parent,
             java.util.List<ScriptedClass> implementedInterfaces,
+            boolean treatFieldsAsStatic,
             CallStack callstack,
             Interpreter interpreter) throws EvalError {
 
@@ -179,8 +196,9 @@ public final class ScriptedClass {
                     }
                 } else if (child instanceof BSHTypedVariableDeclaration) {
                     BSHTypedVariableDeclaration fdecl = (BSHTypedVariableDeclaration) child;
-                    boolean isStatic = fdecl.modifiers != null
-                            && fdecl.modifiers.hasModifier("static");
+                    boolean isStatic = treatFieldsAsStatic
+                            || (fdecl.modifiers != null
+                                && fdecl.modifiers.hasModifier("static"));
                     if (isStatic) {
                         // Static field: evaluate now, bind into static namespace.
                         callstack.push(staticNs);

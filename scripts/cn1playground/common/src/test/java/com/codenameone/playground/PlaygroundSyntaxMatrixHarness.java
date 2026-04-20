@@ -869,13 +869,10 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "interface Config { String DEFAULT_NAME = \"world\"; String greet(); }\n"
                 + "class Greeter implements Config { public String greet() { return \"hi \" + DEFAULT_NAME; } }\n"
                 + "root.add(new Label(new Greeter().greet()));"), ExpectedOutcome.EVAL_ERROR, null));
-        // Interface constants accessed via Iface.NAME from inside a
-        // scripted class also hit the callstack-null issue in field
-        // resolution. Cross-referenced with two_classes_typed_cross_ref.
-        cases.add(new Case(cat, "interface_constant_qualified_unsupported", ui(""
+        cases.add(new Case(cat, "interface_constant_qualified", ui(""
                 + "interface Config { String DEFAULT_NAME = \"world\"; String greet(); }\n"
                 + "class Greeter implements Config { public String greet() { return \"hi \" + Config.DEFAULT_NAME; } }\n"
-                + "root.add(new Label(new Greeter().greet()));"), ExpectedOutcome.EVAL_ERROR, null));
+                + "root.add(new Label(new Greeter().greet()));"), ExpectedOutcome.SUCCESS, null));
         cases.add(new Case(cat, "lambda_method_ref_combo", ui(""
                 + "import java.util.function.*;\n"
                 + "Predicate<String> nonEmpty = s -> s.length() > 0;\n"
