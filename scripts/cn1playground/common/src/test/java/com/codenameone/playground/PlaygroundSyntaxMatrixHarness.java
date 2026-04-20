@@ -525,6 +525,43 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "q.add(\"a\"); q.add(\"b\"); q.add(\"c\");\n"
                 + "String first = q.removeFirst();\n"
                 + "root.add(new Label(\"first=\" + first + \" left=\" + q.size()));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "instanceof_array_type", ui(""
+                + "Object o = new int[]{1,2,3};\n"
+                + "boolean b = o instanceof int[];\n"
+                + "root.add(new Label(\"b=\" + b));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "final_local_variable", ui(""
+                + "final int x = 42;\n"
+                + "int y = x + 1;\n"
+                + "root.add(new Label(\"y=\" + y));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "long_arithmetic", ui(""
+                + "long a = 1_000_000_000L;\n"
+                + "long b = a * 7L;\n"
+                + "root.add(new Label(\"b=\" + b));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "bitwise_long_ops", ui(""
+                + "long mask = 0xFFL << 8;\n"
+                + "long v = mask | 0xAAL;\n"
+                + "root.add(new Label(\"v=\" + v));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "scripted_class_as_map_key", ui(""
+                + "import java.util.*;\n"
+                + "class Key { int id; Key(int v) { id = v; } }\n"
+                + "Map<Key, String> m = new HashMap<>();\n"
+                + "Key k = new Key(1);\n"
+                + "m.put(k, \"one\");\n"
+                + "root.add(new Label(\"got=\" + m.get(k)));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "multi_return_paths", ui(""
+                + "class C { String classify(int n) { if (n < 0) return \"neg\"; if (n == 0) return \"zero\"; return \"pos\"; } }\n"
+                + "C c = new C();\n"
+                + "root.add(new Label(c.classify(-3) + \"/\" + c.classify(0) + \"/\" + c.classify(5)));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "this_in_listener_captures_field", ui(""
+                + "class C {\n"
+                + "  String[] tag = new String[]{\"init\"};\n"
+                + "  void setup(Button b) { b.addActionListener(e -> tag[0] = \"clicked\"); }\n"
+                + "}\n"
+                + "C c = new C();\n"
+                + "Button b = new Button(\"Go\");\n"
+                + "c.setup(b);\n"
+                + "root.add(b);\n"
+                + "root.add(new Label(c.tag[0]));"), ExpectedOutcome.SUCCESS, null));
         cases.add(new Case(cat, "lambda_method_ref_combo", ui(""
                 + "import java.util.function.*;\n"
                 + "Predicate<String> nonEmpty = s -> s.length() > 0;\n"
