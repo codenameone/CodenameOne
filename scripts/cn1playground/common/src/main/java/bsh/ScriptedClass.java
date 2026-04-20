@@ -40,6 +40,7 @@ public final class ScriptedClass {
     private boolean isInterface;
     private boolean isEnum;
     private List<ScriptedInstance> enumConstants;
+    private Class<?> javaParent;
 
     private ScriptedClass(
             String name,
@@ -62,6 +63,14 @@ public final class ScriptedClass {
 
     public ScriptedClass getParent() {
         return parent;
+    }
+
+    public Class<?> getJavaParent() {
+        return javaParent;
+    }
+
+    void setJavaParent(Class<?> javaParent) {
+        this.javaParent = javaParent;
     }
 
     /** Look up an instance method declared on the *parent* class only, used

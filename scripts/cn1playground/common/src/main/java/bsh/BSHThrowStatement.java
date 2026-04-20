@@ -37,6 +37,16 @@ class BSHThrowStatement extends SimpleNode
     {
         Object obj = jjtGetChild(0).eval(callstack, interpreter);
 
+        // Scripted-class instances aren't Throwable at the Java level —
+        // wrap them in a ScriptedThrowable so the JVM's exception pipe
+        // can carry them through the try/catch machinery. Catch matching
+        // unwraps when the declared type is the instance's ScriptedClass.
+        if (obj instanceof ScriptedInstance) {
+            throw new TargetError(
+                    new ScriptedThrowable((ScriptedInstance) obj),
+                    this, callstack);
+        }
+
         if(!(obj instanceof Throwable))
             throw new EvalException("Expression in 'throw' must be Throwable type",
                 this, callstack );

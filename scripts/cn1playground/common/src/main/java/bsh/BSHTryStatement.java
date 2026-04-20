@@ -164,14 +164,23 @@ class BSHTryStatement extends SimpleNode
                     NameSpace enclosingNameSpace = callstack.top();
                     BlockNameSpace cbNameSpace = new BlockNameSpace(callstack.top(), blockId);
 
+                    // A ScriptedInstance thrown via the ScriptedThrowable
+                    // wrapper should be unwrapped when bound to the catch
+                    // variable so `e.someScriptedMethod()` works.
+                    Object boundValue = thrown;
+                    if (boundValue instanceof ScriptedThrowable) {
+                        ScriptedInstance si = ((ScriptedThrowable) boundValue)
+                                .getScriptedInstance();
+                        if (si != null) boundValue = si;
+                    }
                     try {
                         if ( mcType == BSHMultiCatch.UNTYPED )
                             // set an untyped variable directly in the block
-                            cbNameSpace.setBlockVariable( mc.name, thrown );
+                            cbNameSpace.setBlockVariable( mc.name, boundValue );
                         else
                             // set a typed variable (directly in the block)
                             cbNameSpace.setTypedVariable(
-                                mc.name, mcType, thrown, modifiers);
+                                mc.name, mcType, boundValue, modifiers);
                     } catch ( UtilEvalError e ) {
                         throw new InterpreterError(
                             "Unable to set var in catch block namespace." );

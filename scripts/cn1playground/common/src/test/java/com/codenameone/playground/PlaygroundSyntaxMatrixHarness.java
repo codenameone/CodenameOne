@@ -290,11 +290,7 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "tasks.add(new Task(\"b\", 5));\n"
                 + "Collections.sort(tasks, (x, y) -> x.priority() - y.priority());\n"
                 + "root.add(new Label(\"first=\" + tasks.get(0).name()));"), ExpectedOutcome.SUCCESS, null));
-        // Super-ctor chaining into a Java superclass (RuntimeException) isn't
-        // modeled — our super(args) dispatch only walks ScriptedClass parents.
-        // The `super(m, c)` call inside AppEx's ctor is a no-op, so the cause
-        // isn't forwarded and ex.getCause() is null.
-        cases.add(new Case(cat, "exception_with_cause_chain_unsupported", ui(""
+        cases.add(new Case(cat, "exception_with_cause_chain", ui(""
                 + "class AppEx extends RuntimeException { AppEx(String m, Throwable c) { super(m, c); } }\n"
                 + "String chain = \"\";\n"
                 + "try {\n"
@@ -303,7 +299,7 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "} catch (AppEx ex) {\n"
                 + "  chain = ex.getMessage() + \"/\" + ex.getCause().getMessage();\n"
                 + "}\n"
-                + "root.add(new Label(chain));"), ExpectedOutcome.EVAL_ERROR, null));
+                + "root.add(new Label(chain));"), ExpectedOutcome.SUCCESS, null));
         cases.add(new Case(cat, "generic_method_on_class", ui(""
                 + "class Box { <T> T identity(T t) { return t; } }\n"
                 + "Box b = new Box();\n"
@@ -329,15 +325,21 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "String s = \"\";\n"
                 + "for (Color c : Color.values()) s += c.name() + \" \";\n"
                 + "root.add(new Label(s.trim()));"), ExpectedOutcome.SUCCESS, null));
-        // Map.Entry is a nested interface of Map; our registry doesn't expose
-        // Java-class nested types. Iterate via keySet() instead.
-        cases.add(new Case(cat, "map_entryset_iteration_unsupported", ui(""
+        // Map.Entry now resolves as a type (falling back to the JVM
+        // `Outer$Inner` form). Method dispatch on HashMap$Node itself
+        // isn't in the registry, so iterate via keySet() instead — that
+        // case is covered by map_keyset_iteration.
+        cases.add(new Case(cat, "map_entry_type_resolves", ui(""
+                + "import java.util.*;\n"
+                + "Class c = Map.Entry.class;\n"
+                + "root.add(new Label(c.getName()));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "map_entryset_method_dispatch_unsupported", ui(""
                 + "import java.util.*;\n"
                 + "Map<String, Integer> m = new HashMap<>();\n"
                 + "m.put(\"a\", 1); m.put(\"b\", 2);\n"
                 + "int total = 0;\n"
                 + "for (Map.Entry e : m.entrySet()) total += (Integer) e.getValue();\n"
-                + "root.add(new Label(\"total=\" + total));"), ExpectedOutcome.EVAL_ERROR, null));
+                + "root.add(new Label(\"total=\" + total));"), ExpectedOutcome.EVAL_ERROR, "Generated instance dispatch not implemented"));
         cases.add(new Case(cat, "map_keyset_iteration", ui(""
                 + "import java.util.*;\n"
                 + "Map<String, Integer> m = new HashMap<>();\n"

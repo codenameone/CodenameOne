@@ -151,7 +151,32 @@ public final class Reflect {
         try {
             return Primitive.wrap(CN1AccessRegistry.getInstance().getStaticField(clas, fieldName), null);
         } catch (Exception ex) {
+            // Nested class/interface fallback: treat `Outer.Inner` as a
+            // reference to the nested Java class `Outer$Inner`. The CN1
+            // registry indexes nested types by their full dotted name; try
+            // that first, then fall back to a JVM-form class lookup.
+            Class<?> nested = lookupNestedJavaClass(clas, fieldName);
+            if (nested != null) {
+                return new ClassIdentifier(nested);
+            }
             throw new ReflectError("No such field: " + fieldName + " for class: " + clas.getName(), ex);
+        }
+    }
+
+    private static Class<?> lookupNestedJavaClass(Class<?> outer, String nestedName) {
+        // Try the CN1 registry first (uses dotted nested names).
+        try {
+            Class<?> viaRegistry = CN1AccessRegistry.getInstance()
+                    .findClass(outer.getName() + "." + nestedName);
+            if (viaRegistry != null) return viaRegistry;
+        } catch (Exception ignore) {
+        }
+        // Fall back to the JVM's `$`-separated form, which works for any
+        // public nested type regardless of registry coverage.
+        try {
+            return Class.forName(outer.getName() + "$" + nestedName);
+        } catch (ClassNotFoundException ignore) {
+            return null;
         }
     }
 

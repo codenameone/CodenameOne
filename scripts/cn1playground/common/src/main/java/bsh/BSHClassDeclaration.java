@@ -67,6 +67,8 @@ class BSHClassDeclaration extends SimpleNode
         if (scriptedClass == null) {
             BSHBlock body = findBody();
             ScriptedClass parent = extend ? resolveParentScriptedClass(callstack) : null;
+            Class<?> javaParent = (extend && parent == null)
+                    ? resolveParentJavaClass(callstack, interpreter) : null;
             java.util.List<ScriptedClass> interfaces = resolveImplementedInterfaces(callstack);
             // Interfaces share the ScriptedClass machinery — they can declare
             // static methods (callable as Iface.foo()) and default methods
@@ -77,6 +79,7 @@ class BSHClassDeclaration extends SimpleNode
                     interfaces, type == Type.INTERFACE, callstack, interpreter);
             scriptedClass.markInterface(type == Type.INTERFACE);
             scriptedClass.markEnum(type == Type.ENUM);
+            scriptedClass.setJavaParent(javaParent);
             if (type == Type.ENUM) {
                 scriptedClass.populateEnumConstants(body, callstack, interpreter);
             }
@@ -87,6 +90,23 @@ class BSHClassDeclaration extends SimpleNode
             }
         }
         return scriptedClass;
+    }
+
+    /** Resolve the extends-target as a Java class when it isn't a
+     * ScriptedClass. Powers the super(args) forwarding for classes that
+     * extend e.g. RuntimeException. */
+    private Class<?> resolveParentJavaClass(CallStack callstack, Interpreter interpreter) {
+        for (int i = 0; i < jjtGetNumChildren(); i++) {
+            Node child = jjtGetChild(i);
+            if (child instanceof BSHAmbiguousName) {
+                try {
+                    return ((BSHAmbiguousName) child).toClass(callstack, interpreter);
+                } catch (EvalError ignore) {
+                    return null;
+                }
+            }
+        }
+        return null;
     }
 
     /** Collect the scripted interfaces this class/interface declares (via

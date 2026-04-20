@@ -19,6 +19,11 @@ package bsh;
 public final class ScriptedInstance {
     private final ScriptedClass scriptedClass;
     private final NameSpace instanceNameSpace;
+    /** Delegate Java instance when the ScriptedClass extends a real Java
+     * class (e.g. RuntimeException). Constructed by super(args); method
+     * calls on this ScriptedInstance that don't resolve to a scripted
+     * method fall through to this delegate. */
+    private Object javaDelegate;
 
     ScriptedInstance(ScriptedClass scriptedClass, NameSpace instanceNameSpace) {
         this.scriptedClass = scriptedClass;
@@ -31,6 +36,14 @@ public final class ScriptedInstance {
 
     public NameSpace getInstanceNameSpace() {
         return instanceNameSpace;
+    }
+
+    public Object getJavaDelegate() {
+        return javaDelegate;
+    }
+
+    public void setJavaDelegate(Object javaDelegate) {
+        this.javaDelegate = javaDelegate;
     }
 
     /** Read an instance field by name. Returns Primitive.VOID if not bound. */
@@ -70,6 +83,20 @@ public final class ScriptedInstance {
             }
             if ("getClass".equals(methodName) && (args == null || args.length == 0)) {
                 return ScriptedInstance.class;
+            }
+            // When this scripted class extends a real Java class, fall
+            // through to a delegate Java instance constructed by super(...)
+            // for methods the scripted class doesn't override (e.g.
+            // getMessage / getCause on scripted Exception subclasses).
+            if (javaDelegate != null) {
+                try {
+                    return bsh.Reflect.invokeObjectMethod(
+                            javaDelegate, methodName, args == null ? new Object[0] : args,
+                            interpreter, callstack, callerInfo);
+                } catch (bsh.EvalError ex) {
+                    // fall through to the diagnostic below if the delegate
+                    // doesn't have the method either
+                }
             }
             // Enum-constant built-ins.
             if (scriptedClass.isEnum()

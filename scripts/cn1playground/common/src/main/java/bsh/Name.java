@@ -1053,15 +1053,31 @@ class Name implements java.io.Serializable
         }
 
         // super(args) inside a scripted-class constructor: forward to the
-        // matching ctor on the parent ScriptedClass.
+        // matching ctor on the parent ScriptedClass, or if the parent is a
+        // Java class, construct a delegate Java instance and stash it on
+        // the ScriptedInstance so subsequent method calls can fall through
+        // to the real Java parent (common for Exception subclasses).
         if ("super".equals(methodName)) {
             ScriptedInstance scriptedThis = findScriptedThis(callstack);
-            if (scriptedThis != null && scriptedThis.getScriptedClass().getParent() != null) {
-                ScriptedClass parent = scriptedThis.getScriptedClass().getParent();
-                ScriptedClass.MethodTemplate ctor = parent.findConstructorTemplate(args);
-                if (ctor != null) {
-                    BshMethod bound = ctor.bind(scriptedThis.getInstanceNameSpace());
-                    return bound.invoke(args, interpreter, callstack, callerInfo, false);
+            if (scriptedThis != null) {
+                ScriptedClass sc = scriptedThis.getScriptedClass();
+                if (sc.getParent() != null) {
+                    ScriptedClass.MethodTemplate ctor = sc.getParent().findConstructorTemplate(args);
+                    if (ctor != null) {
+                        BshMethod bound = ctor.bind(scriptedThis.getInstanceNameSpace());
+                        return bound.invoke(args, interpreter, callstack, callerInfo, false);
+                    }
+                }
+                if (sc.getJavaParent() != null) {
+                    try {
+                        Object delegate = Reflect.constructObject(sc.getJavaParent(), args);
+                        scriptedThis.setJavaDelegate(delegate);
+                        return Primitive.VOID;
+                    } catch (ReflectError ex) {
+                        throw new EvalError("super() for Java parent "
+                                + sc.getJavaParent().getName() + " failed: " + ex.getMessage(),
+                                callerInfo, callstack);
+                    }
                 }
             }
         }
