@@ -371,13 +371,43 @@ public final class GeneratedAccess_com_codename1_charts_transitions {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == com.codename1.charts.transitions.SeriesTransition.class) {
-            if ("EASING_IN".equals(name)) return com.codename1.charts.transitions.SeriesTransition.EASING_IN;
-            if ("EASING_IN_OUT".equals(name)) return com.codename1.charts.transitions.SeriesTransition.EASING_IN_OUT;
-            if ("EASING_LINEAR".equals(name)) return com.codename1.charts.transitions.SeriesTransition.EASING_LINEAR;
-            if ("EASING_OUT".equals(name)) return com.codename1.charts.transitions.SeriesTransition.EASING_OUT;
-        }
+        if (type == com.codename1.charts.transitions.SeriesTransition.class) return getStaticField0(name);
+        if (type == com.codename1.charts.transitions.XYMultiSeriesTransition.class) return getStaticField1(name);
+        if (type == com.codename1.charts.transitions.XYSeriesTransition.class) return getStaticField2(name);
+        if (type == com.codename1.charts.transitions.XYValueSeriesTransition.class) return getStaticField3(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("EASING_IN".equals(name)) return com.codename1.charts.transitions.SeriesTransition.EASING_IN;
+        if ("EASING_IN_OUT".equals(name)) return com.codename1.charts.transitions.SeriesTransition.EASING_IN_OUT;
+        if ("EASING_LINEAR".equals(name)) return com.codename1.charts.transitions.SeriesTransition.EASING_LINEAR;
+        if ("EASING_OUT".equals(name)) return com.codename1.charts.transitions.SeriesTransition.EASING_OUT;
+        throw unsupportedStaticField(com.codename1.charts.transitions.SeriesTransition.class, name);
+    }
+
+    private static Object getStaticField1(String name) throws Exception {
+        if ("EASING_IN".equals(name)) return com.codename1.charts.transitions.XYMultiSeriesTransition.EASING_IN;
+        if ("EASING_IN_OUT".equals(name)) return com.codename1.charts.transitions.XYMultiSeriesTransition.EASING_IN_OUT;
+        if ("EASING_LINEAR".equals(name)) return com.codename1.charts.transitions.XYMultiSeriesTransition.EASING_LINEAR;
+        if ("EASING_OUT".equals(name)) return com.codename1.charts.transitions.XYMultiSeriesTransition.EASING_OUT;
+        throw unsupportedStaticField(com.codename1.charts.transitions.XYMultiSeriesTransition.class, name);
+    }
+
+    private static Object getStaticField2(String name) throws Exception {
+        if ("EASING_IN".equals(name)) return com.codename1.charts.transitions.XYSeriesTransition.EASING_IN;
+        if ("EASING_IN_OUT".equals(name)) return com.codename1.charts.transitions.XYSeriesTransition.EASING_IN_OUT;
+        if ("EASING_LINEAR".equals(name)) return com.codename1.charts.transitions.XYSeriesTransition.EASING_LINEAR;
+        if ("EASING_OUT".equals(name)) return com.codename1.charts.transitions.XYSeriesTransition.EASING_OUT;
+        throw unsupportedStaticField(com.codename1.charts.transitions.XYSeriesTransition.class, name);
+    }
+
+    private static Object getStaticField3(String name) throws Exception {
+        if ("EASING_IN".equals(name)) return com.codename1.charts.transitions.XYValueSeriesTransition.EASING_IN;
+        if ("EASING_IN_OUT".equals(name)) return com.codename1.charts.transitions.XYValueSeriesTransition.EASING_IN_OUT;
+        if ("EASING_LINEAR".equals(name)) return com.codename1.charts.transitions.XYValueSeriesTransition.EASING_LINEAR;
+        if ("EASING_OUT".equals(name)) return com.codename1.charts.transitions.XYValueSeriesTransition.EASING_OUT;
+        throw unsupportedStaticField(com.codename1.charts.transitions.XYValueSeriesTransition.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

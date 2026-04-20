@@ -341,22 +341,28 @@ public final class GeneratedAccess_com_codename1_xml {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == com.codename1.xml.Element.class) {
-            if ("DEPTH_INFINITE".equals(name)) return com.codename1.xml.Element.DEPTH_INFINITE;
-        }
-        if (type == com.codename1.xml.ParserCallback.class) {
-            if ("ERROR_ATTIBUTE_VALUE_INVALID".equals(name)) return com.codename1.xml.ParserCallback.ERROR_ATTIBUTE_VALUE_INVALID;
-            if ("ERROR_ATTRIBUTE_NOT_SUPPORTED".equals(name)) return com.codename1.xml.ParserCallback.ERROR_ATTRIBUTE_NOT_SUPPORTED;
-            if ("ERROR_ENCODING".equals(name)) return com.codename1.xml.ParserCallback.ERROR_ENCODING;
-            if ("ERROR_MULTIPLE_ROOTS".equals(name)) return com.codename1.xml.ParserCallback.ERROR_MULTIPLE_ROOTS;
-            if ("ERROR_NO_CLOSE_TAG".equals(name)) return com.codename1.xml.ParserCallback.ERROR_NO_CLOSE_TAG;
-            if ("ERROR_NO_ROOTS".equals(name)) return com.codename1.xml.ParserCallback.ERROR_NO_ROOTS;
-            if ("ERROR_TAG_NOT_SUPPORTED".equals(name)) return com.codename1.xml.ParserCallback.ERROR_TAG_NOT_SUPPORTED;
-            if ("ERROR_UNEXPECTED_CHARACTER".equals(name)) return com.codename1.xml.ParserCallback.ERROR_UNEXPECTED_CHARACTER;
-            if ("ERROR_UNEXPECTED_TAG_CLOSING".equals(name)) return com.codename1.xml.ParserCallback.ERROR_UNEXPECTED_TAG_CLOSING;
-            if ("ERROR_UNRECOGNIZED_CHAR_ENTITY".equals(name)) return com.codename1.xml.ParserCallback.ERROR_UNRECOGNIZED_CHAR_ENTITY;
-        }
+        if (type == com.codename1.xml.Element.class) return getStaticField0(name);
+        if (type == com.codename1.xml.ParserCallback.class) return getStaticField1(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("DEPTH_INFINITE".equals(name)) return com.codename1.xml.Element.DEPTH_INFINITE;
+        throw unsupportedStaticField(com.codename1.xml.Element.class, name);
+    }
+
+    private static Object getStaticField1(String name) throws Exception {
+        if ("ERROR_ATTIBUTE_VALUE_INVALID".equals(name)) return com.codename1.xml.ParserCallback.ERROR_ATTIBUTE_VALUE_INVALID;
+        if ("ERROR_ATTRIBUTE_NOT_SUPPORTED".equals(name)) return com.codename1.xml.ParserCallback.ERROR_ATTRIBUTE_NOT_SUPPORTED;
+        if ("ERROR_ENCODING".equals(name)) return com.codename1.xml.ParserCallback.ERROR_ENCODING;
+        if ("ERROR_MULTIPLE_ROOTS".equals(name)) return com.codename1.xml.ParserCallback.ERROR_MULTIPLE_ROOTS;
+        if ("ERROR_NO_CLOSE_TAG".equals(name)) return com.codename1.xml.ParserCallback.ERROR_NO_CLOSE_TAG;
+        if ("ERROR_NO_ROOTS".equals(name)) return com.codename1.xml.ParserCallback.ERROR_NO_ROOTS;
+        if ("ERROR_TAG_NOT_SUPPORTED".equals(name)) return com.codename1.xml.ParserCallback.ERROR_TAG_NOT_SUPPORTED;
+        if ("ERROR_UNEXPECTED_CHARACTER".equals(name)) return com.codename1.xml.ParserCallback.ERROR_UNEXPECTED_CHARACTER;
+        if ("ERROR_UNEXPECTED_TAG_CLOSING".equals(name)) return com.codename1.xml.ParserCallback.ERROR_UNEXPECTED_TAG_CLOSING;
+        if ("ERROR_UNRECOGNIZED_CHAR_ENTITY".equals(name)) return com.codename1.xml.ParserCallback.ERROR_UNRECOGNIZED_CHAR_ENTITY;
+        throw unsupportedStaticField(com.codename1.xml.ParserCallback.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

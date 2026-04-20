@@ -1225,7 +1225,27 @@ public final class GeneratedAccess_com_codename1_ads {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
+        if (type == com.codename1.ads.AdsService.class) return getStaticField0(name);
+        if (type == com.codename1.ads.InnerActive.class) return getStaticField1(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("PRIORITY_CRITICAL".equals(name)) return com.codename1.ads.AdsService.PRIORITY_CRITICAL;
+        if ("PRIORITY_HIGH".equals(name)) return com.codename1.ads.AdsService.PRIORITY_HIGH;
+        if ("PRIORITY_LOW".equals(name)) return com.codename1.ads.AdsService.PRIORITY_LOW;
+        if ("PRIORITY_NORMAL".equals(name)) return com.codename1.ads.AdsService.PRIORITY_NORMAL;
+        if ("PRIORITY_REDUNDANT".equals(name)) return com.codename1.ads.AdsService.PRIORITY_REDUNDANT;
+        throw unsupportedStaticField(com.codename1.ads.AdsService.class, name);
+    }
+
+    private static Object getStaticField1(String name) throws Exception {
+        if ("PRIORITY_CRITICAL".equals(name)) return com.codename1.ads.InnerActive.PRIORITY_CRITICAL;
+        if ("PRIORITY_HIGH".equals(name)) return com.codename1.ads.InnerActive.PRIORITY_HIGH;
+        if ("PRIORITY_LOW".equals(name)) return com.codename1.ads.InnerActive.PRIORITY_LOW;
+        if ("PRIORITY_NORMAL".equals(name)) return com.codename1.ads.InnerActive.PRIORITY_NORMAL;
+        if ("PRIORITY_REDUNDANT".equals(name)) return com.codename1.ads.InnerActive.PRIORITY_REDUNDANT;
+        throw unsupportedStaticField(com.codename1.ads.InnerActive.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

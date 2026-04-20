@@ -3181,18 +3181,63 @@ public final class GeneratedAccess_com_codename1_ui_util {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == com.codename1.ui.util.ImageIO.class) {
-            if ("FORMAT_JPEG".equals(name)) return com.codename1.ui.util.ImageIO.FORMAT_JPEG;
-            if ("FORMAT_PNG".equals(name)) return com.codename1.ui.util.ImageIO.FORMAT_PNG;
-        }
-        if (type == com.codename1.ui.util.UIBuilder.class) {
-            if ("BACK_COMMAND_ID".equals(name)) return com.codename1.ui.util.UIBuilder.BACK_COMMAND_ID;
-            if ("FORM_STATE_KEY_FOCUS".equals(name)) return com.codename1.ui.util.UIBuilder.FORM_STATE_KEY_FOCUS;
-            if ("FORM_STATE_KEY_NAME".equals(name)) return com.codename1.ui.util.UIBuilder.FORM_STATE_KEY_NAME;
-            if ("FORM_STATE_KEY_SELECTION".equals(name)) return com.codename1.ui.util.UIBuilder.FORM_STATE_KEY_SELECTION;
-            if ("FORM_STATE_KEY_TITLE".equals(name)) return com.codename1.ui.util.UIBuilder.FORM_STATE_KEY_TITLE;
-        }
+        if (type == com.codename1.ui.util.EmbeddedContainer.class) return getStaticField0(name);
+        if (type == com.codename1.ui.util.ImageIO.class) return getStaticField1(name);
+        if (type == com.codename1.ui.util.UIBuilder.class) return getStaticField2(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("BASELINE".equals(name)) return com.codename1.ui.util.EmbeddedContainer.BASELINE;
+        if ("BOTTOM".equals(name)) return com.codename1.ui.util.EmbeddedContainer.BOTTOM;
+        if ("BRB_CENTER_OFFSET".equals(name)) return com.codename1.ui.util.EmbeddedContainer.BRB_CENTER_OFFSET;
+        if ("BRB_CONSTANT_ASCENT".equals(name)) return com.codename1.ui.util.EmbeddedContainer.BRB_CONSTANT_ASCENT;
+        if ("BRB_CONSTANT_DESCENT".equals(name)) return com.codename1.ui.util.EmbeddedContainer.BRB_CONSTANT_DESCENT;
+        if ("BRB_OTHER".equals(name)) return com.codename1.ui.util.EmbeddedContainer.BRB_OTHER;
+        if ("CENTER".equals(name)) return com.codename1.ui.util.EmbeddedContainer.CENTER;
+        if ("CROSSHAIR_CURSOR".equals(name)) return com.codename1.ui.util.EmbeddedContainer.CROSSHAIR_CURSOR;
+        if ("DEFAULT_CURSOR".equals(name)) return com.codename1.ui.util.EmbeddedContainer.DEFAULT_CURSOR;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_X".equals(name)) return com.codename1.ui.util.EmbeddedContainer.DRAG_REGION_IMMEDIATELY_DRAG_X;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_XY".equals(name)) return com.codename1.ui.util.EmbeddedContainer.DRAG_REGION_IMMEDIATELY_DRAG_XY;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_Y".equals(name)) return com.codename1.ui.util.EmbeddedContainer.DRAG_REGION_IMMEDIATELY_DRAG_Y;
+        if ("DRAG_REGION_LIKELY_DRAG_X".equals(name)) return com.codename1.ui.util.EmbeddedContainer.DRAG_REGION_LIKELY_DRAG_X;
+        if ("DRAG_REGION_LIKELY_DRAG_XY".equals(name)) return com.codename1.ui.util.EmbeddedContainer.DRAG_REGION_LIKELY_DRAG_XY;
+        if ("DRAG_REGION_LIKELY_DRAG_Y".equals(name)) return com.codename1.ui.util.EmbeddedContainer.DRAG_REGION_LIKELY_DRAG_Y;
+        if ("DRAG_REGION_NOT_DRAGGABLE".equals(name)) return com.codename1.ui.util.EmbeddedContainer.DRAG_REGION_NOT_DRAGGABLE;
+        if ("DRAG_REGION_POSSIBLE_DRAG_X".equals(name)) return com.codename1.ui.util.EmbeddedContainer.DRAG_REGION_POSSIBLE_DRAG_X;
+        if ("DRAG_REGION_POSSIBLE_DRAG_XY".equals(name)) return com.codename1.ui.util.EmbeddedContainer.DRAG_REGION_POSSIBLE_DRAG_XY;
+        if ("DRAG_REGION_POSSIBLE_DRAG_Y".equals(name)) return com.codename1.ui.util.EmbeddedContainer.DRAG_REGION_POSSIBLE_DRAG_Y;
+        if ("E_RESIZE_CURSOR".equals(name)) return com.codename1.ui.util.EmbeddedContainer.E_RESIZE_CURSOR;
+        if ("HAND_CURSOR".equals(name)) return com.codename1.ui.util.EmbeddedContainer.HAND_CURSOR;
+        if ("LEFT".equals(name)) return com.codename1.ui.util.EmbeddedContainer.LEFT;
+        if ("MOVE_CURSOR".equals(name)) return com.codename1.ui.util.EmbeddedContainer.MOVE_CURSOR;
+        if ("NE_RESIZE_CURSOR".equals(name)) return com.codename1.ui.util.EmbeddedContainer.NE_RESIZE_CURSOR;
+        if ("NW_RESIZE_CURSOR".equals(name)) return com.codename1.ui.util.EmbeddedContainer.NW_RESIZE_CURSOR;
+        if ("N_RESIZE_CURSOR".equals(name)) return com.codename1.ui.util.EmbeddedContainer.N_RESIZE_CURSOR;
+        if ("RIGHT".equals(name)) return com.codename1.ui.util.EmbeddedContainer.RIGHT;
+        if ("SE_RESIZE_CURSOR".equals(name)) return com.codename1.ui.util.EmbeddedContainer.SE_RESIZE_CURSOR;
+        if ("SW_RESIZE_CURSOR".equals(name)) return com.codename1.ui.util.EmbeddedContainer.SW_RESIZE_CURSOR;
+        if ("S_RESIZE_CURSOR".equals(name)) return com.codename1.ui.util.EmbeddedContainer.S_RESIZE_CURSOR;
+        if ("TEXT_CURSOR".equals(name)) return com.codename1.ui.util.EmbeddedContainer.TEXT_CURSOR;
+        if ("TOP".equals(name)) return com.codename1.ui.util.EmbeddedContainer.TOP;
+        if ("WAIT_CURSOR".equals(name)) return com.codename1.ui.util.EmbeddedContainer.WAIT_CURSOR;
+        if ("W_RESIZE_CURSOR".equals(name)) return com.codename1.ui.util.EmbeddedContainer.W_RESIZE_CURSOR;
+        throw unsupportedStaticField(com.codename1.ui.util.EmbeddedContainer.class, name);
+    }
+
+    private static Object getStaticField1(String name) throws Exception {
+        if ("FORMAT_JPEG".equals(name)) return com.codename1.ui.util.ImageIO.FORMAT_JPEG;
+        if ("FORMAT_PNG".equals(name)) return com.codename1.ui.util.ImageIO.FORMAT_PNG;
+        throw unsupportedStaticField(com.codename1.ui.util.ImageIO.class, name);
+    }
+
+    private static Object getStaticField2(String name) throws Exception {
+        if ("BACK_COMMAND_ID".equals(name)) return com.codename1.ui.util.UIBuilder.BACK_COMMAND_ID;
+        if ("FORM_STATE_KEY_FOCUS".equals(name)) return com.codename1.ui.util.UIBuilder.FORM_STATE_KEY_FOCUS;
+        if ("FORM_STATE_KEY_NAME".equals(name)) return com.codename1.ui.util.UIBuilder.FORM_STATE_KEY_NAME;
+        if ("FORM_STATE_KEY_SELECTION".equals(name)) return com.codename1.ui.util.UIBuilder.FORM_STATE_KEY_SELECTION;
+        if ("FORM_STATE_KEY_TITLE".equals(name)) return com.codename1.ui.util.UIBuilder.FORM_STATE_KEY_TITLE;
+        throw unsupportedStaticField(com.codename1.ui.util.UIBuilder.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

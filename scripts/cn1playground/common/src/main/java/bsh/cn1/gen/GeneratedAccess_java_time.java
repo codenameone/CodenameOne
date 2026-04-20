@@ -1121,13 +1121,19 @@ public final class GeneratedAccess_java_time {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == java.time.LocalTime.class) {
-            if ("MIDNIGHT".equals(name)) return java.time.LocalTime.MIDNIGHT;
-        }
-        if (type == java.time.ZoneOffset.class) {
-            if ("UTC".equals(name)) return java.time.ZoneOffset.UTC;
-        }
+        if (type == java.time.LocalTime.class) return getStaticField0(name);
+        if (type == java.time.ZoneOffset.class) return getStaticField1(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("MIDNIGHT".equals(name)) return java.time.LocalTime.MIDNIGHT;
+        throw unsupportedStaticField(java.time.LocalTime.class, name);
+    }
+
+    private static Object getStaticField1(String name) throws Exception {
+        if ("UTC".equals(name)) return java.time.ZoneOffset.UTC;
+        throw unsupportedStaticField(java.time.ZoneOffset.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

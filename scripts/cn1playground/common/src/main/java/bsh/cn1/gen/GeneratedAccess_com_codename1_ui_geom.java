@@ -1161,20 +1161,26 @@ public final class GeneratedAccess_com_codename1_ui_geom {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == com.codename1.ui.geom.GeneralPath.class) {
-            if ("WIND_EVEN_ODD".equals(name)) return com.codename1.ui.geom.GeneralPath.WIND_EVEN_ODD;
-            if ("WIND_NON_ZERO".equals(name)) return com.codename1.ui.geom.GeneralPath.WIND_NON_ZERO;
-        }
-        if (type == com.codename1.ui.geom.PathIterator.class) {
-            if ("SEG_CLOSE".equals(name)) return com.codename1.ui.geom.PathIterator.SEG_CLOSE;
-            if ("SEG_CUBICTO".equals(name)) return com.codename1.ui.geom.PathIterator.SEG_CUBICTO;
-            if ("SEG_LINETO".equals(name)) return com.codename1.ui.geom.PathIterator.SEG_LINETO;
-            if ("SEG_MOVETO".equals(name)) return com.codename1.ui.geom.PathIterator.SEG_MOVETO;
-            if ("SEG_QUADTO".equals(name)) return com.codename1.ui.geom.PathIterator.SEG_QUADTO;
-            if ("WIND_EVEN_ODD".equals(name)) return com.codename1.ui.geom.PathIterator.WIND_EVEN_ODD;
-            if ("WIND_NON_ZERO".equals(name)) return com.codename1.ui.geom.PathIterator.WIND_NON_ZERO;
-        }
+        if (type == com.codename1.ui.geom.GeneralPath.class) return getStaticField0(name);
+        if (type == com.codename1.ui.geom.PathIterator.class) return getStaticField1(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("WIND_EVEN_ODD".equals(name)) return com.codename1.ui.geom.GeneralPath.WIND_EVEN_ODD;
+        if ("WIND_NON_ZERO".equals(name)) return com.codename1.ui.geom.GeneralPath.WIND_NON_ZERO;
+        throw unsupportedStaticField(com.codename1.ui.geom.GeneralPath.class, name);
+    }
+
+    private static Object getStaticField1(String name) throws Exception {
+        if ("SEG_CLOSE".equals(name)) return com.codename1.ui.geom.PathIterator.SEG_CLOSE;
+        if ("SEG_CUBICTO".equals(name)) return com.codename1.ui.geom.PathIterator.SEG_CUBICTO;
+        if ("SEG_LINETO".equals(name)) return com.codename1.ui.geom.PathIterator.SEG_LINETO;
+        if ("SEG_MOVETO".equals(name)) return com.codename1.ui.geom.PathIterator.SEG_MOVETO;
+        if ("SEG_QUADTO".equals(name)) return com.codename1.ui.geom.PathIterator.SEG_QUADTO;
+        if ("WIND_EVEN_ODD".equals(name)) return com.codename1.ui.geom.PathIterator.WIND_EVEN_ODD;
+        if ("WIND_NON_ZERO".equals(name)) return com.codename1.ui.geom.PathIterator.WIND_NON_ZERO;
+        throw unsupportedStaticField(com.codename1.ui.geom.PathIterator.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

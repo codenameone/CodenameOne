@@ -143,13 +143,16 @@ public final class GeneratedAccess_com_codename1_messaging {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == com.codename1.messaging.Message.class) {
-            if ("MIME_HTML".equals(name)) return com.codename1.messaging.Message.MIME_HTML;
-            if ("MIME_IMAGE_JPG".equals(name)) return com.codename1.messaging.Message.MIME_IMAGE_JPG;
-            if ("MIME_IMAGE_PNG".equals(name)) return com.codename1.messaging.Message.MIME_IMAGE_PNG;
-            if ("MIME_TEXT".equals(name)) return com.codename1.messaging.Message.MIME_TEXT;
-        }
+        if (type == com.codename1.messaging.Message.class) return getStaticField0(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("MIME_HTML".equals(name)) return com.codename1.messaging.Message.MIME_HTML;
+        if ("MIME_IMAGE_JPG".equals(name)) return com.codename1.messaging.Message.MIME_IMAGE_JPG;
+        if ("MIME_IMAGE_PNG".equals(name)) return com.codename1.messaging.Message.MIME_IMAGE_PNG;
+        if ("MIME_TEXT".equals(name)) return com.codename1.messaging.Message.MIME_TEXT;
+        throw unsupportedStaticField(com.codename1.messaging.Message.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

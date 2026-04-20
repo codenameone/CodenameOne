@@ -585,17 +585,23 @@ public final class GeneratedAccess_com_codename1_location {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == com.codename1.location.LocationManager.class) {
-            if ("AVAILABLE".equals(name)) return com.codename1.location.LocationManager.AVAILABLE;
-            if ("OUT_OF_SERVICE".equals(name)) return com.codename1.location.LocationManager.OUT_OF_SERVICE;
-            if ("TEMPORARILY_UNAVAILABLE".equals(name)) return com.codename1.location.LocationManager.TEMPORARILY_UNAVAILABLE;
-        }
-        if (type == com.codename1.location.LocationRequest.class) {
-            if ("PRIORITY_HIGH_ACCUARCY".equals(name)) return com.codename1.location.LocationRequest.PRIORITY_HIGH_ACCUARCY;
-            if ("PRIORITY_LOW_ACCUARCY".equals(name)) return com.codename1.location.LocationRequest.PRIORITY_LOW_ACCUARCY;
-            if ("PRIORITY_MEDIUM_ACCUARCY".equals(name)) return com.codename1.location.LocationRequest.PRIORITY_MEDIUM_ACCUARCY;
-        }
+        if (type == com.codename1.location.LocationManager.class) return getStaticField0(name);
+        if (type == com.codename1.location.LocationRequest.class) return getStaticField1(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("AVAILABLE".equals(name)) return com.codename1.location.LocationManager.AVAILABLE;
+        if ("OUT_OF_SERVICE".equals(name)) return com.codename1.location.LocationManager.OUT_OF_SERVICE;
+        if ("TEMPORARILY_UNAVAILABLE".equals(name)) return com.codename1.location.LocationManager.TEMPORARILY_UNAVAILABLE;
+        throw unsupportedStaticField(com.codename1.location.LocationManager.class, name);
+    }
+
+    private static Object getStaticField1(String name) throws Exception {
+        if ("PRIORITY_HIGH_ACCUARCY".equals(name)) return com.codename1.location.LocationRequest.PRIORITY_HIGH_ACCUARCY;
+        if ("PRIORITY_LOW_ACCUARCY".equals(name)) return com.codename1.location.LocationRequest.PRIORITY_LOW_ACCUARCY;
+        if ("PRIORITY_MEDIUM_ACCUARCY".equals(name)) return com.codename1.location.LocationRequest.PRIORITY_MEDIUM_ACCUARCY;
+        throw unsupportedStaticField(com.codename1.location.LocationRequest.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

@@ -2017,18 +2017,24 @@ public final class GeneratedAccess_com_codename1_charts_views {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == com.codename1.charts.views.PointStyle.class) {
-            if ("CIRCLE".equals(name)) return com.codename1.charts.views.PointStyle.CIRCLE;
-            if ("DIAMOND".equals(name)) return com.codename1.charts.views.PointStyle.DIAMOND;
-            if ("POINT".equals(name)) return com.codename1.charts.views.PointStyle.POINT;
-            if ("SQUARE".equals(name)) return com.codename1.charts.views.PointStyle.SQUARE;
-            if ("TRIANGLE".equals(name)) return com.codename1.charts.views.PointStyle.TRIANGLE;
-            if ("X".equals(name)) return com.codename1.charts.views.PointStyle.X;
-        }
-        if (type == com.codename1.charts.views.TimeChart.class) {
-            if ("DAY".equals(name)) return com.codename1.charts.views.TimeChart.DAY;
-        }
+        if (type == com.codename1.charts.views.PointStyle.class) return getStaticField0(name);
+        if (type == com.codename1.charts.views.TimeChart.class) return getStaticField1(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("CIRCLE".equals(name)) return com.codename1.charts.views.PointStyle.CIRCLE;
+        if ("DIAMOND".equals(name)) return com.codename1.charts.views.PointStyle.DIAMOND;
+        if ("POINT".equals(name)) return com.codename1.charts.views.PointStyle.POINT;
+        if ("SQUARE".equals(name)) return com.codename1.charts.views.PointStyle.SQUARE;
+        if ("TRIANGLE".equals(name)) return com.codename1.charts.views.PointStyle.TRIANGLE;
+        if ("X".equals(name)) return com.codename1.charts.views.PointStyle.X;
+        throw unsupportedStaticField(com.codename1.charts.views.PointStyle.class, name);
+    }
+
+    private static Object getStaticField1(String name) throws Exception {
+        if ("DAY".equals(name)) return com.codename1.charts.views.TimeChart.DAY;
+        throw unsupportedStaticField(com.codename1.charts.views.TimeChart.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

@@ -6420,49 +6420,55 @@ public final class GeneratedAccess_java_util {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == java.util.Calendar.class) {
-            if ("AM".equals(name)) return java.util.Calendar.AM;
-            if ("AM_PM".equals(name)) return java.util.Calendar.AM_PM;
-            if ("APRIL".equals(name)) return java.util.Calendar.APRIL;
-            if ("AUGUST".equals(name)) return java.util.Calendar.AUGUST;
-            if ("DATE".equals(name)) return java.util.Calendar.DATE;
-            if ("DAY_OF_MONTH".equals(name)) return java.util.Calendar.DAY_OF_MONTH;
-            if ("DAY_OF_WEEK".equals(name)) return java.util.Calendar.DAY_OF_WEEK;
-            if ("DAY_OF_WEEK_IN_MONTH".equals(name)) return java.util.Calendar.DAY_OF_WEEK_IN_MONTH;
-            if ("DECEMBER".equals(name)) return java.util.Calendar.DECEMBER;
-            if ("FEBRUARY".equals(name)) return java.util.Calendar.FEBRUARY;
-            if ("FRIDAY".equals(name)) return java.util.Calendar.FRIDAY;
-            if ("HOUR".equals(name)) return java.util.Calendar.HOUR;
-            if ("HOUR_OF_DAY".equals(name)) return java.util.Calendar.HOUR_OF_DAY;
-            if ("JANUARY".equals(name)) return java.util.Calendar.JANUARY;
-            if ("JULY".equals(name)) return java.util.Calendar.JULY;
-            if ("JUNE".equals(name)) return java.util.Calendar.JUNE;
-            if ("MARCH".equals(name)) return java.util.Calendar.MARCH;
-            if ("MAY".equals(name)) return java.util.Calendar.MAY;
-            if ("MILLISECOND".equals(name)) return java.util.Calendar.MILLISECOND;
-            if ("MINUTE".equals(name)) return java.util.Calendar.MINUTE;
-            if ("MONDAY".equals(name)) return java.util.Calendar.MONDAY;
-            if ("MONTH".equals(name)) return java.util.Calendar.MONTH;
-            if ("NOVEMBER".equals(name)) return java.util.Calendar.NOVEMBER;
-            if ("OCTOBER".equals(name)) return java.util.Calendar.OCTOBER;
-            if ("PM".equals(name)) return java.util.Calendar.PM;
-            if ("SATURDAY".equals(name)) return java.util.Calendar.SATURDAY;
-            if ("SECOND".equals(name)) return java.util.Calendar.SECOND;
-            if ("SEPTEMBER".equals(name)) return java.util.Calendar.SEPTEMBER;
-            if ("SUNDAY".equals(name)) return java.util.Calendar.SUNDAY;
-            if ("THURSDAY".equals(name)) return java.util.Calendar.THURSDAY;
-            if ("TUESDAY".equals(name)) return java.util.Calendar.TUESDAY;
-            if ("WEDNESDAY".equals(name)) return java.util.Calendar.WEDNESDAY;
-            if ("WEEK_OF_MONTH".equals(name)) return java.util.Calendar.WEEK_OF_MONTH;
-            if ("WEEK_OF_YEAR".equals(name)) return java.util.Calendar.WEEK_OF_YEAR;
-            if ("YEAR".equals(name)) return java.util.Calendar.YEAR;
-        }
-        if (type == java.util.Collections.class) {
-            if ("EMPTY_LIST".equals(name)) return java.util.Collections.EMPTY_LIST;
-            if ("EMPTY_MAP".equals(name)) return java.util.Collections.EMPTY_MAP;
-            if ("EMPTY_SET".equals(name)) return java.util.Collections.EMPTY_SET;
-        }
+        if (type == java.util.Calendar.class) return getStaticField0(name);
+        if (type == java.util.Collections.class) return getStaticField1(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("AM".equals(name)) return java.util.Calendar.AM;
+        if ("AM_PM".equals(name)) return java.util.Calendar.AM_PM;
+        if ("APRIL".equals(name)) return java.util.Calendar.APRIL;
+        if ("AUGUST".equals(name)) return java.util.Calendar.AUGUST;
+        if ("DATE".equals(name)) return java.util.Calendar.DATE;
+        if ("DAY_OF_MONTH".equals(name)) return java.util.Calendar.DAY_OF_MONTH;
+        if ("DAY_OF_WEEK".equals(name)) return java.util.Calendar.DAY_OF_WEEK;
+        if ("DAY_OF_WEEK_IN_MONTH".equals(name)) return java.util.Calendar.DAY_OF_WEEK_IN_MONTH;
+        if ("DECEMBER".equals(name)) return java.util.Calendar.DECEMBER;
+        if ("FEBRUARY".equals(name)) return java.util.Calendar.FEBRUARY;
+        if ("FRIDAY".equals(name)) return java.util.Calendar.FRIDAY;
+        if ("HOUR".equals(name)) return java.util.Calendar.HOUR;
+        if ("HOUR_OF_DAY".equals(name)) return java.util.Calendar.HOUR_OF_DAY;
+        if ("JANUARY".equals(name)) return java.util.Calendar.JANUARY;
+        if ("JULY".equals(name)) return java.util.Calendar.JULY;
+        if ("JUNE".equals(name)) return java.util.Calendar.JUNE;
+        if ("MARCH".equals(name)) return java.util.Calendar.MARCH;
+        if ("MAY".equals(name)) return java.util.Calendar.MAY;
+        if ("MILLISECOND".equals(name)) return java.util.Calendar.MILLISECOND;
+        if ("MINUTE".equals(name)) return java.util.Calendar.MINUTE;
+        if ("MONDAY".equals(name)) return java.util.Calendar.MONDAY;
+        if ("MONTH".equals(name)) return java.util.Calendar.MONTH;
+        if ("NOVEMBER".equals(name)) return java.util.Calendar.NOVEMBER;
+        if ("OCTOBER".equals(name)) return java.util.Calendar.OCTOBER;
+        if ("PM".equals(name)) return java.util.Calendar.PM;
+        if ("SATURDAY".equals(name)) return java.util.Calendar.SATURDAY;
+        if ("SECOND".equals(name)) return java.util.Calendar.SECOND;
+        if ("SEPTEMBER".equals(name)) return java.util.Calendar.SEPTEMBER;
+        if ("SUNDAY".equals(name)) return java.util.Calendar.SUNDAY;
+        if ("THURSDAY".equals(name)) return java.util.Calendar.THURSDAY;
+        if ("TUESDAY".equals(name)) return java.util.Calendar.TUESDAY;
+        if ("WEDNESDAY".equals(name)) return java.util.Calendar.WEDNESDAY;
+        if ("WEEK_OF_MONTH".equals(name)) return java.util.Calendar.WEEK_OF_MONTH;
+        if ("WEEK_OF_YEAR".equals(name)) return java.util.Calendar.WEEK_OF_YEAR;
+        if ("YEAR".equals(name)) return java.util.Calendar.YEAR;
+        throw unsupportedStaticField(java.util.Calendar.class, name);
+    }
+
+    private static Object getStaticField1(String name) throws Exception {
+        if ("EMPTY_LIST".equals(name)) return java.util.Collections.EMPTY_LIST;
+        if ("EMPTY_MAP".equals(name)) return java.util.Collections.EMPTY_MAP;
+        if ("EMPTY_SET".equals(name)) return java.util.Collections.EMPTY_SET;
+        throw unsupportedStaticField(java.util.Collections.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

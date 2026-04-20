@@ -4290,82 +4290,119 @@ public final class GeneratedAccess_com_codename1_io {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == com.codename1.io.ConnectionRequest.class) {
-            if ("PRIORITY_CRITICAL".equals(name)) return com.codename1.io.ConnectionRequest.PRIORITY_CRITICAL;
-            if ("PRIORITY_HIGH".equals(name)) return com.codename1.io.ConnectionRequest.PRIORITY_HIGH;
-            if ("PRIORITY_LOW".equals(name)) return com.codename1.io.ConnectionRequest.PRIORITY_LOW;
-            if ("PRIORITY_NORMAL".equals(name)) return com.codename1.io.ConnectionRequest.PRIORITY_NORMAL;
-            if ("PRIORITY_REDUNDANT".equals(name)) return com.codename1.io.ConnectionRequest.PRIORITY_REDUNDANT;
-        }
-        if (type == com.codename1.io.Cookie.class) {
-            if ("STORAGE_NAME".equals(name)) return com.codename1.io.Cookie.STORAGE_NAME;
-        }
-        if (type == com.codename1.io.File.class) {
-            if ("separator".equals(name)) return com.codename1.io.File.separator;
-            if ("separatorChar".equals(name)) return com.codename1.io.File.separatorChar;
-        }
-        if (type == com.codename1.io.FileSystemStorage.class) {
-            if ("ROOT_TYPE_MAINSTORAGE".equals(name)) return com.codename1.io.FileSystemStorage.ROOT_TYPE_MAINSTORAGE;
-            if ("ROOT_TYPE_SDCARD".equals(name)) return com.codename1.io.FileSystemStorage.ROOT_TYPE_SDCARD;
-            if ("ROOT_TYPE_UNKNOWN".equals(name)) return com.codename1.io.FileSystemStorage.ROOT_TYPE_UNKNOWN;
-        }
-        if (type == com.codename1.io.Log.class) {
-            if ("DEBUG".equals(name)) return com.codename1.io.Log.DEBUG;
-            if ("ERROR".equals(name)) return com.codename1.io.Log.ERROR;
-            if ("INFO".equals(name)) return com.codename1.io.Log.INFO;
-            if ("REPORTING_DEBUG".equals(name)) return com.codename1.io.Log.REPORTING_DEBUG;
-            if ("REPORTING_NONE".equals(name)) return com.codename1.io.Log.REPORTING_NONE;
-            if ("REPORTING_PRODUCTION".equals(name)) return com.codename1.io.Log.REPORTING_PRODUCTION;
-            if ("WARNING".equals(name)) return com.codename1.io.Log.WARNING;
-        }
-        if (type == com.codename1.io.NetworkEvent.class) {
-            if ("PROGRESS_TYPE_COMPLETED".equals(name)) return com.codename1.io.NetworkEvent.PROGRESS_TYPE_COMPLETED;
-            if ("PROGRESS_TYPE_INITIALIZING".equals(name)) return com.codename1.io.NetworkEvent.PROGRESS_TYPE_INITIALIZING;
-            if ("PROGRESS_TYPE_INPUT".equals(name)) return com.codename1.io.NetworkEvent.PROGRESS_TYPE_INPUT;
-            if ("PROGRESS_TYPE_OUTPUT".equals(name)) return com.codename1.io.NetworkEvent.PROGRESS_TYPE_OUTPUT;
-        }
-        if (type == com.codename1.io.NetworkManager.class) {
-            if ("ACCESS_POINT_TYPE_CABLE".equals(name)) return com.codename1.io.NetworkManager.ACCESS_POINT_TYPE_CABLE;
-            if ("ACCESS_POINT_TYPE_CORPORATE".equals(name)) return com.codename1.io.NetworkManager.ACCESS_POINT_TYPE_CORPORATE;
-            if ("ACCESS_POINT_TYPE_NETWORK2G".equals(name)) return com.codename1.io.NetworkManager.ACCESS_POINT_TYPE_NETWORK2G;
-            if ("ACCESS_POINT_TYPE_NETWORK3G".equals(name)) return com.codename1.io.NetworkManager.ACCESS_POINT_TYPE_NETWORK3G;
-            if ("ACCESS_POINT_TYPE_UNKNOWN".equals(name)) return com.codename1.io.NetworkManager.ACCESS_POINT_TYPE_UNKNOWN;
-            if ("ACCESS_POINT_TYPE_WLAN".equals(name)) return com.codename1.io.NetworkManager.ACCESS_POINT_TYPE_WLAN;
-        }
-        if (type == com.codename1.io.Oauth2.class) {
-            if ("TOKEN".equals(name)) return com.codename1.io.Oauth2.TOKEN;
-        }
-        if (type == com.codename1.io.WebServiceProxyCall.class) {
-            if ("TYPE_BOOLEAN".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_BOOLEAN;
-            if ("TYPE_BOOLEAN_ARRAY".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_BOOLEAN_ARRAY;
-            if ("TYPE_BOOLEAN_OBJECT".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_BOOLEAN_OBJECT;
-            if ("TYPE_BYTE".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_BYTE;
-            if ("TYPE_BYTE_ARRAY".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_BYTE_ARRAY;
-            if ("TYPE_BYTE_OBJECT".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_BYTE_OBJECT;
-            if ("TYPE_CHAR".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_CHAR;
-            if ("TYPE_CHARACTER_OBJECT".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_CHARACTER_OBJECT;
-            if ("TYPE_CHAR_ARRAY".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_CHAR_ARRAY;
-            if ("TYPE_DOUBLE".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_DOUBLE;
-            if ("TYPE_DOUBLE_ARRAY".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_DOUBLE_ARRAY;
-            if ("TYPE_DOUBLE_OBJECT".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_DOUBLE_OBJECT;
-            if ("TYPE_EXTERNALIABLE".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_EXTERNALIABLE;
-            if ("TYPE_FLOAT".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_FLOAT;
-            if ("TYPE_FLOAT_ARRAY".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_FLOAT_ARRAY;
-            if ("TYPE_FLOAT_OBJECT".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_FLOAT_OBJECT;
-            if ("TYPE_INT".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_INT;
-            if ("TYPE_INTEGER_OBJECT".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_INTEGER_OBJECT;
-            if ("TYPE_INT_ARRAY".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_INT_ARRAY;
-            if ("TYPE_LONG".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_LONG;
-            if ("TYPE_LONG_ARRAY".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_LONG_ARRAY;
-            if ("TYPE_LONG_OBJECT".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_LONG_OBJECT;
-            if ("TYPE_SHORT".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_SHORT;
-            if ("TYPE_SHORT_ARRAY".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_SHORT_ARRAY;
-            if ("TYPE_SHORT_OBJECT".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_SHORT_OBJECT;
-            if ("TYPE_STRING".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_STRING;
-            if ("TYPE_STRING_ARRAY".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_STRING_ARRAY;
-            if ("TYPE_VOID".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_VOID;
-        }
+        if (type == com.codename1.io.ConnectionRequest.class) return getStaticField0(name);
+        if (type == com.codename1.io.Cookie.class) return getStaticField1(name);
+        if (type == com.codename1.io.File.class) return getStaticField2(name);
+        if (type == com.codename1.io.FileSystemStorage.class) return getStaticField3(name);
+        if (type == com.codename1.io.Log.class) return getStaticField4(name);
+        if (type == com.codename1.io.MultipartRequest.class) return getStaticField5(name);
+        if (type == com.codename1.io.NetworkEvent.class) return getStaticField6(name);
+        if (type == com.codename1.io.NetworkManager.class) return getStaticField7(name);
+        if (type == com.codename1.io.Oauth2.class) return getStaticField8(name);
+        if (type == com.codename1.io.WebServiceProxyCall.class) return getStaticField9(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("PRIORITY_CRITICAL".equals(name)) return com.codename1.io.ConnectionRequest.PRIORITY_CRITICAL;
+        if ("PRIORITY_HIGH".equals(name)) return com.codename1.io.ConnectionRequest.PRIORITY_HIGH;
+        if ("PRIORITY_LOW".equals(name)) return com.codename1.io.ConnectionRequest.PRIORITY_LOW;
+        if ("PRIORITY_NORMAL".equals(name)) return com.codename1.io.ConnectionRequest.PRIORITY_NORMAL;
+        if ("PRIORITY_REDUNDANT".equals(name)) return com.codename1.io.ConnectionRequest.PRIORITY_REDUNDANT;
+        throw unsupportedStaticField(com.codename1.io.ConnectionRequest.class, name);
+    }
+
+    private static Object getStaticField1(String name) throws Exception {
+        if ("STORAGE_NAME".equals(name)) return com.codename1.io.Cookie.STORAGE_NAME;
+        throw unsupportedStaticField(com.codename1.io.Cookie.class, name);
+    }
+
+    private static Object getStaticField2(String name) throws Exception {
+        if ("separator".equals(name)) return com.codename1.io.File.separator;
+        if ("separatorChar".equals(name)) return com.codename1.io.File.separatorChar;
+        throw unsupportedStaticField(com.codename1.io.File.class, name);
+    }
+
+    private static Object getStaticField3(String name) throws Exception {
+        if ("ROOT_TYPE_MAINSTORAGE".equals(name)) return com.codename1.io.FileSystemStorage.ROOT_TYPE_MAINSTORAGE;
+        if ("ROOT_TYPE_SDCARD".equals(name)) return com.codename1.io.FileSystemStorage.ROOT_TYPE_SDCARD;
+        if ("ROOT_TYPE_UNKNOWN".equals(name)) return com.codename1.io.FileSystemStorage.ROOT_TYPE_UNKNOWN;
+        throw unsupportedStaticField(com.codename1.io.FileSystemStorage.class, name);
+    }
+
+    private static Object getStaticField4(String name) throws Exception {
+        if ("DEBUG".equals(name)) return com.codename1.io.Log.DEBUG;
+        if ("ERROR".equals(name)) return com.codename1.io.Log.ERROR;
+        if ("INFO".equals(name)) return com.codename1.io.Log.INFO;
+        if ("REPORTING_DEBUG".equals(name)) return com.codename1.io.Log.REPORTING_DEBUG;
+        if ("REPORTING_NONE".equals(name)) return com.codename1.io.Log.REPORTING_NONE;
+        if ("REPORTING_PRODUCTION".equals(name)) return com.codename1.io.Log.REPORTING_PRODUCTION;
+        if ("WARNING".equals(name)) return com.codename1.io.Log.WARNING;
+        throw unsupportedStaticField(com.codename1.io.Log.class, name);
+    }
+
+    private static Object getStaticField5(String name) throws Exception {
+        if ("PRIORITY_CRITICAL".equals(name)) return com.codename1.io.MultipartRequest.PRIORITY_CRITICAL;
+        if ("PRIORITY_HIGH".equals(name)) return com.codename1.io.MultipartRequest.PRIORITY_HIGH;
+        if ("PRIORITY_LOW".equals(name)) return com.codename1.io.MultipartRequest.PRIORITY_LOW;
+        if ("PRIORITY_NORMAL".equals(name)) return com.codename1.io.MultipartRequest.PRIORITY_NORMAL;
+        if ("PRIORITY_REDUNDANT".equals(name)) return com.codename1.io.MultipartRequest.PRIORITY_REDUNDANT;
+        throw unsupportedStaticField(com.codename1.io.MultipartRequest.class, name);
+    }
+
+    private static Object getStaticField6(String name) throws Exception {
+        if ("PROGRESS_TYPE_COMPLETED".equals(name)) return com.codename1.io.NetworkEvent.PROGRESS_TYPE_COMPLETED;
+        if ("PROGRESS_TYPE_INITIALIZING".equals(name)) return com.codename1.io.NetworkEvent.PROGRESS_TYPE_INITIALIZING;
+        if ("PROGRESS_TYPE_INPUT".equals(name)) return com.codename1.io.NetworkEvent.PROGRESS_TYPE_INPUT;
+        if ("PROGRESS_TYPE_OUTPUT".equals(name)) return com.codename1.io.NetworkEvent.PROGRESS_TYPE_OUTPUT;
+        throw unsupportedStaticField(com.codename1.io.NetworkEvent.class, name);
+    }
+
+    private static Object getStaticField7(String name) throws Exception {
+        if ("ACCESS_POINT_TYPE_CABLE".equals(name)) return com.codename1.io.NetworkManager.ACCESS_POINT_TYPE_CABLE;
+        if ("ACCESS_POINT_TYPE_CORPORATE".equals(name)) return com.codename1.io.NetworkManager.ACCESS_POINT_TYPE_CORPORATE;
+        if ("ACCESS_POINT_TYPE_NETWORK2G".equals(name)) return com.codename1.io.NetworkManager.ACCESS_POINT_TYPE_NETWORK2G;
+        if ("ACCESS_POINT_TYPE_NETWORK3G".equals(name)) return com.codename1.io.NetworkManager.ACCESS_POINT_TYPE_NETWORK3G;
+        if ("ACCESS_POINT_TYPE_UNKNOWN".equals(name)) return com.codename1.io.NetworkManager.ACCESS_POINT_TYPE_UNKNOWN;
+        if ("ACCESS_POINT_TYPE_WLAN".equals(name)) return com.codename1.io.NetworkManager.ACCESS_POINT_TYPE_WLAN;
+        throw unsupportedStaticField(com.codename1.io.NetworkManager.class, name);
+    }
+
+    private static Object getStaticField8(String name) throws Exception {
+        if ("TOKEN".equals(name)) return com.codename1.io.Oauth2.TOKEN;
+        throw unsupportedStaticField(com.codename1.io.Oauth2.class, name);
+    }
+
+    private static Object getStaticField9(String name) throws Exception {
+        if ("TYPE_BOOLEAN".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_BOOLEAN;
+        if ("TYPE_BOOLEAN_ARRAY".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_BOOLEAN_ARRAY;
+        if ("TYPE_BOOLEAN_OBJECT".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_BOOLEAN_OBJECT;
+        if ("TYPE_BYTE".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_BYTE;
+        if ("TYPE_BYTE_ARRAY".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_BYTE_ARRAY;
+        if ("TYPE_BYTE_OBJECT".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_BYTE_OBJECT;
+        if ("TYPE_CHAR".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_CHAR;
+        if ("TYPE_CHARACTER_OBJECT".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_CHARACTER_OBJECT;
+        if ("TYPE_CHAR_ARRAY".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_CHAR_ARRAY;
+        if ("TYPE_DOUBLE".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_DOUBLE;
+        if ("TYPE_DOUBLE_ARRAY".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_DOUBLE_ARRAY;
+        if ("TYPE_DOUBLE_OBJECT".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_DOUBLE_OBJECT;
+        if ("TYPE_EXTERNALIABLE".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_EXTERNALIABLE;
+        if ("TYPE_FLOAT".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_FLOAT;
+        if ("TYPE_FLOAT_ARRAY".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_FLOAT_ARRAY;
+        if ("TYPE_FLOAT_OBJECT".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_FLOAT_OBJECT;
+        if ("TYPE_INT".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_INT;
+        if ("TYPE_INTEGER_OBJECT".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_INTEGER_OBJECT;
+        if ("TYPE_INT_ARRAY".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_INT_ARRAY;
+        if ("TYPE_LONG".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_LONG;
+        if ("TYPE_LONG_ARRAY".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_LONG_ARRAY;
+        if ("TYPE_LONG_OBJECT".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_LONG_OBJECT;
+        if ("TYPE_SHORT".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_SHORT;
+        if ("TYPE_SHORT_ARRAY".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_SHORT_ARRAY;
+        if ("TYPE_SHORT_OBJECT".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_SHORT_OBJECT;
+        if ("TYPE_STRING".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_STRING;
+        if ("TYPE_STRING_ARRAY".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_STRING_ARRAY;
+        if ("TYPE_VOID".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_VOID;
+        throw unsupportedStaticField(com.codename1.io.WebServiceProxyCall.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

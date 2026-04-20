@@ -632,46 +632,52 @@ public final class GeneratedAccess_com_codename1_util_regex {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == com.codename1.util.regex.RE.class) {
-            if ("MATCH_CASEINDEPENDENT".equals(name)) return com.codename1.util.regex.RE.MATCH_CASEINDEPENDENT;
-            if ("MATCH_MULTILINE".equals(name)) return com.codename1.util.regex.RE.MATCH_MULTILINE;
-            if ("MATCH_NORMAL".equals(name)) return com.codename1.util.regex.RE.MATCH_NORMAL;
-            if ("MATCH_SINGLELINE".equals(name)) return com.codename1.util.regex.RE.MATCH_SINGLELINE;
-            if ("REPLACE_ALL".equals(name)) return com.codename1.util.regex.RE.REPLACE_ALL;
-            if ("REPLACE_BACKREFERENCES".equals(name)) return com.codename1.util.regex.RE.REPLACE_BACKREFERENCES;
-            if ("REPLACE_FIRSTONLY".equals(name)) return com.codename1.util.regex.RE.REPLACE_FIRSTONLY;
-        }
-        if (type == com.codename1.util.regex.RECharacter.class) {
-            if ("COMBINING_SPACING_MARK".equals(name)) return com.codename1.util.regex.RECharacter.COMBINING_SPACING_MARK;
-            if ("CONNECTOR_PUNCTUATION".equals(name)) return com.codename1.util.regex.RECharacter.CONNECTOR_PUNCTUATION;
-            if ("CONTROL".equals(name)) return com.codename1.util.regex.RECharacter.CONTROL;
-            if ("CURRENCY_SYMBOL".equals(name)) return com.codename1.util.regex.RECharacter.CURRENCY_SYMBOL;
-            if ("DASH_PUNCTUATION".equals(name)) return com.codename1.util.regex.RECharacter.DASH_PUNCTUATION;
-            if ("DECIMAL_DIGIT_NUMBER".equals(name)) return com.codename1.util.regex.RECharacter.DECIMAL_DIGIT_NUMBER;
-            if ("ENCLOSING_MARK".equals(name)) return com.codename1.util.regex.RECharacter.ENCLOSING_MARK;
-            if ("END_PUNCTUATION".equals(name)) return com.codename1.util.regex.RECharacter.END_PUNCTUATION;
-            if ("FORMAT".equals(name)) return com.codename1.util.regex.RECharacter.FORMAT;
-            if ("LETTER_NUMBER".equals(name)) return com.codename1.util.regex.RECharacter.LETTER_NUMBER;
-            if ("LINE_SEPARATOR".equals(name)) return com.codename1.util.regex.RECharacter.LINE_SEPARATOR;
-            if ("LOWERCASE_LETTER".equals(name)) return com.codename1.util.regex.RECharacter.LOWERCASE_LETTER;
-            if ("MATH_SYMBOL".equals(name)) return com.codename1.util.regex.RECharacter.MATH_SYMBOL;
-            if ("MODIFIER_LETTER".equals(name)) return com.codename1.util.regex.RECharacter.MODIFIER_LETTER;
-            if ("MODIFIER_SYMBOL".equals(name)) return com.codename1.util.regex.RECharacter.MODIFIER_SYMBOL;
-            if ("NON_SPACING_MARK".equals(name)) return com.codename1.util.regex.RECharacter.NON_SPACING_MARK;
-            if ("OTHER_LETTER".equals(name)) return com.codename1.util.regex.RECharacter.OTHER_LETTER;
-            if ("OTHER_NUMBER".equals(name)) return com.codename1.util.regex.RECharacter.OTHER_NUMBER;
-            if ("OTHER_PUNCTUATION".equals(name)) return com.codename1.util.regex.RECharacter.OTHER_PUNCTUATION;
-            if ("OTHER_SYMBOL".equals(name)) return com.codename1.util.regex.RECharacter.OTHER_SYMBOL;
-            if ("PARAGRAPH_SEPARATOR".equals(name)) return com.codename1.util.regex.RECharacter.PARAGRAPH_SEPARATOR;
-            if ("PRIVATE_USE".equals(name)) return com.codename1.util.regex.RECharacter.PRIVATE_USE;
-            if ("SPACE_SEPARATOR".equals(name)) return com.codename1.util.regex.RECharacter.SPACE_SEPARATOR;
-            if ("START_PUNCTUATION".equals(name)) return com.codename1.util.regex.RECharacter.START_PUNCTUATION;
-            if ("SURROGATE".equals(name)) return com.codename1.util.regex.RECharacter.SURROGATE;
-            if ("TITLECASE_LETTER".equals(name)) return com.codename1.util.regex.RECharacter.TITLECASE_LETTER;
-            if ("UNASSIGNED".equals(name)) return com.codename1.util.regex.RECharacter.UNASSIGNED;
-            if ("UPPERCASE_LETTER".equals(name)) return com.codename1.util.regex.RECharacter.UPPERCASE_LETTER;
-        }
+        if (type == com.codename1.util.regex.RE.class) return getStaticField0(name);
+        if (type == com.codename1.util.regex.RECharacter.class) return getStaticField1(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("MATCH_CASEINDEPENDENT".equals(name)) return com.codename1.util.regex.RE.MATCH_CASEINDEPENDENT;
+        if ("MATCH_MULTILINE".equals(name)) return com.codename1.util.regex.RE.MATCH_MULTILINE;
+        if ("MATCH_NORMAL".equals(name)) return com.codename1.util.regex.RE.MATCH_NORMAL;
+        if ("MATCH_SINGLELINE".equals(name)) return com.codename1.util.regex.RE.MATCH_SINGLELINE;
+        if ("REPLACE_ALL".equals(name)) return com.codename1.util.regex.RE.REPLACE_ALL;
+        if ("REPLACE_BACKREFERENCES".equals(name)) return com.codename1.util.regex.RE.REPLACE_BACKREFERENCES;
+        if ("REPLACE_FIRSTONLY".equals(name)) return com.codename1.util.regex.RE.REPLACE_FIRSTONLY;
+        throw unsupportedStaticField(com.codename1.util.regex.RE.class, name);
+    }
+
+    private static Object getStaticField1(String name) throws Exception {
+        if ("COMBINING_SPACING_MARK".equals(name)) return com.codename1.util.regex.RECharacter.COMBINING_SPACING_MARK;
+        if ("CONNECTOR_PUNCTUATION".equals(name)) return com.codename1.util.regex.RECharacter.CONNECTOR_PUNCTUATION;
+        if ("CONTROL".equals(name)) return com.codename1.util.regex.RECharacter.CONTROL;
+        if ("CURRENCY_SYMBOL".equals(name)) return com.codename1.util.regex.RECharacter.CURRENCY_SYMBOL;
+        if ("DASH_PUNCTUATION".equals(name)) return com.codename1.util.regex.RECharacter.DASH_PUNCTUATION;
+        if ("DECIMAL_DIGIT_NUMBER".equals(name)) return com.codename1.util.regex.RECharacter.DECIMAL_DIGIT_NUMBER;
+        if ("ENCLOSING_MARK".equals(name)) return com.codename1.util.regex.RECharacter.ENCLOSING_MARK;
+        if ("END_PUNCTUATION".equals(name)) return com.codename1.util.regex.RECharacter.END_PUNCTUATION;
+        if ("FORMAT".equals(name)) return com.codename1.util.regex.RECharacter.FORMAT;
+        if ("LETTER_NUMBER".equals(name)) return com.codename1.util.regex.RECharacter.LETTER_NUMBER;
+        if ("LINE_SEPARATOR".equals(name)) return com.codename1.util.regex.RECharacter.LINE_SEPARATOR;
+        if ("LOWERCASE_LETTER".equals(name)) return com.codename1.util.regex.RECharacter.LOWERCASE_LETTER;
+        if ("MATH_SYMBOL".equals(name)) return com.codename1.util.regex.RECharacter.MATH_SYMBOL;
+        if ("MODIFIER_LETTER".equals(name)) return com.codename1.util.regex.RECharacter.MODIFIER_LETTER;
+        if ("MODIFIER_SYMBOL".equals(name)) return com.codename1.util.regex.RECharacter.MODIFIER_SYMBOL;
+        if ("NON_SPACING_MARK".equals(name)) return com.codename1.util.regex.RECharacter.NON_SPACING_MARK;
+        if ("OTHER_LETTER".equals(name)) return com.codename1.util.regex.RECharacter.OTHER_LETTER;
+        if ("OTHER_NUMBER".equals(name)) return com.codename1.util.regex.RECharacter.OTHER_NUMBER;
+        if ("OTHER_PUNCTUATION".equals(name)) return com.codename1.util.regex.RECharacter.OTHER_PUNCTUATION;
+        if ("OTHER_SYMBOL".equals(name)) return com.codename1.util.regex.RECharacter.OTHER_SYMBOL;
+        if ("PARAGRAPH_SEPARATOR".equals(name)) return com.codename1.util.regex.RECharacter.PARAGRAPH_SEPARATOR;
+        if ("PRIVATE_USE".equals(name)) return com.codename1.util.regex.RECharacter.PRIVATE_USE;
+        if ("SPACE_SEPARATOR".equals(name)) return com.codename1.util.regex.RECharacter.SPACE_SEPARATOR;
+        if ("START_PUNCTUATION".equals(name)) return com.codename1.util.regex.RECharacter.START_PUNCTUATION;
+        if ("SURROGATE".equals(name)) return com.codename1.util.regex.RECharacter.SURROGATE;
+        if ("TITLECASE_LETTER".equals(name)) return com.codename1.util.regex.RECharacter.TITLECASE_LETTER;
+        if ("UNASSIGNED".equals(name)) return com.codename1.util.regex.RECharacter.UNASSIGNED;
+        if ("UPPERCASE_LETTER".equals(name)) return com.codename1.util.regex.RECharacter.UPPERCASE_LETTER;
+        throw unsupportedStaticField(com.codename1.util.regex.RECharacter.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

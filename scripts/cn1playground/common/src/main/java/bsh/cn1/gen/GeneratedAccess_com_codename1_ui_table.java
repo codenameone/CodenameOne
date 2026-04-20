@@ -2750,13 +2750,50 @@ public final class GeneratedAccess_com_codename1_ui_table {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == com.codename1.ui.table.Table.class) {
-            if ("INNER_BORDERS_ALL".equals(name)) return com.codename1.ui.table.Table.INNER_BORDERS_ALL;
-            if ("INNER_BORDERS_COLS".equals(name)) return com.codename1.ui.table.Table.INNER_BORDERS_COLS;
-            if ("INNER_BORDERS_NONE".equals(name)) return com.codename1.ui.table.Table.INNER_BORDERS_NONE;
-            if ("INNER_BORDERS_ROWS".equals(name)) return com.codename1.ui.table.Table.INNER_BORDERS_ROWS;
-        }
+        if (type == com.codename1.ui.table.Table.class) return getStaticField0(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("BASELINE".equals(name)) return com.codename1.ui.table.Table.BASELINE;
+        if ("BOTTOM".equals(name)) return com.codename1.ui.table.Table.BOTTOM;
+        if ("BRB_CENTER_OFFSET".equals(name)) return com.codename1.ui.table.Table.BRB_CENTER_OFFSET;
+        if ("BRB_CONSTANT_ASCENT".equals(name)) return com.codename1.ui.table.Table.BRB_CONSTANT_ASCENT;
+        if ("BRB_CONSTANT_DESCENT".equals(name)) return com.codename1.ui.table.Table.BRB_CONSTANT_DESCENT;
+        if ("BRB_OTHER".equals(name)) return com.codename1.ui.table.Table.BRB_OTHER;
+        if ("CENTER".equals(name)) return com.codename1.ui.table.Table.CENTER;
+        if ("CROSSHAIR_CURSOR".equals(name)) return com.codename1.ui.table.Table.CROSSHAIR_CURSOR;
+        if ("DEFAULT_CURSOR".equals(name)) return com.codename1.ui.table.Table.DEFAULT_CURSOR;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_X".equals(name)) return com.codename1.ui.table.Table.DRAG_REGION_IMMEDIATELY_DRAG_X;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_XY".equals(name)) return com.codename1.ui.table.Table.DRAG_REGION_IMMEDIATELY_DRAG_XY;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_Y".equals(name)) return com.codename1.ui.table.Table.DRAG_REGION_IMMEDIATELY_DRAG_Y;
+        if ("DRAG_REGION_LIKELY_DRAG_X".equals(name)) return com.codename1.ui.table.Table.DRAG_REGION_LIKELY_DRAG_X;
+        if ("DRAG_REGION_LIKELY_DRAG_XY".equals(name)) return com.codename1.ui.table.Table.DRAG_REGION_LIKELY_DRAG_XY;
+        if ("DRAG_REGION_LIKELY_DRAG_Y".equals(name)) return com.codename1.ui.table.Table.DRAG_REGION_LIKELY_DRAG_Y;
+        if ("DRAG_REGION_NOT_DRAGGABLE".equals(name)) return com.codename1.ui.table.Table.DRAG_REGION_NOT_DRAGGABLE;
+        if ("DRAG_REGION_POSSIBLE_DRAG_X".equals(name)) return com.codename1.ui.table.Table.DRAG_REGION_POSSIBLE_DRAG_X;
+        if ("DRAG_REGION_POSSIBLE_DRAG_XY".equals(name)) return com.codename1.ui.table.Table.DRAG_REGION_POSSIBLE_DRAG_XY;
+        if ("DRAG_REGION_POSSIBLE_DRAG_Y".equals(name)) return com.codename1.ui.table.Table.DRAG_REGION_POSSIBLE_DRAG_Y;
+        if ("E_RESIZE_CURSOR".equals(name)) return com.codename1.ui.table.Table.E_RESIZE_CURSOR;
+        if ("HAND_CURSOR".equals(name)) return com.codename1.ui.table.Table.HAND_CURSOR;
+        if ("INNER_BORDERS_ALL".equals(name)) return com.codename1.ui.table.Table.INNER_BORDERS_ALL;
+        if ("INNER_BORDERS_COLS".equals(name)) return com.codename1.ui.table.Table.INNER_BORDERS_COLS;
+        if ("INNER_BORDERS_NONE".equals(name)) return com.codename1.ui.table.Table.INNER_BORDERS_NONE;
+        if ("INNER_BORDERS_ROWS".equals(name)) return com.codename1.ui.table.Table.INNER_BORDERS_ROWS;
+        if ("LEFT".equals(name)) return com.codename1.ui.table.Table.LEFT;
+        if ("MOVE_CURSOR".equals(name)) return com.codename1.ui.table.Table.MOVE_CURSOR;
+        if ("NE_RESIZE_CURSOR".equals(name)) return com.codename1.ui.table.Table.NE_RESIZE_CURSOR;
+        if ("NW_RESIZE_CURSOR".equals(name)) return com.codename1.ui.table.Table.NW_RESIZE_CURSOR;
+        if ("N_RESIZE_CURSOR".equals(name)) return com.codename1.ui.table.Table.N_RESIZE_CURSOR;
+        if ("RIGHT".equals(name)) return com.codename1.ui.table.Table.RIGHT;
+        if ("SE_RESIZE_CURSOR".equals(name)) return com.codename1.ui.table.Table.SE_RESIZE_CURSOR;
+        if ("SW_RESIZE_CURSOR".equals(name)) return com.codename1.ui.table.Table.SW_RESIZE_CURSOR;
+        if ("S_RESIZE_CURSOR".equals(name)) return com.codename1.ui.table.Table.S_RESIZE_CURSOR;
+        if ("TEXT_CURSOR".equals(name)) return com.codename1.ui.table.Table.TEXT_CURSOR;
+        if ("TOP".equals(name)) return com.codename1.ui.table.Table.TOP;
+        if ("WAIT_CURSOR".equals(name)) return com.codename1.ui.table.Table.WAIT_CURSOR;
+        if ("W_RESIZE_CURSOR".equals(name)) return com.codename1.ui.table.Table.W_RESIZE_CURSOR;
+        throw unsupportedStaticField(com.codename1.ui.table.Table.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

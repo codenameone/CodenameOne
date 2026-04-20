@@ -152,21 +152,27 @@ public final class GeneratedAccess_com_codename1_charts_util {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == com.codename1.charts.util.ColorUtil.class) {
-            if ("BLACK".equals(name)) return com.codename1.charts.util.ColorUtil.BLACK;
-            if ("BLUE".equals(name)) return com.codename1.charts.util.ColorUtil.BLUE;
-            if ("CYAN".equals(name)) return com.codename1.charts.util.ColorUtil.CYAN;
-            if ("GRAY".equals(name)) return com.codename1.charts.util.ColorUtil.GRAY;
-            if ("GREEN".equals(name)) return com.codename1.charts.util.ColorUtil.GREEN;
-            if ("LTGRAY".equals(name)) return com.codename1.charts.util.ColorUtil.LTGRAY;
-            if ("MAGENTA".equals(name)) return com.codename1.charts.util.ColorUtil.MAGENTA;
-            if ("WHITE".equals(name)) return com.codename1.charts.util.ColorUtil.WHITE;
-            if ("YELLOW".equals(name)) return com.codename1.charts.util.ColorUtil.YELLOW;
-        }
-        if (type == com.codename1.charts.util.MathHelper.class) {
-            if ("NULL_VALUE".equals(name)) return com.codename1.charts.util.MathHelper.NULL_VALUE;
-        }
+        if (type == com.codename1.charts.util.ColorUtil.class) return getStaticField0(name);
+        if (type == com.codename1.charts.util.MathHelper.class) return getStaticField1(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("BLACK".equals(name)) return com.codename1.charts.util.ColorUtil.BLACK;
+        if ("BLUE".equals(name)) return com.codename1.charts.util.ColorUtil.BLUE;
+        if ("CYAN".equals(name)) return com.codename1.charts.util.ColorUtil.CYAN;
+        if ("GRAY".equals(name)) return com.codename1.charts.util.ColorUtil.GRAY;
+        if ("GREEN".equals(name)) return com.codename1.charts.util.ColorUtil.GREEN;
+        if ("LTGRAY".equals(name)) return com.codename1.charts.util.ColorUtil.LTGRAY;
+        if ("MAGENTA".equals(name)) return com.codename1.charts.util.ColorUtil.MAGENTA;
+        if ("WHITE".equals(name)) return com.codename1.charts.util.ColorUtil.WHITE;
+        if ("YELLOW".equals(name)) return com.codename1.charts.util.ColorUtil.YELLOW;
+        throw unsupportedStaticField(com.codename1.charts.util.ColorUtil.class, name);
+    }
+
+    private static Object getStaticField1(String name) throws Exception {
+        if ("NULL_VALUE".equals(name)) return com.codename1.charts.util.MathHelper.NULL_VALUE;
+        throw unsupportedStaticField(com.codename1.charts.util.MathHelper.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

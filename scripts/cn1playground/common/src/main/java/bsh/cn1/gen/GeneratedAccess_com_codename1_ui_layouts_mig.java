@@ -2933,101 +2933,151 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == com.codename1.ui.layouts.mig.BoundSize.class) {
-            if ("NULL_SIZE".equals(name)) return com.codename1.ui.layouts.mig.BoundSize.NULL_SIZE;
-            if ("ZERO_PIXEL".equals(name)) return com.codename1.ui.layouts.mig.BoundSize.ZERO_PIXEL;
-        }
-        if (type == com.codename1.ui.layouts.mig.ComponentWrapper.class) {
-            if ("TYPE_BUTTON".equals(name)) return com.codename1.ui.layouts.mig.ComponentWrapper.TYPE_BUTTON;
-            if ("TYPE_CHECK_BOX".equals(name)) return com.codename1.ui.layouts.mig.ComponentWrapper.TYPE_CHECK_BOX;
-            if ("TYPE_COMBO_BOX".equals(name)) return com.codename1.ui.layouts.mig.ComponentWrapper.TYPE_COMBO_BOX;
-            if ("TYPE_CONTAINER".equals(name)) return com.codename1.ui.layouts.mig.ComponentWrapper.TYPE_CONTAINER;
-            if ("TYPE_IMAGE".equals(name)) return com.codename1.ui.layouts.mig.ComponentWrapper.TYPE_IMAGE;
-            if ("TYPE_LABEL".equals(name)) return com.codename1.ui.layouts.mig.ComponentWrapper.TYPE_LABEL;
-            if ("TYPE_LIST".equals(name)) return com.codename1.ui.layouts.mig.ComponentWrapper.TYPE_LIST;
-            if ("TYPE_PANEL".equals(name)) return com.codename1.ui.layouts.mig.ComponentWrapper.TYPE_PANEL;
-            if ("TYPE_PROGRESS_BAR".equals(name)) return com.codename1.ui.layouts.mig.ComponentWrapper.TYPE_PROGRESS_BAR;
-            if ("TYPE_SCROLL_BAR".equals(name)) return com.codename1.ui.layouts.mig.ComponentWrapper.TYPE_SCROLL_BAR;
-            if ("TYPE_SCROLL_PANE".equals(name)) return com.codename1.ui.layouts.mig.ComponentWrapper.TYPE_SCROLL_PANE;
-            if ("TYPE_SEPARATOR".equals(name)) return com.codename1.ui.layouts.mig.ComponentWrapper.TYPE_SEPARATOR;
-            if ("TYPE_SLIDER".equals(name)) return com.codename1.ui.layouts.mig.ComponentWrapper.TYPE_SLIDER;
-            if ("TYPE_SPINNER".equals(name)) return com.codename1.ui.layouts.mig.ComponentWrapper.TYPE_SPINNER;
-            if ("TYPE_TABBED_PANE".equals(name)) return com.codename1.ui.layouts.mig.ComponentWrapper.TYPE_TABBED_PANE;
-            if ("TYPE_TABLE".equals(name)) return com.codename1.ui.layouts.mig.ComponentWrapper.TYPE_TABLE;
-            if ("TYPE_TEXT_AREA".equals(name)) return com.codename1.ui.layouts.mig.ComponentWrapper.TYPE_TEXT_AREA;
-            if ("TYPE_TEXT_FIELD".equals(name)) return com.codename1.ui.layouts.mig.ComponentWrapper.TYPE_TEXT_FIELD;
-            if ("TYPE_TREE".equals(name)) return com.codename1.ui.layouts.mig.ComponentWrapper.TYPE_TREE;
-            if ("TYPE_UNKNOWN".equals(name)) return com.codename1.ui.layouts.mig.ComponentWrapper.TYPE_UNKNOWN;
-            if ("TYPE_UNSET".equals(name)) return com.codename1.ui.layouts.mig.ComponentWrapper.TYPE_UNSET;
-        }
-        if (type == com.codename1.ui.layouts.mig.Grid.class) {
-            if ("TEST_GAPS".equals(name)) return com.codename1.ui.layouts.mig.Grid.TEST_GAPS;
-        }
-        if (type == com.codename1.ui.layouts.mig.LayoutUtil.class) {
-            if ("HAS_BEANS".equals(name)) return com.codename1.ui.layouts.mig.LayoutUtil.HAS_BEANS;
-            if ("HORIZONTAL".equals(name)) return com.codename1.ui.layouts.mig.LayoutUtil.HORIZONTAL;
-            if ("INF".equals(name)) return com.codename1.ui.layouts.mig.LayoutUtil.INF;
-            if ("MAX".equals(name)) return com.codename1.ui.layouts.mig.LayoutUtil.MAX;
-            if ("MIN".equals(name)) return com.codename1.ui.layouts.mig.LayoutUtil.MIN;
-            if ("PREF".equals(name)) return com.codename1.ui.layouts.mig.LayoutUtil.PREF;
-            if ("VERTICAL".equals(name)) return com.codename1.ui.layouts.mig.LayoutUtil.VERTICAL;
-        }
-        if (type == com.codename1.ui.layouts.mig.LinkHandler.class) {
-            if ("HEIGHT".equals(name)) return com.codename1.ui.layouts.mig.LinkHandler.HEIGHT;
-            if ("WIDTH".equals(name)) return com.codename1.ui.layouts.mig.LinkHandler.WIDTH;
-            if ("X".equals(name)) return com.codename1.ui.layouts.mig.LinkHandler.X;
-            if ("X2".equals(name)) return com.codename1.ui.layouts.mig.LinkHandler.X2;
-            if ("Y".equals(name)) return com.codename1.ui.layouts.mig.LinkHandler.Y;
-            if ("Y2".equals(name)) return com.codename1.ui.layouts.mig.LinkHandler.Y2;
-        }
-        if (type == com.codename1.ui.layouts.mig.PlatformDefaults.class) {
-            if ("BASE_FONT_SIZE".equals(name)) return com.codename1.ui.layouts.mig.PlatformDefaults.BASE_FONT_SIZE;
-            if ("BASE_REAL_PIXEL".equals(name)) return com.codename1.ui.layouts.mig.PlatformDefaults.BASE_REAL_PIXEL;
-            if ("BASE_SCALE_FACTOR".equals(name)) return com.codename1.ui.layouts.mig.PlatformDefaults.BASE_SCALE_FACTOR;
-            if ("GNOME".equals(name)) return com.codename1.ui.layouts.mig.PlatformDefaults.GNOME;
-            if ("MAC_OSX".equals(name)) return com.codename1.ui.layouts.mig.PlatformDefaults.MAC_OSX;
-            if ("VISUAL_PADDING_PROPERTY".equals(name)) return com.codename1.ui.layouts.mig.PlatformDefaults.VISUAL_PADDING_PROPERTY;
-            if ("WINDOWS_XP".equals(name)) return com.codename1.ui.layouts.mig.PlatformDefaults.WINDOWS_XP;
-        }
-        if (type == com.codename1.ui.layouts.mig.UnitConverter.class) {
-            if ("UNABLE".equals(name)) return com.codename1.ui.layouts.mig.UnitConverter.UNABLE;
-        }
-        if (type == com.codename1.ui.layouts.mig.UnitValue.class) {
-            if ("ADD".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.ADD;
-            if ("ALIGN".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.ALIGN;
-            if ("BUTTON".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.BUTTON;
-            if ("CM".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.CM;
-            if ("DIV".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.DIV;
-            if ("INCH".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.INCH;
-            if ("LABEL_ALIGN".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.LABEL_ALIGN;
-            if ("LINK_H".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.LINK_H;
-            if ("LINK_W".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.LINK_W;
-            if ("LINK_X".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.LINK_X;
-            if ("LINK_X2".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.LINK_X2;
-            if ("LINK_XPOS".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.LINK_XPOS;
-            if ("LINK_Y".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.LINK_Y;
-            if ("LINK_Y2".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.LINK_Y2;
-            if ("LINK_YPOS".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.LINK_YPOS;
-            if ("LOOKUP".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.LOOKUP;
-            if ("LPX".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.LPX;
-            if ("LPY".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.LPY;
-            if ("MAX".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.MAX;
-            if ("MAX_SIZE".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.MAX_SIZE;
-            if ("MID".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.MID;
-            if ("MIN".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.MIN;
-            if ("MIN_SIZE".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.MIN_SIZE;
-            if ("MM".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.MM;
-            if ("MUL".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.MUL;
-            if ("PERCENT".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.PERCENT;
-            if ("PIXEL".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.PIXEL;
-            if ("PREF_SIZE".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.PREF_SIZE;
-            if ("PT".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.PT;
-            if ("SPX".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.SPX;
-            if ("SPY".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.SPY;
-            if ("STATIC".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.STATIC;
-            if ("SUB".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.SUB;
-        }
+        if (type == com.codename1.ui.layouts.mig.BoundSize.class) return getStaticField0(name);
+        if (type == com.codename1.ui.layouts.mig.ComponentWrapper.class) return getStaticField1(name);
+        if (type == com.codename1.ui.layouts.mig.ContainerWrapper.class) return getStaticField2(name);
+        if (type == com.codename1.ui.layouts.mig.Grid.class) return getStaticField3(name);
+        if (type == com.codename1.ui.layouts.mig.LayoutUtil.class) return getStaticField4(name);
+        if (type == com.codename1.ui.layouts.mig.LinkHandler.class) return getStaticField5(name);
+        if (type == com.codename1.ui.layouts.mig.PlatformDefaults.class) return getStaticField6(name);
+        if (type == com.codename1.ui.layouts.mig.UnitConverter.class) return getStaticField7(name);
+        if (type == com.codename1.ui.layouts.mig.UnitValue.class) return getStaticField8(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("NULL_SIZE".equals(name)) return com.codename1.ui.layouts.mig.BoundSize.NULL_SIZE;
+        if ("ZERO_PIXEL".equals(name)) return com.codename1.ui.layouts.mig.BoundSize.ZERO_PIXEL;
+        throw unsupportedStaticField(com.codename1.ui.layouts.mig.BoundSize.class, name);
+    }
+
+    private static Object getStaticField1(String name) throws Exception {
+        if ("TYPE_BUTTON".equals(name)) return com.codename1.ui.layouts.mig.ComponentWrapper.TYPE_BUTTON;
+        if ("TYPE_CHECK_BOX".equals(name)) return com.codename1.ui.layouts.mig.ComponentWrapper.TYPE_CHECK_BOX;
+        if ("TYPE_COMBO_BOX".equals(name)) return com.codename1.ui.layouts.mig.ComponentWrapper.TYPE_COMBO_BOX;
+        if ("TYPE_CONTAINER".equals(name)) return com.codename1.ui.layouts.mig.ComponentWrapper.TYPE_CONTAINER;
+        if ("TYPE_IMAGE".equals(name)) return com.codename1.ui.layouts.mig.ComponentWrapper.TYPE_IMAGE;
+        if ("TYPE_LABEL".equals(name)) return com.codename1.ui.layouts.mig.ComponentWrapper.TYPE_LABEL;
+        if ("TYPE_LIST".equals(name)) return com.codename1.ui.layouts.mig.ComponentWrapper.TYPE_LIST;
+        if ("TYPE_PANEL".equals(name)) return com.codename1.ui.layouts.mig.ComponentWrapper.TYPE_PANEL;
+        if ("TYPE_PROGRESS_BAR".equals(name)) return com.codename1.ui.layouts.mig.ComponentWrapper.TYPE_PROGRESS_BAR;
+        if ("TYPE_SCROLL_BAR".equals(name)) return com.codename1.ui.layouts.mig.ComponentWrapper.TYPE_SCROLL_BAR;
+        if ("TYPE_SCROLL_PANE".equals(name)) return com.codename1.ui.layouts.mig.ComponentWrapper.TYPE_SCROLL_PANE;
+        if ("TYPE_SEPARATOR".equals(name)) return com.codename1.ui.layouts.mig.ComponentWrapper.TYPE_SEPARATOR;
+        if ("TYPE_SLIDER".equals(name)) return com.codename1.ui.layouts.mig.ComponentWrapper.TYPE_SLIDER;
+        if ("TYPE_SPINNER".equals(name)) return com.codename1.ui.layouts.mig.ComponentWrapper.TYPE_SPINNER;
+        if ("TYPE_TABBED_PANE".equals(name)) return com.codename1.ui.layouts.mig.ComponentWrapper.TYPE_TABBED_PANE;
+        if ("TYPE_TABLE".equals(name)) return com.codename1.ui.layouts.mig.ComponentWrapper.TYPE_TABLE;
+        if ("TYPE_TEXT_AREA".equals(name)) return com.codename1.ui.layouts.mig.ComponentWrapper.TYPE_TEXT_AREA;
+        if ("TYPE_TEXT_FIELD".equals(name)) return com.codename1.ui.layouts.mig.ComponentWrapper.TYPE_TEXT_FIELD;
+        if ("TYPE_TREE".equals(name)) return com.codename1.ui.layouts.mig.ComponentWrapper.TYPE_TREE;
+        if ("TYPE_UNKNOWN".equals(name)) return com.codename1.ui.layouts.mig.ComponentWrapper.TYPE_UNKNOWN;
+        if ("TYPE_UNSET".equals(name)) return com.codename1.ui.layouts.mig.ComponentWrapper.TYPE_UNSET;
+        throw unsupportedStaticField(com.codename1.ui.layouts.mig.ComponentWrapper.class, name);
+    }
+
+    private static Object getStaticField2(String name) throws Exception {
+        if ("TYPE_BUTTON".equals(name)) return com.codename1.ui.layouts.mig.ContainerWrapper.TYPE_BUTTON;
+        if ("TYPE_CHECK_BOX".equals(name)) return com.codename1.ui.layouts.mig.ContainerWrapper.TYPE_CHECK_BOX;
+        if ("TYPE_COMBO_BOX".equals(name)) return com.codename1.ui.layouts.mig.ContainerWrapper.TYPE_COMBO_BOX;
+        if ("TYPE_CONTAINER".equals(name)) return com.codename1.ui.layouts.mig.ContainerWrapper.TYPE_CONTAINER;
+        if ("TYPE_IMAGE".equals(name)) return com.codename1.ui.layouts.mig.ContainerWrapper.TYPE_IMAGE;
+        if ("TYPE_LABEL".equals(name)) return com.codename1.ui.layouts.mig.ContainerWrapper.TYPE_LABEL;
+        if ("TYPE_LIST".equals(name)) return com.codename1.ui.layouts.mig.ContainerWrapper.TYPE_LIST;
+        if ("TYPE_PANEL".equals(name)) return com.codename1.ui.layouts.mig.ContainerWrapper.TYPE_PANEL;
+        if ("TYPE_PROGRESS_BAR".equals(name)) return com.codename1.ui.layouts.mig.ContainerWrapper.TYPE_PROGRESS_BAR;
+        if ("TYPE_SCROLL_BAR".equals(name)) return com.codename1.ui.layouts.mig.ContainerWrapper.TYPE_SCROLL_BAR;
+        if ("TYPE_SCROLL_PANE".equals(name)) return com.codename1.ui.layouts.mig.ContainerWrapper.TYPE_SCROLL_PANE;
+        if ("TYPE_SEPARATOR".equals(name)) return com.codename1.ui.layouts.mig.ContainerWrapper.TYPE_SEPARATOR;
+        if ("TYPE_SLIDER".equals(name)) return com.codename1.ui.layouts.mig.ContainerWrapper.TYPE_SLIDER;
+        if ("TYPE_SPINNER".equals(name)) return com.codename1.ui.layouts.mig.ContainerWrapper.TYPE_SPINNER;
+        if ("TYPE_TABBED_PANE".equals(name)) return com.codename1.ui.layouts.mig.ContainerWrapper.TYPE_TABBED_PANE;
+        if ("TYPE_TABLE".equals(name)) return com.codename1.ui.layouts.mig.ContainerWrapper.TYPE_TABLE;
+        if ("TYPE_TEXT_AREA".equals(name)) return com.codename1.ui.layouts.mig.ContainerWrapper.TYPE_TEXT_AREA;
+        if ("TYPE_TEXT_FIELD".equals(name)) return com.codename1.ui.layouts.mig.ContainerWrapper.TYPE_TEXT_FIELD;
+        if ("TYPE_TREE".equals(name)) return com.codename1.ui.layouts.mig.ContainerWrapper.TYPE_TREE;
+        if ("TYPE_UNKNOWN".equals(name)) return com.codename1.ui.layouts.mig.ContainerWrapper.TYPE_UNKNOWN;
+        if ("TYPE_UNSET".equals(name)) return com.codename1.ui.layouts.mig.ContainerWrapper.TYPE_UNSET;
+        throw unsupportedStaticField(com.codename1.ui.layouts.mig.ContainerWrapper.class, name);
+    }
+
+    private static Object getStaticField3(String name) throws Exception {
+        if ("TEST_GAPS".equals(name)) return com.codename1.ui.layouts.mig.Grid.TEST_GAPS;
+        throw unsupportedStaticField(com.codename1.ui.layouts.mig.Grid.class, name);
+    }
+
+    private static Object getStaticField4(String name) throws Exception {
+        if ("HAS_BEANS".equals(name)) return com.codename1.ui.layouts.mig.LayoutUtil.HAS_BEANS;
+        if ("HORIZONTAL".equals(name)) return com.codename1.ui.layouts.mig.LayoutUtil.HORIZONTAL;
+        if ("INF".equals(name)) return com.codename1.ui.layouts.mig.LayoutUtil.INF;
+        if ("MAX".equals(name)) return com.codename1.ui.layouts.mig.LayoutUtil.MAX;
+        if ("MIN".equals(name)) return com.codename1.ui.layouts.mig.LayoutUtil.MIN;
+        if ("PREF".equals(name)) return com.codename1.ui.layouts.mig.LayoutUtil.PREF;
+        if ("VERTICAL".equals(name)) return com.codename1.ui.layouts.mig.LayoutUtil.VERTICAL;
+        throw unsupportedStaticField(com.codename1.ui.layouts.mig.LayoutUtil.class, name);
+    }
+
+    private static Object getStaticField5(String name) throws Exception {
+        if ("HEIGHT".equals(name)) return com.codename1.ui.layouts.mig.LinkHandler.HEIGHT;
+        if ("WIDTH".equals(name)) return com.codename1.ui.layouts.mig.LinkHandler.WIDTH;
+        if ("X".equals(name)) return com.codename1.ui.layouts.mig.LinkHandler.X;
+        if ("X2".equals(name)) return com.codename1.ui.layouts.mig.LinkHandler.X2;
+        if ("Y".equals(name)) return com.codename1.ui.layouts.mig.LinkHandler.Y;
+        if ("Y2".equals(name)) return com.codename1.ui.layouts.mig.LinkHandler.Y2;
+        throw unsupportedStaticField(com.codename1.ui.layouts.mig.LinkHandler.class, name);
+    }
+
+    private static Object getStaticField6(String name) throws Exception {
+        if ("BASE_FONT_SIZE".equals(name)) return com.codename1.ui.layouts.mig.PlatformDefaults.BASE_FONT_SIZE;
+        if ("BASE_REAL_PIXEL".equals(name)) return com.codename1.ui.layouts.mig.PlatformDefaults.BASE_REAL_PIXEL;
+        if ("BASE_SCALE_FACTOR".equals(name)) return com.codename1.ui.layouts.mig.PlatformDefaults.BASE_SCALE_FACTOR;
+        if ("GNOME".equals(name)) return com.codename1.ui.layouts.mig.PlatformDefaults.GNOME;
+        if ("MAC_OSX".equals(name)) return com.codename1.ui.layouts.mig.PlatformDefaults.MAC_OSX;
+        if ("VISUAL_PADDING_PROPERTY".equals(name)) return com.codename1.ui.layouts.mig.PlatformDefaults.VISUAL_PADDING_PROPERTY;
+        if ("WINDOWS_XP".equals(name)) return com.codename1.ui.layouts.mig.PlatformDefaults.WINDOWS_XP;
+        throw unsupportedStaticField(com.codename1.ui.layouts.mig.PlatformDefaults.class, name);
+    }
+
+    private static Object getStaticField7(String name) throws Exception {
+        if ("UNABLE".equals(name)) return com.codename1.ui.layouts.mig.UnitConverter.UNABLE;
+        throw unsupportedStaticField(com.codename1.ui.layouts.mig.UnitConverter.class, name);
+    }
+
+    private static Object getStaticField8(String name) throws Exception {
+        if ("ADD".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.ADD;
+        if ("ALIGN".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.ALIGN;
+        if ("BUTTON".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.BUTTON;
+        if ("CM".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.CM;
+        if ("DIV".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.DIV;
+        if ("INCH".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.INCH;
+        if ("LABEL_ALIGN".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.LABEL_ALIGN;
+        if ("LINK_H".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.LINK_H;
+        if ("LINK_W".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.LINK_W;
+        if ("LINK_X".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.LINK_X;
+        if ("LINK_X2".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.LINK_X2;
+        if ("LINK_XPOS".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.LINK_XPOS;
+        if ("LINK_Y".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.LINK_Y;
+        if ("LINK_Y2".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.LINK_Y2;
+        if ("LINK_YPOS".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.LINK_YPOS;
+        if ("LOOKUP".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.LOOKUP;
+        if ("LPX".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.LPX;
+        if ("LPY".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.LPY;
+        if ("MAX".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.MAX;
+        if ("MAX_SIZE".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.MAX_SIZE;
+        if ("MID".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.MID;
+        if ("MIN".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.MIN;
+        if ("MIN_SIZE".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.MIN_SIZE;
+        if ("MM".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.MM;
+        if ("MUL".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.MUL;
+        if ("PERCENT".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.PERCENT;
+        if ("PIXEL".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.PIXEL;
+        if ("PREF_SIZE".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.PREF_SIZE;
+        if ("PT".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.PT;
+        if ("SPX".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.SPX;
+        if ("SPY".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.SPY;
+        if ("STATIC".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.STATIC;
+        if ("SUB".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.SUB;
+        throw unsupportedStaticField(com.codename1.ui.layouts.mig.UnitValue.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

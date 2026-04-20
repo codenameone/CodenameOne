@@ -946,16 +946,43 @@ public final class GeneratedAccess_com_codename1_media {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == com.codename1.media.Media.class) {
-            if ("VARIABLE_BACKGROUND_ALBUM_COVER".equals(name)) return com.codename1.media.Media.VARIABLE_BACKGROUND_ALBUM_COVER;
-            if ("VARIABLE_BACKGROUND_ARTIST".equals(name)) return com.codename1.media.Media.VARIABLE_BACKGROUND_ARTIST;
-            if ("VARIABLE_BACKGROUND_DURATION".equals(name)) return com.codename1.media.Media.VARIABLE_BACKGROUND_DURATION;
-            if ("VARIABLE_BACKGROUND_POSITION".equals(name)) return com.codename1.media.Media.VARIABLE_BACKGROUND_POSITION;
-            if ("VARIABLE_BACKGROUND_SUPPORTED".equals(name)) return com.codename1.media.Media.VARIABLE_BACKGROUND_SUPPORTED;
-            if ("VARIABLE_BACKGROUND_TITLE".equals(name)) return com.codename1.media.Media.VARIABLE_BACKGROUND_TITLE;
-            if ("VARIABLE_NATIVE_CONTRLOLS_EMBEDDED".equals(name)) return com.codename1.media.Media.VARIABLE_NATIVE_CONTRLOLS_EMBEDDED;
-        }
+        if (type == com.codename1.media.AbstractMedia.class) return getStaticField0(name);
+        if (type == com.codename1.media.AsyncMedia.class) return getStaticField1(name);
+        if (type == com.codename1.media.Media.class) return getStaticField2(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("VARIABLE_BACKGROUND_ALBUM_COVER".equals(name)) return com.codename1.media.AbstractMedia.VARIABLE_BACKGROUND_ALBUM_COVER;
+        if ("VARIABLE_BACKGROUND_ARTIST".equals(name)) return com.codename1.media.AbstractMedia.VARIABLE_BACKGROUND_ARTIST;
+        if ("VARIABLE_BACKGROUND_DURATION".equals(name)) return com.codename1.media.AbstractMedia.VARIABLE_BACKGROUND_DURATION;
+        if ("VARIABLE_BACKGROUND_POSITION".equals(name)) return com.codename1.media.AbstractMedia.VARIABLE_BACKGROUND_POSITION;
+        if ("VARIABLE_BACKGROUND_SUPPORTED".equals(name)) return com.codename1.media.AbstractMedia.VARIABLE_BACKGROUND_SUPPORTED;
+        if ("VARIABLE_BACKGROUND_TITLE".equals(name)) return com.codename1.media.AbstractMedia.VARIABLE_BACKGROUND_TITLE;
+        if ("VARIABLE_NATIVE_CONTRLOLS_EMBEDDED".equals(name)) return com.codename1.media.AbstractMedia.VARIABLE_NATIVE_CONTRLOLS_EMBEDDED;
+        throw unsupportedStaticField(com.codename1.media.AbstractMedia.class, name);
+    }
+
+    private static Object getStaticField1(String name) throws Exception {
+        if ("VARIABLE_BACKGROUND_ALBUM_COVER".equals(name)) return com.codename1.media.AsyncMedia.VARIABLE_BACKGROUND_ALBUM_COVER;
+        if ("VARIABLE_BACKGROUND_ARTIST".equals(name)) return com.codename1.media.AsyncMedia.VARIABLE_BACKGROUND_ARTIST;
+        if ("VARIABLE_BACKGROUND_DURATION".equals(name)) return com.codename1.media.AsyncMedia.VARIABLE_BACKGROUND_DURATION;
+        if ("VARIABLE_BACKGROUND_POSITION".equals(name)) return com.codename1.media.AsyncMedia.VARIABLE_BACKGROUND_POSITION;
+        if ("VARIABLE_BACKGROUND_SUPPORTED".equals(name)) return com.codename1.media.AsyncMedia.VARIABLE_BACKGROUND_SUPPORTED;
+        if ("VARIABLE_BACKGROUND_TITLE".equals(name)) return com.codename1.media.AsyncMedia.VARIABLE_BACKGROUND_TITLE;
+        if ("VARIABLE_NATIVE_CONTRLOLS_EMBEDDED".equals(name)) return com.codename1.media.AsyncMedia.VARIABLE_NATIVE_CONTRLOLS_EMBEDDED;
+        throw unsupportedStaticField(com.codename1.media.AsyncMedia.class, name);
+    }
+
+    private static Object getStaticField2(String name) throws Exception {
+        if ("VARIABLE_BACKGROUND_ALBUM_COVER".equals(name)) return com.codename1.media.Media.VARIABLE_BACKGROUND_ALBUM_COVER;
+        if ("VARIABLE_BACKGROUND_ARTIST".equals(name)) return com.codename1.media.Media.VARIABLE_BACKGROUND_ARTIST;
+        if ("VARIABLE_BACKGROUND_DURATION".equals(name)) return com.codename1.media.Media.VARIABLE_BACKGROUND_DURATION;
+        if ("VARIABLE_BACKGROUND_POSITION".equals(name)) return com.codename1.media.Media.VARIABLE_BACKGROUND_POSITION;
+        if ("VARIABLE_BACKGROUND_SUPPORTED".equals(name)) return com.codename1.media.Media.VARIABLE_BACKGROUND_SUPPORTED;
+        if ("VARIABLE_BACKGROUND_TITLE".equals(name)) return com.codename1.media.Media.VARIABLE_BACKGROUND_TITLE;
+        if ("VARIABLE_NATIVE_CONTRLOLS_EMBEDDED".equals(name)) return com.codename1.media.Media.VARIABLE_NATIVE_CONTRLOLS_EMBEDDED;
+        throw unsupportedStaticField(com.codename1.media.Media.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

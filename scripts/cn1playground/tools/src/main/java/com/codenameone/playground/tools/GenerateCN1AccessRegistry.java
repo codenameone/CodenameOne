@@ -511,6 +511,7 @@ public final class GenerateCN1AccessRegistry {
 
         LinkedHashMap<String, ApiMethod> inheritedMethods = new LinkedHashMap<String, ApiMethod>();
         LinkedHashMap<String, ApiField> inheritedFields = new LinkedHashMap<String, ApiField>();
+        LinkedHashMap<String, ApiField> inheritedStaticFields = new LinkedHashMap<String, ApiField>();
         for (String superType : apiClass.superTypes) {
             ApiClass superClass = classIndex.get(superType);
             if (superClass == null) {
@@ -519,20 +520,24 @@ public final class GenerateCN1AccessRegistry {
             ApiClass resolvedSuper = resolveInheritedMembers(superClass, classIndex, resolved, visiting, typeHierarchy);
             mergeInheritedMethods(inheritedMethods, resolvedSuper.instanceMethods);
             mergeInheritedFields(inheritedFields, resolvedSuper.instanceFields);
+            mergeInheritedFields(inheritedStaticFields, resolvedSuper.staticFields);
         }
 
         mergeDeclaredMethods(inheritedMethods, apiClass.instanceMethods);
         mergeDeclaredFields(inheritedFields, apiClass.instanceFields);
+        mergeDeclaredFields(inheritedStaticFields, apiClass.staticFields);
 
         List<ApiMethod> instanceMethods = filterBridgeLikeMethods(new ArrayList<ApiMethod>(inheritedMethods.values()), typeHierarchy);
         instanceMethods = filterGenericInheritedMethods(apiClass.qualifiedName, instanceMethods);
         List<ApiField> instanceFields = new ArrayList<ApiField>(inheritedFields.values());
+        List<ApiField> staticFields = new ArrayList<ApiField>(inheritedStaticFields.values());
         sortMethods(instanceMethods);
         sortFields(instanceFields);
+        sortFields(staticFields);
 
         ApiClass merged = new ApiClass(apiClass.packageName, apiClass.simpleName, apiClass.qualifiedName, apiClass.superTypes,
                 apiClass.isInterface, apiClass.isAbstract, apiClass.constructors, apiClass.staticMethods, instanceMethods,
-                apiClass.staticFields, instanceFields);
+                staticFields, instanceFields);
         visiting.remove(apiClass.qualifiedName);
         resolved.put(apiClass.qualifiedName, merged);
         return merged;
@@ -1811,20 +1816,36 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
     }
 
     private static void writeGetStaticField(Writer writer, List<ApiClass> classes) throws IOException {
+        // Emit a per-class helper so each class's static-field dispatch
+        // stays under the 64KB method-code limit once inherited fields
+        // are folded in.
         writer.write("    public static Object getStaticField(Class<?> type, String name) throws Exception {\n");
+        int helperIndex = 0;
         for (ApiClass apiClass : classes) {
             if (apiClass.isLookupOnly() || apiClass.staticFields.isEmpty()) {
                 continue;
             }
-            writer.write("        if (type == " + typeLiteral(apiClass.qualifiedName) + ") {\n");
-            for (ApiField field : apiClass.staticFields) {
-                writer.write("            if (\"" + field.name + "\".equals(name)) return "
-                        + apiClass.qualifiedName + "." + field.name + ";\n");
-            }
-            writer.write("        }\n");
+            writer.write("        if (type == " + typeLiteral(apiClass.qualifiedName) + ") return getStaticField"
+                    + helperIndex + "(name);\n");
+            helperIndex++;
         }
         writer.write("        throw unsupportedStaticField(type, name);\n");
         writer.write("    }\n\n");
+
+        helperIndex = 0;
+        for (ApiClass apiClass : classes) {
+            if (apiClass.isLookupOnly() || apiClass.staticFields.isEmpty()) {
+                continue;
+            }
+            writer.write("    private static Object getStaticField" + helperIndex + "(String name) throws Exception {\n");
+            for (ApiField field : apiClass.staticFields) {
+                writer.write("        if (\"" + field.name + "\".equals(name)) return "
+                        + apiClass.qualifiedName + "." + field.name + ";\n");
+            }
+            writer.write("        throw unsupportedStaticField(" + typeLiteral(apiClass.qualifiedName) + ", name);\n");
+            writer.write("    }\n\n");
+            helperIndex++;
+        }
     }
 
     private static void writeGetField(Writer writer, List<ApiClass> classes) throws IOException {

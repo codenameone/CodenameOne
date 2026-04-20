@@ -2380,7 +2380,46 @@ public final class GeneratedAccess_com_codename1_ui_scene {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
+        if (type == com.codename1.ui.scene.Scene.class) return getStaticField0(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("BASELINE".equals(name)) return com.codename1.ui.scene.Scene.BASELINE;
+        if ("BOTTOM".equals(name)) return com.codename1.ui.scene.Scene.BOTTOM;
+        if ("BRB_CENTER_OFFSET".equals(name)) return com.codename1.ui.scene.Scene.BRB_CENTER_OFFSET;
+        if ("BRB_CONSTANT_ASCENT".equals(name)) return com.codename1.ui.scene.Scene.BRB_CONSTANT_ASCENT;
+        if ("BRB_CONSTANT_DESCENT".equals(name)) return com.codename1.ui.scene.Scene.BRB_CONSTANT_DESCENT;
+        if ("BRB_OTHER".equals(name)) return com.codename1.ui.scene.Scene.BRB_OTHER;
+        if ("CENTER".equals(name)) return com.codename1.ui.scene.Scene.CENTER;
+        if ("CROSSHAIR_CURSOR".equals(name)) return com.codename1.ui.scene.Scene.CROSSHAIR_CURSOR;
+        if ("DEFAULT_CURSOR".equals(name)) return com.codename1.ui.scene.Scene.DEFAULT_CURSOR;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_X".equals(name)) return com.codename1.ui.scene.Scene.DRAG_REGION_IMMEDIATELY_DRAG_X;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_XY".equals(name)) return com.codename1.ui.scene.Scene.DRAG_REGION_IMMEDIATELY_DRAG_XY;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_Y".equals(name)) return com.codename1.ui.scene.Scene.DRAG_REGION_IMMEDIATELY_DRAG_Y;
+        if ("DRAG_REGION_LIKELY_DRAG_X".equals(name)) return com.codename1.ui.scene.Scene.DRAG_REGION_LIKELY_DRAG_X;
+        if ("DRAG_REGION_LIKELY_DRAG_XY".equals(name)) return com.codename1.ui.scene.Scene.DRAG_REGION_LIKELY_DRAG_XY;
+        if ("DRAG_REGION_LIKELY_DRAG_Y".equals(name)) return com.codename1.ui.scene.Scene.DRAG_REGION_LIKELY_DRAG_Y;
+        if ("DRAG_REGION_NOT_DRAGGABLE".equals(name)) return com.codename1.ui.scene.Scene.DRAG_REGION_NOT_DRAGGABLE;
+        if ("DRAG_REGION_POSSIBLE_DRAG_X".equals(name)) return com.codename1.ui.scene.Scene.DRAG_REGION_POSSIBLE_DRAG_X;
+        if ("DRAG_REGION_POSSIBLE_DRAG_XY".equals(name)) return com.codename1.ui.scene.Scene.DRAG_REGION_POSSIBLE_DRAG_XY;
+        if ("DRAG_REGION_POSSIBLE_DRAG_Y".equals(name)) return com.codename1.ui.scene.Scene.DRAG_REGION_POSSIBLE_DRAG_Y;
+        if ("E_RESIZE_CURSOR".equals(name)) return com.codename1.ui.scene.Scene.E_RESIZE_CURSOR;
+        if ("HAND_CURSOR".equals(name)) return com.codename1.ui.scene.Scene.HAND_CURSOR;
+        if ("LEFT".equals(name)) return com.codename1.ui.scene.Scene.LEFT;
+        if ("MOVE_CURSOR".equals(name)) return com.codename1.ui.scene.Scene.MOVE_CURSOR;
+        if ("NE_RESIZE_CURSOR".equals(name)) return com.codename1.ui.scene.Scene.NE_RESIZE_CURSOR;
+        if ("NW_RESIZE_CURSOR".equals(name)) return com.codename1.ui.scene.Scene.NW_RESIZE_CURSOR;
+        if ("N_RESIZE_CURSOR".equals(name)) return com.codename1.ui.scene.Scene.N_RESIZE_CURSOR;
+        if ("RIGHT".equals(name)) return com.codename1.ui.scene.Scene.RIGHT;
+        if ("SE_RESIZE_CURSOR".equals(name)) return com.codename1.ui.scene.Scene.SE_RESIZE_CURSOR;
+        if ("SW_RESIZE_CURSOR".equals(name)) return com.codename1.ui.scene.Scene.SW_RESIZE_CURSOR;
+        if ("S_RESIZE_CURSOR".equals(name)) return com.codename1.ui.scene.Scene.S_RESIZE_CURSOR;
+        if ("TEXT_CURSOR".equals(name)) return com.codename1.ui.scene.Scene.TEXT_CURSOR;
+        if ("TOP".equals(name)) return com.codename1.ui.scene.Scene.TOP;
+        if ("WAIT_CURSOR".equals(name)) return com.codename1.ui.scene.Scene.WAIT_CURSOR;
+        if ("W_RESIZE_CURSOR".equals(name)) return com.codename1.ui.scene.Scene.W_RESIZE_CURSOR;
+        throw unsupportedStaticField(com.codename1.ui.scene.Scene.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

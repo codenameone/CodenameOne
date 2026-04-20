@@ -275,11 +275,14 @@ public final class GeneratedAccess_com_codename1_capture {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == com.codename1.capture.VideoCaptureConstraints.class) {
-            if ("QUALITY_HIGH".equals(name)) return com.codename1.capture.VideoCaptureConstraints.QUALITY_HIGH;
-            if ("QUALITY_LOW".equals(name)) return com.codename1.capture.VideoCaptureConstraints.QUALITY_LOW;
-        }
+        if (type == com.codename1.capture.VideoCaptureConstraints.class) return getStaticField0(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("QUALITY_HIGH".equals(name)) return com.codename1.capture.VideoCaptureConstraints.QUALITY_HIGH;
+        if ("QUALITY_LOW".equals(name)) return com.codename1.capture.VideoCaptureConstraints.QUALITY_LOW;
+        throw unsupportedStaticField(com.codename1.capture.VideoCaptureConstraints.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

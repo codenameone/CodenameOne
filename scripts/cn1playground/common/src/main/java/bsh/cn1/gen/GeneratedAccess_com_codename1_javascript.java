@@ -384,10 +384,13 @@ public final class GeneratedAccess_com_codename1_javascript {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == com.codename1.javascript.JavascriptContext.class) {
-            if ("DEBUG".equals(name)) return com.codename1.javascript.JavascriptContext.DEBUG;
-        }
+        if (type == com.codename1.javascript.JavascriptContext.class) return getStaticField0(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("DEBUG".equals(name)) return com.codename1.javascript.JavascriptContext.DEBUG;
+        throw unsupportedStaticField(com.codename1.javascript.JavascriptContext.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

@@ -703,13 +703,16 @@ public final class GeneratedAccess_com_codename1_payment {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == com.codename1.payment.Receipt.class) {
-            if ("STORE_CODE_ITUNES".equals(name)) return com.codename1.payment.Receipt.STORE_CODE_ITUNES;
-            if ("STORE_CODE_PLAY".equals(name)) return com.codename1.payment.Receipt.STORE_CODE_PLAY;
-            if ("STORE_CODE_SIMULATOR".equals(name)) return com.codename1.payment.Receipt.STORE_CODE_SIMULATOR;
-            if ("STORE_CODE_WINDOWS".equals(name)) return com.codename1.payment.Receipt.STORE_CODE_WINDOWS;
-        }
+        if (type == com.codename1.payment.Receipt.class) return getStaticField0(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("STORE_CODE_ITUNES".equals(name)) return com.codename1.payment.Receipt.STORE_CODE_ITUNES;
+        if ("STORE_CODE_PLAY".equals(name)) return com.codename1.payment.Receipt.STORE_CODE_PLAY;
+        if ("STORE_CODE_SIMULATOR".equals(name)) return com.codename1.payment.Receipt.STORE_CODE_SIMULATOR;
+        if ("STORE_CODE_WINDOWS".equals(name)) return com.codename1.payment.Receipt.STORE_CODE_WINDOWS;
+        throw unsupportedStaticField(com.codename1.payment.Receipt.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

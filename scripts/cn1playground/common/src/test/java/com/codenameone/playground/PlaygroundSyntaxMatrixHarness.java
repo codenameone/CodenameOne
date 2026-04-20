@@ -189,6 +189,12 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "items.add(\"a\"); items.add(\"bb\"); items.add(\"ccc\");\n"
                 + "List lens = items.stream().map(s -> ((String) s).length()).toList();\n"
                 + "root.add(new Label(\"lens=\" + lens));"), ExpectedOutcome.SUCCESS, null));
+        // Inherited static field access: Display extends CN1Constants, so
+        // PICKER_TYPE_DATE (declared on CN1Constants) is reachable through
+        // the Display subclass reference.
+        cases.add(new Case(cat, "inherited_static_field_via_subclass", ui(""
+                + "int t = Display.PICKER_TYPE_DATE;\n"
+                + "root.add(new Label(\"t=\" + t));"), ExpectedOutcome.SUCCESS, null));
         cases.add(new Case(cat, "method_overloading", ui(""
                 + "class M { String fmt(int n) { return \"int:\" + n; } String fmt(String s) { return \"str:\" + s; } }\n"
                 + "M m = new M();\n"

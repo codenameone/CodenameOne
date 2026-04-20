@@ -1523,20 +1523,26 @@ public final class GeneratedAccess_com_codename1_util {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == com.codename1.util.BigInteger.class) {
-            if ("ONE".equals(name)) return com.codename1.util.BigInteger.ONE;
-            if ("ZERO".equals(name)) return com.codename1.util.BigInteger.ZERO;
-        }
-        if (type == com.codename1.util.DateUtil.class) {
-            if ("DAY".equals(name)) return com.codename1.util.DateUtil.DAY;
-            if ("HOUR".equals(name)) return com.codename1.util.DateUtil.HOUR;
-            if ("MILLISECOND".equals(name)) return com.codename1.util.DateUtil.MILLISECOND;
-            if ("MINUTE".equals(name)) return com.codename1.util.DateUtil.MINUTE;
-            if ("MONTH".equals(name)) return com.codename1.util.DateUtil.MONTH;
-            if ("SECOND".equals(name)) return com.codename1.util.DateUtil.SECOND;
-            if ("YEAR".equals(name)) return com.codename1.util.DateUtil.YEAR;
-        }
+        if (type == com.codename1.util.BigInteger.class) return getStaticField0(name);
+        if (type == com.codename1.util.DateUtil.class) return getStaticField1(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("ONE".equals(name)) return com.codename1.util.BigInteger.ONE;
+        if ("ZERO".equals(name)) return com.codename1.util.BigInteger.ZERO;
+        throw unsupportedStaticField(com.codename1.util.BigInteger.class, name);
+    }
+
+    private static Object getStaticField1(String name) throws Exception {
+        if ("DAY".equals(name)) return com.codename1.util.DateUtil.DAY;
+        if ("HOUR".equals(name)) return com.codename1.util.DateUtil.HOUR;
+        if ("MILLISECOND".equals(name)) return com.codename1.util.DateUtil.MILLISECOND;
+        if ("MINUTE".equals(name)) return com.codename1.util.DateUtil.MINUTE;
+        if ("MONTH".equals(name)) return com.codename1.util.DateUtil.MONTH;
+        if ("SECOND".equals(name)) return com.codename1.util.DateUtil.SECOND;
+        if ("YEAR".equals(name)) return com.codename1.util.DateUtil.YEAR;
+        throw unsupportedStaticField(com.codename1.util.DateUtil.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

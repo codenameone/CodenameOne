@@ -4926,70 +4926,103 @@ public final class GeneratedAccess_java_lang {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == java.lang.Boolean.class) {
-            if ("FALSE".equals(name)) return java.lang.Boolean.FALSE;
-            if ("TRUE".equals(name)) return java.lang.Boolean.TRUE;
-        }
-        if (type == java.lang.Byte.class) {
-            if ("MAX_VALUE".equals(name)) return java.lang.Byte.MAX_VALUE;
-            if ("MIN_VALUE".equals(name)) return java.lang.Byte.MIN_VALUE;
-            if ("SIZE".equals(name)) return java.lang.Byte.SIZE;
-        }
-        if (type == java.lang.Character.class) {
-            if ("MAX_CODE_POINT".equals(name)) return java.lang.Character.MAX_CODE_POINT;
-            if ("MAX_HIGH_SURROGATE".equals(name)) return java.lang.Character.MAX_HIGH_SURROGATE;
-            if ("MAX_LOW_SURROGATE".equals(name)) return java.lang.Character.MAX_LOW_SURROGATE;
-            if ("MAX_RADIX".equals(name)) return java.lang.Character.MAX_RADIX;
-            if ("MAX_SURROGATE".equals(name)) return java.lang.Character.MAX_SURROGATE;
-            if ("MAX_VALUE".equals(name)) return java.lang.Character.MAX_VALUE;
-            if ("MIN_CODE_POINT".equals(name)) return java.lang.Character.MIN_CODE_POINT;
-            if ("MIN_HIGH_SURROGATE".equals(name)) return java.lang.Character.MIN_HIGH_SURROGATE;
-            if ("MIN_LOW_SURROGATE".equals(name)) return java.lang.Character.MIN_LOW_SURROGATE;
-            if ("MIN_RADIX".equals(name)) return java.lang.Character.MIN_RADIX;
-            if ("MIN_SUPPLEMENTARY_CODE_POINT".equals(name)) return java.lang.Character.MIN_SUPPLEMENTARY_CODE_POINT;
-            if ("MIN_SURROGATE".equals(name)) return java.lang.Character.MIN_SURROGATE;
-            if ("MIN_VALUE".equals(name)) return java.lang.Character.MIN_VALUE;
-            if ("SIZE".equals(name)) return java.lang.Character.SIZE;
-        }
-        if (type == java.lang.Double.class) {
-            if ("MAX_VALUE".equals(name)) return java.lang.Double.MAX_VALUE;
-            if ("MIN_VALUE".equals(name)) return java.lang.Double.MIN_VALUE;
-            if ("NEGATIVE_INFINITY".equals(name)) return java.lang.Double.NEGATIVE_INFINITY;
-            if ("NaN".equals(name)) return java.lang.Double.NaN;
-            if ("POSITIVE_INFINITY".equals(name)) return java.lang.Double.POSITIVE_INFINITY;
-        }
-        if (type == java.lang.Float.class) {
-            if ("MAX_VALUE".equals(name)) return java.lang.Float.MAX_VALUE;
-            if ("MIN_VALUE".equals(name)) return java.lang.Float.MIN_VALUE;
-            if ("NEGATIVE_INFINITY".equals(name)) return java.lang.Float.NEGATIVE_INFINITY;
-            if ("NaN".equals(name)) return java.lang.Float.NaN;
-            if ("POSITIVE_INFINITY".equals(name)) return java.lang.Float.POSITIVE_INFINITY;
-        }
-        if (type == java.lang.Integer.class) {
-            if ("MAX_VALUE".equals(name)) return java.lang.Integer.MAX_VALUE;
-            if ("MIN_VALUE".equals(name)) return java.lang.Integer.MIN_VALUE;
-        }
-        if (type == java.lang.Long.class) {
-            if ("MAX_VALUE".equals(name)) return java.lang.Long.MAX_VALUE;
-            if ("MIN_VALUE".equals(name)) return java.lang.Long.MIN_VALUE;
-        }
-        if (type == java.lang.Math.class) {
-            if ("E".equals(name)) return java.lang.Math.E;
-            if ("PI".equals(name)) return java.lang.Math.PI;
-        }
-        if (type == java.lang.Short.class) {
-            if ("MAX_VALUE".equals(name)) return java.lang.Short.MAX_VALUE;
-            if ("MIN_VALUE".equals(name)) return java.lang.Short.MIN_VALUE;
-        }
-        if (type == java.lang.String.class) {
-            if ("CASE_INSENSITIVE_ORDER".equals(name)) return java.lang.String.CASE_INSENSITIVE_ORDER;
-        }
-        if (type == java.lang.Thread.class) {
-            if ("MAX_PRIORITY".equals(name)) return java.lang.Thread.MAX_PRIORITY;
-            if ("MIN_PRIORITY".equals(name)) return java.lang.Thread.MIN_PRIORITY;
-            if ("NORM_PRIORITY".equals(name)) return java.lang.Thread.NORM_PRIORITY;
-        }
+        if (type == java.lang.Boolean.class) return getStaticField0(name);
+        if (type == java.lang.Byte.class) return getStaticField1(name);
+        if (type == java.lang.Character.class) return getStaticField2(name);
+        if (type == java.lang.Double.class) return getStaticField3(name);
+        if (type == java.lang.Float.class) return getStaticField4(name);
+        if (type == java.lang.Integer.class) return getStaticField5(name);
+        if (type == java.lang.Long.class) return getStaticField6(name);
+        if (type == java.lang.Math.class) return getStaticField7(name);
+        if (type == java.lang.Short.class) return getStaticField8(name);
+        if (type == java.lang.String.class) return getStaticField9(name);
+        if (type == java.lang.Thread.class) return getStaticField10(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("FALSE".equals(name)) return java.lang.Boolean.FALSE;
+        if ("TRUE".equals(name)) return java.lang.Boolean.TRUE;
+        throw unsupportedStaticField(java.lang.Boolean.class, name);
+    }
+
+    private static Object getStaticField1(String name) throws Exception {
+        if ("MAX_VALUE".equals(name)) return java.lang.Byte.MAX_VALUE;
+        if ("MIN_VALUE".equals(name)) return java.lang.Byte.MIN_VALUE;
+        if ("SIZE".equals(name)) return java.lang.Byte.SIZE;
+        throw unsupportedStaticField(java.lang.Byte.class, name);
+    }
+
+    private static Object getStaticField2(String name) throws Exception {
+        if ("MAX_CODE_POINT".equals(name)) return java.lang.Character.MAX_CODE_POINT;
+        if ("MAX_HIGH_SURROGATE".equals(name)) return java.lang.Character.MAX_HIGH_SURROGATE;
+        if ("MAX_LOW_SURROGATE".equals(name)) return java.lang.Character.MAX_LOW_SURROGATE;
+        if ("MAX_RADIX".equals(name)) return java.lang.Character.MAX_RADIX;
+        if ("MAX_SURROGATE".equals(name)) return java.lang.Character.MAX_SURROGATE;
+        if ("MAX_VALUE".equals(name)) return java.lang.Character.MAX_VALUE;
+        if ("MIN_CODE_POINT".equals(name)) return java.lang.Character.MIN_CODE_POINT;
+        if ("MIN_HIGH_SURROGATE".equals(name)) return java.lang.Character.MIN_HIGH_SURROGATE;
+        if ("MIN_LOW_SURROGATE".equals(name)) return java.lang.Character.MIN_LOW_SURROGATE;
+        if ("MIN_RADIX".equals(name)) return java.lang.Character.MIN_RADIX;
+        if ("MIN_SUPPLEMENTARY_CODE_POINT".equals(name)) return java.lang.Character.MIN_SUPPLEMENTARY_CODE_POINT;
+        if ("MIN_SURROGATE".equals(name)) return java.lang.Character.MIN_SURROGATE;
+        if ("MIN_VALUE".equals(name)) return java.lang.Character.MIN_VALUE;
+        if ("SIZE".equals(name)) return java.lang.Character.SIZE;
+        throw unsupportedStaticField(java.lang.Character.class, name);
+    }
+
+    private static Object getStaticField3(String name) throws Exception {
+        if ("MAX_VALUE".equals(name)) return java.lang.Double.MAX_VALUE;
+        if ("MIN_VALUE".equals(name)) return java.lang.Double.MIN_VALUE;
+        if ("NEGATIVE_INFINITY".equals(name)) return java.lang.Double.NEGATIVE_INFINITY;
+        if ("NaN".equals(name)) return java.lang.Double.NaN;
+        if ("POSITIVE_INFINITY".equals(name)) return java.lang.Double.POSITIVE_INFINITY;
+        throw unsupportedStaticField(java.lang.Double.class, name);
+    }
+
+    private static Object getStaticField4(String name) throws Exception {
+        if ("MAX_VALUE".equals(name)) return java.lang.Float.MAX_VALUE;
+        if ("MIN_VALUE".equals(name)) return java.lang.Float.MIN_VALUE;
+        if ("NEGATIVE_INFINITY".equals(name)) return java.lang.Float.NEGATIVE_INFINITY;
+        if ("NaN".equals(name)) return java.lang.Float.NaN;
+        if ("POSITIVE_INFINITY".equals(name)) return java.lang.Float.POSITIVE_INFINITY;
+        throw unsupportedStaticField(java.lang.Float.class, name);
+    }
+
+    private static Object getStaticField5(String name) throws Exception {
+        if ("MAX_VALUE".equals(name)) return java.lang.Integer.MAX_VALUE;
+        if ("MIN_VALUE".equals(name)) return java.lang.Integer.MIN_VALUE;
+        throw unsupportedStaticField(java.lang.Integer.class, name);
+    }
+
+    private static Object getStaticField6(String name) throws Exception {
+        if ("MAX_VALUE".equals(name)) return java.lang.Long.MAX_VALUE;
+        if ("MIN_VALUE".equals(name)) return java.lang.Long.MIN_VALUE;
+        throw unsupportedStaticField(java.lang.Long.class, name);
+    }
+
+    private static Object getStaticField7(String name) throws Exception {
+        if ("E".equals(name)) return java.lang.Math.E;
+        if ("PI".equals(name)) return java.lang.Math.PI;
+        throw unsupportedStaticField(java.lang.Math.class, name);
+    }
+
+    private static Object getStaticField8(String name) throws Exception {
+        if ("MAX_VALUE".equals(name)) return java.lang.Short.MAX_VALUE;
+        if ("MIN_VALUE".equals(name)) return java.lang.Short.MIN_VALUE;
+        throw unsupportedStaticField(java.lang.Short.class, name);
+    }
+
+    private static Object getStaticField9(String name) throws Exception {
+        if ("CASE_INSENSITIVE_ORDER".equals(name)) return java.lang.String.CASE_INSENSITIVE_ORDER;
+        throw unsupportedStaticField(java.lang.String.class, name);
+    }
+
+    private static Object getStaticField10(String name) throws Exception {
+        if ("MAX_PRIORITY".equals(name)) return java.lang.Thread.MAX_PRIORITY;
+        if ("MIN_PRIORITY".equals(name)) return java.lang.Thread.MIN_PRIORITY;
+        if ("NORM_PRIORITY".equals(name)) return java.lang.Thread.NORM_PRIORITY;
+        throw unsupportedStaticField(java.lang.Thread.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

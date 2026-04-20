@@ -553,31 +553,50 @@ public final class GeneratedAccess_com_codename1_l10n {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == com.codename1.l10n.DateFormat.class) {
-            if ("DEFAULT".equals(name)) return com.codename1.l10n.DateFormat.DEFAULT;
-            if ("FULL".equals(name)) return com.codename1.l10n.DateFormat.FULL;
-            if ("LONG".equals(name)) return com.codename1.l10n.DateFormat.LONG;
-            if ("MEDIUM".equals(name)) return com.codename1.l10n.DateFormat.MEDIUM;
-            if ("SHORT".equals(name)) return com.codename1.l10n.DateFormat.SHORT;
-        }
-        if (type == com.codename1.l10n.DateFormatPatterns.class) {
-            if ("ISO8601".equals(name)) return com.codename1.l10n.DateFormatPatterns.ISO8601;
-            if ("RFC2822".equals(name)) return com.codename1.l10n.DateFormatPatterns.RFC2822;
-            if ("RFC822".equals(name)) return com.codename1.l10n.DateFormatPatterns.RFC822;
-            if ("TWITTER_SEARCH".equals(name)) return com.codename1.l10n.DateFormatPatterns.TWITTER_SEARCH;
-            if ("TWITTER_TIMELINE".equals(name)) return com.codename1.l10n.DateFormatPatterns.TWITTER_TIMELINE;
-            if ("VERBOSE_DATE".equals(name)) return com.codename1.l10n.DateFormatPatterns.VERBOSE_DATE;
-            if ("VERBOSE_TIME".equals(name)) return com.codename1.l10n.DateFormatPatterns.VERBOSE_TIME;
-            if ("VERBOSE_TIMESTAMP".equals(name)) return com.codename1.l10n.DateFormatPatterns.VERBOSE_TIMESTAMP;
-        }
-        if (type == com.codename1.l10n.DateFormatSymbols.class) {
-            if ("ZONE_ID".equals(name)) return com.codename1.l10n.DateFormatSymbols.ZONE_ID;
-            if ("ZONE_LONGNAME".equals(name)) return com.codename1.l10n.DateFormatSymbols.ZONE_LONGNAME;
-            if ("ZONE_LONGNAME_DST".equals(name)) return com.codename1.l10n.DateFormatSymbols.ZONE_LONGNAME_DST;
-            if ("ZONE_SHORTNAME".equals(name)) return com.codename1.l10n.DateFormatSymbols.ZONE_SHORTNAME;
-            if ("ZONE_SHORTNAME_DST".equals(name)) return com.codename1.l10n.DateFormatSymbols.ZONE_SHORTNAME_DST;
-        }
+        if (type == com.codename1.l10n.DateFormat.class) return getStaticField0(name);
+        if (type == com.codename1.l10n.DateFormatPatterns.class) return getStaticField1(name);
+        if (type == com.codename1.l10n.DateFormatSymbols.class) return getStaticField2(name);
+        if (type == com.codename1.l10n.SimpleDateFormat.class) return getStaticField3(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("DEFAULT".equals(name)) return com.codename1.l10n.DateFormat.DEFAULT;
+        if ("FULL".equals(name)) return com.codename1.l10n.DateFormat.FULL;
+        if ("LONG".equals(name)) return com.codename1.l10n.DateFormat.LONG;
+        if ("MEDIUM".equals(name)) return com.codename1.l10n.DateFormat.MEDIUM;
+        if ("SHORT".equals(name)) return com.codename1.l10n.DateFormat.SHORT;
+        throw unsupportedStaticField(com.codename1.l10n.DateFormat.class, name);
+    }
+
+    private static Object getStaticField1(String name) throws Exception {
+        if ("ISO8601".equals(name)) return com.codename1.l10n.DateFormatPatterns.ISO8601;
+        if ("RFC2822".equals(name)) return com.codename1.l10n.DateFormatPatterns.RFC2822;
+        if ("RFC822".equals(name)) return com.codename1.l10n.DateFormatPatterns.RFC822;
+        if ("TWITTER_SEARCH".equals(name)) return com.codename1.l10n.DateFormatPatterns.TWITTER_SEARCH;
+        if ("TWITTER_TIMELINE".equals(name)) return com.codename1.l10n.DateFormatPatterns.TWITTER_TIMELINE;
+        if ("VERBOSE_DATE".equals(name)) return com.codename1.l10n.DateFormatPatterns.VERBOSE_DATE;
+        if ("VERBOSE_TIME".equals(name)) return com.codename1.l10n.DateFormatPatterns.VERBOSE_TIME;
+        if ("VERBOSE_TIMESTAMP".equals(name)) return com.codename1.l10n.DateFormatPatterns.VERBOSE_TIMESTAMP;
+        throw unsupportedStaticField(com.codename1.l10n.DateFormatPatterns.class, name);
+    }
+
+    private static Object getStaticField2(String name) throws Exception {
+        if ("ZONE_ID".equals(name)) return com.codename1.l10n.DateFormatSymbols.ZONE_ID;
+        if ("ZONE_LONGNAME".equals(name)) return com.codename1.l10n.DateFormatSymbols.ZONE_LONGNAME;
+        if ("ZONE_LONGNAME_DST".equals(name)) return com.codename1.l10n.DateFormatSymbols.ZONE_LONGNAME_DST;
+        if ("ZONE_SHORTNAME".equals(name)) return com.codename1.l10n.DateFormatSymbols.ZONE_SHORTNAME;
+        if ("ZONE_SHORTNAME_DST".equals(name)) return com.codename1.l10n.DateFormatSymbols.ZONE_SHORTNAME_DST;
+        throw unsupportedStaticField(com.codename1.l10n.DateFormatSymbols.class, name);
+    }
+
+    private static Object getStaticField3(String name) throws Exception {
+        if ("DEFAULT".equals(name)) return com.codename1.l10n.SimpleDateFormat.DEFAULT;
+        if ("FULL".equals(name)) return com.codename1.l10n.SimpleDateFormat.FULL;
+        if ("LONG".equals(name)) return com.codename1.l10n.SimpleDateFormat.LONG;
+        if ("MEDIUM".equals(name)) return com.codename1.l10n.SimpleDateFormat.MEDIUM;
+        if ("SHORT".equals(name)) return com.codename1.l10n.SimpleDateFormat.SHORT;
+        throw unsupportedStaticField(com.codename1.l10n.SimpleDateFormat.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

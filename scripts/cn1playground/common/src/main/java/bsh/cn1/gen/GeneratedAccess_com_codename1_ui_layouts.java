@@ -2141,77 +2141,95 @@ public final class GeneratedAccess_com_codename1_ui_layouts {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == com.codename1.ui.layouts.BorderLayout.class) {
-            if ("CENTER".equals(name)) return com.codename1.ui.layouts.BorderLayout.CENTER;
-            if ("CENTER_BEHAVIOR_CENTER".equals(name)) return com.codename1.ui.layouts.BorderLayout.CENTER_BEHAVIOR_CENTER;
-            if ("CENTER_BEHAVIOR_CENTER_ABSOLUTE".equals(name)) return com.codename1.ui.layouts.BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE;
-            if ("CENTER_BEHAVIOR_SCALE".equals(name)) return com.codename1.ui.layouts.BorderLayout.CENTER_BEHAVIOR_SCALE;
-            if ("CENTER_BEHAVIOR_TOTAL_BELLOW".equals(name)) return com.codename1.ui.layouts.BorderLayout.CENTER_BEHAVIOR_TOTAL_BELLOW;
-            if ("CENTER_BEHAVIOR_TOTAL_BELOW".equals(name)) return com.codename1.ui.layouts.BorderLayout.CENTER_BEHAVIOR_TOTAL_BELOW;
-            if ("EAST".equals(name)) return com.codename1.ui.layouts.BorderLayout.EAST;
-            if ("NORTH".equals(name)) return com.codename1.ui.layouts.BorderLayout.NORTH;
-            if ("OVERLAY".equals(name)) return com.codename1.ui.layouts.BorderLayout.OVERLAY;
-            if ("SOUTH".equals(name)) return com.codename1.ui.layouts.BorderLayout.SOUTH;
-            if ("WEST".equals(name)) return com.codename1.ui.layouts.BorderLayout.WEST;
-        }
-        if (type == com.codename1.ui.layouts.BoxLayout.class) {
-            if ("X_AXIS".equals(name)) return com.codename1.ui.layouts.BoxLayout.X_AXIS;
-            if ("X_AXIS_NO_GROW".equals(name)) return com.codename1.ui.layouts.BoxLayout.X_AXIS_NO_GROW;
-            if ("Y_AXIS".equals(name)) return com.codename1.ui.layouts.BoxLayout.Y_AXIS;
-            if ("Y_AXIS_BOTTOM_LAST".equals(name)) return com.codename1.ui.layouts.BoxLayout.Y_AXIS_BOTTOM_LAST;
-        }
-        if (type == com.codename1.ui.layouts.GridBagConstraints.class) {
-            if ("BOTH".equals(name)) return com.codename1.ui.layouts.GridBagConstraints.BOTH;
-            if ("CENTER".equals(name)) return com.codename1.ui.layouts.GridBagConstraints.CENTER;
-            if ("EAST".equals(name)) return com.codename1.ui.layouts.GridBagConstraints.EAST;
-            if ("FIRST_LINE_END".equals(name)) return com.codename1.ui.layouts.GridBagConstraints.FIRST_LINE_END;
-            if ("FIRST_LINE_START".equals(name)) return com.codename1.ui.layouts.GridBagConstraints.FIRST_LINE_START;
-            if ("HORIZONTAL".equals(name)) return com.codename1.ui.layouts.GridBagConstraints.HORIZONTAL;
-            if ("LAST_LINE_END".equals(name)) return com.codename1.ui.layouts.GridBagConstraints.LAST_LINE_END;
-            if ("LAST_LINE_START".equals(name)) return com.codename1.ui.layouts.GridBagConstraints.LAST_LINE_START;
-            if ("LINE_END".equals(name)) return com.codename1.ui.layouts.GridBagConstraints.LINE_END;
-            if ("LINE_START".equals(name)) return com.codename1.ui.layouts.GridBagConstraints.LINE_START;
-            if ("NONE".equals(name)) return com.codename1.ui.layouts.GridBagConstraints.NONE;
-            if ("NORTH".equals(name)) return com.codename1.ui.layouts.GridBagConstraints.NORTH;
-            if ("NORTHEAST".equals(name)) return com.codename1.ui.layouts.GridBagConstraints.NORTHEAST;
-            if ("NORTHWEST".equals(name)) return com.codename1.ui.layouts.GridBagConstraints.NORTHWEST;
-            if ("PAGE_END".equals(name)) return com.codename1.ui.layouts.GridBagConstraints.PAGE_END;
-            if ("PAGE_START".equals(name)) return com.codename1.ui.layouts.GridBagConstraints.PAGE_START;
-            if ("RELATIVE".equals(name)) return com.codename1.ui.layouts.GridBagConstraints.RELATIVE;
-            if ("REMAINDER".equals(name)) return com.codename1.ui.layouts.GridBagConstraints.REMAINDER;
-            if ("SOUTH".equals(name)) return com.codename1.ui.layouts.GridBagConstraints.SOUTH;
-            if ("SOUTHEAST".equals(name)) return com.codename1.ui.layouts.GridBagConstraints.SOUTHEAST;
-            if ("SOUTHWEST".equals(name)) return com.codename1.ui.layouts.GridBagConstraints.SOUTHWEST;
-            if ("VERTICAL".equals(name)) return com.codename1.ui.layouts.GridBagConstraints.VERTICAL;
-            if ("WEST".equals(name)) return com.codename1.ui.layouts.GridBagConstraints.WEST;
-        }
-        if (type == com.codename1.ui.layouts.GroupLayout.class) {
-            if ("BASELINE".equals(name)) return com.codename1.ui.layouts.GroupLayout.BASELINE;
-            if ("CENTER".equals(name)) return com.codename1.ui.layouts.GroupLayout.CENTER;
-            if ("DEFAULT_SIZE".equals(name)) return com.codename1.ui.layouts.GroupLayout.DEFAULT_SIZE;
-            if ("EAST".equals(name)) return com.codename1.ui.layouts.GroupLayout.EAST;
-            if ("HORIZONTAL".equals(name)) return com.codename1.ui.layouts.GroupLayout.HORIZONTAL;
-            if ("LEADING".equals(name)) return com.codename1.ui.layouts.GroupLayout.LEADING;
-            if ("NORTH".equals(name)) return com.codename1.ui.layouts.GroupLayout.NORTH;
-            if ("PREFERRED_SIZE".equals(name)) return com.codename1.ui.layouts.GroupLayout.PREFERRED_SIZE;
-            if ("SOUTH".equals(name)) return com.codename1.ui.layouts.GroupLayout.SOUTH;
-            if ("TRAILING".equals(name)) return com.codename1.ui.layouts.GroupLayout.TRAILING;
-            if ("VERTICAL".equals(name)) return com.codename1.ui.layouts.GroupLayout.VERTICAL;
-            if ("WEST".equals(name)) return com.codename1.ui.layouts.GroupLayout.WEST;
-        }
-        if (type == com.codename1.ui.layouts.LayeredLayout.class) {
-            if ("UNIT_AUTO".equals(name)) return com.codename1.ui.layouts.LayeredLayout.UNIT_AUTO;
-            if ("UNIT_BASELINE".equals(name)) return com.codename1.ui.layouts.LayeredLayout.UNIT_BASELINE;
-            if ("UNIT_DIPS".equals(name)) return com.codename1.ui.layouts.LayeredLayout.UNIT_DIPS;
-            if ("UNIT_PERCENT".equals(name)) return com.codename1.ui.layouts.LayeredLayout.UNIT_PERCENT;
-            if ("UNIT_PIXELS".equals(name)) return com.codename1.ui.layouts.LayeredLayout.UNIT_PIXELS;
-        }
-        if (type == com.codename1.ui.layouts.LayoutStyle.class) {
-            if ("INDENT".equals(name)) return com.codename1.ui.layouts.LayoutStyle.INDENT;
-            if ("RELATED".equals(name)) return com.codename1.ui.layouts.LayoutStyle.RELATED;
-            if ("UNRELATED".equals(name)) return com.codename1.ui.layouts.LayoutStyle.UNRELATED;
-        }
+        if (type == com.codename1.ui.layouts.BorderLayout.class) return getStaticField0(name);
+        if (type == com.codename1.ui.layouts.BoxLayout.class) return getStaticField1(name);
+        if (type == com.codename1.ui.layouts.GridBagConstraints.class) return getStaticField2(name);
+        if (type == com.codename1.ui.layouts.GroupLayout.class) return getStaticField3(name);
+        if (type == com.codename1.ui.layouts.LayeredLayout.class) return getStaticField4(name);
+        if (type == com.codename1.ui.layouts.LayoutStyle.class) return getStaticField5(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("CENTER".equals(name)) return com.codename1.ui.layouts.BorderLayout.CENTER;
+        if ("CENTER_BEHAVIOR_CENTER".equals(name)) return com.codename1.ui.layouts.BorderLayout.CENTER_BEHAVIOR_CENTER;
+        if ("CENTER_BEHAVIOR_CENTER_ABSOLUTE".equals(name)) return com.codename1.ui.layouts.BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE;
+        if ("CENTER_BEHAVIOR_SCALE".equals(name)) return com.codename1.ui.layouts.BorderLayout.CENTER_BEHAVIOR_SCALE;
+        if ("CENTER_BEHAVIOR_TOTAL_BELLOW".equals(name)) return com.codename1.ui.layouts.BorderLayout.CENTER_BEHAVIOR_TOTAL_BELLOW;
+        if ("CENTER_BEHAVIOR_TOTAL_BELOW".equals(name)) return com.codename1.ui.layouts.BorderLayout.CENTER_BEHAVIOR_TOTAL_BELOW;
+        if ("EAST".equals(name)) return com.codename1.ui.layouts.BorderLayout.EAST;
+        if ("NORTH".equals(name)) return com.codename1.ui.layouts.BorderLayout.NORTH;
+        if ("OVERLAY".equals(name)) return com.codename1.ui.layouts.BorderLayout.OVERLAY;
+        if ("SOUTH".equals(name)) return com.codename1.ui.layouts.BorderLayout.SOUTH;
+        if ("WEST".equals(name)) return com.codename1.ui.layouts.BorderLayout.WEST;
+        throw unsupportedStaticField(com.codename1.ui.layouts.BorderLayout.class, name);
+    }
+
+    private static Object getStaticField1(String name) throws Exception {
+        if ("X_AXIS".equals(name)) return com.codename1.ui.layouts.BoxLayout.X_AXIS;
+        if ("X_AXIS_NO_GROW".equals(name)) return com.codename1.ui.layouts.BoxLayout.X_AXIS_NO_GROW;
+        if ("Y_AXIS".equals(name)) return com.codename1.ui.layouts.BoxLayout.Y_AXIS;
+        if ("Y_AXIS_BOTTOM_LAST".equals(name)) return com.codename1.ui.layouts.BoxLayout.Y_AXIS_BOTTOM_LAST;
+        throw unsupportedStaticField(com.codename1.ui.layouts.BoxLayout.class, name);
+    }
+
+    private static Object getStaticField2(String name) throws Exception {
+        if ("BOTH".equals(name)) return com.codename1.ui.layouts.GridBagConstraints.BOTH;
+        if ("CENTER".equals(name)) return com.codename1.ui.layouts.GridBagConstraints.CENTER;
+        if ("EAST".equals(name)) return com.codename1.ui.layouts.GridBagConstraints.EAST;
+        if ("FIRST_LINE_END".equals(name)) return com.codename1.ui.layouts.GridBagConstraints.FIRST_LINE_END;
+        if ("FIRST_LINE_START".equals(name)) return com.codename1.ui.layouts.GridBagConstraints.FIRST_LINE_START;
+        if ("HORIZONTAL".equals(name)) return com.codename1.ui.layouts.GridBagConstraints.HORIZONTAL;
+        if ("LAST_LINE_END".equals(name)) return com.codename1.ui.layouts.GridBagConstraints.LAST_LINE_END;
+        if ("LAST_LINE_START".equals(name)) return com.codename1.ui.layouts.GridBagConstraints.LAST_LINE_START;
+        if ("LINE_END".equals(name)) return com.codename1.ui.layouts.GridBagConstraints.LINE_END;
+        if ("LINE_START".equals(name)) return com.codename1.ui.layouts.GridBagConstraints.LINE_START;
+        if ("NONE".equals(name)) return com.codename1.ui.layouts.GridBagConstraints.NONE;
+        if ("NORTH".equals(name)) return com.codename1.ui.layouts.GridBagConstraints.NORTH;
+        if ("NORTHEAST".equals(name)) return com.codename1.ui.layouts.GridBagConstraints.NORTHEAST;
+        if ("NORTHWEST".equals(name)) return com.codename1.ui.layouts.GridBagConstraints.NORTHWEST;
+        if ("PAGE_END".equals(name)) return com.codename1.ui.layouts.GridBagConstraints.PAGE_END;
+        if ("PAGE_START".equals(name)) return com.codename1.ui.layouts.GridBagConstraints.PAGE_START;
+        if ("RELATIVE".equals(name)) return com.codename1.ui.layouts.GridBagConstraints.RELATIVE;
+        if ("REMAINDER".equals(name)) return com.codename1.ui.layouts.GridBagConstraints.REMAINDER;
+        if ("SOUTH".equals(name)) return com.codename1.ui.layouts.GridBagConstraints.SOUTH;
+        if ("SOUTHEAST".equals(name)) return com.codename1.ui.layouts.GridBagConstraints.SOUTHEAST;
+        if ("SOUTHWEST".equals(name)) return com.codename1.ui.layouts.GridBagConstraints.SOUTHWEST;
+        if ("VERTICAL".equals(name)) return com.codename1.ui.layouts.GridBagConstraints.VERTICAL;
+        if ("WEST".equals(name)) return com.codename1.ui.layouts.GridBagConstraints.WEST;
+        throw unsupportedStaticField(com.codename1.ui.layouts.GridBagConstraints.class, name);
+    }
+
+    private static Object getStaticField3(String name) throws Exception {
+        if ("BASELINE".equals(name)) return com.codename1.ui.layouts.GroupLayout.BASELINE;
+        if ("CENTER".equals(name)) return com.codename1.ui.layouts.GroupLayout.CENTER;
+        if ("DEFAULT_SIZE".equals(name)) return com.codename1.ui.layouts.GroupLayout.DEFAULT_SIZE;
+        if ("EAST".equals(name)) return com.codename1.ui.layouts.GroupLayout.EAST;
+        if ("HORIZONTAL".equals(name)) return com.codename1.ui.layouts.GroupLayout.HORIZONTAL;
+        if ("LEADING".equals(name)) return com.codename1.ui.layouts.GroupLayout.LEADING;
+        if ("NORTH".equals(name)) return com.codename1.ui.layouts.GroupLayout.NORTH;
+        if ("PREFERRED_SIZE".equals(name)) return com.codename1.ui.layouts.GroupLayout.PREFERRED_SIZE;
+        if ("SOUTH".equals(name)) return com.codename1.ui.layouts.GroupLayout.SOUTH;
+        if ("TRAILING".equals(name)) return com.codename1.ui.layouts.GroupLayout.TRAILING;
+        if ("VERTICAL".equals(name)) return com.codename1.ui.layouts.GroupLayout.VERTICAL;
+        if ("WEST".equals(name)) return com.codename1.ui.layouts.GroupLayout.WEST;
+        throw unsupportedStaticField(com.codename1.ui.layouts.GroupLayout.class, name);
+    }
+
+    private static Object getStaticField4(String name) throws Exception {
+        if ("UNIT_AUTO".equals(name)) return com.codename1.ui.layouts.LayeredLayout.UNIT_AUTO;
+        if ("UNIT_BASELINE".equals(name)) return com.codename1.ui.layouts.LayeredLayout.UNIT_BASELINE;
+        if ("UNIT_DIPS".equals(name)) return com.codename1.ui.layouts.LayeredLayout.UNIT_DIPS;
+        if ("UNIT_PERCENT".equals(name)) return com.codename1.ui.layouts.LayeredLayout.UNIT_PERCENT;
+        if ("UNIT_PIXELS".equals(name)) return com.codename1.ui.layouts.LayeredLayout.UNIT_PIXELS;
+        throw unsupportedStaticField(com.codename1.ui.layouts.LayeredLayout.class, name);
+    }
+
+    private static Object getStaticField5(String name) throws Exception {
+        if ("INDENT".equals(name)) return com.codename1.ui.layouts.LayoutStyle.INDENT;
+        if ("RELATED".equals(name)) return com.codename1.ui.layouts.LayoutStyle.RELATED;
+        if ("UNRELATED".equals(name)) return com.codename1.ui.layouts.LayoutStyle.UNRELATED;
+        throw unsupportedStaticField(com.codename1.ui.layouts.LayoutStyle.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

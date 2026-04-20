@@ -514,36 +514,42 @@ public final class GeneratedAccess_com_codename1_io_tar {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == com.codename1.io.tar.TarConstants.class) {
-            if ("DATA_BLOCK".equals(name)) return com.codename1.io.tar.TarConstants.DATA_BLOCK;
-            if ("EOF_BLOCK".equals(name)) return com.codename1.io.tar.TarConstants.EOF_BLOCK;
-            if ("HEADER_BLOCK".equals(name)) return com.codename1.io.tar.TarConstants.HEADER_BLOCK;
-        }
-        if (type == com.codename1.io.tar.TarHeader.class) {
-            if ("CHKSUMLEN".equals(name)) return com.codename1.io.tar.TarHeader.CHKSUMLEN;
-            if ("DEVLEN".equals(name)) return com.codename1.io.tar.TarHeader.DEVLEN;
-            if ("GIDLEN".equals(name)) return com.codename1.io.tar.TarHeader.GIDLEN;
-            if ("GNAMELEN".equals(name)) return com.codename1.io.tar.TarHeader.GNAMELEN;
-            if ("GNU_TMAGIC".equals(name)) return com.codename1.io.tar.TarHeader.GNU_TMAGIC;
-            if ("LF_BLK".equals(name)) return com.codename1.io.tar.TarHeader.LF_BLK;
-            if ("LF_CHR".equals(name)) return com.codename1.io.tar.TarHeader.LF_CHR;
-            if ("LF_CONTIG".equals(name)) return com.codename1.io.tar.TarHeader.LF_CONTIG;
-            if ("LF_DIR".equals(name)) return com.codename1.io.tar.TarHeader.LF_DIR;
-            if ("LF_FIFO".equals(name)) return com.codename1.io.tar.TarHeader.LF_FIFO;
-            if ("LF_LINK".equals(name)) return com.codename1.io.tar.TarHeader.LF_LINK;
-            if ("LF_NORMAL".equals(name)) return com.codename1.io.tar.TarHeader.LF_NORMAL;
-            if ("LF_OLDNORM".equals(name)) return com.codename1.io.tar.TarHeader.LF_OLDNORM;
-            if ("LF_SYMLINK".equals(name)) return com.codename1.io.tar.TarHeader.LF_SYMLINK;
-            if ("MAGICLEN".equals(name)) return com.codename1.io.tar.TarHeader.MAGICLEN;
-            if ("MODELEN".equals(name)) return com.codename1.io.tar.TarHeader.MODELEN;
-            if ("MODTIMELEN".equals(name)) return com.codename1.io.tar.TarHeader.MODTIMELEN;
-            if ("NAMELEN".equals(name)) return com.codename1.io.tar.TarHeader.NAMELEN;
-            if ("SIZELEN".equals(name)) return com.codename1.io.tar.TarHeader.SIZELEN;
-            if ("TMAGIC".equals(name)) return com.codename1.io.tar.TarHeader.TMAGIC;
-            if ("UIDLEN".equals(name)) return com.codename1.io.tar.TarHeader.UIDLEN;
-            if ("UNAMELEN".equals(name)) return com.codename1.io.tar.TarHeader.UNAMELEN;
-        }
+        if (type == com.codename1.io.tar.TarConstants.class) return getStaticField0(name);
+        if (type == com.codename1.io.tar.TarHeader.class) return getStaticField1(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("DATA_BLOCK".equals(name)) return com.codename1.io.tar.TarConstants.DATA_BLOCK;
+        if ("EOF_BLOCK".equals(name)) return com.codename1.io.tar.TarConstants.EOF_BLOCK;
+        if ("HEADER_BLOCK".equals(name)) return com.codename1.io.tar.TarConstants.HEADER_BLOCK;
+        throw unsupportedStaticField(com.codename1.io.tar.TarConstants.class, name);
+    }
+
+    private static Object getStaticField1(String name) throws Exception {
+        if ("CHKSUMLEN".equals(name)) return com.codename1.io.tar.TarHeader.CHKSUMLEN;
+        if ("DEVLEN".equals(name)) return com.codename1.io.tar.TarHeader.DEVLEN;
+        if ("GIDLEN".equals(name)) return com.codename1.io.tar.TarHeader.GIDLEN;
+        if ("GNAMELEN".equals(name)) return com.codename1.io.tar.TarHeader.GNAMELEN;
+        if ("GNU_TMAGIC".equals(name)) return com.codename1.io.tar.TarHeader.GNU_TMAGIC;
+        if ("LF_BLK".equals(name)) return com.codename1.io.tar.TarHeader.LF_BLK;
+        if ("LF_CHR".equals(name)) return com.codename1.io.tar.TarHeader.LF_CHR;
+        if ("LF_CONTIG".equals(name)) return com.codename1.io.tar.TarHeader.LF_CONTIG;
+        if ("LF_DIR".equals(name)) return com.codename1.io.tar.TarHeader.LF_DIR;
+        if ("LF_FIFO".equals(name)) return com.codename1.io.tar.TarHeader.LF_FIFO;
+        if ("LF_LINK".equals(name)) return com.codename1.io.tar.TarHeader.LF_LINK;
+        if ("LF_NORMAL".equals(name)) return com.codename1.io.tar.TarHeader.LF_NORMAL;
+        if ("LF_OLDNORM".equals(name)) return com.codename1.io.tar.TarHeader.LF_OLDNORM;
+        if ("LF_SYMLINK".equals(name)) return com.codename1.io.tar.TarHeader.LF_SYMLINK;
+        if ("MAGICLEN".equals(name)) return com.codename1.io.tar.TarHeader.MAGICLEN;
+        if ("MODELEN".equals(name)) return com.codename1.io.tar.TarHeader.MODELEN;
+        if ("MODTIMELEN".equals(name)) return com.codename1.io.tar.TarHeader.MODTIMELEN;
+        if ("NAMELEN".equals(name)) return com.codename1.io.tar.TarHeader.NAMELEN;
+        if ("SIZELEN".equals(name)) return com.codename1.io.tar.TarHeader.SIZELEN;
+        if ("TMAGIC".equals(name)) return com.codename1.io.tar.TarHeader.TMAGIC;
+        if ("UIDLEN".equals(name)) return com.codename1.io.tar.TarHeader.UIDLEN;
+        if ("UNAMELEN".equals(name)) return com.codename1.io.tar.TarHeader.UNAMELEN;
+        throw unsupportedStaticField(com.codename1.io.tar.TarHeader.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

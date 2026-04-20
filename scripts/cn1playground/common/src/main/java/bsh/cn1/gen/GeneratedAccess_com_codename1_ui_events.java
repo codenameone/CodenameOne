@@ -706,12 +706,15 @@ public final class GeneratedAccess_com_codename1_ui_events {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == com.codename1.ui.events.DataChangedListener.class) {
-            if ("ADDED".equals(name)) return com.codename1.ui.events.DataChangedListener.ADDED;
-            if ("CHANGED".equals(name)) return com.codename1.ui.events.DataChangedListener.CHANGED;
-            if ("REMOVED".equals(name)) return com.codename1.ui.events.DataChangedListener.REMOVED;
-        }
+        if (type == com.codename1.ui.events.DataChangedListener.class) return getStaticField0(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("ADDED".equals(name)) return com.codename1.ui.events.DataChangedListener.ADDED;
+        if ("CHANGED".equals(name)) return com.codename1.ui.events.DataChangedListener.CHANGED;
+        if ("REMOVED".equals(name)) return com.codename1.ui.events.DataChangedListener.REMOVED;
+        throw unsupportedStaticField(com.codename1.ui.events.DataChangedListener.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

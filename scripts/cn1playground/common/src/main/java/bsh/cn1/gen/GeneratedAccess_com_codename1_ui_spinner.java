@@ -14062,7 +14062,283 @@ public final class GeneratedAccess_com_codename1_ui_spinner {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
+        if (type == com.codename1.ui.spinner.BaseSpinner.class) return getStaticField0(name);
+        if (type == com.codename1.ui.spinner.DateSpinner.class) return getStaticField1(name);
+        if (type == com.codename1.ui.spinner.DateTimeSpinner.class) return getStaticField2(name);
+        if (type == com.codename1.ui.spinner.GenericSpinner.class) return getStaticField3(name);
+        if (type == com.codename1.ui.spinner.NumericSpinner.class) return getStaticField4(name);
+        if (type == com.codename1.ui.spinner.Picker.class) return getStaticField5(name);
+        if (type == com.codename1.ui.spinner.TimeSpinner.class) return getStaticField6(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("BASELINE".equals(name)) return com.codename1.ui.spinner.BaseSpinner.BASELINE;
+        if ("BOTTOM".equals(name)) return com.codename1.ui.spinner.BaseSpinner.BOTTOM;
+        if ("BRB_CENTER_OFFSET".equals(name)) return com.codename1.ui.spinner.BaseSpinner.BRB_CENTER_OFFSET;
+        if ("BRB_CONSTANT_ASCENT".equals(name)) return com.codename1.ui.spinner.BaseSpinner.BRB_CONSTANT_ASCENT;
+        if ("BRB_CONSTANT_DESCENT".equals(name)) return com.codename1.ui.spinner.BaseSpinner.BRB_CONSTANT_DESCENT;
+        if ("BRB_OTHER".equals(name)) return com.codename1.ui.spinner.BaseSpinner.BRB_OTHER;
+        if ("CENTER".equals(name)) return com.codename1.ui.spinner.BaseSpinner.CENTER;
+        if ("CROSSHAIR_CURSOR".equals(name)) return com.codename1.ui.spinner.BaseSpinner.CROSSHAIR_CURSOR;
+        if ("DEFAULT_CURSOR".equals(name)) return com.codename1.ui.spinner.BaseSpinner.DEFAULT_CURSOR;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_X".equals(name)) return com.codename1.ui.spinner.BaseSpinner.DRAG_REGION_IMMEDIATELY_DRAG_X;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_XY".equals(name)) return com.codename1.ui.spinner.BaseSpinner.DRAG_REGION_IMMEDIATELY_DRAG_XY;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_Y".equals(name)) return com.codename1.ui.spinner.BaseSpinner.DRAG_REGION_IMMEDIATELY_DRAG_Y;
+        if ("DRAG_REGION_LIKELY_DRAG_X".equals(name)) return com.codename1.ui.spinner.BaseSpinner.DRAG_REGION_LIKELY_DRAG_X;
+        if ("DRAG_REGION_LIKELY_DRAG_XY".equals(name)) return com.codename1.ui.spinner.BaseSpinner.DRAG_REGION_LIKELY_DRAG_XY;
+        if ("DRAG_REGION_LIKELY_DRAG_Y".equals(name)) return com.codename1.ui.spinner.BaseSpinner.DRAG_REGION_LIKELY_DRAG_Y;
+        if ("DRAG_REGION_NOT_DRAGGABLE".equals(name)) return com.codename1.ui.spinner.BaseSpinner.DRAG_REGION_NOT_DRAGGABLE;
+        if ("DRAG_REGION_POSSIBLE_DRAG_X".equals(name)) return com.codename1.ui.spinner.BaseSpinner.DRAG_REGION_POSSIBLE_DRAG_X;
+        if ("DRAG_REGION_POSSIBLE_DRAG_XY".equals(name)) return com.codename1.ui.spinner.BaseSpinner.DRAG_REGION_POSSIBLE_DRAG_XY;
+        if ("DRAG_REGION_POSSIBLE_DRAG_Y".equals(name)) return com.codename1.ui.spinner.BaseSpinner.DRAG_REGION_POSSIBLE_DRAG_Y;
+        if ("E_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.BaseSpinner.E_RESIZE_CURSOR;
+        if ("HAND_CURSOR".equals(name)) return com.codename1.ui.spinner.BaseSpinner.HAND_CURSOR;
+        if ("LEFT".equals(name)) return com.codename1.ui.spinner.BaseSpinner.LEFT;
+        if ("MOVE_CURSOR".equals(name)) return com.codename1.ui.spinner.BaseSpinner.MOVE_CURSOR;
+        if ("NE_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.BaseSpinner.NE_RESIZE_CURSOR;
+        if ("NW_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.BaseSpinner.NW_RESIZE_CURSOR;
+        if ("N_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.BaseSpinner.N_RESIZE_CURSOR;
+        if ("RIGHT".equals(name)) return com.codename1.ui.spinner.BaseSpinner.RIGHT;
+        if ("SE_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.BaseSpinner.SE_RESIZE_CURSOR;
+        if ("SW_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.BaseSpinner.SW_RESIZE_CURSOR;
+        if ("S_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.BaseSpinner.S_RESIZE_CURSOR;
+        if ("TEXT_CURSOR".equals(name)) return com.codename1.ui.spinner.BaseSpinner.TEXT_CURSOR;
+        if ("TOP".equals(name)) return com.codename1.ui.spinner.BaseSpinner.TOP;
+        if ("WAIT_CURSOR".equals(name)) return com.codename1.ui.spinner.BaseSpinner.WAIT_CURSOR;
+        if ("W_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.BaseSpinner.W_RESIZE_CURSOR;
+        throw unsupportedStaticField(com.codename1.ui.spinner.BaseSpinner.class, name);
+    }
+
+    private static Object getStaticField1(String name) throws Exception {
+        if ("BASELINE".equals(name)) return com.codename1.ui.spinner.DateSpinner.BASELINE;
+        if ("BOTTOM".equals(name)) return com.codename1.ui.spinner.DateSpinner.BOTTOM;
+        if ("BRB_CENTER_OFFSET".equals(name)) return com.codename1.ui.spinner.DateSpinner.BRB_CENTER_OFFSET;
+        if ("BRB_CONSTANT_ASCENT".equals(name)) return com.codename1.ui.spinner.DateSpinner.BRB_CONSTANT_ASCENT;
+        if ("BRB_CONSTANT_DESCENT".equals(name)) return com.codename1.ui.spinner.DateSpinner.BRB_CONSTANT_DESCENT;
+        if ("BRB_OTHER".equals(name)) return com.codename1.ui.spinner.DateSpinner.BRB_OTHER;
+        if ("CENTER".equals(name)) return com.codename1.ui.spinner.DateSpinner.CENTER;
+        if ("CROSSHAIR_CURSOR".equals(name)) return com.codename1.ui.spinner.DateSpinner.CROSSHAIR_CURSOR;
+        if ("DEFAULT_CURSOR".equals(name)) return com.codename1.ui.spinner.DateSpinner.DEFAULT_CURSOR;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_X".equals(name)) return com.codename1.ui.spinner.DateSpinner.DRAG_REGION_IMMEDIATELY_DRAG_X;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_XY".equals(name)) return com.codename1.ui.spinner.DateSpinner.DRAG_REGION_IMMEDIATELY_DRAG_XY;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_Y".equals(name)) return com.codename1.ui.spinner.DateSpinner.DRAG_REGION_IMMEDIATELY_DRAG_Y;
+        if ("DRAG_REGION_LIKELY_DRAG_X".equals(name)) return com.codename1.ui.spinner.DateSpinner.DRAG_REGION_LIKELY_DRAG_X;
+        if ("DRAG_REGION_LIKELY_DRAG_XY".equals(name)) return com.codename1.ui.spinner.DateSpinner.DRAG_REGION_LIKELY_DRAG_XY;
+        if ("DRAG_REGION_LIKELY_DRAG_Y".equals(name)) return com.codename1.ui.spinner.DateSpinner.DRAG_REGION_LIKELY_DRAG_Y;
+        if ("DRAG_REGION_NOT_DRAGGABLE".equals(name)) return com.codename1.ui.spinner.DateSpinner.DRAG_REGION_NOT_DRAGGABLE;
+        if ("DRAG_REGION_POSSIBLE_DRAG_X".equals(name)) return com.codename1.ui.spinner.DateSpinner.DRAG_REGION_POSSIBLE_DRAG_X;
+        if ("DRAG_REGION_POSSIBLE_DRAG_XY".equals(name)) return com.codename1.ui.spinner.DateSpinner.DRAG_REGION_POSSIBLE_DRAG_XY;
+        if ("DRAG_REGION_POSSIBLE_DRAG_Y".equals(name)) return com.codename1.ui.spinner.DateSpinner.DRAG_REGION_POSSIBLE_DRAG_Y;
+        if ("E_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.DateSpinner.E_RESIZE_CURSOR;
+        if ("HAND_CURSOR".equals(name)) return com.codename1.ui.spinner.DateSpinner.HAND_CURSOR;
+        if ("LEFT".equals(name)) return com.codename1.ui.spinner.DateSpinner.LEFT;
+        if ("MOVE_CURSOR".equals(name)) return com.codename1.ui.spinner.DateSpinner.MOVE_CURSOR;
+        if ("NE_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.DateSpinner.NE_RESIZE_CURSOR;
+        if ("NW_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.DateSpinner.NW_RESIZE_CURSOR;
+        if ("N_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.DateSpinner.N_RESIZE_CURSOR;
+        if ("RIGHT".equals(name)) return com.codename1.ui.spinner.DateSpinner.RIGHT;
+        if ("SE_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.DateSpinner.SE_RESIZE_CURSOR;
+        if ("SW_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.DateSpinner.SW_RESIZE_CURSOR;
+        if ("S_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.DateSpinner.S_RESIZE_CURSOR;
+        if ("TEXT_CURSOR".equals(name)) return com.codename1.ui.spinner.DateSpinner.TEXT_CURSOR;
+        if ("TOP".equals(name)) return com.codename1.ui.spinner.DateSpinner.TOP;
+        if ("WAIT_CURSOR".equals(name)) return com.codename1.ui.spinner.DateSpinner.WAIT_CURSOR;
+        if ("W_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.DateSpinner.W_RESIZE_CURSOR;
+        throw unsupportedStaticField(com.codename1.ui.spinner.DateSpinner.class, name);
+    }
+
+    private static Object getStaticField2(String name) throws Exception {
+        if ("BASELINE".equals(name)) return com.codename1.ui.spinner.DateTimeSpinner.BASELINE;
+        if ("BOTTOM".equals(name)) return com.codename1.ui.spinner.DateTimeSpinner.BOTTOM;
+        if ("BRB_CENTER_OFFSET".equals(name)) return com.codename1.ui.spinner.DateTimeSpinner.BRB_CENTER_OFFSET;
+        if ("BRB_CONSTANT_ASCENT".equals(name)) return com.codename1.ui.spinner.DateTimeSpinner.BRB_CONSTANT_ASCENT;
+        if ("BRB_CONSTANT_DESCENT".equals(name)) return com.codename1.ui.spinner.DateTimeSpinner.BRB_CONSTANT_DESCENT;
+        if ("BRB_OTHER".equals(name)) return com.codename1.ui.spinner.DateTimeSpinner.BRB_OTHER;
+        if ("CENTER".equals(name)) return com.codename1.ui.spinner.DateTimeSpinner.CENTER;
+        if ("CROSSHAIR_CURSOR".equals(name)) return com.codename1.ui.spinner.DateTimeSpinner.CROSSHAIR_CURSOR;
+        if ("DEFAULT_CURSOR".equals(name)) return com.codename1.ui.spinner.DateTimeSpinner.DEFAULT_CURSOR;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_X".equals(name)) return com.codename1.ui.spinner.DateTimeSpinner.DRAG_REGION_IMMEDIATELY_DRAG_X;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_XY".equals(name)) return com.codename1.ui.spinner.DateTimeSpinner.DRAG_REGION_IMMEDIATELY_DRAG_XY;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_Y".equals(name)) return com.codename1.ui.spinner.DateTimeSpinner.DRAG_REGION_IMMEDIATELY_DRAG_Y;
+        if ("DRAG_REGION_LIKELY_DRAG_X".equals(name)) return com.codename1.ui.spinner.DateTimeSpinner.DRAG_REGION_LIKELY_DRAG_X;
+        if ("DRAG_REGION_LIKELY_DRAG_XY".equals(name)) return com.codename1.ui.spinner.DateTimeSpinner.DRAG_REGION_LIKELY_DRAG_XY;
+        if ("DRAG_REGION_LIKELY_DRAG_Y".equals(name)) return com.codename1.ui.spinner.DateTimeSpinner.DRAG_REGION_LIKELY_DRAG_Y;
+        if ("DRAG_REGION_NOT_DRAGGABLE".equals(name)) return com.codename1.ui.spinner.DateTimeSpinner.DRAG_REGION_NOT_DRAGGABLE;
+        if ("DRAG_REGION_POSSIBLE_DRAG_X".equals(name)) return com.codename1.ui.spinner.DateTimeSpinner.DRAG_REGION_POSSIBLE_DRAG_X;
+        if ("DRAG_REGION_POSSIBLE_DRAG_XY".equals(name)) return com.codename1.ui.spinner.DateTimeSpinner.DRAG_REGION_POSSIBLE_DRAG_XY;
+        if ("DRAG_REGION_POSSIBLE_DRAG_Y".equals(name)) return com.codename1.ui.spinner.DateTimeSpinner.DRAG_REGION_POSSIBLE_DRAG_Y;
+        if ("E_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.DateTimeSpinner.E_RESIZE_CURSOR;
+        if ("HAND_CURSOR".equals(name)) return com.codename1.ui.spinner.DateTimeSpinner.HAND_CURSOR;
+        if ("LEFT".equals(name)) return com.codename1.ui.spinner.DateTimeSpinner.LEFT;
+        if ("MOVE_CURSOR".equals(name)) return com.codename1.ui.spinner.DateTimeSpinner.MOVE_CURSOR;
+        if ("NE_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.DateTimeSpinner.NE_RESIZE_CURSOR;
+        if ("NW_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.DateTimeSpinner.NW_RESIZE_CURSOR;
+        if ("N_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.DateTimeSpinner.N_RESIZE_CURSOR;
+        if ("RIGHT".equals(name)) return com.codename1.ui.spinner.DateTimeSpinner.RIGHT;
+        if ("SE_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.DateTimeSpinner.SE_RESIZE_CURSOR;
+        if ("SW_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.DateTimeSpinner.SW_RESIZE_CURSOR;
+        if ("S_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.DateTimeSpinner.S_RESIZE_CURSOR;
+        if ("TEXT_CURSOR".equals(name)) return com.codename1.ui.spinner.DateTimeSpinner.TEXT_CURSOR;
+        if ("TOP".equals(name)) return com.codename1.ui.spinner.DateTimeSpinner.TOP;
+        if ("WAIT_CURSOR".equals(name)) return com.codename1.ui.spinner.DateTimeSpinner.WAIT_CURSOR;
+        if ("W_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.DateTimeSpinner.W_RESIZE_CURSOR;
+        throw unsupportedStaticField(com.codename1.ui.spinner.DateTimeSpinner.class, name);
+    }
+
+    private static Object getStaticField3(String name) throws Exception {
+        if ("BASELINE".equals(name)) return com.codename1.ui.spinner.GenericSpinner.BASELINE;
+        if ("BOTTOM".equals(name)) return com.codename1.ui.spinner.GenericSpinner.BOTTOM;
+        if ("BRB_CENTER_OFFSET".equals(name)) return com.codename1.ui.spinner.GenericSpinner.BRB_CENTER_OFFSET;
+        if ("BRB_CONSTANT_ASCENT".equals(name)) return com.codename1.ui.spinner.GenericSpinner.BRB_CONSTANT_ASCENT;
+        if ("BRB_CONSTANT_DESCENT".equals(name)) return com.codename1.ui.spinner.GenericSpinner.BRB_CONSTANT_DESCENT;
+        if ("BRB_OTHER".equals(name)) return com.codename1.ui.spinner.GenericSpinner.BRB_OTHER;
+        if ("CENTER".equals(name)) return com.codename1.ui.spinner.GenericSpinner.CENTER;
+        if ("CROSSHAIR_CURSOR".equals(name)) return com.codename1.ui.spinner.GenericSpinner.CROSSHAIR_CURSOR;
+        if ("DEFAULT_CURSOR".equals(name)) return com.codename1.ui.spinner.GenericSpinner.DEFAULT_CURSOR;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_X".equals(name)) return com.codename1.ui.spinner.GenericSpinner.DRAG_REGION_IMMEDIATELY_DRAG_X;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_XY".equals(name)) return com.codename1.ui.spinner.GenericSpinner.DRAG_REGION_IMMEDIATELY_DRAG_XY;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_Y".equals(name)) return com.codename1.ui.spinner.GenericSpinner.DRAG_REGION_IMMEDIATELY_DRAG_Y;
+        if ("DRAG_REGION_LIKELY_DRAG_X".equals(name)) return com.codename1.ui.spinner.GenericSpinner.DRAG_REGION_LIKELY_DRAG_X;
+        if ("DRAG_REGION_LIKELY_DRAG_XY".equals(name)) return com.codename1.ui.spinner.GenericSpinner.DRAG_REGION_LIKELY_DRAG_XY;
+        if ("DRAG_REGION_LIKELY_DRAG_Y".equals(name)) return com.codename1.ui.spinner.GenericSpinner.DRAG_REGION_LIKELY_DRAG_Y;
+        if ("DRAG_REGION_NOT_DRAGGABLE".equals(name)) return com.codename1.ui.spinner.GenericSpinner.DRAG_REGION_NOT_DRAGGABLE;
+        if ("DRAG_REGION_POSSIBLE_DRAG_X".equals(name)) return com.codename1.ui.spinner.GenericSpinner.DRAG_REGION_POSSIBLE_DRAG_X;
+        if ("DRAG_REGION_POSSIBLE_DRAG_XY".equals(name)) return com.codename1.ui.spinner.GenericSpinner.DRAG_REGION_POSSIBLE_DRAG_XY;
+        if ("DRAG_REGION_POSSIBLE_DRAG_Y".equals(name)) return com.codename1.ui.spinner.GenericSpinner.DRAG_REGION_POSSIBLE_DRAG_Y;
+        if ("E_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.GenericSpinner.E_RESIZE_CURSOR;
+        if ("HAND_CURSOR".equals(name)) return com.codename1.ui.spinner.GenericSpinner.HAND_CURSOR;
+        if ("LEFT".equals(name)) return com.codename1.ui.spinner.GenericSpinner.LEFT;
+        if ("MOVE_CURSOR".equals(name)) return com.codename1.ui.spinner.GenericSpinner.MOVE_CURSOR;
+        if ("NE_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.GenericSpinner.NE_RESIZE_CURSOR;
+        if ("NW_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.GenericSpinner.NW_RESIZE_CURSOR;
+        if ("N_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.GenericSpinner.N_RESIZE_CURSOR;
+        if ("RIGHT".equals(name)) return com.codename1.ui.spinner.GenericSpinner.RIGHT;
+        if ("SE_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.GenericSpinner.SE_RESIZE_CURSOR;
+        if ("SW_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.GenericSpinner.SW_RESIZE_CURSOR;
+        if ("S_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.GenericSpinner.S_RESIZE_CURSOR;
+        if ("TEXT_CURSOR".equals(name)) return com.codename1.ui.spinner.GenericSpinner.TEXT_CURSOR;
+        if ("TOP".equals(name)) return com.codename1.ui.spinner.GenericSpinner.TOP;
+        if ("WAIT_CURSOR".equals(name)) return com.codename1.ui.spinner.GenericSpinner.WAIT_CURSOR;
+        if ("W_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.GenericSpinner.W_RESIZE_CURSOR;
+        throw unsupportedStaticField(com.codename1.ui.spinner.GenericSpinner.class, name);
+    }
+
+    private static Object getStaticField4(String name) throws Exception {
+        if ("BASELINE".equals(name)) return com.codename1.ui.spinner.NumericSpinner.BASELINE;
+        if ("BOTTOM".equals(name)) return com.codename1.ui.spinner.NumericSpinner.BOTTOM;
+        if ("BRB_CENTER_OFFSET".equals(name)) return com.codename1.ui.spinner.NumericSpinner.BRB_CENTER_OFFSET;
+        if ("BRB_CONSTANT_ASCENT".equals(name)) return com.codename1.ui.spinner.NumericSpinner.BRB_CONSTANT_ASCENT;
+        if ("BRB_CONSTANT_DESCENT".equals(name)) return com.codename1.ui.spinner.NumericSpinner.BRB_CONSTANT_DESCENT;
+        if ("BRB_OTHER".equals(name)) return com.codename1.ui.spinner.NumericSpinner.BRB_OTHER;
+        if ("CENTER".equals(name)) return com.codename1.ui.spinner.NumericSpinner.CENTER;
+        if ("CROSSHAIR_CURSOR".equals(name)) return com.codename1.ui.spinner.NumericSpinner.CROSSHAIR_CURSOR;
+        if ("DEFAULT_CURSOR".equals(name)) return com.codename1.ui.spinner.NumericSpinner.DEFAULT_CURSOR;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_X".equals(name)) return com.codename1.ui.spinner.NumericSpinner.DRAG_REGION_IMMEDIATELY_DRAG_X;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_XY".equals(name)) return com.codename1.ui.spinner.NumericSpinner.DRAG_REGION_IMMEDIATELY_DRAG_XY;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_Y".equals(name)) return com.codename1.ui.spinner.NumericSpinner.DRAG_REGION_IMMEDIATELY_DRAG_Y;
+        if ("DRAG_REGION_LIKELY_DRAG_X".equals(name)) return com.codename1.ui.spinner.NumericSpinner.DRAG_REGION_LIKELY_DRAG_X;
+        if ("DRAG_REGION_LIKELY_DRAG_XY".equals(name)) return com.codename1.ui.spinner.NumericSpinner.DRAG_REGION_LIKELY_DRAG_XY;
+        if ("DRAG_REGION_LIKELY_DRAG_Y".equals(name)) return com.codename1.ui.spinner.NumericSpinner.DRAG_REGION_LIKELY_DRAG_Y;
+        if ("DRAG_REGION_NOT_DRAGGABLE".equals(name)) return com.codename1.ui.spinner.NumericSpinner.DRAG_REGION_NOT_DRAGGABLE;
+        if ("DRAG_REGION_POSSIBLE_DRAG_X".equals(name)) return com.codename1.ui.spinner.NumericSpinner.DRAG_REGION_POSSIBLE_DRAG_X;
+        if ("DRAG_REGION_POSSIBLE_DRAG_XY".equals(name)) return com.codename1.ui.spinner.NumericSpinner.DRAG_REGION_POSSIBLE_DRAG_XY;
+        if ("DRAG_REGION_POSSIBLE_DRAG_Y".equals(name)) return com.codename1.ui.spinner.NumericSpinner.DRAG_REGION_POSSIBLE_DRAG_Y;
+        if ("E_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.NumericSpinner.E_RESIZE_CURSOR;
+        if ("HAND_CURSOR".equals(name)) return com.codename1.ui.spinner.NumericSpinner.HAND_CURSOR;
+        if ("LEFT".equals(name)) return com.codename1.ui.spinner.NumericSpinner.LEFT;
+        if ("MOVE_CURSOR".equals(name)) return com.codename1.ui.spinner.NumericSpinner.MOVE_CURSOR;
+        if ("NE_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.NumericSpinner.NE_RESIZE_CURSOR;
+        if ("NW_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.NumericSpinner.NW_RESIZE_CURSOR;
+        if ("N_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.NumericSpinner.N_RESIZE_CURSOR;
+        if ("RIGHT".equals(name)) return com.codename1.ui.spinner.NumericSpinner.RIGHT;
+        if ("SE_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.NumericSpinner.SE_RESIZE_CURSOR;
+        if ("SW_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.NumericSpinner.SW_RESIZE_CURSOR;
+        if ("S_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.NumericSpinner.S_RESIZE_CURSOR;
+        if ("TEXT_CURSOR".equals(name)) return com.codename1.ui.spinner.NumericSpinner.TEXT_CURSOR;
+        if ("TOP".equals(name)) return com.codename1.ui.spinner.NumericSpinner.TOP;
+        if ("WAIT_CURSOR".equals(name)) return com.codename1.ui.spinner.NumericSpinner.WAIT_CURSOR;
+        if ("W_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.NumericSpinner.W_RESIZE_CURSOR;
+        throw unsupportedStaticField(com.codename1.ui.spinner.NumericSpinner.class, name);
+    }
+
+    private static Object getStaticField5(String name) throws Exception {
+        if ("BASELINE".equals(name)) return com.codename1.ui.spinner.Picker.BASELINE;
+        if ("BOTTOM".equals(name)) return com.codename1.ui.spinner.Picker.BOTTOM;
+        if ("BRB_CENTER_OFFSET".equals(name)) return com.codename1.ui.spinner.Picker.BRB_CENTER_OFFSET;
+        if ("BRB_CONSTANT_ASCENT".equals(name)) return com.codename1.ui.spinner.Picker.BRB_CONSTANT_ASCENT;
+        if ("BRB_CONSTANT_DESCENT".equals(name)) return com.codename1.ui.spinner.Picker.BRB_CONSTANT_DESCENT;
+        if ("BRB_OTHER".equals(name)) return com.codename1.ui.spinner.Picker.BRB_OTHER;
+        if ("CENTER".equals(name)) return com.codename1.ui.spinner.Picker.CENTER;
+        if ("CROSSHAIR_CURSOR".equals(name)) return com.codename1.ui.spinner.Picker.CROSSHAIR_CURSOR;
+        if ("DEFAULT_CURSOR".equals(name)) return com.codename1.ui.spinner.Picker.DEFAULT_CURSOR;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_X".equals(name)) return com.codename1.ui.spinner.Picker.DRAG_REGION_IMMEDIATELY_DRAG_X;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_XY".equals(name)) return com.codename1.ui.spinner.Picker.DRAG_REGION_IMMEDIATELY_DRAG_XY;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_Y".equals(name)) return com.codename1.ui.spinner.Picker.DRAG_REGION_IMMEDIATELY_DRAG_Y;
+        if ("DRAG_REGION_LIKELY_DRAG_X".equals(name)) return com.codename1.ui.spinner.Picker.DRAG_REGION_LIKELY_DRAG_X;
+        if ("DRAG_REGION_LIKELY_DRAG_XY".equals(name)) return com.codename1.ui.spinner.Picker.DRAG_REGION_LIKELY_DRAG_XY;
+        if ("DRAG_REGION_LIKELY_DRAG_Y".equals(name)) return com.codename1.ui.spinner.Picker.DRAG_REGION_LIKELY_DRAG_Y;
+        if ("DRAG_REGION_NOT_DRAGGABLE".equals(name)) return com.codename1.ui.spinner.Picker.DRAG_REGION_NOT_DRAGGABLE;
+        if ("DRAG_REGION_POSSIBLE_DRAG_X".equals(name)) return com.codename1.ui.spinner.Picker.DRAG_REGION_POSSIBLE_DRAG_X;
+        if ("DRAG_REGION_POSSIBLE_DRAG_XY".equals(name)) return com.codename1.ui.spinner.Picker.DRAG_REGION_POSSIBLE_DRAG_XY;
+        if ("DRAG_REGION_POSSIBLE_DRAG_Y".equals(name)) return com.codename1.ui.spinner.Picker.DRAG_REGION_POSSIBLE_DRAG_Y;
+        if ("E_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.Picker.E_RESIZE_CURSOR;
+        if ("HAND_CURSOR".equals(name)) return com.codename1.ui.spinner.Picker.HAND_CURSOR;
+        if ("LEFT".equals(name)) return com.codename1.ui.spinner.Picker.LEFT;
+        if ("MOVE_CURSOR".equals(name)) return com.codename1.ui.spinner.Picker.MOVE_CURSOR;
+        if ("NE_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.Picker.NE_RESIZE_CURSOR;
+        if ("NW_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.Picker.NW_RESIZE_CURSOR;
+        if ("N_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.Picker.N_RESIZE_CURSOR;
+        if ("RIGHT".equals(name)) return com.codename1.ui.spinner.Picker.RIGHT;
+        if ("SE_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.Picker.SE_RESIZE_CURSOR;
+        if ("STATE_DEFAULT".equals(name)) return com.codename1.ui.spinner.Picker.STATE_DEFAULT;
+        if ("STATE_PRESSED".equals(name)) return com.codename1.ui.spinner.Picker.STATE_PRESSED;
+        if ("STATE_ROLLOVER".equals(name)) return com.codename1.ui.spinner.Picker.STATE_ROLLOVER;
+        if ("SW_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.Picker.SW_RESIZE_CURSOR;
+        if ("S_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.Picker.S_RESIZE_CURSOR;
+        if ("TEXT_CURSOR".equals(name)) return com.codename1.ui.spinner.Picker.TEXT_CURSOR;
+        if ("TOP".equals(name)) return com.codename1.ui.spinner.Picker.TOP;
+        if ("WAIT_CURSOR".equals(name)) return com.codename1.ui.spinner.Picker.WAIT_CURSOR;
+        if ("W_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.Picker.W_RESIZE_CURSOR;
+        throw unsupportedStaticField(com.codename1.ui.spinner.Picker.class, name);
+    }
+
+    private static Object getStaticField6(String name) throws Exception {
+        if ("BASELINE".equals(name)) return com.codename1.ui.spinner.TimeSpinner.BASELINE;
+        if ("BOTTOM".equals(name)) return com.codename1.ui.spinner.TimeSpinner.BOTTOM;
+        if ("BRB_CENTER_OFFSET".equals(name)) return com.codename1.ui.spinner.TimeSpinner.BRB_CENTER_OFFSET;
+        if ("BRB_CONSTANT_ASCENT".equals(name)) return com.codename1.ui.spinner.TimeSpinner.BRB_CONSTANT_ASCENT;
+        if ("BRB_CONSTANT_DESCENT".equals(name)) return com.codename1.ui.spinner.TimeSpinner.BRB_CONSTANT_DESCENT;
+        if ("BRB_OTHER".equals(name)) return com.codename1.ui.spinner.TimeSpinner.BRB_OTHER;
+        if ("CENTER".equals(name)) return com.codename1.ui.spinner.TimeSpinner.CENTER;
+        if ("CROSSHAIR_CURSOR".equals(name)) return com.codename1.ui.spinner.TimeSpinner.CROSSHAIR_CURSOR;
+        if ("DEFAULT_CURSOR".equals(name)) return com.codename1.ui.spinner.TimeSpinner.DEFAULT_CURSOR;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_X".equals(name)) return com.codename1.ui.spinner.TimeSpinner.DRAG_REGION_IMMEDIATELY_DRAG_X;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_XY".equals(name)) return com.codename1.ui.spinner.TimeSpinner.DRAG_REGION_IMMEDIATELY_DRAG_XY;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_Y".equals(name)) return com.codename1.ui.spinner.TimeSpinner.DRAG_REGION_IMMEDIATELY_DRAG_Y;
+        if ("DRAG_REGION_LIKELY_DRAG_X".equals(name)) return com.codename1.ui.spinner.TimeSpinner.DRAG_REGION_LIKELY_DRAG_X;
+        if ("DRAG_REGION_LIKELY_DRAG_XY".equals(name)) return com.codename1.ui.spinner.TimeSpinner.DRAG_REGION_LIKELY_DRAG_XY;
+        if ("DRAG_REGION_LIKELY_DRAG_Y".equals(name)) return com.codename1.ui.spinner.TimeSpinner.DRAG_REGION_LIKELY_DRAG_Y;
+        if ("DRAG_REGION_NOT_DRAGGABLE".equals(name)) return com.codename1.ui.spinner.TimeSpinner.DRAG_REGION_NOT_DRAGGABLE;
+        if ("DRAG_REGION_POSSIBLE_DRAG_X".equals(name)) return com.codename1.ui.spinner.TimeSpinner.DRAG_REGION_POSSIBLE_DRAG_X;
+        if ("DRAG_REGION_POSSIBLE_DRAG_XY".equals(name)) return com.codename1.ui.spinner.TimeSpinner.DRAG_REGION_POSSIBLE_DRAG_XY;
+        if ("DRAG_REGION_POSSIBLE_DRAG_Y".equals(name)) return com.codename1.ui.spinner.TimeSpinner.DRAG_REGION_POSSIBLE_DRAG_Y;
+        if ("E_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.TimeSpinner.E_RESIZE_CURSOR;
+        if ("HAND_CURSOR".equals(name)) return com.codename1.ui.spinner.TimeSpinner.HAND_CURSOR;
+        if ("LEFT".equals(name)) return com.codename1.ui.spinner.TimeSpinner.LEFT;
+        if ("MOVE_CURSOR".equals(name)) return com.codename1.ui.spinner.TimeSpinner.MOVE_CURSOR;
+        if ("NE_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.TimeSpinner.NE_RESIZE_CURSOR;
+        if ("NW_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.TimeSpinner.NW_RESIZE_CURSOR;
+        if ("N_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.TimeSpinner.N_RESIZE_CURSOR;
+        if ("RIGHT".equals(name)) return com.codename1.ui.spinner.TimeSpinner.RIGHT;
+        if ("SE_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.TimeSpinner.SE_RESIZE_CURSOR;
+        if ("SW_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.TimeSpinner.SW_RESIZE_CURSOR;
+        if ("S_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.TimeSpinner.S_RESIZE_CURSOR;
+        if ("TEXT_CURSOR".equals(name)) return com.codename1.ui.spinner.TimeSpinner.TEXT_CURSOR;
+        if ("TOP".equals(name)) return com.codename1.ui.spinner.TimeSpinner.TOP;
+        if ("WAIT_CURSOR".equals(name)) return com.codename1.ui.spinner.TimeSpinner.WAIT_CURSOR;
+        if ("W_RESIZE_CURSOR".equals(name)) return com.codename1.ui.spinner.TimeSpinner.W_RESIZE_CURSOR;
+        throw unsupportedStaticField(com.codename1.ui.spinner.TimeSpinner.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

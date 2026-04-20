@@ -2144,52 +2144,68 @@ public final class GeneratedAccess_com_codename1_io_gzip {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == com.codename1.io.gzip.GZIPHeader.class) {
-            if ("OS_AMIGA".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_AMIGA;
-            if ("OS_ATARI".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_ATARI;
-            if ("OS_CPM".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_CPM;
-            if ("OS_MACOS".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_MACOS;
-            if ("OS_MSDOS".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_MSDOS;
-            if ("OS_OS2".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_OS2;
-            if ("OS_QDOS".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_QDOS;
-            if ("OS_RISCOS".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_RISCOS;
-            if ("OS_TOPS20".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_TOPS20;
-            if ("OS_UNIX".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_UNIX;
-            if ("OS_UNKNOWN".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_UNKNOWN;
-            if ("OS_VMCMS".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_VMCMS;
-            if ("OS_VMS".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_VMS;
-            if ("OS_WIN32".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_WIN32;
-            if ("OS_ZSYSTEM".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_ZSYSTEM;
-        }
-        if (type == com.codename1.io.gzip.JZlib.class) {
-            if ("DEF_WBITS".equals(name)) return com.codename1.io.gzip.JZlib.DEF_WBITS;
-            if ("MAX_WBITS".equals(name)) return com.codename1.io.gzip.JZlib.MAX_WBITS;
-            if ("Z_ASCII".equals(name)) return com.codename1.io.gzip.JZlib.Z_ASCII;
-            if ("Z_BEST_COMPRESSION".equals(name)) return com.codename1.io.gzip.JZlib.Z_BEST_COMPRESSION;
-            if ("Z_BEST_SPEED".equals(name)) return com.codename1.io.gzip.JZlib.Z_BEST_SPEED;
-            if ("Z_BINARY".equals(name)) return com.codename1.io.gzip.JZlib.Z_BINARY;
-            if ("Z_BUF_ERROR".equals(name)) return com.codename1.io.gzip.JZlib.Z_BUF_ERROR;
-            if ("Z_DATA_ERROR".equals(name)) return com.codename1.io.gzip.JZlib.Z_DATA_ERROR;
-            if ("Z_DEFAULT_COMPRESSION".equals(name)) return com.codename1.io.gzip.JZlib.Z_DEFAULT_COMPRESSION;
-            if ("Z_DEFAULT_STRATEGY".equals(name)) return com.codename1.io.gzip.JZlib.Z_DEFAULT_STRATEGY;
-            if ("Z_ERRNO".equals(name)) return com.codename1.io.gzip.JZlib.Z_ERRNO;
-            if ("Z_FILTERED".equals(name)) return com.codename1.io.gzip.JZlib.Z_FILTERED;
-            if ("Z_FINISH".equals(name)) return com.codename1.io.gzip.JZlib.Z_FINISH;
-            if ("Z_FULL_FLUSH".equals(name)) return com.codename1.io.gzip.JZlib.Z_FULL_FLUSH;
-            if ("Z_HUFFMAN_ONLY".equals(name)) return com.codename1.io.gzip.JZlib.Z_HUFFMAN_ONLY;
-            if ("Z_MEM_ERROR".equals(name)) return com.codename1.io.gzip.JZlib.Z_MEM_ERROR;
-            if ("Z_NEED_DICT".equals(name)) return com.codename1.io.gzip.JZlib.Z_NEED_DICT;
-            if ("Z_NO_COMPRESSION".equals(name)) return com.codename1.io.gzip.JZlib.Z_NO_COMPRESSION;
-            if ("Z_NO_FLUSH".equals(name)) return com.codename1.io.gzip.JZlib.Z_NO_FLUSH;
-            if ("Z_OK".equals(name)) return com.codename1.io.gzip.JZlib.Z_OK;
-            if ("Z_PARTIAL_FLUSH".equals(name)) return com.codename1.io.gzip.JZlib.Z_PARTIAL_FLUSH;
-            if ("Z_STREAM_END".equals(name)) return com.codename1.io.gzip.JZlib.Z_STREAM_END;
-            if ("Z_STREAM_ERROR".equals(name)) return com.codename1.io.gzip.JZlib.Z_STREAM_ERROR;
-            if ("Z_SYNC_FLUSH".equals(name)) return com.codename1.io.gzip.JZlib.Z_SYNC_FLUSH;
-            if ("Z_UNKNOWN".equals(name)) return com.codename1.io.gzip.JZlib.Z_UNKNOWN;
-            if ("Z_VERSION_ERROR".equals(name)) return com.codename1.io.gzip.JZlib.Z_VERSION_ERROR;
-        }
+        if (type == com.codename1.io.gzip.GZConnectionRequest.class) return getStaticField0(name);
+        if (type == com.codename1.io.gzip.GZIPHeader.class) return getStaticField1(name);
+        if (type == com.codename1.io.gzip.JZlib.class) return getStaticField2(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("PRIORITY_CRITICAL".equals(name)) return com.codename1.io.gzip.GZConnectionRequest.PRIORITY_CRITICAL;
+        if ("PRIORITY_HIGH".equals(name)) return com.codename1.io.gzip.GZConnectionRequest.PRIORITY_HIGH;
+        if ("PRIORITY_LOW".equals(name)) return com.codename1.io.gzip.GZConnectionRequest.PRIORITY_LOW;
+        if ("PRIORITY_NORMAL".equals(name)) return com.codename1.io.gzip.GZConnectionRequest.PRIORITY_NORMAL;
+        if ("PRIORITY_REDUNDANT".equals(name)) return com.codename1.io.gzip.GZConnectionRequest.PRIORITY_REDUNDANT;
+        throw unsupportedStaticField(com.codename1.io.gzip.GZConnectionRequest.class, name);
+    }
+
+    private static Object getStaticField1(String name) throws Exception {
+        if ("OS_AMIGA".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_AMIGA;
+        if ("OS_ATARI".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_ATARI;
+        if ("OS_CPM".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_CPM;
+        if ("OS_MACOS".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_MACOS;
+        if ("OS_MSDOS".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_MSDOS;
+        if ("OS_OS2".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_OS2;
+        if ("OS_QDOS".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_QDOS;
+        if ("OS_RISCOS".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_RISCOS;
+        if ("OS_TOPS20".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_TOPS20;
+        if ("OS_UNIX".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_UNIX;
+        if ("OS_UNKNOWN".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_UNKNOWN;
+        if ("OS_VMCMS".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_VMCMS;
+        if ("OS_VMS".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_VMS;
+        if ("OS_WIN32".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_WIN32;
+        if ("OS_ZSYSTEM".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_ZSYSTEM;
+        throw unsupportedStaticField(com.codename1.io.gzip.GZIPHeader.class, name);
+    }
+
+    private static Object getStaticField2(String name) throws Exception {
+        if ("DEF_WBITS".equals(name)) return com.codename1.io.gzip.JZlib.DEF_WBITS;
+        if ("MAX_WBITS".equals(name)) return com.codename1.io.gzip.JZlib.MAX_WBITS;
+        if ("Z_ASCII".equals(name)) return com.codename1.io.gzip.JZlib.Z_ASCII;
+        if ("Z_BEST_COMPRESSION".equals(name)) return com.codename1.io.gzip.JZlib.Z_BEST_COMPRESSION;
+        if ("Z_BEST_SPEED".equals(name)) return com.codename1.io.gzip.JZlib.Z_BEST_SPEED;
+        if ("Z_BINARY".equals(name)) return com.codename1.io.gzip.JZlib.Z_BINARY;
+        if ("Z_BUF_ERROR".equals(name)) return com.codename1.io.gzip.JZlib.Z_BUF_ERROR;
+        if ("Z_DATA_ERROR".equals(name)) return com.codename1.io.gzip.JZlib.Z_DATA_ERROR;
+        if ("Z_DEFAULT_COMPRESSION".equals(name)) return com.codename1.io.gzip.JZlib.Z_DEFAULT_COMPRESSION;
+        if ("Z_DEFAULT_STRATEGY".equals(name)) return com.codename1.io.gzip.JZlib.Z_DEFAULT_STRATEGY;
+        if ("Z_ERRNO".equals(name)) return com.codename1.io.gzip.JZlib.Z_ERRNO;
+        if ("Z_FILTERED".equals(name)) return com.codename1.io.gzip.JZlib.Z_FILTERED;
+        if ("Z_FINISH".equals(name)) return com.codename1.io.gzip.JZlib.Z_FINISH;
+        if ("Z_FULL_FLUSH".equals(name)) return com.codename1.io.gzip.JZlib.Z_FULL_FLUSH;
+        if ("Z_HUFFMAN_ONLY".equals(name)) return com.codename1.io.gzip.JZlib.Z_HUFFMAN_ONLY;
+        if ("Z_MEM_ERROR".equals(name)) return com.codename1.io.gzip.JZlib.Z_MEM_ERROR;
+        if ("Z_NEED_DICT".equals(name)) return com.codename1.io.gzip.JZlib.Z_NEED_DICT;
+        if ("Z_NO_COMPRESSION".equals(name)) return com.codename1.io.gzip.JZlib.Z_NO_COMPRESSION;
+        if ("Z_NO_FLUSH".equals(name)) return com.codename1.io.gzip.JZlib.Z_NO_FLUSH;
+        if ("Z_OK".equals(name)) return com.codename1.io.gzip.JZlib.Z_OK;
+        if ("Z_PARTIAL_FLUSH".equals(name)) return com.codename1.io.gzip.JZlib.Z_PARTIAL_FLUSH;
+        if ("Z_STREAM_END".equals(name)) return com.codename1.io.gzip.JZlib.Z_STREAM_END;
+        if ("Z_STREAM_ERROR".equals(name)) return com.codename1.io.gzip.JZlib.Z_STREAM_ERROR;
+        if ("Z_SYNC_FLUSH".equals(name)) return com.codename1.io.gzip.JZlib.Z_SYNC_FLUSH;
+        if ("Z_UNKNOWN".equals(name)) return com.codename1.io.gzip.JZlib.Z_UNKNOWN;
+        if ("Z_VERSION_ERROR".equals(name)) return com.codename1.io.gzip.JZlib.Z_VERSION_ERROR;
+        throw unsupportedStaticField(com.codename1.io.gzip.JZlib.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

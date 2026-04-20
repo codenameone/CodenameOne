@@ -1310,15 +1310,21 @@ public final class GeneratedAccess_com_codename1_ui_animations {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == com.codename1.ui.animations.AnimationObject.class) {
-            if ("MOTION_TYPE_LINEAR".equals(name)) return com.codename1.ui.animations.AnimationObject.MOTION_TYPE_LINEAR;
-            if ("MOTION_TYPE_SPLINE".equals(name)) return com.codename1.ui.animations.AnimationObject.MOTION_TYPE_SPLINE;
-        }
-        if (type == com.codename1.ui.animations.CommonTransitions.class) {
-            if ("SLIDE_HORIZONTAL".equals(name)) return com.codename1.ui.animations.CommonTransitions.SLIDE_HORIZONTAL;
-            if ("SLIDE_VERTICAL".equals(name)) return com.codename1.ui.animations.CommonTransitions.SLIDE_VERTICAL;
-        }
+        if (type == com.codename1.ui.animations.AnimationObject.class) return getStaticField0(name);
+        if (type == com.codename1.ui.animations.CommonTransitions.class) return getStaticField1(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("MOTION_TYPE_LINEAR".equals(name)) return com.codename1.ui.animations.AnimationObject.MOTION_TYPE_LINEAR;
+        if ("MOTION_TYPE_SPLINE".equals(name)) return com.codename1.ui.animations.AnimationObject.MOTION_TYPE_SPLINE;
+        throw unsupportedStaticField(com.codename1.ui.animations.AnimationObject.class, name);
+    }
+
+    private static Object getStaticField1(String name) throws Exception {
+        if ("SLIDE_HORIZONTAL".equals(name)) return com.codename1.ui.animations.CommonTransitions.SLIDE_HORIZONTAL;
+        if ("SLIDE_VERTICAL".equals(name)) return com.codename1.ui.animations.CommonTransitions.SLIDE_VERTICAL;
+        throw unsupportedStaticField(com.codename1.ui.animations.CommonTransitions.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

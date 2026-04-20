@@ -2103,7 +2103,46 @@ public final class GeneratedAccess_com_codename1_ui_tree {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
+        if (type == com.codename1.ui.tree.Tree.class) return getStaticField0(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("BASELINE".equals(name)) return com.codename1.ui.tree.Tree.BASELINE;
+        if ("BOTTOM".equals(name)) return com.codename1.ui.tree.Tree.BOTTOM;
+        if ("BRB_CENTER_OFFSET".equals(name)) return com.codename1.ui.tree.Tree.BRB_CENTER_OFFSET;
+        if ("BRB_CONSTANT_ASCENT".equals(name)) return com.codename1.ui.tree.Tree.BRB_CONSTANT_ASCENT;
+        if ("BRB_CONSTANT_DESCENT".equals(name)) return com.codename1.ui.tree.Tree.BRB_CONSTANT_DESCENT;
+        if ("BRB_OTHER".equals(name)) return com.codename1.ui.tree.Tree.BRB_OTHER;
+        if ("CENTER".equals(name)) return com.codename1.ui.tree.Tree.CENTER;
+        if ("CROSSHAIR_CURSOR".equals(name)) return com.codename1.ui.tree.Tree.CROSSHAIR_CURSOR;
+        if ("DEFAULT_CURSOR".equals(name)) return com.codename1.ui.tree.Tree.DEFAULT_CURSOR;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_X".equals(name)) return com.codename1.ui.tree.Tree.DRAG_REGION_IMMEDIATELY_DRAG_X;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_XY".equals(name)) return com.codename1.ui.tree.Tree.DRAG_REGION_IMMEDIATELY_DRAG_XY;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_Y".equals(name)) return com.codename1.ui.tree.Tree.DRAG_REGION_IMMEDIATELY_DRAG_Y;
+        if ("DRAG_REGION_LIKELY_DRAG_X".equals(name)) return com.codename1.ui.tree.Tree.DRAG_REGION_LIKELY_DRAG_X;
+        if ("DRAG_REGION_LIKELY_DRAG_XY".equals(name)) return com.codename1.ui.tree.Tree.DRAG_REGION_LIKELY_DRAG_XY;
+        if ("DRAG_REGION_LIKELY_DRAG_Y".equals(name)) return com.codename1.ui.tree.Tree.DRAG_REGION_LIKELY_DRAG_Y;
+        if ("DRAG_REGION_NOT_DRAGGABLE".equals(name)) return com.codename1.ui.tree.Tree.DRAG_REGION_NOT_DRAGGABLE;
+        if ("DRAG_REGION_POSSIBLE_DRAG_X".equals(name)) return com.codename1.ui.tree.Tree.DRAG_REGION_POSSIBLE_DRAG_X;
+        if ("DRAG_REGION_POSSIBLE_DRAG_XY".equals(name)) return com.codename1.ui.tree.Tree.DRAG_REGION_POSSIBLE_DRAG_XY;
+        if ("DRAG_REGION_POSSIBLE_DRAG_Y".equals(name)) return com.codename1.ui.tree.Tree.DRAG_REGION_POSSIBLE_DRAG_Y;
+        if ("E_RESIZE_CURSOR".equals(name)) return com.codename1.ui.tree.Tree.E_RESIZE_CURSOR;
+        if ("HAND_CURSOR".equals(name)) return com.codename1.ui.tree.Tree.HAND_CURSOR;
+        if ("LEFT".equals(name)) return com.codename1.ui.tree.Tree.LEFT;
+        if ("MOVE_CURSOR".equals(name)) return com.codename1.ui.tree.Tree.MOVE_CURSOR;
+        if ("NE_RESIZE_CURSOR".equals(name)) return com.codename1.ui.tree.Tree.NE_RESIZE_CURSOR;
+        if ("NW_RESIZE_CURSOR".equals(name)) return com.codename1.ui.tree.Tree.NW_RESIZE_CURSOR;
+        if ("N_RESIZE_CURSOR".equals(name)) return com.codename1.ui.tree.Tree.N_RESIZE_CURSOR;
+        if ("RIGHT".equals(name)) return com.codename1.ui.tree.Tree.RIGHT;
+        if ("SE_RESIZE_CURSOR".equals(name)) return com.codename1.ui.tree.Tree.SE_RESIZE_CURSOR;
+        if ("SW_RESIZE_CURSOR".equals(name)) return com.codename1.ui.tree.Tree.SW_RESIZE_CURSOR;
+        if ("S_RESIZE_CURSOR".equals(name)) return com.codename1.ui.tree.Tree.S_RESIZE_CURSOR;
+        if ("TEXT_CURSOR".equals(name)) return com.codename1.ui.tree.Tree.TEXT_CURSOR;
+        if ("TOP".equals(name)) return com.codename1.ui.tree.Tree.TOP;
+        if ("WAIT_CURSOR".equals(name)) return com.codename1.ui.tree.Tree.WAIT_CURSOR;
+        if ("W_RESIZE_CURSOR".equals(name)) return com.codename1.ui.tree.Tree.W_RESIZE_CURSOR;
+        throw unsupportedStaticField(com.codename1.ui.tree.Tree.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

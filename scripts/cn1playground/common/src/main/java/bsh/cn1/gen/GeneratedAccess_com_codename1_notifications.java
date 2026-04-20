@@ -157,14 +157,17 @@ public final class GeneratedAccess_com_codename1_notifications {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == com.codename1.notifications.LocalNotification.class) {
-            if ("REPEAT_DAY".equals(name)) return com.codename1.notifications.LocalNotification.REPEAT_DAY;
-            if ("REPEAT_HOUR".equals(name)) return com.codename1.notifications.LocalNotification.REPEAT_HOUR;
-            if ("REPEAT_MINUTE".equals(name)) return com.codename1.notifications.LocalNotification.REPEAT_MINUTE;
-            if ("REPEAT_NONE".equals(name)) return com.codename1.notifications.LocalNotification.REPEAT_NONE;
-            if ("REPEAT_WEEK".equals(name)) return com.codename1.notifications.LocalNotification.REPEAT_WEEK;
-        }
+        if (type == com.codename1.notifications.LocalNotification.class) return getStaticField0(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("REPEAT_DAY".equals(name)) return com.codename1.notifications.LocalNotification.REPEAT_DAY;
+        if ("REPEAT_HOUR".equals(name)) return com.codename1.notifications.LocalNotification.REPEAT_HOUR;
+        if ("REPEAT_MINUTE".equals(name)) return com.codename1.notifications.LocalNotification.REPEAT_MINUTE;
+        if ("REPEAT_NONE".equals(name)) return com.codename1.notifications.LocalNotification.REPEAT_NONE;
+        if ("REPEAT_WEEK".equals(name)) return com.codename1.notifications.LocalNotification.REPEAT_WEEK;
+        throw unsupportedStaticField(com.codename1.notifications.LocalNotification.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

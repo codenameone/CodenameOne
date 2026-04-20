@@ -197,14 +197,17 @@ public final class GeneratedAccess_com_codename1_processing {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == com.codename1.processing.Result.class) {
-            if ("ARRAY_END".equals(name)) return com.codename1.processing.Result.ARRAY_END;
-            if ("ARRAY_START".equals(name)) return com.codename1.processing.Result.ARRAY_START;
-            if ("JSON".equals(name)) return com.codename1.processing.Result.JSON;
-            if ("SEPARATOR".equals(name)) return com.codename1.processing.Result.SEPARATOR;
-            if ("XML".equals(name)) return com.codename1.processing.Result.XML;
-        }
+        if (type == com.codename1.processing.Result.class) return getStaticField0(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("ARRAY_END".equals(name)) return com.codename1.processing.Result.ARRAY_END;
+        if ("ARRAY_START".equals(name)) return com.codename1.processing.Result.ARRAY_START;
+        if ("JSON".equals(name)) return com.codename1.processing.Result.JSON;
+        if ("SEPARATOR".equals(name)) return com.codename1.processing.Result.SEPARATOR;
+        if ("XML".equals(name)) return com.codename1.processing.Result.XML;
+        throw unsupportedStaticField(com.codename1.processing.Result.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

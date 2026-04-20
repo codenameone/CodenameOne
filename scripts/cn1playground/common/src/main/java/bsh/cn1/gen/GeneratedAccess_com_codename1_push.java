@@ -513,18 +513,24 @@ public final class GeneratedAccess_com_codename1_push {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == com.codename1.push.Push.class) {
-            if ("GOOGLE_PUSH_KEY".equals(name)) return com.codename1.push.Push.GOOGLE_PUSH_KEY;
-        }
-        if (type == com.codename1.push.PushCallback.class) {
-            if ("REGISTRATION_ACCOUNT_MISSING".equals(name)) return com.codename1.push.PushCallback.REGISTRATION_ACCOUNT_MISSING;
-            if ("REGISTRATION_AUTHENTICATION_FAILED".equals(name)) return com.codename1.push.PushCallback.REGISTRATION_AUTHENTICATION_FAILED;
-            if ("REGISTRATION_ERROR_SERVICE_NOT_AVAILABLE".equals(name)) return com.codename1.push.PushCallback.REGISTRATION_ERROR_SERVICE_NOT_AVAILABLE;
-            if ("REGISTRATION_INVALID_SENDER".equals(name)) return com.codename1.push.PushCallback.REGISTRATION_INVALID_SENDER;
-            if ("REGISTRATION_PHONE_REGISTRATION_ERROR".equals(name)) return com.codename1.push.PushCallback.REGISTRATION_PHONE_REGISTRATION_ERROR;
-            if ("REGISTRATION_TOO_MANY_REGISTRATIONS".equals(name)) return com.codename1.push.PushCallback.REGISTRATION_TOO_MANY_REGISTRATIONS;
-        }
+        if (type == com.codename1.push.Push.class) return getStaticField0(name);
+        if (type == com.codename1.push.PushCallback.class) return getStaticField1(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("GOOGLE_PUSH_KEY".equals(name)) return com.codename1.push.Push.GOOGLE_PUSH_KEY;
+        throw unsupportedStaticField(com.codename1.push.Push.class, name);
+    }
+
+    private static Object getStaticField1(String name) throws Exception {
+        if ("REGISTRATION_ACCOUNT_MISSING".equals(name)) return com.codename1.push.PushCallback.REGISTRATION_ACCOUNT_MISSING;
+        if ("REGISTRATION_AUTHENTICATION_FAILED".equals(name)) return com.codename1.push.PushCallback.REGISTRATION_AUTHENTICATION_FAILED;
+        if ("REGISTRATION_ERROR_SERVICE_NOT_AVAILABLE".equals(name)) return com.codename1.push.PushCallback.REGISTRATION_ERROR_SERVICE_NOT_AVAILABLE;
+        if ("REGISTRATION_INVALID_SENDER".equals(name)) return com.codename1.push.PushCallback.REGISTRATION_INVALID_SENDER;
+        if ("REGISTRATION_PHONE_REGISTRATION_ERROR".equals(name)) return com.codename1.push.PushCallback.REGISTRATION_PHONE_REGISTRATION_ERROR;
+        if ("REGISTRATION_TOO_MANY_REGISTRATIONS".equals(name)) return com.codename1.push.PushCallback.REGISTRATION_TOO_MANY_REGISTRATIONS;
+        throw unsupportedStaticField(com.codename1.push.PushCallback.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

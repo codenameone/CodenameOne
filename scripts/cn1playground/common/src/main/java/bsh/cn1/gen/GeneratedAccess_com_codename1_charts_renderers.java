@@ -2656,17 +2656,39 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == com.codename1.charts.renderers.BasicStroke.class) {
-            if ("DASHED".equals(name)) return com.codename1.charts.renderers.BasicStroke.DASHED;
-            if ("DOTTED".equals(name)) return com.codename1.charts.renderers.BasicStroke.DOTTED;
-            if ("SOLID".equals(name)) return com.codename1.charts.renderers.BasicStroke.SOLID;
-        }
-        if (type == com.codename1.charts.renderers.DefaultRenderer.class) {
-            if ("BACKGROUND_COLOR".equals(name)) return com.codename1.charts.renderers.DefaultRenderer.BACKGROUND_COLOR;
-            if ("NO_COLOR".equals(name)) return com.codename1.charts.renderers.DefaultRenderer.NO_COLOR;
-            if ("TEXT_COLOR".equals(name)) return com.codename1.charts.renderers.DefaultRenderer.TEXT_COLOR;
-        }
+        if (type == com.codename1.charts.renderers.BasicStroke.class) return getStaticField0(name);
+        if (type == com.codename1.charts.renderers.DefaultRenderer.class) return getStaticField1(name);
+        if (type == com.codename1.charts.renderers.DialRenderer.class) return getStaticField2(name);
+        if (type == com.codename1.charts.renderers.XYMultipleSeriesRenderer.class) return getStaticField3(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("DASHED".equals(name)) return com.codename1.charts.renderers.BasicStroke.DASHED;
+        if ("DOTTED".equals(name)) return com.codename1.charts.renderers.BasicStroke.DOTTED;
+        if ("SOLID".equals(name)) return com.codename1.charts.renderers.BasicStroke.SOLID;
+        throw unsupportedStaticField(com.codename1.charts.renderers.BasicStroke.class, name);
+    }
+
+    private static Object getStaticField1(String name) throws Exception {
+        if ("BACKGROUND_COLOR".equals(name)) return com.codename1.charts.renderers.DefaultRenderer.BACKGROUND_COLOR;
+        if ("NO_COLOR".equals(name)) return com.codename1.charts.renderers.DefaultRenderer.NO_COLOR;
+        if ("TEXT_COLOR".equals(name)) return com.codename1.charts.renderers.DefaultRenderer.TEXT_COLOR;
+        throw unsupportedStaticField(com.codename1.charts.renderers.DefaultRenderer.class, name);
+    }
+
+    private static Object getStaticField2(String name) throws Exception {
+        if ("BACKGROUND_COLOR".equals(name)) return com.codename1.charts.renderers.DialRenderer.BACKGROUND_COLOR;
+        if ("NO_COLOR".equals(name)) return com.codename1.charts.renderers.DialRenderer.NO_COLOR;
+        if ("TEXT_COLOR".equals(name)) return com.codename1.charts.renderers.DialRenderer.TEXT_COLOR;
+        throw unsupportedStaticField(com.codename1.charts.renderers.DialRenderer.class, name);
+    }
+
+    private static Object getStaticField3(String name) throws Exception {
+        if ("BACKGROUND_COLOR".equals(name)) return com.codename1.charts.renderers.XYMultipleSeriesRenderer.BACKGROUND_COLOR;
+        if ("NO_COLOR".equals(name)) return com.codename1.charts.renderers.XYMultipleSeriesRenderer.NO_COLOR;
+        if ("TEXT_COLOR".equals(name)) return com.codename1.charts.renderers.XYMultipleSeriesRenderer.TEXT_COLOR;
+        throw unsupportedStaticField(com.codename1.charts.renderers.XYMultipleSeriesRenderer.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

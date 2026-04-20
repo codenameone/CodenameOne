@@ -6313,11 +6313,147 @@ public final class GeneratedAccess_com_codename1_ui_list {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == com.codename1.ui.list.GenericListCellRenderer.class) {
-            if ("ENABLED".equals(name)) return com.codename1.ui.list.GenericListCellRenderer.ENABLED;
-            if ("SELECT_ALL_FLAG".equals(name)) return com.codename1.ui.list.GenericListCellRenderer.SELECT_ALL_FLAG;
-        }
+        if (type == com.codename1.ui.list.ContainerList.class) return getStaticField0(name);
+        if (type == com.codename1.ui.list.DefaultListCellRenderer.class) return getStaticField1(name);
+        if (type == com.codename1.ui.list.FilterProxyListModel.class) return getStaticField2(name);
+        if (type == com.codename1.ui.list.GenericListCellRenderer.class) return getStaticField3(name);
+        if (type == com.codename1.ui.list.MultiList.class) return getStaticField4(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("BASELINE".equals(name)) return com.codename1.ui.list.ContainerList.BASELINE;
+        if ("BOTTOM".equals(name)) return com.codename1.ui.list.ContainerList.BOTTOM;
+        if ("BRB_CENTER_OFFSET".equals(name)) return com.codename1.ui.list.ContainerList.BRB_CENTER_OFFSET;
+        if ("BRB_CONSTANT_ASCENT".equals(name)) return com.codename1.ui.list.ContainerList.BRB_CONSTANT_ASCENT;
+        if ("BRB_CONSTANT_DESCENT".equals(name)) return com.codename1.ui.list.ContainerList.BRB_CONSTANT_DESCENT;
+        if ("BRB_OTHER".equals(name)) return com.codename1.ui.list.ContainerList.BRB_OTHER;
+        if ("CENTER".equals(name)) return com.codename1.ui.list.ContainerList.CENTER;
+        if ("CROSSHAIR_CURSOR".equals(name)) return com.codename1.ui.list.ContainerList.CROSSHAIR_CURSOR;
+        if ("DEFAULT_CURSOR".equals(name)) return com.codename1.ui.list.ContainerList.DEFAULT_CURSOR;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_X".equals(name)) return com.codename1.ui.list.ContainerList.DRAG_REGION_IMMEDIATELY_DRAG_X;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_XY".equals(name)) return com.codename1.ui.list.ContainerList.DRAG_REGION_IMMEDIATELY_DRAG_XY;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_Y".equals(name)) return com.codename1.ui.list.ContainerList.DRAG_REGION_IMMEDIATELY_DRAG_Y;
+        if ("DRAG_REGION_LIKELY_DRAG_X".equals(name)) return com.codename1.ui.list.ContainerList.DRAG_REGION_LIKELY_DRAG_X;
+        if ("DRAG_REGION_LIKELY_DRAG_XY".equals(name)) return com.codename1.ui.list.ContainerList.DRAG_REGION_LIKELY_DRAG_XY;
+        if ("DRAG_REGION_LIKELY_DRAG_Y".equals(name)) return com.codename1.ui.list.ContainerList.DRAG_REGION_LIKELY_DRAG_Y;
+        if ("DRAG_REGION_NOT_DRAGGABLE".equals(name)) return com.codename1.ui.list.ContainerList.DRAG_REGION_NOT_DRAGGABLE;
+        if ("DRAG_REGION_POSSIBLE_DRAG_X".equals(name)) return com.codename1.ui.list.ContainerList.DRAG_REGION_POSSIBLE_DRAG_X;
+        if ("DRAG_REGION_POSSIBLE_DRAG_XY".equals(name)) return com.codename1.ui.list.ContainerList.DRAG_REGION_POSSIBLE_DRAG_XY;
+        if ("DRAG_REGION_POSSIBLE_DRAG_Y".equals(name)) return com.codename1.ui.list.ContainerList.DRAG_REGION_POSSIBLE_DRAG_Y;
+        if ("E_RESIZE_CURSOR".equals(name)) return com.codename1.ui.list.ContainerList.E_RESIZE_CURSOR;
+        if ("HAND_CURSOR".equals(name)) return com.codename1.ui.list.ContainerList.HAND_CURSOR;
+        if ("LEFT".equals(name)) return com.codename1.ui.list.ContainerList.LEFT;
+        if ("MOVE_CURSOR".equals(name)) return com.codename1.ui.list.ContainerList.MOVE_CURSOR;
+        if ("NE_RESIZE_CURSOR".equals(name)) return com.codename1.ui.list.ContainerList.NE_RESIZE_CURSOR;
+        if ("NW_RESIZE_CURSOR".equals(name)) return com.codename1.ui.list.ContainerList.NW_RESIZE_CURSOR;
+        if ("N_RESIZE_CURSOR".equals(name)) return com.codename1.ui.list.ContainerList.N_RESIZE_CURSOR;
+        if ("RIGHT".equals(name)) return com.codename1.ui.list.ContainerList.RIGHT;
+        if ("SE_RESIZE_CURSOR".equals(name)) return com.codename1.ui.list.ContainerList.SE_RESIZE_CURSOR;
+        if ("SW_RESIZE_CURSOR".equals(name)) return com.codename1.ui.list.ContainerList.SW_RESIZE_CURSOR;
+        if ("S_RESIZE_CURSOR".equals(name)) return com.codename1.ui.list.ContainerList.S_RESIZE_CURSOR;
+        if ("TEXT_CURSOR".equals(name)) return com.codename1.ui.list.ContainerList.TEXT_CURSOR;
+        if ("TOP".equals(name)) return com.codename1.ui.list.ContainerList.TOP;
+        if ("WAIT_CURSOR".equals(name)) return com.codename1.ui.list.ContainerList.WAIT_CURSOR;
+        if ("W_RESIZE_CURSOR".equals(name)) return com.codename1.ui.list.ContainerList.W_RESIZE_CURSOR;
+        throw unsupportedStaticField(com.codename1.ui.list.ContainerList.class, name);
+    }
+
+    private static Object getStaticField1(String name) throws Exception {
+        if ("BASELINE".equals(name)) return com.codename1.ui.list.DefaultListCellRenderer.BASELINE;
+        if ("BOTTOM".equals(name)) return com.codename1.ui.list.DefaultListCellRenderer.BOTTOM;
+        if ("BRB_CENTER_OFFSET".equals(name)) return com.codename1.ui.list.DefaultListCellRenderer.BRB_CENTER_OFFSET;
+        if ("BRB_CONSTANT_ASCENT".equals(name)) return com.codename1.ui.list.DefaultListCellRenderer.BRB_CONSTANT_ASCENT;
+        if ("BRB_CONSTANT_DESCENT".equals(name)) return com.codename1.ui.list.DefaultListCellRenderer.BRB_CONSTANT_DESCENT;
+        if ("BRB_OTHER".equals(name)) return com.codename1.ui.list.DefaultListCellRenderer.BRB_OTHER;
+        if ("CENTER".equals(name)) return com.codename1.ui.list.DefaultListCellRenderer.CENTER;
+        if ("CROSSHAIR_CURSOR".equals(name)) return com.codename1.ui.list.DefaultListCellRenderer.CROSSHAIR_CURSOR;
+        if ("DEFAULT_CURSOR".equals(name)) return com.codename1.ui.list.DefaultListCellRenderer.DEFAULT_CURSOR;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_X".equals(name)) return com.codename1.ui.list.DefaultListCellRenderer.DRAG_REGION_IMMEDIATELY_DRAG_X;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_XY".equals(name)) return com.codename1.ui.list.DefaultListCellRenderer.DRAG_REGION_IMMEDIATELY_DRAG_XY;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_Y".equals(name)) return com.codename1.ui.list.DefaultListCellRenderer.DRAG_REGION_IMMEDIATELY_DRAG_Y;
+        if ("DRAG_REGION_LIKELY_DRAG_X".equals(name)) return com.codename1.ui.list.DefaultListCellRenderer.DRAG_REGION_LIKELY_DRAG_X;
+        if ("DRAG_REGION_LIKELY_DRAG_XY".equals(name)) return com.codename1.ui.list.DefaultListCellRenderer.DRAG_REGION_LIKELY_DRAG_XY;
+        if ("DRAG_REGION_LIKELY_DRAG_Y".equals(name)) return com.codename1.ui.list.DefaultListCellRenderer.DRAG_REGION_LIKELY_DRAG_Y;
+        if ("DRAG_REGION_NOT_DRAGGABLE".equals(name)) return com.codename1.ui.list.DefaultListCellRenderer.DRAG_REGION_NOT_DRAGGABLE;
+        if ("DRAG_REGION_POSSIBLE_DRAG_X".equals(name)) return com.codename1.ui.list.DefaultListCellRenderer.DRAG_REGION_POSSIBLE_DRAG_X;
+        if ("DRAG_REGION_POSSIBLE_DRAG_XY".equals(name)) return com.codename1.ui.list.DefaultListCellRenderer.DRAG_REGION_POSSIBLE_DRAG_XY;
+        if ("DRAG_REGION_POSSIBLE_DRAG_Y".equals(name)) return com.codename1.ui.list.DefaultListCellRenderer.DRAG_REGION_POSSIBLE_DRAG_Y;
+        if ("E_RESIZE_CURSOR".equals(name)) return com.codename1.ui.list.DefaultListCellRenderer.E_RESIZE_CURSOR;
+        if ("HAND_CURSOR".equals(name)) return com.codename1.ui.list.DefaultListCellRenderer.HAND_CURSOR;
+        if ("LEFT".equals(name)) return com.codename1.ui.list.DefaultListCellRenderer.LEFT;
+        if ("MOVE_CURSOR".equals(name)) return com.codename1.ui.list.DefaultListCellRenderer.MOVE_CURSOR;
+        if ("NE_RESIZE_CURSOR".equals(name)) return com.codename1.ui.list.DefaultListCellRenderer.NE_RESIZE_CURSOR;
+        if ("NW_RESIZE_CURSOR".equals(name)) return com.codename1.ui.list.DefaultListCellRenderer.NW_RESIZE_CURSOR;
+        if ("N_RESIZE_CURSOR".equals(name)) return com.codename1.ui.list.DefaultListCellRenderer.N_RESIZE_CURSOR;
+        if ("RIGHT".equals(name)) return com.codename1.ui.list.DefaultListCellRenderer.RIGHT;
+        if ("SE_RESIZE_CURSOR".equals(name)) return com.codename1.ui.list.DefaultListCellRenderer.SE_RESIZE_CURSOR;
+        if ("SW_RESIZE_CURSOR".equals(name)) return com.codename1.ui.list.DefaultListCellRenderer.SW_RESIZE_CURSOR;
+        if ("S_RESIZE_CURSOR".equals(name)) return com.codename1.ui.list.DefaultListCellRenderer.S_RESIZE_CURSOR;
+        if ("TEXT_CURSOR".equals(name)) return com.codename1.ui.list.DefaultListCellRenderer.TEXT_CURSOR;
+        if ("TOP".equals(name)) return com.codename1.ui.list.DefaultListCellRenderer.TOP;
+        if ("WAIT_CURSOR".equals(name)) return com.codename1.ui.list.DefaultListCellRenderer.WAIT_CURSOR;
+        if ("W_RESIZE_CURSOR".equals(name)) return com.codename1.ui.list.DefaultListCellRenderer.W_RESIZE_CURSOR;
+        throw unsupportedStaticField(com.codename1.ui.list.DefaultListCellRenderer.class, name);
+    }
+
+    private static Object getStaticField2(String name) throws Exception {
+        if ("ADDED".equals(name)) return com.codename1.ui.list.FilterProxyListModel.ADDED;
+        if ("CHANGED".equals(name)) return com.codename1.ui.list.FilterProxyListModel.CHANGED;
+        if ("REMOVED".equals(name)) return com.codename1.ui.list.FilterProxyListModel.REMOVED;
+        throw unsupportedStaticField(com.codename1.ui.list.FilterProxyListModel.class, name);
+    }
+
+    private static Object getStaticField3(String name) throws Exception {
+        if ("ENABLED".equals(name)) return com.codename1.ui.list.GenericListCellRenderer.ENABLED;
+        if ("SELECT_ALL_FLAG".equals(name)) return com.codename1.ui.list.GenericListCellRenderer.SELECT_ALL_FLAG;
+        throw unsupportedStaticField(com.codename1.ui.list.GenericListCellRenderer.class, name);
+    }
+
+    private static Object getStaticField4(String name) throws Exception {
+        if ("BASELINE".equals(name)) return com.codename1.ui.list.MultiList.BASELINE;
+        if ("BOTTOM".equals(name)) return com.codename1.ui.list.MultiList.BOTTOM;
+        if ("BRB_CENTER_OFFSET".equals(name)) return com.codename1.ui.list.MultiList.BRB_CENTER_OFFSET;
+        if ("BRB_CONSTANT_ASCENT".equals(name)) return com.codename1.ui.list.MultiList.BRB_CONSTANT_ASCENT;
+        if ("BRB_CONSTANT_DESCENT".equals(name)) return com.codename1.ui.list.MultiList.BRB_CONSTANT_DESCENT;
+        if ("BRB_OTHER".equals(name)) return com.codename1.ui.list.MultiList.BRB_OTHER;
+        if ("CENTER".equals(name)) return com.codename1.ui.list.MultiList.CENTER;
+        if ("CROSSHAIR_CURSOR".equals(name)) return com.codename1.ui.list.MultiList.CROSSHAIR_CURSOR;
+        if ("DEFAULT_CURSOR".equals(name)) return com.codename1.ui.list.MultiList.DEFAULT_CURSOR;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_X".equals(name)) return com.codename1.ui.list.MultiList.DRAG_REGION_IMMEDIATELY_DRAG_X;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_XY".equals(name)) return com.codename1.ui.list.MultiList.DRAG_REGION_IMMEDIATELY_DRAG_XY;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_Y".equals(name)) return com.codename1.ui.list.MultiList.DRAG_REGION_IMMEDIATELY_DRAG_Y;
+        if ("DRAG_REGION_LIKELY_DRAG_X".equals(name)) return com.codename1.ui.list.MultiList.DRAG_REGION_LIKELY_DRAG_X;
+        if ("DRAG_REGION_LIKELY_DRAG_XY".equals(name)) return com.codename1.ui.list.MultiList.DRAG_REGION_LIKELY_DRAG_XY;
+        if ("DRAG_REGION_LIKELY_DRAG_Y".equals(name)) return com.codename1.ui.list.MultiList.DRAG_REGION_LIKELY_DRAG_Y;
+        if ("DRAG_REGION_NOT_DRAGGABLE".equals(name)) return com.codename1.ui.list.MultiList.DRAG_REGION_NOT_DRAGGABLE;
+        if ("DRAG_REGION_POSSIBLE_DRAG_X".equals(name)) return com.codename1.ui.list.MultiList.DRAG_REGION_POSSIBLE_DRAG_X;
+        if ("DRAG_REGION_POSSIBLE_DRAG_XY".equals(name)) return com.codename1.ui.list.MultiList.DRAG_REGION_POSSIBLE_DRAG_XY;
+        if ("DRAG_REGION_POSSIBLE_DRAG_Y".equals(name)) return com.codename1.ui.list.MultiList.DRAG_REGION_POSSIBLE_DRAG_Y;
+        if ("E_RESIZE_CURSOR".equals(name)) return com.codename1.ui.list.MultiList.E_RESIZE_CURSOR;
+        if ("FIXED_CENTER".equals(name)) return com.codename1.ui.list.MultiList.FIXED_CENTER;
+        if ("FIXED_LEAD".equals(name)) return com.codename1.ui.list.MultiList.FIXED_LEAD;
+        if ("FIXED_NONE".equals(name)) return com.codename1.ui.list.MultiList.FIXED_NONE;
+        if ("FIXED_NONE_CYCLIC".equals(name)) return com.codename1.ui.list.MultiList.FIXED_NONE_CYCLIC;
+        if ("FIXED_NONE_ONE_ELEMENT_MARGIN_FROM_EDGE".equals(name)) return com.codename1.ui.list.MultiList.FIXED_NONE_ONE_ELEMENT_MARGIN_FROM_EDGE;
+        if ("FIXED_TRAIL".equals(name)) return com.codename1.ui.list.MultiList.FIXED_TRAIL;
+        if ("HAND_CURSOR".equals(name)) return com.codename1.ui.list.MultiList.HAND_CURSOR;
+        if ("HORIZONTAL".equals(name)) return com.codename1.ui.list.MultiList.HORIZONTAL;
+        if ("LEFT".equals(name)) return com.codename1.ui.list.MultiList.LEFT;
+        if ("MOVE_CURSOR".equals(name)) return com.codename1.ui.list.MultiList.MOVE_CURSOR;
+        if ("NE_RESIZE_CURSOR".equals(name)) return com.codename1.ui.list.MultiList.NE_RESIZE_CURSOR;
+        if ("NW_RESIZE_CURSOR".equals(name)) return com.codename1.ui.list.MultiList.NW_RESIZE_CURSOR;
+        if ("N_RESIZE_CURSOR".equals(name)) return com.codename1.ui.list.MultiList.N_RESIZE_CURSOR;
+        if ("RIGHT".equals(name)) return com.codename1.ui.list.MultiList.RIGHT;
+        if ("SE_RESIZE_CURSOR".equals(name)) return com.codename1.ui.list.MultiList.SE_RESIZE_CURSOR;
+        if ("SW_RESIZE_CURSOR".equals(name)) return com.codename1.ui.list.MultiList.SW_RESIZE_CURSOR;
+        if ("S_RESIZE_CURSOR".equals(name)) return com.codename1.ui.list.MultiList.S_RESIZE_CURSOR;
+        if ("TEXT_CURSOR".equals(name)) return com.codename1.ui.list.MultiList.TEXT_CURSOR;
+        if ("TOP".equals(name)) return com.codename1.ui.list.MultiList.TOP;
+        if ("VERTICAL".equals(name)) return com.codename1.ui.list.MultiList.VERTICAL;
+        if ("WAIT_CURSOR".equals(name)) return com.codename1.ui.list.MultiList.WAIT_CURSOR;
+        if ("W_RESIZE_CURSOR".equals(name)) return com.codename1.ui.list.MultiList.W_RESIZE_CURSOR;
+        throw unsupportedStaticField(com.codename1.ui.list.MultiList.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

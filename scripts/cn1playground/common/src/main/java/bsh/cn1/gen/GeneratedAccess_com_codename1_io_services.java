@@ -2558,11 +2558,59 @@ public final class GeneratedAccess_com_codename1_io_services {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == com.codename1.io.services.TwitterRESTService.class) {
-            if ("METHOD_TWEETS".equals(name)) return com.codename1.io.services.TwitterRESTService.METHOD_TWEETS;
-            if ("METHOD_USER_TIMELINE".equals(name)) return com.codename1.io.services.TwitterRESTService.METHOD_USER_TIMELINE;
-        }
+        if (type == com.codename1.io.services.CachedDataService.class) return getStaticField0(name);
+        if (type == com.codename1.io.services.ImageDownloadService.class) return getStaticField1(name);
+        if (type == com.codename1.io.services.RSSService.class) return getStaticField2(name);
+        if (type == com.codename1.io.services.TwitterRESTService.class) return getStaticField3(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("PRIORITY_CRITICAL".equals(name)) return com.codename1.io.services.CachedDataService.PRIORITY_CRITICAL;
+        if ("PRIORITY_HIGH".equals(name)) return com.codename1.io.services.CachedDataService.PRIORITY_HIGH;
+        if ("PRIORITY_LOW".equals(name)) return com.codename1.io.services.CachedDataService.PRIORITY_LOW;
+        if ("PRIORITY_NORMAL".equals(name)) return com.codename1.io.services.CachedDataService.PRIORITY_NORMAL;
+        if ("PRIORITY_REDUNDANT".equals(name)) return com.codename1.io.services.CachedDataService.PRIORITY_REDUNDANT;
+        throw unsupportedStaticField(com.codename1.io.services.CachedDataService.class, name);
+    }
+
+    private static Object getStaticField1(String name) throws Exception {
+        if ("PRIORITY_CRITICAL".equals(name)) return com.codename1.io.services.ImageDownloadService.PRIORITY_CRITICAL;
+        if ("PRIORITY_HIGH".equals(name)) return com.codename1.io.services.ImageDownloadService.PRIORITY_HIGH;
+        if ("PRIORITY_LOW".equals(name)) return com.codename1.io.services.ImageDownloadService.PRIORITY_LOW;
+        if ("PRIORITY_NORMAL".equals(name)) return com.codename1.io.services.ImageDownloadService.PRIORITY_NORMAL;
+        if ("PRIORITY_REDUNDANT".equals(name)) return com.codename1.io.services.ImageDownloadService.PRIORITY_REDUNDANT;
+        throw unsupportedStaticField(com.codename1.io.services.ImageDownloadService.class, name);
+    }
+
+    private static Object getStaticField2(String name) throws Exception {
+        if ("ERROR_ATTIBUTE_VALUE_INVALID".equals(name)) return com.codename1.io.services.RSSService.ERROR_ATTIBUTE_VALUE_INVALID;
+        if ("ERROR_ATTRIBUTE_NOT_SUPPORTED".equals(name)) return com.codename1.io.services.RSSService.ERROR_ATTRIBUTE_NOT_SUPPORTED;
+        if ("ERROR_ENCODING".equals(name)) return com.codename1.io.services.RSSService.ERROR_ENCODING;
+        if ("ERROR_MULTIPLE_ROOTS".equals(name)) return com.codename1.io.services.RSSService.ERROR_MULTIPLE_ROOTS;
+        if ("ERROR_NO_CLOSE_TAG".equals(name)) return com.codename1.io.services.RSSService.ERROR_NO_CLOSE_TAG;
+        if ("ERROR_NO_ROOTS".equals(name)) return com.codename1.io.services.RSSService.ERROR_NO_ROOTS;
+        if ("ERROR_TAG_NOT_SUPPORTED".equals(name)) return com.codename1.io.services.RSSService.ERROR_TAG_NOT_SUPPORTED;
+        if ("ERROR_UNEXPECTED_CHARACTER".equals(name)) return com.codename1.io.services.RSSService.ERROR_UNEXPECTED_CHARACTER;
+        if ("ERROR_UNEXPECTED_TAG_CLOSING".equals(name)) return com.codename1.io.services.RSSService.ERROR_UNEXPECTED_TAG_CLOSING;
+        if ("ERROR_UNRECOGNIZED_CHAR_ENTITY".equals(name)) return com.codename1.io.services.RSSService.ERROR_UNRECOGNIZED_CHAR_ENTITY;
+        if ("PRIORITY_CRITICAL".equals(name)) return com.codename1.io.services.RSSService.PRIORITY_CRITICAL;
+        if ("PRIORITY_HIGH".equals(name)) return com.codename1.io.services.RSSService.PRIORITY_HIGH;
+        if ("PRIORITY_LOW".equals(name)) return com.codename1.io.services.RSSService.PRIORITY_LOW;
+        if ("PRIORITY_NORMAL".equals(name)) return com.codename1.io.services.RSSService.PRIORITY_NORMAL;
+        if ("PRIORITY_REDUNDANT".equals(name)) return com.codename1.io.services.RSSService.PRIORITY_REDUNDANT;
+        throw unsupportedStaticField(com.codename1.io.services.RSSService.class, name);
+    }
+
+    private static Object getStaticField3(String name) throws Exception {
+        if ("METHOD_TWEETS".equals(name)) return com.codename1.io.services.TwitterRESTService.METHOD_TWEETS;
+        if ("METHOD_USER_TIMELINE".equals(name)) return com.codename1.io.services.TwitterRESTService.METHOD_USER_TIMELINE;
+        if ("PRIORITY_CRITICAL".equals(name)) return com.codename1.io.services.TwitterRESTService.PRIORITY_CRITICAL;
+        if ("PRIORITY_HIGH".equals(name)) return com.codename1.io.services.TwitterRESTService.PRIORITY_HIGH;
+        if ("PRIORITY_LOW".equals(name)) return com.codename1.io.services.TwitterRESTService.PRIORITY_LOW;
+        if ("PRIORITY_NORMAL".equals(name)) return com.codename1.io.services.TwitterRESTService.PRIORITY_NORMAL;
+        if ("PRIORITY_REDUNDANT".equals(name)) return com.codename1.io.services.TwitterRESTService.PRIORITY_REDUNDANT;
+        throw unsupportedStaticField(com.codename1.io.services.TwitterRESTService.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

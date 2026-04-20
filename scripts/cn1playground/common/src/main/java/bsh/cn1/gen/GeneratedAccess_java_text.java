@@ -340,14 +340,27 @@ public final class GeneratedAccess_java_text {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == java.text.DateFormat.class) {
-            if ("DEFAULT".equals(name)) return java.text.DateFormat.DEFAULT;
-            if ("FULL".equals(name)) return java.text.DateFormat.FULL;
-            if ("LONG".equals(name)) return java.text.DateFormat.LONG;
-            if ("MEDIUM".equals(name)) return java.text.DateFormat.MEDIUM;
-            if ("SHORT".equals(name)) return java.text.DateFormat.SHORT;
-        }
+        if (type == java.text.DateFormat.class) return getStaticField0(name);
+        if (type == java.text.SimpleDateFormat.class) return getStaticField1(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("DEFAULT".equals(name)) return java.text.DateFormat.DEFAULT;
+        if ("FULL".equals(name)) return java.text.DateFormat.FULL;
+        if ("LONG".equals(name)) return java.text.DateFormat.LONG;
+        if ("MEDIUM".equals(name)) return java.text.DateFormat.MEDIUM;
+        if ("SHORT".equals(name)) return java.text.DateFormat.SHORT;
+        throw unsupportedStaticField(java.text.DateFormat.class, name);
+    }
+
+    private static Object getStaticField1(String name) throws Exception {
+        if ("DEFAULT".equals(name)) return java.text.SimpleDateFormat.DEFAULT;
+        if ("FULL".equals(name)) return java.text.SimpleDateFormat.FULL;
+        if ("LONG".equals(name)) return java.text.SimpleDateFormat.LONG;
+        if ("MEDIUM".equals(name)) return java.text.SimpleDateFormat.MEDIUM;
+        if ("SHORT".equals(name)) return java.text.SimpleDateFormat.SHORT;
+        throw unsupportedStaticField(java.text.SimpleDateFormat.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

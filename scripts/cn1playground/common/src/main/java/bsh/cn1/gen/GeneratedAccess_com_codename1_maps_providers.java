@@ -394,12 +394,15 @@ public final class GeneratedAccess_com_codename1_maps_providers {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == com.codename1.maps.providers.GoogleMapsProvider.class) {
-            if ("HYBRID".equals(name)) return com.codename1.maps.providers.GoogleMapsProvider.HYBRID;
-            if ("REGULAR".equals(name)) return com.codename1.maps.providers.GoogleMapsProvider.REGULAR;
-            if ("SATELLITE".equals(name)) return com.codename1.maps.providers.GoogleMapsProvider.SATELLITE;
-        }
+        if (type == com.codename1.maps.providers.GoogleMapsProvider.class) return getStaticField0(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("HYBRID".equals(name)) return com.codename1.maps.providers.GoogleMapsProvider.HYBRID;
+        if ("REGULAR".equals(name)) return com.codename1.maps.providers.GoogleMapsProvider.REGULAR;
+        if ("SATELLITE".equals(name)) return com.codename1.maps.providers.GoogleMapsProvider.SATELLITE;
+        throw unsupportedStaticField(com.codename1.maps.providers.GoogleMapsProvider.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

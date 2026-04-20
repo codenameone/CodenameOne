@@ -3817,101 +3817,110 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == com.codename1.ui.plaf.CSSBorder.class) {
-            if ("HPOSITION_CENTER".equals(name)) return com.codename1.ui.plaf.CSSBorder.HPOSITION_CENTER;
-            if ("HPOSITION_LEFT".equals(name)) return com.codename1.ui.plaf.CSSBorder.HPOSITION_LEFT;
-            if ("HPOSITION_OTHER".equals(name)) return com.codename1.ui.plaf.CSSBorder.HPOSITION_OTHER;
-            if ("HPOSITION_RIGHT".equals(name)) return com.codename1.ui.plaf.CSSBorder.HPOSITION_RIGHT;
-            if ("REPEAT_BOTH".equals(name)) return com.codename1.ui.plaf.CSSBorder.REPEAT_BOTH;
-            if ("REPEAT_NONE".equals(name)) return com.codename1.ui.plaf.CSSBorder.REPEAT_NONE;
-            if ("REPEAT_X".equals(name)) return com.codename1.ui.plaf.CSSBorder.REPEAT_X;
-            if ("REPEAT_Y".equals(name)) return com.codename1.ui.plaf.CSSBorder.REPEAT_Y;
-            if ("SIZE_AUTO".equals(name)) return com.codename1.ui.plaf.CSSBorder.SIZE_AUTO;
-            if ("SIZE_CONTAIN".equals(name)) return com.codename1.ui.plaf.CSSBorder.SIZE_CONTAIN;
-            if ("SIZE_COVER".equals(name)) return com.codename1.ui.plaf.CSSBorder.SIZE_COVER;
-            if ("SIZE_OTHER".equals(name)) return com.codename1.ui.plaf.CSSBorder.SIZE_OTHER;
-            if ("STYLE_DASHED".equals(name)) return com.codename1.ui.plaf.CSSBorder.STYLE_DASHED;
-            if ("STYLE_DOTTED".equals(name)) return com.codename1.ui.plaf.CSSBorder.STYLE_DOTTED;
-            if ("STYLE_HIDDEN".equals(name)) return com.codename1.ui.plaf.CSSBorder.STYLE_HIDDEN;
-            if ("STYLE_NONE".equals(name)) return com.codename1.ui.plaf.CSSBorder.STYLE_NONE;
-            if ("STYLE_SOLID".equals(name)) return com.codename1.ui.plaf.CSSBorder.STYLE_SOLID;
-            if ("UNIT_EM".equals(name)) return com.codename1.ui.plaf.CSSBorder.UNIT_EM;
-            if ("UNIT_MM".equals(name)) return com.codename1.ui.plaf.CSSBorder.UNIT_MM;
-            if ("UNIT_PERCENT".equals(name)) return com.codename1.ui.plaf.CSSBorder.UNIT_PERCENT;
-            if ("UNIT_PIXELS".equals(name)) return com.codename1.ui.plaf.CSSBorder.UNIT_PIXELS;
-            if ("VPOSITION_BOTTOM".equals(name)) return com.codename1.ui.plaf.CSSBorder.VPOSITION_BOTTOM;
-            if ("VPOSITION_CENTER".equals(name)) return com.codename1.ui.plaf.CSSBorder.VPOSITION_CENTER;
-            if ("VPOSITION_OTHER".equals(name)) return com.codename1.ui.plaf.CSSBorder.VPOSITION_OTHER;
-            if ("VPOSITION_TOP".equals(name)) return com.codename1.ui.plaf.CSSBorder.VPOSITION_TOP;
-        }
-        if (type == com.codename1.ui.plaf.Style.class) {
-            if ("ALIGNMENT".equals(name)) return com.codename1.ui.plaf.Style.ALIGNMENT;
-            if ("BACKGROUND_ALIGNMENT".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_ALIGNMENT;
-            if ("BACKGROUND_GRADIENT".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_GRADIENT;
-            if ("BACKGROUND_GRADIENT_LINEAR_HORIZONTAL".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_GRADIENT_LINEAR_HORIZONTAL;
-            if ("BACKGROUND_GRADIENT_LINEAR_VERTICAL".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL;
-            if ("BACKGROUND_GRADIENT_RADIAL".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_GRADIENT_RADIAL;
-            if ("BACKGROUND_IMAGE_ALIGNED_BOTTOM".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM;
-            if ("BACKGROUND_IMAGE_ALIGNED_BOTTOM_LEFT".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM_LEFT;
-            if ("BACKGROUND_IMAGE_ALIGNED_BOTTOM_RIGHT".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM_RIGHT;
-            if ("BACKGROUND_IMAGE_ALIGNED_CENTER".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_ALIGNED_CENTER;
-            if ("BACKGROUND_IMAGE_ALIGNED_LEFT".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_ALIGNED_LEFT;
-            if ("BACKGROUND_IMAGE_ALIGNED_RIGHT".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_ALIGNED_RIGHT;
-            if ("BACKGROUND_IMAGE_ALIGNED_TOP".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_ALIGNED_TOP;
-            if ("BACKGROUND_IMAGE_ALIGNED_TOP_LEFT".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_ALIGNED_TOP_LEFT;
-            if ("BACKGROUND_IMAGE_ALIGNED_TOP_RIGHT".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_ALIGNED_TOP_RIGHT;
-            if ("BACKGROUND_IMAGE_SCALED".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_SCALED;
-            if ("BACKGROUND_IMAGE_SCALED_FILL".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_SCALED_FILL;
-            if ("BACKGROUND_IMAGE_SCALED_FIT".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_SCALED_FIT;
-            if ("BACKGROUND_IMAGE_TILE_BOTH".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_TILE_BOTH;
-            if ("BACKGROUND_IMAGE_TILE_HORIZONTAL".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_TILE_HORIZONTAL;
-            if ("BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_BOTTOM".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_BOTTOM;
-            if ("BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_CENTER".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_CENTER;
-            if ("BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_TOP".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_TOP;
-            if ("BACKGROUND_IMAGE_TILE_VERTICAL".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_TILE_VERTICAL;
-            if ("BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_CENTER".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_CENTER;
-            if ("BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_LEFT".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_LEFT;
-            if ("BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_RIGHT".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_RIGHT;
-            if ("BACKGROUND_NONE".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_NONE;
-            if ("BACKGROUND_TYPE".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_TYPE;
-            if ("BG_COLOR".equals(name)) return com.codename1.ui.plaf.Style.BG_COLOR;
-            if ("BG_IMAGE".equals(name)) return com.codename1.ui.plaf.Style.BG_IMAGE;
-            if ("BORDER".equals(name)) return com.codename1.ui.plaf.Style.BORDER;
-            if ("ELEVATION".equals(name)) return com.codename1.ui.plaf.Style.ELEVATION;
-            if ("FG_ALPHA".equals(name)) return com.codename1.ui.plaf.Style.FG_ALPHA;
-            if ("FG_COLOR".equals(name)) return com.codename1.ui.plaf.Style.FG_COLOR;
-            if ("FONT".equals(name)) return com.codename1.ui.plaf.Style.FONT;
-            if ("ICON_GAP".equals(name)) return com.codename1.ui.plaf.Style.ICON_GAP;
-            if ("ICON_GAP_UNIT".equals(name)) return com.codename1.ui.plaf.Style.ICON_GAP_UNIT;
-            if ("MARGIN".equals(name)) return com.codename1.ui.plaf.Style.MARGIN;
-            if ("MARGIN_UNIT".equals(name)) return com.codename1.ui.plaf.Style.MARGIN_UNIT;
-            if ("OPACITY".equals(name)) return com.codename1.ui.plaf.Style.OPACITY;
-            if ("PADDING".equals(name)) return com.codename1.ui.plaf.Style.PADDING;
-            if ("PADDING_UNIT".equals(name)) return com.codename1.ui.plaf.Style.PADDING_UNIT;
-            if ("PAINTER".equals(name)) return com.codename1.ui.plaf.Style.PAINTER;
-            if ("SURFACE".equals(name)) return com.codename1.ui.plaf.Style.SURFACE;
-            if ("TEXT_DECORATION".equals(name)) return com.codename1.ui.plaf.Style.TEXT_DECORATION;
-            if ("TEXT_DECORATION_3D".equals(name)) return com.codename1.ui.plaf.Style.TEXT_DECORATION_3D;
-            if ("TEXT_DECORATION_3D_LOWERED".equals(name)) return com.codename1.ui.plaf.Style.TEXT_DECORATION_3D_LOWERED;
-            if ("TEXT_DECORATION_3D_SHADOW_NORTH".equals(name)) return com.codename1.ui.plaf.Style.TEXT_DECORATION_3D_SHADOW_NORTH;
-            if ("TEXT_DECORATION_NONE".equals(name)) return com.codename1.ui.plaf.Style.TEXT_DECORATION_NONE;
-            if ("TEXT_DECORATION_OVERLINE".equals(name)) return com.codename1.ui.plaf.Style.TEXT_DECORATION_OVERLINE;
-            if ("TEXT_DECORATION_STRIKETHRU".equals(name)) return com.codename1.ui.plaf.Style.TEXT_DECORATION_STRIKETHRU;
-            if ("TEXT_DECORATION_UNDERLINE".equals(name)) return com.codename1.ui.plaf.Style.TEXT_DECORATION_UNDERLINE;
-            if ("TRANSPARENCY".equals(name)) return com.codename1.ui.plaf.Style.TRANSPARENCY;
-            if ("UNIT_TYPE_DIPS".equals(name)) return com.codename1.ui.plaf.Style.UNIT_TYPE_DIPS;
-            if ("UNIT_TYPE_PIXELS".equals(name)) return com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS;
-            if ("UNIT_TYPE_REM".equals(name)) return com.codename1.ui.plaf.Style.UNIT_TYPE_REM;
-            if ("UNIT_TYPE_SCREEN_PERCENTAGE".equals(name)) return com.codename1.ui.plaf.Style.UNIT_TYPE_SCREEN_PERCENTAGE;
-            if ("UNIT_TYPE_VH".equals(name)) return com.codename1.ui.plaf.Style.UNIT_TYPE_VH;
-            if ("UNIT_TYPE_VMAX".equals(name)) return com.codename1.ui.plaf.Style.UNIT_TYPE_VMAX;
-            if ("UNIT_TYPE_VMIN".equals(name)) return com.codename1.ui.plaf.Style.UNIT_TYPE_VMIN;
-            if ("UNIT_TYPE_VW".equals(name)) return com.codename1.ui.plaf.Style.UNIT_TYPE_VW;
-        }
-        if (type == com.codename1.ui.plaf.StyleParser.class) {
-            if ("UNIT_INHERIT".equals(name)) return com.codename1.ui.plaf.StyleParser.UNIT_INHERIT;
-        }
+        if (type == com.codename1.ui.plaf.CSSBorder.class) return getStaticField0(name);
+        if (type == com.codename1.ui.plaf.Style.class) return getStaticField1(name);
+        if (type == com.codename1.ui.plaf.StyleParser.class) return getStaticField2(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("HPOSITION_CENTER".equals(name)) return com.codename1.ui.plaf.CSSBorder.HPOSITION_CENTER;
+        if ("HPOSITION_LEFT".equals(name)) return com.codename1.ui.plaf.CSSBorder.HPOSITION_LEFT;
+        if ("HPOSITION_OTHER".equals(name)) return com.codename1.ui.plaf.CSSBorder.HPOSITION_OTHER;
+        if ("HPOSITION_RIGHT".equals(name)) return com.codename1.ui.plaf.CSSBorder.HPOSITION_RIGHT;
+        if ("REPEAT_BOTH".equals(name)) return com.codename1.ui.plaf.CSSBorder.REPEAT_BOTH;
+        if ("REPEAT_NONE".equals(name)) return com.codename1.ui.plaf.CSSBorder.REPEAT_NONE;
+        if ("REPEAT_X".equals(name)) return com.codename1.ui.plaf.CSSBorder.REPEAT_X;
+        if ("REPEAT_Y".equals(name)) return com.codename1.ui.plaf.CSSBorder.REPEAT_Y;
+        if ("SIZE_AUTO".equals(name)) return com.codename1.ui.plaf.CSSBorder.SIZE_AUTO;
+        if ("SIZE_CONTAIN".equals(name)) return com.codename1.ui.plaf.CSSBorder.SIZE_CONTAIN;
+        if ("SIZE_COVER".equals(name)) return com.codename1.ui.plaf.CSSBorder.SIZE_COVER;
+        if ("SIZE_OTHER".equals(name)) return com.codename1.ui.plaf.CSSBorder.SIZE_OTHER;
+        if ("STYLE_DASHED".equals(name)) return com.codename1.ui.plaf.CSSBorder.STYLE_DASHED;
+        if ("STYLE_DOTTED".equals(name)) return com.codename1.ui.plaf.CSSBorder.STYLE_DOTTED;
+        if ("STYLE_HIDDEN".equals(name)) return com.codename1.ui.plaf.CSSBorder.STYLE_HIDDEN;
+        if ("STYLE_NONE".equals(name)) return com.codename1.ui.plaf.CSSBorder.STYLE_NONE;
+        if ("STYLE_SOLID".equals(name)) return com.codename1.ui.plaf.CSSBorder.STYLE_SOLID;
+        if ("UNIT_EM".equals(name)) return com.codename1.ui.plaf.CSSBorder.UNIT_EM;
+        if ("UNIT_MM".equals(name)) return com.codename1.ui.plaf.CSSBorder.UNIT_MM;
+        if ("UNIT_PERCENT".equals(name)) return com.codename1.ui.plaf.CSSBorder.UNIT_PERCENT;
+        if ("UNIT_PIXELS".equals(name)) return com.codename1.ui.plaf.CSSBorder.UNIT_PIXELS;
+        if ("VPOSITION_BOTTOM".equals(name)) return com.codename1.ui.plaf.CSSBorder.VPOSITION_BOTTOM;
+        if ("VPOSITION_CENTER".equals(name)) return com.codename1.ui.plaf.CSSBorder.VPOSITION_CENTER;
+        if ("VPOSITION_OTHER".equals(name)) return com.codename1.ui.plaf.CSSBorder.VPOSITION_OTHER;
+        if ("VPOSITION_TOP".equals(name)) return com.codename1.ui.plaf.CSSBorder.VPOSITION_TOP;
+        throw unsupportedStaticField(com.codename1.ui.plaf.CSSBorder.class, name);
+    }
+
+    private static Object getStaticField1(String name) throws Exception {
+        if ("ALIGNMENT".equals(name)) return com.codename1.ui.plaf.Style.ALIGNMENT;
+        if ("BACKGROUND_ALIGNMENT".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_ALIGNMENT;
+        if ("BACKGROUND_GRADIENT".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_GRADIENT;
+        if ("BACKGROUND_GRADIENT_LINEAR_HORIZONTAL".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_GRADIENT_LINEAR_HORIZONTAL;
+        if ("BACKGROUND_GRADIENT_LINEAR_VERTICAL".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL;
+        if ("BACKGROUND_GRADIENT_RADIAL".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_GRADIENT_RADIAL;
+        if ("BACKGROUND_IMAGE_ALIGNED_BOTTOM".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM;
+        if ("BACKGROUND_IMAGE_ALIGNED_BOTTOM_LEFT".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM_LEFT;
+        if ("BACKGROUND_IMAGE_ALIGNED_BOTTOM_RIGHT".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM_RIGHT;
+        if ("BACKGROUND_IMAGE_ALIGNED_CENTER".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_ALIGNED_CENTER;
+        if ("BACKGROUND_IMAGE_ALIGNED_LEFT".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_ALIGNED_LEFT;
+        if ("BACKGROUND_IMAGE_ALIGNED_RIGHT".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_ALIGNED_RIGHT;
+        if ("BACKGROUND_IMAGE_ALIGNED_TOP".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_ALIGNED_TOP;
+        if ("BACKGROUND_IMAGE_ALIGNED_TOP_LEFT".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_ALIGNED_TOP_LEFT;
+        if ("BACKGROUND_IMAGE_ALIGNED_TOP_RIGHT".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_ALIGNED_TOP_RIGHT;
+        if ("BACKGROUND_IMAGE_SCALED".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_SCALED;
+        if ("BACKGROUND_IMAGE_SCALED_FILL".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_SCALED_FILL;
+        if ("BACKGROUND_IMAGE_SCALED_FIT".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_SCALED_FIT;
+        if ("BACKGROUND_IMAGE_TILE_BOTH".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_TILE_BOTH;
+        if ("BACKGROUND_IMAGE_TILE_HORIZONTAL".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_TILE_HORIZONTAL;
+        if ("BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_BOTTOM".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_BOTTOM;
+        if ("BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_CENTER".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_CENTER;
+        if ("BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_TOP".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_TOP;
+        if ("BACKGROUND_IMAGE_TILE_VERTICAL".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_TILE_VERTICAL;
+        if ("BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_CENTER".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_CENTER;
+        if ("BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_LEFT".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_LEFT;
+        if ("BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_RIGHT".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_RIGHT;
+        if ("BACKGROUND_NONE".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_NONE;
+        if ("BACKGROUND_TYPE".equals(name)) return com.codename1.ui.plaf.Style.BACKGROUND_TYPE;
+        if ("BG_COLOR".equals(name)) return com.codename1.ui.plaf.Style.BG_COLOR;
+        if ("BG_IMAGE".equals(name)) return com.codename1.ui.plaf.Style.BG_IMAGE;
+        if ("BORDER".equals(name)) return com.codename1.ui.plaf.Style.BORDER;
+        if ("ELEVATION".equals(name)) return com.codename1.ui.plaf.Style.ELEVATION;
+        if ("FG_ALPHA".equals(name)) return com.codename1.ui.plaf.Style.FG_ALPHA;
+        if ("FG_COLOR".equals(name)) return com.codename1.ui.plaf.Style.FG_COLOR;
+        if ("FONT".equals(name)) return com.codename1.ui.plaf.Style.FONT;
+        if ("ICON_GAP".equals(name)) return com.codename1.ui.plaf.Style.ICON_GAP;
+        if ("ICON_GAP_UNIT".equals(name)) return com.codename1.ui.plaf.Style.ICON_GAP_UNIT;
+        if ("MARGIN".equals(name)) return com.codename1.ui.plaf.Style.MARGIN;
+        if ("MARGIN_UNIT".equals(name)) return com.codename1.ui.plaf.Style.MARGIN_UNIT;
+        if ("OPACITY".equals(name)) return com.codename1.ui.plaf.Style.OPACITY;
+        if ("PADDING".equals(name)) return com.codename1.ui.plaf.Style.PADDING;
+        if ("PADDING_UNIT".equals(name)) return com.codename1.ui.plaf.Style.PADDING_UNIT;
+        if ("PAINTER".equals(name)) return com.codename1.ui.plaf.Style.PAINTER;
+        if ("SURFACE".equals(name)) return com.codename1.ui.plaf.Style.SURFACE;
+        if ("TEXT_DECORATION".equals(name)) return com.codename1.ui.plaf.Style.TEXT_DECORATION;
+        if ("TEXT_DECORATION_3D".equals(name)) return com.codename1.ui.plaf.Style.TEXT_DECORATION_3D;
+        if ("TEXT_DECORATION_3D_LOWERED".equals(name)) return com.codename1.ui.plaf.Style.TEXT_DECORATION_3D_LOWERED;
+        if ("TEXT_DECORATION_3D_SHADOW_NORTH".equals(name)) return com.codename1.ui.plaf.Style.TEXT_DECORATION_3D_SHADOW_NORTH;
+        if ("TEXT_DECORATION_NONE".equals(name)) return com.codename1.ui.plaf.Style.TEXT_DECORATION_NONE;
+        if ("TEXT_DECORATION_OVERLINE".equals(name)) return com.codename1.ui.plaf.Style.TEXT_DECORATION_OVERLINE;
+        if ("TEXT_DECORATION_STRIKETHRU".equals(name)) return com.codename1.ui.plaf.Style.TEXT_DECORATION_STRIKETHRU;
+        if ("TEXT_DECORATION_UNDERLINE".equals(name)) return com.codename1.ui.plaf.Style.TEXT_DECORATION_UNDERLINE;
+        if ("TRANSPARENCY".equals(name)) return com.codename1.ui.plaf.Style.TRANSPARENCY;
+        if ("UNIT_TYPE_DIPS".equals(name)) return com.codename1.ui.plaf.Style.UNIT_TYPE_DIPS;
+        if ("UNIT_TYPE_PIXELS".equals(name)) return com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS;
+        if ("UNIT_TYPE_REM".equals(name)) return com.codename1.ui.plaf.Style.UNIT_TYPE_REM;
+        if ("UNIT_TYPE_SCREEN_PERCENTAGE".equals(name)) return com.codename1.ui.plaf.Style.UNIT_TYPE_SCREEN_PERCENTAGE;
+        if ("UNIT_TYPE_VH".equals(name)) return com.codename1.ui.plaf.Style.UNIT_TYPE_VH;
+        if ("UNIT_TYPE_VMAX".equals(name)) return com.codename1.ui.plaf.Style.UNIT_TYPE_VMAX;
+        if ("UNIT_TYPE_VMIN".equals(name)) return com.codename1.ui.plaf.Style.UNIT_TYPE_VMIN;
+        if ("UNIT_TYPE_VW".equals(name)) return com.codename1.ui.plaf.Style.UNIT_TYPE_VW;
+        throw unsupportedStaticField(com.codename1.ui.plaf.Style.class, name);
+    }
+
+    private static Object getStaticField2(String name) throws Exception {
+        if ("UNIT_INHERIT".equals(name)) return com.codename1.ui.plaf.StyleParser.UNIT_INHERIT;
+        throw unsupportedStaticField(com.codename1.ui.plaf.StyleParser.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

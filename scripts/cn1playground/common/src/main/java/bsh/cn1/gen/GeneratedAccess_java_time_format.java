@@ -117,15 +117,18 @@ public final class GeneratedAccess_java_time_format {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == java.time.format.DateTimeFormatter.class) {
-            if ("ISO_INSTANT".equals(name)) return java.time.format.DateTimeFormatter.ISO_INSTANT;
-            if ("ISO_LOCAL_DATE".equals(name)) return java.time.format.DateTimeFormatter.ISO_LOCAL_DATE;
-            if ("ISO_LOCAL_DATE_TIME".equals(name)) return java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME;
-            if ("ISO_LOCAL_TIME".equals(name)) return java.time.format.DateTimeFormatter.ISO_LOCAL_TIME;
-            if ("ISO_OFFSET_DATE_TIME".equals(name)) return java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME;
-            if ("ISO_ZONED_DATE_TIME".equals(name)) return java.time.format.DateTimeFormatter.ISO_ZONED_DATE_TIME;
-        }
+        if (type == java.time.format.DateTimeFormatter.class) return getStaticField0(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("ISO_INSTANT".equals(name)) return java.time.format.DateTimeFormatter.ISO_INSTANT;
+        if ("ISO_LOCAL_DATE".equals(name)) return java.time.format.DateTimeFormatter.ISO_LOCAL_DATE;
+        if ("ISO_LOCAL_DATE_TIME".equals(name)) return java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME;
+        if ("ISO_LOCAL_TIME".equals(name)) return java.time.format.DateTimeFormatter.ISO_LOCAL_TIME;
+        if ("ISO_OFFSET_DATE_TIME".equals(name)) return java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME;
+        if ("ISO_ZONED_DATE_TIME".equals(name)) return java.time.format.DateTimeFormatter.ISO_ZONED_DATE_TIME;
+        throw unsupportedStaticField(java.time.format.DateTimeFormatter.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {
