@@ -65,11 +65,11 @@ public final class GeneratedAccess_com_codename1_ui_animations {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return new com.codename1.ui.animations.BubbleTransition(((Number) adaptedArgs[0]).intValue());
+                return new com.codename1.ui.animations.BubbleTransition(toIntValue(adaptedArgs[0]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class}, false);
-                return new com.codename1.ui.animations.BubbleTransition(((Number) adaptedArgs[0]).intValue(), (java.lang.String) adaptedArgs[1]);
+                return new com.codename1.ui.animations.BubbleTransition(toIntValue(adaptedArgs[0]), (java.lang.String) adaptedArgs[1]);
             }
         }
         if (type == com.codename1.ui.animations.FlipTransition.class) {
@@ -79,11 +79,11 @@ public final class GeneratedAccess_com_codename1_ui_animations {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return new com.codename1.ui.animations.FlipTransition(((Number) adaptedArgs[0]).intValue());
+                return new com.codename1.ui.animations.FlipTransition(toIntValue(adaptedArgs[0]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return new com.codename1.ui.animations.FlipTransition(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return new com.codename1.ui.animations.FlipTransition(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
         throw unsupportedConstruct(type, safeArgs);
@@ -104,11 +104,11 @@ public final class GeneratedAccess_com_codename1_ui_animations {
         if ("createAnimationImage".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Image.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Image.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return com.codename1.ui.animations.AnimationObject.createAnimationImage((com.codename1.ui.Image) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
+                return com.codename1.ui.animations.AnimationObject.createAnimationImage((com.codename1.ui.Image) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.util.Resources.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.util.Resources.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return com.codename1.ui.animations.AnimationObject.createAnimationImage((java.lang.String) adaptedArgs[0], (com.codename1.ui.util.Resources) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue());
+                return com.codename1.ui.animations.AnimationObject.createAnimationImage((java.lang.String) adaptedArgs[0], (com.codename1.ui.util.Resources) adaptedArgs[1], toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3]));
             }
         }
         throw unsupportedStatic(com.codename1.ui.animations.AnimationObject.class, name, safeArgs);
@@ -118,7 +118,7 @@ public final class GeneratedAccess_com_codename1_ui_animations {
         if ("createCover".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class, java.lang.Integer.class}, false);
-                return com.codename1.ui.animations.CommonTransitions.createCover(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue(), ((Number) adaptedArgs[2]).intValue());
+                return com.codename1.ui.animations.CommonTransitions.createCover(toIntValue(adaptedArgs[0]), ((Boolean) adaptedArgs[1]).booleanValue(), toIntValue(adaptedArgs[2]));
             }
         }
         if ("createDialogPulsate".equals(name)) {
@@ -134,33 +134,33 @@ public final class GeneratedAccess_com_codename1_ui_animations {
         if ("createFade".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return com.codename1.ui.animations.CommonTransitions.createFade(((Number) adaptedArgs[0]).intValue());
+                return com.codename1.ui.animations.CommonTransitions.createFade(toIntValue(adaptedArgs[0]));
             }
         }
         if ("createFastSlide".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class, java.lang.Integer.class}, false);
-                return com.codename1.ui.animations.CommonTransitions.createFastSlide(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue(), ((Number) adaptedArgs[2]).intValue());
+                return com.codename1.ui.animations.CommonTransitions.createFastSlide(toIntValue(adaptedArgs[0]), ((Boolean) adaptedArgs[1]).booleanValue(), toIntValue(adaptedArgs[2]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class, java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class, java.lang.Integer.class, java.lang.Boolean.class}, false);
-                return com.codename1.ui.animations.CommonTransitions.createFastSlide(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue(), ((Number) adaptedArgs[2]).intValue(), ((Boolean) adaptedArgs[3]).booleanValue());
+                return com.codename1.ui.animations.CommonTransitions.createFastSlide(toIntValue(adaptedArgs[0]), ((Boolean) adaptedArgs[1]).booleanValue(), toIntValue(adaptedArgs[2]), ((Boolean) adaptedArgs[3]).booleanValue());
             }
         }
         if ("createSlide".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class, java.lang.Integer.class}, false);
-                return com.codename1.ui.animations.CommonTransitions.createSlide(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue(), ((Number) adaptedArgs[2]).intValue());
+                return com.codename1.ui.animations.CommonTransitions.createSlide(toIntValue(adaptedArgs[0]), ((Boolean) adaptedArgs[1]).booleanValue(), toIntValue(adaptedArgs[2]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class, java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class, java.lang.Integer.class, java.lang.Boolean.class}, false);
-                return com.codename1.ui.animations.CommonTransitions.createSlide(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue(), ((Number) adaptedArgs[2]).intValue(), ((Boolean) adaptedArgs[3]).booleanValue());
+                return com.codename1.ui.animations.CommonTransitions.createSlide(toIntValue(adaptedArgs[0]), ((Boolean) adaptedArgs[1]).booleanValue(), toIntValue(adaptedArgs[2]), ((Boolean) adaptedArgs[3]).booleanValue());
             }
         }
         if ("createSlideFadeTitle".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class, java.lang.Integer.class}, false);
-                return com.codename1.ui.animations.CommonTransitions.createSlideFadeTitle(((Boolean) adaptedArgs[0]).booleanValue(), ((Number) adaptedArgs[1]).intValue());
+                return com.codename1.ui.animations.CommonTransitions.createSlideFadeTitle(((Boolean) adaptedArgs[0]).booleanValue(), toIntValue(adaptedArgs[1]));
             }
         }
         if ("createTimeline".equals(name)) {
@@ -172,7 +172,7 @@ public final class GeneratedAccess_com_codename1_ui_animations {
         if ("createUncover".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class, java.lang.Integer.class}, false);
-                return com.codename1.ui.animations.CommonTransitions.createUncover(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue(), ((Number) adaptedArgs[2]).intValue());
+                return com.codename1.ui.animations.CommonTransitions.createUncover(toIntValue(adaptedArgs[0]), ((Boolean) adaptedArgs[1]).booleanValue(), toIntValue(adaptedArgs[2]));
             }
         }
         if ("isDefaultLinearMotion".equals(name)) {
@@ -217,7 +217,7 @@ public final class GeneratedAccess_com_codename1_ui_animations {
         if ("create".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return com.codename1.ui.animations.MorphTransition.create(((Number) adaptedArgs[0]).intValue());
+                return com.codename1.ui.animations.MorphTransition.create(toIntValue(adaptedArgs[0]));
             }
         }
         throw unsupportedStatic(com.codename1.ui.animations.MorphTransition.class, name, safeArgs);
@@ -227,73 +227,73 @@ public final class GeneratedAccess_com_codename1_ui_animations {
         if ("createCubicBezierMotion".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class}, false);
-                return com.codename1.ui.animations.Motion.createCubicBezierMotion(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).floatValue(), ((Number) adaptedArgs[4]).floatValue(), ((Number) adaptedArgs[5]).floatValue(), ((Number) adaptedArgs[6]).floatValue());
+                return com.codename1.ui.animations.Motion.createCubicBezierMotion(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), ((Number) adaptedArgs[3]).floatValue(), ((Number) adaptedArgs[4]).floatValue(), ((Number) adaptedArgs[5]).floatValue(), ((Number) adaptedArgs[6]).floatValue());
             }
         }
         if ("createDecelerationMotion".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return com.codename1.ui.animations.Motion.createDecelerationMotion(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
+                return com.codename1.ui.animations.Motion.createDecelerationMotion(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]));
             }
         }
         if ("createDecelerationMotionFrom".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.animations.Motion.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.animations.Motion.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return com.codename1.ui.animations.Motion.createDecelerationMotionFrom((com.codename1.ui.animations.Motion) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
+                return com.codename1.ui.animations.Motion.createDecelerationMotionFrom((com.codename1.ui.animations.Motion) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]));
             }
         }
         if ("createEaseInMotion".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return com.codename1.ui.animations.Motion.createEaseInMotion(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
+                return com.codename1.ui.animations.Motion.createEaseInMotion(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]));
             }
         }
         if ("createEaseInOutMotion".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return com.codename1.ui.animations.Motion.createEaseInOutMotion(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
+                return com.codename1.ui.animations.Motion.createEaseInOutMotion(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]));
             }
         }
         if ("createEaseMotion".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return com.codename1.ui.animations.Motion.createEaseMotion(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
+                return com.codename1.ui.animations.Motion.createEaseMotion(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]));
             }
         }
         if ("createEaseOutMotion".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return com.codename1.ui.animations.Motion.createEaseOutMotion(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
+                return com.codename1.ui.animations.Motion.createEaseOutMotion(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]));
             }
         }
         if ("createExponentialDecayMotion".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Double.class, java.lang.Double.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Double.class, java.lang.Double.class}, false);
-                return com.codename1.ui.animations.Motion.createExponentialDecayMotion(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).doubleValue(), ((Number) adaptedArgs[3]).doubleValue());
+                return com.codename1.ui.animations.Motion.createExponentialDecayMotion(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), ((Number) adaptedArgs[2]).doubleValue(), ((Number) adaptedArgs[3]).doubleValue());
             }
         }
         if ("createFrictionMotion".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Float.class, java.lang.Float.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Float.class, java.lang.Float.class}, false);
-                return com.codename1.ui.animations.Motion.createFrictionMotion(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).floatValue(), ((Number) adaptedArgs[3]).floatValue());
+                return com.codename1.ui.animations.Motion.createFrictionMotion(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), ((Number) adaptedArgs[2]).floatValue(), ((Number) adaptedArgs[3]).floatValue());
             }
         }
         if ("createLinearColorMotion".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return com.codename1.ui.animations.Motion.createLinearColorMotion(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
+                return com.codename1.ui.animations.Motion.createLinearColorMotion(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]));
             }
         }
         if ("createLinearMotion".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return com.codename1.ui.animations.Motion.createLinearMotion(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
+                return com.codename1.ui.animations.Motion.createLinearMotion(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]));
             }
         }
         if ("createSplineMotion".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return com.codename1.ui.animations.Motion.createSplineMotion(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
+                return com.codename1.ui.animations.Motion.createSplineMotion(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]));
             }
         }
         if ("isSlowMotion".equals(name)) {
@@ -314,7 +314,7 @@ public final class GeneratedAccess_com_codename1_ui_animations {
         if ("createTimeline".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, com.codename1.ui.animations.AnimationObject[].class, com.codename1.ui.geom.Dimension.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, com.codename1.ui.animations.AnimationObject[].class, com.codename1.ui.geom.Dimension.class}, false);
-                return com.codename1.ui.animations.Timeline.createTimeline(((Number) adaptedArgs[0]).intValue(), (com.codename1.ui.animations.AnimationObject[]) adaptedArgs[1], (com.codename1.ui.geom.Dimension) adaptedArgs[2]);
+                return com.codename1.ui.animations.Timeline.createTimeline(toIntValue(adaptedArgs[0]), (com.codename1.ui.animations.AnimationObject[]) adaptedArgs[1], (com.codename1.ui.geom.Dimension) adaptedArgs[2]);
             }
         }
         throw unsupportedStatic(com.codename1.ui.animations.Timeline.class, name, safeArgs);
@@ -457,7 +457,7 @@ public final class GeneratedAccess_com_codename1_ui_animations {
         if ("setDuration".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setDuration(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setDuration(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setRoundBubble".equals(name)) {
@@ -629,13 +629,13 @@ public final class GeneratedAccess_com_codename1_ui_animations {
         if ("setBgColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setBgColor(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setBgColor(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setDuration".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setDuration(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setDuration(toIntValue(adaptedArgs[0])); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -707,43 +707,43 @@ public final class GeneratedAccess_com_codename1_ui_animations {
         if ("defineFrames".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.defineFrames(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue()); return null;
+                typedTarget.defineFrames(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2])); return null;
             }
         }
         if ("defineHeight".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.defineHeight(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue(), ((Number) adaptedArgs[4]).intValue()); return null;
+                typedTarget.defineHeight(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3]), toIntValue(adaptedArgs[4])); return null;
             }
         }
         if ("defineMotionX".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.defineMotionX(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue(), ((Number) adaptedArgs[4]).intValue()); return null;
+                typedTarget.defineMotionX(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3]), toIntValue(adaptedArgs[4])); return null;
             }
         }
         if ("defineMotionY".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.defineMotionY(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue(), ((Number) adaptedArgs[4]).intValue()); return null;
+                typedTarget.defineMotionY(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3]), toIntValue(adaptedArgs[4])); return null;
             }
         }
         if ("defineOpacity".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.defineOpacity(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue(), ((Number) adaptedArgs[4]).intValue()); return null;
+                typedTarget.defineOpacity(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3]), toIntValue(adaptedArgs[4])); return null;
             }
         }
         if ("defineOrientation".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.defineOrientation(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue(), ((Number) adaptedArgs[4]).intValue()); return null;
+                typedTarget.defineOrientation(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3]), toIntValue(adaptedArgs[4])); return null;
             }
         }
         if ("defineWidth".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.defineWidth(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue(), ((Number) adaptedArgs[4]).intValue()); return null;
+                typedTarget.defineWidth(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3]), toIntValue(adaptedArgs[4])); return null;
             }
         }
         if ("getEndTime".equals(name)) {
@@ -759,13 +759,13 @@ public final class GeneratedAccess_com_codename1_ui_animations {
         if ("setEndTime".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setEndTime(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setEndTime(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setStartTime".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setStartTime(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setStartTime(toIntValue(adaptedArgs[0])); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -818,7 +818,7 @@ public final class GeneratedAccess_com_codename1_ui_animations {
         if ("setStep".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setStep(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setStep(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("updateAnimationState".equals(name)) {
@@ -889,7 +889,7 @@ public final class GeneratedAccess_com_codename1_ui_animations {
         if ("setSourceValue".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setSourceValue(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setSourceValue(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setStartTime".equals(name)) {
@@ -931,7 +931,7 @@ public final class GeneratedAccess_com_codename1_ui_animations {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.applyMask((java.lang.Object) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
+                return typedTarget.applyMask((java.lang.Object) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]));
             }
         }
         if ("applyMaskAutoScale".equals(name)) {
@@ -959,7 +959,7 @@ public final class GeneratedAccess_com_codename1_ui_animations {
         if ("fill".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.fill(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.fill(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
         if ("fireChangedEvent".equals(name)) {
@@ -982,13 +982,13 @@ public final class GeneratedAccess_com_codename1_ui_animations {
         if ("getAnimation".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getAnimation(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.getAnimation(toIntValue(adaptedArgs[0]));
             }
         }
         if ("getAnimationAt".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.getAnimationAt(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.getAnimationAt(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
         if ("getAnimationCount".equals(name)) {
@@ -1103,17 +1103,17 @@ public final class GeneratedAccess_com_codename1_ui_animations {
         if ("modifyAlpha".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Byte.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Byte.class}, false);
-                return typedTarget.modifyAlpha(((Number) adaptedArgs[0]).byteValue());
+                return typedTarget.modifyAlpha((byte) toIntValue(adaptedArgs[0]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Byte.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Byte.class, java.lang.Integer.class}, false);
-                return typedTarget.modifyAlpha(((Number) adaptedArgs[0]).byteValue(), ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.modifyAlpha((byte) toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
         if ("modifyAlphaWithTranslucency".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Byte.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Byte.class}, false);
-                return typedTarget.modifyAlphaWithTranslucency(((Number) adaptedArgs[0]).byteValue());
+                return typedTarget.modifyAlphaWithTranslucency((byte) toIntValue(adaptedArgs[0]));
             }
         }
         if ("paint".equals(name)) {
@@ -1140,7 +1140,7 @@ public final class GeneratedAccess_com_codename1_ui_animations {
         if ("rotate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.rotate(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.rotate(toIntValue(adaptedArgs[0]));
             }
         }
         if ("rotate180Degrees".equals(name)) {
@@ -1164,43 +1164,43 @@ public final class GeneratedAccess_com_codename1_ui_animations {
         if ("scale".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.scale(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.scale(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("scaled".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.scaled(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.scaled(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
         if ("scaledHeight".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.scaledHeight(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.scaledHeight(toIntValue(adaptedArgs[0]));
             }
         }
         if ("scaledLargerRatio".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.scaledLargerRatio(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.scaledLargerRatio(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
         if ("scaledSmallerRatio".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.scaledSmallerRatio(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.scaledSmallerRatio(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
         if ("scaledWidth".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.scaledWidth(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.scaledWidth(toIntValue(adaptedArgs[0]));
             }
         }
         if ("setAnimationDelay".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setAnimationDelay(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setAnimationDelay(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setImageName".equals(name)) {
@@ -1224,19 +1224,19 @@ public final class GeneratedAccess_com_codename1_ui_animations {
         if ("setTime".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setTime(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setTime(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("subImage".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false);
-                return typedTarget.subImage(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue(), ((Boolean) adaptedArgs[4]).booleanValue());
+                return typedTarget.subImage(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3]), ((Boolean) adaptedArgs[4]).booleanValue());
             }
         }
         if ("toRGB".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.RGBImage.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.RGBImage.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.toRGB((com.codename1.ui.RGBImage) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue(), ((Number) adaptedArgs[4]).intValue(), ((Number) adaptedArgs[5]).intValue(), ((Number) adaptedArgs[6]).intValue()); return null;
+                typedTarget.toRGB((com.codename1.ui.RGBImage) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3]), toIntValue(adaptedArgs[4]), toIntValue(adaptedArgs[5]), toIntValue(adaptedArgs[6])); return null;
             }
         }
         if ("unlock".equals(name)) {
@@ -1480,6 +1480,13 @@ public final class GeneratedAccess_com_codename1_ui_animations {
         return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
     }
 
+    private static int toIntValue(Object value) {
+        if (value instanceof Number) return ((Number) value).intValue();
+        if (value instanceof Character) return (int) ((Character) value).charValue();
+        throw new ClassCastException("Cannot coerce "
+            + (value == null ? "null" : value.getClass().getName()) + " to int");
+    }
+
     private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
         if (!varArgs) {
             if (args.length != paramTypes.length) {
@@ -1532,7 +1539,9 @@ public final class GeneratedAccess_com_codename1_ui_animations {
         if ("byte".equals(type.getName()) || type == Byte.class || "short".equals(type.getName()) || type == Short.class
                 || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
                 || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
-            return value instanceof Number;
+            // Java widens char to int implicitly, so accept Character
+            // for any int-or-larger numeric slot.
+            return value instanceof Number || value instanceof Character;
         }
         if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
             // LambdaValue implements common SAMs directly (Runnable,

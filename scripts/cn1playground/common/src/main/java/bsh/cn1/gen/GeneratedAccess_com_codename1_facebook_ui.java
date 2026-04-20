@@ -180,25 +180,25 @@ public final class GeneratedAccess_com_codename1_facebook_ui {
         if ("contains".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.contains(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.contains(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
         if ("containsOrOwns".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.containsOrOwns(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.containsOrOwns(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
         if ("createStyleAnimation".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
-                return typedTarget.createStyleAnimation((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.createStyleAnimation((java.lang.String) adaptedArgs[0], toIntValue(adaptedArgs[1]));
             }
         }
         if ("drop".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.drop((com.codename1.ui.Component) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue()); return null;
+                typedTarget.drop((com.codename1.ui.Component) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2])); return null;
             }
         }
         if ("getAbsoluteX".equals(name)) {
@@ -254,7 +254,7 @@ public final class GeneratedAccess_com_codename1_facebook_ui {
         if ("getBaseline".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.getBaseline(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.getBaseline(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
         if ("getBaselineResizeBehavior".equals(name)) {
@@ -841,7 +841,7 @@ public final class GeneratedAccess_com_codename1_facebook_ui {
         if ("growShrink".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.growShrink(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.growShrink(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("handlesInput".equals(name)) {
@@ -1083,25 +1083,25 @@ public final class GeneratedAccess_com_codename1_facebook_ui {
         if ("keyPressed".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.keyPressed(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.keyPressed(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("keyReleased".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.keyReleased(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.keyReleased(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("keyRepeated".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.keyRepeated(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.keyRepeated(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("longPointerPress".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.longPointerPress(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.longPointerPress(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("paint".equals(name)) {
@@ -1146,19 +1146,19 @@ public final class GeneratedAccess_com_codename1_facebook_ui {
         if ("paintRippleOverlay".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.paintRippleOverlay((com.codename1.ui.Graphics) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue()); return null;
+                typedTarget.paintRippleOverlay((com.codename1.ui.Graphics) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3])); return null;
             }
         }
         if ("paintShadows".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.paintShadows((com.codename1.ui.Graphics) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue()); return null;
+                typedTarget.paintShadows((com.codename1.ui.Graphics) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2])); return null;
             }
         }
         if ("pointerDragged".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.pointerDragged(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.pointerDragged(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1])); return null;
             }
             if (matches(safeArgs, new Class<?>[]{int[].class, int[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class, int[].class}, false);
@@ -1186,7 +1186,7 @@ public final class GeneratedAccess_com_codename1_facebook_ui {
         if ("pointerPressed".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.pointerPressed(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.pointerPressed(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1])); return null;
             }
             if (matches(safeArgs, new Class<?>[]{int[].class, int[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class, int[].class}, false);
@@ -1196,7 +1196,7 @@ public final class GeneratedAccess_com_codename1_facebook_ui {
         if ("pointerReleased".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.pointerReleased(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.pointerReleased(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1])); return null;
             }
             if (matches(safeArgs, new Class<?>[]{int[].class, int[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class, int[].class}, false);
@@ -1229,7 +1229,7 @@ public final class GeneratedAccess_com_codename1_facebook_ui {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.released(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.released(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("remove".equals(name)) {
@@ -1309,7 +1309,7 @@ public final class GeneratedAccess_com_codename1_facebook_ui {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.repaint(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue()); return null;
+                typedTarget.repaint(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3])); return null;
             }
         }
         if ("requestFocus".equals(name)) {
@@ -1325,7 +1325,7 @@ public final class GeneratedAccess_com_codename1_facebook_ui {
         if ("scrollRectToVisible".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.ui.Component.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.ui.Component.class}, false);
-                typedTarget.scrollRectToVisible(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue(), (com.codename1.ui.Component) adaptedArgs[4]); return null;
+                typedTarget.scrollRectToVisible(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3]), (com.codename1.ui.Component) adaptedArgs[4]); return null;
             }
         }
         if ("setAccessibilityText".equals(name)) {
@@ -1337,7 +1337,7 @@ public final class GeneratedAccess_com_codename1_facebook_ui {
         if ("setAlignment".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setAlignment(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setAlignment(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setAlwaysTensile".equals(name)) {
@@ -1433,7 +1433,7 @@ public final class GeneratedAccess_com_codename1_facebook_ui {
         if ("setCursor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setCursor(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setCursor(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setDirtyRegion".equals(name)) {
@@ -1457,7 +1457,7 @@ public final class GeneratedAccess_com_codename1_facebook_ui {
         if ("setDragTransparency".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Byte.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Byte.class}, false);
-                typedTarget.setDragTransparency(((Number) adaptedArgs[0]).byteValue()); return null;
+                typedTarget.setDragTransparency((byte) toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setDraggable".equals(name)) {
@@ -1525,7 +1525,7 @@ public final class GeneratedAccess_com_codename1_facebook_ui {
         if ("setGap".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setGap(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setGap(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setGrabsPointerEvents".equals(name)) {
@@ -1543,7 +1543,7 @@ public final class GeneratedAccess_com_codename1_facebook_ui {
         if ("setHeight".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setHeight(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setHeight(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setHidden".equals(name)) {
@@ -1737,7 +1737,7 @@ public final class GeneratedAccess_com_codename1_facebook_ui {
         if ("setPreferredH".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setPreferredH(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setPreferredH(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setPreferredSize".equals(name)) {
@@ -1755,13 +1755,13 @@ public final class GeneratedAccess_com_codename1_facebook_ui {
         if ("setPreferredTabIndex".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setPreferredTabIndex(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setPreferredTabIndex(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setPreferredW".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setPreferredW(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setPreferredW(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setPressedIcon".equals(name)) {
@@ -1797,7 +1797,7 @@ public final class GeneratedAccess_com_codename1_facebook_ui {
         if ("setReleaseRadius".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setReleaseRadius(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setReleaseRadius(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setReleased".equals(name)) {
@@ -1826,13 +1826,13 @@ public final class GeneratedAccess_com_codename1_facebook_ui {
         if ("setScrollAnimationSpeed".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setScrollAnimationSpeed(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setScrollAnimationSpeed(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setScrollOpacityChangeSpeed".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setScrollOpacityChangeSpeed(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setScrollOpacityChangeSpeed(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setScrollSize".equals(name)) {
@@ -1866,13 +1866,13 @@ public final class GeneratedAccess_com_codename1_facebook_ui {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setShiftMillimeters(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setShiftMillimeters(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setShiftText".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setShiftText(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setShiftText(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setShouldCalcPreferredSize".equals(name)) {
@@ -1914,7 +1914,7 @@ public final class GeneratedAccess_com_codename1_facebook_ui {
         if ("setTabIndex".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setTabIndex(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setTabIndex(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setTactileTouch".equals(name)) {
@@ -1932,7 +1932,7 @@ public final class GeneratedAccess_com_codename1_facebook_ui {
         if ("setTensileLength".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setTensileLength(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setTensileLength(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setText".equals(name)) {
@@ -1944,7 +1944,7 @@ public final class GeneratedAccess_com_codename1_facebook_ui {
         if ("setTextPosition".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setTextPosition(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setTextPosition(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setTextSelectionEnabled".equals(name)) {
@@ -1996,7 +1996,7 @@ public final class GeneratedAccess_com_codename1_facebook_ui {
         if ("setVerticalAlignment".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setVerticalAlignment(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setVerticalAlignment(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setVisible".equals(name)) {
@@ -2008,19 +2008,19 @@ public final class GeneratedAccess_com_codename1_facebook_ui {
         if ("setWidth".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setWidth(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setWidth(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setX".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setX(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setX(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setY".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setY(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setY(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("shouldTickerStart".equals(name)) {
@@ -2089,7 +2089,7 @@ public final class GeneratedAccess_com_codename1_facebook_ui {
         if ("visibleBoundsContains".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.visibleBoundsContains(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.visibleBoundsContains(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -2258,6 +2258,13 @@ public final class GeneratedAccess_com_codename1_facebook_ui {
         return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
     }
 
+    private static int toIntValue(Object value) {
+        if (value instanceof Number) return ((Number) value).intValue();
+        if (value instanceof Character) return (int) ((Character) value).charValue();
+        throw new ClassCastException("Cannot coerce "
+            + (value == null ? "null" : value.getClass().getName()) + " to int");
+    }
+
     private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
         if (!varArgs) {
             if (args.length != paramTypes.length) {
@@ -2310,7 +2317,9 @@ public final class GeneratedAccess_com_codename1_facebook_ui {
         if ("byte".equals(type.getName()) || type == Byte.class || "short".equals(type.getName()) || type == Short.class
                 || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
                 || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
-            return value instanceof Number;
+            // Java widens char to int implicitly, so accept Character
+            // for any int-or-larger numeric slot.
+            return value instanceof Number || value instanceof Character;
         }
         if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
             // LambdaValue implements common SAMs directly (Runnable,

@@ -70,7 +70,7 @@ public final class GeneratedAccess_com_codename1_maps_providers {
         if ("setTileSize".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                com.codename1.maps.providers.GoogleMapsProvider.setTileSize(((Number) adaptedArgs[0]).intValue()); return null;
+                com.codename1.maps.providers.GoogleMapsProvider.setTileSize(toIntValue(adaptedArgs[0])); return null;
             }
         }
         throw unsupportedStatic(com.codename1.maps.providers.GoogleMapsProvider.class, name, safeArgs);
@@ -122,7 +122,7 @@ public final class GeneratedAccess_com_codename1_maps_providers {
         if ("bboxFor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.maps.Coord.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.maps.Coord.class, java.lang.Integer.class}, false);
-                return typedTarget.bboxFor((com.codename1.maps.Coord) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.bboxFor((com.codename1.maps.Coord) adaptedArgs[0], toIntValue(adaptedArgs[1]));
             }
         }
         if ("getLanguage".equals(name)) {
@@ -159,7 +159,7 @@ public final class GeneratedAccess_com_codename1_maps_providers {
         if ("scale".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.scale(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.scale(toIntValue(adaptedArgs[0]));
             }
         }
         if ("setLanguage".equals(name)) {
@@ -171,7 +171,7 @@ public final class GeneratedAccess_com_codename1_maps_providers {
         if ("setMapType".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setMapType(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setMapType(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setSensor".equals(name)) {
@@ -198,7 +198,7 @@ public final class GeneratedAccess_com_codename1_maps_providers {
         if ("translate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.maps.Coord.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.maps.Coord.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.translate((com.codename1.maps.Coord) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue());
+                return typedTarget.translate((com.codename1.maps.Coord) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3]));
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -213,7 +213,7 @@ public final class GeneratedAccess_com_codename1_maps_providers {
         if ("bboxFor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.maps.Coord.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.maps.Coord.class, java.lang.Integer.class}, false);
-                return typedTarget.bboxFor((com.codename1.maps.Coord) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.bboxFor((com.codename1.maps.Coord) adaptedArgs[0], toIntValue(adaptedArgs[1]));
             }
         }
         if ("maxZoomFor".equals(name)) {
@@ -240,7 +240,7 @@ public final class GeneratedAccess_com_codename1_maps_providers {
         if ("scale".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.scale(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.scale(toIntValue(adaptedArgs[0]));
             }
         }
         if ("tileFor".equals(name)) {
@@ -261,7 +261,7 @@ public final class GeneratedAccess_com_codename1_maps_providers {
         if ("translate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.maps.Coord.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.maps.Coord.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.translate((com.codename1.maps.Coord) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue());
+                return typedTarget.translate((com.codename1.maps.Coord) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3]));
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -276,7 +276,7 @@ public final class GeneratedAccess_com_codename1_maps_providers {
         if ("bboxFor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.maps.Coord.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.maps.Coord.class, java.lang.Integer.class}, false);
-                return typedTarget.bboxFor((com.codename1.maps.Coord) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.bboxFor((com.codename1.maps.Coord) adaptedArgs[0], toIntValue(adaptedArgs[1]));
             }
         }
         if ("maxZoomFor".equals(name)) {
@@ -303,7 +303,7 @@ public final class GeneratedAccess_com_codename1_maps_providers {
         if ("scale".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.scale(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.scale(toIntValue(adaptedArgs[0]));
             }
         }
         if ("tileFor".equals(name)) {
@@ -324,7 +324,7 @@ public final class GeneratedAccess_com_codename1_maps_providers {
         if ("translate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.maps.Coord.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.maps.Coord.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.translate((com.codename1.maps.Coord) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue());
+                return typedTarget.translate((com.codename1.maps.Coord) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3]));
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -339,7 +339,7 @@ public final class GeneratedAccess_com_codename1_maps_providers {
         if ("bboxFor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.maps.Coord.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.maps.Coord.class, java.lang.Integer.class}, false);
-                return typedTarget.bboxFor((com.codename1.maps.Coord) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.bboxFor((com.codename1.maps.Coord) adaptedArgs[0], toIntValue(adaptedArgs[1]));
             }
         }
         if ("maxZoomFor".equals(name)) {
@@ -366,7 +366,7 @@ public final class GeneratedAccess_com_codename1_maps_providers {
         if ("scale".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.scale(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.scale(toIntValue(adaptedArgs[0]));
             }
         }
         if ("tileFor".equals(name)) {
@@ -387,7 +387,7 @@ public final class GeneratedAccess_com_codename1_maps_providers {
         if ("translate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.maps.Coord.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.maps.Coord.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.translate((com.codename1.maps.Coord) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue());
+                return typedTarget.translate((com.codename1.maps.Coord) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3]));
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -561,6 +561,13 @@ public final class GeneratedAccess_com_codename1_maps_providers {
         return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
     }
 
+    private static int toIntValue(Object value) {
+        if (value instanceof Number) return ((Number) value).intValue();
+        if (value instanceof Character) return (int) ((Character) value).charValue();
+        throw new ClassCastException("Cannot coerce "
+            + (value == null ? "null" : value.getClass().getName()) + " to int");
+    }
+
     private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
         if (!varArgs) {
             if (args.length != paramTypes.length) {
@@ -613,7 +620,9 @@ public final class GeneratedAccess_com_codename1_maps_providers {
         if ("byte".equals(type.getName()) || type == Byte.class || "short".equals(type.getName()) || type == Short.class
                 || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
                 || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
-            return value instanceof Number;
+            // Java widens char to int implicitly, so accept Character
+            // for any int-or-larger numeric slot.
+            return value instanceof Number || value instanceof Character;
         }
         if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
             // LambdaValue implements common SAMs directly (Runnable,

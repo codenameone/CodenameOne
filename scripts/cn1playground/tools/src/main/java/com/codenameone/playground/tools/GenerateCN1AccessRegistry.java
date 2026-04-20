@@ -1954,6 +1954,12 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
         writer.write("        }\n");
         writer.write("        return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);\n");
         writer.write("    }\n\n");
+        writer.write("    private static int toIntValue(Object value) {\n");
+        writer.write("        if (value instanceof Number) return ((Number) value).intValue();\n");
+        writer.write("        if (value instanceof Character) return (int) ((Character) value).charValue();\n");
+        writer.write("        throw new ClassCastException(\"Cannot coerce \"\n");
+        writer.write("            + (value == null ? \"null\" : value.getClass().getName()) + \" to int\");\n");
+        writer.write("    }\n\n");
         writer.write("    private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {\n");
         writer.write("        if (!varArgs) {\n");
         writer.write("            if (args.length != paramTypes.length) {\n");
@@ -2005,7 +2011,9 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
         writer.write("        if (\"byte\".equals(type.getName()) || type == Byte.class || \"short\".equals(type.getName()) || type == Short.class\n");
         writer.write("                || \"int\".equals(type.getName()) || type == Integer.class || \"long\".equals(type.getName()) || type == Long.class\n");
         writer.write("                || \"float\".equals(type.getName()) || type == Float.class || \"double\".equals(type.getName()) || type == Double.class) {\n");
-        writer.write("            return value instanceof Number;\n");
+        writer.write("            // Java widens char to int implicitly, so accept Character\n");
+        writer.write("            // for any int-or-larger numeric slot.\n");
+        writer.write("            return value instanceof Number || value instanceof Character;\n");
         writer.write("        }\n");
         writer.write("        if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {\n");
         writer.write("            // LambdaValue implements common SAMs directly (Runnable,\n");
@@ -2388,23 +2396,24 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
         if ("java.lang.Character".equals(type.baseName)) {
             return "Character.valueOf(((Character) " + expression + ").charValue())";
         }
+        // Numeric slots accept Character too (Java widens char to int).
         if ("byte".equals(type.baseName)) {
-            return "((Number) " + expression + ").byteValue()";
+            return "(byte) toIntValue(" + expression + ")";
         }
         if ("java.lang.Byte".equals(type.baseName)) {
-            return "Byte.valueOf(((Number) " + expression + ").byteValue())";
+            return "Byte.valueOf((byte) toIntValue(" + expression + "))";
         }
         if ("short".equals(type.baseName)) {
-            return "((Number) " + expression + ").shortValue()";
+            return "(short) toIntValue(" + expression + ")";
         }
         if ("java.lang.Short".equals(type.baseName)) {
-            return "Short.valueOf(((Number) " + expression + ").shortValue())";
+            return "Short.valueOf((short) toIntValue(" + expression + "))";
         }
         if ("int".equals(type.baseName)) {
-            return "((Number) " + expression + ").intValue()";
+            return "toIntValue(" + expression + ")";
         }
         if ("java.lang.Integer".equals(type.baseName)) {
-            return "Integer.valueOf(((Number) " + expression + ").intValue())";
+            return "Integer.valueOf(toIntValue(" + expression + "))";
         }
         if ("long".equals(type.baseName)) {
             return "((Number) " + expression + ").longValue()";

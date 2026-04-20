@@ -54,11 +54,11 @@ public final class GeneratedAccess_com_codename1_io_services {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.Component.class, java.lang.Integer.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.Component.class, java.lang.Integer.class, java.lang.String.class}, false);
-                return new com.codename1.io.services.ImageDownloadService((java.lang.String) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue(), (java.lang.String) adaptedArgs[3]);
+                return new com.codename1.io.services.ImageDownloadService((java.lang.String) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1], toIntValue(adaptedArgs[2]), (java.lang.String) adaptedArgs[3]);
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.List.class, java.lang.Integer.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.List.class, java.lang.Integer.class, java.lang.String.class}, false);
-                return new com.codename1.io.services.ImageDownloadService((java.lang.String) adaptedArgs[0], (com.codename1.ui.List) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue(), (java.lang.String) adaptedArgs[3]);
+                return new com.codename1.io.services.ImageDownloadService((java.lang.String) adaptedArgs[0], (com.codename1.ui.List) adaptedArgs[1], toIntValue(adaptedArgs[2]), (java.lang.String) adaptedArgs[3]);
             }
         }
         if (type == com.codename1.io.services.RSSService.class) {
@@ -68,11 +68,11 @@ public final class GeneratedAccess_com_codename1_io_services {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
-                return new com.codename1.io.services.RSSService((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
+                return new com.codename1.io.services.RSSService((java.lang.String) adaptedArgs[0], toIntValue(adaptedArgs[1]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return new com.codename1.io.services.RSSService((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
+                return new com.codename1.io.services.RSSService((java.lang.String) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]));
             }
         }
         if (type == com.codename1.io.services.TwitterRESTService.class) {
@@ -129,19 +129,19 @@ public final class GeneratedAccess_com_codename1_io_services {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.List.class, java.lang.Integer.class, java.lang.String.class, java.lang.String.class, com.codename1.ui.geom.Dimension.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.List.class, java.lang.Integer.class, java.lang.String.class, java.lang.String.class, com.codename1.ui.geom.Dimension.class}, false);
-                com.codename1.io.services.ImageDownloadService.createImageToFileSystem((java.lang.String) adaptedArgs[0], (com.codename1.ui.List) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue(), (java.lang.String) adaptedArgs[3], (java.lang.String) adaptedArgs[4], (com.codename1.ui.geom.Dimension) adaptedArgs[5]); return null;
+                com.codename1.io.services.ImageDownloadService.createImageToFileSystem((java.lang.String) adaptedArgs[0], (com.codename1.ui.List) adaptedArgs[1], toIntValue(adaptedArgs[2]), (java.lang.String) adaptedArgs[3], (java.lang.String) adaptedArgs[4], (com.codename1.ui.geom.Dimension) adaptedArgs[5]); return null;
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.Component.class, java.lang.Integer.class, java.lang.String.class, java.lang.String.class, com.codename1.ui.geom.Dimension.class, java.lang.Byte.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.Component.class, java.lang.Integer.class, java.lang.String.class, java.lang.String.class, com.codename1.ui.geom.Dimension.class, java.lang.Byte.class}, false);
-                com.codename1.io.services.ImageDownloadService.createImageToFileSystem((java.lang.String) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue(), (java.lang.String) adaptedArgs[3], (java.lang.String) adaptedArgs[4], (com.codename1.ui.geom.Dimension) adaptedArgs[5], ((Number) adaptedArgs[6]).byteValue()); return null;
+                com.codename1.io.services.ImageDownloadService.createImageToFileSystem((java.lang.String) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1], toIntValue(adaptedArgs[2]), (java.lang.String) adaptedArgs[3], (java.lang.String) adaptedArgs[4], (com.codename1.ui.geom.Dimension) adaptedArgs[5], (byte) toIntValue(adaptedArgs[6])); return null;
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.Component.class, java.lang.Integer.class, java.lang.String.class, java.lang.String.class, com.codename1.ui.Image.class, java.lang.Byte.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.Component.class, java.lang.Integer.class, java.lang.String.class, java.lang.String.class, com.codename1.ui.Image.class, java.lang.Byte.class}, false);
-                com.codename1.io.services.ImageDownloadService.createImageToFileSystem((java.lang.String) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue(), (java.lang.String) adaptedArgs[3], (java.lang.String) adaptedArgs[4], (com.codename1.ui.Image) adaptedArgs[5], ((Number) adaptedArgs[6]).byteValue()); return null;
+                com.codename1.io.services.ImageDownloadService.createImageToFileSystem((java.lang.String) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1], toIntValue(adaptedArgs[2]), (java.lang.String) adaptedArgs[3], (java.lang.String) adaptedArgs[4], (com.codename1.ui.Image) adaptedArgs[5], (byte) toIntValue(adaptedArgs[6])); return null;
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.Component.class, com.codename1.ui.list.ListModel.class, java.lang.Integer.class, java.lang.String.class, java.lang.String.class, com.codename1.ui.Image.class, java.lang.Byte.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.Component.class, com.codename1.ui.list.ListModel.class, java.lang.Integer.class, java.lang.String.class, java.lang.String.class, com.codename1.ui.Image.class, java.lang.Byte.class}, false);
-                com.codename1.io.services.ImageDownloadService.createImageToFileSystem((java.lang.String) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1], (com.codename1.ui.list.ListModel) adaptedArgs[2], ((Number) adaptedArgs[3]).intValue(), (java.lang.String) adaptedArgs[4], (java.lang.String) adaptedArgs[5], (com.codename1.ui.Image) adaptedArgs[6], ((Number) adaptedArgs[7]).byteValue()); return null;
+                com.codename1.io.services.ImageDownloadService.createImageToFileSystem((java.lang.String) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1], (com.codename1.ui.list.ListModel) adaptedArgs[2], toIntValue(adaptedArgs[3]), (java.lang.String) adaptedArgs[4], (java.lang.String) adaptedArgs[5], (com.codename1.ui.Image) adaptedArgs[6], (byte) toIntValue(adaptedArgs[7])); return null;
             }
         }
         if ("createImageToStorage".equals(name)) {
@@ -159,27 +159,27 @@ public final class GeneratedAccess_com_codename1_io_services {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.Label.class, java.lang.String.class, com.codename1.ui.geom.Dimension.class, java.lang.Byte.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.Label.class, java.lang.String.class, com.codename1.ui.geom.Dimension.class, java.lang.Byte.class}, false);
-                com.codename1.io.services.ImageDownloadService.createImageToStorage((java.lang.String) adaptedArgs[0], (com.codename1.ui.Label) adaptedArgs[1], (java.lang.String) adaptedArgs[2], (com.codename1.ui.geom.Dimension) adaptedArgs[3], ((Number) adaptedArgs[4]).byteValue()); return null;
+                com.codename1.io.services.ImageDownloadService.createImageToStorage((java.lang.String) adaptedArgs[0], (com.codename1.ui.Label) adaptedArgs[1], (java.lang.String) adaptedArgs[2], (com.codename1.ui.geom.Dimension) adaptedArgs[3], (byte) toIntValue(adaptedArgs[4])); return null;
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.Label.class, java.lang.String.class, com.codename1.ui.Image.class, java.lang.Byte.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.Label.class, java.lang.String.class, com.codename1.ui.Image.class, java.lang.Byte.class}, false);
-                com.codename1.io.services.ImageDownloadService.createImageToStorage((java.lang.String) adaptedArgs[0], (com.codename1.ui.Label) adaptedArgs[1], (java.lang.String) adaptedArgs[2], (com.codename1.ui.Image) adaptedArgs[3], ((Number) adaptedArgs[4]).byteValue()); return null;
+                com.codename1.io.services.ImageDownloadService.createImageToStorage((java.lang.String) adaptedArgs[0], (com.codename1.ui.Label) adaptedArgs[1], (java.lang.String) adaptedArgs[2], (com.codename1.ui.Image) adaptedArgs[3], (byte) toIntValue(adaptedArgs[4])); return null;
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.List.class, java.lang.Integer.class, java.lang.String.class, java.lang.String.class, com.codename1.ui.geom.Dimension.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.List.class, java.lang.Integer.class, java.lang.String.class, java.lang.String.class, com.codename1.ui.geom.Dimension.class}, false);
-                com.codename1.io.services.ImageDownloadService.createImageToStorage((java.lang.String) adaptedArgs[0], (com.codename1.ui.List) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue(), (java.lang.String) adaptedArgs[3], (java.lang.String) adaptedArgs[4], (com.codename1.ui.geom.Dimension) adaptedArgs[5]); return null;
+                com.codename1.io.services.ImageDownloadService.createImageToStorage((java.lang.String) adaptedArgs[0], (com.codename1.ui.List) adaptedArgs[1], toIntValue(adaptedArgs[2]), (java.lang.String) adaptedArgs[3], (java.lang.String) adaptedArgs[4], (com.codename1.ui.geom.Dimension) adaptedArgs[5]); return null;
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.Component.class, java.lang.Integer.class, java.lang.String.class, java.lang.String.class, com.codename1.ui.geom.Dimension.class, java.lang.Byte.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.Component.class, java.lang.Integer.class, java.lang.String.class, java.lang.String.class, com.codename1.ui.geom.Dimension.class, java.lang.Byte.class}, false);
-                com.codename1.io.services.ImageDownloadService.createImageToStorage((java.lang.String) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue(), (java.lang.String) adaptedArgs[3], (java.lang.String) adaptedArgs[4], (com.codename1.ui.geom.Dimension) adaptedArgs[5], ((Number) adaptedArgs[6]).byteValue()); return null;
+                com.codename1.io.services.ImageDownloadService.createImageToStorage((java.lang.String) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1], toIntValue(adaptedArgs[2]), (java.lang.String) adaptedArgs[3], (java.lang.String) adaptedArgs[4], (com.codename1.ui.geom.Dimension) adaptedArgs[5], (byte) toIntValue(adaptedArgs[6])); return null;
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.Component.class, java.lang.Integer.class, java.lang.String.class, java.lang.String.class, com.codename1.ui.Image.class, java.lang.Byte.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.Component.class, java.lang.Integer.class, java.lang.String.class, java.lang.String.class, com.codename1.ui.Image.class, java.lang.Byte.class}, false);
-                com.codename1.io.services.ImageDownloadService.createImageToStorage((java.lang.String) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue(), (java.lang.String) adaptedArgs[3], (java.lang.String) adaptedArgs[4], (com.codename1.ui.Image) adaptedArgs[5], ((Number) adaptedArgs[6]).byteValue()); return null;
+                com.codename1.io.services.ImageDownloadService.createImageToStorage((java.lang.String) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1], toIntValue(adaptedArgs[2]), (java.lang.String) adaptedArgs[3], (java.lang.String) adaptedArgs[4], (com.codename1.ui.Image) adaptedArgs[5], (byte) toIntValue(adaptedArgs[6])); return null;
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.Component.class, com.codename1.ui.list.ListModel.class, java.lang.Integer.class, java.lang.String.class, java.lang.String.class, com.codename1.ui.Image.class, java.lang.Byte.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.Component.class, com.codename1.ui.list.ListModel.class, java.lang.Integer.class, java.lang.String.class, java.lang.String.class, com.codename1.ui.Image.class, java.lang.Byte.class}, false);
-                com.codename1.io.services.ImageDownloadService.createImageToStorage((java.lang.String) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1], (com.codename1.ui.list.ListModel) adaptedArgs[2], ((Number) adaptedArgs[3]).intValue(), (java.lang.String) adaptedArgs[4], (java.lang.String) adaptedArgs[5], (com.codename1.ui.Image) adaptedArgs[6], ((Number) adaptedArgs[7]).byteValue()); return null;
+                com.codename1.io.services.ImageDownloadService.createImageToStorage((java.lang.String) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1], (com.codename1.ui.list.ListModel) adaptedArgs[2], toIntValue(adaptedArgs[3]), (java.lang.String) adaptedArgs[4], (java.lang.String) adaptedArgs[5], (com.codename1.ui.Image) adaptedArgs[6], (byte) toIntValue(adaptedArgs[7])); return null;
             }
         }
         if ("getDefaultTimeout".equals(name)) {
@@ -223,7 +223,7 @@ public final class GeneratedAccess_com_codename1_io_services {
         if ("setDefaultTimeout".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                com.codename1.io.services.ImageDownloadService.setDefaultTimeout(((Number) adaptedArgs[0]).intValue()); return null;
+                com.codename1.io.services.ImageDownloadService.setDefaultTimeout(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setFastScale".equals(name)) {
@@ -591,7 +591,7 @@ public final class GeneratedAccess_com_codename1_io_services {
         if ("ioStreamUpdate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class}, false);
-                typedTarget.ioStreamUpdate((java.lang.Object) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.ioStreamUpdate((java.lang.Object) adaptedArgs[0], toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("isCheckSSLCertificates".equals(name)) {
@@ -724,7 +724,7 @@ public final class GeneratedAccess_com_codename1_io_services {
         if ("setChunkedStreamingMode".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setChunkedStreamingMode(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setChunkedStreamingMode(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setContentType".equals(name)) {
@@ -796,7 +796,7 @@ public final class GeneratedAccess_com_codename1_io_services {
         if ("setPriority".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Byte.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Byte.class}, false);
-                typedTarget.setPriority(((Number) adaptedArgs[0]).byteValue()); return null;
+                typedTarget.setPriority((byte) toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setReadRequest".equals(name)) {
@@ -814,7 +814,7 @@ public final class GeneratedAccess_com_codename1_io_services {
         if ("setReadTimeout".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setReadTimeout(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setReadTimeout(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setRequestBody".equals(name)) {
@@ -836,13 +836,13 @@ public final class GeneratedAccess_com_codename1_io_services {
         if ("setSilentRetryCount".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setSilentRetryCount(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setSilentRetryCount(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setTimeout".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setTimeout(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setTimeout(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setUrl".equals(name)) {
@@ -1131,7 +1131,7 @@ public final class GeneratedAccess_com_codename1_io_services {
         if ("ioStreamUpdate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class}, false);
-                typedTarget.ioStreamUpdate((java.lang.Object) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.ioStreamUpdate((java.lang.Object) adaptedArgs[0], toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("isCheckSSLCertificates".equals(name)) {
@@ -1274,7 +1274,7 @@ public final class GeneratedAccess_com_codename1_io_services {
         if ("setChunkedStreamingMode".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setChunkedStreamingMode(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setChunkedStreamingMode(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setContentType".equals(name)) {
@@ -1358,7 +1358,7 @@ public final class GeneratedAccess_com_codename1_io_services {
         if ("setPriority".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Byte.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Byte.class}, false);
-                typedTarget.setPriority(((Number) adaptedArgs[0]).byteValue()); return null;
+                typedTarget.setPriority((byte) toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setReadRequest".equals(name)) {
@@ -1376,7 +1376,7 @@ public final class GeneratedAccess_com_codename1_io_services {
         if ("setReadTimeout".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setReadTimeout(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setReadTimeout(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setRequestBody".equals(name)) {
@@ -1398,13 +1398,13 @@ public final class GeneratedAccess_com_codename1_io_services {
         if ("setSilentRetryCount".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setSilentRetryCount(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setSilentRetryCount(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setTimeout".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setTimeout(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setTimeout(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setUrl".equals(name)) {
@@ -1703,7 +1703,7 @@ public final class GeneratedAccess_com_codename1_io_services {
         if ("ioStreamUpdate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class}, false);
-                typedTarget.ioStreamUpdate((java.lang.Object) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.ioStreamUpdate((java.lang.Object) adaptedArgs[0], toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("isCheckSSLCertificates".equals(name)) {
@@ -1780,7 +1780,7 @@ public final class GeneratedAccess_com_codename1_io_services {
         if ("parsingError".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class}, false);
-                return typedTarget.parsingError(((Number) adaptedArgs[0]).intValue(), (java.lang.String) adaptedArgs[1], (java.lang.String) adaptedArgs[2], (java.lang.String) adaptedArgs[3], (java.lang.String) adaptedArgs[4]);
+                return typedTarget.parsingError(toIntValue(adaptedArgs[0]), (java.lang.String) adaptedArgs[1], (java.lang.String) adaptedArgs[2], (java.lang.String) adaptedArgs[3], (java.lang.String) adaptedArgs[4]);
             }
         }
         if ("pause".equals(name)) {
@@ -1847,7 +1847,7 @@ public final class GeneratedAccess_com_codename1_io_services {
         if ("setChunkedStreamingMode".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setChunkedStreamingMode(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setChunkedStreamingMode(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setContentType".equals(name)) {
@@ -1931,7 +1931,7 @@ public final class GeneratedAccess_com_codename1_io_services {
         if ("setPriority".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Byte.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Byte.class}, false);
-                typedTarget.setPriority(((Number) adaptedArgs[0]).byteValue()); return null;
+                typedTarget.setPriority((byte) toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setReadRequest".equals(name)) {
@@ -1949,7 +1949,7 @@ public final class GeneratedAccess_com_codename1_io_services {
         if ("setReadTimeout".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setReadTimeout(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setReadTimeout(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setRequestBody".equals(name)) {
@@ -1971,13 +1971,13 @@ public final class GeneratedAccess_com_codename1_io_services {
         if ("setSilentRetryCount".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setSilentRetryCount(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setSilentRetryCount(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setTimeout".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setTimeout(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setTimeout(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setUrl".equals(name)) {
@@ -2251,7 +2251,7 @@ public final class GeneratedAccess_com_codename1_io_services {
         if ("getStatus".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getStatus(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.getStatus(toIntValue(adaptedArgs[0]));
             }
         }
         if ("getStatusesCount".equals(name)) {
@@ -2282,7 +2282,7 @@ public final class GeneratedAccess_com_codename1_io_services {
         if ("ioStreamUpdate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class}, false);
-                typedTarget.ioStreamUpdate((java.lang.Object) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.ioStreamUpdate((java.lang.Object) adaptedArgs[0], toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("isCheckSSLCertificates".equals(name)) {
@@ -2415,7 +2415,7 @@ public final class GeneratedAccess_com_codename1_io_services {
         if ("setChunkedStreamingMode".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setChunkedStreamingMode(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setChunkedStreamingMode(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setContentType".equals(name)) {
@@ -2487,7 +2487,7 @@ public final class GeneratedAccess_com_codename1_io_services {
         if ("setPriority".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Byte.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Byte.class}, false);
-                typedTarget.setPriority(((Number) adaptedArgs[0]).byteValue()); return null;
+                typedTarget.setPriority((byte) toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setReadRequest".equals(name)) {
@@ -2505,7 +2505,7 @@ public final class GeneratedAccess_com_codename1_io_services {
         if ("setReadTimeout".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setReadTimeout(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setReadTimeout(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setRequestBody".equals(name)) {
@@ -2527,13 +2527,13 @@ public final class GeneratedAccess_com_codename1_io_services {
         if ("setSilentRetryCount".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setSilentRetryCount(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setSilentRetryCount(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setTimeout".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setTimeout(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setTimeout(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setUrl".equals(name)) {
@@ -2724,6 +2724,13 @@ public final class GeneratedAccess_com_codename1_io_services {
         return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
     }
 
+    private static int toIntValue(Object value) {
+        if (value instanceof Number) return ((Number) value).intValue();
+        if (value instanceof Character) return (int) ((Character) value).charValue();
+        throw new ClassCastException("Cannot coerce "
+            + (value == null ? "null" : value.getClass().getName()) + " to int");
+    }
+
     private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
         if (!varArgs) {
             if (args.length != paramTypes.length) {
@@ -2776,7 +2783,9 @@ public final class GeneratedAccess_com_codename1_io_services {
         if ("byte".equals(type.getName()) || type == Byte.class || "short".equals(type.getName()) || type == Short.class
                 || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
                 || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
-            return value instanceof Number;
+            // Java widens char to int implicitly, so accept Character
+            // for any int-or-larger numeric slot.
+            return value instanceof Number || value instanceof Character;
         }
         if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
             // LambdaValue implements common SAMs directly (Runnable,

@@ -52,7 +52,7 @@ public final class GeneratedAccess_com_codename1_location {
         if (type == com.codename1.location.Geofence.class) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.location.Location.class, java.lang.Integer.class, java.lang.Long.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.location.Location.class, java.lang.Integer.class, java.lang.Long.class}, false);
-                return new com.codename1.location.Geofence((java.lang.String) adaptedArgs[0], (com.codename1.location.Location) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).longValue());
+                return new com.codename1.location.Geofence((java.lang.String) adaptedArgs[0], (com.codename1.location.Location) adaptedArgs[1], toIntValue(adaptedArgs[2]), ((Number) adaptedArgs[3]).longValue());
             }
         }
         if (type == com.codename1.location.Location.class) {
@@ -76,7 +76,7 @@ public final class GeneratedAccess_com_codename1_location {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Long.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Long.class}, false);
-                return new com.codename1.location.LocationRequest(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).longValue());
+                return new com.codename1.location.LocationRequest(toIntValue(adaptedArgs[0]), ((Number) adaptedArgs[1]).longValue());
             }
         }
         throw unsupportedConstruct(type, safeArgs);
@@ -316,7 +316,7 @@ public final class GeneratedAccess_com_codename1_location {
         if ("setBubbleRadius".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setBubbleRadius(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setBubbleRadius(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setListenerClass".equals(name)) {
@@ -333,11 +333,11 @@ public final class GeneratedAccess_com_codename1_location {
         if ("update".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.update(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.update(toIntValue(adaptedArgs[0])); return null;
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false);
-                typedTarget.update(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
+                typedTarget.update(toIntValue(adaptedArgs[0]), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -439,7 +439,7 @@ public final class GeneratedAccess_com_codename1_location {
         if ("setStatus".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setStatus(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setStatus(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setTimeStamp".equals(name)) {
@@ -578,7 +578,7 @@ public final class GeneratedAccess_com_codename1_location {
         if ("providerStateChanged".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.providerStateChanged(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.providerStateChanged(toIntValue(adaptedArgs[0])); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -757,6 +757,13 @@ public final class GeneratedAccess_com_codename1_location {
         return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
     }
 
+    private static int toIntValue(Object value) {
+        if (value instanceof Number) return ((Number) value).intValue();
+        if (value instanceof Character) return (int) ((Character) value).charValue();
+        throw new ClassCastException("Cannot coerce "
+            + (value == null ? "null" : value.getClass().getName()) + " to int");
+    }
+
     private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
         if (!varArgs) {
             if (args.length != paramTypes.length) {
@@ -809,7 +816,9 @@ public final class GeneratedAccess_com_codename1_location {
         if ("byte".equals(type.getName()) || type == Byte.class || "short".equals(type.getName()) || type == Short.class
                 || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
                 || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
-            return value instanceof Number;
+            // Java widens char to int implicitly, so accept Character
+            // for any int-or-larger numeric slot.
+            return value instanceof Number || value instanceof Character;
         }
         if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
             // LambdaValue implements common SAMs directly (Runnable,

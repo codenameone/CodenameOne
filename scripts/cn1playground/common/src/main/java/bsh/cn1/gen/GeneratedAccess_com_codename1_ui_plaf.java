@@ -90,11 +90,11 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, com.codename1.ui.Font.class, java.lang.Byte.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, com.codename1.ui.Font.class, java.lang.Byte.class}, false);
-                return new com.codename1.ui.plaf.Style(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), (com.codename1.ui.Font) adaptedArgs[2], ((Number) adaptedArgs[3]).byteValue());
+                return new com.codename1.ui.plaf.Style(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), (com.codename1.ui.Font) adaptedArgs[2], (byte) toIntValue(adaptedArgs[3]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, com.codename1.ui.Font.class, java.lang.Byte.class, com.codename1.ui.Image.class, java.lang.Byte.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, com.codename1.ui.Font.class, java.lang.Byte.class, com.codename1.ui.Image.class, java.lang.Byte.class}, false);
-                return new com.codename1.ui.plaf.Style(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), (com.codename1.ui.Font) adaptedArgs[2], ((Number) adaptedArgs[3]).byteValue(), (com.codename1.ui.Image) adaptedArgs[4], ((Number) adaptedArgs[5]).byteValue());
+                return new com.codename1.ui.plaf.Style(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), (com.codename1.ui.Font) adaptedArgs[2], (byte) toIntValue(adaptedArgs[3]), (com.codename1.ui.Image) adaptedArgs[4], (byte) toIntValue(adaptedArgs[5]));
             }
         }
         throw unsupportedConstruct(type, safeArgs);
@@ -119,7 +119,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return com.codename1.ui.plaf.Border.createBevelLowered(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue());
+                return com.codename1.ui.plaf.Border.createBevelLowered(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3]));
             }
         }
         if ("createBevelRaised".equals(name)) {
@@ -128,7 +128,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return com.codename1.ui.plaf.Border.createBevelRaised(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue());
+                return com.codename1.ui.plaf.Border.createBevelRaised(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3]));
             }
         }
         if ("createCompoundBorder".equals(name)) {
@@ -140,31 +140,31 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("createDashedBorder".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return com.codename1.ui.plaf.Border.createDashedBorder(((Number) adaptedArgs[0]).intValue());
+                return com.codename1.ui.plaf.Border.createDashedBorder(toIntValue(adaptedArgs[0]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return com.codename1.ui.plaf.Border.createDashedBorder(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return com.codename1.ui.plaf.Border.createDashedBorder(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
         if ("createDottedBorder".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return com.codename1.ui.plaf.Border.createDottedBorder(((Number) adaptedArgs[0]).intValue());
+                return com.codename1.ui.plaf.Border.createDottedBorder(toIntValue(adaptedArgs[0]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return com.codename1.ui.plaf.Border.createDottedBorder(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return com.codename1.ui.plaf.Border.createDottedBorder(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
         if ("createDoubleBorder".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return com.codename1.ui.plaf.Border.createDoubleBorder(((Number) adaptedArgs[0]).intValue());
+                return com.codename1.ui.plaf.Border.createDoubleBorder(toIntValue(adaptedArgs[0]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return com.codename1.ui.plaf.Border.createDoubleBorder(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return com.codename1.ui.plaf.Border.createDoubleBorder(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
         if ("createEmpty".equals(name)) {
@@ -178,7 +178,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return com.codename1.ui.plaf.Border.createEtchedLowered(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return com.codename1.ui.plaf.Border.createEtchedLowered(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
         if ("createEtchedRaised".equals(name)) {
@@ -187,17 +187,17 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return com.codename1.ui.plaf.Border.createEtchedRaised(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return com.codename1.ui.plaf.Border.createEtchedRaised(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
         if ("createGrooveBorder".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return com.codename1.ui.plaf.Border.createGrooveBorder(((Number) adaptedArgs[0]).intValue());
+                return com.codename1.ui.plaf.Border.createGrooveBorder(toIntValue(adaptedArgs[0]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return com.codename1.ui.plaf.Border.createGrooveBorder(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return com.codename1.ui.plaf.Border.createGrooveBorder(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
         if ("createHorizonalImageBorder".equals(name)) {
@@ -231,11 +231,11 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("createInsetBorder".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return com.codename1.ui.plaf.Border.createInsetBorder(((Number) adaptedArgs[0]).intValue());
+                return com.codename1.ui.plaf.Border.createInsetBorder(toIntValue(adaptedArgs[0]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return com.codename1.ui.plaf.Border.createInsetBorder(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return com.codename1.ui.plaf.Border.createInsetBorder(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
         if ("createLineBorder".equals(name)) {
@@ -245,61 +245,61 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return com.codename1.ui.plaf.Border.createLineBorder(((Number) adaptedArgs[0]).intValue());
+                return com.codename1.ui.plaf.Border.createLineBorder(toIntValue(adaptedArgs[0]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Integer.class}, false);
-                return com.codename1.ui.plaf.Border.createLineBorder(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).intValue());
+                return com.codename1.ui.plaf.Border.createLineBorder(((Number) adaptedArgs[0]).floatValue(), toIntValue(adaptedArgs[1]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return com.codename1.ui.plaf.Border.createLineBorder(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return com.codename1.ui.plaf.Border.createLineBorder(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class}, false);
-                return com.codename1.ui.plaf.Border.createLineBorder(((Number) adaptedArgs[0]).intValue(), (java.lang.String) adaptedArgs[1]);
+                return com.codename1.ui.plaf.Border.createLineBorder(toIntValue(adaptedArgs[0]), (java.lang.String) adaptedArgs[1]);
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.String.class}, false);
-                return com.codename1.ui.plaf.Border.createLineBorder(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), (java.lang.String) adaptedArgs[2]);
+                return com.codename1.ui.plaf.Border.createLineBorder(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), (java.lang.String) adaptedArgs[2]);
             }
         }
         if ("createOutsetBorder".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return com.codename1.ui.plaf.Border.createOutsetBorder(((Number) adaptedArgs[0]).intValue());
+                return com.codename1.ui.plaf.Border.createOutsetBorder(toIntValue(adaptedArgs[0]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return com.codename1.ui.plaf.Border.createOutsetBorder(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return com.codename1.ui.plaf.Border.createOutsetBorder(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
         if ("createRidgeBorder".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return com.codename1.ui.plaf.Border.createRidgeBorder(((Number) adaptedArgs[0]).intValue());
+                return com.codename1.ui.plaf.Border.createRidgeBorder(toIntValue(adaptedArgs[0]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return com.codename1.ui.plaf.Border.createRidgeBorder(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return com.codename1.ui.plaf.Border.createRidgeBorder(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
         if ("createRoundBorder".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return com.codename1.ui.plaf.Border.createRoundBorder(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return com.codename1.ui.plaf.Border.createRoundBorder(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false);
-                return com.codename1.ui.plaf.Border.createRoundBorder(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Boolean) adaptedArgs[2]).booleanValue());
+                return com.codename1.ui.plaf.Border.createRoundBorder(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), ((Boolean) adaptedArgs[2]).booleanValue());
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return com.codename1.ui.plaf.Border.createRoundBorder(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
+                return com.codename1.ui.plaf.Border.createRoundBorder(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false);
-                return com.codename1.ui.plaf.Border.createRoundBorder(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Boolean) adaptedArgs[3]).booleanValue());
+                return com.codename1.ui.plaf.Border.createRoundBorder(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), ((Boolean) adaptedArgs[3]).booleanValue());
             }
         }
         if ("createUndelineBorder".equals(name)) {
@@ -309,7 +309,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return com.codename1.ui.plaf.Border.createUndelineBorder(((Number) adaptedArgs[0]).intValue());
+                return com.codename1.ui.plaf.Border.createUndelineBorder(toIntValue(adaptedArgs[0]));
             }
         }
         if ("createUnderlineBorder".equals(name)) {
@@ -319,15 +319,15 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return com.codename1.ui.plaf.Border.createUnderlineBorder(((Number) adaptedArgs[0]).intValue());
+                return com.codename1.ui.plaf.Border.createUnderlineBorder(toIntValue(adaptedArgs[0]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Integer.class}, false);
-                return com.codename1.ui.plaf.Border.createUnderlineBorder(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).intValue());
+                return com.codename1.ui.plaf.Border.createUnderlineBorder(((Number) adaptedArgs[0]).floatValue(), toIntValue(adaptedArgs[1]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return com.codename1.ui.plaf.Border.createUnderlineBorder(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return com.codename1.ui.plaf.Border.createUnderlineBorder(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
         if ("createVerticalImageBorder".equals(name)) {
@@ -359,7 +359,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("reverseAlignForBidi".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, java.lang.Integer.class}, false);
-                return com.codename1.ui.plaf.DefaultLookAndFeel.reverseAlignForBidi((com.codename1.ui.Component) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
+                return com.codename1.ui.plaf.DefaultLookAndFeel.reverseAlignForBidi((com.codename1.ui.Component) adaptedArgs[0], toIntValue(adaptedArgs[1]));
             }
         }
         throw unsupportedStatic(com.codename1.ui.plaf.DefaultLookAndFeel.class, name, safeArgs);
@@ -763,7 +763,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("setThickness".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setThickness(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setThickness(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setTrackComponent".equals(name)) {
@@ -805,7 +805,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("calculateSpanForLabelText".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.TextSelection.class, com.codename1.ui.Label.class, java.lang.String.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.TextSelection.class, com.codename1.ui.Label.class, java.lang.String.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.calculateSpanForLabelText((com.codename1.ui.TextSelection) adaptedArgs[0], (com.codename1.ui.Label) adaptedArgs[1], (java.lang.String) adaptedArgs[2], ((Number) adaptedArgs[3]).intValue(), ((Number) adaptedArgs[4]).intValue(), ((Number) adaptedArgs[5]).intValue());
+                return typedTarget.calculateSpanForLabelText((com.codename1.ui.TextSelection) adaptedArgs[0], (com.codename1.ui.Label) adaptedArgs[1], (java.lang.String) adaptedArgs[2], toIntValue(adaptedArgs[3]), toIntValue(adaptedArgs[4]), toIntValue(adaptedArgs[5]));
             }
         }
         if ("calculateTextAreaSpan".equals(name)) {
@@ -1150,7 +1150,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("paintTensileHighlight".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Graphics.class, java.lang.Boolean.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Graphics.class, java.lang.Boolean.class, java.lang.Integer.class}, false);
-                typedTarget.paintTensileHighlight((com.codename1.ui.Component) adaptedArgs[0], (com.codename1.ui.Graphics) adaptedArgs[1], ((Boolean) adaptedArgs[2]).booleanValue(), ((Number) adaptedArgs[3]).intValue()); return null;
+                typedTarget.paintTensileHighlight((com.codename1.ui.Component) adaptedArgs[0], (com.codename1.ui.Graphics) adaptedArgs[1], ((Boolean) adaptedArgs[2]).booleanValue(), toIntValue(adaptedArgs[3])); return null;
             }
         }
         if ("refreshTheme".equals(name)) {
@@ -1214,7 +1214,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("setDefaultFormTintColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setDefaultFormTintColor(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setDefaultFormTintColor(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setDefaultFormTransitionIn".equals(name)) {
@@ -1250,7 +1250,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("setDefaultSmoothScrollingSpeed".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setDefaultSmoothScrollingSpeed(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setDefaultSmoothScrollingSpeed(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setDefaultSnapToGrid".equals(name)) {
@@ -1268,7 +1268,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("setDisableColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setDisableColor(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setDisableColor(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setFG".equals(name)) {
@@ -1286,7 +1286,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("setFadeScrollBarSpeed".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setFadeScrollBarSpeed(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setFadeScrollBarSpeed(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setFadeScrollEdge".equals(name)) {
@@ -1298,7 +1298,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("setFadeScrollEdgeLength".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setFadeScrollEdgeLength(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setFadeScrollEdgeLength(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setFocusScrolling".equals(name)) {
@@ -1362,13 +1362,13 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("setTactileTouchDuration".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setTactileTouchDuration(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setTactileTouchDuration(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setTextFieldCursorColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setTextFieldCursorColor(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setTextFieldCursorColor(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setTickWhenFocused".equals(name)) {
@@ -1412,7 +1412,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("color".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.color(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.color(toIntValue(adaptedArgs[0]));
             }
         }
         if ("createPressedVersion".equals(name)) {
@@ -1592,7 +1592,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("opacity".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.opacity(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.opacity(toIntValue(adaptedArgs[0]));
             }
         }
         if ("paint".equals(name)) {
@@ -1644,7 +1644,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("setThickness".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setThickness(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setThickness(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setTrackComponent".equals(name)) {
@@ -1666,17 +1666,17 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("shadowOpacity".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.shadowOpacity(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.shadowOpacity(toIntValue(adaptedArgs[0]));
             }
         }
         if ("shadowSpread".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.shadowSpread(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.shadowSpread(toIntValue(adaptedArgs[0]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false);
-                return typedTarget.shadowSpread(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue());
+                return typedTarget.shadowSpread(toIntValue(adaptedArgs[0]), ((Boolean) adaptedArgs[1]).booleanValue());
             }
         }
         if ("shadowX".equals(name)) {
@@ -1704,19 +1704,19 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("strokeAngle".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.strokeAngle(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.strokeAngle(toIntValue(adaptedArgs[0]));
             }
         }
         if ("strokeColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.strokeColor(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.strokeColor(toIntValue(adaptedArgs[0]));
             }
         }
         if ("strokeOpacity".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.strokeOpacity(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.strokeOpacity(toIntValue(adaptedArgs[0]));
             }
         }
         if ("uiid".equals(name)) {
@@ -2022,7 +2022,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("setThickness".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setThickness(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setThickness(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setTrackComponent".equals(name)) {
@@ -2044,13 +2044,13 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("shadowColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.shadowColor(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.shadowColor(toIntValue(adaptedArgs[0]));
             }
         }
         if ("shadowOpacity".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.shadowOpacity(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.shadowOpacity(toIntValue(adaptedArgs[0]));
             }
         }
         if ("shadowSpread".equals(name)) {
@@ -2060,7 +2060,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.shadowSpread(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.shadowSpread(toIntValue(adaptedArgs[0]));
             }
         }
         if ("shadowX".equals(name)) {
@@ -2088,13 +2088,13 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("strokeColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.strokeColor(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.strokeColor(toIntValue(adaptedArgs[0]));
             }
         }
         if ("strokeOpacity".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.strokeOpacity(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.strokeOpacity(toIntValue(adaptedArgs[0]));
             }
         }
         if ("topLeftMode".equals(name)) {
@@ -2124,7 +2124,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("trackComponentSide".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.trackComponentSide(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.trackComponentSide(toIntValue(adaptedArgs[0]));
             }
         }
         if ("trackComponentVerticalPosition".equals(name)) {
@@ -2284,7 +2284,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("setThickness".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setThickness(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setThickness(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setTrackComponent".equals(name)) {
@@ -2623,7 +2623,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("paintTensileHighlight".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Graphics.class, java.lang.Boolean.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Graphics.class, java.lang.Boolean.class, java.lang.Integer.class}, false);
-                typedTarget.paintTensileHighlight((com.codename1.ui.Component) adaptedArgs[0], (com.codename1.ui.Graphics) adaptedArgs[1], ((Boolean) adaptedArgs[2]).booleanValue(), ((Number) adaptedArgs[3]).intValue()); return null;
+                typedTarget.paintTensileHighlight((com.codename1.ui.Component) adaptedArgs[0], (com.codename1.ui.Graphics) adaptedArgs[1], ((Boolean) adaptedArgs[2]).booleanValue(), toIntValue(adaptedArgs[3])); return null;
             }
         }
         if ("refreshTheme".equals(name)) {
@@ -2665,7 +2665,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("setDefaultFormTintColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setDefaultFormTintColor(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setDefaultFormTintColor(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setDefaultFormTransitionIn".equals(name)) {
@@ -2701,7 +2701,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("setDefaultSmoothScrollingSpeed".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setDefaultSmoothScrollingSpeed(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setDefaultSmoothScrollingSpeed(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setDefaultSnapToGrid".equals(name)) {
@@ -2719,7 +2719,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("setDisableColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setDisableColor(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setDisableColor(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setFG".equals(name)) {
@@ -2737,7 +2737,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("setFadeScrollBarSpeed".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setFadeScrollBarSpeed(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setFadeScrollBarSpeed(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setFadeScrollEdge".equals(name)) {
@@ -2749,7 +2749,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("setFadeScrollEdgeLength".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setFadeScrollEdgeLength(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setFadeScrollEdgeLength(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setFocusScrolling".equals(name)) {
@@ -2791,13 +2791,13 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("setTactileTouchDuration".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setTactileTouchDuration(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setTactileTouchDuration(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setTextFieldCursorColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setTextFieldCursorColor(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setTextFieldCursorColor(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setTickerSpeed".equals(name)) {
@@ -2947,11 +2947,11 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("getMargin".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getMargin(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.getMargin(toIntValue(adaptedArgs[0]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class, java.lang.Integer.class}, false);
-                return typedTarget.getMargin(((Boolean) adaptedArgs[0]).booleanValue(), ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.getMargin(((Boolean) adaptedArgs[0]).booleanValue(), toIntValue(adaptedArgs[1]));
             }
         }
         if ("getMarginBottom".equals(name)) {
@@ -2962,7 +2962,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("getMarginFloatValue".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class, java.lang.Integer.class}, false);
-                return typedTarget.getMarginFloatValue(((Boolean) adaptedArgs[0]).booleanValue(), ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.getMarginFloatValue(((Boolean) adaptedArgs[0]).booleanValue(), toIntValue(adaptedArgs[1]));
             }
         }
         if ("getMarginLeft".equals(name)) {
@@ -3000,7 +3000,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("getMarginValue".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class, java.lang.Integer.class}, false);
-                return typedTarget.getMarginValue(((Boolean) adaptedArgs[0]).booleanValue(), ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.getMarginValue(((Boolean) adaptedArgs[0]).booleanValue(), toIntValue(adaptedArgs[1]));
             }
         }
         if ("getOpacity".equals(name)) {
@@ -3011,11 +3011,11 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("getPadding".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getPadding(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.getPadding(toIntValue(adaptedArgs[0]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class, java.lang.Integer.class}, false);
-                return typedTarget.getPadding(((Boolean) adaptedArgs[0]).booleanValue(), ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.getPadding(((Boolean) adaptedArgs[0]).booleanValue(), toIntValue(adaptedArgs[1]));
             }
         }
         if ("getPaddingBottom".equals(name)) {
@@ -3026,7 +3026,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("getPaddingFloatValue".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class, java.lang.Integer.class}, false);
-                return typedTarget.getPaddingFloatValue(((Boolean) adaptedArgs[0]).booleanValue(), ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.getPaddingFloatValue(((Boolean) adaptedArgs[0]).booleanValue(), toIntValue(adaptedArgs[1]));
             }
         }
         if ("getPaddingLeft".equals(name)) {
@@ -3064,7 +3064,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("getPaddingValue".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class, java.lang.Integer.class}, false);
-                return typedTarget.getPaddingValue(((Boolean) adaptedArgs[0]).booleanValue(), ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.getPaddingValue(((Boolean) adaptedArgs[0]).booleanValue(), toIntValue(adaptedArgs[1]));
             }
         }
         if ("getTextDecoration".equals(name)) {
@@ -3179,21 +3179,21 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("setAlignment".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setAlignment(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setAlignment(toIntValue(adaptedArgs[0])); return null;
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false);
-                typedTarget.setAlignment(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
+                typedTarget.setAlignment(toIntValue(adaptedArgs[0]), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
             }
         }
         if ("setBackgroundGradientEndColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setBackgroundGradientEndColor(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setBackgroundGradientEndColor(toIntValue(adaptedArgs[0])); return null;
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false);
-                typedTarget.setBackgroundGradientEndColor(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
+                typedTarget.setBackgroundGradientEndColor(toIntValue(adaptedArgs[0]), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
             }
         }
         if ("setBackgroundGradientRelativeSize".equals(name)) {
@@ -3229,31 +3229,31 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("setBackgroundGradientStartColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setBackgroundGradientStartColor(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setBackgroundGradientStartColor(toIntValue(adaptedArgs[0])); return null;
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false);
-                typedTarget.setBackgroundGradientStartColor(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
+                typedTarget.setBackgroundGradientStartColor(toIntValue(adaptedArgs[0]), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
             }
         }
         if ("setBackgroundType".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Byte.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Byte.class}, false);
-                typedTarget.setBackgroundType(((Number) adaptedArgs[0]).byteValue()); return null;
+                typedTarget.setBackgroundType((byte) toIntValue(adaptedArgs[0])); return null;
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Byte.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Byte.class, java.lang.Boolean.class}, false);
-                typedTarget.setBackgroundType(((Number) adaptedArgs[0]).byteValue(), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
+                typedTarget.setBackgroundType((byte) toIntValue(adaptedArgs[0]), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
             }
         }
         if ("setBgColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setBgColor(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setBgColor(toIntValue(adaptedArgs[0])); return null;
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false);
-                typedTarget.setBgColor(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
+                typedTarget.setBgColor(toIntValue(adaptedArgs[0]), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
             }
         }
         if ("setBgImage".equals(name)) {
@@ -3275,15 +3275,15 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("setBgTransparency".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Byte.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Byte.class}, false);
-                typedTarget.setBgTransparency(((Number) adaptedArgs[0]).byteValue()); return null;
+                typedTarget.setBgTransparency((byte) toIntValue(adaptedArgs[0])); return null;
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setBgTransparency(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setBgTransparency(toIntValue(adaptedArgs[0])); return null;
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false);
-                typedTarget.setBgTransparency(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
+                typedTarget.setBgTransparency(toIntValue(adaptedArgs[0]), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
             }
         }
         if ("setBorder".equals(name)) {
@@ -3299,31 +3299,31 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("setElevation".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setElevation(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setElevation(toIntValue(adaptedArgs[0])); return null;
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false);
-                typedTarget.setElevation(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
+                typedTarget.setElevation(toIntValue(adaptedArgs[0]), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
             }
         }
         if ("setFgAlpha".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setFgAlpha(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setFgAlpha(toIntValue(adaptedArgs[0])); return null;
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false);
-                typedTarget.setFgAlpha(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
+                typedTarget.setFgAlpha(toIntValue(adaptedArgs[0]), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
             }
         }
         if ("setFgColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setFgColor(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setFgColor(toIntValue(adaptedArgs[0])); return null;
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false);
-                typedTarget.setFgColor(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
+                typedTarget.setFgColor(toIntValue(adaptedArgs[0]), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
             }
         }
         if ("setFont".equals(name)) {
@@ -3347,39 +3347,39 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Byte.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Byte.class}, false);
-                typedTarget.setIconGap(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).byteValue()); return null;
+                typedTarget.setIconGap(((Number) adaptedArgs[0]).floatValue(), (byte) toIntValue(adaptedArgs[1])); return null;
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Byte.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Byte.class, java.lang.Boolean.class}, false);
-                typedTarget.setIconGap(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).byteValue(), ((Boolean) adaptedArgs[2]).booleanValue()); return null;
+                typedTarget.setIconGap(((Number) adaptedArgs[0]).floatValue(), (byte) toIntValue(adaptedArgs[1]), ((Boolean) adaptedArgs[2]).booleanValue()); return null;
             }
         }
         if ("setIconGapUnit".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Byte.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Byte.class}, false);
-                typedTarget.setIconGapUnit(((Number) adaptedArgs[0]).byteValue()); return null;
+                typedTarget.setIconGapUnit((byte) toIntValue(adaptedArgs[0])); return null;
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Byte.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Byte.class, java.lang.Boolean.class}, false);
-                typedTarget.setIconGapUnit(((Number) adaptedArgs[0]).byteValue(), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
+                typedTarget.setIconGapUnit((byte) toIntValue(adaptedArgs[0]), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
             }
         }
         if ("setMargin".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Float.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Float.class}, false);
-                typedTarget.setMargin(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).floatValue()); return null;
+                typedTarget.setMargin(toIntValue(adaptedArgs[0]), ((Number) adaptedArgs[1]).floatValue()); return null;
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.setMargin(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.setMargin(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1])); return null;
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Float.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Float.class, java.lang.Boolean.class}, false);
-                typedTarget.setMargin(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).floatValue(), ((Boolean) adaptedArgs[2]).booleanValue()); return null;
+                typedTarget.setMargin(toIntValue(adaptedArgs[0]), ((Number) adaptedArgs[1]).floatValue(), ((Boolean) adaptedArgs[2]).booleanValue()); return null;
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false);
-                typedTarget.setMargin(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Boolean) adaptedArgs[2]).booleanValue()); return null;
+                typedTarget.setMargin(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), ((Boolean) adaptedArgs[2]).booleanValue()); return null;
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class}, false);
@@ -3387,7 +3387,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.setMargin(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue()); return null;
+                typedTarget.setMargin(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3])); return null;
             }
         }
         if ("setMarginBottom".equals(name)) {
@@ -3397,7 +3397,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setMarginBottom(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setMarginBottom(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setMarginLeft".equals(name)) {
@@ -3407,7 +3407,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setMarginLeft(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setMarginLeft(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setMarginRight".equals(name)) {
@@ -3417,7 +3417,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setMarginRight(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setMarginRight(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setMarginTop".equals(name)) {
@@ -3427,7 +3427,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setMarginTop(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setMarginTop(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setMarginUnit".equals(name)) {
@@ -3435,7 +3435,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class}, true);
                 byte[] varArgs = new byte[adaptedArgs.length - 0];
                 for (int i = 0; i < adaptedArgs.length; i++) {
-                    varArgs[i - 0] = ((Number) adaptedArgs[i]).byteValue();
+                    varArgs[i - 0] = (byte) toIntValue(adaptedArgs[i]);
                 }
                 typedTarget.setMarginUnit(varArgs); return null;
             }
@@ -3443,35 +3443,35 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("setMarginUnitBottom".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Byte.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Byte.class}, false);
-                typedTarget.setMarginUnitBottom(((Number) adaptedArgs[0]).byteValue()); return null;
+                typedTarget.setMarginUnitBottom((byte) toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setMarginUnitLeft".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Byte.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Byte.class}, false);
-                typedTarget.setMarginUnitLeft(((Number) adaptedArgs[0]).byteValue()); return null;
+                typedTarget.setMarginUnitLeft((byte) toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setMarginUnitRight".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Byte.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Byte.class}, false);
-                typedTarget.setMarginUnitRight(((Number) adaptedArgs[0]).byteValue()); return null;
+                typedTarget.setMarginUnitRight((byte) toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setMarginUnitTop".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Byte.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Byte.class}, false);
-                typedTarget.setMarginUnitTop(((Number) adaptedArgs[0]).byteValue()); return null;
+                typedTarget.setMarginUnitTop((byte) toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setOpacity".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setOpacity(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setOpacity(toIntValue(adaptedArgs[0])); return null;
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false);
-                typedTarget.setOpacity(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
+                typedTarget.setOpacity(toIntValue(adaptedArgs[0]), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
             }
         }
         if ("setOverline".equals(name)) {
@@ -3483,19 +3483,19 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("setPadding".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Float.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Float.class}, false);
-                typedTarget.setPadding(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).floatValue()); return null;
+                typedTarget.setPadding(toIntValue(adaptedArgs[0]), ((Number) adaptedArgs[1]).floatValue()); return null;
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.setPadding(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.setPadding(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1])); return null;
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Float.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Float.class, java.lang.Boolean.class}, false);
-                typedTarget.setPadding(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).floatValue(), ((Boolean) adaptedArgs[2]).booleanValue()); return null;
+                typedTarget.setPadding(toIntValue(adaptedArgs[0]), ((Number) adaptedArgs[1]).floatValue(), ((Boolean) adaptedArgs[2]).booleanValue()); return null;
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false);
-                typedTarget.setPadding(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Boolean) adaptedArgs[2]).booleanValue()); return null;
+                typedTarget.setPadding(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), ((Boolean) adaptedArgs[2]).booleanValue()); return null;
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class}, false);
@@ -3503,7 +3503,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.setPadding(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue()); return null;
+                typedTarget.setPadding(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3])); return null;
             }
         }
         if ("setPaddingBottom".equals(name)) {
@@ -3513,7 +3513,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setPaddingBottom(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setPaddingBottom(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setPaddingLeft".equals(name)) {
@@ -3523,7 +3523,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setPaddingLeft(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setPaddingLeft(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setPaddingRight".equals(name)) {
@@ -3533,7 +3533,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setPaddingRight(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setPaddingRight(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setPaddingTop".equals(name)) {
@@ -3543,7 +3543,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setPaddingTop(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setPaddingTop(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setPaddingUnit".equals(name)) {
@@ -3551,7 +3551,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class}, true);
                 byte[] varArgs = new byte[adaptedArgs.length - 0];
                 for (int i = 0; i < adaptedArgs.length; i++) {
-                    varArgs[i - 0] = ((Number) adaptedArgs[i]).byteValue();
+                    varArgs[i - 0] = (byte) toIntValue(adaptedArgs[i]);
                 }
                 typedTarget.setPaddingUnit(varArgs); return null;
             }
@@ -3559,25 +3559,25 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("setPaddingUnitBottom".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Byte.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Byte.class}, false);
-                typedTarget.setPaddingUnitBottom(((Number) adaptedArgs[0]).byteValue()); return null;
+                typedTarget.setPaddingUnitBottom((byte) toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setPaddingUnitLeft".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Byte.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Byte.class}, false);
-                typedTarget.setPaddingUnitLeft(((Number) adaptedArgs[0]).byteValue()); return null;
+                typedTarget.setPaddingUnitLeft((byte) toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setPaddingUnitRight".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Byte.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Byte.class}, false);
-                typedTarget.setPaddingUnitRight(((Number) adaptedArgs[0]).byteValue()); return null;
+                typedTarget.setPaddingUnitRight((byte) toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setPaddingUnitTop".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Byte.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Byte.class}, false);
-                typedTarget.setPaddingUnitTop(((Number) adaptedArgs[0]).byteValue()); return null;
+                typedTarget.setPaddingUnitTop((byte) toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setStrikeThru".equals(name)) {
@@ -3605,11 +3605,11 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("setTextDecoration".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setTextDecoration(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setTextDecoration(toIntValue(adaptedArgs[0])); return null;
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false);
-                typedTarget.setTextDecoration(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
+                typedTarget.setTextDecoration(toIntValue(adaptedArgs[0]), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
             }
         }
         if ("setUnderline".equals(name)) {
@@ -3681,7 +3681,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("getThemeConstant".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
-                return typedTarget.getThemeConstant((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.getThemeConstant((java.lang.String) adaptedArgs[0], toIntValue(adaptedArgs[1]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
@@ -4073,6 +4073,13 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
     }
 
+    private static int toIntValue(Object value) {
+        if (value instanceof Number) return ((Number) value).intValue();
+        if (value instanceof Character) return (int) ((Character) value).charValue();
+        throw new ClassCastException("Cannot coerce "
+            + (value == null ? "null" : value.getClass().getName()) + " to int");
+    }
+
     private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
         if (!varArgs) {
             if (args.length != paramTypes.length) {
@@ -4125,7 +4132,9 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("byte".equals(type.getName()) || type == Byte.class || "short".equals(type.getName()) || type == Short.class
                 || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
                 || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
-            return value instanceof Number;
+            // Java widens char to int implicitly, so accept Character
+            // for any int-or-larger numeric slot.
+            return value instanceof Number || value instanceof Character;
         }
         if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
             // LambdaValue implements common SAMs directly (Runnable,

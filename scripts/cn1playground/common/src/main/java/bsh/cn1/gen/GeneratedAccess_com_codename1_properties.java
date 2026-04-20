@@ -111,7 +111,7 @@ public final class GeneratedAccess_com_codename1_properties {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Byte.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Byte.class}, false);
-                return new com.codename1.properties.ByteProperty((java.lang.String) adaptedArgs[0], Byte.valueOf(((Number) adaptedArgs[1]).byteValue()));
+                return new com.codename1.properties.ByteProperty((java.lang.String) adaptedArgs[0], Byte.valueOf((byte) toIntValue(adaptedArgs[1])));
             }
         }
         if (type == com.codename1.properties.CharProperty.class) {
@@ -151,7 +151,7 @@ public final class GeneratedAccess_com_codename1_properties {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
-                return new com.codename1.properties.IntProperty((java.lang.String) adaptedArgs[0], Integer.valueOf(((Number) adaptedArgs[1]).intValue()));
+                return new com.codename1.properties.IntProperty((java.lang.String) adaptedArgs[0], Integer.valueOf(toIntValue(adaptedArgs[1])));
             }
         }
         if (type == com.codename1.properties.ListProperty.class) {
@@ -1122,7 +1122,7 @@ public final class GeneratedAccess_com_codename1_properties {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Object.class}, false);
-                return typedTarget.add(((Number) adaptedArgs[0]).intValue(), (java.lang.Object) adaptedArgs[1]);
+                return typedTarget.add(toIntValue(adaptedArgs[0]), (java.lang.Object) adaptedArgs[1]);
             }
         }
         if ("addAll".equals(name)) {
@@ -1167,7 +1167,7 @@ public final class GeneratedAccess_com_codename1_properties {
         if ("get".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.get(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.get(toIntValue(adaptedArgs[0]));
             }
         }
         if ("getClientProperty".equals(name)) {
@@ -1216,7 +1216,7 @@ public final class GeneratedAccess_com_codename1_properties {
         if ("remove".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.remove(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.remove(toIntValue(adaptedArgs[0]));
             }
         }
         if ("removeAll".equals(name)) {
@@ -1238,7 +1238,7 @@ public final class GeneratedAccess_com_codename1_properties {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Object.class}, false);
-                return typedTarget.set(((Number) adaptedArgs[0]).intValue(), (java.lang.Object) adaptedArgs[1]);
+                return typedTarget.set(toIntValue(adaptedArgs[0]), (java.lang.Object) adaptedArgs[1]);
             }
         }
         if ("setLabel".equals(name)) {
@@ -1449,7 +1449,7 @@ public final class GeneratedAccess_com_codename1_properties {
         if ("remove".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.remove(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.remove(toIntValue(adaptedArgs[0]));
             }
         }
         if ("removeAll".equals(name)) {
@@ -1580,7 +1580,7 @@ public final class GeneratedAccess_com_codename1_properties {
         if ("remove".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.remove(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.remove(toIntValue(adaptedArgs[0]));
             }
         }
         if ("removeAll".equals(name)) {
@@ -1936,7 +1936,7 @@ public final class GeneratedAccess_com_codename1_properties {
         if ("setTextFieldConstraint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.properties.PropertyBase.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.properties.PropertyBase.class, java.lang.Integer.class}, false);
-                typedTarget.setTextFieldConstraint((com.codename1.properties.PropertyBase) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.setTextFieldConstraint((com.codename1.properties.PropertyBase) adaptedArgs[0], toIntValue(adaptedArgs[1])); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -2087,7 +2087,7 @@ public final class GeneratedAccess_com_codename1_properties {
         if ("get".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.get(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.get(toIntValue(adaptedArgs[0]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -2300,7 +2300,7 @@ public final class GeneratedAccess_com_codename1_properties {
         if ("select".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.properties.PropertyBusinessObject.class, com.codename1.properties.Property.class, java.lang.Boolean.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.properties.PropertyBusinessObject.class, com.codename1.properties.Property.class, java.lang.Boolean.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.select((com.codename1.properties.PropertyBusinessObject) adaptedArgs[0], (com.codename1.properties.Property) adaptedArgs[1], ((Boolean) adaptedArgs[2]).booleanValue(), ((Number) adaptedArgs[3]).intValue(), ((Number) adaptedArgs[4]).intValue());
+                return typedTarget.select((com.codename1.properties.PropertyBusinessObject) adaptedArgs[0], (com.codename1.properties.Property) adaptedArgs[1], ((Boolean) adaptedArgs[2]).booleanValue(), toIntValue(adaptedArgs[3]), toIntValue(adaptedArgs[4]));
             }
         }
         if ("selectBuild".equals(name)) {
@@ -2311,7 +2311,7 @@ public final class GeneratedAccess_com_codename1_properties {
         if ("selectNot".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.properties.PropertyBusinessObject.class, com.codename1.properties.Property.class, java.lang.Boolean.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.properties.PropertyBusinessObject.class, com.codename1.properties.Property.class, java.lang.Boolean.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.selectNot((com.codename1.properties.PropertyBusinessObject) adaptedArgs[0], (com.codename1.properties.Property) adaptedArgs[1], ((Boolean) adaptedArgs[2]).booleanValue(), ((Number) adaptedArgs[3]).intValue(), ((Number) adaptedArgs[4]).intValue());
+                return typedTarget.selectNot((com.codename1.properties.PropertyBusinessObject) adaptedArgs[0], (com.codename1.properties.Property) adaptedArgs[1], ((Boolean) adaptedArgs[2]).booleanValue(), toIntValue(adaptedArgs[3]), toIntValue(adaptedArgs[4]));
             }
         }
         if ("setColumnName".equals(name)) {
@@ -2602,6 +2602,13 @@ public final class GeneratedAccess_com_codename1_properties {
         return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
     }
 
+    private static int toIntValue(Object value) {
+        if (value instanceof Number) return ((Number) value).intValue();
+        if (value instanceof Character) return (int) ((Character) value).charValue();
+        throw new ClassCastException("Cannot coerce "
+            + (value == null ? "null" : value.getClass().getName()) + " to int");
+    }
+
     private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
         if (!varArgs) {
             if (args.length != paramTypes.length) {
@@ -2654,7 +2661,9 @@ public final class GeneratedAccess_com_codename1_properties {
         if ("byte".equals(type.getName()) || type == Byte.class || "short".equals(type.getName()) || type == Short.class
                 || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
                 || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
-            return value instanceof Number;
+            // Java widens char to int implicitly, so accept Character
+            // for any int-or-larger numeric slot.
+            return value instanceof Number || value instanceof Character;
         }
         if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
             // LambdaValue implements common SAMs directly (Runnable,

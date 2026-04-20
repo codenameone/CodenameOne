@@ -342,7 +342,7 @@ public final class GeneratedAccess_com_codename1_io_rest {
         if ("priority".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Byte.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Byte.class}, false);
-                return typedTarget.priority(((Number) adaptedArgs[0]).byteValue());
+                return typedTarget.priority((byte) toIntValue(adaptedArgs[0]));
             }
         }
         if ("queryParam".equals(name)) {
@@ -358,13 +358,13 @@ public final class GeneratedAccess_com_codename1_io_rest {
         if ("readTimeout".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.readTimeout(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.readTimeout(toIntValue(adaptedArgs[0]));
             }
         }
         if ("timeout".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.timeout(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.timeout(toIntValue(adaptedArgs[0]));
             }
         }
         if ("useBoolean".equals(name)) {
@@ -574,6 +574,13 @@ public final class GeneratedAccess_com_codename1_io_rest {
         return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
     }
 
+    private static int toIntValue(Object value) {
+        if (value instanceof Number) return ((Number) value).intValue();
+        if (value instanceof Character) return (int) ((Character) value).charValue();
+        throw new ClassCastException("Cannot coerce "
+            + (value == null ? "null" : value.getClass().getName()) + " to int");
+    }
+
     private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
         if (!varArgs) {
             if (args.length != paramTypes.length) {
@@ -626,7 +633,9 @@ public final class GeneratedAccess_com_codename1_io_rest {
         if ("byte".equals(type.getName()) || type == Byte.class || "short".equals(type.getName()) || type == Short.class
                 || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
                 || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
-            return value instanceof Number;
+            // Java widens char to int implicitly, so accept Character
+            // for any int-or-larger numeric slot.
+            return value instanceof Number || value instanceof Character;
         }
         if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
             // LambdaValue implements common SAMs directly (Runnable,

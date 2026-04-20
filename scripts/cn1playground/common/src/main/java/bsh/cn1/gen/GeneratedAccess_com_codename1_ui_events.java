@@ -75,43 +75,43 @@ public final class GeneratedAccess_com_codename1_ui_events {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class}, false);
-                return new com.codename1.ui.events.ActionEvent((java.lang.Object) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
+                return new com.codename1.ui.events.ActionEvent((java.lang.Object) adaptedArgs[0], toIntValue(adaptedArgs[1]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, com.codename1.ui.events.ActionEvent.Type.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, com.codename1.ui.events.ActionEvent.Type.class, java.lang.Integer.class}, false);
-                return new com.codename1.ui.events.ActionEvent((java.lang.Object) adaptedArgs[0], (com.codename1.ui.events.ActionEvent.Type) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue());
+                return new com.codename1.ui.events.ActionEvent((java.lang.Object) adaptedArgs[0], (com.codename1.ui.events.ActionEvent.Type) adaptedArgs[1], toIntValue(adaptedArgs[2]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class, java.lang.Boolean.class}, false);
-                return new com.codename1.ui.events.ActionEvent((java.lang.Object) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Boolean) adaptedArgs[2]).booleanValue());
+                return new com.codename1.ui.events.ActionEvent((java.lang.Object) adaptedArgs[0], toIntValue(adaptedArgs[1]), ((Boolean) adaptedArgs[2]).booleanValue());
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return new com.codename1.ui.events.ActionEvent((java.lang.Object) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
+                return new com.codename1.ui.events.ActionEvent((java.lang.Object) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]));
             }
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Command.class, com.codename1.ui.Component.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Command.class, com.codename1.ui.Component.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return new com.codename1.ui.events.ActionEvent((com.codename1.ui.Command) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue());
+                return new com.codename1.ui.events.ActionEvent((com.codename1.ui.Command) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1], toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3]));
             }
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return new com.codename1.ui.events.ActionEvent((com.codename1.ui.Component) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue());
+                return new com.codename1.ui.events.ActionEvent((com.codename1.ui.Component) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1], toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, com.codename1.ui.events.ActionEvent.Type.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, com.codename1.ui.events.ActionEvent.Type.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return new com.codename1.ui.events.ActionEvent((java.lang.Object) adaptedArgs[0], (com.codename1.ui.events.ActionEvent.Type) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue());
+                return new com.codename1.ui.events.ActionEvent((java.lang.Object) adaptedArgs[0], (com.codename1.ui.events.ActionEvent.Type) adaptedArgs[1], toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false);
-                return new com.codename1.ui.events.ActionEvent((java.lang.Object) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Boolean) adaptedArgs[3]).booleanValue());
+                return new com.codename1.ui.events.ActionEvent((java.lang.Object) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), ((Boolean) adaptedArgs[3]).booleanValue());
             }
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Command.class, com.codename1.ui.events.ActionEvent.Type.class, com.codename1.ui.Component.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Command.class, com.codename1.ui.events.ActionEvent.Type.class, com.codename1.ui.Component.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return new com.codename1.ui.events.ActionEvent((com.codename1.ui.Command) adaptedArgs[0], (com.codename1.ui.events.ActionEvent.Type) adaptedArgs[1], (com.codename1.ui.Component) adaptedArgs[2], ((Number) adaptedArgs[3]).intValue(), ((Number) adaptedArgs[4]).intValue());
+                return new com.codename1.ui.events.ActionEvent((com.codename1.ui.Command) adaptedArgs[0], (com.codename1.ui.events.ActionEvent.Type) adaptedArgs[1], (com.codename1.ui.Component) adaptedArgs[2], toIntValue(adaptedArgs[3]), toIntValue(adaptedArgs[4]));
             }
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.events.ActionEvent.Type.class, com.codename1.ui.Component.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.events.ActionEvent.Type.class, com.codename1.ui.Component.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return new com.codename1.ui.events.ActionEvent((com.codename1.ui.Component) adaptedArgs[0], (com.codename1.ui.events.ActionEvent.Type) adaptedArgs[1], (com.codename1.ui.Component) adaptedArgs[2], ((Number) adaptedArgs[3]).intValue(), ((Number) adaptedArgs[4]).intValue());
+                return new com.codename1.ui.events.ActionEvent((com.codename1.ui.Component) adaptedArgs[0], (com.codename1.ui.events.ActionEvent.Type) adaptedArgs[1], (com.codename1.ui.Component) adaptedArgs[2], toIntValue(adaptedArgs[3]), toIntValue(adaptedArgs[4]));
             }
         }
         if (type == com.codename1.ui.events.ComponentStateChangeEvent.class) {
@@ -123,7 +123,7 @@ public final class GeneratedAccess_com_codename1_ui_events {
         if (type == com.codename1.ui.events.MessageEvent.class) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.String.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.String.class, java.lang.Integer.class}, false);
-                return new com.codename1.ui.events.MessageEvent((java.lang.Object) adaptedArgs[0], (java.lang.String) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue());
+                return new com.codename1.ui.events.MessageEvent((java.lang.Object) adaptedArgs[0], (java.lang.String) adaptedArgs[1], toIntValue(adaptedArgs[2]));
             }
         }
         if (type == com.codename1.ui.events.WindowEvent.class) {
@@ -653,7 +653,7 @@ public final class GeneratedAccess_com_codename1_ui_events {
         if ("dataChanged".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.dataChanged(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.dataChanged(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1])); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -679,7 +679,7 @@ public final class GeneratedAccess_com_codename1_ui_events {
         if ("scrollChanged".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.scrollChanged(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue()); return null;
+                typedTarget.scrollChanged(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3])); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -689,7 +689,7 @@ public final class GeneratedAccess_com_codename1_ui_events {
         if ("selectionChanged".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.selectionChanged(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.selectionChanged(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1])); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -873,6 +873,13 @@ public final class GeneratedAccess_com_codename1_ui_events {
         return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
     }
 
+    private static int toIntValue(Object value) {
+        if (value instanceof Number) return ((Number) value).intValue();
+        if (value instanceof Character) return (int) ((Character) value).charValue();
+        throw new ClassCastException("Cannot coerce "
+            + (value == null ? "null" : value.getClass().getName()) + " to int");
+    }
+
     private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
         if (!varArgs) {
             if (args.length != paramTypes.length) {
@@ -925,7 +932,9 @@ public final class GeneratedAccess_com_codename1_ui_events {
         if ("byte".equals(type.getName()) || type == Byte.class || "short".equals(type.getName()) || type == Short.class
                 || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
                 || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
-            return value instanceof Number;
+            // Java widens char to int implicitly, so accept Character
+            // for any int-or-larger numeric slot.
+            return value instanceof Number || value instanceof Character;
         }
         if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
             // LambdaValue implements common SAMs directly (Runnable,

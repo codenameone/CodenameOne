@@ -52,37 +52,37 @@ public final class GeneratedAccess_com_codename1_charts_util {
         if ("alpha".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return com.codename1.charts.util.ColorUtil.alpha(((Number) adaptedArgs[0]).intValue());
+                return com.codename1.charts.util.ColorUtil.alpha(toIntValue(adaptedArgs[0]));
             }
         }
         if ("argb".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return com.codename1.charts.util.ColorUtil.argb(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue());
+                return com.codename1.charts.util.ColorUtil.argb(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3]));
             }
         }
         if ("blue".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return com.codename1.charts.util.ColorUtil.blue(((Number) adaptedArgs[0]).intValue());
+                return com.codename1.charts.util.ColorUtil.blue(toIntValue(adaptedArgs[0]));
             }
         }
         if ("green".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return com.codename1.charts.util.ColorUtil.green(((Number) adaptedArgs[0]).intValue());
+                return com.codename1.charts.util.ColorUtil.green(toIntValue(adaptedArgs[0]));
             }
         }
         if ("red".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return com.codename1.charts.util.ColorUtil.red(((Number) adaptedArgs[0]).intValue());
+                return com.codename1.charts.util.ColorUtil.red(toIntValue(adaptedArgs[0]));
             }
         }
         if ("rgb".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return com.codename1.charts.util.ColorUtil.rgb(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
+                return com.codename1.charts.util.ColorUtil.rgb(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]));
             }
         }
         throw unsupportedStatic(com.codename1.charts.util.ColorUtil.class, name, safeArgs);
@@ -92,7 +92,7 @@ public final class GeneratedAccess_com_codename1_charts_util {
         if ("getLabels".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Integer.class}, false);
-                return com.codename1.charts.util.MathHelper.getLabels(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).doubleValue(), ((Number) adaptedArgs[2]).intValue());
+                return com.codename1.charts.util.MathHelper.getLabels(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).doubleValue(), toIntValue(adaptedArgs[2]));
             }
         }
         if ("minmax".equals(name)) {
@@ -145,7 +145,7 @@ public final class GeneratedAccess_com_codename1_charts_util {
         if ("setMaximumFractionDigits".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setMaximumFractionDigits(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setMaximumFractionDigits(toIntValue(adaptedArgs[0])); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -328,6 +328,13 @@ public final class GeneratedAccess_com_codename1_charts_util {
         return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
     }
 
+    private static int toIntValue(Object value) {
+        if (value instanceof Number) return ((Number) value).intValue();
+        if (value instanceof Character) return (int) ((Character) value).charValue();
+        throw new ClassCastException("Cannot coerce "
+            + (value == null ? "null" : value.getClass().getName()) + " to int");
+    }
+
     private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
         if (!varArgs) {
             if (args.length != paramTypes.length) {
@@ -380,7 +387,9 @@ public final class GeneratedAccess_com_codename1_charts_util {
         if ("byte".equals(type.getName()) || type == Byte.class || "short".equals(type.getName()) || type == Short.class
                 || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
                 || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
-            return value instanceof Number;
+            // Java widens char to int implicitly, so accept Character
+            // for any int-or-larger numeric slot.
+            return value instanceof Number || value instanceof Character;
         }
         if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
             // LambdaValue implements common SAMs directly (Runnable,

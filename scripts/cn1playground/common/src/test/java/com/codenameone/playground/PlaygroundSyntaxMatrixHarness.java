@@ -492,6 +492,10 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "int sp = s.indexOf(\" \");\n"
                 + "String first = s.substring(0, sp);\n"
                 + "root.add(new Label(first));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "string_indexof_char_widens", ui(""
+                + "String s = \"hello world\";\n"
+                + "int sp = s.indexOf(' ');\n"
+                + "root.add(new Label(\"sp=\" + sp));"), ExpectedOutcome.SUCCESS, null));
         cases.add(new Case(cat, "integer_parse_and_format", ui(""
                 + "int v = Integer.parseInt(\"42\");\n"
                 + "String s = Integer.toString(v * 2);\n"

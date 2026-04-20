@@ -123,7 +123,7 @@ public final class GeneratedAccess_com_codename1_xml {
         if ("getAttributeAsInt".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
-                return typedTarget.getAttributeAsInt((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.getAttributeAsInt((java.lang.String) adaptedArgs[0], toIntValue(adaptedArgs[1]));
             }
         }
         if ("getAttributes".equals(name)) {
@@ -134,7 +134,7 @@ public final class GeneratedAccess_com_codename1_xml {
         if ("getChildAt".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getChildAt(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.getChildAt(toIntValue(adaptedArgs[0]));
             }
         }
         if ("getChildIndex".equals(name)) {
@@ -156,13 +156,13 @@ public final class GeneratedAccess_com_codename1_xml {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
-                return typedTarget.getDescendantsByTagName((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.getDescendantsByTagName((java.lang.String) adaptedArgs[0], toIntValue(adaptedArgs[1]));
             }
         }
         if ("getDescendantsByTagNameAndAttribute".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.Integer.class}, false);
-                return typedTarget.getDescendantsByTagNameAndAttribute((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue());
+                return typedTarget.getDescendantsByTagNameAndAttribute((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], toIntValue(adaptedArgs[2]));
             }
         }
         if ("getElementById".equals(name)) {
@@ -210,7 +210,7 @@ public final class GeneratedAccess_com_codename1_xml {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class, java.lang.Integer.class}, false);
-                return typedTarget.getTextDescendants((java.lang.String) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue(), ((Number) adaptedArgs[2]).intValue());
+                return typedTarget.getTextDescendants((java.lang.String) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue(), toIntValue(adaptedArgs[2]));
             }
         }
         if ("hasTextChild".equals(name)) {
@@ -221,7 +221,7 @@ public final class GeneratedAccess_com_codename1_xml {
         if ("insertChildAt".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.xml.Element.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.xml.Element.class, java.lang.Integer.class}, false);
-                typedTarget.insertChildAt((com.codename1.xml.Element) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.insertChildAt((com.codename1.xml.Element) adaptedArgs[0], toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("isEmpty".equals(name)) {
@@ -248,7 +248,7 @@ public final class GeneratedAccess_com_codename1_xml {
         if ("removeChildAt".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.removeChildAt(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.removeChildAt(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("replaceChild".equals(name)) {
@@ -285,13 +285,13 @@ public final class GeneratedAccess_com_codename1_xml {
         if ("addCharEntitiesRange".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String[].class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String[].class, java.lang.Integer.class}, false);
-                typedTarget.addCharEntitiesRange((java.lang.String[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.addCharEntitiesRange((java.lang.String[]) adaptedArgs[0], toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("addCharEntity".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
-                typedTarget.addCharEntity((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.addCharEntity((java.lang.String) adaptedArgs[0], toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("isCaseSensitive".equals(name)) {
@@ -334,7 +334,7 @@ public final class GeneratedAccess_com_codename1_xml {
         if ("parsingError".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class}, false);
-                return typedTarget.parsingError(((Number) adaptedArgs[0]).intValue(), (java.lang.String) adaptedArgs[1], (java.lang.String) adaptedArgs[2], (java.lang.String) adaptedArgs[3], (java.lang.String) adaptedArgs[4]);
+                return typedTarget.parsingError(toIntValue(adaptedArgs[0]), (java.lang.String) adaptedArgs[1], (java.lang.String) adaptedArgs[2], (java.lang.String) adaptedArgs[3], (java.lang.String) adaptedArgs[4]);
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -518,6 +518,13 @@ public final class GeneratedAccess_com_codename1_xml {
         return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
     }
 
+    private static int toIntValue(Object value) {
+        if (value instanceof Number) return ((Number) value).intValue();
+        if (value instanceof Character) return (int) ((Character) value).charValue();
+        throw new ClassCastException("Cannot coerce "
+            + (value == null ? "null" : value.getClass().getName()) + " to int");
+    }
+
     private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
         if (!varArgs) {
             if (args.length != paramTypes.length) {
@@ -570,7 +577,9 @@ public final class GeneratedAccess_com_codename1_xml {
         if ("byte".equals(type.getName()) || type == Byte.class || "short".equals(type.getName()) || type == Short.class
                 || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
                 || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
-            return value instanceof Number;
+            // Java widens char to int implicitly, so accept Character
+            // for any int-or-larger numeric slot.
+            return value instanceof Number || value instanceof Character;
         }
         if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
             // LambdaValue implements common SAMs directly (Runnable,

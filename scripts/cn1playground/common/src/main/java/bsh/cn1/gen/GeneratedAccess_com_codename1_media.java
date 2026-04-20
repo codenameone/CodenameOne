@@ -58,13 +58,13 @@ public final class GeneratedAccess_com_codename1_media {
         if (type == com.codename1.media.AudioBuffer.class) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return new com.codename1.media.AudioBuffer(((Number) adaptedArgs[0]).intValue());
+                return new com.codename1.media.AudioBuffer(toIntValue(adaptedArgs[0]));
             }
         }
         if (type == com.codename1.media.WAVWriter.class) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.io.File.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.io.File.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return new com.codename1.media.WAVWriter((com.codename1.io.File) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue());
+                return new com.codename1.media.WAVWriter((com.codename1.io.File) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3]));
             }
         }
         throw unsupportedConstruct(type, safeArgs);
@@ -144,7 +144,7 @@ public final class GeneratedAccess_com_codename1_media {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class, java.lang.Integer.class}, false);
-                return com.codename1.media.MediaManager.getAudioBuffer((java.lang.String) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue(), ((Number) adaptedArgs[2]).intValue());
+                return com.codename1.media.MediaManager.getAudioBuffer((java.lang.String) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue(), toIntValue(adaptedArgs[2]));
             }
         }
         if ("getAvailableRecordingMimeTypes".equals(name)) {
@@ -375,7 +375,7 @@ public final class GeneratedAccess_com_codename1_media {
         if ("setTime".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setTime(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setTime(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setVariable".equals(name)) {
@@ -387,7 +387,7 @@ public final class GeneratedAccess_com_codename1_media {
         if ("setVolume".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setVolume(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setVolume(toIntValue(adaptedArgs[0])); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -407,11 +407,11 @@ public final class GeneratedAccess_com_codename1_media {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, float[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, float[].class}, false);
-                typedTarget.copyFrom(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), (float[]) adaptedArgs[2]); return null;
+                typedTarget.copyFrom(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), (float[]) adaptedArgs[2]); return null;
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, float[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, float[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.copyFrom(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), (float[]) adaptedArgs[2], ((Number) adaptedArgs[3]).intValue(), ((Number) adaptedArgs[4]).intValue()); return null;
+                typedTarget.copyFrom(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), (float[]) adaptedArgs[2], toIntValue(adaptedArgs[3]), toIntValue(adaptedArgs[4])); return null;
             }
         }
         if ("copyTo".equals(name)) {
@@ -425,13 +425,13 @@ public final class GeneratedAccess_com_codename1_media {
             }
             if (matches(safeArgs, new Class<?>[]{float[].class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{float[].class, java.lang.Integer.class}, false);
-                typedTarget.copyTo((float[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.copyTo((float[]) adaptedArgs[0], toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("downSample".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.downSample(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.downSample(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("getMaxSize".equals(name)) {
@@ -520,7 +520,7 @@ public final class GeneratedAccess_com_codename1_media {
         if ("setNumTracks".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setNumTracks(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setNumTracks(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setSubtitle".equals(name)) {
@@ -538,7 +538,7 @@ public final class GeneratedAccess_com_codename1_media {
         if ("setTrackNumber".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setTrackNumber(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setTrackNumber(toIntValue(adaptedArgs[0])); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -548,13 +548,13 @@ public final class GeneratedAccess_com_codename1_media {
         if ("audioChannels".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.audioChannels(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.audioChannels(toIntValue(adaptedArgs[0]));
             }
         }
         if ("bitRate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.bitRate(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.bitRate(toIntValue(adaptedArgs[0]));
             }
         }
         if ("build".equals(name)) {
@@ -613,7 +613,7 @@ public final class GeneratedAccess_com_codename1_media {
         if ("samplingRate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.samplingRate(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.samplingRate(toIntValue(adaptedArgs[0]));
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -694,7 +694,7 @@ public final class GeneratedAccess_com_codename1_media {
         if ("write".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{float[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{float[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.write((float[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue()); return null;
+                typedTarget.write((float[]) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2])); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -827,7 +827,7 @@ public final class GeneratedAccess_com_codename1_media {
         if ("setTime".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setTime(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setTime(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setVariable".equals(name)) {
@@ -839,7 +839,7 @@ public final class GeneratedAccess_com_codename1_media {
         if ("setVolume".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setVolume(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setVolume(toIntValue(adaptedArgs[0])); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -927,7 +927,7 @@ public final class GeneratedAccess_com_codename1_media {
         if ("setTime".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setTime(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setTime(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setVariable".equals(name)) {
@@ -939,7 +939,7 @@ public final class GeneratedAccess_com_codename1_media {
         if ("setVolume".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setVolume(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setVolume(toIntValue(adaptedArgs[0])); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -1117,6 +1117,13 @@ public final class GeneratedAccess_com_codename1_media {
         return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
     }
 
+    private static int toIntValue(Object value) {
+        if (value instanceof Number) return ((Number) value).intValue();
+        if (value instanceof Character) return (int) ((Character) value).charValue();
+        throw new ClassCastException("Cannot coerce "
+            + (value == null ? "null" : value.getClass().getName()) + " to int");
+    }
+
     private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
         if (!varArgs) {
             if (args.length != paramTypes.length) {
@@ -1169,7 +1176,9 @@ public final class GeneratedAccess_com_codename1_media {
         if ("byte".equals(type.getName()) || type == Byte.class || "short".equals(type.getName()) || type == Short.class
                 || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
                 || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
-            return value instanceof Number;
+            // Java widens char to int implicitly, so accept Character
+            // for any int-or-larger numeric slot.
+            return value instanceof Number || value instanceof Character;
         }
         if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
             // LambdaValue implements common SAMs directly (Runnable,

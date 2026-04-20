@@ -91,11 +91,11 @@ public final class GeneratedAccess_com_codename1_ui_validation {
         if (type == com.codename1.ui.validation.LengthConstraint.class) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return new com.codename1.ui.validation.LengthConstraint(((Number) adaptedArgs[0]).intValue());
+                return new com.codename1.ui.validation.LengthConstraint(toIntValue(adaptedArgs[0]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class}, false);
-                return new com.codename1.ui.validation.LengthConstraint(((Number) adaptedArgs[0]).intValue(), (java.lang.String) adaptedArgs[1]);
+                return new com.codename1.ui.validation.LengthConstraint(toIntValue(adaptedArgs[0]), (java.lang.String) adaptedArgs[1]);
             }
         }
         if (type == com.codename1.ui.validation.NotConstraint.class) {
@@ -669,6 +669,13 @@ public final class GeneratedAccess_com_codename1_ui_validation {
         return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
     }
 
+    private static int toIntValue(Object value) {
+        if (value instanceof Number) return ((Number) value).intValue();
+        if (value instanceof Character) return (int) ((Character) value).charValue();
+        throw new ClassCastException("Cannot coerce "
+            + (value == null ? "null" : value.getClass().getName()) + " to int");
+    }
+
     private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
         if (!varArgs) {
             if (args.length != paramTypes.length) {
@@ -721,7 +728,9 @@ public final class GeneratedAccess_com_codename1_ui_validation {
         if ("byte".equals(type.getName()) || type == Byte.class || "short".equals(type.getName()) || type == Short.class
                 || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
                 || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
-            return value instanceof Number;
+            // Java widens char to int implicitly, so accept Character
+            // for any int-or-larger numeric slot.
+            return value instanceof Number || value instanceof Character;
         }
         if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
             // LambdaValue implements common SAMs directly (Runnable,

@@ -49,7 +49,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
         if (type == com.codename1.charts.renderers.BasicStroke.class) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Float.class, float[].class, java.lang.Float.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Float.class, float[].class, java.lang.Float.class}, false);
-                return new com.codename1.charts.renderers.BasicStroke(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).floatValue(), (float[]) adaptedArgs[3], ((Number) adaptedArgs[4]).floatValue());
+                return new com.codename1.charts.renderers.BasicStroke(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), ((Number) adaptedArgs[2]).floatValue(), (float[]) adaptedArgs[3], ((Number) adaptedArgs[4]).floatValue());
             }
         }
         if (type == com.codename1.charts.renderers.XYMultipleSeriesRenderer.class) {
@@ -59,7 +59,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return new com.codename1.charts.renderers.XYMultipleSeriesRenderer(((Number) adaptedArgs[0]).intValue());
+                return new com.codename1.charts.renderers.XYMultipleSeriesRenderer(toIntValue(adaptedArgs[0]));
             }
         }
         throw unsupportedConstruct(type, safeArgs);
@@ -129,7 +129,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, com.codename1.charts.renderers.SimpleSeriesRenderer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, com.codename1.charts.renderers.SimpleSeriesRenderer.class}, false);
-                typedTarget.addSeriesRenderer(((Number) adaptedArgs[0]).intValue(), (com.codename1.charts.renderers.SimpleSeriesRenderer) adaptedArgs[1]); return null;
+                typedTarget.addSeriesRenderer(toIntValue(adaptedArgs[0]), (com.codename1.charts.renderers.SimpleSeriesRenderer) adaptedArgs[1]); return null;
             }
         }
         if ("getAngleMax".equals(name)) {
@@ -225,7 +225,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
         if ("getSeriesRendererAt".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getSeriesRendererAt(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.getSeriesRendererAt(toIntValue(adaptedArgs[0]));
             }
         }
         if ("getSeriesRendererCount".equals(name)) {
@@ -261,7 +261,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
         if ("getVisualTypeForIndex".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getVisualTypeForIndex(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.getVisualTypeForIndex(toIntValue(adaptedArgs[0]));
             }
         }
         if ("getXAxisColor".equals(name)) {
@@ -417,13 +417,13 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
         if ("setAxesColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setAxesColor(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setAxesColor(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setBackgroundColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setBackgroundColor(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setBackgroundColor(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setChartTitle".equals(name)) {
@@ -477,7 +477,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
         if ("setLabelsColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setLabelsColor(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setLabelsColor(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setLabelsTextFont".equals(name)) {
@@ -495,7 +495,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
         if ("setLegendHeight".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setLegendHeight(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setLegendHeight(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setLegendTextFont".equals(name)) {
@@ -555,7 +555,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
         if ("setSelectableBuffer".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setSelectableBuffer(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setSelectableBuffer(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setShowAxes".equals(name)) {
@@ -631,7 +631,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.setTextTypeface(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.setTextTypeface(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("setVisualTypes".equals(name)) {
@@ -643,13 +643,13 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
         if ("setXAxisColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setXAxisColor(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setXAxisColor(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setYAxisColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setYAxisColor(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setYAxisColor(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setZoomButtonsVisible".equals(name)) {
@@ -681,7 +681,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, com.codename1.charts.renderers.SimpleSeriesRenderer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, com.codename1.charts.renderers.SimpleSeriesRenderer.class}, false);
-                typedTarget.addSeriesRenderer(((Number) adaptedArgs[0]).intValue(), (com.codename1.charts.renderers.SimpleSeriesRenderer) adaptedArgs[1]); return null;
+                typedTarget.addSeriesRenderer(toIntValue(adaptedArgs[0]), (com.codename1.charts.renderers.SimpleSeriesRenderer) adaptedArgs[1]); return null;
             }
         }
         if ("addTextLabel".equals(name)) {
@@ -703,7 +703,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.String.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.String.class, java.lang.Integer.class}, false);
-                typedTarget.addYTextLabel(((Number) adaptedArgs[0]).doubleValue(), (java.lang.String) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue()); return null;
+                typedTarget.addYTextLabel(((Number) adaptedArgs[0]).doubleValue(), (java.lang.String) adaptedArgs[1], toIntValue(adaptedArgs[2])); return null;
             }
         }
         if ("clearTextLabels".equals(name)) {
@@ -722,7 +722,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.clearYTextLabels(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.clearYTextLabels(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("getAxesColor".equals(name)) {
@@ -768,7 +768,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
         if ("getGridColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getGridColor(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.getGridColor(toIntValue(adaptedArgs[0]));
             }
         }
         if ("getInitialRange".equals(name)) {
@@ -777,7 +777,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getInitialRange(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.getInitialRange(toIntValue(adaptedArgs[0]));
             }
         }
         if ("getLabelFormat".equals(name)) {
@@ -853,7 +853,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
         if ("getSeriesRendererAt".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getSeriesRendererAt(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.getSeriesRendererAt(toIntValue(adaptedArgs[0]));
             }
         }
         if ("getSeriesRendererCount".equals(name)) {
@@ -897,7 +897,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getXAxisMax(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.getXAxisMax(toIntValue(adaptedArgs[0]));
             }
         }
         if ("getXAxisMin".equals(name)) {
@@ -906,7 +906,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getXAxisMin(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.getXAxisMin(toIntValue(adaptedArgs[0]));
             }
         }
         if ("getXLabelFormat".equals(name)) {
@@ -958,7 +958,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
         if ("getYAxisAlign".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getYAxisAlign(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.getYAxisAlign(toIntValue(adaptedArgs[0]));
             }
         }
         if ("getYAxisColor".equals(name)) {
@@ -972,7 +972,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getYAxisMax(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.getYAxisMax(toIntValue(adaptedArgs[0]));
             }
         }
         if ("getYAxisMin".equals(name)) {
@@ -981,13 +981,13 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getYAxisMin(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.getYAxisMin(toIntValue(adaptedArgs[0]));
             }
         }
         if ("getYLabelFormat".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getYLabelFormat(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.getYLabelFormat(toIntValue(adaptedArgs[0]));
             }
         }
         if ("getYLabels".equals(name)) {
@@ -998,7 +998,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
         if ("getYLabelsAlign".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getYLabelsAlign(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.getYLabelsAlign(toIntValue(adaptedArgs[0]));
             }
         }
         if ("getYLabelsAngle".equals(name)) {
@@ -1009,7 +1009,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
         if ("getYLabelsColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getYLabelsColor(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.getYLabelsColor(toIntValue(adaptedArgs[0]));
             }
         }
         if ("getYLabelsPadding".equals(name)) {
@@ -1029,7 +1029,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Integer.class}, false);
-                return typedTarget.getYTextLabel(Double.valueOf(((Number) adaptedArgs[0]).doubleValue()), ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.getYTextLabel(Double.valueOf(((Number) adaptedArgs[0]).doubleValue()), toIntValue(adaptedArgs[1]));
             }
         }
         if ("getYTextLabelLocations".equals(name)) {
@@ -1038,7 +1038,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getYTextLabelLocations(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.getYTextLabelLocations(toIntValue(adaptedArgs[0]));
             }
         }
         if ("getYTitle".equals(name)) {
@@ -1047,7 +1047,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getYTitle(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.getYTitle(toIntValue(adaptedArgs[0]));
             }
         }
         if ("getZoomInLimitX".equals(name)) {
@@ -1073,13 +1073,13 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
         if ("initAxesRange".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.initAxesRange(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.initAxesRange(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("initAxesRangeForScale".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.initAxesRangeForScale(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.initAxesRangeForScale(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("isAntialiasing".equals(name)) {
@@ -1123,7 +1123,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.isInitialRangeSet(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.isInitialRangeSet(toIntValue(adaptedArgs[0]));
             }
         }
         if ("isMaxXSet".equals(name)) {
@@ -1132,7 +1132,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.isMaxXSet(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.isMaxXSet(toIntValue(adaptedArgs[0]));
             }
         }
         if ("isMaxYSet".equals(name)) {
@@ -1141,7 +1141,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.isMaxYSet(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.isMaxYSet(toIntValue(adaptedArgs[0]));
             }
         }
         if ("isMinXSet".equals(name)) {
@@ -1150,7 +1150,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.isMinXSet(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.isMinXSet(toIntValue(adaptedArgs[0]));
             }
         }
         if ("isMinYSet".equals(name)) {
@@ -1159,7 +1159,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.isMinYSet(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.isMinYSet(toIntValue(adaptedArgs[0]));
             }
         }
         if ("isPanEnabled".equals(name)) {
@@ -1266,7 +1266,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Integer.class}, false);
-                typedTarget.removeYTextLabel(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.removeYTextLabel(((Number) adaptedArgs[0]).doubleValue(), toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("setAntialiasing".equals(name)) {
@@ -1284,7 +1284,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
         if ("setAxesColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setAxesColor(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setAxesColor(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setAxisTitleTextFont".equals(name)) {
@@ -1302,7 +1302,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
         if ("setBackgroundColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setBackgroundColor(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setBackgroundColor(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setBarSpacing".equals(name)) {
@@ -1362,11 +1362,11 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
         if ("setGridColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setGridColor(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setGridColor(toIntValue(adaptedArgs[0])); return null;
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.setGridColor(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.setGridColor(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("setInScroll".equals(name)) {
@@ -1382,13 +1382,13 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
             }
             if (matches(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false);
-                typedTarget.setInitialRange((double[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.setInitialRange((double[]) adaptedArgs[0], toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("setLabelsColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setLabelsColor(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setLabelsColor(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setLabelsTextFont".equals(name)) {
@@ -1406,7 +1406,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
         if ("setLegendHeight".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setLegendHeight(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setLegendHeight(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setLegendTextFont".equals(name)) {
@@ -1430,7 +1430,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
         if ("setMarginsColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setMarginsColor(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setMarginsColor(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setOrientation".equals(name)) {
@@ -1468,7 +1468,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
             }
             if (matches(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false);
-                typedTarget.setRange((double[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.setRange((double[]) adaptedArgs[0], toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("setScale".equals(name)) {
@@ -1480,7 +1480,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
         if ("setSelectableBuffer".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setSelectableBuffer(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setSelectableBuffer(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setShowAxes".equals(name)) {
@@ -1556,13 +1556,13 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.setTextTypeface(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.setTextTypeface(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("setXAxisColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setXAxisColor(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setXAxisColor(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setXAxisMax".equals(name)) {
@@ -1572,7 +1572,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Integer.class}, false);
-                typedTarget.setXAxisMax(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.setXAxisMax(((Number) adaptedArgs[0]).doubleValue(), toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("setXAxisMin".equals(name)) {
@@ -1582,7 +1582,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Integer.class}, false);
-                typedTarget.setXAxisMin(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.setXAxisMin(((Number) adaptedArgs[0]).doubleValue(), toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("setXLabelFormat".equals(name)) {
@@ -1594,13 +1594,13 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
         if ("setXLabels".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setXLabels(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setXLabels(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setXLabelsAlign".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setXLabelsAlign(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setXLabelsAlign(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setXLabelsAngle".equals(name)) {
@@ -1612,7 +1612,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
         if ("setXLabelsColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setXLabelsColor(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setXLabelsColor(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setXLabelsPadding".equals(name)) {
@@ -1636,13 +1636,13 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
         if ("setYAxisAlign".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.setYAxisAlign(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.setYAxisAlign(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("setYAxisColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setYAxisColor(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setYAxisColor(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setYAxisMax".equals(name)) {
@@ -1652,7 +1652,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Integer.class}, false);
-                typedTarget.setYAxisMax(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.setYAxisMax(((Number) adaptedArgs[0]).doubleValue(), toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("setYAxisMin".equals(name)) {
@@ -1662,29 +1662,29 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Integer.class}, false);
-                typedTarget.setYAxisMin(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.setYAxisMin(((Number) adaptedArgs[0]).doubleValue(), toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("setYLabelFormat".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.util.NumberFormat.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.util.NumberFormat.class, java.lang.Integer.class}, false);
-                typedTarget.setYLabelFormat((com.codename1.charts.util.NumberFormat) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.setYLabelFormat((com.codename1.charts.util.NumberFormat) adaptedArgs[0], toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("setYLabels".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setYLabels(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setYLabels(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setYLabelsAlign".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setYLabelsAlign(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setYLabelsAlign(toIntValue(adaptedArgs[0])); return null;
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.setYLabelsAlign(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.setYLabelsAlign(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("setYLabelsAngle".equals(name)) {
@@ -1696,7 +1696,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
         if ("setYLabelsColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.setYLabelsColor(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.setYLabelsColor(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("setYLabelsPadding".equals(name)) {
@@ -1718,7 +1718,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
-                typedTarget.setYTitle((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.setYTitle((java.lang.String) adaptedArgs[0], toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("setZoomButtonsVisible".equals(name)) {
@@ -1899,13 +1899,13 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
         if ("setAnnotationsColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setAnnotationsColor(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setAnnotationsColor(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setAnnotationsTextAlign".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setAnnotationsTextAlign(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setAnnotationsTextAlign(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setAnnotationsTextFont".equals(name)) {
@@ -1935,7 +1935,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
         if ("setChartValuesTextAlign".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setChartValuesTextAlign(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setChartValuesTextAlign(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setChartValuesTextFont".equals(name)) {
@@ -1953,7 +1953,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
         if ("setColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setColor(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setColor(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setDisplayBoundingPoints".equals(name)) {
@@ -1971,7 +1971,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
         if ("setDisplayChartValuesDistance".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setDisplayChartValuesDistance(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setDisplayChartValuesDistance(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setFillBelowLine".equals(name)) {
@@ -1983,7 +1983,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
         if ("setFillBelowLineColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setFillBelowLineColor(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setFillBelowLineColor(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setFillPoints".equals(name)) {
@@ -2001,13 +2001,13 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
         if ("setGradientStart".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Integer.class}, false);
-                typedTarget.setGradientStart(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.setGradientStart(((Number) adaptedArgs[0]).doubleValue(), toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("setGradientStop".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Integer.class}, false);
-                typedTarget.setGradientStop(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.setGradientStop(((Number) adaptedArgs[0]).doubleValue(), toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("setHighlighted".equals(name)) {
@@ -2086,7 +2086,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, com.codename1.charts.renderers.SimpleSeriesRenderer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, com.codename1.charts.renderers.SimpleSeriesRenderer.class}, false);
-                typedTarget.addSeriesRenderer(((Number) adaptedArgs[0]).intValue(), (com.codename1.charts.renderers.SimpleSeriesRenderer) adaptedArgs[1]); return null;
+                typedTarget.addSeriesRenderer(toIntValue(adaptedArgs[0]), (com.codename1.charts.renderers.SimpleSeriesRenderer) adaptedArgs[1]); return null;
             }
         }
         if ("getAxesColor".equals(name)) {
@@ -2152,7 +2152,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
         if ("getSeriesRendererAt".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getSeriesRendererAt(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.getSeriesRendererAt(toIntValue(adaptedArgs[0]));
             }
         }
         if ("getSeriesRendererCount".equals(name)) {
@@ -2316,13 +2316,13 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
         if ("setAxesColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setAxesColor(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setAxesColor(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setBackgroundColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setBackgroundColor(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setBackgroundColor(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setChartTitle".equals(name)) {
@@ -2376,7 +2376,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
         if ("setLabelsColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setLabelsColor(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setLabelsColor(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setLabelsTextFont".equals(name)) {
@@ -2394,7 +2394,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
         if ("setLegendHeight".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setLegendHeight(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setLegendHeight(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setLegendTextFont".equals(name)) {
@@ -2430,7 +2430,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
         if ("setSelectableBuffer".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setSelectableBuffer(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setSelectableBuffer(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setShowAxes".equals(name)) {
@@ -2506,19 +2506,19 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.setTextTypeface(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.setTextTypeface(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("setXAxisColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setXAxisColor(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setXAxisColor(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setYAxisColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setYAxisColor(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setYAxisColor(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setZoomButtonsVisible".equals(name)) {
@@ -2607,7 +2607,7 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
         if ("setColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setColor(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setColor(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setDisplayBoundingPoints".equals(name)) {
@@ -2625,13 +2625,13 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
         if ("setGradientStart".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Integer.class}, false);
-                typedTarget.setGradientStart(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.setGradientStart(((Number) adaptedArgs[0]).doubleValue(), toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("setGradientStop".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Integer.class}, false);
-                typedTarget.setGradientStop(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.setGradientStop(((Number) adaptedArgs[0]).doubleValue(), toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("setHighlighted".equals(name)) {
@@ -2828,6 +2828,13 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
         return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
     }
 
+    private static int toIntValue(Object value) {
+        if (value instanceof Number) return ((Number) value).intValue();
+        if (value instanceof Character) return (int) ((Character) value).charValue();
+        throw new ClassCastException("Cannot coerce "
+            + (value == null ? "null" : value.getClass().getName()) + " to int");
+    }
+
     private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
         if (!varArgs) {
             if (args.length != paramTypes.length) {
@@ -2880,7 +2887,9 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
         if ("byte".equals(type.getName()) || type == Byte.class || "short".equals(type.getName()) || type == Short.class
                 || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
                 || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
-            return value instanceof Number;
+            // Java widens char to int implicitly, so accept Character
+            // for any int-or-larger numeric slot.
+            return value instanceof Number || value instanceof Character;
         }
         if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
             // LambdaValue implements common SAMs directly (Runnable,

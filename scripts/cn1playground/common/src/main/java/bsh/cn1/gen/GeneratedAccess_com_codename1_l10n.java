@@ -52,7 +52,7 @@ public final class GeneratedAccess_com_codename1_l10n {
         if (type == com.codename1.l10n.ParseException.class) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
-                return new com.codename1.l10n.ParseException((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
+                return new com.codename1.l10n.ParseException((java.lang.String) adaptedArgs[0], toIntValue(adaptedArgs[1]));
             }
         }
         if (type == com.codename1.l10n.SimpleDateFormat.class) {
@@ -83,13 +83,13 @@ public final class GeneratedAccess_com_codename1_l10n {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return com.codename1.l10n.DateFormat.getDateInstance(((Number) adaptedArgs[0]).intValue());
+                return com.codename1.l10n.DateFormat.getDateInstance(toIntValue(adaptedArgs[0]));
             }
         }
         if ("getDateTimeInstance".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return com.codename1.l10n.DateFormat.getDateTimeInstance(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return com.codename1.l10n.DateFormat.getDateTimeInstance(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
         if ("getInstance".equals(name)) {
@@ -103,7 +103,7 @@ public final class GeneratedAccess_com_codename1_l10n {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return com.codename1.l10n.DateFormat.getTimeInstance(((Number) adaptedArgs[0]).intValue());
+                return com.codename1.l10n.DateFormat.getTimeInstance(toIntValue(adaptedArgs[0]));
             }
         }
         throw unsupportedStatic(com.codename1.l10n.DateFormat.class, name, safeArgs);
@@ -429,11 +429,11 @@ public final class GeneratedAccess_com_codename1_l10n {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.format(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.format(toIntValue(adaptedArgs[0]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Integer.class}, false);
-                return typedTarget.format(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.format(((Number) adaptedArgs[0]).doubleValue(), toIntValue(adaptedArgs[1]));
             }
         }
         if ("formatCurrency".equals(name)) {
@@ -739,6 +739,13 @@ public final class GeneratedAccess_com_codename1_l10n {
         return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
     }
 
+    private static int toIntValue(Object value) {
+        if (value instanceof Number) return ((Number) value).intValue();
+        if (value instanceof Character) return (int) ((Character) value).charValue();
+        throw new ClassCastException("Cannot coerce "
+            + (value == null ? "null" : value.getClass().getName()) + " to int");
+    }
+
     private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
         if (!varArgs) {
             if (args.length != paramTypes.length) {
@@ -791,7 +798,9 @@ public final class GeneratedAccess_com_codename1_l10n {
         if ("byte".equals(type.getName()) || type == Byte.class || "short".equals(type.getName()) || type == Short.class
                 || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
                 || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
-            return value instanceof Number;
+            // Java widens char to int implicitly, so accept Character
+            // for any int-or-larger numeric slot.
+            return value instanceof Number || value instanceof Character;
         }
         if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
             // LambdaValue implements common SAMs directly (Runnable,
