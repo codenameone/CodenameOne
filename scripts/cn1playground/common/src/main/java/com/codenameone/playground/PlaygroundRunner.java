@@ -197,8 +197,219 @@ final class PlaygroundRunner {
         rewritten = rewriteTopLevelLambdas(rewritten);
         rewritten = rewriteTopLevelAnonSams(rewritten);
         rewritten = rewriteSwitchExpressions(rewritten);
+        // Pattern-switch arrow statements (case Type name -> ...) don't
+        // fit BSH's case-label grammar. Rewrite them into explicit
+        // instanceof / bind / if-else chains. Constant-label switches go
+        // through rewriteArrowSwitchStatements below.
+        rewritten = rewritePatternSwitchStatements(rewritten);
         rewritten = rewriteArrowSwitchStatements(rewritten);
         return rewritten;
+    }
+
+    /** Rewrites a {@code switch (x) { case Foo f -> ...; default -> ...; }}
+     * statement that contains at least one pattern label into an
+     * equivalent if-else chain. Constant-only switches are left alone
+     * so the existing arrow-to-colon pass can handle them. */
+    private String rewritePatternSwitchStatements(String script) {
+        StringBuilder out = new StringBuilder();
+        int i = 0;
+        int last = 0;
+        while (i < script.length()) {
+            char ch = script.charAt(i);
+            if (ch == '"' || ch == '\'') { i = skipQuoted(script, i) + 1; continue; }
+            if (startsLineComment(script, i)) { i = skipLineComment(script, i) + 1; continue; }
+            if (startsBlockComment(script, i)) { i = skipBlockComment(script, i) + 1; continue; }
+            if (!startsWithWord(script, i, "switch")) { i++; continue; }
+            int parenStart = skipWhitespace(script, i + "switch".length());
+            if (parenStart >= script.length() || script.charAt(parenStart) != '(') {
+                i += "switch".length(); continue;
+            }
+            int parenEnd = findMatchingParen(script, parenStart);
+            if (parenEnd < 0) break;
+            int braceStart = skipWhitespace(script, parenEnd + 1);
+            if (braceStart >= script.length() || script.charAt(braceStart) != '{') {
+                i += "switch".length(); continue;
+            }
+            int braceEnd = findMatchingBrace(script, braceStart);
+            if (braceEnd < 0) break;
+            String scrutinee = script.substring(parenStart + 1, parenEnd).trim();
+            String body = script.substring(braceStart + 1, braceEnd);
+            if (!containsPatternCase(body)) { i = braceEnd + 1; continue; }
+            String rewritten = rewritePatternSwitchBody(scrutinee, body);
+            if (rewritten == null) { i = braceEnd + 1; continue; }
+            out.append(script, last, i).append(rewritten);
+            last = braceEnd + 1;
+            i = last;
+        }
+        out.append(script.substring(last));
+        return out.toString();
+    }
+
+    private boolean containsPatternCase(String body) {
+        int i = 0;
+        int depth = 0;
+        int n = body.length();
+        while (i < n) {
+            char ch = body.charAt(i);
+            if (ch == '"' || ch == '\'') { i = skipQuoted(body, i) + 1; continue; }
+            if (startsLineComment(body, i)) { i = skipLineComment(body, i) + 1; continue; }
+            if (startsBlockComment(body, i)) { i = skipBlockComment(body, i) + 1; continue; }
+            if (ch == '(' || ch == '[' || ch == '{') { depth++; i++; continue; }
+            if (ch == ')' || ch == ']' || ch == '}') { depth--; i++; continue; }
+            if (depth == 0 && startsWithWord(body, i, "case")) {
+                int labelStart = skipWhitespace(body, i + "case".length());
+                // Find arrow at depth 0 from here.
+                int j = labelStart;
+                int localDepth = 0;
+                while (j + 1 < n) {
+                    char k = body.charAt(j);
+                    if (k == '(' || k == '[' || k == '{') localDepth++;
+                    else if (k == ')' || k == ']' || k == '}') localDepth--;
+                    else if (localDepth == 0 && k == '-' && body.charAt(j + 1) == '>') break;
+                    j++;
+                }
+                if (j + 1 >= n) { i++; continue; }
+                String label = body.substring(labelStart, j).trim();
+                if (looksLikePatternLabel(label)) return true;
+                i = j + 2;
+                continue;
+            }
+            i++;
+        }
+        return false;
+    }
+
+    /** A pattern label looks like {@code Type ident} — a Java-identifier
+     * (possibly dotted or with type args) followed by a bare identifier
+     * binding. Constant labels (a number, a dotted-name constant, a
+     * string literal) don't match because they have no trailing
+     * identifier at top level. */
+    private boolean looksLikePatternLabel(String label) {
+        if (label.isEmpty() || label.charAt(0) == '"' || label.charAt(0) == '\'') return false;
+        if (!isIdentifierStart(label.charAt(0))) return false;
+        int i = 0;
+        int n = label.length();
+        int depth = 0;
+        int lastNonWsAtDepth0 = -1;
+        int firstWsAtDepth0 = -1;
+        while (i < n) {
+            char ch = label.charAt(i);
+            if (ch == '<') depth++;
+            else if (ch == '>') depth--;
+            else if (depth == 0 && Character.isWhitespace(ch)) {
+                if (firstWsAtDepth0 < 0 && lastNonWsAtDepth0 >= 0) firstWsAtDepth0 = i;
+            } else if (depth == 0) {
+                lastNonWsAtDepth0 = i;
+            }
+            i++;
+        }
+        if (firstWsAtDepth0 < 0) return false;
+        String head = label.substring(0, firstWsAtDepth0).trim();
+        String tail = label.substring(firstWsAtDepth0).trim();
+        // Head must look like a type reference (identifiers and dots);
+        // tail must be a single identifier.
+        for (int j = 0; j < head.length(); j++) {
+            char c = head.charAt(j);
+            if (!isIdentifierPart(c) && c != '.' && c != '<' && c != '>' && c != ',' && c != '?'
+                    && !Character.isWhitespace(c)) return false;
+        }
+        for (int j = 0; j < tail.length(); j++) {
+            char c = tail.charAt(j);
+            if (!isIdentifierPart(c)) return false;
+        }
+        return true;
+    }
+
+    private static int PATTERN_SWITCH_COUNTER = 0;
+
+    private String rewritePatternSwitchBody(String scrutinee, String body) {
+        String scrVar = "__patternScrutinee" + (++PATTERN_SWITCH_COUNTER);
+        StringBuilder out = new StringBuilder();
+        out.append("{ Object ").append(scrVar).append(" = ").append(scrutinee).append(";");
+        int i = 0;
+        int n = body.length();
+        boolean firstBranch = true;
+        while (i < n) {
+            i = skipWhitespace(body, i);
+            if (i >= n) break;
+            String kw;
+            if (startsWithWord(body, i, "case")) kw = "case";
+            else if (startsWithWord(body, i, "default")) kw = "default";
+            else return null;
+            int afterKw = i + kw.length();
+            int arrow = -1;
+            int depth = 0;
+            for (int j = afterKw; j + 1 < n; j++) {
+                char ch = body.charAt(j);
+                if (ch == '"' || ch == '\'') { j = skipQuoted(body, j); continue; }
+                if (ch == '(' || ch == '[' || ch == '{') depth++;
+                else if (ch == ')' || ch == ']' || ch == '}') depth--;
+                else if (depth == 0 && ch == '-' && body.charAt(j + 1) == '>') {
+                    arrow = j;
+                    break;
+                }
+            }
+            if (arrow < 0) return null;
+            String label = body.substring(afterKw, arrow).trim();
+            int bodyStart = skipWhitespace(body, arrow + 2);
+            String caseBody;
+            int bodyEnd;
+            if (bodyStart < n && body.charAt(bodyStart) == '{') {
+                int close = findMatchingBrace(body, bodyStart);
+                if (close < 0) return null;
+                caseBody = body.substring(bodyStart + 1, close);
+                bodyEnd = close + 1;
+                int semi = skipWhitespace(body, bodyEnd);
+                if (semi < n && body.charAt(semi) == ';') bodyEnd = semi + 1;
+            } else {
+                int semi = findTopLevelSemicolon(body, bodyStart);
+                if (semi < 0) return null;
+                caseBody = body.substring(bodyStart, semi);
+                bodyEnd = semi + 1;
+            }
+            if ("default".equals(kw)) {
+                if (!firstBranch) out.append(" else ");
+                out.append("{ ").append(caseBody);
+                if (!caseBody.trim().endsWith(";") && !caseBody.trim().endsWith("}")) out.append(';');
+                out.append(" }");
+            } else {
+                // Extract Type and variable name from label.
+                int lastWs = -1;
+                int depth2 = 0;
+                for (int j = 0; j < label.length(); j++) {
+                    char k = label.charAt(j);
+                    if (k == '<') depth2++;
+                    else if (k == '>') depth2--;
+                    else if (depth2 == 0 && Character.isWhitespace(k)) lastWs = j;
+                }
+                String type;
+                String binding;
+                if (lastWs < 0) {
+                    // Constant-label inside a pattern switch — compare by equals.
+                    type = null;
+                    binding = null;
+                }
+                else {
+                    type = label.substring(0, lastWs).trim();
+                    binding = label.substring(lastWs + 1).trim();
+                }
+                if (!firstBranch) out.append(" else ");
+                if (type != null) {
+                    out.append("if (").append(scrVar).append(" instanceof ").append(type).append(") { ")
+                            .append(type).append(' ').append(binding).append(" = (").append(type).append(") ")
+                            .append(scrVar).append("; ").append(caseBody);
+                } else {
+                    out.append("if (").append(scrVar).append(" != null && ").append(scrVar).append(".equals(")
+                            .append(label).append(")) { ").append(caseBody);
+                }
+                if (!caseBody.trim().endsWith(";") && !caseBody.trim().endsWith("}")) out.append(';');
+                out.append(" }");
+            }
+            firstBranch = false;
+            i = bodyEnd;
+        }
+        out.append(" }");
+        return out.toString();
     }
 
     /**
@@ -326,14 +537,53 @@ final class PlaygroundRunner {
             if (ctorParams.length() > 0) ctorParams.append(',');
             ctorParams.append(type).append(' ').append(comp);
         }
+        // Compact-ctor form: `<RecordName> { ... }` inside the body runs
+        // validation/normalization before the implicit field assignments.
+        // Extract it and inline the statements ahead of the assignments.
+        String compactBody = extractCompactRecordCtor(name, body);
+        String trimmedBody;
+        String prefixStmts;
+        if (compactBody == null) {
+            trimmedBody = body;
+            prefixStmts = "";
+        } else {
+            trimmedBody = compactBody.substring(0, compactBody.indexOf('\u0000'));
+            prefixStmts = compactBody.substring(compactBody.indexOf('\u0000') + 1);
+        }
         StringBuilder out = new StringBuilder();
         out.append("class ").append(name).append('{');
         out.append(fields);
-        out.append(name).append('(').append(ctorParams).append("){").append(ctorAssigns).append('}');
+        out.append(name).append('(').append(ctorParams).append("){");
+        if (!prefixStmts.isEmpty()) out.append(prefixStmts).append(';');
+        out.append(ctorAssigns).append('}');
         out.append(accessors);
-        if (!body.isEmpty()) out.append(body);
+        if (!trimmedBody.isEmpty()) out.append(trimmedBody);
         out.append('}');
         return out.toString();
+    }
+
+    /** Looks for a compact record constructor inside the body: the
+     * bare form {@code <RecordName> { stmts }} with no parameter list.
+     * Returns {@code null} if none present, otherwise a string of the
+     * form {@code <bodyWithoutCompact>\u0000<stmts>} so the caller can
+     * get both halves without allocating a pair. */
+    private String extractCompactRecordCtor(String recordName, String body) {
+        int i = 0;
+        while (i < body.length()) {
+            char ch = body.charAt(i);
+            if (ch == '"' || ch == '\'') { i = skipQuoted(body, i) + 1; continue; }
+            if (startsLineComment(body, i)) { i = skipLineComment(body, i) + 1; continue; }
+            if (startsBlockComment(body, i)) { i = skipBlockComment(body, i) + 1; continue; }
+            if (!startsWithWord(body, i, recordName)) { i++; continue; }
+            int after = skipWhitespace(body, i + recordName.length());
+            if (after >= body.length() || body.charAt(after) != '{') { i += recordName.length(); continue; }
+            int braceEnd = findMatchingBrace(body, after);
+            if (braceEnd < 0) return null;
+            String stmts = body.substring(after + 1, braceEnd).trim();
+            String stripped = body.substring(0, i) + body.substring(braceEnd + 1);
+            return stripped + "\u0000" + stmts;
+        }
+        return null;
     }
 
     private int lastTopLevelWhitespace(String s) {

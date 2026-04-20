@@ -225,6 +225,27 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "groups.add(a); groups.add(b);\n"
                 + "List flat = groups.stream().flatMap(g -> ((List) g).stream()).toList();\n"
                 + "root.add(new Label(\"flat=\" + flat));"), ExpectedOutcome.SUCCESS, null));
+        // Record compact constructor runs validation/normalisation
+        // before the implicit field assignments.
+        cases.add(new Case(cat, "record_compact_constructor", ui(""
+                + "record Range(int lo, int hi) {\n"
+                + "    Range {\n"
+                + "        if (lo > hi) { int t = lo; lo = hi; hi = t; }\n"
+                + "    }\n"
+                + "}\n"
+                + "Range r = new Range(7, 3);\n"
+                + "root.add(new Label(\"lo=\" + r.lo() + \" hi=\" + r.hi()));"), ExpectedOutcome.SUCCESS, null));
+        // Pattern-match switch binds the scrutinee into a typed variable
+        // inside each arrow branch. Desugars to an if/else chain.
+        cases.add(new Case(cat, "pattern_switch_statement", ui(""
+                + "Object o = Integer.valueOf(7);\n"
+                + "String tag;\n"
+                + "switch (o) {\n"
+                + "    case Integer i -> tag = \"int:\" + i;\n"
+                + "    case String s -> tag = \"str:\" + s;\n"
+                + "    default -> tag = \"other\";\n"
+                + "}\n"
+                + "root.add(new Label(tag));"), ExpectedOutcome.SUCCESS, null));
         // Inherited static field access: Display extends CN1Constants, so
         // PICKER_TYPE_DATE (declared on CN1Constants) is reachable through
         // the Display subclass reference.
