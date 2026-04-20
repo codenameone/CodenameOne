@@ -1,7 +1,6 @@
 package com.codename1.tools.skindesigner;
 
 import com.codename1.system.Lifecycle;
-import com.codename1.components.ImageViewer;
 import com.codename1.components.OnOffSwitch;
 import com.codename1.components.ScaleImageLabel;
 import com.codename1.components.SplitPane;
@@ -31,7 +30,6 @@ import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.GridLayout;
-import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.spinner.Picker;
 import com.codename1.ui.util.ImageIO;
 import com.codename1.ui.util.UITimer;
@@ -774,44 +772,306 @@ public class SkinDesigner extends Lifecycle {
         helpForm.show();
     }
 
-    private Image createMute(int x, int y, int w, int h, int safeX, int safeY, int safeW, int safeH, Image img) {
-        Image mute = Image.createImage(img.getWidth(), img.getHeight(), 0);
-        Graphics g = mute.getGraphics();
-        g.setAlpha(150);
-        g.setColor(0);
-        g.fillRect(x, y, w, h);
-        g.setAlpha(80);
-        int checker = 12;
-        for(int yy = y; yy < y + h; yy += checker) {
-            for(int xx = x; xx < x + w; xx += checker) {
-                boolean dark = (((xx - x) / checker) + ((yy - y) / checker)) % 2 == 0;
-                g.setColor(dark ? 0x999999 : 0xcccccc);
-                g.fillRect(xx, yy, Math.min(checker, x + w - xx), Math.min(checker, y + h - yy));
+    static final int AIM_MODE_SCREEN = 0;
+    static final int AIM_MODE_SAFE = 1;
+    static final int AIM_MODE_PAN = 2;
+
+    final class AimView extends Component {
+        private final Image img;
+        private final int imgW;
+        private final int imgH;
+        private final int screenW;
+        private final int screenH;
+        private final TextField xField;
+        private final TextField yField;
+        private final TextField safeXField;
+        private final TextField safeYField;
+        private final TextField safeWField;
+        private final TextField safeHField;
+        private int mode = AIM_MODE_SCREEN;
+        private float zoomMul = 1f;
+        private float panNX = 0.5f;
+        private float panNY = 0.5f;
+        private int lastPX = -1;
+        private int lastPY = -1;
+
+        AimView(Image img, TextField xField, TextField yField, TextField safeXField, TextField safeYField,
+                TextField safeWField, TextField safeHField, int screenW, int screenH) {
+            this.img = img;
+            this.imgW = img.getWidth();
+            this.imgH = img.getHeight();
+            this.xField = xField;
+            this.yField = yField;
+            this.safeXField = safeXField;
+            this.safeYField = safeYField;
+            this.safeWField = safeWField;
+            this.safeHField = safeHField;
+            this.screenW = screenW;
+            this.screenH = screenH;
+            setUIID("SkinDesignerCard");
+            setFocusable(true);
+        }
+
+        void setMode(int mode) {
+            this.mode = mode;
+        }
+
+        int getMode() {
+            return mode;
+        }
+
+        void zoomIn() {
+            float nz = Math.min(8f, zoomMul * 1.5f);
+            if (nz != zoomMul) {
+                zoomMul = nz;
+                repaint();
             }
         }
-        g.setColor(0xff0000);
-        int safeRight = safeX + safeW;
-        int safeBottom = safeY + safeH;
-        int screenRight = x + w;
-        int screenBottom = y + h;
-        if(safeY > y) {
-            g.fillRect(x, y, w, Math.max(0, safeY - y));
+
+        void zoomOut() {
+            float nz = Math.max(1f, zoomMul / 1.5f);
+            if (nz != zoomMul) {
+                zoomMul = nz;
+                if (zoomMul <= 1f) {
+                    panNX = 0.5f;
+                    panNY = 0.5f;
+                }
+                repaint();
+            }
         }
-        if(safeX > x) {
-            g.fillRect(x, safeY, Math.max(0, safeX - x), Math.max(0, safeH));
+
+        void nudge(int dx, int dy) {
+            applyDelta(dx, dy);
+            repaint();
         }
-        if(safeRight < screenRight) {
-            g.fillRect(safeRight, safeY, Math.max(0, screenRight - safeRight), Math.max(0, safeH));
+
+        private float currentScale() {
+            int vw = getWidth();
+            int vh = getHeight();
+            if (vw <= 0 || vh <= 0 || imgW <= 0 || imgH <= 0) {
+                return 0f;
+            }
+            float fit = Math.min(((float) vw) / imgW, ((float) vh) / imgH);
+            return fit * zoomMul;
         }
-        if(safeBottom < screenBottom) {
-            g.fillRect(x, safeBottom, w, Math.max(0, screenBottom - safeBottom));
+
+        private int drawOriginX(float scale) {
+            int vw = getWidth();
+            int drawW = Math.max(1, Math.round(imgW * scale));
+            if (drawW <= vw) {
+                return getX() + (vw - drawW) / 2;
+            }
+            int raw = getX() + vw / 2 - Math.round(panNX * drawW);
+            int min = getX() + vw - drawW;
+            int max = getX();
+            return Math.max(min, Math.min(max, raw));
         }
-        g.setColor(0xff);
-        g.drawRect(x, y, w, h);
-        g.setColor(0xff0000);
-        g.drawRect(safeX, safeY, safeW, safeH);
-        g.setAlpha(255);
-        return mute;
+
+        private int drawOriginY(float scale) {
+            int vh = getHeight();
+            int drawH = Math.max(1, Math.round(imgH * scale));
+            if (drawH <= vh) {
+                return getY() + (vh - drawH) / 2;
+            }
+            int raw = getY() + vh / 2 - Math.round(panNY * drawH);
+            int min = getY() + vh - drawH;
+            int max = getY();
+            return Math.max(min, Math.min(max, raw));
+        }
+
+        private int clamp(int v, int lo, int hi) {
+            if (hi < lo) {
+                hi = lo;
+            }
+            return Math.max(lo, Math.min(hi, v));
+        }
+
+        private void applyDelta(int dImgX, int dImgY) {
+            if (dImgX == 0 && dImgY == 0) {
+                return;
+            }
+            if (mode == AIM_MODE_PAN) {
+                if (zoomMul > 1f) {
+                    float scale = currentScale();
+                    if (scale > 0f) {
+                        float drawW = imgW * scale;
+                        float drawH = imgH * scale;
+                        float vw = getWidth();
+                        float vh = getHeight();
+                        if (drawW > vw) {
+                            panNX = Math.max(0f, Math.min(1f, panNX - (dImgX * scale) / (drawW - vw)));
+                        }
+                        if (drawH > vh) {
+                            panNY = Math.max(0f, Math.min(1f, panNY - (dImgY * scale) / (drawH - vh)));
+                        }
+                    }
+                }
+                return;
+            }
+            if (mode == AIM_MODE_SAFE) {
+                int saw = safeWField.getAsInt(screenW);
+                int sah = safeHField.getAsInt(screenH);
+                int curX = safeXField.getAsInt(0);
+                int curY = safeYField.getAsInt(0);
+                int newX = clamp(curX + dImgX, 0, imgW - saw);
+                int newY = clamp(curY + dImgY, 0, imgH - sah);
+                if (newX != curX) {
+                    safeXField.setText("" + newX);
+                }
+                if (newY != curY) {
+                    safeYField.setText("" + newY);
+                }
+                return;
+            }
+            int curX = xField.getAsInt(0);
+            int curY = yField.getAsInt(0);
+            int newX = clamp(curX + dImgX, 0, imgW - screenW);
+            int newY = clamp(curY + dImgY, 0, imgH - screenH);
+            int actualDx = newX - curX;
+            int actualDy = newY - curY;
+            if (actualDx != 0) {
+                xField.setText("" + newX);
+            }
+            if (actualDy != 0) {
+                yField.setText("" + newY);
+            }
+            if (actualDx != 0 || actualDy != 0) {
+                int saw = safeWField.getAsInt(screenW);
+                int sah = safeHField.getAsInt(screenH);
+                int curSafeX = safeXField.getAsInt(curX);
+                int curSafeY = safeYField.getAsInt(curY);
+                int newSafeX = clamp(curSafeX + actualDx, 0, imgW - saw);
+                int newSafeY = clamp(curSafeY + actualDy, 0, imgH - sah);
+                if (newSafeX != curSafeX) {
+                    safeXField.setText("" + newSafeX);
+                }
+                if (newSafeY != curSafeY) {
+                    safeYField.setText("" + newSafeY);
+                }
+            }
+        }
+
+        @Override
+        public void pointerPressed(int x, int y) {
+            lastPX = x;
+            lastPY = y;
+        }
+
+        @Override
+        public void pointerReleased(int x, int y) {
+            lastPX = -1;
+            lastPY = -1;
+        }
+
+        @Override
+        public void pointerDragged(int x, int y) {
+            if (lastPX < 0 || lastPY < 0) {
+                lastPX = x;
+                lastPY = y;
+                return;
+            }
+            int dpx = x - lastPX;
+            int dpy = y - lastPY;
+            float scale = currentScale();
+            if (scale <= 0f) {
+                lastPX = x;
+                lastPY = y;
+                return;
+            }
+            int dImgX = Math.round(dpx / scale);
+            int dImgY = Math.round(dpy / scale);
+            if (dImgX == 0 && dImgY == 0) {
+                return;
+            }
+            applyDelta(dImgX, dImgY);
+            lastPX = x;
+            lastPY = y;
+            repaint();
+        }
+
+        @Override
+        public void paint(Graphics g) {
+            super.paint(g);
+            float scale = currentScale();
+            if (scale <= 0f) {
+                return;
+            }
+            int drawW = Math.max(1, Math.round(imgW * scale));
+            int drawH = Math.max(1, Math.round(imgH * scale));
+            int drawX = drawOriginX(scale);
+            int drawY = drawOriginY(scale);
+
+            int[] clip = g.getClip();
+            g.pushClip();
+            g.clipRect(getX(), getY(), getWidth(), getHeight());
+
+            g.drawImage(img, drawX, drawY, drawW, drawH);
+
+            int screenImgX = xField.getAsInt(0);
+            int screenImgY = yField.getAsInt(0);
+            int safeImgX = safeXField.getAsInt(screenImgX);
+            int safeImgY = safeYField.getAsInt(screenImgY);
+            int safeImgW = safeWField.getAsInt(screenW);
+            int safeImgH = safeHField.getAsInt(screenH);
+
+            int sx = drawX + Math.round(screenImgX * scale);
+            int sy = drawY + Math.round(screenImgY * scale);
+            int sw = Math.max(1, Math.round(screenW * scale));
+            int sh = Math.max(1, Math.round(screenH * scale));
+            int fx = drawX + Math.round(safeImgX * scale);
+            int fy = drawY + Math.round(safeImgY * scale);
+            int fw = Math.max(1, Math.round(safeImgW * scale));
+            int fh = Math.max(1, Math.round(safeImgH * scale));
+
+            int oldAlpha = g.getAlpha();
+            int oldColor = g.getColor();
+
+            g.setAlpha(150);
+            g.setColor(0);
+            g.fillRect(sx, sy, sw, sh);
+
+            g.setAlpha(80);
+            int checker = Math.max(4, Math.round(12f * scale));
+            for (int yy = sy; yy < sy + sh; yy += checker) {
+                for (int xx = sx; xx < sx + sw; xx += checker) {
+                    boolean dark = (((xx - sx) / checker) + ((yy - sy) / checker)) % 2 == 0;
+                    g.setColor(dark ? 0x999999 : 0xcccccc);
+                    int cw = Math.min(checker, sx + sw - xx);
+                    int ch = Math.min(checker, sy + sh - yy);
+                    g.fillRect(xx, yy, cw, ch);
+                }
+            }
+
+            g.setAlpha(150);
+            g.setColor(0xff0000);
+            int safeRight = fx + fw;
+            int safeBottom = fy + fh;
+            int screenRight = sx + sw;
+            int screenBottom = sy + sh;
+            if (fy > sy) {
+                g.fillRect(sx, sy, sw, Math.max(0, fy - sy));
+            }
+            if (fx > sx) {
+                g.fillRect(sx, fy, Math.max(0, fx - sx), Math.max(0, fh));
+            }
+            if (safeRight < screenRight) {
+                g.fillRect(safeRight, fy, Math.max(0, screenRight - safeRight), Math.max(0, fh));
+            }
+            if (safeBottom < screenBottom) {
+                g.fillRect(sx, safeBottom, sw, Math.max(0, screenBottom - safeBottom));
+            }
+
+            g.setAlpha(255);
+            g.setColor(mode == AIM_MODE_SCREEN ? 0x2f6bff : 0x00ffff);
+            g.drawRect(sx, sy, sw, sh);
+            g.setColor(mode == AIM_MODE_SAFE ? 0xffaa00 : 0xff0000);
+            g.drawRect(fx, fy, fw, fh);
+
+            g.setAlpha(oldAlpha);
+            g.setColor(oldColor);
+            g.popClip();
+            g.setClip(clip);
+        }
     }
 
     void aimPosition(final Image img, final TextField x, final TextField y, final TextField safeX, final TextField safeY, final TextField safeW, final TextField safeH, final int w, final int h) {
@@ -819,115 +1079,46 @@ public class SkinDesigner extends Lifecycle {
             ToastBar.showErrorMessage("You need to pick a skin image first");
             return;
         }
-        String originalX = x.getText();
-        String originalY = y.getText();
-        Form editPosition = new Form("", new BorderLayout());
+        final String originalX = x.getText();
+        final String originalY = y.getText();
+        final String originalSafeX = safeX.getText();
+        final String originalSafeY = safeY.getText();
+        final Form editPosition = new Form("", new BorderLayout());
         editPosition.setUIID("SkinDesignerForm");
         Button done = new Button("Done");
         styleActionButton(done, FontImage.MATERIAL_CHECK);
-        done.addActionListener(e -> x.getComponentForm().showBack());
+        done.addActionListener(e -> editPosition.showBack());
         Button cancel = new Button("Cancel");
         styleActionButton(cancel, FontImage.MATERIAL_CANCEL);
         cancel.addActionListener(e -> {
             x.setText(originalX);
             y.setText(originalY);
-            x.getComponentForm().showBack();
+            safeX.setText(originalSafeX);
+            safeY.setText(originalSafeY);
+            editPosition.showBack();
         });
         Container topActions = GridLayout.encloseIn(2, cancel, done);
         topActions.setUIID("SkinDesignerTabBar");
         editPosition.add(BorderLayout.NORTH, topActions);
 
-        Image mute = createMute(x.getAsInt(0), y.getAsInt(0), w, h, safeX.getAsInt(x.getAsInt(0)), safeY.getAsInt(y.getAsInt(0)), safeW.getAsInt(w), safeH.getAsInt(h), img);
-        class oo extends ImageViewer {
-            private int lastDragX = -1;
-            private int lastDragY = -1;
+        final AimView view = new AimView(img, x, y, safeX, safeY, safeW, safeH, w, h);
 
-            public oo(Image img) {
-                super(img);
-            }
-            @Override
-            public boolean pinch(float scale) {
-                return super.pinch(scale);
-            }
-
-            @Override
-            public void pointerPressed(int xPos, int yPos) {
-                super.pointerPressed(xPos, yPos);
-                lastDragX = xPos;
-                lastDragY = yPos;
-            }
-
-            @Override
-            public void pointerDragged(int xPos, int yPos) {
-                if(lastDragX < 0 || lastDragY < 0) {
-                    lastDragX = xPos;
-                    lastDragY = yPos;
-                    return;
-                }
-                int dx = Math.round((xPos - lastDragX) / getZoom());
-                int dy = Math.round((yPos - lastDragY) / getZoom());
-                if(dx != 0 || dy != 0) {
-                    int maxX = Math.max(0, img.getWidth() - w);
-                    int maxY = Math.max(0, img.getHeight() - h);
-                    int newX = Math.min(maxX, Math.max(0, x.getAsInt(0) + dx));
-                    int newY = Math.min(maxY, Math.max(0, y.getAsInt(0) + dy));
-                    int safeWidthValue = safeW.getAsInt(w);
-                    int safeHeightValue = safeH.getAsInt(h);
-                    int safeMaxX = Math.max(0, img.getWidth() - safeWidthValue);
-                    int safeMaxY = Math.max(0, img.getHeight() - safeHeightValue);
-                    int newSafeX = Math.min(safeMaxX, Math.max(0, safeX.getAsInt(newX) + dx));
-                    int newSafeY = Math.min(safeMaxY, Math.max(0, safeY.getAsInt(newY) + dy));
-                    x.setText("" + newX);
-                    y.setText("" + newY);
-                    safeX.setText("" + newSafeX);
-                    safeY.setText("" + newSafeY);
-                    setImageNoReposition(createMute(newX, newY, w, h, newSafeX, newSafeY, safeWidthValue, safeHeightValue, img));
-                    lastDragX = xPos;
-                    lastDragY = yPos;
-                }
-            }
-
-            @Override
-            public void pointerReleased(int xPos, int yPos) {
-                super.pointerReleased(xPos, yPos);
-                lastDragX = -1;
-                lastDragY = -1;
-            }
+        Button modeScreen = new Button("Screen");
+        Button modeSafe = new Button("Safe");
+        Button modePan = new Button("Pan");
+        final Button[] modeButtons = { modeScreen, modeSafe, modePan };
+        final int[] modeValues = { AIM_MODE_SCREEN, AIM_MODE_SAFE, AIM_MODE_PAN };
+        updateModeButtons(modeButtons, view.getMode());
+        for (int i = 0; i < modeButtons.length; i++) {
+            final int target = modeValues[i];
+            modeButtons[i].addActionListener(e -> {
+                view.setMode(target);
+                updateModeButtons(modeButtons, target);
+                view.repaint();
+            });
         }
-        final oo overlay = new oo(mute);
-        ImageViewer iv = new ImageViewer(img) {
-            @Override
-            public void pointerDragged(int x, int y) {
-                super.pointerDragged(x, y);
-                overlay.pointerDragged(x, y);
-            }
-
-            @Override
-            protected boolean pinch(float scale) {
-                boolean b = super.pinch(scale);
-                overlay.pinch(scale);
-                return b;
-            }
-
-            @Override
-            public void pointerPressed(int x, int y) {
-                super.pointerPressed(x, y);
-                overlay.pointerPressed(x, y);
-            }
-
-            @Override
-            public void pointerReleased(int x, int y) {
-                super.pointerReleased(x, y);
-                overlay.pointerReleased(x, y);
-            }
-
-            @Override
-            public void keyReleased(int key) {
-                super.keyReleased(key);
-                overlay.keyReleased(key);
-            }
-        };
-        overlay.setFocusable(false);
+        Container modeBar = GridLayout.encloseIn(3, modeScreen, modeSafe, modePan);
+        modeBar.setUIID("SkinDesignerTabBar");
 
         Button zoomIn = new Button();
         Button zoomOut = new Button();
@@ -942,55 +1133,27 @@ public class SkinDesigner extends Lifecycle {
         FontImage.setMaterialIcon(up, FontImage.MATERIAL_KEYBOARD_ARROW_UP, 3);
         FontImage.setMaterialIcon(down, FontImage.MATERIAL_KEYBOARD_ARROW_DOWN, 3);
 
-        zoomIn.addActionListener(e -> {
-            iv.setZoom(iv.getZoom() + 1);
-            overlay.setZoom(iv.getZoom());
-            overlay.setImageNoReposition(createMute(x.getAsInt(0), y.getAsInt(0), w, h, safeX.getAsInt(x.getAsInt(0)), safeY.getAsInt(y.getAsInt(0)), safeW.getAsInt(w), safeH.getAsInt(h), img));
-        });
+        zoomIn.addActionListener(e -> view.zoomIn());
+        zoomOut.addActionListener(e -> view.zoomOut());
+        left.addActionListener(e -> view.nudge(-1, 0));
+        right.addActionListener(e -> view.nudge(1, 0));
+        up.addActionListener(e -> view.nudge(0, -1));
+        down.addActionListener(e -> view.nudge(0, 1));
 
-        zoomOut.addActionListener(e -> {
-            iv.setZoom(iv.getZoom() - 1);
-            overlay.setZoom(iv.getZoom());
-            overlay.setImageNoReposition(createMute(x.getAsInt(0), y.getAsInt(0), w, h, safeX.getAsInt(x.getAsInt(0)), safeY.getAsInt(y.getAsInt(0)), safeW.getAsInt(w), safeH.getAsInt(h), img));
-        });
-
-        left.addActionListener(e -> {
-            int newX = Math.max(0, x.getAsInt(0) - 1);
-            x.setText("" + newX);
-            int safeMaxX = Math.max(0, img.getWidth() - safeW.getAsInt(w));
-            safeX.setText("" + Math.max(0, Math.min(safeMaxX, safeX.getAsInt(0) - 1)));
-            overlay.setImageNoReposition(createMute(x.getAsInt(0), y.getAsInt(0), w, h, safeX.getAsInt(x.getAsInt(0)), safeY.getAsInt(y.getAsInt(0)), safeW.getAsInt(w), safeH.getAsInt(h), img));
-        });
-
-        right.addActionListener(e -> {
-            int newX = Math.min(Math.max(0, img.getWidth() - w), x.getAsInt(0) + 1);
-            x.setText("" + newX);
-            int safeMaxX = Math.max(0, img.getWidth() - safeW.getAsInt(w));
-            safeX.setText("" + Math.max(0, Math.min(safeMaxX, safeX.getAsInt(0) + 1)));
-            overlay.setImageNoReposition(createMute(x.getAsInt(0), y.getAsInt(0), w, h, safeX.getAsInt(x.getAsInt(0)), safeY.getAsInt(y.getAsInt(0)), safeW.getAsInt(w), safeH.getAsInt(h), img));
-        });
-
-        up.addActionListener(e -> {
-            int newY = Math.max(0, y.getAsInt(0) - 1);
-            y.setText("" + newY);
-            int safeMaxY = Math.max(0, img.getHeight() - safeH.getAsInt(h));
-            safeY.setText("" + Math.max(0, Math.min(safeMaxY, safeY.getAsInt(0) - 1)));
-            overlay.setImageNoReposition(createMute(x.getAsInt(0), y.getAsInt(0), w, h, safeX.getAsInt(x.getAsInt(0)), safeY.getAsInt(y.getAsInt(0)), safeW.getAsInt(w), safeH.getAsInt(h), img));
-        });
-
-        down.addActionListener(e -> {
-            int newY = Math.min(Math.max(0, img.getHeight() - h), y.getAsInt(0) + 1);
-            y.setText("" + newY);
-            int safeMaxY = Math.max(0, img.getHeight() - safeH.getAsInt(h));
-            safeY.setText("" + Math.max(0, Math.min(safeMaxY, safeY.getAsInt(0) + 1)));
-            overlay.setImageNoReposition(createMute(x.getAsInt(0), y.getAsInt(0), w, h, safeX.getAsInt(x.getAsInt(0)), safeY.getAsInt(y.getAsInt(0)), safeW.getAsInt(w), safeH.getAsInt(h), img));
-        });
-
-        editPosition.add(BorderLayout.CENTER, LayeredLayout.encloseIn(iv, overlay,
-                BorderLayout.south(GridLayout.encloseIn(6, zoomIn, zoomOut, left, right, up, down))));
+        Container navBar = GridLayout.encloseIn(6, zoomIn, zoomOut, left, right, up, down);
+        Container south = BoxLayout.encloseY(modeBar, navBar);
+        editPosition.add(BorderLayout.CENTER, view);
+        editPosition.add(BorderLayout.SOUTH, south);
         applyWebsiteTheme(editPosition, websiteDarkMode);
-
         editPosition.show();
+    }
+
+    private void updateModeButtons(Button[] buttons, int selectedMode) {
+        for (int i = 0; i < buttons.length; i++) {
+            boolean selected = i == selectedMode;
+            String base = selected ? "SkinDesignerTabButtonSelected" : "SkinDesignerTabButton";
+            buttons[i].setUIID(websiteDarkMode ? base + "Dark" : base);
+        }
     }
 
     private byte[] imageToByteArray(Image img) throws IOException {
