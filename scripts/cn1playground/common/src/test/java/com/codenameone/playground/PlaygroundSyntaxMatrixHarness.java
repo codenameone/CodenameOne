@@ -825,6 +825,57 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "String joined = \"\";\n"
                 + "for (Item it : items) joined = joined + it.n;\n"
                 + "root.add(new Label(joined));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "cn1_container_border_layout", ui(""
+                + "Container c = new Container(new BorderLayout());\n"
+                + "c.add(BorderLayout.NORTH, new Label(\"n\"));\n"
+                + "c.add(BorderLayout.CENTER, new Label(\"c\"));\n"
+                + "c.add(BorderLayout.SOUTH, new Label(\"s\"));\n"
+                + "root.add(c);\n"
+                + "root.add(new Label(\"cnt=\" + c.getComponentCount()));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "cn1_textfield_and_listener", ui(""
+                + "TextField tf = new TextField();\n"
+                + "String[] last = new String[]{\"\"};\n"
+                + "tf.addActionListener(e -> last[0] = \"changed\");\n"
+                + "root.add(tf);\n"
+                + "root.add(new Label(\"ok\"));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "cn1_button_chain_setters", ui(""
+                + "Button b = new Button(\"Go\");\n"
+                + "b.setUIID(\"Custom\");\n"
+                + "b.setEnabled(false);\n"
+                + "root.add(b);\n"
+                + "root.add(new Label(\"uiid=\" + b.getUIID() + \" en=\" + b.isEnabled()));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "collections_reverse_then_check", ui(""
+                + "import java.util.*;\n"
+                + "List<Integer> xs = new ArrayList<>();\n"
+                + "for (int i = 1; i <= 3; i++) xs.add(i);\n"
+                + "Collections.reverse(xs);\n"
+                + "root.add(new Label(xs.toString()));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "function_chain_via_scripted_class", ui(""
+                + "class Pipeline {\n"
+                + "  int run(int start) { return add(mul(start, 3), 4); }\n"
+                + "  int add(int a, int b) { return a + b; }\n"
+                + "  int mul(int a, int b) { return a * b; }\n"
+                + "}\n"
+                + "root.add(new Label(\"v=\" + new Pipeline().run(5)));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "varargs_like_user_method", ui(""
+                + "class V { int sum(int... xs) { int s = 0; for (int x : xs) s += x; return s; } }\n"
+                + "V v = new V();\n"
+                + "root.add(new Label(\"s=\" + v.sum(1, 2, 3, 4)));"), ExpectedOutcome.SUCCESS, null));
+        // Interface constants aren't visible from an implementing class's
+        // method body (the implementor's method lookup doesn't walk the
+        // implemented interfaces' static namespaces). Qualify with the
+        // interface name as a workaround.
+        cases.add(new Case(cat, "interface_constant_unqualified_unsupported", ui(""
+                + "interface Config { String DEFAULT_NAME = \"world\"; String greet(); }\n"
+                + "class Greeter implements Config { public String greet() { return \"hi \" + DEFAULT_NAME; } }\n"
+                + "root.add(new Label(new Greeter().greet()));"), ExpectedOutcome.EVAL_ERROR, null));
+        // Interface constants accessed via Iface.NAME from inside a
+        // scripted class also hit the callstack-null issue in field
+        // resolution. Cross-referenced with two_classes_typed_cross_ref.
+        cases.add(new Case(cat, "interface_constant_qualified_unsupported", ui(""
+                + "interface Config { String DEFAULT_NAME = \"world\"; String greet(); }\n"
+                + "class Greeter implements Config { public String greet() { return \"hi \" + Config.DEFAULT_NAME; } }\n"
+                + "root.add(new Label(new Greeter().greet()));"), ExpectedOutcome.EVAL_ERROR, null));
         cases.add(new Case(cat, "lambda_method_ref_combo", ui(""
                 + "import java.util.function.*;\n"
                 + "Predicate<String> nonEmpty = s -> s.length() > 0;\n"
