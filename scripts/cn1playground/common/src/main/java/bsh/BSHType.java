@@ -124,6 +124,7 @@ class BSHType extends SimpleNode implements BshClassManager.Listener {
     }
 
     private static boolean resolvesToScriptedClass(Node node, CallStack callstack) {
+        if (callstack == null) return false;
         try {
             String text = node.getText();
             if (text == null) return false;
@@ -131,7 +132,9 @@ class BSHType extends SimpleNode implements BshClassManager.Listener {
             int lt = text.indexOf('<');
             if (lt >= 0) text = text.substring(0, lt).trim();
             if (text.length() == 0 || text.indexOf('.') >= 0) return false;
-            Object v = callstack.top().getVariable(text);
+            NameSpace top = callstack.top();
+            if (top == null) return false;
+            Object v = top.getVariable(text);
             return v instanceof ScriptedClass;
         } catch (UtilEvalError ex) {
             return false;

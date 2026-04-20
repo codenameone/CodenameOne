@@ -2119,6 +2119,11 @@ final class PlaygroundRunner {
             // would confuse rewriteLambdaExpression). This handles nested
             // top-level lambdas like `a -> b -> a + b`.
             String recursedBody = rewriteTopLevelLambdas(body);
+            // Rewrite switch expressions / arrow switches inside the
+            // lambda body too — the body is eval'd as a standalone script
+            // at invocation time and otherwise wouldn't get those passes.
+            recursedBody = rewriteSwitchExpressions(recursedBody);
+            recursedBody = rewriteArrowSwitchStatements(recursedBody);
             String bodyText = normalizeLambdaBody(recursedBody);
             if (bodyText == null) {
                 return script;

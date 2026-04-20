@@ -757,6 +757,74 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "class Button { String id; Button(String v) { id = v; } }\n"
                 + "Button b = new Button(\"custom\");\n"
                 + "root.add(new Label(\"id=\" + b.id));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "empty_switch_expression", ui(""
+                + "int x = 1;\n"
+                + "String s = switch (x) { default -> \"fallback\"; };\n"
+                + "root.add(new Label(s));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "switch_in_lambda_body", ui(""
+                + "import java.util.function.*;\n"
+                + "Function<Integer, String> f = n -> { String s = switch (n) { case 1 -> \"one\"; default -> \"other\"; }; return s; };\n"
+                + "root.add(new Label(f.apply(1) + \"-\" + f.apply(9)));"), ExpectedOutcome.SUCCESS, null));
+        // Two scripted classes referencing each other through a field of
+        // the other's type hits a subtle callstack issue during field
+        // resolution; documented for follow-up. Workaround: use Object
+        // field types (see next case).
+        cases.add(new Case(cat, "two_classes_typed_cross_ref_unsupported", ui(""
+                + "class Pair { Box first; Box second; }\n"
+                + "class Box { int v; Box(int n) { v = n; } }\n"
+                + "Pair p = new Pair();\n"
+                + "p.first = new Box(1);\n"
+                + "p.second = new Box(2);\n"
+                + "root.add(new Label(\"sum=\" + (p.first.v + p.second.v)));"), ExpectedOutcome.EVAL_ERROR, null));
+        // External assignment to a scripted-class field (p.first = ...)
+        // where the field value is another ScriptedInstance hits a
+        // callstack issue in BSH's LHS dispatch; documented gap.
+        cases.add(new Case(cat, "external_field_assignment_unsupported", ui(""
+                + "class Pair { Object first; Object second; }\n"
+                + "class Box { int v; Box(int n) { v = n; } }\n"
+                + "Pair p = new Pair();\n"
+                + "p.first = new Box(1);\n"
+                + "root.add(new Label(\"ok\"));"), ExpectedOutcome.EVAL_ERROR, null));
+        // Internal assignment (inside a method body) works fine —
+        // the workaround is to wrap external mutation in a setter.
+        cases.add(new Case(cat, "internal_field_assignment_via_setter", ui(""
+                + "class Pair { Object first; Object second; void setFirst(Object o) { first = o; } void setSecond(Object o) { second = o; } }\n"
+                + "class Box { int v; Box(int n) { v = n; } }\n"
+                + "Pair p = new Pair();\n"
+                + "p.setFirst(new Box(1));\n"
+                + "p.setSecond(new Box(2));\n"
+                + "Box f = (Box) p.first;\n"
+                + "Box s = (Box) p.second;\n"
+                + "root.add(new Label(\"sum=\" + (f.v + s.v)));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "class_accessing_another_class_method", ui(""
+                + "class Math1 { int plus(int a, int b) { return a + b; } }\n"
+                + "class Client { Math1 m = new Math1(); int run() { return m.plus(2, 3); } }\n"
+                + "Client c = new Client();\n"
+                + "root.add(new Label(\"v=\" + c.run()));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "enum_switch_statement_arrow", ui(""
+                + "enum Light { RED, YELLOW, GREEN }\n"
+                + "Light l = Light.YELLOW;\n"
+                + "String[] out = new String[]{\"\"};\n"
+                + "switch (l) {\n"
+                + "  case RED -> out[0] = \"stop\";\n"
+                + "  case YELLOW -> out[0] = \"slow\";\n"
+                + "  case GREEN -> out[0] = \"go\";\n"
+                + "}\n"
+                + "root.add(new Label(out[0]));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "initial_non_null_field", ui(""
+                + "import java.util.*;\n"
+                + "class Holder { List<String> items = new ArrayList<>(); }\n"
+                + "Holder h = new Holder();\n"
+                + "h.items.add(\"a\"); h.items.add(\"b\");\n"
+                + "root.add(new Label(\"n=\" + h.items.size()));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "scripted_list_of_scripted_instances", ui(""
+                + "import java.util.*;\n"
+                + "class Item { String n; Item(String v) { n = v; } }\n"
+                + "List<Item> items = new ArrayList<>();\n"
+                + "items.add(new Item(\"a\")); items.add(new Item(\"b\"));\n"
+                + "String joined = \"\";\n"
+                + "for (Item it : items) joined = joined + it.n;\n"
+                + "root.add(new Label(joined));"), ExpectedOutcome.SUCCESS, null));
         cases.add(new Case(cat, "lambda_method_ref_combo", ui(""
                 + "import java.util.function.*;\n"
                 + "Predicate<String> nonEmpty = s -> s.length() > 0;\n"

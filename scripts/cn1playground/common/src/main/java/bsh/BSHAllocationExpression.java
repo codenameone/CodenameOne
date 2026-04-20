@@ -138,6 +138,7 @@ class BSHAllocationExpression extends SimpleNode
 
     private static Object lookupScriptedClass(String rawName, CallStack callstack) {
         if (rawName == null || rawName.length() == 0) return null;
+        if (callstack == null) return null;
         // Strip a generic suffix like "Pair<String>" — type arguments are
         // erased at runtime in our scripted-class model.
         String simpleName = rawName;
