@@ -273,13 +273,11 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "}\n"
                 + "S s = S.OPEN.next();\n"
                 + "root.add(new Label(s.name()));"), ExpectedOutcome.SUCCESS, null));
-        // `var` in a try-with-resources declaration isn't supported by the
-        // BSH parser's TWR production. Declare the type explicitly for now.
-        cases.add(new Case(cat, "twr_with_var_unsupported", ui(""
+        cases.add(new Case(cat, "twr_with_var", ui(""
                 + "import java.io.*;\n"
                 + "try (var in = new StringReader(\"hi\")) {\n"
                 + "  root.add(new Label(\"ok\"));\n"
-                + "}"), ExpectedOutcome.EVAL_ERROR, null));
+                + "}"), ExpectedOutcome.SUCCESS, null));
         cases.add(new Case(cat, "field_init_at_declaration", ui(""
                 + "class C { int x = 42; String s = \"hi\"; }\n"
                 + "C c = new C();\n"
