@@ -67,13 +67,14 @@ class BSHClassDeclaration extends SimpleNode
         if (scriptedClass == null) {
             BSHBlock body = findBody();
             ScriptedClass parent = extend ? resolveParentScriptedClass(callstack) : null;
+            java.util.List<ScriptedClass> interfaces = resolveImplementedInterfaces(callstack);
             // Interfaces share the ScriptedClass machinery — they can declare
             // static methods (callable as Iface.foo()) and default methods
             // (inherited by implementing classes). They cannot be instantiated
             // directly with `new Iface()`. Enums use the same machinery with
             // a marker plus per-constant ScriptedInstances populated at build.
             scriptedClass = ScriptedClass.build(name, callstack.top(), body, parent,
-                    callstack, interpreter);
+                    interfaces, callstack, interpreter);
             scriptedClass.markInterface(type == Type.INTERFACE);
             scriptedClass.markEnum(type == Type.ENUM);
             if (type == Type.ENUM) {
@@ -86,6 +87,36 @@ class BSHClassDeclaration extends SimpleNode
             }
         }
         return scriptedClass;
+    }
+
+    /** Collect the scripted interfaces this class/interface declares (via
+     * `implements` on a class or `extends` on an interface — in the parser's
+     * AST they appear as BSHAmbiguousName children after the optional
+     * extends-name). Default methods from these interfaces are merged into
+     * the class's instance-method table so `c.defaultMethod()` resolves. */
+    private java.util.List<ScriptedClass> resolveImplementedInterfaces(CallStack callstack) {
+        java.util.List<ScriptedClass> result = new java.util.ArrayList<ScriptedClass>();
+        // The first BSHAmbiguousName child is the extends-target when
+        // `extend` is true; skip it.
+        int seen = 0;
+        for (int i = 0; i < jjtGetNumChildren(); i++) {
+            Node child = jjtGetChild(i);
+            if (!(child instanceof BSHAmbiguousName)) continue;
+            if (extend && seen == 0) { seen++; continue; }
+            seen++;
+            String rawName = ((BSHAmbiguousName) child).text;
+            if (rawName == null || rawName.isEmpty()) continue;
+            int lt = rawName.indexOf('<');
+            String simple = lt >= 0 ? rawName.substring(0, lt).trim() : rawName.trim();
+            if (simple.indexOf('.') >= 0) continue;
+            try {
+                Object v = callstack.top().getVariable(simple);
+                if (v instanceof ScriptedClass) result.add((ScriptedClass) v);
+            } catch (UtilEvalError ex) {
+                // skip unresolved interfaces
+            }
+        }
+        return result;
     }
 
     private BSHBlock findBody() {

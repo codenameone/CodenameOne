@@ -99,15 +99,30 @@ public final class ScriptedClass {
         return s.isEmpty() ? null : s.peek();
     }
 
-    /** Build a ScriptedClass from a class-declaration body, evaluating
-     * static initializers eagerly. The optional {@code parent} is a
-     * previously-declared ScriptedClass whose instance methods and field
-     * declarations are inherited (overridden by name+arity in this class). */
+    /** Convenience for call sites that have no interfaces to merge. */
     static ScriptedClass build(
             String name,
             NameSpace declaringNameSpace,
             BSHBlock body,
             ScriptedClass parent,
+            CallStack callstack,
+            Interpreter interpreter) throws EvalError {
+        return build(name, declaringNameSpace, body, parent,
+                java.util.Collections.<ScriptedClass>emptyList(), callstack, interpreter);
+    }
+
+    /** Build a ScriptedClass from a class-declaration body, evaluating
+     * static initializers eagerly. The optional {@code parent} is a
+     * previously-declared ScriptedClass whose instance methods and field
+     * declarations are inherited (overridden by name+arity in this class).
+     * {@code implementedInterfaces} is a list of scripted interfaces whose
+     * default methods are also merged. */
+    static ScriptedClass build(
+            String name,
+            NameSpace declaringNameSpace,
+            BSHBlock body,
+            ScriptedClass parent,
+            java.util.List<ScriptedClass> implementedInterfaces,
             CallStack callstack,
             Interpreter interpreter) throws EvalError {
 
@@ -184,20 +199,35 @@ public final class ScriptedClass {
         // Merge parent instance methods that aren't shadowed (same name+arity)
         // by this class's own declarations.
         if (parent != null) {
-            for (MethodTemplate pm : parent.instanceMethods) {
-                boolean shadowed = false;
-                for (MethodTemplate own : instanceMethods) {
-                    if (own.name.equals(pm.name) && own.paramCount == pm.paramCount) {
-                        shadowed = true;
-                        break;
-                    }
-                }
-                if (!shadowed) instanceMethods.add(pm);
+            mergeNonShadowed(instanceMethods, parent.instanceMethods);
+        }
+        // Merge default methods from implemented interfaces. Classes in the
+        // chain before interfaces win (parent > interface); within the
+        // interface list, earlier-declared interfaces win.
+        if (implementedInterfaces != null) {
+            for (ScriptedClass iface : implementedInterfaces) {
+                if (iface == null) continue;
+                mergeNonShadowed(instanceMethods, iface.instanceMethods);
             }
         }
 
         return new ScriptedClass(name, declaringNameSpace, parent, instanceMethods,
                 staticMethods, ctors, fieldDecls, staticNs);
+    }
+
+    private static void mergeNonShadowed(java.util.List<MethodTemplate> target,
+            java.util.List<MethodTemplate> source) {
+        for (MethodTemplate candidate : source) {
+            boolean shadowed = false;
+            for (MethodTemplate own : target) {
+                if (own.name.equals(candidate.name)
+                        && own.paramCount == candidate.paramCount) {
+                    shadowed = true;
+                    break;
+                }
+            }
+            if (!shadowed) target.add(candidate);
+        }
     }
 
     public String getName() {
