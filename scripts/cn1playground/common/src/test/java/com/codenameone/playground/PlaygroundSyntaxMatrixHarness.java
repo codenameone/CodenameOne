@@ -333,13 +333,13 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "import java.util.*;\n"
                 + "Class c = Map.Entry.class;\n"
                 + "root.add(new Label(c.getName()));"), ExpectedOutcome.SUCCESS, null));
-        cases.add(new Case(cat, "map_entryset_method_dispatch_unsupported", ui(""
+        cases.add(new Case(cat, "map_entryset_iteration", ui(""
                 + "import java.util.*;\n"
                 + "Map<String, Integer> m = new HashMap<>();\n"
                 + "m.put(\"a\", 1); m.put(\"b\", 2);\n"
                 + "int total = 0;\n"
                 + "for (Map.Entry e : m.entrySet()) total += (Integer) e.getValue();\n"
-                + "root.add(new Label(\"total=\" + total));"), ExpectedOutcome.EVAL_ERROR, "Generated instance dispatch not implemented"));
+                + "root.add(new Label(\"total=\" + total));"), ExpectedOutcome.SUCCESS, null));
         cases.add(new Case(cat, "map_keyset_iteration", ui(""
                 + "import java.util.*;\n"
                 + "Map<String, Integer> m = new HashMap<>();\n"

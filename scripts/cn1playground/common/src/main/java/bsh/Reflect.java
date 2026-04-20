@@ -102,12 +102,36 @@ public final class Reflect {
                 return Primitive.wrap(CN1AccessRegistry.getInstance().invoke(object, methodName, unwrapArgs(args)),
                         null);
             } catch (Exception ex) {
+                Object fallback = invokeWellKnownInterfaceMethod(object, methodName, args);
+                if (fallback != FALLBACK_MISS) return fallback;
                 throw new EvalError("Error invoking method " + methodName + ": " + ex.getMessage(),
                         callerInfo, callstack, ex);
             }
         } finally {
             CN1LambdaSupport.setCurrentNameSpace(prevNs);
         }
+    }
+
+    private static final Object FALLBACK_MISS = new Object();
+
+    /** Last-resort dispatch for well-known Java interface methods that
+     * don't have a registry entry on the concrete type. Covers the
+     * common case of java.util.Map.Entry (implementation is
+     * HashMap$Node / TreeMap$Entry / etc., none of which are in the
+     * registry). Only uses direct virtual calls — no reflection. */
+    @SuppressWarnings("unchecked")
+    private static Object invokeWellKnownInterfaceMethod(
+            Object object, String methodName, Object[] args) {
+        if (object instanceof java.util.Map.Entry) {
+            java.util.Map.Entry entry = (java.util.Map.Entry) object;
+            if (args == null || args.length == 0) {
+                if ("getKey".equals(methodName)) return entry.getKey();
+                if ("getValue".equals(methodName)) return entry.getValue();
+            } else if (args.length == 1 && "setValue".equals(methodName)) {
+                return entry.setValue(unwrapArgs(args)[0]);
+            }
+        }
+        return FALLBACK_MISS;
     }
 
     static TargetError targetErrorFromTargetException(Throwable e,
