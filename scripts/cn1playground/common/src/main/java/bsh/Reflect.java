@@ -139,34 +139,98 @@ public final class Reflect {
             return new bsh.cn1.CN1StreamBridge((java.util.Collection<?>) object);
         }
         if (object instanceof bsh.cn1.CN1StreamBridge) {
-            bsh.cn1.CN1StreamBridge sb = (bsh.cn1.CN1StreamBridge) object;
-            Object[] unwrapped = unwrapArgs(args);
-            if ("filter".equals(methodName) && unwrapped.length == 1
-                    && unwrapped[0] instanceof java.util.function.Predicate) {
-                return sb.filter((java.util.function.Predicate<Object>) unwrapped[0]);
-            }
-            if ("map".equals(methodName) && unwrapped.length == 1
-                    && unwrapped[0] instanceof java.util.function.Function) {
-                return sb.map((java.util.function.Function<Object, Object>) unwrapped[0]);
-            }
-            if ("forEach".equals(methodName) && unwrapped.length == 1
-                    && unwrapped[0] instanceof java.util.function.Consumer) {
-                sb.forEach((java.util.function.Consumer<Object>) unwrapped[0]);
-                return null;
-            }
-            if ("count".equals(methodName) && unwrapped.length == 0) {
-                return Long.valueOf(sb.count());
-            }
-            if ("toList".equals(methodName) && unwrapped.length == 0) {
-                return sb.toList();
-            }
-            if ("collect".equals(methodName) && unwrapped.length == 1) {
-                return sb.collect(unwrapped[0]);
-            }
-            if ("iterator".equals(methodName) && unwrapped.length == 0) {
-                return sb.iterator();
+            Object dispatched = dispatchStreamBridge((bsh.cn1.CN1StreamBridge) object, methodName, unwrapArgs(args));
+            if (dispatched != FALLBACK_MISS) return dispatched;
+        }
+        return FALLBACK_MISS;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Object dispatchStreamBridge(bsh.cn1.CN1StreamBridge sb, String methodName, Object[] unwrapped) {
+        int n = unwrapped.length;
+        if ("filter".equals(methodName) && n == 1
+                && unwrapped[0] instanceof java.util.function.Predicate) {
+            return sb.filter((java.util.function.Predicate<Object>) unwrapped[0]);
+        }
+        if ("map".equals(methodName) && n == 1
+                && unwrapped[0] instanceof java.util.function.Function) {
+            return sb.map((java.util.function.Function<Object, Object>) unwrapped[0]);
+        }
+        if ("flatMap".equals(methodName) && n == 1
+                && unwrapped[0] instanceof java.util.function.Function) {
+            return sb.flatMap((java.util.function.Function<Object, Object>) unwrapped[0]);
+        }
+        if ("peek".equals(methodName) && n == 1
+                && unwrapped[0] instanceof java.util.function.Consumer) {
+            return sb.peek((java.util.function.Consumer<Object>) unwrapped[0]);
+        }
+        if ("sorted".equals(methodName)) {
+            if (n == 0) return sb.sorted();
+            if (n == 1 && unwrapped[0] instanceof java.util.Comparator) {
+                return sb.sorted((java.util.Comparator<Object>) unwrapped[0]);
             }
         }
+        if ("distinct".equals(methodName) && n == 0) return sb.distinct();
+        if ("limit".equals(methodName) && n == 1 && unwrapped[0] instanceof Number) {
+            return sb.limit(((Number) unwrapped[0]).longValue());
+        }
+        if ("skip".equals(methodName) && n == 1 && unwrapped[0] instanceof Number) {
+            return sb.skip(((Number) unwrapped[0]).longValue());
+        }
+        if ("forEach".equals(methodName) && n == 1
+                && unwrapped[0] instanceof java.util.function.Consumer) {
+            sb.forEach((java.util.function.Consumer<Object>) unwrapped[0]);
+            return null;
+        }
+        if ("count".equals(methodName) && n == 0) return Long.valueOf(sb.count());
+        if ("anyMatch".equals(methodName) && n == 1
+                && unwrapped[0] instanceof java.util.function.Predicate) {
+            return Boolean.valueOf(sb.anyMatch((java.util.function.Predicate<Object>) unwrapped[0]));
+        }
+        if ("allMatch".equals(methodName) && n == 1
+                && unwrapped[0] instanceof java.util.function.Predicate) {
+            return Boolean.valueOf(sb.allMatch((java.util.function.Predicate<Object>) unwrapped[0]));
+        }
+        if ("noneMatch".equals(methodName) && n == 1
+                && unwrapped[0] instanceof java.util.function.Predicate) {
+            return Boolean.valueOf(sb.noneMatch((java.util.function.Predicate<Object>) unwrapped[0]));
+        }
+        if ("findFirst".equals(methodName) && n == 0) return sb.findFirst();
+        if ("findAny".equals(methodName) && n == 0) return sb.findAny();
+        if ("min".equals(methodName)) {
+            if (n == 0) return sb.min();
+            if (n == 1 && unwrapped[0] instanceof java.util.Comparator) {
+                return sb.min((java.util.Comparator<Object>) unwrapped[0]);
+            }
+        }
+        if ("max".equals(methodName)) {
+            if (n == 0) return sb.max();
+            if (n == 1 && unwrapped[0] instanceof java.util.Comparator) {
+                return sb.max((java.util.Comparator<Object>) unwrapped[0]);
+            }
+        }
+        if ("reduce".equals(methodName)) {
+            java.util.function.BinaryOperator<Object> binaryOp = null;
+            int opIndex = -1;
+            if (n == 1) opIndex = 0;
+            else if (n == 2) opIndex = 1;
+            if (opIndex >= 0) {
+                if (unwrapped[opIndex] instanceof java.util.function.BinaryOperator) {
+                    binaryOp = (java.util.function.BinaryOperator<Object>) unwrapped[opIndex];
+                } else if (unwrapped[opIndex] instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
+                    binaryOp = bsh.cn1.CN1LambdaSupport.asBinaryOperator(
+                            (bsh.cn1.CN1LambdaSupport.LambdaValue) unwrapped[opIndex]);
+                }
+            }
+            if (binaryOp != null) {
+                if (n == 1) return sb.reduce(binaryOp);
+                return sb.reduce(unwrapped[0], binaryOp);
+            }
+        }
+        if ("toArray".equals(methodName) && n == 0) return sb.toArray();
+        if ("toList".equals(methodName) && n == 0) return sb.toList();
+        if ("collect".equals(methodName) && n == 1) return sb.collect(unwrapped[0]);
+        if ("iterator".equals(methodName) && n == 0) return sb.iterator();
         return FALLBACK_MISS;
     }
 

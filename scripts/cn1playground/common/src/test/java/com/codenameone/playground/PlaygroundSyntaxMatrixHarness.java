@@ -189,6 +189,42 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "items.add(\"a\"); items.add(\"bb\"); items.add(\"ccc\");\n"
                 + "List lens = items.stream().map(s -> ((String) s).length()).toList();\n"
                 + "root.add(new Label(\"lens=\" + lens));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "stream_sorted_distinct_limit", ui(""
+                + "import java.util.*;\n"
+                + "List<Integer> xs = new ArrayList<>();\n"
+                + "xs.add(3); xs.add(1); xs.add(2); xs.add(3); xs.add(2);\n"
+                + "List out = xs.stream().distinct().sorted().limit(2).toList();\n"
+                + "root.add(new Label(\"out=\" + out));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "stream_any_all_none_match", ui(""
+                + "import java.util.*;\n"
+                + "List<Integer> xs = new ArrayList<>();\n"
+                + "xs.add(2); xs.add(4); xs.add(6);\n"
+                + "boolean any = xs.stream().anyMatch(x -> ((Integer) x) > 3);\n"
+                + "boolean all = xs.stream().allMatch(x -> ((Integer) x) % 2 == 0);\n"
+                + "boolean none = xs.stream().noneMatch(x -> ((Integer) x) > 10);\n"
+                + "root.add(new Label(any + \",\" + all + \",\" + none));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "stream_reduce_binary_operator", ui(""
+                + "import java.util.*;\n"
+                + "List<Integer> xs = new ArrayList<>();\n"
+                + "xs.add(1); xs.add(2); xs.add(3); xs.add(4);\n"
+                + "Object sum = xs.stream().reduce(0, (a, b) -> ((Integer) a) + ((Integer) b));\n"
+                + "root.add(new Label(\"sum=\" + sum));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "stream_find_first_min_max", ui(""
+                + "import java.util.*;\n"
+                + "List<Integer> xs = new ArrayList<>();\n"
+                + "xs.add(5); xs.add(2); xs.add(9); xs.add(3);\n"
+                + "Object first = xs.stream().findFirst();\n"
+                + "Object min = xs.stream().min();\n"
+                + "Object max = xs.stream().max();\n"
+                + "root.add(new Label(first + \",\" + min + \",\" + max));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "stream_flat_map", ui(""
+                + "import java.util.*;\n"
+                + "List<List<Integer>> groups = new ArrayList<>();\n"
+                + "List<Integer> a = new ArrayList<>(); a.add(1); a.add(2);\n"
+                + "List<Integer> b = new ArrayList<>(); b.add(3); b.add(4);\n"
+                + "groups.add(a); groups.add(b);\n"
+                + "List flat = groups.stream().flatMap(g -> ((List) g).stream()).toList();\n"
+                + "root.add(new Label(\"flat=\" + flat));"), ExpectedOutcome.SUCCESS, null));
         // Inherited static field access: Display extends CN1Constants, so
         // PICKER_TYPE_DATE (declared on CN1Constants) is reachable through
         // the Display subclass reference.

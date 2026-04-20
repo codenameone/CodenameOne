@@ -167,6 +167,16 @@ public final class CN1LambdaSupport {
             return invokeChecked(new Object[]{a});
         }
 
+        /** Two-arg invocation exposed for {@code reduce(identity, op)}-style
+         * call sites. Not part of any implemented SAM (adding
+         * {@code BinaryOperator} would collide with
+         * {@code Function#andThen}). Callers that need a
+         * {@code java.util.function.BinaryOperator} should wrap via
+         * {@link #asBinaryOperator(LambdaValue)}. */
+        public Object applyBinary(Object a, Object b) {
+            return invokeChecked(new Object[]{a, b});
+        }
+
         /** Predicate#test — boolean-returning one-arg. */
         public boolean test(Object a) {
             Object r = invokeChecked(new Object[]{a});
@@ -219,5 +229,18 @@ public final class CN1LambdaSupport {
                 }
             }
         }
+    }
+
+    /** Adapt a {@link LambdaValue} to a {@link java.util.function.BinaryOperator}
+     * for call sites (e.g. {@code stream().reduce}) whose target SAM is
+     * {@code BinaryOperator}. We can't make {@code LambdaValue} implement
+     * {@code BinaryOperator} directly because its default
+     * {@code andThen} collides with {@code Function#andThen}. */
+    public static java.util.function.BinaryOperator<Object> asBinaryOperator(final LambdaValue lambda) {
+        return new java.util.function.BinaryOperator<Object>() {
+            public Object apply(Object a, Object b) {
+                return lambda.applyBinary(a, b);
+            }
+        };
     }
 }
