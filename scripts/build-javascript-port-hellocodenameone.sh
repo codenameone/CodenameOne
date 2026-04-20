@@ -257,6 +257,21 @@ while IFS= read -r -d '' entry; do
   fi
 done < <(find "$TRANSLATOR_OUT" -mindepth 1 -maxdepth 1 -print0)
 
+# HTML5Implementation.getResourceAsStream resolves relative resources under
+# "assets/", but some bundled artifacts (most notably material-design-font.ttf
+# from codenameone-core.jar) land at the bundle root because the translator
+# mirrors the jar layout. Relocate those into assets/ so the Java side can
+# actually load them without every caller paying a ci-fallback stub tax.
+if [ -d "$DIST_DIR" ]; then
+  mkdir -p "$DIST_DIR/assets"
+  for rel in material-design-font.ttf; do
+    if [ -f "$DIST_DIR/$rel" ] && [ ! -f "$DIST_DIR/assets/$rel" ]; then
+      mv "$DIST_DIR/$rel" "$DIST_DIR/assets/$rel"
+      bj_log "Relocated $rel to assets/"
+    fi
+  done
+fi
+
 FINAL_DIST_DIR="$TRANSLATOR_OUT/dist/$DIST_APP_NAME-js"
 if [ "$DIST_DIR" != "$FINAL_DIST_DIR" ]; then
   rm -rf "$FINAL_DIST_DIR"

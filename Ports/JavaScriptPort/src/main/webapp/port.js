@@ -1512,6 +1512,15 @@ bindCiFallback("NetworkManager.addErrorListener", [
 bindCiFallback("Font.createTrueTypeFont", [
   "cn1_com_codename1_ui_Font_createTrueTypeFont_java_lang_String_java_lang_String_R_com_codename1_ui_Font"
 ], function*() {
+  // The real HTML5Implementation.loadTrueTypeFont path injects @font-face via
+  // document.createElement + WebFont.load, which is unreachable from the worker.
+  // TODO(js-port): route font loading through the host bridge so the returned
+  // Font carries the requested font-family (and material icons actually render).
+  // Today's stopgap: return the default font - the font file itself is
+  // pre-registered in index.html (@font-face for 'Material Icons' ->
+  // assets/material-design-font.ttf), so once the CN1-side Font wrapper is
+  // taught to carry the requested family, icon rendering will light up with
+  // no further asset work needed.
   const getDefaultFont = global.cn1_com_codename1_ui_Font_getDefaultFont_R_com_codename1_ui_Font__impl
     || global.cn1_com_codename1_ui_Font_getDefaultFont_R_com_codename1_ui_Font;
   if (typeof getDefaultFont === "function") {

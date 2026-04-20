@@ -87,6 +87,22 @@
     
     <link rel="stylesheet" type="text/css" href="style.css?v={APP_VERSION}">
     <link rel="manifest" href="manifest.json?v={APP_VERSION}"/>
+
+    <!-- Pre-register the material icon font up front so Toolbar/Tabs/Picker icons
+         render without waiting for the worker-side TTF load path, which in the
+         current worker-only architecture cannot reach document/@font-face. The
+         font is bundled at assets/material-design-font.ttf (relocated by
+         scripts/build-javascript-port-hellocodenameone.sh). FontImage.java asks
+         for font-family "Material Icons" so that name must match. -->
+    <style type="text/css">
+    @font-face {
+        font-family: 'Material Icons';
+        src: url('assets/material-design-font.ttf?v={APP_VERSION}') format('truetype');
+        font-weight: normal;
+        font-style: normal;
+        font-display: block;
+    }
+    </style>
     
     <!-- CN1-CSS-INCLUDES -->
     
