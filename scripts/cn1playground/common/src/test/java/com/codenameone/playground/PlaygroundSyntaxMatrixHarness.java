@@ -439,6 +439,46 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "Object o = new A();\n"
                 + "A a = (A) o;\n"
                 + "root.add(new Label(\"v=\" + a.v()));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "exception_across_methods", ui(""
+                + "class C {\n"
+                + "  int inner() { throw new RuntimeException(\"boom\"); }\n"
+                + "  String outer() { try { inner(); return \"no\"; } catch (RuntimeException e) { return e.getMessage(); } }\n"
+                + "}\n"
+                + "root.add(new Label(new C().outer()));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "return_inside_lambda_block", ui(""
+                + "import java.util.function.*;\n"
+                + "Function<Integer, Integer> abs = n -> { if (n < 0) return -n; return n; };\n"
+                + "root.add(new Label(\"abs=\" + abs.apply(-7)));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "multiple_anonymous_impls", ui(""
+                + "interface Op { int go(); }\n"
+                + "Op a = new Op() { public int go() { return 1; } };\n"
+                + "Op b = new Op() { public int go() { return 2; } };\n"
+                + "root.add(new Label(\"sum=\" + (a.go() + b.go())));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "generic_class_with_generic_method", ui(""
+                + "class Box<T> { T val; Box(T v) { val = v; } <U> U swap(U other) { return other; } }\n"
+                + "Box<String> b = new Box<String>(\"a\");\n"
+                + "String r = (String) b.swap(\"hello\");\n"
+                + "root.add(new Label(r));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "enum_switch_with_yield", ui(""
+                + "enum D { UP, DOWN }\n"
+                + "D d = D.DOWN;\n"
+                + "String s = switch (d) { case UP: yield \"up\"; case DOWN: yield \"down\"; };\n"
+                + "root.add(new Label(s));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "record_toString_format", ui(""
+                + "record P(int x, int y) {}\n"
+                + "P p = new P(3, 4);\n"
+                + "String s = \"point=\" + p;\n"
+                + "root.add(new Label(\"len>0=\" + (s.length() > 0)));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "class_with_private_helper_method", ui(""
+                + "class C { private int helper(int n) { return n * 2; } int doit(int n) { return helper(n) + 1; } }\n"
+                + "root.add(new Label(\"v=\" + new C().doit(3)));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "loop_accumulating_into_list", ui(""
+                + "import java.util.*;\n"
+                + "List<Integer> nums = new ArrayList<>();\n"
+                + "for (int i = 0; i < 5; i++) nums.add(i * i);\n"
+                + "int sum = 0;\n"
+                + "for (int n : nums) sum += n;\n"
+                + "root.add(new Label(\"sum=\" + sum));"), ExpectedOutcome.SUCCESS, null));
         cases.add(new Case(cat, "lambda_method_ref_combo", ui(""
                 + "import java.util.function.*;\n"
                 + "Predicate<String> nonEmpty = s -> s.length() > 0;\n"
