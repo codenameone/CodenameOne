@@ -5486,7 +5486,9 @@ static BOOL cn1_renderViewIntoContext(UIView *renderView, UIView *rootView, CGCo
     }
 #endif
     if (!drawn && [renderView respondsToSelector:@selector(drawViewHierarchyInRect:afterScreenUpdates:)]) {
-        drawn = [renderView drawViewHierarchyInRect:localBounds afterScreenUpdates:YES];
+        // afterScreenUpdates:NO — YES can stall indefinitely under UIScene waiting
+        // for a scene display-link cycle that never fires during a synchronous capture.
+        drawn = [renderView drawViewHierarchyInRect:localBounds afterScreenUpdates:NO];
     }
     if (!drawn) {
         [renderView.layer renderInContext:ctx];

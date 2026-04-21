@@ -35,6 +35,7 @@ interface Cn1ssDeviceRunnerHelper {
         if (current == null) {
             println("CN1SS:ERR:test=" + safeName + " message=Current form is null");
             println("CN1SS:END:" + safeName);
+            return;
         }
         int width = Math.max(1, current.getWidth());
         int height = Math.max(1, current.getHeight());
@@ -50,16 +51,18 @@ interface Cn1ssDeviceRunnerHelper {
                 }
             }
         });
-        if (img[0] == null) {
+        Image screenshot = img[0];
+        if (screenshot == null) {
             println("CN1SS:ERR:test=" + safeName + " message=Screenshot process timed out");
             println("CN1SS:END:" + safeName);
+            return;
         }
-        Image screenshot = img[0];
         try {
             ImageIO io = ImageIO.getImageIO();
             if (io == null || !io.isFormatSupported(ImageIO.FORMAT_PNG)) {
                 println("CN1SS:ERR:test=" + safeName + " message=PNG encoding unavailable");
                 println("CN1SS:END:" + safeName);
+                return;
             }
             if(Display.getInstance().isSimulator()) {
                 io.save(screenshot, Storage.getInstance().createOutputStream(safeName + ".png"), ImageIO.FORMAT_PNG, 1);
