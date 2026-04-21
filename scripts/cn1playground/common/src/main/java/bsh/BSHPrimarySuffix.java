@@ -163,7 +163,7 @@ class BSHPrimarySuffix extends SimpleNode
                     throw new EvalError(
                         "Can't assign array length", this, callstack );
                 else
-                    return new Primitive(((Object[]) obj).length);
+                    return new Primitive(BshArray.arrayLength(obj));
             }
 
             // field access
@@ -312,7 +312,7 @@ class BSHPrimarySuffix extends SimpleNode
             throw new EvalError("Not an array or List type", this, callstack );
 
         int length = obj instanceof List
-                ? ((List) obj).size() : ((Object[]) obj).length;
+                ? ((List) obj).size() : BshArray.arrayLength(obj);
 
         int index = length + 1;
         // allow index access for a Map.Entry array.

@@ -217,13 +217,39 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "int v = Math.max(Math.abs(-5), Math.min(10, 3));\n"
                 + "root.add(new Label(\"v=\" + v));"), ExpectedOutcome.SUCCESS, null));
         // Arrays utilities over an Object[] (CN1's reduced runtime
-        // supports Object[] arrays, not primitive int[] iteration via
-        // enhanced-for inside the BSH layer).
+        // supports Object[] arrays, and now primitive int[] iteration
+        // via enhanced-for).
         cases.add(new Case(cat, "arrays_asList_and_sum", ui(""
                 + "import java.util.*;\n"
                 + "List<Integer> xs = Arrays.asList(1, 2, 3, 4);\n"
                 + "int sum = 0; for (Object x : xs) sum += ((Integer) x).intValue();\n"
                 + "root.add(new Label(\"sum=\" + sum));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "enhanced_for_int_array", ui(""
+                + "int[] arr = {1, 2, 3, 4};\n"
+                + "int sum = 0; for (int x : arr) sum += x;\n"
+                + "root.add(new Label(\"sum=\" + sum));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "enhanced_for_long_array", ui(""
+                + "long[] arr = {10L, 20L, 30L};\n"
+                + "long sum = 0; for (long x : arr) sum += x;\n"
+                + "root.add(new Label(\"sum=\" + sum));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "enhanced_for_char_array", ui(""
+                + "char[] chars = {'a', 'b', 'c'};\n"
+                + "StringBuilder sb = new StringBuilder();\n"
+                + "for (char c : chars) sb.append(c).append('-');\n"
+                + "root.add(new Label(sb.toString()));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "enhanced_for_boolean_array", ui(""
+                + "boolean[] flags = {true, false, true};\n"
+                + "int trueCount = 0; for (boolean b : flags) if (b) trueCount++;\n"
+                + "root.add(new Label(\"n=\" + trueCount));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "enhanced_for_double_array", ui(""
+                + "double[] vals = {1.5, 2.5, 4.0};\n"
+                + "double sum = 0; for (double v : vals) sum += v;\n"
+                + "root.add(new Label(\"sum=\" + sum));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "enhanced_for_string_array", ui(""
+                + "String[] names = {\"Alice\", \"Bob\", \"Cara\"};\n"
+                + "StringBuilder sb = new StringBuilder();\n"
+                + "for (String n : names) sb.append(n).append(',');\n"
+                + "root.add(new Label(sb.toString()));"), ExpectedOutcome.SUCCESS, null));
         // HashMap iteration via entrySet.
         cases.add(new Case(cat, "hashmap_entryset_walk", ui(""
                 + "import java.util.*;\n"
@@ -269,13 +295,18 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "int r = (0b1010 | 0b0101) & 0xFF;\n"
                 + "int s = 1 << 4;\n"
                 + "root.add(new Label(\"r=\" + r + \" s=\" + s));"), ExpectedOutcome.SUCCESS, null));
-        // Indexed iteration of a String — primitive char[] enhanced-for
-        // isn't supported in the reduced CN1 array runtime, but
-        // charAt(i) with a classic for is.
+        // Indexed iteration of a String via charAt.
         cases.add(new Case(cat, "string_indexed_charat", ui(""
                 + "String text = \"abc\";\n"
                 + "StringBuilder sb = new StringBuilder();\n"
                 + "for (int i = 0; i < text.length(); i++) sb.append(text.charAt(i)).append('-');\n"
+                + "root.add(new Label(sb.toString()));"), ExpectedOutcome.SUCCESS, null));
+        // toCharArray into enhanced-for — uses the new primitive-array
+        // iterator path.
+        cases.add(new Case(cat, "string_to_char_array", ui(""
+                + "char[] chars = \"abc\".toCharArray();\n"
+                + "StringBuilder sb = new StringBuilder();\n"
+                + "for (char c : chars) sb.append(c).append('-');\n"
                 + "root.add(new Label(sb.toString()));"), ExpectedOutcome.SUCCESS, null));
         // ArrayList sort via Comparator.
         cases.add(new Case(cat, "arraylist_sort_comparator", ui(""
@@ -298,6 +329,120 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + " public abstract int apply(int a, int b); }\n"
                 + "int r = Op.ADD.apply(2, 3) + Op.MUL.apply(2, 3);\n"
                 + "root.add(new Label(\"r=\" + r));"), ExpectedOutcome.SUCCESS, null));
+        // CN1 UI components beyond Label/Button.
+        cases.add(new Case(cat, "text_field_and_text_area", ui(""
+                + "TextField tf = new TextField(\"hello\");\n"
+                + "TextArea ta = new TextArea(\"line1\\nline2\");\n"
+                + "root.add(tf); root.add(ta);\n"
+                + "root.add(new Label(\"tf=\" + tf.getText()));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "checkbox_and_radio", ui(""
+                + "CheckBox cb = new CheckBox(\"check\");\n"
+                + "cb.setSelected(true);\n"
+                + "RadioButton rb = new RadioButton(\"radio\");\n"
+                + "root.add(cb); root.add(rb);\n"
+                + "root.add(new Label(\"cb=\" + cb.isSelected()));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "slider_with_value", ui(""
+                + "Slider s = new Slider();\n"
+                + "s.setMinValue(0); s.setMaxValue(100); s.setProgress(42);\n"
+                + "root.add(s);\n"
+                + "root.add(new Label(\"v=\" + s.getProgress()));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "combobox_items", ui(""
+                + "ComboBox cb = new ComboBox(\"a\", \"b\", \"c\");\n"
+                + "cb.setSelectedIndex(1);\n"
+                + "root.add(cb);\n"
+                + "root.add(new Label(\"sel=\" + cb.getSelectedItem()));"), ExpectedOutcome.SUCCESS, null));
+        // Layout variations.
+        cases.add(new Case(cat, "border_layout_east_west", ui(""
+                + "Container c = new Container(new BorderLayout());\n"
+                + "c.add(BorderLayout.WEST, new Label(\"L\"));\n"
+                + "c.add(BorderLayout.CENTER, new Label(\"C\"));\n"
+                + "c.add(BorderLayout.EAST, new Label(\"R\"));\n"
+                + "root.add(c);"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "grid_layout_2x2", ui(""
+                + "Container c = new Container(new GridLayout(2, 2));\n"
+                + "for (int i = 0; i < 4; i++) c.add(new Label(\"\" + i));\n"
+                + "root.add(c);"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "flow_layout_centered", ui(""
+                + "Container c = new Container(new FlowLayout(Component.CENTER));\n"
+                + "c.add(new Button(\"One\"));\n"
+                + "c.add(new Button(\"Two\"));\n"
+                + "root.add(c);"), ExpectedOutcome.SUCCESS, null));
+        // Style API.
+        cases.add(new Case(cat, "style_set_fg_color", ui(""
+                + "Label l = new Label(\"styled\");\n"
+                + "l.getAllStyles().setFgColor(0xff0000);\n"
+                + "root.add(l);"), ExpectedOutcome.SUCCESS, null));
+        // Event listener beyond ActionListener.
+        cases.add(new Case(cat, "textfield_datachanged_listener", ui(""
+                + "TextField tf = new TextField(\"x\");\n"
+                + "int[] count = {0};\n"
+                + "tf.addDataChangedListener((type, index) -> count[0]++);\n"
+                + "root.add(tf);\n"
+                + "root.add(new Label(\"c=\" + count[0]));"), ExpectedOutcome.SUCCESS, null));
+        // Date/time (CN1 ships java.util.Date and Calendar).
+        cases.add(new Case(cat, "date_via_calendar", ui(""
+                + "import java.util.Calendar;\n"
+                + "import java.util.Date;\n"
+                + "Calendar cal = Calendar.getInstance();\n"
+                + "cal.set(Calendar.YEAR, 2026);\n"
+                + "cal.set(Calendar.MONTH, 0);\n"
+                + "cal.set(Calendar.DAY_OF_MONTH, 15);\n"
+                + "Date d = cal.getTime();\n"
+                + "root.add(new Label(\"year=\" + cal.get(Calendar.YEAR)));"), ExpectedOutcome.SUCCESS, null));
+        // Math.sqrt/floor/ceil — CN1's Math exposes these double ops.
+        cases.add(new Case(cat, "math_sqrt_and_floor", ui(""
+                + "double v = Math.sqrt(50.0);\n"
+                + "double floored = Math.floor(v);\n"
+                + "root.add(new Label(\"floor=\" + floored));"), ExpectedOutcome.SUCCESS, null));
+        // HashMap put + get + remove.
+        cases.add(new Case(cat, "hashmap_put_remove_size", ui(""
+                + "import java.util.*;\n"
+                + "Map<String, Integer> m = new HashMap<>();\n"
+                + "m.put(\"a\", 1); m.put(\"b\", 2); m.put(\"c\", 3);\n"
+                + "m.remove(\"b\");\n"
+                + "root.add(new Label(\"size=\" + m.size() + \" c=\" + m.get(\"c\")));"), ExpectedOutcome.SUCCESS, null));
+        // Nested class with generic parameter reference.
+        cases.add(new Case(cat, "class_generic_holder", ui(""
+                + "class Holder<T> { T value; void set(T v) { value = v; } T get() { return value; } }\n"
+                + "Holder h = new Holder();\n"
+                + "h.set(\"hello\");\n"
+                + "root.add(new Label(\"v=\" + h.get()));"), ExpectedOutcome.SUCCESS, null));
+        // Array field initializer in a class.
+        cases.add(new Case(cat, "class_with_int_array_field", ui(""
+                + "class Stats { int[] buckets = new int[4]; void add(int i) { buckets[i]++; } }\n"
+                + "Stats s = new Stats();\n"
+                + "s.add(0); s.add(2); s.add(2);\n"
+                + "int sum = 0; for (int b : s.buckets) sum += b;\n"
+                + "root.add(new Label(\"sum=\" + sum));"), ExpectedOutcome.SUCCESS, null));
+        // Exception message and stack.
+        cases.add(new Case(cat, "runtime_exception_message", ui(""
+                + "try { throw new RuntimeException(\"explanation\"); }\n"
+                + "catch (RuntimeException ex) { root.add(new Label(ex.getMessage())); }"), ExpectedOutcome.SUCCESS, null));
+        // Iterator explicit use with remove.
+        cases.add(new Case(cat, "iterator_remove_path", ui(""
+                + "import java.util.*;\n"
+                + "List<Integer> xs = new ArrayList<>();\n"
+                + "xs.add(1); xs.add(2); xs.add(3); xs.add(4);\n"
+                + "Iterator it = xs.iterator();\n"
+                + "while (it.hasNext()) { int v = (Integer) it.next(); if (v % 2 == 0) it.remove(); }\n"
+                + "root.add(new Label(xs.toString()));"), ExpectedOutcome.SUCCESS, null));
+        // Boolean short-circuit + parenthesised expr.
+        cases.add(new Case(cat, "short_circuit_evaluation", ui(""
+                + "int[] counter = {0};\n"
+                + "Runnable inc = () -> counter[0]++;\n"
+                + "boolean ok = false || (counter[0] == 0 && true);\n"
+                + "root.add(new Label(\"ok=\" + ok + \" c=\" + counter[0]));"), ExpectedOutcome.SUCCESS, null));
+        // Nested enhanced-for with primitive arrays.
+        cases.add(new Case(cat, "nested_enhanced_for_int_arrays", ui(""
+                + "int[][] grid = { {1,2}, {3,4}, {5,6} };\n"
+                + "int sum = 0;\n"
+                + "for (int[] row : grid) for (int v : row) sum += v;\n"
+                + "root.add(new Label(\"sum=\" + sum));"), ExpectedOutcome.SUCCESS, null));
+        // Recursive method.
+        cases.add(new Case(cat, "recursive_factorial", ui(""
+                + "class F { int fact(int n) { return n <= 1 ? 1 : n * fact(n - 1); } }\n"
+                + "F f = new F();\n"
+                + "root.add(new Label(\"5!=\" + f.fact(5)));"), ExpectedOutcome.SUCCESS, null));
     }
 
     // ------------------------------------------------------------------

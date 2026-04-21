@@ -40,6 +40,70 @@ public final class CollectionManager {
         };
     }
 
+    private Iterator<Object> primitiveIntArrayIt(final int[] array) {
+        return new Iterator<Object>() {
+            private int index;
+            public boolean hasNext() { return index < array.length; }
+            public Object next() { return Integer.valueOf(array[index++]); }
+        };
+    }
+
+    private Iterator<Object> primitiveLongArrayIt(final long[] array) {
+        return new Iterator<Object>() {
+            private int index;
+            public boolean hasNext() { return index < array.length; }
+            public Object next() { return Long.valueOf(array[index++]); }
+        };
+    }
+
+    private Iterator<Object> primitiveDoubleArrayIt(final double[] array) {
+        return new Iterator<Object>() {
+            private int index;
+            public boolean hasNext() { return index < array.length; }
+            public Object next() { return Double.valueOf(array[index++]); }
+        };
+    }
+
+    private Iterator<Object> primitiveFloatArrayIt(final float[] array) {
+        return new Iterator<Object>() {
+            private int index;
+            public boolean hasNext() { return index < array.length; }
+            public Object next() { return Float.valueOf(array[index++]); }
+        };
+    }
+
+    private Iterator<Object> primitiveShortArrayIt(final short[] array) {
+        return new Iterator<Object>() {
+            private int index;
+            public boolean hasNext() { return index < array.length; }
+            public Object next() { return Short.valueOf(array[index++]); }
+        };
+    }
+
+    private Iterator<Object> primitiveByteArrayIt(final byte[] array) {
+        return new Iterator<Object>() {
+            private int index;
+            public boolean hasNext() { return index < array.length; }
+            public Object next() { return Byte.valueOf(array[index++]); }
+        };
+    }
+
+    private Iterator<Object> primitiveCharArrayIt(final char[] array) {
+        return new Iterator<Object>() {
+            private int index;
+            public boolean hasNext() { return index < array.length; }
+            public Object next() { return Character.valueOf(array[index++]); }
+        };
+    }
+
+    private Iterator<Object> primitiveBooleanArrayIt(final boolean[] array) {
+        return new Iterator<Object>() {
+            private int index;
+            public boolean hasNext() { return index < array.length; }
+            public Object next() { return Boolean.valueOf(array[index++]); }
+        };
+    }
+
     public <T> Iterator<T> getBshIterator(final Enumeration<T> obj) {
         return Collections.list(obj).iterator();
     }
@@ -114,6 +178,17 @@ public final class CollectionManager {
         if (obj instanceof Object[]) {
             return objectArrayIt((Object[]) obj);
         }
+        // Primitive arrays — iterate and box each element. CN1's
+        // reduced reflection surface forbids java.lang.reflect.Array,
+        // so dispatch by instanceof on each primitive array type.
+        if (obj instanceof int[]) return primitiveIntArrayIt((int[]) obj);
+        if (obj instanceof long[]) return primitiveLongArrayIt((long[]) obj);
+        if (obj instanceof double[]) return primitiveDoubleArrayIt((double[]) obj);
+        if (obj instanceof float[]) return primitiveFloatArrayIt((float[]) obj);
+        if (obj instanceof short[]) return primitiveShortArrayIt((short[]) obj);
+        if (obj instanceof byte[]) return primitiveByteArrayIt((byte[]) obj);
+        if (obj instanceof char[]) return primitiveCharArrayIt((char[]) obj);
+        if (obj instanceof boolean[]) return primitiveBooleanArrayIt((boolean[]) obj);
         if (obj instanceof Iterable) {
             return getBshIterator((Iterable<?>) obj);
         }

@@ -27,9 +27,14 @@ public final class BshArray {
             if (array instanceof List) {
                 return ((List<?>) array).get(index);
             }
-            return Primitive.wrap(asObjectArray(array)[index], Object.class);
+            // Primitive arrays — read element and box into a Primitive
+            // wrapper so arithmetic on the result works without an
+            // explicit cast. Falls through to the Object[] path.
+            Object primitive = primitiveGet(array, index);
+            if (primitive != null) return primitive;
+            return Primitive.wrap(((Object[]) array)[index], Object.class);
         } catch (IndexOutOfBoundsException e) {
-            int len = array instanceof List ? ((List<?>) array).size() : asObjectArray(array).length;
+            int len = lengthOf(array);
             throw new UtilTargetError("Index " + index + " out-of-bounds for length " + len, e);
         }
     }
@@ -42,13 +47,69 @@ public final class BshArray {
                 ((List<Object>) array).set(index, value);
                 return;
             }
-            asObjectArray(array)[index] = value;
+            if (primitiveSet(array, index, value)) return;
+            ((Object[]) array)[index] = value;
         } catch (IndexOutOfBoundsException e) {
-            int len = array instanceof List ? ((List<?>) array).size() : asObjectArray(array).length;
+            int len = lengthOf(array);
             throw new UtilTargetError("Index " + index + " out-of-bounds for length " + len, e);
         } catch (ClassCastException e) {
             throw new UtilTargetError(new ArrayStoreException(e.getMessage()));
         }
+    }
+
+    /** Read an element of a primitive array and return it as the
+     * corresponding boxed wrapper. Returns {@code null} when
+     * {@code array} isn't a primitive array (caller falls back to
+     * the {@code Object[]} path). CN1's reduced reflection surface
+     * forbids {@code Float.TYPE}/{@code Short.TYPE} etc., so we
+     * box directly rather than calling {@link Primitive#wrap} with a
+     * primitive-type {@code Class} literal. */
+    private static Object primitiveGet(Object array, int index) {
+        if (array instanceof int[]) return Integer.valueOf(((int[]) array)[index]);
+        if (array instanceof long[]) return Long.valueOf(((long[]) array)[index]);
+        if (array instanceof double[]) return Double.valueOf(((double[]) array)[index]);
+        if (array instanceof float[]) return Float.valueOf(((float[]) array)[index]);
+        if (array instanceof short[]) return Short.valueOf(((short[]) array)[index]);
+        if (array instanceof byte[]) return Byte.valueOf(((byte[]) array)[index]);
+        if (array instanceof char[]) return Character.valueOf(((char[]) array)[index]);
+        if (array instanceof boolean[]) return Boolean.valueOf(((boolean[]) array)[index]);
+        return null;
+    }
+
+    /** Store {@code value} into a primitive array, coercing Number /
+     * Character / Boolean wrappers as needed. Returns true when
+     * {@code array} was a primitive array and the store happened. */
+    private static boolean primitiveSet(Object array, int index, Object value) {
+        if (array instanceof int[]) { ((int[]) array)[index] = ((Number) value).intValue(); return true; }
+        if (array instanceof long[]) { ((long[]) array)[index] = ((Number) value).longValue(); return true; }
+        if (array instanceof double[]) { ((double[]) array)[index] = ((Number) value).doubleValue(); return true; }
+        if (array instanceof float[]) { ((float[]) array)[index] = ((Number) value).floatValue(); return true; }
+        if (array instanceof short[]) { ((short[]) array)[index] = ((Number) value).shortValue(); return true; }
+        if (array instanceof byte[]) { ((byte[]) array)[index] = ((Number) value).byteValue(); return true; }
+        if (array instanceof char[]) { ((char[]) array)[index] = ((Character) value).charValue(); return true; }
+        if (array instanceof boolean[]) { ((boolean[]) array)[index] = ((Boolean) value).booleanValue(); return true; }
+        return false;
+    }
+
+    /** Length of any supported array/List type, including primitive
+     * arrays. Exposed so callers that used to hard-cast
+     * {@code (Object[]) obj} can be primitive-array-safe. */
+    public static int arrayLength(Object array) {
+        return lengthOf(array);
+    }
+
+    private static int lengthOf(Object array) {
+        if (array instanceof List) return ((List<?>) array).size();
+        if (array instanceof Object[]) return ((Object[]) array).length;
+        if (array instanceof int[]) return ((int[]) array).length;
+        if (array instanceof long[]) return ((long[]) array).length;
+        if (array instanceof double[]) return ((double[]) array).length;
+        if (array instanceof float[]) return ((float[]) array).length;
+        if (array instanceof short[]) return ((short[]) array).length;
+        if (array instanceof byte[]) return ((byte[]) array).length;
+        if (array instanceof char[]) return ((char[]) array).length;
+        if (array instanceof boolean[]) return ((boolean[]) array).length;
+        return 0;
     }
 
     public static Object slice(List<Object> list, int from, int to, int step) {
@@ -175,7 +236,66 @@ public final class BshArray {
         if (value instanceof Object[]) {
             return (Object[]) value;
         }
+        // Box primitive arrays so legacy Object[]-only helpers still work.
+        // CN1's reduced reflection surface forbids java.lang.reflect.Array,
+        // so dispatch by instanceof.
+        if (value instanceof int[]) return boxIntArray((int[]) value);
+        if (value instanceof long[]) return boxLongArray((long[]) value);
+        if (value instanceof double[]) return boxDoubleArray((double[]) value);
+        if (value instanceof float[]) return boxFloatArray((float[]) value);
+        if (value instanceof short[]) return boxShortArray((short[]) value);
+        if (value instanceof byte[]) return boxByteArray((byte[]) value);
+        if (value instanceof char[]) return boxCharArray((char[]) value);
+        if (value instanceof boolean[]) return boxBooleanArray((boolean[]) value);
         throw new IllegalArgumentException("Only Object[] arrays are supported in the reduced CN1 runtime.");
+    }
+
+    private static Object[] boxIntArray(int[] a) {
+        Object[] out = new Object[a.length];
+        for (int i = 0; i < a.length; i++) out[i] = Integer.valueOf(a[i]);
+        return out;
+    }
+
+    private static Object[] boxLongArray(long[] a) {
+        Object[] out = new Object[a.length];
+        for (int i = 0; i < a.length; i++) out[i] = Long.valueOf(a[i]);
+        return out;
+    }
+
+    private static Object[] boxDoubleArray(double[] a) {
+        Object[] out = new Object[a.length];
+        for (int i = 0; i < a.length; i++) out[i] = Double.valueOf(a[i]);
+        return out;
+    }
+
+    private static Object[] boxFloatArray(float[] a) {
+        Object[] out = new Object[a.length];
+        for (int i = 0; i < a.length; i++) out[i] = Float.valueOf(a[i]);
+        return out;
+    }
+
+    private static Object[] boxShortArray(short[] a) {
+        Object[] out = new Object[a.length];
+        for (int i = 0; i < a.length; i++) out[i] = Short.valueOf(a[i]);
+        return out;
+    }
+
+    private static Object[] boxByteArray(byte[] a) {
+        Object[] out = new Object[a.length];
+        for (int i = 0; i < a.length; i++) out[i] = Byte.valueOf(a[i]);
+        return out;
+    }
+
+    private static Object[] boxCharArray(char[] a) {
+        Object[] out = new Object[a.length];
+        for (int i = 0; i < a.length; i++) out[i] = Character.valueOf(a[i]);
+        return out;
+    }
+
+    private static Object[] boxBooleanArray(boolean[] a) {
+        Object[] out = new Object[a.length];
+        for (int i = 0; i < a.length; i++) out[i] = Boolean.valueOf(a[i]);
+        return out;
     }
 
     private static class SteppedSubList extends AbstractList<Object> implements RandomAccess {
