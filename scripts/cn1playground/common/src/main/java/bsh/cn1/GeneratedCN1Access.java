@@ -914,11 +914,17 @@ public final class GeneratedCN1Access implements CN1Access {
         "java.util.stream.Stream"
     };
 
-    private static final Map<String, Class<?>> CLASS_INDEX = buildClassIndex();
+    private static final class ClassIndexHolder {
+        static final Map<String, Class<?>> INDEX = buildClassIndex();
+    }
 
-    private static final Map<String, String[]> METHOD_INDEX = buildMethodIndex();
+    private static final class MethodIndexHolder {
+        static final Map<String, String[]> INDEX = buildMethodIndex();
+    }
 
-    private static final Map<String, String[]> FIELD_INDEX = buildFieldIndex();
+    private static final class FieldIndexHolder {
+        static final Map<String, String[]> INDEX = buildFieldIndex();
+    }
 
     private static Map<String, Class<?>> buildClassIndex() {
         Map<String, Class<?>> index = new LinkedHashMap<String, Class<?>>();
@@ -3553,7 +3559,7 @@ public final class GeneratedCN1Access implements CN1Access {
         if (name == null) {
             return null;
         }
-        return CLASS_INDEX.get(name);
+        return ClassIndexHolder.INDEX.get(name);
     }
 
     public String[] getIndexedClassNames() {
@@ -3561,11 +3567,11 @@ public final class GeneratedCN1Access implements CN1Access {
     }
 
     public String[] getMethodSignatures(String name) {
-        return copyStrings(METHOD_INDEX.get(name));
+        return copyStrings(MethodIndexHolder.INDEX.get(name));
     }
 
     public String[] getFieldNames(String name) {
-        return copyStrings(FIELD_INDEX.get(name));
+        return copyStrings(FieldIndexHolder.INDEX.get(name));
     }
 
     @Override

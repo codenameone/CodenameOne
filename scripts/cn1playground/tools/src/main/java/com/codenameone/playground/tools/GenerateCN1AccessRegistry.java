@@ -1388,16 +1388,16 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
         writer.write("        if (name == null) {\n");
         writer.write("            return null;\n");
         writer.write("        }\n");
-        writer.write("        return CLASS_INDEX.get(name);\n");
+        writer.write("        return ClassIndexHolder.INDEX.get(name);\n");
         writer.write("    }\n\n");
         writer.write("    public String[] getIndexedClassNames() {\n");
         writer.write("        return INDEXED_CLASS_NAMES.clone();\n");
         writer.write("    }\n\n");
         writer.write("    public String[] getMethodSignatures(String name) {\n");
-        writer.write("        return copyStrings(METHOD_INDEX.get(name));\n");
+        writer.write("        return copyStrings(MethodIndexHolder.INDEX.get(name));\n");
         writer.write("    }\n\n");
         writer.write("    public String[] getFieldNames(String name) {\n");
-        writer.write("        return copyStrings(FIELD_INDEX.get(name));\n");
+        writer.write("        return copyStrings(FieldIndexHolder.INDEX.get(name));\n");
         writer.write("    }\n\n");
     }
 
@@ -1414,9 +1414,21 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
             writer.write(i + 1 < classes.size() ? ",\n" : "\n");
         }
         writer.write("    };\n\n");
-        writer.write("    private static final Map<String, Class<?>> CLASS_INDEX = buildClassIndex();\n\n");
-        writer.write("    private static final Map<String, String[]> METHOD_INDEX = buildMethodIndex();\n\n");
-        writer.write("    private static final Map<String, String[]> FIELD_INDEX = buildFieldIndex();\n\n");
+        // Initialization-on-demand holder idiom: each index isn't built
+        // until the corresponding accessor is called for the first time.
+        // The CLASS_INDEX holder is warmed on the first findClass. The
+        // METHOD_INDEX and FIELD_INDEX holders stay cold until a
+        // "did you mean" suggestion is requested — they're diagnostic-
+        // only and the cold-start win is measurable.
+        writer.write("    private static final class ClassIndexHolder {\n");
+        writer.write("        static final Map<String, Class<?>> INDEX = buildClassIndex();\n");
+        writer.write("    }\n\n");
+        writer.write("    private static final class MethodIndexHolder {\n");
+        writer.write("        static final Map<String, String[]> INDEX = buildMethodIndex();\n");
+        writer.write("    }\n\n");
+        writer.write("    private static final class FieldIndexHolder {\n");
+        writer.write("        static final Map<String, String[]> INDEX = buildFieldIndex();\n");
+        writer.write("    }\n\n");
         writer.write("    private static Map<String, Class<?>> buildClassIndex() {\n");
         writer.write("        Map<String, Class<?>> index = new LinkedHashMap<String, Class<?>>();\n");
         int chunkCount = (classes.size() + FIND_CLASS_CHUNK_SIZE - 1) / FIND_CLASS_CHUNK_SIZE;
