@@ -83,6 +83,9 @@ class BSHClassDeclaration extends SimpleNode
             if (type == Type.ENUM) {
                 scriptedClass.populateEnumConstants(body, callstack, interpreter);
             }
+            if (type == Type.CLASS && !isAbstract()) {
+                enforceInterfaceMethodImplementations(callstack, interpreter);
+            }
             try {
                 callstack.top().setVariable(name, scriptedClass, false);
             } catch (UtilEvalError ex) {
@@ -90,6 +93,90 @@ class BSHClassDeclaration extends SimpleNode
             }
         }
         return scriptedClass;
+    }
+
+    private boolean isAbstract() {
+        return modifiers != null && modifiers.hasModifier("abstract");
+    }
+
+    /** After a concrete class is built, verify that every method
+     * declared on each implemented interface is actually provided by
+     * the class (declared here, inherited from an extends-parent, or
+     * pulled in from another scripted interface default). Fails with
+     * a clear diagnostic when anything is missing — catches the case
+     * where a user writes `class X implements ActionListener {}` and
+     * forgets {@code actionPerformed}. */
+    private void enforceInterfaceMethodImplementations(CallStack callstack, Interpreter interpreter)
+            throws EvalError {
+        java.util.Set<String> provided = new java.util.HashSet<String>();
+        provided.addAll(scriptedClass.getInstanceMethodNames());
+        int seen = 0;
+        for (int i = 0; i < jjtGetNumChildren(); i++) {
+            Node child = jjtGetChild(i);
+            if (!(child instanceof BSHAmbiguousName)) continue;
+            if (extend && seen == 0) { seen++; continue; }
+            seen++;
+            BSHAmbiguousName node = (BSHAmbiguousName) child;
+            String rawName = node.text;
+            if (rawName == null || rawName.isEmpty()) continue;
+            // Skip scripted interfaces — they're already merged via
+            // resolveImplementedInterfaces, so method names that come
+            // from their instance-method table are in `provided`.
+            try {
+                Object v = callstack.top().getVariable(simpleIfaceName(rawName));
+                if (v instanceof ScriptedClass) continue;
+            } catch (UtilEvalError ignore) {
+                // fall through — treat as Java interface candidate
+            }
+            Class<?> ifaceClass;
+            try {
+                ifaceClass = node.toClass(callstack, interpreter);
+            } catch (EvalError ex) {
+                continue;
+            }
+            if (ifaceClass == null || !ifaceClass.isInterface()) continue;
+            String[] required = methodNamesOf(ifaceClass);
+            if (required == null) continue;
+            java.util.List<String> missing = new java.util.ArrayList<String>();
+            for (String m : required) {
+                if (m == null || m.isEmpty()) continue;
+                if (!provided.contains(m)) missing.add(m);
+            }
+            if (!missing.isEmpty()) {
+                StringBuilder msg = new StringBuilder("class '").append(name)
+                        .append("' is not abstract and does not implement all methods from ")
+                        .append(ifaceClass.getName()).append(". Missing: ");
+                for (int k = 0; k < missing.size(); k++) {
+                    if (k > 0) msg.append(", ");
+                    msg.append(missing.get(k));
+                }
+                msg.append('.');
+                throw new EvalError(msg.toString(), this, callstack);
+            }
+        }
+    }
+
+    private String simpleIfaceName(String raw) {
+        int lt = raw.indexOf('<');
+        String simple = lt >= 0 ? raw.substring(0, lt).trim() : raw.trim();
+        int dot = simple.lastIndexOf('.');
+        return dot >= 0 ? simple.substring(dot + 1) : simple;
+    }
+
+    private String[] methodNamesOf(Class<?> ifaceClass) {
+        bsh.cn1.CN1Access registry = bsh.cn1.CN1AccessRegistry.getInstance();
+        if (!(registry instanceof bsh.cn1.GeneratedCN1Access)) return null;
+        String[] entries = ((bsh.cn1.GeneratedCN1Access) registry).getMethodSignatures(ifaceClass.getName());
+        if (entries == null) return null;
+        java.util.List<String> names = new java.util.ArrayList<String>();
+        for (String entry : entries) {
+            if (entry == null) continue;
+            int paren = entry.indexOf('(');
+            String n = paren > 0 ? entry.substring(0, paren) : entry;
+            n = n.trim();
+            if (!n.isEmpty()) names.add(n);
+        }
+        return names.toArray(new String[names.size()]);
     }
 
     /** Resolve the extends-target as a Java class when it isn't a

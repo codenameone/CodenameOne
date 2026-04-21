@@ -123,13 +123,71 @@ public final class ScriptedInstance {
                 java.util.List<ScriptedInstance> all = scriptedClass.getEnumConstants();
                 return Integer.valueOf(all == null ? -1 : all.indexOf(this));
             }
-            throw new EvalError("No instance method " + scriptedClass.getName()
-                    + "." + methodName + "/"
-                    + (args == null ? 0 : args.length),
+            throw new EvalError(buildMissingMethodError(methodName, args),
                     callerInfo, callstack);
         }
         BshMethod bound = tpl.bind(instanceNameSpace);
         return bound.invoke(args, interpreter, callstack, callerInfo, false);
+    }
+
+    private String buildMissingMethodError(String methodName, Object[] args) {
+        int arity = args == null ? 0 : args.length;
+        StringBuilder msg = new StringBuilder();
+        msg.append("No instance method ").append(scriptedClass.getName())
+                .append('.').append(methodName).append('/').append(arity).append('.');
+        java.util.List<String> known = scriptedClass.getInstanceMethodNames();
+        String suggestion = closestMatch(known, methodName);
+        if (suggestion != null) {
+            msg.append(" Did you mean: ").append(suggestion).append('?');
+        } else if (!known.isEmpty()) {
+            msg.append(' ').append(scriptedClass.getName()).append(" declares: ");
+            int n = Math.min(8, known.size());
+            for (int i = 0; i < n; i++) {
+                if (i > 0) msg.append(", ");
+                msg.append(known.get(i));
+            }
+            if (known.size() > n) msg.append(", ...");
+            msg.append('.');
+        }
+        return msg.toString();
+    }
+
+    private static String closestMatch(java.util.List<String> candidates, String requested) {
+        if (candidates.isEmpty() || requested == null) return null;
+        String lowerReq = requested.toLowerCase();
+        for (String c : candidates) {
+            if (c.toLowerCase().equals(lowerReq)) return c; // case only
+        }
+        String best = null;
+        int bestDist = Integer.MAX_VALUE;
+        int threshold = Math.max(2, requested.length() / 3);
+        for (String c : candidates) {
+            int d = levenshtein(c.toLowerCase(), lowerReq);
+            if (d < bestDist && d <= threshold) {
+                bestDist = d;
+                best = c;
+            }
+        }
+        return best;
+    }
+
+    private static int levenshtein(String a, String b) {
+        int la = a.length();
+        int lb = b.length();
+        if (la == 0) return lb;
+        if (lb == 0) return la;
+        int[] prev = new int[lb + 1];
+        int[] curr = new int[lb + 1];
+        for (int j = 0; j <= lb; j++) prev[j] = j;
+        for (int i = 1; i <= la; i++) {
+            curr[0] = i;
+            for (int j = 1; j <= lb; j++) {
+                int cost = a.charAt(i - 1) == b.charAt(j - 1) ? 0 : 1;
+                curr[j] = Math.min(Math.min(curr[j - 1] + 1, prev[j] + 1), prev[j - 1] + cost);
+            }
+            int[] tmp = prev; prev = curr; curr = tmp;
+        }
+        return prev[lb];
     }
 
     @Override

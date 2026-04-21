@@ -304,6 +304,26 @@ public final class ScriptedClass {
         return name;
     }
 
+    /** Unique instance method names declared on this class (including
+     * those merged in from superclasses and implemented interfaces).
+     * Used by diagnostics to help the user spot typos. */
+    public java.util.List<String> getInstanceMethodNames() {
+        java.util.LinkedHashSet<String> out = new java.util.LinkedHashSet<String>();
+        for (MethodTemplate mt : instanceMethods) out.add(mt.name);
+        return new java.util.ArrayList<String>(out);
+    }
+
+    /** Instance methods declared on this class only (does NOT include
+     * inherited or interface-default methods). Used to detect
+     * unimplemented abstract interface methods. */
+    public java.util.List<String> getDeclaredInstanceMethodSignatures() {
+        java.util.List<String> out = new java.util.ArrayList<String>();
+        for (MethodTemplate mt : instanceMethods) {
+            out.add(mt.name + "/" + mt.paramCount);
+        }
+        return out;
+    }
+
     public boolean isInterface() {
         return isInterface;
     }

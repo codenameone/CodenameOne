@@ -1460,6 +1460,29 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "}\n"
                 + "Object i = new Outer.Inner();\n"
                 + "root.add(new Label(\"oops\"));"), ExpectedOutcome.EVAL_ERROR, "enclosing"));
+        // Concrete class implementing a Java SAM interface must
+        // provide the SAM method. Declaration fails otherwise.
+        cases.add(new Case(cat, "class_missing_iface_method_rejected", ui(""
+                + "import com.codename1.ui.events.ActionListener;\n"
+                + "class Silent implements ActionListener { }\n"
+                + "root.add(new Label(\"unreachable\"));"),
+                ExpectedOutcome.EVAL_ERROR, "does not implement"));
+        // Concrete class providing the SAM method is accepted.
+        cases.add(new Case(cat, "class_with_iface_method_accepted", ui(""
+                + "import com.codename1.ui.events.ActionListener;\n"
+                + "import com.codename1.ui.events.ActionEvent;\n"
+                + "class Loud implements ActionListener {\n"
+                + "    public void actionPerformed(ActionEvent e) { }\n"
+                + "}\n"
+                + "Loud l = new Loud();\n"
+                + "root.add(new Label(\"ok\"));"), ExpectedOutcome.SUCCESS, null));
+        // Calling an undefined method produces a helpful "did you
+        // mean" diagnostic rather than a bare "not found".
+        cases.add(new Case(cat, "missing_method_suggests_correction", ui(""
+                + "class Thing { String say() { return \"hi\"; } }\n"
+                + "Thing t = new Thing();\n"
+                + "t.sayz();\n"
+                + "root.add(new Label(\"unreachable\"));"), ExpectedOutcome.EVAL_ERROR, "Did you mean"));
         cases.add(new Case(cat, "generic_class_usage", ui(""
                 + "class Pair<T> { private final T value; Pair(T value) { this.value = value; } T get() { return value; } }\n"
                 + "Pair<String> p = new Pair<String>(\"generic-ok\");\n"
