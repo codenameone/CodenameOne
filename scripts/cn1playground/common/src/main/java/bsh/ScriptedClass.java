@@ -324,6 +324,32 @@ public final class ScriptedClass {
         return out;
     }
 
+    /** Names of abstract methods this ScriptedClass (if it's an
+     * interface) declares. Used by concrete class declarations to
+     * verify they implement every abstract method of each
+     * implemented scripted interface. */
+    public java.util.List<String> getAbstractInstanceMethodNames() {
+        java.util.LinkedHashSet<String> out = new java.util.LinkedHashSet<String>();
+        for (MethodTemplate mt : instanceMethods) {
+            if (mt.isAbstract()) out.add(mt.name);
+        }
+        return new java.util.ArrayList<String>(out);
+    }
+
+    /** Concrete (non-abstract) instance method names this class
+     * supplies — includes own declarations, inherited methods from
+     * the extends chain, and default methods merged from
+     * implemented scripted interfaces. The interface-method
+     * enforcement uses this to distinguish real implementations
+     * from just-inherited-abstract stubs. */
+    public java.util.Set<String> getConcreteInstanceMethodNames() {
+        java.util.LinkedHashSet<String> out = new java.util.LinkedHashSet<String>();
+        for (MethodTemplate mt : instanceMethods) {
+            if (!mt.isAbstract()) out.add(mt.name);
+        }
+        return out;
+    }
+
     public boolean isInterface() {
         return isInterface;
     }
@@ -597,6 +623,15 @@ public final class ScriptedClass {
         final int paramCount;
         final boolean isVarArgs;
         private final BSHMethodDeclaration decl;
+
+        boolean isAbstract() {
+            // insureNodesParsed sets blockNode only when the source has
+            // a body. A missing body (`void foo();`) leaves blockNode
+            // null. An explicit empty body (`void foo() {}`) produces a
+            // BSHBlock with zero children and must NOT count as
+            // abstract — the user wrote a concrete no-op.
+            return decl.blockNode == null;
+        }
 
         MethodTemplate(BSHMethodDeclaration decl) {
             this.decl = decl;

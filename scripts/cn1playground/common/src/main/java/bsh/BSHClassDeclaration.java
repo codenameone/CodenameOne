@@ -99,17 +99,19 @@ class BSHClassDeclaration extends SimpleNode
         return modifiers != null && modifiers.hasModifier("abstract");
     }
 
-    /** After a concrete class is built, verify that every method
-     * declared on each implemented interface is actually provided by
-     * the class (declared here, inherited from an extends-parent, or
-     * pulled in from another scripted interface default). Fails with
-     * a clear diagnostic when anything is missing — catches the case
-     * where a user writes `class X implements ActionListener {}` and
-     * forgets {@code actionPerformed}. */
+    /** After a concrete class is built, verify that every abstract
+     * method declared on each implemented interface is actually
+     * provided by the class with a body (declared here, inherited
+     * from an extends-parent, or pulled in as a default from another
+     * scripted interface). Fails with a clear diagnostic when
+     * anything is missing — catches the case where a user writes
+     * `class X implements ActionListener {}` and forgets
+     * {@code actionPerformed}. Works for both Java interfaces
+     * (names drawn from the CN1 registry) and scripted interfaces
+     * (names drawn from the interface's own abstract-method list). */
     private void enforceInterfaceMethodImplementations(CallStack callstack, Interpreter interpreter)
             throws EvalError {
-        java.util.Set<String> provided = new java.util.HashSet<String>();
-        provided.addAll(scriptedClass.getInstanceMethodNames());
+        java.util.Set<String> concrete = scriptedClass.getConcreteInstanceMethodNames();
         int seen = 0;
         for (int i = 0; i < jjtGetNumChildren(); i++) {
             Node child = jjtGetChild(i);
@@ -119,33 +121,50 @@ class BSHClassDeclaration extends SimpleNode
             BSHAmbiguousName node = (BSHAmbiguousName) child;
             String rawName = node.text;
             if (rawName == null || rawName.isEmpty()) continue;
-            // Skip scripted interfaces — they're already merged via
-            // resolveImplementedInterfaces, so method names that come
-            // from their instance-method table are in `provided`.
+
+            String ifaceLabel;
+            java.util.List<String> required;
+            // Scripted interfaces: pull abstract method names directly
+            // from the interface's own ScriptedClass. Java interfaces:
+            // pull names from the CN1 registry's method index.
             try {
                 Object v = callstack.top().getVariable(simpleIfaceName(rawName));
-                if (v instanceof ScriptedClass) continue;
+                if (v instanceof ScriptedClass) {
+                    ScriptedClass iface = (ScriptedClass) v;
+                    ifaceLabel = "scripted interface '" + iface.getName() + "'";
+                    required = iface.getAbstractInstanceMethodNames();
+                } else {
+                    ifaceLabel = null;
+                    required = null;
+                }
             } catch (UtilEvalError ignore) {
-                // fall through — treat as Java interface candidate
+                ifaceLabel = null;
+                required = null;
             }
-            Class<?> ifaceClass;
-            try {
-                ifaceClass = node.toClass(callstack, interpreter);
-            } catch (EvalError ex) {
-                continue;
+            if (required == null) {
+                Class<?> ifaceClass;
+                try {
+                    ifaceClass = node.toClass(callstack, interpreter);
+                } catch (EvalError ex) {
+                    continue;
+                }
+                if (ifaceClass == null || !ifaceClass.isInterface()) continue;
+                ifaceLabel = ifaceClass.getName();
+                String[] javaMethods = methodNamesOf(ifaceClass);
+                if (javaMethods == null) continue;
+                required = new java.util.ArrayList<String>();
+                for (String m : javaMethods) if (m != null && !m.isEmpty()) required.add(m);
             }
-            if (ifaceClass == null || !ifaceClass.isInterface()) continue;
-            String[] required = methodNamesOf(ifaceClass);
-            if (required == null) continue;
+
             java.util.List<String> missing = new java.util.ArrayList<String>();
             for (String m : required) {
                 if (m == null || m.isEmpty()) continue;
-                if (!provided.contains(m)) missing.add(m);
+                if (!concrete.contains(m)) missing.add(m);
             }
             if (!missing.isEmpty()) {
                 StringBuilder msg = new StringBuilder("class '").append(name)
                         .append("' is not abstract and does not implement all methods from ")
-                        .append(ifaceClass.getName()).append(". Missing: ");
+                        .append(ifaceLabel).append(". Missing: ");
                 for (int k = 0; k < missing.size(); k++) {
                     if (k > 0) msg.append(", ");
                     msg.append(missing.get(k));

@@ -1483,6 +1483,20 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "Thing t = new Thing();\n"
                 + "t.sayz();\n"
                 + "root.add(new Label(\"unreachable\"));"), ExpectedOutcome.EVAL_ERROR, "Did you mean"));
+        // Scripted interface with an abstract method must be
+        // implemented by a concrete class that names it in `implements`.
+        cases.add(new Case(cat, "scripted_iface_abstract_method_required", ui(""
+                + "interface Shape { int area(); }\n"
+                + "class Box implements Shape { }\n"
+                + "root.add(new Label(\"unreachable\"));"),
+                ExpectedOutcome.EVAL_ERROR, "does not implement"));
+        // Default methods on a scripted interface satisfy the
+        // requirement without the implementing class redeclaring them.
+        cases.add(new Case(cat, "scripted_iface_default_method_inherited", ui(""
+                + "interface Greeter { default String greet() { return \"hi\"; } }\n"
+                + "class Hi implements Greeter { }\n"
+                + "Hi h = new Hi();\n"
+                + "root.add(new Label(h.greet()));"), ExpectedOutcome.SUCCESS, null));
         cases.add(new Case(cat, "generic_class_usage", ui(""
                 + "class Pair<T> { private final T value; Pair(T value) { this.value = value; } T get() { return value; } }\n"
                 + "Pair<String> p = new Pair<String>(\"generic-ok\");\n"
