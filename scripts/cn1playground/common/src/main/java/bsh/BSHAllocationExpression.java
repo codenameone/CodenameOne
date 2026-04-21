@@ -231,9 +231,61 @@ class BSHAllocationExpression extends SimpleNode
 
     Object constructFromEnclosingInstance(Object obj, CallStack callstack,
             Interpreter interpreter ) throws EvalError {
-        throw new EvalError(
-                "Inner class allocation from an enclosing instance is not supported in the Codename One BeanShell runtime.",
-                this, callstack);
+        // The outer instance `obj` must be a ScriptedInstance for the
+        // `outer.new Inner(args)` form to resolve — Java inner classes
+        // still aren't constructable without reflection.
+        if (!(obj instanceof ScriptedInstance)) {
+            throw new EvalError(
+                    "Inner class allocation from a Java enclosing instance is not supported"
+                            + " in the Codename One BeanShell runtime.",
+                    this, callstack);
+        }
+        ScriptedInstance outerInstance = (ScriptedInstance) obj;
+        ScriptedClass outerClass = outerInstance.getScriptedClass();
+
+        Node typeNode = jjtGetChild(0);
+        Node argsNode = jjtGetChild(1);
+        if (!(typeNode instanceof BSHAmbiguousName) || !(argsNode instanceof BSHArguments)) {
+            throw new EvalError(
+                    "Unsupported inner-class allocation shape",
+                    this, callstack);
+        }
+        String innerName = ((BSHAmbiguousName) typeNode).text;
+        Object[] args = ((BSHArguments) argsNode).getArguments(callstack, interpreter);
+
+        ScriptedClass inner;
+        try {
+            Object v = outerClass.getStaticNameSpace().getVariable(innerName);
+            if (!(v instanceof ScriptedClass)) {
+                throw new EvalError("No nested class '" + innerName + "' on "
+                        + outerClass.getName(), this, callstack);
+            }
+            inner = (ScriptedClass) v;
+        } catch (UtilEvalError ex) {
+            throw ex.toEvalError(this, callstack);
+        }
+        if (inner.getEnclosingClass() == null) {
+            throw new EvalError("Nested class '" + outerClass.getName() + "." + innerName
+                    + "' is static — use new " + outerClass.getName() + "." + innerName
+                    + "(...) instead.",
+                    this, callstack);
+        }
+        // Ensure the supplied outer is an instance of the inner's
+        // enclosing class (or a subclass thereof via the extends chain).
+        ScriptedClass requiredOuter = inner.getEnclosingClass();
+        ScriptedClass walkCls = outerClass;
+        boolean ok = false;
+        while (walkCls != null) {
+            if (walkCls == requiredOuter) { ok = true; break; }
+            walkCls = walkCls.getParent();
+        }
+        if (!ok) {
+            throw new EvalError("Outer instance of type " + outerClass.getName()
+                    + " cannot construct " + inner.getName()
+                    + " — expected enclosing type " + requiredOuter.getName() + ".",
+                    this, callstack);
+        }
+        return inner.newInstance(args, outerInstance, callstack, interpreter);
     }
 
     private Object constructObject(Class<?> type, Object[] args,

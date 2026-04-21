@@ -1497,6 +1497,26 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "class Hi implements Greeter { }\n"
                 + "Hi h = new Hi();\n"
                 + "root.add(new Label(h.greet()));"), ExpectedOutcome.SUCCESS, null));
+        // outer.new Inner(...) explicit-enclosing construction.
+        cases.add(new Case(cat, "outer_dot_new_inner", ui(""
+                + "class Outer {\n"
+                + "    int x = 3;\n"
+                + "    class Inner {\n"
+                + "        int y = 4;\n"
+                + "        int sum() { return x + y; }\n"
+                + "    }\n"
+                + "}\n"
+                + "Outer a = new Outer();\n"
+                + "Object i = a.new Inner();\n"
+                + "int s = (int) i.sum();\n"
+                + "root.add(new Label(\"sum=\" + s));"), ExpectedOutcome.SUCCESS, null));
+        // Static nested class rejects outer.new because it doesn't need
+        // an enclosing instance.
+        cases.add(new Case(cat, "outer_dot_new_static_rejected", ui(""
+                + "class Outer { static class Nested { int v = 1; } }\n"
+                + "Outer o = new Outer();\n"
+                + "Object n = o.new Nested();\n"
+                + "root.add(new Label(\"oops\"));"), ExpectedOutcome.EVAL_ERROR, "static"));
         cases.add(new Case(cat, "generic_class_usage", ui(""
                 + "class Pair<T> { private final T value; Pair(T value) { this.value = value; } T get() { return value; } }\n"
                 + "Pair<String> p = new Pair<String>(\"generic-ok\");\n"

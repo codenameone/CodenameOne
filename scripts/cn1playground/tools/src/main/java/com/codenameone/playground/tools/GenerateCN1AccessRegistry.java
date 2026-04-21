@@ -1385,10 +1385,31 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
     private static void writeRootFindClass(Writer writer, List<GeneratedPackage> packages) throws IOException {
         writer.write("    @Override\n");
         writer.write("    public Class<?> findClass(String name) {\n");
-        writer.write("        if (name == null) {\n");
-        writer.write("            return null;\n");
+        writer.write("        if (name == null) return null;\n");
+        writer.write("        // Dispatch per package. Nested classes like\n");
+        writer.write("        // com.codename1.ui.Picker.LightweightPopupButtonPlacement\n");
+        writer.write("        // are resolved by walking the dotted name back until a\n");
+        writer.write("        // known package prefix matches. Only the matched package's\n");
+        writer.write("        // helper class loads — the rest stay cold. That removes the\n");
+        writer.write("        // eager Map<String, Class<?>> build from <clinit> time.\n");
+        writer.write("        String candidate = name;\n");
+        writer.write("        while (candidate != null) {\n");
+        writer.write("            int lastDot = candidate.lastIndexOf('.');\n");
+        writer.write("            if (lastDot < 0) return null;\n");
+        writer.write("            String pkg = candidate.substring(0, lastDot);\n");
+        writer.write("            Class<?> found = findClassInPackage(pkg, name);\n");
+        writer.write("            if (found != null) return found;\n");
+        writer.write("            candidate = pkg;\n");
         writer.write("        }\n");
-        writer.write("        return ClassIndexHolder.INDEX.get(name);\n");
+        writer.write("        return null;\n");
+        writer.write("    }\n\n");
+        writer.write("    private static Class<?> findClassInPackage(String packageName, String fullName) {\n");
+        for (GeneratedPackage generatedPackage : packages) {
+            writer.write("        if (\"" + generatedPackage.packageName + "\".equals(packageName)) {\n");
+            writer.write("            return " + generatedPackage.helperClassName + ".findClass(fullName);\n");
+            writer.write("        }\n");
+        }
+        writer.write("        return null;\n");
         writer.write("    }\n\n");
         writer.write("    public String[] getIndexedClassNames() {\n");
         writer.write("        return INDEXED_CLASS_NAMES.clone();\n");
@@ -1414,40 +1435,19 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
             writer.write(i + 1 < classes.size() ? ",\n" : "\n");
         }
         writer.write("    };\n\n");
-        // Initialization-on-demand holder idiom: each index isn't built
-        // until the corresponding accessor is called for the first time.
-        // The CLASS_INDEX holder is warmed on the first findClass. The
-        // METHOD_INDEX and FIELD_INDEX holders stay cold until a
-        // "did you mean" suggestion is requested — they're diagnostic-
-        // only and the cold-start win is measurable.
-        writer.write("    private static final class ClassIndexHolder {\n");
-        writer.write("        static final Map<String, Class<?>> INDEX = buildClassIndex();\n");
-        writer.write("    }\n\n");
+        // Initialization-on-demand holder idiom: the METHOD_INDEX and
+        // FIELD_INDEX tables stay cold until a "did you mean"
+        // suggestion is requested — they're diagnostic-only and the
+        // cold-start win is measurable. Class lookup no longer goes
+        // through a prebuilt map; findClass dispatches per package so
+        // only the hit package's helper class loads.
         writer.write("    private static final class MethodIndexHolder {\n");
         writer.write("        static final Map<String, String[]> INDEX = buildMethodIndex();\n");
         writer.write("    }\n\n");
         writer.write("    private static final class FieldIndexHolder {\n");
         writer.write("        static final Map<String, String[]> INDEX = buildFieldIndex();\n");
         writer.write("    }\n\n");
-        writer.write("    private static Map<String, Class<?>> buildClassIndex() {\n");
-        writer.write("        Map<String, Class<?>> index = new LinkedHashMap<String, Class<?>>();\n");
         int chunkCount = (classes.size() + FIND_CLASS_CHUNK_SIZE - 1) / FIND_CLASS_CHUNK_SIZE;
-        for (int i = 0; i < chunkCount; i++) {
-            writer.write("        fillClassIndex" + i + "(index);\n");
-        }
-        writer.write("        return index;\n");
-        writer.write("    }\n");
-        for (int i = 0; i < chunkCount; i++) {
-            int fromIndex = i * FIND_CLASS_CHUNK_SIZE;
-            int toIndex = Math.min(classes.size(), fromIndex + FIND_CLASS_CHUNK_SIZE);
-            writer.write("\n");
-            writer.write("    private static void fillClassIndex" + i + "(Map<String, Class<?>> index) {\n");
-            for (int j = fromIndex; j < toIndex; j++) {
-                ApiClass apiClass = classes.get(j);
-                writer.write("        index.put(\"" + apiClass.qualifiedName + "\", " + typeLiteral(apiClass.qualifiedName) + ");\n");
-            }
-            writer.write("    }\n");
-        }
         writer.write("\n");
         writer.write("    private static Map<String, String[]> buildMethodIndex() {\n");
         writer.write("        Map<String, String[]> index = new LinkedHashMap<String, String[]>();\n");
