@@ -142,6 +142,19 @@ if (display.isLargerTextEnabled()) {
 }
 ----
 
+==== How the scale is computed per platform
+
+* *iOS* — the scale is the ratio between the body text size at the user's current Dynamic Type setting and the iOS standard 17pt body size, i.e. `[UIFont preferredFontForTextStyle:UIFontTextStyleBody].pointSize / [UIFont systemFontSize]`. Scales for the standard slider stops range from `0.82×` (Extra Small) through `1.00×` (Large, default) up to `1.35×` (Extra Extra Extra Large). When the user enables _Larger Accessibility Sizes_ in Settings → Accessibility → Display & Text Size → Larger Text, the slider extends with five additional stops whose scales reach as high as `3.12×`. These values match what every native iOS app sees from `UIFontMetrics`.
+* *Android* — the scale is `Configuration.fontScale`, which is bucketed by Android (typically `0.85`, `1.0`, `1.15`, `1.30`).
+
+NOTE: Because the scale is multiplicative, a base font size that is already larger than the platform default will compound. For example, a `defaultFontSizeInt: 18` in your CSS is roughly 6% larger than iOS's 17pt body, so at iOS Dynamic Type _Extra Extra Extra Large_ (`1.35×`) your text will render at roughly `24.3pt` versus a native iOS app's `23pt`. If you intentionally use a base size larger than the platform default and you also enable `useLargerTextScaleBool`, expect the absolute size at high accessibility settings to be visibly larger than typical native apps. Many native iOS apps cap Dynamic Type via `UIFontMetrics maximumPointSize:` for non-text-heavy UIs to avoid layout breakage.
+
+==== Previewing in the simulator
+
+The JavaSE simulator includes a *Simulate → Larger Text* menu that lets you preview every iOS Dynamic Type stop (Extra Small through Accessibility 5) without leaving your desktop. The simulator returns the same scale factor that the corresponding iOS device would report, so this is the recommended way to verify how your UI behaves at each setting before testing on hardware. The selected stop is persisted across simulator restarts.
+
+TIP: If your app looks correct in the simulator at _Large (default)_ but fonts appear oversized on your iPhone with the Display & Brightness slider near the middle, check whether _Settings → Accessibility → Display & Text Size → Larger Text → Larger Accessibility Sizes_ is enabled on the device. When that toggle is on, the system reports the larger _Accessibility_ size categories whose scales begin at `1.65×` and exceed what the standard slider can reach.
+
 === Contacts API
 
 The contacts API provides you with the means to query the phone’s address book, delete elements from it and create new entries into it. To get the platform specific list of contacts you can use

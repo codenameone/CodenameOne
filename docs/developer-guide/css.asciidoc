@@ -935,6 +935,18 @@ On the desktop, you may find that 18 is too big. You can additionally define a d
 
 ****
 
+.How density is determined per platform
+****
+The conversion from "screen-independent pixels" or `mm` to physical pixels uses the device's PPI. The two mobile ports compute it differently, which is worth keeping in mind when chasing per-platform sizing differences:
+
+* *Android* — uses `density × 160` from `DisplayMetrics`, where `density` is the bucketed scale factor reported by Android (typically `1.0`, `1.5`, `2.0`, `3.0`, `3.5`, `4.0`). Because the buckets are coarse, a phone whose physical density falls between two buckets will report the lower one, so mm-based measurements may render slightly smaller than their nominal physical size.
+* *iOS* — uses an explicit per-device PPI lookup keyed on the screen's pixel dimensions (e.g. `460ppi` for iPhone 12 / 13 / 14 / 15 / 16, `458ppi` for the Plus and Pro Max models, `326ppi` for older 2× devices). This is exact for catalogued devices. Any iPhone whose resolution is not in the table falls through to a default fallback (now `460ppi`, since Apple has held that density steady for every non-Plus iPhone since the iPhone 12).
+
+Net result: the same `defaultFontSizeInt: 18` may render at slightly different absolute physical sizes on an iPhone vs. an Android device of similar physical size — typically the iOS rendering is the larger of the two when both are at the platform's default text size. If you need cross-platform pixel-perfect sizing, use platform overrides (`@iOS-platform-font-size`, etc., via media queries) rather than relying on the conversion math alone.
+
+NOTE: When a new iPhone model ships with a resolution that isn't yet in the iOS PPI table, mm-based measurements will use the fallback `460ppi`, which is correct to within a few percent for every modern iPhone. If you discover a model that should use a different value (for example a future Plus/Max device that returns to `458ppi`), file an issue so the table can be updated.
+****
+
 ==== `text-decoration`
 
 See link:Supported-Properties#text-decoration[the text-decoration section] in the "Supported Properties" page.
