@@ -156,6 +156,62 @@ class JavaScriptDisplayMetricsTest {
     }
 
     @Test
+    void observedKotlinSwitchPillSizeBacktracksToRoughlyHdOr4kDensity() throws Exception {
+        // The Kotlin screenshot shows switches ~600 px wide, ~300 px tall.
+        // Switch.calcPreferredSize = (horizontalPadding + fontSize*trackScaleX=3)
+        //                          x (verticalPadding + fontSize*thumbScaleY=1.5)
+        //
+        // For fontSize=16 and trackScaleX=3, trackWidth=48 px. That leaves
+        // ~552 px of horizontal padding (left+right) to reach 600 px, i.e.
+        // ~276 px per side. This backtrack tells us *which* density + mm
+        // padding combo could have produced the observed pill:
+        //
+        //   MEDIUM  ppm=6.3  -> 276 px = 43 mm per side (clearly wrong)
+        //   HD      ppm=21.3 -> 276 px = 13 mm per side (implausible theme value)
+        //   560     ppm=29.5 ->  9.4 mm per side (still unusual)
+        //   4K      ppm=50.4 ->  5.5 mm per side (plausible theme value!)
+        //
+        // So if the live port renders 600 px pills with fontSize=16 and a
+        // standard ~5mm padding, it must be running at something close to
+        // 4K density. In our desktop-at-DPR=1 unit tests MEDIUM is selected,
+        // so the discrepancy has to come from a different DPR reading at
+        // runtime (likely overridePixelRatio, window.devicePixelRatio, or
+        // the worker-bridged window proxy returning something unexpected).
+        Class<?> metrics = loadMetricsClass();
+        Method convertToPixels = metrics.getMethod("convertToPixels", int.class, int.class);
+
+        int trackWidth = 48; // fontSize=16 * trackScaleX=3
+        int observedPillWidth = 600;
+        int paddingBudgetPerSide = (observedPillWidth - trackWidth) / 2; // 276
+
+        int[] densitiesToProbe = {30, 50, 60, 65, 70, 80};
+        int matchingDensity = -1;
+        int matchingMm = -1;
+        for (int density : densitiesToProbe) {
+            for (int mm = 1; mm <= 15; mm++) {
+                int px = (Integer) convertToPixels.invoke(null, mm, density);
+                if (Math.abs(px - paddingBudgetPerSide) <= 15) {
+                    matchingDensity = density;
+                    matchingMm = mm;
+                    break;
+                }
+            }
+            if (matchingDensity != -1) {
+                break;
+            }
+        }
+
+        // We expect a match at a density/mm combo. If this fails, either the
+        // observed 600 px measurement was wrong, or the pill is not driven
+        // by the convertToPixels path at all (which would in itself be a
+        // useful finding - look at image scaling or DPR-double-apply).
+        assertTrue(matchingDensity != -1,
+                "No density/mm combo reproduces a 276 px per-side padding - the huge-pill bug "
+                        + "likely isn't coming from Style padding * convertToPixels at all. "
+                        + "Investigate image scaling or a DPR multiplier applied twice.");
+    }
+
+    @Test
     void switchPreferredSizeAtMediumDensityStaysInHumanRange() throws Exception {
         // Reconstruct the Switch.calcPreferredSize() formula with known inputs
         // (fontSize=16, thumbScaleY=1.5, trackScaleX=3, padding=3mm). If this
