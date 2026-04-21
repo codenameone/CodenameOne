@@ -202,7 +202,6 @@ public class CN1Playground extends Lifecycle {
         if (component == null) {
             inspector.setPreviewRoot(null);
             previewRoot.revalidate();
-            previewRoot.repaint();
             return;
         }
 
@@ -213,12 +212,6 @@ public class CN1Playground extends Lifecycle {
         previewRoot.add(BorderLayout.CENTER, component);
         inspector.setPreviewRoot(previewRoot);
         previewRoot.revalidate();
-        // Explicit repaint: on newer CN1 runtimes revalidate() alone
-        // doesn't always clear the previous frame's pixel artifacts
-        // (especially when the replaced component has a different
-        // background or occupies a smaller region than the previous
-        // one). repaint() forces a full redraw of the preview area.
-        previewRoot.repaint();
     }
 
     private void detachForPreview(Component component) {
