@@ -182,9 +182,13 @@ final class PlaygroundRunner {
 
     private String rewriteClassModel(String script) {
         // sealed/non-sealed/permits are stripped first so the underlying
-        // class declaration parses cleanly. The permit list is not enforced
-        // at runtime — this is documented as a known limitation.
-        String rewritten = rewriteSealedModifiers(script);
+        // class declaration parses cleanly. enforceSealedPermits runs on
+        // the original script (sealed modifiers still visible) to
+        // collect permit lists, then replaces any class declaration
+        // whose parent is sealed and whose name isn't in the parent's
+        // permit list with an immediate `throw`.
+        String rewritten = enforceSealedPermits(script);
+        rewritten = rewriteSealedModifiers(rewritten);
         // Records desugar into a class declaration before any other pass —
         // downstream rewrites then treat them as regular scripted classes.
         rewritten = rewriteRecords(rewritten);
@@ -413,11 +417,164 @@ final class PlaygroundRunner {
     }
 
     /**
+     * Collect permit lists from {@code sealed class X permits A, B} and
+     * then replace any class declaration whose parent is in the map
+     * but whose own name isn't in the parent's permit set with an
+     * immediate {@code throw}. Runs ahead of
+     * {@link #rewriteSealedModifiers} so the sealed keyword is still
+     * visible. Enforcement is best-effort across a single snippet —
+     * sealed hierarchies that span multiple source roots aren't
+     * supported (documented as out of scope).
+     */
+    private String enforceSealedPermits(String script) {
+        java.util.Map<String, java.util.Set<String>> permitsByParent = collectSealedPermits(script);
+        if (permitsByParent.isEmpty()) return script;
+        StringBuilder out = new StringBuilder();
+        int i = 0;
+        int last = 0;
+        int n = script.length();
+        while (i < n) {
+            char ch = script.charAt(i);
+            if (ch == '"' || ch == '\'') { i = skipQuoted(script, i) + 1; continue; }
+            if (startsLineComment(script, i)) { i = skipLineComment(script, i) + 1; continue; }
+            if (startsBlockComment(script, i)) { i = skipBlockComment(script, i) + 1; continue; }
+            if (!startsWithWord(script, i, "class")) { i++; continue; }
+            int nameStart = skipWhitespace(script, i + "class".length());
+            int nameEnd = nameStart;
+            while (nameEnd < n && isIdentifierPart(script.charAt(nameEnd))) nameEnd++;
+            if (nameStart == nameEnd) { i++; continue; }
+            String className = script.substring(nameStart, nameEnd);
+            int cursor = skipWhitespace(script, nameEnd);
+            if (cursor >= n || !startsWithWord(script, cursor, "extends")) { i = nameEnd; continue; }
+            int parentStart = skipWhitespace(script, cursor + "extends".length());
+            int parentEnd = parentStart;
+            while (parentEnd < n && (isIdentifierPart(script.charAt(parentEnd)) || script.charAt(parentEnd) == '.')) {
+                parentEnd++;
+            }
+            if (parentStart == parentEnd) { i = nameEnd; continue; }
+            String parentName = script.substring(parentStart, parentEnd);
+            java.util.Set<String> permits = permitsByParent.get(parentName);
+            if (permits == null || permits.contains(className)) { i = parentEnd; continue; }
+            int braceStart = findClassBodyBraceStart(script, parentEnd);
+            if (braceStart < 0) { i = parentEnd; continue; }
+            int braceEnd = findMatchingBrace(script, braceStart);
+            if (braceEnd < 0) { i = parentEnd; continue; }
+            // Include any preceding modifiers (final/public/abstract/...) in
+            // the replacement so the emitted `throw` isn't prefixed with a
+            // dangling keyword like `final throw new ...`.
+            int replaceStart = backUpOverClassModifiers(script, i);
+            out.append(script, last, replaceStart);
+            out.append("throw new RuntimeException(\"class '").append(className)
+                    .append("' is not permitted to extend sealed class '").append(parentName)
+                    .append("'\");");
+            last = braceEnd + 1;
+            i = last;
+        }
+        out.append(script.substring(last));
+        return out.toString();
+    }
+
+    /** Back up from a {@code class} keyword over any contiguous modifier
+     * keywords (public/private/protected/abstract/static/final/strictfp)
+     * so a replacement can subsume them. */
+    private int backUpOverClassModifiers(String script, int classPos) {
+        int pos = classPos;
+        while (pos > 0) {
+            int end = pos;
+            int cursor = end - 1;
+            while (cursor >= 0 && Character.isWhitespace(script.charAt(cursor))) cursor--;
+            int wordEnd = cursor + 1;
+            int wordStart = wordEnd;
+            while (wordStart > 0 && isIdentifierPart(script.charAt(wordStart - 1))) wordStart--;
+            if (wordStart == wordEnd) return pos;
+            String word = script.substring(wordStart, wordEnd);
+            if (!isClassModifier(word)) return pos;
+            pos = wordStart;
+        }
+        return pos;
+    }
+
+    /** Scan forward from a position just after the parent type for the
+     * opening brace of the class body, skipping an {@code implements}
+     * clause if present. Returns {@code -1} if structure doesn't match. */
+    private int findClassBodyBraceStart(String script, int from) {
+        int i = from;
+        int n = script.length();
+        while (i < n) {
+            char ch = script.charAt(i);
+            if (ch == '{') return i;
+            if (ch == ';') return -1;
+            i++;
+        }
+        return -1;
+    }
+
+    /** Build a {@code parent -> permits} map from the script's
+     * {@code sealed class X [extends ...] permits A, B} declarations. */
+    private java.util.Map<String, java.util.Set<String>> collectSealedPermits(String script) {
+        java.util.Map<String, java.util.Set<String>> out = new java.util.LinkedHashMap<String, java.util.Set<String>>();
+        int i = 0;
+        int n = script.length();
+        while (i < n) {
+            char ch = script.charAt(i);
+            if (ch == '"' || ch == '\'') { i = skipQuoted(script, i) + 1; continue; }
+            if (startsLineComment(script, i)) { i = skipLineComment(script, i) + 1; continue; }
+            if (startsBlockComment(script, i)) { i = skipBlockComment(script, i) + 1; continue; }
+            if (!startsWithWord(script, i, "permits")) { i++; continue; }
+            String parent = findPrecedingClassName(script, i);
+            int end = i + "permits".length();
+            int j = end;
+            while (j < n && script.charAt(j) != '{' && script.charAt(j) != ';') j++;
+            if (parent != null) {
+                java.util.Set<String> permits = parseCommaList(script.substring(end, j));
+                out.put(parent, permits);
+            }
+            i = j;
+        }
+        return out;
+    }
+
+    private java.util.Set<String> parseCommaList(String input) {
+        java.util.Set<String> out = new java.util.HashSet<String>();
+        int from = 0;
+        int n = input.length();
+        for (int i = 0; i <= n; i++) {
+            if (i == n || input.charAt(i) == ',') {
+                String part = input.substring(from, i).trim();
+                if (!part.isEmpty()) out.add(part);
+                from = i + 1;
+            }
+        }
+        return out;
+    }
+
+    private String findPrecedingClassName(String script, int permitsPos) {
+        int i = permitsPos - 1;
+        while (i >= 0 && Character.isWhitespace(script.charAt(i))) i--;
+        for (int pass = 0; pass < 2; pass++) {
+            int end = i + 1;
+            int start = end;
+            while (start > 0 && isIdentifierPart(script.charAt(start - 1))) start--;
+            if (start == end) return null;
+            String token = script.substring(start, end);
+            i = start - 1;
+            while (i >= 0 && Character.isWhitespace(script.charAt(i))) i--;
+            if ("extends".equals(token)) continue;
+            int prevEnd = i + 1;
+            int prevStart = prevEnd;
+            while (prevStart > 0 && isIdentifierPart(script.charAt(prevStart - 1))) prevStart--;
+            if (prevStart < prevEnd && "class".equals(script.substring(prevStart, prevEnd))) {
+                return token;
+            }
+            return null;
+        }
+        return null;
+    }
+
+    /**
      * Strips Java 17 sealed/non-sealed/permits modifiers from class
-     * declarations so they parse with the existing grammar. The permit list
-     * is discarded — runtime does not enforce that subclasses are declared
-     * in the permit clause. This matches the playground's overall posture
-     * of "best-effort syntactic support" rather than full Java semantics.
+     * declarations so they parse with the existing grammar. The permit
+     * enforcement happens earlier in {@link #enforceSealedPermits}.
      */
     private String rewriteSealedModifiers(String script) {
         StringBuilder out = new StringBuilder();

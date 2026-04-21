@@ -246,6 +246,20 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "    default -> tag = \"other\";\n"
                 + "}\n"
                 + "root.add(new Label(tag));"), ExpectedOutcome.SUCCESS, null));
+        // Sealed class with subclass named in the permit list is accepted.
+        cases.add(new Case(cat, "sealed_permits_allowed", ui(""
+                + "sealed class Shape permits Circle, Square {}\n"
+                + "final class Circle extends Shape {}\n"
+                + "final class Square extends Shape {}\n"
+                + "Circle c = new Circle();\n"
+                + "root.add(new Label(\"ok\"));"), ExpectedOutcome.SUCCESS, null));
+        // Sealed enforcement: a subclass NOT named in the permit list is
+        // replaced at rewrite time with an immediate throw.
+        cases.add(new Case(cat, "sealed_permits_rejected", ui(""
+                + "sealed class Base permits Allowed {}\n"
+                + "final class Allowed extends Base {}\n"
+                + "final class Sneaky extends Base {}\n"
+                + "root.add(new Label(\"oops\"));"), ExpectedOutcome.EVAL_ERROR, "not permitted"));
         // Inherited static field access: Display extends CN1Constants, so
         // PICKER_TYPE_DATE (declared on CN1Constants) is reachable through
         // the Display subclass reference.
