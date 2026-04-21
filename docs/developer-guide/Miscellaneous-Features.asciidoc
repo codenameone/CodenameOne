@@ -443,6 +443,49 @@ See <<_example_localizing_the_app_name, the above example>> for instructions on 
 "NSCameraUsageDescription"="Cette application doit utiliser votre appareil photo pour scanner les codes à barres";
 ----
 
+==== Localizing the App Icon
+
+Codename One can ship a different launcher icon per locale on iOS and Android by detecting specially-named PNG files during the build. Drop your per-locale artwork into `common/src/main/resources` using the convention:
+
+[source,text]
+----
+cn1_icon_<lang>[_<country>].png
+----
+
+`<lang>` is a two-letter ISO 639-1 language code and the optional `<country>` is a two-letter ISO 3166-1 country code. Language is treated as case-insensitive; the country component is normalized to uppercase. A few valid examples:
+
+* `cn1_icon_fr.png` — French (any region)
+* `cn1_icon_en_GB.png` — British English
+* `cn1_icon_es_MX.png` — Mexican Spanish
+
+Supply a square source image at least 432×432 pixels (the largest size emitted for Android adaptive icons); the build resizes it to every target density. The default app icon continues to be controlled by your `codenameone_settings.properties` file and is used whenever the device locale doesn't match any of the localized variants. At runtime the builders look for a `<lang>_<COUNTRY>` match first, then fall back to a bare `<lang>` match. Providing both (for example `cn1_icon_en.png` plus `cn1_icon_en_GB.png`) lets you give British users a country-specific icon while every other English locale still receives the generic English icon.
+
+===== Android Behaviour
+
+On Android the build generates locale-qualified drawable resources at every density so the platform picks the right icon automatically based on the device's current locale:
+
+* `drawable-<lang>[-r<COUNTRY>]/icon.png` at 36, 48, 72, 96, 128, 144 and 192 pixels for legacy launchers.
+* When `android.enableAdaptiveIcons=true` the same variants are also written as `mipmap-<dpi>-<lang>[-r<COUNTRY>]/ic_launcher.png` and `ic_launcher_foreground.png`. The default adaptive background and the `mipmap-anydpi-v26/ic_launcher.xml` definition are reused as-is.
+
+No code changes are required — Android's resource framework switches icons when the locale changes.
+
+===== iOS Behaviour
+
+iOS does not localize launcher icons natively, so Codename One wires up https://developer.apple.com/documentation/uikit/uiapplication/2806818-setalternateiconname[alternate app icons] for you:
+
+* For each detected locale the build generates `AppIcon_<lang>_<COUNTRY>60x60@2x.png` (120×120), `@3x.png` (180×180) and `76x76@2x~ipad.png` (152×152) in the app bundle root.
+* A `CFBundleIcons` (and `CFBundleIcons~ipad`) entry is injected into `Info.plist` containing a `CFBundleAlternateIcons` dictionary with one entry per locale. `CFBundlePrimaryIcon` continues to reference the default `iPhone7App`/`iPadApp7` image families.
+* The `CodenameOne_GLAppDelegate` is patched to call `-[UIApplication setAlternateIconName:completionHandler:]` at launch. The delegate reads `[NSLocale preferredLanguages]`, tries the full `<lang>_<COUNTRY>` key first, then falls back to the language-only key, and clears the alternate icon (reverting to the default) if no variant matches.
+* The injection is idempotent and runs before the `ios.afterFinishLaunching` hook, so any custom code you supply via that build hint is unaffected.
+
+NOTE: iOS briefly displays a system alert the first time an app switches to an alternate icon. This is platform-standard behaviour — Codename One cannot suppress it.
+
+===== Tips and Troubleshooting
+
+* File names are matched case-insensitively. `cn1_icon_EN_uk.png` is treated the same as `cn1_icon_en_UK.png`.
+* Names that don't fit the `<2-letter lang>[_<2-letter country>]` pattern are logged and skipped; the rest of the build continues.
+* The original `cn1_icon_*.png` files are removed after processing so they aren't shipped as stray bundle resources.
+* To override the default (non-localized) icon, keep using the `Icon` setting in `codenameone_settings.properties` or the `icon` image in `CN1Resource.res` — this feature only adds *alternate* icons for specific locales.
 
 === Location - GPS
 

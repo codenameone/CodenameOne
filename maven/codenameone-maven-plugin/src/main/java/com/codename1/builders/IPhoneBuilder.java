@@ -67,6 +67,12 @@ public class IPhoneBuilder extends Executor {
     // which adds localized strings files to the project.
     private StringBuilder installLocalizedStringsScript = new StringBuilder();
 
+    // Populated by processLocalizedIcons from cn1_icon_LANG[_COUNTRY].png files
+    // found in common/src/resources. Keys are alternate icon names embedded in the
+    // Info.plist (e.g. "AppIcon_en_GB"); values are the normalized locale match key
+    // (e.g. "en_GB" or just "en" when no country is supplied).
+    private Map<String, String> localizedIcons = new LinkedHashMap<String, String>();
+
     private boolean detectJailbreak;
 
     private boolean runPods=false;
@@ -1395,6 +1401,14 @@ public class IPhoneBuilder extends Executor {
             String beforeFinishLaunching = request.getArg("ios.beforeFinishLaunching", null);
             if (beforeFinishLaunching != null) {
                 replaceInFile(glAppDelegate, "//beforeDidFinishLaunchingWithOptionsMarkerEntry", beforeFinishLaunching);
+            }
+
+            if (!localizedIcons.isEmpty()) {
+                // Runs before the user's ios.afterFinishLaunching injection so the marker
+                // is still present for that replacement. Preserve the marker for future hooks.
+                String selector = buildLocalizedIconSelectorObjC();
+                replaceInFile(glAppDelegate, "//afterDidFinishLaunchingWithOptionsMarkerEntry",
+                        selector + "    //afterDidFinishLaunchingWithOptionsMarkerEntry");
             }
 
             String afterFinishLaunching = request.getArg("ios.afterFinishLaunching", null);
@@ -2770,6 +2784,9 @@ public class IPhoneBuilder extends Executor {
         if(inject.indexOf("CFBundleShortVersionString") < 0) {
             inject += "\n<key>CFBundleShortVersionString</key> 	<string>" + buildVersion +"</string>";
         }
+        if (!localizedIcons.isEmpty() && !inject.contains("CFBundleAlternateIcons")) {
+            inject += buildLocalizedIconsPlistFragment();
+        }
         String locationUsageDescription = null;
         if (xcodeVersion >= 9) {
             if ( (locationUsageDescription = request.getArg("ios.locationUsageDescription", null)) != null ){
@@ -3127,6 +3144,96 @@ public class IPhoneBuilder extends Executor {
     private void copyIcon(String name, File srcDir, File destDir) throws IOException {
         copy(new File(srcDir, name), new File(destDir, name));
     }
+
+    private String buildLocalizedIconsPlistFragment() {
+        StringBuilder alternateIcons = new StringBuilder();
+        for (Map.Entry<String, String> entry : localizedIcons.entrySet()) {
+            String iconName = entry.getKey();
+            alternateIcons.append("        <key>").append(iconName).append("</key>\n");
+            alternateIcons.append("        <dict>\n");
+            alternateIcons.append("            <key>CFBundleIconFiles</key>\n");
+            alternateIcons.append("            <array>\n");
+            alternateIcons.append("                <string>").append(iconName).append("</string>\n");
+            alternateIcons.append("            </array>\n");
+            alternateIcons.append("            <key>UIPrerenderedIcon</key>\n");
+            alternateIcons.append("            <false/>\n");
+            alternateIcons.append("        </dict>\n");
+        }
+        StringBuilder out = new StringBuilder();
+        out.append("\n<key>CFBundleIcons</key>\n");
+        out.append("<dict>\n");
+        out.append("    <key>CFBundlePrimaryIcon</key>\n");
+        out.append("    <dict>\n");
+        out.append("        <key>CFBundleIconFiles</key>\n");
+        out.append("        <array>\n");
+        out.append("            <string>iPhone7App</string>\n");
+        out.append("            <string>iPhoneApp</string>\n");
+        out.append("        </array>\n");
+        out.append("    </dict>\n");
+        out.append("    <key>CFBundleAlternateIcons</key>\n");
+        out.append("    <dict>\n");
+        out.append(alternateIcons);
+        out.append("    </dict>\n");
+        out.append("</dict>\n");
+        out.append("<key>CFBundleIcons~ipad</key>\n");
+        out.append("<dict>\n");
+        out.append("    <key>CFBundlePrimaryIcon</key>\n");
+        out.append("    <dict>\n");
+        out.append("        <key>CFBundleIconFiles</key>\n");
+        out.append("        <array>\n");
+        out.append("            <string>iPadApp7</string>\n");
+        out.append("            <string>iPhone7App</string>\n");
+        out.append("        </array>\n");
+        out.append("    </dict>\n");
+        out.append("    <key>CFBundleAlternateIcons</key>\n");
+        out.append("    <dict>\n");
+        out.append(alternateIcons);
+        out.append("    </dict>\n");
+        out.append("</dict>\n");
+        return out.toString();
+    }
+
+    private String buildLocalizedIconSelectorObjC() {
+        StringBuilder mapping = new StringBuilder();
+        mapping.append("        @{ ");
+        boolean first = true;
+        for (Map.Entry<String, String> entry : localizedIcons.entrySet()) {
+            if (!first) {
+                mapping.append(", ");
+            }
+            first = false;
+            mapping.append("@\"").append(entry.getValue()).append("\": @\"").append(entry.getKey()).append("\"");
+        }
+        mapping.append(" }");
+        return "\n    // Codename One localized app icon selection\n"
+                + "    if ([[UIApplication sharedApplication] respondsToSelector:@selector(setAlternateIconName:completionHandler:)]) {\n"
+                + "        NSDictionary *cn1LocalizedIcons =\n"
+                + mapping + ";\n"
+                + "        NSString *cn1CurrentIcon = [[UIApplication sharedApplication] alternateIconName];\n"
+                + "        NSString *cn1TargetIcon = nil;\n"
+                + "        NSArray *cn1PrefLangs = [NSLocale preferredLanguages];\n"
+                + "        if (cn1PrefLangs.count > 0) {\n"
+                + "            NSString *cn1PrefLang = [cn1PrefLangs objectAtIndex:0];\n"
+                + "            NSArray *cn1LangParts = [cn1PrefLang componentsSeparatedByCharactersInSet:\n"
+                + "                [NSCharacterSet characterSetWithCharactersInString:@\"-_\"]];\n"
+                + "            if (cn1LangParts.count >= 2) {\n"
+                + "                NSString *cn1Key = [NSString stringWithFormat:@\"%@_%@\",\n"
+                + "                    [[cn1LangParts objectAtIndex:0] lowercaseString],\n"
+                + "                    [[cn1LangParts objectAtIndex:1] uppercaseString]];\n"
+                + "                cn1TargetIcon = [cn1LocalizedIcons objectForKey:cn1Key];\n"
+                + "            }\n"
+                + "            if (cn1TargetIcon == nil && cn1LangParts.count >= 1) {\n"
+                + "                NSString *cn1Key = [[cn1LangParts objectAtIndex:0] lowercaseString];\n"
+                + "                cn1TargetIcon = [cn1LocalizedIcons objectForKey:cn1Key];\n"
+                + "            }\n"
+                + "        }\n"
+                + "        BOOL cn1NeedsUpdate = (cn1TargetIcon == nil && cn1CurrentIcon != nil)\n"
+                + "            || (cn1TargetIcon != nil && ![cn1TargetIcon isEqualToString:cn1CurrentIcon]);\n"
+                + "        if (cn1NeedsUpdate) {\n"
+                + "            [[UIApplication sharedApplication] setAlternateIconName:cn1TargetIcon completionHandler:nil];\n"
+                + "        }\n"
+                + "    }\n";
+    }
     
     private void copyIcons(File srcDir, File destDir, String... icons) throws IOException {
         for (String icon : icons) {
@@ -3172,7 +3279,7 @@ public class IPhoneBuilder extends Executor {
         createIconFile(new File(iconDirectory, "iPadPro@2x.png"), iconImage, 167, 167);
         createIconFile(new File(iconDirectory, "AppStore.png"), iconImage, 1024, 1024);
         
-        copyIcons(iconDirectory, resDir, 
+        copyIcons(iconDirectory, resDir,
                 "iPhoneNotification@2x.png",
                 "iPhoneNotification@3x.png",
                 "iPhoneSpotlight.png",
@@ -3198,9 +3305,66 @@ public class IPhoneBuilder extends Executor {
                 "iPadApp7@2x.png",
                 "iPadPro@2x.png",
                 "AppStore.png");
-        
-        
+
+        processLocalizedIcons(resDir);
+
         return true;
+    }
+
+    /**
+     * Scans the resources directory for files named cn1_icon_LANG[_COUNTRY].png
+     * and registers them as iOS alternate app icons so the bundle will contain
+     * per-locale launcher icons in addition to the default icon. Runtime icon
+     * selection is wired up in the GL app delegate and the Info.plist
+     * CFBundleIcons entry is populated in {@link #injectToPlist}.
+     */
+    private void processLocalizedIcons(File resDir) throws IOException {
+        File[] candidates = resDir.listFiles(new FilenameFilter() {
+            @Override
+            public boolean accept(File dir, String name) {
+                String lower = name.toLowerCase();
+                return lower.startsWith("cn1_icon_") && lower.endsWith(".png");
+            }
+        });
+        if (candidates == null || candidates.length == 0) {
+            return;
+        }
+        for (File candidate : candidates) {
+            String base = candidate.getName();
+            // strip prefix/suffix
+            String core = base.substring("cn1_icon_".length(), base.length() - ".png".length());
+            String[] parts = core.split("_");
+            if (parts.length < 1 || parts[0].length() != 2) {
+                log("Ignoring localized icon with unsupported name: " + base
+                        + ". Expected cn1_icon_<lang>[_<country>].png");
+                continue;
+            }
+            String lang = parts[0].toLowerCase();
+            String country = parts.length >= 2 && parts[1].length() == 2 ? parts[1].toUpperCase() : null;
+            String localeKey = country != null ? lang + "_" + country : lang;
+            String iconName = "AppIcon_" + localeKey;
+
+            BufferedImage img;
+            try {
+                img = ImageIO.read(candidate);
+            } catch (IOException ex) {
+                log("Failed to read localized icon " + base + ": " + ex.getMessage());
+                candidate.delete();
+                continue;
+            }
+            if (img == null) {
+                log("Localized icon " + base + " is not a valid PNG image. Skipping.");
+                candidate.delete();
+                continue;
+            }
+            createIconFile(new File(resDir, iconName + "60x60@2x.png"), img, 120, 120);
+            createIconFile(new File(resDir, iconName + "60x60@3x.png"), img, 180, 180);
+            createIconFile(new File(resDir, iconName + "76x76@2x~ipad.png"), img, 152, 152);
+            localizedIcons.put(iconName, localeKey);
+            // Remove the original so it isn't bundled as a stray resource.
+            candidate.delete();
+            log("Registered localized app icon '" + iconName + "' for locale " + localeKey);
+        }
     }
 
     
