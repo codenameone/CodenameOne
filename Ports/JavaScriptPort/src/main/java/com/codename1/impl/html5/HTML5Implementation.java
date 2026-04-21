@@ -6140,46 +6140,20 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 && resolvedFileName.length() > 0
                 && !"null".equals(resolvedFileName)
                 && !loadedFonts.contains(resolvedFontName)) {
-            ArrayBufferInputStream is = (ArrayBufferInputStream)this.getResourceAsStream(null, resolvedFileName);
-            if (is == null) {
-                return createFallbackTrueTypeFont(resolvedFontName, resolvedFileName);
-            }
-            String dataURL = arrayBufferToDataURL(is.getBuffer().getBuffer(), "font/truetype");
-            final boolean[] complete = new boolean[1];
-            EventListener loadedListener = new EventListener() {
-
-                @Override
-                public void handleEvent(Event evt) {
-                    window.getDocument().removeEventListener("fontLoaded", this);
-                    new Thread(new Runnable() {
-                        public void run() {
-                            synchronized(complete) {
-                                complete[0] = true;
-                                complete.notify();
-                            }
-                        }
-                    }).start();
-                }
-                
-            };
-            window.getDocument().addEventListener("fontLoaded", loadedListener);
-            loadTrueTypeFont_(fontName, dataURL, "truetype");
-            synchronized(complete) {
-                while (!complete[0]) {
-                    try {
-                        complete.wait(1000);
-                    } catch (InterruptedException ex) {
-                        Log.e(ex);
-                    }
-                }
-            }
-            
-            
-            
+            // Hand the bare filename to the host via the port.js native binding.
+            // HTML5Implementation.getResourceAsStream rewrites relative resource
+            // paths to "assets/..."; the host bridge mirrors that so the browser
+            // can fetch the TTF directly into a FontFace without having to
+            // transfer a ~500 KB ArrayBuffer through the worker bridge.
+            // The existing arrayBufferToBase64 path runs through Window.current,
+            // which is not reachable from the worker and truncates the data URL
+            // to 26 chars, so the old byte->dataURL approach 100% failed to load
+            // the font.
+            loadTrueTypeFont_(resolvedFontName, resolvedFileName, "truetype");
             loadedFonts.add(resolvedFontName);
         }
         return createFallbackTrueTypeFont(resolvedFontName, resolvedFileName);
-        
+
     }
 
     private NativeFont createFallbackTrueTypeFont(String fontName, String fileName) {

@@ -1180,6 +1180,89 @@
     });
   });
 
+  hostBridge.register('__cn1_load_truetype_font__', function(request) {
+    // Loads a TrueType/OpenType font into the host document so the browser can
+    // resolve 'font-family: <fontName>' at paint time. Called from the worker
+    // (HTML5Implementation.loadTrueTypeFont_ via the port.js native binding)
+    // because document/FontFace/WebFont are not reachable from the worker.
+    //
+    // Prefers the CSS FontFace API (covers every browser this port targets)
+    // and falls back to <style>@font-face injection + the WebFont loader so a
+    // Chromium/Firefox FontFace regression doesn't strand the load path.
+    var payload = request || {};
+    var fontName = payload.fontName == null ? '' : String(payload.fontName);
+    var rawPath = payload.fontUrl == null ? '' : String(payload.fontUrl);
+    var fontFormat = payload.fontFormat == null ? 'truetype' : String(payload.fontFormat);
+    // Match HTML5Implementation.getResourceAsStream: relative resource names
+    // are rooted at "assets/" in the bundle layout, and file paths with a
+    // directory portion get collapsed to their basename first. Absolute URLs
+    // (data:, http:, /...) pass through untouched.
+    var fontUrl = rawPath;
+    if (fontUrl) {
+      if (!/^(?:data:|https?:|\/)/i.test(fontUrl)) {
+        var lastSlash = fontUrl.lastIndexOf('/');
+        if (lastSlash >= 0) {
+          fontUrl = fontUrl.substring(lastSlash + 1);
+        }
+        if (fontUrl !== 'icon.png' && fontUrl.indexOf('assets/') !== 0) {
+          fontUrl = 'assets/' + fontUrl;
+        }
+      }
+    }
+    return new Promise(function(resolve) {
+      if (!fontName || !fontUrl) {
+        resolve({ loaded: false, reason: 'missing-args' });
+        return;
+      }
+      try {
+        if (typeof FontFace !== 'undefined'
+            && typeof document !== 'undefined'
+            && document.fonts
+            && typeof document.fonts.add === 'function') {
+          var descriptor = "url('" + fontUrl.replace(/'/g, "\\'") + "') format('"
+            + fontFormat.replace(/'/g, "\\'") + "')";
+          var ff = new FontFace(fontName, descriptor);
+          ff.load().then(function(loaded) {
+            try { document.fonts.add(loaded); } catch (_err) {}
+            resolve({ loaded: true, path: 'FontFace' });
+          }, function(err) {
+            if (typeof console !== 'undefined' && typeof console.warn === 'function') {
+              console.warn('PARPAR:DIAG:HOST:loadTrueTypeFont:FontFace:fail:fontName=' + fontName
+                + ':url=' + fontUrl
+                + ':error=' + String(err && err.message ? err.message : err));
+            }
+            resolve({ loaded: false, path: 'FontFace', error: String(err && err.message ? err.message : err) });
+          });
+          return;
+        }
+        if (typeof document !== 'undefined' && document.head) {
+          var styleEl = document.createElement('style');
+          var escapedName = fontName.replace(/'/g, "\\'");
+          var escapedUrl = fontUrl.replace(/'/g, "\\'");
+          var escapedFormat = fontFormat.replace(/'/g, "\\'");
+          styleEl.appendChild(document.createTextNode(
+            "@font-face { font-family: '" + escapedName + "'; "
+              + "src: url('" + escapedUrl + "') format('" + escapedFormat + "'); }"
+          ));
+          document.head.appendChild(styleEl);
+        }
+        if (typeof WebFont !== 'undefined' && typeof WebFont.load === 'function') {
+          WebFont.load({
+            custom: { families: [fontName] },
+            active: function() { resolve({ loaded: true, path: 'WebFont' }); },
+            inactive: function() { resolve({ loaded: false, path: 'WebFont' }); }
+          });
+        } else {
+          setTimeout(function() {
+            resolve({ loaded: true, path: 'styleOnly' });
+          }, 50);
+        }
+      } catch (err) {
+        resolve({ loaded: false, error: String(err && err.message ? err.message : err) });
+      }
+    });
+  });
+
   hostBridge.register('__cn1_delay__', function(request) {
     var millis = 0;
     if (request && typeof request === 'object' && request.millis != null) {

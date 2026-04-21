@@ -1509,50 +1509,72 @@ bindCiFallback("NetworkManager.addErrorListener", [
   return null;
 });
 
-bindCiFallback("Font.createTrueTypeFont", [
-  "cn1_com_codename1_ui_Font_createTrueTypeFont_java_lang_String_java_lang_String_R_com_codename1_ui_Font"
-], function*() {
-  // The real HTML5Implementation.loadTrueTypeFont path injects @font-face via
-  // document.createElement + WebFont.load, which is unreachable from the worker.
-  // TODO(js-port): route font loading through the host bridge so the returned
-  // Font carries the requested font-family (and material icons actually render).
-  // Today's stopgap: return the default font - the font file itself is
-  // pre-registered in index.html (@font-face for 'Material Icons' ->
-  // assets/material-design-font.ttf), so once the CN1-side Font wrapper is
-  // taught to carry the requested family, icon rendering will light up with
-  // no further asset work needed.
-  const getDefaultFont = global.cn1_com_codename1_ui_Font_getDefaultFont_R_com_codename1_ui_Font__impl
-    || global.cn1_com_codename1_ui_Font_getDefaultFont_R_com_codename1_ui_Font;
-  if (typeof getDefaultFont === "function") {
-    return yield* getDefaultFont();
-  }
-  if (jvm.classes && jvm.classes["com_codename1_ui_Font"] && jvm.classes["com_codename1_ui_Font"].staticFields) {
-    return jvm.classes["com_codename1_ui_Font"].staticFields["defaultFont"] || null;
+// Worker-safe implementation of HTML5Implementation.loadTrueTypeFont_: the
+// @JSBody version expands to document.createElement + WebFont.load, which has
+// no hope of running in the worker-only runtime. Route to the host via the
+// __cn1_load_truetype_font__ bridge so the returned promise suspends the
+// generator until the host actually has the font available to CSS. The
+// worker passes the bare resource name (e.g. material-design-font.ttf); the
+// host mirrors HTML5Implementation.getResourceAsStream and resolves it to
+// assets/<name> before handing it to FontFace. We avoid the previous
+// arrayBuffer->base64 dataURL route because Window.current().arrayBufferToBase64
+// is not wired up in the worker and silently returned an empty string.
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_loadTrueTypeFont__java_lang_String_java_lang_String_java_lang_String"
+], function*(fontName, fontFile, fontFormat) {
+  const toStr = function(v) {
+    if (v == null) return "";
+    return typeof v === "string" ? v : (jvm.toNativeString ? jvm.toNativeString(v) : String(v));
+  };
+  const payload = {
+    fontName: toStr(fontName),
+    fontUrl: toStr(fontFile),
+    fontFormat: toStr(fontFormat) || "truetype"
+  };
+  try {
+    yield jvm.invokeHostNative("__cn1_load_truetype_font__", [payload]);
+  } catch (err) {
+    if (global.console && typeof global.console.warn === "function") {
+      global.console.warn("PARPAR:DIAG:loadTrueTypeFont:hostBridgeError=" + (err && err.message ? err.message : err));
+    }
   }
   return null;
 });
 
 const nativeFontGetCssMethodId = "cn1_com_codename1_impl_html5_HTML5Implementation_NativeFont_getCSS_R_java_lang_String";
 const nativeFontCharWidthMethodId = "cn1_com_codename1_impl_html5_HTML5Implementation_NativeFont_charWidth_char_R_int";
-const nativeFontGetCssOriginal = (jvm.classes
-  && jvm.classes["com_codename1_impl_html5_HTML5Implementation_NativeFont"]
-  && jvm.classes["com_codename1_impl_html5_HTML5Implementation_NativeFont"].methods)
-  ? jvm.classes["com_codename1_impl_html5_HTML5Implementation_NativeFont"].methods[nativeFontGetCssMethodId]
-  : null;
-const nativeFontCharWidthOriginal = (jvm.classes
-  && jvm.classes["com_codename1_impl_html5_HTML5Implementation_NativeFont"]
-  && jvm.classes["com_codename1_impl_html5_HTML5Implementation_NativeFont"].methods)
-  ? jvm.classes["com_codename1_impl_html5_HTML5Implementation_NativeFont"].methods[nativeFontCharWidthMethodId]
-  : null;
+
+// Resolve the translated NativeFont methods lazily. bindCiFallback captures the
+// original symbol at port.js evaluation time, which runs before the translated
+// class metadata is attached to jvm.classes - so a top-level lookup returns
+// null and the fallback silently returns "16px sans-serif" for every font,
+// stripping the 'Material Icons' (or any) family from the CSS. bindNative
+// preserves the pre-override function in jvm.translatedMethods, so prefer that
+// path. Fall back to the __impl global (which is not replaced by bindNative).
+// Never read back from global[methodId] itself or jvm.classes[..].methods[id]
+// because bindCiFallback has overwritten those with this very fallback - that
+// would be an infinite recursion (was the cause of a Maximum call stack size
+// exceeded during the first attempt at lazy resolution).
+function resolveNativeFontOriginal(methodId) {
+  if (jvm.translatedMethods && typeof jvm.translatedMethods[methodId] === "function") {
+    return jvm.translatedMethods[methodId];
+  }
+  const implKey = methodId + "__impl";
+  if (typeof global[implKey] === "function" && !global[implKey].__cn1CiFallbackSymbol) {
+    return global[implKey];
+  }
+  return null;
+}
 
 bindCiFallback("NativeFont.getCSSNullSafe", [
   nativeFontGetCssMethodId
 ], function*(__cn1ThisObject) {
-  if (typeof nativeFontGetCssOriginal !== "function") {
+  const original = resolveNativeFontOriginal(nativeFontGetCssMethodId);
+  if (typeof original !== "function") {
     return jvm.createStringLiteral("16px sans-serif");
   }
   try {
-    return yield* nativeFontGetCssOriginal(__cn1ThisObject);
+    return yield* original(__cn1ThisObject);
   } catch (err) {
     const message = String(err && err.message ? err.message : err || "");
     if (message.indexOf("__classDef") >= 0) {
@@ -1566,11 +1588,12 @@ bindCiFallback("NativeFont.getCSSNullSafe", [
 bindCiFallback("NativeFont.charWidthNullSafe", [
   nativeFontCharWidthMethodId
 ], function*(__cn1ThisObject, chr) {
-  if (typeof nativeFontCharWidthOriginal !== "function") {
+  const original = resolveNativeFontOriginal(nativeFontCharWidthMethodId);
+  if (typeof original !== "function") {
     return 8;
   }
   try {
-    return yield* nativeFontCharWidthOriginal(__cn1ThisObject, chr);
+    return yield* original(__cn1ThisObject, chr);
   } catch (err) {
     emitCiFallbackMarker("NativeFont.charWidthDefaulted", "HIT");
     return 8;
