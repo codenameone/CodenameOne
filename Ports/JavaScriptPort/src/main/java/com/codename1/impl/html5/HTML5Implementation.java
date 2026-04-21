@@ -2734,56 +2734,17 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @Override
     public int getDeviceDensity() {
         if (dDensity == -1) {
-            int overrideDensity = getDensityOverride();
-            if (overrideDensity > 0) {
-                dDensity = overrideDensity;
-                return dDensity;
-            }
-            double ratio = getDevicePixelRatio();
+            JavaScriptDisplayMetrics.FormFactor ff;
             if (isPhone_()) {
-                // This is a phone
-                if (ratio < 2) {
-                    dDensity = Display.DENSITY_MEDIUM;
-                } else if (ratio < 2.5) {
-                    dDensity = Display.DENSITY_VERY_HIGH;
-                } else if (ratio < 4) {
-                    dDensity = Display.DENSITY_HD;
-                } else if (ratio < 5) {
-                    dDensity = Display.DENSITY_560;
-                } else if (ratio < 7) {
-                    dDensity = Display.DENSITY_2HD;
-                } else {
-                    dDensity = Display.DENSITY_4K;
-                }
+                ff = JavaScriptDisplayMetrics.FormFactor.PHONE;
             } else if (isPhoneOrTablet_()) {
-                // It must be a tablet
-                if (ratio < 1.9) {
-                    dDensity = Display.DENSITY_MEDIUM;
-                } else {
-                    dDensity = Display.DENSITY_VERY_HIGH;
-                }
-                
+                ff = JavaScriptDisplayMetrics.FormFactor.TABLET;
             } else {
-                // We're dealing with a desktop computer.
-                // Based on the Retina models here (https://en.wikipedia.org/wiki/Retina_Display)
-                // The display density on desktops are much lower.  Retina displays (which would have a
-                // pixel ratio of 2, would generally be about 220ppi.  Our High density is about 240ppi
-                // So that puts the property density for a pixel ratio of over 2 at about HIGH.
-                // Regular pixel density would correspond with about half that.  Our LOW density
-                // is about 120ppi which fits the bill
-                if (ratio < 1.9) {
-                    dDensity = Display.DENSITY_MEDIUM;
-                } else if (ratio < 2.9) {
-                    dDensity = Display.DENSITY_VERY_HIGH;
-                } else {
-                    dDensity = Display.DENSITY_HD;
-                }
+                ff = JavaScriptDisplayMetrics.FormFactor.DESKTOP;
             }
-            
-            
+            dDensity = JavaScriptDisplayMetrics.pickDensity(getDevicePixelRatio(), ff, getDensityOverride());
         }
         return dDensity;
-        
     }
     
     
@@ -2813,30 +2774,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @Override
     public int convertToPixels(int dipCount, boolean horizontal) {
         if (ppi == 0) {
-            switch (getDeviceDensity()) {
-                case Display.DENSITY_VERY_LOW :
-                    ppi = 72.0 / 25.4; break;
-                case Display.DENSITY_LOW :
-                    ppi = 120.0 / 25.4; break;
-                case Display.DENSITY_MEDIUM:
-                    ppi = 160.0 / 25.4; break;
-                case Display.DENSITY_HIGH:
-                    ppi = 240.0 / 25.4; break;
-                case Display.DENSITY_VERY_HIGH:
-                    ppi = 320.0 / 25.4; break;
-                case Display.DENSITY_HD:
-                    ppi = 540.0 / 25.4; break;
-                case Display.DENSITY_560:
-                    ppi = 750.0 / 25.4; break;
-                case Display.DENSITY_2HD:
-                    ppi = 1080.0 / 25.4; break;
-                case Display.DENSITY_4K:
-                    ppi = 1280.0 /25.4; break;
-                default:
-                    ppi = 160.0 / 25.4; break; 
-            }
+            ppi = JavaScriptDisplayMetrics.pixelsPerMillimeter(getDeviceDensity());
         }
-        return (int)Math.round((((float)dipCount) * ppi));
+        return (int) Math.round(((float) dipCount) * ppi);
     }
     
     @JSBody(params={}, script="var ua = navigator.userAgent.toLowerCase(); \n" +
