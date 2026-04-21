@@ -3,7 +3,7 @@
 JavaScript Port Status (ParparVM)
 =================================
 
-Last updated: 2026-04-20
+Last updated: 2026-04-21
 
 Current Pass — Rendering correctness (2026-04-20)
 -------------------------------------------------
@@ -886,3 +886,58 @@ Files Touched In This Pass
 - `vm/ByteCodeTranslator/src/javascript/browser_bridge.js`
 - `Ports/JavaScriptPort/src/main/webapp/port.js`
 - `Ports/JavaScriptPort/STATUS.md`
+
+2026-04-21 Pass - Orientation + component rendering triage
+-----------------------------------------------------------
+
+**Done:**
+
+1. Skip `OrientationLockScreenshotTest` on HTML5 (commit `e1a33b77c`). The
+   Screen Orientation API needs a fullscreen promise that a worker-hosted
+   CN1 app can't satisfy, so running the test produced a broken
+   `landscape.png` and degraded the next test. Guard at the top of
+   `runTest()` with `Display.getPlatformName() == "HTML5"`, emit
+   `CN1SS:INFO:test=OrientationLockScreenshotTest status=SKIPPED` and
+   `done()` without showing the form. `landscape.png` no longer emitted.
+
+**Open (user reported 2026-04-21):**
+
+1. **Sheet/Picker modal panels missing** - Sheet's `ShowPainter` backdrop
+   (30% alpha black fillRect) renders across the form, but the modal panel
+   containing "Details / Sheet content / Primary Action" at the bottom
+   does not draw its white rounded-rect background. Same shape hits
+   `LightweightPickerButtons` and `ValidatorLightweightPicker`: the large
+   `#EFF0F5` dialog body paints without its inner spinner wheel or date
+   field. Theory: Dialog-level background rendering path that iOS/Android
+   take doesn't reach HTML5, so the Dialog's own style background fills
+   but its children aren't laid out / painted onto it.
+
+2. **Kotlin switches rendered as huge pills** - `Switch()` rendered at
+   ~450x300 instead of ~48x24. `calcPreferredSize = padding + fontSize *
+   (trackScaleX=3)`. Added a diagnostic for `Font.getHeight` - consistent
+   16-19px, so font size isn't the culprit. Suspect the Switch component
+   paintComponent fills a rounded-rect background at its *bounds* rather
+   than at preferred size, and BoxLayout.encloseX is stretching children
+   to fill the parent Form's available width. Confirmed via screenshot
+   inspection: the huge gray/green pill is the component bg, with the
+   actual track image visible as a small white horizontal stripe inside
+   the gray one.
+
+3. **Graphics-clip cross-quadrant bleed** - `graphics-clip.png` shows the
+   `setClip(triangleShape)` triangle extending beyond its containing
+   quadrant into the adjacent quadrant. pushClip/popClip landed in commit
+   `e55098851` and fixed the post-popClip green rect in the bottom-right
+   of each quadrant. But the shape-clip intersection with the outer
+   component clip isn't fully kicking in. Suspect `setClip(Shape)`
+   replaces rather than intersects with the component-level clip that the
+   outer `CleanPaintComponent.paint` pushClip saved.
+
+**Next steps (defer to follow-up):**
+
+- Add a component-bounds log in `HTML5Implementation.paintDirty` (or
+  equivalent) to confirm the Switch's actual rendered bounds vs its
+  `calcPreferredSize()` output.
+- Audit Dialog paint path on JS port for how modal panel backgrounds
+  should fill - compare against iOS's `Dialog.paint` routing.
+- Instrument `setClip(Shape)` to verify it intersects with the current
+  clip or replaces it wholesale.
