@@ -978,3 +978,70 @@ getHorizontalPadding/getVerticalPadding math as a helper (similar shape
 to JavaScriptDisplayMetrics) and verify theme-resource padding values
 round-trip through the JS port the same way they do on iOS. If that
 matches, the bug is in BoxLayout layout distribution.
+
+2026-04-21 Unit-test pass - shape path + native image (commits `2bbceb7f2`, `ca4794d19`)
+----------------------------------------------------------------------------------------
+
+Added two more localized unit-test suites to narrow the Switch/Sheet
+rendering bugs without full build+CI cycles:
+
+**JavaScriptShapePathAdapterTest** (6 tests, ~1.9 s): drives the
+`addShapeToPath` walker with a Proxy PathSink and verifies:
+
+- Simple rectangle -> moveTo + 3 lineTo + closePath, in order
+- `quadTo` / `curveTo` in a CN1 GeneralPath dispatch to
+  `quadraticCurveTo` / `bezierCurveTo` on the canvas sink
+- Sheet-like rounded-rect (400x300 + 20 px corner radius) produces
+  exactly 1 moveTo, >= 2 beziers (top corners), >= 3 lineTos (edges),
+  and exactly 1 closePath
+- Empty path -> no sink calls (null-Shape guard)
+- `resolveJoin` / `resolveCap` cover all Stroke constants plus
+  miter/butt fallback branches
+
+All pass. Rules out the port's shape->canvas translation as a cause
+of the missing Sheet / Picker rounded-rect backgrounds. Bug must be
+upstream (RoundRectBorder's precondition chain, or Style.bgTransparency
+reading 0 from theme).
+
+**JavaScriptNativeImageAdapterTest** (10 tests, ~5.3 s): covers the
+pure-Java helper that backs `NativeImage.getWidth/getHeight` and the
+`drawImage` dispatch. Verifies:
+
+- `resolveWidth` ladder: explicitWidth > 0 wins, else loadedImage width,
+  else mutableSurface width, else sentinel 10
+- `resolveHeight` mirrors the width ladder
+- `resolveSurfaceKind` prefers LOADED_IMAGE over MUTABLE_SURFACE over NONE
+- `draw` skips zero/negative-dim inputs silently (prevents NaN cascade)
+- `draw` dispatches to the correct LOADED / MUTABLE branch based on kind
+- `invalidatePatternCache` nulls the cached pattern
+
+All pass. Rules out a scaled NativeImage dimension (e.g., explicit width
+accidentally set to 2x for DPR) as a cause of inflated Switch track
+widths. Switch track images created via `createMutableImage(48, 24, ...)`
+will report getWidth=48 through the mutableSurface branch (explicitWidth
+stays 0). No scaling in that path.
+
+Combined state after this pass: three localized suites, 26 tests,
+total ~10 s. The Switch huge-pill bug cannot come from:
+
+- Density / ppi / convertToPixels math (tested)
+- Shape -> canvas path translation (tested)
+- NativeImage dimension resolution (tested)
+
+Suspects still on the table, in priority order:
+
+1. Worker-bridged `window.devicePixelRatio` returning something other
+   than 1 at runtime in headless Chromium, pushing density up the ladder
+2. Switch/Sheet `Style` padding mm values resolved from iOS7Theme.res
+   being larger than the iOS / Android ports see
+3. `BoxLayout.encloseX` width distribution differing from iOS somehow
+   (unlikely - BoxLayout is core CN1 and platform-agnostic)
+4. Theme loading on JS port skipping a critical style rule for the
+   Switch / Sheet UIIDs (needs verification via a run-time style dump)
+
+To make progress on (1) and (2), live-port diagnostics is probably
+faster than another unit test - add a one-shot
+`System.out.println("CN1JS:DIAG:density=" + ... + " dpr=" + ... + ...)`
+at port startup plus an equivalent for the Switch's computed
+`getStyle().getHorizontalPadding() / .getVerticalPadding()` values and
+compare against the unit-test expectations (MEDIUM + ~19 px per side).
