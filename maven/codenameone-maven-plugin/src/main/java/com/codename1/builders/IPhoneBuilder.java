@@ -742,7 +742,7 @@ public class IPhoneBuilder extends Executor {
         }
         
         File glAppDelegate = new File(buildinRes, "CodenameOne_GLAppDelegate.m");
-        boolean useUIScene = "true".equalsIgnoreCase(request.getArg("ios.uiscene", "false"));
+        boolean useUIScene = "true".equalsIgnoreCase(request.getArg("ios.uiscene", "true"));
         String integrateFacebook = "";
         
 
@@ -2737,7 +2737,7 @@ public class IPhoneBuilder extends Executor {
                 inject += "\n<key>UILaunchStoryboardName</key><string>"+request.getArg("ios.launchStoryboardName", "LaunchScreen")+"</string>";
             }
         }
-        if ("true".equalsIgnoreCase(request.getArg("ios.uiscene", "false")) && !inject.contains("UIApplicationSceneManifest")) {
+        if ("true".equalsIgnoreCase(request.getArg("ios.uiscene", "true")) && !inject.contains("UIApplicationSceneManifest")) {
             inject += "\n<key>UIApplicationSceneManifest</key>\n"
                     + "<dict>\n"
                     + "    <key>UIApplicationSupportsMultipleScenes</key>\n"

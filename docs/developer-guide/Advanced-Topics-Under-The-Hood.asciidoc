@@ -259,7 +259,7 @@ Currently only supported for App Store builds.  See https://www.codenameone.com/
 |Flips between iOS keyboard open mode and auto-fold keyboard mode. Defaults to true which means the keyboard will remain open and not fold automatically when editing moves to another field.
 
 |ios.uiscene
-|true/false (defaults to false). Experimental flag to enable iOS UIScene lifecycle support. UIScene lets iOS manage one or more app UI sessions independently, improving lifecycle handling in modern iOS versions. Apple has indicated UIScene will be required starting with iOS 27, so this flag can be used to prepare your app ahead of that transition.
+|true/false (defaults to true). Enables iOS UIScene lifecycle support. UIScene lets iOS manage one or more app UI sessions independently, improving lifecycle handling in modern iOS versions. Apple has indicated UIScene will be required starting with iOS 27, so this is now on by default; set the flag to `false` only if you need to temporarily fall back to the legacy `UIApplicationDelegate` lifecycle.
 
 |ios.urlScheme
 |Allows intercepting a URL call using the syntax `<string>urlPrefix<string>`
