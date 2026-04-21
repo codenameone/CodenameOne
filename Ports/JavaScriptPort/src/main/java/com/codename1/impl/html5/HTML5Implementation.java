@@ -4983,18 +4983,29 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
 
     private int isTablet = -1;
-    
+
     @Override
     public boolean isTablet() {
-        
+
         if (isTablet == -1) {
             String overrideVal = getParameterByName("isTablet");
             if ("1".equals(overrideVal)) {
                 isTablet = 1;
             } else if ("0".equals(overrideVal)) {
                 isTablet = 0;
+            } else if (isPhone_()) {
+                isTablet = 0;
             } else {
-                isTablet = isPhone_() ? 0:1;
+                // The mobile-browser regex above leaves headless Chromium
+                // (and any desktop browser opened at a phone-sized viewport)
+                // classified as a tablet. That kicks widgets into their
+                // tablet layout path — Picker's tablet branch in particular
+                // wraps the Spinner3D in PickerDialogTablet, which inflates
+                // to fill the screen and pushes the date wheels off-canvas
+                // at narrow viewports. Fall back to Material Design's sw600
+                // breakpoint on the shortest viewport side in CSS px.
+                int minSide = Math.min(getDisplayWidth(), getDisplayHeight());
+                isTablet = minSide >= 600 ? 1 : 0;
             }
         }
         return isTablet==1;

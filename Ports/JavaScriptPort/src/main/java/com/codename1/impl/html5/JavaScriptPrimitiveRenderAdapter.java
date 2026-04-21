@@ -71,7 +71,10 @@ public final class JavaScriptPrimitiveRenderAdapter<F, O> {
     }
 
     private static void debugSubmit(String operationName, Object operation) {
-        if (debugLogCount >= 80) {
+        if (!PortDiag.isPickerDiag()) {
+            return;
+        }
+        if (debugLogCount >= 5000) {
             return;
         }
         debugLogCount++;
