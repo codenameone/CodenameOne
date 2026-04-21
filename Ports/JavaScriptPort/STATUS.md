@@ -941,3 +941,40 @@ Files Touched In This Pass
   should fill - compare against iOS's `Dialog.paint` routing.
 - Instrument `setClip(Shape)` to verify it intersects with the current
   clip or replaces it wholesale.
+
+2026-04-21 Unit-test pass - density / ppi math (commit `8056ac150`)
+-------------------------------------------------------------------
+
+Per user direction ("create smaller localized unit tests to verify the
+port itself produces expected results"), hoisted the
+HTML5Implementation.getDeviceDensity() DPR-to-density ladder and the
+convertToPixels() density-to-ppi switch into `JavaScriptDisplayMetrics`,
+a pure-Java helper with zero @JSBody / CN1 UI dependencies. Added
+`JavaScriptDisplayMetricsTest` (9 tests, ~2.6 s) which compiles the
+helper standalone and drives it via reflection.
+
+**What passed:** all 9 tests. In particular:
+
+- Desktop at DPR=1 resolves to `DENSITY_MEDIUM` (not HD)
+- Desktop at DPR=2 resolves to `DENSITY_VERY_HIGH` (not 4K)
+- `convertToPixels(3mm, MEDIUM) = 19 px` (sane)
+- `convertToPixels(10mm, MEDIUM) = 63 px` (sane)
+- Reconstructed `Switch.calcPreferredSize(fontSize=16, padding=3mm, MEDIUM)`
+  yields 40-250 px wide / 20-150 px tall - nowhere near the 600x300 pill
+  the Kotlin screenshot shows
+
+**What this localizes:** the huge-pill Switch bug is *not* in the
+density/ppi math on the JS port. Remaining suspects:
+
+1. The Switch's effective theme padding is much larger than 3mm on the
+   JS port (iOS7Theme Switch UIID override not read correctly)
+2. `BoxLayout.encloseX` is stretching children past their preferredSize
+3. Font.getHeight() is returning something other than 16-19 when the
+   Switch actually runs its calcPreferredSize (our earlier diagnostic
+   sampled Labels' fonts, not the Switch's style font)
+
+Next localized unit test to write: extract the Style
+getHorizontalPadding/getVerticalPadding math as a helper (similar shape
+to JavaScriptDisplayMetrics) and verify theme-resource padding values
+round-trip through the JS port the same way they do on iOS. If that
+matches, the bug is in BoxLayout layout distribution.
