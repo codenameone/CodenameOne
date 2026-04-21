@@ -2680,8 +2680,15 @@ public class IPhoneBuilder extends Executor {
         if(lang != null) {
             replaceAllInFile(infoPlist, "<string>English</string>", "<string>"  + lang + "</string>");
         }
-        
-        
+
+        if ("true".equalsIgnoreCase(request.getArg("ios.uiscene", "false"))) {
+            // MainWindow.xib auto-instantiates a UIWindow with visibleAtLaunch=YES; under
+            // UIScene the window has no scene and FrontBoard kills the launch in iOS 26.
+            // UIApplicationMain(..., @"CodenameOne_GLAppDelegate") still creates the
+            // delegate from the class name, so the NIB is no longer needed.
+            replaceAllInFile(infoPlist, "<key>NSMainNibFile</key>\\s*<string>[^<]*</string>", "");
+        }
+
         // nothing to inject here? move along
         String inject = request.getArg("ios.plistInject", "<key>CFBundleShortVersionString</key> 	<string>" + buildVersion +"</string>");
         
