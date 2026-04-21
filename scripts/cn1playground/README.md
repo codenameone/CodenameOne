@@ -223,17 +223,38 @@ What works:
   per-constant method bodies, and built-in `name()` / `ordinal()` /
   `values()` / `valueOf()`.
 - **Records** (`record Point(int x, int y) {}`) with auto-generated
-  accessors and an optional body block.
-- **Sealed / non-sealed / permits** modifiers parse cleanly (the permit
-  list is not enforced at runtime — best-effort syntactic support).
+  accessors, an optional body block, and the compact-constructor form
+  (`Range { if (lo > hi) { ... } }`) which runs validation/normalisation
+  before the implicit field assignments.
+- **Sealed / non-sealed / permits** with runtime-enforced permit lists:
+  declaring a subclass that isn't named in the parent's `permits` clause
+  fails at evaluation time with a clear diagnostic.
+- **Pattern-matching switch statements** with type bindings:
+  `switch (o) { case Integer i -> useInt(i); case String s -> useStr(s); default -> ...; }`.
 
 What still doesn't work:
 
-- Non-static inner classes that need an enclosing-instance reference.
+- Non-static inner classes that need an enclosing-instance reference
+  (static-field-only access via `Outer.Inner.CONSTANT` works because
+  the registry flattens nested static classes; constructing
+  `new Outer().new Inner()` does not).
 - Reflection APIs (`java.lang.reflect.*`, `Class.forName`) — forbidden in
   CN1 and out of scope.
-- Streams via `Collection.stream()` — CN1's `java.util.Collection` backport
-  doesn't expose `stream()`.
+
+### Streams
+
+`Collection.stream()` is wired through a minimal in-process shim
+(`bsh.cn1.CN1StreamBridge`) because CN1's collection backport doesn't
+expose `stream()` natively. Supported intermediate ops: `filter`,
+`map`, `flatMap`, `peek`, `sorted` / `sorted(Comparator)`, `distinct`,
+`limit`, `skip`. Supported terminal ops: `forEach`, `count`, `collect`
+(returns a `List`, ignores the collector argument), `toList`,
+`toArray`, `iterator`, `anyMatch` / `allMatch` / `noneMatch`,
+`findFirst` / `findAny`, `min` / `max`, `reduce(BinaryOperator)`,
+`reduce(identity, BinaryOperator)`. Methods that ordinarily return
+`Optional` return the value directly, or `null` when the stream is
+empty — CN1's runtime omits `java.util.Optional`. `reduce` keys off
+`BinaryOperator` rather than `BiFunction` for the same reason.
 
 ### Lambdas and Method References
 
@@ -271,6 +292,14 @@ specific generic types may require casting:
 // Generic types are erased, so explicit casting may be needed:
 List<String> items = (List<String>) someMethod();
 ```
+
+### Error Diagnostics
+
+When a static field or method lookup misses, the playground searches
+the registry for the closest known names by case-insensitive prefix or
+short edit distance and appends the top three candidates to the error
+message. A typo like `Display.PICKER_TYP_DATE` surfaces as
+`... (did you mean: PICKER_TYPE_DATE, PICKER_TYPE_DATE_AND_TIME?)`.
 
 ## JavaScript Port Considerations
 
