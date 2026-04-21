@@ -126,6 +126,32 @@ static void installSignalHandlers() {
         self.viewController = viewController;
         [viewController release];
 #endif
+        // A VC instantiated via initWithNibName:bundle: is File's Owner of its own NIB and
+        // does NOT receive awakeFromNib. In the legacy MainWindow.xib path the VC was a
+        // NIB-archived object so awakeFromNib fired before viewDidLoad, setting scaleValue
+        // to [UIScreen mainScreen].scale; viewDidLoad's updateDisplayMetricsFromView then
+        // used the correct scaleValue. Fire awakeFromNib manually, but do NOT force
+        // [self.viewController view] first — awakeFromNib reaches self.view through
+        // [self eaglView] internally, which triggers loadView/viewDidLoad after scaleValue
+        // has already been set. Forcing the view load separately reverses that order and
+        // caches wrong density/ppi (scaleValue=1 × NIB 320×460 bounds = DENSITY_MEDIUM).
+        [self.viewController awakeFromNib];
+
+        // awakeFromNib's embedded viewDidLoad leaves displayWidth/displayHeight at the
+        // NIB's 320×460 bounds × scale. In legacy AppDelegate mode that doesn't matter
+        // because viewDidAppear → updateCanvas rewrites them to the window bounds before
+        // CN1's Java main reaches getDeviceDensity(). UIScene inserts scene:willConnectTo
+        // Session between didFinishLaunching and viewDidAppear, widening that window,
+        // and Java main can cache the NIB-sized values first — pinning density to
+        // DENSITY_MEDIUM/VERY_HIGH instead of the iPhone 16 DENSITY_560 baseline. Seed
+        // the globals with the actual screen size now so the first density/ppi read
+        // resolves to the same DPI-class legacy sees post-viewDidAppear.
+        CGSize screenSize = [UIScreen mainScreen].bounds.size;
+        extern int displayWidth;
+        extern int displayHeight;
+        extern float scaleValue;
+        displayWidth = (int)(screenSize.width * scaleValue);
+        displayHeight = (int)(screenSize.height * scaleValue);
     }
     return self.viewController;
 }

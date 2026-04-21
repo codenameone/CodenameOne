@@ -108,7 +108,7 @@ If none of the services are defined to true then plus, auth, base, analytics, gc
 |Boolean true/false defaults to true. Toggles the Android pipeline between the legacy pipeline (false) and new pipeline (true)
 
 |android.stringsXml
-|Allows injecting additional entries into the strings.xml file using a value that includes something like this`<string name="key1">value1</string><string name="key2">value2</string>`
+|Allows injecting additional entries into the strings.xml file using a value that includes something like this `<string name="key1">value1</string><string name="key2">value2</string>`
 
 |android.supportV4
 |Boolean true/false defaults to false but that can change based on usage (e.g. push implicitly activates this). Indicates whether the android support v4 library should be included in the build
@@ -259,7 +259,7 @@ Currently only supported for App Store builds.  See https://www.codenameone.com/
 |Flips between iOS keyboard open mode and auto-fold keyboard mode. Defaults to true which means the keyboard will remain open and not fold automatically when editing moves to another field.
 
 |ios.uiscene
-|true/false (defaults to false). Experimental flag to enable iOS UIScene lifecycle support. UIScene lets iOS manage one or more app UI sessions independently, improving lifecycle handling in modern iOS versions. Apple has indicated UIScene will be required starting with iOS 27, so this flag can be used to prepare your app ahead of that transition.
+|true/false (defaults to true). Enables iOS UIScene lifecycle support. UIScene lets iOS manage one or more app UI sessions independently, improving lifecycle handling in modern iOS versions. Apple has indicated UIScene will be required starting with iOS 27, so this is now on by default; set the flag to `false` only if you need to temporarily fall back to the legacy `UIApplicationDelegate` lifecycle.
 
 |ios.urlScheme
 |Allows intercepting a URL call using the syntax `<string>urlPrefix<string>`
@@ -313,7 +313,7 @@ Currently only supported for App Store builds.  See https://www.codenameone.com/
 |default/legacy/modern/auto (defaults to default). Default means you don't define a theme mode. Currently this is equivalent to legacy. In the future we'll switch this to be equivalent to auto. legacy - this will behave like iOS 6 regardless of the device you're running on. modern - this will behave like iOS 7 regardless of the device you're running on. auto - this will behave like iOS 6 on older devices and iOS 7 on newer devices.
 
 |ios.interface_orientation
-|UIInterfaceOrientationPortrait by default. Indicates the  orientation, one or more of (separated by colon :): UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight. Notice that the IDE plugin has an "Interface Orientation" combo box you *should* use under the iOS section.
+|UIInterfaceOrientationPortrait by default. Indicates the  orientation, one or more of (separated by colon :): `UIInterfaceOrientationPortrait`, `UIInterfaceOrientationPortraitUpsideDown`, `UIInterfaceOrientationLandscapeLeft`, `UIInterfaceOrientationLandscapeRight`. Notice that the IDE plugin has an "Interface Orientation" combo box you *should* use under the iOS section.
 
 |ios.xcode_version
 |The version of Xcode used on the server. Defaults to 4.5; currently accepts 5.0 as an option and nothing else.

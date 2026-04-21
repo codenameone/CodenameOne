@@ -742,7 +742,7 @@ public class IPhoneBuilder extends Executor {
         }
         
         File glAppDelegate = new File(buildinRes, "CodenameOne_GLAppDelegate.m");
-        boolean useUIScene = "true".equalsIgnoreCase(request.getArg("ios.uiscene", "false"));
+        boolean useUIScene = "true".equalsIgnoreCase(request.getArg("ios.uiscene", "true"));
         String integrateFacebook = "";
         
 
@@ -2680,8 +2680,15 @@ public class IPhoneBuilder extends Executor {
         if(lang != null) {
             replaceAllInFile(infoPlist, "<string>English</string>", "<string>"  + lang + "</string>");
         }
-        
-        
+
+        if ("true".equalsIgnoreCase(request.getArg("ios.uiscene", "true"))) {
+            // MainWindow.xib auto-instantiates a UIWindow with visibleAtLaunch=YES; under
+            // UIScene the window has no scene and FrontBoard kills the launch in iOS 26.
+            // UIApplicationMain(..., @"CodenameOne_GLAppDelegate") still creates the
+            // delegate from the class name, so the NIB is no longer needed.
+            replaceAllInFile(infoPlist, "<key>NSMainNibFile</key>\\s*<string>[^<]*</string>", "");
+        }
+
         // nothing to inject here? move along
         String inject = request.getArg("ios.plistInject", "<key>CFBundleShortVersionString</key> 	<string>" + buildVersion +"</string>");
         
@@ -2737,7 +2744,7 @@ public class IPhoneBuilder extends Executor {
                 inject += "\n<key>UILaunchStoryboardName</key><string>"+request.getArg("ios.launchStoryboardName", "LaunchScreen")+"</string>";
             }
         }
-        if ("true".equalsIgnoreCase(request.getArg("ios.uiscene", "false")) && !inject.contains("UIApplicationSceneManifest")) {
+        if ("true".equalsIgnoreCase(request.getArg("ios.uiscene", "true")) && !inject.contains("UIApplicationSceneManifest")) {
             inject += "\n<key>UIApplicationSceneManifest</key>\n"
                     + "<dict>\n"
                     + "    <key>UIApplicationSupportsMultipleScenes</key>\n"
