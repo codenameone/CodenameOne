@@ -202,6 +202,9 @@ public class JavaSEPort extends CodenameOneImplementation {
     private Boolean darkMode;
     private AutoLocalizationBundle autoLocalizationBundle;
     private boolean autoUpdateDefaultResourceBundle;
+    private float largerTextScale = 1.0f;
+    private boolean largerTextEnabled = false;
+    private static final String PREF_LARGER_TEXT_SCALE = "cn1.simulator.largerTextScale";
 
     static {
         IOS_NATIVE_FONT_CANDIDATES.put("native:MainThin", new String[] {
@@ -4463,6 +4466,8 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         });
 
+        installLargerTextMenu(simulateMenu, pref, frm);
+
         pause = new JMenuItem("Pause App");
         simulateMenu.addSeparator();
         simulateMenu.add(pause);
@@ -5291,6 +5296,75 @@ public class JavaSEPort extends CodenameOneImplementation {
         return Math.min(h1, w1);
     }
     
+    private void installLargerTextMenu(JMenu parent, final Preferences pref, final JFrame frm) {
+        // Standard iOS Dynamic Type stops with their actual body-text point sizes.
+        // The simulator returns ratio = bodyPt / 17pt, matching what iOS reports.
+        final String[] labels = {
+            "Extra Small",
+            "Small",
+            "Medium",
+            "Large (default)",
+            "Extra Large",
+            "Extra Extra Large",
+            "Extra Extra Extra Large",
+            "Accessibility 1",
+            "Accessibility 2",
+            "Accessibility 3",
+            "Accessibility 4",
+            "Accessibility 5"
+        };
+        final float[] scales = {
+            14f / 17f,   // XS
+            15f / 17f,   // S
+            16f / 17f,   // M
+            17f / 17f,   // L (iOS default)
+            19f / 17f,   // XL
+            21f / 17f,   // XXL
+            23f / 17f,   // XXXL (largest non-accessibility)
+            28f / 17f,   // AX1
+            33f / 17f,   // AX2
+            40f / 17f,   // AX3
+            47f / 17f,   // AX4
+            53f / 17f    // AX5
+        };
+
+        JMenu largerTextMenu = new JMenu("Larger Text");
+        registerMenuWithBlit(largerTextMenu);
+
+        float saved = pref.getFloat(PREF_LARGER_TEXT_SCALE, 1.0f);
+        largerTextScale = saved;
+        largerTextEnabled = saved > 1.0f + 0.001f;
+
+        ButtonGroup group = new ButtonGroup();
+        for (int i = 0; i < labels.length; i++) {
+            final float scale = scales[i];
+            JRadioButtonMenuItem item = new JRadioButtonMenuItem(labels[i],
+                    Math.abs(saved - scale) < 0.001f);
+            item.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    largerTextScale = scale;
+                    largerTextEnabled = scale > 1.0f + 0.001f;
+                    pref.putFloat(PREF_LARGER_TEXT_SCALE, scale);
+                    refreshSkin(frm);
+                }
+            });
+            group.add(item);
+            largerTextMenu.add(item);
+        }
+        parent.add(largerTextMenu);
+    }
+
+    @Override
+    public boolean isLargerTextEnabled() {
+        return largerTextEnabled;
+    }
+
+    @Override
+    public float getLargerTextScale() {
+        return largerTextScale;
+    }
+
     private void refreshSkin(final JFrame frm) {
         Display.getInstance().callSerially(new Runnable() {
 
@@ -5774,7 +5848,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             window.setLocationByPlatform(true);
 
             android6PermissionsFlag = pref.getBoolean("Android6Permissions", false);
-            
+
+            largerTextScale = pref.getFloat(PREF_LARGER_TEXT_SCALE, 1.0f);
+            largerTextEnabled = largerTextScale > 1.0f + 0.001f;
+
             alwaysOnTop = pref.getBoolean("AlwaysOnTop", false);
             if (appFrame == null) window.setAlwaysOnTop(alwaysOnTop);
             

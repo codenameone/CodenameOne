@@ -5816,28 +5816,47 @@ public class IOSImplementation extends CodenameOneImplementation {
                     return dDensity;
                 }
                 else if (largest == 2532 && smallest == 1170) {
-                    // 12
+                    // iPhone 12, 12 Pro, 13, 13 Pro, 14
+                    dDensity = Display.DENSITY_560;
+                    return dDensity;
+                }
+                else if (largest == 2556 && smallest == 1179) {
+                    // iPhone 14 Pro, 15, 15 Pro, 16
+                    //ppi = PPI_460;
+                    dDensity = Display.DENSITY_560;
+                    return dDensity;
+                }
+                else if (largest == 2796 && smallest == 1290) {
+                    // iPhone 14 Pro Max, 15 Plus, 15 Pro Max, 16 Plus
+                    //ppi = PPI_460;
+                    dDensity = Display.DENSITY_560;
+                    return dDensity;
+                }
+                else if (largest == 2622 && smallest == 1206) {
+                    // iPhone 16 Pro
+                    //ppi = PPI_460;
+                    dDensity = Display.DENSITY_560;
+                    return dDensity;
+                }
+                else if (largest == 2868 && smallest == 1320) {
+                    // iPhone 16 Pro Max
+                    //ppi = PPI_460;
+                    dDensity = Display.DENSITY_560;
+                    return dDensity;
+                }
+                else if (largest == 2778 && smallest == 1284) {
+                    // iPhone 12 Pro Max, 13 Pro Max, 14 Plus
+                    //ppi = PPI_458;
                     dDensity = Display.DENSITY_560;
                     return dDensity;
                 }
                 else if (largest == 1792 && smallest == 828) {
-                    // iPhone 11
+                    // iPhone 11, XR
                     //ppi = PPI_326;
                     dDensity = Display.DENSITY_VERY_HIGH;
                     return dDensity;
                 } else if (largest == 2688 && smallest == 1242) {
-                    // iPhone 11 max pro
-                    //ppi = PPI_458;
-                    dDensity = Display.DENSITY_560;
-                    return dDensity;
-                } else if (largest == 1792 && smallest == 828) {
-                    // 11, XR
-                    //ppi = PPI_326;
-                    dDensity = Display.DENSITY_VERY_HIGH;
-                    return dDensity;
-
-                } else if (largest == 2688 && smallest == 1242) {
-                    // 11 Pro Max, Xs Max
+                    // iPhone 11 Pro Max, Xs Max
                     //ppi = PPI_458;
                     dDensity = Display.DENSITY_560;
                     return dDensity;
@@ -5919,29 +5938,43 @@ public class IOSImplementation extends CodenameOneImplementation {
                         ppi = PPI_476;
                     }
                     else if (largest == 2532 && smallest == 1170) {
-                        // 12
+                        // iPhone 12, 12 Pro, 13, 13 Pro, 14
                         ppi = PPI_460;
                     }
-                    else if (largest == 1792 && smallest == 828) {
-                        // iPhone 11
-                        ppi = PPI_326;
-                    } else if (largest == 2688 && smallest == 1242) {
-                        // iPhone 11 max pro
+                    else if (largest == 2556 && smallest == 1179) {
+                        // iPhone 14 Pro, 15, 15 Pro, 16
+                        ppi = PPI_460;
+                    }
+                    else if (largest == 2796 && smallest == 1290) {
+                        // iPhone 14 Pro Max, 15 Plus, 15 Pro Max, 16 Plus
+                        ppi = PPI_460;
+                    }
+                    else if (largest == 2622 && smallest == 1206) {
+                        // iPhone 16 Pro
+                        ppi = PPI_460;
+                    }
+                    else if (largest == 2868 && smallest == 1320) {
+                        // iPhone 16 Pro Max
+                        ppi = PPI_460;
+                    }
+                    else if (largest == 2778 && smallest == 1284) {
+                        // iPhone 12 Pro Max, 13 Pro Max, 14 Plus
                         ppi = PPI_458;
-                    } else if (largest == 1792 && smallest == 828) {
-                        // 11, XR
+                    }
+                    else if (largest == 1792 && smallest == 828) {
+                        // iPhone 11, XR
                         ppi = PPI_326;
                     } else if (largest == 2688 && smallest == 1242) {
-                        // 11 Pro Max, Xs Max
+                        // iPhone 11 Pro Max, Xs Max
                         ppi = PPI_458;
                     } else if (largest == 2208 && smallest == 1242) {
-                        // 6+, 6s, 7+, 8+
+                        // 6+, 6s+, 7+, 8+
                         ppi = PPI_401;
                     } else if (largest == 1334 && smallest == 750) {
-                        // 6, 6s, 7, 8
+                        // 6, 6s, 7, 8, SE 2nd/3rd gen
                         ppi = PPI_326;
                     } else if (largest == 1136 && smallest == 640) {
-                        //5, 5s, 5c, SE
+                        //5, 5s, 5c, SE 1st gen
                         ppi = PPI_326;
                     } else if (largest == 960 && smallest == 640) {
                         // 4, 4s
@@ -5951,19 +5984,17 @@ public class IOSImplementation extends CodenameOneImplementation {
                         ppi = PPI_163;
                     }
                     else if (largest == 2436) {
-                        // iphone X
-                        ppi = 18.031496062992126;
+                        // iPhone X, Xs, 11 Pro
+                        ppi = PPI_458;
                     } else {
-                        if(largest > 2000) {
-                            // iphone 6 plus
-                            ppi = 19.25429416;                    
+                        // Unknown 3x device. Apple has held 460 ppi for every
+                        // non-Plus iPhone since the iPhone 12, so default future
+                        // phones to that rather than the legacy 6 Plus value.
+                        if (largest > 2000) {
+                            ppi = PPI_460;
                         } else {
-                            if(largest > 1300) {
-                                // iphone 6
-                                ppi = 12.8369704749679;                    
-                            } else {
-                                ppi = 12.8369704749679;                    
-                            }
+                            // Older 2x device fallback (~PPI_326).
+                            ppi = 12.8369704749679;
                         }
                     }
                 }
