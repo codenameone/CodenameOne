@@ -47,7 +47,7 @@ const browser = await chromium.launch({
 
 try {
   const page = await browser.newPage({
-    viewport: { width: 1280, height: 900 }
+    viewport: { width: 375, height: 667 }
   });
 
   page.on('console', msg => {

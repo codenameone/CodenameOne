@@ -5917,7 +5917,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @Override
     public void getTransform(Object nativeGraphics, Transform t) {
-        Transform existing = ((HTML5Graphics)graphics).getTransform();
+        Transform existing = ((HTML5Graphics)nativeGraphics).getTransform();
         if (existing == null) {
             t.setIdentity();
         } else {
