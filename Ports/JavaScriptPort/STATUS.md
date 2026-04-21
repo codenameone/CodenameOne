@@ -3,7 +3,7 @@
 JavaScript Port Status (ParparVM)
 =================================
 
-Last updated: 2026-04-21
+Last updated: 2026-04-21 (post-parseDouble-fix)
 
 Current Pass — Rendering correctness (2026-04-20)
 -------------------------------------------------
@@ -1045,3 +1045,55 @@ faster than another unit test - add a one-shot
 at port startup plus an equivalent for the Switch's computed
 `getStyle().getHorizontalPadding() / .getVerticalPadding()` values and
 compare against the unit-test expectations (MEDIUM + ~19 px per side).
+
+2026-04-21 Root cause fix - Double.parseDouble (commit `9449526a3`)
+-------------------------------------------------------------------
+
+Per user direction ("reproduce the test with simple Java code so you
+can see if that relates to the on/off switch or to something in
+Kotlin or some other UI element"), wrote
+`SwitchIsolationScreenshotTest` - a pure-Java reproduction of
+KotlinUiTest's Switch row (3 layouts: FlowLayout + two encloseX
+variants). Result: all three rows showed identical ~479x285 pills, so
+the bug was NOT Kotlin-specific and NOT layout-dependent - every
+single Switch in isolation reproduced it.
+
+Adding port-side `createMutableImage` logging revealed the Switch
+created its thumb image at 270x270 and track at 479x285. Those
+numbers mean `getFontSize() * thumbScaleY = 266` and
+`getFontSize() * trackScaleX = 475`, so either fontSize was ~190 or
+the scale constants were ~10x. fontSize was 19 (verified via
+Font.getHeight inside Switch.calcPreferredSize), so the scale
+constants were wrong.
+
+Direct test: `Double.parseDouble("1.4") = 14`, `"2.5" = 25`,
+`"10.9" = 109`, `".5" = 5`. 10x everywhere a decimal point appears.
+
+Root cause: `parparvm_runtime.js:2262` parseDblImpl binding returned
+`Number(text)` and dropped the exponent argument. StringToReal splits
+"1.4" into digits="14" + exponent=-1 and expects the native to compute
+14 * 10^-1 = 1.4. The binding ignored the -1, returning 14.
+
+Fix (one-liner): multiply parsed by `Math.pow(10, exponentIndex)` when
+exponent != 0.
+
+Regression guard:
+- `JsDoubleParseApp` fixture + new test
+  `JavascriptRuntimeSemanticsTest.parseDoubleAppliesExponentFromStringToRealSplit`
+  covers 9 decimal / sign / exponent combos
+- `SwitchIsolationScreenshotTest` wired into `Cn1ssDeviceRunner` as
+  a screenshot regression. Baseline: three rows of correctly-sized
+  switches (gray off, green on)
+
+Impact: Switch rendering now correct. Same fix also cleans up any
+other CN1 path using fractional theme constants (Switch track scales,
+ThumbInsetMM "0.25", RoundRectBorder shadowSpread values, etc.).
+Full suite re-run pending; expected improvements across the Kotlin
+screenshot and possibly the Sheet/Picker panels if their bg styling
+also used fractional padding/mm values that were 10x inflated.
+
+The unit-test-first approach paid off doubly here: the three previous
+localized test suites (density, shape path, native image) all passed,
+which was initially "disappointing" but in fact correctly ruled out
+three false leads. The parseDouble test landed the actual bug in
+under a minute of test runtime once the right fixture was in place.
