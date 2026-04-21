@@ -231,15 +231,36 @@ What works:
   fails at evaluation time with a clear diagnostic.
 - **Pattern-matching switch statements** with type bindings:
   `switch (o) { case Integer i -> useInt(i); case String s -> useStr(s); default -> ...; }`.
+- **Non-static inner classes** — `class Outer { class Inner { ... } }`
+  works, with Inner's methods reading/writing Outer's instance fields
+  through the namespace chain. Construction via
+  `new Outer().new Inner()` is supported; `new Inner()` inside an
+  Outer method also works (the enclosing `this` is auto-resolved).
+- **Interface method enforcement at declaration time** — a concrete
+  class that says `implements Iface` must provide every abstract
+  method Iface declares. Fires for both Java interfaces (signatures
+  pulled from the CN1 registry) and scripted interfaces (abstract
+  methods read from the interface's own `ScriptedClass`). A bare
+  `class Other implements ActionListener {}` now fails with
+  `class 'Other' is not abstract and does not implement all methods
+  from com.codename1.ui.events.ActionListener. Missing:
+  actionPerformed.`
+- **Diagnostic suggestions** — missing static fields, static methods,
+  and instance methods on scripted classes all produce a "Did you
+  mean: X?" hint drawn from the relevant name table. Helps spot
+  typos like `Display.PICKER_TYP_DATE` or `myObj.sayz()`.
 
 What still doesn't work:
 
-- Non-static inner classes that need an enclosing-instance reference
-  (static-field-only access via `Outer.Inner.CONSTANT` works because
-  the registry flattens nested static classes; constructing
-  `new Outer().new Inner()` does not).
 - Reflection APIs (`java.lang.reflect.*`, `Class.forName`) — forbidden in
   CN1 and out of scope.
+- Cross-snippet sealed hierarchies — sealed enforcement operates on a
+  single snippet because the Interpreter is per-run.
+- JDK surface that isn't in CN1's runtime (`Optional`, `List.of`,
+  `Map.of`, `Set.of`, `Stream.of`, `IntStream.range`, extended
+  Collectors, etc.). The playground mirrors CN1's actual API surface
+  rather than full JDK parity — scripts that compile here also run
+  on device.
 
 ### Streams
 
@@ -295,11 +316,32 @@ List<String> items = (List<String>) someMethod();
 
 ### Error Diagnostics
 
-When a static field or method lookup misses, the playground searches
-the registry for the closest known names by case-insensitive prefix or
-short edit distance and appends the top three candidates to the error
-message. A typo like `Display.PICKER_TYP_DATE` surfaces as
-`... (did you mean: PICKER_TYPE_DATE, PICKER_TYPE_DATE_AND_TIME?)`.
+When a static field, static method, or instance method on a scripted
+class misses, the playground searches the relevant name table (CN1
+registry for Java types, the scripted class's own method list for
+user types) for the closest match by case-insensitive prefix or
+short Levenshtein distance and appends up to three suggestions.
+Typos like `Display.PICKER_TYP_DATE` surface as `... (did you mean:
+PICKER_TYPE_DATE, PICKER_TYPE_DATE_AND_TIME?)`, and
+`myThing.sayz()` surfaces as `No instance method Thing.sayz/0. Did
+you mean: say?`.
+
+Interface-method enforcement fires at class-declaration time, so
+`class X implements ActionListener {}` fails immediately with
+`Missing: actionPerformed.` rather than deferring to the first
+invocation site.
+
+### Cold-start Performance
+
+`PlaygroundColdStartHarness` in the test sources prints baseline
+timings for the cold-start phases (registry first use, first
+package-helper load, first FIELD_INDEX lookup, CN1 `Display.init`,
+first full `PlaygroundRunner.run`). Run it against a fresh JVM via
+`java -cp ...` to catch regressions. Typical median on a dev
+laptop: first registry hit ~27 ms, first `PlaygroundRunner.run`
+~60 ms, CN1's own `Display.init` ~800 ms. Only the
+playground-controlled phases are actionable; the rest is CN1
+runtime wiring.
 
 ## JavaScript Port Considerations
 
