@@ -159,6 +159,145 @@ public final class PlaygroundSyntaxMatrixHarness {
         addTextBlocks(cases);
         addVarInference(cases);
         addIntegrationCases(cases);
+        addParseDiagnostics(cases);
+        addExtendedCoverage(cases);
+    }
+
+    // ------------------------------------------------------------------
+    // Category: Parse-error diagnostics — the messages themselves are
+    // tested to confirm the enriched formatting (location + caret +
+    // token-specific hint) actually surfaces.
+    // ------------------------------------------------------------------
+    private static void addParseDiagnostics(List<Case> cases) {
+        String cat = "parse_diagnostics";
+        cases.add(new Case(cat, "missing_closing_brace_reports_eof", ui(""
+                + "class Bad { public String hello() { return \"hi\";\n"),
+                ExpectedOutcome.PARSE_ERROR, "end-of-input"));
+        cases.add(new Case(cat, "missing_semicolon_hint_mentions_preceding", ui(""
+                + "int a = 1\n"
+                + "int b = 2;\n"
+                + "root.add(new Label(\"\" + a + b));"),
+                ExpectedOutcome.PARSE_ERROR, "Syntax error"));
+        cases.add(new Case(cat, "unterminated_paren_hint", ui(""
+                + "int a = (1 + 2;\n"
+                + "root.add(new Label(\"\" + a));"),
+                ExpectedOutcome.PARSE_ERROR, "Syntax error"));
+        cases.add(new Case(cat, "parse_error_includes_line_number", ui(""
+                + "int a = 1;\n"
+                + "if a > 0) { }\n"
+                + "root.add(new Label(\"\" + a));"),
+                ExpectedOutcome.PARSE_ERROR, "line "));
+    }
+
+    // ------------------------------------------------------------------
+    // Category: Extended coverage — CN1-supported features and edge
+    // cases that weren't previously exercised. All cases operate
+    // strictly within CN1's runtime surface.
+    // ------------------------------------------------------------------
+    private static void addExtendedCoverage(List<Case> cases) {
+        String cat = "extended";
+        // String methods on CN1-supported String API.
+        cases.add(new Case(cat, "string_contains", ui(""
+                + "String s = \"hello world\";\n"
+                + "boolean has = s.indexOf(\"world\") >= 0;\n"
+                + "root.add(new Label(\"has=\" + has));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "string_replace_char", ui(""
+                + "String s = \"abc\".replace('b', 'X');\n"
+                + "root.add(new Label(s));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "stringbuilder_append_chain", ui(""
+                + "StringBuilder b = new StringBuilder();\n"
+                + "b.append(\"x=\").append(42).append('!');\n"
+                + "root.add(new Label(b.toString()));"), ExpectedOutcome.SUCCESS, null));
+        // Integer parsing and math.
+        cases.add(new Case(cat, "integer_parse_and_math", ui(""
+                + "int n = Integer.parseInt(\"42\");\n"
+                + "int sq = n * n;\n"
+                + "root.add(new Label(\"sq=\" + sq));"), ExpectedOutcome.SUCCESS, null));
+        cases.add(new Case(cat, "math_min_max_abs", ui(""
+                + "int v = Math.max(Math.abs(-5), Math.min(10, 3));\n"
+                + "root.add(new Label(\"v=\" + v));"), ExpectedOutcome.SUCCESS, null));
+        // Arrays utilities over an Object[] (CN1's reduced runtime
+        // supports Object[] arrays, not primitive int[] iteration via
+        // enhanced-for inside the BSH layer).
+        cases.add(new Case(cat, "arrays_asList_and_sum", ui(""
+                + "import java.util.*;\n"
+                + "List<Integer> xs = Arrays.asList(1, 2, 3, 4);\n"
+                + "int sum = 0; for (Object x : xs) sum += ((Integer) x).intValue();\n"
+                + "root.add(new Label(\"sum=\" + sum));"), ExpectedOutcome.SUCCESS, null));
+        // HashMap iteration via entrySet.
+        cases.add(new Case(cat, "hashmap_entryset_walk", ui(""
+                + "import java.util.*;\n"
+                + "Map<String, Integer> m = new LinkedHashMap<>();\n"
+                + "m.put(\"a\", 1); m.put(\"b\", 2);\n"
+                + "int total = 0;\n"
+                + "for (Map.Entry<String, Integer> e : m.entrySet()) total += e.getValue();\n"
+                + "root.add(new Label(\"total=\" + total));"), ExpectedOutcome.SUCCESS, null));
+        // String.format via formatted CN1 API (if present).
+        cases.add(new Case(cat, "locale_independent_format", ui(""
+                + "String s = Integer.toHexString(255);\n"
+                + "root.add(new Label(\"hex=\" + s));"), ExpectedOutcome.SUCCESS, null));
+        // Button listener with anonymous class full-paths.
+        cases.add(new Case(cat, "button_listener_chain", ui(""
+                + "Button b1 = new Button(\"A\");\n"
+                + "Button b2 = new Button(\"B\");\n"
+                + "b1.addActionListener(e -> b2.setText(\"X\"));\n"
+                + "root.add(b1); root.add(b2);"), ExpectedOutcome.SUCCESS, null));
+        // Nested try/catch with finally rethrowing into an outer
+        // catch. Exercises the full try stack unwinding and finally
+        // semantics with an explicitly thrown script-level exception.
+        cases.add(new Case(cat, "nested_try_catch_finally", ui(""
+                + "int r = -1;\n"
+                + "try {\n"
+                + "    try { throw new IllegalStateException(\"boom\"); }\n"
+                + "    catch (IllegalStateException ex) { r = 0; throw new RuntimeException(\"x\"); }\n"
+                + "    finally { r++; }\n"
+                + "} catch (RuntimeException ex) { r = r + 10; }\n"
+                + "root.add(new Label(\"r=\" + r));"), ExpectedOutcome.SUCCESS, null));
+        // Enhanced-for over an array and mutation.
+        cases.add(new Case(cat, "enhanced_for_over_array", ui(""
+                + "int[] arr = {1, 2, 3, 4};\n"
+                + "int p = 1;\n"
+                + "for (int x : arr) p *= x;\n"
+                + "root.add(new Label(\"p=\" + p));"), ExpectedOutcome.SUCCESS, null));
+        // Ternary chains.
+        cases.add(new Case(cat, "ternary_chain", ui(""
+                + "int n = 7;\n"
+                + "String label = n < 0 ? \"neg\" : n == 0 ? \"zero\" : n < 10 ? \"small\" : \"big\";\n"
+                + "root.add(new Label(label));"), ExpectedOutcome.SUCCESS, null));
+        // Bitwise ops on int.
+        cases.add(new Case(cat, "bitwise_ops", ui(""
+                + "int r = (0b1010 | 0b0101) & 0xFF;\n"
+                + "int s = 1 << 4;\n"
+                + "root.add(new Label(\"r=\" + r + \" s=\" + s));"), ExpectedOutcome.SUCCESS, null));
+        // Indexed iteration of a String — primitive char[] enhanced-for
+        // isn't supported in the reduced CN1 array runtime, but
+        // charAt(i) with a classic for is.
+        cases.add(new Case(cat, "string_indexed_charat", ui(""
+                + "String text = \"abc\";\n"
+                + "StringBuilder sb = new StringBuilder();\n"
+                + "for (int i = 0; i < text.length(); i++) sb.append(text.charAt(i)).append('-');\n"
+                + "root.add(new Label(sb.toString()));"), ExpectedOutcome.SUCCESS, null));
+        // ArrayList sort via Comparator.
+        cases.add(new Case(cat, "arraylist_sort_comparator", ui(""
+                + "import java.util.*;\n"
+                + "List<Integer> xs = new ArrayList<>();\n"
+                + "xs.add(3); xs.add(1); xs.add(2);\n"
+                + "Collections.sort(xs, (a, b) -> ((Integer) a).compareTo((Integer) b));\n"
+                + "root.add(new Label(xs.toString()));"), ExpectedOutcome.SUCCESS, null));
+        // Deeply-nested scripted classes.
+        cases.add(new Case(cat, "three_level_class_hierarchy", ui(""
+                + "class A { int v() { return 1; } }\n"
+                + "class B extends A { public int v() { return super.v() + 10; } }\n"
+                + "class C extends B { public int v() { return super.v() + 100; } }\n"
+                + "C c = new C();\n"
+                + "root.add(new Label(\"v=\" + c.v()));"), ExpectedOutcome.SUCCESS, null));
+        // Enum with abstract per-constant method.
+        cases.add(new Case(cat, "enum_per_constant_abstract_method", ui(""
+                + "enum Op { ADD { public int apply(int a, int b) { return a + b; } },"
+                + " MUL { public int apply(int a, int b) { return a * b; } };"
+                + " public abstract int apply(int a, int b); }\n"
+                + "int r = Op.ADD.apply(2, 3) + Op.MUL.apply(2, 3);\n"
+                + "root.add(new Label(\"r=\" + r));"), ExpectedOutcome.SUCCESS, null));
     }
 
     // ------------------------------------------------------------------

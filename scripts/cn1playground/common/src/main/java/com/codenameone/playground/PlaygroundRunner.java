@@ -108,9 +108,11 @@ final class PlaygroundRunner {
             } catch (NullPointerException e) {
                 // currentToken can be null in some parse error cases
             }
-            return failure("Parse error: " + safeMessage(ex), errorLine, extractColumn(ex.getMessage()), inlineMessages);
+            return failure("Parse error: " + formatParseMessageWithSource(ex, script),
+                    errorLine, extractColumn(ex.getMessage()), inlineMessages);
         } catch (TokenMgrException ex) {
-            return failure("Lexer error: " + safeMessage(ex), extractLine(ex.getMessage()), extractColumn(ex.getMessage()), inlineMessages);
+            return failure("Lexer error: " + formatLexerMessageWithSource(ex, script),
+                    extractLine(ex.getMessage()), extractColumn(ex.getMessage()), inlineMessages);
         } catch (TargetError ex) {
             return failure("Evaluation error: " + safeMessage(ex), extractTargetLine(ex), 1, inlineMessages);
         } catch (EvalError ex) {
@@ -3032,41 +3034,171 @@ final class PlaygroundRunner {
     }
 
     private String formatParseMessage(ParseException ex) {
+        return formatParseMessageWithSource(ex, null);
+    }
+
+    private String formatLexerMessage(TokenMgrException ex) {
+        return formatLexerMessageWithSource(ex, null);
+    }
+
+    /** Build an enriched parse-error message: precise location,
+     * offending token, a source-line excerpt with a caret under the
+     * bad column, and a specific hint when we can infer one. Falls
+     * back to BSH's own "Unable to parse code syntax" message when
+     * the exception doesn't carry a {@code currentToken}. */
+    private String formatParseMessageWithSource(ParseException ex, String source) {
         int line = -1;
+        int column = -1;
+        String encountered = null;
         try {
-            line = ex.getErrorLineNumber();
+            if (ex.currentToken != null && ex.currentToken.next != null) {
+                line = ex.currentToken.next.beginLine;
+                column = ex.currentToken.next.beginColumn;
+                encountered = tokenImage(ex.currentToken.next);
+            } else {
+                line = ex.getErrorLineNumber();
+            }
         } catch (NullPointerException e) {
-            // currentToken can be null in some parse error cases
+            // currentToken can be null on some parse paths
         }
         String raw = ex.getMessage();
+        if (encountered == null) encountered = inferEncounteredToken(raw);
+
         StringBuilder out = new StringBuilder();
         out.append("Syntax error");
-        if (line > 0) {
-            out.append(" at line ").append(line);
+        if (line > 0) out.append(" at line ").append(line);
+        if (column > 0) out.append(", column ").append(column);
+        if (encountered != null && !encountered.isEmpty()) {
+            out.append(" (unexpected ").append(encountered).append(")");
         }
-        String detail = extractLocationDetail(raw);
-        if (detail != null) {
-            out.append(", ").append(detail);
-        }
-        String hint = parseHint(raw);
-        if (hint != null) {
-            out.append(". ").append(hint);
+        out.append('.');
+
+        String excerpt = sourceExcerpt(source, line, column);
+        if (excerpt != null) out.append('\n').append(excerpt);
+
+        String hint = tokenAwareHint(encountered, raw);
+        if (hint != null) out.append('\n').append(hint);
+        return out.toString();
+    }
+
+    private String formatLexerMessageWithSource(TokenMgrException ex, String source) {
+        String raw = ex.getMessage();
+        int line = extractLine(raw);
+        int column = extractColumn(raw);
+        StringBuilder out = new StringBuilder("Lexer error");
+        if (line > 0) out.append(" at line ").append(line);
+        if (column > 0) out.append(", column ").append(column);
+        out.append('.');
+        String excerpt = sourceExcerpt(source, line, column);
+        if (excerpt != null) out.append('\n').append(excerpt);
+        String hint = tokenAwareHint(null, raw);
+        if (hint != null) out.append('\n').append(hint);
+        return out.toString();
+    }
+
+    /** Render an excerpt of the offending source line with a caret
+     * marking the bad column. Returns {@code null} when no useful
+     * line can be extracted. */
+    private String sourceExcerpt(String source, int line, int column) {
+        if (source == null || line <= 0) return null;
+        String lineText = readLine(source, line);
+        if (lineText == null) return null;
+        // Trim only leading whitespace we won't need (keep alignment).
+        StringBuilder out = new StringBuilder();
+        out.append("  ").append(lineText);
+        if (column > 0 && column <= lineText.length() + 1) {
+            out.append('\n').append("  ");
+            for (int i = 1; i < column; i++) out.append(' ');
+            out.append('^');
         }
         return out.toString();
     }
 
-    private String formatLexerMessage(TokenMgrException ex) {
-        String raw = ex.getMessage();
-        StringBuilder out = new StringBuilder("Syntax error");
-        String detail = extractLexerLocation(raw);
-        if (detail != null) {
-            out.append(" ").append(detail);
+    private String readLine(String source, int line) {
+        int start = 0;
+        int current = 1;
+        while (current < line) {
+            int nl = source.indexOf('\n', start);
+            if (nl < 0) return null;
+            start = nl + 1;
+            current++;
         }
-        String hint = parseHint(raw);
-        if (hint != null) {
-            out.append(". ").append(hint);
+        int end = source.indexOf('\n', start);
+        String raw = end < 0 ? source.substring(start) : source.substring(start, end);
+        if (raw.endsWith("\r")) raw = raw.substring(0, raw.length() - 1);
+        // Clamp overlong lines so the diagnostic stays readable.
+        if (raw.length() > 200) raw = raw.substring(0, 200) + "…";
+        return raw;
+    }
+
+    /** Pretty-print a Token's image. Strips leading/trailing
+     * whitespace and wraps in double-quotes. */
+    private String tokenImage(bsh.Token tok) {
+        if (tok == null || tok.image == null) return null;
+        String img = tok.image;
+        if (img.isEmpty()) return "end of input";
+        return "\"" + img + "\"";
+    }
+
+    /** Pull out the token from BSH's "Encountered: X at line ..." message. */
+    private String inferEncounteredToken(String raw) {
+        if (raw == null) return null;
+        int key = raw.indexOf("Encountered:");
+        if (key < 0) return null;
+        int start = key + "Encountered:".length();
+        int at = raw.indexOf(" at line", start);
+        String span = (at > start ? raw.substring(start, at) : raw.substring(start)).trim();
+        if (span.isEmpty()) return null;
+        return "\"" + span + "\"";
+    }
+
+    /** Produce a targeted hint based on the token or raw message. */
+    private String tokenAwareHint(String encountered, String raw) {
+        if (raw != null && raw.indexOf("Encountered:  at line") >= 0) {
+            return "  Hint: parser reached end-of-input. Check for a missing closing brace or bracket.";
+        }
+        if (encountered != null) {
+            String tok = stripQuotes(encountered);
+            if ("(".equals(tok) || ")".equals(tok)) {
+                return "  Hint: mismatched parentheses. Count the '(' and ')' on this line.";
+            }
+            if ("{".equals(tok) || "}".equals(tok)) {
+                return "  Hint: mismatched braces. Check the preceding block's opening/closing '{' and '}'.";
+            }
+            if (";".equals(tok)) {
+                return "  Hint: unexpected semicolon — the previous expression may be incomplete.";
+            }
+            if (",".equals(tok)) {
+                return "  Hint: unexpected comma — check argument lists or variable declarations.";
+            }
+            if (":".equals(tok)) {
+                return "  Hint: a ':' typically appears in switch labels, ternary expressions, or labels.";
+            }
+            if ("else".equals(tok)) {
+                return "  Hint: 'else' without a matching 'if' — check the previous block.";
+            }
+            if ("catch".equals(tok) || "finally".equals(tok)) {
+                return "  Hint: '" + tok + "' must follow a complete 'try' block.";
+            }
+            if (tok.length() == 1 && !isLetterOrDigitAscii(tok.charAt(0))) {
+                return "  Hint: '" + tok + "' isn't valid here. Check the preceding expression for a missing operator or keyword.";
+            }
+        }
+        return "  Hint: check for mismatched braces, missing semicolons, or unsupported class syntax.";
+    }
+
+    private static String stripQuotes(String s) {
+        if (s == null || s.length() == 0) return s;
+        StringBuilder out = new StringBuilder(s.length());
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c != '"') out.append(c);
         }
         return out.toString();
+    }
+
+    private static boolean isLetterOrDigitAscii(char c) {
+        return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_';
     }
 
     private String extractLocationDetail(String raw) {
