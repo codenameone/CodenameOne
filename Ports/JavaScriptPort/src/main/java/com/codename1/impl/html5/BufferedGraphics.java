@@ -414,6 +414,50 @@ public class BufferedGraphics extends HTML5Graphics {
         clipBoundsDirty = true;
         imageTransformRenderAdapter.setClipShape(shape, t);
     }
+
+    private static final class ClipFrame {
+        final Rectangle rect;
+        final GeneralPath shape;
+        final boolean isShape;
+        final Transform transform;
+
+        ClipFrame(Rectangle rect, GeneralPath shape, boolean isShape, Transform transform) {
+            this.rect = new Rectangle(rect);
+            this.shape = shape == null ? null : new GeneralPath(shape);
+            this.isShape = isShape;
+            this.transform = transform == null ? null : transform.copy();
+        }
+    }
+
+    private final java.util.ArrayList<ClipFrame> clipStack = new java.util.ArrayList<ClipFrame>();
+
+    @Override
+    public void pushClip() {
+        clipStack.add(new ClipFrame(clip, clipShape, isClipShape, clipTransform));
+    }
+
+    @Override
+    public void popClip() {
+        if (clipStack.isEmpty()) {
+            return;
+        }
+        ClipFrame frame = clipStack.remove(clipStack.size() - 1);
+        if (frame.isShape) {
+            if (frame.transform != null && !frame.transform.isIdentity()) {
+                Transform savedTransform = transform;
+                transform = frame.transform;
+                try {
+                    setClip(frame.shape);
+                } finally {
+                    transform = savedTransform;
+                }
+            } else {
+                setClip(frame.shape);
+            }
+        } else {
+            setClip(frame.rect.getX(), frame.rect.getY(), frame.rect.getWidth(), frame.rect.getHeight());
+        }
+    }
     
     private void clipShape(Shape shape) {
         if (!isClipShape) {

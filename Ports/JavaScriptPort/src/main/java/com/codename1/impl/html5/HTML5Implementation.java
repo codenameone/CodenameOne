@@ -5673,8 +5673,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
         g(graphics).setClip(shape);
     }
 
-    
-    
     @Override
     public void setClip(Object graphics, int x, int y, int width, int height) {
         g(graphics).setClip(x, y, width, height);
@@ -5683,6 +5681,24 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @Override
     public void clipRect(Object graphics, int x, int y, int width, int height) {
         g(graphics).clipRect(x, y, width, height);
+    }
+
+    @Override
+    public void pushClip(Object graphics) {
+        // CodenameOneImplementation.pushClip is an empty stub ("NOt implemented
+        // yet"). Without this override, every g.pushClip() was a no-op, which
+        // meant g.popClip() left any intermediate clipRect/setClip(Shape) in
+        // place - the Sheet/Picker rounded-panel clip never restored, the Clip
+        // screenshot test lost its post-popClip green rect, and generally any
+        // component that temporarily narrowed its clip contaminated its
+        // siblings. Route to the HTML5Graphics clip stack so clips actually
+        // unwind in LIFO order.
+        g(graphics).pushClip();
+    }
+
+    @Override
+    public void popClip(Object graphics) {
+        g(graphics).popClip();
     }
 
     @Override

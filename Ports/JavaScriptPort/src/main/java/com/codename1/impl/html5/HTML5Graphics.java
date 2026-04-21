@@ -471,6 +471,52 @@ public class HTML5Graphics {
         imageTransformRenderAdapter.setClipShape(shape, t);
         //upcoming.add(new ClipShape(shape, t));
     }
+
+    private static final class ClipFrame {
+        final Rectangle rect;
+        final GeneralPath shape;
+        final boolean isShape;
+        final Transform transform;
+
+        ClipFrame(Rectangle rect, GeneralPath shape, boolean isShape, Transform transform) {
+            this.rect = new Rectangle(rect);
+            this.shape = shape == null ? null : new GeneralPath(shape);
+            this.isShape = isShape;
+            this.transform = transform == null ? null : transform.copy();
+        }
+    }
+
+    private final java.util.ArrayList<ClipFrame> clipStack = new java.util.ArrayList<ClipFrame>();
+
+    public void pushClip() {
+        clipStack.add(new ClipFrame(clipRect, clipShape, isClipShape, clipTransform));
+    }
+
+    public void popClip() {
+        if (clipStack.isEmpty()) {
+            return;
+        }
+        ClipFrame frame = clipStack.remove(clipStack.size() - 1);
+        if (frame.isShape) {
+            // Re-apply the saved shape clip. setClip(Shape) re-queues a
+            // ClipShape op and refreshes clipTransform, so callers get the
+            // same rendering result as when that clip was originally set.
+            GeneralPath restored = frame.shape;
+            if (frame.transform != null && !frame.transform.isIdentity()) {
+                Transform savedTransform = transform;
+                transform = frame.transform;
+                try {
+                    setClip(restored);
+                } finally {
+                    transform = savedTransform;
+                }
+            } else {
+                setClip(restored);
+            }
+        } else {
+            setClip(frame.rect.getX(), frame.rect.getY(), frame.rect.getWidth(), frame.rect.getHeight());
+        }
+    }
     
     private void clipShape(Shape shape) {
         if (!isClipShape) {
