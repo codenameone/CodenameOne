@@ -1,8 +1,10 @@
 package com.codenameone.playground;
 
+import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
+import com.codename1.ui.Image;
 import com.codename1.ui.layouts.BorderLayout;
 import java.util.ArrayList;
 import java.util.List;
@@ -66,6 +68,8 @@ public final class PlaygroundSyntaxMatrixHarness {
 
             List<String> failures = new ArrayList<String>();
             int passed = 0;
+            int paintAttempts = 0;
+            int paintFailures = 0;
             for (Case testCase : cases) {
                 PlaygroundRunner.RunResult result = runSnippet(testCase.sourceSnippet);
                 ExpectedOutcome actual = classify(result);
@@ -77,7 +81,18 @@ public final class PlaygroundSyntaxMatrixHarness {
                     diagnosticOk = diagnostic != null
                             && diagnostic.indexOf(testCase.expectedDiagnosticSubstring) >= 0;
                 }
-                if (outcomeOk && diagnosticOk) {
+                // Extra UI-path check: for SUCCESS cases, try to paint the
+                // produced Component into an offscreen image. Exceptions
+                // during paint mean the snippet evaluated but its UI is
+                // broken — a distinct failure from a missing syntax.
+                String paintError = null;
+                if (outcomeOk && testCase.expectedOutcome == ExpectedOutcome.SUCCESS
+                        && result.getComponent() != null) {
+                    paintAttempts++;
+                    paintError = tryPaintHeadless(result.getComponent());
+                    if (paintError != null) paintFailures++;
+                }
+                if (outcomeOk && diagnosticOk && paintError == null) {
                     passed++;
                     continue;
                 }
@@ -94,6 +109,10 @@ public final class PlaygroundSyntaxMatrixHarness {
                             .append(testCase.expectedDiagnosticSubstring)
                             .append("' actual='").append(diagnostic).append("'");
                 }
+                if (paintError != null) {
+                    if (!outcomeOk || !diagnosticOk) msg.append("; ");
+                    msg.append("paint failure: ").append(trim(paintError, 200));
+                }
                 if (diagnostic != null) {
                     msg.append(" diag=").append(trim(diagnostic, 400));
                 }
@@ -101,7 +120,8 @@ public final class PlaygroundSyntaxMatrixHarness {
             }
 
             System.out.println("Playground syntax matrix: "
-                    + passed + "/" + cases.size() + " passed");
+                    + passed + "/" + cases.size() + " passed; UI paint: "
+                    + (paintAttempts - paintFailures) + "/" + paintAttempts + " clean");
             if (!failures.isEmpty()) {
                 System.out.println("Failures (" + failures.size() + "):");
                 for (int i = 0; i < failures.size(); i++) {
@@ -1673,6 +1693,28 @@ public final class PlaygroundSyntaxMatrixHarness {
             return messages.get(0).text;
         }
         return null;
+    }
+
+    /** Attempt to lay out and paint the given component into an
+     * offscreen image. This simulates the playground's actual render
+     * path (the JavaSE simulator uses a framebuffer in CI via
+     * xvfb-run). Returns an error string when paint fails, or
+     * {@code null} when the component paints cleanly. */
+    private static String tryPaintHeadless(Component component) {
+        try {
+            int w = 320;
+            int h = 480;
+            if (component instanceof Container) {
+                component.setWidth(w);
+                component.setHeight(h);
+                ((Container) component).revalidate();
+            }
+            Image offscreen = Image.createImage(w, h);
+            component.paintComponent(offscreen.getGraphics(), true);
+            return null;
+        } catch (Throwable t) {
+            return t.getClass().getSimpleName() + ": " + t.getMessage();
+        }
     }
 
     private static PlaygroundRunner.RunResult runSnippet(String script) {
