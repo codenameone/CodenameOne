@@ -191,6 +191,26 @@ body.dark .cn1-developer-guide {
   background: transparent !important;
 }
 
+.cn1-developer-guide table.tableblock {
+  table-layout: fixed;
+  width: 100%;
+  max-width: 100%;
+}
+
+.cn1-developer-guide table.tableblock td,
+.cn1-developer-guide table.tableblock th {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.cn1-developer-guide table.tableblock td code,
+.cn1-developer-guide table.tableblock th code,
+.cn1-developer-guide table.tableblock td a,
+.cn1-developer-guide table.tableblock th a {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 body.dark .cn1-developer-guide .imageblock img,
 body.dark .cn1-developer-guide img[style*="background: transparent"],
 body.dark .cn1-developer-guide img {
