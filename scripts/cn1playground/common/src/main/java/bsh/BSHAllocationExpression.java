@@ -100,7 +100,19 @@ class BSHAllocationExpression extends SimpleNode
                         + sc.getName() + " directly; use a class that implements it.",
                         this, callstack);
             }
-            return sc.newInstance(args, callstack, interpreter);
+            // Non-static inner class — walk callstack for an enclosing
+            // `this` whose ScriptedClass matches the required outer.
+            ScriptedInstance enclosing = null;
+            if (sc.getEnclosingClass() != null) {
+                enclosing = findEnclosingInstance(sc.getEnclosingClass(), callstack);
+                if (enclosing == null) {
+                    throw new EvalError("Cannot construct non-static inner class "
+                            + sc.getName() + " without an enclosing instance of "
+                            + sc.getEnclosingClass().getName() + " in scope.",
+                            this, callstack);
+                }
+            }
+            return sc.newInstance(args, enclosing, callstack, interpreter);
         }
         Object obj = nameNode.toObject(
             callstack, interpreter, true /*force class*/ );
@@ -134,6 +146,44 @@ class BSHAllocationExpression extends SimpleNode
                     type, args, body, callstack, interpreter );
         } else
             return constructObject( type, args, callstack, interpreter );
+    }
+
+    /** Walk the callstack looking for a `this` binding whose
+     * ScriptedInstance is an instance of {@code outer} (or of any
+     * nested non-static class whose enclosing chain reaches
+     * {@code outer}). Used when constructing a non-static inner
+     * class. */
+    private static ScriptedInstance findEnclosingInstance(ScriptedClass outer, CallStack callstack) {
+        for (int i = 0; i < callstack.depth(); i++) {
+            NameSpace ns = callstack.get(i);
+            while (ns != null) {
+                try {
+                    Object thisObj = ns.getVariable("this");
+                    if (thisObj instanceof ScriptedInstance) {
+                        ScriptedInstance si = (ScriptedInstance) thisObj;
+                        ScriptedInstance walk = si;
+                        while (walk != null) {
+                            if (walk.getScriptedClass() == outer) return walk;
+                            walk = walk.getEnclosingInstance();
+                        }
+                    }
+                    if (thisObj instanceof This) {
+                        Object inner = ((This) thisObj).namespace.getVariable("this");
+                        if (inner instanceof ScriptedInstance) {
+                            ScriptedInstance walk = (ScriptedInstance) inner;
+                            while (walk != null) {
+                                if (walk.getScriptedClass() == outer) return walk;
+                                walk = walk.getEnclosingInstance();
+                            }
+                        }
+                    }
+                } catch (UtilEvalError ignore) {
+                    // no `this` in this namespace — keep walking
+                }
+                ns = ns.getParent();
+            }
+        }
+        return null;
     }
 
     private static Object lookupScriptedClass(String rawName, CallStack callstack) {

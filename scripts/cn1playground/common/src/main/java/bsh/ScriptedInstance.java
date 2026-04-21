@@ -24,6 +24,10 @@ public final class ScriptedInstance {
      * calls on this ScriptedInstance that don't resolve to a scripted
      * method fall through to this delegate. */
     private Object javaDelegate;
+    /** Non-null when this is an instance of a non-static inner class —
+     * holds the outer instance so inner methods can walk to outer
+     * fields and methods. */
+    private ScriptedInstance enclosingInstance;
 
     ScriptedInstance(ScriptedClass scriptedClass, NameSpace instanceNameSpace) {
         this.scriptedClass = scriptedClass;
@@ -44,6 +48,14 @@ public final class ScriptedInstance {
 
     public void setJavaDelegate(Object javaDelegate) {
         this.javaDelegate = javaDelegate;
+    }
+
+    public ScriptedInstance getEnclosingInstance() {
+        return enclosingInstance;
+    }
+
+    public void setEnclosingInstance(ScriptedInstance enclosingInstance) {
+        this.enclosingInstance = enclosingInstance;
     }
 
     /** Read an instance field by name. Returns Primitive.VOID if not bound. */

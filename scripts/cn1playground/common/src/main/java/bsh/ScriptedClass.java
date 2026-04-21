@@ -41,6 +41,10 @@ public final class ScriptedClass {
     private boolean isEnum;
     private List<ScriptedInstance> enumConstants;
     private Class<?> javaParent;
+    /** When set, this is a non-static inner class — new instances must
+     * be supplied with an enclosing instance of this outer type so
+     * their namespace chain reaches the outer instance's fields. */
+    private ScriptedClass enclosingClass;
 
     private ScriptedClass(
             String name,
@@ -71,6 +75,14 @@ public final class ScriptedClass {
 
     void setJavaParent(Class<?> javaParent) {
         this.javaParent = javaParent;
+    }
+
+    public ScriptedClass getEnclosingClass() {
+        return enclosingClass;
+    }
+
+    void setEnclosingClass(ScriptedClass enclosingClass) {
+        this.enclosingClass = enclosingClass;
     }
 
     /** Look up an instance method declared on the *parent* class only, used
@@ -158,6 +170,10 @@ public final class ScriptedClass {
         List<BshMethod> staticMethods = new ArrayList<BshMethod>();
         List<MethodTemplate> ctors = new ArrayList<MethodTemplate>();
         List<BSHTypedVariableDeclaration> fieldDecls = new ArrayList<BSHTypedVariableDeclaration>();
+        // Non-static nested classes discovered during the body pass; we
+        // back-fill their enclosingClass reference once the outer's
+        // ScriptedClass is fully constructed below.
+        List<ScriptedClass> nestedEnclosings = new ArrayList<ScriptedClass>();
 
         // Inherit parent fields first so subclass field decls can shadow them.
         if (parent != null) {
@@ -188,20 +204,23 @@ public final class ScriptedClass {
                         instanceMethods.add(new MethodTemplate(mdecl));
                     }
                 } else if (child instanceof BSHClassDeclaration) {
-                    // Nested static class declaration. We build it eagerly
-                    // and bind it in the parent's static namespace so that
-                    // `Outer.Inner` resolution finds it. Only `static` nested
-                    // classes are supported — non-static inner classes need
-                    // an enclosing-instance reference which we don't model.
+                    // Nested class declaration — static or inner. Both
+                    // are built eagerly and bound in the parent's
+                    // static namespace so `Outer.Inner` resolution
+                    // finds them. Non-static inner classes also get an
+                    // enclosingClass reference so their instances can
+                    // walk the outer instance's fields.
                     BSHClassDeclaration nested = (BSHClassDeclaration) child;
-                    if (nested.modifiers != null
-                            && nested.modifiers.hasModifier("static")) {
-                        callstack.push(staticNs);
-                        try {
-                            child.eval(callstack, interpreter);
-                        } finally {
-                            callstack.pop();
+                    boolean isStaticNested = nested.modifiers != null
+                            && nested.modifiers.hasModifier("static");
+                    callstack.push(staticNs);
+                    try {
+                        Object nestedResult = child.eval(callstack, interpreter);
+                        if (!isStaticNested && nestedResult instanceof ScriptedClass) {
+                            nestedEnclosings.add((ScriptedClass) nestedResult);
                         }
+                    } finally {
+                        callstack.pop();
                     }
                 } else if (child instanceof BSHTypedVariableDeclaration) {
                     BSHTypedVariableDeclaration fdecl = (BSHTypedVariableDeclaration) child;
@@ -242,8 +261,12 @@ public final class ScriptedClass {
             }
         }
 
-        return new ScriptedClass(name, declaringNameSpace, parent, instanceMethods,
+        ScriptedClass built = new ScriptedClass(name, declaringNameSpace, parent, instanceMethods,
                 staticMethods, ctors, fieldDecls, staticNs);
+        for (ScriptedClass nested : nestedEnclosings) {
+            nested.setEnclosingClass(built);
+        }
+        return built;
     }
 
     private static void copyStaticVariables(NameSpace source, NameSpace target) {
@@ -375,9 +398,28 @@ public final class ScriptedClass {
      * constructor arguments. */
     public ScriptedInstance newInstance(Object[] args, CallStack callstack,
             Interpreter interpreter) throws EvalError {
-        NameSpace instanceNs = new NameSpace(staticNameSpace,
+        return newInstance(args, null, callstack, interpreter);
+    }
+
+    /** Construct a new instance, optionally linking it to an enclosing
+     * instance so that non-static inner classes can reach the outer
+     * instance's fields through their namespace chain. */
+    public ScriptedInstance newInstance(Object[] args, ScriptedInstance enclosingInstance,
+            CallStack callstack, Interpreter interpreter) throws EvalError {
+        // For non-static inner classes, chain instanceNs through the
+        // enclosing instance's namespace so outer fields resolve. When
+        // no enclosing is provided for an inner class, fall back to the
+        // static namespace (outer static fields still visible).
+        NameSpace parentNs = staticNameSpace;
+        if (enclosingClass != null && enclosingInstance != null) {
+            parentNs = enclosingInstance.getInstanceNameSpace();
+        }
+        NameSpace instanceNs = new NameSpace(parentNs,
                 interpreter.getClassManager(), name + "(instance)");
         ScriptedInstance instance = new ScriptedInstance(this, instanceNs);
+        if (enclosingClass != null && enclosingInstance != null) {
+            instance.setEnclosingInstance(enclosingInstance);
+        }
         try {
             instanceNs.setVariable("this", instance, false);
         } catch (UtilEvalError ex) {

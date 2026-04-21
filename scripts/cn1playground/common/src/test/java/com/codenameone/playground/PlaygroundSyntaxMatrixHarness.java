@@ -1437,6 +1437,29 @@ public final class PlaygroundSyntaxMatrixHarness {
         cases.add(new Case(cat, "static_inner", ui(""
                 + "class Outer { static class Inner { String label() { return \"ok\"; } } }\n"
                 + "root.add(new Label(new Outer.Inner().label()));"), ExpectedOutcome.SUCCESS, null));
+        // Non-static inner classes: Inner's methods resolve outer
+        // fields through the enclosing instance.
+        cases.add(new Case(cat, "non_static_inner_reads_outer_field", ui(""
+                + "class Outer {\n"
+                + "    int x = 10;\n"
+                + "    class Inner {\n"
+                + "        int y = 5;\n"
+                + "        int sum() { return x + y; }\n"
+                + "    }\n"
+                + "    Object make() { return new Inner(); }\n"
+                + "}\n"
+                + "Outer o = new Outer();\n"
+                + "Object i = o.make();\n"
+                + "int s = (int) i.sum();\n"
+                + "root.add(new Label(\"sum=\" + s));"), ExpectedOutcome.SUCCESS, null));
+        // Constructing an inner class with no enclosing scope in scope
+        // is an error at the call site.
+        cases.add(new Case(cat, "non_static_inner_needs_enclosing", ui(""
+                + "class Outer {\n"
+                + "    class Inner { int x = 1; }\n"
+                + "}\n"
+                + "Object i = new Outer.Inner();\n"
+                + "root.add(new Label(\"oops\"));"), ExpectedOutcome.EVAL_ERROR, "enclosing"));
         cases.add(new Case(cat, "generic_class_usage", ui(""
                 + "class Pair<T> { private final T value; Pair(T value) { this.value = value; } T get() { return value; } }\n"
                 + "Pair<String> p = new Pair<String>(\"generic-ok\");\n"
