@@ -280,6 +280,11 @@ public final class PlaygroundSyntaxMatrixHarness {
                 + "final class Allowed extends Base {}\n"
                 + "final class Sneaky extends Base {}\n"
                 + "root.add(new Label(\"oops\"));"), ExpectedOutcome.EVAL_ERROR, "not permitted"));
+        // Diagnostic suggestions: typo'd field name produces a "did you
+        // mean" hint pointing at the nearest registry-known field.
+        cases.add(new Case(cat, "typo_field_suggests_correction", ui(""
+                + "int t = Display.PICKER_TYP_DATE;\n"
+                + "root.add(new Label(\"t=\" + t));"), ExpectedOutcome.EVAL_ERROR, "did you mean"));
         // Inherited static field access: Display extends CN1Constants, so
         // PICKER_TYPE_DATE (declared on CN1Constants) is reachable through
         // the Display subclass reference.

@@ -262,8 +262,11 @@ public final class Reflect {
                 return Primitive.wrap(CN1AccessRegistry.getInstance().invokeStatic(clas, methodName, unwrapArgs(args)),
                         null);
             } catch (Exception ex) {
-                throw new ReflectError("Static method " + StringUtil.methodString(methodName, Types.getTypes(args))
-                        + " not found in class '" + clas.getName() + "'", ex);
+                String hint = suggestNearestMethod(clas, methodName);
+                String msg = "Static method " + StringUtil.methodString(methodName, Types.getTypes(args))
+                        + " not found in class '" + clas.getName() + "'";
+                if (hint != null) msg += " (did you mean: " + hint + "?)";
+                throw new ReflectError(msg, ex);
             }
         } finally {
             CN1LambdaSupport.setCurrentNameSpace(prevNs);
@@ -283,8 +286,94 @@ public final class Reflect {
             if (nested != null) {
                 return new ClassIdentifier(nested);
             }
-            throw new ReflectError("No such field: " + fieldName + " for class: " + clas.getName(), ex);
+            // Repackage the registry's terse exception with a "did you
+            // mean" suggestion. We re-throw an unchecked RuntimeException
+            // so the suggestion-bearing message is what surfaces through
+            // BSH's evaluation chain (which would otherwise swallow our
+            // wrapped ReflectError on the static-field property fallback
+            // path and surface the registry's original message instead).
+            String hint = suggestNearestField(clas, fieldName);
+            String original = ex.getMessage() == null ? "" : ex.getMessage();
+            String msg = original.isEmpty() ? "No such field: " + fieldName : original;
+            if (hint != null) msg += " (did you mean: " + hint + "?)";
+            throw new RuntimeException(msg, ex);
         }
+    }
+
+    /** Compare the requested name against the registry's known field
+     * names for this class and return a comma-separated list of the
+     * closest matches (case-insensitive prefix or short edit
+     * distance). Returns {@code null} when no known names are available
+     * or no name is plausibly close. */
+    static String suggestNearestField(Class<?> clas, String requested) {
+        if (clas == null || requested == null) return null;
+        bsh.cn1.CN1Access registry = CN1AccessRegistry.getInstance();
+        if (!(registry instanceof bsh.cn1.GeneratedCN1Access)) return null;
+        try {
+            String[] names = ((bsh.cn1.GeneratedCN1Access) registry).getFieldNames(clas.getName());
+            return pickSuggestions(names, requested, 3);
+        } catch (Throwable ignore) {
+            return null;
+        }
+    }
+
+    static String suggestNearestMethod(Class<?> clas, String requested) {
+        if (clas == null || requested == null) return null;
+        bsh.cn1.CN1Access registry = CN1AccessRegistry.getInstance();
+        if (!(registry instanceof bsh.cn1.GeneratedCN1Access)) return null;
+        try {
+            String[] names = ((bsh.cn1.GeneratedCN1Access) registry).getMethodSignatures(clas.getName());
+            return pickSuggestions(names, requested, 3);
+        } catch (Throwable ignore) {
+            return null;
+        }
+    }
+
+    private static String pickSuggestions(String[] candidates, String requested, int max) {
+        if (candidates == null || candidates.length == 0) return null;
+        String lowerReq = requested.toLowerCase();
+        java.util.List<String> exact = new java.util.ArrayList<String>();
+        java.util.List<String> close = new java.util.ArrayList<String>();
+        for (String c : candidates) {
+            if (c == null) continue;
+            String lc = c.toLowerCase();
+            if (lc.equals(lowerReq) || lc.startsWith(lowerReq) || lowerReq.startsWith(lc)) {
+                exact.add(c);
+            } else if (editDistance(lc, lowerReq) <= Math.max(2, requested.length() / 3)) {
+                close.add(c);
+            }
+        }
+        java.util.List<String> picks = exact.isEmpty() ? close : exact;
+        if (picks.isEmpty()) return null;
+        StringBuilder out = new StringBuilder();
+        int n = Math.min(max, picks.size());
+        for (int i = 0; i < n; i++) {
+            if (i > 0) out.append(", ");
+            out.append(picks.get(i));
+        }
+        return out.toString();
+    }
+
+    /** Cheap iterative Levenshtein. The candidate sets are bounded by
+     * the registry size for one class (typically dozens), so the
+     * O(m·n) cost per name is fine. */
+    private static int editDistance(String a, String b) {
+        int la = a.length();
+        int lb = b.length();
+        if (la == 0) return lb;
+        if (lb == 0) return la;
+        int[] prev = new int[lb + 1];
+        int[] curr = new int[lb + 1];
+        for (int j = 0; j <= lb; j++) prev[j] = j;
+        for (int i = 1; i <= la; i++) {
+            curr[0] = i;
+            for (int j = 1; j <= lb; j++) {
+                int cost = a.charAt(i - 1) == b.charAt(j - 1) ? 0 : 1;
+                curr[j] = Math.min(Math.min(curr[j - 1] + 1, prev[j] + 1), prev[j - 1] + cost);
+            }
+            int[] tmp = prev; prev = curr; curr = tmp;
+        }
+        return prev[lb];
     }
 
     private static Class<?> lookupNestedJavaClass(Class<?> outer, String nestedName) {
