@@ -24,6 +24,24 @@ class JavascriptRuntimeSemanticsTest {
 
     @ParameterizedTest
     @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void parseDoubleAppliesExponentFromStringToRealSplit(CompilerHelper.CompilerConfig config) throws Exception {
+        // Regression guard for the parparvm_runtime.js parseDblImpl binding.
+        // StringToReal.parseDouble("1.4") strips the decimal point and hands
+        // parseDblImpl("14", -1) to the native; the JS binding must apply 10^-1
+        // to the integer value. A stale binding that ignored the exponent was
+        // the root cause of Kotlin Switch pills rendering at ~600x300 instead
+        // of ~50x25: Switch.getTrackScaleX() parses theme "2.5" via
+        // Double.parseDouble, and 2.5 -> 25 made track width 10x too big.
+        WorkerRunResult result = translateAndRunFixture(config, "JsDoubleParseApp.java", "JsDoubleParseApp");
+
+        assertEquals(511, result.result,
+                "parseDouble must apply the exponent split out by StringToReal (1.4 must not resolve to 14). raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
     void executesLocaleTimeZoneAndDateFormatInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
         WorkerRunResult result = translateAndRunFixture(config, "JsLocaleTimeZoneApp.java", "JsLocaleTimeZoneApp");
 

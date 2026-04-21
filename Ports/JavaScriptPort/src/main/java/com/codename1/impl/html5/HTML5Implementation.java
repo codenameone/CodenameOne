@@ -5457,7 +5457,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         NativeImage img = new NativeImage();
         attachMutableImageSurface(img, buffer.getGraphics());
         return img;
-        
+
     }
 
     @Override

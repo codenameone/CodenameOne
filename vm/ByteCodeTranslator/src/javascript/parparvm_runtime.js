@@ -2260,9 +2260,18 @@ bindNative(["cn1_java_lang_String_format_java_lang_String_java_lang_Object_1ARRA
   return createJavaString(out);
 });
 bindNative(["cn1_java_lang_StringToReal_parseDblImpl_java_lang_String_int_R_double"], function*(value, exponentIndex) {
+  // Contract (per Apache Harmony StringToReal.parseDblImpl): the input string
+  // is the pre-processed digits with no decimal point, and exponentIndex is
+  // the power of 10 to multiply by. StringToReal.parseDouble("1.4") strips
+  // the '.' -> "14" with exponentIndex=-1, so the correct value is 14 * 10^-1 = 1.4.
+  // The previous implementation returned Number("14")=14, which was the root
+  // cause of the huge Switch pills and any other CN1 path that uses fractional
+  // theme constants / scale factors. Apply the exponent.
   const text = jvm.toNativeString(value);
   const parsed = Number(text);
-  return isNaN(parsed) ? 0 : parsed;
+  if (isNaN(parsed)) return 0;
+  const exp = exponentIndex | 0;
+  return exp === 0 ? parsed : parsed * Math.pow(10, exp);
 });
 bindNative(["cn1_java_lang_Enum_valueOf_java_lang_Class_java_lang_String_R_java_lang_Enum"], function*(enumType, name) {
   if (!enumType || !enumType.__classDef) {
