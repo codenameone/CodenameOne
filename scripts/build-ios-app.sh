@@ -69,7 +69,7 @@ bia_log "Java version for baseline toolchain:"
 "$JAVA_HOME/bin/java" -version
 bia_log "Using JAVAC from JAVA17_HOME for demo compilation:"
 "$JAVA17_HOME/bin/javac" -version
-IOS_UISCENE="${IOS_UISCENE:-false}"
+IOS_UISCENE="${IOS_UISCENE:-true}"
 bia_log "Building sample app with ios.uiscene=${IOS_UISCENE}"
 EXTRA_IOS_ARGS=()
 if [ -n "${IOS_DEPENDENCY_ARGS:-}" ]; then
