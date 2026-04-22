@@ -35,14 +35,12 @@
 Label {
     color: var(--cn1-text);
     background-color: var(--cn1-surface);
-    font-family: native:MainRegular;
     padding: 1mm 2mm 1mm 2mm;
 }
 
 Button {
     color: var(--cn1-accent);
     background-color: var(--cn1-surface);
-    font-family: native:MainRegular;
     padding: 2mm 3mm 2mm 3mm;
     cn1-derive: Label;
 }
