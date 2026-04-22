@@ -67,6 +67,7 @@ node_modules
 **/genfiles.properties
 **/private/private.properties
 .idea/
+.claude/
 target
 pom.xml.versionsBackup
 pom.xml.releaseBackup
