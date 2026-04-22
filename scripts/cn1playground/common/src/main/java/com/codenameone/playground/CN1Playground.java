@@ -46,6 +46,7 @@ public class CN1Playground extends Lifecycle {
     private PlaygroundInspector inspector;
     private Container previewRoot;
     private Container historyMenu;
+    private final List<Component> sideMenuComponents = new ArrayList<>();
     private Resources theme;
     private boolean websiteDarkMode = DEFAULT_DARK_MODE;
     private String currentScript;
@@ -268,12 +269,8 @@ public class CN1Playground extends Lifecycle {
     }
 
     private void addSideMenuComponent(Toolbar toolbar, Component component) {
-        // Dark-mode theming hacks (applyWebsiteTheme walk + tracking
-        // components in a list for re-theming on dark toggle) were
-        // removed: they correlate with the JS-port ghost-side-menu
-        // regression and CN1's own theme system can handle these UIIDs
-        // if the theme props are right. Side-menu visual polish for
-        // dark mode is a separate follow-up.
+        applyWebsiteTheme(component, websiteDarkMode);
+        sideMenuComponents.add(component);
         toolbar.addComponentToSideMenu(component);
     }
 
@@ -282,6 +279,7 @@ public class CN1Playground extends Lifecycle {
 
         if (history.isEmpty()) {
             Label empty = new Label("No saved runs yet");
+            empty.setUIID("PlaygroundMenuEmpty");
             historyMenu.add(empty);
         } else {
             for (PlaygroundStateStore.HistoryEntry entry : history) {
@@ -289,6 +287,7 @@ public class CN1Playground extends Lifecycle {
             }
         }
 
+        applyWebsiteTheme(historyMenu, websiteDarkMode);
         historyMenu.revalidate();
     }
 
@@ -297,16 +296,22 @@ public class CN1Playground extends Lifecycle {
                                             Toolbar toolbar) {
         MultiButton button = new MultiButton(entry.title());
         button.setTextLine2(entry.detail(history));
+        button.setUIID("PlaygroundSideCommand");
+        button.setUIIDLine1("PlaygroundSideCommandLine1");
+        button.setUIIDLine2("PlaygroundSideCommandLine2");
         button.addActionListener(e -> {
             setScript(entry.script, true);
             toolbar.closeSideMenu();
         });
+        applyWebsiteTheme(button, websiteDarkMode);
         return button;
     }
 
     private Button createSideMenuButton(String text, Runnable action) {
         Button button = new Button(text);
+        button.setUIID("PlaygroundSideCommand");
         button.addActionListener(e -> action.run());
+        applyWebsiteTheme(button, websiteDarkMode);
         return button;
     }
 
@@ -457,6 +462,7 @@ public class CN1Playground extends Lifecycle {
             return;
         }
         restoreThemeDefaults();
+        applySideMenuPalette(websiteDarkMode);
         List<PlaygroundRunner.Diagnostic> diagnostics = new ArrayList<PlaygroundRunner.Diagnostic>();
         List<PlaygroundRunner.InlineMessage> messages = new ArrayList<PlaygroundRunner.InlineMessage>();
         try {
@@ -651,6 +657,7 @@ public class CN1Playground extends Lifecycle {
         if (!websiteThemeInitialized || dark != websiteDarkMode) {
             websiteDarkMode = dark;
             websiteThemeInitialized = true;
+            applySideMenuPalette(dark);
             applyWebsiteTheme(form, dark);
             applyTabsTheme(dark);
             form.refreshTheme();
@@ -664,7 +671,33 @@ public class CN1Playground extends Lifecycle {
             if (inspector != null) {
                 inspector.applyTheme(dark);
             }
+            for (Component cmp : sideMenuComponents) {
+                applyWebsiteTheme(cmp, dark);
+            }
         }
+    }
+
+    private void applySideMenuPalette(boolean dark) {
+        Hashtable sideMenuPalette = new Hashtable();
+        int bgColor = dark ? 0x0f172a : 0xffffff;
+        int borderColor = dark ? 0x1f2937 : 0xcccccc;
+
+        sideMenuPalette.put("SideNavigationPanel.bgColor", bgColor);
+        sideMenuPalette.put("SideNavigationPanel.bgTransparency", 255);
+        sideMenuPalette.put("SideNavigationPanelDark.bgColor", bgColor);
+        sideMenuPalette.put("SideNavigationPanelDark.bgTransparency", 255);
+        sideMenuPalette.put("RightSideNavigationPanel.bgColor", bgColor);
+        sideMenuPalette.put("RightSideNavigationPanel.bgTransparency", 255);
+
+        sideMenuPalette.put("StatusBarSideMenu.bgColor", bgColor);
+        sideMenuPalette.put("StatusBarSideMenu.bgTransparency", 255);
+        sideMenuPalette.put("StatusBarSideMenuDark.bgColor", bgColor);
+        sideMenuPalette.put("StatusBarSideMenuDark.bgTransparency", 255);
+
+        sideMenuPalette.put("SideCommand.bgColor", bgColor);
+        sideMenuPalette.put("SideCommand.bgTransparency", 255);
+        sideMenuPalette.put("SideCommand.border", com.codename1.ui.plaf.Border.createLineBorder(2, borderColor));
+        UIManager.getInstance().addThemeProps(sideMenuPalette);
     }
 
     private void applyWebsiteTheme(Component component, boolean dark) {
