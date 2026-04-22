@@ -27,6 +27,9 @@ log() { echo "[build-native-themes] $1" >&2; }
 CSS_COMPILER_MODULE="$REPO_ROOT/maven/css-compiler"
 CSS_SRC_ROOT="$REPO_ROOT/native-themes"
 OUT_DIR="$REPO_ROOT/Themes"
+# JavaScriptPort's runtime serves themes out of its webapp assets folder;
+# mirror the generated .res files there too so the JS port picks them up.
+JS_ASSETS_DIR="$REPO_ROOT/Ports/JavaScriptPort/src/main/webapp/assets"
 
 # Resolve the compiler jar. Prefer a freshly-built target/ jar (so CSS compiler
 # source edits are always picked up); fall back to the installed copy in ~/.m2
@@ -74,9 +77,9 @@ ensure_jar() {
 }
 
 compile_theme() {
-  local jar="$1" name="$2"
+  local jar="$1" name="$2" basename="$3"
   local css="$CSS_SRC_ROOT/$name/theme.css"
-  local out="$OUT_DIR/$3"
+  local out="$OUT_DIR/$basename"
   if [ ! -f "$css" ]; then
     log "Skipping $name: no source at $css"
     return
@@ -84,6 +87,10 @@ compile_theme() {
   mkdir -p "$OUT_DIR"
   log "Compiling $name -> $out"
   java -jar "$jar" -input "$css" -output "$out"
+  if [ -d "$JS_ASSETS_DIR" ]; then
+    cp "$out" "$JS_ASSETS_DIR/$basename"
+    log "Mirrored -> $JS_ASSETS_DIR/$basename"
+  fi
 }
 
 main() {
