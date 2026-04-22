@@ -222,16 +222,20 @@ public final class Util {
         }
     }
 
-    private static void closeQuietly(java.io.Closeable c) {
-        if (c == null) {
-            return;
-        }
+    private static void closeQuietly(InputStream c) {
+        if (c == null) return;
         try {
             c.close();
         } catch (IOException e) {
-            // Best-effort close; surface to stderr so it's visible but do not
-            // re-throw - callers of the copy() family treat completion of the
-            // payload copy as success regardless of close failures.
+            System.err.println("Util.copy: ignoring " + e);
+        }
+    }
+
+    private static void closeQuietly(OutputStream c) {
+        if (c == null) return;
+        try {
+            c.close();
+        } catch (IOException e) {
             System.err.println("Util.copy: ignoring " + e);
         }
     }
