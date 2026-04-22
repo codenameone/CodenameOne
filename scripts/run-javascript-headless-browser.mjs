@@ -47,7 +47,13 @@ const browser = await chromium.launch({
 
 try {
   const page = await browser.newPage({
-    viewport: { width: 375, height: 667 }
+    viewport: { width: 375, height: 667 },
+    // deviceScaleFactor=2 emulates a retina display so window.devicePixelRatio
+    // reports 2 — without it Chromium reports 1 and CN1 picks DENSITY_MEDIUM,
+    // which leaves padding/margin/font sizes about half of what an iOS/Android
+    // reference screenshot shows. Backing store is 750x1334 (similar area to
+    // the previous 1280x900 viewport; still comfortably smaller per-test).
+    deviceScaleFactor: 2
   });
 
   page.on('console', msg => {

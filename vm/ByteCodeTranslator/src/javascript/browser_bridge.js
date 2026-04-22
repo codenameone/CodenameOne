@@ -1540,9 +1540,22 @@
   }
   var worker = installWorkerMode();
   appStarter = function() {
+    // devicePixelRatio lives only on the main-thread window — workers see
+    // `self.devicePixelRatio` as undefined and fall back to 1.0, which in
+    // turn drives CN1's density picker to DENSITY_MEDIUM on real retina
+    // devices. Ship the current ratio over with the boot message so the
+    // worker can surface it through getDevicePixelRatio() without needing
+    // a round-trip host-bridge call on every read.
+    var dpr = 1.0;
+    try {
+      if (global.devicePixelRatio && global.devicePixelRatio > 0) {
+        dpr = Number(global.devicePixelRatio);
+      }
+    } catch (e) { /* ignore */ }
     worker.postMessage({
       type: 'start',
-      locationSearch: (global.location && global.location.search) ? String(global.location.search) : ''
+      locationSearch: (global.location && global.location.search) ? String(global.location.search) : '',
+      devicePixelRatio: dpr
     });
   };
 
