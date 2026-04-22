@@ -153,7 +153,7 @@ public class ResourceEditorView extends FrameView {
     private HelpAction helpAction = new HelpAction();
     private static final String IMAGE_DIR = "/com/codename1/designer/resources/";
 
-    private static EditableResourcesEditor loadedResources = new EditableResourcesEditor();
+    private static EditableResources loadedResources = new EditableResourcesEditor();
     private Properties projectGeneratorSettings;
     private static String manualIDESettings;
     private List<String> recentFiles = new ArrayList<String>();
@@ -658,7 +658,7 @@ public class ResourceEditorView extends FrameView {
             // tree tries to restore selection sometimes with a non-existing resource:
             for(String s : loadedResources.getResourceNames()) {
                 if(s.equals(selectedResource)) {
-                    BaseForm b = (BaseForm)loadedResources.getResourceEditor(selectedResource, ResourceEditorView.this);
+                    BaseForm b = (BaseForm)((EditableResourcesEditor)loadedResources).getResourceEditor(selectedResource, ResourceEditorView.this);
                     if(loadedResources.isOverrideMode() && !loadedResources.isOverridenResource(selectedResource)) {
                         b.setOverrideMode(true, mainPanel);
                     }
