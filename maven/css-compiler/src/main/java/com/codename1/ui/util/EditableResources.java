@@ -1042,7 +1042,7 @@ public class EditableResources extends Resources implements TreeModel {
                             case 0xf5:
                             // multiimage with SVG
                             case 0xf7:
-                                SVGDocument s = (SVGDocument)image.getSVGDocument();
+                                SvgBridge s = SvgBridge.of(image.getSVGDocument());
                                 writeToFile(s.getSvgData(), new File(resourcesDir, normalizeFileName(resourceNames[iter])));
 
                                 if(s.getBaseURL() != null && s.getBaseURL().length() > 0) {
@@ -2654,7 +2654,7 @@ public class EditableResources extends Resources implements TreeModel {
     }
 
     private void saveSVG(DataOutputStream out, Image i, boolean isMultiImage) throws IOException {
-        SVGDocument s = (SVGDocument)i.getSVGDocument();
+        SvgBridge s = SvgBridge.of(i.getSVGDocument());
         out.writeInt(s.getSvgData().length);
         out.write(s.getSvgData());
         if(s.getBaseURL() == null) {
@@ -2694,7 +2694,7 @@ public class EditableResources extends Resources implements TreeModel {
     }
 
     private MultiImage svgToMulti(Image image) throws IOException {
-        SVGDocument s = (SVGDocument)image.getSVGDocument();
+        SvgBridge s = SvgBridge.of(image.getSVGDocument());
         MultiImage mi = new MultiImage();
         mi.dpi = s.getDpis();
         if(mi.dpi == null || mi.dpi.length == 0) {
@@ -2714,7 +2714,7 @@ public class EditableResources extends Resources implements TreeModel {
     @Override
     com.codename1.ui.Image createSVG(boolean animated, byte[] data) throws IOException {
         com.codename1.ui.Image img = super.createSVG(animated, data);
-        SVGDocument s = (SVGDocument)img.getSVGDocument();
+        SvgBridge s = SvgBridge.of(img.getSVGDocument());
         if(s != null) {
             s.setDpis(dpisLoaded);
             s.setWidthForDPI(widthForDPI);
@@ -2790,7 +2790,7 @@ public class EditableResources extends Resources implements TreeModel {
     Image createImage() throws IOException {
         Image i = super.createImage();
         if(i.isSVG()) {
-            SVGDocument s = (SVGDocument)i.getSVGDocument();
+            SvgBridge s = SvgBridge.of(i.getSVGDocument());
             s.setRatioH(ratioH);
             s.setRatioW(ratioW);
         }
@@ -2801,7 +2801,7 @@ public class EditableResources extends Resources implements TreeModel {
     Image createImage(DataInputStream input) throws IOException {
         Image i = super.createImage(input);
         if(i.isSVG()) {
-            SVGDocument s = (SVGDocument)i.getSVGDocument();
+            SvgBridge s = SvgBridge.of(i.getSVGDocument());
             s.setRatioH(ratioH);
             s.setRatioW(ratioW);
         }
@@ -2895,7 +2895,7 @@ public class EditableResources extends Resources implements TreeModel {
     }
 
     public void setSVGDPIs(final String name, final int[] dpi, final int[] widths, final int[] heights) {
-        final SVGDocument sv = (SVGDocument)getImage(name).getSVGDocument();
+        final SvgBridge sv = SvgBridge.of(getImage(name).getSVGDocument());
         final int[] currentDPIs = sv.getDpis();
         final int[] currentWidths = sv.getWidthForDPI();
         final int[] currentHeights = sv.getHeightForDPI();
@@ -3642,6 +3642,54 @@ public class EditableResources extends Resources implements TreeModel {
                 }
             }
             return getInternalImages()[bestFitOffset];
+        }
+    }
+
+    /**
+     * Reflective bridge to the javase-svg SVG class. Kept internal so that
+     * neither core nor the css-compiler module has to expose an SVG-facing
+     * public API, and so that neither module has to name the SVG class at
+     * compile time (it lives in javase-svg). The reflection paths are cold
+     * in the headless css-compiler run - they execute only when the resource
+     * being serialized actually contains SVG images.
+     */
+    static final class SvgBridge {
+        private final Object svg;
+
+        private SvgBridge(Object svg) {
+            this.svg = svg;
+        }
+
+        static SvgBridge of(Object svg) {
+            return svg == null ? null : new SvgBridge(svg);
+        }
+
+        byte[] getSvgData() { return (byte[]) call("getSvgData"); }
+        String getBaseURL() { return (String) call("getBaseURL"); }
+        float getRatioW() { return ((Number) call("getRatioW")).floatValue(); }
+        float getRatioH() { return ((Number) call("getRatioH")).floatValue(); }
+        int[] getDpis() { return (int[]) call("getDpis"); }
+        int[] getWidthForDPI() { return (int[]) call("getWidthForDPI"); }
+        int[] getHeightForDPI() { return (int[]) call("getHeightForDPI"); }
+
+        void setRatioW(float v) { call("setRatioW", new Class[]{float.class}, v); }
+        void setRatioH(float v) { call("setRatioH", new Class[]{float.class}, v); }
+        void setDpis(int[] v) { call("setDpis", new Class[]{int[].class}, (Object) v); }
+        void setWidthForDPI(int[] v) { call("setWidthForDPI", new Class[]{int[].class}, (Object) v); }
+        void setHeightForDPI(int[] v) { call("setHeightForDPI", new Class[]{int[].class}, (Object) v); }
+
+        private Object call(String method) {
+            return call(method, new Class[0]);
+        }
+
+        private Object call(String method, Class<?>[] ptypes, Object... args) {
+            try {
+                return svg.getClass().getMethod(method, ptypes).invoke(svg, args);
+            } catch (Exception e) {
+                throw new RuntimeException(
+                        "SVG bridge failed to invoke " + method + " on "
+                        + (svg == null ? "null" : svg.getClass().getName()), e);
+            }
         }
     }
 }

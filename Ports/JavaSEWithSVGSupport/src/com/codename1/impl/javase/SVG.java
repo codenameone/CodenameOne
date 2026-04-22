@@ -24,11 +24,10 @@
 
 package com.codename1.impl.javase;
 
-import com.codename1.ui.util.SVGDocument;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 
-public class SVG implements SVGDocument {
+public class SVG {
 
     private byte[] svgData;
     private String baseURL;
