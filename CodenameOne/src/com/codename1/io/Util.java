@@ -223,7 +223,9 @@ public final class Util {
     }
 
     private static void closeQuietly(InputStream c) {
-        if (c == null) return;
+        if (c == null) {
+            return;
+        }
         try {
             c.close();
         } catch (IOException e) {
@@ -232,7 +234,9 @@ public final class Util {
     }
 
     private static void closeQuietly(OutputStream c) {
-        if (c == null) return;
+        if (c == null) {
+            return;
+        }
         try {
             c.close();
         } catch (IOException e) {
