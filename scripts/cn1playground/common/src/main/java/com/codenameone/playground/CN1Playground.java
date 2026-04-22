@@ -77,21 +77,6 @@ public class CN1Playground extends Lifecycle {
 
         toolbar.addMaterialCommandToRightBar("Download", com.codename1.ui.FontImage.MATERIAL_DOWNLOAD, e -> projectExporter.export(currentScript, currentCss));
 
-        // Diagnostic buttons: bypass the side menu entirely so we can
-        // test whether the "previous demo visible in background" bug
-        // reproduces without any side-menu animation. Each button
-        // invokes exactly the same setScript(...) that the matching
-        // side-menu button does, nothing more.
-        for (int i = 0; i < Math.min(3, PlaygroundExamples.SAMPLES.length); i++) {
-            final PlaygroundExamples.Sample debugSample = PlaygroundExamples.SAMPLES[i];
-            toolbar.addCommandToRightBar(new com.codename1.ui.Command(debugSample.title) {
-                @Override
-                public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
-                    setScript(debugSample.script, true);
-                }
-            });
-        }
-
         editor = new PlaygroundBrowserEditor(PlaygroundBrowserEditor.Mode.JAVA, currentScript, websiteDarkMode, this::handleSourceChanged);
         cssEditor = new PlaygroundBrowserEditor(PlaygroundBrowserEditor.Mode.CSS, currentCss, websiteDarkMode, this::handleCssChanged);
         inspector = new PlaygroundInspector(websiteDarkMode, (component, property, value) -> handlePropertyChanged(component));
