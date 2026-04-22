@@ -201,7 +201,7 @@ public class CN1Playground extends Lifecycle {
 
         if (component == null) {
             inspector.setPreviewRoot(null);
-            previewRoot.revalidate();
+            previewRoot.forceRevalidate();
             return;
         }
 
@@ -211,7 +211,17 @@ public class CN1Playground extends Lifecycle {
 
         previewRoot.add(BorderLayout.CENTER, component);
         inspector.setPreviewRoot(previewRoot);
-        previewRoot.revalidate();
+        // forceRevalidate recursively re-lays out the full hierarchy
+        // before repainting. Plain revalidate() on the JavaScript
+        // port can leave the previous component's pixels cached in
+        // the canvas offscreen buffer when the new component has
+        // different bounds, producing the "ghost of previous sample
+        // as background" symptom. forceRevalidate + a parent chain
+        // revalidate deterministically invalidates the whole
+        // rendering surface.
+        previewRoot.forceRevalidate();
+        Container parent = previewRoot.getParent();
+        if (parent != null) parent.revalidate();
     }
 
     private void detachForPreview(Component component) {
