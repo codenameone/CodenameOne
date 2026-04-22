@@ -81,7 +81,12 @@ public class CN1Playground extends Lifecycle {
     private WebsiteThemeNative websiteThemeNative;
     private boolean websiteThemeInitialized;
 
-    private String lastBreakpoint;
+    private static final int LAYOUT_NONE = -1;
+    private static final int LAYOUT_MOBILE = 0;
+    private static final int LAYOUT_TABLET = 1;
+    private static final int LAYOUT_DESKTOP = 2;
+
+    private int lastLayout = LAYOUT_NONE;
 
     private static void detach(Component c) {
         if (c == null) {
@@ -293,41 +298,23 @@ public class CN1Playground extends Lifecycle {
     }
 
     private void applyLayoutForCurrentSize() {
-        String bp = computeBreakpoint();
-        if (bp.equals(lastBreakpoint)) {
+        Display d = Display.getInstance();
+        int layout = d.isDesktop() ? LAYOUT_DESKTOP : d.isTablet() ? LAYOUT_TABLET : LAYOUT_MOBILE;
+        if (layout == lastLayout) {
             return;
         }
-        lastBreakpoint = bp;
+        lastLayout = layout;
 
         bodyContainer.removeAll();
-
-        switch (bp) {
-            case "mobile":
-                assembleMobileLayout();
-                break;
-            case "tablet":
-                assembleDesktopLayout(true);
-                break;
-            default:
-                assembleDesktopLayout(false);
-                break;
+        if (layout == LAYOUT_MOBILE) {
+            assembleMobileLayout();
+        } else {
+            assembleDesktopLayout(layout == LAYOUT_TABLET);
         }
 
         if (bodyContainer.getComponentForm() != null) {
             bodyContainer.revalidate();
         }
-    }
-
-    private String computeBreakpoint() {
-        int w = Display.getInstance().getDisplayWidth();
-        int dipsW = (int) (w / (float) Display.getInstance().convertToPixels(1f));
-        if (dipsW < 720) {
-            return "mobile";
-        }
-        if (dipsW < 1100) {
-            return "tablet";
-        }
-        return "desktop";
     }
 
     private void assembleDesktopLayout(boolean compact) {
