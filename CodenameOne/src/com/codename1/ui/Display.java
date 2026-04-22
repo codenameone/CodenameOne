@@ -2752,6 +2752,14 @@ public final class Display extends CN1Constants {
     ///
     /// value in pixels
     public int convertToPixels(float dipCount) {
+        if (impl == null) {
+            // Headless callers (e.g. the css-compiler native-themes build)
+            // compile theme constants before Display is initialized; return
+            // a 1:1 fallback so border/padding serialization succeeds. The
+            // actual pixel conversion happens at app runtime when a full
+            // implementation is available.
+            return Math.round(dipCount);
+        }
         return Math.round(impl.convertToPixels((int) (dipCount * 1000), true) / 1000.0f);
     }
 
