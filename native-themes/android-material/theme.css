@@ -49,12 +49,12 @@ Button {
     cn1-derive: Label;
 }
 
-Button:pressed {
+Button.pressed {
     background-color: var(--cn1-surface-variant);
     color: var(--cn1-on-surface-variant);
 }
 
-Button:disabled {
+Button.disabled {
     color: var(--cn1-on-surface-variant);
     background-color: var(--cn1-surface-variant);
 }

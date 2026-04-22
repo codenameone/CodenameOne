@@ -31,7 +31,9 @@ require CEF rasterization fails the build and lists the offending UIID.
 - `padding`, `margin`, typography (`font-family`/`font-size`/`font-weight`).
 - `cn1-derive`, `cn1-image-id` (resource images shipped as PNG), `cn1-mutable-image`.
 - `cn1-source-dpi` for multi-DPI image variants.
-- `:pressed`, `:selected`, `:unselected`, `:disabled` pseudo-classes.
+- `.pressed`, `.selected`, `.unselected`, `.disabled` state selectors (dot-class
+  syntax — the CN1 CSS compiler translates these to the binding state of the
+  UIID, not CSS classes in the HTML sense).
 - `@media (prefers-color-scheme: dark)` for dark palette overrides.
 - `var(--x)` and `@constants { ... }`.
 
