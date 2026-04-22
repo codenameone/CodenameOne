@@ -88,7 +88,7 @@ public class Simd {
     /// the same method-local constraints as `allocaByte(int)`.
     public byte[] allocaByteZeroed(int size) {
         byte[] out = allocaByte(size);
-        fillByte(out, (byte)0);
+        fillByte(out, (byte) 0);
         return out;
     }
 
@@ -166,14 +166,14 @@ public class Simd {
     /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void and(byte[] srcA, int srcAOffset, byte[] srcB, int srcBOffset, byte[] dst, int dstOffset, int length) {
         for (int i = 0; i < length; i++) {
-            dst[dstOffset + i] = (byte)(srcA[srcAOffset + i] & srcB[srcBOffset + i]);
+            dst[dstOffset + i] = (byte) (srcA[srcAOffset + i] & srcB[srcBOffset + i]);
         }
     }
 
     /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void or(byte[] srcA, int srcAOffset, byte[] srcB, int srcBOffset, byte[] dst, int dstOffset, int length) {
         for (int i = 0; i < length; i++) {
-            dst[dstOffset + i] = (byte)(srcA[srcAOffset + i] | srcB[srcBOffset + i]);
+            dst[dstOffset + i] = (byte) (srcA[srcAOffset + i] | srcB[srcBOffset + i]);
         }
     }
 
@@ -181,7 +181,7 @@ public class Simd {
     public void shl(byte[] src, int srcOffset, int bits, byte[] dst, int dstOffset, int length) {
         int shift = bits & 7;
         for (int i = 0; i < length; i++) {
-            dst[dstOffset + i] = (byte)((src[srcOffset + i] & 0xff) << shift);
+            dst[dstOffset + i] = (byte) ((src[srcOffset + i] & 0xff) << shift);
         }
     }
 
@@ -189,7 +189,7 @@ public class Simd {
     public void shrLogical(byte[] src, int srcOffset, int bits, byte[] dst, int dstOffset, int length) {
         int shift = bits & 7;
         for (int i = 0; i < length; i++) {
-            dst[dstOffset + i] = (byte)((src[srcOffset + i] & 0xff) >>> shift);
+            dst[dstOffset + i] = (byte) ((src[srcOffset + i] & 0xff) >>> shift);
         }
     }
 
@@ -245,7 +245,7 @@ public class Simd {
             if (v == Byte.MIN_VALUE) {
                 dst[i] = Byte.MAX_VALUE;
             } else {
-                dst[i] = (byte)Math.abs(v);
+                dst[i] = (byte) Math.abs(v);
             }
         }
     }
@@ -259,7 +259,7 @@ public class Simd {
             } else if (v > maxValue) {
                 dst[i] = maxValue;
             } else {
-                dst[i] = (byte)v;
+                dst[i] = (byte) v;
             }
         }
     }
@@ -277,49 +277,49 @@ public class Simd {
     /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void xor(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
-            dst[i] = (byte)(srcA[i] ^ srcB[i]);
+            dst[i] = (byte) (srcA[i] ^ srcB[i]);
         }
     }
 
     /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void not(byte[] src, byte[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
-            dst[i] = (byte)(~src[i]);
+            dst[i] = (byte) (~src[i]);
         }
     }
 
     /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void cmpEq(byte[] srcA, byte[] srcB, byte[] dstMask, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
-            dstMask[i] = srcA[i] == srcB[i] ? (byte)-1 : (byte)0;
+            dstMask[i] = srcA[i] == srcB[i] ? (byte) -1 : (byte) 0;
         }
     }
 
     /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void cmpEq(byte[] src, byte value, byte[] dstMask, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
-            dstMask[i] = src[i] == value ? (byte)-1 : (byte)0;
+            dstMask[i] = src[i] == value ? (byte) -1 : (byte) 0;
         }
     }
 
     /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void cmpLt(byte[] srcA, byte[] srcB, byte[] dstMask, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
-            dstMask[i] = srcA[i] < srcB[i] ? (byte)-1 : (byte)0;
+            dstMask[i] = srcA[i] < srcB[i] ? (byte) -1 : (byte) 0;
         }
     }
 
     /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void cmpLt(byte[] src, byte value, byte[] dstMask, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
-            dstMask[i] = src[i] < value ? (byte)-1 : (byte)0;
+            dstMask[i] = src[i] < value ? (byte) -1 : (byte) 0;
         }
     }
 
     /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void cmpGt(byte[] srcA, byte[] srcB, byte[] dstMask, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
-            dstMask[i] = srcA[i] > srcB[i] ? (byte)-1 : (byte)0;
+            dstMask[i] = srcA[i] > srcB[i] ? (byte) -1 : (byte) 0;
         }
     }
 
@@ -327,7 +327,7 @@ public class Simd {
     public void cmpRange(byte[] src, byte minValue, byte maxValue, byte[] dstMask, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
             int v = src[i];
-            dstMask[i] = v >= minValue && v <= maxValue ? (byte)-1 : (byte)0;
+            dstMask[i] = v >= minValue && v <= maxValue ? (byte) -1 : (byte) 0;
         }
     }
 
@@ -351,28 +351,28 @@ public class Simd {
     /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void addWrapping(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
-            dst[i] = (byte)(srcA[i] + srcB[i]);
+            dst[i] = (byte) (srcA[i] + srcB[i]);
         }
     }
 
     /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void addWrapping(byte[] src, byte value, byte[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
-            dst[i] = (byte)(src[i] + value);
+            dst[i] = (byte) (src[i] + value);
         }
     }
 
     /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void subWrapping(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
-            dst[i] = (byte)(srcA[i] - srcB[i]);
+            dst[i] = (byte) (srcA[i] - srcB[i]);
         }
     }
 
     /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void subWrapping(byte[] src, byte value, byte[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
-            dst[i] = (byte)(src[i] - value);
+            dst[i] = (byte) (src[i] - value);
         }
     }
 
@@ -492,14 +492,14 @@ public class Simd {
     /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void packIntToByteTruncate(int[] src, byte[] dst, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
-            dst[i] = (byte)src[i];
+            dst[i] = (byte) src[i];
         }
     }
 
     /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void packIntToByteTruncate(int[] src, int srcOffset, byte[] dst, int dstOffset, int length) {
         for (int i = 0; i < length; i++) {
-            dst[dstOffset + i] = (byte)src[srcOffset + i];
+            dst[dstOffset + i] = (byte) src[srcOffset + i];
         }
     }
 
@@ -507,10 +507,10 @@ public class Simd {
     public void packIntToByteTruncateInterleaved4(int[] src, int src0Offset, int src1Offset, int src2Offset, int src3Offset, byte[] dst, int dstOffset, int length) {
         for (int i = 0; i < length; i++) {
             int dstIndex = dstOffset + i * 4;
-            dst[dstIndex] = (byte)src[src0Offset + i];
-            dst[dstIndex + 1] = (byte)src[src1Offset + i];
-            dst[dstIndex + 2] = (byte)src[src2Offset + i];
-            dst[dstIndex + 3] = (byte)src[src3Offset + i];
+            dst[dstIndex] = (byte) src[src0Offset + i];
+            dst[dstIndex + 1] = (byte) src[src1Offset + i];
+            dst[dstIndex + 2] = (byte) src[src2Offset + i];
+            dst[dstIndex + 3] = (byte) src[src3Offset + i];
         }
     }
 
@@ -713,35 +713,35 @@ public class Simd {
     /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void cmpEq(int[] srcA, int[] srcB, byte[] dstMask, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
-            dstMask[i] = srcA[i] == srcB[i] ? (byte)-1 : (byte)0;
+            dstMask[i] = srcA[i] == srcB[i] ? (byte) -1 : (byte) 0;
         }
     }
 
     /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void cmpEq(int[] srcA, int srcAOffset, int[] srcB, int srcBOffset, byte[] dstMask, int dstOffset, int length) {
         for (int i = 0; i < length; i++) {
-            dstMask[dstOffset + i] = srcA[srcAOffset + i] == srcB[srcBOffset + i] ? (byte)-1 : (byte)0;
+            dstMask[dstOffset + i] = srcA[srcAOffset + i] == srcB[srcBOffset + i] ? (byte) -1 : (byte) 0;
         }
     }
 
     /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void cmpLt(int[] srcA, int[] srcB, byte[] dstMask, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
-            dstMask[i] = srcA[i] < srcB[i] ? (byte)-1 : (byte)0;
+            dstMask[i] = srcA[i] < srcB[i] ? (byte) -1 : (byte) 0;
         }
     }
 
     /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void cmpLt(int[] srcA, int srcAOffset, int[] srcB, int srcBOffset, byte[] dstMask, int dstOffset, int length) {
         for (int i = 0; i < length; i++) {
-            dstMask[dstOffset + i] = srcA[srcAOffset + i] < srcB[srcBOffset + i] ? (byte)-1 : (byte)0;
+            dstMask[dstOffset + i] = srcA[srcAOffset + i] < srcB[srcBOffset + i] ? (byte) -1 : (byte) 0;
         }
     }
 
     /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void cmpGt(int[] srcA, int[] srcB, byte[] dstMask, int offset, int length) {
         for (int i = offset, end = offset + length; i < end; i++) {
-            dstMask[i] = srcA[i] > srcB[i] ? (byte)-1 : (byte)0;
+            dstMask[i] = srcA[i] > srcB[i] ? (byte) -1 : (byte) 0;
         }
     }
 
@@ -875,28 +875,28 @@ public class Simd {
     /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void cmpEq(int[] src, int srcOffset, int constant, byte[] dstMask, int dstOffset, int length) {
         for (int i = 0; i < length; i++) {
-            dstMask[dstOffset + i] = src[srcOffset + i] == constant ? (byte)-1 : (byte)0;
+            dstMask[dstOffset + i] = src[srcOffset + i] == constant ? (byte) -1 : (byte) 0;
         }
     }
 
     /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void cmpLt(int[] src, int srcOffset, int constant, byte[] dstMask, int dstOffset, int length) {
         for (int i = 0; i < length; i++) {
-            dstMask[dstOffset + i] = src[srcOffset + i] < constant ? (byte)-1 : (byte)0;
+            dstMask[dstOffset + i] = src[srcOffset + i] < constant ? (byte) -1 : (byte) 0;
         }
     }
 
     /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void cmpGt(int[] src, int srcOffset, int constant, byte[] dstMask, int dstOffset, int length) {
         for (int i = 0; i < length; i++) {
-            dstMask[dstOffset + i] = src[srcOffset + i] > constant ? (byte)-1 : (byte)0;
+            dstMask[dstOffset + i] = src[srcOffset + i] > constant ? (byte) -1 : (byte) 0;
         }
     }
 
     /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
     public void not(byte[] src, int srcOffset, byte[] dst, int dstOffset, int length) {
         for (int i = 0; i < length; i++) {
-            dst[dstOffset + i] = (byte)(~src[srcOffset + i]);
+            dst[dstOffset + i] = (byte) (~src[srcOffset + i]);
         }
     }
 
@@ -1182,6 +1182,6 @@ public class Simd {
         if (value < Byte.MIN_VALUE) {
             return Byte.MIN_VALUE;
         }
-        return (byte)value;
+        return (byte) value;
     }
 }
