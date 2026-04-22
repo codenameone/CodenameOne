@@ -36,11 +36,6 @@ import com.codename1.ui.geom.Shape;
 /// using either a paint callback or a mutable image. There is no supported  way to create this
 /// object directly.
 public final class Graphics {
-    private static int debugDrawStringLogCount;
-    private static int debugDrawImageLogCount;
-    private static int debugTransformLogCount;
-    private static int debugTileImageLogCount;
-
     /// Rendering hint to indicate that the context should prefer to render
     /// primitives in a quick way, at the cost of quality, if there is an
     /// expensive operation.
@@ -73,10 +68,6 @@ public final class Graphics {
     private Object[] nativeGraphicsState;
     private float scaleX = 1;
     private float scaleY = 1;
-
-    private static String debugClassName(Object obj) {
-        return obj == null ? "null" : obj.getClass().getName();
-    }
 
     /// Constructing new graphics with a given javax.microedition.lcdui.Graphics
     ///
@@ -746,14 +737,6 @@ public final class Graphics {
         if (current instanceof CustomFont) {
             current.drawString(this, str, x, y);
         } else {
-            if (debugDrawStringLogCount < 80) {
-                debugDrawStringLogCount++;
-                System.out.println("CN1JS:Graphics.drawString textDecoration=" + textDecoration
-                        + " text=" + str
-                        + " nativeFont=" + debugClassName(nativeFont)
-                        + " graphics=" + debugClassName(nativeGraphics)
-                        + " impl=" + debugClassName(impl));
-            }
             impl.drawString(nativeGraphics, nativeFont, str, x + xTranslate, y + yTranslate, textDecoration);
         }
     }
@@ -865,14 +848,6 @@ public final class Graphics {
     ///
     /// - `y`: the y coordinate.
     public void drawImage(Image img, int x, int y) {
-        if (debugDrawImageLogCount < 120) {
-            debugDrawImageLogCount++;
-            System.out.println("CN1JS:Graphics.drawImage imageClass=" + debugClassName(img)
-                    + " nativeImage=" + debugClassName(img == null ? null : img.getImage())
-                    + " dst=" + x + "," + y
-                    + " graphics=" + debugClassName(nativeGraphics)
-                    + " impl=" + debugClassName(impl));
-        }
         img.drawImage(this, nativeGraphics, x, y);
     }
 
@@ -891,15 +866,6 @@ public final class Graphics {
     ///
     /// - `h`: the height to occupy
     public void drawImage(Image img, int x, int y, int w, int h) {
-        if (debugDrawImageLogCount < 120) {
-            debugDrawImageLogCount++;
-            System.out.println("CN1JS:Graphics.drawImageScaled imageClass=" + debugClassName(img)
-                    + " nativeImage=" + debugClassName(img == null ? null : img.getImage())
-                    + " dst=" + x + "," + y + " " + w + "x" + h
-                    + " graphics=" + debugClassName(nativeGraphics)
-                    + " impl=" + debugClassName(impl)
-                    + " scaledSupported=" + impl.isScaledImageDrawingSupported());
-        }
         if (impl.isScaledImageDrawingSupported()) {
             img.drawImage(this, nativeGraphics, x, y, w, h);
         } else {
@@ -1194,12 +1160,6 @@ public final class Graphics {
     ///
     /// - #setTransform(com.codename1.ui.geom.Matrix, int, int)
     public void setTransform(Transform transform) {
-        if (debugTransformLogCount < 80) {
-            debugTransformLogCount++;
-            System.out.println("CN1JS:Graphics.setTransform transform=" + debugClassName(transform)
-                    + " graphics=" + debugClassName(nativeGraphics)
-                    + " impl=" + debugClassName(impl));
-        }
         impl.setTransform(nativeGraphics, transform);
     }
 
@@ -1626,12 +1586,6 @@ public final class Graphics {
     ///
     /// - `y`: scale factor for y
     public void scale(float x, float y) {
-        if (debugTransformLogCount < 80) {
-            debugTransformLogCount++;
-            System.out.println("CN1JS:Graphics.scale x=" + x + " y=" + y
-                    + " graphics=" + debugClassName(nativeGraphics)
-                    + " impl=" + debugClassName(impl));
-        }
         impl.scale(nativeGraphics, x, y);
         scaleX = x;
         scaleY = y;
@@ -1789,15 +1743,6 @@ public final class Graphics {
     ///
     /// - `h`: coordinate to tile the image along
     public void tileImage(Image img, int x, int y, int w, int h) {
-        if (debugTileImageLogCount < 80) {
-            debugTileImageLogCount++;
-            System.out.println("CN1JS:Graphics.tileImage imageClass=" + debugClassName(img)
-                    + " nativeImage=" + debugClassName(img == null ? null : img.getImage())
-                    + " dst=" + x + "," + y + " " + w + "x" + h
-                    + " requiresDrawImage=" + (img != null && img.requiresDrawImage())
-                    + " graphics=" + debugClassName(nativeGraphics)
-                    + " impl=" + debugClassName(impl));
-        }
         if (img.requiresDrawImage()) {
             int iW = img.getWidth();
             int iH = img.getHeight();

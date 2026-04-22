@@ -42,14 +42,7 @@ public abstract class BaseTest extends AbstractTest {
 
     protected void registerReadyCallback(Form parent, Runnable run) {
         // Android misses some images when the time is lower
-        int delay = 1500;
-        if ("HTML5".equals(com.codename1.ui.Display.getInstance().getPlatformName())
-                && parent != null
-                && "graphics-draw-image-rect".equals(parent.getTitle())) {
-            delay = 4000;
-            System.out.println("CN1JS:BaseTest.delayOverride title=" + parent.getTitle() + " delayMs=" + delay);
-        }
-        UITimer.timer(delay, false, parent, run);
+        UITimer.timer(1500, false, parent, run);
     }
 
     protected synchronized void done() {
