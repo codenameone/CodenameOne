@@ -171,6 +171,9 @@ public class Font extends CN {
     }
 
     Font(int face, int style, int size) {
+        this.headlessFace = face;
+        this.headlessStyle = style;
+        this.headlessSize = size;
         Display d = Display.getInstance();
         CodenameOneImplementation i = d.getImplementation();
         if (i != null) {
@@ -181,6 +184,13 @@ public class Font extends CN {
         // the native font object is recreated when the resource is loaded
         // inside a running CN1 app.
     }
+
+    /** Face/style/size copies used by getFace/getStyle/getSize when Display.impl
+     *  is null (headless native-themes build). Only populated by the system-font
+     *  constructor; other code paths (TTF, bitmap) keep them at zero. */
+    private int headlessFace;
+    private int headlessStyle;
+    private int headlessSize;
 
     /// Returns a previously loaded bitmap font from cache
     ///
@@ -739,6 +749,9 @@ public class Font extends CN {
     ///
     /// Optional operation returning the font face for system fonts
     public int getFace() {
+        if (Display.impl == null) {
+            return headlessFace;
+        }
         return Display.impl.getFace(font);
     }
 
@@ -748,6 +761,9 @@ public class Font extends CN {
     ///
     /// Optional operation returning the font size for system fonts
     public int getSize() {
+        if (Display.impl == null) {
+            return headlessSize;
+        }
         return Display.impl.getSize(font);
     }
 
@@ -757,6 +773,9 @@ public class Font extends CN {
     ///
     /// Optional operation returning the font style for system fonts
     public int getStyle() {
+        if (Display.impl == null) {
+            return headlessStyle;
+        }
         return Display.impl.getStyle(font);
     }
 
