@@ -26,6 +26,7 @@
 package com.codename1.designer;
 
 import com.codename1.ui.util.EditableResources;
+import com.codename1.ui.util.EditableResourcesEditor;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Hashtable;
@@ -198,7 +199,7 @@ public class AddThemeResource extends javax.swing.JDialog {
         InputStream is = getClass().getResourceAsStream("/templates/" + template.getSelectedItem().toString() + ".res");
         if(is != null) {
             try {
-                EditableResources r = new EditableResources();
+                EditableResources r = new EditableResourcesEditor();
                 r.openFile(is);
                 is.close();
                 theme = r.getTheme(r.getThemeResourceNames()[0]);

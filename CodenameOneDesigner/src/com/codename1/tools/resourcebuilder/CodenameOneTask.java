@@ -26,6 +26,7 @@ package com.codename1.tools.resourcebuilder;
 
 import com.codename1.ui.Display;
 import com.codename1.ui.util.EditableResources;
+import com.codename1.ui.util.EditableResourcesEditor;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -88,7 +89,7 @@ public class CodenameOneTask extends MatchingTask {
             System.out.println("Processing " + dest);
 
             Display.init(null);
-            EditableResources output = new EditableResources();
+            EditableResources output = new EditableResourcesEditor();
             for(ResourceTask task : resources) {
                 task.addToResources(output);
             }

@@ -1,0 +1,61 @@
+/*
+ * iOS modern (liquid glass) theme -- smoke placeholder.
+ *
+ * This file exists to exercise the scripts/build-native-themes.sh pipeline
+ * end-to-end with the thin css-compiler jar and strictNoCef enforcement.
+ * Real component styling lands in a follow-up phase; nothing here should
+ * rely on CEF-backed rasterization.
+ */
+
+#Constants {
+    includeNativeBool: false;
+    darkModeBool: true;
+}
+
+:root {
+    --cn1-accent: #007aff;
+    --cn1-surface: #ffffff;
+    --cn1-surface-secondary: #f2f2f7;
+    --cn1-text: #000000;
+    --cn1-text-secondary: #3c3c43;
+    --cn1-separator: #c6c6c8;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --cn1-accent: #0a84ff;
+        --cn1-surface: #000000;
+        --cn1-surface-secondary: #1c1c1e;
+        --cn1-text: #ffffff;
+        --cn1-text-secondary: #ebebf5;
+        --cn1-separator: #38383a;
+    }
+}
+
+Label {
+    color: var(--cn1-text);
+    background-color: var(--cn1-surface);
+    font-family: native:MainRegular;
+    padding: 1mm 2mm 1mm 2mm;
+}
+
+Button {
+    color: var(--cn1-accent);
+    background-color: var(--cn1-surface);
+    font-family: native:MainRegular;
+    padding: 2mm 3mm 2mm 3mm;
+    cn1-derive: Label;
+}
+
+Button:pressed {
+    color: var(--cn1-accent);
+    background-color: var(--cn1-surface-secondary);
+}
+
+Button:disabled {
+    color: var(--cn1-text-secondary);
+}
+
+Form {
+    background-color: var(--cn1-surface);
+}

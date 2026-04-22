@@ -117,7 +117,15 @@ public class CSSTheme {
     EditableResources res;
     private String themeName = "Theme";
     private ImagesMetadata imagesMetadata = new ImagesMetadata();
-    
+
+    /**
+     * When true, {@link #createImageBorders(WebViewProvider)} refuses to rasterize any
+     * style via CEF and instead throws an {@link IllegalStateException} listing offending
+     * rules. Used by the native-themes build to guarantee that shipped platform themes
+     * contain no rasterized fallback images (which would bloat the .res file).
+     */
+    public static boolean strictNoCef = false;
+
     private List<FontFace> fontFaces = new ArrayList<FontFace>();
     public static final int DEFAULT_TARGET_DENSITY = com.codename1.ui.Display.DENSITY_HD;
     public static final String[] supportedNativeBorderTypes = new String[]{
@@ -2611,9 +2619,50 @@ public class CSSTheme {
         com.codename1.ui.BrowserComponent getWebView();
     }
     private static String currentId;
+
+    private void enforceNoCef() {
+        List<String> offenders = new ArrayList<String>();
+        String[] states = new String[] {"unselected", "selected", "pressed", "disabled"};
+        for (String id : elements.keySet()) {
+            if (!isModified(id)) {
+                continue;
+            }
+            Element e = (Element) elements.get(id);
+            Element[] stateElements = new Element[] {
+                e.getUnselected(), e.getSelected(), e.getPressed(), e.getDisabled()
+            };
+            for (int i = 0; i < stateElements.length; i++) {
+                Map<String, LexicalUnit> styles =
+                        (Map<String, LexicalUnit>) stateElements[i].getFlattenedStyle();
+                if (e.requiresImageBorder(styles)) {
+                    offenders.add(id + "." + states[i] + " (image border)");
+                } else if (e.requiresBackgroundImageGeneration(styles)) {
+                    offenders.add(id + "." + states[i] + " (background image)");
+                }
+            }
+        }
+        if (!offenders.isEmpty()) {
+            StringBuilder sb = new StringBuilder();
+            sb.append("CSS rules require CEF-backed image rasterization, which is disabled ");
+            sb.append("in no-cef mode (native-themes build). Offending rules:\n");
+            for (String o : offenders) {
+                sb.append("  - ").append(o).append("\n");
+            }
+            sb.append("Fix: avoid box-shadow, border-radius combined with a visible border, ");
+            sb.append("mixed-side borders, filter, and complex gradients. ");
+            sb.append("Use cn1-round-border / cn1-pill-border or solid backgrounds instead. ");
+            sb.append("If the effect is genuinely required, extend the CSS compiler and/or ");
+            sb.append("the resource format with a native primitive rather than rasterizing.");
+            throw new IllegalStateException(sb.toString());
+        }
+    }
+
     public void createImageBorders(WebViewProvider webviewProvider) {
         if (res == null) {
             res = new EditableResourcesForCSS(resourceFile);
+        }
+        if (strictNoCef) {
+            enforceNoCef();
         }
         ArrayList<Border> borders = new ArrayList<Border>();
         

@@ -25,6 +25,7 @@ package com.codename1.designer.css;
 import com.codename1.impl.javase.JavaSEPort;
 import com.codename1.ui.Display;
 import com.codename1.ui.util.EditableResources;
+import com.codename1.ui.util.EditableResourcesEditor;
 import java.awt.EventQueue;
 import java.io.DataOutputStream;
 import java.io.File;
@@ -52,7 +53,7 @@ public class CN1CSSInstallerCLI {
                 frm.setVisible(false);
                 Display.init(frm.getContentPane());
                 JavaSEPort.setBaseResourceDir(resFile.getParentFile());
-                EditableResources res = new EditableResources();
+                EditableResources res = new EditableResourcesEditor();
                 res.openFile(new FileInputStream(resFile));
                 String mainTheme = res.getThemeResourceNames()[0];
                 res.setThemeProperty(mainTheme, "@OverlayThemes", cssFile.getName());

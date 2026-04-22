@@ -28,6 +28,10 @@
             <artifactId>codenameone-javase-svg</artifactId>
 
         </dependency>
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-css-compiler</artifactId>
+        </dependency>
         <!-- https://mvnrepository.com/artifact/org.swinglabs/swing-layout -->
         <dependency>
             <groupId>org.swinglabs</groupId>

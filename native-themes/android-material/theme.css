@@ -1,0 +1,64 @@
+/*
+ * Android Material 3 theme -- smoke placeholder.
+ *
+ * This file exists to exercise the scripts/build-native-themes.sh pipeline
+ * end-to-end with the thin css-compiler jar and strictNoCef enforcement.
+ * Real component styling lands in a follow-up phase; nothing here should
+ * rely on CEF-backed rasterization.
+ */
+
+#Constants {
+    includeNativeBool: false;
+    darkModeBool: true;
+}
+
+:root {
+    --cn1-primary: #6750a4;
+    --cn1-on-primary: #ffffff;
+    --cn1-surface: #fef7ff;
+    --cn1-surface-variant: #e7e0ec;
+    --cn1-on-surface: #1d1b20;
+    --cn1-on-surface-variant: #49454f;
+    --cn1-outline: #79747e;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --cn1-primary: #d0bcff;
+        --cn1-on-primary: #381e72;
+        --cn1-surface: #141218;
+        --cn1-surface-variant: #49454f;
+        --cn1-on-surface: #e6e0e9;
+        --cn1-on-surface-variant: #cac4d0;
+        --cn1-outline: #938f99;
+    }
+}
+
+Label {
+    color: var(--cn1-on-surface);
+    background-color: var(--cn1-surface);
+    font-family: native:MainRegular;
+    padding: 1mm 2mm 1mm 2mm;
+}
+
+Button {
+    color: var(--cn1-on-primary);
+    background-color: var(--cn1-primary);
+    font-family: native:MainRegular;
+    padding: 2mm 4mm 2mm 4mm;
+    cn1-derive: Label;
+}
+
+Button:pressed {
+    background-color: var(--cn1-surface-variant);
+    color: var(--cn1-on-surface-variant);
+}
+
+Button:disabled {
+    color: var(--cn1-on-surface-variant);
+    background-color: var(--cn1-surface-variant);
+}
+
+Form {
+    background-color: var(--cn1-surface);
+}
