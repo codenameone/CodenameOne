@@ -185,9 +185,9 @@ public class Font extends CN {
         // inside a running CN1 app.
     }
 
-    /** Face/style/size copies used by getFace/getStyle/getSize when Display.impl
-     *  is null (headless native-themes build). Only populated by the system-font
-     *  constructor; other code paths (TTF, bitmap) keep them at zero. */
+    /// Face/style/size copies used by getFace/getStyle/getSize when Display.impl
+    /// is null (headless native-themes build). Only populated by the system-font
+    /// constructor; other code paths (TTF, bitmap) keep them at zero.
     private int headlessFace;
     private int headlessStyle;
     private int headlessSize;
