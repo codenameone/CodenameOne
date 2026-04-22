@@ -259,30 +259,37 @@ public class CN1Playground extends Lifecycle {
 
     private void installSideMenu(Toolbar toolbar) {
         Toolbar.setEnableSideMenuSwipe(false);
-        // Use CN1's Command-based API for side menu items (not Button
-        // + addComponentToSideMenu + manual closeSideMenu). Commands
-        // let CN1 own the tap -> close -> actionPerformed sequence,
-        // which is different from the hand-rolled Button + manual-
-        // close we had before. The title-bar right-bar commands use
-        // this same mechanism and don't reproduce the ghost-preview
-        // / duplicate-side-menu bug on the JS port, while the
-        // Button-based side-menu entries did. Swapping to Commands
-        // aligns both paths.
-        toolbar.addComponentToSideMenu(new PlaygroundMenuSection("Share"));
-        toolbar.addCommandToSideMenu(com.codename1.ui.Command.create(SHARE_BUTTON_LABEL, null,
-                e -> copyCurrentSourceUrl()));
+        PlaygroundMenuSection shareSection = new PlaygroundMenuSection("Share");
+        addSideMenuComponent(toolbar, shareSection);
+        addSideMenuComponent(toolbar, createSideMenuButton(SHARE_BUTTON_LABEL, () -> {
+            copyCurrentSourceUrl();
+            toolbar.closeSideMenu();
+        }));
 
-        toolbar.addComponentToSideMenu(new PlaygroundMenuSection("Samples"));
+        PlaygroundMenuSection samplesSection = new PlaygroundMenuSection("Samples");
+        addSideMenuComponent(toolbar, samplesSection);
         for (PlaygroundExamples.Sample sample : PlaygroundExamples.SAMPLES) {
-            final PlaygroundExamples.Sample bound = sample;
-            toolbar.addCommandToSideMenu(com.codename1.ui.Command.create(bound.title, null,
-                    e -> setScript(bound.script, true)));
+            addSideMenuComponent(toolbar, createSideMenuButton(sample.title, () -> {
+                setScript(sample.script, true);
+                toolbar.closeSideMenu();
+            }));
         }
 
-        toolbar.addComponentToSideMenu(new PlaygroundMenuSection("History"));
-        toolbar.addComponentToSideMenu(historyMenu);
+        PlaygroundMenuSection historySection = new PlaygroundMenuSection("History");
+        addSideMenuComponent(toolbar, historySection);
+        addSideMenuComponent(toolbar, historyMenu);
 
         refreshHistoryMenu(toolbar, PlaygroundStateStore.loadHistory());
+    }
+
+    private void addSideMenuComponent(Toolbar toolbar, Component component) {
+        // Dark-mode theming hacks (applyWebsiteTheme walk + tracking
+        // components in a list for re-theming on dark toggle) were
+        // removed: they correlate with the JS-port ghost-side-menu
+        // regression and CN1's own theme system can handle these UIIDs
+        // if the theme props are right. Side-menu visual polish for
+        // dark mode is a separate follow-up.
+        toolbar.addComponentToSideMenu(component);
     }
 
     private void refreshHistoryMenu(Toolbar toolbar, List<PlaygroundStateStore.HistoryEntry> history) {
@@ -312,6 +319,11 @@ public class CN1Playground extends Lifecycle {
         return button;
     }
 
+    private Button createSideMenuButton(String text, Runnable action) {
+        Button button = new Button(text);
+        button.addActionListener(e -> action.run());
+        return button;
+    }
 
     private String resolveInitialScript() {
         String sharedScript = scriptFromUrl();
