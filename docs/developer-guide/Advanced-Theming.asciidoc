@@ -184,6 +184,9 @@ SoftKey, Touch, Bar, Title, Right, Native
 |iconUiid
 |Allows theming the icon component used by `SpanLabel`, `SpanButton`, `MultiButton`, and `SpanMultiButton` when they fetch icon styling via theme constants.
 
+|iosScrollMotionBool
+|Enables iOS-style scroll physics (nonlinear rubber-band during drag and critically-damped tensile snap-back). When unset it defaults to `true` on the iOS platform and `false` elsewhere. Set explicitly to override the platform default. See <<scroll-motion-tuning-section>>
+
 |imageviewerNavigationArrowsBool
 |Enables side navigation arrows by default for `ImageViewer` instances using the `ImageViewer` UIID (or a lowercased custom UIID prefix).
 
@@ -201,6 +204,9 @@ SoftKey, Touch, Bar, Title, Right, Native
 
 |dialogTransitionOutImage
 |Default transition https://www.codenameone.com/javadoc/com/codename1/ui/Image.html[Image] for dialog, causes a https://www.codenameone.com/javadoc/com/codename1/ui/animations/Timeline.html[Timeline] transition effect
+
+|DecayMotionScaleFactorInt
+|Velocity-to-distance multiplier for the exponential-decay scroll motion (see <<scroll-motion-tuning-section>>). Default is `950`. Larger values make flicks travel farther for the same release velocity
 
 |disabledColor
 |Color to use when disabling entries by default
@@ -472,6 +478,15 @@ SoftKey, Touch, Bar, Title, Right, Native
 |rightSideMenuPressImage
 |Same as sideMenuPressImage only for the right side, optional and defaults to sideMenuPressImage
 
+|rubberBandCoefficientInt
+|Resistance coefficient for the iOS-style rubber-band compression used while the finger drags past a scroll edge. Value is interpreted as hundredths, so `55` means `0.55` (the iOS reference value). Larger values let the content be pulled farther for the same finger travel; smaller values make the content feel stiffer. Only active when `iosScrollMotionBool` is `true`. See <<scroll-motion-tuning-section>>
+
+|ScrollMotion
+|Selects the post-release flick model. `DECAY` (default) uses exponential velocity decay controlled by `ScrollMotionTimeConstantInt` and `DecayMotionScaleFactorInt`. Any other value (e.g. `FRICTION`) falls back to the linear-friction model. See <<scroll-motion-tuning-section>>
+
+|ScrollMotionTimeConstantInt
+|Time constant in milliseconds for the exponential-decay flick model (active when `ScrollMotion=DECAY`). Default is `500`. Smaller values stop the flick sooner
+
 |scrollVisibleBool
 |`true`/`false` default is platform dependent. Toggles whether the scroll bar is visible
 
@@ -642,7 +657,30 @@ SoftKey, Touch, Bar, Title, Right, Native
 
 |tensileDragBool
 |Indicates that tensile drag should be enabled/disabled. This is usually set by platform themes
+
+|tensileSnapMinDurationInt
+|Minimum duration in milliseconds for the tensile snap-back animation when the finger is released past a scroll edge. Defaults to `400` when `iosScrollMotionBool` is `true` and `300` otherwise. The actual duration scales with the distance being snapped; this is only a floor
+
+|tensileSnapMotion
+|Motion curve used for the tensile snap-back. `SPRING` (the default when `iosScrollMotionBool` is `true`) applies a critically-damped spring envelope that settles softly. `DECELERATION` (the default elsewhere) applies the legacy quadratic ease-out. See <<scroll-motion-tuning-section>>
 |===
+
+[[scroll-motion-tuning-section]]
+==== Scroll motion tuning
+
+Scroll feel is controlled by three stages, each tunable via theme constants:
+
+. *While the finger is dragging past an edge* -- when `iosScrollMotionBool` is `true`, the over-edge distance is compressed by the iOS UIScrollView rubber-band function `c * d * dim / (c * d + dim)`, where `d` is the raw finger displacement past the edge, `dim` is the viewport dimension, and `c` is `rubberBandCoefficientInt / 100` (default `0.55`). The result is that the content feels heavier the farther you pull it, asymptotically approaching `dim`. When `iosScrollMotionBool` is `false`, the legacy behavior is used: a linear 1:1 follow clamped to `tensileLength`.
+. *After the finger is lifted, while there is still velocity* -- the `ScrollMotion` constant selects the model. `DECAY` (default) uses exponential velocity decay with a time constant of `ScrollMotionTimeConstantInt` milliseconds and a distance scale of `DecayMotionScaleFactorInt`. Any other value (e.g. `FRICTION`) falls back to linear friction.
+. *When the scroll comes to rest past an edge* -- a tensile snap-back animates the content back to the edge. `tensileSnapMotion` picks the curve: `SPRING` is a critically-damped envelope (iOS-like soft settle) and `DECELERATION` is the legacy quadratic ease-out. The duration scales with distance but never falls below `tensileSnapMinDurationInt` milliseconds.
++
+`iosScrollMotionBool` is the single switch that flips stage 1 and the default of stage 3 to the iOS-matching behavior. It defaults to `true` on the iOS platform only. Every individual constant can still be overridden regardless of this switch, so you can, for example, enable the nonlinear rubber-band globally (`iosScrollMotionBool=true`) while keeping the legacy quadratic snap-back (`tensileSnapMotion=DECELERATION`).
+
+.Tuning suggestions
+* To make scrolling feel stiffer on iOS (less pull), reduce `rubberBandCoefficientInt` from `55` toward `35`.
+* To make flicks stop sooner, reduce `ScrollMotionTimeConstantInt` (default `500`) or `DecayMotionScaleFactorInt` (default `950`).
+* To enable iOS-style physics on Android or desktop for consistency, set `iosScrollMotionBool=true` explicitly.
+* To disable iOS physics on the simulator while debugging, set `iosScrollMotionBool=false` in your development theme.
 
 .Dynamic Theme Swapping & Theme Constants
 ****

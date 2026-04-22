@@ -185,6 +185,55 @@ public class Component implements Animation, StyleListener, Editable {
     private static boolean disableSmoothScrolling = false;
     private static boolean paintLockEnableChecked;
     private static boolean paintLockEnabled;
+
+    // Cached platform check for iOS-style scroll motion. Platform name is constant per
+    // process, so we cache it lazily to avoid repeated string comparisons in the drag hot path.
+    private static Boolean iosPlatformCached;
+
+    /// Returns true when iOS-style scroll physics (nonlinear rubber-band during drag,
+    /// critically-damped snap-back, ScrollMotion=DECAY defaults) should be applied.
+    /// The theme constant `iosScrollMotionBool` can force it on or off explicitly; when
+    /// unset, it defaults to true on the iOS platform and false elsewhere.
+    static boolean isIOSScrollMotion() {
+        String v = UIManager.getInstance().getThemeConstant("iosScrollMotionBool", null);
+        if (v != null) {
+            return "true".equalsIgnoreCase(v) || "1".equals(v);
+        }
+        Boolean cached = iosPlatformCached;
+        if (cached == null) {
+            cached = "ios".equals(Display.getInstance().getPlatformName());
+            iosPlatformCached = cached;
+        }
+        return cached;
+    }
+
+    /// iOS-style rubber-band compression: given a raw over-edge distance and the viewport
+    /// dimension, returns the compressed (visible) distance using `c*d*dim / (c*d + dim)`.
+    /// The coefficient `c` comes from the `rubberBandCoefficientInt` theme constant (value
+    /// is interpreted as hundredths, e.g. `55` = 0.55 which matches iOS UIScrollView).
+    static int rubberBandCompress(int raw, int dim) {
+        if (raw <= 0 || dim <= 0) {
+            return 0;
+        }
+        double c = UIManager.getInstance().getThemeConstant("rubberBandCoefficientInt", 55) / 100.0d;
+        double cd = c * raw;
+        return (int) Math.round(cd * dim / (cd + dim));
+    }
+
+    /// Inverse of `rubberBandCompress` - given a compressed over-edge distance, returns
+    /// the raw (finger) distance that would have produced it. Used to reconstruct the
+    /// raw drag offset from the currently-displayed compressed scroll position.
+    static int rubberBandDecompress(int compressed, int dim) {
+        if (compressed <= 0 || dim <= 0) {
+            return 0;
+        }
+        double c = UIManager.getInstance().getThemeConstant("rubberBandCoefficientInt", 55) / 100.0d;
+        double denom = c * (dim - compressed);
+        if (denom <= 0) {
+            return Integer.MAX_VALUE / 2;
+        }
+        return (int) Math.round(compressed * (double) dim / denom);
+    }
     private final Rectangle bounds = new Rectangle(0, 0, new Dimension(0, 0));
     private final Object dirtyRegionLock = new Object();
     boolean hasLead;
@@ -5522,6 +5571,7 @@ public class Component implements Animation, StyleListener, Editable {
 
             // we drag inversly to get a feel of grabbing a physical screen
             // and pulling it in the reverse direction of the drag
+            boolean rubberBand = isIOSScrollMotion();
             if (isScrollableY()) {
                 int tl;
                 if (getTensileLength() > -1 && (refreshTask == null || InfiniteProgress.isDefaultMaterialDesignMode())) {
@@ -5532,14 +5582,43 @@ public class Component implements Animation, StyleListener, Editable {
                 if (!isSmoothScrolling() || !isTensileDragEnabled()) {
                     tl = 0;
                 }
-                int scroll = getScrollY() + (lastScrollY - y);
-
+                int fingerDelta = lastScrollY - y;
+                int maxScroll;
                 if (isAlwaysTensile() && getScrollDimension().getHeight() + getInvisibleAreaUnderVKB() <= getHeight()) {
-                    if (scroll >= -tl && scroll < getHeight() + tl) {
-                        setScrollY(scroll);
-                    }
+                    maxScroll = getHeight();
                 } else {
-                    if (scroll >= -tl && scroll < getScrollDimension().getHeight() + getInvisibleAreaUnderVKB() - getHeight() + tl) {
+                    maxScroll = getScrollDimension().getHeight() + getInvisibleAreaUnderVKB() - getHeight();
+                }
+                int newScroll;
+                if (rubberBand && tl > 0) {
+                    int dim = getHeight();
+                    int currentScroll = getScrollY();
+                    int raw;
+                    if (currentScroll < 0) {
+                        raw = -rubberBandDecompress(-currentScroll, dim);
+                    } else if (currentScroll > maxScroll) {
+                        raw = maxScroll + rubberBandDecompress(currentScroll - maxScroll, dim);
+                    } else {
+                        raw = currentScroll;
+                    }
+                    int newRaw = raw + fingerDelta;
+                    if (newRaw < 0) {
+                        newScroll = -rubberBandCompress(-newRaw, dim);
+                        if (newScroll < -tl) {
+                            newScroll = -tl;
+                        }
+                    } else if (newRaw > maxScroll) {
+                        newScroll = maxScroll + rubberBandCompress(newRaw - maxScroll, dim);
+                        if (newScroll > maxScroll + tl) {
+                            newScroll = maxScroll + tl;
+                        }
+                    } else {
+                        newScroll = newRaw;
+                    }
+                    setScrollY(newScroll);
+                } else {
+                    int scroll = getScrollY() + fingerDelta;
+                    if (scroll >= -tl && scroll < maxScroll + tl) {
                         setScrollY(scroll);
                     }
                 }
@@ -5555,9 +5634,40 @@ public class Component implements Animation, StyleListener, Editable {
                 if (!isSmoothScrolling() || !isTensileDragEnabled()) {
                     tl = 0;
                 }
-                int scroll = getScrollX() + (lastScrollX - x);
-                if (scroll >= -tl && scroll < getScrollDimension().getWidth() - getWidth() + tl) {
-                    setScrollX(scroll);
+                int fingerDelta = lastScrollX - x;
+                int maxScroll = getScrollDimension().getWidth() - getWidth();
+                if (rubberBand && tl > 0) {
+                    int dim = getWidth();
+                    int currentScroll = getScrollX();
+                    int raw;
+                    if (currentScroll < 0) {
+                        raw = -rubberBandDecompress(-currentScroll, dim);
+                    } else if (currentScroll > maxScroll) {
+                        raw = maxScroll + rubberBandDecompress(currentScroll - maxScroll, dim);
+                    } else {
+                        raw = currentScroll;
+                    }
+                    int newRaw = raw + fingerDelta;
+                    int newScroll;
+                    if (newRaw < 0) {
+                        newScroll = -rubberBandCompress(-newRaw, dim);
+                        if (newScroll < -tl) {
+                            newScroll = -tl;
+                        }
+                    } else if (newRaw > maxScroll) {
+                        newScroll = maxScroll + rubberBandCompress(newRaw - maxScroll, dim);
+                        if (newScroll > maxScroll + tl) {
+                            newScroll = maxScroll + tl;
+                        }
+                    } else {
+                        newScroll = newRaw;
+                    }
+                    setScrollX(newScroll);
+                } else {
+                    int scroll = getScrollX() + fingerDelta;
+                    if (scroll >= -tl && scroll < maxScroll + tl) {
+                        setScrollX(scroll);
+                    }
                 }
             }
             lastScrollY = y;
@@ -5761,8 +5871,16 @@ public class Component implements Animation, StyleListener, Editable {
         Motion draggedMotion;
         if (tensileDragEnabled) {
             final int distance = Math.abs(offset - dest);
-            final int duration = Math.max(300, (int) Math.round(1000 * distance / (double) CN.getDisplayHeight()));
-            draggedMotion = Motion.createDecelerationMotion(offset, dest, duration);
+            final UIManager uim = UIManager.getInstance();
+            final boolean ios = isIOSScrollMotion();
+            final int minDuration = uim.getThemeConstant("tensileSnapMinDurationInt", ios ? 400 : 300);
+            final int duration = Math.max(minDuration, (int) Math.round(1000 * distance / (double) CN.getDisplayHeight()));
+            final String motion = uim.getThemeConstant("tensileSnapMotion", ios ? "SPRING" : "DECELERATION");
+            if ("SPRING".equalsIgnoreCase(motion)) {
+                draggedMotion = Motion.createCriticalDampedSpringMotion(offset, dest, duration);
+            } else {
+                draggedMotion = Motion.createDecelerationMotion(offset, dest, duration);
+            }
             draggedMotion.start();
         } else {
             draggedMotion = Motion.createLinearMotion(offset, dest, 0);

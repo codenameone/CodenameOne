@@ -46,6 +46,7 @@ public class Motion {
     private static final int CUBIC = 4;
     private static final int COLOR_LINEAR = 5;
     private static final int EXPONENTIAL_DECAY = 6;
+    private static final int CRITICAL_DAMPED_SPRING = 7;
     private static boolean slowMotion;
     private final int[] previousLastReturnedValue = new int[3];
     private final long[] previousLastReturnedValueTime = new long[3];
@@ -313,6 +314,30 @@ public class Motion {
         return deceleration;
     }
 
+    /// Creates a critically-damped spring motion from source to destination. This is the
+    /// envelope of a second-order critically damped system step response:
+    /// `x(t) = dst - (dst - src) * (1 + w*t) * e^(-w*t)` where w is chosen so the residual
+    /// at t=duration is about 2%. Produces a quick initial approach with a soft settling
+    /// tail, closer in feel to the iOS rubber-band snap-back than the quadratic
+    /// `createDecelerationMotion` curve.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sourceValue`: the number from which we are starting
+    ///
+    /// - `destinationValue`: the number to which we are heading
+    ///
+    /// - `duration`: the length in milliseconds of the motion
+    ///
+    /// #### Returns
+    ///
+    /// new motion object
+    public static Motion createCriticalDampedSpringMotion(int sourceValue, int destinationValue, int duration) {
+        Motion m = new Motion(sourceValue, destinationValue, duration);
+        m.motionType = CRITICAL_DAMPED_SPRING;
+        return m;
+    }
+
     /// Creates a deceleration motion starting from the current position of another motion.
     ///
     /// #### Parameters
@@ -530,6 +555,9 @@ public class Motion {
             case EXPONENTIAL_DECAY:
                 lastReturnedValue = getExponentialDecay();
                 break;
+            case CRITICAL_DAMPED_SPRING:
+                lastReturnedValue = getCriticalDampedSpring();
+                break;
             default:
                 lastReturnedValue = getLinear();
                 break;
@@ -712,6 +740,31 @@ public class Motion {
             x = Math.max(destinationValue, x);
         }
         return x;
+    }
+
+    // Critically damped second-order step response: produces a fast initial approach
+    // with a soft tail, no overshoot. Omega*duration = 5.83 so residual is ~2% at t=duration.
+    private static final double CRITICAL_DAMPED_OMEGA_T = 5.83d;
+
+    private int getCriticalDampedSpring() {
+        if (isFinished()) {
+            return destinationValue;
+        }
+        float totalTime = duration;
+        float currentTime = (int) getCurrentMotionTime();
+        if (currentMotionTime > -1) {
+            currentTime -= startTime;
+            totalTime -= startTime;
+        }
+        if (totalTime <= 0) {
+            return destinationValue;
+        }
+        if (currentTime > totalTime) {
+            currentTime = totalTime;
+        }
+        double omegaT = CRITICAL_DAMPED_OMEGA_T * (currentTime / (double) totalTime);
+        double residual = (1.0d + omegaT) * MathUtil.exp(-omegaT);
+        return (int) Math.round(destinationValue - (destinationValue - sourceValue) * residual);
     }
 
     /// The number from which we are starting (usually indicating animation start position)
