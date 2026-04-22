@@ -10,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -138,7 +139,7 @@ class JavaScriptNativeImageAdapterTest {
         Object proxy = proxyDrawTarget(drawTargetIface, target);
 
         draw.invoke(null, model, proxy, 10, 20, 30, 40);
-        assertEquals(List.of("drawMutableSurface(10,20,30,40)"), target.calls);
+        assertEquals(Collections.singletonList("drawMutableSurface(10,20,30,40)"), target.calls);
     }
 
     @Test
