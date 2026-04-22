@@ -67,6 +67,9 @@ public class CN1Playground extends Lifecycle {
     private Container sidePanelSlot;
 
     private Resources theme;
+    private Resources androidTheme;
+    private Resources iosTheme;
+    private String activeDeviceThemeKey;
     private boolean websiteDarkMode = DEFAULT_DARK_MODE;
     private String currentScript;
     private String currentCss;
@@ -162,6 +165,7 @@ public class CN1Playground extends Lifecycle {
         previewColumn = new PlaygroundPreviewColumn(device, orientation, websiteDarkMode, () -> {
             PlaygroundStateStore.saveDevice(previewColumn.getDevice());
             PlaygroundStateStore.saveOrientation(previewColumn.getOrientation());
+            applyDeviceTheme(previewColumn.getDevice());
         });
 
         mobileTopTabs = buildMobileTopTabs();
@@ -192,6 +196,7 @@ public class CN1Playground extends Lifecycle {
         applyActivity(currentActivity);
 
         applyWebsiteTheme(appForm, websiteDarkMode);
+        applyDeviceTheme(previewColumn.getDevice());
         runScript(appForm);
         initWebsiteThemeSync(appForm);
 
@@ -778,7 +783,11 @@ public class CN1Playground extends Lifecycle {
         cssEditor.setMarkers(diagnostics);
         cssEditor.setInlineMessages(messages);
         cssEditor.setUiidCompletions(PlaygroundCssSupport.collectVisibleUiids(previewColumn.getContentHost()));
-        appForm.refreshTheme();
+        // Refresh only the user's preview content. Walking the bezel/screen/mask would
+        // wipe programmatic borders that have no theme.css counterpart.
+        if (previewColumn != null) {
+            previewColumn.refreshPreviewTheme();
+        }
     }
 
     private void restoreThemeDefaults() {
@@ -792,6 +801,77 @@ public class CN1Playground extends Lifecycle {
         Hashtable baseTheme = theme.getTheme(names[0]);
         if (baseTheme != null) {
             UIManager.getInstance().setThemeProps(baseTheme);
+        }
+        if (PlaygroundPreviewColumn.DEVICE_PIXEL.equals(activeDeviceThemeKey)) {
+            layerAndroidTheme();
+        } else if (PlaygroundPreviewColumn.DEVICE_IPHONE.equals(activeDeviceThemeKey)) {
+            layerIosTheme();
+        }
+    }
+
+    private void applyDeviceTheme(String device) {
+        if (device == null) {
+            device = PlaygroundPreviewColumn.DEVICE_IPHONE;
+        }
+        if (device.equals(activeDeviceThemeKey)) {
+            return;
+        }
+        activeDeviceThemeKey = device;
+        restoreThemeDefaults();
+        applyCurrentCss();
+        // Only refresh the user's preview content subtree. refreshTheme() walks by UIID
+        // and would overwrite the bezel's programmatic RoundRectBorder and the
+        // corner-mask overlay's transparent background since those UIIDs have no
+        // matching declarations in theme.css.
+        if (previewColumn != null) {
+            previewColumn.refreshPreviewTheme();
+        }
+    }
+
+    private void layerAndroidTheme() {
+        if (androidTheme == null) {
+            try {
+                androidTheme = Resources.open("/androidTheme.res");
+            } catch (java.io.IOException ex) {
+                Log.p("Android theme unavailable: " + ex);
+                return;
+            }
+        }
+        applyThemeOverlay(androidTheme);
+    }
+
+    /// Layers the builtin iPhone native theme on top of the playground base.
+    /// `iOS7Theme.res` ships with the Codename One distribution; we load it from the
+    /// classpath instead of copying a local copy into the project resources.
+    /// If the resource isn't on the runtime classpath (falls back silently) the
+    /// iPhone skin renders with the playground base theme only.
+    private void layerIosTheme() {
+        if (iosTheme == null) {
+            try {
+                iosTheme = Resources.openLayered("/iOS7Theme");
+            } catch (java.io.IOException ex) {
+                try {
+                    iosTheme = Resources.openLayered("/iPhoneTheme");
+                } catch (java.io.IOException ex2) {
+                    Log.p("iOS theme unavailable: " + ex2);
+                    return;
+                }
+            }
+        }
+        applyThemeOverlay(iosTheme);
+    }
+
+    private void applyThemeOverlay(Resources res) {
+        if (res == null) {
+            return;
+        }
+        String[] names = res.getThemeResourceNames();
+        if (names == null || names.length == 0) {
+            return;
+        }
+        Hashtable props = res.getTheme(names[0]);
+        if (props != null && !props.isEmpty()) {
+            UIManager.getInstance().addThemeProps(props);
         }
     }
 
@@ -807,12 +887,8 @@ public class CN1Playground extends Lifecycle {
         Hashtable customTheme = resource.getTheme("PlaygroundCustomTheme");
         if (customTheme != null && !customTheme.isEmpty()) {
             UIManager.getInstance().addThemeProps(customTheme);
-            Container host = previewColumn.getContentHost();
-            if (host != null) {
-                host.refreshTheme();
-                host.revalidate();
-            } else {
-                form.refreshTheme();
+            if (previewColumn != null) {
+                previewColumn.refreshPreviewTheme();
             }
         }
     }

@@ -24,7 +24,7 @@ final class PlaygroundPreviewColumn extends Container {
     static final String ORIENTATION_PORTRAIT = "portrait";
     static final String ORIENTATION_LANDSCAPE = "landscape";
 
-    private final Container toolbar;
+    private Container toolbar;
     private final PlaygroundSegmented deviceSegmented;
     private final PlaygroundSegmented orientationSegmented;
     private Container orientationWrapper;
@@ -57,11 +57,15 @@ final class PlaygroundPreviewColumn extends Container {
         deviceSegmented = new PlaygroundSegmented(deviceOptions, this.device, darkMode, key -> {
             this.device = key;
             if (orientationWrapper != null) {
+                orientationWrapper.setHidden(DEVICE_NO_SKIN.equals(key));
                 orientationWrapper.setVisible(!DEVICE_NO_SKIN.equals(key));
             }
             rebuildStage();
             if (listener != null) {
                 listener.onPreviewSettingsChanged();
+            }
+            if (toolbar != null && toolbar.getComponentForm() != null) {
+                toolbar.revalidate();
             }
         });
 
@@ -79,7 +83,9 @@ final class PlaygroundPreviewColumn extends Container {
         orientationWrapper = new Container(new FlowLayout(Component.LEFT, Component.CENTER));
         orientationWrapper.getAllStyles().setBgTransparency(0);
         orientationWrapper.add(orientationSegmented);
-        orientationWrapper.setVisible(!DEVICE_NO_SKIN.equals(this.device));
+        boolean hideOrientation = DEVICE_NO_SKIN.equals(this.device);
+        orientationWrapper.setHidden(hideOrientation);
+        orientationWrapper.setVisible(!hideOrientation);
 
         dimensionsLabel = new Label("");
         dimensionsLabel.setUIID(darkMode ? "PlaygroundDimensionsDark" : "PlaygroundDimensions");
@@ -150,6 +156,22 @@ final class PlaygroundPreviewColumn extends Container {
 
     Container getContentHost() {
         return contentHost;
+    }
+
+    /// Refreshes theme styles only on the user's preview content. Skips the bezel,
+    /// screen, and corner-mask overlay so their programmatic borders / transparency
+    /// are not overwritten by `refreshTheme()`.
+    void refreshPreviewTheme() {
+        if (currentPreview == null) {
+            return;
+        }
+        currentPreview.refreshTheme();
+        Container parent = currentPreview.getParent();
+        if (parent != null) {
+            parent.revalidate();
+        } else {
+            currentPreview.repaint();
+        }
     }
 
     void setCompact(boolean compact) {

@@ -1,6 +1,5 @@
 /** Define Theme Constants here */
 #Constants {
-    includeNativeBool: true;
     defaultSourceDPIInt: "0";
     sideMenuSizeLandscapeInt: "75";
     sideMenuSizeTabLandscapeInt: "75";
