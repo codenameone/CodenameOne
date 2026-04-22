@@ -173,7 +173,13 @@ public class Font extends CN {
     Font(int face, int style, int size) {
         Display d = Display.getInstance();
         CodenameOneImplementation i = d.getImplementation();
-        font = i.createFont(face, style, size);
+        if (i != null) {
+            font = i.createFont(face, style, size);
+        }
+        // Headless callers (e.g. the css-compiler native-themes build) never
+        // render text; the serialized theme only stores face/style/size and
+        // the native font object is recreated when the resource is loaded
+        // inside a running CN1 app.
     }
 
     /// Returns a previously loaded bitmap font from cache
