@@ -59,7 +59,16 @@ final class PlaygroundBrowserEditor {
         this.pendingDarkMode = darkMode;
         if (shouldUseBrowserEditor()) {
             browser = new BrowserComponent();
-            browser.putClientProperty("HTML5Peer.removeOnDeinitialize", Boolean.FALSE);
+            // Experiment: drop the "keep iframe on deinit" flag. When
+            // set to FALSE, the HTML5Peer is pinned in the DOM even
+            // when its CN1 peer is detached/reattached during
+            // re-layout — suspected to cause orphaned editor iframes
+            // stacking over the preview on the JavaScript port. Trade-
+            // off: Dialog.show deinitializes the parent Form, which
+            // would now also remove the editor iframe until the Form
+            // is re-shown. Acceptable for the experiment; we can
+            // restore the flag (or find a more targeted guard) if the
+            // Dialog-survives-deinit regression actually bites users.
             fallbackEditor = null;
             fallbackMessages = null;
             component = browser;
