@@ -1401,6 +1401,12 @@ bindCiFallback("Display.setProperty", [
   return null;
 });
 
+// The JSAffineTransform matrix is stored as { m00, m10, m01, m11, m02, m12 }
+// — plain fields, no accessor methods. The earlier version of this fallback
+// called getScaleX()/getShearY()/etc. (mirroring the JS-side getter methods
+// that used to exist) and broke the moment that JS wrapper was simplified to
+// field-only storage. Read the six fields directly to match the Java-side
+// @JSBody scripts in JSAffineTransform.JSOFactory.
 bindCiFallback("JSAffineTransform.setTransformHostBridge", [
   "cn1_com_codename1_teavm_geom_JSAffineTransform_JSOFactory_setTransform_com_codename1_html5_js_canvas_CanvasRenderingContext2D_com_codename1_teavm_geom_JSAffineTransform_JSOAffineTransform",
   "cn1_com_codename1_teavm_geom_JSAffineTransform_JSOFactory_setTransform_com_codename1_html5_js_canvas_CanvasRenderingContext2D_com_codename1_teavm_geom_JSAffineTransform_JSOAffineTransform__impl"
@@ -1408,12 +1414,12 @@ bindCiFallback("JSAffineTransform.setTransformHostBridge", [
   const nativeContext = jvm.unwrapJsValue(context) || context;
   const nativeTransform = jvm.unwrapJsValue(transform) || transform;
   const args = [
-    nativeTransform.getScaleX(),
-    nativeTransform.getShearY(),
-    nativeTransform.getShearX(),
-    nativeTransform.getScaleY(),
-    nativeTransform.getTranslateX(),
-    nativeTransform.getTranslateY()
+    nativeTransform.m00,
+    nativeTransform.m10,
+    nativeTransform.m01,
+    nativeTransform.m11,
+    nativeTransform.m02,
+    nativeTransform.m12
   ];
   if (nativeContext && nativeContext.__cn1HostRef != null && typeof jvm.invokeHostNative === "function") {
     yield jvm.invokeHostNative("__cn1_jso_bridge__", [{
@@ -1435,12 +1441,12 @@ bindCiFallback("JSAffineTransform.transformHostBridge", [
   const nativeContext = jvm.unwrapJsValue(context) || context;
   const nativeTransform = jvm.unwrapJsValue(transform) || transform;
   const args = [
-    nativeTransform.getScaleX(),
-    nativeTransform.getShearY(),
-    nativeTransform.getShearX(),
-    nativeTransform.getScaleY(),
-    nativeTransform.getTranslateX(),
-    nativeTransform.getTranslateY()
+    nativeTransform.m00,
+    nativeTransform.m10,
+    nativeTransform.m01,
+    nativeTransform.m11,
+    nativeTransform.m02,
+    nativeTransform.m12
   ];
   if (nativeContext && nativeContext.__cn1HostRef != null && typeof jvm.invokeHostNative === "function") {
     yield jvm.invokeHostNative("__cn1_jso_bridge__", [{

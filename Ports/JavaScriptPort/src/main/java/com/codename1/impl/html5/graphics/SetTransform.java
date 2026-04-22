@@ -36,7 +36,6 @@ public class SetTransform implements ExecutableOp {
     private native static void log(JSObject str);
     @Override
     public void execute(CanvasRenderingContext2D context) {
-        
         if (replace) {
             JSAffineTransform.Factory.setTransform(context, t);
         } else {
