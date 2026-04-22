@@ -93,6 +93,12 @@ public class Simulator {
         } catch (ClassNotFoundException ex) {
         }
         System.setProperty("NSHighResolutionCapable", "true");
+
+        // Register framework-level BuildHintEditor schema defaults (see
+        // Ports/JavaSE/src/com/codename1/impl/javase/BuildHintSchemaDefaults)
+        // before any code reads codename1.arg.{{*}} system properties.
+        BuildHintSchemaDefaults.register();
+
         String skin = System.getProperty("dskin");
         if (skin == null) {
             System.setProperty("dskin", DEFAULT_SKIN);
