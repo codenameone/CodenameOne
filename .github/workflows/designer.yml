@@ -64,9 +64,21 @@ jobs:
 
       - name: Verify designer CLI CSS compilation
         run: |
-          designer_jar=$(ls maven/designer/target/codenameone-designer-*-jar-with-dependencies.jar | head -n1)
-          if [ -z "${designer_jar}" ] || [ ! -f "${designer_jar}" ]; then
+          # The Maven-built jar-with-dependencies is a ZIP wrapper around the
+          # actual runnable designer_1.jar (see the antrun
+          # add-designer-jar-with-dependencies execution in maven/designer/pom.xml).
+          # Unpack and run the inner jar directly.
+          wrapped=$(ls maven/designer/target/codenameone-designer-*-jar-with-dependencies.jar | head -n1)
+          if [ -z "${wrapped}" ] || [ ! -f "${wrapped}" ]; then
             echo "designer jar-with-dependencies not found" >&2
+            exit 1
+          fi
+          extract_dir="$(mktemp -d)"
+          unzip -q "${wrapped}" -d "${extract_dir}"
+          designer_jar="${extract_dir}/designer_1.jar"
+          if [ ! -f "${designer_jar}" ]; then
+            echo "designer_1.jar not found inside ${wrapped}" >&2
+            ls -la "${extract_dir}"
             exit 1
           fi
           tmp_dir="CodenameOneDesigner/tmp-cli-test"
