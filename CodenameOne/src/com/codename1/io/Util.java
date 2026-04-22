@@ -208,8 +208,17 @@ public final class Util {
         try {
             copyNoClose(i, o, bufferSize);
         } finally {
-            Util.getImplementation().cleanup(o);
-            Util.getImplementation().cleanup(i);
+            CodenameOneImplementation impl = Util.getImplementation();
+            if (impl != null) {
+                impl.cleanup(o);
+                impl.cleanup(i);
+            } else {
+                // Headless callers (e.g. the css-compiler native-themes build)
+                // use this method before Display is initialized. Fall back to
+                // closing the streams directly so we do not NPE.
+                try { if (o != null) o.close(); } catch (IOException ignored) {}
+                try { if (i != null) i.close(); } catch (IOException ignored) {}
+            }
         }
     }
 
