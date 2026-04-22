@@ -151,6 +151,16 @@ public class EditableResources extends Resources implements TreeModel {
     }
 
     /**
+     * Materialize a UI container from an XML component description. Called
+     * during openFile() when the resource was saved as XML. Returns null in
+     * the base class so openFile falls back to reading the binary UI blob;
+     * the Designer subclass overrides to drive UIBuilderOverride.
+     */
+    protected com.codename1.ui.Container loadUIContainerFromXml(com.codename1.ui.util.xml.comps.ComponentEntry uiXMLData) {
+        return null;
+    }
+
+    /**
      * Invoked at the end of openFile(). The Designer subclass overrides this
      * to reset GUI-side theme caches; headless callers do nothing.
      */
@@ -876,9 +886,8 @@ public class EditableResources extends Resources implements TreeModel {
                                     }
                                 });
                                 for(ComponentEntry uiXMLData : guiElements) {
-                                    UIBuilderOverride uib = new UIBuilderOverride();
-                                    com.codename1.ui.Container cnt = uib.createInstance(uiXMLData, this);
-                                    
+                                    com.codename1.ui.Container cnt = loadUIContainerFromXml(uiXMLData);
+
                                     // encountered an error loading the component fallback to loading with the binary types
                                     if(cnt == null) {
                                         for(Ui ui : xmlData.getUi()) {
