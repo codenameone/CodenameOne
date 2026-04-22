@@ -409,10 +409,6 @@ function emitDiagLine(line) {
   }
 }
 
-const cn1ssBootstrapChunkBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO5WZ8kAAAAASUVORK5CYII=";
-emitDiagLine("CN1SS:bootstrap_placeholder:000000:" + cn1ssBootstrapChunkBase64);
-emitDiagLine("CN1SS:END:bootstrap_placeholder");
-
 function wrapVirtualMethodWithDiag(className, methodId, marker) {
   if (!jvm || !jvm.classes || !jvm.classes[className]) {
     return false;

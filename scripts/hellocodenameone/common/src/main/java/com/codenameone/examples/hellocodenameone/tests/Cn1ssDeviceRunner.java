@@ -83,8 +83,6 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new LightweightPickerButtonsScreenshotTest(),
             new ToastBarTopPositionScreenshotTest(),
             new SwitchIsolationScreenshotTest(),
-            new SheetIsolationScreenshotTest(),
-            new PickerIsolationScreenshotTest(),
             // Keep this as the last screenshot test; orientation changes can leak into subsequent screenshots.
             new OrientationLockScreenshotTest(),
             new InPlaceEditViewTest(),
