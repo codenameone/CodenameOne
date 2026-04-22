@@ -47,12 +47,12 @@ Button {
     cn1-derive: Label;
 }
 
-Button:pressed {
+Button.pressed {
     color: var(--cn1-accent);
     background-color: var(--cn1-surface-secondary);
 }
 
-Button:disabled {
+Button.disabled {
     color: var(--cn1-text-secondary);
 }
 
