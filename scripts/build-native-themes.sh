@@ -22,7 +22,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 cd "$REPO_ROOT"
 
-log() { echo "[build-native-themes] $1"; }
+log() { echo "[build-native-themes] $1" >&2; }
 
 CSS_COMPILER_MODULE="$REPO_ROOT/maven/css-compiler"
 CSS_SRC_ROOT="$REPO_ROOT/native-themes"
