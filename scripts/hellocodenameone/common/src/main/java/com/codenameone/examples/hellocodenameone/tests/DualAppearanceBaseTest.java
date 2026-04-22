@@ -4,7 +4,6 @@ import com.codename1.ui.CN;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.layouts.Layout;
-import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.UITimer;
 
 /**
@@ -52,11 +51,10 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
 
     private void runAppearance(boolean dark, final String suffix, final Runnable next) {
         Display.getInstance().setDarkMode(dark);
-        // The theme picks up the flag on the next style lookup; refresh the
-        // global UIManager so any shared constants (e.g. @darkModeBool gated
-        // $DarkUIID lookups) re-resolve before we build components.
-        UIManager.getInstance().setThemeProps(UIManager.getInstance().getThemeProps());
-
+        // The theme picks up the dark flag at style-lookup time; because we
+        // build a fresh Form per appearance, its components all resolve their
+        // styles in the new appearance at attach time. No global refresh
+        // needed.
         final String imageName = baseName() + "_" + suffix;
         Form form = new Form(baseName() + " / " + suffix, newLayout()) {
             @Override
