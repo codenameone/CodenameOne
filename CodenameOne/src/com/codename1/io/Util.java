@@ -216,9 +216,23 @@ public final class Util {
                 // Headless callers (e.g. the css-compiler native-themes build)
                 // use this method before Display is initialized. Fall back to
                 // closing the streams directly so we do not NPE.
-                try { if (o != null) o.close(); } catch (IOException ignored) {}
-                try { if (i != null) i.close(); } catch (IOException ignored) {}
+                closeQuietly(o);
+                closeQuietly(i);
             }
+        }
+    }
+
+    private static void closeQuietly(java.io.Closeable c) {
+        if (c == null) {
+            return;
+        }
+        try {
+            c.close();
+        } catch (IOException e) {
+            // Best-effort close; surface to stderr so it's visible but do not
+            // re-throw - callers of the copy() family treat completion of the
+            // payload copy as success regardless of close failures.
+            System.err.println("Util.copy: ignoring " + e);
         }
     }
 
