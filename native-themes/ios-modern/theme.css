@@ -1,59 +1,434 @@
 /*
- * iOS modern (liquid glass) theme -- smoke placeholder.
+ * iOS modern (liquid-glass) native theme.
  *
- * This file exists to exercise the scripts/build-native-themes.sh pipeline
- * end-to-end with the thin css-compiler jar and strictNoCef enforcement.
- * Real component styling lands in a follow-up phase; nothing here should
- * rely on CEF-backed rasterization.
+ * Targets the CEF-free subset of the Codename One CSS compiler: solid
+ * fills, native rounded/pill borders, state selectors via .pressed /
+ * .selected / .disabled, and light/dark palettes via the standard
+ * @media (prefers-color-scheme: dark) query. No box-shadow, no filter,
+ * no border-radius combined with a visible border (each would force
+ * CEF image rasterization and fail the native-themes build).
+ *
+ * Native theme rule: includeNativeBool must be false here (see
+ * feedback_native_themes_css_constraints memory).
  */
 
 #Constants {
     includeNativeBool: false;
     darkModeBool: true;
+    commandBehavior: Native;
+    ios7StatusBarHack: true;
+    paintsTitleBarBool: true;
 }
 
 :root {
+    /* Apple system palette, light */
     --cn1-accent: #007aff;
-    --cn1-surface: #ffffff;
-    --cn1-surface-secondary: #f2f2f7;
-    --cn1-text: #000000;
+    --cn1-accent-pressed: #0064d1;
+    --cn1-accent-disabled: #b3d4ff;
+    --cn1-danger: #ff3b30;
+    --cn1-success: #34c759;
+    --cn1-warning: #ff9500;
+
+    --cn1-text-primary: #000000;
     --cn1-text-secondary: #3c3c43;
+    --cn1-text-tertiary: #8e8e93;
+    --cn1-text-disabled: #c7c7cc;
+
+    --cn1-surface: #ffffff;
+    --cn1-surface-grouped: #f2f2f7;
+    --cn1-surface-tertiary: #e5e5ea;
+    --cn1-surface-pressed: #e5e5ea;
+
     --cn1-separator: #c6c6c8;
+    --cn1-outline: #d1d1d6;
 }
 
 @media (prefers-color-scheme: dark) {
     :root {
         --cn1-accent: #0a84ff;
-        --cn1-surface: #000000;
-        --cn1-surface-secondary: #1c1c1e;
-        --cn1-text: #ffffff;
+        --cn1-accent-pressed: #64b1ff;
+        --cn1-accent-disabled: #004a99;
+        --cn1-danger: #ff453a;
+        --cn1-success: #30d158;
+        --cn1-warning: #ff9f0a;
+
+        --cn1-text-primary: #ffffff;
         --cn1-text-secondary: #ebebf5;
+        --cn1-text-tertiary: #8e8e93;
+        --cn1-text-disabled: #48484a;
+
+        --cn1-surface: #000000;
+        --cn1-surface-grouped: #1c1c1e;
+        --cn1-surface-tertiary: #2c2c2e;
+        --cn1-surface-pressed: #3a3a3c;
+
         --cn1-separator: #38383a;
+        --cn1-outline: #48484a;
     }
 }
 
-Label {
-    color: var(--cn1-text);
+/* ---- base ---- */
+
+Component {
+    color: var(--cn1-text-primary);
     background-color: var(--cn1-surface);
-    padding: 1mm 2mm 1mm 2mm;
-}
-
-Button {
-    color: var(--cn1-accent);
-    background-color: var(--cn1-surface);
-    padding: 2mm 3mm 2mm 3mm;
-    cn1-derive: Label;
-}
-
-Button.pressed {
-    color: var(--cn1-accent);
-    background-color: var(--cn1-surface-secondary);
-}
-
-Button.disabled {
-    color: var(--cn1-text-secondary);
+    padding: 0;
+    margin: 0;
+    font-family: "native:MainRegular";
 }
 
 Form {
+    background-color: var(--cn1-surface-grouped);
+    padding: 0;
+    margin: 0;
+}
+
+ContentPane {
+    background-color: var(--cn1-surface-grouped);
+    padding: 0;
+    margin: 0;
+}
+
+Container {
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+}
+
+/* ---- typography ---- */
+
+Label {
+    color: var(--cn1-text-primary);
+    background-color: transparent;
+    padding: 1mm 2mm 1mm 2mm;
+    margin: 0;
+    font-family: "native:MainRegular";
+}
+
+SecondaryLabel {
+    cn1-derive: Label;
+    color: var(--cn1-text-secondary);
+}
+
+TertiaryLabel {
+    cn1-derive: Label;
+    color: var(--cn1-text-tertiary);
+}
+
+SpanLabel {
+    cn1-derive: Label;
+}
+
+SpanLabelText {
+    cn1-derive: Label;
+}
+
+/* ---- buttons ---- */
+
+Button {
+    color: var(--cn1-accent);
+    background-color: transparent;
+    padding: 2mm 3mm 2mm 3mm;
+    margin: 1mm;
+    font-family: "native:MainRegular";
+    cn1-pill-border: true;
+}
+
+Button.pressed {
+    color: var(--cn1-accent-pressed);
+    background-color: var(--cn1-surface-pressed);
+}
+
+Button.disabled {
+    color: var(--cn1-accent-disabled);
+}
+
+RaisedButton {
+    cn1-derive: Button;
+    color: #ffffff;
+    background-color: var(--cn1-accent);
+}
+
+RaisedButton.pressed {
+    background-color: var(--cn1-accent-pressed);
+}
+
+RaisedButton.disabled {
+    background-color: var(--cn1-accent-disabled);
+    color: var(--cn1-surface);
+}
+
+FlatButton {
+    cn1-derive: Button;
+}
+
+/* ---- text input ---- */
+
+TextField {
+    color: var(--cn1-text-primary);
     background-color: var(--cn1-surface);
+    padding: 2mm 3mm 2mm 3mm;
+    margin: 1mm 2mm 1mm 2mm;
+    font-family: "native:MainRegular";
+    cn1-round-border: true;
+}
+
+TextField.pressed {
+    background-color: var(--cn1-surface-tertiary);
+}
+
+TextField.disabled {
+    color: var(--cn1-text-disabled);
+    background-color: var(--cn1-surface-tertiary);
+}
+
+TextArea {
+    cn1-derive: TextField;
+    padding: 2mm 3mm 2mm 3mm;
+}
+
+TextHint {
+    color: var(--cn1-text-tertiary);
+    background-color: transparent;
+    padding: 2mm 3mm 2mm 3mm;
+    font-family: "native:MainRegular";
+}
+
+/* ---- selection controls ---- */
+
+CheckBox {
+    cn1-derive: Button;
+    color: var(--cn1-text-primary);
+    padding: 1mm 2mm 1mm 2mm;
+}
+
+CheckBox.selected {
+    color: var(--cn1-accent);
+}
+
+CheckBox.disabled {
+    color: var(--cn1-text-disabled);
+}
+
+RadioButton {
+    cn1-derive: CheckBox;
+}
+
+RadioButton.selected {
+    color: var(--cn1-accent);
+}
+
+OnOffSwitch {
+    cn1-derive: Button;
+    padding: 1mm 2mm 1mm 2mm;
+    color: var(--cn1-accent);
+    background-color: var(--cn1-surface-tertiary);
+    cn1-pill-border: true;
+}
+
+OnOffSwitch.selected {
+    background-color: var(--cn1-success);
+    color: #ffffff;
+}
+
+/* ---- toolbar ---- */
+
+Toolbar {
+    background-color: var(--cn1-surface);
+    color: var(--cn1-text-primary);
+    padding: 1mm;
+    margin: 0;
+}
+
+TitleArea {
+    cn1-derive: Toolbar;
+    padding: 1mm 2mm 1mm 2mm;
+}
+
+Title {
+    color: var(--cn1-text-primary);
+    background-color: transparent;
+    padding: 1mm;
+    font-family: "native:MainBold";
+}
+
+MainTitle {
+    cn1-derive: Title;
+    font-family: "native:MainBold";
+}
+
+BackCommand {
+    cn1-derive: Button;
+    color: var(--cn1-accent);
+    padding: 1mm 2mm 1mm 2mm;
+}
+
+TitleCommand {
+    cn1-derive: Button;
+    color: var(--cn1-accent);
+    padding: 1mm 2mm 1mm 2mm;
+}
+
+/* ---- tabs ---- */
+
+Tabs {
+    background-color: var(--cn1-surface);
+    padding: 0;
+    margin: 0;
+}
+
+TabsContainer {
+    background-color: var(--cn1-surface);
+    padding: 0;
+    margin: 0;
+}
+
+Tab {
+    cn1-derive: Button;
+    color: var(--cn1-text-secondary);
+    background-color: transparent;
+    padding: 2mm 3mm 2mm 3mm;
+}
+
+Tab.selected {
+    color: var(--cn1-accent);
+}
+
+Tab.pressed {
+    color: var(--cn1-accent-pressed);
+}
+
+SelectedTab {
+    cn1-derive: Tab;
+    color: var(--cn1-accent);
+}
+
+UnselectedTab {
+    cn1-derive: Tab;
+    color: var(--cn1-text-secondary);
+}
+
+/* ---- side menu ---- */
+
+SideNavigationPanel {
+    background-color: var(--cn1-surface);
+    padding: 0;
+    margin: 0;
+}
+
+SideCommand {
+    cn1-derive: Button;
+    color: var(--cn1-text-primary);
+    padding: 2mm 3mm 2mm 3mm;
+    margin: 0;
+}
+
+SideCommand.pressed {
+    background-color: var(--cn1-surface-pressed);
+}
+
+/* ---- list / MultiButton ---- */
+
+List {
+    background-color: var(--cn1-surface);
+    padding: 0;
+    margin: 0;
+}
+
+ListRenderer {
+    cn1-derive: Label;
+    padding: 2mm 3mm 2mm 3mm;
+}
+
+MultiButton {
+    cn1-derive: Button;
+    background-color: var(--cn1-surface);
+    color: var(--cn1-text-primary);
+    padding: 2mm 3mm 2mm 3mm;
+    margin: 0;
+}
+
+MultiButton.pressed {
+    background-color: var(--cn1-surface-pressed);
+}
+
+MultiLine1 {
+    cn1-derive: Label;
+    color: var(--cn1-text-primary);
+    font-family: "native:MainBold";
+}
+
+MultiLine2 {
+    cn1-derive: Label;
+    color: var(--cn1-text-secondary);
+}
+
+MultiLine3 {
+    cn1-derive: Label;
+    color: var(--cn1-text-tertiary);
+}
+
+MultiLine4 {
+    cn1-derive: Label;
+    color: var(--cn1-text-tertiary);
+}
+
+/* ---- dialog / sheet ---- */
+
+Dialog {
+    background-color: var(--cn1-surface);
+    color: var(--cn1-text-primary);
+    padding: 3mm;
+    margin: 0;
+    cn1-round-border: true;
+}
+
+DialogBody {
+    cn1-derive: Dialog;
+    padding: 2mm;
+}
+
+DialogTitle {
+    cn1-derive: Title;
+    font-family: "native:MainBold";
+    padding: 2mm;
+}
+
+DialogContentPane {
+    background-color: var(--cn1-surface);
+    padding: 2mm;
+    margin: 0;
+}
+
+DialogCommandArea {
+    background-color: var(--cn1-surface);
+    padding: 1mm;
+}
+
+/* ---- FAB ---- */
+
+FloatingActionButton {
+    color: #ffffff;
+    background-color: var(--cn1-accent);
+    padding: 3mm;
+    margin: 3mm;
+    font-family: "native:MainBold";
+    cn1-pill-border: true;
+}
+
+FloatingActionButton.pressed {
+    background-color: var(--cn1-accent-pressed);
+}
+
+/* ---- misc ---- */
+
+Separator {
+    background-color: var(--cn1-separator);
+    padding: 0;
+    margin: 0;
+}
+
+PopupContent {
+    cn1-derive: Dialog;
+    padding: 2mm;
 }
