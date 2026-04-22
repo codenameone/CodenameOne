@@ -150,9 +150,6 @@ import com.codename1.html5.js.typedarrays.Uint8ClampedArray;
  * @author shannah
  */
 public class HTML5Implementation extends CodenameOneImplementation {
-    private static int implDrawStringDebugLogCount;
-    private static int renderQueueDebugLogCount;
-
     private L10NManager l10n;
     private int density;
     private static final String STORAGE_KEY_PREFIX = JavaScriptRuntimeFacade.STORAGE_KEY_PREFIX;
@@ -2183,13 +2180,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
         if (frame.isEmpty()) {
             return false;
-        }
-        if (renderQueueDebugLogCount < 60) {
-            renderQueueDebugLogCount++;
-            System.out.println("CN1JS:RenderQueue.drain ops=" + frame.getOps().size()
-                    + " crop=" + frame.getCropX() + "," + frame.getCropY()
-                    + " " + frame.getCropW() + "x" + frame.getCropH()
-                    + " sample=" + sampleExecutableOps(frame.getOps(), 6));
         }
         CanvasRenderingContext2D context = (CanvasRenderingContext2D)outputCanvas.getContext("2d");
         context.save();
@@ -4748,12 +4738,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
             }
             */
             flushedOps = graphics.flush(x, y, width, height);
-            if (renderQueueDebugLogCount < 60) {
-                renderQueueDebugLogCount++;
-                System.out.println("CN1JS:RenderQueue.flush ops=" + flushedOps.size()
-                        + " region=" + x + "," + y + " " + width + "x" + height
-                        + " sample=" + sampleExecutableOps(flushedOps, 6));
-            }
             JavaScriptRenderQueueCoordinator.queueFlush(new JavaScriptRenderQueueCoordinator.GraphicsLock() {
                 @Override
                 public void setGraphicsLocked(boolean locked) {
@@ -4811,22 +4795,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
             }
         }, rgb, 0);
         callback.onSucess(Image.createImage(rgb, width, height));
-    }
-
-    private static String sampleExecutableOps(List<ExecutableOp> ops, int limit) {
-        if (ops == null || ops.isEmpty()) {
-            return "none";
-        }
-        StringBuilder out = new StringBuilder();
-        int max = Math.min(limit, ops.size());
-        for (int i = 0; i < max; i++) {
-            if (i > 0) {
-                out.append(',');
-            }
-            ExecutableOp op = ops.get(i);
-            out.append(op == null ? "null" : op.getClass().getSimpleName());
-        }
-        return out.toString();
     }
 
     @Override
@@ -5731,12 +5699,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @Override
     public void drawString(Object graphics, String str, int x, int y) {
-        if (implDrawStringDebugLogCount < 80) {
-            implDrawStringDebugLogCount++;
-            System.out.println("CN1JS:HTML5Implementation.drawString text=" + str
-                    + " dst=" + x + "," + y
-                    + " graphics=" + (graphics == null ? "null" : graphics.getClass().getName()));
-        }
         g(graphics).drawString(str, x, y);
     }
 
