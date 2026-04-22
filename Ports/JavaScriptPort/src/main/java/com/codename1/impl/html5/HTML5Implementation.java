@@ -7600,13 +7600,29 @@ public class HTML5Implementation extends CodenameOneImplementation {
         if ( lastSlash >= 0 ){
             resource = resource.substring(lastSlash+1);
         }
+        // The ParparVM translator emits the app's own theme.res /
+        // CN1Resource.res at the bundle root, while assets/ holds the merged
+        // system themes (iOS7Theme.res, tzone_theme.res, etc.). The default
+        // path below always prepends assets/, which meant
+        // Resources.openLayered("/theme") used to return the big system
+        // theme and the app's theme.css-compiled overrides (Style UIIDs like
+        // TabsColorSync) were silently discarded. Try the root first for the
+        // two known app-level bundle entries; everything else keeps the
+        // assets/ prefix so iOS7Theme.res etc. still resolve correctly.
+        if ("theme.res".equals(resource) || "CN1Resource.res".equals(resource)) {
+            InputStream rootStream = getStream(resource);
+            if (rootStream != null) {
+                notifyProgressLoaderThatResourceIsLoaded(resource);
+                return rootStream;
+            }
+        }
         if (!"icon.png".equals(resource)) {
             resource = "assets/"+resource;
         }
         InputStream out = getStream(resource);
         notifyProgressLoaderThatResourceIsLoaded(resource);
         return out;
-        
+
     }
 
     @JSBody(script="jQuery(\"div#cn1-splash\").fadeOut(100, function(){ jQuery(this).remove(); });")
