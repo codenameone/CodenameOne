@@ -625,9 +625,9 @@ public class ResourcesMutator {
                     web.execute("$(document).ready(function(){ captureScreenshots();});");
                     //web.getEngine().executeScript("window.onload = function(){window.app.ready()};");
                 } catch (IllegalArgumentException ex) {
-                    Logger.getLogger(CN1CSSCompiler.class.getName()).log(Level.SEVERE, null, ex);
+                    Logger.getLogger(ResourcesMutator.class.getName()).log(Level.SEVERE, null, ex);
                 }  catch (SecurityException ex) {
-                    Logger.getLogger(CN1CSSCompiler.class.getName()).log(Level.SEVERE, null, ex);
+                    Logger.getLogger(ResourcesMutator.class.getName()).log(Level.SEVERE, null, ex);
                 }
 
             };
@@ -696,7 +696,7 @@ public class ResourcesMutator {
                 try {
                     lock.wait();
                 } catch (InterruptedException ex) {
-                    Logger.getLogger(CN1CSSCompiler.class.getName()).log(Level.SEVERE, null, ex);
+                    Logger.getLogger(ResourcesMutator.class.getName()).log(Level.SEVERE, null, ex);
                 }
             }
         }

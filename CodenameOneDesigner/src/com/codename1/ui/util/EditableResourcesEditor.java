@@ -61,6 +61,12 @@ public class EditableResourcesEditor extends EditableResources {
     }
 
     @Override
+    protected Container materializeUIContainer(String resourceName) {
+        UIBuilderOverride u = new UIBuilderOverride();
+        return u.createContainer(this, resourceName);
+    }
+
+    @Override
     protected void writeUIXml(Container cnt, FileOutputStream dest) throws IOException {
         Writer w = new OutputStreamWriter(dest, "UTF-8");
         w.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\n");
