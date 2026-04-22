@@ -698,6 +698,17 @@ public class CN1Playground extends Lifecycle {
         if (current == null) {
             return;
         }
+        // Only force side-menu styling while the menu is actually
+        // showing. Previously we re-applied on every tick which
+        // stomped on CN1's close-animation (fading transparency back
+        // up to 255 mid-slide) and left a "ghost" panel stuck over
+        // the form. The stuck panel then appeared behind any newly
+        // opened menu (the "two menus" symptom) and covered the
+        // preview during sample swaps (the "overlay" symptom).
+        Toolbar tb = current.getToolbar();
+        if (tb == null || !tb.isSideMenuShowing()) {
+            return;
+        }
         applySideMenuContainerTheme(current);
     }
 
