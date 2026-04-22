@@ -51,6 +51,7 @@ jobs:
       CN1_JS_TIMEOUT_SECONDS: "180"
       CN1_JS_BROWSER_LIFETIME_SECONDS: "150"
       CN1SS_SKIP_COVERAGE: "1"
+      CN1SS_FAIL_ON_MISMATCH: "1"
       BROWSER_CMD: "node \"$GITHUB_WORKSPACE/scripts/run-javascript-headless-browser.mjs\""
     steps:
       - uses: actions/checkout@v4
