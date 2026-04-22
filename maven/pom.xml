@@ -60,6 +60,7 @@
         <module>java-runtime</module>
         <module>core</module>
         <module>factory</module>
+        <module>css-compiler</module>
         <module>sqlite-jdbc</module>
         <module>javase</module>
         <module>javase-svg</module>

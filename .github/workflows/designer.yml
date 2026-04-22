@@ -6,6 +6,7 @@ on:
       - master
     paths:
       - 'CodenameOneDesigner/**'
+      - 'maven/css-compiler/**'
       - 'maven/designer/**'
       - '.github/workflows/designer.yml'
   pull_request:
@@ -13,6 +14,7 @@ on:
       - master
     paths:
       - 'CodenameOneDesigner/**'
+      - 'maven/css-compiler/**'
       - 'maven/designer/**'
       - '.github/workflows/designer.yml'
 
@@ -38,30 +40,35 @@ jobs:
           wget https://github.com/codenameone/cn1-binaries/archive/refs/heads/master.zip
           unzip master.zip -d ..
           mv ../cn1-binaries-master ../cn1-binaries
-
-      - name: Build core dependencies
-        run: |
-          xvfb-run -a ant -noinput -buildfile Ports/CLDC11/build.xml jar
-          xvfb-run -a ant -noinput -buildfile Ports/JavaSE/build.xml jar
-          xvfb-run -a ant -noinput -buildfile Ports/JavaSEWithSVGSupport/build.xml jar
-          xvfb-run -a ant -noinput -buildfile CodenameOne/build.xml jar
-
-      - name: Run designer CSS localization tests
-        run: xvfb-run -a ant -noinput -buildfile CodenameOneDesigner/build.xml test-css-localization
-
-      - name: Run designer XML parser unit tests (Maven)
-        run: |
           mkdir -p maven/target
           rm -rf maven/target/cn1-binaries
           cp -R ../cn1-binaries maven/target/cn1-binaries
-          cd maven
-          mvn -B -pl designer -am -DunitTests=true -Dcodename1.platform=javase -Plocal-dev-javase -Dmaven.javadoc.skip=true -Dmaven.antrun.skip=true -Dtest=SimpleXmlParserTest -DfailIfNoTests=false test
 
-      - name: Build designer release jar
-        run: xvfb-run -a ant -noinput -buildfile CodenameOneDesigner/build.xml release
+      - name: Build Designer (pulls in codenameone-css-compiler as dep)
+        env:
+          CN1_BINARIES: ${{ github.workspace }}/maven/target/cn1-binaries
+        run: |
+          cd maven
+          mvn -B -pl designer -am -DskipTests -Plocal-dev-javase \
+              -Dmaven.javadoc.skip=true -Dcn1.binaries="${CN1_BINARIES}" install
+
+      - name: Run designer XML parser unit tests (Maven)
+        env:
+          CN1_BINARIES: ${{ github.workspace }}/maven/target/cn1-binaries
+        run: |
+          cd maven
+          mvn -B -pl designer -am -DunitTests=true -Dcodename1.platform=javase \
+              -Plocal-dev-javase -Dmaven.javadoc.skip=true -Dmaven.antrun.skip=true \
+              -Dcn1.binaries="${CN1_BINARIES}" \
+              -Dtest=SimpleXmlParserTest -DfailIfNoTests=false test
 
       - name: Verify designer CLI CSS compilation
         run: |
+          designer_jar=$(ls maven/designer/target/codenameone-designer-*-jar-with-dependencies.jar | head -n1)
+          if [ -z "${designer_jar}" ] || [ ! -f "${designer_jar}" ]; then
+            echo "designer jar-with-dependencies not found" >&2
+            exit 1
+          fi
           tmp_dir="CodenameOneDesigner/tmp-cli-test"
           css_file="$tmp_dir/test.css"
           l10n_dir="$tmp_dir/localization"
@@ -75,12 +82,21 @@ jobs:
           cat <<'EOF' > "$l10n_dir/Strings.properties"
           greeting=Hello from CLI
           EOF
-          xvfb-run -a java -Dcli=true -jar CodenameOneDesigner/dist/designer.jar \
+          xvfb-run -a java -Dcli=true -jar "${designer_jar}" \
             -css -stateless -input "$css_file" -output "$output_file" -localization "$l10n_dir"
           test -s "$output_file"
+
+      - name: Verify native-themes CEF-free build
+        run: |
+          cd maven
+          mvn -B -pl css-compiler -am install -DskipTests -Dmaven.javadoc.skip=true -Plocal-dev-javase
+          cd ..
+          ./scripts/build-native-themes.sh
+          test -f Themes/iOSModernTheme.res || { echo "missing Themes/iOSModernTheme.res"; exit 1; }
+          test -f Themes/AndroidMaterialTheme.res || { echo "missing Themes/AndroidMaterialTheme.res"; exit 1; }
 
       - name: Upload designer jar artifact
         uses: actions/upload-artifact@v4
         with:
           name: designer-jar
-          path: CodenameOneDesigner/dist/designer.jar
+          path: maven/designer/target/codenameone-designer-*-jar-with-dependencies.jar
