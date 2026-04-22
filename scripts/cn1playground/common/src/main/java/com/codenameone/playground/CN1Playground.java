@@ -1,7 +1,5 @@
 package com.codenameone.playground;
 
-import com.codename1.components.MultiButton;
-import com.codename1.components.SplitPane;
 import com.codename1.io.Log;
 import com.codename1.io.NetworkEvent;
 import com.codename1.io.Util;
@@ -13,12 +11,14 @@ import com.codename1.ui.CN;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
+import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
-import com.codename1.ui.Tabs;
 import com.codename1.ui.Toolbar;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.FlowLayout;
+import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.Resources;
 import com.codename1.ui.util.UITimer;
@@ -36,7 +36,15 @@ public class CN1Playground extends Lifecycle {
     private static final String THEME_ROLE = "playgroundThemeRole";
     private static final String ROLE_EMBEDDED_FORM = "embeddedForm";
     private static final String ROLE_EMBEDDED_TITLE_AREA = "embeddedTitleArea";
-    private static final String SHARE_BUTTON_LABEL = "Copy Shareable Playground URL";
+
+    private static final String PANEL_SAMPLES = "samples";
+    private static final String PANEL_INSPECTOR = "inspector";
+    private static final String PANEL_HISTORY = "history";
+
+    private static final String MOBILE_TAB_CODE = "code";
+    private static final String MOBILE_TAB_CSS = "css";
+    private static final String MOBILE_TAB_PREVIEW = "preview";
+
     private final PlaygroundRunner runner = new PlaygroundRunner();
     private final PlaygroundProjectExporter projectExporter = new PlaygroundProjectExporter();
 
@@ -44,20 +52,36 @@ public class CN1Playground extends Lifecycle {
     private PlaygroundBrowserEditor editor;
     private PlaygroundBrowserEditor cssEditor;
     private PlaygroundInspector inspector;
-    private Container previewRoot;
-    private Container historyMenu;
-    private final List<Component> sideMenuComponents = new ArrayList<>();
+    private PlaygroundTopBar topBar;
+    private PlaygroundActivityBar activityBar;
+    private PlaygroundSamplesPanel samplesPanel;
+    private PlaygroundHistoryPanel historyPanel;
+    private Container inspectorWrapper;
+    private PlaygroundPreviewColumn previewColumn;
+    private PlaygroundSegmented mobileTopTabs;
+    private Container bottomNav;
+
+    private Container bodyContainer;
+    private Container editorHost;
+    private Container previewContainer;
+    private Container sidePanelSlot;
+
     private Resources theme;
     private boolean websiteDarkMode = DEFAULT_DARK_MODE;
     private String currentScript;
     private String currentCss;
+    private String currentMode = PlaygroundTopBar.MODE_CODE;
+    private String currentActivity = PlaygroundActivityBar.NONE;
+    private String currentMobileTab = MOBILE_TAB_CODE;
     private List<PlaygroundRunner.InlineMessage> currentMessages = new ArrayList<>();
     private List<PlaygroundRunner.InlineMessage> currentCssMessages = new ArrayList<>();
     private int editSequence;
     private int autoRunSequence;
-    private Tabs editorTabs;
+    private int historySequence;
     private WebsiteThemeNative websiteThemeNative;
     private boolean websiteThemeInitialized;
+
+    private String lastBreakpoint;
 
     @Override
     public void runApp() {
@@ -65,6 +89,7 @@ public class CN1Playground extends Lifecycle {
         theme = Resources.getGlobalResources();
         currentScript = resolveInitialScript();
         currentCss = resolveInitialCss();
+        currentMode = PlaygroundStateStore.loadMode(PlaygroundTopBar.MODE_CODE);
 
         appForm = new Form("Playground", new BorderLayout());
         appForm.setUIID("PlaygroundForm");
@@ -72,40 +97,83 @@ public class CN1Playground extends Lifecycle {
         Toolbar toolbar = appForm.getToolbar();
         toolbar.setUIID("PlaygroundToolbar");
         toolbar.setTitleCentered(false);
-        if (toolbar.getTitleComponent() != null) {
-            toolbar.getTitleComponent().setUIID("PlaygroundTitle");
-        }
-
-        toolbar.addMaterialCommandToRightBar("Download", com.codename1.ui.FontImage.MATERIAL_DOWNLOAD, e -> projectExporter.export(currentScript, currentCss));
+        toolbar.hideToolbar();
 
         editor = new PlaygroundBrowserEditor(PlaygroundBrowserEditor.Mode.JAVA, currentScript, websiteDarkMode, this::handleSourceChanged);
         cssEditor = new PlaygroundBrowserEditor(PlaygroundBrowserEditor.Mode.CSS, currentCss, websiteDarkMode, this::handleCssChanged);
         inspector = new PlaygroundInspector(websiteDarkMode, (component, property, value) -> handlePropertyChanged(component));
 
-        previewRoot = createPreviewRoot();
-        historyMenu = new Container(BoxLayout.y());
-        historyMenu.setUIID("PlaygroundMenuContainer");
+        topBar = new PlaygroundTopBar(currentMode, websiteDarkMode, new PlaygroundTopBar.Actions() {
+            @Override
+            public void onModeChanged(String key) {
+                switchMode(key);
+            }
 
-        Container editorPanel = wrapPanel(editor.getComponent());
-        Container cssEditorPanel = wrapPanel(cssEditor.getComponent());
-        Container inspectorPanel = wrapPanel(inspector.getComponent());
+            @Override
+            public void onShare() {
+                copyCurrentSourceUrl();
+            }
 
-        editorTabs = new Tabs();
-        editorTabs.setUIID("PlaygroundEditorTabs");
-        editorTabs.addTab("Code", editorPanel);
-        editorTabs.addTab("CSS", cssEditorPanel);
-        editorTabs.addTab("Inspector", inspectorPanel);
-        applyTabsTheme(websiteDarkMode);
+            @Override
+            public void onDownload() {
+                projectExporter.export(currentScript, currentCss);
+            }
+        });
 
-        Container previewPanel = wrapPanel(previewRoot);
+        PlaygroundActivityBar.Item[] activityItems = new PlaygroundActivityBar.Item[]{
+                new PlaygroundActivityBar.Item(PANEL_SAMPLES, "Samples", FontImage.MATERIAL_DASHBOARD),
+                new PlaygroundActivityBar.Item(PANEL_INSPECTOR, "Inspector", FontImage.MATERIAL_ACCOUNT_TREE),
+                new PlaygroundActivityBar.Item(PANEL_HISTORY, "History", FontImage.MATERIAL_HISTORY)
+        };
+        currentActivity = PlaygroundStateStore.loadPanel(PlaygroundActivityBar.NONE);
+        activityBar = new PlaygroundActivityBar(activityItems, currentActivity, websiteDarkMode, this::handleActivitySelected);
 
-        appForm.add(BorderLayout.CENTER, createMainContent(editorTabs, previewPanel));
+        samplesPanel = new PlaygroundSamplesPanel(websiteDarkMode, () -> handleActivitySelected(PlaygroundActivityBar.NONE), this::handleSampleSelected);
+        historyPanel = new PlaygroundHistoryPanel(websiteDarkMode, () -> handleActivitySelected(PlaygroundActivityBar.NONE), this::handleHistorySelected);
+        historyPanel.setEntries(PlaygroundStateStore.loadHistory());
 
-        installSideMenu(toolbar);
+        inspectorWrapper = buildInspectorWrapper();
+
+        String device = PlaygroundStateStore.loadDevice(PlaygroundPreviewColumn.DEVICE_IPHONE);
+        String orientation = PlaygroundStateStore.loadOrientation(PlaygroundPreviewColumn.ORIENTATION_PORTRAIT);
+        previewColumn = new PlaygroundPreviewColumn(device, orientation, websiteDarkMode, () -> {
+            PlaygroundStateStore.saveDevice(previewColumn.getDevice());
+            PlaygroundStateStore.saveOrientation(previewColumn.getOrientation());
+        });
+
+        mobileTopTabs = buildMobileTopTabs();
+        bottomNav = buildBottomNav();
+
+        editorHost = new Container(new BorderLayout());
+        editorHost.setUIID(websiteDarkMode ? "PlaygroundPanelDark" : "PlaygroundPanel");
+
+        previewContainer = new Container(new BorderLayout());
+        previewContainer.setUIID(websiteDarkMode ? "PlaygroundPanelDark" : "PlaygroundPanel");
+        previewContainer.add(BorderLayout.CENTER, previewColumn);
+
+        sidePanelSlot = new Container(new BorderLayout());
+        sidePanelSlot.getAllStyles().setBgTransparency(0);
+
+        bodyContainer = new Container(new BorderLayout());
+        bodyContainer.setUIID(websiteDarkMode ? "PlaygroundBodyDark" : "PlaygroundBody");
+
+        Container topBarStack = new Container(BoxLayout.y());
+        topBarStack.getAllStyles().setBgTransparency(0);
+        topBarStack.add(topBar);
+
+        appForm.add(BorderLayout.NORTH, topBarStack);
+        appForm.add(BorderLayout.CENTER, bodyContainer);
+
+        applyLayoutForCurrentSize();
+        applyMode(currentMode, false);
+        applyActivity(currentActivity);
+
         applyWebsiteTheme(appForm, websiteDarkMode);
-
         runScript(appForm);
         initWebsiteThemeSync(appForm);
+
+        appForm.addOrientationListener(e -> applyLayoutForCurrentSize());
+        appForm.addSizeChangedListener(e -> applyLayoutForCurrentSize());
 
         appForm.show();
         notifyWebsiteUiReady();
@@ -116,11 +184,234 @@ public class CN1Playground extends Lifecycle {
         Log.p("Networking error: " + err);
     }
 
-    private Container wrapPanel(Component content) {
-        Container panel = new Container(new BorderLayout());
-        panel.setUIID("PlaygroundPanel");
-        panel.add(BorderLayout.CENTER, content);
-        return panel;
+    private Container buildInspectorWrapper() {
+        Container wrapper = new Container(new BorderLayout());
+        wrapper.setUIID(websiteDarkMode ? "PlaygroundSidePanelDark" : "PlaygroundSidePanel");
+
+        Label headerLabel = new Label("INSPECTOR");
+        headerLabel.setUIID(websiteDarkMode ? "PlaygroundSidePanelHeaderDark" : "PlaygroundSidePanelHeader");
+
+        Button closeButton = new Button();
+        closeButton.setUIID(websiteDarkMode ? "PlaygroundSidePanelCloseDark" : "PlaygroundSidePanelClose");
+        FontImage.setMaterialIcon(closeButton, FontImage.MATERIAL_CLOSE, 3f);
+        closeButton.addActionListener(e -> handleActivitySelected(PlaygroundActivityBar.NONE));
+
+        Container header = new Container(new BorderLayout());
+        header.getAllStyles().setBgTransparency(0);
+        header.add(BorderLayout.CENTER, headerLabel);
+        header.add(BorderLayout.EAST, closeButton);
+
+        wrapper.add(BorderLayout.NORTH, header);
+        wrapper.add(BorderLayout.CENTER, inspector.getComponent());
+        wrapper.setPreferredW(Display.getInstance().convertToPixels(60f));
+        return wrapper;
+    }
+
+    private PlaygroundSegmented buildMobileTopTabs() {
+        PlaygroundSegmented.Option[] opts = new PlaygroundSegmented.Option[]{
+                new PlaygroundSegmented.Option(MOBILE_TAB_CODE, "Code", FontImage.MATERIAL_CODE),
+                new PlaygroundSegmented.Option(MOBILE_TAB_CSS, "CSS", FontImage.MATERIAL_PALETTE),
+                new PlaygroundSegmented.Option(MOBILE_TAB_PREVIEW, "Preview", FontImage.MATERIAL_VISIBILITY)
+        };
+        return new PlaygroundSegmented(opts, MOBILE_TAB_CODE, websiteDarkMode, key -> {
+            currentMobileTab = key;
+            refreshMobileTabContent();
+        });
+    }
+
+    private Container buildBottomNav() {
+        Container nav = new Container(new GridLayout(1, 3));
+        nav.setUIID(websiteDarkMode ? "PlaygroundBottomNavDark" : "PlaygroundBottomNav");
+        nav.add(createBottomNavButton(PANEL_SAMPLES, "Samples", FontImage.MATERIAL_DASHBOARD));
+        nav.add(createBottomNavButton(PANEL_INSPECTOR, "Inspector", FontImage.MATERIAL_ACCOUNT_TREE));
+        nav.add(createBottomNavButton(PANEL_HISTORY, "History", FontImage.MATERIAL_HISTORY));
+        return nav;
+    }
+
+    private Button createBottomNavButton(String key, String label, char icon) {
+        Button btn = new Button(label);
+        boolean active = key.equals(currentActivity);
+        String uiid;
+        if (active) {
+            uiid = websiteDarkMode ? "PlaygroundBottomNavItemActiveDark" : "PlaygroundBottomNavItemActive";
+        } else {
+            uiid = websiteDarkMode ? "PlaygroundBottomNavItemDark" : "PlaygroundBottomNavItem";
+        }
+        btn.setUIID(uiid);
+        btn.setTextPosition(Component.BOTTOM);
+        FontImage.setMaterialIcon(btn, icon, 4f);
+        btn.putClientProperty("navKey", key);
+        btn.addActionListener(e -> handleActivitySelected(key));
+        return btn;
+    }
+
+    private void refreshBottomNav() {
+        if (bottomNav == null) {
+            return;
+        }
+        for (int i = 0; i < bottomNav.getComponentCount(); i++) {
+            Component c = bottomNav.getComponentAt(i);
+            if (!(c instanceof Button)) {
+                continue;
+            }
+            Button btn = (Button) c;
+            Object keyObj = btn.getClientProperty("navKey");
+            if (!(keyObj instanceof String)) {
+                continue;
+            }
+            boolean active = keyObj.equals(currentActivity);
+            String uiid;
+            if (active) {
+                uiid = websiteDarkMode ? "PlaygroundBottomNavItemActiveDark" : "PlaygroundBottomNavItemActive";
+            } else {
+                uiid = websiteDarkMode ? "PlaygroundBottomNavItemDark" : "PlaygroundBottomNavItem";
+            }
+            btn.setUIID(uiid);
+        }
+        bottomNav.setUIID(websiteDarkMode ? "PlaygroundBottomNavDark" : "PlaygroundBottomNav");
+        if (bottomNav.getComponentForm() != null) {
+            bottomNav.revalidate();
+        }
+    }
+
+    private void applyLayoutForCurrentSize() {
+        String bp = computeBreakpoint();
+        if (bp.equals(lastBreakpoint)) {
+            return;
+        }
+        lastBreakpoint = bp;
+
+        bodyContainer.removeAll();
+
+        switch (bp) {
+            case "mobile":
+                assembleMobileLayout();
+                break;
+            case "tablet":
+                assembleDesktopLayout(true);
+                break;
+            default:
+                assembleDesktopLayout(false);
+                break;
+        }
+
+        if (bodyContainer.getComponentForm() != null) {
+            bodyContainer.revalidate();
+        }
+    }
+
+    private String computeBreakpoint() {
+        int w = Display.getInstance().getDisplayWidth();
+        int dipsW = (int) (w / (float) Display.getInstance().convertToPixels(1f));
+        if (dipsW < 720) {
+            return "mobile";
+        }
+        if (dipsW < 1100) {
+            return "tablet";
+        }
+        return "desktop";
+    }
+
+    private void assembleDesktopLayout(boolean compact) {
+        topBar.setCompact(compact);
+        previewColumn.setCompact(compact);
+
+        Container center = new Container(new BorderLayout());
+        center.getAllStyles().setBgTransparency(0);
+
+        Container sideAndEditor = new Container(new BorderLayout());
+        sideAndEditor.getAllStyles().setBgTransparency(0);
+        sideAndEditor.add(BorderLayout.WEST, sidePanelSlot);
+        sideAndEditor.add(BorderLayout.CENTER, editorHost);
+
+        center.add(BorderLayout.CENTER, sideAndEditor);
+        center.add(BorderLayout.EAST, previewContainer);
+
+        Container bodyInner = new Container(new BorderLayout());
+        bodyInner.getAllStyles().setBgTransparency(0);
+        bodyInner.add(BorderLayout.WEST, activityBar);
+        bodyInner.add(BorderLayout.CENTER, center);
+
+        bodyContainer.add(BorderLayout.CENTER, bodyInner);
+
+        int previewW = Display.getInstance().convertToPixels(compact ? 85f : 110f);
+        previewContainer.setPreferredW(previewW);
+
+        attachEditorsToHost();
+    }
+
+    private void assembleMobileLayout() {
+        topBar.setCompact(true);
+        previewColumn.setCompact(true);
+
+        Container stack = new Container(BoxLayout.y());
+        stack.getAllStyles().setBgTransparency(0);
+        stack.add(mobileTopTabs);
+
+        Container tabContent = new Container(new BorderLayout());
+        tabContent.getAllStyles().setBgTransparency(0);
+        tabContent.putClientProperty("mobileTabContent", Boolean.TRUE);
+
+        Container mobileLayout = new Container(new BorderLayout());
+        mobileLayout.getAllStyles().setBgTransparency(0);
+        mobileLayout.add(BorderLayout.NORTH, stack);
+        mobileLayout.add(BorderLayout.CENTER, tabContent);
+        mobileLayout.add(BorderLayout.SOUTH, bottomNav);
+
+        bodyContainer.add(BorderLayout.CENTER, mobileLayout);
+        refreshMobileTabContent();
+    }
+
+    private void refreshMobileTabContent() {
+        Container tabContent = findMobileTabContent(bodyContainer);
+        if (tabContent == null) {
+            return;
+        }
+        tabContent.removeAll();
+
+        switch (currentMobileTab) {
+            case MOBILE_TAB_CSS:
+                tabContent.add(BorderLayout.CENTER, cssEditor.getComponent());
+                break;
+            case MOBILE_TAB_PREVIEW:
+                tabContent.add(BorderLayout.CENTER, previewColumn);
+                break;
+            default:
+                tabContent.add(BorderLayout.CENTER, editor.getComponent());
+                break;
+        }
+        if (tabContent.getComponentForm() != null) {
+            tabContent.revalidate();
+        }
+    }
+
+    private Container findMobileTabContent(Container root) {
+        if (root == null) {
+            return null;
+        }
+        Object flag = root.getClientProperty("mobileTabContent");
+        if (Boolean.TRUE.equals(flag)) {
+            return root;
+        }
+        for (int i = 0; i < root.getComponentCount(); i++) {
+            Component c = root.getComponentAt(i);
+            if (c instanceof Container) {
+                Container found = findMobileTabContent((Container) c);
+                if (found != null) {
+                    return found;
+                }
+            }
+        }
+        return null;
+    }
+
+    private void attachEditorsToHost() {
+        editorHost.removeAll();
+        Component active = PlaygroundTopBar.MODE_CSS.equals(currentMode) ? cssEditor.getComponent() : editor.getComponent();
+        editorHost.add(BorderLayout.CENTER, active);
+        if (editorHost.getComponentForm() != null) {
+            editorHost.revalidate();
+        }
     }
 
     private void handlePropertyChanged(Component component) {
@@ -149,20 +440,56 @@ public class CN1Playground extends Lifecycle {
         applyCurrentCss();
     }
 
-    private Container createPreviewRoot() {
-        Container root = new Container(new BorderLayout());
-        root.setScrollableY(true);
-        root.setUIID("PlaygroundPreview");
-        return root;
+    private void handleActivitySelected(String key) {
+        currentActivity = key == null ? PlaygroundActivityBar.NONE : key;
+        if (activityBar != null) {
+            activityBar.setActive(currentActivity);
+        }
+        PlaygroundStateStore.savePanel(currentActivity);
+        applyActivity(currentActivity);
+        refreshBottomNav();
     }
 
-    private Component createMainContent(Tabs tabs, Container previewPanel) {
-        tabs.setSwipeActivated(false);
-        if (!Display.getInstance().isPortrait()) {
-            return new SplitPane(SplitPane.HORIZONTAL_SPLIT, tabs, previewPanel, "25%", "50%", "75%");
+    private void applyActivity(String key) {
+        sidePanelSlot.removeAll();
+        if (PANEL_SAMPLES.equals(key)) {
+            sidePanelSlot.add(BorderLayout.CENTER, samplesPanel.getComponent());
+        } else if (PANEL_HISTORY.equals(key)) {
+            historyPanel.setEntries(PlaygroundStateStore.loadHistory());
+            sidePanelSlot.add(BorderLayout.CENTER, historyPanel.getComponent());
+        } else if (PANEL_INSPECTOR.equals(key)) {
+            sidePanelSlot.add(BorderLayout.CENTER, inspectorWrapper);
         }
-        tabs.addTab("Preview", previewPanel);
-        return tabs;
+        if (sidePanelSlot.getComponentForm() != null) {
+            sidePanelSlot.revalidate();
+        }
+    }
+
+    private void handleSampleSelected(PlaygroundExamples.Sample sample) {
+        setScript(sample.script, true);
+    }
+
+    private void handleHistorySelected(PlaygroundStateStore.HistoryEntry entry) {
+        setScript(entry.script, true);
+    }
+
+    private void switchMode(String mode) {
+        applyMode(mode, true);
+    }
+
+    private void applyMode(String mode, boolean userInitiated) {
+        if (mode == null) {
+            mode = PlaygroundTopBar.MODE_CODE;
+        }
+        currentMode = mode;
+        if (topBar != null) {
+            topBar.setMode(mode);
+        }
+        PlaygroundStateStore.saveMode(mode);
+        attachEditorsToHost();
+        if (userInitiated) {
+            refreshMobileTabContent();
+        }
     }
 
     private void runScript(Form form) {
@@ -171,13 +498,10 @@ public class CN1Playground extends Lifecycle {
 
     private void executeRunScript(Form form) {
         CN.callSerially(() -> {
-            List<PlaygroundStateStore.HistoryEntry> history = PlaygroundStateStore.pushHistory(currentScript);
-            refreshHistoryMenu(form.getToolbar(), history);
-
             List<PlaygroundRunner.InlineMessage> loggedMessages = new ArrayList<>();
             PlaygroundContext context = new PlaygroundContext(
                     form,
-                    previewRoot,
+                    previewColumn.getContentHost(),
                     theme,
                     message -> loggedMessages.add(new PlaygroundRunner.InlineMessage(0, message, "info"))
             );
@@ -187,21 +511,36 @@ public class CN1Playground extends Lifecycle {
             currentMessages = new ArrayList<>(loggedMessages);
             currentMessages.addAll(result.getMessages());
 
-            replacePreview(result.getComponent());
-            editor.setMarkers(result.getDiagnostics());
+            boolean hasErrors = false;
+            List<PlaygroundRunner.Diagnostic> diagnostics = result.getDiagnostics();
+            for (int i = 0; i < diagnostics.size(); i++) {
+                if ("error".equalsIgnoreCase(diagnostics.get(i).severity)) {
+                    hasErrors = true;
+                    break;
+                }
+            }
+
+            if (hasErrors) {
+                topBar.showFailed();
+                previewColumn.setStale(true);
+            } else {
+                topBar.showLive();
+                previewColumn.setStale(false);
+                replacePreview(result.getComponent());
+            }
+
+            editor.setMarkers(diagnostics);
             editor.setInlineMessages(currentMessages);
-            editor.setUiidCompletions(PlaygroundCssSupport.collectVisibleUiids(previewRoot));
+            editor.setUiidCompletions(PlaygroundCssSupport.collectVisibleUiids(previewColumn.getContentHost()));
             applyCurrentCss();
             persistCurrentState();
         });
     }
 
     private void replacePreview(Component component) {
-        previewRoot.removeAll();
-
         if (component == null) {
+            previewColumn.setPreview(null);
             inspector.setPreviewRoot(null);
-            previewRoot.revalidate();
             return;
         }
 
@@ -209,9 +548,8 @@ public class CN1Playground extends Lifecycle {
         markEmbeddedPreviewRoles(component);
         applyWebsiteTheme(component, websiteDarkMode);
 
-        previewRoot.add(BorderLayout.CENTER, component);
-        inspector.setPreviewRoot(previewRoot);
-        previewRoot.revalidate();
+        previewColumn.setPreview(component);
+        inspector.setPreviewRoot(previewColumn.getContentHost());
     }
 
     private void detachForPreview(Component component) {
@@ -221,11 +559,6 @@ public class CN1Playground extends Lifecycle {
         }
     }
 
-    /**
-     * Small special-case hook:
-     * when a Form or its title area is rendered inside the preview,
-     * keep its semantic appearance without introducing a whole second theme system.
-     */
     private void markEmbeddedPreviewRoles(Component component) {
         if (component instanceof Form) {
             component.putClientProperty(THEME_ROLE, ROLE_EMBEDDED_FORM);
@@ -234,85 +567,12 @@ public class CN1Playground extends Lifecycle {
                 f.getTitleArea().putClientProperty(THEME_ROLE, ROLE_EMBEDDED_TITLE_AREA);
             }
         }
-
         if (component instanceof Container) {
             Container cnt = (Container) component;
             for (int i = 0; i < cnt.getComponentCount(); i++) {
                 markEmbeddedPreviewRoles(cnt.getComponentAt(i));
             }
         }
-    }
-
-    private void installSideMenu(Toolbar toolbar) {
-        Toolbar.setEnableSideMenuSwipe(false);
-        PlaygroundMenuSection shareSection = new PlaygroundMenuSection("Share");
-        addSideMenuComponent(toolbar, shareSection);
-        addSideMenuComponent(toolbar, createSideMenuButton(SHARE_BUTTON_LABEL, () -> {
-            copyCurrentSourceUrl();
-            toolbar.closeSideMenu();
-        }));
-
-        PlaygroundMenuSection samplesSection = new PlaygroundMenuSection("Samples");
-        addSideMenuComponent(toolbar, samplesSection);
-        for (PlaygroundExamples.Sample sample : PlaygroundExamples.SAMPLES) {
-            addSideMenuComponent(toolbar, createSideMenuButton(sample.title, () -> {
-                setScript(sample.script, true);
-                toolbar.closeSideMenu();
-            }));
-        }
-
-        PlaygroundMenuSection historySection = new PlaygroundMenuSection("History");
-        addSideMenuComponent(toolbar, historySection);
-        addSideMenuComponent(toolbar, historyMenu);
-
-        refreshHistoryMenu(toolbar, PlaygroundStateStore.loadHistory());
-    }
-
-    private void addSideMenuComponent(Toolbar toolbar, Component component) {
-        applyWebsiteTheme(component, websiteDarkMode);
-        sideMenuComponents.add(component);
-        toolbar.addComponentToSideMenu(component);
-    }
-
-    private void refreshHistoryMenu(Toolbar toolbar, List<PlaygroundStateStore.HistoryEntry> history) {
-        historyMenu.removeAll();
-
-        if (history.isEmpty()) {
-            Label empty = new Label("No saved runs yet");
-            empty.setUIID("PlaygroundMenuEmpty");
-            historyMenu.add(empty);
-        } else {
-            for (PlaygroundStateStore.HistoryEntry entry : history) {
-                historyMenu.add(createHistoryButton(entry, history, toolbar));
-            }
-        }
-
-        applyWebsiteTheme(historyMenu, websiteDarkMode);
-        historyMenu.revalidate();
-    }
-
-    private MultiButton createHistoryButton(PlaygroundStateStore.HistoryEntry entry,
-                                            List<PlaygroundStateStore.HistoryEntry> history,
-                                            Toolbar toolbar) {
-        MultiButton button = new MultiButton(entry.title());
-        button.setTextLine2(entry.detail(history));
-        button.setUIID("PlaygroundSideCommand");
-        button.setUIIDLine1("PlaygroundSideCommandLine1");
-        button.setUIIDLine2("PlaygroundSideCommandLine2");
-        button.addActionListener(e -> {
-            setScript(entry.script, true);
-            toolbar.closeSideMenu();
-        });
-        applyWebsiteTheme(button, websiteDarkMode);
-        return button;
-    }
-
-    private Button createSideMenuButton(String text, Runnable action) {
-        Button button = new Button(text);
-        button.setUIID("PlaygroundSideCommand");
-        button.addActionListener(e -> action.run());
-        applyWebsiteTheme(button, websiteDarkMode);
-        return button;
     }
 
     private String resolveInitialScript() {
@@ -451,6 +711,7 @@ public class CN1Playground extends Lifecycle {
         if (editor != null) {
             editor.setSource(currentScript);
         }
+        applyMode(PlaygroundTopBar.MODE_CODE, true);
         persistCurrentState();
         if (runNow && appForm != null) {
             runScript(appForm);
@@ -462,7 +723,6 @@ public class CN1Playground extends Lifecycle {
             return;
         }
         restoreThemeDefaults();
-        applySideMenuPalette(websiteDarkMode);
         List<PlaygroundRunner.Diagnostic> diagnostics = new ArrayList<PlaygroundRunner.Diagnostic>();
         List<PlaygroundRunner.InlineMessage> messages = new ArrayList<PlaygroundRunner.InlineMessage>();
         try {
@@ -478,8 +738,7 @@ public class CN1Playground extends Lifecycle {
         currentCssMessages = messages;
         cssEditor.setMarkers(diagnostics);
         cssEditor.setInlineMessages(messages);
-        cssEditor.setUiidCompletions(PlaygroundCssSupport.collectVisibleUiids(previewRoot));
-        applyTabsTheme(websiteDarkMode);
+        cssEditor.setUiidCompletions(PlaygroundCssSupport.collectVisibleUiids(previewColumn.getContentHost()));
         appForm.refreshTheme();
     }
 
@@ -509,9 +768,10 @@ public class CN1Playground extends Lifecycle {
         Hashtable customTheme = resource.getTheme("PlaygroundCustomTheme");
         if (customTheme != null && !customTheme.isEmpty()) {
             UIManager.getInstance().addThemeProps(customTheme);
-            if (previewRoot != null) {
-                previewRoot.refreshTheme();
-                previewRoot.revalidate();
+            Container host = previewColumn.getContentHost();
+            if (host != null) {
+                host.refreshTheme();
+                host.revalidate();
             } else {
                 form.refreshTheme();
             }
@@ -548,11 +808,13 @@ public class CN1Playground extends Lifecycle {
         if (appForm == null) {
             return;
         }
-
-        final int snapshot = ++editSequence;
-        UITimer.timer(1200, false, appForm, () -> {
-            if (snapshot == editSequence) {
-                refreshHistoryMenu(appForm.getToolbar(), PlaygroundStateStore.pushHistory(currentScript));
+        final int snapshot = ++historySequence;
+        UITimer.timer(2000, false, appForm, () -> {
+            if (snapshot == historySequence) {
+                List<PlaygroundStateStore.HistoryEntry> updated = PlaygroundStateStore.pushHistory(currentScript);
+                if (historyPanel != null) {
+                    historyPanel.setEntries(updated);
+                }
             }
         });
     }
@@ -561,7 +823,6 @@ public class CN1Playground extends Lifecycle {
         if (appForm == null) {
             return;
         }
-
         final int runTicket = ++autoRunSequence;
         UITimer.timer(850, false, appForm, () -> {
             if (runTicket == autoRunSequence) {
@@ -574,7 +835,6 @@ public class CN1Playground extends Lifecycle {
         websiteThemeNative = NativeLookup.create(WebsiteThemeNative.class);
         refreshWebsiteTheme(form);
         UITimer.timer(900, true, form, () -> refreshWebsiteTheme(form));
-        UITimer.timer(250, true, form, this::syncOpenSideMenuTheme);
     }
 
     private void notifyWebsiteUiReady() {
@@ -650,10 +910,8 @@ public class CN1Playground extends Lifecycle {
         if (!websiteThemeInitialized || dark != websiteDarkMode) {
             websiteDarkMode = dark;
             websiteThemeInitialized = true;
-            applySideMenuPalette(dark);
+
             applyWebsiteTheme(form, dark);
-            applyTabsTheme(dark);
-            form.refreshTheme();
 
             if (editor != null) {
                 editor.applyTheme(dark);
@@ -664,62 +922,39 @@ public class CN1Playground extends Lifecycle {
             if (inspector != null) {
                 inspector.applyTheme(dark);
             }
-            for (Component cmp : sideMenuComponents) {
-                applyWebsiteTheme(cmp, dark);
+            if (topBar != null) {
+                topBar.applyTheme(dark);
             }
-        }
-    }
-
-    private void applySideMenuPalette(boolean dark) {
-        Hashtable sideMenuPalette = new Hashtable();
-        int bgColor = dark ? 0x0f172a : 0xffffff;
-        int borderColor = dark ? 0x1f2937 : 0xcccccc;
-
-        sideMenuPalette.put("SideNavigationPanel.bgColor", bgColor);
-        sideMenuPalette.put("SideNavigationPanel.bgTransparency", 255);
-        sideMenuPalette.put("SideNavigationPanelDark.bgColor", bgColor);
-        sideMenuPalette.put("SideNavigationPanelDark.bgTransparency", 255);
-        sideMenuPalette.put("RightSideNavigationPanel.bgColor", bgColor);
-        sideMenuPalette.put("RightSideNavigationPanel.bgTransparency", 255);
-
-        sideMenuPalette.put("StatusBarSideMenu.bgColor", bgColor);
-        sideMenuPalette.put("StatusBarSideMenu.bgTransparency", 255);
-        sideMenuPalette.put("StatusBarSideMenuDark.bgColor", bgColor);
-        sideMenuPalette.put("StatusBarSideMenuDark.bgTransparency", 255);
-
-        sideMenuPalette.put("SideCommand.bgColor", bgColor);
-        sideMenuPalette.put("SideCommand.bgTransparency", 255);
-        sideMenuPalette.put("SideCommand.border", com.codename1.ui.plaf.Border.createLineBorder(2, borderColor));
-        UIManager.getInstance().addThemeProps(sideMenuPalette);
-    }
-
-    private void syncOpenSideMenuTheme() {
-        Form current = Display.getInstance().getCurrent();
-        if (current == null) {
-            return;
-        }
-        applySideMenuContainerTheme(current);
-    }
-
-    private void applySideMenuContainerTheme(Component component) {
-        if (component == null) {
-            return;
-        }
-        String uiid = component.getUIID();
-        if ("SideNavigationPanel".equals(uiid)
-                || "SideNavigationPanelDark".equals(uiid)
-                || "RightSideNavigationPanel".equals(uiid)
-                || "StatusBarSideMenu".equals(uiid)
-                || "StatusBarSideMenuDark".equals(uiid)) {
-            applyWebsiteTheme(component, websiteDarkMode);
-            component.getAllStyles().setBgTransparency(255);
-            component.getAllStyles().setBgColor(websiteDarkMode ? 0x0f172a : 0xffffff);
-        }
-        if (component instanceof Container) {
-            Container cnt = (Container) component;
-            for (int i = 0; i < cnt.getComponentCount(); i++) {
-                applySideMenuContainerTheme(cnt.getComponentAt(i));
+            if (activityBar != null) {
+                activityBar.applyTheme(dark);
             }
+            if (samplesPanel != null) {
+                samplesPanel.applyTheme(dark);
+            }
+            if (historyPanel != null) {
+                historyPanel.applyTheme(dark);
+            }
+            if (previewColumn != null) {
+                previewColumn.applyTheme(dark);
+            }
+            if (mobileTopTabs != null) {
+                mobileTopTabs.applyTheme(dark);
+            }
+
+            if (inspectorWrapper != null) {
+                inspectorWrapper.setUIID(dark ? "PlaygroundSidePanelDark" : "PlaygroundSidePanel");
+            }
+            if (editorHost != null) {
+                editorHost.setUIID(dark ? "PlaygroundPanelDark" : "PlaygroundPanel");
+            }
+            if (previewContainer != null) {
+                previewContainer.setUIID(dark ? "PlaygroundPanelDark" : "PlaygroundPanel");
+            }
+            if (bodyContainer != null) {
+                bodyContainer.setUIID(dark ? "PlaygroundBodyDark" : "PlaygroundBody");
+            }
+            refreshBottomNav();
+            form.refreshTheme();
         }
     }
 
@@ -777,8 +1012,43 @@ public class CN1Playground extends Lifecycle {
         switch (uiid) {
             case "PlaygroundForm":
             case "PlaygroundContent":
+            case "PlaygroundBody":
             case "PlaygroundToolbar":
             case "PlaygroundTitle":
+            case "PlaygroundTopBar":
+            case "PlaygroundWordmark":
+            case "PlaygroundSegment":
+            case "PlaygroundSegmentOption":
+            case "PlaygroundSegmentOptionSelected":
+            case "PlaygroundStatusPill":
+            case "PlaygroundStatusPillError":
+            case "PlaygroundShareButton":
+            case "PlaygroundDownloadButton":
+            case "PlaygroundActivityBar":
+            case "PlaygroundActivityButton":
+            case "PlaygroundActivityButtonActive":
+            case "PlaygroundSidePanel":
+            case "PlaygroundSidePanelHeader":
+            case "PlaygroundSidePanelClose":
+            case "PlaygroundSearchField":
+            case "PlaygroundSampleItem":
+            case "PlaygroundSampleItemSelected":
+            case "PlaygroundHistoryItem":
+            case "PlaygroundHistoryLine1":
+            case "PlaygroundHistoryLine2":
+            case "PlaygroundPreviewToolbar":
+            case "PlaygroundDimensions":
+            case "PlaygroundDeviceStage":
+            case "PlaygroundNoSkinStage":
+            case "PlaygroundDeviceBezel":
+            case "PlaygroundDeviceScreen":
+            case "PlaygroundStaleChip":
+            case "PlaygroundTopTabs":
+            case "PlaygroundTopTab":
+            case "PlaygroundTopTabSelected":
+            case "PlaygroundBottomNav":
+            case "PlaygroundBottomNavItem":
+            case "PlaygroundBottomNavItemActive":
             case "PlaygroundPanel":
             case "PlaygroundPreview":
             case "SideNavigationPanel":
@@ -806,21 +1076,6 @@ public class CN1Playground extends Lifecycle {
                 return true;
             default:
                 return false;
-        }
-    }
-
-    private void applyTabsTheme(boolean dark) {
-        if (editorTabs != null) {
-            String tabsUiid = dark ? "PlaygroundEditorTabsDark" : "PlaygroundEditorTabs";
-            String tabUiid = dark ? "TabDark" : "Tab";
-            editorTabs.setUIID(tabsUiid);
-            editorTabs.setTabUIID(tabUiid);
-            Container tabsContainer = editorTabs.getTabsContainer();
-            for (int i = 0; i < tabsContainer.getComponentCount(); i++) {
-                tabsContainer.getComponentAt(i).setUIID(tabUiid);
-            }
-            editorTabs.refreshTheme();
-            editorTabs.revalidate();
         }
     }
 

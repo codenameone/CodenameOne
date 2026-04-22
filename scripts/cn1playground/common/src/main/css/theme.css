@@ -6,13 +6,34 @@
     sideMenuSizeTabLandscapeInt: "75";
 }
 
-/** Style for Button class */
+/* ------------------------------------------------------------
+ *  DESIGN TOKENS
+ *
+ *  Light palette                         Dark palette
+ *  --bg-app        #F7F8FB               #0A0F1E
+ *  --bg-panel      #FFFFFF               #102B66
+ *  --bg-subtle     #F0F2F7               #0B2055
+ *  --bg-input      #FFFFFF               #0E2A61
+ *  --border        #E1E4EA               #253B73
+ *  --text          #112247               #F5F8FF
+ *  --muted         #7F8AA3               #A8B8DA
+ *  --soft          #AAB2C5               #6E80A6
+ *  --accent        #2F6BFF               #4D86FF
+ *  --accent-soft   #E6EDFF               #1F3A7A
+ *  --success       #36A853               #5FCF7C
+ *  --danger        #D93636               #FF6B6B
+ *  --activity-bar  #0E1A34 (both themes)
+ *  --activity-text #A2ADC9
+ *  --activity-active #FFFFFF
+ * ------------------------------------------------------------ */
+
+/* ----- Standard component defaults ----- */
+
 Button {
     font-family: "native:MainLight";
     font-size: 3mm;
 }
 
-/** Style for App Title Bar Text */
 Title {
     font-family: "native:MainLight";
     font-size: 6mm;
@@ -22,49 +43,605 @@ TitleArea {
     background: #F3F4F7;
 }
 
+DialogBody {
+    font-family: "native:MainLight";
+    font-size: 2.8mm;
+}
+
+DialogTitle {
+    font-family: "native:MainLight";
+    font-size: 4.5mm;
+}
+
+/* ----- Shell: form + body chrome ----- */
+
 PlaygroundForm, PlaygroundContent {
     background: #F7F8FB;
 }
 
 PlaygroundFormDark, PlaygroundContentDark {
-    background: #071B4D;
+    background: #0A0F1E;
+}
+
+PlaygroundBody {
+    background: #F7F8FB;
+    padding: 0;
+    margin: 0;
+}
+
+PlaygroundBodyDark {
+    background: #0A0F1E;
+    padding: 0;
+    margin: 0;
 }
 
 PlaygroundToolbar {
     background: #F3F4F7;
-    padding: 1mm 2mm 1mm 2mm;
+    padding: 0;
 }
 
 PlaygroundToolbarDark {
-    background: #102B66;
-    padding: 1mm 2mm 1mm 2mm;
+    background: #0A0F1E;
+    padding: 0;
 }
 
 PlaygroundTitle {
     color: #112247;
-    background: #F3F4F7;
+    background: transparent;
     font-family: "native:MainLight";
     font-size: 6mm;
 }
 
 PlaygroundTitleDark {
     color: #F5F8FF;
-    background: #102B66;
+    background: transparent;
     font-family: "native:MainLight";
     font-size: 6mm;
 }
 
+/* ----- Top bar ----- */
+
+PlaygroundTopBar {
+    background: #FFFFFF;
+    border-bottom: 1px solid #E1E4EA;
+    padding: 1.5mm 3mm 1.5mm 3mm;
+}
+
+PlaygroundTopBarDark {
+    background: #102B66;
+    border-bottom: 1px solid #253B73;
+    padding: 1.5mm 3mm 1.5mm 3mm;
+}
+
+PlaygroundWordmark {
+    color: #112247;
+    background: transparent;
+    font-family: "native:MainBold";
+    font-size: 3.5mm;
+    padding: 0 2mm 0 2mm;
+}
+
+PlaygroundWordmarkDark {
+    color: #F5F8FF;
+    background: transparent;
+    font-family: "native:MainBold";
+    font-size: 3.5mm;
+    padding: 0 2mm 0 2mm;
+}
+
+/* ----- Segmented control ----- */
+
+PlaygroundSegment {
+    background: #F0F2F7;
+    border: 1px solid #E1E4EA;
+    padding: 0.5mm;
+    margin: 0;
+}
+
+PlaygroundSegmentDark {
+    background: #0B2055;
+    border: 1px solid #253B73;
+    padding: 0.5mm;
+    margin: 0;
+}
+
+PlaygroundSegmentOption {
+    background: transparent;
+    color: #7F8AA3;
+    border: none;
+    font-family: "native:MainLight";
+    font-size: 2.8mm;
+    padding: 1mm 2.5mm 1mm 2.5mm;
+    margin: 0;
+    text-decoration: none;
+}
+
+PlaygroundSegmentOptionDark {
+    background: transparent;
+    color: #A8B8DA;
+    border: none;
+    font-family: "native:MainLight";
+    font-size: 2.8mm;
+    padding: 1mm 2.5mm 1mm 2.5mm;
+    margin: 0;
+    text-decoration: none;
+}
+
+PlaygroundSegmentOptionSelected {
+    background: #FFFFFF;
+    color: #112247;
+    border: none;
+    font-family: "native:MainBold";
+    font-size: 2.8mm;
+    padding: 1mm 2.5mm 1mm 2.5mm;
+    margin: 0;
+    text-decoration: none;
+}
+
+PlaygroundSegmentOptionSelectedDark {
+    background: #163575;
+    color: #F5F8FF;
+    border: none;
+    font-family: "native:MainBold";
+    font-size: 2.8mm;
+    padding: 1mm 2.5mm 1mm 2.5mm;
+    margin: 0;
+    text-decoration: none;
+}
+
+/* ----- Status pill ----- */
+
+PlaygroundStatusPill {
+    background: #F0F2F7;
+    color: #112247;
+    font-family: "native:MainLight";
+    font-size: 2.6mm;
+    padding: 0.8mm 2mm 0.8mm 2mm;
+    margin: 0 1mm 0 1mm;
+    text-decoration: none;
+}
+
+PlaygroundStatusPillDark {
+    background: #0B2055;
+    color: #F5F8FF;
+    font-family: "native:MainLight";
+    font-size: 2.6mm;
+    padding: 0.8mm 2mm 0.8mm 2mm;
+    margin: 0 1mm 0 1mm;
+    text-decoration: none;
+}
+
+PlaygroundStatusPillError {
+    background: #FBE6E6;
+    color: #D93636;
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+    padding: 0.8mm 2mm 0.8mm 2mm;
+    margin: 0 1mm 0 1mm;
+    text-decoration: none;
+}
+
+PlaygroundStatusPillErrorDark {
+    background: #3A1515;
+    color: #FF6B6B;
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+    padding: 0.8mm 2mm 0.8mm 2mm;
+    margin: 0 1mm 0 1mm;
+    text-decoration: none;
+}
+
+PlaygroundStatusDot {
+    background: #36A853;
+    padding: 0;
+    margin: 0 1mm 0 0;
+}
+
+PlaygroundStatusDotDark {
+    background: #5FCF7C;
+    padding: 0;
+    margin: 0 1mm 0 0;
+}
+
+PlaygroundStatusDotError {
+    background: #D93636;
+    padding: 0;
+    margin: 0 1mm 0 0;
+}
+
+PlaygroundStatusDotErrorDark {
+    background: #FF6B6B;
+    padding: 0;
+    margin: 0 1mm 0 0;
+}
+
+/* ----- Top bar buttons ----- */
+
+PlaygroundShareButton {
+    background: transparent;
+    color: #112247;
+    border: 1px solid #E1E4EA;
+    font-family: "native:MainLight";
+    font-size: 2.8mm;
+    padding: 1mm 2.5mm 1mm 2.5mm;
+    margin: 0 1mm 0 1mm;
+    text-decoration: none;
+}
+
+PlaygroundShareButtonDark {
+    background: transparent;
+    color: #F5F8FF;
+    border: 1px solid #253B73;
+    font-family: "native:MainLight";
+    font-size: 2.8mm;
+    padding: 1mm 2.5mm 1mm 2.5mm;
+    margin: 0 1mm 0 1mm;
+    text-decoration: none;
+}
+
+PlaygroundDownloadButton {
+    background: #2F6BFF;
+    color: #FFFFFF;
+    border: none;
+    font-family: "native:MainBold";
+    font-size: 2.8mm;
+    padding: 1mm 2.5mm 1mm 2.5mm;
+    margin: 0 0 0 1mm;
+    text-decoration: none;
+}
+
+PlaygroundDownloadButtonDark {
+    background: #4D86FF;
+    color: #0A0F1E;
+    border: none;
+    font-family: "native:MainBold";
+    font-size: 2.8mm;
+    padding: 1mm 2.5mm 1mm 2.5mm;
+    margin: 0 0 0 1mm;
+    text-decoration: none;
+}
+
+/* ----- Activity bar (stays navy in both themes) ----- */
+
+PlaygroundActivityBar {
+    background: #0E1A34;
+    padding: 2mm 0 2mm 0;
+    border-right: 1px solid #1A2645;
+}
+
+PlaygroundActivityBarDark {
+    background: #0E1A34;
+    padding: 2mm 0 2mm 0;
+    border-right: 1px solid #1A2645;
+}
+
+PlaygroundActivityButton {
+    background: transparent;
+    color: #A2ADC9;
+    border: none;
+    font-family: "native:MainLight";
+    font-size: 2.6mm;
+    padding: 2mm;
+    margin: 0.5mm 1mm 0.5mm 1mm;
+    text-decoration: none;
+}
+
+PlaygroundActivityButtonDark {
+    background: transparent;
+    color: #A2ADC9;
+    border: none;
+    font-family: "native:MainLight";
+    font-size: 2.6mm;
+    padding: 2mm;
+    margin: 0.5mm 1mm 0.5mm 1mm;
+    text-decoration: none;
+}
+
+PlaygroundActivityButtonActive {
+    background: #1F2E52;
+    color: #FFFFFF;
+    border-left: 0.8mm solid #4D86FF;
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+    padding: 2mm;
+    margin: 0.5mm 1mm 0.5mm 0;
+    text-decoration: none;
+}
+
+PlaygroundActivityButtonActiveDark {
+    background: #1F2E52;
+    color: #FFFFFF;
+    border-left: 0.8mm solid #4D86FF;
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+    padding: 2mm;
+    margin: 0.5mm 1mm 0.5mm 0;
+    text-decoration: none;
+}
+
+/* ----- Side panel (Samples / History / Inspector dock) ----- */
+
+PlaygroundSidePanel {
+    background: #FFFFFF;
+    border-right: 1px solid #E1E4EA;
+    padding: 0;
+}
+
+PlaygroundSidePanelDark {
+    background: #102B66;
+    border-right: 1px solid #253B73;
+    padding: 0;
+}
+
+PlaygroundSidePanelHeader {
+    background: transparent;
+    color: #7F8AA3;
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+    padding: 2mm 3mm 1.5mm 3mm;
+    margin: 0;
+}
+
+PlaygroundSidePanelHeaderDark {
+    background: transparent;
+    color: #A8B8DA;
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+    padding: 2mm 3mm 1.5mm 3mm;
+    margin: 0;
+}
+
+PlaygroundSidePanelClose {
+    background: transparent;
+    color: #7F8AA3;
+    border: none;
+    padding: 0.5mm;
+    margin: 1.5mm 3mm 1.5mm 0;
+}
+
+PlaygroundSidePanelCloseDark {
+    background: transparent;
+    color: #A8B8DA;
+    border: none;
+    padding: 0.5mm;
+    margin: 1.5mm 3mm 1.5mm 0;
+}
+
+PlaygroundSearchField {
+    background: #FFFFFF;
+    color: #112247;
+    border: 1px solid #E1E4EA;
+    font-family: "native:MainLight";
+    font-size: 2.8mm;
+    padding: 1mm 2mm 1mm 2mm;
+    margin: 0 2mm 1.5mm 2mm;
+    text-decoration: none;
+}
+
+PlaygroundSearchFieldDark {
+    background: #0E2A61;
+    color: #F5F8FF;
+    border: 1px solid #253B73;
+    font-family: "native:MainLight";
+    font-size: 2.8mm;
+    padding: 1mm 2mm 1mm 2mm;
+    margin: 0 2mm 1.5mm 2mm;
+    text-decoration: none;
+}
+
+PlaygroundSampleItem {
+    background: transparent;
+    color: #112247;
+    border: none;
+    font-family: "native:MainLight";
+    font-size: 3mm;
+    padding: 1.5mm 2.5mm 1.5mm 2.5mm;
+    margin: 0 1.5mm 0 1.5mm;
+    text-decoration: none;
+}
+
+PlaygroundSampleItemDark {
+    background: transparent;
+    color: #F5F8FF;
+    border: none;
+    font-family: "native:MainLight";
+    font-size: 3mm;
+    padding: 1.5mm 2.5mm 1.5mm 2.5mm;
+    margin: 0 1.5mm 0 1.5mm;
+    text-decoration: none;
+}
+
+PlaygroundSampleItemSelected {
+    background: #E6EDFF;
+    color: #2F6BFF;
+    border: none;
+    font-family: "native:MainBold";
+    font-size: 3mm;
+    padding: 1.5mm 2.5mm 1.5mm 2.5mm;
+    margin: 0 1.5mm 0 1.5mm;
+    text-decoration: none;
+}
+
+PlaygroundSampleItemSelectedDark {
+    background: #1F3A7A;
+    color: #4D86FF;
+    border: none;
+    font-family: "native:MainBold";
+    font-size: 3mm;
+    padding: 1.5mm 2.5mm 1.5mm 2.5mm;
+    margin: 0 1.5mm 0 1.5mm;
+    text-decoration: none;
+}
+
+PlaygroundHistoryItem {
+    background: transparent;
+    border: none;
+    padding: 1mm 2.5mm 1mm 2.5mm;
+    margin: 0 1.5mm 0 1.5mm;
+}
+
+PlaygroundHistoryItemDark {
+    background: transparent;
+    border: none;
+    padding: 1mm 2.5mm 1mm 2.5mm;
+    margin: 0 1.5mm 0 1.5mm;
+}
+
+PlaygroundHistoryLine1 {
+    background: transparent;
+    color: #112247;
+    font-family: "native:MainLight";
+    font-size: 3mm;
+    margin: 0;
+    padding: 0;
+    text-decoration: none;
+}
+
+PlaygroundHistoryLine1Dark {
+    background: transparent;
+    color: #F5F8FF;
+    font-family: "native:MainLight";
+    font-size: 3mm;
+    margin: 0;
+    padding: 0;
+    text-decoration: none;
+}
+
+PlaygroundHistoryLine2 {
+    background: transparent;
+    color: #7F8AA3;
+    font-family: "native:MainLight";
+    font-size: 2.4mm;
+    margin: 0;
+    padding: 0;
+    text-decoration: none;
+}
+
+PlaygroundHistoryLine2Dark {
+    background: transparent;
+    color: #A8B8DA;
+    font-family: "native:MainLight";
+    font-size: 2.4mm;
+    margin: 0;
+    padding: 0;
+    text-decoration: none;
+}
+
+/* ----- Editor column ----- */
+
 PlaygroundPanel {
     background: #FFFFFF;
-    margin: 1mm;
-    padding: 1mm;
+    margin: 0;
+    padding: 0;
 }
 
 PlaygroundPanelDark {
     background: #102B66;
-    margin: 1mm;
-    padding: 1mm;
+    margin: 0;
+    padding: 0;
 }
+
+/* ----- Preview column ----- */
+
+PlaygroundPreviewToolbar {
+    background: #FFFFFF;
+    border-bottom: 1px solid #E1E4EA;
+    padding: 1mm 2mm 1mm 2mm;
+}
+
+PlaygroundPreviewToolbarDark {
+    background: #102B66;
+    border-bottom: 1px solid #253B73;
+    padding: 1mm 2mm 1mm 2mm;
+}
+
+PlaygroundDimensions {
+    background: transparent;
+    color: #AAB2C5;
+    font-family: "native:MainLight";
+    font-size: 2.6mm;
+    padding: 0 2mm 0 2mm;
+}
+
+PlaygroundDimensionsDark {
+    background: transparent;
+    color: #6E80A6;
+    font-family: "native:MainLight";
+    font-size: 2.6mm;
+    padding: 0 2mm 0 2mm;
+}
+
+PlaygroundDeviceStage {
+    background: #F0F2F7;
+    padding: 3mm;
+    margin: 0;
+}
+
+PlaygroundDeviceStageDark {
+    background: #0B2055;
+    padding: 3mm;
+    margin: 0;
+}
+
+PlaygroundNoSkinStage {
+    background: #FFFFFF;
+    padding: 0;
+    margin: 0;
+}
+
+PlaygroundNoSkinStageDark {
+    background: #102B66;
+    padding: 0;
+    margin: 0;
+}
+
+PlaygroundDeviceBezel {
+    background: #1A1A1C;
+    border: 1px solid #2A2A2D;
+    padding: 3mm;
+    margin: 0;
+}
+
+PlaygroundDeviceBezelDark {
+    background: #1A1A1C;
+    border: 1px solid #2A2A2D;
+    padding: 3mm;
+    margin: 0;
+}
+
+PlaygroundDeviceScreen {
+    background: #FFFFFF;
+    padding: 0;
+    margin: 0;
+}
+
+PlaygroundDeviceScreenDark {
+    background: #102B66;
+    padding: 0;
+    margin: 0;
+}
+
+PlaygroundStaleChip {
+    background: #FBE6E6;
+    color: #D93636;
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+    padding: 1mm 2.5mm 1mm 2.5mm;
+    margin: 2mm;
+    text-decoration: none;
+}
+
+PlaygroundStaleChipDark {
+    background: #3A1515;
+    color: #FF6B6B;
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+    padding: 1mm 2.5mm 1mm 2.5mm;
+    margin: 2mm;
+    text-decoration: none;
+}
+
+/* ----- Embedded forms rendered inside the preview ----- */
 
 PlaygroundPreview {
     background: #FFFFFF;
@@ -72,197 +649,6 @@ PlaygroundPreview {
 
 PlaygroundPreviewDark {
     background: #112F70;
-}
-
-/** Style for Dialog body */
-DialogBody {
-    font-family: "native:MainLight";
-    font-size: 2.8mm;
-}
-
-/** Style for Dialog title bar text */
-DialogTitle {
-    font-family: "native:MainLight";
-    font-size: 4.5mm;
-}
-
-/** Style for the side menu */
-SideNavigationPanel {
-    background: #FFFFFF;
-    padding: 2mm 1mm 1mm 1mm;
-}
-
-SideNavigationPanelDark {
-    background: #071B4D;
-    padding: 2mm 1mm 1mm 1mm;
-}
-
-@media platform-ios {
-    /** iOS Only styles for side menu. */
-    SideNavigationPanel {
-        /** Extra top padding to deal with notch on iPhoneX */
-        padding: 6mm 1mm 1mm 1mm;
-    }
-    SideNavigationPanelDark {
-        padding: 6mm 1mm 1mm 1mm;
-    }
-}
-
-/** Style for commands in side menu. */
-SideCommand {
-    padding: 1mm;
-    border: none;
-    text-decoration: none;
-    color: black;
-    background: #FFFFFF;
-    font-family: "native:MainLight";
-    font-size: 4mm;
-    border-bottom: 2px solid #D9DEE8;
-}
-
-StatusBarSideMenu {
-    background: #FFFFFF;
-    padding: 0mm;
-}
-
-StatusBarSideMenuDark {
-    background: #071B4D;
-    padding: 0mm;
-}
-
-PlaygroundSideCommand {
-    padding: 1mm;
-    border: none;
-    text-decoration: none;
-    color: #112247;
-    background: #FFFFFF;
-    font-family: "native:MainLight";
-    font-size: 4mm;
-    border-bottom: 2px solid #D9DEE8;
-}
-
-PlaygroundSideCommandDark {
-    color: #F5F8FF;
-    background: #071B4D;
-    border-bottom: 2px solid #102B66;
-}
-
-PlaygroundMenuSection {
-    padding: 2mm 1mm 0.5mm 1mm;
-    margin: 1mm 0 0 0;
-    border: none;
-    border-bottom: 1px solid #D9DEE8;
-    background: #FFFFFF;
-}
-
-PlaygroundMenuSectionDark {
-    border-bottom: 1px solid #4C6EA8;
-    background: #071B4D;
-}
-
-PlaygroundMenuSectionTitle {
-    color: #7F8AA3;
-    font-family: "native:MainBold";
-    font-size: 2.6mm;
-    text-decoration: none;
-    padding: 0 0 1mm 0;
-}
-
-PlaygroundMenuSectionTitleDark {
-    color: #A8B8DA;
-}
-
-PlaygroundMenuEmpty {
-    color: #7F8AA3;
-    font-family: "native:MainLight";
-    font-size: 3mm;
-    padding: 1mm;
-}
-
-PlaygroundMenuEmptyDark {
-    color: #A8B8DA;
-    background: #071B4D;
-}
-
-PlaygroundMenuContainer {
-    background: #FFFFFF;
-}
-
-PlaygroundMenuContainerDark {
-    background: #071B4D;
-}
-
-@media (prefers-color-scheme: dark) {
-    SideNavigationPanel {
-        background: #071B4D;
-    }
-    SideNavigationPanelDark {
-        background: #071B4D;
-    }
-
-    SideCommand {
-        color: #F5F8FF;
-        background: #071B4D;
-        border-bottom: 2px solid #102B66;
-    }
-
-    StatusBarSideMenu {
-        background: #071B4D;
-    }
-    StatusBarSideMenuDark {
-        background: #071B4D;
-    }
-
-    PlaygroundSideCommand {
-        color: #F5F8FF;
-        background: #071B4D;
-        border-bottom: 2px solid #102B66;
-    }
-    PlaygroundSideCommandDark {
-        color: #F5F8FF;
-        background: #071B4D;
-        border-bottom: 2px solid #102B66;
-    }
-
-    PlaygroundSideCommandLine1 {
-        color: #F5F8FF;
-    }
-
-    PlaygroundSideCommandLine2 {
-        color: #A8B8DA;
-    }
-
-    PlaygroundMenuSection {
-        border-bottom: 1px solid #4C6EA8;
-        background: #071B4D;
-    }
-    PlaygroundMenuSectionDark {
-        border-bottom: 1px solid #4C6EA8;
-        background: #071B4D;
-    }
-
-    PlaygroundMenuSectionTitle {
-        color: #A8B8DA;
-    }
-    PlaygroundMenuSectionTitleDark {
-        color: #A8B8DA;
-    }
-
-    PlaygroundMenuEmpty {
-        color: #A8B8DA;
-        background: #071B4D;
-    }
-    PlaygroundMenuEmptyDark {
-        color: #A8B8DA;
-        background: #071B4D;
-    }
-
-    PlaygroundMenuContainer {
-        background: #071B4D;
-    }
-    PlaygroundMenuContainerDark {
-        background: #071B4D;
-    }
 }
 
 PlaygroundEmbeddedForm {
@@ -280,6 +666,8 @@ PlaygroundEmbeddedTitleArea {
 PlaygroundEmbeddedTitleAreaDark {
     background: #163575;
 }
+
+/* ----- Inspector ----- */
 
 PlaygroundInspectorRoot {
     background: #FFFFFF;
@@ -305,22 +693,90 @@ PlaygroundInspectorTreeDark {
     padding: 0;
 }
 
+PlaygroundInspectorProps {
+    background: #FFFFFF;
+    padding: 1mm;
+    margin: 0;
+}
+
+PlaygroundInspectorPropsDark {
+    background: #102B66;
+    padding: 1mm;
+    margin: 0;
+}
+
 PlaygroundPropRow {
     background: transparent;
     margin: 0 0 1mm 0;
     padding: 0;
 }
 
+PlaygroundPropName {
+    color: #7F8AA3;
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+    padding: 0.5mm 0mm 0.5mm 1.5mm;
+    margin: 0;
+}
+
+PlaygroundPropNameDark {
+    color: #A8B8DA;
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+    padding: 0.5mm 0mm 0.5mm 1.5mm;
+    margin: 0;
+}
+
+PlaygroundPropValue {
+    color: #112247;
+    background: #FFFFFF;
+    border: 1px solid #E1E4EA;
+    font-family: "native:MainLight";
+    font-size: 2.8mm;
+    padding: 0.5mm 1mm 0.5mm 1mm;
+    margin: 0.5mm 0.5mm 0.5mm 0;
+}
+
+PlaygroundPropValueDark {
+    color: #F5F8FF;
+    background: #0E2A61;
+    border: 1px solid #253B73;
+    font-family: "native:MainLight";
+    font-size: 2.8mm;
+    padding: 0.5mm 1mm 0.5mm 1mm;
+    margin: 0.5mm 0.5mm 0.5mm 0;
+}
+
+PlaygroundPropSmall {
+    color: #112247;
+    background: #FFFFFF;
+    border: 1px solid #E1E4EA;
+    font-family: "native:MainLight";
+    font-size: 2.6mm;
+    padding: 0.5mm;
+    margin: 0 0.5mm 0 0;
+}
+
+PlaygroundPropSmallDark {
+    color: #F5F8FF;
+    background: #0E2A61;
+    border: 1px solid #253B73;
+    font-family: "native:MainLight";
+    font-size: 2.6mm;
+    padding: 0.5mm;
+    margin: 0 0.5mm 0 0;
+}
+
 PlaygroundPropUnit {
     color: #112247;
     background: #FFFFFF;
-    border: 1px solid #D9DEE8;
+    border: 1px solid #E1E4EA;
 }
 
 PlaygroundPropUnitDark {
     color: #F5F8FF;
     background: #0E2A61;
-    border: 1px solid #4C6EA8;
+    border: 1px solid #253B73;
 }
 
 PlaygroundPropEmpty {
@@ -339,15 +795,21 @@ PlaygroundPropEmptyDark {
     padding: 1mm;
 }
 
+PlaygroundPropGroup {
+    background: transparent;
+    padding: 0.5mm 0 0.5mm 0;
+    margin: 0;
+}
+
 PlaygroundColorPreview {
     background: #FFFFFF;
-    border: 1px solid #D9DEE8;
+    border: 1px solid #E1E4EA;
     padding: 0.5mm 1mm 0.5mm 1mm;
 }
 
 PlaygroundColorPreviewDark {
     background: #0E2A61;
-    border: 1px solid #4C6EA8;
+    border: 1px solid #253B73;
     padding: 0.5mm 1mm 0.5mm 1mm;
 }
 
@@ -373,51 +835,216 @@ PlaygroundInspectorTreeNodeDark {
     padding: 0;
 }
 
-Tab {
-    background: #F3F4F7;
-    color: #112247;
-    border: 1px solid #D9DEE8;
-    font-family: "native:MainLight";
-    font-size: 3mm;
-    text-align: center;
-}
+/* ----- Mobile top tabs + bottom nav ----- */
 
-PlaygroundEditorTabs {
-    background: #F3F4F7;
-}
-
-PlaygroundEditorTabsDark {
-    background: #112247;
-}
-
-TabDark {
-    background: #102B66;
-    color: #F5F8FF;
-    border: 1px solid #4C6EA8;
-    font-family: "native:MainLight";
-    font-size: 3mm;
-    text-align: center;
-}
-
-TabSelected {
+PlaygroundTopTabs {
     background: #FFFFFF;
+    border-bottom: 1px solid #E1E4EA;
+}
+
+PlaygroundTopTabsDark {
+    background: #102B66;
+    border-bottom: 1px solid #253B73;
+}
+
+PlaygroundTopTab {
+    background: transparent;
+    color: #7F8AA3;
+    border: none;
+    font-family: "native:MainLight";
+    font-size: 2.8mm;
+    padding: 1.5mm 2mm 1.5mm 2mm;
+    text-decoration: none;
+}
+
+PlaygroundTopTabDark {
+    background: transparent;
+    color: #A8B8DA;
+    border: none;
+    font-family: "native:MainLight";
+    font-size: 2.8mm;
+    padding: 1.5mm 2mm 1.5mm 2mm;
+    text-decoration: none;
+}
+
+PlaygroundTopTabSelected {
+    background: transparent;
+    color: #2F6BFF;
+    border-bottom: 0.6mm solid #2F6BFF;
+    font-family: "native:MainBold";
+    font-size: 2.8mm;
+    padding: 1.5mm 2mm 1.5mm 2mm;
+    text-decoration: none;
+}
+
+PlaygroundTopTabSelectedDark {
+    background: transparent;
+    color: #4D86FF;
+    border-bottom: 0.6mm solid #4D86FF;
+    font-family: "native:MainBold";
+    font-size: 2.8mm;
+    padding: 1.5mm 2mm 1.5mm 2mm;
+    text-decoration: none;
+}
+
+PlaygroundBottomNav {
+    background: #FFFFFF;
+    border: none;
+    border-bottom: 1px solid #E1E4EA;
+    padding: 1mm 0 1mm 0;
+}
+
+PlaygroundBottomNavDark {
+    background: #102B66;
+    border: none;
+    border-bottom: 1px solid #253B73;
+    padding: 1mm 0 1mm 0;
+}
+
+PlaygroundBottomNavItem {
+    background: transparent;
+    color: #7F8AA3;
+    border: none;
+    font-family: "native:MainLight";
+    font-size: 2.4mm;
+    padding: 1mm;
+    text-decoration: none;
+}
+
+PlaygroundBottomNavItemDark {
+    background: transparent;
+    color: #A8B8DA;
+    border: none;
+    font-family: "native:MainLight";
+    font-size: 2.4mm;
+    padding: 1mm;
+    text-decoration: none;
+}
+
+PlaygroundBottomNavItemActive {
+    background: transparent;
+    color: #2F6BFF;
+    border: none;
+    font-family: "native:MainBold";
+    font-size: 2.4mm;
+    padding: 1mm;
+    text-decoration: none;
+}
+
+PlaygroundBottomNavItemActiveDark {
+    background: transparent;
+    color: #4D86FF;
+    border: none;
+    font-family: "native:MainBold";
+    font-size: 2.4mm;
+    padding: 1mm;
+    text-decoration: none;
+}
+
+/* ----- Existing side menu (kept around for overlay fallback) ----- */
+
+SideNavigationPanel {
+    background: #FFFFFF;
+    padding: 2mm 1mm 1mm 1mm;
+}
+
+SideNavigationPanelDark {
+    background: #0A0F1E;
+    padding: 2mm 1mm 1mm 1mm;
+}
+
+@media platform-ios {
+    SideNavigationPanel {
+        padding: 6mm 1mm 1mm 1mm;
+    }
+    SideNavigationPanelDark {
+        padding: 6mm 1mm 1mm 1mm;
+    }
+}
+
+SideCommand {
+    padding: 1mm;
+    border: none;
+    text-decoration: none;
+    color: black;
+    background: #FFFFFF;
+    font-family: "native:MainLight";
+    font-size: 4mm;
+    border-bottom: 2px solid #E1E4EA;
+}
+
+StatusBarSideMenu {
+    background: #FFFFFF;
+    padding: 0mm;
+}
+
+StatusBarSideMenuDark {
+    background: #0A0F1E;
+    padding: 0mm;
+}
+
+PlaygroundSideCommand {
+    padding: 1mm;
+    border: none;
+    text-decoration: none;
     color: #112247;
-    border: 2px solid #2F6BFF;
+    background: #FFFFFF;
+    font-family: "native:MainLight";
+    font-size: 4mm;
+    border-bottom: 2px solid #E1E4EA;
 }
 
-TabSelectedDark {
-    background: #163575;
+PlaygroundSideCommandDark {
     color: #F5F8FF;
-    border: 2px solid #4D86FF;
+    background: #0A0F1E;
+    border-bottom: 2px solid #102B66;
 }
 
-TabsContainer {
-    background: #F3F4F7;
+PlaygroundMenuSection {
+    padding: 2mm 1mm 0.5mm 1mm;
+    margin: 1mm 0 0 0;
+    border: none;
+    border-bottom: 1px solid #E1E4EA;
+    background: #FFFFFF;
 }
 
-TabsContainerDark {
-    background: #112247;
+PlaygroundMenuSectionDark {
+    border-bottom: 1px solid #253B73;
+    background: #0A0F1E;
 }
+
+PlaygroundMenuSectionTitle {
+    color: #7F8AA3;
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+    text-decoration: none;
+    padding: 0 0 1mm 0;
+}
+
+PlaygroundMenuSectionTitleDark {
+    color: #A8B8DA;
+}
+
+PlaygroundMenuEmpty {
+    color: #7F8AA3;
+    font-family: "native:MainLight";
+    font-size: 3mm;
+    padding: 1mm;
+}
+
+PlaygroundMenuEmptyDark {
+    color: #A8B8DA;
+    background: #0A0F1E;
+}
+
+PlaygroundMenuContainer {
+    background: #FFFFFF;
+}
+
+PlaygroundMenuContainerDark {
+    background: #0A0F1E;
+}
+
 PlaygroundSideCommandLine1 {
     color: #112247;
     background: transparent;
@@ -446,76 +1073,48 @@ PlaygroundSideCommandLine2Dark {
     font-size: 2.6mm;
 }
 
-PlaygroundInspectorProps {
-    background: #FFFFFF;
-    padding: 1mm;
-    margin: 0;
+Tab {
+    background: #F3F4F7;
+    color: #112247;
+    border: 1px solid #E1E4EA;
+    font-family: "native:MainLight";
+    font-size: 3mm;
+    text-align: center;
 }
 
-PlaygroundInspectorPropsDark {
+PlaygroundEditorTabs {
+    background: #F3F4F7;
+}
+
+PlaygroundEditorTabsDark {
+    background: #112247;
+}
+
+TabDark {
     background: #102B66;
-    padding: 1mm;
-    margin: 0;
-}
-
-PlaygroundPropName {
-    color: #7F8AA3;
-    font-family: "native:MainBold";
-    font-size: 2.6mm;
-    padding: 0.5mm 0mm 0.5mm 1.5mm;
-    margin: 0;
-}
-
-PlaygroundPropNameDark {
-    color: #A8B8DA;
-    font-family: "native:MainBold";
-    font-size: 2.6mm;
-    padding: 0.5mm 0mm 0.5mm 1.5mm;
-    margin: 0;
-}
-
-PlaygroundPropValue {
-    color: #112247;
-    background: #FFFFFF;
-    border: 1px solid #D9DEE8;
-    font-family: "native:MainLight";
-    font-size: 2.8mm;
-    padding: 0.5mm 1mm 0.5mm 1mm;
-    margin: 0.5mm 0.5mm 0.5mm 0;
-}
-
-PlaygroundPropValueDark {
     color: #F5F8FF;
-    background: #0E2A61;
-    border: 1px solid #4C6EA8;
+    border: 1px solid #253B73;
     font-family: "native:MainLight";
-    font-size: 2.8mm;
-    padding: 0.5mm 1mm 0.5mm 1mm;
-    margin: 0.5mm 0.5mm 0.5mm 0;
+    font-size: 3mm;
+    text-align: center;
 }
 
-PlaygroundPropSmall {
-    color: #112247;
+TabSelected {
     background: #FFFFFF;
-    border: 1px solid #D9DEE8;
-    font-family: "native:MainLight";
-    font-size: 2.6mm;
-    padding: 0.5mm;
-    margin: 0 0.5mm 0 0;
+    color: #112247;
+    border: 2px solid #2F6BFF;
 }
 
-PlaygroundPropSmallDark {
+TabSelectedDark {
+    background: #163575;
     color: #F5F8FF;
-    background: #0E2A61;
-    border: 1px solid #4C6EA8;
-    font-family: "native:MainLight";
-    font-size: 2.6mm;
-    padding: 0.5mm;
-    margin: 0 0.5mm 0 0;
+    border: 2px solid #4D86FF;
 }
 
-PlaygroundPropGroup {
-    background: transparent;
-    padding: 0.5mm 0 0.5mm 0;
-    margin: 0;
+TabsContainer {
+    background: #F3F4F7;
+}
+
+TabsContainerDark {
+    background: #112247;
 }

@@ -39,6 +39,27 @@ final class PlaygroundExamples {
             root;
             """;
 
+    static final String HELLO_WORLD_SCRIPT = """
+            import com.codename1.ui.*;
+            import com.codename1.ui.layouts.*;
+
+            Container root = new Container(BoxLayout.y());
+            root.add(new Label("Hello, World!"));
+            root;
+            """;
+
+    static final String DATE_PICKER_SCRIPT = """
+            import com.codename1.ui.*;
+            import com.codename1.ui.layouts.*;
+
+            Container root = new Container(BoxLayout.y());
+            Picker datePicker = new Picker();
+            datePicker.setType(Display.PICKER_TYPE_DATE);
+            root.add(new Label("Pick a date:"));
+            root.add(datePicker);
+            root;
+            """;
+
     static final String BUILD_METHOD_SCRIPT = """
             import com.codename1.ui.*;
             import com.codename1.ui.layouts.*;
@@ -234,9 +255,9 @@ final class PlaygroundExamples {
 
     static final Sample[] SAMPLES = new Sample[]{
             new Sample("Welcome", DEFAULT_SCRIPT),
-            new Sample("build(ctx)", BUILD_METHOD_SCRIPT),
+            new Sample("Hello World", HELLO_WORLD_SCRIPT),
             new Sample("Lifecycle Demo", LIFECYCLE_SCRIPT),
-            new Sample("Profile Form", FORM_SCRIPT),
+            new Sample("Date Picker", DATE_PICKER_SCRIPT),
             new Sample("Menu List", LIST_SCRIPT),
             new Sample("Tabs", TABS_SCRIPT),
             new Sample("BrowserComponent", BROWSER_SCRIPT),
