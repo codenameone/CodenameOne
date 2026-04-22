@@ -175,6 +175,7 @@ final class PlaygroundPreviewColumn extends Container {
     }
 
     private void rebuildStage() {
+        detachPreview();
         contentHost.removeAll();
         if (DEVICE_NO_SKIN.equals(device)) {
             contentHost.setUIID(darkMode ? "PlaygroundNoSkinStageDark" : "PlaygroundNoSkinStage");
@@ -204,6 +205,16 @@ final class PlaygroundPreviewColumn extends Container {
 
         if (getComponentForm() != null) {
             revalidate();
+        }
+    }
+
+    private void detachPreview() {
+        if (currentPreview == null) {
+            return;
+        }
+        Container parent = currentPreview.getParent();
+        if (parent != null) {
+            parent.removeComponent(currentPreview);
         }
     }
 

@@ -83,6 +83,24 @@ public class CN1Playground extends Lifecycle {
 
     private String lastBreakpoint;
 
+    private static void detach(Component c) {
+        if (c == null) {
+            return;
+        }
+        Container parent = c.getParent();
+        if (parent != null) {
+            parent.removeComponent(c);
+        }
+    }
+
+    private static void safeAddCenter(Container parent, Component child) {
+        if (parent == null || child == null) {
+            return;
+        }
+        detach(child);
+        parent.add(BorderLayout.CENTER, child);
+    }
+
     @Override
     public void runApp() {
         CN.setProperty("platformHint.javascript.beforeUnloadMessage", null);
@@ -316,6 +334,17 @@ public class CN1Playground extends Lifecycle {
         topBar.setCompact(compact);
         previewColumn.setCompact(compact);
 
+        detach(activityBar);
+        detach(sidePanelSlot);
+        detach(editorHost);
+        detach(previewContainer);
+        detach(previewColumn);
+
+        if (previewColumn.getParent() == null) {
+            previewContainer.removeAll();
+            previewContainer.add(BorderLayout.CENTER, previewColumn);
+        }
+
         Container center = new Container(new BorderLayout());
         center.getAllStyles().setBgTransparency(0);
 
@@ -344,6 +373,17 @@ public class CN1Playground extends Lifecycle {
         topBar.setCompact(true);
         previewColumn.setCompact(true);
 
+        detach(mobileTopTabs);
+        detach(bottomNav);
+        detach(editorHost);
+        detach(previewContainer);
+        detach(previewColumn);
+
+        if (previewColumn.getParent() == null) {
+            previewContainer.removeAll();
+            previewContainer.add(BorderLayout.CENTER, previewColumn);
+        }
+
         Container stack = new Container(BoxLayout.y());
         stack.getAllStyles().setBgTransparency(0);
         stack.add(mobileTopTabs);
@@ -371,13 +411,22 @@ public class CN1Playground extends Lifecycle {
 
         switch (currentMobileTab) {
             case MOBILE_TAB_CSS:
-                tabContent.add(BorderLayout.CENTER, cssEditor.getComponent());
+                currentMode = PlaygroundTopBar.MODE_CSS;
+                attachEditorsToHost();
+                safeAddCenter(tabContent, editorHost);
                 break;
             case MOBILE_TAB_PREVIEW:
-                tabContent.add(BorderLayout.CENTER, previewColumn);
+                if (previewColumn.getParent() != previewContainer) {
+                    detach(previewColumn);
+                    previewContainer.removeAll();
+                    previewContainer.add(BorderLayout.CENTER, previewColumn);
+                }
+                safeAddCenter(tabContent, previewContainer);
                 break;
             default:
-                tabContent.add(BorderLayout.CENTER, editor.getComponent());
+                currentMode = PlaygroundTopBar.MODE_CODE;
+                attachEditorsToHost();
+                safeAddCenter(tabContent, editorHost);
                 break;
         }
         if (tabContent.getComponentForm() != null) {
@@ -406,8 +455,11 @@ public class CN1Playground extends Lifecycle {
     }
 
     private void attachEditorsToHost() {
-        editorHost.removeAll();
         Component active = PlaygroundTopBar.MODE_CSS.equals(currentMode) ? cssEditor.getComponent() : editor.getComponent();
+        Component other = PlaygroundTopBar.MODE_CSS.equals(currentMode) ? editor.getComponent() : cssEditor.getComponent();
+        editorHost.removeAll();
+        detach(active);
+        detach(other);
         editorHost.add(BorderLayout.CENTER, active);
         if (editorHost.getComponentForm() != null) {
             editorHost.revalidate();
@@ -453,12 +505,12 @@ public class CN1Playground extends Lifecycle {
     private void applyActivity(String key) {
         sidePanelSlot.removeAll();
         if (PANEL_SAMPLES.equals(key)) {
-            sidePanelSlot.add(BorderLayout.CENTER, samplesPanel.getComponent());
+            safeAddCenter(sidePanelSlot, samplesPanel.getComponent());
         } else if (PANEL_HISTORY.equals(key)) {
             historyPanel.setEntries(PlaygroundStateStore.loadHistory());
-            sidePanelSlot.add(BorderLayout.CENTER, historyPanel.getComponent());
+            safeAddCenter(sidePanelSlot, historyPanel.getComponent());
         } else if (PANEL_INSPECTOR.equals(key)) {
-            sidePanelSlot.add(BorderLayout.CENTER, inspectorWrapper);
+            safeAddCenter(sidePanelSlot, inspectorWrapper);
         }
         if (sidePanelSlot.getComponentForm() != null) {
             sidePanelSlot.revalidate();
