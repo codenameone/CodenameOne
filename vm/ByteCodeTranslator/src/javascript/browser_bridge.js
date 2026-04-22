@@ -1268,6 +1268,67 @@
     });
   });
 
+  hostBridge.register('__cn1_decode_image_from_url__', function(request) {
+    // Creates an <img> on the main thread, sets its src, and awaits
+    // HTMLImageElement.decode() so the worker can be handed an
+    // already-decoded HTMLImageElement. Without this, the worker's Java
+    // code returns from createCrossOriginImageElement as soon as setSrc
+    // runs but before the browser has actually fetched/decoded the
+    // picture — so NativeImage.isComplete() returns false on the first
+    // paint, NativeImage.draw silently no-ops, and theme 9-patch borders
+    // / EncodedImage-backed draws end up painting zero bytes.
+    var payload = request || {};
+    var sourceUrl = payload && payload.sourceUrl != null ? String(payload.sourceUrl) : null;
+    var crossOrigin = payload && payload.crossOrigin != null ? String(payload.crossOrigin) : 'anonymous';
+    if (!sourceUrl) {
+      return null;
+    }
+    return new Promise(function(resolve) {
+      if (typeof document === 'undefined' || !document.createElement) {
+        resolve(null);
+        return;
+      }
+      var img;
+      try {
+        img = document.createElement('img');
+      } catch (e) {
+        resolve(null);
+        return;
+      }
+      try { img.setAttribute('crossorigin', crossOrigin); } catch (_ignored) {}
+      img.src = sourceUrl;
+      // HTMLImageElement cannot be structured-cloned back to the worker —
+      // wrap it in a host-ref marker (like __cn1_jso_bridge__ does for
+      // createElement results) so the worker receives an opaque handle
+      // that re-hydrates to the same main-thread element on subsequent
+      // bridge calls.
+      var settle = function() { resolve(hostResult(img)); };
+      // decode() may reject on a decoding error or if the browser has
+      // detached the image before it settles; treat either path as
+      // "decode done" so the worker still gets the element back and the
+      // existing NativeImage error-handling takes over (it'll just paint
+      // nothing for broken bytes, matching pre-barrier behaviour).
+      if (typeof img.decode === 'function') {
+        try {
+          img.decode().then(settle, settle);
+          return;
+        } catch (e) { /* fall through */ }
+      }
+      // Browsers without HTMLImageElement.decode fall back to the load
+      // event (plus a timeout safety net so we don't hang forever on a
+      // mis-typed path).
+      var done = false;
+      var finish = function() {
+        if (done) return;
+        done = true;
+        settle();
+      };
+      img.addEventListener('load', finish);
+      img.addEventListener('error', finish);
+      setTimeout(finish, 10000);
+    });
+  });
+
   hostBridge.register('__cn1_delay__', function(request) {
     var millis = 0;
     if (request && typeof request === 'object' && request.millis != null) {

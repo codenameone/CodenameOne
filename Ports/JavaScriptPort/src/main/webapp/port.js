@@ -1457,6 +1457,33 @@ bindCiFallback("JSAffineTransform.transformHostBridge", [
   return null;
 });
 
+// Route createCrossOriginImageElement through the main-thread image decoder
+// so the worker receives an already-decoded <img>. The stock Java flow
+// (createElement + setSrc + return) returns before the browser has actually
+// fetched/decoded the image, so NativeImage.isComplete() reports false on
+// the first paint and Border.paintBorderBackground ends up painting only
+// the first 9-patch piece whose blob happened to decode fastest. Awaiting
+// img.decode() here makes the subsequent draws have a ready pixel source.
+bindCiFallback("BrowserDomRenderingBackend.createCrossOriginImageElement", [
+  "cn1_com_codename1_impl_html5_HTML5Implementation_BrowserDomRenderingBackend_createCrossOriginImageElement_java_lang_String_R_com_codename1_html5_js_dom_HTMLImageElement"
+], function*(__cn1ThisObject, sourceUrl) {
+  const url = sourceUrl == null ? null : jvm.toNativeString(sourceUrl);
+  if (!url) {
+    return null;
+  }
+  if (typeof jvm.invokeHostNative !== "function") {
+    return null;
+  }
+  const hostImage = yield jvm.invokeHostNative("__cn1_decode_image_from_url__", [{
+    sourceUrl: url,
+    crossOrigin: "anonymous"
+  }]);
+  if (hostImage == null) {
+    return null;
+  }
+  return jvm.wrapJsObject(hostImage, "com_codename1_html5_js_dom_HTMLImageElement");
+});
+
 bindCiFallback("Display.getProperty", [
   "cn1_com_codename1_ui_Display_getProperty_java_lang_String_java_lang_String_R_java_lang_String"
 ], function*(__cn1ThisObject, key, defaultValue) {
