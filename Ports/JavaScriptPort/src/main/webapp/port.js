@@ -1722,15 +1722,30 @@ if (hashMapClassDef && hashMapClassDef.methods && typeof hashMapClassDef.methods
 const styleSetPaddingUnitMethodId = "cn1_com_codename1_ui_plaf_Style_setPaddingUnit_byte_1ARRAY";
 const styleSetMarginUnitMethodId = "cn1_com_codename1_ui_plaf_Style_setMarginUnit_byte_1ARRAY";
 const styleConvertUnitMethodId = "cn1_com_codename1_ui_plaf_Style_convertUnit_byte_1ARRAY_float_int_R_int";
-const styleSetPaddingUnitOriginal = (jvm.classes && jvm.classes["com_codename1_ui_plaf_Style"] && jvm.classes["com_codename1_ui_plaf_Style"].methods)
-  ? jvm.classes["com_codename1_ui_plaf_Style"].methods[styleSetPaddingUnitMethodId]
-  : null;
-const styleSetMarginUnitOriginal = (jvm.classes && jvm.classes["com_codename1_ui_plaf_Style"] && jvm.classes["com_codename1_ui_plaf_Style"].methods)
-  ? jvm.classes["com_codename1_ui_plaf_Style"].methods[styleSetMarginUnitMethodId]
-  : null;
-const styleConvertUnitOriginal = (jvm.classes && jvm.classes["com_codename1_ui_plaf_Style"] && jvm.classes["com_codename1_ui_plaf_Style"].methods)
-  ? jvm.classes["com_codename1_ui_plaf_Style"].methods[styleConvertUnitMethodId]
-  : null;
+// The translator-generated method functions aren't all registered yet at
+// port.js evaluation time, so capturing a snapshot here can leave these
+// originals null. When the fallback below then short-circuits to `return 0`,
+// every Style.getMarginTop()/getPaddingTop() call returns 0 — which
+// collapses every layout's margin/padding and in particular leaves the
+// Picker's InteractionDialog filling the full layered pane instead of
+// anchoring to the bottom. Resolve the original lazily at call time
+// against the jvm.translatedMethods map (populated by bindNative before it
+// replaces the global), with fallbacks so late registrations still work.
+function resolveTranslatedMethod(className, methodId) {
+  if (jvm && jvm.translatedMethods && typeof jvm.translatedMethods[methodId] === "function") {
+    return jvm.translatedMethods[methodId];
+  }
+  if (jvm && jvm.classes && jvm.classes[className] && jvm.classes[className].methods) {
+    const method = jvm.classes[className].methods[methodId];
+    if (typeof method === "function") {
+      return method;
+    }
+  }
+  if (typeof global[methodId] === "function" && !global[methodId].__cn1CiFallbackSymbol) {
+    return global[methodId];
+  }
+  return null;
+}
 
 function ensureJavaByteArray4(value) {
   if (value && value.__array) {
@@ -1782,28 +1797,38 @@ function installGlobalArrayReturnCoerce(symbol, className, marker) {
 bindCiFallback("Style.setPaddingUnitArrayCoerce", [
   styleSetPaddingUnitMethodId
 ], function*(__cn1ThisObject, arr) {
-  if (typeof styleSetPaddingUnitOriginal !== "function") {
+  const original = resolveTranslatedMethod("com_codename1_ui_plaf_Style", styleSetPaddingUnitMethodId);
+  if (typeof original !== "function") {
     return null;
   }
-  return yield* styleSetPaddingUnitOriginal(__cn1ThisObject, ensureJavaByteArray4(arr));
+  return yield* original(__cn1ThisObject, ensureJavaByteArray4(arr));
 });
 
 bindCiFallback("Style.setMarginUnitArrayCoerce", [
   styleSetMarginUnitMethodId
 ], function*(__cn1ThisObject, arr) {
-  if (typeof styleSetMarginUnitOriginal !== "function") {
+  const original = resolveTranslatedMethod("com_codename1_ui_plaf_Style", styleSetMarginUnitMethodId);
+  if (typeof original !== "function") {
     return null;
   }
-  return yield* styleSetMarginUnitOriginal(__cn1ThisObject, ensureJavaByteArray4(arr));
+  return yield* original(__cn1ThisObject, ensureJavaByteArray4(arr));
 });
 
 bindCiFallback("Style.convertUnitArrayCoerce", [
   styleConvertUnitMethodId
 ], function*(__cn1ThisObject, arr, value, side) {
-  if (typeof styleConvertUnitOriginal !== "function") {
+  const original = resolveTranslatedMethod("com_codename1_ui_plaf_Style", styleConvertUnitMethodId);
+  if (typeof original !== "function") {
+    // Null unit means PIXELS in CN1; for any other byte value the translator
+    // already normalises through the original body, but if we can't find it
+    // at all, at least behave like pixels for the null-unit path instead of
+    // collapsing every margin/padding getter to zero.
+    if (arr == null || !arr.__array) {
+      return value | 0;
+    }
     return 0;
   }
-  return yield* styleConvertUnitOriginal(__cn1ThisObject, ensureJavaByteArray4(arr), value, side);
+  return yield* original(__cn1ThisObject, ensureJavaByteArray4(arr), value, side);
 });
 
 installGlobalArrayReturnCoerce(

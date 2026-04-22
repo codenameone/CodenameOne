@@ -11,12 +11,11 @@ import java.time.ZoneId;
 import java.util.Date;
 
 /// Pure-Java repro for the Picker lightweight popup on the JS port. Opens a
-/// date Picker in lightweight mode at a fixed date so the three Spinner3D
-/// wheels (month / day / year) are visible, then screenshots after the
-/// popup has had time to settle. A regression guard against the class of
-/// Scene-graph render bugs that collapsed the wheels into invisible no-ops
-/// (isTablet misclassification, JSO-method dispatch) while the full
-/// LightweightPickerButtons test is noisier to iterate on.
+/// date Picker in lightweight mode, then screenshots after the popup has had
+/// time to settle. Regression guard for the class of bugs that collapsed
+/// the Picker popup into a full-screen opaque overlay (isTablet
+/// misclassification, JSO-method dispatch, and the Style convertUnit
+/// fallback that returned 0 for every margin/padding pixel value).
 public class PickerIsolationScreenshotTest extends BaseTest {
     private Picker picker;
 

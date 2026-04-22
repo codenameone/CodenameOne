@@ -5003,8 +5003,14 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 // wraps the Spinner3D in PickerDialogTablet, which inflates
                 // to fill the screen and pushes the date wheels off-canvas
                 // at narrow viewports. Fall back to Material Design's sw600
-                // breakpoint on the shortest viewport side in CSS px.
-                int minSide = Math.min(getDisplayWidth(), getDisplayHeight());
+                // breakpoint on the shortest viewport side in CSS px. The
+                // display dimensions are already in native pixels so divide
+                // by DPR to compare against a CSS-pixel threshold (without
+                // this divide, a 375x667 retina viewport reports 750x1334
+                // and trips the sw600 gate).
+                double dpr = getDevicePixelRatio();
+                if (dpr <= 0) dpr = 1.0;
+                int minSide = (int) (Math.min(getDisplayWidth(), getDisplayHeight()) / dpr);
                 isTablet = minSide >= 600 ? 1 : 0;
             }
         }
