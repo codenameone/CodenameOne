@@ -7369,11 +7369,12 @@ public class CSSTheme {
         } catch (InstantiationException ex) {
             Logger.getLogger(CSSTheme.class.getName()).log(Level.SEVERE, null, ex);
         } catch (NullPointerException ex) {
-            if (ex.getMessage().contains("encoding properties")) {
+            String msg = ex.getMessage();
+            if (msg != null && msg.contains("encoding properties")) {
                 // This error always happens and there doesn't seem to be a way to fix it... so let's just hide
                 // it .  Doesn't seem to hurt anything.
             } else {
-                //Logger.getLogger(CSSTheme.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(CSSTheme.class.getName()).log(Level.SEVERE, "Failed to load CSS theme", ex);
             }
         } catch (ClassCastException ex) {
             Logger.getLogger(CSSTheme.class.getName()).log(Level.SEVERE, null, ex);

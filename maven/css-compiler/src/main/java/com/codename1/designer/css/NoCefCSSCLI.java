@@ -53,6 +53,11 @@ public class NoCefCSSCLI {
 
         URL url = inputFile.toURI().toURL();
         CSSTheme theme = CSSTheme.load(url);
+        if (theme == null) {
+            System.err.println("CSSTheme.load returned null for " + inputFile
+                    + " - parser probably failed to initialize. See stderr above for details.");
+            System.exit(4);
+        }
         theme.cssFile = inputFile;
         theme.resourceFile = outputFile;
 
