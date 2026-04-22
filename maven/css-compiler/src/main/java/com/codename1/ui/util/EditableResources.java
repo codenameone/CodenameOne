@@ -161,6 +161,17 @@ public class EditableResources extends Resources implements TreeModel {
     }
 
     /**
+     * Materialize a UI container from a named binary UI resource so the
+     * containing resource can be re-serialized as XML. The Designer subclass
+     * overrides this with UIBuilderOverride; headless callers never hit the
+     * XML save path.
+     */
+    protected com.codename1.ui.Container materializeUIContainer(String resourceName) {
+        throw new UnsupportedOperationException(
+                "UI container materialization for XML save requires EditableResourcesEditor");
+    }
+
+    /**
      * Invoked at the end of openFile(). The Designer subclass overrides this
      * to reset GUI-side theme caches; headless callers do nothing.
      */
@@ -1463,8 +1474,7 @@ public class EditableResources extends Resources implements TreeModel {
                     }
                     case MAGIC_UI: {
                         File uiXML = new File(resourcesDir, resourceNames[iter] + ".ui");
-                        UIBuilderOverride u = new UIBuilderOverride();
-                        com.codename1.ui.Container cnt = u.createContainer(this, resourceNames[iter]);
+                        com.codename1.ui.Container cnt = materializeUIContainer(resourceNames[iter]);
                         FileOutputStream fos = new FileOutputStream(uiXML);
                         writeUIXml(cnt, fos);
                         fos.close();

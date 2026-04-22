@@ -2,7 +2,8 @@
  * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
  *
  * Minimal CLI entry point for compiling a CSS theme to a .res file with the
- * strictNoCef flag enabled. Unlike {@link CN1CSSCLI}, this class does NOT
+ * strictNoCef flag enabled. Unlike CN1CSSCLI (in the Designer module),
+ * this class does NOT
  * pull in any JavaSE port classes or initialize a BrowserComponent host --
  * it is designed to live in a thin "css-compiler" jar that depends only on
  * codenameone-core, flute, and sac.
