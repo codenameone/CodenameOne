@@ -452,6 +452,15 @@ public class InteractionDialog extends Container implements AbstractDialog {
         disposeTo(Component.LEFT);
     }
 
+    /// Removes the interaction dialog from view with an animation to the left.
+    ///
+    /// #### Parameters
+    ///
+    /// - `onFinish`: Callback called when dispose animation is complete.
+    public void disposeToTheLeft(Runnable onFinish) {
+        disposeTo(Component.LEFT, onFinish);
+    }
+
     /// Removes the interaction dialog from view with an animation to the bottom
     public void disposeToTheBottom() {
         disposeTo(Component.BOTTOM);
@@ -471,9 +480,27 @@ public class InteractionDialog extends Container implements AbstractDialog {
         disposeTo(Component.TOP);
     }
 
+    /// Removes the interaction dialog from view with an animation to the top.
+    ///
+    /// #### Parameters
+    ///
+    /// - `onFinish`: Callback called when dispose animation is complete.
+    public void disposeToTheTop(Runnable onFinish) {
+        disposeTo(Component.TOP, onFinish);
+    }
+
     /// Removes the interaction dialog from view with an animation to the right
     public void disposeToTheRight() {
         disposeTo(Component.RIGHT);
+    }
+
+    /// Removes the interaction dialog from view with an animation to the right.
+    ///
+    /// #### Parameters
+    ///
+    /// - `onFinish`: Callback called when dispose animation is complete.
+    public void disposeToTheRight(Runnable onFinish) {
+        disposeTo(Component.RIGHT, onFinish);
     }
 
     private void disposeTo(int direction) {
