@@ -10,12 +10,10 @@
  */
 package com.codename1.ui.util;
 
-/**
- * Cross-module view of an SVG document embedded in an Image. Implemented by
- * platform-specific SVG representations (e.g. the javase-svg port's SVG class)
- * so that the resource serializer in the css-compiler module can read and
- * write SVG metadata without a compile-time dependency on the port.
- */
+/// Cross-module view of an SVG document embedded in an Image. Implemented by
+/// platform-specific SVG representations (e.g. the javase-svg port's SVG class)
+/// so that the resource serializer in the css-compiler module can read and
+/// write SVG metadata without a compile-time dependency on the port.
 public interface SVGDocument {
     byte[] getSvgData();
     String getBaseURL();

@@ -24,6 +24,7 @@ import com.codename1.impl.javase.JavaSEPortWithSVGSupport;
 import com.codename1.ui.Container;
 import com.codename1.ui.Image;
 import com.codename1.ui.animations.Timeline;
+import com.codename1.ui.util.xml.comps.ComponentEntry;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -51,6 +52,12 @@ public class EditableResourcesEditor extends EditableResources {
     @Override
     protected byte[] persistUIContainer(Container cnt) {
         return UserInterfaceEditor.persistContainer(cnt, this);
+    }
+
+    @Override
+    protected Container loadUIContainerFromXml(ComponentEntry uiXMLData) {
+        UIBuilderOverride uib = new UIBuilderOverride();
+        return uib.createInstance(uiXMLData, this);
     }
 
     @Override
