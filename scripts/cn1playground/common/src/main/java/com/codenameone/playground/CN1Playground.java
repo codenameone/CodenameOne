@@ -166,7 +166,14 @@ public class CN1Playground extends Lifecycle {
     }
 
     private void runScript(Form form) {
-        UITimer.timer(1, false, form, () -> executeRunScript(form));
+        // callSerially enqueues onto the EDT event queue AFTER the
+        // current event / animation frame completes. UITimer(1ms)
+        // previously raced with the side-menu close animation: the
+        // timer would fire while the form was mid-animation, so the
+        // subsequent replacePreview / revalidate didn't visibly land
+        // until another user input forced a repaint. callSerially
+        // sidesteps that by waiting for the EDT to drain.
+        CN.callSerially(() -> executeRunScript(form));
     }
 
     private void executeRunScript(Form form) {
@@ -256,8 +263,13 @@ public class CN1Playground extends Lifecycle {
         addSideMenuComponent(toolbar, samplesSection);
         for (PlaygroundExamples.Sample sample : PlaygroundExamples.SAMPLES) {
             addSideMenuComponent(toolbar, createSideMenuButton(sample.title, () -> {
-                setScript(sample.script, true);
+                // Close the side menu before triggering the run. The
+                // slide-out animation otherwise preempts the short-delay
+                // UITimer scheduled by runScript, and the preview stays
+                // on the previous sample until the user types something
+                // into the editor.
                 toolbar.closeSideMenu();
+                setScript(sample.script, true);
             }));
         }
 
@@ -300,8 +312,11 @@ public class CN1Playground extends Lifecycle {
         button.setUIIDLine1("PlaygroundSideCommandLine1");
         button.setUIIDLine2("PlaygroundSideCommandLine2");
         button.addActionListener(e -> {
-            setScript(entry.script, true);
+            // Close first so the slide-out animation doesn't preempt
+            // runScript's short UITimer — see the sample-menu branch
+            // for the same reason.
             toolbar.closeSideMenu();
+            setScript(entry.script, true);
         });
         applyWebsiteTheme(button, websiteDarkMode);
         return button;
