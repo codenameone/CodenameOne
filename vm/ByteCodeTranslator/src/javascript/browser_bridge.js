@@ -1215,12 +1215,17 @@
         return;
       }
       try {
+        // Escape backslashes *before* single quotes so a pathological input
+        // like `foo\` can't close the CSS string and smuggle in extra tokens.
+        var cssStringEscape = function (s) {
+          return String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        };
         if (typeof FontFace !== 'undefined'
             && typeof document !== 'undefined'
             && document.fonts
             && typeof document.fonts.add === 'function') {
-          var descriptor = "url('" + fontUrl.replace(/'/g, "\\'") + "') format('"
-            + fontFormat.replace(/'/g, "\\'") + "')";
+          var descriptor = "url('" + cssStringEscape(fontUrl) + "') format('"
+            + cssStringEscape(fontFormat) + "')";
           var ff = new FontFace(fontName, descriptor);
           ff.load().then(function(loaded) {
             try { document.fonts.add(loaded); } catch (_err) {}
@@ -1237,9 +1242,9 @@
         }
         if (typeof document !== 'undefined' && document.head) {
           var styleEl = document.createElement('style');
-          var escapedName = fontName.replace(/'/g, "\\'");
-          var escapedUrl = fontUrl.replace(/'/g, "\\'");
-          var escapedFormat = fontFormat.replace(/'/g, "\\'");
+          var escapedName = cssStringEscape(fontName);
+          var escapedUrl = cssStringEscape(fontUrl);
+          var escapedFormat = cssStringEscape(fontFormat);
           styleEl.appendChild(document.createTextNode(
             "@font-face { font-family: '" + escapedName + "'; "
               + "src: url('" + escapedUrl + "') format('" + escapedFormat + "'); }"

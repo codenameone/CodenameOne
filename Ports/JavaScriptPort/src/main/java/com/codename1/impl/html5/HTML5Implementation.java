@@ -8363,7 +8363,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
         clickBtn = btn;
     }
     
-    @JSBody(params={"label","l"}, script="return jQuery('<button class=\"btn btn-default\">'+label+'</button>').click(l).appendTo(jQuery('body')).get(0);")
+    // Use jQuery's .text() to set the label — concatenating label into the
+    // <button> markup would let any HTML tags or script inside label run as
+    // markup (XSS on user-controlled text).
+    @JSBody(params={"label","l"}, script=
+            "return jQuery('<button class=\"btn btn-default\"></button>')"
+            + ".text(label).click(l).appendTo(jQuery('body')).get(0);")
     private native static HTMLButtonElement showButton_(String label, EventListener l);
 
     @Override
