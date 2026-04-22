@@ -4,7 +4,9 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
+import com.codename1.ui.Graphics;
 import com.codename1.ui.Label;
+import com.codename1.ui.geom.GeneralPath;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.LayeredLayout;
@@ -246,15 +248,23 @@ final class PlaygroundPreviewColumn extends Container {
         int bezelPxH = display.convertToPixels(mm[1]);
         int screenPxW = display.convertToPixels(mm[2]);
         int screenPxH = display.convertToPixels(mm[3]);
+        int screenCornerPx = display.convertToPixels(mm[5]);
 
-        Container screen = new Container(new BorderLayout());
-        screen.setUIID(darkMode ? "PlaygroundDeviceScreenDark" : "PlaygroundDeviceScreen");
+        Container content = new Container(new BorderLayout());
+        content.setUIID(darkMode ? "PlaygroundDeviceScreenDark" : "PlaygroundDeviceScreen");
+        if (currentPreview != null) {
+            content.add(BorderLayout.CENTER, currentPreview);
+        }
+
+        CornerMaskOverlay cornerMask = new CornerMaskOverlay(BEZEL_FILL_COLOR, screenCornerPx);
+
+        Container screen = new Container(new LayeredLayout());
         screen.setPreferredW(screenPxW);
         screen.setPreferredH(screenPxH);
-        screen.getAllStyles().setBorder(RoundRectBorder.create().cornerRadius(mm[5]));
-        if (currentPreview != null) {
-            screen.add(BorderLayout.CENTER, currentPreview);
-        }
+        screen.getAllStyles().setPadding(0, 0, 0, 0);
+        screen.getAllStyles().setMargin(0, 0, 0, 0);
+        screen.add(content);
+        screen.add(cornerMask);
 
         Container bezel = new Container(new FlowLayout(Component.CENTER, Component.CENTER));
         bezel.setUIID(darkMode ? "PlaygroundDeviceBezelDark" : "PlaygroundDeviceBezel");
@@ -263,5 +273,113 @@ final class PlaygroundPreviewColumn extends Container {
         bezel.getAllStyles().setBorder(RoundRectBorder.create().cornerRadius(mm[4]));
         bezel.add(screen);
         return bezel;
+    }
+
+    private static final int BEZEL_FILL_COLOR = 0x1A1A1C;
+
+    /// Overlay component that paints bezel-color pixels over the four corners of the
+    /// layered-layout sibling beneath it, producing the illusion that content is
+    /// clipped to the device's inner corner radius.
+    ///
+    /// Lives as a sibling of the content in `LayeredLayout` rather than as a Border
+    /// because `getAllStyles().setBorder(...)` is wiped whenever `refreshTheme()` runs
+    /// on a UIID that has no `border:` declaration in theme.css. As a real Component
+    /// it survives theme refreshes. `setIgnorePointerEvents(true)` so taps fall through
+    /// to the preview beneath.
+    ///
+    /// Each corner is a closed path: two straight edges of the outer-corner square plus
+    /// a cubic Bezier approximating a quarter-circle arc (k ~= 0.5523). This renders
+    /// identically on every CN1 port without arc-direction ambiguity.
+    private static final class CornerMaskOverlay extends Component {
+        private static final float BEZIER_K = 0.5522847498f;
+        /// Pixels of overhang past the component bounds on each outer straight edge.
+        /// CN1 clips the fill at the component's bounds, so the overhang is invisible,
+        /// but it ensures boundary pixels are fully inside the fill polygon rather than
+        /// sitting exactly on an anti-aliased edge (which would leave ~50% coverage).
+        private static final int OVERHANG = 2;
+
+        private final int color;
+        private final int radius;
+
+        CornerMaskOverlay(int color, int radius) {
+            this.color = color;
+            this.radius = Math.max(1, radius);
+            setFocusable(false);
+            setEnabled(false);
+            setIgnorePointerEvents(true);
+            getAllStyles().setBgTransparency(0);
+            getAllStyles().setPadding(0, 0, 0, 0);
+            getAllStyles().setMargin(0, 0, 0, 0);
+        }
+
+        @Override
+        protected com.codename1.ui.geom.Dimension calcPreferredSize() {
+            return new com.codename1.ui.geom.Dimension(0, 0);
+        }
+
+        @Override
+        public void paint(Graphics g) {
+            int x = getX();
+            int y = getY();
+            int w = getWidth();
+            int h = getHeight();
+            int r = Math.min(radius, Math.min(w, h) / 2);
+            if (r <= 0) {
+                return;
+            }
+            int oldColor = g.getColor();
+            int oldAlpha = g.getAlpha();
+            boolean oldAA = g.isAntiAliased();
+            g.setColor(color);
+            g.setAlpha(255);
+            g.setAntiAliased(true);
+
+            float k = BEZIER_K * r;
+            int o = OVERHANG;
+
+            // Each sliver: overhang rectangle outside the component bounds + Bezier arc
+            // approximating the device's inner corner radius. The overhang ensures the
+            // component's boundary pixels are inside the polygon instead of on its edge.
+
+            GeneralPath tl = new GeneralPath();
+            tl.moveTo(x + r, y - o);
+            tl.lineTo(x - o, y - o);
+            tl.lineTo(x - o, y + r);
+            tl.lineTo(x, y + r);
+            tl.curveTo(x, y + r - k, x + r - k, y, x + r, y);
+            tl.closePath();
+            g.fillShape(tl);
+
+            GeneralPath tr = new GeneralPath();
+            tr.moveTo(x + w - r, y - o);
+            tr.lineTo(x + w + o, y - o);
+            tr.lineTo(x + w + o, y + r);
+            tr.lineTo(x + w, y + r);
+            tr.curveTo(x + w, y + r - k, x + w - r + k, y, x + w - r, y);
+            tr.closePath();
+            g.fillShape(tr);
+
+            GeneralPath br = new GeneralPath();
+            br.moveTo(x + w - r, y + h + o);
+            br.lineTo(x + w + o, y + h + o);
+            br.lineTo(x + w + o, y + h - r);
+            br.lineTo(x + w, y + h - r);
+            br.curveTo(x + w, y + h - r + k, x + w - r + k, y + h, x + w - r, y + h);
+            br.closePath();
+            g.fillShape(br);
+
+            GeneralPath bl = new GeneralPath();
+            bl.moveTo(x + r, y + h + o);
+            bl.lineTo(x - o, y + h + o);
+            bl.lineTo(x - o, y + h - r);
+            bl.lineTo(x, y + h - r);
+            bl.curveTo(x, y + h - r + k, x + r - k, y + h, x + r, y + h);
+            bl.closePath();
+            g.fillShape(bl);
+
+            g.setAntiAliased(oldAA);
+            g.setAlpha(oldAlpha);
+            g.setColor(oldColor);
+        }
     }
 }
