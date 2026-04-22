@@ -131,7 +131,7 @@ Button {
     padding: 2mm 3mm 2mm 3mm;
     margin: 1mm;
     font-family: "native:MainRegular";
-    cn1-pill-border: true;
+    cn1-background-type: cn1-pill-border;
 }
 
 Button.pressed {
@@ -170,7 +170,7 @@ TextField {
     padding: 2mm 3mm 2mm 3mm;
     margin: 1mm 2mm 1mm 2mm;
     font-family: "native:MainRegular";
-    cn1-round-border: true;
+    cn1-background-type: cn1-round-border;
 }
 
 TextField.pressed {
@@ -223,7 +223,7 @@ OnOffSwitch {
     padding: 1mm 2mm 1mm 2mm;
     color: var(--cn1-accent);
     background-color: var(--cn1-surface-tertiary);
-    cn1-pill-border: true;
+    cn1-background-type: cn1-pill-border;
 }
 
 OnOffSwitch.selected {
@@ -380,7 +380,7 @@ Dialog {
     color: var(--cn1-text-primary);
     padding: 3mm;
     margin: 0;
-    cn1-round-border: true;
+    cn1-background-type: cn1-round-border;
 }
 
 DialogBody {
@@ -413,7 +413,7 @@ FloatingActionButton {
     padding: 3mm;
     margin: 3mm;
     font-family: "native:MainBold";
-    cn1-pill-border: true;
+    cn1-background-type: cn1-pill-border;
 }
 
 FloatingActionButton.pressed {
