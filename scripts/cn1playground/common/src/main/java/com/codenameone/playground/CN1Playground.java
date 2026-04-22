@@ -574,14 +574,7 @@ public class CN1Playground extends Lifecycle {
         websiteThemeNative = NativeLookup.create(WebsiteThemeNative.class);
         refreshWebsiteTheme(form);
         UITimer.timer(900, true, form, () -> refreshWebsiteTheme(form));
-        // The 250ms repeating sync timer was responsible for
-        // continuously re-applying side-menu styling. On the JS port
-        // that accumulated stale side-menu DOM elements (confirmed:
-        // title-bar sample buttons, which bypass the side menu, don't
-        // show the "previous demo as background" symptom; side-menu
-        // buttons do). Removed along with the per-component theming
-        // hacks in addSideMenuComponent — CN1's own theming handles
-        // these UIIDs correctly now.
+        UITimer.timer(250, true, form, this::syncOpenSideMenuTheme);
     }
 
     private void notifyWebsiteUiReady() {
@@ -698,6 +691,36 @@ public class CN1Playground extends Lifecycle {
         sideMenuPalette.put("SideCommand.bgTransparency", 255);
         sideMenuPalette.put("SideCommand.border", com.codename1.ui.plaf.Border.createLineBorder(2, borderColor));
         UIManager.getInstance().addThemeProps(sideMenuPalette);
+    }
+
+    private void syncOpenSideMenuTheme() {
+        Form current = Display.getInstance().getCurrent();
+        if (current == null) {
+            return;
+        }
+        applySideMenuContainerTheme(current);
+    }
+
+    private void applySideMenuContainerTheme(Component component) {
+        if (component == null) {
+            return;
+        }
+        String uiid = component.getUIID();
+        if ("SideNavigationPanel".equals(uiid)
+                || "SideNavigationPanelDark".equals(uiid)
+                || "RightSideNavigationPanel".equals(uiid)
+                || "StatusBarSideMenu".equals(uiid)
+                || "StatusBarSideMenuDark".equals(uiid)) {
+            applyWebsiteTheme(component, websiteDarkMode);
+            component.getAllStyles().setBgTransparency(255);
+            component.getAllStyles().setBgColor(websiteDarkMode ? 0x0f172a : 0xffffff);
+        }
+        if (component instanceof Container) {
+            Container cnt = (Container) component;
+            for (int i = 0; i < cnt.getComponentCount(); i++) {
+                applySideMenuContainerTheme(cnt.getComponentAt(i));
+            }
+        }
     }
 
     private void applyWebsiteTheme(Component component, boolean dark) {
