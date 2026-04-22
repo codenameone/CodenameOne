@@ -241,12 +241,23 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ env.CLOUDFLARE_TOKEN }}
           PREVIEW_BRANCH: pr-${{ github.event.pull_request.number }}-website-preview
         run: |
-          set -euo pipefail
-          deploy_output="$(npx --yes wrangler@4 pages deploy docs/website/public \
+          set -uo pipefail
+          # Stream wrangler output to the job log (via tee) while still
+          # capturing it so we can pull the *.pages.dev preview URL out. The
+          # previous `deploy_output=$(... 2>&1)` form hid every line — when
+          # wrangler died without any stdout we had nothing to debug with.
+          # -e is intentionally off for the wrangler invocation so we can
+          # report its exit status explicitly instead of exiting opaquely.
+          deploy_log="$(mktemp)"
+          npx --yes wrangler@4 pages deploy docs/website/public \
             --project-name "${CF_PAGES_PROJECT_NAME}" \
-            --branch "${PREVIEW_BRANCH}" 2>&1)"
-          echo "${deploy_output}"
-          preview_url="$(printf '%s\n' "${deploy_output}" | grep -Eo 'https://[A-Za-z0-9._-]+\.pages\.dev' | tail -n1 || true)"
+            --branch "${PREVIEW_BRANCH}" 2>&1 | tee "${deploy_log}"
+          wrangler_status="${PIPESTATUS[0]}"
+          if [ "${wrangler_status}" -ne 0 ]; then
+            echo "wrangler pages deploy exited with status ${wrangler_status}" >&2
+            exit "${wrangler_status}"
+          fi
+          preview_url="$(grep -Eo 'https://[A-Za-z0-9._-]+\.pages\.dev' "${deploy_log}" | tail -n1 || true)"
           if [ -z "${preview_url}" ]; then
             echo "Could not determine Cloudflare preview URL from deploy output." >&2
             exit 1
