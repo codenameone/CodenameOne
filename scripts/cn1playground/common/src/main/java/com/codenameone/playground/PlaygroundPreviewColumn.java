@@ -183,24 +183,17 @@ final class PlaygroundPreviewColumn extends Container {
             if (currentPreview != null) {
                 contentHost.add(BorderLayout.CENTER, currentPreview);
             }
-            updateDimensionsLabel(0, 0);
+            dimensionsLabel.setText("Fills preview");
         } else {
             contentHost.setUIID(darkMode ? "PlaygroundDeviceStageDark" : "PlaygroundDeviceStage");
             stageWrapper.setUIID(darkMode ? "PlaygroundDeviceStageDark" : "PlaygroundDeviceStage");
-            int[] logical = logicalDimensions(device);
-            int screenW = logical[0];
-            int screenH = logical[1];
-            if (ORIENTATION_LANDSCAPE.equals(orientation)) {
-                int tmp = screenW;
-                screenW = screenH;
-                screenH = tmp;
-            }
-            Container bezel = buildBezel(device, screenW, screenH);
+            Container bezel = buildBezel();
             Container center = new Container(new FlowLayout(Component.CENTER, Component.CENTER));
             center.getAllStyles().setBgTransparency(0);
             center.add(bezel);
             contentHost.add(BorderLayout.CENTER, center);
-            updateDimensionsLabel(screenW, screenH);
+            int[] logical = logicalResolution();
+            dimensionsLabel.setText(logical[0] + " x " + logical[1]);
         }
 
         if (getComponentForm() != null) {
@@ -218,52 +211,57 @@ final class PlaygroundPreviewColumn extends Container {
         }
     }
 
-    private void updateDimensionsLabel(int w, int h) {
-        if (DEVICE_NO_SKIN.equals(device)) {
-            dimensionsLabel.setText("Fills preview");
-        } else {
-            dimensionsLabel.setText(w + " x " + h);
-        }
+    /// Returns logical CSS-pixel resolution advertised to the user.
+    /// Width first, height second, already rotated for the current orientation.
+    private int[] logicalResolution() {
+        int w = DEVICE_PIXEL.equals(device) ? 393 : 375;
+        int h = DEVICE_PIXEL.equals(device) ? 852 : 812;
+        return ORIENTATION_LANDSCAPE.equals(orientation) ? new int[]{h, w} : new int[]{w, h};
     }
 
-    private int[] logicalDimensions(String d) {
-        if (DEVICE_PIXEL.equals(d)) {
-            return new int[]{393, 852};
+    /// Returns physical device dimensions in millimeters for the current device + orientation.
+    /// Array layout: [deviceW, deviceH, screenW, screenH, bezelCorner, screenCorner].
+    private float[] physicalMillimeters() {
+        float deviceW, deviceH, screenW, screenH, bezelCorner, screenCorner;
+        if (DEVICE_PIXEL.equals(device)) {
+            deviceW = 73f; deviceH = 155f;
+            screenW = 68f; screenH = 150f;
+            bezelCorner = 6f; screenCorner = 4f;
+        } else {
+            deviceW = 72f; deviceH = 147f;
+            screenW = 67f; screenH = 142f;
+            bezelCorner = 8f; screenCorner = 6f;
         }
-        return new int[]{375, 812};
+        if (ORIENTATION_LANDSCAPE.equals(orientation)) {
+            float t = deviceW; deviceW = deviceH; deviceH = t;
+            t = screenW; screenW = screenH; screenH = t;
+        }
+        return new float[]{deviceW, deviceH, screenW, screenH, bezelCorner, screenCorner};
     }
 
-    private Container buildBezel(String device, int screenW, int screenH) {
-        int pad = Display.getInstance().convertToPixels(3f);
-        int bezelRadius;
-        int screenRadius;
-        if (DEVICE_IPHONE.equals(device)) {
-            bezelRadius = Display.getInstance().convertToPixels(8f);
-            screenRadius = Display.getInstance().convertToPixels(5f);
-        } else {
-            bezelRadius = Display.getInstance().convertToPixels(6f);
-            screenRadius = Display.getInstance().convertToPixels(3f);
-        }
+    private Container buildBezel() {
+        float[] mm = physicalMillimeters();
+        Display display = Display.getInstance();
+        int bezelPxW = display.convertToPixels(mm[0]);
+        int bezelPxH = display.convertToPixels(mm[1]);
+        int screenPxW = display.convertToPixels(mm[2]);
+        int screenPxH = display.convertToPixels(mm[3]);
 
         Container screen = new Container(new BorderLayout());
         screen.setUIID(darkMode ? "PlaygroundDeviceScreenDark" : "PlaygroundDeviceScreen");
-        screen.setPreferredW(screenW);
-        screen.setPreferredH(screenH);
-        RoundRectBorder screenBorder = RoundRectBorder.create()
-                .cornerRadius(screenRadius / (float) Display.getInstance().convertToPixels(1f));
-        screen.getAllStyles().setBorder(screenBorder);
+        screen.setPreferredW(screenPxW);
+        screen.setPreferredH(screenPxH);
+        screen.getAllStyles().setBorder(RoundRectBorder.create().cornerRadius(mm[5]));
         if (currentPreview != null) {
             screen.add(BorderLayout.CENTER, currentPreview);
         }
 
-        Container bezel = new Container(new BorderLayout());
+        Container bezel = new Container(new FlowLayout(Component.CENTER, Component.CENTER));
         bezel.setUIID(darkMode ? "PlaygroundDeviceBezelDark" : "PlaygroundDeviceBezel");
-        bezel.setPreferredW(screenW + pad * 2);
-        bezel.setPreferredH(screenH + pad * 2);
-        RoundRectBorder bezelBorder = RoundRectBorder.create()
-                .cornerRadius(bezelRadius / (float) Display.getInstance().convertToPixels(1f));
-        bezel.getAllStyles().setBorder(bezelBorder);
-        bezel.add(BorderLayout.CENTER, screen);
+        bezel.setPreferredW(bezelPxW);
+        bezel.setPreferredH(bezelPxH);
+        bezel.getAllStyles().setBorder(RoundRectBorder.create().cornerRadius(mm[4]));
+        bezel.add(screen);
         return bezel;
     }
 }
