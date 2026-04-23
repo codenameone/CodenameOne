@@ -156,7 +156,17 @@ Toolbar {
     padding: 1mm;
     margin: 0;
 }
-TitleArea { cn1-derive: Toolbar; padding: 1mm 2mm 1mm 2mm; }
+/* NOTE: iOS hangs in getComponentStyle when TitleArea uses cn1-derive to
+   resolve a sibling UIID (Toolbar) that was just swapped in via
+   setThemeProps - the ParparVM-side style resolver appears to loop on
+   the first post-swap Title/TitleArea probe. Inline Toolbar's props
+   here instead of using cn1-derive until the port is fixed. */
+TitleArea {
+    background-color: #ffffff;
+    color: #000000;
+    padding: 1mm 2mm 1mm 2mm;
+    margin: 0;
+}
 
 Title {
     color: #000000;
