@@ -1297,7 +1297,22 @@ const jvm = {
       monitor.count++;
       return;
     }
-    throw new Error("Blocking monitor acquisition is not yet supported in javascript backend");
+    // Contention. The whole JS backend runs on one real thread, so the
+    // current owner is another simulated Java thread that yielded while
+    // still inside a synchronized block (e.g. Display.callSerially's
+    // internal lock held across a thread hand-off during Form.show's
+    // focus bring-up path). That thread can't make progress until we
+    // yield back to the scheduler, so stealing the lock here is safe:
+    // we push its (owner, count) pair onto a stack, take over, and pop
+    // on our way out. When the original owner eventually resumes and
+    // calls monitorExit, its (owner, count) match again. Nested steals
+    // cascade through the stack. This avoids needing generator-based
+    // yielding semantics in the emitted code (jvm.monitorEnter is a
+    // plain synchronous call in JavascriptMethodGenerator).
+    const stolen = monitor.__stolen || (monitor.__stolen = []);
+    stolen.push({ owner: monitor.owner, count: monitor.count });
+    monitor.owner = thread.id;
+    monitor.count = 1;
   },
   monitorExit(thread, obj) {
     const monitor = obj.__monitor || (obj.__monitor = this.createMonitor());
@@ -1308,7 +1323,18 @@ const jvm = {
     if (monitor.count <= 0) {
       monitor.count = 0;
       monitor.owner = null;
-      if (monitor.entrants.length) {
+      // Unwind the most recent steal before handing the lock to a
+      // properly-queued entrant. The stolen-from thread will expect its
+      // own (owner, count) to still be in place when its monitorExit
+      // runs eventually.
+      if (monitor.__stolen && monitor.__stolen.length) {
+        const prev = monitor.__stolen.pop();
+        if (!monitor.__stolen.length) {
+          monitor.__stolen = null;
+        }
+        monitor.owner = prev.owner;
+        monitor.count = prev.count;
+      } else if (monitor.entrants.length) {
         const next = monitor.entrants.shift();
         monitor.owner = next.thread.id;
         monitor.count = next.reentryCount;
