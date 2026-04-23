@@ -1509,6 +1509,12 @@ public class UIManager {
     /// either reapply the theme or call this method with the reciprocal
     /// factor.
     ///
+    /// **Note:** this updates the theme definitions and clears the cached
+    /// styles, but components already shown on a form continue to render
+    /// with the Font instances they captured before the call. To apply the
+    /// new sizes to a live form, invoke `refreshTheme()` on it (typically
+    /// `Form.getCurrentForm().refreshTheme()`) after calling this method.
+    ///
     /// #### Parameters
     ///
     /// - `factor`: the multiplier applied to every scalable font size. Must
