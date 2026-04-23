@@ -1498,6 +1498,89 @@ public class UIManager {
         }
     }
 
+    /// Scales the font sizes of the current theme by the given factor, e.g.
+    /// a factor of 1.2 increases all font sizes by 20% and a factor of 0.8
+    /// decreases them by 20%. Only fonts that support scaling (TTF or native:
+    /// fonts, see [Font#isTTFNativeFont()]) are affected; system fonts are
+    /// skipped since their size is fixed by the underlying platform.
+    ///
+    /// The zoom is applied relative to the current state of the theme, so
+    /// calling this method repeatedly compounds the effect. To undo a zoom,
+    /// either reapply the theme or call this method with the reciprocal
+    /// factor.
+    ///
+    /// #### Parameters
+    ///
+    /// - `factor`: the multiplier applied to every scalable font size. Must
+    ///   be greater than zero.
+    public void zoomFonts(float factor) {
+        if (factor <= 0f) {
+            throw new IllegalArgumentException("Zoom factor must be greater than zero");
+        }
+        if (factor == 1f) {
+            return;
+        }
+        for (Map.Entry<String, Object> entry : themeProps.entrySet()) {
+            if (!entry.getKey().endsWith(Style.FONT)) {
+                continue;
+            }
+            Object value = entry.getValue();
+            Font font = null;
+            if (value instanceof Font) {
+                font = (Font) value;
+            } else if (value instanceof String) {
+                Font parsed = parseFont((String) value);
+                if (parsed != null && parsed.isTTFNativeFont()) {
+                    font = parsed;
+                }
+            }
+            if (font == null || !font.isTTFNativeFont()) {
+                continue;
+            }
+            Font scaled = scaleFontByFactor(font, factor);
+            if (scaled != null && scaled != font) { //NOPMD CompareObjectsWithEquals
+                entry.setValue(scaled);
+            }
+        }
+        Font defFont = defaultStyle.getFont();
+        if (defFont != null && defFont.isTTFNativeFont()) {
+            Font scaled = scaleFontByFactor(defFont, factor);
+            if (scaled != null && scaled != defFont) { //NOPMD CompareObjectsWithEquals
+                defaultStyle.setFont(scaled);
+            }
+        }
+        Font defSelFont = defaultSelectedStyle.getFont();
+        if (defSelFont != null && defSelFont.isTTFNativeFont()) {
+            Font scaled = scaleFontByFactor(defSelFont, factor);
+            if (scaled != null && scaled != defSelFont) { //NOPMD CompareObjectsWithEquals
+                defaultSelectedStyle.setFont(scaled);
+            }
+        }
+        styles.clear();
+        selectedStyles.clear();
+        imageCache.clear();
+        current.refreshTheme(false);
+    }
+
+    private Font scaleFontByFactor(Font font, float factor) {
+        if (font == null || !font.isTTFNativeFont()) {
+            return font;
+        }
+        float baseSize = font.getPixelSize();
+        if (baseSize <= 0) {
+            baseSize = font.getHeight();
+        }
+        if (baseSize <= 0) {
+            return font;
+        }
+        try {
+            return font.derive(baseSize * factor, font.getStyle());
+        } catch (Exception ex) {
+            Log.e(ex);
+            return font;
+        }
+    }
+
     /// Returns a theme constant defined in the resource editor
     ///
     /// #### Parameters
