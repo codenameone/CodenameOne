@@ -4,6 +4,83 @@
  * used by the JavaScript port of Codename One.
  */
 
+// Worker-side jQuery shim. The main thread pulls in real jQuery via
+// <script src="js/jquery.min.js"> in index.html, but port.js is also
+// imported into the worker (see JavascriptBundleWriter.writeWorker) and
+// several @JSBody natives on HTML5Implementation embed inline jQuery
+// expressions that the translator emits verbatim into worker-side JS
+// (e.g. getScrollY_ returns ``jQuery(window).scrollTop()``). Before the
+// worker-callback event forwarding landed those natives were never
+// reached because no DOM event ever made it into the worker; now that
+// mouse/key events do flow through, every single one was crashing with
+// ``ReferenceError: jQuery is not defined``. Install a minimal no-op
+// shim so those callsites don't throw — their real DOM side effects
+// either no-op on the worker side or go through the host bridge on the
+// main thread anyway. This shim is ONLY active in the worker (the main
+// thread's real jQuery wins via the typeof check).
+(function() {
+  var target = typeof globalThis !== "undefined" ? globalThis
+             : (typeof self !== "undefined" ? self
+             : (typeof window !== "undefined" ? window : null));
+  if (!target || typeof target.jQuery === "function") {
+    return;
+  }
+  var stub;
+  stub = {
+    length: 0,
+    scrollTop: function(v) { return v === undefined ? 0 : stub; },
+    scrollLeft: function(v) { return v === undefined ? 0 : stub; },
+    scroll: function() { return stub; },
+    is: function() { return false; },
+    on: function() { return stub; },
+    off: function() { return stub; },
+    one: function() { return stub; },
+    trigger: function() { return stub; },
+    get: function() { return null; },
+    find: function() { return stub; },
+    each: function() { return stub; },
+    filter: function() { return stub; },
+    fadeOut: function(_ms, cb) {
+      if (typeof cb === "function") { try { cb.call(stub); } catch (_e) {} }
+      return stub;
+    },
+    fadeIn: function(_ms, cb) {
+      if (typeof cb === "function") { try { cb.call(stub); } catch (_e) {} }
+      return stub;
+    },
+    hide: function() { return stub; },
+    show: function() { return stub; },
+    remove: function() { return stub; },
+    append: function() { return stub; },
+    prepend: function() { return stub; },
+    focus: function() { return stub; },
+    blur: function() { return stub; },
+    css: function() { return ""; },
+    attr: function() { return ""; },
+    prop: function() { return null; },
+    addClass: function() { return stub; },
+    removeClass: function() { return stub; },
+    hasClass: function() { return false; },
+    val: function() { return ""; },
+    text: function() { return ""; },
+    html: function() { return ""; },
+    height: function() { return 0; },
+    width: function() { return 0; },
+    innerHeight: function() { return 0; },
+    innerWidth: function() { return 0; },
+    outerHeight: function() { return 0; },
+    outerWidth: function() { return 0; },
+    offset: function() { return { top: 0, left: 0 }; },
+    position: function() { return { top: 0, left: 0 }; }
+  };
+  target.jQuery = function() { return stub; };
+  target.jQuery.fn = {};
+  target.jQuery.extend = function(out) { return out || {}; };
+  if (typeof target.$ === "undefined") {
+    target.$ = target.jQuery;
+  }
+})();
+
 (function(global) {
   const jsoRegistry = global.jvm && global.jvm.jsoRegistry;
   if (!jsoRegistry) {
