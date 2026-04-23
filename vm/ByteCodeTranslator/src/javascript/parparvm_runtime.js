@@ -1073,14 +1073,17 @@ const jvm = {
     // that the translator emits verbatim into worker-side JS. In the
     // worker, ``target`` is a JSO wrapper with no native DOM methods,
     // so the inline lookup throws ``TypeError: X is not a function``.
-    // Install defensive no-op stubs for the handful of DOM element
-    // methods that @JSBody scripts commonly call, so secondary
-    // registrations inside worker-forwarded event handlers don't crash.
-    // Real DOM side-effects on the main-thread element still happen
-    // when code goes through EventUtil.addEventListener on the main
-    // thread via JavaScriptEventWiring (the primary registration path),
-    // and the listener itself is already wired via the worker-callback
-    // round-trip in toHostTransferArg.
+    //
+    // The @JSBody emitter (JavascriptMethodGenerator, line ~1309) passes
+    // object params through ``jvm.unwrapJsValue(...)`` before calling
+    // the inline script body, which means the value visible inside the
+    // script is ``wrapper.__jsValue`` — the raw host-ref proxy object
+    // received via postMessage, NOT the wrapper we created here. So
+    // stub the no-op DOM methods on BOTH the wrapper and the underlying
+    // host-ref proxy. Mutating the proxy is safe: it's a plain object
+    // owned by this worker, the main-thread host-ref id lives in
+    // ``__cn1HostRef`` which we don't touch, and subsequent receipts of
+    // the same proxy pick up the stubs via the property write.
     if (value && value.__cn1HostRef != null) {
       if (typeof wrapper.addEventListener !== "function") {
         wrapper.addEventListener = function() {};
@@ -1090,6 +1093,15 @@ const jvm = {
       }
       if (typeof wrapper.dispatchEvent !== "function") {
         wrapper.dispatchEvent = function() { return true; };
+      }
+      if (typeof value.addEventListener !== "function") {
+        value.addEventListener = function() {};
+      }
+      if (typeof value.removeEventListener !== "function") {
+        value.removeEventListener = function() {};
+      }
+      if (typeof value.dispatchEvent !== "function") {
+        value.dispatchEvent = function() { return true; };
       }
     }
     if (jsObjectWrappers) {
