@@ -178,19 +178,26 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
         }
         String resourceName = pickModernThemeResource();
         if (resourceName == null) {
+            System.out.println("CN1SS:INFO:DualAppearance no modern theme resource for platform="
+                    + Display.getInstance().getPlatformName());
             return;
         }
         InputStream in = getClass().getResourceAsStream(resourceName);
         if (in == null) {
             // Modern theme isn't packaged on this platform - stay on the
             // legacy default rather than crashing the test.
+            System.out.println("CN1SS:WARN:DualAppearance modern theme resource missing: " + resourceName
+                    + " test=" + baseName());
             return;
         }
         try {
             Resources r = Resources.open(in);
             UIManager.getInstance().setThemeProps(r.getTheme(r.getThemeResourceNames()[0]));
+            System.out.println("CN1SS:INFO:DualAppearance installed modern theme " + resourceName
+                    + " test=" + baseName());
         } catch (IOException ex) {
-            // Leave the legacy theme in place on error.
+            System.out.println("CN1SS:ERR:DualAppearance modern theme load failed: " + ex
+                    + " resource=" + resourceName + " test=" + baseName());
         } finally {
             Util.cleanup(in);
         }
