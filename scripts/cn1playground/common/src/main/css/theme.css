@@ -1351,8 +1351,8 @@ PlaygroundTopTab {
     color: #7F8AA3;
     border: none;
     font-family: "native:MainLight";
-    font-size: 2.8mm;
-    padding: 1.5mm 2mm 1.5mm 2mm;
+    font-size: 2.4mm;
+    padding: 1.2mm 1.5mm 1.2mm 1.5mm;
     text-decoration: none;
 }
 
@@ -1371,8 +1371,8 @@ PlaygroundTopTabSelected {
     color: #2F6BFF;
     border-bottom: 0.6mm solid #2F6BFF;
     font-family: "native:MainBold";
-    font-size: 2.8mm;
-    padding: 1.5mm 2mm 1.5mm 2mm;
+    font-size: 2.4mm;
+    padding: 1.2mm 1.5mm 1.2mm 1.5mm;
     text-decoration: none;
 }
 
@@ -1381,8 +1381,8 @@ PlaygroundTopTabSelectedDark {
     color: #4D86FF;
     border-bottom: 0.6mm solid #4D86FF;
     font-family: "native:MainBold";
-    font-size: 2.8mm;
-    padding: 1.5mm 2mm 1.5mm 2mm;
+    font-size: 2.4mm;
+    padding: 1.2mm 1.5mm 1.2mm 1.5mm;
     text-decoration: none;
 }
 
@@ -1405,8 +1405,8 @@ PlaygroundBottomNavItem {
     color: #7F8AA3;
     border: none;
     font-family: "native:MainLight";
-    font-size: 2.4mm;
-    padding: 1mm;
+    font-size: 2mm;
+    padding: 0.8mm;
     text-decoration: none;
 }
 
@@ -1415,8 +1415,8 @@ PlaygroundBottomNavItemDark {
     color: #A8B8DA;
     border: none;
     font-family: "native:MainLight";
-    font-size: 2.4mm;
-    padding: 1mm;
+    font-size: 2mm;
+    padding: 0.8mm;
     text-decoration: none;
 }
 
@@ -1425,8 +1425,8 @@ PlaygroundBottomNavItemActive {
     color: #2F6BFF;
     border: none;
     font-family: "native:MainBold";
-    font-size: 2.4mm;
-    padding: 1mm;
+    font-size: 2mm;
+    padding: 0.8mm;
     text-decoration: none;
 }
 
@@ -1435,8 +1435,8 @@ PlaygroundBottomNavItemActiveDark {
     color: #4D86FF;
     border: none;
     font-family: "native:MainBold";
-    font-size: 2.4mm;
-    padding: 1mm;
+    font-size: 2mm;
+    padding: 0.8mm;
     text-decoration: none;
 }
 

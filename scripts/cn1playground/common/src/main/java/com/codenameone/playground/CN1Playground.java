@@ -388,6 +388,14 @@ public class CN1Playground extends Lifecycle {
         detach(previewContainer);
         detach(previewColumn);
 
+        // Defensive: earlier flows may have called setHidden on bottomNav (the
+        // brief calls for hiding it when the keyboard is up). Ensure it is
+        // visible and has a real preferred height when mobile assembles so the
+        // Samples / Inspector / History row is never silently missing.
+        bottomNav.setHidden(false);
+        bottomNav.setVisible(true);
+        bottomNav.setPreferredH(Display.getInstance().convertToPixels(12f));
+
         if (previewColumn.getParent() == null) {
             previewContainer.removeAll();
             previewContainer.add(BorderLayout.CENTER, previewColumn);
@@ -884,7 +892,9 @@ public class CN1Playground extends Lifecycle {
         }
         if (PlaygroundPreviewColumn.DEVICE_PIXEL.equals(activeDeviceThemeKey)) {
             layerAndroidTheme();
-        } else if (PlaygroundPreviewColumn.DEVICE_IPHONE.equals(activeDeviceThemeKey)) {
+        } else {
+            // iPhone AND no-skin both default to iOS base theme - no-skin just
+            // means "don't render a bezel", not "don't theme the content".
             layerIosTheme();
         }
     }

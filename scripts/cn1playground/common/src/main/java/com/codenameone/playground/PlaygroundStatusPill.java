@@ -11,6 +11,7 @@ import com.codename1.ui.plaf.Style;
 final class PlaygroundStatusPill extends Container {
     private final Label dot;
     private final Label text;
+    private final Container textWrap;
     private boolean darkMode;
     private boolean failed;
 
@@ -46,7 +47,7 @@ final class PlaygroundStatusPill extends Container {
         dotWrap.getAllStyles().setMargin(0f, 0f, 0f, 0f);
         dotWrap.add(dot);
 
-        Container textWrap = new Container(new com.codename1.ui.layouts.FlowLayout(Component.LEFT, Component.CENTER));
+        textWrap = new Container(new com.codename1.ui.layouts.FlowLayout(Component.LEFT, Component.CENTER));
         textWrap.getAllStyles().setBgTransparency(0);
         textWrap.getAllStyles().setPadding(0, 0, 0, 0);
         textWrap.getAllStyles().setMargin(0, 0, 0, 0);
@@ -62,12 +63,15 @@ final class PlaygroundStatusPill extends Container {
         applyState(failed, dark, text.getText());
     }
 
-    /// Collapses the pill to a dot-only form for mobile. The label text and
-    /// its wrap stay in the layout so the pill border doesn't reshape, just
-    /// invisible so only the coloured dot shows next to the app icon.
+    /// Collapses the pill to a dot-only form for mobile. Both the text label
+    /// AND its wrap get hidden so the whole pill shrinks to just the coloured
+    /// dot rather than keeping the original width with an empty space to the
+    /// right of the dot.
     void setCompactDot(boolean compact) {
         text.setVisible(!compact);
         text.setHidden(compact);
+        textWrap.setVisible(!compact);
+        textWrap.setHidden(compact);
         if (getComponentForm() != null) {
             revalidate();
         }
