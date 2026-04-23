@@ -221,8 +221,13 @@ final class PlaygroundInspector {
 
     private void handleComponentSelected(Component c) {
         selectedComponent = c;
-        highlightComponent(c);
+        // Update panel BEFORE highlighting: highlightComponent sets the form's
+        // glass pane and calls form.repaint(), which was consuming the pending
+        // revalidateLater() queued by updatePropertyPanel and leaving the panel
+        // blank. Expanding a container (chevron click) never called highlight
+        // and always worked - that was the clue.
         updatePropertyPanel(c);
+        highlightComponent(c);
     }
 
     private void highlightComponent(Component c) {

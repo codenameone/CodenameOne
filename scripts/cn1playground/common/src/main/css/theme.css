@@ -103,13 +103,13 @@ PlaygroundTitleDark {
 PlaygroundTopBar {
     background: #FFFFFF;
     border-bottom: 1px solid #E1E4EA;
-    padding: 1.5mm 3mm 1.5mm 3mm;
+    padding: 1.5mm 3mm 1.5mm 0;
 }
 
 PlaygroundTopBarDark {
     background: #102B66;
     border-bottom: 1px solid #253B73;
-    padding: 1.5mm 3mm 1.5mm 3mm;
+    padding: 1.5mm 3mm 1.5mm 0;
 }
 
 PlaygroundAppIcon {

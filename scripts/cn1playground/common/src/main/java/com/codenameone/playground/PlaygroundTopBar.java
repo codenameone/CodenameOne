@@ -41,7 +41,7 @@ final class PlaygroundTopBar extends Container {
         appIcon = new Label();
         applyAppIconStyle(appIcon, darkMode);
         appIcon.getAllStyles().setMarginUnit(com.codename1.ui.plaf.Style.UNIT_TYPE_DIPS);
-        appIcon.getAllStyles().setMargin(0, 0, 0, 1);
+        appIcon.getAllStyles().setMargin(0, 0, 0, 0);
 
         wordmark = new Label("Playground");
         wordmark.setUIID(darkMode ? "PlaygroundWordmarkDark" : "PlaygroundWordmark");
@@ -84,9 +84,18 @@ final class PlaygroundTopBar extends Container {
             }
         });
 
+        // Wrap the app icon in a fixed-width column that matches the activity
+        // bar (13 mm) so the top-bar icon sits directly above the activity bar
+        // icons and the wordmark lines up with whatever panel title is open
+        // in the left side panel.
+        Container iconColumn = new Container(new FlowLayout(Component.CENTER, Component.CENTER));
+        iconColumn.getAllStyles().setBgTransparency(0);
+        iconColumn.setPreferredW(Display.getInstance().convertToPixels(13f));
+        iconColumn.add(appIcon);
+
         Container left = new Container(BoxLayout.x());
         left.getAllStyles().setBgTransparency(0);
-        left.add(appIcon);
+        left.add(iconColumn);
         left.add(wordmark);
         left.add(modeToggle);
         left.add(statusPill);
