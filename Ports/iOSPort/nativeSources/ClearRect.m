@@ -24,6 +24,9 @@
 #import "CodenameOne_GLViewController.h"
 #include "xmlvm.h"
 #include "TargetConditionals.h"
+#ifdef CN1_USE_METAL
+#import "CN1Metalcompat.h"
+#endif
 
 #ifdef USE_ES2
 extern GLKMatrix4 CN1modelViewMatrix;
@@ -98,6 +101,10 @@ static GLuint getOGLProgram(){
 }
 #ifdef USE_ES2
 -(void)execute {
+#ifdef CN1_USE_METAL
+    CN1MetalClearRect(x, y, width, height);
+    return;
+#endif
     glUseProgram(getOGLProgram());
     GLfloat xOffset = 0;
     GLfloat yOffset = 0;

@@ -1,6 +1,9 @@
 #import "DrawImage.h"
 #import "CodenameOne_GLViewController.h"
 #include "xmlvm.h"
+#ifdef CN1_USE_METAL
+#import "CN1Metalcompat.h"
+#endif
 
 #ifdef USE_ES2
 extern GLKMatrix4 CN1modelViewMatrix;
@@ -104,6 +107,14 @@ static GLuint getOGLProgram(){
 }
 #ifdef USE_ES2
 -(void)execute {
+#ifdef CN1_USE_METAL
+    // Phase 1: rasterize the UIImage into an MTLTexture on every draw.
+    // This is slow; Phase 1.5 will cache the MTLTexture on GLUIImage so
+    // repeated DrawImage hits for the same image reuse the texture.
+    id<MTLTexture> texture = CN1MetalTextureFromUIImage([img getImage]);
+    CN1MetalDrawImage(texture, alpha, x, y, width, height);
+    return;
+#endif
     glUseProgram(getOGLProgram());
     GLKVector4 color = GLKVector4Make(((float)alpha) / 255.0f, ((float)alpha) / 255.0f, ((float)alpha) / 255.0f, ((float)alpha) / 255.0f);
     
