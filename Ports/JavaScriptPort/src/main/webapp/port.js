@@ -2796,7 +2796,8 @@ const cn1ssForcedTimeoutTestClasses = Object.freeze({
   "com_codenameone_examples_hellocodenameone_tests_DialogThemeScreenshotTest": "themeScreenshot",
   "com_codenameone_examples_hellocodenameone_tests_FloatingActionButtonThemeScreenshotTest": "themeScreenshot",
   "com_codenameone_examples_hellocodenameone_tests_SpanLabelThemeScreenshotTest": "themeScreenshot",
-  "com_codenameone_examples_hellocodenameone_tests_DarkLightShowcaseThemeScreenshotTest": "themeScreenshot"
+  "com_codenameone_examples_hellocodenameone_tests_DarkLightShowcaseThemeScreenshotTest": "themeScreenshot",
+  "com_codenameone_examples_hellocodenameone_tests_PaletteOverrideThemeScreenshotTest": "themeScreenshot"
 });
 const cn1ssForcedTimeoutTestNames = Object.freeze({
   "MediaPlaybackScreenshotTest": "mediaPlayback",
@@ -2819,7 +2820,8 @@ const cn1ssForcedTimeoutTestNames = Object.freeze({
   "DialogThemeScreenshotTest": "themeScreenshot",
   "FloatingActionButtonThemeScreenshotTest": "themeScreenshot",
   "SpanLabelThemeScreenshotTest": "themeScreenshot",
-  "DarkLightShowcaseThemeScreenshotTest": "themeScreenshot"
+  "DarkLightShowcaseThemeScreenshotTest": "themeScreenshot",
+  "PaletteOverrideThemeScreenshotTest": "themeScreenshot"
 });
 
 if (jvm && typeof jvm.addVirtualMethod === "function" && jvm.classes && jvm.classes["java_lang_String"]) {

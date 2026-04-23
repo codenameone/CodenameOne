@@ -97,6 +97,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new FloatingActionButtonThemeScreenshotTest(),
             new SpanLabelThemeScreenshotTest(),
             new DarkLightShowcaseThemeScreenshotTest(),
+            new PaletteOverrideThemeScreenshotTest(),
             // Keep this as the last screenshot test; orientation changes can leak into subsequent screenshots.
             new OrientationLockScreenshotTest(),
             new InPlaceEditViewTest(),
@@ -188,7 +189,8 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 || "DialogThemeScreenshotTest".equals(testName)
                 || "FloatingActionButtonThemeScreenshotTest".equals(testName)
                 || "SpanLabelThemeScreenshotTest".equals(testName)
-                || "DarkLightShowcaseThemeScreenshotTest".equals(testName);
+                || "DarkLightShowcaseThemeScreenshotTest".equals(testName)
+                || "PaletteOverrideThemeScreenshotTest".equals(testName);
     }
 
     private void awaitTestCompletion(int index, BaseTest testClass, String testName, long deadline) {
