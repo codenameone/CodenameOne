@@ -168,7 +168,45 @@ def collect_files(out_dir: Path) -> list[Path]:
     return keep
 
 
-def collect_counts(files: list[Path]) -> Counter:
+_CLASSDEF_NAME_PATTERN = re.compile(
+    r'jvm\.defineClass\(\{\s*name:\s*"([A-Za-z0-9_]+)"'
+)
+_CLASSDEF_ASSIGNABLE_TAIL_PATTERN = re.compile(
+    r'assignableTo:\s*\{([^}]*)\}'
+)
+_JSO_BRIDGE_MARKER = "com_codename1_html5_js_JSObject"
+
+
+def _collect_jso_bridge_class_names(files: list[Path]) -> set[str]:
+    """Find every class whose ``assignableTo`` set contains the JSO bridge
+    marker. These classes go through ``jvm.invokeJsoBridge`` at runtime,
+    which uses ``parseJsoBridgeMethod(className, methodId)`` — an explicit
+    string split of ``methodId`` against ``"cn1_" + className + "_"`` — to
+    recover the DOM member name the call is targeting (getter / setter /
+    method). That split ONLY works when the method id is the unmangled
+    ``cn1_<class>_<member>_<sig>`` form, because the host receiver has
+    real JS properties named ``createElement`` / ``appendChild`` / etc.
+    Mangling those ids to ``$a`` makes the runtime pass ``$a`` as the
+    member name and the host throws "Missing JS member $a for host
+    receiver". Returning the class names here lets the caller exclude
+    every ``cn1_<jsoClass>_*`` identifier from the mangle pass.
+    """
+    jso_classes: set[str] = set()
+    for path in files:
+        data = path.read_text(encoding="utf-8")
+        for match in _CLASSDEF_NAME_PATTERN.finditer(data):
+            class_name = match.group(1)
+            # Peek ahead at the assignableTo block for this defineClass
+            # call. We bound the search to a reasonable window so runaway
+            # scans on giant one-line-minified output don't degrade.
+            window = data[match.end(): match.end() + 4096]
+            tail = _CLASSDEF_ASSIGNABLE_TAIL_PATTERN.search(window)
+            if tail and _JSO_BRIDGE_MARKER in tail.group(1):
+                jso_classes.add(class_name)
+    return jso_classes
+
+
+def collect_counts(files: list[Path]) -> tuple[Counter, frozenset[str]]:
     counts: Counter = Counter()
     for path in files:
         data = path.read_text(encoding="utf-8")
@@ -176,23 +214,92 @@ def collect_counts(files: list[Path]) -> Counter:
             counts[match.group(0)] += 1
     for name in EXCLUDE:
         counts.pop(name, None)
-    return counts
+
+    jso_bridge_classes = _collect_jso_bridge_class_names(files)
+    # Exclude every ``cn1_<jsoClass>_*`` method id so ``parseJsoBridgeMethod``
+    # keeps working against host DOM receivers. Also exclude the class name
+    # itself, both because it flows through the runtime as a plain string
+    # (the ``className`` argument of ``invokeJsoBridge`` / ``isJsoBridgeClass``
+    # / ``classes[...]`` lookup) and so runtime-built ``"cn1_" + className +
+    # "_"`` prefixes still match the unmangled method ids we just excluded.
+    to_exclude: set[str] = set()
+    for name in list(counts.keys()):
+        for cls in jso_bridge_classes:
+            if name.startswith("cn1_" + cls + "_") or name.startswith("cn1_" + cls + "__"):
+                to_exclude.add(name)
+                break
+        if name in jso_bridge_classes:
+            to_exclude.add(name)
+    for name in to_exclude:
+        counts.pop(name, None)
+
+    preserved = frozenset(to_exclude | set(EXCLUDE) | jso_bridge_classes)
+    return counts, preserved
+
+
+_IMPL_SUFFIX = "__impl"
 
 
 def build_mapping(counts: Counter) -> dict[str, str]:
     """Assign short symbols to the most frequent identifiers first.
 
+    Identifiers with an ``X``/``X__impl`` twin are kept in lockstep:
+    when ``X`` is mapped to ``$a``, ``X__impl`` is mapped to
+    ``$a__impl``. This preserves runtime ``methodId + "__impl"``
+    concatenation patterns in port.js (e.g. ctor lookup, CN1SS hooks)
+    without requiring a lookup table.
+
     We only mangle when the mangled form is strictly shorter than the
     original — otherwise skipping leaves the source slightly larger but
     avoids bloating identifiers whose original name was already short.
     """
-    ordered = sorted(counts.items(), key=lambda item: (-item[1], item[0]))
-    mapping: dict[str, str] = {}
-    for rank, (name, _count) in enumerate(ordered):
-        new = symbol_for(rank)
-        if len(new) >= len(name):
+    names = set(counts.keys())
+    # Bases: names without __impl suffix (plus __impl names whose base is
+    # not present — orphans that can mangle freely).
+    pairs: dict[str, str | None] = {}
+    for name in sorted(names):
+        if name.endswith(_IMPL_SUFFIX):
+            base = name[: -len(_IMPL_SUFFIX)]
+            if base in names:
+                # handled via its base entry below
+                continue
+            # Orphan impl — mangle on its own; no twin exists in this bundle
+            pairs[name] = None
             continue
-        mapping[name] = new
+        impl = name + _IMPL_SUFFIX
+        pairs[name] = impl if impl in names else None
+
+    def rank_key(base: str) -> tuple[int, str]:
+        impl = pairs.get(base)
+        total = counts[base]
+        if impl:
+            total += counts.get(impl, 0)
+        return (-total, base)
+
+    mapping: dict[str, str] = {}
+    rank = 0
+    for base in sorted(pairs.keys(), key=rank_key):
+        impl = pairs[base]
+        short = symbol_for(rank)
+        rank += 1
+        base_saves = len(short) < len(base)
+        if impl:
+            impl_short = short + _IMPL_SUFFIX
+            impl_saves = len(impl_short) < len(impl)
+        else:
+            impl_short = None
+            impl_saves = False
+        # Mangle the pair atomically: either both move to the short form
+        # or neither does. Splitting would break ``X + "__impl"`` lookups
+        # at runtime (the mangled base would resolve but the appended
+        # suffix would name a non-existent global).
+        if impl is not None and not (base_saves and impl_saves):
+            continue
+        if impl is None and not base_saves:
+            continue
+        mapping[base] = short
+        if impl is not None:
+            mapping[impl] = impl_short  # type: ignore[assignment]
     return mapping
 
 
@@ -249,7 +356,7 @@ def main() -> int:
         print("[mangle] no eligible .js files in output dir", file=sys.stderr)
         return 0
 
-    counts = collect_counts(files)
+    counts, preserved = collect_counts(files)
     # An identifier that appears once at all can't be shrunk (the one
     # definition site is its one use; mangling makes the file bigger by
     # the length of the mapping entry unless we're willing to write a
@@ -261,10 +368,12 @@ def main() -> int:
     saved = rewrite(files, mapping)
 
     total_bytes = sum(path.stat().st_size for path in files)
+    preserved_count = len(preserved)
     print(
         f"[mangle] {len(mapping):,} identifiers mangled across {len(files)} files; "
         f"saved ~{saved / (1024 * 1024):.1f} MiB "
-        f"(total after: {total_bytes / (1024 * 1024):.1f} MiB)"
+        f"(total after: {total_bytes / (1024 * 1024):.1f} MiB; "
+        f"preserved {preserved_count} JSO-bridge / excluded names)"
     )
 
     # Persist the reverse mapping so stack traces / debugging can demangle
