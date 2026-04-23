@@ -1,5 +1,6 @@
 package com.codenameone.playground;
 
+import com.codename1.components.SplitPane;
 import com.codename1.ui.Button;
 import com.codename1.ui.CheckBox;
 import com.codename1.ui.Component;
@@ -53,42 +54,34 @@ final class PlaygroundInspector {
     private UITimer highlightTimer;
     private final java.util.Set<Component> expanded = new java.util.HashSet<Component>();
 
-    private Container unifiedScroll;
-
     PlaygroundInspector(boolean darkMode, Listener listener) {
         this.darkMode = darkMode;
         this.listener = listener;
 
         treeContainer = new Container(BoxLayout.y());
-        // Only the outer unifiedScroll should scroll; the tree must stay
-        // non-scrollable so the panel doesn't get a double-scroll bounce.
-        treeContainer.setScrollable(false);
+        treeContainer.setScrollableY(true);
 
         propertiesContainer = new Container(BoxLayout.y());
+        propertiesContainer.setScrollableY(true);
 
-        // A single scrollable Y container holds the tree, the divider, and the
-        // property form, so the user scrolls the inspector panel as one unit
-        // rather than two independent nested scrolls.
-        unifiedScroll = new Container(BoxLayout.y());
-        unifiedScroll.setScrollableY(true);
-        unifiedScroll.add(treeContainer);
-        unifiedScroll.add(buildTreeDivider());
-        unifiedScroll.add(propertiesContainer);
+        // Vertical SplitPane between tree (top) and property form (bottom),
+        // using the same thin PlaygroundSplitDivider as the main editor/
+        // preview split. Defaults to 50/50, clamped between 30% and 70%.
+        SplitPane.Settings settings = new SplitPane.Settings(
+                SplitPane.VERTICAL_SPLIT, "30%", "50%", "70%")
+                .showExpandCollapseButtons(false)
+                .showDragHandle(false)
+                .dividerThicknessMM(0.8f)
+                .dividerUIID("PlaygroundSplitDivider");
+        SplitPane split = new SplitPane(settings, treeContainer, propertiesContainer);
 
         component = new Container(new BorderLayout());
         component.setUIID(darkMode ? "PlaygroundInspectorRootDark" : "PlaygroundInspectorRoot");
-        component.add(BorderLayout.CENTER, unifiedScroll);
+        component.add(BorderLayout.CENTER, split);
 
         applyTheme(darkMode);
         rebuildTree();
         updatePropertyPanel(null);
-    }
-
-    private Container buildTreeDivider() {
-        Container divider = new Container(new BorderLayout());
-        divider.setUIID(uiidDark("PlaygroundInspectorTreeDivider"));
-        divider.setPreferredH(Math.max(1, Display.getInstance().convertToPixels(0.3f)));
-        return divider;
     }
 
     Component getComponent() {
@@ -109,13 +102,12 @@ final class PlaygroundInspector {
         propertiesContainer.getAllStyles().setBgColor(panelBg);
         propertiesContainer.getAllStyles().setBgTransparency(255);
 
-        // Breathing-room padding is applied inline on the tree and property
-        // containers (not the root) so the divider between them can span the
-        // full panel width without being cropped.
+        // Inline breathing-room padding - the root UIID is padding-less so the
+        // SplitPane divider can span the full panel width.
         treeContainer.getAllStyles().setPaddingUnit(Style.UNIT_TYPE_DIPS);
-        treeContainer.getAllStyles().setPadding(0, 0, 2, 2);
+        treeContainer.getAllStyles().setPadding(1, 1, 2, 2);
         propertiesContainer.getAllStyles().setPaddingUnit(Style.UNIT_TYPE_DIPS);
-        propertiesContainer.getAllStyles().setPadding(0, 2, 2, 2);
+        propertiesContainer.getAllStyles().setPadding(1, 2, 2, 2);
 
         rebuildTree();
         updatePropertyPanel(selectedComponent);
@@ -232,16 +224,6 @@ final class PlaygroundInspector {
         highlightComponent(c);
         updatePropertyPanel(c);
         rebuildTree();
-        // The tree and property Containers call revalidate() on themselves in
-        // their rebuild paths, but CN1's revalidate is self-only and does not
-        // propagate to the outer unifiedScroll, so the updated child preferred
-        // sizes (and the new active-row UIID on the selected row) may be left
-        // off-screen until the next unrelated layout pass. Force the whole
-        // inspector subtree to re-layout and repaint here.
-        if (component.getComponentForm() != null) {
-            component.revalidate();
-            component.repaint();
-        }
     }
 
     private void highlightComponent(Component c) {
