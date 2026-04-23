@@ -1,11 +1,12 @@
 package com.codenameone.examples.hellocodenameone.tests;
 
-import com.codename1.ui.CN;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Painter;
+import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.Layout;
 import com.codename1.ui.plaf.UIManager;
-import com.codename1.ui.util.UITimer;
 
 /**
  * Base for theme-fidelity screenshot tests that emit a light + dark image
@@ -16,9 +17,11 @@ import com.codename1.ui.util.UITimer;
  * the form, waiting for onShowCompleted, and emitting the CN1SS chunk
  * with the right filename suffix.
  *
- * Used by the CSS-driven native-themes work to validate that both the iOS
- * Modern and Android Material themes render each core UIID correctly in
- * both appearances.
+ * A design-system gridline overlay is painted on top of every capture so
+ * reviewers can eyeball component sizing against a physical 4mm grid
+ * (rough 8pt-equivalent rhythm). Subclasses can opt out via
+ * {@link #gridOverlayEnabled()} when the overlay would obscure the signal
+ * the test is trying to establish.
  */
 public abstract class DualAppearanceBaseTest extends BaseTest {
 
@@ -45,6 +48,16 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
      */
     protected abstract Layout newLayout();
 
+    /**
+     * Whether the 4mm design-system gridline overlay is painted above the
+     * form contents. Defaults to {@code true}. Override to {@code false}
+     * for tests where the grid would obscure the signal (e.g. a gradient
+     * rendering test).
+     */
+    protected boolean gridOverlayEnabled() {
+        return true;
+    }
+
     @Override
     public boolean runTest() {
         runAppearance(false, "light", () -> runAppearance(true, "dark", this::finish));
@@ -64,6 +77,7 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
         UIManager.getInstance().refreshTheme();
 
         final String imageName = baseName() + "_" + suffix;
+        final boolean showGrid = gridOverlayEnabled();
         Form form = new Form(baseName() + " / " + suffix, newLayout()) {
             @Override
             protected void onShowCompleted() {
@@ -73,6 +87,9 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
                 });
             }
         };
+        if (showGrid) {
+            form.setGlassPane(new GridOverlayPainter(dark));
+        }
         populate(form, suffix);
         form.show();
     }
@@ -84,5 +101,62 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
         Display.getInstance().setDarkMode(null);
         UIManager.getInstance().refreshTheme();
         done();
+    }
+
+    /**
+     * Low-contrast 4mm major / 1mm minor grid painted above the form.
+     * 4mm is roughly the 8pt Apple / 8dp Material design-system cell,
+     * scaled via Display.convertToPixels so it matches physical size
+     * on every DPI.
+     */
+    private static final class GridOverlayPainter implements Painter {
+        private final boolean dark;
+
+        GridOverlayPainter(boolean dark) {
+            this.dark = dark;
+        }
+
+        @Override
+        public void paint(Graphics g, Rectangle rect) {
+            int minor = Display.getInstance().convertToPixels(1f);
+            int major = Display.getInstance().convertToPixels(4f);
+            if (minor < 1) {
+                minor = 1;
+            }
+            if (major < minor) {
+                major = minor * 4;
+            }
+            int x0 = rect.getX();
+            int y0 = rect.getY();
+            int x1 = x0 + rect.getWidth();
+            int y1 = y0 + rect.getHeight();
+
+            int minorColor = dark ? 0x202020 : 0xe8e8e8;
+            int majorColor = dark ? 0x353535 : 0xc8c8c8;
+
+            int prevColor = g.getColor();
+            int prevAlpha = g.getAlpha();
+            g.setAlpha(90);
+
+            g.setColor(minorColor);
+            for (int x = x0; x <= x1; x += minor) {
+                g.drawLine(x, y0, x, y1);
+            }
+            for (int y = y0; y <= y1; y += minor) {
+                g.drawLine(x0, y, x1, y);
+            }
+
+            g.setColor(majorColor);
+            g.setAlpha(150);
+            for (int x = x0; x <= x1; x += major) {
+                g.drawLine(x, y0, x, y1);
+            }
+            for (int y = y0; y <= y1; y += major) {
+                g.drawLine(x0, y, x1, y);
+            }
+
+            g.setAlpha(prevAlpha);
+            g.setColor(prevColor);
+        }
     }
 }

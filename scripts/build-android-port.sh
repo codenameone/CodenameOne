@@ -131,4 +131,12 @@ if [ ! -f "$BUILD_CLIENT" ]; then
   fi
 fi
 
+# Compile native CSS themes (AndroidMaterialTheme.res) and stage them in the
+# Android port's src/ so the Maven build packages them into the port jar. The
+# runtime falls back to android_holo_light.res if AndroidMaterialTheme.res is
+# missing, which loses the Material 3 palette + all $DarkUIID entries.
+./scripts/build-native-themes.sh
+mkdir -p Ports/Android/src
+cp Themes/AndroidMaterialTheme.res Ports/Android/src/AndroidMaterialTheme.res
+
 run_maven -q -f maven/pom.xml -pl android -am -Dcn1.binaries="$CN1_BINARIES" -P !download-cn1-binaries -T 1C -Dmaven.javadoc.skip=true -Dmaven.source.skip=true -Djava.awt.headless=true clean install "$@"

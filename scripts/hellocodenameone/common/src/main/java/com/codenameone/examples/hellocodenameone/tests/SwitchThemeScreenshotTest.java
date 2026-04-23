@@ -1,6 +1,6 @@
 package com.codenameone.examples.hellocodenameone.tests;
 
-import com.codename1.components.OnOffSwitch;
+import com.codename1.components.Switch;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BoxLayout;
@@ -19,17 +19,18 @@ public class SwitchThemeScreenshotTest extends DualAppearanceBaseTest {
 
     @Override
     protected void populate(Form form, String suffix) {
-        form.add(new Label("On/Off Switch"));
-        OnOffSwitch off = new OnOffSwitch();
+        form.add(new Label("Switch off"));
+        Switch off = new Switch();
         off.setValue(false);
         form.add(off);
 
-        OnOffSwitch on = new OnOffSwitch();
+        form.add(new Label("Switch on"));
+        Switch on = new Switch();
         on.setValue(true);
         form.add(on);
 
         form.add(new Label("Disabled switch"));
-        OnOffSwitch disabled = new OnOffSwitch();
+        Switch disabled = new Switch();
         disabled.setValue(true);
         disabled.setEnabled(false);
         form.add(disabled);
