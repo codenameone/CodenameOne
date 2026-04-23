@@ -7053,6 +7053,13 @@ public class CSSTheme {
         return out.toString();
     }
 
+    /// SAC / Flute rejects `$` as a selector-name starter, so we can't
+    /// emit `$DarkButton { ... }` directly or the parser silently drops
+    /// the whole rule with a "Skipping" warning. Emit a Flute-valid
+    /// identifier prefix (`CN1DARK_`) here and rename the elements back
+    /// to `$Dark...` in `renameDarkElements` after parsing completes.
+    static final String DARK_PLACEHOLDER = "CN1DARK_";
+
     private static String toDarkSelectors(String selectors) {
         StringBuilder out = new StringBuilder();
         String[] parts = selectors.split(",");
@@ -7061,7 +7068,7 @@ public class CSSTheme {
                 out.append(',');
             }
             String selector = parts[i].trim();
-            if (selector.length() == 0 || selector.startsWith("$Dark")) {
+            if (selector.length() == 0 || selector.startsWith("$Dark") || selector.startsWith(DARK_PLACEHOLDER)) {
                 out.append(parts[i]);
                 continue;
             }
@@ -7080,9 +7087,33 @@ public class CSSTheme {
             if ("*".equals(base) || base.length() == 0) {
                 base = "Component";
             }
-            out.append("$Dark").append(base).append(suffix);
+            out.append(DARK_PLACEHOLDER).append(base).append(suffix);
         }
         return out.toString();
+    }
+
+    /// After the Flute parser populates `theme.elements` with keys like
+    /// `CN1DARK_Button`, rename them to `$DarkButton` so `updateResources`
+    /// emits the proper `$Dark<UIID>.fgColor` entries the runtime UIManager
+    /// consults via `shouldUseDarkStyle`.
+    private static void renameDarkElements(CSSTheme theme) {
+        if (theme == null || theme.elements == null) {
+            return;
+        }
+        LinkedHashMap<String, Element> renamed = new LinkedHashMap<String, Element>();
+        boolean changed = false;
+        for (Map.Entry<String, Element> e : theme.elements.entrySet()) {
+            String k = e.getKey();
+            if (k != null && k.startsWith(DARK_PLACEHOLDER)) {
+                renamed.put("$Dark" + k.substring(DARK_PLACEHOLDER.length()), e.getValue());
+                changed = true;
+            } else {
+                renamed.put(k, e.getValue());
+            }
+        }
+        if (changed) {
+            theme.elements = renamed;
+        }
     }
 
     /// Finds the next occurrence of `needle` in `css` starting at `fromPos`,
@@ -7387,6 +7418,7 @@ public class CSSTheme {
             
             parser.parseStyleSheet(source);
             stream.close();
+            renameDarkElements(theme);
             return theme;
         } catch (ClassNotFoundException ex) {
             Logger.getLogger(CSSTheme.class.getName()).log(Level.SEVERE, null, ex);
