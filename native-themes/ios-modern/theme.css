@@ -69,12 +69,17 @@ TertiaryLabel { cn1-derive: Label; color: #8e8e93; }
 SpanLabel { cn1-derive: Label; }
 SpanLabelText { cn1-derive: Label; }
 
+/* iOS rounded-rect button style. Using border-radius (RoundRectBorder,
+   CEF-free) rather than cn1-pill-border so short-text buttons don't
+   degenerate to a circle when width<=height - RoundBorder paints a
+   circle in that case, border-radius always keeps the corner radius. */
 Button {
     color: #007aff;
-    padding: 2mm 3mm 2mm 3mm;
+    padding: 2mm 4mm 2mm 4mm;
     margin: 1mm;
     font-family: "native:MainRegular";
-    cn1-background-type: cn1-pill-border;
+    background-color: transparent;
+    border-radius: 3mm;
 }
 Button.pressed { color: #0064d1; background-color: #e5e5ea; }
 Button.disabled { color: #b3d4ff; }
@@ -83,6 +88,7 @@ RaisedButton {
     cn1-derive: Button;
     color: #ffffff;
     background-color: #007aff;
+    border-radius: 3mm;
 }
 RaisedButton.pressed { background-color: #0064d1; }
 RaisedButton.disabled { background-color: #b3d4ff; color: #ffffff; }
@@ -95,7 +101,7 @@ TextField {
     padding: 2mm 3mm 2mm 3mm;
     margin: 1mm 2mm 1mm 2mm;
     font-family: "native:MainRegular";
-    cn1-background-type: cn1-round-border;
+    border-radius: 2mm;
 }
 TextField.pressed { background-color: #e5e5ea; }
 TextField.disabled { color: #c7c7cc; background-color: #e5e5ea; }
@@ -212,7 +218,7 @@ Dialog {
     color: #000000;
     padding: 3mm;
     margin: 0;
-    cn1-background-type: cn1-round-border;
+    border-radius: 3mm;
 }
 DialogBody { cn1-derive: Dialog; padding: 2mm; }
 DialogTitle { cn1-derive: Title; padding: 2mm; }
