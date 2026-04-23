@@ -2,7 +2,7 @@ package com.codenameone.examples.hellocodenameone.tests;
 
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
-import com.codename1.ui.Picker;
+import com.codename1.ui.spinner.Picker;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.Layout;
 
