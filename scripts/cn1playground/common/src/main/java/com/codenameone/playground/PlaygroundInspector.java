@@ -222,20 +222,7 @@ final class PlaygroundInspector {
     private void handleComponentSelected(Component c) {
         selectedComponent = c;
         highlightComponent(c);
-        // Defer the panel rebuild one EDT tick so the Button's tactile press
-        // animation has finished before we reflow its parents. If we revalidate
-        // while the press animation is in flight, CN1's AnimationManager snaps
-        // the pending layout to the animation's final frame and the new field
-        // rows end up with measured size 0 until the next unrelated resize.
-        com.codename1.ui.CN.callSerially(() -> {
-            updatePropertyPanel(c);
-            rebuildTree();
-            Form f = component.getComponentForm();
-            if (f != null) {
-                f.revalidate();
-                f.repaint();
-            }
-        });
+        updatePropertyPanel(c);
     }
 
     private void highlightComponent(Component c) {
