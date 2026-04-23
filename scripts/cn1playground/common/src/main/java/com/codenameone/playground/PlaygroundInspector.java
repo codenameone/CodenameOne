@@ -64,10 +64,12 @@ final class PlaygroundInspector {
         // propertiesContainer is the non-scrollable inner content we mutate on
         // selection. A dedicated scroll wrapper sits between it and the SplitPane
         // bottom pane so the scroll state is never recreated when content changes.
+        // BoxLayout.y on the wrapper (not BorderLayout.NORTH) so overflow extends
+        // downward and scrollableY actually engages.
         propertiesContainer = new Container(BoxLayout.y());
-        Container propertiesScroll = new Container(new BorderLayout());
+        Container propertiesScroll = new Container(BoxLayout.y());
         propertiesScroll.setScrollableY(true);
-        propertiesScroll.add(BorderLayout.NORTH, propertiesContainer);
+        propertiesScroll.add(propertiesContainer);
 
         SplitPane.Settings settings = new SplitPane.Settings(
                 SplitPane.VERTICAL_SPLIT, "30%", "50%", "70%")
