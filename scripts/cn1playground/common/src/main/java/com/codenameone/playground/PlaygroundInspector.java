@@ -222,17 +222,20 @@ final class PlaygroundInspector {
     private void handleComponentSelected(Component c) {
         selectedComponent = c;
         highlightComponent(c);
-        updatePropertyPanel(c);
-        rebuildTree();
-        // propertiesContainer is scrollableY inside a SplitPane: the inner
-        // revalidate() in updatePropertyPanel fires but the new children end
-        // up with zero measured size until the container's ancestor chain
-        // (scroll + pane wrapper) is re-laid out. revalidateWithAnimationSafety
-        // walks up from this container, forcing the pane to re-measure so the
-        // freshly-added field rows actually render without waiting on a resize.
-        if (propertiesContainer.getComponentForm() != null) {
-            propertiesContainer.revalidateWithAnimationSafety();
-        }
+        // Defer the panel rebuild one EDT tick so the Button's tactile press
+        // animation has finished before we reflow its parents. If we revalidate
+        // while the press animation is in flight, CN1's AnimationManager snaps
+        // the pending layout to the animation's final frame and the new field
+        // rows end up with measured size 0 until the next unrelated resize.
+        com.codename1.ui.CN.callSerially(() -> {
+            updatePropertyPanel(c);
+            rebuildTree();
+            Form f = component.getComponentForm();
+            if (f != null) {
+                f.revalidate();
+                f.repaint();
+            }
+        });
     }
 
     private void highlightComponent(Component c) {
