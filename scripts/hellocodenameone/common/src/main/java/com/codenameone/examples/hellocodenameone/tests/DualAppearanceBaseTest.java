@@ -182,7 +182,11 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
                     + Display.getInstance().getPlatformName());
             return;
         }
-        InputStream in = getClass().getResourceAsStream(resourceName);
+        // On Android the .res ships as an asset, not a Java classpath
+        // resource - Class.getResourceAsStream returns null. Route
+        // through Display.getResourceAsStream which delegates to the
+        // native impl and on Android reads getContext().getAssets().
+        InputStream in = Display.getInstance().getResourceAsStream(getClass(), resourceName);
         if (in == null) {
             // Modern theme isn't packaged on this platform - stay on the
             // legacy default rather than crashing the test.
