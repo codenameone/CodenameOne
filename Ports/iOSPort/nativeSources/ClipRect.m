@@ -21,10 +21,10 @@
  * need additional information or have any questions.
  */
 #import "ClipRect.h"
+#import "CodenameOne_GLViewController.h"
 #ifdef CN1_USE_METAL
 #import "CN1Metalcompat.h"
 #endif
-#import "CodenameOne_GLViewController.h"
 #import "FillRect.h"
 #ifdef USE_ES2
 #import "DrawTextureAlphaMask.h"

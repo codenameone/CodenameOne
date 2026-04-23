@@ -448,8 +448,9 @@ public class ByteCodeTranslator {
                 }
             } else {
                 fileListEntry.append("; path = \"");
-                if(file.endsWith(".m") || file.endsWith(".c") || file.endsWith(".cpp") || file.endsWith(".mm") || file.endsWith(".h") || 
-                        file.endsWith(".swift") || file.endsWith(".bundle") || file.endsWith(".xcdatamodeld") || file.endsWith(".hh") || file.endsWith(".hpp") || file.endsWith(".xib")) {
+                if(file.endsWith(".m") || file.endsWith(".c") || file.endsWith(".cpp") || file.endsWith(".mm") || file.endsWith(".h") ||
+                        file.endsWith(".swift") || file.endsWith(".bundle") || file.endsWith(".xcdatamodeld") || file.endsWith(".hh") || file.endsWith(".hpp") || file.endsWith(".xib") ||
+                        file.endsWith(".metal")) {
                     fileListEntry.append(file);
                 } else {
                     fileListEntry.append(appName);
