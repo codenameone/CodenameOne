@@ -113,6 +113,17 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
         annotations.clear();
 
         final String imageName = baseName() + "_" + suffix;
+        // Pre-resolve each UIID the Form constructor will touch in its field
+        // inits + ctor body. Any of these calls going into an infinite loop
+        // will be the one whose "done" line never shows up in the next log.
+        probeStyle("Component");
+        probeStyle("Container");
+        probeStyle("Form");
+        probeStyle("Title");
+        probeStyle("TitleArea");
+        probeStyle("Toolbar");
+        probeStyle("ContentPane");
+        probeStyle("StatusBar");
         logDiag("CN1SS:INFO:DualAppearance form.newCtor.begin test=" + baseName());
         Form form = new Form() {
             @Override
@@ -248,6 +259,20 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
     private static void logDiag(String message) {
         System.out.println(message);
         Log.p(message);
+    }
+
+    // Narrowing step: resolve a named UIID's Style before we touch Form.
+    // If one of these probes never returns we've found the UIID whose
+    // style resolution is looping against the freshly-installed modern
+    // theme on iOS.
+    private void probeStyle(String uiid) {
+        logDiag("CN1SS:INFO:DualAppearance probeStyle.begin uiid=" + uiid + " test=" + baseName());
+        try {
+            UIManager.getInstance().getComponentStyle(uiid);
+        } catch (Throwable t) {
+            logDiag("CN1SS:ERR:DualAppearance probeStyle.failed uiid=" + uiid + " err=" + t);
+        }
+        logDiag("CN1SS:INFO:DualAppearance probeStyle.done uiid=" + uiid + " test=" + baseName());
     }
 
     private String pickModernThemeResource() {
