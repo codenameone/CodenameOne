@@ -4,46 +4,29 @@
  * CEF-free subset of the Codename One CSS compiler: solid fills, native
  * rounded/pill borders, state selectors via .pressed / .selected /
  * .disabled, and light/dark palettes via @media (prefers-color-scheme:
- * dark) producing $DarkUIID variants.
+ * dark) producing $DarkUIID variants. Colors are inlined (not CSS
+ * variables) because the compiler's dark-mode rewriter operates at
+ * string level and doesn't re-scope :root var() declarations.
  *
  * Apple system palette reference:
- *   accent            #007aff   / dark #0a84ff
- *   accent-pressed    #0064d1   / dark #64b1ff
- *   text-primary      #000000   / dark #ffffff
- *   text-secondary    #3c3c43   / dark #ebebf5
- *   text-tertiary     #8e8e93   / dark #8e8e93
- *   text-disabled     #c7c7cc   / dark #48484a
- *   surface           #ffffff   / dark #000000
- *   surface-grouped   #f2f2f7   / dark #1c1c1e
- *   surface-tertiary  #e5e5ea   / dark #2c2c2e
- *   separator         #c6c6c8   / dark #38383a
+ *   accent            #007aff   dark #0a84ff
+ *   accent-pressed    #0064d1   dark #64b1ff
+ *   accent-disabled   #b3d4ff   dark #004a99
+ *   text-primary      #000000   dark #ffffff
+ *   text-secondary    #3c3c43   dark #ebebf5
+ *   text-tertiary     #8e8e93   dark #8e8e93
+ *   text-disabled     #c7c7cc   dark #48484a
+ *   surface           #ffffff   dark #000000
+ *   surface-grouped   #f2f2f7   dark #1c1c1e
+ *   surface-tertiary  #e5e5ea   dark #2c2c2e
+ *   separator         #c6c6c8   dark #38383a
+ *   success           #34c759   dark #30d158
  *
- * Overridable palette. Sub-themes that wish to re-skin the iOS native
- * appearance can redefine these variables in :root before re-compiling,
- * or override individual UIID properties in their own theme.css layered
- * on top. The @media (prefers-color-scheme: dark) block re-declares the
- * same variables with dark values - the compiler's dark-mode rewriter
- * emits that block as $DarkUIID styles.
- *
- * Native theme rule: includeNativeBool must be false here. darkModeBool
- * gates UIManager's $DarkUIID lookup. tabsGridBool forces equal-width
- * Tabs so a 3-tab bar fills the screen width (iOS-standard look).
+ * Overridable palette: user apps layer their own theme.css or runtime
+ * UIManager.addThemeProps on top of this theme - see
+ * PaletteOverrideThemeScreenshotTest for a working example that flips
+ * the accent to magenta at runtime.
  */
-
-:root {
-    --cn1-accent: #007aff;
-    --cn1-accent-pressed: #0064d1;
-    --cn1-accent-disabled: #b3d4ff;
-    --cn1-text-primary: #000000;
-    --cn1-text-secondary: #3c3c43;
-    --cn1-text-tertiary: #8e8e93;
-    --cn1-text-disabled: #c7c7cc;
-    --cn1-surface: #ffffff;
-    --cn1-surface-grouped: #f2f2f7;
-    --cn1-surface-tertiary: #e5e5ea;
-    --cn1-separator: #c6c6c8;
-    --cn1-success: #34c759;
-}
 
 #Constants {
     includeNativeBool: false;
@@ -51,14 +34,8 @@
     commandBehavior: Native;
     ios7StatusBarHack: true;
     paintsTitleBarBool: true;
-
-    /* Tabs: distribute evenly across the bar (iOS tab-bar look). */
     tabsGridBool: true;
     tabsFillRowsBool: false;
-
-    /* Switch (modern component) - iOS look sizing. Thumb is a white
-       circle, track is rounded pill, green when on with outlined grey
-       when off. Values mirror the historical iOS native theme. */
     switchThumbPaddingInt: 2;
     switchThumbScaleY: "1.4";
     switchTrackScaleY: "1.5";
@@ -69,278 +46,191 @@
     switchThumbInsetMM: "0.25";
 }
 
-/* ---- base ---- */
-
 Component {
-    color: var(--cn1-text-primary);
-    background-color: var(--cn1-surface);
+    color: #000000;
+    background-color: #ffffff;
     padding: 0;
     margin: 0;
 }
 
-Form {
-    background-color: var(--cn1-surface-grouped);
-    padding: 0;
-    margin: 0;
-}
-
-ContentPane {
-    background-color: var(--cn1-surface-grouped);
-    padding: 0;
-    margin: 0;
-}
-
-Container {
-    padding: 0;
-    margin: 0;
-}
-
-/* ---- typography ---- */
+Form { background-color: #f2f2f7; padding: 0; margin: 0; }
+ContentPane { background-color: #f2f2f7; padding: 0; margin: 0; }
+Container { padding: 0; margin: 0; }
 
 Label {
-    color: var(--cn1-text-primary);
+    color: #000000;
     padding: 1mm 2mm 1mm 2mm;
     margin: 0;
     font-family: "native:MainRegular";
 }
 
-SecondaryLabel { cn1-derive: Label; color: var(--cn1-text-secondary); }
-TertiaryLabel { cn1-derive: Label; color: var(--cn1-text-tertiary); }
+SecondaryLabel { cn1-derive: Label; color: #3c3c43; }
+TertiaryLabel { cn1-derive: Label; color: #8e8e93; }
 SpanLabel { cn1-derive: Label; }
 SpanLabelText { cn1-derive: Label; }
 
-/* ---- buttons ---- */
-
 Button {
-    color: var(--cn1-accent);
+    color: #007aff;
     padding: 2mm 3mm 2mm 3mm;
     margin: 1mm;
     font-family: "native:MainRegular";
     cn1-background-type: cn1-pill-border;
 }
-
-Button.pressed { color: var(--cn1-accent-pressed); background-color: var(--cn1-surface-tertiary); }
-Button.disabled { color: var(--cn1-accent-disabled); }
+Button.pressed { color: #0064d1; background-color: #e5e5ea; }
+Button.disabled { color: #b3d4ff; }
 
 RaisedButton {
     cn1-derive: Button;
-    color: var(--cn1-surface);
-    background-color: var(--cn1-accent);
+    color: #ffffff;
+    background-color: #007aff;
 }
-RaisedButton.pressed { background-color: var(--cn1-accent-pressed); }
-RaisedButton.disabled { background-color: var(--cn1-accent-disabled); color: var(--cn1-surface); }
+RaisedButton.pressed { background-color: #0064d1; }
+RaisedButton.disabled { background-color: #b3d4ff; color: #ffffff; }
 
 FlatButton { cn1-derive: Button; }
 
-/* ---- text input ---- */
-
 TextField {
-    color: var(--cn1-text-primary);
-    background-color: var(--cn1-surface);
+    color: #000000;
+    background-color: #ffffff;
     padding: 2mm 3mm 2mm 3mm;
     margin: 1mm 2mm 1mm 2mm;
     font-family: "native:MainRegular";
     cn1-background-type: cn1-round-border;
 }
+TextField.pressed { background-color: #e5e5ea; }
+TextField.disabled { color: #c7c7cc; background-color: #e5e5ea; }
 
-TextField.pressed { background-color: var(--cn1-surface-tertiary); }
-TextField.disabled { color: var(--cn1-text-disabled); background-color: var(--cn1-surface-tertiary); }
-
-TextArea {
-    cn1-derive: TextField;
-    padding: 2mm 3mm 2mm 3mm;
-}
+TextArea { cn1-derive: TextField; padding: 2mm 3mm 2mm 3mm; }
 
 TextHint {
-    color: var(--cn1-text-tertiary);
+    color: #8e8e93;
     padding: 2mm 3mm 2mm 3mm;
     font-family: "native:MainRegular";
 }
 
-/* ---- selection controls ---- */
-
 CheckBox {
     cn1-derive: Label;
-    color: var(--cn1-text-primary);
+    color: #000000;
     background-color: transparent;
     padding: 1mm 2mm 1mm 2mm;
 }
-CheckBox.selected { color: var(--cn1-accent); }
-CheckBox.disabled {
-    color: var(--cn1-text-disabled);
-    background-color: var(--cn1-surface-tertiary);
-}
+CheckBox.selected { color: #007aff; }
+CheckBox.disabled { color: #c7c7cc; background-color: #e5e5ea; }
 
 RadioButton {
     cn1-derive: CheckBox;
-    color: var(--cn1-text-primary);
+    color: #000000;
     background-color: transparent;
     padding: 1mm 2mm 1mm 2mm;
 }
-RadioButton.selected { color: var(--cn1-accent); }
-RadioButton.disabled {
-    color: var(--cn1-text-disabled);
-    background-color: var(--cn1-surface-tertiary);
-}
+RadioButton.selected { color: #007aff; }
+RadioButton.disabled { color: #c7c7cc; background-color: #e5e5ea; }
 
-/* Switch (modern component - preferred over OnOffSwitch). Thumb = fg
-   (white), track = bg (white off / green on). See Switch.java javadoc
-   for renderer contract. */
 Switch {
-    color: var(--cn1-surface);
-    background-color: var(--cn1-surface);
+    color: #ffffff;
+    background-color: #ffffff;
     padding: 1mm;
     margin: 1mm 2mm 1mm 2mm;
 }
-Switch.selected {
-    color: var(--cn1-surface);
-    background-color: var(--cn1-success);
-}
-Switch.disabled {
-    color: var(--cn1-text-disabled);
-    background-color: var(--cn1-surface-tertiary);
-}
+Switch.selected { color: #ffffff; background-color: #34c759; }
+Switch.disabled { color: #c7c7cc; background-color: #e5e5ea; }
 
-/* OnOffSwitch (legacy) - without the mask/on/off images the iOS-mode
-   constant enables, the component falls back to a CheckBox-based
-   "Button" track. Style the Button UIID separately via cn1-derive so
-   at least the colors and pill outline are consistent. */
 OnOffSwitch {
     cn1-derive: Label;
-    color: var(--cn1-accent);
-    background-color: var(--cn1-surface-tertiary);
+    color: #007aff;
+    background-color: #e5e5ea;
     padding: 1mm 2mm 1mm 2mm;
     cn1-background-type: cn1-pill-border;
 }
-OnOffSwitch.selected { background-color: var(--cn1-success); color: var(--cn1-surface); }
-
-/* ---- toolbar ---- */
+OnOffSwitch.selected { background-color: #34c759; color: #ffffff; }
 
 Toolbar {
-    background-color: var(--cn1-surface);
-    color: var(--cn1-text-primary);
+    background-color: #ffffff;
+    color: #000000;
     padding: 1mm;
     margin: 0;
 }
-
-TitleArea {
-    cn1-derive: Toolbar;
-    padding: 1mm 2mm 1mm 2mm;
-}
+TitleArea { cn1-derive: Toolbar; padding: 1mm 2mm 1mm 2mm; }
 
 Title {
-    color: var(--cn1-text-primary);
+    color: #000000;
     padding: 1mm;
     font-family: "native:MainBold";
 }
-
 MainTitle { cn1-derive: Title; }
 
-BackCommand {
-    cn1-derive: Button;
-    color: var(--cn1-accent);
-    padding: 1mm 2mm 1mm 2mm;
-}
+BackCommand { cn1-derive: Button; color: #007aff; padding: 1mm 2mm 1mm 2mm; }
+TitleCommand { cn1-derive: Button; color: #007aff; padding: 1mm 2mm 1mm 2mm; }
 
-TitleCommand {
-    cn1-derive: Button;
-    color: var(--cn1-accent);
-    padding: 1mm 2mm 1mm 2mm;
-}
-
-/* ---- tabs ---- */
-
-Tabs { background-color: var(--cn1-surface); padding: 0; margin: 0; }
-TabsContainer { background-color: var(--cn1-surface); padding: 0; margin: 0; }
+Tabs { background-color: #ffffff; padding: 0; margin: 0; }
+TabsContainer { background-color: #ffffff; padding: 0; margin: 0; }
 
 Tab {
-    color: var(--cn1-text-secondary);
-    background-color: var(--cn1-surface);
+    color: #3c3c43;
+    background-color: #ffffff;
     padding: 2mm 3mm 2mm 3mm;
     margin: 0;
     font-family: "native:MainRegular";
     text-align: center;
 }
-Tab.selected { color: var(--cn1-accent); }
-Tab.pressed { color: var(--cn1-accent-pressed); background-color: var(--cn1-surface-tertiary); }
+Tab.selected { color: #007aff; }
+Tab.pressed { color: #0064d1; background-color: #e5e5ea; }
 
-SelectedTab { cn1-derive: Tab; color: var(--cn1-accent); }
-UnselectedTab { cn1-derive: Tab; color: var(--cn1-text-secondary); }
+SelectedTab { cn1-derive: Tab; color: #007aff; }
+UnselectedTab { cn1-derive: Tab; color: #3c3c43; }
 
-/* ---- side menu ---- */
-
-SideNavigationPanel { background-color: var(--cn1-surface); padding: 0; margin: 0; }
+SideNavigationPanel { background-color: #ffffff; padding: 0; margin: 0; }
 
 SideCommand {
     cn1-derive: Button;
-    color: var(--cn1-text-primary);
+    color: #000000;
     padding: 2mm 3mm 2mm 3mm;
     margin: 0;
 }
-SideCommand.pressed { background-color: var(--cn1-surface-tertiary); }
+SideCommand.pressed { background-color: #e5e5ea; }
 
-/* ---- list / MultiButton ---- */
+List { background-color: #ffffff; padding: 0; margin: 0; }
 
-List { background-color: var(--cn1-surface); padding: 0; margin: 0; }
-
-ListRenderer {
-    cn1-derive: Label;
-    padding: 2mm 3mm 2mm 3mm;
-}
+ListRenderer { cn1-derive: Label; padding: 2mm 3mm 2mm 3mm; }
 
 MultiButton {
     cn1-derive: Button;
-    background-color: var(--cn1-surface);
-    color: var(--cn1-text-primary);
+    background-color: #ffffff;
+    color: #000000;
     padding: 2mm 3mm 2mm 3mm;
     margin: 0;
 }
-MultiButton.pressed { background-color: var(--cn1-surface-tertiary); }
+MultiButton.pressed { background-color: #e5e5ea; }
 
-MultiLine1 { cn1-derive: Label; color: var(--cn1-text-primary); font-family: "native:MainBold"; }
-MultiLine2 { cn1-derive: Label; color: var(--cn1-text-secondary); }
-MultiLine3 { cn1-derive: Label; color: var(--cn1-text-tertiary); }
-MultiLine4 { cn1-derive: Label; color: var(--cn1-text-tertiary); }
-
-/* ---- dialog / sheet ---- */
+MultiLine1 { cn1-derive: Label; color: #000000; font-family: "native:MainBold"; }
+MultiLine2 { cn1-derive: Label; color: #3c3c43; }
+MultiLine3 { cn1-derive: Label; color: #8e8e93; }
+MultiLine4 { cn1-derive: Label; color: #8e8e93; }
 
 Dialog {
-    background-color: var(--cn1-surface);
-    color: var(--cn1-text-primary);
+    background-color: #ffffff;
+    color: #000000;
     padding: 3mm;
     margin: 0;
     cn1-background-type: cn1-round-border;
 }
-
 DialogBody { cn1-derive: Dialog; padding: 2mm; }
 DialogTitle { cn1-derive: Title; padding: 2mm; }
-DialogContentPane { background-color: var(--cn1-surface); padding: 2mm; margin: 0; }
-DialogCommandArea { background-color: var(--cn1-surface); padding: 1mm; }
-
-/* ---- FAB ---- */
+DialogContentPane { background-color: #ffffff; padding: 2mm; margin: 0; }
+DialogCommandArea { background-color: #ffffff; padding: 1mm; }
 
 FloatingActionButton {
-    color: var(--cn1-surface);
-    background-color: var(--cn1-accent);
+    color: #ffffff;
+    background-color: #007aff;
     padding: 3mm;
     margin: 3mm;
     font-family: "native:MainBold";
     cn1-background-type: cn1-pill-border;
 }
-FloatingActionButton.pressed { background-color: var(--cn1-accent-pressed); }
+FloatingActionButton.pressed { background-color: #0064d1; }
 
-/* ---- misc ---- */
-
-Separator { background-color: var(--cn1-separator); padding: 0; margin: 0; }
+Separator { background-color: #c6c6c8; padding: 0; margin: 0; }
 PopupContent { cn1-derive: Dialog; padding: 2mm; }
-
-/* ==============================================================
- * Dark mode overrides. The compiler emits these as $DarkUIID so
- * UIManager.getStyle picks them up when CN.isDarkMode() is true.
- * Values are inlined (not var()) because the compiler's dark-mode
- * rewriter treats the @media block at string level and doesn't
- * re-scope :root variable declarations.
- * ============================================================ */
 
 @media (prefers-color-scheme: dark) {
     Component { color: #ffffff; background-color: #000000; }
