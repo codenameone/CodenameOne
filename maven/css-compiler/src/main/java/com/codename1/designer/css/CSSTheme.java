@@ -6996,7 +6996,7 @@ public class CSSTheme {
         int len = css.length();
         int pos = 0;
         while (pos < len) {
-            int mediaPos = css.indexOf("@media", pos);
+            int mediaPos = indexOfOutsideComments(css, "@media", pos);
             if (mediaPos < 0) {
                 out.append(css.substring(pos));
                 break;
@@ -7083,6 +7083,32 @@ public class CSSTheme {
             out.append("$Dark").append(base).append(suffix);
         }
         return out.toString();
+    }
+
+    /// Finds the next occurrence of `needle` in `css` starting at `fromPos`,
+    /// skipping over any `/* ... */` block-comment regions. Used by the
+    /// dark-mode rewriter so a literal "@media" token documented inside a
+    /// header comment isn't mistaken for a real media block.
+    private static int indexOfOutsideComments(String css, String needle, int fromPos) {
+        int len = css.length();
+        int pos = fromPos;
+        while (pos < len) {
+            int commentStart = css.indexOf("/*", pos);
+            int hit = css.indexOf(needle, pos);
+            if (hit < 0) {
+                return -1;
+            }
+            if (commentStart < 0 || hit < commentStart) {
+                return hit;
+            }
+            int commentEnd = css.indexOf("*/", commentStart + 2);
+            if (commentEnd < 0) {
+                // Unterminated comment - everything from here on is comment.
+                return -1;
+            }
+            pos = commentEnd + 2;
+        }
+        return -1;
     }
 
     private static int findMatchingBrace(String css, int openPos) {
