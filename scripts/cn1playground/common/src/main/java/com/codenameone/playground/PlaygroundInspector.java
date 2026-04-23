@@ -343,11 +343,6 @@ final class PlaygroundInspector {
             notifyChange(comp, "visible");
         });
 
-        // Reset the scroll to the top since the content just changed. If a
-        // previous selection left the pane scrolled down, the first rows of
-        // the new content would appear above the visible scroll viewport.
-        propertiesContainer.scrollComponentToVisible(null);
-        propertiesContainer.setScrollY(0);
         // forceRevalidate walks the entire sub-tree marking every descendant
         // for preferred-size recalc, then revalidates. Plain revalidate() /
         // revalidateLater() inside the Button's ActionListener had children
