@@ -13,8 +13,8 @@ Add a Metal-based rendering backend to the iOS port, gated by `#ifdef CN1_USE_ME
 | Phase | Scope | Status |
 |-------|-------|--------|
 | 0 | Unblock the Metal stub; scaffolding + compile | **complete** |
-| 1 | `CN1Metalcompat` + MVP ops (`FillRect`, `DrawImage`, `ClipRect`, `SetTransform`, `ClearRect`) | **in progress** |
-| 2 | Remaining `ExecutableOp`s + parity text | not started |
+| 1 | `CN1Metalcompat` + MVP ops (`FillRect`, `DrawImage`, `ClipRect`, `SetTransform`, `ClearRect`) | **complete (MVP)** |
+| 2 | Remaining `ExecutableOp`s + parity text + coordinate-system calibration | not started |
 | 3 | Unify mutable image rendering onto Metal | not started |
 | 4 | CoreText glyph atlas | not started |
 | 5 | Harden (colour space, drawable throttling, memory, lifecycle) | not started |
@@ -46,11 +46,18 @@ Add a Metal-based rendering backend to the iOS port, gated by `#ifdef CN1_USE_ME
 - `ByteCodeTranslator.java` — registers `.metal` as `sourcecode.metal` in the generated `project.pbxproj` and includes it in the Sources build phase so Xcode builds `default.metallib` from our shader source.
 - Op ports: `FillRect.m`, `ClearRect.m`, `ClipRect.m` (rectangular-only, stencil clip TBD Phase 2), `SetTransform.m`, `DrawImage.m` — each with a one-line `#ifdef CN1_USE_METAL` branch at the top of `execute` that calls the new API, followed by `return`.
 
-### Pending
+### Validated (MVP)
 
-- **Metal Toolchain installation.** Xcode 26.3 on iOS 26 SDK requires `xcodebuild -downloadComponent MetalToolchain` before `.metal` files will compile. Without it, xcodebuild fails at the `CompileMetalFile` step with *"cannot execute tool 'metal' due to missing Metal Toolchain"*. Once installed, `CN1MetalShaders.metal` → `default.metallib` is automatic.
-- **Visual validation.** Once the toolchain is installed, launch hellocodenameone on the simulator and confirm `FillRect` renders a visible rectangle through Metal (it should match the GL baseline's pixels within the comparator tolerance).
-- **GLUIImage Metal texture caching.** Currently `CN1MetalDrawImage` re-rasterises the UIImage on every draw — slow. Add an `MTLTexture` cache on `GLUIImage` so repeated draws of the same image reuse the texture.
+- **xcodebuild end-to-end success** under `-Dcodename1.arg.ios.metal=true` on iOS 26 SDK (Xcode 26.3). Shader compiles into `default.metallib` and is embedded in the app bundle.
+- **Runtime smoke test** — a forced `CN1MetalFillRect(0xFF0000, 0xFF, 100, 100, 400, 400)` at the tail of every frame produces a visible red rectangle on the iPhone 17 Pro simulator (screenshot archived). `drawQuad` trace confirmed 841+ draw calls per 6-second window with non-nil `MTLRenderCommandEncoder` and resolved `MTLRenderPipelineState`. No crashes, no Metal validation assertions, no `nextDrawable` stalls.
+- **Form background renders.** The hellocodenameone test runner's Form displays its grey background through the Metal pipeline (not through UIKit fallback) — confirmed by clearColor=black contrast: we see grey, not black.
+
+### Known follow-ups for Phase 2
+
+- **Coordinate-system calibration.** The red rect from the smoke test landed lower and larger than expected, suggesting a logical-vs-physical pixel mismatch in the projection. The Metal `framebufferWidth`/`framebufferHeight` are in physical pixels but CodenameOne's `drawFrame` may be passing op coordinates in logical points. Needs a pass to align with the GL path's convention (probably `_glScalef(scaleValue, scaleValue, 1)` equivalent or adjust projection to logical-point extent).
+- **Metal Toolchain dependency.** Xcode 26.3 on iOS 26 SDK requires `xcodebuild -downloadComponent MetalToolchain` as a one-time setup, else xcodebuild fails at `CompileMetalFile` with *"cannot execute tool 'metal' due to missing Metal Toolchain"*. Documented in the verification flow below.
+- **GLUIImage Metal texture caching.** Currently `CN1MetalDrawImage` re-rasterises the UIImage on every draw. Add an `MTLTexture` cache on `GLUIImage` so repeated draws reuse the texture.
+- **Header include pattern for new Metal sources.** Any new file that checks `#ifdef CN1_USE_METAL` MUST `#import "CN1ES2compat.h"` before the ifdef, otherwise the preprocessor treats the whole file as empty and the linker reports undefined symbols (a bug we hit twice during Phase 0/1).
 
 ## Phase 1 verification flow
 
