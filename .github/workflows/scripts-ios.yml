@@ -162,3 +162,142 @@ jobs:
           path: artifacts
           if-no-files-found: warn
           retention-days: 14
+
+  build-ios-metal:
+    # Mirrors build-ios but enables the Metal rendering backend via the
+    # codename1.arg.ios.metal=true build hint. Keeps the GL path untouched
+    # so a regression on either path is isolated in its own job. Part of
+    # the iOS Metal port migration -- see Ports/iOSPort/METAL_PORT_STATUS.md.
+    #
+    # continue-on-error while the Metal port is still in progress:
+    # screenshot comparisons will differ from golden images until DrawString
+    # is ported and ClipRect is re-enabled (Phase 2 follow-ups tracked in
+    # METAL_PORT_STATUS.md). The Metal job still runs on every PR that
+    # touches the paths below so we can watch for new regressions and
+    # download artifacts for comparison, but a failure here won't block
+    # the PR. Flip this to false (or remove the line) once the Metal
+    # variant matches the GL variant's screenshot set.
+    continue-on-error: true
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    runs-on: macos-15
+    timeout-minutes: 60
+    concurrency:
+      group: mac-ci-${{ github.workflow }}-metal-${{ github.ref_name }}
+      cancel-in-progress: true
+
+    env:
+      GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+      GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ensure CocoaPods tooling
+        run: |
+          mkdir -p ~/.codenameone
+          cp maven/UpdateCodenameOne.jar ~/.codenameone/
+          set -euo pipefail
+          if ! command -v ruby >/dev/null; then
+            echo "ruby not found"; exit 1
+          fi
+          GEM_USER_DIR="$(ruby -e 'print Gem.user_dir')"
+          export PATH="$GEM_USER_DIR/bin:$PATH"
+          gem install cocoapods xcodeproj --no-document --user-install
+          pod --version
+
+      - name: Compute setup-workspace hash
+        id: setup_hash
+        run: |
+          set -euo pipefail
+          echo "hash=$(shasum -a 256 scripts/setup-workspace.sh | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Set TMPDIR
+        run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
+
+      - name: Cache codenameone-tools
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/codenameone-tools
+          key: ${{ runner.os }}-cn1-tools-${{ steps.setup_hash.outputs.hash }}
+          restore-keys: |
+            ${{ runner.os }}-cn1-tools-
+
+      - name: Restore cn1-binaries cache
+        uses: actions/cache@v4
+        with:
+          path: ../cn1-binaries
+          key: cn1-binaries-${{ runner.os }}-${{ steps.setup_hash.outputs.hash }}
+          restore-keys: |
+            cn1-binaries-${{ runner.os }}-
+
+      - name: Setup workspace
+        run: ./scripts/setup-workspace.sh -q -DskipTests
+        timeout-minutes: 40
+
+      - name: Build iOS port
+        run: ./scripts/build-ios-port.sh -q -DskipTests
+        timeout-minutes: 40
+
+      - name: Install Metal Toolchain
+        # Xcode 26+ requires the Metal Toolchain component to be downloaded
+        # explicitly before .metal files can compile. No-op if the component
+        # is already installed on the runner image.
+        run: xcodebuild -downloadComponent MetalToolchain
+        timeout-minutes: 10
+
+      - name: Enable Metal backend for hellocodenameone
+        # -Dcodename1.arg.* on the mvnw CLI doesn't flow into the Codename
+        # One Maven plugin's BuildRequest -- the plugin reads build args
+        # from the codenameone_settings.properties file on disk. Inject the
+        # Metal flag there so IPhoneBuilder's useMetal path activates.
+        run: |
+          set -euo pipefail
+          SETTINGS=scripts/hellocodenameone/common/codenameone_settings.properties
+          if grep -q '^codename1\.arg\.ios\.metal=' "$SETTINGS"; then
+            sed -i '' 's|^codename1.arg.ios.metal=.*|codename1.arg.ios.metal=true|' "$SETTINGS"
+          else
+            # Insert next to the other ios.* keys (after applicationQueriesSchemes).
+            awk '
+              /^codename1\.arg\.ios\.applicationQueriesSchemes=/ {
+                print
+                print "codename1.arg.ios.metal=true"
+                next
+              }
+              { print }
+            ' "$SETTINGS" > "$SETTINGS.tmp" && mv "$SETTINGS.tmp" "$SETTINGS"
+          fi
+          echo "--- codenameone_settings.properties (ios.* keys after patch) ---"
+          grep -n 'codename1\.arg\.ios' "$SETTINGS" || true
+
+      - name: Build sample iOS app and compile workspace (Metal)
+        id: build-ios-app
+        run: ./scripts/build-ios-app.sh -q -DskipTests
+        timeout-minutes: 30
+
+      - name: Run iOS UI screenshot tests (Metal)
+        env:
+          ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/ios-ui-tests-metal
+        run: |
+          set -euo pipefail
+          mkdir -p "${ARTIFACTS_DIR}"
+
+          echo "workspace='${{ steps.build-ios-app.outputs.workspace }}'"
+          echo "scheme='${{ steps.build-ios-app.outputs.scheme }}'"
+
+          ./scripts/run-ios-ui-tests.sh \
+            "${{ steps.build-ios-app.outputs.workspace }}" \
+            "" \
+            "${{ steps.build-ios-app.outputs.scheme }}"
+        timeout-minutes: 30
+
+      - name: Upload iOS Metal artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ui-tests-metal
+          path: artifacts
+          if-no-files-found: warn
+          retention-days: 14
