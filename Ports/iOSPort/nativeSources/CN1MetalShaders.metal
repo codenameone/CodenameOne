@@ -56,7 +56,7 @@ static inline float4 applyMatrices(float2 p, constant CN1Matrices &m) {
 
 vertex VertexOutPlain cn1_vs_solid(
     uint vid [[vertex_id]],
-    const device float2 *positions [[buffer(0)]],
+    constant float2 *positions [[buffer(0)]],
     constant CN1Matrices &matrices [[buffer(1)]])
 {
     VertexOutPlain out;
@@ -75,9 +75,9 @@ fragment float4 cn1_fs_solid(
 
 vertex VertexOutTextured cn1_vs_textured(
     uint vid [[vertex_id]],
-    const device float2 *positions [[buffer(0)]],
+    constant float2 *positions [[buffer(0)]],
     constant CN1Matrices &matrices [[buffer(1)]],
-    const device float2 *texcoords [[buffer(2)]])
+    constant float2 *texcoords [[buffer(2)]])
 {
     VertexOutTextured out;
     out.position = applyMatrices(positions[vid], matrices);

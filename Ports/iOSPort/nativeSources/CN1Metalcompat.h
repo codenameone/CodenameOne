@@ -23,6 +23,7 @@
 #ifndef CN1Metalcompat_h
 #define CN1Metalcompat_h
 
+#import "CN1ES2compat.h"
 #ifdef CN1_USE_METAL
 
 @import Metal;

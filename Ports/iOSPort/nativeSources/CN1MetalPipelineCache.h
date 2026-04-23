@@ -5,6 +5,7 @@
 #ifndef CN1MetalPipelineCache_h
 #define CN1MetalPipelineCache_h
 
+#import "CN1ES2compat.h"
 #ifdef CN1_USE_METAL
 #import <Foundation/Foundation.h>
 @import Metal;
