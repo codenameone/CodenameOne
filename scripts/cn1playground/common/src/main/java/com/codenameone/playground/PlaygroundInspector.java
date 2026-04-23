@@ -165,11 +165,14 @@ final class PlaygroundInspector {
     }
 
     private Container createTreeRow(Component c, int depth) {
-        final boolean isContainer = c instanceof Container;
+        boolean isContainer = c instanceof Container;
         boolean selected = c == selectedComponent;
         String rowUiid = uiidDark(selected ? "PlaygroundTreeRowActive" : "PlaygroundTreeRow");
 
-        final Button chevron = new Button();
+        Container row = new Container(new BorderLayout());
+        row.setUIID(rowUiid);
+
+        Button chevron = new Button();
         chevron.setUIID(uiidDark("PlaygroundTreeChevron"));
         if (isContainer) {
             char arrow = isExpanded(c) ? FontImage.MATERIAL_EXPAND_MORE : FontImage.MATERIAL_CHEVRON_RIGHT;
@@ -187,26 +190,20 @@ final class PlaygroundInspector {
             chevron.setHidden(true);
         }
 
-        Label typeIcon = new Label();
-        typeIcon.setUIID(uiidDark("PlaygroundTreeTypeIcon"));
+        // Button-in-CENTER: works reliably inside a scrollable container where
+        // a Container pointer-listener does not (the outer scroll swallows the
+        // drag gestures). The Button stretches to fill CENTER, giving the full
+        // row width as a click target.
+        String text = c.getClass().getSimpleName() + extractBracket(c);
+        Button body = new Button(text);
+        body.setUIID(uiidDark(selected ? "PlaygroundTreeTypeActive" : "PlaygroundTreeType"));
         char typeChar = isContainer ? FontImage.MATERIAL_FOLDER_OPEN : FontImage.MATERIAL_ARTICLE;
-        FontImage.setMaterialIcon(typeIcon, typeChar, 3f);
+        FontImage.setMaterialIcon(body, typeChar, 3f);
+        body.setTextPosition(Component.RIGHT);
+        body.setGap(Display.getInstance().convertToPixels(1f));
+        body.setAlignment(Component.LEFT);
+        body.addActionListener(e -> handleComponentSelected(c));
 
-        Label textLabel = new Label(c.getClass().getSimpleName() + extractBracket(c));
-        textLabel.setUIID(uiidDark(selected ? "PlaygroundTreeTypeActive" : "PlaygroundTreeType"));
-
-        Container body = new Container(BoxLayout.x());
-        body.getAllStyles().setBgTransparency(0);
-        body.add(typeIcon);
-        body.add(textLabel);
-
-        Container row = new Container(new BorderLayout());
-        row.setUIID(rowUiid);
-        row.add(BorderLayout.WEST, chevron);
-        row.add(BorderLayout.CENTER, body);
-
-        // Depth indent: spec values (3 mm base + 5 mm per level) rendered at
-        // ~75% so they sit correctly at CN1 physical-mm scale.
         float indentMm = 2f + depth * 3.8f;
         row.getAllStyles().setPaddingUnit(Style.UNIT_TYPE_DIPS);
         row.getAllStyles().setPaddingLeft((int) indentMm);
@@ -216,20 +213,8 @@ final class PlaygroundInspector {
         int rowH = Display.getInstance().convertToPixels(6f);
         row.setPreferredH(rowH);
 
-        // Selection fires on a pointer release anywhere on the row, except when
-        // the release lands inside the chevron button (which handles its own
-        // expand/collapse). addPointerReleasedListener fires in addition to the
-        // chevron's own ActionListener, so gate on absolute X coords.
-        row.addPointerReleasedListener(e -> {
-            if (isContainer && chevron.isVisible()) {
-                int x = e.getX();
-                int cx = chevron.getAbsoluteX();
-                if (x >= cx && x < cx + chevron.getWidth()) {
-                    return;
-                }
-            }
-            handleComponentSelected(c);
-        });
+        row.add(BorderLayout.WEST, chevron);
+        row.add(BorderLayout.CENTER, body);
         return row;
     }
 
