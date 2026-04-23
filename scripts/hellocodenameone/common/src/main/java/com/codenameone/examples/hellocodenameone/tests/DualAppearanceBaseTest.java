@@ -157,16 +157,21 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
     }
 
     private void finish() {
-        // Restore platform-default dark mode + the installed native theme
-        // so subsequent tests in the suite (including ones that rely on
-        // the legacy theme) start from a clean slate.
+        // Restore platform-default dark mode + the app's own theme so
+        // subsequent tests in the suite (legacy screenshots matching
+        // pre-change goldens) see exactly the state they had before
+        // this test ran.
         Display.getInstance().setDarkMode(null);
         if (useModernTheme()) {
-            // Reload the platform's default theme via the native impl.
-            // This reinstalls iPhoneTheme / iOS7Theme / android_holo_light
-            // / androidTheme per the non-modern defaults - exactly what
-            // the app saw before this test ran.
-            Display.getInstance().installNativeTheme();
+            // UIManager.initFirstTheme loads /theme.res (the app's
+            // compiled theme.css). With includeNativeBool=true in its
+            // constants it triggers Display.installNativeTheme() -
+            // Holo Light / iPhoneTheme per the platform's legacy default -
+            // and then layers the user's UIID overrides on top. This
+            // recreates the original startup theme state, which
+            // Display.installNativeTheme alone doesn't (it drops the
+            // user's font / padding / colour overrides).
+            UIManager.initFirstTheme("/theme");
         }
         UIManager.getInstance().refreshTheme();
         done();
