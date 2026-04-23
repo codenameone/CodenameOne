@@ -396,7 +396,7 @@ PlaygroundActivityButton {
     border-left: 0.8mm solid transparent;
     font-family: "native:MainLight";
     font-size: 2.6mm;
-    padding: 2mm 1.5mm 2mm 0.7mm;
+    padding: 2mm 1.5mm 2mm 1.7mm;
     margin: 0.5mm 0 0.5mm 0;
     text-decoration: none;
 }
@@ -407,7 +407,7 @@ PlaygroundActivityButtonDark {
     border-left: 0.8mm solid transparent;
     font-family: "native:MainLight";
     font-size: 2.6mm;
-    padding: 2mm 1.5mm 2mm 0.7mm;
+    padding: 2mm 1.5mm 2mm 1.7mm;
     margin: 0.5mm 0 0.5mm 0;
     text-decoration: none;
 }
@@ -418,7 +418,7 @@ PlaygroundActivityButtonActive {
     border-left: 0.8mm solid #4D86FF;
     font-family: "native:MainBold";
     font-size: 2.6mm;
-    padding: 2mm 1.5mm 2mm 0.7mm;
+    padding: 2mm 1.5mm 2mm 1.7mm;
     margin: 0.5mm 0 0.5mm 0;
     text-decoration: none;
 }
@@ -429,7 +429,7 @@ PlaygroundActivityButtonActiveDark {
     border-left: 0.8mm solid #4D86FF;
     font-family: "native:MainBold";
     font-size: 2.6mm;
-    padding: 2mm 1.5mm 2mm 0.7mm;
+    padding: 2mm 1.5mm 2mm 1.7mm;
     margin: 0.5mm 0 0.5mm 0;
     text-decoration: none;
 }

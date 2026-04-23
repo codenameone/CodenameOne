@@ -222,11 +222,7 @@ final class PlaygroundInspector {
     private void handleComponentSelected(Component c) {
         selectedComponent = c;
         highlightComponent(c);
-        // Defer the panel rebuild to the next EDT tick so the Button's tactile
-        // press-and-release handling finishes fully before we touch any parent
-        // layout. revalidate() inside the Button's ActionListener was fighting
-        // the Button's own press animation and the preview-highlight repaint.
-        com.codename1.ui.CN.callSerially(() -> updatePropertyPanel(c));
+        updatePropertyPanel(c);
     }
 
     private void highlightComponent(Component c) {
@@ -347,13 +343,17 @@ final class PlaygroundInspector {
             notifyChange(comp, "visible");
         });
 
-        // revalidateLater() queues the layout pass via the form's paint-cycle
-        // revalidation queue instead of firing mid-callback. Calling revalidate()
-        // here (inside the Button's ActionListener callback, while the Button's
-        // press animation is still running) was the silent no-op: the layout
-        // would snap to the animation's final frame and the new children stayed
-        // at measured size 0.
-        propertiesContainer.revalidateLater();
+        // Reset the scroll to the top since the content just changed. If a
+        // previous selection left the pane scrolled down, the first rows of
+        // the new content would appear above the visible scroll viewport.
+        propertiesContainer.scrollComponentToVisible(null);
+        propertiesContainer.setScrollY(0);
+        // forceRevalidate walks the entire sub-tree marking every descendant
+        // for preferred-size recalc, then revalidates. Plain revalidate() /
+        // revalidateLater() inside the Button's ActionListener had children
+        // retain stale 0-size from the previous layout pass, which kept the
+        // pane blank until a manual resize forced a fresh layout.
+        propertiesContainer.forceRevalidate();
     }
 
     // ============================================================
