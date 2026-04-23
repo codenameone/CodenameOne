@@ -314,7 +314,7 @@ bj_log "Compiling JavaScript-port runtime sources"
 cp -R "$PORT_CLASSES"/. "$STAGE_CLASSES"/
 
 bj_log "Running ByteCodeTranslator for $DIST_APP_NAME"
-"$JAVA_BIN" -cp "$PARPARVM_COMPILER" com.codename1.tools.translator.ByteCodeTranslator \
+"$JAVA_BIN" ${PARPARVM_TRANSLATOR_OPTS:-} -cp "$PARPARVM_COMPILER" com.codename1.tools.translator.ByteCodeTranslator \
   javascript \
   "$STAGE_CLASSES" \
   "$TRANSLATOR_OUT" \

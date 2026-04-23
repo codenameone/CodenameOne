@@ -1,0 +1,424 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ */
+
+package com.codename1.tools.translator;
+
+import com.codename1.tools.translator.bytecodes.Field;
+import com.codename1.tools.translator.bytecodes.Instruction;
+import com.codename1.tools.translator.bytecodes.Invoke;
+import com.codename1.tools.translator.bytecodes.TypeInstruction;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Deque;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.IdentityHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import org.objectweb.asm.Opcodes;
+
+/**
+ * JavaScript-target-only Rapid Type Analysis culler. The default
+ * {@link MethodDependencyGraph}-based culler over-approximates heavily:
+ * it keys callers by ``desc.name`` only (no class), so any call to
+ * {@code Foo.size()I} marks {@code Bar.size()I}, {@code Baz.size()I}
+ * and every other ``size()I`` in the program as reachable. Running the
+ * JS port through it produced ~72k surviving methods for an app that
+ * only needs a small fraction.
+ *
+ * RTA starts from {@code main} plus a handful of runtime roots, keeps a
+ * set of classes that have actually been instantiated (via {@code new}
+ * or array creation), and resolves each {@code invokevirtual /
+ * invokeinterface} to exactly the set of overrides reachable from the
+ * currently known instantiated subtypes. When a new subtype enters
+ * the instantiated set, pending virtual calls whose receiver type is
+ * a supertype are re-resolved against it. {@code invokestatic /
+ * invokespecial} are handled precisely against the declared owner.
+ *
+ * We leave the conservative culler alone for iOS / C# — their
+ * runtimes rely on different dispatch mechanics and changing their
+ * reachability could break end-user apps. JS is opt-in via the output
+ * type check in {@link Parser#compile(File)}.
+ *
+ * Safety net: methods marked "used by native" and main methods are
+ * kept unconditionally. Common runtime roots (Boolean/String/Integer/
+ * Thread/etc. that {@link ByteCodeClass#markDependencies} pins
+ * regardless) are also seeded as instantiated — app code that reaches
+ * them via {@code Class.forName} or reflection still finds them alive.
+ */
+final class JavascriptReachability {
+    private static final String[] RUNTIME_ROOT_CLASSES = {
+        "java_lang_Boolean",
+        "java_lang_String",
+        "java_lang_Integer",
+        "java_lang_Byte",
+        "java_lang_Short",
+        "java_lang_Character",
+        "java_lang_Thread",
+        "java_lang_Long",
+        "java_lang_Double",
+        "java_lang_Float",
+        "java_lang_StackOverflowError",
+        "java_text_DateFormat",
+        "java_lang_NullPointerException",
+        "java_lang_ArrayIndexOutOfBoundsException",
+        "java_lang_ArithmeticException",
+        "java_lang_ClassCastException",
+        "java_lang_NegativeArraySizeException",
+        "java_lang_Object"
+    };
+
+    private final Map<String, ByteCodeClass> byName = new HashMap<String, ByteCodeClass>();
+    private final Map<String, Set<String>> subclassesOf = new HashMap<String, Set<String>>();
+    private final Set<String> instantiated = new HashSet<String>();
+    // BytecodeMethod.equals() is content-based (name+args+return) and
+    // intentionally ignores the declaring class, so a plain HashSet
+    // would collapse every class's ``<init>()V`` into a single entry
+    // and wreck RTA. Use identity equality to keep per-class methods
+    // distinct.
+    private final Set<BytecodeMethod> live = Collections.newSetFromMap(new IdentityHashMap<BytecodeMethod, Boolean>());
+    private final Deque<BytecodeMethod> worklist = new ArrayDeque<BytecodeMethod>();
+    private final Map<String, List<VirtualCall>> pendingByReceiver = new HashMap<String, List<VirtualCall>>();
+
+    private static final class VirtualCall {
+        final String receiver;
+        final String methodName;
+        final String desc;
+        final boolean isInterface;
+        VirtualCall(String receiver, String methodName, String desc, boolean isInterface) {
+            this.receiver = receiver;
+            this.methodName = methodName;
+            this.desc = desc;
+            this.isInterface = isInterface;
+        }
+    }
+
+    static int run(List<ByteCodeClass> classes, String[] nativeSources) {
+        JavascriptReachability rta = new JavascriptReachability();
+        rta.index(classes);
+        rta.seedRoots(classes, nativeSources);
+        rta.propagate();
+        return rta.eliminate(classes);
+    }
+
+    private void index(List<ByteCodeClass> classes) {
+        for (ByteCodeClass cls : classes) {
+            byName.put(cls.getClsName(), cls);
+        }
+        // Build a subtype index covering both the extends chain and
+        // implements/interface-extends relationships. This is the
+        // transitive subtype set we scan when a virtual call's
+        // receiver is a supertype of some instantiated class.
+        for (ByteCodeClass cls : classes) {
+            String clsName = cls.getClsName();
+            String base = cls.getBaseClass();
+            if (base != null) {
+                base = JavascriptNameUtil.sanitizeClassName(base);
+                addSubtype(base, clsName);
+            }
+            List<String> ifaces = cls.getBaseInterfaces();
+            if (ifaces != null) {
+                for (String iface : ifaces) {
+                    iface = JavascriptNameUtil.sanitizeClassName(iface);
+                    addSubtype(iface, clsName);
+                }
+            }
+        }
+    }
+
+    private void addSubtype(String supertype, String subtype) {
+        Set<String> set = subclassesOf.get(supertype);
+        if (set == null) {
+            set = new HashSet<String>();
+            subclassesOf.put(supertype, set);
+        }
+        set.add(subtype);
+    }
+
+    private void seedRoots(List<ByteCodeClass> classes, String[] nativeSources) {
+        // main + all main methods
+        for (ByteCodeClass cls : classes) {
+            for (BytecodeMethod m : cls.getMethods()) {
+                if (m.isEliminated()) {
+                    continue;
+                }
+                if (m.isMain()) {
+                    enqueue(m);
+                }
+                // Native-consumer methods are always kept — the iOS/JS
+                // host may reach them via a channel the RTA can't see.
+                if (m.isMethodUsedByNative(nativeSources, cls)) {
+                    enqueue(m);
+                }
+                // finalize() is legal to be called by the VM without
+                // appearing in bytecode.
+                if ("finalize".equals(m.getMethodName())) {
+                    enqueue(m);
+                }
+                // __CLINIT__ fires when the owning class is first
+                // touched; seed it when we see the class.
+            }
+            if (cls.getUsedByNative() == ByteCodeClass.UsedByNativeResult.Used) {
+                markClassInstantiated(cls.getClsName());
+            }
+        }
+        // Runtime roots that the translator always keeps alive.
+        for (String root : RUNTIME_ROOT_CLASSES) {
+            markClassInstantiated(root);
+        }
+    }
+
+    private void enqueue(BytecodeMethod method) {
+        if (method == null || method.isEliminated() || !live.add(method)) {
+            return;
+        }
+        worklist.add(method);
+    }
+
+    private void markClassInstantiated(String clsName) {
+        if (clsName == null || !instantiated.add(clsName)) {
+            return;
+        }
+        ByteCodeClass cls = byName.get(clsName);
+        if (cls == null) {
+            return;
+        }
+        // Static-initialiser fires implicitly on first touch.
+        for (BytecodeMethod m : cls.getMethods()) {
+            if ("__CLINIT__".equals(m.getMethodName())) {
+                enqueue(m);
+            }
+        }
+        // Walk the supertype chain so instance method dispatch can
+        // land on any of them. Instantiating Foo implicitly touches
+        // Foo's base classes too (they don't get their own "new", but
+        // Foo's ctor calls super() etc.).
+        String base = cls.getBaseClass();
+        if (base != null) {
+            markClassInstantiated(JavascriptNameUtil.sanitizeClassName(base));
+        }
+        // Resolve any pending virtual calls whose receiver type is
+        // now this class or any supertype.
+        resolvePendingFor(clsName);
+        if (base != null) {
+            resolvePendingFor(JavascriptNameUtil.sanitizeClassName(base));
+        }
+        List<String> ifaces = cls.getBaseInterfaces();
+        if (ifaces != null) {
+            for (String iface : ifaces) {
+                String sanitized = JavascriptNameUtil.sanitizeClassName(iface);
+                resolvePendingFor(sanitized);
+            }
+        }
+    }
+
+    private void resolvePendingFor(String receiverType) {
+        List<VirtualCall> pending = pendingByReceiver.get(receiverType);
+        if (pending == null) {
+            return;
+        }
+        // Snapshot so re-entrant adds don't break iteration.
+        VirtualCall[] snapshot = pending.toArray(new VirtualCall[0]);
+        for (VirtualCall call : snapshot) {
+            dispatchVirtualFromInstantiated(call);
+        }
+    }
+
+    private void propagate() {
+        while (!worklist.isEmpty()) {
+            BytecodeMethod method = worklist.poll();
+            visitMethod(method);
+        }
+    }
+
+    private void visitMethod(BytecodeMethod method) {
+        String clsName = method.getClsName();
+        markClassInstantiated(clsName);
+        List<Instruction> instructions = method.getInstructions();
+        if (instructions == null) {
+            return;
+        }
+        for (Instruction instr : instructions) {
+            if (instr instanceof TypeInstruction) {
+                int op = instr.getOpcode();
+                if (op == Opcodes.NEW) {
+                    String type = ((TypeInstruction) instr).getTypeName();
+                    if (type != null) {
+                        markClassInstantiated(JavascriptNameUtil.sanitizeClassName(type));
+                    }
+                }
+                // ANEWARRAY doesn't create instances of the component type
+                // (it creates an array object) — the component type only
+                // becomes relevant when its methods are invoked, which
+                // the invoke-walk below covers.
+            } else if (instr instanceof Field) {
+                Field f = (Field) instr;
+                int op = f.getOpcode();
+                if (op == Opcodes.GETSTATIC || op == Opcodes.PUTSTATIC) {
+                    // Touching a static triggers the owner's clinit.
+                    markClassInstantiated(JavascriptNameUtil.sanitizeClassName(f.getOwner()));
+                }
+            } else if (instr instanceof Invoke) {
+                handleInvoke((Invoke) instr);
+            }
+        }
+    }
+
+    private void handleInvoke(Invoke inv) {
+        String owner = JavascriptNameUtil.sanitizeClassName(inv.getOwner());
+        switch (inv.getOpcode()) {
+            case Opcodes.INVOKESTATIC:
+                markClassInstantiated(owner);
+                enqueueResolved(owner, inv.getName(), inv.getDesc(), true);
+                break;
+            case Opcodes.INVOKESPECIAL:
+                markClassInstantiated(owner);
+                enqueueResolved(owner, inv.getName(), inv.getDesc(), true);
+                break;
+            case Opcodes.INVOKEVIRTUAL:
+            case Opcodes.INVOKEINTERFACE: {
+                VirtualCall call = new VirtualCall(owner, inv.getName(), inv.getDesc(),
+                        inv.getOpcode() == Opcodes.INVOKEINTERFACE);
+                recordPending(call);
+                dispatchVirtualFromInstantiated(call);
+                break;
+            }
+            default:
+                break;
+        }
+    }
+
+    private void recordPending(VirtualCall call) {
+        List<VirtualCall> list = pendingByReceiver.get(call.receiver);
+        if (list == null) {
+            list = new ArrayList<VirtualCall>();
+            pendingByReceiver.put(call.receiver, list);
+        }
+        list.add(call);
+    }
+
+    private void dispatchVirtualFromInstantiated(VirtualCall call) {
+        // If the static receiver type is itself instantiated, dispatch
+        // to it first (covers the trivial case where no subtype has
+        // been seen yet but the receiver's own method is reachable).
+        if (instantiated.contains(call.receiver)) {
+            enqueueResolved(call.receiver, call.methodName, call.desc, false);
+        }
+        Set<String> subtypes = subclassesOf.get(call.receiver);
+        if (subtypes != null) {
+            for (String sub : subtypes) {
+                if (instantiated.contains(sub)) {
+                    enqueueResolved(sub, call.methodName, call.desc, false);
+                }
+                // Transitively walk further subtypes too.
+                dispatchVirtualSubtree(sub, call);
+            }
+        }
+    }
+
+    private void dispatchVirtualSubtree(String subtype, VirtualCall call) {
+        Set<String> further = subclassesOf.get(subtype);
+        if (further == null) {
+            return;
+        }
+        for (String sub : further) {
+            if (instantiated.contains(sub)) {
+                enqueueResolved(sub, call.methodName, call.desc, false);
+            }
+            dispatchVirtualSubtree(sub, call);
+        }
+    }
+
+    /**
+     * Walk startClass's inheritance chain to find a concrete
+     * (non-abstract, non-eliminated, matching name+desc) method, then
+     * enqueue it for liveness. When {@code precise} is true the
+     * starting class itself is the resolution target (static/special
+     * dispatch); otherwise we still walk up in case the class inherits
+     * the concrete impl from an ancestor.
+     */
+    private void enqueueResolved(String startClass, String methodName, String desc, boolean precise) {
+        // BytecodeMethod normalises ``<init>`` / ``<clinit>`` to
+        // ``__INIT__`` / ``__CLINIT__`` when it stores the method name,
+        // but the Invoke instruction (built from raw ASM callbacks)
+        // still holds the angle-bracket form. Normalise to the
+        // translator's canonical form before comparing, or ctor /
+        // clinit resolutions silently miss and the RTA culls bodies
+        // the runtime still references.
+        String normalizedName;
+        if ("<init>".equals(methodName)) {
+            normalizedName = "__INIT__";
+        } else if ("<clinit>".equals(methodName)) {
+            normalizedName = "__CLINIT__";
+        } else {
+            normalizedName = methodName;
+        }
+        String current = startClass;
+        Set<String> visited = new HashSet<String>();
+        while (current != null && visited.add(current)) {
+            ByteCodeClass cls = byName.get(current);
+            if (cls == null) {
+                return;
+            }
+            for (BytecodeMethod m : cls.getMethods()) {
+                if (m.isEliminated()) {
+                    continue;
+                }
+                if (!normalizedName.equals(m.getMethodName()) || !desc.equals(m.getSignature())) {
+                    continue;
+                }
+                if (m.isAbstract()) {
+                    // Abstract declaration — keep walking up for a
+                    // concrete impl (for static/special dispatch this
+                    // would be a link error, but the conservative
+                    // behaviour is safe).
+                    if (precise) {
+                        return;
+                    }
+                    break;
+                }
+                enqueue(m);
+                return;
+            }
+            String base = cls.getBaseClass();
+            current = base == null ? null : JavascriptNameUtil.sanitizeClassName(base);
+        }
+    }
+
+    private int eliminate(List<ByteCodeClass> classes) {
+        int eliminated = 0;
+        for (ByteCodeClass cls : classes) {
+            for (BytecodeMethod m : cls.getMethods()) {
+                if (m.isEliminated()) {
+                    continue;
+                }
+                if (live.contains(m)) {
+                    continue;
+                }
+                if (m.isMain()) {
+                    continue;
+                }
+                // Abstract declarations emit no function body and have
+                // no runtime cost beyond the classDef entry (they never
+                // reach appendMethod). Leave them alone so interface
+                // types keep their method list intact for RTTI /
+                // dispatch-table consumers.
+                if (m.isAbstract()) {
+                    continue;
+                }
+                m.setEliminated(true);
+                eliminated++;
+            }
+        }
+        return eliminated;
+    }
+}

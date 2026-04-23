@@ -387,6 +387,31 @@ const jvm = {
     const nativeOverride = this.nativeMethods[methodId];
     this.classes[className].methods[methodId] = typeof nativeOverride === "function" ? nativeOverride : fn;
   },
+  // Batched virtual-method registration. The translator emits one
+  // ``jvm.m("Cls",{$m1,$m2,$anc:$m1,...})`` per class instead of a
+  // separate ``jvm.addVirtualMethod(...)`` call per method+alias.
+  // That was 62% of a ~28 MB bundle at its peak — ES2015 property
+  // shorthand collapses primary registrations to ``$m1,`` (5 bytes)
+  // and ancestor aliases to ``$anc:$m1,`` (~12 bytes).
+  //
+  // The object's own property enumeration order is the translator's
+  // emission order, so native overrides take effect even when the
+  // method's own entry lands in the table before the override is
+  // registered: we consult ``jvm.nativeMethods`` for every entry.
+  m(className, methodMap) {
+    const cls = this.classes[className];
+    if (!cls) {
+      return;
+    }
+    const methods = cls.methods;
+    const natives = this.nativeMethods;
+    const keys = Object.keys(methodMap);
+    for (let i = 0; i < keys.length; i++) {
+      const methodId = keys[i];
+      const override = natives[methodId];
+      methods[methodId] = typeof override === "function" ? override : methodMap[methodId];
+    }
+  },
   setMain(className, methodName) {
     this.mainClass = className;
     this.mainMethod = methodName;
@@ -417,13 +442,19 @@ const jvm = {
     const clinitMethodId = "cn1_" + className + "___CLINIT__";
     const clinit = this.nativeMethods[clinitMethodId] || cls.clinit;
     if (clinit) {
-      const gen = clinit();
-      let step = gen.next();
-      while (!step.done) {
-        if (step.value && (step.value.op === "sleep" || step.value.op === "wait")) {
-          throw new Error("Blocking static initializers are not supported in javascript backend");
+      const result = clinit();
+      // A clinit declared synchronous by the translator returns a
+      // non-iterable value (usually ``null``) and has no suspension
+      // points — nothing to drive. Only generator-shaped results need
+      // the step-until-done loop.
+      if (result && typeof result.next === "function") {
+        let step = result.next();
+        while (!step.done) {
+          if (step.value && (step.value.op === "sleep" || step.value.op === "wait")) {
+            throw new Error("Blocking static initializers are not supported in javascript backend");
+          }
+          step = result.next();
         }
-        step = gen.next();
       }
     }
     cls.initializing = false;
@@ -1681,30 +1712,43 @@ function cn1_ivResolve(target, mid) {
   }
   return method;
 }
+// Some translated methods are now emitted as plain synchronous
+// ``function`` rather than ``function*`` — their bodies cannot yield
+// the scheduler. We still want the single virtual-dispatch helper
+// family to work uniformly at call sites: the bytecode's invokevirtual
+// is translated to ``yield* cn1_iv*(...)`` regardless of which
+// override runs at runtime. ``adaptResult`` preserves that contract by
+// delegating into generator returns but short-circuiting sync returns.
+function* adaptVirtualResult(result) {
+  if (result && typeof result.next === "function") {
+    return yield* result;
+  }
+  return result;
+}
 function* cn1_iv0(target, mid) {
   if (target == null) { yield* throwNullPointerException(); }
-  return yield* cn1_ivResolve(target, mid)(target);
+  return yield* adaptVirtualResult(cn1_ivResolve(target, mid)(target));
 }
 function* cn1_iv1(target, mid, a0) {
   if (target == null) { yield* throwNullPointerException(); }
-  return yield* cn1_ivResolve(target, mid)(target, a0);
+  return yield* adaptVirtualResult(cn1_ivResolve(target, mid)(target, a0));
 }
 function* cn1_iv2(target, mid, a0, a1) {
   if (target == null) { yield* throwNullPointerException(); }
-  return yield* cn1_ivResolve(target, mid)(target, a0, a1);
+  return yield* adaptVirtualResult(cn1_ivResolve(target, mid)(target, a0, a1));
 }
 function* cn1_iv3(target, mid, a0, a1, a2) {
   if (target == null) { yield* throwNullPointerException(); }
-  return yield* cn1_ivResolve(target, mid)(target, a0, a1, a2);
+  return yield* adaptVirtualResult(cn1_ivResolve(target, mid)(target, a0, a1, a2));
 }
 function* cn1_iv4(target, mid, a0, a1, a2, a3) {
   if (target == null) { yield* throwNullPointerException(); }
-  return yield* cn1_ivResolve(target, mid)(target, a0, a1, a2, a3);
+  return yield* adaptVirtualResult(cn1_ivResolve(target, mid)(target, a0, a1, a2, a3));
 }
 function* cn1_ivN(target, mid, args) {
   if (target == null) { yield* throwNullPointerException(); }
   const method = cn1_ivResolve(target, mid);
-  return yield* method.apply(null, [target].concat(args));
+  return yield* adaptVirtualResult(method.apply(null, [target].concat(args)));
 }
 global.cn1_iv0 = cn1_iv0;
 global.cn1_iv1 = cn1_iv1;
@@ -1829,7 +1873,7 @@ function* runtimeToNativeString(value) {
   }
   if (value && value.__class) {
     const toStringMethod = jvm.resolveVirtual(value.__class, "cn1_java_lang_Object_toString_R_java_lang_String");
-    return jvm.toNativeString(yield* toStringMethod(value));
+    return jvm.toNativeString(yield* adaptVirtualResult(toStringMethod(value)));
   }
   return String(value);
 }
@@ -2038,14 +2082,14 @@ function* throwInterruptedException() {
   }
   const ex = jvm.createException("java_lang_InterruptedException");
   if (typeof ex.ctor === "function") {
-    yield* ex.ctor(ex.object);
+    yield* adaptVirtualResult(ex.ctor(ex.object));
   }
   throw ex.object;
 }
 function* throwNullPointerException() {
   const ex = jvm.createException("java_lang_NullPointerException");
   if (typeof ex.ctor === "function") {
-    yield* ex.ctor(ex.object);
+    yield* adaptVirtualResult(ex.ctor(ex.object));
   }
   throw ex.object;
 }
@@ -2219,7 +2263,7 @@ bindNative([
   }
   if (a && a.__class) {
     const equalsMethod = jvm.resolveVirtual(a.__class, "cn1_java_lang_Object_equals_java_lang_Object_R_boolean");
-    return yield* equalsMethod(a, b);
+    return yield* adaptVirtualResult(equalsMethod(a, b));
   }
   return a === b ? 1 : 0;
 });
@@ -2303,7 +2347,7 @@ bindNative(["cn1_java_lang_Thread_start", "cn1_java_lang_Thread_start__"], funct
   const generator = (function*() {
     try {
       const runMethod = jvm.resolveVirtual(target.__class, "cn1_java_lang_Runnable_run");
-      yield* runMethod(target);
+      yield* adaptVirtualResult(runMethod(target));
     } catch (err) {
       jvm.fail(err);
     } finally {
@@ -2565,7 +2609,7 @@ bindNative(["cn1_java_lang_Class_newInstanceImpl_R_java_lang_Object"], function*
   const obj = jvm.newObject(def.name);
   const ctor = global["cn1_" + def.name + "___INIT__"];
   if (typeof ctor === "function") {
-    yield* ctor(obj);
+    yield* adaptVirtualResult(ctor(obj));
   }
   return obj;
 });

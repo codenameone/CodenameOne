@@ -445,6 +445,44 @@ public class Parser extends ClassVisitor {
                 }
             }
 
+            // JavaScript-target-only Rapid Type Analysis pass. Runs AFTER
+            // the existing desc.name-keyed culler so we start from an
+            // already-pruned class list. RTA only eliminates additional
+            // methods the conservative graph considered "used" because
+            // some OTHER class with the same name+desc was invoked; it
+            // never resurrects methods the earlier pass removed. Gated
+            // on OUTPUT_TYPE_JAVASCRIPT because iOS / C# runtimes rely on
+            // different dispatch mechanics and may break under stricter
+            // reachability.
+            if (BytecodeMethod.optimizerOn
+                    && ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT) {
+                Date rtaStart = new Date();
+                int rtaEliminated = JavascriptReachability.run(classes, nativeSources);
+                Date rtaEnd = new Date();
+                long rtaDif = rtaEnd.getTime() - rtaStart.getTime();
+                if (ByteCodeTranslator.verbose) {
+                    System.out.println("JS RTA pass removed " + rtaEliminated + " additional methods in "
+                            + (rtaDif / 1000) + " seconds");
+                }
+                neliminated += rtaEliminated;
+            }
+
+            // JavaScript-target-only suspension analysis: decide which
+            // surviving methods can be emitted as plain ``function``
+            // (no generator allocation / no yield*) vs which must stay
+            // as ``function*``. Must run after RTA so eliminated
+            // methods don't pollute the analysis.
+            if (ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT) {
+                Date suspStart = new Date();
+                int syncCount = JavascriptSuspensionAnalysis.run(classes);
+                Date suspEnd = new Date();
+                if (ByteCodeTranslator.verbose) {
+                    System.out.println("JS suspension analysis: " + syncCount
+                            + " methods classified synchronous in "
+                            + ((suspEnd.getTime() - suspStart.getTime()) / 1000) + " seconds");
+                }
+            }
+
             if (ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT) {
                 JavascriptBundleWriter.write(outputDirectory, classes);
             } else {

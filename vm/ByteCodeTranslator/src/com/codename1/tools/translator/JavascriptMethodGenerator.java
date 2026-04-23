@@ -15,6 +15,8 @@ import com.codename1.tools.translator.bytecodes.SwitchInstruction;
 import com.codename1.tools.translator.bytecodes.TryCatch;
 import com.codename1.tools.translator.bytecodes.TypeInstruction;
 import com.codename1.tools.translator.bytecodes.VarOp;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -26,20 +28,168 @@ import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 
 final class JavascriptMethodGenerator {
+    // Global class-name to ByteCodeClass index, used by appendFieldInstruction
+    // to resolve a getfield/putfield instruction's class reference (the
+    // "current receiver type" from the bytecode's Fieldref) to the actual
+    // class that declares the field. Java bytecode allows the reference
+    // to name any accessible class on the receiver's hierarchy — the JVM
+    // resolves it at link time by walking up from there — but the
+    // translator was emitting the unresolved owner as the property
+    // prefix, producing ``target["cn1_<subclass>_<field>"]`` reads on
+    // fields declared on an ancestor. Under the identifier mangler those
+    // two prefixes pick up unrelated mangled forms, so the runtime
+    // property read misses (returns undefined) and the next field access
+    // blows up with "Cannot read properties of undefined".
+    //
+    // We rebuild this map at the start of every bundle generation so
+    // resolution sees the fully loaded class graph, not a partial view.
+    private static volatile Map<String, ByteCodeClass> classIndex = null;
+
     private JavascriptMethodGenerator() {
     }
 
+    static void setClassIndex(List<ByteCodeClass> allClasses) {
+        if (allClasses == null) {
+            classIndex = null;
+            return;
+        }
+        HashMap<String, ByteCodeClass> index = new HashMap<String, ByteCodeClass>();
+        for (ByteCodeClass c : allClasses) {
+            if (c != null && c.getClsName() != null) {
+                index.put(c.getClsName(), c);
+            }
+        }
+        classIndex = index;
+    }
+
+    /**
+     * Walk up the class hierarchy rooted at the declared owner and
+     * return the first non-abstract, non-eliminated method matching
+     * the invoke's name + descriptor. Used by the emitter to decide
+     * whether a direct (invokestatic / invokespecial) call should be
+     * wrapped in ``yield*``: if the resolved target is flagged
+     * synchronous, the call site emits a plain function call; if it
+     * suspends, the call site emits ``yield* target(...)`` and the
+     * caller is itself suspending. Returns null for virtual /
+     * interface dispatches (resolution is runtime-only) and for
+     * unresolvable targets (caller treats those as suspending for
+     * safety — matches the conservative default on
+     * {@link BytecodeMethod#isJavascriptSuspending}).
+     */
+    private static BytecodeMethod resolveDirectInvokeTarget(Invoke invoke) {
+        int op = invoke.getOpcode();
+        if (op != Opcodes.INVOKESTATIC && op != Opcodes.INVOKESPECIAL) {
+            return null;
+        }
+        Map<String, ByteCodeClass> idx = classIndex;
+        if (idx == null || invoke.getOwner() == null) {
+            return null;
+        }
+        String name = invoke.getName();
+        String normalizedName;
+        if ("<init>".equals(name)) {
+            normalizedName = "__INIT__";
+        } else if ("<clinit>".equals(name)) {
+            normalizedName = "__CLINIT__";
+        } else {
+            normalizedName = name;
+        }
+        String desc = invoke.getDesc();
+        String current = JavascriptNameUtil.sanitizeClassName(invoke.getOwner());
+        java.util.HashSet<String> visited = new java.util.HashSet<String>();
+        while (current != null && visited.add(current)) {
+            ByteCodeClass cls = idx.get(current);
+            if (cls == null) {
+                return null;
+            }
+            for (BytecodeMethod m : cls.getMethods()) {
+                if (m.isEliminated() || m.isAbstract()) {
+                    continue;
+                }
+                if (normalizedName.equals(m.getMethodName()) && desc.equals(m.getSignature())) {
+                    return m;
+                }
+            }
+            String base = cls.getBaseClass();
+            current = base == null ? null : JavascriptNameUtil.sanitizeClassName(base);
+        }
+        return null;
+    }
+
+    /**
+     * True when the given invoke's callee is (or must be conservatively
+     * treated as) suspending. Virtual / interface dispatches go through
+     * {@code cn1_iv*} which is a generator, so they are always
+     * suspending from the emitter's perspective. Unresolved direct
+     * dispatches default to suspending as a safety net — the
+     * {@link BytecodeMethod#isJavascriptSuspending} flag itself
+     * defaults to {@code true} for the same reason.
+     */
+    private static boolean isInvokeSuspending(Invoke invoke) {
+        int op = invoke.getOpcode();
+        if (op == Opcodes.INVOKEVIRTUAL || op == Opcodes.INVOKEINTERFACE) {
+            return true;
+        }
+        BytecodeMethod target = resolveDirectInvokeTarget(invoke);
+        return target == null || target.isJavascriptSuspending();
+    }
+
+    private static String resolveFieldOwner(String owner, String fieldName) {
+        Map<String, ByteCodeClass> idx = classIndex;
+        if (idx == null || owner == null || fieldName == null) {
+            return owner;
+        }
+        // ByteCodeClass stores names in the translator's sanitized form
+        // (underscored), but callers may hand us either the sanitized
+        // name or the raw JVM-style ``java/util/HashMap``. Normalise to
+        // the sanitized form before every lookup, and also apply the
+        // same normalisation when following ``getBaseClass()`` — it
+        // returns the JVM-style reference the class reader saw.
+        String current = JavascriptNameUtil.sanitizeClassName(owner);
+        while (current != null) {
+            ByteCodeClass cls = idx.get(current);
+            if (cls == null) {
+                return current;
+            }
+            for (ByteCodeField f : cls.getFields()) {
+                if (!f.isStaticField() && fieldName.equals(f.getFieldName())) {
+                    return current;
+                }
+            }
+            String base = cls.getBaseClass();
+            current = base == null ? null : JavascriptNameUtil.sanitizeClassName(base);
+        }
+        return JavascriptNameUtil.sanitizeClassName(owner);
+    }
+
     static String generateClassJavascript(ByteCodeClass cls, List<ByteCodeClass> allClasses) {
+        // Populate the resolution index lazily on first call and keep it
+        // alive for the rest of the generation pass. Translator callers
+        // hand the same ``allClasses`` list to every generateClassJavascript
+        // invocation, so a pointer-identity check is enough to avoid
+        // rebuilding the map on every class while still recovering
+        // correctly if a future orchestrator swaps the list out.
+        if (classIndex == null || classIndex.size() != (allClasses == null ? 0 : allClasses.size())) {
+            setClassIndex(allClasses);
+        }
         StringBuilder out = new StringBuilder();
+        // Collects virtual-method registrations (primary + aliases) so the
+        // whole class can be attached via a single ``jvm.m("cls",{...})``
+        // call at the end. Per-method ``jvm.addVirtualMethod(...)`` emits
+        // were previously 62% of the bundle — ~190k call sites at ~90
+        // bytes each. Batching drops each entry to ``$methodId,`` (5
+        // bytes via ES2015 property shorthand) or ``$ancestorId:$fn,``
+        // (~12 bytes for ancestor aliases).
+        StringBuilder regs = new StringBuilder();
         out.append("// ").append(cls.getClsName()).append("\n");
         appendClassRegistration(out, cls, allClasses);
         for (BytecodeMethod method : cls.getMethods()) {
             if (method.isNative() || method.isAbstract() || method.isEliminated()) {
                 continue;
             }
-            appendMethod(out, cls, method);
+            appendMethod(out, regs, cls, method);
         }
-        appendInheritedMethodAliases(out, cls);
+        appendInheritedMethodAliases(out, regs, cls);
         for (BytecodeMethod method : cls.getMethods()) {
             if (!method.isNative() || method.isEliminated()) {
                 continue;
@@ -47,13 +197,50 @@ final class JavascriptMethodGenerator {
             appendNativeStubIfNeeded(out, cls, method);
             if (!method.isStatic() && !method.isConstructor()) {
                 String jsMethodName = jsMethodIdentifier(cls, method);
-                out.append("jvm.addVirtualMethod(\"").append(cls.getClsName()).append("\", \"")
-                        .append(jsMethodName).append("\", ")
-                        .append(jsMethodName).append(");\n");
+                appendPrimaryRegistration(regs, jsMethodName);
             }
         }
+        appendInterfaceMethodAliases(regs, cls);
         appendSyntheticClinitIfNeeded(out, cls);
+        flushRegistrations(out, cls, regs);
         return out.toString();
+    }
+
+    /**
+     * Append an object-literal entry for a method whose methodId equals
+     * the emitted JS function identifier. Uses ES2015 property shorthand
+     * so ``$ab`` expands to ``$ab: $ab`` at a 5-byte cost instead of the
+     * 20-byte ``"$ab":$ab``. Safe because every identifier produced by
+     * {@code JavascriptNameUtil.methodIdentifier} (and by the cross-file
+     * mangler's short symbols) is a valid JS identifier.
+     */
+    private static void appendPrimaryRegistration(StringBuilder regs, String methodId) {
+        if (regs.length() > 0) {
+            regs.append(',');
+        }
+        regs.append(methodId);
+    }
+
+    /**
+     * Append an object-literal entry that points an ancestor method id
+     * (or any id that differs from the backing function's identifier)
+     * at a specific function. Emits ``$ancestorId:$implFn``. The
+     * ancestor id is always a translator-owned ``cn1_...`` identifier
+     * (or its mangled form) — both valid JS identifiers — so no
+     * quoting is required.
+     */
+    private static void appendAliasRegistration(StringBuilder regs, String methodId, String implMethodId) {
+        if (regs.length() > 0) {
+            regs.append(',');
+        }
+        regs.append(methodId).append(':').append(implMethodId);
+    }
+
+    private static void flushRegistrations(StringBuilder out, ByteCodeClass cls, StringBuilder regs) {
+        if (regs.length() == 0) {
+            return;
+        }
+        out.append("jvm.m(\"").append(cls.getClsName()).append("\",{").append(regs).append("});\n");
     }
 
     private static void appendClassRegistration(StringBuilder out, ByteCodeClass cls, List<ByteCodeClass> allClasses) {
@@ -243,13 +430,22 @@ final class JavascriptMethodGenerator {
         out.append("jvm.classes[\"").append(cls.getClsName()).append("\"].clinit = ").append(fn).append(";\n");
     }
 
-    private static void appendMethod(StringBuilder out, ByteCodeClass cls, BytecodeMethod method) {
+    private static void appendMethod(StringBuilder out, StringBuilder regs, ByteCodeClass cls, BytecodeMethod method) {
         List<Instruction> instructions = method.getInstructions();
         Map<Label, Integer> labelToIndex = buildLabelMap(instructions);
         String jsMethodName = jsMethodIdentifier(cls, method);
         String jsMethodBodyName = jsMethodBodyIdentifier(cls, method);
         boolean wrappedStaticMethod = isWrappedStaticMethod(method);
-        out.append("function* ").append(wrappedStaticMethod ? jsMethodBodyName : jsMethodName).append("(");
+        // Suspension flag drives whether the method is emitted as a
+        // generator (``function*``) or a plain sync function. Only sync
+        // methods can be invoked without the ``yield*`` ceremony, so a
+        // mis-classification toward sync would break runtime dispatch.
+        // The classifier conservatively defaults to suspending, so this
+        // flag is only false when the analysis has proven the body
+        // cannot yield the cooperative scheduler.
+        boolean methodSuspending = method.isJavascriptSuspending();
+        String fnKeyword = methodSuspending ? "function* " : "function ";
+        out.append(fnKeyword).append(wrappedStaticMethod ? jsMethodBodyName : jsMethodName).append("(");
         boolean first = true;
         if (!method.isStatic()) {
             out.append("__cn1ThisObject");
@@ -270,7 +466,7 @@ final class JavascriptMethodGenerator {
         if ("__CLINIT__".equals(method.getMethodName())) {
             appendDeferredStaticFieldInitialization(out, cls);
         }
-        if (appendStraightLineMethodBody(out, cls, method, instructions, wrappedStaticMethod ? jsMethodBodyName : jsMethodName)) {
+        if (appendStraightLineMethodBody(out, regs, cls, method, instructions, wrappedStaticMethod ? jsMethodBodyName : jsMethodName)) {
             if (wrappedStaticMethod) {
                 appendWrappedStaticMethod(out, cls, method, jsMethodName, jsMethodBodyName);
             }
@@ -304,46 +500,115 @@ final class JavascriptMethodGenerator {
                 localIndex++;
             }
         }
-        appendTryCatchTable(out, instructions, labelToIndex);
+        // Only emit the exception-dispatch scaffolding when the method
+        // actually has a try/catch block. Many simple methods have no
+        // exception table, in which case the ``const __cn1TryCatch =
+        // []; ... try { switch (pc) { ... } } catch (__cn1Error) {
+        // const __handler = jvm.findExceptionHandler(__cn1TryCatch,
+        // pc, __cn1Error); if (!__handler) throw __cn1Error; ... }``
+        // wrapper is pure overhead (~200 bytes/method, ~5-6 MiB total
+        // across an app the size of Initializr). When it is omitted,
+        // uncaught JS throws propagate naturally up through the
+        // generator's ``yield*`` chain — identical observable
+        // semantics without the boilerplate.
+        boolean hasTryCatch = methodHasTryCatch(instructions);
+        if (hasTryCatch) {
+            appendTryCatchTable(out, instructions, labelToIndex);
+        }
         if (method.isSynchronizedMethod()) {
             out.append("  const __cn1Monitor = ").append(method.isStatic() ? "jvm.getClassObject(\"" + cls.getClsName() + "\")" : "__cn1ThisObject").append(";\n");
             out.append("  jvm.monitorEnter(jvm.currentThread, __cn1Monitor);\n");
             out.append("  try {\n");
         }
         out.append("  while (true) {\n");
-        out.append("    try {\n");
+        if (hasTryCatch) {
+            out.append("    try {\n");
+        }
         out.append("    switch (pc) {\n");
+        // Merge sequential non-branch-target instructions into a single
+        // case block. Each instruction ordinarily emits its body with a
+        // trailing ``pc = N+1; break;`` to leave the switch and let the
+        // outer ``while(true)`` re-enter at pc N+1. When the next
+        // instruction isn't a jump target and isn't itself a branch,
+        // we can drop that tail and rely on JS switch fall-through to
+        // execute the next instruction's body in the same dispatch
+        // iteration. For a typical Initializr method body (long runs of
+        // stack / local / field / invoke ops punctuated by occasional
+        // jumps), this collapses hundreds of per-case ``pc = N+1;
+        // break;`` tails and their closing braces into a single block.
+        java.util.Set<Integer> jumpTargets = computeJumpTargets(instructions, labelToIndex);
+        boolean blockOpen = false;
         for (int i = 0; i < instructions.size(); i++) {
             Instruction instruction = instructions.get(i);
-            // Pure-metadata instructions (LABEL / LINENUMBER / LocalVariable /
-            // TryCatch) would otherwise emit `case N: { pc = N+1; break; }`
-            // blocks — ~35 bytes each, and Initializr alone produced ~107k of
-            // them (~3 MiB). Instead emit just `case N:` and let the switch
-            // fall through to the next real instruction. Jumps landing on the
-            // no-op PC still execute the same next-instruction body that the
-            // old pc-advance-then-re-enter form produced, so semantics are
-            // preserved. We only elide when there IS a next instruction so
-            // a trailing no-op still has somewhere to land.
+            boolean isTarget = i == 0 || jumpTargets.contains(i);
             if (isPcSkippableNoOp(instruction) && i + 1 < instructions.size()) {
+                // Emit just the case label — fall through into the next
+                // instruction's block (which supplies the executable
+                // body). If a ``{`` block is currently open, close it
+                // first so the case label is syntactically at switch
+                // scope rather than inside a previous block.
+                if (blockOpen) {
+                    out.append("      }\n");
+                    blockOpen = false;
+                }
                 out.append("      case ").append(i).append(":\n");
                 continue;
             }
-            out.append("      case ").append(i).append(": {\n");
-            appendInstruction(out, method, instructions, labelToIndex, instruction, i, usesClassInitCache, usesVirtualDispatchCache);
+            boolean nextIsNewBlock = i + 1 >= instructions.size() || jumpTargets.contains(i + 1);
+            boolean isTerminal = isTerminatingInstruction(instruction);
+            boolean strip = !isTerminal && !nextIsNewBlock;
+            if (isTarget) {
+                // Close any currently open block so the case label is
+                // at switch scope.
+                if (blockOpen) {
+                    out.append("      }\n");
+                    blockOpen = false;
+                }
+                out.append("      case ").append(i).append(": {\n");
+                blockOpen = true;
+            } else if (!blockOpen) {
+                // Dead code: this instruction has no case label and no
+                // preceding open block to fall through from (the
+                // previous instruction was a goto/throw/return that
+                // closed its block). Nothing can reach it, so skip.
+                continue;
+            }
+            if (strip) {
+                StringBuilder buf = new StringBuilder();
+                appendInstruction(buf, method, instructions, labelToIndex, instruction, i, usesClassInitCache, usesVirtualDispatchCache);
+                out.append(stripTrailingPcAdvance(buf.toString(), i + 1));
+            } else {
+                appendInstruction(out, method, instructions, labelToIndex, instruction, i, usesClassInitCache, usesVirtualDispatchCache);
+            }
+            // Close the case block when this instruction terminates the
+            // run (either a branch/throw that sets pc itself, or the
+            // next instruction starts a new case). Only emit the
+            // closing brace if an opening brace is currently
+            // outstanding — earlier iterations may have closed it when
+            // emitting a bare no-op label.
+            if ((isTerminal || nextIsNewBlock) && blockOpen) {
+                out.append("      }\n");
+                blockOpen = false;
+            }
+        }
+        if (blockOpen) {
             out.append("      }\n");
+            blockOpen = false;
         }
         out.append("      default:\n");
         out.append("        return null;\n");
         out.append("    }\n");
-        out.append("    } catch (__cn1Error) {\n");
-        out.append("      const __handler = jvm.findExceptionHandler(__cn1TryCatch, pc, __cn1Error);\n");
-        out.append("      if (!__handler) {\n");
-        out.append("        throw __cn1Error;\n");
-        out.append("      }\n");
-        out.append("      stack.length = 0;\n");
-        out.append("      stack.push(__cn1Error);\n");
-        out.append("      pc = __handler.handler;\n");
-        out.append("    }\n");
+        if (hasTryCatch) {
+            out.append("    } catch (__cn1Error) {\n");
+            out.append("      const __handler = jvm.findExceptionHandler(__cn1TryCatch, pc, __cn1Error);\n");
+            out.append("      if (!__handler) {\n");
+            out.append("        throw __cn1Error;\n");
+            out.append("      }\n");
+            out.append("      stack.length = 0;\n");
+            out.append("      stack.push(__cn1Error);\n");
+            out.append("      pc = __handler.handler;\n");
+            out.append("    }\n");
+        }
         out.append("  }\n");
         if (method.isSynchronizedMethod()) {
             out.append("  } finally {\n");
@@ -359,8 +624,7 @@ final class JavascriptMethodGenerator {
                     .append(wrappedStaticMethod ? jsMethodBodyName : jsMethodName).append(";\n");
         }
         if (!method.isStatic() && !method.isConstructor()) {
-            out.append("jvm.addVirtualMethod(\"").append(cls.getClsName()).append("\", \"")
-                    .append(jsMethodName).append("\", ").append(jsMethodName).append(");\n");
+            appendPrimaryRegistration(regs, jsMethodName);
         }
     }
 
@@ -369,11 +633,16 @@ final class JavascriptMethodGenerator {
     }
 
     private static void appendWrappedStaticMethod(StringBuilder out, ByteCodeClass cls, BytecodeMethod method, String wrapperName, String bodyName) {
-        out.append("function* ").append(wrapperName).append("(");
+        // Wrapper matches the body's suspension. If the body is sync,
+        // the wrapper can be sync too — ``jvm.ensureClassInitialized``
+        // runs the clinit generator to completion synchronously and
+        // then returns, so the wrapper never yields on that call.
+        boolean suspending = method.isJavascriptSuspending();
+        out.append(suspending ? "function* " : "function ").append(wrapperName).append("(");
         appendMethodParameters(out, method);
         out.append("){\n");
         out.append("  jvm.ensureClassInitialized(\"").append(cls.getClsName()).append("\");\n");
-        out.append("  return yield* ").append(bodyName).append("(");
+        out.append("  return ").append(suspending ? "yield* " : "").append(bodyName).append("(");
         appendMethodParameterArguments(out, method);
         out.append(");\n");
         out.append("}\n");
@@ -411,7 +680,7 @@ final class JavascriptMethodGenerator {
         }
     }
 
-    private static void appendInheritedMethodAliases(StringBuilder out, ByteCodeClass cls) {
+    private static void appendInheritedMethodAliases(StringBuilder out, StringBuilder regs, ByteCodeClass cls) {
         Map<String, BytecodeMethod> inherited = new LinkedHashMap<String, BytecodeMethod>();
         collectInheritedMethodAliases(cls.getBaseClassObject(), inherited, new HashSet<ByteCodeClass>());
         List<ByteCodeClass> baseInterfaces = cls.getBaseInterfacesObject();
@@ -432,16 +701,216 @@ final class JavascriptMethodGenerator {
             if (aliasName.equals(targetName)) {
                 continue;
             }
-            out.append("function* ").append(aliasName).append("(");
+            // Inherit the target's suspension: an inherited-alias
+            // wrapper does nothing but forward arguments to the
+            // upstream impl, so it can be sync when the impl is sync.
+            boolean targetSuspending = method.isJavascriptSuspending();
+            out.append(targetSuspending ? "function* " : "function ").append(aliasName).append("(");
             appendMethodParameters(out, method);
             out.append("){\n");
-            out.append("  return yield* ").append(targetName).append("(");
+            out.append("  return ").append(targetSuspending ? "yield* " : "").append(targetName).append("(");
             appendMethodParameterArguments(out, method);
             out.append(");\n");
             out.append("}\n");
             if (!method.isStatic()) {
-                out.append("jvm.addVirtualMethod(\"").append(cls.getClsName()).append("\", \"")
-                        .append(aliasName).append("\", ").append(aliasName).append(");\n");
+                appendPrimaryRegistration(regs, aliasName);
+            }
+        }
+    }
+
+    /**
+     * Register cls under every ancestor method id its concrete methods
+     * satisfy. Without these aliases the runtime would depend on
+     * {@code methodTail} / {@code remappedMethodId} — which reconstruct
+     * method ids by concatenating class names with literal method
+     * suffixes at runtime — to dispatch interface or base-class method
+     * calls to cls's implementing method. That reconstruction works
+     * only while method ids are the verbose translator-owned
+     * ``cn1_&lt;class&gt;_&lt;method&gt;`` form. When the cross-file
+     * identifier mangler rewrites those ids to short ``$a`` tokens,
+     * the ancestor's id and cls's id pick up unrelated mangled forms,
+     * so runtime concatenation of the ancestor class + unmangled tail
+     * no longer matches the mangled key in the methods table and the
+     * dispatch either fails ("Missing virtual method") or silently
+     * resolves to the ancestor's own impl — breaking polymorphism.
+     *
+     * Emitting explicit {@code addVirtualMethod(cls, ancestorId, fn)}
+     * pairs here lets {@code resolveVirtual}'s direct-lookup branch
+     * succeed before any remapping is attempted, regardless of
+     * whether the ids are mangled (both sides move in lockstep).
+     *
+     * We cover BOTH base-class overrides and interface implementations
+     * in a single pass: the ancestor walk visits the full class +
+     * interface hierarchy reachable from cls, including interfaces
+     * inherited transitively via base classes and parent interfaces.
+     */
+    private static void appendInterfaceMethodAliases(StringBuilder regs, ByteCodeClass cls) {
+        if (cls.isIsInterface()) {
+            return;
+        }
+        // Resolvable = every (name+sig) whose ``cn1_<cls>_<m>`` is
+        // guaranteed to exist as a function at load time:
+        //   (a) cls declares the method concretely (appendMethod /
+        //       appendNativeStubIfNeeded emits the function body),
+        //   (b) cls does NOT declare the method but inherits a
+        //       concrete impl from a base class or interface default
+        //       method, and appendInheritedMethodAliases mirrors that
+        //       impl under cls's prefix via a wrapper function.
+        //
+        // We include inherited-resolvable methods so that a concrete
+        // subclass dispatches correctly even for method ids declared
+        // abstractly in an intermediate ancestor whose own base class
+        // provides the impl: in that case the intermediate can't emit
+        // the alias (it doesn't declare the method concretely) and the
+        // concrete base can't either (the intermediate isn't in its
+        // ancestor chain), so the concrete subclass has to register
+        // the mapping on its own methods table.
+        Set<String> resolvable = new HashSet<String>();
+        for (BytecodeMethod method : cls.getMethods()) {
+            if (method == null || method.isAbstract() || method.isEliminated() || method.isConstructor() || method.isStatic()) {
+                continue;
+            }
+            resolvable.add(method.getMethodName() + method.getSignature());
+        }
+        Map<String, BytecodeMethod> inherited = new LinkedHashMap<String, BytecodeMethod>();
+        collectInheritedMethodAliases(cls.getBaseClassObject(), inherited, new HashSet<ByteCodeClass>());
+        List<ByteCodeClass> directInterfaces = cls.getBaseInterfacesObject();
+        if (directInterfaces != null) {
+            for (ByteCodeClass iface : directInterfaces) {
+                collectInheritedMethodAliases(iface, inherited, new HashSet<ByteCodeClass>());
+            }
+        }
+        for (Map.Entry<String, BytecodeMethod> entry : inherited.entrySet()) {
+            BytecodeMethod method = entry.getValue();
+            if (method == null || method.isConstructor() || method.isAbstract() || method.isEliminated() || method.isStatic()) {
+                continue;
+            }
+            // Only inherited methods that appendInheritedMethodAliases
+            // actually generated a wrapper for — i.e. ones cls does not
+            // declare itself. Otherwise cn1_<cls>_<m> is either cls's
+            // own concrete declaration (handled above) or an abstract
+            // declaration that has no function body to reference.
+            if (declaresMethod(cls, method.getMethodName(), method.getSignature())) {
+                continue;
+            }
+            resolvable.add(method.getMethodName() + method.getSignature());
+        }
+
+        Set<ByteCodeClass> visited = new HashSet<ByteCodeClass>();
+        Set<String> emitted = new HashSet<String>();
+        Deque<ByteCodeClass> pending = new ArrayDeque<ByteCodeClass>();
+        // Enqueue the full ancestor set: every base class (except cls
+        // itself — cls's own ids are emitted by appendMethod) and every
+        // interface reachable from cls or any of its base classes.
+        // Parent interfaces are enumerated inside the loop body so the
+        // walk covers transitive interface inheritance too.
+        ByteCodeClass baseWalk = cls.getBaseClassObject();
+        while (baseWalk != null) {
+            pending.add(baseWalk);
+            List<ByteCodeClass> interfaces = baseWalk.getBaseInterfacesObject();
+            if (interfaces != null) {
+                for (ByteCodeClass iface : interfaces) {
+                    if (iface != null) {
+                        pending.add(iface);
+                    }
+                }
+            }
+            baseWalk = baseWalk.getBaseClassObject();
+        }
+        if (directInterfaces != null) {
+            for (ByteCodeClass iface : directInterfaces) {
+                if (iface != null) {
+                    pending.add(iface);
+                }
+            }
+        }
+        while (!pending.isEmpty()) {
+            ByteCodeClass ancestor = pending.pop();
+            if (ancestor == null || ancestor == cls || !visited.add(ancestor)) {
+                continue;
+            }
+            // A method id may legitimately be built from any ancestor in
+            // cls's hierarchy, not just the ancestor that declares the
+            // method. Java's ``invokevirtual X.m`` encodes X's name into
+            // the method id regardless of which ancestor of X actually
+            // declares m — so e.g. an ``invokevirtual AbstractList.size``
+            // emits ``cn1_java_util_AbstractList_size`` even though size
+            // is declared abstract on AbstractCollection. Collect every
+            // method reachable from this ancestor (via its own
+            // declarations or transitive inheritance) so we emit the
+            // alias on cls for any id a call site might produce.
+            Set<String> accessible = new HashSet<String>();
+            collectAccessibleMethods(ancestor, accessible, new HashSet<ByteCodeClass>());
+            String ancestorClassName = ancestor.getClsName();
+            for (BytecodeMethod ownMethod : cls.getMethods()) {
+                if (ownMethod == null || ownMethod.isAbstract() || ownMethod.isEliminated()
+                        || ownMethod.isConstructor() || ownMethod.isStatic()) {
+                    continue;
+                }
+                String name = ownMethod.getMethodName();
+                String signature = ownMethod.getSignature();
+                if (!resolvable.contains(name + signature) || !accessible.contains(name + signature)) {
+                    continue;
+                }
+                String ancestorMethodId = JavascriptNameUtil.methodIdentifier(ancestorClassName, name, signature);
+                String implMethodId = JavascriptNameUtil.methodIdentifier(cls.getClsName(), name, signature);
+                if (ancestorMethodId.equals(implMethodId) || !emitted.add(ancestorMethodId)) {
+                    continue;
+                }
+                appendAliasRegistration(regs, ancestorMethodId, implMethodId);
+            }
+            // Inherited-via-wrapper resolvable methods: cls doesn't
+            // declare them, but appendInheritedMethodAliases emitted
+            // a wrapper under cls's prefix. Walk cls's inherited set
+            // and, for each inherited method that's accessible via
+            // this ancestor, point the alias at the wrapper.
+            for (Map.Entry<String, BytecodeMethod> entry : inherited.entrySet()) {
+                BytecodeMethod method = entry.getValue();
+                if (method == null || method.isConstructor() || method.isAbstract() || method.isEliminated()
+                        || method.isStatic()) {
+                    continue;
+                }
+                String name = method.getMethodName();
+                String signature = method.getSignature();
+                if (declaresMethod(cls, name, signature)) {
+                    continue;
+                }
+                if (!resolvable.contains(name + signature) || !accessible.contains(name + signature)) {
+                    continue;
+                }
+                String ancestorMethodId = JavascriptNameUtil.methodIdentifier(ancestorClassName, name, signature);
+                String implMethodId = JavascriptNameUtil.methodIdentifier(cls.getClsName(), name, signature);
+                if (ancestorMethodId.equals(implMethodId) || !emitted.add(ancestorMethodId)) {
+                    continue;
+                }
+                appendAliasRegistration(regs, ancestorMethodId, implMethodId);
+            }
+            List<ByteCodeClass> parents = ancestor.getBaseInterfacesObject();
+            if (parents != null) {
+                for (ByteCodeClass parent : parents) {
+                    if (parent != null) {
+                        pending.push(parent);
+                    }
+                }
+            }
+        }
+    }
+
+    private static void collectAccessibleMethods(ByteCodeClass owner, Set<String> out, Set<ByteCodeClass> visited) {
+        if (owner == null || !visited.add(owner)) {
+            return;
+        }
+        for (BytecodeMethod method : owner.getMethods()) {
+            if (method == null || method.isConstructor() || method.isEliminated() || method.isStatic()) {
+                continue;
+            }
+            out.add(method.getMethodName() + method.getSignature());
+        }
+        collectAccessibleMethods(owner.getBaseClassObject(), out, visited);
+        List<ByteCodeClass> parents = owner.getBaseInterfacesObject();
+        if (parents != null) {
+            for (ByteCodeClass parent : parents) {
+                collectAccessibleMethods(parent, out, visited);
             }
         }
     }
@@ -477,7 +946,7 @@ final class JavascriptMethodGenerator {
         return false;
     }
 
-    private static boolean appendStraightLineMethodBody(StringBuilder out, ByteCodeClass cls, BytecodeMethod method,
+    private static boolean appendStraightLineMethodBody(StringBuilder out, StringBuilder regs, ByteCodeClass cls, BytecodeMethod method,
             List<Instruction> instructions, String jsMethodName) {
         if (!isStraightLineEligible(method, instructions)) {
             return false;
@@ -538,8 +1007,7 @@ final class JavascriptMethodGenerator {
                 out.append("jvm.classes[\"").append(cls.getClsName()).append("\"].clinit = ").append(jsMethodName).append(";\n");
             }
             if (!method.isStatic() && !method.isConstructor()) {
-                out.append("jvm.addVirtualMethod(\"").append(cls.getClsName()).append("\", \"")
-                        .append(jsMethodName).append("\", ").append(jsMethodName).append(");\n");
+                appendPrimaryRegistration(regs, jsMethodName);
             }
             return true;
         } catch (IllegalStateException ex) {
@@ -554,6 +1022,20 @@ final class JavascriptMethodGenerator {
         if (method.isSynchronizedMethod()) {
             return false;
         }
+        // ATHROW is straight-line-friendly: we just emit ``throw
+        // stack.pop();`` and anything past it is dead. The earlier
+        // exclusion was conservative; allowing it lets many simple
+        // ``throw new Foo(msg)`` methods skip the full switch/case
+        // interpreter scaffolding.
+        //
+        // Jump / SwitchInstruction / TryCatch / MultiArray still
+        // require the interpreter because they either branch or
+        // implement a runtime exception table the straight-line
+        // emitter has no place to hang.
+        //
+        // MONITORENTER/EXIT also need the interpreter so the stack
+        // entry that holds the monitor can be tracked across the
+        // implicit ``pc`` progression.
         for (int i = 0; i < instructions.size(); i++) {
             Instruction instruction = instructions.get(i);
             if (instruction instanceof Jump || instruction instanceof SwitchInstruction || instruction instanceof TryCatch
@@ -562,7 +1044,7 @@ final class JavascriptMethodGenerator {
             }
             if (instruction instanceof BasicInstruction) {
                 int opcode = ((BasicInstruction) instruction).getOpcode();
-                if (opcode == Opcodes.MONITORENTER || opcode == Opcodes.MONITOREXIT || opcode == Opcodes.ATHROW) {
+                if (opcode == Opcodes.MONITORENTER || opcode == Opcodes.MONITOREXIT) {
                     return false;
                 }
             }
@@ -860,6 +1342,9 @@ final class JavascriptMethodGenerator {
             case Opcodes.RETURN:
                 out.append("  return null;\n");
                 return true;
+            case Opcodes.ATHROW:
+                out.append("  throw ").append(ctx.pop()).append(";\n");
+                return true;
             case Opcodes.ARRAYLENGTH:
                 return emitUnary(out, ctx, "%s.length");
             case Opcodes.AALOAD:
@@ -1012,9 +1497,11 @@ final class JavascriptMethodGenerator {
     }
 
     private static boolean appendStraightLineFieldInstruction(StringBuilder out, Field field, StraightLineContext ctx) {
-        String owner = JavascriptNameUtil.sanitizeClassName(field.getOwner());
+        String rawOwner = field.getOwner();
         String fieldName = field.getFieldName();
-        String propertyName = JavascriptNameUtil.fieldProperty(field.getOwner(), fieldName);
+        String instanceOwner = resolveFieldOwner(rawOwner, fieldName);
+        String owner = JavascriptNameUtil.sanitizeClassName(rawOwner);
+        String propertyName = JavascriptNameUtil.fieldProperty(instanceOwner, fieldName);
         switch (field.getOpcode()) {
             case Opcodes.GETSTATIC:
                 appendStraightLineEnsureClassInitialized(out, ctx, owner);
@@ -1094,10 +1581,14 @@ final class JavascriptMethodGenerator {
         String invokedName = invoke.getOpcode() == Opcodes.INVOKESTATIC
                 ? "(" + staticInvocationTargetExpression(methodId, methodBodyId) + ")"
                 : methodId;
+        // Sync targets are invoked directly; generator targets keep the
+        // ``yield*`` ceremony so the cooperative scheduler can interleave
+        // them with other threads.
+        String yieldPrefix = isInvokeSuspending(invoke) ? "yield* " : "";
         if (hasReturn) {
-            out.append("  { const __result = yield* ").append(invokedName).append("(");
+            out.append("  { const __result = ").append(yieldPrefix).append(invokedName).append("(");
         } else {
-            out.append("  { yield* ").append(invokedName).append("(");
+            out.append("  { ").append(yieldPrefix).append(invokedName).append("(");
         }
         appendInvocationArgumentExpressions(out, target, argValues);
         out.append(");");
@@ -1358,11 +1849,151 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
      * switch fall through to the next real instruction's body. See the
      * emission loop in appendMethodJavaScript for the rationale.
      */
+    private static boolean methodHasTryCatch(List<Instruction> instructions) {
+        for (int i = 0; i < instructions.size(); i++) {
+            if (instructions.get(i) instanceof TryCatch) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static boolean isPcSkippableNoOp(Instruction instruction) {
         return instruction instanceof LabelInstruction
                 || instruction instanceof LineNumber
                 || instruction instanceof LocalVariable
                 || instruction instanceof TryCatch;
+    }
+
+    /**
+     * Collect every instruction index that might be branched to. That
+     * includes explicit {@link Jump} / {@link SwitchInstruction}
+     * targets, the instruction following any branch or throw (the
+     * fall-through PC for conditional jumps and a re-entry point that
+     * incoming gotos may target even after an unconditional branch),
+     * exception-handler starts, and every label referenced by the
+     * method's try/catch table. Any index NOT in this set can be
+     * reached only by fall-through inside the switch, so its case
+     * label is purely decorative and a preceding ``pc = i; break;``
+     * may be omitted.
+     */
+    private static java.util.Set<Integer> computeJumpTargets(List<Instruction> instructions, Map<Label, Integer> labelToIndex) {
+        java.util.Set<Integer> targets = new java.util.HashSet<Integer>();
+        for (int i = 0; i < instructions.size(); i++) {
+            Instruction instr = instructions.get(i);
+            if (instr instanceof Jump) {
+                Label target = ((Jump) instr).getLabel();
+                Integer idx = target == null ? null : labelToIndex.get(target);
+                if (idx != null) {
+                    targets.add(idx);
+                }
+                // The instruction right after a Jump re-enters the
+                // dispatch loop either via fall-through on a
+                // conditional or via some unrelated ``goto`` — in
+                // either case it needs a real case label.
+                if (i + 1 < instructions.size()) {
+                    targets.add(i + 1);
+                }
+            } else if (instr instanceof SwitchInstruction) {
+                SwitchInstruction sw = (SwitchInstruction) instr;
+                Label dflt = sw.getDefaultLabel();
+                if (dflt != null) {
+                    Integer idx = labelToIndex.get(dflt);
+                    if (idx != null) {
+                        targets.add(idx);
+                    }
+                }
+                Label[] labels = sw.getLabels();
+                if (labels != null) {
+                    for (Label label : labels) {
+                        Integer idx = label == null ? null : labelToIndex.get(label);
+                        if (idx != null) {
+                            targets.add(idx);
+                        }
+                    }
+                }
+                if (i + 1 < instructions.size()) {
+                    targets.add(i + 1);
+                }
+            } else if (instr instanceof TryCatch) {
+                TryCatch tc = (TryCatch) instr;
+                Integer start = tc.getStart() == null ? null : labelToIndex.get(tc.getStart());
+                Integer end = tc.getEnd() == null ? null : labelToIndex.get(tc.getEnd());
+                Integer handler = tc.getHandler() == null ? null : labelToIndex.get(tc.getHandler());
+                if (start != null) targets.add(start);
+                if (end != null) targets.add(end);
+                if (handler != null) targets.add(handler);
+            } else if (instr instanceof BasicInstruction) {
+                int op = instr.getOpcode();
+                // Instructions that terminate the linear flow of a
+                // basic block — the next instruction can only be
+                // reached via a jump, so it too is a target.
+                if (op == Opcodes.ATHROW || op == Opcodes.RETURN || op == Opcodes.IRETURN
+                        || op == Opcodes.LRETURN || op == Opcodes.FRETURN || op == Opcodes.DRETURN
+                        || op == Opcodes.ARETURN) {
+                    if (i + 1 < instructions.size()) {
+                        targets.add(i + 1);
+                    }
+                }
+            }
+        }
+        return targets;
+    }
+
+    /**
+     * True for instructions that write their own {@code pc = ...;
+     * break;} tail (or otherwise transfer control without the
+     * translator's standard ``pc = index + 1; break;`` suffix). These
+     * cannot participate in case-merging because stripping a tail
+     * that isn't there corrupts their control flow.
+     */
+    private static boolean isTerminatingInstruction(Instruction instruction) {
+        if (instruction instanceof Jump || instruction instanceof SwitchInstruction) {
+            return true;
+        }
+        if (instruction instanceof BasicInstruction) {
+            int op = instruction.getOpcode();
+            return op == Opcodes.ATHROW
+                    || op == Opcodes.RETURN
+                    || op == Opcodes.IRETURN
+                    || op == Opcodes.LRETURN
+                    || op == Opcodes.FRETURN
+                    || op == Opcodes.DRETURN
+                    || op == Opcodes.ARETURN;
+        }
+        return false;
+    }
+
+    /**
+     * Strip a trailing {@code pc = <nextIndex>; break;} from an
+     * instruction's emitted body. The pattern is emitted by every
+     * non-branch, non-throw sub-emitter (basic ops, locals, fields,
+     * invokes, multi-array, etc.) and always uses the literal
+     * advance to ``nextIndex``. We match the exact sub-string with
+     * surrounding whitespace so the strip is unambiguous — the
+     * instruction's own code can legitimately contain the words
+     * ``pc``/``break`` for unrelated reasons (diagnostics, bridge
+     * emission) and we don't want to hit those.
+     */
+    private static String stripTrailingPcAdvance(String body, int nextIndex) {
+        String pattern = "pc = " + nextIndex + "; break;";
+        int idx = body.lastIndexOf(pattern);
+        if (idx < 0) {
+            return body;
+        }
+        int end = idx + pattern.length();
+        // Also swallow a trailing newline so the next instruction's
+        // body starts cleanly on a fresh line.
+        if (end < body.length() && body.charAt(end) == '\n') {
+            end++;
+        }
+        // And any same-line whitespace preceding the tail so we don't
+        // leave a row of dangling spaces.
+        int stripStart = idx;
+        while (stripStart > 0 && (body.charAt(stripStart - 1) == ' ' || body.charAt(stripStart - 1) == '\t')) {
+            stripStart--;
+        }
+        return body.substring(0, stripStart) + body.substring(end);
     }
 
     private static Map<Label, Integer> buildLabelMap(List<Instruction> instructions) {
@@ -1900,9 +2531,19 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
     }
 
     private static void appendFieldInstruction(StringBuilder out, Field field, int index, boolean usesStaticFieldInitCache) {
-        String owner = JavascriptNameUtil.sanitizeClassName(field.getOwner());
+        String rawOwner = field.getOwner();
         String fieldName = field.getFieldName();
-        String propertyName = JavascriptNameUtil.fieldProperty(field.getOwner(), fieldName);
+        // Resolve the bytecode's class reference to the actual declaring
+        // class so the emitted ``target["cn1_<declaring>_<field>"]`` access
+        // stays aligned with the prop the translator emitted on the
+        // declaring class's classDef.instanceFields entry. Without this,
+        // reads against a subclass receiver access a never-set property
+        // and come back undefined under mangling (initFieldAliases sets
+        // up the alias under the verbose ``cn1_<subclass>_...`` key,
+        // which mangling rewrites inconsistently).
+        String instanceOwner = resolveFieldOwner(rawOwner, fieldName);
+        String owner = JavascriptNameUtil.sanitizeClassName(rawOwner);
+        String propertyName = JavascriptNameUtil.fieldProperty(instanceOwner, fieldName);
         switch (field.getOpcode()) {
             case Opcodes.GETSTATIC:
                 appendInterpreterEnsureClassInitialized(out, owner, usesStaticFieldInitCache);
@@ -2077,10 +2718,11 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
         String invokedName = invoke.getOpcode() == Opcodes.INVOKESTATIC
                 ? "(" + staticInvocationTargetExpression(methodId, methodBodyId) + ")"
                 : methodId;
+        String interpYieldPrefix = isInvokeSuspending(invoke) ? "yield* " : "";
         if (hasReturn) {
-            out.append("          const __result = yield* ").append(invokedName).append("(");
+            out.append("          const __result = ").append(interpYieldPrefix).append(invokedName).append("(");
         } else {
-            out.append("          yield* ").append(invokedName).append("(");
+            out.append("          ").append(interpYieldPrefix).append(invokedName).append("(");
         }
         appendInvocationArguments(out, invoke.getOpcode() != Opcodes.INVOKESTATIC, argCount);
         out.append(");\n");

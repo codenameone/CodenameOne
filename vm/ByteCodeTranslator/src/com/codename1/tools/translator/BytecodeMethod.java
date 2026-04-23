@@ -1395,6 +1395,25 @@ public class BytecodeMethod implements SignatureSet {
         return result;
     }
     
+    /**
+     * JS-target-only flag. When true the method body may transitively
+     * block the cooperative scheduler (sleep / wait / monitor entry /
+     * native host bridge) and must be emitted as ``function*`` with
+     * ``yield*`` at every call site. When false the method can run
+     * straight through and is emitted as a regular ``function`` —
+     * callers invoke it directly, with no generator allocation per
+     * call. Computed by {@link JavascriptSuspensionAnalysis}.
+     */
+    private boolean javascriptSuspending = true;
+
+    public boolean isJavascriptSuspending() {
+        return javascriptSuspending;
+    }
+
+    public void setJavascriptSuspending(boolean value) {
+        this.javascriptSuspending = value;
+    }
+
     public boolean isStatic() {
         return staticMethod;
     }
