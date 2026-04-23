@@ -64,7 +64,8 @@ public class CN1Playground extends Lifecycle {
     private Container bodyContainer;
     private Container editorHost;
     private Container previewContainer;
-    private Container sidePanelSlot;
+    private Container leftSidePanelSlot;
+    private Container rightSidePanelSlot;
 
     private Resources theme;
     private Resources androidTheme;
@@ -178,8 +179,11 @@ public class CN1Playground extends Lifecycle {
         previewContainer.setUIID(websiteDarkMode ? "PlaygroundPanelDark" : "PlaygroundPanel");
         previewContainer.add(BorderLayout.CENTER, previewColumn);
 
-        sidePanelSlot = new Container(new BorderLayout());
-        sidePanelSlot.getAllStyles().setBgTransparency(0);
+        leftSidePanelSlot = new Container(new BorderLayout());
+        leftSidePanelSlot.getAllStyles().setBgTransparency(0);
+
+        rightSidePanelSlot = new Container(new BorderLayout());
+        rightSidePanelSlot.getAllStyles().setBgTransparency(0);
 
         bodyContainer = new Container(new BorderLayout());
         bodyContainer.setUIID(websiteDarkMode ? "PlaygroundBodyDark" : "PlaygroundBody");
@@ -327,7 +331,8 @@ public class CN1Playground extends Lifecycle {
         previewColumn.setCompact(compact);
 
         detach(activityBar);
-        detach(sidePanelSlot);
+        detach(leftSidePanelSlot);
+        detach(rightSidePanelSlot);
         detach(editorHost);
         detach(previewContainer);
         detach(previewColumn);
@@ -342,11 +347,16 @@ public class CN1Playground extends Lifecycle {
 
         Container sideAndEditor = new Container(new BorderLayout());
         sideAndEditor.getAllStyles().setBgTransparency(0);
-        sideAndEditor.add(BorderLayout.WEST, sidePanelSlot);
+        sideAndEditor.add(BorderLayout.WEST, leftSidePanelSlot);
         sideAndEditor.add(BorderLayout.CENTER, editorHost);
 
+        Container previewAndInspector = new Container(new BorderLayout());
+        previewAndInspector.getAllStyles().setBgTransparency(0);
+        previewAndInspector.add(BorderLayout.CENTER, previewContainer);
+        previewAndInspector.add(BorderLayout.EAST, rightSidePanelSlot);
+
         center.add(BorderLayout.CENTER, sideAndEditor);
-        center.add(BorderLayout.EAST, previewContainer);
+        center.add(BorderLayout.EAST, previewAndInspector);
 
         Container bodyInner = new Container(new BorderLayout());
         bodyInner.getAllStyles().setBgTransparency(0);
@@ -495,17 +505,41 @@ public class CN1Playground extends Lifecycle {
     }
 
     private void applyActivity(String key) {
-        sidePanelSlot.removeAll();
+        if (leftSidePanelSlot == null || rightSidePanelSlot == null) {
+            return;
+        }
+        leftSidePanelSlot.removeAll();
+        rightSidePanelSlot.removeAll();
+
         if (PANEL_SAMPLES.equals(key)) {
-            safeAddCenter(sidePanelSlot, samplesPanel.getComponent());
+            safeAddCenter(leftSidePanelSlot, samplesPanel.getComponent());
         } else if (PANEL_HISTORY.equals(key)) {
             historyPanel.setEntries(PlaygroundStateStore.loadHistory());
-            safeAddCenter(sidePanelSlot, historyPanel.getComponent());
+            safeAddCenter(leftSidePanelSlot, historyPanel.getComponent());
         } else if (PANEL_INSPECTOR.equals(key)) {
-            safeAddCenter(sidePanelSlot, inspectorWrapper);
+            safeAddCenter(rightSidePanelSlot, inspectorWrapper);
         }
-        if (sidePanelSlot.getComponentForm() != null) {
-            sidePanelSlot.revalidate();
+
+        // Empty Containers naturally collapse to ~0 preferred size so adjacent
+        // slots (editorHost, previewContainer) fill the remaining space on their own.
+        // Animate the top-level body only when the form is actually displayed —
+        // animating during init (before show()) leaves transient positions.
+        Form current = Display.getInstance().getCurrent();
+        boolean formShowing = appForm != null && current == appForm;
+        Container animationRoot = leftSidePanelSlot.getParent();
+        if (formShowing && animationRoot != null) {
+            Container top = animationRoot;
+            while (top.getParent() != null && top.getParent() != bodyContainer) {
+                top = top.getParent();
+            }
+            top.animateLayout(220);
+        } else {
+            if (leftSidePanelSlot.getParent() != null) {
+                leftSidePanelSlot.getParent().revalidate();
+            }
+            if (rightSidePanelSlot.getParent() != null) {
+                rightSidePanelSlot.getParent().revalidate();
+            }
         }
     }
 

@@ -317,22 +317,22 @@ PlaygroundActivityBarDark {
 PlaygroundActivityButton {
     background: transparent;
     color: #A2ADC9;
-    border: none;
+    border-left: 0.8mm solid transparent;
     font-family: "native:MainLight";
     font-size: 2.6mm;
     padding: 2mm;
-    margin: 0.5mm 1mm 0.5mm 1mm;
+    margin: 0.5mm 1mm 0.5mm 0;
     text-decoration: none;
 }
 
 PlaygroundActivityButtonDark {
     background: transparent;
     color: #A2ADC9;
-    border: none;
+    border-left: 0.8mm solid transparent;
     font-family: "native:MainLight";
     font-size: 2.6mm;
     padding: 2mm;
-    margin: 0.5mm 1mm 0.5mm 1mm;
+    margin: 0.5mm 1mm 0.5mm 0;
     text-decoration: none;
 }
 
