@@ -169,7 +169,26 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 || "CallDetectionAPITest".equals(testName)
                 || "LocalNotificationOverrideTest".equals(testName)
                 || "Base64NativePerformanceTest".equals(testName)
-                || "AccessibilityTest".equals(testName);
+                || "AccessibilityTest".equals(testName)
+                // The native-theme fidelity tests (each emits a light+dark PNG
+                // pair) matter for iOS/Android/JavaSE where the user actually
+                // looks at visual output. The JS port run has a tight 150s
+                // browser-lifetime budget that doesn't accommodate another
+                // 13 x 2 captures; skip them here. Re-enable selectively when
+                // we move the JS port to a longer-lived harness.
+                || "ButtonThemeScreenshotTest".equals(testName)
+                || "TextFieldThemeScreenshotTest".equals(testName)
+                || "CheckBoxRadioThemeScreenshotTest".equals(testName)
+                || "SwitchThemeScreenshotTest".equals(testName)
+                || "PickerThemeScreenshotTest".equals(testName)
+                || "ToolbarThemeScreenshotTest".equals(testName)
+                || "TabsThemeScreenshotTest".equals(testName)
+                || "MultiButtonThemeScreenshotTest".equals(testName)
+                || "ListThemeScreenshotTest".equals(testName)
+                || "DialogThemeScreenshotTest".equals(testName)
+                || "FloatingActionButtonThemeScreenshotTest".equals(testName)
+                || "SpanLabelThemeScreenshotTest".equals(testName)
+                || "DarkLightShowcaseThemeScreenshotTest".equals(testName);
     }
 
     private void awaitTestCompletion(int index, BaseTest testClass, String testName, long deadline) {
