@@ -4931,14 +4931,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         try {
             // Resolve desired theme flavor. cn1.androidTheme is the new per-CN1
             // hint (material | hololight | legacy). and.hololight stays
-            // recognized for back-compat. Anything else, including unset,
-            // defaults to the Material 3 modern theme.
+            // recognized for back-compat. The Material 3 modern theme is
+            // opt-in via cn1.androidTheme=material / modern so existing apps
+            // and screenshot goldens targeting the legacy Holo Light theme
+            // aren't silently redesigned.
             String mode = Display.getInstance().getProperty("cn1.androidTheme", null);
             if (mode == null) {
                 if ("true".equalsIgnoreCase(Display.getInstance().getProperty("and.hololight", "false"))) {
                     mode = "hololight";
                 } else {
-                    mode = "material";
+                    mode = "legacy";
                 }
             } else {
                 mode = mode.toLowerCase();
@@ -4956,9 +4958,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             InputStream is = getResourceAsStream(getClass(), resPath);
             if (is == null) {
                 // Modern theme may not be in the apk if the framework build
-                // skipped native-themes generation. Fall back to holo light
-                // so the app still boots.
-                is = getResourceAsStream(getClass(), "/android_holo_light.res");
+                // skipped native-themes generation. Fall back to the legacy
+                // Android theme so the app still boots with a known look.
+                is = getResourceAsStream(getClass(), "/androidTheme.res");
             }
             Resources r = Resources.open(is);
             Hashtable h = r.getTheme(r.getThemeResourceNames()[0]);

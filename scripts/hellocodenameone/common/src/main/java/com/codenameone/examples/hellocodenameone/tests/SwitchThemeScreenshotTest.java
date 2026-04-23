@@ -23,6 +23,7 @@ public class SwitchThemeScreenshotTest extends DualAppearanceBaseTest {
         Switch off = new Switch();
         off.setValue(false);
         form.add(off);
+        annotateComponent(off, "Switch track: pill + 1.4x thumb scale (iOS) / 1.5x (Material)");
 
         form.add(new Label("Switch on"));
         Switch on = new Switch();

@@ -22,13 +22,21 @@ public class ButtonThemeScreenshotTest extends DualAppearanceBaseTest {
 
     @Override
     protected void populate(Form form, String suffix) {
-        form.add(stateRow(new Button("Default")));
-        form.add(stateRow(pressed(new Button("Pressed"))));
-        form.add(stateRow(disabled(new Button("Disabled"))));
+        Button defaultBtn = new Button("Default");
+        form.add(defaultBtn);
+        // Annotate the primary button so reviewers can see top/bottom
+        // edges, the inner text band (inset by padding), and a measured
+        // height callout. Design-system spec for a text button is ~10mm
+        // (Material 40dp / iOS 44pt) with text centered vertically.
+        annotateComponent(defaultBtn, "Default button: ~10mm target, text centered");
+
+        form.add(pressed(new Button("Pressed")));
+        form.add(disabled(new Button("Disabled")));
 
         Button raised = new Button("Raised");
         raised.setUIID("RaisedButton");
         form.add(raised);
+        annotateComponent(raised, "RaisedButton: primary fill, same 10mm rhythm");
 
         Button raisedPressed = new Button("Raised pressed");
         raisedPressed.setUIID("RaisedButton");
@@ -37,10 +45,6 @@ public class ButtonThemeScreenshotTest extends DualAppearanceBaseTest {
         Button flat = new Button("Flat");
         flat.setUIID("FlatButton");
         form.add(flat);
-    }
-
-    private static Button stateRow(Button b) {
-        return b;
     }
 
     private static Button pressed(Button b) {
