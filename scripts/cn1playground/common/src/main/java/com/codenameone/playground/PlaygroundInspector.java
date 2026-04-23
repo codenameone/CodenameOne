@@ -447,12 +447,10 @@ final class PlaygroundInspector {
             f.setUIID(uiidDark("PlaygroundFieldInput"));
             f.setSingleLineTextArea(true);
             f.getAllStyles().setMarginUnit(Style.UNIT_TYPE_DIPS);
-            // Symmetric horizontal margin on every cell so fields never touch;
-            // the GridLayout distributes the four cells at equal width and each
-            // cell's internal input has the same gap from its left and right
-            // neighbour (the GridLayout's surrounding padding absorbs the outer
-            // half-gap).
-            f.getAllStyles().setMargin(0, 0, 1, 1);
+            // Left margin on every cell except the first so cells never touch.
+            // Equal internal gap between adjacent cells; the first cell's
+            // outer-left edge aligns with the field-row's CENTER edge.
+            f.getAllStyles().setMargin(0, 0, i == 0 ? 0 : 1, 0);
             if (tooltips != null && i < tooltips.length && tooltips[i] != null) {
                 f.setTooltip(tooltips[i]);
             }
@@ -469,11 +467,6 @@ final class PlaygroundInspector {
         for (TextField f : tfs) {
             f.addDataChangedListener((t, i) -> commitRunner.run());
         }
-
-        // The grid itself gets negative horizontal margin equal to the per-cell
-        // margin so the outer edges align back with the CENTER slot.
-        fields.getAllStyles().setMarginUnit(Style.UNIT_TYPE_DIPS);
-        fields.getAllStyles().setMargin(0, 0, -1, -1);
 
         row.add(BorderLayout.CENTER, fields);
         propertiesContainer.add(row);
