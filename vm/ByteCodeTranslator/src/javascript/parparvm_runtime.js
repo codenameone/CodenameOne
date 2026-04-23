@@ -1067,6 +1067,31 @@ const jvm = {
       __id: this.nextIdentity++,
       __monitor: this.createMonitor()
     };
+    // Several @JSBody natives (EventUtil._addEventListener,
+    // _removeEventListener, getContentWindow().dispatchEvent, iframe
+    // focus()/blur() etc.) embed inline ``target.methodName(...)`` calls
+    // that the translator emits verbatim into worker-side JS. In the
+    // worker, ``target`` is a JSO wrapper with no native DOM methods,
+    // so the inline lookup throws ``TypeError: X is not a function``.
+    // Install defensive no-op stubs for the handful of DOM element
+    // methods that @JSBody scripts commonly call, so secondary
+    // registrations inside worker-forwarded event handlers don't crash.
+    // Real DOM side-effects on the main-thread element still happen
+    // when code goes through EventUtil.addEventListener on the main
+    // thread via JavaScriptEventWiring (the primary registration path),
+    // and the listener itself is already wired via the worker-callback
+    // round-trip in toHostTransferArg.
+    if (value && value.__cn1HostRef != null) {
+      if (typeof wrapper.addEventListener !== "function") {
+        wrapper.addEventListener = function() {};
+      }
+      if (typeof wrapper.removeEventListener !== "function") {
+        wrapper.removeEventListener = function() {};
+      }
+      if (typeof wrapper.dispatchEvent !== "function") {
+        wrapper.dispatchEvent = function() { return true; };
+      }
+    }
     if (jsObjectWrappers) {
       jsObjectWrappers.set(value, wrapper);
     }

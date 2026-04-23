@@ -79,6 +79,43 @@
   if (typeof target.$ === "undefined") {
     target.$ = target.jQuery;
   }
+
+  // Worker-side cn1NormalizeWheel — HTML5Implementation.mouseWheelMoved
+  // calls this via @JSBody as ``window.cn1NormalizeWheel(evt)``. On the
+  // main thread the function is installed by fontmetrics.js; that file
+  // never runs in the worker. The body itself is pure data munging (no
+  // DOM access), so inlining a copy here is enough to keep the wheel
+  // event path from tripping over a ReferenceError once events are
+  // forwarded to Java handlers.
+  if (typeof target.cn1NormalizeWheel !== "function") {
+    var normalizeWheel = function(event) {
+      if (!event) {
+        return { spinX: 0, spinY: 0, pixelX: 0, pixelY: 0 };
+      }
+      var PIXEL_STEP = 10, LINE_HEIGHT = 40, PAGE_HEIGHT = 800;
+      var sX = 0, sY = 0, pX = 0, pY = 0;
+      if ("detail"      in event) { sY = event.detail; }
+      if ("wheelDelta"  in event) { sY = -event.wheelDelta / 120; }
+      if ("wheelDeltaY" in event) { sY = -event.wheelDeltaY / 120; }
+      if ("wheelDeltaX" in event) { sX = -event.wheelDeltaX / 120; }
+      if ("axis" in event && event.axis === event.HORIZONTAL_AXIS) {
+        sX = sY; sY = 0;
+      }
+      pX = sX * PIXEL_STEP;
+      pY = sY * PIXEL_STEP;
+      if ("deltaY" in event) { pY = event.deltaY; }
+      if ("deltaX" in event) { pX = event.deltaX; }
+      if ((pX || pY) && event.deltaMode) {
+        if (event.deltaMode === 1) { pX *= LINE_HEIGHT; pY *= LINE_HEIGHT; }
+        else { pX *= PAGE_HEIGHT; pY *= PAGE_HEIGHT; }
+      }
+      if (pX && !sX) { sX = (pX < 1) ? -1 : 1; }
+      if (pY && !sY) { sY = (pY < 1) ? -1 : 1; }
+      return { spinX: sX, spinY: sY, pixelX: pX, pixelY: pY };
+    };
+    normalizeWheel.getEventType = function() { return "wheel"; };
+    target.cn1NormalizeWheel = normalizeWheel;
+  }
 })();
 
 (function(global) {
