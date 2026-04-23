@@ -53,24 +53,39 @@ final class PlaygroundInspector {
     private UITimer highlightTimer;
     private final java.util.Set<Component> expanded = new java.util.HashSet<Component>();
 
+    private Container unifiedScroll;
+
     PlaygroundInspector(boolean darkMode, Listener listener) {
         this.darkMode = darkMode;
         this.listener = listener;
 
         treeContainer = new Container(BoxLayout.y());
-        treeContainer.setScrollableY(true);
-
         propertiesContainer = new Container(BoxLayout.y());
-        propertiesContainer.setScrollableY(true);
+
+        // A single scrollable Y container holds the tree, the divider, and the
+        // property form, so the user scrolls the inspector panel as one unit
+        // rather than two independent nested scrolls (which produced a bouncy
+        // dual-scroll effect).
+        unifiedScroll = new Container(BoxLayout.y());
+        unifiedScroll.setScrollableY(true);
+        unifiedScroll.add(treeContainer);
+        unifiedScroll.add(buildTreeDivider());
+        unifiedScroll.add(propertiesContainer);
 
         component = new Container(new BorderLayout());
         component.setUIID(darkMode ? "PlaygroundInspectorRootDark" : "PlaygroundInspectorRoot");
-        component.add(BorderLayout.NORTH, treeContainer);
-        component.add(BorderLayout.CENTER, propertiesContainer);
+        component.add(BorderLayout.CENTER, unifiedScroll);
 
         applyTheme(darkMode);
         rebuildTree();
         updatePropertyPanel(null);
+    }
+
+    private Container buildTreeDivider() {
+        Container divider = new Container(new BorderLayout());
+        divider.setUIID(uiidDark("PlaygroundInspectorTreeDivider"));
+        divider.setPreferredH(Math.max(1, Display.getInstance().convertToPixels(0.3f)));
+        return divider;
     }
 
     Component getComponent() {
@@ -91,8 +106,7 @@ final class PlaygroundInspector {
         propertiesContainer.getAllStyles().setBgColor(panelBg);
         propertiesContainer.getAllStyles().setBgTransparency(255);
 
-        int maxTreePx = Display.getInstance().convertToPixels(38f);
-        treeContainer.setPreferredH(maxTreePx);
+        // Unified scroll (see rebuildTree). Tree height is intrinsic, properties fill.
 
         rebuildTree();
         updatePropertyPanel(selectedComponent);
@@ -149,13 +163,11 @@ final class PlaygroundInspector {
         Container row = new Container(new BorderLayout());
         row.setUIID(rowUiid);
 
-        // Chevron: its own Button so clicks expand/collapse without bubbling to
-        // the row selection. Hidden placeholder for leaves to keep alignment.
         Button chevron = new Button();
         chevron.setUIID(uiidDark("PlaygroundTreeChevron"));
         if (isContainer) {
             char arrow = isExpanded(c) ? FontImage.MATERIAL_EXPAND_MORE : FontImage.MATERIAL_CHEVRON_RIGHT;
-            FontImage.setMaterialIcon(chevron, arrow, 2.2f);
+            FontImage.setMaterialIcon(chevron, arrow, 2.6f);
             chevron.addActionListener(e -> {
                 if (isExpanded(c) && c != previewRoot) {
                     expanded.remove(c);
@@ -169,29 +181,25 @@ final class PlaygroundInspector {
             chevron.setHidden(true);
         }
 
-        // The main row body is a Button so the entire label area (icon + type +
-        // bracket text) is a single large click target. Selection fires on its
-        // ActionListener. Type and bracket must share a single Button text here,
-        // since Button can't nest two differently-styled labels internally.
         String text = c.getClass().getSimpleName() + extractBracket(c);
         Button body = new Button(text);
         body.setUIID(uiidDark(selected ? "PlaygroundTreeTypeActive" : "PlaygroundTreeType"));
         char typeChar = isContainer ? FontImage.MATERIAL_FOLDER_OPEN : FontImage.MATERIAL_ARTICLE;
-        FontImage.setMaterialIcon(body, typeChar, 2.5f);
+        FontImage.setMaterialIcon(body, typeChar, 3f);
         body.setTextPosition(Component.RIGHT);
-        body.setGap(Display.getInstance().convertToPixels(0.8f));
+        body.setGap(Display.getInstance().convertToPixels(1f));
         body.setAlignment(Component.LEFT);
         body.addActionListener(e -> handleComponentSelected(c));
 
-        // Depth indent: 1.5 mm base + 2.5 mm per level (spec's 3/5 halved to
-        // match the intended CSS-px footprint).
-        float indentMm = 1.5f + depth * 2.5f;
+        // Depth indent: spec values (3 mm base + 5 mm per level) rendered at
+        // ~75% so they sit correctly at CN1 physical-mm scale.
+        float indentMm = 2f + depth * 3.8f;
         row.getAllStyles().setPaddingUnit(Style.UNIT_TYPE_DIPS);
         row.getAllStyles().setPaddingLeft((int) indentMm);
         row.getAllStyles().setPaddingRight(1);
         row.getAllStyles().setPaddingTop(0);
         row.getAllStyles().setPaddingBottom(0);
-        int rowH = Display.getInstance().convertToPixels(4f);
+        int rowH = Display.getInstance().convertToPixels(5.2f);
         row.setPreferredH(rowH);
 
         row.add(BorderLayout.WEST, chevron);
@@ -266,7 +274,7 @@ final class PlaygroundInspector {
             return;
         }
 
-        addSectionHeader("IDENTITY", /*firstSection*/ true);
+        addSectionHeader("IDENTITY");
         addTextRow("Type", comp.getClass().getSimpleName(), false, null);
         addTextRow("UIID", comp.getUIID(), true, v -> {
             comp.setUIID(v);
@@ -277,27 +285,26 @@ final class PlaygroundInspector {
             notifyChange(comp, "name");
         });
 
-        addSectionHeader("CONTENT", false);
+        // CONTENT only appears when the selected component actually has editable
+        // text, so we never render an empty "Text: -" placeholder.
+        String textValue = null;
+        Consumer<String> textSetter = null;
         if (comp instanceof Label) {
-            addTextRow("Text", ((Label) comp).getText(), true, v -> {
-                ((Label) comp).setText(v);
-                notifyChange(comp, "text");
-            });
+            textValue = ((Label) comp).getText();
+            textSetter = v -> { ((Label) comp).setText(v); notifyChange(comp, "text"); };
         } else if (comp instanceof TextField) {
-            addTextRow("Text", ((TextField) comp).getText(), true, v -> {
-                ((TextField) comp).setText(v);
-                notifyChange(comp, "text");
-            });
+            textValue = ((TextField) comp).getText();
+            textSetter = v -> { ((TextField) comp).setText(v); notifyChange(comp, "text"); };
         } else if (comp instanceof TextArea) {
-            addTextRow("Text", ((TextArea) comp).getText(), true, v -> {
-                ((TextArea) comp).setText(v);
-                notifyChange(comp, "text");
-            });
-        } else {
-            addTextRow("Text", "-", false, null);
+            textValue = ((TextArea) comp).getText();
+            textSetter = v -> { ((TextArea) comp).setText(v); notifyChange(comp, "text"); };
+        }
+        if (textSetter != null) {
+            addSectionHeader("CONTENT");
+            addTextRow("Text", textValue == null ? "" : textValue, true, textSetter);
         }
 
-        addSectionHeader("APPEARANCE", false);
+        addSectionHeader("APPEARANCE");
         Style s = comp.getUnselectedStyle();
         addColorRow("Background", s.getBgColor(), s.getBgTransparency(), (color, alpha) -> {
             Style a = comp.getAllStyles();
@@ -310,10 +317,10 @@ final class PlaygroundInspector {
             notifyChange(comp, "fg");
         });
 
-        addSectionHeader("LAYOUT", false);
+        addSectionHeader("LAYOUT");
         addMultiValueRow("Bounds",
                 new int[]{comp.getX(), comp.getY(), comp.getWidth(), comp.getHeight()},
-                new String[]{"X", "Y", "W", "H"},
+                new String[]{"X", "Y", "Width", "Height"},
                 vals -> {
                     comp.setX(vals[0]);
                     comp.setY(vals[1]);
@@ -349,20 +356,9 @@ final class PlaygroundInspector {
         return Display.getInstance().convertToPixels(v);
     }
 
-    private void addSectionHeader(String title, boolean firstSection) {
-        if (!firstSection) {
-            Container divider = new Container(new BorderLayout());
-            divider.setUIID(uiidDark("PlaygroundInspectorDivider"));
-            divider.setPreferredH(1);
-            divider.getAllStyles().setMarginUnit(Style.UNIT_TYPE_DIPS);
-            divider.getAllStyles().setMargin(2, 0, 0, 0);
-            propertiesContainer.add(divider);
-        }
-
+    private void addSectionHeader(String title) {
         Label header = new Label(title);
         header.setUIID(uiidDark("PlaygroundInspectorSection"));
-        header.getAllStyles().setMarginUnit(Style.UNIT_TYPE_DIPS);
-        header.getAllStyles().setMargin(firstSection ? 1 : 1, 1, 0, 0);
         propertiesContainer.add(header);
     }
 
@@ -432,20 +428,30 @@ final class PlaygroundInspector {
         propertiesContainer.add(row);
     }
 
-    private void addMultiValueRow(String labelText, int[] values, String[] microLabels,
+    private void addMultiValueRow(String labelText, int[] values, String[] tooltips,
                                   Consumer<int[]> commit) {
         Container row = baseFieldRow(labelText);
 
         Container fields = new Container(new GridLayout(1, 4));
         fields.getAllStyles().setBgTransparency(0);
 
+        // Spec's micro labels (X Y W H / T R B L) are represented as tooltips so
+        // the row stays compact while each input is still discoverable.
         TextField[] tfs = new TextField[4];
         for (int i = 0; i < 4; i++) {
             TextField f = new TextField(String.valueOf(values[i]));
             f.setUIID(uiidDark("PlaygroundFieldInput"));
             f.setSingleLineTextArea(true);
             f.getAllStyles().setMarginUnit(Style.UNIT_TYPE_DIPS);
-            f.getAllStyles().setMargin(0, 0, 0, i == 0 ? 0 : 1);
+            // Symmetric horizontal margin on every cell so fields never touch;
+            // the GridLayout distributes the four cells at equal width and each
+            // cell's internal input has the same gap from its left and right
+            // neighbour (the GridLayout's surrounding padding absorbs the outer
+            // half-gap).
+            f.getAllStyles().setMargin(0, 0, 1, 1);
+            if (tooltips != null && i < tooltips.length && tooltips[i] != null) {
+                f.setTooltip(tooltips[i]);
+            }
             tfs[i] = f;
             fields.add(f);
         }
@@ -460,23 +466,12 @@ final class PlaygroundInspector {
             f.addDataChangedListener((t, i) -> commitRunner.run());
         }
 
-        Container micros = new Container(new GridLayout(1, 4));
-        micros.getAllStyles().setBgTransparency(0);
-        micros.getAllStyles().setMarginUnit(Style.UNIT_TYPE_DIPS);
-        micros.getAllStyles().setMargin(1, 0, 0, 0);
-        for (String m : microLabels) {
-            Label micro = new Label(m);
-            micro.setUIID(uiidDark("PlaygroundFieldMicro"));
-            micro.getAllStyles().setAlignment(Component.CENTER);
-            micros.add(micro);
-        }
+        // The grid itself gets negative horizontal margin equal to the per-cell
+        // margin so the outer edges align back with the CENTER slot.
+        fields.getAllStyles().setMarginUnit(Style.UNIT_TYPE_DIPS);
+        fields.getAllStyles().setMargin(0, 0, -1, -1);
 
-        Container rightStack = new Container(BoxLayout.y());
-        rightStack.getAllStyles().setBgTransparency(0);
-        rightStack.add(fields);
-        rightStack.add(micros);
-
-        row.add(BorderLayout.CENTER, rightStack);
+        row.add(BorderLayout.CENTER, fields);
         propertiesContainer.add(row);
     }
 
@@ -493,7 +488,7 @@ final class PlaygroundInspector {
             v[2] = s.getMarginBottom();
             v[3] = s.getMarginLeft(false);
         }
-        addMultiValueRow(labelText, v, new String[]{"T", "R", "B", "L"}, vals -> {
+        addMultiValueRow(labelText, v, new String[]{"Top", "Right", "Bottom", "Left"}, vals -> {
             if (isPadding) {
                 s.setPadding(vals[0], vals[2], vals[3], vals[1]);
             } else {

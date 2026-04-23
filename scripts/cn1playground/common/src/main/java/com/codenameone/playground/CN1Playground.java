@@ -623,7 +623,11 @@ public class CN1Playground extends Lifecycle {
         applyWebsiteTheme(component, websiteDarkMode);
 
         previewColumn.setPreview(component);
-        inspector.setPreviewRoot(previewColumn.getContentHost());
+        // Feed the Inspector the user's script result directly rather than the
+        // preview wrapper chain (stage / bezel / screen / mask) - otherwise the
+        // tree's root shows inspector-internal skin chrome rather than the
+        // user's actual root Component.
+        inspector.setPreviewRoot(component);
     }
 
     private void detachForPreview(Component component) {
@@ -1230,6 +1234,7 @@ public class CN1Playground extends Lifecycle {
             case "PlaygroundTreeBracketActive":
             case "PlaygroundInspectorSection":
             case "PlaygroundInspectorDivider":
+            case "PlaygroundInspectorTreeDivider":
             case "PlaygroundFieldRow":
             case "PlaygroundFieldLabel":
             case "PlaygroundFieldInput":
