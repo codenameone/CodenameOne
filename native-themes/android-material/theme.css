@@ -4,66 +4,38 @@
  * CEF-free subset of the Codename One CSS compiler: solid fills, native
  * rounded/pill borders, state selectors via .pressed / .selected /
  * .disabled, and light/dark palettes via @media (prefers-color-scheme:
- * dark) producing $DarkUIID variants.
+ * dark) producing $DarkUIID variants. Colors are inlined (not CSS
+ * variables) because the compiler's dark-mode rewriter operates at
+ * string level and doesn't re-scope :root var() declarations.
  *
  * Material 3 baseline palette reference:
- *   primary               #6750a4 / dark #d0bcff
- *   on-primary            #ffffff / dark #381e72
- *   primary-container     #eaddff / dark #4f378b
- *   on-primary-container  #21005d / dark #eaddff
- *   surface               #fef7ff / dark #141218
- *   on-surface            #1d1b20 / dark #e6e0e9
- *   surface-variant       #e7e0ec / dark #49454f
- *   on-surface-variant    #49454f / dark #cac4d0
- *   surface-container     #f3edf7 / dark #211f26
- *   surface-container-hi  #ece6f0 / dark #2b2930
- *   outline               #79747e / dark #938f99
- *   outline-variant       #cac4d0 / dark #49454f
- *   state-pressed         #d0bcff / dark #4f378b
- *   state-disabled        #e0dce4 / dark #2b2930
- *   on-disabled           #a5a0ab / dark #5c5967
+ *   primary               #6750a4 dark #d0bcff
+ *   on-primary            #ffffff dark #381e72
+ *   primary-container     #eaddff dark #4f378b
+ *   on-primary-container  #21005d dark #eaddff
+ *   surface               #fef7ff dark #141218
+ *   on-surface            #1d1b20 dark #e6e0e9
+ *   surface-variant       #e7e0ec dark #49454f
+ *   on-surface-variant    #49454f dark #cac4d0
+ *   surface-container     #f3edf7 dark #211f26
+ *   outline               #79747e dark #938f99
+ *   outline-variant       #cac4d0 dark #49454f
+ *   state-pressed         #d0bcff dark #4f378b
+ *   state-disabled        #e0dce4 dark #2b2930
+ *   on-disabled           #a5a0ab dark #5c5967
  *
- * Overridable palette. Sub-themes re-skin Material by redefining these
- * variables in :root before re-compilation, or by layering UIID property
- * overrides on top. The @media (prefers-color-scheme: dark) block has
- * its own palette because the compiler's dark-mode rewriter emits that
- * block as $DarkUIID styles without re-scoping variables.
- *
- * Native theme rule: includeNativeBool must be false here. tabsGridBool
- * forces equal-width Tabs matching the Material 3 top-tab-bar spec.
+ * Overridable palette: user apps layer their own theme.css or runtime
+ * UIManager.addThemeProps on top of this theme - see
+ * PaletteOverrideThemeScreenshotTest for a working example.
  */
-
-:root {
-    --cn1-primary: #6750a4;
-    --cn1-on-primary: #ffffff;
-    --cn1-primary-container: #eaddff;
-    --cn1-on-primary-container: #21005d;
-    --cn1-secondary: #625b71;
-    --cn1-surface: #fef7ff;
-    --cn1-on-surface: #1d1b20;
-    --cn1-surface-variant: #e7e0ec;
-    --cn1-on-surface-variant: #49454f;
-    --cn1-surface-container: #f3edf7;
-    --cn1-outline: #79747e;
-    --cn1-outline-variant: #cac4d0;
-    --cn1-pressed: #d0bcff;
-    --cn1-disabled-container: #e0dce4;
-    --cn1-disabled-on: #a5a0ab;
-}
 
 #Constants {
     includeNativeBool: false;
     darkModeBool: true;
     commandBehavior: Native;
     paintsTitleBarBool: false;
-
-    /* Tabs: fill-rows flow matches the Material 3 primary-tab look. */
     tabsGridBool: true;
     tabsFillRowsBool: false;
-
-    /* Switch - Material 3 look. Thumb (fg) slides off-edge-grey when
-       off / on-primary when on. Track (bg) is surface-variant off /
-       primary on. */
     switchThumbPaddingInt: 2;
     switchThumbScaleY: "1.5";
     switchTrackScaleY: "0.9";
@@ -74,229 +46,195 @@
     switchThumbInsetMM: "0";
 }
 
-/* ---- base ---- */
-
 Component {
-    color: var(--cn1-on-surface);
-    background-color: var(--cn1-surface);
+    color: #1d1b20;
+    background-color: #fef7ff;
     padding: 0;
     margin: 0;
 }
 
-Form { background-color: var(--cn1-surface); padding: 0; margin: 0; }
-ContentPane { background-color: var(--cn1-surface); padding: 0; margin: 0; }
+Form { background-color: #fef7ff; padding: 0; margin: 0; }
+ContentPane { background-color: #fef7ff; padding: 0; margin: 0; }
 Container { padding: 0; margin: 0; }
 
-/* ---- typography ---- */
-
 Label {
-    color: var(--cn1-on-surface);
+    color: #1d1b20;
     padding: 1mm 2mm 1mm 2mm;
     margin: 0;
     font-family: "native:MainRegular";
 }
 
-SecondaryLabel { cn1-derive: Label; color: var(--cn1-on-surface-variant); }
-TertiaryLabel { cn1-derive: Label; color: var(--cn1-outline); }
+SecondaryLabel { cn1-derive: Label; color: #49454f; }
+TertiaryLabel { cn1-derive: Label; color: #79747e; }
 SpanLabel { cn1-derive: Label; }
 SpanLabelText { cn1-derive: Label; }
 
-/* ---- buttons ---- */
-
 Button {
-    color: var(--cn1-on-primary);
-    background-color: var(--cn1-primary);
+    color: #ffffff;
+    background-color: #6750a4;
     padding: 2mm 4mm 2mm 4mm;
     margin: 1mm;
     font-family: "native:MainRegular";
     cn1-background-type: cn1-pill-border;
 }
+Button.pressed { background-color: #d0bcff; color: #21005d; }
+Button.disabled { color: #a5a0ab; background-color: #e0dce4; }
 
-Button.pressed { background-color: var(--cn1-pressed); color: var(--cn1-on-primary-container); }
-Button.disabled { color: var(--cn1-disabled-on); background-color: var(--cn1-disabled-container); }
-
-RaisedButton {
-    cn1-derive: Button;
-}
-RaisedButton.pressed { background-color: var(--cn1-pressed); }
-RaisedButton.disabled { background-color: var(--cn1-disabled-container); color: var(--cn1-disabled-on); }
+RaisedButton { cn1-derive: Button; }
+RaisedButton.pressed { background-color: #d0bcff; }
+RaisedButton.disabled { background-color: #e0dce4; color: #a5a0ab; }
 
 FlatButton {
     cn1-derive: Button;
     background-color: transparent;
-    color: var(--cn1-primary);
+    color: #6750a4;
     cn1-background-type: cn1-pill-border;
 }
-FlatButton.pressed { background-color: var(--cn1-primary-container); color: var(--cn1-on-primary-container); }
-
-/* ---- text input ---- */
+FlatButton.pressed { background-color: #eaddff; color: #21005d; }
 
 TextField {
-    color: var(--cn1-on-surface);
-    background-color: var(--cn1-surface-container);
+    color: #1d1b20;
+    background-color: #f3edf7;
     padding: 2mm 3mm 2mm 3mm;
     margin: 1mm 2mm 1mm 2mm;
     font-family: "native:MainRegular";
     cn1-background-type: cn1-round-border;
 }
-TextField.pressed { background-color: var(--cn1-surface-variant); }
-TextField.disabled { color: var(--cn1-disabled-on); background-color: var(--cn1-disabled-container); }
+TextField.pressed { background-color: #e7e0ec; }
+TextField.disabled { color: #a5a0ab; background-color: #e0dce4; }
 
 TextArea { cn1-derive: TextField; padding: 2mm 3mm 2mm 3mm; }
 
 TextHint {
-    color: var(--cn1-outline);
+    color: #79747e;
     padding: 2mm 3mm 2mm 3mm;
     font-family: "native:MainRegular";
 }
 
-/* ---- selection controls ---- */
-
 CheckBox {
     cn1-derive: Label;
-    color: var(--cn1-on-surface);
+    color: #1d1b20;
     background-color: transparent;
     padding: 1mm 2mm 1mm 2mm;
 }
-CheckBox.selected { color: var(--cn1-primary); }
-CheckBox.disabled { color: var(--cn1-disabled-on); background-color: var(--cn1-disabled-container); }
+CheckBox.selected { color: #6750a4; }
+CheckBox.disabled { color: #a5a0ab; background-color: #e0dce4; }
 
 RadioButton {
     cn1-derive: CheckBox;
-    color: var(--cn1-on-surface);
+    color: #1d1b20;
     background-color: transparent;
     padding: 1mm 2mm 1mm 2mm;
 }
-RadioButton.selected { color: var(--cn1-primary); }
-RadioButton.disabled { color: var(--cn1-disabled-on); background-color: var(--cn1-disabled-container); }
+RadioButton.selected { color: #6750a4; }
+RadioButton.disabled { color: #a5a0ab; background-color: #e0dce4; }
 
 Switch {
-    color: var(--cn1-outline);
-    background-color: var(--cn1-surface-variant);
+    color: #79747e;
+    background-color: #e7e0ec;
     padding: 1mm;
     margin: 1mm 2mm 1mm 2mm;
 }
-Switch.selected { color: var(--cn1-on-primary); background-color: var(--cn1-primary); }
-Switch.disabled { color: var(--cn1-disabled-on); background-color: var(--cn1-disabled-container); }
+Switch.selected { color: #ffffff; background-color: #6750a4; }
+Switch.disabled { color: #a5a0ab; background-color: #e0dce4; }
 
 OnOffSwitch {
     cn1-derive: Label;
-    color: var(--cn1-on-primary);
-    background-color: var(--cn1-surface-variant);
+    color: #ffffff;
+    background-color: #e7e0ec;
     padding: 1mm 2mm 1mm 2mm;
     cn1-background-type: cn1-pill-border;
 }
-OnOffSwitch.selected { background-color: var(--cn1-primary); color: var(--cn1-on-primary); }
-
-/* ---- toolbar ---- */
+OnOffSwitch.selected { background-color: #6750a4; color: #ffffff; }
 
 Toolbar {
-    background-color: var(--cn1-surface);
-    color: var(--cn1-on-surface);
+    background-color: #fef7ff;
+    color: #1d1b20;
     padding: 1mm;
     margin: 0;
 }
 TitleArea { cn1-derive: Toolbar; padding: 1mm 2mm 1mm 2mm; }
 
 Title {
-    color: var(--cn1-on-surface);
+    color: #1d1b20;
     padding: 1mm;
     font-family: "native:MainBold";
 }
 MainTitle { cn1-derive: Title; }
 
-BackCommand { cn1-derive: Button; background-color: transparent; color: var(--cn1-primary); padding: 1mm 2mm 1mm 2mm; }
-TitleCommand { cn1-derive: Button; background-color: transparent; color: var(--cn1-primary); padding: 1mm 2mm 1mm 2mm; }
+BackCommand { cn1-derive: Button; background-color: transparent; color: #6750a4; padding: 1mm 2mm 1mm 2mm; }
+TitleCommand { cn1-derive: Button; background-color: transparent; color: #6750a4; padding: 1mm 2mm 1mm 2mm; }
 
-/* ---- tabs ---- */
-
-Tabs { background-color: var(--cn1-surface); padding: 0; margin: 0; }
-TabsContainer { background-color: var(--cn1-surface); padding: 0; margin: 0; }
+Tabs { background-color: #fef7ff; padding: 0; margin: 0; }
+TabsContainer { background-color: #fef7ff; padding: 0; margin: 0; }
 
 Tab {
-    color: var(--cn1-on-surface-variant);
-    background-color: var(--cn1-surface);
+    color: #49454f;
+    background-color: #fef7ff;
     padding: 2mm 3mm 2mm 3mm;
     margin: 0;
     font-family: "native:MainRegular";
     text-align: center;
 }
-Tab.selected { color: var(--cn1-primary); }
-Tab.pressed { color: var(--cn1-on-primary-container); background-color: var(--cn1-primary-container); }
+Tab.selected { color: #6750a4; }
+Tab.pressed { color: #21005d; background-color: #eaddff; }
 
-SelectedTab { cn1-derive: Tab; color: var(--cn1-primary); }
-UnselectedTab { cn1-derive: Tab; color: var(--cn1-on-surface-variant); }
+SelectedTab { cn1-derive: Tab; color: #6750a4; }
+UnselectedTab { cn1-derive: Tab; color: #49454f; }
 
-/* ---- side menu ---- */
-
-SideNavigationPanel { background-color: var(--cn1-surface); padding: 0; margin: 0; }
+SideNavigationPanel { background-color: #fef7ff; padding: 0; margin: 0; }
 
 SideCommand {
     cn1-derive: Button;
     background-color: transparent;
-    color: var(--cn1-on-surface);
+    color: #1d1b20;
     padding: 2mm 3mm 2mm 3mm;
     margin: 0;
 }
-SideCommand.pressed { background-color: var(--cn1-primary-container); }
+SideCommand.pressed { background-color: #eaddff; }
 
-/* ---- list / MultiButton ---- */
-
-List { background-color: var(--cn1-surface); padding: 0; margin: 0; }
+List { background-color: #fef7ff; padding: 0; margin: 0; }
 
 ListRenderer { cn1-derive: Label; padding: 2mm 3mm 2mm 3mm; }
 
 MultiButton {
     cn1-derive: Button;
-    background-color: var(--cn1-surface);
-    color: var(--cn1-on-surface);
+    background-color: #fef7ff;
+    color: #1d1b20;
     padding: 2mm 3mm 2mm 3mm;
     margin: 0;
 }
-MultiButton.pressed { background-color: var(--cn1-primary-container); }
+MultiButton.pressed { background-color: #eaddff; }
 
-MultiLine1 { cn1-derive: Label; color: var(--cn1-on-surface); font-family: "native:MainBold"; }
-MultiLine2 { cn1-derive: Label; color: var(--cn1-on-surface-variant); }
-MultiLine3 { cn1-derive: Label; color: var(--cn1-outline); }
-MultiLine4 { cn1-derive: Label; color: var(--cn1-outline); }
-
-/* ---- dialog / sheet ---- */
+MultiLine1 { cn1-derive: Label; color: #1d1b20; font-family: "native:MainBold"; }
+MultiLine2 { cn1-derive: Label; color: #49454f; }
+MultiLine3 { cn1-derive: Label; color: #79747e; }
+MultiLine4 { cn1-derive: Label; color: #79747e; }
 
 Dialog {
-    background-color: var(--cn1-surface-container);
-    color: var(--cn1-on-surface);
+    background-color: #f3edf7;
+    color: #1d1b20;
     padding: 3mm;
     margin: 0;
     cn1-background-type: cn1-round-border;
 }
 DialogBody { cn1-derive: Dialog; padding: 2mm; }
 DialogTitle { cn1-derive: Title; padding: 2mm; }
-DialogContentPane { background-color: var(--cn1-surface-container); padding: 2mm; margin: 0; }
-DialogCommandArea { background-color: var(--cn1-surface-container); padding: 1mm; }
-
-/* ---- FAB ---- */
+DialogContentPane { background-color: #f3edf7; padding: 2mm; margin: 0; }
+DialogCommandArea { background-color: #f3edf7; padding: 1mm; }
 
 FloatingActionButton {
-    color: var(--cn1-on-primary-container);
-    background-color: var(--cn1-primary-container);
+    color: #21005d;
+    background-color: #eaddff;
     padding: 3mm;
     margin: 3mm;
     font-family: "native:MainBold";
     cn1-background-type: cn1-pill-border;
 }
-FloatingActionButton.pressed { background-color: var(--cn1-pressed); }
+FloatingActionButton.pressed { background-color: #d0bcff; }
 
-/* ---- misc ---- */
-
-Separator { background-color: var(--cn1-outline-variant); padding: 0; margin: 0; }
+Separator { background-color: #cac4d0; padding: 0; margin: 0; }
 PopupContent { cn1-derive: Dialog; padding: 2mm; }
-
-/* ============================================================
- * Dark mode overrides. Compiler emits as $DarkUIID so UIManager
- * resolves them when CN.isDarkMode() is true. Values inlined - do
- * not use var() here because the rewriter doesn't re-scope :root
- * inside @media.
- * ============================================================ */
 
 @media (prefers-color-scheme: dark) {
     Component { color: #e6e0e9; background-color: #141218; }
