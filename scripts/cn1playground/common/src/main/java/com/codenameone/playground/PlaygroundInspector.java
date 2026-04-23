@@ -60,12 +60,21 @@ final class PlaygroundInspector {
         this.listener = listener;
 
         treeContainer = new Container(BoxLayout.y());
+        // Explicitly off - only the outer unifiedScroll should scroll so the
+        // user doesn't get a double-scroll bounce. A plain Container defaults
+        // to non-scrollable, but leaving this implicit has already bitten us
+        // once (the old Tree-based implementation enabled Y scroll in its own
+        // constructor), so keep it explicit.
+        treeContainer.setScrollableY(false);
+        treeContainer.setScrollableX(false);
+
         propertiesContainer = new Container(BoxLayout.y());
+        propertiesContainer.setScrollableY(false);
+        propertiesContainer.setScrollableX(false);
 
         // A single scrollable Y container holds the tree, the divider, and the
         // property form, so the user scrolls the inspector panel as one unit
-        // rather than two independent nested scrolls (which produced a bouncy
-        // dual-scroll effect).
+        // rather than two independent nested scrolls.
         unifiedScroll = new Container(BoxLayout.y());
         unifiedScroll.setScrollableY(true);
         unifiedScroll.add(treeContainer);
