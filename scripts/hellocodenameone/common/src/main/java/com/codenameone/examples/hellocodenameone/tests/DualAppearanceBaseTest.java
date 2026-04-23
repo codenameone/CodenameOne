@@ -1,7 +1,8 @@
 package com.codenameone.examples.hellocodenameone.tests;
 
+import com.codename1.components.SpanLabel;
+import com.codename1.io.Util;
 import com.codename1.ui.Component;
-import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Font;
 import com.codename1.ui.Form;
@@ -11,28 +12,36 @@ import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.Layout;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.util.Resources;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Base for theme-fidelity screenshot tests that emit a light + dark image
- * pair. Subclasses implement {@link #populate(Form, String)} to add the
- * component(s) to be captured; the helper takes care of toggling
- * {@code Display.setDarkMode(...)}, refreshing the UIManager style cache
- * so the next style lookups re-resolve against the new appearance, showing
- * the form, waiting for onShowCompleted, and emitting the CN1SS chunk
- * with the right filename suffix.
+ * pair against the modern iOS or Android Material native theme. The
+ * legacy iOS 7 / Android Holo themes stay in place as the framework's
+ * default - the modern theme is opt-in specifically for tests in this
+ * family so existing screenshot goldens aren't silently redesigned.
  *
- * Instead of painting a fine uniform grid across the form (too busy to
- * read), a designer-style per-component overlay annotates each Button,
- * Label, Switch etc. with measurement guide lines and an "H=NNmm"
- * callout, letting reviewers visually verify each component is the
- * height the design system calls for (Material 40dp / iOS 44pt, etc.)
- * without squinting at uniform cross-hatching.
+ * Subclasses implement {@link #populate(Form, String)} to add the
+ * component(s) to exercise. During populate() they can also call
+ * {@link #annotateComponent(Component, String)} to register a specific
+ * component for the designer-style grid overlay - a thin horizontal
+ * line at its top, its content/text band, its bottom, plus a legend
+ * SpanLabel at the bottom of the form describing the measurement. The
+ * overlay is opt-in per component instead of painted on every Button/
+ * Label blindly, so it stays readable even when the form is dense.
  */
 public abstract class DualAppearanceBaseTest extends BaseTest {
 
     /**
      * Populate the given form with the component(s) to exercise. Called
      * once per appearance (first light, then dark) on a fresh form.
+     * Use {@link #annotateComponent(Component, String)} from inside
+     * populate() to tag specific components for the grid overlay.
      *
      * @param form   fresh form with its Layout already set
      * @param suffix "light" or "dark" - useful if populate() wants to
@@ -54,15 +63,34 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
     protected abstract Layout newLayout();
 
     /**
-     * Whether the designer-style per-component guide overlay paints above
-     * the form contents. Defaults to {@code true}.
+     * Subclasses override if a specific test should stay on the legacy
+     * default theme (iOS 7 / Android Holo Light) - e.g. a regression
+     * test that must exercise the legacy palette. Default: modern theme.
      */
-    protected boolean gridOverlayEnabled() {
+    protected boolean useModernTheme() {
         return true;
+    }
+
+    private final List<Annotation> annotations = new ArrayList<Annotation>();
+
+    /**
+     * Register a component for the designer-style grid overlay. Call
+     * from inside {@link #populate(Form, String)}. A thin guide line is
+     * drawn at the component's top, text band, and bottom, and the
+     * supplied legend is appended as a SpanLabel at the bottom of the
+     * form describing what's being measured (e.g. "Primary button:
+     * Material 3 full rounded, target H=10mm / 40dp, text centered").
+     */
+    protected final void annotateComponent(Component c, String legend) {
+        if (c == null) {
+            return;
+        }
+        annotations.add(new Annotation(c, legend));
     }
 
     @Override
     public boolean runTest() {
+        installModernThemeIfRequested();
         runAppearance(false, "light", () -> runAppearance(true, "dark", this::finish));
         return true;
     }
@@ -75,12 +103,12 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
         // appearance. UIManager.refreshTheme() clears the caches and re-runs
         // the theme build pass against CN.isDarkMode()'s current value, so
         // fresh components on the new Form pick up the correct $Dark<UIID>
-        // entries (emitted by the native theme's
-        // @media (prefers-color-scheme: dark) block).
+        // entries (emitted by the native theme's @media dark block).
         UIManager.getInstance().refreshTheme();
 
+        annotations.clear();
+
         final String imageName = baseName() + "_" + suffix;
-        final boolean showGrid = gridOverlayEnabled();
         Form form = new Form(baseName() + " / " + suffix, newLayout()) {
             @Override
             protected void onShowCompleted() {
@@ -89,145 +117,206 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
                     // onComplete callback. If we call next.run() inline the
                     // dark-appearance flow kicks off Form2.show() before the
                     // Display.screenshot() callback has fired, so both emits
-                    // race over the same transitioning screen buffer and
-                    // produce byte-identical PNGs (classic symptom was
+                    // race over the same transitioning buffer and produce
+                    // byte-identical PNGs (classic symptom was
                     // ButtonTheme_light.png == ButtonTheme_dark.png).
                     Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot(imageName, next);
                 });
             }
         };
-        if (showGrid) {
-            form.setGlassPane(new ComponentGuidePainter(form, dark));
-        }
         populate(form, suffix);
+        if (!annotations.isEmpty()) {
+            form.setGlassPane(new AnnotationPainter(annotations, dark));
+            SpanLabel legend = buildLegend();
+            if (legend != null) {
+                form.add(legend);
+            }
+        }
         form.show();
     }
 
+    private SpanLabel buildLegend() {
+        if (annotations.isEmpty()) {
+            return null;
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.append("Grid: ");
+        for (int i = 0; i < annotations.size(); i++) {
+            Annotation a = annotations.get(i);
+            if (a.legend == null || a.legend.length() == 0) {
+                continue;
+            }
+            if (sb.length() > 7) {
+                sb.append(" - ");
+            }
+            sb.append(a.legend);
+        }
+        SpanLabel s = new SpanLabel(sb.toString());
+        s.setUIID("TertiaryLabel");
+        return s;
+    }
+
     private void finish() {
-        // Restore platform-default dark mode so subsequent tests in the
-        // suite start from a clean slate, and refresh the theme once more
-        // so any follow-up test resolves styles against the restored state.
+        // Restore platform-default dark mode + the installed native theme
+        // so subsequent tests in the suite (including ones that rely on
+        // the legacy theme) start from a clean slate.
         Display.getInstance().setDarkMode(null);
+        if (useModernTheme()) {
+            // Reload the platform's default theme via the native impl.
+            // This reinstalls iPhoneTheme / iOS7Theme / android_holo_light
+            // / androidTheme per the non-modern defaults - exactly what
+            // the app saw before this test ran.
+            Display.getInstance().installNativeTheme();
+        }
         UIManager.getInstance().refreshTheme();
         done();
     }
 
+    private void installModernThemeIfRequested() {
+        if (!useModernTheme()) {
+            return;
+        }
+        String resourceName = pickModernThemeResource();
+        if (resourceName == null) {
+            return;
+        }
+        InputStream in = getClass().getResourceAsStream(resourceName);
+        if (in == null) {
+            // Modern theme isn't packaged on this platform - stay on the
+            // legacy default rather than crashing the test.
+            return;
+        }
+        try {
+            Resources r = Resources.open(in);
+            UIManager.getInstance().setThemeProps(r.getTheme(r.getThemeResourceNames()[0]));
+        } catch (IOException ex) {
+            // Leave the legacy theme in place on error.
+        } finally {
+            Util.cleanup(in);
+        }
+    }
+
+    private String pickModernThemeResource() {
+        String platform = Display.getInstance().getPlatformName();
+        if ("ios".equals(platform)) {
+            return "/iOSModernTheme.res";
+        }
+        if ("and".equals(platform)) {
+            return "/AndroidMaterialTheme.res";
+        }
+        return null;
+    }
+
+    private static final class Annotation {
+        final Component component;
+        final String legend;
+
+        Annotation(Component component, String legend) {
+            this.component = component;
+            this.legend = legend;
+        }
+    }
+
     /**
-     * Designer-style overlay: walks the Form's component tree and draws
-     * thin horizontal guide lines at the top and bottom of each
-     * interactive component (Button, Label, Switch etc.) plus a small
-     * "H=NNmm" callout to its right. Gives a per-component visual proof
-     * of height that reviewers can eyeball against the design system's
-     * spec (Material 40dp / iOS 44pt etc.) without a distracting uniform
-     * cross-hatch covering the whole screen.
+     * Designer-style overlay: for each annotated component, paints three
+     * thin horizontal guide lines (top edge, content/text band, bottom
+     * edge) plus an H=NNmm callout. The text band is derived from the
+     * component's padding so reviewers can eyeball the spec (e.g.
+     * "button text centered with 2mm top/bottom padding").
      */
-    private static final class ComponentGuidePainter implements Painter {
-        private final Form form;
+    private static final class AnnotationPainter implements Painter {
+        private final List<Annotation> annotations;
         private final boolean dark;
 
-        ComponentGuidePainter(Form form, boolean dark) {
-            this.form = form;
+        AnnotationPainter(List<Annotation> annotations, boolean dark) {
+            this.annotations = annotations;
             this.dark = dark;
         }
 
         @Override
         public void paint(Graphics g, Rectangle rect) {
+            if (annotations.isEmpty()) {
+                return;
+            }
             int prevColor = g.getColor();
             int prevAlpha = g.getAlpha();
             int pxPerMm = Math.max(1, Display.getInstance().convertToPixels(1f));
             int rightEdge = rect.getX() + rect.getWidth();
-            paintGuides(g, form, pxPerMm, rightEdge);
-            g.setAlpha(prevAlpha);
-            g.setColor(prevColor);
-        }
 
-        private void paintGuides(Graphics g, Container root, int pxPerMm, int rightEdge) {
-            int count = root.getComponentCount();
-            for (int i = 0; i < count; i++) {
-                Component c = root.getComponentAt(i);
+            int edgeColor = dark ? 0x66bbff : 0xcc0088;
+            int textBandColor = dark ? 0x88ff99 : 0x00aa55;
+            int labelBg = dark ? 0x002233 : 0xfff0f8;
+
+            for (Annotation a : annotations) {
+                Component c = a.component;
                 if (c == null) {
                     continue;
                 }
-                if (shouldAnnotate(c)) {
-                    drawGuideFor(g, c, pxPerMm, rightEdge);
+                int x = c.getAbsoluteX();
+                int y = c.getAbsoluteY();
+                int w = c.getWidth();
+                int h = c.getHeight();
+                if (w <= 0 || h <= 0) {
+                    continue;
                 }
-                if (c instanceof Container) {
-                    paintGuides(g, (Container) c, pxPerMm, rightEdge);
+
+                Style s = c.getUnselectedStyle();
+                int padTop = s != null ? s.getPaddingTop() : 0;
+                int padBottom = s != null ? s.getPaddingBottom() : 0;
+                int textTop = y + padTop;
+                int textBottom = y + h - padBottom;
+                int heightMm = Math.round(((float) h) / pxPerMm);
+                int textHeightMm = Math.round(((float) (textBottom - textTop)) / pxPerMm);
+
+                // Edge guide lines at the top and bottom of the component.
+                g.setColor(edgeColor);
+                g.setAlpha(180);
+                g.drawLine(x, y, x + w - 1, y);
+                g.drawLine(x, y + h - 1, x + w - 1, y + h - 1);
+
+                // End ticks so the reviewer can visually measure the box.
+                int tick = Math.max(2, pxPerMm / 2);
+                g.drawLine(x, y - tick, x, y + tick);
+                g.drawLine(x + w - 1, y - tick, x + w - 1, y + tick);
+                g.drawLine(x, y + h - 1 - tick, x, y + h - 1 + tick);
+                g.drawLine(x + w - 1, y + h - 1 - tick, x + w - 1, y + h - 1 + tick);
+
+                // Text-band guides (inset by padding) in a second colour
+                // so the text position inside the component is measurable
+                // too, not just the outer box.
+                if (textBottom > textTop + pxPerMm) {
+                    g.setColor(textBandColor);
+                    g.setAlpha(140);
+                    g.drawLine(x, textTop, x + w - 1, textTop);
+                    g.drawLine(x, textBottom, x + w - 1, textBottom);
                 }
-            }
-        }
 
-        private boolean shouldAnnotate(Component c) {
-            String id = c.getUIID();
-            if (id == null) {
-                return false;
-            }
-            return id.equals("Button")
-                    || id.equals("RaisedButton")
-                    || id.equals("FlatButton")
-                    || id.equals("Label")
-                    || id.equals("SecondaryLabel")
-                    || id.equals("Switch")
-                    || id.equals("OnOffSwitch")
-                    || id.equals("CheckBox")
-                    || id.equals("RadioButton")
-                    || id.equals("TextField")
-                    || id.equals("TextArea")
-                    || id.equals("Tab")
-                    || id.equals("MultiButton")
-                    || id.equals("Title");
-        }
+                // Callout placed outside the component (to the right if
+                // there's room, otherwise below).
+                String label = "H=" + heightMm + "mm, text=" + textHeightMm + "mm";
+                Font f = g.getFont();
+                if (f == null) {
+                    f = Font.getDefaultFont();
+                    g.setFont(f);
+                }
+                int textW = f.stringWidth(label);
+                int textH = f.getHeight();
+                int labelX = x + w + 2;
+                int labelY = y + (h - textH) / 2;
+                if (labelX + textW + 4 > rightEdge) {
+                    labelX = Math.max(0, rightEdge - textW - 6);
+                    labelY = y + h + 2;
+                }
 
-        private void drawGuideFor(Graphics g, Component c, int pxPerMm, int rightEdge) {
-            int x = c.getAbsoluteX();
-            int y = c.getAbsoluteY();
-            int w = c.getWidth();
-            int h = c.getHeight();
-            if (w <= 0 || h <= 0) {
-                return;
+                g.setAlpha(210);
+                g.setColor(labelBg);
+                g.fillRect(labelX - 2, labelY - 1, textW + 4, textH + 2);
+                g.setColor(edgeColor);
+                g.drawString(label, labelX, labelY);
             }
 
-            int heightMm = Math.round(((float) h) / pxPerMm);
-
-            int guideColor = dark ? 0x66bbff : 0xcc0088;
-            int labelBg = dark ? 0x224466 : 0xfff0f8;
-
-            g.setColor(guideColor);
-            g.setAlpha(110);
-            // Horizontal guide lines at top + bottom of the component.
-            g.drawLine(x, y, x + w, y);
-            g.drawLine(x, y + h - 1, x + w, y + h - 1);
-
-            // Vertical tick marks at left/right edges so the reviewer can
-            // visually measure the box without hunting for the lines.
-            g.setAlpha(150);
-            int tick = Math.max(2, pxPerMm / 3);
-            g.drawLine(x, y - tick, x, y + tick);
-            g.drawLine(x, y + h - 1 - tick, x, y + h - 1 + tick);
-            g.drawLine(x + w - 1, y - tick, x + w - 1, y + tick);
-            g.drawLine(x + w - 1, y + h - 1 - tick, x + w - 1, y + h - 1 + tick);
-
-            // Height callout to the right (or below if no room).
-            String label = "H=" + heightMm + "mm";
-            Font f = g.getFont();
-            if (f == null) {
-                f = Font.getDefaultFont();
-                g.setFont(f);
-            }
-            int textW = f.stringWidth(label);
-            int textH = f.getHeight();
-            int labelX = x + w + 2;
-            int labelY = y + (h - textH) / 2;
-            if (labelX + textW + 4 > rightEdge) {
-                labelX = Math.max(0, x + w - textW - 6);
-                labelY = y + h + 2;
-            }
-
-            g.setAlpha(200);
-            g.setColor(labelBg);
-            g.fillRect(labelX - 2, labelY - 1, textW + 4, textH + 2);
-            g.setColor(guideColor);
-            g.drawString(label, labelX, labelY);
+            g.setAlpha(prevAlpha);
+            g.setColor(prevColor);
         }
     }
 }

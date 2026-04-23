@@ -1342,27 +1342,24 @@ public class IOSImplementation extends CodenameOneImplementation {
         try {
             Resources r;
             String mode = iosMode == null ? "auto" : iosMode.toLowerCase();
-            // Liquid-glass modern theme generated from native-themes/ios-modern/theme.css.
-            // "auto" defaults to modern; previous iOS 7 flat theme kept reachable as "ios7"
-            // or "flat"; pre-flat iPhone theme as "legacy" or "iphone".
-            if(mode.equals("modern") || mode.equals("liquid") || mode.equals("auto")) {
+            // Modern (liquid-glass) theme is opt-in via ios.themeMode=modern /
+            // liquid / material. Keep the default ("auto" or unset) on the
+            // legacy iOS 7 / pre-flat theme so existing apps and screenshot
+            // goldens aren't disturbed. Apps that want the new look set
+            // ios.themeMode=modern in their build hints or via
+            // Display.setProperty("ios.themeMode", "modern") before the
+            // first Form is shown.
+            if(mode.equals("modern") || mode.equals("liquid")) {
                 InputStream in = getResourceAsStream("/iOSModernTheme.res");
                 if (in != null) {
                     r = Resources.open(in);
                     UIManager.getInstance().setThemeProps(r.getTheme(r.getThemeResourceNames()[0]));
                     return;
                 }
-                // Modern theme isn't in the jar (e.g. framework build hasn't generated
-                // it yet) - fall back to the iOS 7 flat theme so the app still boots.
-                r = Resources.open("/iOS7Theme.res");
-                Hashtable tp = r.getTheme(r.getThemeResourceNames()[0]);
-                if(!nativeInstance.isIOS7()) {
-                    tp.put("TitleArea.padding", "0,0,0,0");
-                }
-                UIManager.getInstance().setThemeProps(tp);
-                return;
+                // Modern theme isn't in the jar (e.g. framework build hasn't
+                // generated it yet) - fall back to iOS 7 so the app still boots.
             }
-            if(mode.equals("ios7") || mode.equals("flat")) {
+            if(mode.equals("ios7") || mode.equals("flat") || mode.equals("auto") || mode.equals("modern") || mode.equals("liquid")) {
                 r = Resources.open("/iOS7Theme.res");
                 Hashtable tp = r.getTheme(r.getThemeResourceNames()[0]);
                 if(!nativeInstance.isIOS7()) {
