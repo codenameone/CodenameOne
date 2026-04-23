@@ -14,10 +14,30 @@ Add a Metal-based rendering backend to the iOS port, gated by `#ifdef CN1_USE_ME
 |-------|-------|--------|
 | 0 | Unblock the Metal stub; scaffolding + compile | **complete** |
 | 1 | `CN1Metalcompat` + MVP ops (`FillRect`, `DrawImage`, `ClipRect`, `SetTransform`, `ClearRect`) | **complete (MVP)** |
-| 2 | Remaining `ExecutableOp`s + parity text + coordinate-system calibration | not started |
+| 2 | Remaining `ExecutableOp`s + parity text + coordinate-system calibration | **in progress — Form bg renders** |
 | 3 | Unify mutable image rendering onto Metal | not started |
 | 4 | CoreText glyph atlas | not started |
 | 5 | Harden (colour space, drawable throttling, memory, lifecycle) | not started |
+
+## Phase 2 — Coord fixes, persistent render target, more ops (in progress)
+
+### Landed
+
+- Ortho projection Y flip: now maps input y=0 to NDC y=+1, matching UIKit's Y-down coordinate system.
+- Framebuffer dimensions always computed from `self.bounds * contentScaleFactor`; ignores the logical-point values `CodenameOne_GLViewController` passes to `updateFrameBufferSize:h:` (the GL path re-reads pixel dims from the renderbuffer).
+- `layoutSubviews` now drives `updateFrameBufferSize` so the drawable gets resized when the view reaches its runtime size (xib has a 320x460 placeholder).
+- Persistent offscreen `screenTexture` with `MTLLoadActionLoad` — CN1 only queues diff ops per frame and the OpenGL path relies on the renderbuffer persisting; Metal drawables are ephemeral, so we render into this reusable texture and blit it to the drawable at present time.
+- `setFramebuffer` is now idempotent (reuse the existing encoder instead of discarding it). Fixes the issue where multiple `drawFrame` invocations per visible frame caused later calls to throw away earlier ones' ops.
+- Drawable only acquired at present time — minimises dwell and avoids `nextDrawable` stalls.
+- Ported `DrawLine`, `DrawRect`, `FillPolygon`, and `Scale` to Metal. `Rotate` and `ResetAffine` were already working via `SetTransform`.
+
+### Known issues for Phase 2 wrap-up
+
+- **ClipRect scissor coords (blocker for Phase 2 golden screenshots).** Temporarily disabled — returns `clipApplied=YES` without actually calling `CN1MetalSetScissor`. Leaving it enabled clipped the drawable to a small top strip (diagnosed by seeing the Form bg paint correctly once disabled). The scissor rect's coord space doesn't match the physical-pixel framebuffer Metal is using. Needs: audit what units `ClipRect` gets passed vs what `CN1MetalSetScissor` expects, adjust accordingly. Once fixed, non-rectangular (stencil) clipping for polygon/texture-mask clips is the next step after.
+- **DrawString not ported.** Text is invisible on the Metal path. Parity-level port uses `CGBitmapContext` rasterisation + `MTLTexture.replaceRegion:` upload + alpha-mask quad render; full glyph-atlas rewrite is Phase 4.
+- **GLUIImage MTLTexture caching.** `CN1MetalDrawImage` re-rasterises the `UIImage` on every draw. Cache the `MTLTexture` on `GLUIImage`.
+- **Gradient ops (`DrawGradient`, `RadialGradientPaint`).** Two more pipeline variants (`LinearGradient`, `RadialGradient`) are already defined in `CN1MetalShaders.metal` but the gradient ops don't call them yet.
+- **Path rendering (`DrawPath`, `DrawTextureAlphaMask`).** Paths are rasterised through `Renderer.c` to a pixel buffer; needs either a direct Metal port or an alpha-mask texture upload.
 
 ## Phase 0 — Scaffolding (complete)
 
