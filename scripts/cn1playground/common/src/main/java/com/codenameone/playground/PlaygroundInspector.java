@@ -221,13 +221,12 @@ final class PlaygroundInspector {
 
     private void handleComponentSelected(Component c) {
         selectedComponent = c;
-        // Update panel BEFORE highlighting: highlightComponent sets the form's
-        // glass pane and calls form.repaint(), which was consuming the pending
-        // revalidateLater() queued by updatePropertyPanel and leaving the panel
-        // blank. Expanding a container (chevron click) never called highlight
-        // and always worked - that was the clue.
-        updatePropertyPanel(c);
         highlightComponent(c);
+        // Defer the panel rebuild to the next EDT tick so the Button's tactile
+        // press-and-release handling finishes fully before we touch any parent
+        // layout. revalidate() inside the Button's ActionListener was fighting
+        // the Button's own press animation and the preview-highlight repaint.
+        com.codename1.ui.CN.callSerially(() -> updatePropertyPanel(c));
     }
 
     private void highlightComponent(Component c) {
@@ -244,8 +243,9 @@ final class PlaygroundInspector {
         glassPaneForm = form;
         originalGlassPane = form.getGlassPane();
         form.setGlassPane(new HighlightPainter(c, darkMode));
-        form.repaint();
-
+        // No explicit form.repaint() - CN1 paints the new glass pane on the
+        // next natural frame. An explicit repaint here was fighting the Button
+        // press animation and the pending inspector revalidate.
         if (highlightTimer != null) {
             highlightTimer.cancel();
         }
@@ -258,7 +258,6 @@ final class PlaygroundInspector {
     private void clearHighlight() {
         if (glassPaneForm != null) {
             glassPaneForm.setGlassPane(originalGlassPane);
-            glassPaneForm.repaint();
             glassPaneForm = null;
         }
         originalGlassPane = null;

@@ -41,7 +41,7 @@ final class PlaygroundActivityBar extends Container {
         this.darkMode = darkMode;
         this.activeKey = activeKey == null ? NONE : activeKey;
         setUIID(darkMode ? "PlaygroundActivityBarDark" : "PlaygroundActivityBar");
-        setPreferredW(Display.getInstance().convertToPixels(13f));
+        setPreferredW(Display.getInstance().convertToPixels(11f));
         for (int i = 0; i < entries.length; i++) {
             Item entry = entries[i];
             items.add(entry);

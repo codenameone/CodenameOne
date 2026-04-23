@@ -90,7 +90,7 @@ final class PlaygroundTopBar extends Container {
         // in the left side panel.
         Container iconColumn = new Container(new FlowLayout(Component.CENTER, Component.CENTER));
         iconColumn.getAllStyles().setBgTransparency(0);
-        iconColumn.setPreferredW(Display.getInstance().convertToPixels(13f));
+        iconColumn.setPreferredW(Display.getInstance().convertToPixels(11f));
         iconColumn.add(appIcon);
 
         Container left = new Container(BoxLayout.x());
