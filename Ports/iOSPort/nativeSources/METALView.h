@@ -48,6 +48,12 @@
 @property (nonatomic, retain) MTLRenderPassDescriptor* renderPassDescriptor;
 @property (nonatomic, retain) id<MTLRenderCommandEncoder> renderCommandEncoder;
 @property (nonatomic, retain) id<CAMetalDrawable> drawable;
+// Persistent offscreen render target that accumulates ops across frames.
+// CN1's drawFrame only queues the ops that have changed since the previous
+// frame; on OpenGL the renderbuffer persists, so that works. Metal drawables
+// are ephemeral (each is cleared on acquire), so we render into this
+// reusable texture and blit it to the drawable at present time.
+@property (nonatomic, retain) id<MTLTexture> screenTexture;
 @property (nonatomic, retain) UIView* peerComponentsLayer;
 @property (nonatomic, readonly) int framebufferWidth;
 @property (nonatomic, readonly) int framebufferHeight;

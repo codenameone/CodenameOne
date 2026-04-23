@@ -33,6 +33,9 @@
 #import <OpenGLES/ES1/gl.h>
 #import "CN1ES2compat.h"
 #import "xmlvm.h"
+#ifdef CN1_USE_METAL
+#import "CN1Metalcompat.h"
+#endif
 
 
 #ifdef USE_ES2
@@ -122,8 +125,12 @@ static GLuint getOGLProgram(){
 }
 -(void)execute
 {
+#ifdef CN1_USE_METAL
+    CN1MetalFillPolygon(x, y, numPoints, color, alpha);
+    return;
+#endif
     glUseProgram(getOGLProgram());
-    
+
     float alph = ((float)alpha)/255.0;
     
     GLKVector4 colorV = GLKVector4Make(((float)((color >> 16) & 0xff))/255.0 * alph,

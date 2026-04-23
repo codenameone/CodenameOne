@@ -48,6 +48,7 @@ extern void repaintUI();
 @synthesize renderPassDescriptor;
 @synthesize renderCommandEncoder;
 @synthesize drawable;
+@synthesize screenTexture;
 @synthesize peerComponentsLayer;
 @synthesize framebufferWidth;
 @synthesize framebufferHeight;
@@ -165,55 +166,83 @@ extern BOOL isRetinaBug();
 
 
 -(void)updateFrameBufferSize:(int)w h:(int)h {
-    if (w == framebufferWidth && h == framebufferHeight) {
+    // Ignore the passed w/h -- CodenameOne_GLViewController.m calls this with
+    // logical points (self.view.bounds.size), but the Metal drawable and
+    // projection must be in physical pixels. The GL path tolerates the
+    // logical-point argument because EAGLView.updateFrameBufferSize: is a
+    // no-op (dimensions get read back from the renderbuffer after the layer
+    // is bound). For Metal we always compute from our own layer bounds.
+    CGSize sz = self.bounds.size;
+    CGFloat s = self.contentScaleFactor;
+    int pw = (int)(sz.width * s);
+    int ph = (int)(sz.height * s);
+    if (pw <= 0 || ph <= 0) return;
+    if (pw == framebufferWidth && ph == framebufferHeight) {
         return;
     }
-    framebufferWidth = w;
-    framebufferHeight = h;
+    framebufferWidth = pw;
+    framebufferHeight = ph;
     // Match iOS UIKit's Y-down convention: origin at top-left.
-    // Using (top=0, bottom=h) instead of the GL-conventional (top=h, bottom=0)
-    // means positive Y in input coordinates maps downward on screen, matching
-    // UIKit and avoiding the _glScalef(1,-1,1) + _glTranslatef(0,-h,0) hack
-    // that the GL path uses in CodenameOne_GLViewController.drawFrame.
-    projectionMatrix = CN1MetalOrtho(0.0f, (float)w, 0.0f, (float)h, -1.0f, 1.0f);
+    // Passing bottom=h, top=0 makes y_ndc = 1 - 2*y_input/h, so y_input=0
+    // maps to NDC y=+1 (top of the drawable) and y_input=h maps to NDC y=-1
+    // (bottom). That avoids the _glScalef(1,-1,1) + _glTranslatef(0,-h,0)
+    // workaround the GL path does in CodenameOne_GLViewController.drawFrame.
+    projectionMatrix = CN1MetalOrtho(0.0f, (float)pw, (float)ph, 0.0f, -1.0f, 1.0f);
     CAMetalLayer *layer = (CAMetalLayer*)self.layer;
-    layer.drawableSize = CGSizeMake(w, h);
+    layer.drawableSize = CGSizeMake(pw, ph);
+
+    // Rebuild the persistent screen render target at the new size. Anything
+    // previously rendered into the old texture is lost; the next frame will
+    // re-clear from black as CN1 repaints -- Form.paint() always issues a
+    // full-screen background fill on layout changes so this is safe.
+    MTLTextureDescriptor *desc = [MTLTextureDescriptor
+        texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm
+        width:pw height:ph mipmapped:NO];
+    desc.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
+    desc.storageMode = MTLStorageModePrivate;
+    self.screenTexture = [layer.device newTextureWithDescriptor:desc];
+
+    // Prime the texture to opaque black: private-storage textures come back
+    // uninitialised, so the first frame (which uses MTLLoadActionLoad) would
+    // sample garbage for any pixel CN1 hasn't drawn yet.
+    id<MTLCommandBuffer> clearCb = [self.commandQueue commandBuffer];
+    MTLRenderPassDescriptor *clearPass = [MTLRenderPassDescriptor renderPassDescriptor];
+    clearPass.colorAttachments[0].texture = self.screenTexture;
+    clearPass.colorAttachments[0].loadAction = MTLLoadActionClear;
+    clearPass.colorAttachments[0].storeAction = MTLStoreActionStore;
+    clearPass.colorAttachments[0].clearColor = MTLClearColorMake(0.0, 0.0, 0.0, 1.0);
+    [[clearCb renderCommandEncoderWithDescriptor:clearPass] endEncoding];
+    [clearCb commit];
 }
 
 -(void)createRenderPassDescriptor {
-    CAMetalLayer *layer = (CAMetalLayer*)self.layer;
-    self.drawable = [layer nextDrawable];
-    if (self.drawable == nil) {
-        // Under memory pressure or rapid resize, nextDrawable may return nil.
-        // Dropping the frame is correct — never block waiting for a drawable.
+    if (self.screenTexture == nil) {
         self.renderPassDescriptor = nil;
         return;
     }
     self.renderPassDescriptor = [MTLRenderPassDescriptor renderPassDescriptor];
     MTLRenderPassColorAttachmentDescriptor* colorAttachment = self.renderPassDescriptor.colorAttachments[0];
-    colorAttachment.texture = self.drawable.texture;
-    colorAttachment.loadAction = MTLLoadActionClear;
+    // Render into the persistent screen texture so incremental draws from
+    // subsequent drawFrame calls accumulate on top of whatever was there
+    // before. MTLLoadActionLoad preserves previous pixels (vs MTLLoadActionClear
+    // which would wipe everything each frame) — CN1 only queues diff ops
+    // per frame; the OpenGL path relies on its renderbuffer persisting.
+    colorAttachment.texture = self.screenTexture;
+    colorAttachment.loadAction = MTLLoadActionLoad;
     colorAttachment.storeAction = MTLStoreActionStore;
-    colorAttachment.clearColor = MTLClearColorMake(0.0, 0.0, 0.0, 1.0);
 }
 
 - (void)setFramebuffer
 {
-    // Tolerate back-to-back setFramebuffer calls (e.g. awakeFromNib calls it
-    // once during init, drawFrame calls it again each frame). If a previous
-    // encoder is still live, end it cleanly — Metal asserts loudly if a
-    // render command encoder is released without endEncoding.
+    // setFramebuffer may be called multiple times per frame (awakeFromNib
+    // issues one unpaired call during init; drawFrame can be invoked
+    // out-of-band alongside the CADisplayLink path). The GL backend tolerates
+    // this because binding the same framebuffer twice is a no-op. For Metal
+    // we keep the same encoder alive across those extra calls -- creating a
+    // fresh encoder each time would throw away any ops queued between setup
+    // and presentFramebuffer. Only presentFramebuffer ends+commits+presents.
     if (self.renderCommandEncoder != nil) {
-        CN1MetalEndFrame();
-        [self.renderCommandEncoder endEncoding];
-        self.renderCommandEncoder = nil;
-    }
-    if (self.commandBuffer != nil) {
-        // No commit for an abandoned buffer — just drop it. The drawable (if
-        // any was acquired) goes back to the pool automatically.
-        self.commandBuffer = nil;
-        self.renderPassDescriptor = nil;
-        self.drawable = nil;
+        return;
     }
     CAMetalLayer *layer = (CAMetalLayer*)self.layer;
     self.commandBuffer = [self.commandQueue commandBuffer];
@@ -224,7 +253,7 @@ extern BOOL isRetinaBug();
         return;
     }
     self.renderCommandEncoder = [self.commandBuffer renderCommandEncoderWithDescriptor:self.renderPassDescriptor];
-    [self.renderCommandEncoder setViewport: (MTLViewport){ 0.0, 0.0, layer.drawableSize.width, layer.drawableSize.height, 0.0, 1.0 }];
+    [self.renderCommandEncoder setViewport: (MTLViewport){ 0.0, 0.0, (double)framebufferWidth, (double)framebufferHeight, 0.0, 1.0 }];
     // Publish the encoder + projection to the CN1Metalcompat layer; each
     // ExecutableOp's Metal branch pulls the encoder from there.
     CN1MetalBeginFrame(self.renderCommandEncoder, projectionMatrix, framebufferWidth, framebufferHeight);
@@ -233,16 +262,40 @@ extern BOOL isRetinaBug();
 - (BOOL)presentFramebuffer
 {
     if (self.renderCommandEncoder == nil) {
-        // Dropped frame (no drawable was acquired in setFramebuffer).
+        // Nothing was encoded (setFramebuffer was not called after the
+        // previous present). Nothing to do.
         self.commandBuffer = nil;
         return NO;
     }
     CN1MetalEndFrame();
     [self.renderCommandEncoder endEncoding];
-    [self.commandBuffer presentDrawable:self.drawable];
-    [self.commandBuffer commit];
     self.renderCommandEncoder = nil;
     self.renderPassDescriptor = nil;
+
+    // Acquire the drawable here (not in setFramebuffer) to minimise its
+    // dwell time -- holding a drawable across the whole op-encoding phase
+    // stalls nextDrawable for subsequent frames.
+    CAMetalLayer *layer = (CAMetalLayer*)self.layer;
+    id<CAMetalDrawable> dr = [layer nextDrawable];
+    if (dr == nil) {
+        // Memory pressure dropped the drawable. Commit render work so
+        // screenTexture still updates; skip this frame's present.
+        [self.commandBuffer commit];
+        self.commandBuffer = nil;
+        return NO;
+    }
+    self.drawable = dr;
+    id<MTLBlitCommandEncoder> blit = [self.commandBuffer blitCommandEncoder];
+    [blit copyFromTexture:self.screenTexture
+              sourceSlice:0 sourceLevel:0
+             sourceOrigin:MTLOriginMake(0, 0, 0)
+               sourceSize:MTLSizeMake(framebufferWidth, framebufferHeight, 1)
+                toTexture:dr.texture
+         destinationSlice:0 destinationLevel:0
+        destinationOrigin:MTLOriginMake(0, 0, 0)];
+    [blit endEncoding];
+    [self.commandBuffer presentDrawable:dr];
+    [self.commandBuffer commit];
     self.drawable = nil;
     self.commandBuffer = nil;
     return YES;
@@ -368,6 +421,19 @@ extern int currentlyEditingMaxLength;
     if (firstTime){
         [self deleteFramebuffer];
         firstTime=NO;
+    }
+    // Keep the Metal drawable + projection in sync with the actual runtime
+    // view size. initWithCoder runs with the xib's default size (often the
+    // legacy 320x480 placeholder), so without this the projection stays
+    // scaled to that default and anything drawn outside those bounds gets
+    // clipped at NDC edges -- the Form ends up only covering a portion of
+    // the screen.
+    CGSize sz = self.bounds.size;
+    CGFloat s = self.contentScaleFactor;
+    int w = (int)(sz.width * s);
+    int h = (int)(sz.height * s);
+    if (w > 0 && h > 0) {
+        [self updateFrameBufferSize:w h:h];
     }
     [super layoutSubviews];
 }

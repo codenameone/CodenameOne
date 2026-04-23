@@ -229,16 +229,42 @@ static void drawQuad(CN1MetalPipeline pipeline,
     [activeEncoder drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0 vertexCount:4];
 }
 
-// --------------- Public draw primitives ---------------
+// Draws an arbitrary solid-color primitive (line / line strip / triangle list)
+// with the pre-encoded vertex array. Used for DrawLine, DrawRect, FillPolygon.
+static void drawSolidPrimitive(MTLPrimitiveType primitive,
+                               const float *vertices,
+                               int vertexCount,
+                               simd_float4 color) {
+    if (activeEncoder == nil || pipelineCache == nil || vertexCount <= 0) return;
+    id<MTLRenderPipelineState> state = [pipelineCache pipelineFor:CN1MetalPipelineSolidColor];
+    if (state == nil) return;
+    // setVertexBytes has a 4KB limit; at 8 bytes per vertex (float2) that's
+    // 512 vertices. Convex polygons from CN1 are well within that.
+    size_t byteCount = sizeof(float) * 2 * (size_t)vertexCount;
+    if (byteCount > 4096) return;
 
-void CN1MetalFillRect(int color, int alpha, int x, int y, int width, int height) {
+    [activeEncoder setRenderPipelineState:state];
+    [activeEncoder setVertexBytes:vertices length:byteCount atIndex:0];
+    CN1MetalMatrices matrices = currentMatrices();
+    [activeEncoder setVertexBytes:&matrices length:sizeof(matrices) atIndex:1];
+    [activeEncoder setFragmentBytes:&color length:sizeof(color) atIndex:0];
+    [activeEncoder drawPrimitives:primitive vertexStart:0 vertexCount:(NSUInteger)vertexCount];
+}
+
+static simd_float4 premultipliedColor(int color, int alpha) {
     float a = alpha / 255.0f;
-    simd_float4 colorV = (simd_float4){
+    return (simd_float4){
         ((color >> 16) & 0xff) / 255.0f * a,
         ((color >> 8)  & 0xff) / 255.0f * a,
         ((color)       & 0xff) / 255.0f * a,
         a
     };
+}
+
+// --------------- Public draw primitives ---------------
+
+void CN1MetalFillRect(int color, int alpha, int x, int y, int width, int height) {
+    simd_float4 colorV = premultipliedColor(color, alpha);
     float vertices[8] = {
         (float)x,         (float)y,
         (float)(x+width), (float)y,
@@ -246,6 +272,46 @@ void CN1MetalFillRect(int color, int alpha, int x, int y, int width, int height)
         (float)(x+width), (float)(y+height)
     };
     drawQuad(CN1MetalPipelineSolidColor, vertices, NULL, colorV, nil);
+}
+
+void CN1MetalDrawLine(int color, int alpha, int x1, int y1, int x2, int y2) {
+    simd_float4 colorV = premultipliedColor(color, alpha);
+    float vertices[4] = { (float)x1, (float)y1, (float)x2, (float)y2 };
+    drawSolidPrimitive(MTLPrimitiveTypeLine, vertices, 2, colorV);
+}
+
+void CN1MetalDrawRect(int color, int alpha, int x, int y, int width, int height) {
+    simd_float4 colorV = premultipliedColor(color, alpha);
+    // Closed rectangle outline as a 5-vertex line strip.
+    float vertices[10] = {
+        (float)x,         (float)y,
+        (float)(x+width), (float)y,
+        (float)(x+width), (float)(y+height),
+        (float)x,         (float)(y+height),
+        (float)x,         (float)y
+    };
+    drawSolidPrimitive(MTLPrimitiveTypeLineStrip, vertices, 5, colorV);
+}
+
+void CN1MetalFillPolygon(const float *xCoords, const float *yCoords, int num,
+                         int color, int alpha) {
+    if (num < 3) return;
+    simd_float4 colorV = premultipliedColor(color, alpha);
+    // Triangulate as a fan from vertex 0: (0,1,2), (0,2,3), (0,3,4), ...
+    // Works for convex polygons only, matching the GL path's assumption.
+    int triCount = num - 2;
+    int vertCount = triCount * 3;
+    // Cap at setVertexBytes's 4KB limit (512 float2 vertices). Convex
+    // polygons from CN1 are typically <100 vertices; this should not clip.
+    if (vertCount > 512) vertCount = 512;
+    float stackBuf[1024]; // 512 vertices * 2 floats = 1024 floats
+    int out = 0;
+    for (int i = 1; i + 1 < num && out + 6 <= (int)(sizeof(stackBuf) / sizeof(float)); i++) {
+        stackBuf[out++] = xCoords[0];   stackBuf[out++] = yCoords[0];
+        stackBuf[out++] = xCoords[i];   stackBuf[out++] = yCoords[i];
+        stackBuf[out++] = xCoords[i+1]; stackBuf[out++] = yCoords[i+1];
+    }
+    drawSolidPrimitive(MTLPrimitiveTypeTriangle, stackBuf, out / 2, colorV);
 }
 
 void CN1MetalClearRect(int x, int y, int width, int height) {

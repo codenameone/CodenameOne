@@ -125,6 +125,21 @@ void CN1MetalFillRect(int color, int alpha, int x, int y, int width, int height)
 // equivalent to the ClearRect fragment shader writing vec4(0,0,0,0).
 void CN1MetalClearRect(int x, int y, int width, int height);
 
+// Draw a 1-pixel line from (x1,y1) to (x2,y2) with the given color+alpha.
+// Note: Metal does not support line width > 1; on retina displays lines
+// appear thin. Matches the GL path's glLineWidth=1 default.
+void CN1MetalDrawLine(int color, int alpha, int x1, int y1, int x2, int y2);
+
+// Draw a rectangular outline (not filled) at (x,y,w,h). Rendered as a
+// closed 4-segment line strip.
+void CN1MetalDrawRect(int color, int alpha, int x, int y, int width, int height);
+
+// Fill a convex polygon given N (x,y) vertex pairs. The polygon is
+// triangulated on the CPU as a fan from the first vertex, so it must
+// be convex for correct results (matches the GL path's assumption).
+void CN1MetalFillPolygon(const float *xCoords, const float *yCoords, int num,
+                         int color, int alpha);
+
 // Draw an RGBA image to (x,y,w,h) with a uniform alpha modulator (0-255).
 // Texture is owned by the caller (typically a GLUIImage); it is retained
 // only for the current command buffer.

@@ -24,6 +24,9 @@
 #import "ClipRect.h"
 #import "CodenameOne_GLViewController.h"
 #include "xmlvm.h"
+#ifdef CN1_USE_METAL
+#import "CN1Metalcompat.h"
+#endif
 
 float currentScaleX = 1;
 float currentScaleY = 1;
@@ -37,6 +40,15 @@ float currentScaleY = 1;
 }
 
 -(void)execute {
+#ifdef CN1_USE_METAL
+    {
+        GLKMatrix4 scaleM = GLKMatrix4MakeScale(x, y, 0);
+        CN1MetalSetTransform(GLKMatrix4Multiply(CN1MetalGetTransform(), scaleM));
+        currentScaleX = x;
+        currentScaleY = y;
+        return;
+    }
+#endif
 #ifdef USE_ES2
     GLKMatrix4 scale = GLKMatrix4MakeScale(x, y, 0);
     glSetTransformES2(GLKMatrix4Multiply(glGetTransformES2(), scale));
