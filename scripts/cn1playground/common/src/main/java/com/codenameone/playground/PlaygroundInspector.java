@@ -61,19 +61,21 @@ final class PlaygroundInspector {
         treeContainer = new Container(BoxLayout.y());
         treeContainer.setScrollableY(true);
 
+        // propertiesContainer is the non-scrollable inner content we mutate on
+        // selection. A dedicated scroll wrapper sits between it and the SplitPane
+        // bottom pane so the scroll state is never recreated when content changes.
         propertiesContainer = new Container(BoxLayout.y());
-        propertiesContainer.setScrollableY(true);
+        Container propertiesScroll = new Container(new BorderLayout());
+        propertiesScroll.setScrollableY(true);
+        propertiesScroll.add(BorderLayout.NORTH, propertiesContainer);
 
-        // Vertical SplitPane between tree (top) and property form (bottom),
-        // using the same thin PlaygroundSplitDivider as the main editor/
-        // preview split. Defaults to 50/50, clamped between 30% and 70%.
         SplitPane.Settings settings = new SplitPane.Settings(
                 SplitPane.VERTICAL_SPLIT, "30%", "50%", "70%")
                 .showExpandCollapseButtons(false)
                 .showDragHandle(false)
                 .dividerThicknessMM(0.8f)
                 .dividerUIID("PlaygroundSplitDivider");
-        SplitPane split = new SplitPane(settings, treeContainer, propertiesContainer);
+        SplitPane split = new SplitPane(settings, treeContainer, propertiesScroll);
 
         component = new Container(new BorderLayout());
         component.setUIID(darkMode ? "PlaygroundInspectorRootDark" : "PlaygroundInspectorRoot");
@@ -270,7 +272,7 @@ final class PlaygroundInspector {
             Label empty = new Label("Select a component");
             empty.setUIID(uiidDark("PlaygroundPropEmpty"));
             propertiesContainer.add(empty);
-            propertiesContainer.revalidateLater();
+            propertiesContainer.revalidate();
             return;
         }
 
@@ -343,12 +345,11 @@ final class PlaygroundInspector {
             notifyChange(comp, "visible");
         });
 
-        // forceRevalidate walks the entire sub-tree marking every descendant
-        // for preferred-size recalc, then revalidates. Plain revalidate() /
-        // revalidateLater() inside the Button's ActionListener had children
-        // retain stale 0-size from the previous layout pass, which kept the
-        // pane blank until a manual resize forced a fresh layout.
-        propertiesContainer.forceRevalidate();
+        // propertiesContainer is now a non-scrollable inner content Container
+        // wrapped inside propertiesScroll. Mutating propertiesContainer never
+        // disturbs the scroll wrapper's layout state, so a plain revalidate
+        // re-lays out the new children reliably.
+        propertiesContainer.revalidate();
     }
 
     // ============================================================
