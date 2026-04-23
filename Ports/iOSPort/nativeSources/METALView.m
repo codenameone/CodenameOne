@@ -198,6 +198,21 @@ extern BOOL isRetinaBug();
 
 - (void)setFramebuffer
 {
+    // Tolerate back-to-back setFramebuffer calls (e.g. awakeFromNib calls it
+    // once during init, drawFrame calls it again each frame). If a previous
+    // encoder is still live, end it cleanly — Metal asserts loudly if a
+    // render command encoder is released without endEncoding.
+    if (self.renderCommandEncoder != nil) {
+        [self.renderCommandEncoder endEncoding];
+        self.renderCommandEncoder = nil;
+    }
+    if (self.commandBuffer != nil) {
+        // No commit for an abandoned buffer — just drop it. The drawable (if
+        // any was acquired) goes back to the pool automatically.
+        self.commandBuffer = nil;
+        self.renderPassDescriptor = nil;
+        self.drawable = nil;
+    }
     CAMetalLayer *layer = (CAMetalLayer*)self.layer;
     self.commandBuffer = [self.commandQueue commandBuffer];
     [self createRenderPassDescriptor];
