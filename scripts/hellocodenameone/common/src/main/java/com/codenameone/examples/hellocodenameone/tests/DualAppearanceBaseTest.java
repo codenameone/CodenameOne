@@ -7,16 +7,12 @@ import com.codename1.ui.layouts.Layout;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.UITimer;
 
-import java.lang.reflect.Field;
-import java.util.Hashtable;
-import java.util.Map;
-
 /**
  * Base for theme-fidelity screenshot tests that emit a light + dark image
  * pair. Subclasses implement {@link #populate(Form, String)} to add the
  * component(s) to be captured; the helper takes care of toggling
- * {@code Display.setDarkMode(...)}, clearing the UIManager style caches so
- * the next style lookups re-resolve against the new appearance, showing
+ * {@code Display.setDarkMode(...)}, refreshing the UIManager style cache
+ * so the next style lookups re-resolve against the new appearance, showing
  * the form, waiting for onShowCompleted, and emitting the CN1SS chunk
  * with the right filename suffix.
  *
@@ -57,15 +53,15 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
 
     private void runAppearance(boolean dark, final String suffix, final Runnable next) {
         Display.getInstance().setDarkMode(dark);
-        // UIManager caches resolved Style objects in its styles / selectedStyles
-        // maps keyed by UIID. A Style created while Display.isDarkMode() was
-        // false is the LIGHT variant; the cache then returns that light Style
-        // for later lookups even after we flip to dark. Reflectively clear the
-        // caches so the next Component.initLaf -> UIManager.getComponentStyle
-        // re-runs the style resolution path (shouldUseDarkStyle consults
-        // CN.isDarkMode() per call and picks up the $Dark<UIID> entries that
-        // the native themes' @media (prefers-color-scheme: dark) block emits).
-        clearStyleCaches();
+        // UIManager caches resolved Style objects per UIID; without this call
+        // the next lookup returns the Style that was resolved while the other
+        // appearance was active, and the screenshot comes out in the wrong
+        // appearance. UIManager.refreshTheme() clears the caches and re-runs
+        // the theme build pass against CN.isDarkMode()'s current value, so
+        // fresh components on the new Form pick up the correct $Dark<UIID>
+        // entries (emitted by the native theme's
+        // @media (prefers-color-scheme: dark) block).
+        UIManager.getInstance().refreshTheme();
 
         final String imageName = baseName() + "_" + suffix;
         Form form = new Form(baseName() + " / " + suffix, newLayout()) {
@@ -83,32 +79,10 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
 
     private void finish() {
         // Restore platform-default dark mode so subsequent tests in the
-        // suite start from a clean slate, and clear caches once more so any
-        // follow-up test resolves its styles from scratch.
+        // suite start from a clean slate, and refresh the theme once more
+        // so any follow-up test resolves styles against the restored state.
         Display.getInstance().setDarkMode(null);
-        clearStyleCaches();
+        UIManager.getInstance().refreshTheme();
         done();
-    }
-
-    private static void clearStyleCaches() {
-        clearField("styles");
-        clearField("selectedStyles");
-    }
-
-    private static void clearField(String name) {
-        try {
-            Field f = UIManager.class.getDeclaredField(name);
-            f.setAccessible(true);
-            Object value = f.get(UIManager.getInstance());
-            if (value instanceof Hashtable) {
-                ((Hashtable) value).clear();
-            } else if (value instanceof Map) {
-                ((Map) value).clear();
-            }
-        } catch (Throwable ignored) {
-            // Reflection not available (e.g. no-reflection VM on device):
-            // best effort. On those platforms the dark-mode screenshot
-            // mirrors whichever appearance was active on first lookup.
-        }
     }
 }

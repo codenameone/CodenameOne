@@ -1587,6 +1587,25 @@ public class UIManager {
         }
     }
 
+    /// Invalidates the cached Style instances and re-runs the theme build pass
+    /// against the currently installed theme properties. Callers use this after
+    /// state changes that affect style resolution (notably `Display.setDarkMode`,
+    /// which makes `$Dark<UIID>` entries eligible) without reloading the theme
+    /// from a resource file. Components styled after this call resolve against
+    /// the refreshed theme; already-resolved Style references on existing
+    /// components keep their old values until those components re-fetch their
+    /// styles.
+    public void refreshTheme() {
+        if (!accessible || themeProps == null) {
+            return;
+        }
+        Hashtable props = new Hashtable();
+        for (String key : themeProps.keySet()) {
+            props.put(key, themeProps.get(key));
+        }
+        setThemePropsImpl(props);
+    }
+
     /// Returns a theme constant defined in the resource editor
     ///
     /// #### Parameters
