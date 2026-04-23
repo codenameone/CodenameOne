@@ -97,7 +97,9 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
     }
 
     private void runAppearance(boolean dark, final String suffix, final Runnable next) {
+        logDiag("CN1SS:INFO:DualAppearance runAppearance.enter dark=" + dark + " test=" + baseName());
         Display.getInstance().setDarkMode(dark);
+        logDiag("CN1SS:INFO:DualAppearance setDarkMode.done dark=" + dark + " test=" + baseName());
         // UIManager caches resolved Style objects per UIID; without this call
         // the next lookup returns the Style that was resolved while the other
         // appearance was active, and the screenshot comes out in the wrong
@@ -106,6 +108,7 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
         // fresh components on the new Form pick up the correct $Dark<UIID>
         // entries (emitted by the native theme's @media dark block).
         UIManager.getInstance().refreshTheme();
+        logDiag("CN1SS:INFO:DualAppearance refreshTheme.done dark=" + dark + " test=" + baseName());
 
         annotations.clear();
 
@@ -113,7 +116,9 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
         Form form = new Form(baseName() + " / " + suffix, newLayout()) {
             @Override
             protected void onShowCompleted() {
+                logDiag("CN1SS:INFO:DualAppearance onShowCompleted test=" + baseName() + " image=" + imageName);
                 registerReadyCallback(this, () -> {
+                    logDiag("CN1SS:INFO:DualAppearance ready emit=" + imageName);
                     // Chain next.run() through emitCurrentFormScreenshot's
                     // onComplete callback. If we call next.run() inline the
                     // dark-appearance flow kicks off Form2.show() before the
@@ -125,7 +130,9 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
                 });
             }
         };
+        logDiag("CN1SS:INFO:DualAppearance form.created test=" + baseName());
         populate(form, suffix);
+        logDiag("CN1SS:INFO:DualAppearance form.populated test=" + baseName() + " annotations=" + annotations.size());
         if (!annotations.isEmpty()) {
             form.setGlassPane(new AnnotationPainter(annotations, dark));
             SpanLabel legend = buildLegend();
@@ -133,7 +140,9 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
                 form.add(legend);
             }
         }
+        logDiag("CN1SS:INFO:DualAppearance form.show test=" + baseName());
         form.show();
+        logDiag("CN1SS:INFO:DualAppearance form.show.returned test=" + baseName());
     }
 
     private SpanLabel buildLegend() {
