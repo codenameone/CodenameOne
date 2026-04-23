@@ -113,7 +113,8 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
         annotations.clear();
 
         final String imageName = baseName() + "_" + suffix;
-        Form form = new Form(baseName() + " / " + suffix, newLayout()) {
+        logDiag("CN1SS:INFO:DualAppearance form.newCtor.begin test=" + baseName());
+        Form form = new Form() {
             @Override
             protected void onShowCompleted() {
                 logDiag("CN1SS:INFO:DualAppearance onShowCompleted test=" + baseName() + " image=" + imageName);
@@ -130,6 +131,11 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
                 });
             }
         };
+        logDiag("CN1SS:INFO:DualAppearance form.newCtor.done test=" + baseName());
+        form.setLayout(newLayout());
+        logDiag("CN1SS:INFO:DualAppearance form.setLayout.done test=" + baseName());
+        form.setTitle(baseName() + " / " + suffix);
+        logDiag("CN1SS:INFO:DualAppearance form.setTitle.done test=" + baseName());
         logDiag("CN1SS:INFO:DualAppearance form.created test=" + baseName());
         populate(form, suffix);
         logDiag("CN1SS:INFO:DualAppearance form.populated test=" + baseName() + " annotations=" + annotations.size());
