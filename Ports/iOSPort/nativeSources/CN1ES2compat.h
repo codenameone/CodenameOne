@@ -20,6 +20,11 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
+// IPhoneBuilder.java:697 uncomments the line below when -Dios.metal=true is set.
+// When defined, the Metal rendering backend (METALView, CN1Metalcompat) is
+// activated and the OpenGL ES 2 backend stays linked but unused. See
+// Ports/iOSPort/METAL_PORT_STATUS.md for the migration plan.
+//#define CN1_USE_METAL
 #define USE_ES2 1
 enum CN1GLenum {
     CN1_GL_ALPHA_TEXTURE,

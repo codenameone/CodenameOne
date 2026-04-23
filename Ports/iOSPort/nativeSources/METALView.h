@@ -17,9 +17,10 @@
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
+#import "CN1ES2compat.h"
 #ifdef CN1_USE_METAL
 #import <UIKit/UIKit.h>
 #import <QuartzCore/CAMetalLayer.h>
