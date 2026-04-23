@@ -772,12 +772,12 @@ PlaygroundEmbeddedTitleAreaDark {
 
 PlaygroundInspectorRoot {
     background: #FFFFFF;
-    padding: 0 2mm 2mm 2mm;
+    padding: 0;
 }
 
 PlaygroundInspectorRootDark {
     background: #0A1D3A;
-    padding: 0 2mm 2mm 2mm;
+    padding: 0;
 }
 
 /* ----- Tree rows (per inspector spec: 7mm tall, depth-indented) ----- */
@@ -960,20 +960,19 @@ PlaygroundInspectorDividerDark {
     border: none;
 }
 
-/* Stronger divider separating the tree from the property sections. Negative
- * horizontal margins so the line extends past the panel's 2mm inner padding
- * and reaches the panel edges. */
+/* Stronger divider separating the tree from the property sections. Spans the
+ * full panel width because the inspector root no longer has inner padding. */
 PlaygroundInspectorTreeDivider {
     background: #BFC7D6;
     padding: 0;
-    margin: 1.5mm -2mm 1.5mm -2mm;
+    margin: 1.5mm 0 1.5mm 0;
     border: none;
 }
 
 PlaygroundInspectorTreeDividerDark {
     background: #3A5A8A;
     padding: 0;
-    margin: 1.5mm -2mm 1.5mm -2mm;
+    margin: 1.5mm 0 1.5mm 0;
     border: none;
 }
 

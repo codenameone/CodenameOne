@@ -106,7 +106,13 @@ final class PlaygroundInspector {
         propertiesContainer.getAllStyles().setBgColor(panelBg);
         propertiesContainer.getAllStyles().setBgTransparency(255);
 
-        // Unified scroll (see rebuildTree). Tree height is intrinsic, properties fill.
+        // Breathing-room padding is applied inline on the tree and property
+        // containers (not the root) so the divider between them can span the
+        // full panel width without being cropped.
+        treeContainer.getAllStyles().setPaddingUnit(Style.UNIT_TYPE_DIPS);
+        treeContainer.getAllStyles().setPadding(0, 0, 2, 2);
+        propertiesContainer.getAllStyles().setPaddingUnit(Style.UNIT_TYPE_DIPS);
+        propertiesContainer.getAllStyles().setPadding(0, 2, 2, 2);
 
         rebuildTree();
         updatePropertyPanel(selectedComponent);
@@ -156,14 +162,11 @@ final class PlaygroundInspector {
     }
 
     private Container createTreeRow(Component c, int depth) {
-        boolean isContainer = c instanceof Container;
+        final boolean isContainer = c instanceof Container;
         boolean selected = c == selectedComponent;
         String rowUiid = uiidDark(selected ? "PlaygroundTreeRowActive" : "PlaygroundTreeRow");
 
-        Container row = new Container(new BorderLayout());
-        row.setUIID(rowUiid);
-
-        Button chevron = new Button();
+        final Button chevron = new Button();
         chevron.setUIID(uiidDark("PlaygroundTreeChevron"));
         if (isContainer) {
             char arrow = isExpanded(c) ? FontImage.MATERIAL_EXPAND_MORE : FontImage.MATERIAL_CHEVRON_RIGHT;
@@ -181,15 +184,23 @@ final class PlaygroundInspector {
             chevron.setHidden(true);
         }
 
-        String text = c.getClass().getSimpleName() + extractBracket(c);
-        Button body = new Button(text);
-        body.setUIID(uiidDark(selected ? "PlaygroundTreeTypeActive" : "PlaygroundTreeType"));
+        Label typeIcon = new Label();
+        typeIcon.setUIID(uiidDark("PlaygroundTreeTypeIcon"));
         char typeChar = isContainer ? FontImage.MATERIAL_FOLDER_OPEN : FontImage.MATERIAL_ARTICLE;
-        FontImage.setMaterialIcon(body, typeChar, 3f);
-        body.setTextPosition(Component.RIGHT);
-        body.setGap(Display.getInstance().convertToPixels(1f));
-        body.setAlignment(Component.LEFT);
-        body.addActionListener(e -> handleComponentSelected(c));
+        FontImage.setMaterialIcon(typeIcon, typeChar, 3f);
+
+        Label textLabel = new Label(c.getClass().getSimpleName() + extractBracket(c));
+        textLabel.setUIID(uiidDark(selected ? "PlaygroundTreeTypeActive" : "PlaygroundTreeType"));
+
+        Container body = new Container(BoxLayout.x());
+        body.getAllStyles().setBgTransparency(0);
+        body.add(typeIcon);
+        body.add(textLabel);
+
+        Container row = new Container(new BorderLayout());
+        row.setUIID(rowUiid);
+        row.add(BorderLayout.WEST, chevron);
+        row.add(BorderLayout.CENTER, body);
 
         // Depth indent: spec values (3 mm base + 5 mm per level) rendered at
         // ~75% so they sit correctly at CN1 physical-mm scale.
@@ -199,11 +210,23 @@ final class PlaygroundInspector {
         row.getAllStyles().setPaddingRight(1);
         row.getAllStyles().setPaddingTop(0);
         row.getAllStyles().setPaddingBottom(0);
-        int rowH = Display.getInstance().convertToPixels(5.2f);
+        int rowH = Display.getInstance().convertToPixels(6f);
         row.setPreferredH(rowH);
 
-        row.add(BorderLayout.WEST, chevron);
-        row.add(BorderLayout.CENTER, body);
+        // Selection fires on a pointer release anywhere on the row, except when
+        // the release lands inside the chevron button (which handles its own
+        // expand/collapse). addPointerReleasedListener fires in addition to the
+        // chevron's own ActionListener, so gate on absolute X coords.
+        row.addPointerReleasedListener(e -> {
+            if (isContainer && chevron.isVisible()) {
+                int x = e.getX();
+                int cx = chevron.getAbsoluteX();
+                if (x >= cx && x < cx + chevron.getWidth()) {
+                    return;
+                }
+            }
+            handleComponentSelected(c);
+        });
         return row;
     }
 
