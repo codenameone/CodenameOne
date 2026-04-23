@@ -1542,9 +1542,21 @@ bindCiFallback("Display.addEdtErrorHandler", [
 bindCiFallback("Log.print", [
   "cn1_com_codename1_io_Log_print_java_lang_String_int"
 ], function*(__cn1ThisObject, message, level) {
+  // Codename One's Log levels: DEBUG=1, INFO=2, WARNING=3, ERROR=4.
+  // Any level >= 1 goes to console.error (WARNING/ERROR) or console.log
+  // (DEBUG/INFO with level >= 1 actually hits the .error branch here —
+  // mirrors the pre-existing behaviour). Level 0 is the "untagged"
+  // Log.p(String) path which Codename One calls from internals like
+  // [installNativeTheme] tracing; that chatter doesn't belong in a
+  // production browser console, so silence it unless the diagnostic
+  // toggle is on. User code that wants noisy logs can either route
+  // through Log.e() (always surfaced) or load with ?parparDiag=1.
   const text = message == null ? "" : jvm.toNativeString(message);
-  if ((level | 0) >= 1 && global.console && typeof global.console.error === "function") {
+  const lv = level | 0;
+  if (lv >= 1 && global.console && typeof global.console.error === "function") {
     global.console.error(text);
+  } else if (lv < 1 && !__cn1PortDiagEnabled()) {
+    return null;
   } else if (global.console && typeof global.console.log === "function") {
     global.console.log(text);
   }

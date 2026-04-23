@@ -1529,6 +1529,24 @@
     }
     if (data.type === 'error') {
       global.__parparError = data;
+      // ALWAYS surface runtime errors to the main-thread console — this is
+      // unrelated to the diagEnabled diagnostics toggle. Without this, an
+      // app crash inside the worker vanishes silently because diag() is
+      // gated, and users only see the "Loading..." splash hang forever.
+      if (global.console && typeof global.console.error === 'function') {
+        var errorText = 'PARPAR:ERROR: ' + (data.message || 'unknown');
+        if (data.stack) {
+          errorText += '\n' + data.stack;
+        }
+        if (data.virtualFailure) {
+          try {
+            errorText += '\n  virtualFailure=' + JSON.stringify(data.virtualFailure);
+          } catch (_jse) {
+            errorText += '\n  virtualFailure=[unserialisable]';
+          }
+        }
+        global.console.error(errorText);
+      }
       var failure = data.virtualFailure || null;
       if (failure) {
         diag('FIRST_FAILURE', 'category', failure.category || 'runtime_error');
