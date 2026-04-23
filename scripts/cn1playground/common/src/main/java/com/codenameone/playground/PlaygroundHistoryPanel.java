@@ -86,6 +86,10 @@ final class PlaygroundHistoryPanel {
         wrapper.add(com.codename1.ui.layouts.BorderLayout.CENTER, lines);
         wrapper.add(com.codename1.ui.layouts.BorderLayout.EAST, row);
         wrapper.getAllStyles().setBgTransparency(0);
+        // Align row text to the 3 mm left padding used by the panel header so
+        // entries line up underneath the "HISTORY" title.
+        wrapper.getAllStyles().setPaddingUnit(com.codename1.ui.plaf.Style.UNIT_TYPE_DIPS);
+        wrapper.getAllStyles().setPadding(1, 1, 2, 3);
         return wrapper;
     }
 

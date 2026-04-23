@@ -3,6 +3,8 @@ package com.codenameone.playground;
 import com.codename1.ui.Button;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
+import com.codename1.ui.FontImage;
+import com.codename1.ui.Label;
 import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
@@ -29,9 +31,10 @@ final class PlaygroundSamplesPanel {
         panel = new PlaygroundSidePanel("SAMPLES", darkMode, onClose);
 
         search = new TextField();
-        search.setHint("Search samples");
+        search.setHint("Search");
         search.setSingleLineTextArea(true);
         search.setUIID(darkMode ? "PlaygroundSearchFieldDark" : "PlaygroundSearchField");
+        applySearchHintIcon(search);
         search.addDataChangedListener((type, index) -> rebuildList());
 
         listContainer = new Container(BoxLayout.y());
@@ -61,7 +64,21 @@ final class PlaygroundSamplesPanel {
         this.darkMode = dark;
         panel.applyTheme(dark);
         search.setUIID(dark ? "PlaygroundSearchFieldDark" : "PlaygroundSearchField");
+        applySearchHintIcon(search);
         applyItemStyles();
+    }
+
+    /// Render a magnifying-glass glyph on the hint label so the hint reads
+    /// "[search icon] Search" until the user starts typing, at which point
+    /// the hint hides and only the user's text remains.
+    private static void applySearchHintIcon(TextField field) {
+        Label hint = field.getHintLabel();
+        if (hint == null) {
+            return;
+        }
+        FontImage.setMaterialIcon(hint, FontImage.MATERIAL_SEARCH, 3f);
+        hint.setTextPosition(Component.RIGHT);
+        hint.setGap(com.codename1.ui.Display.getInstance().convertToPixels(1.3f));
     }
 
     private void rebuildList() {

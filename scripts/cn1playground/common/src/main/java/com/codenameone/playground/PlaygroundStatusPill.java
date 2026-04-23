@@ -40,9 +40,10 @@ final class PlaygroundStatusPill extends Container {
         Container dotWrap = new Container(new com.codename1.ui.layouts.FlowLayout(Component.CENTER, Component.CENTER));
         dotWrap.getAllStyles().setBgTransparency(0);
         dotWrap.getAllStyles().setPadding(0, 0, 0, 0);
-        dotWrap.getAllStyles().setPaddingUnit(Style.UNIT_TYPE_PIXELS);
+        dotWrap.getAllStyles().setPaddingUnit(Style.UNIT_TYPE_DIPS);
+        dotWrap.getAllStyles().setPadding(0f, 0f, 0f, 2f);
         dotWrap.getAllStyles().setMarginUnit(Style.UNIT_TYPE_DIPS);
-        dotWrap.getAllStyles().setMargin(0f, 0f, 0f, 1.3f);
+        dotWrap.getAllStyles().setMargin(0f, 0f, 0f, 0f);
         dotWrap.add(dot);
 
         Container textWrap = new Container(new com.codename1.ui.layouts.FlowLayout(Component.LEFT, Component.CENTER));

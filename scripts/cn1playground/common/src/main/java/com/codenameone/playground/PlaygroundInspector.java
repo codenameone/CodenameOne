@@ -270,9 +270,7 @@ final class PlaygroundInspector {
             Label empty = new Label("Select a component");
             empty.setUIID(uiidDark("PlaygroundPropEmpty"));
             propertiesContainer.add(empty);
-            if (propertiesContainer.getComponentForm() != null) {
-                propertiesContainer.revalidate();
-            }
+            propertiesContainer.revalidateLater();
             return;
         }
 
@@ -345,9 +343,13 @@ final class PlaygroundInspector {
             notifyChange(comp, "visible");
         });
 
-        if (propertiesContainer.getComponentForm() != null) {
-            propertiesContainer.revalidate();
-        }
+        // revalidateLater() queues the layout pass via the form's paint-cycle
+        // revalidation queue instead of firing mid-callback. Calling revalidate()
+        // here (inside the Button's ActionListener callback, while the Button's
+        // press animation is still running) was the silent no-op: the layout
+        // would snap to the animation's final frame and the new children stayed
+        // at measured size 0.
+        propertiesContainer.revalidateLater();
     }
 
     // ============================================================
