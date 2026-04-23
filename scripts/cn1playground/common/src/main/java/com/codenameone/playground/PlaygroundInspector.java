@@ -232,6 +232,16 @@ final class PlaygroundInspector {
         highlightComponent(c);
         updatePropertyPanel(c);
         rebuildTree();
+        // The tree and property Containers call revalidate() on themselves in
+        // their rebuild paths, but CN1's revalidate is self-only and does not
+        // propagate to the outer unifiedScroll, so the updated child preferred
+        // sizes (and the new active-row UIID on the selected row) may be left
+        // off-screen until the next unrelated layout pass. Force the whole
+        // inspector subtree to re-layout and repaint here.
+        if (component.getComponentForm() != null) {
+            component.revalidate();
+            component.repaint();
+        }
     }
 
     private void highlightComponent(Component c) {
