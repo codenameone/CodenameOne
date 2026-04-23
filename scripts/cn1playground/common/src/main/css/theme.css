@@ -195,7 +195,7 @@ PlaygroundSegmentOptionSelectedDark {
 /* ----- Status pill ----- */
 
 PlaygroundStatusPill {
-    background: #F0F2F7;
+    background: rgba(240, 242, 247, 0.5);
     color: #112247;
     border: 1px solid #E1E4EA;
     border-radius: 3mm;
@@ -207,7 +207,7 @@ PlaygroundStatusPill {
 }
 
 PlaygroundStatusPillDark {
-    background: #0B2055;
+    background: rgba(11, 32, 85, 0.5);
     color: #F5F8FF;
     border: 1px solid #253B73;
     border-radius: 3mm;
@@ -219,7 +219,7 @@ PlaygroundStatusPillDark {
 }
 
 PlaygroundStatusPillError {
-    background: #FBE6E6;
+    background: rgba(251, 230, 230, 0.5);
     color: #D93636;
     border: 1px solid #F0C2C2;
     border-radius: 3mm;
@@ -231,7 +231,7 @@ PlaygroundStatusPillError {
 }
 
 PlaygroundStatusPillErrorDark {
-    background: #3A1515;
+    background: rgba(58, 21, 21, 0.5);
     color: #FF6B6B;
     border: 1px solid #5A2525;
     border-radius: 3mm;
@@ -271,7 +271,7 @@ PlaygroundStatusDotErrorDark {
 PlaygroundShareButton {
     background: transparent;
     color: #112247;
-    border: 1px solid #E1E4EA;
+    border: 1px solid #8692A8;
     border-radius: 1.5mm;
     font-family: "native:MainLight";
     font-size: 2.8mm;
@@ -283,7 +283,7 @@ PlaygroundShareButton {
 PlaygroundShareButtonDark {
     background: transparent;
     color: #F5F8FF;
-    border: 1px solid #253B73;
+    border: 1px solid #4D6DA8;
     border-radius: 1.5mm;
     font-family: "native:MainLight";
     font-size: 2.8mm;
@@ -548,12 +548,40 @@ PlaygroundPanel {
     background: #FFFFFF;
     margin: 0;
     padding: 0;
+    border: none;
 }
 
 PlaygroundPanelDark {
     background: #102B66;
     margin: 0;
     padding: 0;
+    border: none;
+}
+
+/* The default "BrowserComponent" UIID ships a border that shows as a 1px
+ * outline around the Monaco editor / preview. Clear it so the editor sits
+ * flush against its panel. */
+BrowserComponent {
+    border: none;
+    padding: 0;
+    margin: 0;
+    background: transparent;
+}
+
+/* ----- Split pane divider ----- */
+
+PlaygroundSplitDivider {
+    background: #E1E4EA;
+    padding: 0;
+    margin: 0;
+    border: none;
+}
+
+PlaygroundSplitDividerDark {
+    background: #253B73;
+    padding: 0;
+    margin: 0;
+    border: none;
 }
 
 /* ----- Preview column ----- */

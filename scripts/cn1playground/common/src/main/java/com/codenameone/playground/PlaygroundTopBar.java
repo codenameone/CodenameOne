@@ -72,7 +72,7 @@ final class PlaygroundTopBar extends Container {
         shareButton.setUIID(darkMode ? "PlaygroundShareButtonDark" : "PlaygroundShareButton");
         FontImage.setMaterialIcon(shareButton, FontImage.MATERIAL_IOS_SHARE, 3f);
         shareButton.setTextPosition(Component.RIGHT);
-        shareButton.setGap(2);
+        shareButton.setGap(Display.getInstance().convertToPixels(1.3f));
         shareButton.addActionListener(e -> {
             if (actions != null) {
                 actions.onShare();
@@ -83,7 +83,7 @@ final class PlaygroundTopBar extends Container {
         downloadButton.setUIID(darkMode ? "PlaygroundDownloadButtonDark" : "PlaygroundDownloadButton");
         FontImage.setMaterialIcon(downloadButton, FontImage.MATERIAL_DOWNLOAD, 3f);
         downloadButton.setTextPosition(Component.RIGHT);
-        downloadButton.setGap(2);
+        downloadButton.setGap(Display.getInstance().convertToPixels(1.3f));
         downloadButton.addActionListener(e -> {
             if (actions != null) {
                 actions.onDownload();

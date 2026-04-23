@@ -355,8 +355,14 @@ public class CN1Playground extends Lifecycle {
 
         // Horizontal split between editor side and preview side. Divider starts
         // at 50% and can be dragged between 25% and 75% of the total width.
-        SplitPane split = new SplitPane(SplitPane.HORIZONTAL_SPLIT,
-                sideAndEditor, previewAndInspector, "25%", "50%", "75%");
+        // No expand/collapse arrows, no drag-handle icon, just a thin subtle line.
+        SplitPane.Settings splitSettings = new SplitPane.Settings(
+                SplitPane.HORIZONTAL_SPLIT, "25%", "50%", "75%")
+                .showExpandCollapseButtons(false)
+                .showDragHandle(false)
+                .dividerThicknessMM(0.8f)
+                .dividerUIID("PlaygroundSplitDivider");
+        SplitPane split = new SplitPane(splitSettings, sideAndEditor, previewAndInspector);
         Container center = new Container(new BorderLayout());
         center.getAllStyles().setBgTransparency(0);
         center.add(BorderLayout.CENTER, split);
@@ -1199,6 +1205,7 @@ public class CN1Playground extends Lifecycle {
             case "PlaygroundBottomNavItem":
             case "PlaygroundBottomNavItemActive":
             case "PlaygroundPanel":
+            case "PlaygroundSplitDivider":
             case "PlaygroundPreview":
             case "SideNavigationPanel":
             case "RightSideNavigationPanel":

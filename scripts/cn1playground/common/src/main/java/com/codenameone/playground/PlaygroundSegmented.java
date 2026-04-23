@@ -3,6 +3,7 @@ package com.codenameone.playground;
 import com.codename1.ui.Button;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
+import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.layouts.BoxLayout;
 
@@ -42,7 +43,7 @@ final class PlaygroundSegmented extends Container {
             options.add(opts[i]);
             Button btn = new Button();
             btn.setTextPosition(Component.RIGHT);
-            btn.setGap(2);
+            btn.setGap(Display.getInstance().convertToPixels(1.3f));
             final String key = opts[i].key;
             btn.addActionListener(e -> selectInternal(key, true));
             buttons.add(btn);

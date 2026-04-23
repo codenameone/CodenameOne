@@ -80,6 +80,9 @@ final class PlaygroundPreviewColumn extends Container {
                 listener.onPreviewSettingsChanged();
             }
         });
+        // Orientation uses icons only in every layout density -- the labels
+        // add no value when the two icons are self-explanatory.
+        orientationSegmented.setIconsOnly(true);
         orientationWrapper = new Container(new FlowLayout(Component.LEFT, Component.CENTER));
         orientationWrapper.getAllStyles().setBgTransparency(0);
         orientationWrapper.add(orientationSegmented);
