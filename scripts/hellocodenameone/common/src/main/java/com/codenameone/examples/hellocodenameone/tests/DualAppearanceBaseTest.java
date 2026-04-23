@@ -1,11 +1,15 @@
 package com.codenameone.examples.hellocodenameone.tests;
 
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
 import com.codename1.ui.Display;
+import com.codename1.ui.Font;
 import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Painter;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.Layout;
+import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 
 /**
@@ -17,11 +21,12 @@ import com.codename1.ui.plaf.UIManager;
  * the form, waiting for onShowCompleted, and emitting the CN1SS chunk
  * with the right filename suffix.
  *
- * A design-system gridline overlay is painted on top of every capture so
- * reviewers can eyeball component sizing against a physical 4mm grid
- * (rough 8pt-equivalent rhythm). Subclasses can opt out via
- * {@link #gridOverlayEnabled()} when the overlay would obscure the signal
- * the test is trying to establish.
+ * Instead of painting a fine uniform grid across the form (too busy to
+ * read), a designer-style per-component overlay annotates each Button,
+ * Label, Switch etc. with measurement guide lines and an "H=NNmm"
+ * callout, letting reviewers visually verify each component is the
+ * height the design system calls for (Material 40dp / iOS 44pt, etc.)
+ * without squinting at uniform cross-hatching.
  */
 public abstract class DualAppearanceBaseTest extends BaseTest {
 
@@ -49,10 +54,8 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
     protected abstract Layout newLayout();
 
     /**
-     * Whether the 4mm design-system gridline overlay is painted above the
-     * form contents. Defaults to {@code true}. Override to {@code false}
-     * for tests where the grid would obscure the signal (e.g. a gradient
-     * rendering test).
+     * Whether the designer-style per-component guide overlay paints above
+     * the form contents. Defaults to {@code true}.
      */
     protected boolean gridOverlayEnabled() {
         return true;
@@ -82,13 +85,19 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
             @Override
             protected void onShowCompleted() {
                 registerReadyCallback(this, () -> {
-                    Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot(imageName);
-                    next.run();
+                    // Chain next.run() through emitCurrentFormScreenshot's
+                    // onComplete callback. If we call next.run() inline the
+                    // dark-appearance flow kicks off Form2.show() before the
+                    // Display.screenshot() callback has fired, so both emits
+                    // race over the same transitioning screen buffer and
+                    // produce byte-identical PNGs (classic symptom was
+                    // ButtonTheme_light.png == ButtonTheme_dark.png).
+                    Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot(imageName, next);
                 });
             }
         };
         if (showGrid) {
-            form.setGlassPane(new GridOverlayPainter(dark));
+            form.setGlassPane(new ComponentGuidePainter(form, dark));
         }
         populate(form, suffix);
         form.show();
@@ -104,59 +113,121 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
     }
 
     /**
-     * Low-contrast 4mm major / 1mm minor grid painted above the form.
-     * 4mm is roughly the 8pt Apple / 8dp Material design-system cell,
-     * scaled via Display.convertToPixels so it matches physical size
-     * on every DPI.
+     * Designer-style overlay: walks the Form's component tree and draws
+     * thin horizontal guide lines at the top and bottom of each
+     * interactive component (Button, Label, Switch etc.) plus a small
+     * "H=NNmm" callout to its right. Gives a per-component visual proof
+     * of height that reviewers can eyeball against the design system's
+     * spec (Material 40dp / iOS 44pt etc.) without a distracting uniform
+     * cross-hatch covering the whole screen.
      */
-    private static final class GridOverlayPainter implements Painter {
+    private static final class ComponentGuidePainter implements Painter {
+        private final Form form;
         private final boolean dark;
 
-        GridOverlayPainter(boolean dark) {
+        ComponentGuidePainter(Form form, boolean dark) {
+            this.form = form;
             this.dark = dark;
         }
 
         @Override
         public void paint(Graphics g, Rectangle rect) {
-            int minor = Display.getInstance().convertToPixels(1f);
-            int major = Display.getInstance().convertToPixels(4f);
-            if (minor < 1) {
-                minor = 1;
-            }
-            if (major < minor) {
-                major = minor * 4;
-            }
-            int x0 = rect.getX();
-            int y0 = rect.getY();
-            int x1 = x0 + rect.getWidth();
-            int y1 = y0 + rect.getHeight();
-
-            int minorColor = dark ? 0x202020 : 0xe8e8e8;
-            int majorColor = dark ? 0x353535 : 0xc8c8c8;
-
             int prevColor = g.getColor();
             int prevAlpha = g.getAlpha();
-            g.setAlpha(90);
-
-            g.setColor(minorColor);
-            for (int x = x0; x <= x1; x += minor) {
-                g.drawLine(x, y0, x, y1);
-            }
-            for (int y = y0; y <= y1; y += minor) {
-                g.drawLine(x0, y, x1, y);
-            }
-
-            g.setColor(majorColor);
-            g.setAlpha(150);
-            for (int x = x0; x <= x1; x += major) {
-                g.drawLine(x, y0, x, y1);
-            }
-            for (int y = y0; y <= y1; y += major) {
-                g.drawLine(x0, y, x1, y);
-            }
-
+            int pxPerMm = Math.max(1, Display.getInstance().convertToPixels(1f));
+            int rightEdge = rect.getX() + rect.getWidth();
+            paintGuides(g, form, pxPerMm, rightEdge);
             g.setAlpha(prevAlpha);
             g.setColor(prevColor);
+        }
+
+        private void paintGuides(Graphics g, Container root, int pxPerMm, int rightEdge) {
+            int count = root.getComponentCount();
+            for (int i = 0; i < count; i++) {
+                Component c = root.getComponentAt(i);
+                if (c == null) {
+                    continue;
+                }
+                if (shouldAnnotate(c)) {
+                    drawGuideFor(g, c, pxPerMm, rightEdge);
+                }
+                if (c instanceof Container) {
+                    paintGuides(g, (Container) c, pxPerMm, rightEdge);
+                }
+            }
+        }
+
+        private boolean shouldAnnotate(Component c) {
+            String id = c.getUIID();
+            if (id == null) {
+                return false;
+            }
+            return id.equals("Button")
+                    || id.equals("RaisedButton")
+                    || id.equals("FlatButton")
+                    || id.equals("Label")
+                    || id.equals("SecondaryLabel")
+                    || id.equals("Switch")
+                    || id.equals("OnOffSwitch")
+                    || id.equals("CheckBox")
+                    || id.equals("RadioButton")
+                    || id.equals("TextField")
+                    || id.equals("TextArea")
+                    || id.equals("Tab")
+                    || id.equals("MultiButton")
+                    || id.equals("Title");
+        }
+
+        private void drawGuideFor(Graphics g, Component c, int pxPerMm, int rightEdge) {
+            int x = c.getAbsoluteX();
+            int y = c.getAbsoluteY();
+            int w = c.getWidth();
+            int h = c.getHeight();
+            if (w <= 0 || h <= 0) {
+                return;
+            }
+
+            int heightMm = Math.round(((float) h) / pxPerMm);
+
+            int guideColor = dark ? 0x66bbff : 0xcc0088;
+            int labelBg = dark ? 0x224466 : 0xfff0f8;
+
+            g.setColor(guideColor);
+            g.setAlpha(110);
+            // Horizontal guide lines at top + bottom of the component.
+            g.drawLine(x, y, x + w, y);
+            g.drawLine(x, y + h - 1, x + w, y + h - 1);
+
+            // Vertical tick marks at left/right edges so the reviewer can
+            // visually measure the box without hunting for the lines.
+            g.setAlpha(150);
+            int tick = Math.max(2, pxPerMm / 3);
+            g.drawLine(x, y - tick, x, y + tick);
+            g.drawLine(x, y + h - 1 - tick, x, y + h - 1 + tick);
+            g.drawLine(x + w - 1, y - tick, x + w - 1, y + tick);
+            g.drawLine(x + w - 1, y + h - 1 - tick, x + w - 1, y + h - 1 + tick);
+
+            // Height callout to the right (or below if no room).
+            String label = "H=" + heightMm + "mm";
+            Font f = g.getFont();
+            if (f == null) {
+                f = Font.getDefaultFont();
+                g.setFont(f);
+            }
+            int textW = f.stringWidth(label);
+            int textH = f.getHeight();
+            int labelX = x + w + 2;
+            int labelY = y + (h - textH) / 2;
+            if (labelX + textW + 4 > rightEdge) {
+                labelX = Math.max(0, x + w - textW - 6);
+                labelY = y + h + 2;
+            }
+
+            g.setAlpha(200);
+            g.setColor(labelBg);
+            g.fillRect(labelX - 2, labelY - 1, textW + 4, textH + 2);
+            g.setColor(guideColor);
+            g.drawString(label, labelX, labelY);
         }
     }
 }

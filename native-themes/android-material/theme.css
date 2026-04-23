@@ -69,13 +69,19 @@ TertiaryLabel { cn1-derive: Label; color: #79747e; }
 SpanLabel { cn1-derive: Label; }
 SpanLabelText { cn1-derive: Label; }
 
+/* Material 3 button: fully-rounded (~5mm corner radius on a ~10mm-tall
+   button approximates the M3 "full" shape). Using border-radius
+   (RoundRectBorder, CEF-free) rather than cn1-pill-border so short-text
+   buttons don't degenerate to a circle when width<=height - the
+   underlying RoundBorder paints a circle in that case, border-radius
+   always keeps the corner radius. */
 Button {
     color: #ffffff;
     background-color: #6750a4;
     padding: 2mm 4mm 2mm 4mm;
     margin: 1mm;
     font-family: "native:MainRegular";
-    cn1-background-type: cn1-pill-border;
+    border-radius: 5mm;
 }
 Button.pressed { background-color: #d0bcff; color: #21005d; }
 Button.disabled { color: #a5a0ab; background-color: #e0dce4; }
@@ -88,7 +94,7 @@ FlatButton {
     cn1-derive: Button;
     background-color: transparent;
     color: #6750a4;
-    cn1-background-type: cn1-pill-border;
+    border-radius: 5mm;
 }
 FlatButton.pressed { background-color: #eaddff; color: #21005d; }
 
@@ -98,7 +104,7 @@ TextField {
     padding: 2mm 3mm 2mm 3mm;
     margin: 1mm 2mm 1mm 2mm;
     font-family: "native:MainRegular";
-    cn1-background-type: cn1-round-border;
+    border-radius: 1mm;
 }
 TextField.pressed { background-color: #e7e0ec; }
 TextField.disabled { color: #a5a0ab; background-color: #e0dce4; }
@@ -216,7 +222,7 @@ Dialog {
     color: #1d1b20;
     padding: 3mm;
     margin: 0;
-    cn1-background-type: cn1-round-border;
+    border-radius: 6mm;
 }
 DialogBody { cn1-derive: Dialog; padding: 2mm; }
 DialogTitle { cn1-derive: Title; padding: 2mm; }
