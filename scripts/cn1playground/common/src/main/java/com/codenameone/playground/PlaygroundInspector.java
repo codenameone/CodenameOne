@@ -224,6 +224,15 @@ final class PlaygroundInspector {
         highlightComponent(c);
         updatePropertyPanel(c);
         rebuildTree();
+        // propertiesContainer is scrollableY inside a SplitPane: the inner
+        // revalidate() in updatePropertyPanel fires but the new children end
+        // up with zero measured size until the container's ancestor chain
+        // (scroll + pane wrapper) is re-laid out. revalidateWithAnimationSafety
+        // walks up from this container, forcing the pane to re-measure so the
+        // freshly-added field rows actually render without waiting on a resize.
+        if (propertiesContainer.getComponentForm() != null) {
+            propertiesContainer.revalidateWithAnimationSafety();
+        }
     }
 
     private void highlightComponent(Component c) {
