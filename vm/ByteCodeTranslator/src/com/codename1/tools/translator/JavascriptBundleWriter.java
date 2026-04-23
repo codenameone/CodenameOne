@@ -34,8 +34,16 @@ final class JavascriptBundleWriter {
         writeResource(outputDirectory, "parparvm_runtime.js", "parparvm_runtime.js");
     }
 
+    /**
+     * Cap on how large any single emitted class-definitions file may grow
+     * before we start a new chunk. Cloudflare Pages rejects uploads with any
+     * individual file larger than ~25 MiB, so we stay comfortably under that
+     * while keeping the chunk count small. The chunks are concatenated at
+     * load time via the worker's generated importScripts list.
+     */
+    private static final int CLASS_CHUNK_MAX_BYTES = 20 * 1024 * 1024;
+
     private static void writeTranslatedClasses(File outputDirectory, List<ByteCodeClass> classes) throws IOException {
-        StringBuilder out = new StringBuilder();
         List<ByteCodeClass> sorted = new ArrayList<ByteCodeClass>(classes);
         Collections.sort(sorted, new Comparator<ByteCodeClass>() {
             @Override
@@ -47,17 +55,45 @@ final class JavascriptBundleWriter {
                 return a.getClsName().compareTo(b.getClsName());
             }
         });
+
+        // Stream class bodies into bounded chunks. We materialise every chunk
+        // but the last one as translated_app_NN.js; the final chunk lands at
+        // translated_app.js and carries the jvm.setMain(...) tail so that
+        // call always runs after every class has been registered (writeWorker
+        // imports translated_app.js last).
+        List<StringBuilder> chunks = new ArrayList<StringBuilder>();
+        StringBuilder current = new StringBuilder();
+        chunks.add(current);
         for (ByteCodeClass cls : sorted) {
-            out.append(cls.generateJavascriptCode(classes)).append('\n');
+            String code = cls.generateJavascriptCode(classes);
+            if (current.length() > 0 && current.length() + code.length() > CLASS_CHUNK_MAX_BYTES) {
+                current = new StringBuilder();
+                chunks.add(current);
+            }
+            current.append(code).append('\n');
         }
+
+        StringBuilder tail = chunks.get(chunks.size() - 1);
         ByteCodeClass mainClass = ByteCodeClass.getMainClass();
         if (mainClass != null) {
-            out.append("jvm.setMain(\"").append(mainClass.getClsName()).append("\", \"")
+            tail.append("jvm.setMain(\"").append(mainClass.getClsName()).append("\", \"")
                     .append(JavascriptNameUtil.methodIdentifier(mainClass.getClsName(), "main", "([Ljava/lang/String;)V"))
                     .append("\");\n");
         }
+
+        // Lead chunks use zero-padded suffixes so writeWorker's lexicographic
+        // scan of top-level *.js files imports them in the intended order
+        // (they're all independent class definitions so the relative order
+        // among them doesn't matter for correctness, but stable ordering
+        // keeps debug output deterministic).
+        int leadCount = chunks.size() - 1;
+        for (int i = 0; i < leadCount; i++) {
+            String suffix = leadCount >= 10 ? String.format("_%02d", i + 1) : String.format("_%d", i + 1);
+            Files.write(new File(outputDirectory, "translated_app" + suffix + ".js").toPath(),
+                    chunks.get(i).toString().getBytes(StandardCharsets.UTF_8));
+        }
         Files.write(new File(outputDirectory, "translated_app.js").toPath(),
-                out.toString().getBytes(StandardCharsets.UTF_8));
+                tail.toString().getBytes(StandardCharsets.UTF_8));
     }
 
     private static int bootstrapPriority(ByteCodeClass cls) {
@@ -85,6 +121,7 @@ final class JavascriptBundleWriter {
 
     private static void writeWorker(File outputDirectory) throws IOException {
         List<String> nativeScripts = new ArrayList<String>();
+        List<String> classChunkScripts = new ArrayList<String>();
         File[] files = outputDirectory.listFiles();
         if (files != null) {
             for (File file : files) {
@@ -99,13 +136,28 @@ final class JavascriptBundleWriter {
                         || "browser_bridge.js".equals(name)) {
                     continue;
                 }
-                nativeScripts.add(name);
+                // translated_app_NN.js are class-definition chunks split off
+                // from translated_app.js for Cloudflare Pages' per-file size
+                // limit. Group them separately so they load *before*
+                // translated_app.js (which contains the trailing jvm.setMain
+                // call) but *after* other runtime helpers / native shims.
+                if (name.startsWith("translated_app_") && name.endsWith(".js")) {
+                    classChunkScripts.add(name);
+                } else {
+                    nativeScripts.add(name);
+                }
             }
         }
+        // Deterministic order across OSes — listFiles() doesn't guarantee any.
+        Collections.sort(nativeScripts);
+        Collections.sort(classChunkScripts);
 
         StringBuilder imports = new StringBuilder();
         imports.append("importScripts('parparvm_runtime.js');\n");
         for (String script : nativeScripts) {
+            imports.append("importScripts('").append(script).append("');\n");
+        }
+        for (String script : classChunkScripts) {
             imports.append("importScripts('").append(script).append("');\n");
         }
         imports.append("importScripts('translated_app.js');\n");

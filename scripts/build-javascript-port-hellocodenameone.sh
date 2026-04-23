@@ -272,6 +272,45 @@ if [ -d "$DIST_DIR" ]; then
   done
 fi
 
+# --- Post-translation minimisation pass -------------------------------------
+# See build-javascript-port-initializr.sh for the rationale. Applying the
+# same mangle + esbuild pass here keeps the JS port's per-bundle output
+# under Cloudflare Pages' 25 MiB per-file limit and matches the competitive
+# TeaVM-like sizes we publish from the website.
+if [ "${SKIP_JS_MINIFICATION:-0}" != "1" ]; then
+  if command -v python3 >/dev/null 2>&1; then
+    bj_log "Mangling cn1_* / class-name identifiers across worker-side JS"
+    map_path="$(dirname "$OUTPUT_ZIP")/$(basename "$OUTPUT_ZIP" .zip).mangle-map.json"
+    mkdir -p "$(dirname "$map_path")"
+    python3 "$SCRIPT_DIR/mangle-javascript-port-identifiers.py" \
+      --map-output "$map_path" "$DIST_DIR" || \
+      bj_log "WARNING: identifier mangling failed; continuing with unmangled output" >&2
+  else
+    bj_log "python3 not found; skipping identifier mangling"
+  fi
+  if command -v npx >/dev/null 2>&1; then
+    bj_log "Minifying translated JS chunks with esbuild"
+    minified_count=0
+    for js in "$DIST_DIR"/*.js; do
+      name="$(basename "$js")"
+      case "$name" in
+        browser_bridge.js|port.js|worker.js|sw.js) continue ;;
+        *_native_handlers.js) continue ;;
+      esac
+      if npx --yes esbuild --minify --log-level=error --allow-overwrite \
+          --target=es2020 "$js" --outfile="$js" >/dev/null 2>&1; then
+        minified_count=$((minified_count + 1))
+      else
+        bj_log "WARNING: esbuild minify failed for $name; leaving it as-is" >&2
+      fi
+    done
+    bj_log "Minified $minified_count JS file(s) via esbuild"
+  else
+    bj_log "npx not found; skipping esbuild minification"
+  fi
+fi
+# ---------------------------------------------------------------------------
+
 FINAL_DIST_DIR="$TRANSLATOR_OUT/dist/$DIST_APP_NAME-js"
 if [ "$DIST_DIR" != "$FINAL_DIST_DIR" ]; then
   rm -rf "$FINAL_DIST_DIR"

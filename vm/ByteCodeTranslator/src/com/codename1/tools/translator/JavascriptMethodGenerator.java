@@ -277,7 +277,13 @@ final class JavascriptMethodGenerator {
             return;
         }
         boolean usesClassInitCache = hasClassInitSensitiveAccess(instructions);
-        boolean usesVirtualDispatchCache = hasVirtualDispatchAccess(instructions);
+        // Virtual-dispatch caching is now handled globally by jvm.resolveVirtual
+        // (it owns resolvedVirtualCache keyed on className|methodId), so we no
+        // longer emit a per-method __cn1Virtual cache object. The cn1_iv*
+        // helpers in parparvm_runtime.js do the classDef fast-path + fallback.
+        // The old boolean is retained (hardcoded false) so the existing method
+        // signatures that plumb it through don't need cascading edits.
+        boolean usesVirtualDispatchCache = false;
         out.append("  const locals = new Array(").append(Math.max(1, method.getMaxLocals())).append(").fill(null);\n");
         out.append("  const stack = [];\n");
         out.append("  let pc = 0;\n");
@@ -286,9 +292,6 @@ final class JavascriptMethodGenerator {
             if (method.isStatic() && !"__CLINIT__".equals(method.getMethodName())) {
                 out.append("  __cn1Init[\"").append(cls.getClsName()).append("\"] = true;\n");
             }
-        }
-        if (usesVirtualDispatchCache) {
-            out.append("  const __cn1Virtual = Object.create(null);\n");
         }
         if (!method.isStatic()) {
             out.append("  locals[0] = __cn1ThisObject;\n");
@@ -312,6 +315,19 @@ final class JavascriptMethodGenerator {
         out.append("    switch (pc) {\n");
         for (int i = 0; i < instructions.size(); i++) {
             Instruction instruction = instructions.get(i);
+            // Pure-metadata instructions (LABEL / LINENUMBER / LocalVariable /
+            // TryCatch) would otherwise emit `case N: { pc = N+1; break; }`
+            // blocks — ~35 bytes each, and Initializr alone produced ~107k of
+            // them (~3 MiB). Instead emit just `case N:` and let the switch
+            // fall through to the next real instruction. Jumps landing on the
+            // no-op PC still execute the same next-instruction body that the
+            // old pc-advance-then-re-enter form produced, so semantics are
+            // preserved. We only elide when there IS a next instruction so
+            // a trailing no-op still has somewhere to land.
+            if (isPcSkippableNoOp(instruction) && i + 1 < instructions.size()) {
+                out.append("      case ").append(i).append(":\n");
+                continue;
+            }
             out.append("      case ").append(i).append(": {\n");
             appendInstruction(out, method, instructions, labelToIndex, instruction, i, usesClassInitCache, usesVirtualDispatchCache);
             out.append("      }\n");
@@ -1059,22 +1075,17 @@ final class JavascriptMethodGenerator {
                 return false;
         }
         if (invoke.getOpcode() == Opcodes.INVOKEVIRTUAL || invoke.getOpcode() == Opcodes.INVOKEINTERFACE) {
-            out.append("  {\n");
-            out.append("    const __target = ").append(target).append(";\n");
-            out.append("    const __classDef = __target.__classDef;\n");
-            out.append("    const __method = ((__classDef && __classDef.methods) ? __classDef.methods[\"").append(methodId)
-                    .append("\"] : null) || jvm.resolveVirtual(__target.__class, \"").append(methodId).append("\");\n");
+            // Straight-line INVOKEVIRTUAL / INVOKEINTERFACE: emit one cn1_iv*
+            // helper call instead of __classDef/resolveVirtual boilerplate.
+            // See appendCompactVirtualDispatch for the shared emission rules.
             if (hasReturn) {
-                out.append("    const __result = yield* __method(");
-                appendInvocationArgumentExpressions(out, "__target", argValues);
-                out.append(");\n");
+                out.append("  {\n");
+                appendCompactVirtualDispatch(out, "    ", methodId, argValues.length, true, target, false, argValues);
                 out.append("    ").append(ctx.push("__result")).append(";\n");
+                out.append("  }\n");
             } else {
-                out.append("    yield* __method(");
-                appendInvocationArgumentExpressions(out, "__target", argValues);
-                out.append(");\n");
+                appendCompactVirtualDispatch(out, "  ", methodId, argValues.length, false, target, false, argValues);
             }
-            out.append("  }\n");
             return true;
         }
         if (invoke.getOpcode() == Opcodes.INVOKESTATIC) {
@@ -1338,6 +1349,20 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
         
         out.append("  }\n");
         out.append("}\n");
+    }
+
+    /**
+     * Instructions that don't emit any meaningful JS on their own — they're
+     * debug/metadata bytecode nodes that translate to a plain PC increment.
+     * Callers elide the per-instruction case block for these and let the
+     * switch fall through to the next real instruction's body. See the
+     * emission loop in appendMethodJavaScript for the rationale.
+     */
+    private static boolean isPcSkippableNoOp(Instruction instruction) {
+        return instruction instanceof LabelInstruction
+                || instruction instanceof LineNumber
+                || instruction instanceof LocalVariable
+                || instruction instanceof TryCatch;
     }
 
     private static Map<Label, Integer> buildLabelMap(List<Instruction> instructions) {
@@ -2025,34 +2050,18 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
         }
 
         if (invoke.getOpcode() == Opcodes.INVOKEVIRTUAL || invoke.getOpcode() == Opcodes.INVOKEINTERFACE) {
+            // Virtual-dispatch call site. We used to emit ~15 lines of inline
+            // __classDef lookup + resolveVirtual fallback + per-method cache
+            // around every single INVOKEVIRTUAL / INVOKEINTERFACE; on Initializr
+            // that pattern alone weighed ~24 MiB across 35k call sites. The
+            // runtime now ships cn1_iv0..cn1_iv4 / cn1_ivN helpers that
+            // collapse that boilerplate into one call, with the same fast-path
+            // (classDef.methods lookup) and fallback (jvm.resolveVirtual has
+            // its own class-wide cache) semantics.
             out.append("        {\n");
             appendInvocationArgumentBindings(out, argCount, "          ", "stack.pop()");
             out.append("          const __target = stack.pop();\n");
-            out.append("          const __classDef = __target.__classDef;\n");
-            out.append("          let __method = (__classDef && __classDef.methods) ? __classDef.methods[\"").append(methodId)
-                    .append("\"] : null;\n");
-            if (usesVirtualDispatchCache) {
-                out.append("          if (!__method) {\n");
-                out.append("            const __cacheKey = __target.__class + \"|").append(methodId).append("\";\n");
-                out.append("            __method = __cn1Virtual[__cacheKey];\n");
-                out.append("            if (!__method) {\n");
-                out.append("              __method = jvm.resolveVirtual(__target.__class, \"").append(methodId).append("\");\n");
-                out.append("              __cn1Virtual[__cacheKey] = __method;\n");
-                out.append("            }\n");
-                out.append("          }\n");
-            } else {
-                out.append("          if (!__method) __method = jvm.resolveVirtual(__target.__class, \"").append(methodId).append("\");\n");
-            }
-            if (hasReturn) {
-                out.append("          const __result = yield* __method(");
-                appendInvocationArguments(out, true, argCount);
-                out.append(");\n");
-                out.append("          stack.push(__result);\n");
-            } else {
-                out.append("          yield* __method(");
-                appendInvocationArguments(out, true, argCount);
-                out.append(");\n");
-            }
+            appendCompactVirtualDispatch(out, "          ", methodId, argCount, hasReturn, "__target", true);
             out.append("          pc = ").append(index + 1).append("; break;\n");
             out.append("        }\n");
             return;
@@ -2100,6 +2109,72 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
     private static void appendInvocationArgumentBindings(StringBuilder out, int argCount, String indent, String sourceExpression) {
         for (int i = argCount - 1; i >= 0; i--) {
             out.append(indent).append("const __arg").append(i).append(" = ").append(sourceExpression).append(";\n");
+        }
+    }
+
+    /**
+     * Emit a virtual-dispatch invocation using the cn1_iv* helpers in
+     * parparvm_runtime.js. Replaces ~15 lines of inline boilerplate with one
+     * helper call and saves ~500 bytes per call site (on Initializr: ~14 MiB
+     * of translated_app.js was this one pattern). The helpers preserve the
+     * original semantics: target.__classDef.methods fast-path, then
+     * jvm.resolveVirtual fallback which owns a class-wide cache.
+     *
+     * @param out             Output builder.
+     * @param indent          Leading whitespace for the emitted statement.
+     * @param methodId        Resolved method identifier string.
+     * @param argCount        Number of non-receiver arguments on the stack.
+     * @param hasReturn       Whether the method returns a value (must be pushed).
+     * @param targetExpr      Expression evaluating to the receiver.
+     * @param argsFromStack   If true, call-site already bound stack values to
+     *                        __arg0..__arg{N-1}. If false, argValues provides
+     *                        the arg expressions directly (straight-line path).
+     */
+    private static void appendCompactVirtualDispatch(StringBuilder out, String indent, String methodId,
+            int argCount, boolean hasReturn, String targetExpr, boolean argsFromStack) {
+        appendCompactVirtualDispatch(out, indent, methodId, argCount, hasReturn, targetExpr, argsFromStack, null);
+    }
+
+    private static void appendCompactVirtualDispatch(StringBuilder out, String indent, String methodId,
+            int argCount, boolean hasReturn, String targetExpr, boolean argsFromStack, String[] argExpressions) {
+        String helper;
+        boolean variadic = false;
+        switch (argCount) {
+            case 0: helper = "cn1_iv0"; break;
+            case 1: helper = "cn1_iv1"; break;
+            case 2: helper = "cn1_iv2"; break;
+            case 3: helper = "cn1_iv3"; break;
+            case 4: helper = "cn1_iv4"; break;
+            default:
+                helper = "cn1_ivN";
+                variadic = true;
+                break;
+        }
+        out.append(indent);
+        if (hasReturn && argsFromStack) {
+            out.append("stack.push(yield* ").append(helper).append("(").append(targetExpr).append(", \"").append(methodId).append("\"");
+        } else if (hasReturn) {
+            out.append("const __result = yield* ").append(helper).append("(").append(targetExpr).append(", \"").append(methodId).append("\"");
+        } else {
+            out.append("yield* ").append(helper).append("(").append(targetExpr).append(", \"").append(methodId).append("\"");
+        }
+        if (variadic) {
+            out.append(", [");
+            for (int i = 0; i < argCount; i++) {
+                if (i > 0) out.append(", ");
+                out.append(argsFromStack ? ("__arg" + i) : argExpressions[i]);
+            }
+            out.append("]");
+        } else {
+            for (int i = 0; i < argCount; i++) {
+                out.append(", ").append(argsFromStack ? ("__arg" + i) : argExpressions[i]);
+            }
+        }
+        out.append(")");
+        if (hasReturn && argsFromStack) {
+            out.append(");\n");
+        } else {
+            out.append(";\n");
         }
     }
 

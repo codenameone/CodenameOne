@@ -1470,6 +1470,64 @@ jvm.jsoRegistry = jsoRegistry;
 global.bindNative = bindNative;
 global.global = global;
 global.__parparInstallNativeBindings = installNativeBindings;
+
+// Virtual-dispatch helpers used by emitted method bodies. Each INVOKEVIRTUAL /
+// INVOKEINTERFACE call site used to expand into ~15 lines of inline boilerplate
+// (__classDef lookup, resolveVirtual fallback, __cn1Virtual per-method cache).
+// That pattern dominated the translated_app.js size on large apps. The helpers
+// below collapse that boilerplate into one call. Arity-specialised versions
+// avoid allocating an args array on hot paths; the variadic tail handles the
+// long-tail of wider signatures.
+//
+// Semantics match the previous inline form exactly: try target.__classDef.methods
+// first (fast path for the common same-class case), then fall back to
+// jvm.resolveVirtual which has its own className|methodId-keyed cache, then
+// yield* into the resolved generator.
+function cn1_ivResolve(target, mid) {
+  // Fast-path: direct method on the target's classDef. This mirrors the
+  // inline form that used to live at every call site. No null check here —
+  // callers (cn1_iv0..4 / cn1_ivN below) are generators and delegate to
+  // throwNullPointerException() for the Java-spec-compliant NPE, which
+  // cannot be done from a plain function.
+  const classDef = target.__classDef;
+  let method = classDef && classDef.methods ? classDef.methods[mid] : null;
+  if (!method) {
+    method = jvm.resolveVirtual(target.__class, mid);
+  }
+  return method;
+}
+function* cn1_iv0(target, mid) {
+  if (target == null) { yield* throwNullPointerException(); }
+  return yield* cn1_ivResolve(target, mid)(target);
+}
+function* cn1_iv1(target, mid, a0) {
+  if (target == null) { yield* throwNullPointerException(); }
+  return yield* cn1_ivResolve(target, mid)(target, a0);
+}
+function* cn1_iv2(target, mid, a0, a1) {
+  if (target == null) { yield* throwNullPointerException(); }
+  return yield* cn1_ivResolve(target, mid)(target, a0, a1);
+}
+function* cn1_iv3(target, mid, a0, a1, a2) {
+  if (target == null) { yield* throwNullPointerException(); }
+  return yield* cn1_ivResolve(target, mid)(target, a0, a1, a2);
+}
+function* cn1_iv4(target, mid, a0, a1, a2, a3) {
+  if (target == null) { yield* throwNullPointerException(); }
+  return yield* cn1_ivResolve(target, mid)(target, a0, a1, a2, a3);
+}
+function* cn1_ivN(target, mid, args) {
+  if (target == null) { yield* throwNullPointerException(); }
+  const method = cn1_ivResolve(target, mid);
+  return yield* method.apply(null, [target].concat(args));
+}
+global.cn1_iv0 = cn1_iv0;
+global.cn1_iv1 = cn1_iv1;
+global.cn1_iv2 = cn1_iv2;
+global.cn1_iv3 = cn1_iv3;
+global.cn1_iv4 = cn1_iv4;
+global.cn1_ivN = cn1_ivN;
+
 vmDiag("BOOT", "runtime", "loaded");
 function lowerFirst(value) {
   if (!value) {

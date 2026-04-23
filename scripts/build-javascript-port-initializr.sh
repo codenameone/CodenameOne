@@ -521,6 +521,60 @@ if [ -f "$DIST_DIR/index.html" ] && ! grep -q "initializr_native_handlers.js" "$
   bj_log "Patched index.html to load native impl and host-bridge handlers"
 fi
 
+# --- Post-translation minimisation pass -------------------------------------
+# A raw ByteCodeTranslator JS bundle for Initializr is ~90 MiB and consists
+# overwhelmingly of repeated long identifiers (e.g. "cn1_com_codename1_ui_
+# Form_setTitle_java_lang_String" appears thousands of times as both a
+# function name and an explicit string literal). esbuild can only mangle
+# local variables and whitespace — the repeated identifiers are string
+# literals it cannot touch. A dedicated cross-file identifier mangler +
+# esbuild after it cuts the output from ~90 MiB to ~20 MiB (brotli: ~1.6
+# MiB on the wire), which is what Cloudflare Pages actually uploads.
+#
+# Both passes are best-effort: if Python or npx/esbuild is missing we just
+# emit the unminified bundle so this script still works in development
+# environments that don't have the toolchain.
+if [ "${SKIP_JS_MINIFICATION:-0}" != "1" ]; then
+  if command -v python3 >/dev/null 2>&1; then
+    bj_log "Mangling cn1_* / class-name identifiers across worker-side JS"
+    # Write the mangle map next to the zip (not inside the shipped bundle)
+    # so stack traces can be demangled without paying a ~6 MiB cost on every
+    # page load.
+    map_path="$(dirname "$OUTPUT_ZIP")/$(basename "$OUTPUT_ZIP" .zip).mangle-map.json"
+    mkdir -p "$(dirname "$map_path")"
+    python3 "$SCRIPT_DIR/mangle-javascript-port-identifiers.py" \
+      --map-output "$map_path" "$DIST_DIR" || \
+      bj_log "WARNING: identifier mangling failed; continuing with unmangled output" >&2
+  else
+    bj_log "python3 not found; skipping identifier mangling"
+  fi
+
+  # Minify each worker-side JS file in place with esbuild. We deliberately
+  # skip browser_bridge.js / port.js / native_handlers (hand-written,
+  # main-thread glue that we want to keep readable for integration debugging).
+  if command -v npx >/dev/null 2>&1; then
+    bj_log "Minifying translated JS chunks with esbuild"
+    minified_count=0
+    for js in "$DIST_DIR"/*.js; do
+      name="$(basename "$js")"
+      case "$name" in
+        browser_bridge.js|port.js|worker.js|sw.js) continue ;;
+        *_native_handlers.js) continue ;;
+      esac
+      if npx --yes esbuild --minify --log-level=error --allow-overwrite \
+          --target=es2020 "$js" --outfile="$js" >/dev/null 2>&1; then
+        minified_count=$((minified_count + 1))
+      else
+        bj_log "WARNING: esbuild minify failed for $name; leaving it as-is" >&2
+      fi
+    done
+    bj_log "Minified $minified_count JS file(s) via esbuild"
+  else
+    bj_log "npx not found; skipping esbuild minification"
+  fi
+fi
+# ---------------------------------------------------------------------------
+
 FINAL_DIST_DIR="$TRANSLATOR_OUT/dist/$DIST_APP_NAME-js"
 if [ "$DIST_DIR" != "$FINAL_DIST_DIR" ]; then
   rm -rf "$FINAL_DIST_DIR"
