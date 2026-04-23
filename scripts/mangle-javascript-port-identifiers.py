@@ -118,19 +118,32 @@ def collect_files(out_dir: Path) -> list[Path]:
     names, translated code calls global ``cn1_iv*`` helpers, etc.).
 
     We skip:
-      * browser_bridge.js and port.js — hand-authored main-thread code
-        that talks to the browser DOM and uses public ``cn1_get_native_*``
-        helpers whose names must stay stable (see EXCLUDE above).
+      * browser_bridge.js — main-thread host-bridge dispatcher. Uses
+        plain ``cn1HostBridge.register`` symbol strings that the worker
+        side sends via ``jvm.invokeHostNative(...)``; those symbols are
+        application-chosen identifiers, not translator-owned names.
       * worker.js / sw.js — tiny shells that just ``importScripts`` the
         mangled files; no identifiers of their own worth mangling.
-      * Anything under a native/ or js/ subdir — app-provided native
-        shims (``native/com_codename1_*``) and vendor runtime (jquery,
-        bootstrap, fontmetrics) that the mangler has no business touching.
 
-    App-supplied glue scripts like ``*_native_bindings.js`` are mangled
-    because they call ``bindNative([...])`` with string names that must
-    match the mangled identifier the translator emitted for the same
-    Java static native. That's a worker-side cross-file link.
+    We *do* mangle:
+      * translated_app*.js — raw translator output.
+      * parparvm_runtime.js — hosts ``resolveVirtual``, ``classes``, the
+        cn1_iv* helpers, and a handful of inline method-name literals
+        (e.g. ``"cn1_java_lang_Object_toString_R_java_lang_String"``)
+        that must match the mangled identifier on the worker.
+      * port.js — imported by worker.js. Contains 300+ cn1_* /
+        class-name literals passed to ``bindCiFallback`` / ``bindNative``
+        to install method overrides by name. These names are ONLY
+        meaningful against the translator's emitted symbols, so they
+        must move in lockstep with the mangler's output.
+      * App-supplied ``*_native_bindings.js`` — worker-side
+        ``bindNative([...])`` calls that register overrides on the
+        generated WebsiteThemeNativeImpl static natives; their string
+        arguments must match the mangled identifier.
+
+    App-supplied main-thread ``*_native_handlers.js`` are skipped — they
+    pair with files under native/ which we never mangle (their JS-visible
+    keys in ``cn1_get_native_interfaces()`` are public API).
     """
     keep: list[Path] = []
     for entry in sorted(out_dir.iterdir()):
@@ -141,7 +154,6 @@ def collect_files(out_dir: Path) -> list[Path]:
         name = entry.name
         if name in {
             "browser_bridge.js",
-            "port.js",
             "worker.js",
             "sw.js",
         }:
