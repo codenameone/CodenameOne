@@ -178,6 +178,33 @@ function getQueryParameter(name) {
   return null;
 }
 
+// Gate for port.js's PARPAR:DIAG:* and PARPAR:DIAG:FALLBACK:* log emissions.
+// Opt-in via ``?parparDiag=1`` (same toggle CI uses). Before this gate every
+// emitDiagLine / emitCiFallbackMarker call produced a console.log entry, and
+// browser_bridge.js was unconditionally echoing worker-side log messages on
+// the main thread — which meant a production Initializr bundle dumped a few
+// hundred PARPAR:DIAG:INIT:missingGlobalDelegate + PARPAR:DIAG:FALLBACK lines
+// to every user's browser console on load. The diagnostics are useful for
+// screenshot-test debugging, so keep them available behind the same query
+// parameter the rest of the port already looks for.
+let __cn1PortDiagEnabledCache = null;
+function __cn1PortDiagEnabled() {
+  if (__cn1PortDiagEnabledCache !== null) {
+    return __cn1PortDiagEnabledCache;
+  }
+  let enabled = false;
+  try {
+    enabled = !!getQueryParameter("parparDiag");
+  } catch (_err) {
+    enabled = false;
+  }
+  if (!enabled && typeof global !== "undefined" && global.__cn1Verbose) {
+    enabled = true;
+  }
+  __cn1PortDiagEnabledCache = enabled;
+  return enabled;
+}
+
 const ciFallbackMarkerSeen = Object.create(null);
 function emitCiFallbackMarker(symbol, markerType) {
   const key = markerType + ":" + symbol;
@@ -185,6 +212,9 @@ function emitCiFallbackMarker(symbol, markerType) {
     return;
   }
   ciFallbackMarkerSeen[key] = true;
+  if (!__cn1PortDiagEnabled()) {
+    return;
+  }
   if (global.console && typeof global.console.log === "function") {
     global.console.log("PARPAR:DIAG:FALLBACK:key=FALLBACK:" + symbol + ":" + markerType);
   }
@@ -392,6 +422,9 @@ global.__cn1ForwardConsoleToMain = (typeof WorkerGlobalScope !== "undefined"
     || (typeof self !== "undefined" && typeof self.importScripts === "function" && typeof process === "undefined"));
 
 function emitDiagLine(line) {
+  if (!__cn1PortDiagEnabled()) {
+    return;
+  }
   if (global.console && typeof global.console.log === "function") {
     global.console.log(line);
   }

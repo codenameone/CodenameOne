@@ -71,6 +71,15 @@
   }
 
   function log(line) {
+    // Gate browser-bridge PARPAR:* log entries behind the same diagEnabled
+    // toggle (``?parparDiag=1``) that already gates diag(). Without this,
+    // every production page load emitted PARPAR:worker-mode /
+    // PARPAR:startParparVmApp / PARPAR:appStarter-present regardless of
+    // context. Tests that *want* these — the Playwright harness passes
+    // parparDiag=1 — still get them.
+    if (!diagEnabled) {
+      return;
+    }
     if (global.console && typeof global.console.log === 'function') {
       global.console.log('PARPAR:' + line);
     }
@@ -1532,7 +1541,14 @@
       return;
     }
     if (data.type === 'log' && data.message) {
-      if (global.console && typeof global.console.log === 'function') {
+      // Forwarded log messages from the worker. We still have to inspect
+      // the message body below (CN1SS:INFO:suite starting drives the
+      // screenshot harness state, and CN1JS:RenderQueue.* updates the
+      // paint-seq counter) so the *detection* path is unconditional; we
+      // only suppress the main-thread console echo unless diagnostics
+      // are enabled. That echo was the source of the doubled
+      // PARPAR:DIAG:* lines in the production browser console.
+      if (diagEnabled && global.console && typeof global.console.log === 'function') {
         global.console.log(String(data.message));
       }
       if (String(data.message).indexOf('CN1SS:INFO:suite starting test=') >= 0) {
