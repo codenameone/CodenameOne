@@ -126,13 +126,26 @@ TextHint {
 CheckBox {
     cn1-derive: Label;
     color: #000000;
+    background-color: transparent;
     padding: 1mm 2mm 1mm 2mm;
 }
 CheckBox.selected { color: #007aff; }
-CheckBox.disabled { color: #c7c7cc; }
+CheckBox.disabled {
+    color: #c7c7cc;
+    background-color: #e5e5ea;
+}
 
-RadioButton { cn1-derive: CheckBox; }
+RadioButton {
+    cn1-derive: CheckBox;
+    color: #000000;
+    background-color: transparent;
+    padding: 1mm 2mm 1mm 2mm;
+}
 RadioButton.selected { color: #007aff; }
+RadioButton.disabled {
+    color: #c7c7cc;
+    background-color: #e5e5ea;
+}
 
 OnOffSwitch {
     cn1-derive: Label;
@@ -287,11 +300,12 @@ PopupContent { cn1-derive: Dialog; padding: 2mm; }
     TextField.disabled { color: #48484a; background-color: #2c2c2e; }
     TextHint { color: #8e8e93; }
 
-    CheckBox { color: #ffffff; }
+    CheckBox { color: #ffffff; background-color: transparent; }
     CheckBox.selected { color: #0a84ff; }
-    CheckBox.disabled { color: #48484a; }
-    RadioButton { color: #ffffff; }
+    CheckBox.disabled { color: #48484a; background-color: #2c2c2e; }
+    RadioButton { color: #ffffff; background-color: transparent; }
     RadioButton.selected { color: #0a84ff; }
+    RadioButton.disabled { color: #48484a; background-color: #2c2c2e; }
 
     OnOffSwitch { color: #0a84ff; background-color: #2c2c2e; }
     OnOffSwitch.selected { background-color: #30d158; color: #ffffff; }
