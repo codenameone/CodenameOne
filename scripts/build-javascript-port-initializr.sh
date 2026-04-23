@@ -535,7 +535,20 @@ fi
 # emit the unminified bundle so this script still works in development
 # environments that don't have the toolchain.
 if [ "${SKIP_JS_MINIFICATION:-0}" != "1" ]; then
-  if command -v python3 >/dev/null 2>&1; then
+  # Identifier mangling is opt-in (ENABLE_JS_IDENT_MANGLING=1) because the
+  # JavaScriptPort runtime (port.js) does reflective work that depends on
+  # the stable "cn1_<owner>_<suffix>" naming convention: it scans global
+  # for keys whose name starts with "cn1_" to discover translated methods
+  # and builds delegate method IDs via runtime string concatenation of
+  # class-name and suffix parts. Renaming those identifiers short-circuits
+  # that machinery and the worker hits a generic runtime error on boot.
+  # Until port.js is rewritten to go through a translation-time manifest
+  # (or the runtime exposes an unmangled→mangled resolver), we leave
+  # identifiers intact and rely on translator-side optimisations +
+  # esbuild locals/whitespace compression + chunk splitting to hit
+  # Cloudflare's 25 MiB per-file cap. Enabling this flag is useful
+  # for measuring best-case sizes once the port.js side is ready.
+  if [ "${ENABLE_JS_IDENT_MANGLING:-0}" = "1" ] && command -v python3 >/dev/null 2>&1; then
     bj_log "Mangling cn1_* / class-name identifiers across worker-side JS"
     # Write the mangle map next to the zip (not inside the shipped bundle)
     # so stack traces can be demangled without paying a ~6 MiB cost on every
@@ -545,8 +558,6 @@ if [ "${SKIP_JS_MINIFICATION:-0}" != "1" ]; then
     python3 "$SCRIPT_DIR/mangle-javascript-port-identifiers.py" \
       --map-output "$map_path" "$DIST_DIR" || \
       bj_log "WARNING: identifier mangling failed; continuing with unmangled output" >&2
-  else
-    bj_log "python3 not found; skipping identifier mangling"
   fi
 
   # Minify each worker-side JS file in place with esbuild. We deliberately

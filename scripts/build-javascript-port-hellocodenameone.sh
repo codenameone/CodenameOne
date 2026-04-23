@@ -278,15 +278,17 @@ fi
 # under Cloudflare Pages' 25 MiB per-file limit and matches the competitive
 # TeaVM-like sizes we publish from the website.
 if [ "${SKIP_JS_MINIFICATION:-0}" != "1" ]; then
-  if command -v python3 >/dev/null 2>&1; then
+  # Identifier mangling is opt-in; see the matching block in
+  # build-javascript-port-initializr.sh for the rationale. port.js's
+  # runtime reflection (key.indexOf("cn1_") scans + "cn1_" + owner +
+  # suffix string concat) breaks if we rename those identifiers.
+  if [ "${ENABLE_JS_IDENT_MANGLING:-0}" = "1" ] && command -v python3 >/dev/null 2>&1; then
     bj_log "Mangling cn1_* / class-name identifiers across worker-side JS"
     map_path="$(dirname "$OUTPUT_ZIP")/$(basename "$OUTPUT_ZIP" .zip).mangle-map.json"
     mkdir -p "$(dirname "$map_path")"
     python3 "$SCRIPT_DIR/mangle-javascript-port-identifiers.py" \
       --map-output "$map_path" "$DIST_DIR" || \
       bj_log "WARNING: identifier mangling failed; continuing with unmangled output" >&2
-  else
-    bj_log "python3 not found; skipping identifier mangling"
   fi
   if command -v npx >/dev/null 2>&1; then
     bj_log "Minifying translated JS chunks with esbuild"
