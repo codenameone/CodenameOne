@@ -77,16 +77,22 @@ final class PlaygroundStatusPill extends Container {
     private void applyState(boolean error, boolean dark, String label) {
         text.setText(label);
         String pillUiid;
+        String labelUiid;
         int dotColor;
         if (error) {
             pillUiid = dark ? "PlaygroundStatusPillErrorDark" : "PlaygroundStatusPillError";
+            labelUiid = dark ? "PlaygroundStatusLabelErrorDark" : "PlaygroundStatusLabelError";
             dotColor = dark ? 0xFF6B6B : 0xD93636;
         } else {
             pillUiid = dark ? "PlaygroundStatusPillDark" : "PlaygroundStatusPill";
+            labelUiid = dark ? "PlaygroundStatusLabelDark" : "PlaygroundStatusLabel";
             dotColor = dark ? 0x5FCF7C : 0x36A853;
         }
+        // Only the outer container carries the pill border/background. The inner
+        // label uses its own UIID (transparent background, no border) so the pill
+        // effect isn't drawn twice.
         setUIID(pillUiid);
-        text.setUIID(pillUiid);
+        text.setUIID(labelUiid);
         RoundBorder circle = RoundBorder.create()
                 .rectangle(false)
                 .color(dotColor);

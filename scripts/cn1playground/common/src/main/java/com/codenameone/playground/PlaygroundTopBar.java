@@ -39,13 +39,7 @@ final class PlaygroundTopBar extends Container {
         setUIID(darkMode ? "PlaygroundTopBarDark" : "PlaygroundTopBar");
 
         appIcon = new Label();
-        Image icon = loadAppIcon();
-        if (icon != null) {
-            int px = Display.getInstance().convertToPixels(6.5f);
-            appIcon.setIcon(icon.scaled(px, px));
-        } else {
-            FontImage.setMaterialIcon(appIcon, FontImage.MATERIAL_CODE, 5.5f);
-        }
+        applyAppIconStyle(appIcon, darkMode);
         appIcon.getAllStyles().setMarginUnit(com.codename1.ui.plaf.Style.UNIT_TYPE_DIPS);
         appIcon.getAllStyles().setMargin(0, 0, 0, 1);
 
@@ -148,6 +142,7 @@ final class PlaygroundTopBar extends Container {
         this.darkMode = dark;
         setUIID(dark ? "PlaygroundTopBarDark" : "PlaygroundTopBar");
         wordmark.setUIID(dark ? "PlaygroundWordmarkDark" : "PlaygroundWordmark");
+        applyAppIconStyle(appIcon, dark);
         modeToggle.applyTheme(dark);
         statusPill.setDarkMode(dark);
         shareButton.setUIID(dark ? "PlaygroundShareButtonDark" : "PlaygroundShareButton");
@@ -159,7 +154,27 @@ final class PlaygroundTopBar extends Container {
         }
     }
 
-    private Image loadAppIcon() {
+    /// In dark mode the playground's icon.png would otherwise flash a white
+    /// background against the navy top bar. Render a white Material icon on a
+    /// translucent rounded pill instead; in light mode keep the bundled image.
+    private static void applyAppIconStyle(Label label, boolean dark) {
+        if (dark) {
+            label.setIcon(null);
+            FontImage.setMaterialIcon(label, FontImage.MATERIAL_WIDGETS, 5.5f);
+            label.setUIID("PlaygroundAppIconDark");
+        } else {
+            Image icon = loadAppIcon();
+            if (icon != null) {
+                int px = Display.getInstance().convertToPixels(6.5f);
+                label.setIcon(icon.scaled(px, px));
+            } else {
+                FontImage.setMaterialIcon(label, FontImage.MATERIAL_WIDGETS, 5.5f);
+            }
+            label.setUIID("PlaygroundAppIcon");
+        }
+    }
+
+    private static Image loadAppIcon() {
         try {
             Resources r = Resources.getGlobalResources();
             if (r == null) {

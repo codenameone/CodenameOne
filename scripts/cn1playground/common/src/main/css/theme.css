@@ -112,6 +112,22 @@ PlaygroundTopBarDark {
     padding: 1.5mm 3mm 1.5mm 3mm;
 }
 
+PlaygroundAppIcon {
+    background: transparent;
+    padding: 0.5mm;
+    margin: 0 0.5mm 0 0.5mm;
+    border: none;
+}
+
+PlaygroundAppIconDark {
+    background: rgba(255, 255, 255, 0.1);
+    color: #FFFFFF;
+    padding: 0.5mm 1mm 0.5mm 1mm;
+    margin: 0 0.5mm 0 0.5mm;
+    border: none;
+    border-radius: 1.5mm;
+}
+
 PlaygroundWordmark {
     color: #112247;
     background: transparent;
@@ -195,7 +211,7 @@ PlaygroundSegmentOptionSelectedDark {
 /* ----- Status pill ----- */
 
 PlaygroundStatusPill {
-    background: rgba(240, 242, 247, 0.5);
+    background: rgba(240, 242, 247, 0.75);
     color: #112247;
     border: 1px solid #E1E4EA;
     border-radius: 3mm;
@@ -207,7 +223,7 @@ PlaygroundStatusPill {
 }
 
 PlaygroundStatusPillDark {
-    background: rgba(11, 32, 85, 0.5);
+    background: rgba(11, 32, 85, 0.75);
     color: #F5F8FF;
     border: 1px solid #253B73;
     border-radius: 3mm;
@@ -219,7 +235,7 @@ PlaygroundStatusPillDark {
 }
 
 PlaygroundStatusPillError {
-    background: rgba(251, 230, 230, 0.5);
+    background: rgba(251, 230, 230, 0.75);
     color: #D93636;
     border: 1px solid #F0C2C2;
     border-radius: 3mm;
@@ -231,7 +247,7 @@ PlaygroundStatusPillError {
 }
 
 PlaygroundStatusPillErrorDark {
-    background: rgba(58, 21, 21, 0.5);
+    background: rgba(58, 21, 21, 0.75);
     color: #FF6B6B;
     border: 1px solid #5A2525;
     border-radius: 3mm;
@@ -239,6 +255,50 @@ PlaygroundStatusPillErrorDark {
     font-size: 2.6mm;
     padding: 0.8mm 2.5mm 0.8mm 2mm;
     margin: 0 1mm 0 1mm;
+    text-decoration: none;
+}
+
+PlaygroundStatusLabel {
+    background: transparent;
+    color: #112247;
+    border: none;
+    font-family: "native:MainLight";
+    font-size: 2.6mm;
+    padding: 0;
+    margin: 0;
+    text-decoration: none;
+}
+
+PlaygroundStatusLabelDark {
+    background: transparent;
+    color: #F5F8FF;
+    border: none;
+    font-family: "native:MainLight";
+    font-size: 2.6mm;
+    padding: 0;
+    margin: 0;
+    text-decoration: none;
+}
+
+PlaygroundStatusLabelError {
+    background: transparent;
+    color: #D93636;
+    border: none;
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+    padding: 0;
+    margin: 0;
+    text-decoration: none;
+}
+
+PlaygroundStatusLabelErrorDark {
+    background: transparent;
+    color: #FF6B6B;
+    border: none;
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+    padding: 0;
+    margin: 0;
     text-decoration: none;
 }
 

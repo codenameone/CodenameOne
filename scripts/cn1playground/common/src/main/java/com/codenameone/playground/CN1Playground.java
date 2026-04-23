@@ -343,29 +343,26 @@ public class CN1Playground extends Lifecycle {
             previewContainer.add(BorderLayout.CENTER, previewColumn);
         }
 
-        Container sideAndEditor = new Container(new BorderLayout());
-        sideAndEditor.getAllStyles().setBgTransparency(0);
-        sideAndEditor.add(BorderLayout.WEST, leftSidePanelSlot);
-        sideAndEditor.add(BorderLayout.CENTER, editorHost);
+        // Hint the preview with a minimum width equal to the iPhone skin in portrait
+        // (72 mm body + ~10 mm breathing room) so the SplitPane / BorderLayout won't
+        // collapse the skin even if the user drags the divider all the way right.
+        previewContainer.setPreferredW(Display.getInstance().convertToPixels(82f));
 
-        Container previewAndInspector = new Container(new BorderLayout());
-        previewAndInspector.getAllStyles().setBgTransparency(0);
-        previewAndInspector.add(BorderLayout.CENTER, previewContainer);
-        previewAndInspector.add(BorderLayout.EAST, rightSidePanelSlot);
-
-        // Horizontal split between editor side and preview side. Divider starts
-        // at 50% and can be dragged between 25% and 75% of the total width.
-        // No expand/collapse arrows, no drag-handle icon, just a thin subtle line.
+        // SplitPane only between editor and preview. Samples/History and Inspector
+        // are siblings OUTSIDE the split so opening them doesn't squash the skin.
         SplitPane.Settings splitSettings = new SplitPane.Settings(
                 SplitPane.HORIZONTAL_SPLIT, "25%", "50%", "75%")
                 .showExpandCollapseButtons(false)
                 .showDragHandle(false)
                 .dividerThicknessMM(0.8f)
                 .dividerUIID("PlaygroundSplitDivider");
-        SplitPane split = new SplitPane(splitSettings, sideAndEditor, previewAndInspector);
+        SplitPane split = new SplitPane(splitSettings, editorHost, previewContainer);
+
         Container center = new Container(new BorderLayout());
         center.getAllStyles().setBgTransparency(0);
+        center.add(BorderLayout.WEST, leftSidePanelSlot);
         center.add(BorderLayout.CENTER, split);
+        center.add(BorderLayout.EAST, rightSidePanelSlot);
 
         Container bodyInner = new Container(new BorderLayout());
         bodyInner.getAllStyles().setBgTransparency(0);
@@ -528,24 +525,17 @@ public class CN1Playground extends Lifecycle {
 
         // Empty Containers naturally collapse to ~0 preferred size so adjacent
         // slots (editorHost, previewContainer) fill the remaining space on their own.
-        // Animate the top-level body only when the form is actually displayed —
-        // animating during init (before show()) leaves transient positions.
+        // Animate the shared ancestor (center) when the form is displayed -- this
+        // is the BorderLayout that hosts both slots plus the SplitPane, so the
+        // animation captures the layout transition as a single coordinated pass.
+        // Do NOT call revalidate() here: animateLayout captures current positions,
+        // applies the new layout, and interpolates between them, and a preceding
+        // revalidate would skip the animation by snapping to the final layout.
         Form current = Display.getInstance().getCurrent();
         boolean formShowing = appForm != null && current == appForm;
         Container animationRoot = leftSidePanelSlot.getParent();
         if (formShowing && animationRoot != null) {
-            Container top = animationRoot;
-            while (top.getParent() != null && top.getParent() != bodyContainer) {
-                top = top.getParent();
-            }
-            top.animateLayout(220);
-        } else {
-            if (leftSidePanelSlot.getParent() != null) {
-                leftSidePanelSlot.getParent().revalidate();
-            }
-            if (rightSidePanelSlot.getParent() != null) {
-                rightSidePanelSlot.getParent().revalidate();
-            }
+            animationRoot.animateLayout(220);
         }
     }
 
@@ -1171,12 +1161,15 @@ public class CN1Playground extends Lifecycle {
             case "PlaygroundToolbar":
             case "PlaygroundTitle":
             case "PlaygroundTopBar":
+            case "PlaygroundAppIcon":
             case "PlaygroundWordmark":
             case "PlaygroundSegment":
             case "PlaygroundSegmentOption":
             case "PlaygroundSegmentOptionSelected":
             case "PlaygroundStatusPill":
             case "PlaygroundStatusPillError":
+            case "PlaygroundStatusLabel":
+            case "PlaygroundStatusLabelError":
             case "PlaygroundShareButton":
             case "PlaygroundDownloadButton":
             case "PlaygroundActivityBar":

@@ -109,7 +109,7 @@ final class PlaygroundPreviewColumn extends Container {
 
         stageWrapper = new Container(new LayeredLayout());
         stageWrapper.setUIID(darkMode ? "PlaygroundDeviceStageDark" : "PlaygroundDeviceStage");
-        stageWrapper.setScrollableY(true);
+        applyStageScroll();
 
         contentHost = new Container(new BorderLayout());
         contentHost.getAllStyles().setBgTransparency(0);
@@ -201,8 +201,22 @@ final class PlaygroundPreviewColumn extends Container {
         rebuildStage();
     }
 
+    /// Exclusive scroll direction based on orientation: portrait scrolls Y, landscape
+    /// scrolls X. Never both at once - CN1 doesn't render two-axis scroll well.
+    private void applyStageScroll() {
+        boolean landscape = ORIENTATION_LANDSCAPE.equals(orientation) && !DEVICE_NO_SKIN.equals(device);
+        if (landscape) {
+            stageWrapper.setScrollableY(false);
+            stageWrapper.setScrollableX(true);
+        } else {
+            stageWrapper.setScrollableX(false);
+            stageWrapper.setScrollableY(true);
+        }
+    }
+
     private void rebuildStage() {
         detachPreview();
+        applyStageScroll();
         contentHost.removeAll();
         if (DEVICE_NO_SKIN.equals(device)) {
             contentHost.setUIID(darkMode ? "PlaygroundNoSkinStageDark" : "PlaygroundNoSkinStage");
