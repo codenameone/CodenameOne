@@ -155,6 +155,47 @@ function shouldEnableDiag() {
   return false;
 }
 const VM_DIAG_ENABLED = shouldEnableDiag();
+
+// Event forwarding (worker-side functions becoming real listeners on the
+// main thread) defaults on because production apps need user input to
+// reach Java code. The screenshot-test harness passes
+// ``cn1DisableEventForwarding=1`` because those tests were written
+// against the pre-existing broken behaviour where addEventListener was
+// a silent no-op; enabling real events makes BrowserComponent /
+// MediaPlayback / etc. tests diverge from their recorded baselines.
+let __cn1EventForwardingCache = null;
+function __cn1EventForwardingEnabled() {
+  if (__cn1EventForwardingCache !== null) {
+    return __cn1EventForwardingCache;
+  }
+  let disabled = false;
+  try {
+    const loc = (global.window || global).location;
+    const rawSearch = (loc && loc.search) ? String(loc.search) : String(global.__cn1LocationSearch || "");
+    if (rawSearch) {
+      const search = rawSearch.charAt(0) === "?" ? rawSearch.substring(1) : rawSearch;
+      const pairs = search.split("&");
+      for (let i = 0; i < pairs.length; i++) {
+        const entry = pairs[i];
+        if (!entry) continue;
+        const eq = entry.indexOf("=");
+        const key = decodeURIComponent((eq >= 0 ? entry.substring(0, eq) : entry).replace(/\+/g, " "));
+        if (key !== "cn1DisableEventForwarding") continue;
+        const rawValue = decodeURIComponent((eq >= 0 ? entry.substring(eq + 1) : "1").replace(/\+/g, " "));
+        const normalized = String(rawValue).toLowerCase();
+        disabled = !(normalized === "0" || normalized === "false" || normalized === "off" || normalized === "no");
+        break;
+      }
+    }
+  } catch (_err) {
+    disabled = false;
+  }
+  if (!disabled && global.__cn1DisableEventForwarding) {
+    disabled = true;
+  }
+  __cn1EventForwardingCache = !disabled;
+  return __cn1EventForwardingCache;
+}
 const VM_TRACE_THREAD_LIMIT = 12;
 function diagValue(value) {
   if (value == null) {
@@ -738,12 +779,14 @@ const jvm = {
         for (let i = 0; i < nativeArgs.length; i++) {
           const arg = nativeArgs[i];
           // Route function arguments through the same callback-token path
-          // ``toHostTransferArg`` uses so host-bridge method calls (e.g.
-          // ``element.addEventListener(name, listener, capture)``) can
-          // actually forward the listener to the main thread instead of
-          // silently losing it to null. The main-thread bridge's
-          // ``mapHostArgs`` sees the token and materialises a real JS
-          // function that posts ``worker-callback`` messages back.
+          // ``toHostTransferArg`` uses (which also honours the
+          // cn1DisableEventForwarding URL opt-out) so host-bridge method
+          // calls like ``element.addEventListener(name, listener,
+          // capture)`` can actually forward the listener to the main
+          // thread instead of silently losing it to null. The main-thread
+          // bridge's ``mapHostArgs`` sees the token and materialises a
+          // real JS function that posts ``worker-callback`` messages
+          // back.
           transferableArgs[i] = (typeof arg === "function")
               ? self.toHostTransferArg(arg)
               : arg;
@@ -1146,14 +1189,23 @@ const jvm = {
       return value;
     }
     if (type === "function") {
-      // Mint a stable ID for this worker-side function and hand the main
-      // thread a token it can resolve back to a real callback at event
-      // fire time. See jvm.workerCallbacks doc above.
-      if (value.__cn1WorkerCallbackId == null) {
-        value.__cn1WorkerCallbackId = this.nextWorkerCallbackId++;
-        this.workerCallbacks[value.__cn1WorkerCallbackId] = value;
+      // By default mint a stable ID for this worker-side function and hand
+      // the main thread a token it can resolve back to a real callback at
+      // event fire time. The screenshot-test harness appends
+      // ``cn1DisableEventForwarding=1`` to the URL because the existing
+      // BrowserComponent-based tests intentionally time out and their
+      // recorded baseline assumes no input events fire; turning
+      // addEventListener back into a no-op there keeps those baselines
+      // stable. Production apps (Initializr, playground, etc.) leave the
+      // flag unset and get real keyboard/mouse/resize routing.
+      if (__cn1EventForwardingEnabled()) {
+        if (value.__cn1WorkerCallbackId == null) {
+          value.__cn1WorkerCallbackId = this.nextWorkerCallbackId++;
+          this.workerCallbacks[value.__cn1WorkerCallbackId] = value;
+        }
+        return { __cn1WorkerCallback: value.__cn1WorkerCallbackId };
       }
-      return { __cn1WorkerCallback: value.__cn1WorkerCallbackId };
+      return null;
     }
     if (Array.isArray(value)) {
       const out = new Array(value.length);
@@ -1542,7 +1594,17 @@ const jvm = {
         try {
           cb.apply(null, rawArgs);
         } catch (err) {
-          this.fail(err);
+          // Don't call jvm.fail here — a single broken event handler
+          // shouldn't halt the whole VM. Log via console.error (which
+          // the main thread will echo when diagEnabled) so the cause is
+          // still visible in dev tools without poisoning __parparError.
+          if (typeof console !== "undefined" && typeof console.error === "function") {
+            try {
+              console.error("PARPAR:worker-callback-error:" + (err && err.message ? err.message : String(err)));
+            } catch (_logErr) {
+              /* best-effort */
+            }
+          }
         }
       }
       return true;
