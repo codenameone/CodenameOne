@@ -247,9 +247,11 @@ PopupContent { cn1-derive: Dialog; padding: 2mm; }
     Form { background-color: #141218; }
     ContentPane { background-color: #141218; }
 
-    Label { color: #e6e0e9; }
-    SecondaryLabel { color: #cac4d0; }
-    TertiaryLabel { color: #938f99; }
+    Label { color: #e6e0e9; background-color: transparent; }
+    SecondaryLabel { color: #cac4d0; background-color: transparent; }
+    TertiaryLabel { color: #938f99; background-color: transparent; }
+    SpanLabel { color: #e6e0e9; background-color: transparent; }
+    SpanLabelText { color: #e6e0e9; background-color: transparent; }
 
     Button { color: #381e72; background-color: #d0bcff; }
     Button.pressed { background-color: #4f378b; color: #eaddff; }
@@ -265,6 +267,9 @@ PopupContent { cn1-derive: Dialog; padding: 2mm; }
     TextField { color: #e6e0e9; background-color: #211f26; }
     TextField.pressed { background-color: #49454f; }
     TextField.disabled { color: #5c5967; background-color: #2b2930; }
+    TextArea { color: #e6e0e9; background-color: #211f26; }
+    TextArea.pressed { background-color: #49454f; }
+    TextArea.disabled { color: #5c5967; background-color: #2b2930; }
     TextHint { color: #938f99; }
 
     CheckBox { color: #e6e0e9; background-color: transparent; }
@@ -282,7 +287,9 @@ PopupContent { cn1-derive: Dialog; padding: 2mm; }
     OnOffSwitch.selected { background-color: #d0bcff; color: #381e72; }
 
     Toolbar { background-color: #141218; color: #e6e0e9; }
-    Title { color: #e6e0e9; }
+    TitleArea { background-color: #141218; color: #e6e0e9; }
+    Title { color: #e6e0e9; background-color: #141218; }
+    MainTitle { color: #e6e0e9; background-color: #141218; }
     BackCommand { color: #d0bcff; background-color: transparent; }
     TitleCommand { color: #d0bcff; background-color: transparent; }
 
@@ -299,6 +306,7 @@ PopupContent { cn1-derive: Dialog; padding: 2mm; }
     SideCommand.pressed { background-color: #4f378b; }
 
     List { background-color: #141218; }
+    ListRenderer { color: #e6e0e9; background-color: transparent; }
     MultiButton { background-color: #141218; color: #e6e0e9; }
     MultiButton.pressed { background-color: #4f378b; }
     MultiLine1 { color: #e6e0e9; }
@@ -307,10 +315,11 @@ PopupContent { cn1-derive: Dialog; padding: 2mm; }
     MultiLine4 { color: #938f99; }
 
     Dialog { background-color: #211f26; color: #e6e0e9; }
-    DialogBody { background-color: #211f26; }
-    DialogTitle { color: #e6e0e9; }
+    DialogBody { background-color: #211f26; color: #e6e0e9; }
+    DialogTitle { color: #e6e0e9; background-color: #211f26; }
     DialogContentPane { background-color: #211f26; }
     DialogCommandArea { background-color: #211f26; }
+    PopupContent { background-color: #211f26; color: #e6e0e9; }
 
     FloatingActionButton { color: #eaddff; background-color: #4f378b; }
     FloatingActionButton.pressed { background-color: #d0bcff; }
