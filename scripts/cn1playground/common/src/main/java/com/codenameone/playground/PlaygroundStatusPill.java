@@ -62,6 +62,17 @@ final class PlaygroundStatusPill extends Container {
         applyState(failed, dark, text.getText());
     }
 
+    /// Collapses the pill to a dot-only form for mobile. The label text and
+    /// its wrap stay in the layout so the pill border doesn't reshape, just
+    /// invisible so only the coloured dot shows next to the app icon.
+    void setCompactDot(boolean compact) {
+        text.setVisible(!compact);
+        text.setHidden(compact);
+        if (getComponentForm() != null) {
+            revalidate();
+        }
+    }
+
     void showLive() {
         failed = false;
         applyState(false, darkMode, "Live");

@@ -329,7 +329,9 @@ public class CN1Playground extends Lifecycle {
 
     private void assembleDesktopLayout(boolean compact) {
         topBar.setCompact(compact);
+        topBar.setMobile(false);
         previewColumn.setCompact(compact);
+        previewColumn.setMobile(false);
 
         detach(activityBar);
         detach(leftSidePanelSlot);
@@ -376,7 +378,9 @@ public class CN1Playground extends Lifecycle {
 
     private void assembleMobileLayout() {
         topBar.setCompact(true);
+        topBar.setMobile(true);
         previewColumn.setCompact(true);
+        previewColumn.setMobile(true);
 
         detach(mobileTopTabs);
         detach(bottomNav);
@@ -413,6 +417,21 @@ public class CN1Playground extends Lifecycle {
             return;
         }
         tabContent.removeAll();
+
+        // If a bottom-nav panel is active, it replaces the tab content while
+        // the top bar + bottom nav stay in place. Tapping the panel's close
+        // button (or tapping the same nav item again) clears the activity and
+        // restores the tab content. Samples / Inspector / History all behave
+        // the same way - the richer "bottom sheet" variant is reserved for
+        // later, but this keeps the mobile flow functional.
+        Component mobilePanel = mobilePanelFor(currentActivity);
+        if (mobilePanel != null) {
+            safeAddCenter(tabContent, mobilePanel);
+            if (tabContent.getComponentForm() != null) {
+                tabContent.revalidate();
+            }
+            return;
+        }
 
         switch (currentMobileTab) {
             case MOBILE_TAB_CSS:
@@ -507,7 +526,34 @@ public class CN1Playground extends Lifecycle {
         refreshBottomNav();
     }
 
+    private Component mobilePanelFor(String key) {
+        if (PANEL_SAMPLES.equals(key)) {
+            return samplesPanel.getComponent();
+        }
+        if (PANEL_HISTORY.equals(key)) {
+            historyPanel.setEntries(PlaygroundStateStore.loadHistory());
+            return historyPanel.getComponent();
+        }
+        if (PANEL_INSPECTOR.equals(key)) {
+            return inspectorWrapper;
+        }
+        return null;
+    }
+
+    private boolean isMobileLayout() {
+        return lastLayout == LAYOUT_MOBILE;
+    }
+
     private void applyActivity(String key) {
+        if (isMobileLayout()) {
+            // Mobile: bottom nav swaps the tab content with the selected
+            // panel. No left/right slot involvement.
+            detach(samplesPanel.getComponent());
+            detach(historyPanel.getComponent());
+            detach(inspectorWrapper);
+            refreshMobileTabContent();
+            return;
+        }
         if (leftSidePanelSlot == null || rightSidePanelSlot == null) {
             return;
         }

@@ -31,6 +31,7 @@ final class PlaygroundTopBar extends Container {
     private final Button downloadButton;
     private boolean darkMode;
     private boolean compact;
+    private boolean mobile;
 
     PlaygroundTopBar(String initialMode, boolean darkMode, Actions actions) {
         super(new BorderLayout());
@@ -142,6 +143,22 @@ final class PlaygroundTopBar extends Container {
             shareButton.setText("Share");
             downloadButton.setText("Download");
         }
+        if (getComponentForm() != null) {
+            revalidate();
+        }
+    }
+
+    /// Mobile strips further than compact: the Code/CSS mode toggle is hidden
+    /// (the tab strip under the top bar takes its role) and the status pill
+    /// collapses to its dot-only compact form.
+    void setMobile(boolean mobile) {
+        if (this.mobile == mobile) {
+            return;
+        }
+        this.mobile = mobile;
+        modeToggle.setVisible(!mobile);
+        modeToggle.setHidden(mobile);
+        statusPill.setCompactDot(mobile);
         if (getComponentForm() != null) {
             revalidate();
         }

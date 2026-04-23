@@ -38,6 +38,8 @@ final class PlaygroundPreviewColumn extends Container {
     private String orientation;
     private boolean darkMode;
     private boolean compact;
+    private boolean mobile;
+    private String savedDeviceBeforeMobile;
     private boolean stale;
     private Component currentPreview;
     private final Listener listener;
@@ -187,6 +189,32 @@ final class PlaygroundPreviewColumn extends Container {
         if (getComponentForm() != null) {
             revalidate();
         }
+    }
+
+    /// Mobile: toolbar is hidden entirely, device is forced to no-skin so the
+    /// preview fills 100% of the tab area without a synthetic phone bezel
+    /// inside the real phone. Reverts on desktop/tablet to whichever device
+    /// was active before the shift.
+    void setMobile(boolean mobile) {
+        if (this.mobile == mobile) {
+            return;
+        }
+        this.mobile = mobile;
+        toolbar.setVisible(!mobile);
+        toolbar.setHidden(mobile);
+        if (mobile) {
+            if (!DEVICE_NO_SKIN.equals(device)) {
+                savedDeviceBeforeMobile = device;
+            }
+            device = DEVICE_NO_SKIN;
+            deviceSegmented.setSelected(DEVICE_NO_SKIN);
+        } else if (savedDeviceBeforeMobile != null) {
+            device = savedDeviceBeforeMobile;
+            deviceSegmented.setSelected(savedDeviceBeforeMobile);
+            savedDeviceBeforeMobile = null;
+        }
+        applyStageScroll();
+        rebuildStage();
     }
 
     void applyTheme(boolean dark) {
