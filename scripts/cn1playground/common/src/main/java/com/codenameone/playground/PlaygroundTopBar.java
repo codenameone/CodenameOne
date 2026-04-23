@@ -54,7 +54,10 @@ final class PlaygroundTopBar extends Container {
 
         PlaygroundSegmented.Option[] modeOptions = new PlaygroundSegmented.Option[]{
                 new PlaygroundSegmented.Option(MODE_CODE, "Code", FontImage.MATERIAL_CODE),
-                new PlaygroundSegmented.Option(MODE_CSS, "CSS", FontImage.MATERIAL_PALETTE)
+                // CN1's MATERIAL_* constants ship only the filled Material Icons.
+                // MATERIAL_BRUSH is the closest wireframe-style alternative for the
+                // "styling" action; use it in place of the filled MATERIAL_PALETTE.
+                new PlaygroundSegmented.Option(MODE_CSS, "CSS", FontImage.MATERIAL_BRUSH)
         };
         modeToggle = new PlaygroundSegmented(modeOptions, initialMode == null ? MODE_CODE : initialMode,
                 darkMode, key -> {

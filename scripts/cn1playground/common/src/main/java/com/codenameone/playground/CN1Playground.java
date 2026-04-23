@@ -1,5 +1,6 @@
 package com.codenameone.playground;
 
+import com.codename1.components.SplitPane;
 import com.codename1.io.Log;
 import com.codename1.io.NetworkEvent;
 import com.codename1.io.Util;
@@ -242,7 +243,7 @@ public class CN1Playground extends Lifecycle {
     private PlaygroundSegmented buildMobileTopTabs() {
         PlaygroundSegmented.Option[] opts = new PlaygroundSegmented.Option[]{
                 new PlaygroundSegmented.Option(MOBILE_TAB_CODE, "Code", FontImage.MATERIAL_CODE),
-                new PlaygroundSegmented.Option(MOBILE_TAB_CSS, "CSS", FontImage.MATERIAL_PALETTE),
+                new PlaygroundSegmented.Option(MOBILE_TAB_CSS, "CSS", FontImage.MATERIAL_BRUSH),
                 new PlaygroundSegmented.Option(MOBILE_TAB_PREVIEW, "Preview", FontImage.MATERIAL_VISIBILITY)
         };
         return new PlaygroundSegmented(opts, MOBILE_TAB_CODE, websiteDarkMode, key -> {
@@ -342,9 +343,6 @@ public class CN1Playground extends Lifecycle {
             previewContainer.add(BorderLayout.CENTER, previewColumn);
         }
 
-        Container center = new Container(new BorderLayout());
-        center.getAllStyles().setBgTransparency(0);
-
         Container sideAndEditor = new Container(new BorderLayout());
         sideAndEditor.getAllStyles().setBgTransparency(0);
         sideAndEditor.add(BorderLayout.WEST, leftSidePanelSlot);
@@ -355,8 +353,13 @@ public class CN1Playground extends Lifecycle {
         previewAndInspector.add(BorderLayout.CENTER, previewContainer);
         previewAndInspector.add(BorderLayout.EAST, rightSidePanelSlot);
 
-        center.add(BorderLayout.CENTER, sideAndEditor);
-        center.add(BorderLayout.EAST, previewAndInspector);
+        // Horizontal split between editor side and preview side. Divider starts
+        // at 50% and can be dragged between 25% and 75% of the total width.
+        SplitPane split = new SplitPane(SplitPane.HORIZONTAL_SPLIT,
+                sideAndEditor, previewAndInspector, "25%", "50%", "75%");
+        Container center = new Container(new BorderLayout());
+        center.getAllStyles().setBgTransparency(0);
+        center.add(BorderLayout.CENTER, split);
 
         Container bodyInner = new Container(new BorderLayout());
         bodyInner.getAllStyles().setBgTransparency(0);
@@ -364,9 +367,6 @@ public class CN1Playground extends Lifecycle {
         bodyInner.add(BorderLayout.CENTER, center);
 
         bodyContainer.add(BorderLayout.CENTER, bodyInner);
-
-        int previewW = Display.getInstance().convertToPixels(compact ? 85f : 110f);
-        previewContainer.setPreferredW(previewW);
 
         attachEditorsToHost();
     }

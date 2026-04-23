@@ -115,7 +115,7 @@ PlaygroundTopBarDark {
 PlaygroundWordmark {
     color: #112247;
     background: transparent;
-    font-family: "native:MainBold";
+    font-family: "native:MainRegular";
     font-size: 3.5mm;
     padding: 0 2mm 0 2mm;
 }
@@ -123,7 +123,7 @@ PlaygroundWordmark {
 PlaygroundWordmarkDark {
     color: #F5F8FF;
     background: transparent;
-    font-family: "native:MainBold";
+    font-family: "native:MainRegular";
     font-size: 3.5mm;
     padding: 0 2mm 0 2mm;
 }
@@ -133,15 +133,17 @@ PlaygroundWordmarkDark {
 PlaygroundSegment {
     background: #F0F2F7;
     border: 1px solid #E1E4EA;
+    border-radius: 1.8mm;
     padding: 0.5mm;
-    margin: 0;
+    margin: 0 1mm 0 1mm;
 }
 
 PlaygroundSegmentDark {
     background: #0B2055;
     border: 1px solid #253B73;
+    border-radius: 1.8mm;
     padding: 0.5mm;
-    margin: 0;
+    margin: 0 1mm 0 1mm;
 }
 
 PlaygroundSegmentOption {
@@ -170,6 +172,7 @@ PlaygroundSegmentOptionSelected {
     background: #FFFFFF;
     color: #112247;
     border: none;
+    border-radius: 1.2mm;
     font-family: "native:MainBold";
     font-size: 2.8mm;
     padding: 1mm 2.5mm 1mm 2.5mm;
@@ -181,6 +184,7 @@ PlaygroundSegmentOptionSelectedDark {
     background: #163575;
     color: #F5F8FF;
     border: none;
+    border-radius: 1.2mm;
     font-family: "native:MainBold";
     font-size: 2.8mm;
     padding: 1mm 2.5mm 1mm 2.5mm;
@@ -193,9 +197,11 @@ PlaygroundSegmentOptionSelectedDark {
 PlaygroundStatusPill {
     background: #F0F2F7;
     color: #112247;
+    border: 1px solid #E1E4EA;
+    border-radius: 3mm;
     font-family: "native:MainLight";
     font-size: 2.6mm;
-    padding: 0.8mm 2mm 0.8mm 2mm;
+    padding: 0.8mm 2.5mm 0.8mm 2mm;
     margin: 0 1mm 0 1mm;
     text-decoration: none;
 }
@@ -203,9 +209,11 @@ PlaygroundStatusPill {
 PlaygroundStatusPillDark {
     background: #0B2055;
     color: #F5F8FF;
+    border: 1px solid #253B73;
+    border-radius: 3mm;
     font-family: "native:MainLight";
     font-size: 2.6mm;
-    padding: 0.8mm 2mm 0.8mm 2mm;
+    padding: 0.8mm 2.5mm 0.8mm 2mm;
     margin: 0 1mm 0 1mm;
     text-decoration: none;
 }
@@ -213,9 +221,11 @@ PlaygroundStatusPillDark {
 PlaygroundStatusPillError {
     background: #FBE6E6;
     color: #D93636;
+    border: 1px solid #F0C2C2;
+    border-radius: 3mm;
     font-family: "native:MainBold";
     font-size: 2.6mm;
-    padding: 0.8mm 2mm 0.8mm 2mm;
+    padding: 0.8mm 2.5mm 0.8mm 2mm;
     margin: 0 1mm 0 1mm;
     text-decoration: none;
 }
@@ -223,9 +233,11 @@ PlaygroundStatusPillError {
 PlaygroundStatusPillErrorDark {
     background: #3A1515;
     color: #FF6B6B;
+    border: 1px solid #5A2525;
+    border-radius: 3mm;
     font-family: "native:MainBold";
     font-size: 2.6mm;
-    padding: 0.8mm 2mm 0.8mm 2mm;
+    padding: 0.8mm 2.5mm 0.8mm 2mm;
     margin: 0 1mm 0 1mm;
     text-decoration: none;
 }
@@ -260,6 +272,7 @@ PlaygroundShareButton {
     background: transparent;
     color: #112247;
     border: 1px solid #E1E4EA;
+    border-radius: 1.5mm;
     font-family: "native:MainLight";
     font-size: 2.8mm;
     padding: 1mm 2.5mm 1mm 2.5mm;
@@ -271,6 +284,7 @@ PlaygroundShareButtonDark {
     background: transparent;
     color: #F5F8FF;
     border: 1px solid #253B73;
+    border-radius: 1.5mm;
     font-family: "native:MainLight";
     font-size: 2.8mm;
     padding: 1mm 2.5mm 1mm 2.5mm;
@@ -281,7 +295,8 @@ PlaygroundShareButtonDark {
 PlaygroundDownloadButton {
     background: #2F6BFF;
     color: #FFFFFF;
-    border: none;
+    border: 1px solid #2F6BFF;
+    border-radius: 1.5mm;
     font-family: "native:MainBold";
     font-size: 2.8mm;
     padding: 1mm 2.5mm 1mm 2.5mm;
@@ -291,8 +306,9 @@ PlaygroundDownloadButton {
 
 PlaygroundDownloadButtonDark {
     background: #4D86FF;
-    color: #0A0F1E;
-    border: none;
+    color: #FFFFFF;
+    border: 1px solid #4D86FF;
+    border-radius: 1.5mm;
     font-family: "native:MainBold";
     font-size: 2.8mm;
     padding: 1mm 2.5mm 1mm 2.5mm;
