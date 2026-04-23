@@ -91,7 +91,7 @@ final class PlaygroundInspector {
         propertiesContainer.getAllStyles().setBgColor(panelBg);
         propertiesContainer.getAllStyles().setBgTransparency(255);
 
-        int maxTreePx = Display.getInstance().convertToPixels(70f);
+        int maxTreePx = Display.getInstance().convertToPixels(38f);
         treeContainer.setPreferredH(maxTreePx);
 
         rebuildTree();
@@ -148,15 +148,14 @@ final class PlaygroundInspector {
 
         Container row = new Container(new BorderLayout());
         row.setUIID(rowUiid);
-        row.setLeadComponent(null);
 
-        // Chevron: filled for containers, blank placeholder for leaves (keeps
-        // column alignment).
+        // Chevron: its own Button so clicks expand/collapse without bubbling to
+        // the row selection. Hidden placeholder for leaves to keep alignment.
         Button chevron = new Button();
         chevron.setUIID(uiidDark("PlaygroundTreeChevron"));
         if (isContainer) {
             char arrow = isExpanded(c) ? FontImage.MATERIAL_EXPAND_MORE : FontImage.MATERIAL_CHEVRON_RIGHT;
-            FontImage.setMaterialIcon(chevron, arrow, 3.5f);
+            FontImage.setMaterialIcon(chevron, arrow, 2.2f);
             chevron.addActionListener(e -> {
                 if (isExpanded(c) && c != previewRoot) {
                     expanded.remove(c);
@@ -170,51 +169,33 @@ final class PlaygroundInspector {
             chevron.setHidden(true);
         }
 
-        // Type icon (outlined folder for containers, document for leaves).
-        Label typeIcon = new Label();
-        typeIcon.setUIID(uiidDark("PlaygroundTreeTypeIcon"));
+        // The main row body is a Button so the entire label area (icon + type +
+        // bracket text) is a single large click target. Selection fires on its
+        // ActionListener. Type and bracket must share a single Button text here,
+        // since Button can't nest two differently-styled labels internally.
+        String text = c.getClass().getSimpleName() + extractBracket(c);
+        Button body = new Button(text);
+        body.setUIID(uiidDark(selected ? "PlaygroundTreeTypeActive" : "PlaygroundTreeType"));
         char typeChar = isContainer ? FontImage.MATERIAL_FOLDER_OPEN : FontImage.MATERIAL_ARTICLE;
-        FontImage.setMaterialIcon(typeIcon, typeChar, 4f);
+        FontImage.setMaterialIcon(body, typeChar, 2.5f);
+        body.setTextPosition(Component.RIGHT);
+        body.setGap(Display.getInstance().convertToPixels(0.8f));
+        body.setAlignment(Component.LEFT);
+        body.addActionListener(e -> handleComponentSelected(c));
 
-        // Text: semibold type name + regular bracketed identifier.
-        String typeName = c.getClass().getSimpleName();
-        String bracket = extractBracket(c);
-        Label typeLabel = new Label(typeName);
-        typeLabel.setUIID(uiidDark(selected ? "PlaygroundTreeTypeActive" : "PlaygroundTreeType"));
-        Label bracketLabel = new Label(bracket);
-        bracketLabel.setUIID(uiidDark(selected ? "PlaygroundTreeBracketActive" : "PlaygroundTreeBracket"));
-
-        Container left = new Container(BoxLayout.x());
-        left.getAllStyles().setBgTransparency(0);
-        left.add(chevron);
-        left.add(typeIcon);
-        left.add(typeLabel);
-        if (bracket.length() > 0) {
-            left.add(bracketLabel);
-        }
-
-        // Depth indent: 3 mm base + 5 mm per level.
-        int indentMm = 3 + depth * 5;
+        // Depth indent: 1.5 mm base + 2.5 mm per level (spec's 3/5 halved to
+        // match the intended CSS-px footprint).
+        float indentMm = 1.5f + depth * 2.5f;
         row.getAllStyles().setPaddingUnit(Style.UNIT_TYPE_DIPS);
-        row.getAllStyles().setPaddingLeft(indentMm);
-        row.getAllStyles().setPaddingRight(2);
+        row.getAllStyles().setPaddingLeft((int) indentMm);
+        row.getAllStyles().setPaddingRight(1);
         row.getAllStyles().setPaddingTop(0);
         row.getAllStyles().setPaddingBottom(0);
-        int rowH = Display.getInstance().convertToPixels(7f);
+        int rowH = Display.getInstance().convertToPixels(4f);
         row.setPreferredH(rowH);
 
-        row.add(BorderLayout.CENTER, left);
-        row.putClientProperty("inspectorComponent", c);
-
-        // Row selection: click anywhere on the row area (except the chevron).
-        row.setLeadComponent(null);
-        left.setLeadComponent(null);
-        Button hit = new Button();
-        hit.setUIID("Container");
-        hit.getAllStyles().setBgTransparency(0);
-        hit.setText("");
-        hit.addActionListener(e -> handleComponentSelected(c));
-        row.add(BorderLayout.EAST, hit);
+        row.add(BorderLayout.WEST, chevron);
+        row.add(BorderLayout.CENTER, body);
         return row;
     }
 
@@ -374,14 +355,14 @@ final class PlaygroundInspector {
             divider.setUIID(uiidDark("PlaygroundInspectorDivider"));
             divider.setPreferredH(1);
             divider.getAllStyles().setMarginUnit(Style.UNIT_TYPE_DIPS);
-            divider.getAllStyles().setMargin(4, 0, 0, 0);
+            divider.getAllStyles().setMargin(2, 0, 0, 0);
             propertiesContainer.add(divider);
         }
 
         Label header = new Label(title);
         header.setUIID(uiidDark("PlaygroundInspectorSection"));
         header.getAllStyles().setMarginUnit(Style.UNIT_TYPE_DIPS);
-        header.getAllStyles().setMargin(firstSection ? 2 : 2, 3, 0, 0);
+        header.getAllStyles().setMargin(firstSection ? 1 : 1, 1, 0, 0);
         propertiesContainer.add(header);
     }
 
@@ -393,7 +374,9 @@ final class PlaygroundInspector {
 
         Label label = new Label(labelText);
         label.setUIID(uiidDark("PlaygroundFieldLabel"));
-        label.setPreferredW(mm(22));
+        // Spec's 22 mm label-column rendered as CSS-px-sized 12 mm -- spec values
+        // were in design-doc mm which at CN1's physical-mm are roughly 2x too big.
+        label.setPreferredW(mm(12));
 
         row.add(BorderLayout.WEST, label);
         return row;
@@ -425,7 +408,7 @@ final class PlaygroundInspector {
 
         Label swatch = new Label(" ");
         swatch.setUIID(uiidDark("PlaygroundInspectorSwatch"));
-        int swatchSize = mm(9);
+        int swatchSize = mm(5);
         swatch.setPreferredW(swatchSize);
         swatch.setPreferredH(swatchSize);
         updateColorPreview(swatch, color, safeAlpha);
