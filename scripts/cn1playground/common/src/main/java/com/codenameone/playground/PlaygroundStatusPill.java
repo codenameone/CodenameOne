@@ -35,13 +35,14 @@ final class PlaygroundStatusPill extends Container {
 
         // Wrap the dot in a centering container; BoxLayout.x aligns children to
         // their own top edge, so wrapping in FlowLayout(CENTER, CENTER) gives us
-        // a cross-axis-centered dot.
+        // a cross-axis-centered dot. Right margin matches the 1.3 mm gap used
+        // between icons and labels in the top-bar buttons.
         Container dotWrap = new Container(new com.codename1.ui.layouts.FlowLayout(Component.CENTER, Component.CENTER));
         dotWrap.getAllStyles().setBgTransparency(0);
         dotWrap.getAllStyles().setPadding(0, 0, 0, 0);
-        dotWrap.getAllStyles().setMargin(0, 0, 0, 1);
         dotWrap.getAllStyles().setPaddingUnit(Style.UNIT_TYPE_PIXELS);
-        dotWrap.getAllStyles().setMarginUnit(Style.UNIT_TYPE_PIXELS);
+        dotWrap.getAllStyles().setMarginUnit(Style.UNIT_TYPE_DIPS);
+        dotWrap.getAllStyles().setMargin(0f, 0f, 0f, 1.3f);
         dotWrap.add(dot);
 
         Container textWrap = new Container(new com.codename1.ui.layouts.FlowLayout(Component.LEFT, Component.CENTER));
