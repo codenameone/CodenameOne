@@ -3,24 +3,24 @@
  *
  * CEF-free subset of the Codename One CSS compiler: solid fills, native
  * rounded/pill borders, state selectors via .pressed / .selected /
- * .disabled, and light/dark palettes via @media (prefers-color-scheme:
- * dark) producing $DarkUIID variants. Colors are inlined (not CSS
- * variables) because the compiler's dark-mode rewriter operates at
- * string level and doesn't re-scope :root var() declarations.
+ * .disabled. Light and dark palettes live at the bottom of this file
+ * in a prefers-color-scheme block the compiler rewrites into $DarkUIID
+ * entries. Colors are inlined (not CSS variables) because the rewriter
+ * operates at string level and doesn't re-scope :root declarations.
  *
- * Apple system palette reference:
- *   accent            #007aff   dark #0a84ff
- *   accent-pressed    #0064d1   dark #64b1ff
- *   accent-disabled   #b3d4ff   dark #004a99
- *   text-primary      #000000   dark #ffffff
- *   text-secondary    #3c3c43   dark #ebebf5
- *   text-tertiary     #8e8e93   dark #8e8e93
- *   text-disabled     #c7c7cc   dark #48484a
- *   surface           #ffffff   dark #000000
- *   surface-grouped   #f2f2f7   dark #1c1c1e
- *   surface-tertiary  #e5e5ea   dark #2c2c2e
- *   separator         #c6c6c8   dark #38383a
- *   success           #34c759   dark #30d158
+ * Apple system palette reference (light / dark):
+ *   accent            007aff / 0a84ff
+ *   accent-pressed    0064d1 / 64b1ff
+ *   accent-disabled   b3d4ff / 004a99
+ *   text-primary      000000 / ffffff
+ *   text-secondary    3c3c43 / ebebf5
+ *   text-tertiary     8e8e93 / 8e8e93
+ *   text-disabled     c7c7cc / 48484a
+ *   surface           ffffff / 000000
+ *   surface-grouped   f2f2f7 / 1c1c1e
+ *   surface-tertiary  e5e5ea / 2c2c2e
+ *   separator         c6c6c8 / 38383a
+ *   success           34c759 / 30d158
  *
  * Overridable palette: user apps layer their own theme.css or runtime
  * UIManager.addThemeProps on top of this theme - see
