@@ -27,6 +27,7 @@
 @import simd;
 
 #import "METALView.h"
+#import "CN1Metalcompat.h"
 #import "ExecutableOp.h"
 #import "CodenameOne_GLViewController.h"
 #include "com_codename1_impl_ios_IOSImplementation.h"
@@ -203,6 +204,7 @@ extern BOOL isRetinaBug();
     // encoder is still live, end it cleanly — Metal asserts loudly if a
     // render command encoder is released without endEncoding.
     if (self.renderCommandEncoder != nil) {
+        CN1MetalEndFrame();
         [self.renderCommandEncoder endEncoding];
         self.renderCommandEncoder = nil;
     }
@@ -223,6 +225,9 @@ extern BOOL isRetinaBug();
     }
     self.renderCommandEncoder = [self.commandBuffer renderCommandEncoderWithDescriptor:self.renderPassDescriptor];
     [self.renderCommandEncoder setViewport: (MTLViewport){ 0.0, 0.0, layer.drawableSize.width, layer.drawableSize.height, 0.0, 1.0 }];
+    // Publish the encoder + projection to the CN1Metalcompat layer; each
+    // ExecutableOp's Metal branch pulls the encoder from there.
+    CN1MetalBeginFrame(self.renderCommandEncoder, projectionMatrix, framebufferWidth, framebufferHeight);
 }
 
 - (BOOL)presentFramebuffer
@@ -232,6 +237,7 @@ extern BOOL isRetinaBug();
         self.commandBuffer = nil;
         return NO;
     }
+    CN1MetalEndFrame();
     [self.renderCommandEncoder endEncoding];
     [self.commandBuffer presentDrawable:self.drawable];
     [self.commandBuffer commit];
