@@ -2657,26 +2657,30 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @Override
     public void installNativeTheme(){
     	try {
-            // New CSS-driven native themes (Liquid Glass / Material 3) are the
-            // default. Legacy themes stay reachable via javascript.native.theme.
-            String defaultTheme;
-            if (isAndroid_()) {
-                String androidMode = Display.getInstance().getProperty("cn1.androidTheme", "material").toLowerCase();
-                if ("hololight".equals(androidMode) || "holo".equals(androidMode)) {
-                    defaultTheme = "/android_holo_light.res";
+            // Prefer the modern native theme when explicitly requested via
+            // ios.themeMode / cn1.androidTheme / javascript.native.theme. If
+            // the hint isn't set we keep the pre-existing JS-port default
+            // (iOS 7 / Holo Light) since the JS bundle may not include the
+            // modern .res files (scripts/build-native-themes.sh has to have
+            // mirrored them before the JS bundle was produced).
+            String defaultTheme = isAndroid_() ? "/android_holo_light.res" : "/iOS7Theme.res";
+            String iosMode = Display.getInstance().getProperty("ios.themeMode", null);
+            String androidMode = Display.getInstance().getProperty("cn1.androidTheme", null);
+            if (isAndroid_() && androidMode != null) {
+                androidMode = androidMode.toLowerCase();
+                if ("material".equals(androidMode) || "modern".equals(androidMode)) {
+                    defaultTheme = "/AndroidMaterialTheme.res";
                 } else if ("legacy".equals(androidMode)) {
                     defaultTheme = "/androidTheme.res";
-                } else {
-                    defaultTheme = "/AndroidMaterialTheme.res";
+                } else if ("hololight".equals(androidMode) || "holo".equals(androidMode)) {
+                    defaultTheme = "/android_holo_light.res";
                 }
-            } else {
-                String iosMode = Display.getInstance().getProperty("ios.themeMode", "auto").toLowerCase();
-                if ("ios7".equals(iosMode) || "flat".equals(iosMode)) {
-                    defaultTheme = "/iOS7Theme.res";
+            } else if (!isAndroid_() && iosMode != null) {
+                iosMode = iosMode.toLowerCase();
+                if ("modern".equals(iosMode) || "liquid".equals(iosMode) || "auto".equals(iosMode)) {
+                    defaultTheme = "/iOSModernTheme.res";
                 } else if ("legacy".equals(iosMode) || "iphone".equals(iosMode)) {
                     defaultTheme = "/iPhoneTheme.res";
-                } else {
-                    defaultTheme = "/iOSModernTheme.res";
                 }
             }
             String nativeTheme = Display.getInstance().getProperty("javascript.native.theme", defaultTheme);
@@ -2684,9 +2688,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
             Resources r;
             try {
                 r = Resources.open(nativeTheme);
-            } catch (IOException notFound) {
-                // Fall back to the legacy theme if the modern .res hasn't been
-                // generated yet (partial build / no scripts/build-native-themes.sh).
+            } catch (Throwable notFound) {
+                // Fall back to the legacy theme if the chosen .res isn't in
+                // the JS bundle (partial build, missing mirror step, etc.).
                 String fallback = isAndroid_() ? "/android_holo_light.res" : "/iOS7Theme.res";
                 Log.p("[installNativeTheme] " + nativeTheme + " missing, falling back to " + fallback);
                 r = Resources.open(fallback);
