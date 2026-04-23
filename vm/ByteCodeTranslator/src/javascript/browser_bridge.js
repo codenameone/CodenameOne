@@ -358,11 +358,120 @@
     return null;
   }
 
+  // Cache of worker-callback proxy functions keyed by the callback ID the
+  // worker minted. addEventListener/removeEventListener parity needs the
+  // *same* real function on both sides of the call, so we memoise here.
+  var workerCallbackProxies = Object.create(null);
+
+  // Serialise the fields of a DOM Event the worker-side EventListener
+  // wrappers in port.js actually read. Everything here is either a
+  // primitive or a host-ref marker so it round-trips through postMessage
+  // without losing information. We extend this as more event types show
+  // up in real user code; the bulk (mouse/key/wheel/resize/popstate) is
+  // covered below.
+  function serializeEventForWorker(evt) {
+    if (evt == null || typeof evt !== 'object') {
+      return evt;
+    }
+    var out = {
+      type: evt.type || '',
+      bubbles: !!evt.bubbles,
+      cancelable: !!evt.cancelable,
+      defaultPrevented: !!evt.defaultPrevented,
+      eventPhase: evt.eventPhase | 0,
+      timeStamp: +evt.timeStamp || 0
+    };
+    if ('clientX' in evt) out.clientX = +evt.clientX || 0;
+    if ('clientY' in evt) out.clientY = +evt.clientY || 0;
+    if ('pageX'   in evt) out.pageX   = +evt.pageX   || 0;
+    if ('pageY'   in evt) out.pageY   = +evt.pageY   || 0;
+    if ('screenX' in evt) out.screenX = +evt.screenX || 0;
+    if ('screenY' in evt) out.screenY = +evt.screenY || 0;
+    if ('button'  in evt) out.button  = evt.button  | 0;
+    if ('buttons' in evt) out.buttons = evt.buttons | 0;
+    if ('detail'  in evt) out.detail  = evt.detail  | 0;
+    if ('deltaX'  in evt) out.deltaX  = +evt.deltaX || 0;
+    if ('deltaY'  in evt) out.deltaY  = +evt.deltaY || 0;
+    if ('deltaZ'  in evt) out.deltaZ  = +evt.deltaZ || 0;
+    if ('deltaMode' in evt) out.deltaMode = evt.deltaMode | 0;
+    if ('key'     in evt) out.key     = evt.key == null ? '' : String(evt.key);
+    if ('code'    in evt) out.code    = evt.code == null ? '' : String(evt.code);
+    if ('keyCode' in evt) out.keyCode = evt.keyCode | 0;
+    if ('which'   in evt) out.which   = evt.which   | 0;
+    if ('charCode' in evt) out.charCode = evt.charCode | 0;
+    if ('shiftKey' in evt) out.shiftKey = !!evt.shiftKey;
+    if ('ctrlKey'  in evt) out.ctrlKey  = !!evt.ctrlKey;
+    if ('altKey'   in evt) out.altKey   = !!evt.altKey;
+    if ('metaKey'  in evt) out.metaKey  = !!evt.metaKey;
+    if ('repeat'   in evt) out.repeat   = !!evt.repeat;
+    // preventDefault / stopPropagation are fire-and-forget from the worker
+    // side (we eagerly call them on the main-thread event just in case).
+    // touches arrays are serialised shallow — most user code reads the
+    // first touch's clientX/Y which is the same as the top-level fields
+    // except on real multi-touch, but the port.js shims use the flat
+    // fields already.
+    if (evt.target && typeof storeHostRef === 'function') {
+      out.target = storeHostRef(evt.target);
+    }
+    if (evt.currentTarget && typeof storeHostRef === 'function') {
+      out.currentTarget = storeHostRef(evt.currentTarget);
+    }
+    // preventDefault / stopPropagation stubs are re-attached on the
+    // worker side (structured-clone postMessage cannot clone functions),
+    // see parparvm_runtime.js `worker-callback` message handling.
+    return out;
+  }
+
+  // Main-thread proxy for a worker-side callback. When the browser fires
+  // a DOM event, we postMessage { type: 'worker-callback', callbackId,
+  // args: [<serialised event>] } back to the worker, which runs the
+  // function that originally produced this ID. We preventDefault/stop
+  // propagation side effects happen on the main-thread event before the
+  // message round-trip, because the worker may not reply synchronously
+  // and a deferred preventDefault would miss the browser's dispatch
+  // window. Apps that depend on conditional preventDefault need to set
+  // it from the native host-bridge path instead.
+  function makeWorkerCallback(callbackId) {
+    if (workerCallbackProxies[callbackId]) {
+      return workerCallbackProxies[callbackId];
+    }
+    var fn = function(event) {
+      var target = global.__parparWorker;
+      if (!target || typeof target.postMessage !== 'function') {
+        return;
+      }
+      var payload;
+      try {
+        payload = serializeEventForWorker(event);
+      } catch (err) {
+        payload = null;
+      }
+      try {
+        target.postMessage({
+          type: 'worker-callback',
+          callbackId: callbackId,
+          args: [payload]
+        });
+      } catch (err) {
+        diag('FIRST_FAILURE', 'category', 'worker_callback_post_failed');
+        diag('FIRST_FAILURE', 'message', err && err.message ? err.message : String(err));
+      }
+    };
+    fn.__cn1WorkerCallbackId = callbackId;
+    workerCallbackProxies[callbackId] = fn;
+    return fn;
+  }
+
   function mapHostArgs(args) {
     var out = [];
     var list = args || [];
     for (var i = 0; i < list.length; i++) {
-      out.push(resolveHostRef(list[i]));
+      var arg = list[i];
+      if (arg && typeof arg === 'object' && typeof arg.__cn1WorkerCallback === 'number') {
+        out.push(makeWorkerCallback(arg.__cn1WorkerCallback));
+      } else {
+        out.push(resolveHostRef(arg));
+      }
     }
     return out;
   }

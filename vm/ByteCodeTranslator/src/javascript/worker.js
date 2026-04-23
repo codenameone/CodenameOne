@@ -22,7 +22,12 @@ self.onmessage = function(event) {
           || event.data.type === protocol.UI_EVENT
           || event.data.type === protocol.EVENT
           || event.data.type === protocol.HOST_CALLBACK
-          || event.data.type === protocol.TIMER_WAKE) {
+          || event.data.type === protocol.TIMER_WAKE
+          || event.data.type === 'worker-callback') {
+    // worker-callback: DOM event fired on the main thread, now forwarded
+    // back to a worker-side JS function registered via the function->
+    // callback-id token dance in toHostTransferArg / browser_bridge.js
+    // mapHostArgs. See jvm.workerCallbacks for the registry shape.
     jvm.handleMessage(event.data);
   }
 };

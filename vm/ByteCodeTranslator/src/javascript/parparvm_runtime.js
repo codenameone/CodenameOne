@@ -305,6 +305,17 @@ const jvm = {
   nextIdentity: 1,
   nextThreadId: 1,
   nextHostCallId: 1,
+  // Registry of worker-side JS functions that can be invoked from the main
+  // thread via an event-dispatch postMessage. ``toHostTransferArg`` mints
+  // an ID for any function argument (e.g. the wrapped EventListener
+  // created by port.js's nativeArgConverter) and hands the main thread
+  // back a ``{ __cn1WorkerCallback: id }`` token instead of null. When the
+  // real DOM event fires on the main thread, browser_bridge.js looks up
+  // the token, wraps it in a real JS function that postMessages a
+  // ``worker-callback`` message carrying the serialised event, and the
+  // worker invokes the stored function with the synthesised event proxy.
+  nextWorkerCallbackId: 1,
+  workerCallbacks: Object.create(null),
   currentThread: null,
   runnable: [],
   threads: [],
@@ -726,7 +737,16 @@ const jvm = {
         const transferableArgs = new Array(nativeArgs.length);
         for (let i = 0; i < nativeArgs.length; i++) {
           const arg = nativeArgs[i];
-          transferableArgs[i] = (typeof arg === "function") ? null : arg;
+          // Route function arguments through the same callback-token path
+          // ``toHostTransferArg`` uses so host-bridge method calls (e.g.
+          // ``element.addEventListener(name, listener, capture)``) can
+          // actually forward the listener to the main thread instead of
+          // silently losing it to null. The main-thread bridge's
+          // ``mapHostArgs`` sees the token and materialises a real JS
+          // function that posts ``worker-callback`` messages back.
+          transferableArgs[i] = (typeof arg === "function")
+              ? self.toHostTransferArg(arg)
+              : arg;
         }
         const hostResult = yield self.invokeHostNative("__cn1_jso_bridge__", [{
           receiver: receiver,
@@ -1126,7 +1146,14 @@ const jvm = {
       return value;
     }
     if (type === "function") {
-      return null;
+      // Mint a stable ID for this worker-side function and hand the main
+      // thread a token it can resolve back to a real callback at event
+      // fire time. See jvm.workerCallbacks doc above.
+      if (value.__cn1WorkerCallbackId == null) {
+        value.__cn1WorkerCallbackId = this.nextWorkerCallbackId++;
+        this.workerCallbacks[value.__cn1WorkerCallbackId] = value;
+      }
+      return { __cn1WorkerCallback: value.__cn1WorkerCallbackId };
     }
     if (Array.isArray(value)) {
       const out = new Array(value.length);
@@ -1485,6 +1512,39 @@ const jvm = {
     if (message.type === this.protocol.messages.EVENT || message.type === this.protocol.messages.UI_EVENT) {
       this.lastEvent = message;
       this.eventQueue.push(message);
+      return true;
+    }
+    if (message.type === "worker-callback") {
+      // DOM events dispatched from the main thread back into the worker.
+      // Look the registered function up by ID and invoke it with whatever
+      // payload the bridge serialised (mouse/key events carry a synthetic
+      // event object with the fields ``port.js`` cares about). We route
+      // exceptions through ``jvm.fail`` so unhandled callback errors
+      // surface via the same path as other runtime failures.
+      const cb = this.workerCallbacks[message.callbackId | 0];
+      if (cb) {
+        // Re-attach the no-op preventDefault / stopPropagation stubs that
+        // browser_bridge.js stripped before postMessage (structured clone
+        // can't carry functions). These are effectively no-ops once we're
+        // inside the worker because the main-thread event has long since
+        // been dispatched, but Java EventListener code commonly calls
+        // them and would otherwise trigger a "Missing JS member" throw
+        // in the JSO bridge.
+        const rawArgs = Array.isArray(message.args) ? message.args : [message.args];
+        for (let i = 0; i < rawArgs.length; i++) {
+          const arg = rawArgs[i];
+          if (arg && typeof arg === "object" && typeof arg.type === "string" && !arg.preventDefault) {
+            arg.preventDefault = function() {};
+            arg.stopPropagation = function() {};
+            arg.stopImmediatePropagation = function() {};
+          }
+        }
+        try {
+          cb.apply(null, rawArgs);
+        } catch (err) {
+          this.fail(err);
+        }
+      }
       return true;
     }
     return false;
