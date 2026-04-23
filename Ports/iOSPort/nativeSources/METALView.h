@@ -22,30 +22,35 @@
  */
 #ifdef CN1_USE_METAL
 #import <UIKit/UIKit.h>
+#import <QuartzCore/CAMetalLayer.h>
 
 @import Metal;
+@import simd;
 #import "GLUIImage.h"
+#import "CN1RenderingView.h"
 
 
-// This class wraps the CAEAGLLayer from CoreAnimation into a convenient UIView subclass.
-// The view content is basically an EAGL surface you render your OpenGL scene into.
-// Note that setting the view non-opaque will only work if the EAGL surface has an alpha channel.
-@interface METALView : UIView<UITextViewDelegate, UITextFieldDelegate> {
+// Metal-backed rendering view. Wraps a CAMetalLayer into a UIView subclass.
+// Gated by CN1_USE_METAL; the OpenGL ES 2 backend (EAGLView) is the default.
+@interface METALView : UIView<UITextViewDelegate, UITextFieldDelegate, CN1RenderingView> {
 @private
-    // The pixel dimensions of the CAEAGLLayer.
+    // The pixel dimensions of the CAMetalLayer's drawable.
     int framebufferWidth;
     int framebufferHeight;
-    
-    // The OpenGL ES names for the framebuffer and renderbuffer used to render to this view.
-    GLuint defaultFramebuffer, colorRenderbuffer;
-    
+
+    // Orthographic projection matrix sized to (framebufferWidth, framebufferHeight).
+    // Rebuilt by updateFrameBufferSize:h: and uploaded to shaders as a uniform.
+    simd_float4x4 projectionMatrix;
 }
-@property (nonatomic, retain) MTLCommandQueue* commandQueue;
-@property (nonatomic, retain) MTLCommandBuffer* commandBuffer;
+@property (nonatomic, retain) id<MTLCommandQueue> commandQueue;
+@property (nonatomic, retain) id<MTLCommandBuffer> commandBuffer;
 @property (nonatomic, retain) MTLRenderPassDescriptor* renderPassDescriptor;
-@property (nonatomic, retain) MTLRenderCommandEncoder* renderCommandEncoder;
-@property (nonatomic, retain) MTLDrawable* drawable;
+@property (nonatomic, retain) id<MTLRenderCommandEncoder> renderCommandEncoder;
+@property (nonatomic, retain) id<CAMetalDrawable> drawable;
 @property (nonatomic, retain) UIView* peerComponentsLayer;
+@property (nonatomic, readonly) int framebufferWidth;
+@property (nonatomic, readonly) int framebufferHeight;
+@property (nonatomic, readonly) simd_float4x4 projectionMatrix;
 
 -(void)textViewDidChange:(UITextView *)textView;
 -(void)deleteFramebuffer;
@@ -56,6 +61,5 @@
 -(void) keyboardDoneClicked;
 -(void) keyboardNextClicked;
 -(void) addPeerComponent:(UIView*) view;
--(void) removePeerComponent:(UIView*) view;
 @end
 #endif

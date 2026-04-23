@@ -24,6 +24,9 @@
 #import <QuartzCore/QuartzCore.h>
 #import "CodenameOne_GLViewController.h"
 #import "EAGLView.h"
+#ifdef CN1_USE_METAL
+#import "METALView.h"
+#endif
 #import "ExecutableOp.h"
 #import "FillRect.h"
 #import "ClipRect.h"
@@ -2161,13 +2164,25 @@ EAGLView* lastFoundEaglView;
  * we need to obtain the EAGLView.
  */
 -(EAGLView*) eaglView {
-    if ([self.view class] == [EAGLView class]) {
+    // Under CN1_USE_METAL the rendering view is a METALView, not an EAGLView.
+    // Both classes conform to CN1RenderingView, so the return value is used
+    // through the shared protocol surface (setFramebuffer, presentFramebuffer,
+    // updateFrameBufferSize:h:, addPeerComponent:, peerComponentsLayer).
+    // The declared return type stays EAGLView* for ABI stability; the cast is
+    // duck-typed. Any EAGLView-only call site (e.g. -setContext:) is guarded
+    // by #ifndef CN1_USE_METAL.
+#ifdef CN1_USE_METAL
+    Class renderingClass = [METALView class];
+#else
+    Class renderingClass = [EAGLView class];
+#endif
+    if ([self.view class] == renderingClass) {
         lastFoundEaglView = (EAGLView*)self.view;
         return (EAGLView*)self.view;
     }
     for (UIView* child in self.view.subviews) {
-        
-        if ([child class] == [EAGLView class]) {
+
+        if ([child class] == renderingClass) {
             lastFoundEaglView = (EAGLView*)child;
             return (EAGLView*)child;
         }
@@ -2226,7 +2241,10 @@ EAGLView* lastFoundEaglView;
     [aContext release];
 #endif
 	
+#ifndef CN1_USE_METAL
+    // METALView has no GL context. Under CN1_USE_METAL this call is a no-op.
     [[self eaglView] setContext:context];
+#endif
     [[self eaglView] setFramebuffer];
     //self.view.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     //self.view.autoresizesSubviews = YES;

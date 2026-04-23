@@ -22,6 +22,8 @@
  */
 #ifdef CN1_USE_METAL
 #import <QuartzCore/QuartzCore.h>
+@import Metal;
+@import simd;
 
 #import "METALView.h"
 #import "ExecutableOp.h"
@@ -37,18 +39,31 @@ extern UIView *editingComponent;
 extern BOOL isVKBAlwaysOpen();
 extern void repaintUI();
 
-@interface METALView (PrivateMethods)
-- (void)createFramebuffer;
-- (void)deleteFramebuffer;
-@end
-
 @implementation METALView
 
 @synthesize commandQueue;
 @synthesize commandBuffer;
 @synthesize renderPassDescriptor;
 @synthesize renderCommandEncoder;
+@synthesize drawable;
 @synthesize peerComponentsLayer;
+@synthesize framebufferWidth;
+@synthesize framebufferHeight;
+@synthesize projectionMatrix;
+
+static simd_float4x4 CN1MetalOrtho(float left, float right, float bottom, float top, float near, float far) {
+    // Metal NDC: x,y in [-1,1], z in [0,1]. Column-major construction matching Apple's conventions.
+    float rl = 1.0f / (right - left);
+    float tb = 1.0f / (top - bottom);
+    float fn = 1.0f / (far - near);
+    simd_float4x4 m = (simd_float4x4){{
+        { 2.0f * rl,                 0.0f,                    0.0f,        0.0f },
+        { 0.0f,                      2.0f * tb,               0.0f,        0.0f },
+        { 0.0f,                      0.0f,                    -fn,         0.0f },
+        { -(right + left) * rl,      -(top + bottom) * tb,    -near * fn,  1.0f }
+    }};
+    return m;
+}
 
 // You must implement this method
 + (Class)layerClass
@@ -120,10 +135,13 @@ extern BOOL isRetinaBug();
         metalLayer.opaque = TRUE;
         metalLayer.pixelFormat = MTLPixelFormatBGRA8Unorm;
         metalLayer.framebufferOnly = YES;
-        self.commandQueue = [metalLayer.device makeCommandQueue];
-        
+        // `makeCommandQueue` is the Swift name; Objective-C uses `newCommandQueue`.
+        self.commandQueue = [metalLayer.device newCommandQueue];
+        CGSize sz = self.bounds.size;
+        CGFloat s = self.contentScaleFactor;
+        [self updateFrameBufferSize:(int)(sz.width * s) h:(int)(sz.height * s)];
     }
-    
+
     return self;
 }
 
@@ -145,53 +163,67 @@ extern BOOL isRetinaBug();
 
 
 -(void)updateFrameBufferSize:(int)w h:(int)h {
-    
+    if (w == framebufferWidth && h == framebufferHeight) {
+        return;
+    }
+    framebufferWidth = w;
+    framebufferHeight = h;
+    // Match iOS UIKit's Y-down convention: origin at top-left.
+    // Using (top=0, bottom=h) instead of the GL-conventional (top=h, bottom=0)
+    // means positive Y in input coordinates maps downward on screen, matching
+    // UIKit and avoiding the _glScalef(1,-1,1) + _glTranslatef(0,-h,0) hack
+    // that the GL path uses in CodenameOne_GLViewController.drawFrame.
+    projectionMatrix = CN1MetalOrtho(0.0f, (float)w, 0.0f, (float)h, -1.0f, 1.0f);
+    CAMetalLayer *layer = (CAMetalLayer*)self.layer;
+    layer.drawableSize = CGSizeMake(w, h);
 }
 
 -(void)createRenderPassDescriptor {
-    if (self.renderPassDescriptor != nil) {
+    CAMetalLayer *layer = (CAMetalLayer*)self.layer;
+    self.drawable = [layer nextDrawable];
+    if (self.drawable == nil) {
+        // Under memory pressure or rapid resize, nextDrawable may return nil.
+        // Dropping the frame is correct — never block waiting for a drawable.
+        self.renderPassDescriptor = nil;
         return;
     }
-    CAMetalLayer *layer = (CAMetalLayer*)self.layer;
     self.renderPassDescriptor = [MTLRenderPassDescriptor renderPassDescriptor];
-    self.drawable = [layer nextDrawable];
-    MTLRenderPipelineColorAttachmentDescriptor* colorAttachment = self.renderPassDescriptor.colorAttachments[0];
+    MTLRenderPassColorAttachmentDescriptor* colorAttachment = self.renderPassDescriptor.colorAttachments[0];
     colorAttachment.texture = self.drawable.texture;
     colorAttachment.loadAction = MTLLoadActionClear;
-    colorAttachment.isBlendingEnabled = YES;
-    colorAttachment.sourceRGBBlendFactor = MTLBlendFactorOne;
-    colorAttachment.destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
-    colorAttachment.sourceAlphaBlendFactor = MTLBlendFactorOne;
-    colorAttachment.destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+    colorAttachment.storeAction = MTLStoreActionStore;
+    colorAttachment.clearColor = MTLClearColorMake(0.0, 0.0, 0.0, 1.0);
 }
 
 - (void)setFramebuffer
 {
-    
     CAMetalLayer *layer = (CAMetalLayer*)self.layer;
-    self.commandBuffer = [self.commandQueue makeCommandBuffer];
+    self.commandBuffer = [self.commandQueue commandBuffer];
     [self createRenderPassDescriptor];
-    self.renderCommandEncoder = [self.commandBuffer makeRenderCommandEncoderWithDescriptor:self.renderPassDescriptor];
+    if (self.renderPassDescriptor == nil) {
+        // nextDrawable returned nil; skip this frame.
+        self.renderCommandEncoder = nil;
+        return;
+    }
+    self.renderCommandEncoder = [self.commandBuffer renderCommandEncoderWithDescriptor:self.renderPassDescriptor];
     [self.renderCommandEncoder setViewport: (MTLViewport){ 0.0, 0.0, layer.drawableSize.width, layer.drawableSize.height, 0.0, 1.0 }];
-    
-    _glMatrixMode(GL_PROJECTION);
-    _glLoadIdentity();
-    _glOrthof(0, framebufferWidth, 0, framebufferHeight, -1, 1);
-    _glMatrixMode(GL_MODELVIEW);
-    _glLoadIdentity();
 }
 
 - (BOOL)presentFramebuffer
 {
-    BOOL success = FALSE;
-    
-    if (self.renderCommandEncoder) {
-        [self.renderCommandEncoder ]
-        [self.commandBuffer present:self.drawable];
-        [self.commandBuffer commit];
+    if (self.renderCommandEncoder == nil) {
+        // Dropped frame (no drawable was acquired in setFramebuffer).
+        self.commandBuffer = nil;
+        return NO;
     }
-    
-    return success;
+    [self.renderCommandEncoder endEncoding];
+    [self.commandBuffer presentDrawable:self.drawable];
+    [self.commandBuffer commit];
+    self.renderCommandEncoder = nil;
+    self.renderPassDescriptor = nil;
+    self.drawable = nil;
+    self.commandBuffer = nil;
+    return YES;
 }
 
 /**
