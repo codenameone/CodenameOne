@@ -1,6 +1,7 @@
 package com.codenameone.examples.hellocodenameone.tests;
 
 import com.codename1.components.SpanLabel;
+import com.codename1.io.Log;
 import com.codename1.io.Util;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
@@ -183,33 +184,55 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
         }
         String resourceName = pickModernThemeResource();
         if (resourceName == null) {
-            System.out.println("CN1SS:INFO:DualAppearance no modern theme resource for platform="
+            logDiag("CN1SS:INFO:DualAppearance no modern theme resource for platform="
                     + Display.getInstance().getPlatformName());
             return;
         }
-        // On Android the .res ships as an asset, not a Java classpath
-        // resource - Class.getResourceAsStream returns null. Route
-        // through Display.getResourceAsStream which delegates to the
-        // native impl and on Android reads getContext().getAssets().
-        InputStream in = Display.getInstance().getResourceAsStream(getClass(), resourceName);
+        // Try the CN1 resource path first (Display.getResourceAsStream goes
+        // through each port's impl - Android via getAssets(), iOS via
+        // nativeInstance.getResourceSize/NSFileInputStream), then fall back
+        // to Class.getResourceAsStream for platforms where the .res sits on
+        // the Java classpath (JavaSE / JavaScript).
+        InputStream in = openModernResource(resourceName);
         if (in == null) {
-            // Modern theme isn't packaged on this platform - stay on the
-            // legacy default rather than crashing the test.
-            System.out.println("CN1SS:WARN:DualAppearance modern theme resource missing: " + resourceName
-                    + " test=" + baseName());
+            logDiag("CN1SS:WARN:DualAppearance modern theme resource missing: " + resourceName
+                    + " test=" + baseName() + " platform=" + Display.getInstance().getPlatformName());
             return;
         }
         try {
             Resources r = Resources.open(in);
-            UIManager.getInstance().setThemeProps(r.getTheme(r.getThemeResourceNames()[0]));
-            System.out.println("CN1SS:INFO:DualAppearance installed modern theme " + resourceName
-                    + " test=" + baseName());
+            String[] names = r.getThemeResourceNames();
+            if (names == null || names.length == 0) {
+                logDiag("CN1SS:ERR:DualAppearance modern theme has no themes resource=" + resourceName
+                        + " test=" + baseName());
+                return;
+            }
+            UIManager.getInstance().setThemeProps(r.getTheme(names[0]));
+            logDiag("CN1SS:INFO:DualAppearance installed modern theme " + resourceName
+                    + " themeName=" + names[0] + " test=" + baseName());
         } catch (IOException ex) {
-            System.out.println("CN1SS:ERR:DualAppearance modern theme load failed: " + ex
+            logDiag("CN1SS:ERR:DualAppearance modern theme load failed: " + ex
                     + " resource=" + resourceName + " test=" + baseName());
         } finally {
             Util.cleanup(in);
         }
+    }
+
+    private InputStream openModernResource(String resourceName) {
+        InputStream in = Display.getInstance().getResourceAsStream(getClass(), resourceName);
+        if (in != null) {
+            return in;
+        }
+        return DualAppearanceBaseTest.class.getResourceAsStream(resourceName);
+    }
+
+    // Route diagnostic messages through com.codename1.io.Log as well as
+    // System.out. On iOS, `simctl log stream` sheds `stdout` lines when the
+    // CN1SS base64 PNG burst saturates unified logging; Log.p ends up in
+    // device-runner.log's fallback persistence path and survives the drop.
+    private static void logDiag(String message) {
+        System.out.println(message);
+        Log.p(message);
     }
 
     private String pickModernThemeResource() {
