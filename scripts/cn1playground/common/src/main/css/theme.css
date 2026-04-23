@@ -772,12 +772,394 @@ PlaygroundEmbeddedTitleAreaDark {
 
 PlaygroundInspectorRoot {
     background: #FFFFFF;
-    padding: 1mm;
+    padding: 0 4mm 4mm 4mm;
 }
 
 PlaygroundInspectorRootDark {
-    background: #102B66;
-    padding: 1mm;
+    background: #0A1D3A;
+    padding: 0 4mm 4mm 4mm;
+}
+
+/* ----- Tree rows (per inspector spec: 7mm tall, depth-indented) ----- */
+
+PlaygroundTreeRow {
+    background: transparent;
+    padding: 0;
+    margin: 0;
+    border: none;
+}
+
+PlaygroundTreeRowDark {
+    background: transparent;
+    padding: 0;
+    margin: 0;
+    border: none;
+}
+
+PlaygroundTreeRowActive {
+    background: #E6EDFF;
+    padding: 0;
+    margin: 0;
+    border: none;
+}
+
+PlaygroundTreeRowActiveDark {
+    background: #1F4C8F;
+    padding: 0;
+    margin: 0;
+    border: none;
+}
+
+PlaygroundTreeChevron {
+    background: transparent;
+    color: #7F8AA3;
+    border: none;
+    padding: 0;
+    margin: 0 1mm 0 0;
+    text-decoration: none;
+}
+
+PlaygroundTreeChevronDark {
+    background: transparent;
+    color: #A8B5CC;
+    border: none;
+    padding: 0;
+    margin: 0 1mm 0 0;
+    text-decoration: none;
+}
+
+PlaygroundTreeTypeIcon {
+    background: transparent;
+    color: #7F8AA3;
+    padding: 0;
+    margin: 0 1.5mm 0 0;
+    border: none;
+}
+
+PlaygroundTreeTypeIconDark {
+    background: transparent;
+    color: #A8B5CC;
+    padding: 0;
+    margin: 0 1.5mm 0 0;
+    border: none;
+}
+
+PlaygroundTreeType {
+    background: transparent;
+    color: #112247;
+    font-family: "native:MainBold";
+    font-size: 3.3mm;
+    padding: 0;
+    margin: 0;
+    text-decoration: none;
+}
+
+PlaygroundTreeTypeDark {
+    background: transparent;
+    color: #F5F8FF;
+    font-family: "native:MainBold";
+    font-size: 3.3mm;
+    padding: 0;
+    margin: 0;
+    text-decoration: none;
+}
+
+PlaygroundTreeTypeActive {
+    background: transparent;
+    color: #2F6BFF;
+    font-family: "native:MainBold";
+    font-size: 3.3mm;
+    padding: 0;
+    margin: 0;
+    text-decoration: none;
+}
+
+PlaygroundTreeTypeActiveDark {
+    background: transparent;
+    color: #6AA6FF;
+    font-family: "native:MainBold";
+    font-size: 3.3mm;
+    padding: 0;
+    margin: 0;
+    text-decoration: none;
+}
+
+PlaygroundTreeBracket {
+    background: transparent;
+    color: #7F8AA3;
+    font-family: "native:MainLight";
+    font-size: 3.3mm;
+    padding: 0;
+    margin: 0 0 0 1mm;
+    text-decoration: none;
+}
+
+PlaygroundTreeBracketDark {
+    background: transparent;
+    color: #A8B5CC;
+    font-family: "native:MainLight";
+    font-size: 3.3mm;
+    padding: 0;
+    margin: 0 0 0 1mm;
+    text-decoration: none;
+}
+
+PlaygroundTreeBracketActive {
+    background: transparent;
+    color: #112247;
+    font-family: "native:MainLight";
+    font-size: 3.3mm;
+    padding: 0;
+    margin: 0 0 0 1mm;
+    text-decoration: none;
+}
+
+PlaygroundTreeBracketActiveDark {
+    background: transparent;
+    color: #FFFFFF;
+    font-family: "native:MainLight";
+    font-size: 3.3mm;
+    padding: 0;
+    margin: 0 0 0 1mm;
+    text-decoration: none;
+}
+
+/* ----- Section headers between field groups ----- */
+
+PlaygroundInspectorSection {
+    background: transparent;
+    color: #7F8AA3;
+    font-family: "native:MainRegular";
+    font-size: 2.6mm;
+    padding: 3mm 0 2mm 0;
+    margin: 0;
+    text-decoration: none;
+}
+
+PlaygroundInspectorSectionDark {
+    background: transparent;
+    color: #6B7FA3;
+    font-family: "native:MainRegular";
+    font-size: 2.6mm;
+    padding: 3mm 0 2mm 0;
+    margin: 0;
+    text-decoration: none;
+}
+
+PlaygroundInspectorDivider {
+    background: #E6EAF2;
+    padding: 0;
+    margin: 0;
+    border: none;
+}
+
+PlaygroundInspectorDividerDark {
+    background: #1F3A5F;
+    padding: 0;
+    margin: 0;
+    border: none;
+}
+
+/* ----- Single-column form rows ----- */
+
+PlaygroundFieldRow {
+    background: transparent;
+    padding: 0;
+    margin: 1mm 0 1mm 0;
+    border: none;
+}
+
+PlaygroundFieldRowDark {
+    background: transparent;
+    padding: 0;
+    margin: 1mm 0 1mm 0;
+    border: none;
+}
+
+PlaygroundFieldLabel {
+    background: transparent;
+    color: #7F8AA3;
+    font-family: "native:MainRegular";
+    font-size: 3mm;
+    padding: 0 2mm 0 0;
+    margin: 0;
+    text-decoration: none;
+}
+
+PlaygroundFieldLabelDark {
+    background: transparent;
+    color: #A8B5CC;
+    font-family: "native:MainRegular";
+    font-size: 3mm;
+    padding: 0 2mm 0 0;
+    margin: 0;
+    text-decoration: none;
+}
+
+PlaygroundFieldInput {
+    background: #FFFFFF;
+    color: #112247;
+    border: 1px solid #D9DEE8;
+    border-radius: 1.5mm;
+    font-family: "native:MainRegular";
+    font-size: 3mm;
+    padding: 1.5mm 2.5mm 1.5mm 2.5mm;
+    margin: 0;
+    text-decoration: none;
+}
+
+PlaygroundFieldInputDark {
+    background: #0F2A4D;
+    color: #FFFFFF;
+    border: 1px solid #1F3A5F;
+    border-radius: 1.5mm;
+    font-family: "native:MainRegular";
+    font-size: 3mm;
+    padding: 1.5mm 2.5mm 1.5mm 2.5mm;
+    margin: 0;
+    text-decoration: none;
+}
+
+PlaygroundFieldReadOnly {
+    background: transparent;
+    color: #112247;
+    border: none;
+    font-family: "native:MainRegular";
+    font-size: 3mm;
+    padding: 1.5mm 2.5mm 1.5mm 2.5mm;
+    margin: 0;
+    text-decoration: none;
+}
+
+PlaygroundFieldReadOnlyDark {
+    background: transparent;
+    color: #F5F8FF;
+    border: none;
+    font-family: "native:MainRegular";
+    font-size: 3mm;
+    padding: 1.5mm 2.5mm 1.5mm 2.5mm;
+    margin: 0;
+    text-decoration: none;
+}
+
+PlaygroundFieldMicro {
+    background: transparent;
+    color: #7F8AA3;
+    font-family: "native:MainRegular";
+    font-size: 2.2mm;
+    padding: 0;
+    margin: 0;
+    text-decoration: none;
+    text-align: center;
+}
+
+PlaygroundFieldMicroDark {
+    background: transparent;
+    color: #6B7FA3;
+    font-family: "native:MainRegular";
+    font-size: 2.2mm;
+    padding: 0;
+    margin: 0;
+    text-decoration: none;
+    text-align: center;
+}
+
+PlaygroundInspectorSwatch {
+    background: #FFFFFF;
+    border: 1px solid #D9DEE8;
+    border-radius: 1.5mm;
+    margin: 0 0 0 2mm;
+    padding: 0;
+}
+
+PlaygroundInspectorSwatchDark {
+    background: #FFFFFF;
+    border: 1px solid #1F3A5F;
+    border-radius: 1.5mm;
+    margin: 0 0 0 2mm;
+    padding: 0;
+}
+
+/* ----- Unit segmented controls inside the inspector ----- */
+
+PlaygroundInspectorSegment {
+    background: #F0F2F7;
+    border: 1px solid #D9DEE8;
+    border-radius: 1.5mm;
+    padding: 0.5mm;
+    margin: 0;
+}
+
+PlaygroundInspectorSegmentDark {
+    background: #0F2A4D;
+    border: 1px solid #1F3A5F;
+    border-radius: 1.5mm;
+    padding: 0.5mm;
+    margin: 0;
+}
+
+PlaygroundInspectorSegmentActive {
+    background: #FFFFFF;
+    color: #112247;
+    border: none;
+    border-radius: 1.2mm;
+    font-family: "native:MainBold";
+    font-size: 2.8mm;
+    padding: 1mm 2.5mm 1mm 2.5mm;
+    margin: 0;
+    text-decoration: none;
+}
+
+PlaygroundInspectorSegmentActiveDark {
+    background: #1F4C8F;
+    color: #FFFFFF;
+    border: none;
+    border-radius: 1.2mm;
+    font-family: "native:MainBold";
+    font-size: 2.8mm;
+    padding: 1mm 2.5mm 1mm 2.5mm;
+    margin: 0;
+    text-decoration: none;
+}
+
+PlaygroundInspectorSegmentInactive {
+    background: transparent;
+    color: #7F8AA3;
+    border: none;
+    font-family: "native:MainRegular";
+    font-size: 2.8mm;
+    padding: 1mm 2.5mm 1mm 2.5mm;
+    margin: 0;
+    text-decoration: none;
+}
+
+PlaygroundInspectorSegmentInactiveDark {
+    background: transparent;
+    color: #A8B5CC;
+    border: none;
+    font-family: "native:MainRegular";
+    font-size: 2.8mm;
+    padding: 1mm 2.5mm 1mm 2.5mm;
+    margin: 0;
+    text-decoration: none;
+}
+
+PlaygroundInspectorCheckbox {
+    background: #FFFFFF;
+    color: #2F6BFF;
+    border: 1px solid #D9DEE8;
+    border-radius: 1.5mm;
+    padding: 0.5mm;
+    margin: 0;
+}
+
+PlaygroundInspectorCheckboxDark {
+    background: #0F2A4D;
+    color: #3B82F6;
+    border: 1px solid #1F3A5F;
+    border-radius: 1.5mm;
+    padding: 0.5mm;
+    margin: 0;
 }
 
 PlaygroundInspectorTree {

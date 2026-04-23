@@ -158,19 +158,23 @@ final class PlaygroundTopBar extends Container {
     /// background against the navy top bar. Render a white Material icon on a
     /// translucent rounded pill instead; in light mode keep the bundled image.
     private static void applyAppIconStyle(Label label, boolean dark) {
+        // `setMaterialIcon` rasterises the glyph using the label's CURRENT style
+        // foreground color, so the UIID must be applied BEFORE the icon is set -
+        // otherwise the icon bakes with the default (black) color and looks like
+        // a solid blob once a white-on-translucent UIID gets applied afterwards.
+        label.setIcon(null);
         if (dark) {
-            label.setIcon(null);
-            FontImage.setMaterialIcon(label, FontImage.MATERIAL_WIDGETS, 5.5f);
             label.setUIID("PlaygroundAppIconDark");
+            FontImage.setMaterialIcon(label, FontImage.MATERIAL_CODE, 4.5f);
         } else {
+            label.setUIID("PlaygroundAppIcon");
             Image icon = loadAppIcon();
             if (icon != null) {
                 int px = Display.getInstance().convertToPixels(6.5f);
                 label.setIcon(icon.scaled(px, px));
             } else {
-                FontImage.setMaterialIcon(label, FontImage.MATERIAL_WIDGETS, 5.5f);
+                FontImage.setMaterialIcon(label, FontImage.MATERIAL_CODE, 4.5f);
             }
-            label.setUIID("PlaygroundAppIcon");
         }
     }
 

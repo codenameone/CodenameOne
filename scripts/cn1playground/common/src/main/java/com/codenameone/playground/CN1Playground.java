@@ -344,9 +344,9 @@ public class CN1Playground extends Lifecycle {
         }
 
         // Hint the preview with a minimum width equal to the iPhone skin in portrait
-        // (72 mm body + ~10 mm breathing room) so the SplitPane / BorderLayout won't
-        // collapse the skin even if the user drags the divider all the way right.
-        previewContainer.setPreferredW(Display.getInstance().convertToPixels(82f));
+        // (72 mm body + ~20 mm breathing room so the bezel + corner mask don't get
+        // squeezed flush against the surrounding chrome).
+        previewContainer.setPreferredW(Display.getInstance().convertToPixels(92f));
 
         // SplitPane only between editor and preview. Samples/History and Inspector
         // are siblings OUTSIDE the split so opening them doesn't squash the skin.
@@ -1220,6 +1220,26 @@ public class CN1Playground extends Lifecycle {
             case "PlaygroundPropSmall":
             case "PlaygroundPropUnit":
             case "PlaygroundPropEmpty":
+            case "PlaygroundTreeRow":
+            case "PlaygroundTreeRowActive":
+            case "PlaygroundTreeChevron":
+            case "PlaygroundTreeTypeIcon":
+            case "PlaygroundTreeType":
+            case "PlaygroundTreeTypeActive":
+            case "PlaygroundTreeBracket":
+            case "PlaygroundTreeBracketActive":
+            case "PlaygroundInspectorSection":
+            case "PlaygroundInspectorDivider":
+            case "PlaygroundFieldRow":
+            case "PlaygroundFieldLabel":
+            case "PlaygroundFieldInput":
+            case "PlaygroundFieldReadOnly":
+            case "PlaygroundFieldMicro":
+            case "PlaygroundInspectorSwatch":
+            case "PlaygroundInspectorSegment":
+            case "PlaygroundInspectorSegmentActive":
+            case "PlaygroundInspectorSegmentInactive":
+            case "PlaygroundInspectorCheckbox":
             case "PlaygroundColorPreview":
             case "PlaygroundInspectorTreeNode":
                 return true;
