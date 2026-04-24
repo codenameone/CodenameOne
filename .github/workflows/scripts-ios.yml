@@ -243,9 +243,22 @@ jobs:
 
       - name: Install Metal Toolchain
         # Xcode 26+ requires the Metal Toolchain component to be downloaded
-        # explicitly before .metal files can compile. No-op if the component
-        # is already installed on the runner image.
-        run: xcodebuild -downloadComponent MetalToolchain
+        # explicitly before .metal files can compile. The runner's default
+        # xcodebuild is often an older Xcode whose -downloadComponent flag
+        # doesn't exist, so we point DEVELOPER_DIR at Xcode 26 first (same
+        # selection logic build-ios-app.sh uses). If the component is
+        # already cached on the runner image, xcodebuild exits quickly
+        # without re-downloading.
+        run: |
+          set -euo pipefail
+          XCODE_APP="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n 1 || true)"
+          if [ ! -x "$XCODE_APP/Contents/Developer/usr/bin/xcodebuild" ]; then
+            echo "Xcode 26 not found under /Applications. Cannot install Metal Toolchain." >&2
+            exit 1
+          fi
+          echo "Using $XCODE_APP"
+          export DEVELOPER_DIR="$XCODE_APP/Contents/Developer"
+          "$DEVELOPER_DIR/usr/bin/xcodebuild" -downloadComponent MetalToolchain
         timeout-minutes: 10
 
       - name: Enable Metal backend for hellocodenameone
