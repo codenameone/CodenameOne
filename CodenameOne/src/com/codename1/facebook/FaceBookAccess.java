@@ -51,14 +51,21 @@ import java.util.Vector;
 /// This class encapsulates the Network access and provide simple methods to acess the Facebook servers.
 ///
 /// @author Chen Fishbein
+///
+/// @deprecated This legacy OAuth2/Graph REST wrapper predates Facebook's current policies and
+/// embeds credentials client-side, which Facebook no longer permits for production use. Use
+/// [com.codename1.social.FacebookConnect] (native SDK path) for login, and a server-side
+/// component for any Graph API access that requires a client secret. This class will be removed
+/// in a future release.
+@Deprecated
 public final class FaceBookAccess {
 
     private static final String TEMP_STORAGE = "FaceBookAccesstmp";
     private static final FaceBookAccess instance = new FaceBookAccess();
-    private static String clientId = "132970916828080";
-    private static String redirectURI = "https://www.codenameone.com/";
-    private static String clientSecret = "6aaf4c8ea791f08ea15735eb647becfe";
-    private static String[] permissions = new String[]{"public_profile", "email", "user_friends"};
+    private static String clientId = "";
+    private static String redirectURI = "";
+    private static String clientSecret = "";
+    private static String[] permissions = new String[0];
     private static String token;
     private static String apiVersion = "v2.0";
     private final Vector responseCodeListeners = new Vector();

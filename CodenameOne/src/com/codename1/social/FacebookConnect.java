@@ -40,6 +40,7 @@ import java.util.Arrays;
 /// app id.
 ///
 /// @author Shai Almog
+@SuppressWarnings("deprecation")
 public class FacebookConnect extends Login {
 
     private static final Object INSTANCE_LOCK = new Object();

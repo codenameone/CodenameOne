@@ -41,6 +41,7 @@ import java.util.Vector;
 /// Invokes the Facebook REST API documented here http://developers.facebook.com/docs/guides/mobile/
 ///
 /// @author Shai Almog
+@SuppressWarnings("deprecation")
 class FacebookRESTService extends ConnectionRequest implements JSONParseCallback {
 
     // PMD Fix (UnusedPrivateField): Removed redundant token storage; the access token is forwarded directly via request arguments.
