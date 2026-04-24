@@ -50,7 +50,16 @@ public final class GenerateCN1AccessRegistry {
     private static final Map<String, Boolean> RUNTIME_PUBLIC_TYPE_CACHE = new HashMap<String, Boolean>();
     private static final Set<String> INTERNAL_CN1_TYPES = new HashSet<String>(Arrays.asList(
             "com.codename1.ui.Accessor",
-            "com.codename1.io.IOAccessor"
+            "com.codename1.io.IOAccessor",
+            // Simd's allocaByte/allocaInt/allocaFloat (+ the *Zeroed/*Filled
+            // variants) return method-local scratch arrays that the ParparVM
+            // lowering may place on the C stack. CN1's compliance check
+            // forbids letting such an array escape the method that allocated
+            // it, and the generated reflection bridge inherently does escape
+            // it by returning it from invokeN. Exclude the whole class from
+            // the bean-shell registry - Simd is a low-level SIMD primitives
+            // API that playground scripts are extremely unlikely to need.
+            "com.codename1.util.Simd"
     ));
 
     private static final String[] INDEX_PACKAGE_PREFIXES = new String[]{
