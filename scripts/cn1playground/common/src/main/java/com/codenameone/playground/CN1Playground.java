@@ -364,6 +364,11 @@ public class CN1Playground extends Lifecycle {
         previewColumn.setCompact(compact);
         previewColumn.setMobile(false);
 
+        // Mobile shell plants bottomNav at appForm.SOUTH. Clear it so the
+        // desktop shell doesn't end up with both an activity bar and a bottom
+        // nav stacked at the form's south edge.
+        detach(bottomNav);
+
         detach(activityBar);
         detach(leftSidePanelSlot);
         detach(rightSidePanelSlot);
@@ -444,9 +449,20 @@ public class CN1Playground extends Lifecycle {
         mobileLayout.getAllStyles().setBgTransparency(0);
         mobileLayout.add(BorderLayout.NORTH, stack);
         mobileLayout.add(BorderLayout.CENTER, tabContent);
-        mobileLayout.add(BorderLayout.SOUTH, bottomNav);
 
         bodyContainer.add(BorderLayout.CENTER, mobileLayout);
+
+        // Put bottomNav at the FORM's SOUTH slot (not inside bodyContainer) so
+        // the Form-level BorderLayout carves out its height BEFORE allocating
+        // bodyContainer. The editor's BrowserComponent is a DOM iframe peer
+        // which paints above the canvas; if bodyContainer extends into the nav
+        // region, the iframe covers the bottomNav (user reported "flickering in
+        // for a second below the HTML component" during resize). Making nav a
+        // Form-level sibling guarantees bodyContainer can never extend into
+        // it, so the iframe's bounds also can never extend into it.
+        detach(bottomNav);
+        appForm.add(BorderLayout.SOUTH, bottomNav);
+
         refreshMobileTabContent();
     }
 
