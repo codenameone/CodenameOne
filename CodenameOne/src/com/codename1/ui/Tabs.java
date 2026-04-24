@@ -156,6 +156,19 @@ public class Tabs extends Container {
         tabsContainer.setScrollVisible(false);
         tabsContainer.getStyle().setMargin(0, 0, 0, 0);
         if (tabP == -1) {
+            // Honor the tabPlacementInt theme constant when no explicit
+            // placement was requested. This used to live solely in
+            // initLaf, but initLaf runs polymorphically from the
+            // Component() super ctor (before the field assignment is
+            // visible here), so the theme-driven value was silently
+            // lost. Reading the constant directly at this point means
+            // the ctor's setTabPlacement call actually places
+            // tabsContainer where the theme asks (BOTTOM / LEFT / RIGHT
+            // instead of the default TOP).
+            int themePlacement = UIManager.getInstance().getThemeConstant("tabPlacementInt", -1);
+            if (themePlacement != -1) {
+                tabPlacement = themePlacement;
+            }
             setTabPlacement(tabPlacement);
         } else {
             setTabPlacement(tabP);
