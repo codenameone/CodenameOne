@@ -1013,8 +1013,23 @@ const jvm = {
     })();
   },
   parseJsoBridgeMethod(className, methodId) {
-    const prefix = "cn1_" + className + "_";
-    let remainder = methodId.indexOf(prefix) === 0 ? methodId.substring(prefix.length) : methodId;
+    // Two methodId shapes arrive here. Historical class-specific:
+    // ``cn1_<class>_<method>_<sig>_R_<ret>`` — strip the ``cn1_<class>_``
+    // prefix and parse what's left. Post-fa4247a42 sig-based dispatch
+    // id: ``cn1_s_<method>_<sig>_R_<ret>`` — strip the ``cn1_s_``
+    // prefix. Either way we want the ``method`` token (plus whether
+    // parameter tokens follow) so the get/is/set heuristics below can
+    // map ``getFoo()`` to a ``{kind:"getter", member:"foo"}`` bridge.
+    const classPrefix = "cn1_" + className + "_";
+    const dispatchPrefix = "cn1_s_";
+    let remainder;
+    if (methodId.indexOf(classPrefix) === 0) {
+      remainder = methodId.substring(classPrefix.length);
+    } else if (methodId.indexOf(dispatchPrefix) === 0) {
+      remainder = methodId.substring(dispatchPrefix.length);
+    } else {
+      remainder = methodId;
+    }
     let returnClass = null;
     const returnMarker = remainder.lastIndexOf("_R_");
     if (returnMarker >= 0) {
