@@ -3168,14 +3168,16 @@ public class IOSImplementation extends CodenameOneImplementation {
         
     }
     
-    public synchronized LocationManager getLocationManager() {
+    public LocationManager getLocationManager() {
         if (!nativeInstance.checkLocationUsage()) {
             throw new RuntimeException("Please add the ios.NSLocationUsageDescription or ios.NSLocationAlwaysUsageDescription build hint");
         }
-        if(lm == null) {
-            lm = new Loc();
+        synchronized (IOSImplementation.class) {
+            if (lm == null) {
+                lm = new Loc();
+            }
+            return lm;
         }
-        return lm;
     }
 
     /**

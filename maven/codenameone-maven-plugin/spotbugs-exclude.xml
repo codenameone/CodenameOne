@@ -172,10 +172,18 @@
     <!-- AbstractCN1Mojo constants are tunable via subclasses. -->
     <Match>
         <Class name="com.codename1.maven.AbstractCN1Mojo" />
-        <Or>
-            <Bug pattern="MS_SHOULD_BE_FINAL" />
-            <Bug pattern="SF_SWITCH_NO_DEFAULT" />
-        </Or>
+        <Bug pattern="MS_SHOULD_BE_FINAL" />
+    </Match>
+
+    <!--
+    StubGenerator emits source files at build time; its per-method String
+    concatenation runs once per native interface on the developer's machine
+    and the outputs are small. Rewriting the five generators to StringBuilder
+    would duplicate a lot of near-identical scaffolding for no measurable win.
+    -->
+    <Match>
+        <Class name="com.codename1.maven.StubGenerator" />
+        <Bug pattern="SBSC_USE_STRINGBUFFER_CONCATENATION" />
     </Match>
 
     <!-- InstallCn1libsMojo / OpenGuiBuilderMojo control-flow patterns. -->

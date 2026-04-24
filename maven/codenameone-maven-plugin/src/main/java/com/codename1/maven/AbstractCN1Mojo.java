@@ -281,6 +281,9 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
                             case Log.LEVEL_WARN:
                                 getLog().warn(output);
                                 break;
+                            default:
+                                getLog().info(output);
+                                break;
                         }
                    }
 
@@ -310,8 +313,11 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
                     case Log.LEVEL_WARN:
                         getLog().warn(output);
                         break;
+                    default:
+                        getLog().info(output);
+                        break;
                 }
-                
+
             }
 
             @Override
@@ -335,6 +341,9 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
                         break;
                     case Log.LEVEL_WARN:
                         getLog().warn(output);
+                        break;
+                    default:
+                        getLog().info(output);
                         break;
                 }
             }
