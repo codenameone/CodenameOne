@@ -240,6 +240,27 @@ public class CN1Playground extends Lifecycle {
             } else {
                 Log.p("bottomNav: NOT ATTACHED to any parent");
             }
+            // Cross-check CN1's reported dimensions against the actual browser
+            // viewport. Mobile browsers (especially iOS Safari) often report
+            // window.innerHeight differently than window.visualViewport.height
+            // because of the dynamic URL bar: CN1 sizes the canvas to
+            // innerHeight, but the visible area may be shorter, which would
+            // hide the bottom nav behind the browser chrome.
+            BrowserComponent js = CN.getSharedJavascriptContext();
+            if (js != null) {
+                js.execute(
+                        "callback.onSuccess((function(){"
+                                + "try {"
+                                + "var vv=window.visualViewport;"
+                                + "return 'window=' + window.innerWidth + 'x' + window.innerHeight"
+                                + " + ' visualVP=' + (vv ? (Math.round(vv.width) + 'x' + Math.round(vv.height)) : 'unsupported')"
+                                + " + ' docHeight=' + document.documentElement.clientHeight"
+                                + " + ' dpr=' + (window.devicePixelRatio || 1);"
+                                + "} catch(e) { return 'err:' + e; }"
+                                + "})())",
+                        res -> Log.p("viewport: " + res.getValue())
+                );
+            }
         });
     }
 
