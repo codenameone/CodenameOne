@@ -1274,19 +1274,23 @@ final class JavascriptMethodGenerator {
             out.append("      }\n");
             blockOpen = false;
         }
-        // ``default`` is omitted — every real method exits via a
-        // ``return``/``throw``/``ATHROW`` somewhere, and the safe-strip
-        // pass guarantees each block's trailing ``pc = N; break;``
-        // points at another real case label. Falling through to
-        // ``default`` would only happen with a corrupted pc, which the
-        // translator doesn't produce. Skipping this saves ~14 chars
-        // × ~3k switch-based methods ≈ 42 KiB. Fallback kill-switch
-        // ``parparvm.js.defaultreturn.keep`` re-enables the explicit
-        // default for paranoid builds.
-        if (System.getProperty("parparvm.js.defaultreturn.keep") != null) {
-            out.append("      default:return}\n");
-        } else {
+        // ``default:return`` guards against a pc landing on an
+        // instruction index that the emission loop elided. That
+        // happens whenever a throwing instruction's ``pc = i + 1;
+        // break;`` tail targets a no-op (LineNumber, LocalVariable
+        // range marker) whose bare ``case i+1:`` was dropped by the
+        // dead-label elision pass: without a matching ``case``
+        // arm, the enclosing ``while (true) switch(pc)`` loop spins
+        // on the same pc forever. Keeping the explicit default
+        // costs ~14 chars × ~3k methods ≈ 42 KiB but buys a clean
+        // method exit in that corner case. Kill-switch
+        // ``parparvm.js.defaultreturn.off`` skips the default for
+        // experimental builds that also arrange for every pc tail
+        // to land on a real label.
+        if (System.getProperty("parparvm.js.defaultreturn.off") != null) {
             out.append("    }\n");
+        } else {
+            out.append("      default:return}\n");
         }
         if (hasTryCatch) {
             // ``_E`` (runtime helper) wraps the repeated catch-block
@@ -1332,10 +1336,24 @@ final class JavascriptMethodGenerator {
      * ``parparvm.js.staticwrapper.keep`` restores the old behaviour.
      */
     private static boolean shouldEmitStaticWrapper(BytecodeMethod method) {
-        if (System.getProperty("parparvm.js.staticwrapper.keep") != null) {
-            return true;
+        // The wrapper is the CANONICAL global-scope name for a
+        // static method: runtime / port.js code that references the
+        // method by its unsuffixed identifier (``cn1_Cls_m_sig``)
+        // relies on it — most importantly ``jvm.setMain`` looks up
+        // ``global[cn1_<mainCls>_main_...]`` to obtain the generator
+        // factory at boot. Eliding the wrapper for non-native
+        // statics saved ~88 KiB after mangling but broke the main
+        // entry point and any @JSBody / bindNative overlay that
+        // resolves methods through the unsuffixed name. Keep the
+        // wrapper for every non-clinit static; the extra bytes are
+        // worth the boot-time correctness guarantee.
+        //
+        // Kill-switch ``parparvm.js.staticwrapper.elide`` re-enables
+        // the (aggressive, risky) elision for experimentation.
+        if (System.getProperty("parparvm.js.staticwrapper.elide") != null) {
+            return method.isNative();
         }
-        return method.isNative();
+        return true;
     }
 
     private static void appendWrappedStaticMethod(StringBuilder out, ByteCodeClass cls, BytecodeMethod method, String wrapperName, String bodyName) {

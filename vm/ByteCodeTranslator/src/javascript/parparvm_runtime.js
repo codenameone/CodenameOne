@@ -1261,7 +1261,7 @@ const jvm = {
     // owned by this worker, the main-thread host-ref id lives in
     // ``__cn1HostRef`` which we don't touch, and subsequent receipts of
     // the same proxy pick up the stubs via the property write.
-    if (value && value.__cn1HostRef != null) {
+    if (value.__cn1HostRef != null) {
       if (typeof wrapper.addEventListener !== "function") {
         wrapper.addEventListener = function() {};
       }
