@@ -69,7 +69,9 @@ import com.codename1.ui.util.EventDispatcher;
 /// hi.add(BorderLayout.CENTER, t);
 /// ```
 ///
-/// The `Tabs` allows swiping on the X-axis (by default) but also on the Y-axis ([demo video](https://youtu.be/9CxqFGOYAU0)):
+/// The `Tabs` allows swiping on the X-axis (by default) but also on the Y-axis:
+/// ![Tabs swiping on the X-axis and Y-axis](https://www.codenameone.com/img/tabs-swipe-x-y-axis.gif)
+///
 /// ```java
 /// Form hi = new Form("Test swipe on tabs", BorderLayout.absolute());
 /// Tabs tabs = new Tabs();
