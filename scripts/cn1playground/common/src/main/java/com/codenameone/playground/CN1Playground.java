@@ -240,13 +240,16 @@ public class CN1Playground extends Lifecycle {
             } else {
                 Log.p("bottomNav: NOT ATTACHED to any parent");
             }
-            // Viewport matches form (657*4=2628) so the nav is not hidden by
-            // browser chrome. Now interrogate the DOM: what element is ACTUALLY
-            // rendered on top at the centre of each nav cell, and what are the
-            // canvas/iframe bounds + z-indices? If elementFromPoint at the nav's
-            // centre returns an IFRAME, a peer is covering the nav. If it
-            // returns the canvas, the nav is drawn but invisible for a style
-            // reason. If it returns HTML/BODY, the canvas itself is clipped.
+            // Previous probe showed cn1-peers-container (CN1's full-viewport
+            // host DIV for peer components) is on top at the nav coordinates,
+            // not the canvas. The container has z-index:-1000 in the computed
+            // style, yet it paints above the canvas. Need to know WHY:
+            //  - position:static ignores z-index (stacking by DOM order).
+            //  - An opaque background would visibly hide the canvas beneath it.
+            //  - elementsFromPoint (plural) reveals the full z-stack so we
+            //    know whether the canvas is behind it or entirely absent.
+            // Also inspect the canvas's own position/zIndex and the DOM parent
+            // of both elements so we can see the stacking context they share.
             BrowserComponent js = CN.getSharedJavascriptContext();
             if (js != null) {
                 final int navY = bottomNav != null && bottomNav.getParent() != null
@@ -258,33 +261,48 @@ public class CN1Playground extends Lifecycle {
                                 + "var dpr = window.devicePixelRatio || 1;"
                                 + "var navYcss = " + navY + " / dpr;"
                                 + "var w = window.innerWidth;"
-                                + "var sample = function(x){"
-                                + "  var el = document.elementFromPoint(x, navYcss);"
+                                + "var dump = function(el){"
                                 + "  if(!el) return 'null';"
+                                + "  var s = getComputedStyle(el);"
                                 + "  var r = el.getBoundingClientRect();"
-                                + "  return el.tagName + '#' + (el.id||'?') + '.' + (el.className||'?').toString().substring(0,30)"
-                                + "    + ' z=' + (getComputedStyle(el).zIndex||'auto')"
+                                + "  return el.tagName + '#' + (el.id||'?')"
+                                + "    + ' pos=' + s.position + ' z=' + s.zIndex"
+                                + "    + ' bg=' + s.backgroundColor + ' op=' + s.opacity + ' pe=' + s.pointerEvents"
                                 + "    + ' rect=' + Math.round(r.left) + ',' + Math.round(r.top) + ',' + Math.round(r.right) + ',' + Math.round(r.bottom);"
                                 + "};"
-                                + "var points = sample(w*0.17) + ' | ' + sample(w*0.5) + ' | ' + sample(w*0.83);"
-                                + "var iframes = document.getElementsByTagName('iframe');"
-                                + "var iframeInfo = '';"
-                                + "for(var i=0;i<iframes.length;i++){"
-                                + "  var ifr = iframes[i];"
-                                + "  var ir = ifr.getBoundingClientRect();"
-                                + "  var st = getComputedStyle(ifr);"
-                                + "  iframeInfo += ' ifr[' + i + ']=' + Math.round(ir.left) + ',' + Math.round(ir.top) + ',' + Math.round(ir.right) + ',' + Math.round(ir.bottom) + ' z=' + st.zIndex + ' vis=' + st.visibility + ' disp=' + st.display;"
+                                + "var stackAt = function(x,y){"
+                                + "  if(!document.elementsFromPoint) return 'no-elementsFromPoint';"
+                                + "  var list = document.elementsFromPoint(x,y);"
+                                + "  var out = '';"
+                                + "  for(var i=0;i<list.length && i<6;i++){"
+                                + "    out += '[' + i + '] ' + dump(list[i]) + ' || ';"
+                                + "  }"
+                                + "  return out;"
+                                + "};"
+                                + "var pc = document.getElementById('cn1-peers-container');"
+                                + "var cv = document.getElementById('codenameone-canvas') || document.getElementsByTagName('canvas')[0];"
+                                + "var pxSample = 'canvas-unreachable';"
+                                + "if(cv){"
+                                + "  try{"
+                                + "    var ctx = cv.getContext('2d');"
+                                + "    var bufferY = Math.round(navYcss * (cv.height / cv.getBoundingClientRect().height));"
+                                + "    var samples = [];"
+                                + "    var xs = [0.17, 0.5, 0.83];"
+                                + "    for(var i=0;i<xs.length;i++){"
+                                + "      var bx = Math.round(xs[i] * cv.width);"
+                                + "      var d = ctx.getImageData(bx, bufferY, 1, 1).data;"
+                                + "      samples.push('rgba(' + d[0] + ',' + d[1] + ',' + d[2] + ',' + d[3] + ')');"
+                                + "    }"
+                                + "    pxSample = 'canvasPx@navY: ' + samples.join(' | ') + ' bufSz=' + cv.width + 'x' + cv.height;"
+                                + "  } catch(e2){ pxSample = 'canvasReadErr:' + e2; }"
                                 + "}"
-                                + "var canvas = document.getElementsByTagName('canvas')[0];"
-                                + "var canvasInfo = 'none';"
-                                + "if(canvas){"
-                                + "  var cr = canvas.getBoundingClientRect();"
-                                + "  canvasInfo = Math.round(cr.left) + ',' + Math.round(cr.top) + ',' + Math.round(cr.right) + ',' + Math.round(cr.bottom) + ' z=' + getComputedStyle(canvas).zIndex;"
-                                + "}"
-                                + "return 'navYcss=' + Math.round(navYcss) + ' canvas=' + canvasInfo + ' iframes=' + iframes.length + iframeInfo + ' atNav: ' + points;"
+                                + "return 'peers=' + dump(pc)"
+                                + "  + ' canvas=' + dump(cv)"
+                                + "  + ' ' + pxSample"
+                                + "  + ' stack@navCenter: ' + stackAt(w*0.5, navYcss);"
                                 + "} catch(e) { return 'err:' + e + ' stack:' + (e.stack||'?').substring(0,200); }"
                                 + "})())",
-                        res -> Log.p("domProbe: " + res.getValue())
+                        res -> Log.p("domProbe2: " + res.getValue())
                 );
             }
         });
