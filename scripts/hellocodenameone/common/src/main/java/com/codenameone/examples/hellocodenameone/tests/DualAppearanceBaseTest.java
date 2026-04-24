@@ -121,7 +121,25 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
         annotations.clear();
 
         final String imageName = baseName() + "_" + suffix;
+        final boolean textured = useTexturedBackdrop();
+        final TextureBackdropPainter backdrop = textured
+                ? new TextureBackdropPainter(dark)
+                : null;
         Form form = new Form(baseName() + " / " + suffix, newLayout()) {
+            @Override
+            public void paintBackground(Graphics g) {
+                if (backdrop != null) {
+                    // Paint the diagonal-stripe pattern into the form's
+                    // backing area before the rest of the render pipeline
+                    // runs. Any translucent widget above (Dialog, pill
+                    // Tabs, Popup) then reveals its see-through tint
+                    // against a visible pattern instead of a plain surface.
+                    backdrop.paint(g, new Rectangle(0, 0, getWidth(), getHeight()));
+                    return;
+                }
+                super.paintBackground(g);
+            }
+
             @Override
             protected void onShowCompleted() {
                 registerReadyCallback(this, () -> {
@@ -137,14 +155,6 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
             }
         };
         populate(form, suffix);
-        if (useTexturedBackdrop()) {
-            // Replace the Form's solid bg with a diagonal-stripe pattern
-            // so any translucent widget (Dialog, pill Tabs, Popup) shows
-            // its see-through tint against something visible instead of
-            // blending into a plain surface.
-            form.getUnselectedStyle().setBgPainter(new TextureBackdropPainter(dark));
-            form.getUnselectedStyle().setBgTransparency((byte) 0xff);
-        }
         if (!annotations.isEmpty()) {
             form.setGlassPane(new AnnotationPainter(annotations, dark));
             SpanLabel legend = buildLegend();
