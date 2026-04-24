@@ -155,6 +155,15 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
             }
         };
         populate(form, suffix);
+        if (textured) {
+            // The ContentPane sits on top of the Form and paints its own
+            // theme-supplied bgColor on every render; without making it
+            // transparent the texture paint underneath is hidden by a
+            // solid wash. TitleArea / Toolbar likewise opaque - clear
+            // them too so the backdrop reads edge-to-edge.
+            form.getContentPane().getUnselectedStyle().setBgTransparency((byte) 0);
+            form.getTitleArea().getUnselectedStyle().setBgTransparency((byte) 0);
+        }
         if (!annotations.isEmpty()) {
             form.setGlassPane(new AnnotationPainter(annotations, dark));
             SpanLabel legend = buildLegend();
