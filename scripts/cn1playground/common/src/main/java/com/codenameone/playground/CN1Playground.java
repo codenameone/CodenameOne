@@ -240,69 +240,74 @@ public class CN1Playground extends Lifecycle {
             } else {
                 Log.p("bottomNav: NOT ATTACHED to any parent");
             }
-            // Previous probe showed cn1-peers-container (CN1's full-viewport
-            // host DIV for peer components) is on top at the nav coordinates,
-            // not the canvas. The container has z-index:-1000 in the computed
-            // style, yet it paints above the canvas. Need to know WHY:
-            //  - position:static ignores z-index (stacking by DOM order).
-            //  - An opaque background would visibly hide the canvas beneath it.
-            //  - elementsFromPoint (plural) reveals the full z-stack so we
-            //    know whether the canvas is behind it or entirely absent.
-            // Also inspect the canvas's own position/zIndex and the DOM parent
-            // of both elements so we can see the stacking context they share.
+            // Previous probe proved CN1 IS painting the nav - the canvas pixels
+            // at nav Y are the expected navy UIID colour, fully opaque. So the
+            // bug is purely compositing: something on the DOM side is hiding
+            // the canvas-painted nav. Suspicious findings to dig into:
+            //   - BODY is position:fixed with bg=rgb(255,255,255). Unusual for
+            //     a page. If it creates a stacking context that beats the
+            //     canvas (z=auto in absolute positioning), its white paint
+            //     could occlude the canvas.
+            //   - HTML rect has height=0.
+            // This probe walks the entire DOM looking for elements whose rect
+            // overlaps the nav band (Y=605) AND are position:fixed/absolute/
+            // sticky. That should surface whatever fixed overlay (perhaps the
+            // Monaco editor chrome, a sticky footer, the website shell's cookie
+            // banner / drawer) is sitting on top of the nav. Also draws a red
+            // rect directly on the canvas at nav Y so if the user doesn't see
+            // red either, the canvas itself is being occluded as a whole.
             BrowserComponent js = CN.getSharedJavascriptContext();
             if (js != null) {
-                final int navY = bottomNav != null && bottomNav.getParent() != null
-                        ? bottomNav.getAbsoluteY() + bottomNav.getHeight() / 2
+                final int navY0 = bottomNav != null && bottomNav.getParent() != null
+                        ? bottomNav.getAbsoluteY()
                         : -1;
+                final int navH = bottomNav != null ? bottomNav.getHeight() : 0;
                 js.execute(
                         "callback.onSuccess((function(){"
                                 + "try {"
                                 + "var dpr = window.devicePixelRatio || 1;"
-                                + "var navYcss = " + navY + " / dpr;"
+                                + "var navTop = " + navY0 + " / dpr;"
+                                + "var navBot = navTop + (" + navH + " / dpr);"
                                 + "var w = window.innerWidth;"
-                                + "var dump = function(el){"
-                                + "  if(!el) return 'null';"
+                                + "var scrollInfo = 'scroll(' + (window.scrollX||0) + ',' + (window.scrollY||0) + ') docScroll(' + (document.documentElement.scrollLeft||0) + ',' + (document.documentElement.scrollTop||0) + ')';"
+                                + "var overlappers = [];"
+                                + "var all = document.querySelectorAll('*');"
+                                + "for(var i=0;i<all.length;i++){"
+                                + "  var el = all[i];"
                                 + "  var s = getComputedStyle(el);"
+                                + "  if(s.position!=='fixed' && s.position!=='absolute' && s.position!=='sticky') continue;"
                                 + "  var r = el.getBoundingClientRect();"
-                                + "  return el.tagName + '#' + (el.id||'?')"
-                                + "    + ' pos=' + s.position + ' z=' + s.zIndex"
-                                + "    + ' bg=' + s.backgroundColor + ' op=' + s.opacity + ' pe=' + s.pointerEvents"
-                                + "    + ' rect=' + Math.round(r.left) + ',' + Math.round(r.top) + ',' + Math.round(r.right) + ',' + Math.round(r.bottom);"
-                                + "};"
-                                + "var stackAt = function(x,y){"
-                                + "  if(!document.elementsFromPoint) return 'no-elementsFromPoint';"
-                                + "  var list = document.elementsFromPoint(x,y);"
-                                + "  var out = '';"
-                                + "  for(var i=0;i<list.length && i<6;i++){"
-                                + "    out += '[' + i + '] ' + dump(list[i]) + ' || ';"
-                                + "  }"
-                                + "  return out;"
-                                + "};"
-                                + "var pc = document.getElementById('cn1-peers-container');"
+                                + "  if(r.bottom < navTop || r.top > navBot) continue;"
+                                + "  if(r.width === 0 || r.height === 0) continue;"
+                                + "  if(el.id==='cn1-peers-container') continue;"
+                                + "  if(el.id==='codenameone-canvas') continue;"
+                                + "  overlappers.push(el.tagName + '#' + (el.id||'?') + '.' + (el.className||'').toString().substring(0,20)"
+                                + "    + ' pos=' + s.position + ' z=' + s.zIndex + ' bg=' + s.backgroundColor + ' op=' + s.opacity + ' pe=' + s.pointerEvents"
+                                + "    + ' rect=' + Math.round(r.left) + ',' + Math.round(r.top) + ',' + Math.round(r.right) + ',' + Math.round(r.bottom));"
+                                + "  if(overlappers.length >= 12) break;"
+                                + "}"
                                 + "var cv = document.getElementById('codenameone-canvas') || document.getElementsByTagName('canvas')[0];"
-                                + "var pxSample = 'canvas-unreachable';"
+                                + "var paintMark = 'no-canvas';"
                                 + "if(cv){"
                                 + "  try{"
                                 + "    var ctx = cv.getContext('2d');"
-                                + "    var bufferY = Math.round(navYcss * (cv.height / cv.getBoundingClientRect().height));"
-                                + "    var samples = [];"
-                                + "    var xs = [0.17, 0.5, 0.83];"
-                                + "    for(var i=0;i<xs.length;i++){"
-                                + "      var bx = Math.round(xs[i] * cv.width);"
-                                + "      var d = ctx.getImageData(bx, bufferY, 1, 1).data;"
-                                + "      samples.push('rgba(' + d[0] + ',' + d[1] + ',' + d[2] + ',' + d[3] + ')');"
-                                + "    }"
-                                + "    pxSample = 'canvasPx@navY: ' + samples.join(' | ') + ' bufSz=' + cv.width + 'x' + cv.height;"
-                                + "  } catch(e2){ pxSample = 'canvasReadErr:' + e2; }"
+                                + "    var sy = cv.height / cv.getBoundingClientRect().height;"
+                                + "    ctx.save();"
+                                + "    ctx.fillStyle = 'rgb(255,0,0)';"
+                                + "    ctx.fillRect(0, Math.round(navTop * sy), cv.width, 8);"
+                                + "    ctx.fillStyle = 'rgb(0,255,0)';"
+                                + "    ctx.fillRect(0, Math.round(navBot * sy) - 8, cv.width, 8);"
+                                + "    ctx.restore();"
+                                + "    paintMark = 'painted red@navTop green@navBot';"
+                                + "  } catch(e3){ paintMark = 'paintErr:' + e3; }"
                                 + "}"
-                                + "return 'peers=' + dump(pc)"
-                                + "  + ' canvas=' + dump(cv)"
-                                + "  + ' ' + pxSample"
-                                + "  + ' stack@navCenter: ' + stackAt(w*0.5, navYcss);"
+                                + "return scrollInfo"
+                                + "  + ' navBand=' + Math.round(navTop) + '..' + Math.round(navBot)"
+                                + "  + ' overlappers(' + overlappers.length + '): ' + overlappers.join(' || ')"
+                                + "  + ' | ' + paintMark;"
                                 + "} catch(e) { return 'err:' + e + ' stack:' + (e.stack||'?').substring(0,200); }"
                                 + "})())",
-                        res -> Log.p("domProbe2: " + res.getValue())
+                        res -> Log.p("domProbe3: " + res.getValue())
                 );
             }
         });
