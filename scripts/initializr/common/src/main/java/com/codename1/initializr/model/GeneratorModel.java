@@ -18,7 +18,7 @@ import java.util.Map;
 import static com.codename1.ui.CN.*;
 
 public class GeneratorModel {
-    private static final String CN1_PLUGIN_VERSION = "7.0.233";
+    private static final String CN1_PLUGIN_VERSION = "7.0.235";
     private static final String PREVIEW_BUTTON_SELECTOR =
             "Button, InitializrLiveButtonDarkClean, "
                     + "InitializrLiveButtonLightTealRound, InitializrLiveButtonLightTealSquare, "
