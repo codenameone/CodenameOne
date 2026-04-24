@@ -119,6 +119,10 @@ public class CN1Playground extends Lifecycle {
 
     @Override
     public void runApp() {
+        // Version marker so we can tell from the browser console whether the
+        // deployed build includes the mobile-shell fixes (Form.SOUTH nav,
+        // viewport-width breakpoint, post-show relayout + diagnostics).
+        Log.p("CN1Playground build marker: mobile-shell-v2 @ 2026-04-24");
         CN.setProperty("platformHint.javascript.beforeUnloadMessage", null);
         theme = Resources.getGlobalResources();
         currentScript = resolveInitialScript();
