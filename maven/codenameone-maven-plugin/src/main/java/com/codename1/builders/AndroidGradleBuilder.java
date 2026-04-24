@@ -1729,16 +1729,14 @@ public class AndroidGradleBuilder extends Executor {
         }
 
         //String sdkVersion = request.getArg("android.targetSDKVersion", defaultVersion);
-        if (targetNumber != null) {
-            if (Integer.parseInt(targetNumber) >= 17) {
-                try {
-                    File androidBrowserComponentCallback = new File(srcDir, "com" + File.separator + "codename1" + File.separator + "impl" + File.separator + "android" + File.separator + "AndroidBrowserComponentCallback.java");
-                    replaceInFile(androidBrowserComponentCallback, "//import android.webkit.JavascriptInterface;", "import android.webkit.JavascriptInterface;");
-                    replaceInFile(androidBrowserComponentCallback, "//@JavascriptInterface", "@JavascriptInterface");
-                } catch (Exception e) {
-                    // Swallow this and continue.
-                    log("Non-fatal exception encountered when processing AndroidBrowserComponentCallback.java: " + e);
-                }
+        if (Integer.parseInt(targetNumber) >= 17) {
+            try {
+                File androidBrowserComponentCallback = new File(srcDir, "com" + File.separator + "codename1" + File.separator + "impl" + File.separator + "android" + File.separator + "AndroidBrowserComponentCallback.java");
+                replaceInFile(androidBrowserComponentCallback, "//import android.webkit.JavascriptInterface;", "import android.webkit.JavascriptInterface;");
+                replaceInFile(androidBrowserComponentCallback, "//@JavascriptInterface", "@JavascriptInterface");
+            } catch (Exception e) {
+                // Swallow this and continue.
+                log("Non-fatal exception encountered when processing AndroidBrowserComponentCallback.java: " + e);
             }
         }
 

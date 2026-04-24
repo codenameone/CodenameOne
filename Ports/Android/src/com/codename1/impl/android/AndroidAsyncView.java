@@ -1305,7 +1305,7 @@ public class AndroidAsyncView extends ViewGroup implements CodenameOneSurface {
                         if(bgt == 0) {
                             return;
                         }
-                        bgPaint = paintBackgroundSolidColor(bgt, s, bgPaint);
+                        bgPaint = paintBackgroundSolidColor(bgt, s);
                     }
                 } else {
                     switch(backgroundType) {
@@ -1314,7 +1314,7 @@ public class AndroidAsyncView extends ViewGroup implements CodenameOneSurface {
                             if(bgt == 0) {
                                 return;
                             }
-                            bgPaint = paintBackgroundSolidColor(bgt, s, bgPaint);
+                            bgPaint = paintBackgroundSolidColor(bgt, s);
                             break;
                         case Style.BACKGROUND_IMAGE_SCALED:
                             final Paint bgImageScalePaint = new Paint();
@@ -1552,26 +1552,16 @@ public class AndroidAsyncView extends ViewGroup implements CodenameOneSurface {
                 sc.backgroundPainter = bgPaint;
             } else {
                 bgPaint.updateClip(clip, clipP, clipIsPath);
-                /*
-                if (clip == null) {
-                    bgPaint.pendingClipW = cn1View.width;
-                    bgPaint.pendingClipH = cn1View.height;
-                    bgPaint.pendingClipX = 0;
-                    bgPaint.pendingClipY = 0;
-                } else {
-                    bgPaint.pendingClipW = clip.getWidth();
-                    bgPaint.pendingClipH = clip.getHeight();
-                    bgPaint.pendingClipX = clip.getX();
-                    bgPaint.pendingClipY = clip.getY();
-                }
-                */
+            }
+            if (bgPaint == null) {
+                return;
             }
             bgPaint.pendingX = x;
             bgPaint.pendingY = y;
             bgPaint.pendingHeight = height;
             bgPaint.pendingWidth = width;
             bgPaint.pendingAlpha = alpha;
-            
+
             pendingRenderingOperations.add(bgPaint);
         }
 
@@ -1650,13 +1640,13 @@ public class AndroidAsyncView extends ViewGroup implements CodenameOneSurface {
             };
         }
         
-        private AsyncPaintPosition paintBackgroundSolidColor(final byte bgt, Style s, AsyncPaintPosition bgPaint) {
+        private AsyncPaintPosition paintBackgroundSolidColor(final byte bgt, Style s) {
             int c = ((bgt << 24) & 0xff000000) | (s.getBgColor() & 0xffffff);
             final Paint pnt = new Paint();
             pnt.setStyle(Paint.Style.FILL);
             pnt.setColor(c);
             pnt.setAntiAlias(false);
-            bgPaint = new AsyncPaintPosition(clip, clipP, clipIsPath) {
+            return new AsyncPaintPosition(clip, clipP, clipIsPath) {
                 @Override
                 public void executeImpl(AndroidGraphics underlying) {
                     if(bgt == 0) {
@@ -1668,7 +1658,6 @@ public class AndroidAsyncView extends ViewGroup implements CodenameOneSurface {
                     return "SolidColorBackground";
                 }
             };
-            return bgPaint;
         }
 
         class DrawStringCache {

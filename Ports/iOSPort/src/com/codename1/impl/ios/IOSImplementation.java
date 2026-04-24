@@ -3172,10 +3172,12 @@ public class IOSImplementation extends CodenameOneImplementation {
         if (!nativeInstance.checkLocationUsage()) {
             throw new RuntimeException("Please add the ios.NSLocationUsageDescription or ios.NSLocationAlwaysUsageDescription build hint");
         }
-        if(lm == null) {
-            lm = new Loc();
+        synchronized (IOSImplementation.class) {
+            if (lm == null) {
+                lm = new Loc();
+            }
+            return lm;
         }
-        return lm;
     }
 
     /**
@@ -5625,27 +5627,6 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
     }
     
-    class NativeAlphaMask {
-        long peer;
-        String debugText;
-        public NativeAlphaMask(String debugText){
-            this.debugText = debugText;
-        }
-        
-        
-        void deleteTexture(){
-            if ( peer != 0 ){
-                nativeDeleteTexture(peer);
-            }
-        }
-        
-        protected void finalize(){
-            deleteTexture();
-        }
-        
-        
-    }
-
     @Override
     public boolean animateImage(Object nativeImage, long lastFrame) {
         return super.animateImage(nativeImage, lastFrame);
@@ -7848,10 +7829,12 @@ public class IOSImplementation extends CodenameOneImplementation {
                             } catch (IOException ex) {
                                 throw new RuntimeException(ex.getMessage());
                             } finally {
-                                try {
-                                    i.close();
-                                } catch (IOException ex) {
-                                    //throw new RuntimeException(ex.getMessage());
+                                if (i != null) {
+                                    try {
+                                        i.close();
+                                    } catch (IOException ex) {
+                                        //throw new RuntimeException(ex.getMessage());
+                                    }
                                 }
                             }
                         }

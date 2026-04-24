@@ -497,7 +497,7 @@ public class BytecodeComplianceMojo extends AbstractCN1Mojo {
             if (this == obj) {
                 return true;
             }
-            if (!(obj instanceof SimdAllocaValue)) {
+            if (obj == null || obj.getClass() != SimdAllocaValue.class) {
                 return false;
             }
             SimdAllocaValue other = (SimdAllocaValue) obj;

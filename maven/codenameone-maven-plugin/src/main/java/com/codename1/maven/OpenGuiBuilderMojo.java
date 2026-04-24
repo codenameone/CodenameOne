@@ -5,6 +5,7 @@
  */
 package com.codename1.maven;
 
+import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -202,7 +203,7 @@ public class OpenGuiBuilderMojo extends AbstractCN1Mojo {
                             try {
                                 FileInputStream fis = new FileInputStream(outputFile);
                                 byte[] data = new byte[(int)outputFile.length()];
-                                fis.read(data);
+                                new DataInputStream(fis).readFully(data);
                                 fis.close();
                                 lastModified = outputFile.lastModified();
                                 String d = new String(data, StandardCharsets.UTF_8);

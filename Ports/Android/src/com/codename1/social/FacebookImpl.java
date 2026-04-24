@@ -36,7 +36,6 @@ import com.facebook.FacebookSdk;
 import com.facebook.login.LoginManager;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 import java.util.StringTokenizer;
@@ -59,16 +58,10 @@ public class FacebookImpl extends FacebookConnect {
         permissionsStr = permissionsStr.trim();
 
         StringTokenizer token = new StringTokenizer(permissionsStr, ", ");
-        if (token.countTokens() > 0) {
-            try {
-                while (token.hasMoreElements()) {
-                    String permission = (String) token.nextToken();
-                    permission = permission.trim();
-                    permissions.add(permission);
-                }
-            } catch (Exception e) {
-                //the pattern is not valid
-            }
+        while (token.hasMoreElements()) {
+            String permission = (String) token.nextToken();
+            permission = permission.trim();
+            permissions.add(permission);
         }
     }
 
@@ -164,15 +157,6 @@ public class FacebookImpl extends FacebookConnect {
         });
         login.registerCallback(mCallbackManager, new FBCallback(cb));
         login.logInWithPublishPermissions(activity, PUBLISH_PERMISSIONS);
-    }
-
-    private boolean isSubsetOf(Collection<String> subset, Collection<String> superset) {
-        for (String string : subset) {
-            if (!superset.contains(string)) {
-                return false;
-            }
-        }
-        return true;
     }
 
     /**

@@ -170,9 +170,6 @@ public class BackgroundAudioService extends MediaBrowserServiceCompat implements
         @Override
         public void onCommand(String command, Bundle extras, ResultReceiver cb) {
             super.onCommand(command, extras, cb);
-            if( COMMAND_EXAMPLE.equalsIgnoreCase(command) ) {
-                //Custom command here
-            }
         }
 
         @Override
