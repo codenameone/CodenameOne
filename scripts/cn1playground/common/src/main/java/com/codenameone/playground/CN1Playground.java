@@ -225,11 +225,8 @@ public class CN1Playground extends Lifecycle {
 
         appForm.show();
         notifyWebsiteUiReady();
+        installIframeBottomGuard();
 
-        // Post-show layout pass: at runApp time the form may not yet report its
-        // true display dimensions (browsers sometimes report a placeholder size
-        // before the layout settles). Force a fresh breakpoint compute + layout
-        // once the form has had a chance to settle, then log final positions.
         UITimer.timer(150, false, appForm, () -> {
             lastLayout = LAYOUT_NONE;
             applyLayoutForCurrentSize();
@@ -244,6 +241,37 @@ public class CN1Playground extends Lifecycle {
                 Log.p("bottomNav: NOT ATTACHED to any parent");
             }
         });
+    }
+
+    /// On the HTML5 port the Monaco editor's iframe is a DOM peer that paints
+    /// above the CN1 canvas. When the viewport is below the mobile breakpoint,
+    /// the iframe's peer bounds can overshoot the editor's Java component
+    /// bounds and cover the bottom-nav band drawn on the canvas underneath.
+    ///
+    /// Mitigation: inject a global stylesheet that caps iframe max-height to
+    /// `calc(100vh - MOBILE_NAV_GUARD_PX)` so no iframe, regardless of its
+    /// peer-positioning logic, can extend into the bottom band reserved for
+    /// the Samples / Inspector / History buttons. Only applies on mobile;
+    /// removed when the layout is tablet or desktop.
+    private static final int MOBILE_NAV_GUARD_PX = 64;
+
+    private void installIframeBottomGuard() {
+        BrowserComponent js = CN.getSharedJavascriptContext();
+        if (js == null) {
+            return;
+        }
+        js.execute(
+                "callback.onSuccess((function(){"
+                        + "try {"
+                        + "var id='cn1-playground-iframe-guard';"
+                        + "var s=document.getElementById(id);"
+                        + "if(!s){s=document.createElement('style');s.id=id;document.head.appendChild(s);}"
+                        + "s.textContent='@media (max-width: 720px){iframe{max-height:calc(100vh - " + MOBILE_NAV_GUARD_PX + "px) !important;}}';"
+                        + "} catch(e){}"
+                        + "return true;"
+                        + "})())",
+                res -> {}
+        );
     }
 
     @Override
