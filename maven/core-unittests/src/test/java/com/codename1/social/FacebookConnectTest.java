@@ -29,6 +29,7 @@ class FacebookConnectTest extends UITestBase {
         implementation.clearConnections();
         clearStoredCredentials();
         FaceBookAccess.setToken(null);
+        FaceBookAccess.setRedirectURI("");
         connect = new FacebookConnect();
     }
 
@@ -38,6 +39,7 @@ class FacebookConnectTest extends UITestBase {
         implementation.clearConnections();
         implementation.clearNetworkMocks();
         FaceBookAccess.setToken(null);
+        FaceBookAccess.setRedirectURI("");
     }
 
     @FormTest
@@ -46,6 +48,7 @@ class FacebookConnectTest extends UITestBase {
         connect.setAccessToken(stored);
         Preferences.set(FacebookConnect.class.getName() + "Token", "cached-token");
         FaceBookAccess.setToken("server-token");
+        FaceBookAccess.setRedirectURI("https://www.codenameone.com/");
 
         runOffEdt(new Runnable() {
             @Override
