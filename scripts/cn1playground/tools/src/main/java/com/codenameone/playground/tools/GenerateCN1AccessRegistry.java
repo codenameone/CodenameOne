@@ -1011,7 +1011,9 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
     }
 
     private static ApiMethod parseMethod(SourceClass sourceClass, MethodTree methodTree, Resolver resolver, boolean enclosingInterface) {
-        if (!isPublicMethod(methodTree, enclosingInterface) || isBlacklistedMethod(methodTree.getName().toString())) {
+        String methodName = methodTree.getName().toString();
+        if (!isPublicMethod(methodTree, enclosingInterface) || isBlacklistedMethod(methodName)
+                || isBlacklistedQualifiedMethod(sourceClass.qualifiedName, methodName)) {
             return null;
         }
         // Push method-level type parameter bounds into the resolver
@@ -2601,6 +2603,27 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
                 || "getClass".equals(name)
                 || "clone".equals(name)
                 || "finalize".equals(name);
+    }
+
+    /// Qualified-name method exclusions. Use this when a specific API is
+    /// present in the CN1 release sources but is not yet available on one of
+    /// the runtime ports the playground deploys to, so the bean-shell
+    /// registry must not reference it. Keep the set small and temporary -
+    /// entries should come out as soon as the runtime catches up.
+    private static final Set<String> BLACKLISTED_QUALIFIED_METHODS = new HashSet<String>(Arrays.asList(
+            // UIManager.zoomFonts was added in 7.0.235 but the JavaScript
+            // cloud build doesn't have it yet, so linking against it from
+            // the access registry fails at runtime with
+            // "com.codename1.ui.plaf.UIManager.zoomFonts(F)V was not found".
+            // Remove this entry once the JS port ships with zoomFonts.
+            "com.codename1.ui.plaf.UIManager.zoomFonts"
+    ));
+
+    private static boolean isBlacklistedQualifiedMethod(String qualifiedClassName, String methodName) {
+        if (qualifiedClassName == null) {
+            return false;
+        }
+        return BLACKLISTED_QUALIFIED_METHODS.contains(qualifiedClassName + "." + methodName);
     }
 
     private static void collectJavaFiles(File root, List<File> out) {

@@ -4647,12 +4647,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 return typedTarget.wasThemeInstalled();
             }
         }
-        if ("zoomFonts".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.Float.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
-                typedTarget.zoomFonts(((Number) adaptedArgs[0]).floatValue()); return null;
-            }
-        }
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
