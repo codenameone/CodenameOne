@@ -551,21 +551,36 @@ if [ "${SKIP_JS_MINIFICATION:-0}" != "1" ]; then
     # page load.
     map_path="$(dirname "$OUTPUT_ZIP")/$(basename "$OUTPUT_ZIP" .zip).mangle-map.json"
     mkdir -p "$(dirname "$map_path")"
+    # ``--min-occurrences=1`` mangles even single-use identifiers. The
+    # default of 2 skipped inherited-method alias keys that only appear
+    # once (as map keys in ``jvm.m({cn1_Child_m: "$parent"})``); those
+    # identifiers are 60-120 chars each and the mangle map lives in a
+    # separate side-car JSON outside the bundle, so the single-use
+    # skip was a leftover from an earlier layout where the map shipped
+    # inside the bundle.
     python3 "$SCRIPT_DIR/mangle-javascript-port-identifiers.py" \
+      --min-occurrences 1 \
       --map-output "$map_path" "$DIST_DIR" || \
       bj_log "WARNING: identifier mangling failed; continuing with unmangled output" >&2
   fi
 
-  # Minify each worker-side JS file in place with esbuild. We deliberately
-  # skip browser_bridge.js / port.js / native_handlers (hand-written,
-  # main-thread glue that we want to keep readable for integration debugging).
+  # Minify each worker-side JS file in place with esbuild. We skip
+  # ``worker.js`` / ``sw.js`` because they're tiny entry-point shims
+  # where the minified form gains nothing, and ``*_native_handlers.js``
+  # because it's regenerated per build and relies on specific function
+  # names staying intact for the host-bridge registration logic.
+  # ``browser_bridge.js`` and ``port.js`` used to be skipped for
+  # readability, but combined they account for ~230 KiB of untouched
+  # text — minifying both saves ~90 KiB off the shipped bundle without
+  # affecting runtime behaviour. Readable copies live in the source
+  # tree for debugging.
   if command -v npx >/dev/null 2>&1; then
     bj_log "Minifying translated JS chunks with esbuild"
     minified_count=0
     for js in "$DIST_DIR"/*.js; do
       name="$(basename "$js")"
       case "$name" in
-        browser_bridge.js|port.js|worker.js|sw.js) continue ;;
+        worker.js|sw.js) continue ;;
         *_native_handlers.js) continue ;;
       esac
       if npx --yes esbuild --minify --log-level=error --allow-overwrite \

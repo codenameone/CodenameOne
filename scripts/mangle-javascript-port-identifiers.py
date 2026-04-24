@@ -168,11 +168,17 @@ def collect_files(out_dir: Path) -> list[Path]:
     return keep
 
 
+# The translator emits short property names (``n``, ``a``, ...) in
+# ``jvm.defineClass`` payloads to save bytes; hand-written runtime
+# snippets still use the verbose forms. Support both spellings when
+# scanning for class metadata. Also accept the ``_Z`` alias emitted
+# by the translator in place of ``jvm.defineClass`` (a 15-char
+# prefix trim).
 _CLASSDEF_NAME_PATTERN = re.compile(
-    r'jvm\.defineClass\(\{\s*name:\s*"([A-Za-z0-9_]+)"'
+    r'(?:jvm\.defineClass|_Z)\(\{\s*(?:n|name):\s*"([A-Za-z0-9_]+)"'
 )
 _CLASSDEF_ASSIGNABLE_TAIL_PATTERN = re.compile(
-    r'assignableTo:\s*\{([^}]*)\}'
+    r'(?:a|assignableTo):\s*\{([^}]*)\}'
 )
 _JSO_BRIDGE_MARKER = "com_codename1_html5_js_JSObject"
 

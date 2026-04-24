@@ -59,7 +59,17 @@ final class JavascriptSuspensionAnalysis {
     private final Map<String, ByteCodeClass> byName = new HashMap<String, ByteCodeClass>();
     private final Set<BytecodeMethod> suspending = Collections.newSetFromMap(new IdentityHashMap<BytecodeMethod, Boolean>());
 
+    // Sigs (name + descriptor) whose concrete impl set contains AT
+    // LEAST ONE suspending method. Populated during ``propagate``
+    // and exposed for the emitter's INVOKEVIRTUAL / INVOKEINTERFACE
+    // callsite decision: a dispatch whose sig isn't in this set can
+    // drop the ``yield*`` ceremony and use a sync dispatcher.
+    static volatile java.util.Set<String> exportedSuspendingSigs = java.util.Collections.<String>emptySet();
+
     static int run(List<ByteCodeClass> classes) {
+        if (System.getProperty("parparvm.js.suspension.off") != null) {
+            return 0;
+        }
         JavascriptSuspensionAnalysis a = new JavascriptSuspensionAnalysis();
         a.index(classes);
         a.seedDirectlySuspending(classes);
@@ -98,10 +108,20 @@ final class JavascriptSuspensionAnalysis {
                 if (m.isEliminated() || m.isAbstract()) {
                     continue;
                 }
+                // Only seed methods that are INTRINSICALLY suspending —
+                // native, synchronized, contain monitor ops, or live on
+                // a JSO-bridge class. Methods that merely have
+                // invokevirtual / invokeinterface are no longer seeded
+                // here; the propagate step does a CHA-style walk and
+                // only marks them suspending when at least one
+                // implementation of the targeted (name+sig) actually
+                // suspends. ~2.6k methods already classify as sync;
+                // this change lifts that count significantly by
+                // catching virtual calls whose dispatch set is
+                // entirely synchronous.
                 if (m.isNative()
                         || m.isSynchronizedMethod()
                         || hasMonitorOps(m)
-                        || hasVirtualDispatch(m)
                         || clsIsJso) {
                     suspending.add(m);
                 }
@@ -174,11 +194,41 @@ final class JavascriptSuspensionAnalysis {
     }
 
     private void propagate(List<ByteCodeClass> classes) {
-        // Build a reverse callee-to-callers index so each time we add
-        // a method to the suspending set we can re-examine only its
-        // callers instead of scanning every class every iteration.
+        // Build two reverse indexes so a method becoming suspending
+        // can propagate to all its callers without rescanning every
+        // class on each iteration:
+        //
+        //   * ``callersOf``      : callee method → methods that
+        //     INVOKESTATIC / INVOKESPECIAL call that exact callee.
+        //   * ``sigCallersOf``   : ``name+desc`` signature → methods
+        //     that INVOKEVIRTUAL / INVOKEINTERFACE dispatch on the
+        //     signature, AND ``sigImpls`` maps the same signature to
+        //     every concrete method that implements it. When any
+        //     impl of a sig becomes suspending, every caller of the
+        //     sig has to be re-examined.
         Map<BytecodeMethod, List<BytecodeMethod>> callersOf = new IdentityHashMap<BytecodeMethod, List<BytecodeMethod>>();
-        Map<BytecodeMethod, List<Invoke>> directInvokes = new IdentityHashMap<BytecodeMethod, List<Invoke>>();
+        Map<String, List<BytecodeMethod>> sigCallersOf = new HashMap<String, List<BytecodeMethod>>();
+        Map<String, List<BytecodeMethod>> sigImpls = new HashMap<String, List<BytecodeMethod>>();
+        Map<BytecodeMethod, Boolean> methodSigIsSuspending = new IdentityHashMap<BytecodeMethod, Boolean>();
+        java.util.Set<String> suspendingSigs = new java.util.HashSet<String>();
+
+        for (ByteCodeClass cls : classes) {
+            for (BytecodeMethod m : cls.getMethods()) {
+                if (m.isEliminated() || m.isAbstract() || m.isStatic() || m.isConstructor()) {
+                    continue;
+                }
+                String sig = m.getMethodName() + m.getSignature();
+                List<BytecodeMethod> impls = sigImpls.get(sig);
+                if (impls == null) {
+                    impls = new ArrayList<BytecodeMethod>();
+                    sigImpls.put(sig, impls);
+                }
+                impls.add(m);
+                if (suspending.contains(m)) {
+                    suspendingSigs.add(sig);
+                }
+            }
+        }
         for (ByteCodeClass cls : classes) {
             for (BytecodeMethod caller : cls.getMethods()) {
                 if (caller.isEliminated() || caller.isAbstract()) {
@@ -193,26 +243,35 @@ final class JavascriptSuspensionAnalysis {
                         continue;
                     }
                     int op = instr.getOpcode();
-                    if (op != Opcodes.INVOKESTATIC && op != Opcodes.INVOKESPECIAL) {
-                        continue;
-                    }
                     Invoke inv = (Invoke) instr;
-                    BytecodeMethod target = resolveTarget(inv.getOwner(), inv.getName(), inv.getDesc());
-                    if (target == null) {
-                        continue;
+                    if (op == Opcodes.INVOKESTATIC || op == Opcodes.INVOKESPECIAL) {
+                        BytecodeMethod target = resolveTarget(inv.getOwner(), inv.getName(), inv.getDesc());
+                        if (target == null) {
+                            continue;
+                        }
+                        List<BytecodeMethod> callers = callersOf.get(target);
+                        if (callers == null) {
+                            callers = new ArrayList<BytecodeMethod>();
+                            callersOf.put(target, callers);
+                        }
+                        callers.add(caller);
+                    } else if (op == Opcodes.INVOKEVIRTUAL || op == Opcodes.INVOKEINTERFACE) {
+                        String sig = inv.getName() + inv.getDesc();
+                        List<BytecodeMethod> callers = sigCallersOf.get(sig);
+                        if (callers == null) {
+                            callers = new ArrayList<BytecodeMethod>();
+                            sigCallersOf.put(sig, callers);
+                        }
+                        callers.add(caller);
+                        // Early escalation: if ANY impl of the sig is
+                        // already known suspending, this caller also
+                        // needs to be suspending. Add to the initial
+                        // worklist via the standard ``suspending.add``
+                        // + propagate path below.
+                        if (suspendingSigs.contains(sig)) {
+                            suspending.add(caller);
+                        }
                     }
-                    List<BytecodeMethod> callers = callersOf.get(target);
-                    if (callers == null) {
-                        callers = new ArrayList<BytecodeMethod>();
-                        callersOf.put(target, callers);
-                    }
-                    callers.add(caller);
-                    List<Invoke> invs = directInvokes.get(caller);
-                    if (invs == null) {
-                        invs = new ArrayList<Invoke>();
-                        directInvokes.put(caller, invs);
-                    }
-                    invs.add(inv);
                 }
             }
         }
@@ -220,16 +279,37 @@ final class JavascriptSuspensionAnalysis {
         Deque<BytecodeMethod> worklist = new ArrayDeque<BytecodeMethod>(suspending);
         while (!worklist.isEmpty()) {
             BytecodeMethod suspended = worklist.poll();
-            List<BytecodeMethod> callers = callersOf.get(suspended);
-            if (callers == null) {
-                continue;
+            // Propagate to direct callers (static / special).
+            List<BytecodeMethod> directCallers = callersOf.get(suspended);
+            if (directCallers != null) {
+                for (BytecodeMethod caller : directCallers) {
+                    if (suspending.add(caller)) {
+                        worklist.add(caller);
+                    }
+                }
             }
-            for (BytecodeMethod caller : callers) {
-                if (suspending.add(caller)) {
-                    worklist.add(caller);
+            // Propagate to virtual / interface callers of any
+            // signature this method implements. If the sig wasn't
+            // previously known-suspending, all its callers now must
+            // be re-examined.
+            if (!suspended.isStatic() && !suspended.isConstructor() && !suspended.isAbstract()) {
+                String sig = suspended.getMethodName() + suspended.getSignature();
+                if (suspendingSigs.add(sig)) {
+                    List<BytecodeMethod> sigCallers = sigCallersOf.get(sig);
+                    if (sigCallers != null) {
+                        for (BytecodeMethod caller : sigCallers) {
+                            if (suspending.add(caller)) {
+                                worklist.add(caller);
+                            }
+                        }
+                    }
                 }
             }
         }
+        // Publish the final suspending-sig set so the emitter can
+        // consult it when deciding whether an INVOKEVIRTUAL /
+        // INVOKEINTERFACE call site needs ``yield*`` wrapping.
+        exportedSuspendingSigs = suspendingSigs;
     }
 
     /**

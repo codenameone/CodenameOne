@@ -44,6 +44,46 @@ final class JavascriptMethodGenerator {
     // We rebuild this map at the start of every bundle generation so
     // resolution sees the fully loaded class graph, not a partial view.
     private static volatile Map<String, ByteCodeClass> classIndex = null;
+    // Set of ``className + '\0' + fieldName`` pairs that any reachable
+    // method references via GETSTATIC or PUTSTATIC. Populated by
+    // ``setClassIndex`` (after the RTA / suspension analyses are done)
+    // and consulted by the class-def emitter to elide static field
+    // entries that nobody ever reads. Typical win: the FontImage
+    // material-icon constant table (~2.2k entries, 60 KiB) where
+    // Initializr only touches a handful of icons.
+    private static volatile java.util.Set<String> referencedStaticFields = null;
+    // Instance-field counterpart to ``referencedStaticFields``: set
+    // of ``className + '\0' + fieldName`` pairs reached by a
+    // GETFIELD / PUTFIELD somewhere in the bundle. Consulted by the
+    // instance-field emitter (``f:[...]``) to skip entries no code
+    // reads or writes.
+    private static volatile java.util.Set<String> referencedInstanceFields = null;
+    // Dispatch IDs referenced by at least one INVOKEVIRTUAL /
+    // INVOKEINTERFACE somewhere in the reachable code. Methods
+    // whose (name+sig) doesn't appear here don't need a
+    // methods-map entry — they're invoked only via
+    // INVOKESPECIAL / INVOKESTATIC direct calls, which use the
+    // class-specific function identifier at the call site, not
+    // the class's ``methods`` table.
+    private static volatile java.util.Set<String> referencedDispatchIds = null;
+    // The class whose method is currently being emitted. Used by
+    // ``appendInterpreterEnsureClassInitialized`` to elide
+    // ``_I("X")`` when ``X`` is the containing class or one of
+    // its ancestors — those are guaranteed to be already initialized
+    // by the JVM spec before any method on ``currentEmissionClass``
+    // runs. Set at the start of each ``appendMethod`` call and cleared
+    // at the end.
+    private static ByteCodeClass currentEmissionClass = null;
+    // Name of the clinit function for the class currently being
+    // emitted, or ``null`` if this class has no clinit. Captured at
+    // method-emission time and consumed by the subsequent
+    // ``_Z({...})`` emission so the clinit is attached via a ``c:``
+    // property on the class def instead of a separate post-Z
+    // ``jvm.classes["cls"].clinit = $fn`` statement (which used to
+    // run before the class def with the new method-first emission
+    // order, causing a "Cannot set properties of undefined"
+    // TypeError).
+    private static String currentClassClinitFn = null;
 
     private JavascriptMethodGenerator() {
     }
@@ -51,6 +91,7 @@ final class JavascriptMethodGenerator {
     static void setClassIndex(List<ByteCodeClass> allClasses) {
         if (allClasses == null) {
             classIndex = null;
+            referencedStaticFields = null;
             return;
         }
         HashMap<String, ByteCodeClass> index = new HashMap<String, ByteCodeClass>();
@@ -60,6 +101,72 @@ final class JavascriptMethodGenerator {
             }
         }
         classIndex = index;
+        // Scan every reachable method's bytecode for field ops and
+        // record the (owner, fieldName) pairs each one touches. The
+        // class-def emitter consults the resulting sets to omit
+        // static / instance field entries nobody references. A
+        // field that's only WRITTEN (by its declaring ``<clinit>``
+        // or a constructor) but never READ is still considered
+        // referenced — the write itself is retained, and ripping
+        // the field out of the metadata would break that assignment
+        // at runtime.
+        //
+        // Instance fields get a small walk-up-the-hierarchy step
+        // too: a subclass access ``GETFIELD <subclass>.field``
+        // resolves to the field's declaring ancestor. Instead of
+        // doing the resolve here at collect time (which would
+        // duplicate logic from ``resolveFieldOwner``), we populate
+        // the set with the raw declared owner AND every ancestor
+        // that has a field by the same name. Over-approximation is
+        // safe: we never accidentally drop a referenced field.
+        java.util.Set<String> fieldRefs = new java.util.HashSet<String>();
+        java.util.Set<String> instanceRefs = new java.util.HashSet<String>();
+        java.util.Set<String> dispatchRefs = new java.util.HashSet<String>();
+        for (ByteCodeClass c : allClasses) {
+            if (c == null) continue;
+            for (BytecodeMethod m : c.getMethods()) {
+                if (m == null || m.isEliminated()) continue;
+                List<Instruction> insns = m.getInstructions();
+                if (insns == null) continue;
+                for (Instruction instr : insns) {
+                    if (instr instanceof com.codename1.tools.translator.bytecodes.Invoke) {
+                        int op = instr.getOpcode();
+                        if (op == Opcodes.INVOKEVIRTUAL || op == Opcodes.INVOKEINTERFACE) {
+                            com.codename1.tools.translator.bytecodes.Invoke inv =
+                                    (com.codename1.tools.translator.bytecodes.Invoke) instr;
+                            dispatchRefs.add(JavascriptNameUtil.dispatchMethodIdentifier(inv.getName(), inv.getDesc()));
+                        }
+                    }
+                    if (instr instanceof com.codename1.tools.translator.bytecodes.Field) {
+                        int op = instr.getOpcode();
+                        com.codename1.tools.translator.bytecodes.Field f =
+                                (com.codename1.tools.translator.bytecodes.Field) instr;
+                        String owner = JavascriptNameUtil.sanitizeClassName(f.getOwner());
+                        String name = f.getFieldName();
+                        if (op == Opcodes.GETSTATIC || op == Opcodes.PUTSTATIC) {
+                            fieldRefs.add(owner + "\0" + name);
+                        } else if (op == Opcodes.GETFIELD || op == Opcodes.PUTFIELD) {
+                            // Walk declared owner + every superclass /
+                            // interface that declares a field by this
+                            // name. Keeps the reference alive on the
+                            // actual declaring class even when the
+                            // access uses a subclass owner.
+                            String current = owner;
+                            while (current != null) {
+                                instanceRefs.add(current + "\0" + name);
+                                ByteCodeClass currentCls = index.get(current);
+                                if (currentCls == null) break;
+                                String base = currentCls.getBaseClass();
+                                current = base == null ? null : JavascriptNameUtil.sanitizeClassName(base);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        referencedStaticFields = fieldRefs;
+        referencedInstanceFields = instanceRefs;
+        referencedDispatchIds = dispatchRefs;
     }
 
     /**
@@ -128,7 +235,17 @@ final class JavascriptMethodGenerator {
     private static boolean isInvokeSuspending(Invoke invoke) {
         int op = invoke.getOpcode();
         if (op == Opcodes.INVOKEVIRTUAL || op == Opcodes.INVOKEINTERFACE) {
-            return true;
+            // CHA result: the signature is sync only if NO class's
+            // impl is suspending. Consult the set exported by the
+            // suspension analysis. Default (no set → all dispatches
+            // suspending) preserves the historical over-conservative
+            // behaviour when the analysis is disabled.
+            java.util.Set<String> suspendingSigs = JavascriptSuspensionAnalysis.exportedSuspendingSigs;
+            if (suspendingSigs == null) {
+                return true;
+            }
+            String sig = invoke.getName() + invoke.getDesc();
+            return suspendingSigs.contains(sig);
         }
         BytecodeMethod target = resolveDirectInvokeTarget(invoke);
         return target == null || target.isJavascriptSuspending();
@@ -174,60 +291,87 @@ final class JavascriptMethodGenerator {
         }
         StringBuilder out = new StringBuilder();
         // Collects virtual-method registrations (primary + aliases) so the
-        // whole class can be attached via a single ``jvm.m("cls",{...})``
+        // whole class can be attached via a single ``_M("cls",{...})``
         // call at the end. Per-method ``jvm.addVirtualMethod(...)`` emits
         // were previously 62% of the bundle — ~190k call sites at ~90
         // bytes each. Batching drops each entry to ``$methodId,`` (5
         // bytes via ES2015 property shorthand) or ``$ancestorId:$fn,``
         // (~12 bytes for ancestor aliases).
         StringBuilder regs = new StringBuilder();
-        out.append("// ").append(cls.getClsName()).append("\n");
-        appendClassRegistration(out, cls, allClasses);
+        StringBuilder methodsOut = new StringBuilder();
+        // Emit function declarations FIRST (they hoist), then the
+        // ``_Z({...})`` class def with the methods map attached
+        // inline. Saves the ``,_M("cls",...)`` separate-call
+        // boilerplate per class. The class def also carries the
+        // clinit function name (``c:$fn``) so the old inline
+        // ``jvm.classes["cls"].clinit = $fn`` assignment — which
+        // ran between emission and ``_Z`` — is no longer needed.
+        currentClassClinitFn = null;
         for (BytecodeMethod method : cls.getMethods()) {
             if (method.isNative() || method.isAbstract() || method.isEliminated()) {
                 continue;
             }
-            appendMethod(out, regs, cls, method);
+            appendMethod(methodsOut, regs, cls, method);
         }
-        appendInheritedMethodAliases(out, regs, cls);
         for (BytecodeMethod method : cls.getMethods()) {
             if (!method.isNative() || method.isEliminated()) {
                 continue;
             }
-            appendNativeStubIfNeeded(out, cls, method);
+            appendNativeStubIfNeeded(methodsOut, cls, method);
             if (!method.isStatic() && !method.isConstructor()) {
                 String jsMethodName = jsMethodIdentifier(cls, method);
-                appendPrimaryRegistration(regs, jsMethodName);
+                String dispatchId = JavascriptNameUtil.dispatchMethodIdentifier(method.getMethodName(), method.getSignature());
+                appendPrimaryRegistration(regs, dispatchId, jsMethodName);
             }
         }
-        appendInterfaceMethodAliases(regs, cls);
-        appendSyntheticClinitIfNeeded(out, cls);
-        flushRegistrations(out, cls, regs);
+        appendSyntheticClinitIfNeeded(methodsOut, cls);
+
+        out.append("// ").append(cls.getClsName()).append("\n");
+        out.append(methodsOut);
+        appendClassRegistration(out, cls, allClasses, regs, currentClassClinitFn);
+        currentClassClinitFn = null;
         return out.toString();
     }
 
     /**
-     * Append an object-literal entry for a method whose methodId equals
-     * the emitted JS function identifier. Uses ES2015 property shorthand
-     * so ``$ab`` expands to ``$ab: $ab`` at a 5-byte cost instead of the
-     * 20-byte ``"$ab":$ab``. Safe because every identifier produced by
-     * {@code JavascriptNameUtil.methodIdentifier} (and by the cross-file
-     * mangler's short symbols) is a valid JS identifier.
+     * Append an object-literal entry for one of this class's declared
+     * methods. The map key is a class-free ``dispatchId`` so every class
+     * that implements the same Java method stores under the same key —
+     * this lets ``resolveVirtual``'s inheritance walk resolve inherited
+     * methods directly on the ancestor's table without the child class
+     * needing to re-register them. The value is the per-class function
+     * identifier. Both sides mangle independently but in lockstep with
+     * call sites.
      */
-    private static void appendPrimaryRegistration(StringBuilder regs, String methodId) {
+    private static void appendPrimaryRegistration(StringBuilder regs, String dispatchId, String functionId) {
+        // Virtual-dispatch RTA: if no reachable INVOKEVIRTUAL /
+        // INVOKEINTERFACE in the bundle resolves to this
+        // dispatchId, skip the entry. The method's body is still
+        // emitted (INVOKESPECIAL / INVOKESTATIC call sites use
+        // ``functionId`` directly), but it doesn't need a slot in
+        // the virtual-dispatch table. ~50% of Initializr's methods
+        // fit this bucket (private / package-private helpers that
+        // never participate in virtual dispatch).
+        java.util.Set<String> dispatchRefs = referencedDispatchIds;
+        if (dispatchRefs != null && !dispatchRefs.contains(dispatchId)) {
+            return;
+        }
         if (regs.length() > 0) {
             regs.append(',');
         }
-        regs.append(methodId);
+        regs.append(dispatchId).append(':').append(functionId);
     }
 
     /**
      * Append an object-literal entry that points an ancestor method id
      * (or any id that differs from the backing function's identifier)
-     * at a specific function. Emits ``$ancestorId:$implFn``. The
-     * ancestor id is always a translator-owned ``cn1_...`` identifier
-     * (or its mangled form) — both valid JS identifiers — so no
-     * quoting is required.
+     * at a specific function. Emits ``$ancestorId:$implFn`` — the
+     * impl is a bareword reference, which works because we wrap the
+     * entire methods object in a deferred thunk (see
+     * ``flushRegistrations``). The thunk isn't evaluated until first
+     * virtual dispatch, by which time every translated_app_N.js chunk
+     * has loaded and all ``function*`` declarations are attached to
+     * globalThis.
      */
     private static void appendAliasRegistration(StringBuilder regs, String methodId, String implMethodId) {
         if (regs.length() > 0) {
@@ -240,79 +384,223 @@ final class JavascriptMethodGenerator {
         if (regs.length() == 0) {
             return;
         }
-        out.append("jvm.m(\"").append(cls.getClsName()).append("\",{").append(regs).append("});\n");
+        // Emit the methods object directly. The historical ``()=>(...)``
+        // thunk deferred evaluation to the first virtual dispatch so
+        // forward references to functions declared in LATER chunks
+        // still resolved. With the post-RTA Initializr bundle now
+        // fitting in a single ``translated_app.js`` file, every
+        // referenced function is hoisted onto the worker globalThis
+        // before ``_M`` runs at top level — no thunk needed. Each
+        // saved thunk is ``()=>(`` + ``)`` = 5 chars × ~600 classes.
+        // Kill-switch ``parparvm.js.mthunk.keep`` restores the thunk
+        // form for debugging.
+        if (System.getProperty("parparvm.js.mthunk.keep") != null) {
+            out.append("_M(\"").append(cls.getClsName()).append("\",()=>({").append(regs).append("}));\n");
+        } else {
+            out.append("_M(\"").append(cls.getClsName()).append("\",{").append(regs).append("});\n");
+        }
     }
 
     private static void appendClassRegistration(StringBuilder out, ByteCodeClass cls, List<ByteCodeClass> allClasses) {
-        out.append("jvm.defineClass({\n");
-        out.append("  name: \"").append(cls.getClsName()).append("\",\n");
-        out.append("  baseClass: ");
-        if (cls.getBaseClass() == null) {
-            out.append("null");
-        } else {
-            out.append("\"").append(JavascriptNameUtil.sanitizeClassName(cls.getBaseClass())).append("\"");
+        appendClassRegistration(out, cls, allClasses, null, null);
+    }
+
+    private static void appendClassRegistration(StringBuilder out, ByteCodeClass cls, List<ByteCodeClass> allClasses, StringBuilder methodsMap, String clinitFn) {
+        // Property names are the single-char short forms the runtime
+        // reads: n=name, b=baseClass, i=interfaces, A=isAbstract, I=isInterface,
+        // a=assignableTo, f=instanceFields, s=staticFields. Each class
+        // was previously ~60 chars of property-name overhead (``name:``,
+        // ``baseClass:``, ``interfaces:``, ``assignableTo:``,
+        // ``instanceFields:``, ``staticFields:``); collapsing to
+        // single chars saves ~60 chars × 1590 classes ≈ 95 KiB.
+        out.append("_Z({\n");
+        // Full class name goes into ``n:`` — runtime uses this for
+        // both ``def.name`` and the auto-populate of ``assignableTo``.
+        out.append("  n: \"").append(cls.getClsName()).append("\",\n");
+        // ``b:`` omitted entirely when the class directly extends
+        // ``java_lang_Object`` — runtime defaults to Object. Saves
+        // 7-8 chars × ~1200 leaf classes. ``b:null`` stays explicit
+        // for the Object class itself (so defineClass knows not to
+        // chase a parent).
+        String baseClass = cls.getBaseClass();
+        if (baseClass == null) {
+            out.append("  b: null,\n");
+        } else if (!"java_lang_Object".equals(JavascriptNameUtil.sanitizeClassName(baseClass))) {
+            out.append("  b: \"").append(JavascriptNameUtil.sanitizeClassName(baseClass)).append("\",\n");
         }
-        out.append(",\n");
-        out.append("  interfaces: [");
-        boolean first = true;
-        for (String iface : cls.getBaseInterfaces()) {
-            if (!first) {
-                out.append(", ");
+        // else: base is Object, emit nothing; runtime defaults to it.
+        boolean first;
+        if (!cls.getBaseInterfaces().isEmpty()) {
+            out.append("  i: [");
+            first = true;
+            for (String iface : cls.getBaseInterfaces()) {
+                if (!first) {
+                    out.append(", ");
+                }
+                first = false;
+                out.append("\"").append(JavascriptNameUtil.sanitizeClassName(iface)).append("\"");
             }
-            first = false;
-            out.append("\"").append(JavascriptNameUtil.sanitizeClassName(iface)).append("\"");
+            out.append("],\n");
         }
-        out.append("],\n");
-        out.append("  isInterface: ").append(cls.isIsInterface()).append(",\n");
-        out.append("  isAbstract: ").append(cls.isIsAbstract()).append(",\n");
+        if (cls.isIsInterface()) {
+            out.append("  I: 1,\n");
+        }
+        if (cls.isIsAbstract()) {
+            out.append("  A: 1,\n");
+        }
         appendAssignableTypes(out, cls, allClasses);
-        out.append("  instanceFields: [");
-        first = true;
+        // Instance fields used to serialize as
+        //   {owner:"$X",name:"hour",desc:"$je",prop:"$Ne"}
+        // per field — ~50 chars each, 4k fields across Initializr. We
+        // now emit a 2-element tuple ``[prop, desc]``. ``owner`` and
+        // ``name`` were only consulted by the runtime's fallback
+        // ``prop || fieldProperty(owner,name)``; that fallback is
+        // dead because the emitter always writes a concrete ``prop``.
+        // Omit ``instanceFields`` / ``staticFields`` when empty. The
+        // runtime's ``defineClass`` defaults a missing ``instanceFields``
+        // to ``[]`` and missing ``staticFields`` to ``{}``. Leaf-only
+        // classes and interfaces often have neither, so omitting
+        // these saves ~30 chars per such class.
+        boolean hasInstanceField = false;
+        boolean hasStaticField = false;
         for (ByteCodeField field : cls.getFields()) {
-            if (field.isStaticField()) {
-                continue;
-            }
-            if (!first) {
-                out.append(", ");
-            }
-            first = false;
-            String desc = field.getRuntimeDescriptor();
-            out.append("{ owner: \"").append(field.getClsName()).append("\", name: \"")
-                    .append(field.getFieldName()).append("\", desc: \"")
-                    .append(JavascriptNameUtil.escapeJs(desc == null ? "" : desc)).append("\", prop: \"")
-                    .append(JavascriptNameUtil.fieldProperty(field.getClsName(), field.getFieldName())).append("\" }");
+            if (field.isStaticField()) hasStaticField = true;
+            else hasInstanceField = true;
         }
-        out.append("],\n");
-        out.append("  staticFields: {");
-        first = true;
-        for (ByteCodeField field : cls.getFields()) {
-            if (!field.isStaticField()) {
-                continue;
+        if (hasInstanceField) {
+            // Field-level RTA for instance fields: skip entries no
+            // reachable code reads or writes. Missing fields cause
+            // GETFIELD-on-fresh-object to see ``undefined`` instead
+            // of the Java default (0 / null); the RTA covers only
+            // fields with ZERO references, so the missing default
+            // can never be observed.
+            //
+            // Packed encoding: ``f: "$a|$b:I|$c"`` — fields separated
+            // by ``|``, primitive type descriptors tacked onto the
+            // field name with ``:`` (reference fields drop the
+            // suffix entirely). Runtime ``initInstanceFields``
+            // splits on ``|`` / ``:`` — same number of branches, but
+            // ~14 KiB shorter on the wire compared to the prior
+            // ``[["$a"],["$b","I"],["$c"]]`` tuple-array form.
+            java.util.Set<String> refs = referencedInstanceFields;
+            StringBuilder packed = new StringBuilder();
+            boolean anyEmitted = false;
+            for (ByteCodeField field : cls.getFields()) {
+                if (field.isStaticField()) {
+                    continue;
+                }
+                if (refs != null
+                        && !refs.contains(cls.getClsName() + "\0" + field.getFieldName())) {
+                    continue;
+                }
+                if (anyEmitted) {
+                    packed.append('|');
+                }
+                anyEmitted = true;
+                String desc = field.getRuntimeDescriptor();
+                packed.append(JavascriptNameUtil.fieldProperty(field.getClsName(), field.getFieldName()));
+                if (desc != null && !desc.isEmpty() && isPrimitiveDescriptor(desc)) {
+                    packed.append(':').append(desc);
+                }
             }
-            if (!first) {
-                out.append(", ");
+            if (anyEmitted) {
+                out.append("  f: \"").append(packed).append("\",\n");
             }
-            first = false;
-            out.append("\"").append(field.getFieldName()).append("\": ")
-                    .append(renderStaticFieldInitialValue(field));
         }
-        out.append("},\n");
-        out.append("  methods: {},\n");
-        out.append("  classObject: null\n");
+        if (hasStaticField) {
+            // Track whether any surviving field needs to be emitted;
+            // if every static field is unreferenced, skip the ``s``
+            // map entirely so we don't ship an empty ``s:{}``.
+            java.util.Set<String> refs = referencedStaticFields;
+            StringBuilder staticBuf = new StringBuilder();
+            boolean anyEmitted = false;
+            for (ByteCodeField field : cls.getFields()) {
+                if (!field.isStaticField()) {
+                    continue;
+                }
+                // Field-level RTA: if no reachable method performs a
+                // GETSTATIC / PUTSTATIC against this (owner, field),
+                // nothing can ever observe or mutate its value —
+                // skip the entry. Java ``public static final``
+                // constants compile to a ``ConstantValue`` attribute
+                // plus a JVM-fabricated clinit PUTSTATIC; eliminating
+                // both the PUTSTATIC and the map slot for unused
+                // constants is safe because no later code reads them.
+                // Kept references are everything else: fields that
+                // somebody somewhere in the surviving bundle touches.
+                if (refs != null
+                        && !refs.contains(cls.getClsName() + "\0" + field.getFieldName())) {
+                    continue;
+                }
+                if (anyEmitted) {
+                    staticBuf.append(", ");
+                }
+                anyEmitted = true;
+                staticBuf.append("\"").append(field.getFieldName()).append("\": ")
+                        .append(renderStaticFieldInitialValue(field));
+            }
+            if (anyEmitted) {
+                out.append("  s: {").append(staticBuf).append("},\n");
+            }
+        }
+        // ``m:`` inline-methods map — consolidates the prior
+        // ``_M("cls",{...})`` call into the class def, saving the
+        // per-class ``,_M("cls",`` prefix (~6-10 chars × 612 classes
+        // ≈ 5 KiB). Runtime ``defineClass`` treats ``def.m`` the
+        // same way ``jvm.m`` used to — applies entries via
+        // ``applyMethodMap`` at registration time.
+        if (methodsMap != null && methodsMap.length() > 0) {
+            out.append("  m: {").append(methodsMap).append("},\n");
+        }
+        // ``c:`` inlines the clinit function reference — used to be
+        // a separate ``jvm.classes["cls"].clinit = $fn`` statement.
+        // Consolidating it here lets us emit methods first (so their
+        // ``function*`` declarations hoist) with the ``_Z({...})``
+        // class def following, without the clinit attachment trying
+        // to write to a not-yet-registered ``jvm.classes["cls"]``.
+        if (clinitFn != null) {
+            out.append("  c: ").append(clinitFn).append("\n");
+        }
+        // ``methods`` and ``classObject`` are always populated/
+        // overwritten by the runtime (defineClass creates the
+        // methods map and classObject; _M() adds entries). Emitting
+        // the explicit placeholders wastes ~28 chars × 1590 classes.
         out.append("});\n");
     }
 
     private static void appendAssignableTypes(StringBuilder out, ByteCodeClass cls, List<ByteCodeClass> allClasses) {
-        List<String> assignableTypes = new java.util.ArrayList<String>();
-        collectAssignableTypes(cls, allClasses, assignableTypes);
-        out.append("  assignableTo: {");
-        for (int i = 0; i < assignableTypes.size(); i++) {
-            if (i > 0) {
-                out.append(", ");
+        // ``a:{...}`` used to enumerate the full transitive closure
+        // of every type this class is assignable to — self, every
+        // base class, every interface (plus their bases and parent
+        // interfaces). That meant ~40-60 repeating class names per
+        // class × 1.5k classes ≈ 62 KiB of duplicated name strings.
+        // We now emit ONLY the class's own name; ``defineClass`` on
+        // the runtime side unions in the parent / interface sets
+        // (both already registered by the time the child's
+        // ``defineClass`` runs, since base classes are always
+        // emitted before their subclasses).
+        //
+        // Kill-switch ``parparvm.js.assignableto.full`` restores the
+        // historical full emission if a future host calls
+        // ``defineClass`` on a class whose ancestors haven't been
+        // registered yet.
+        if (System.getProperty("parparvm.js.assignableto.full") != null) {
+            List<String> assignableTypes = new java.util.ArrayList<String>();
+            collectAssignableTypes(cls, allClasses, assignableTypes);
+            out.append("  a: {");
+            for (int i = 0; i < assignableTypes.size(); i++) {
+                if (i > 0) {
+                    out.append(", ");
+                }
+                out.append("\"").append(assignableTypes.get(i)).append("\":1");
             }
-            out.append("\"").append(assignableTypes.get(i)).append("\": true");
+            out.append("},\n");
+            return;
         }
-        out.append("},\n");
+        // Default: emit nothing. ``defineClass`` treats a missing
+        // ``a:`` key the same way as ``a:1`` — auto-populate the
+        // assignableTo union from the base-class + interfaces
+        // metadata already on the def.
     }
 
     private static void collectAssignableTypes(ByteCodeClass cls, List<ByteCodeClass> allClasses, List<String> out) {
@@ -368,7 +656,7 @@ final class JavascriptMethodGenerator {
     private static String renderStaticConstant(ByteCodeField field) {
         Object value = field.getValue();
         if (value instanceof String) {
-            return "jvm.createStringLiteral(\"" + JavascriptNameUtil.escapeJs((String) value) + "\")";
+            return "_L(\"" + JavascriptNameUtil.escapeJs((String) value) + "\")";
         }
         if (value instanceof Boolean) {
             return ((Boolean) value).booleanValue() ? "1" : "0";
@@ -404,7 +692,12 @@ final class JavascriptMethodGenerator {
             if (!field.isStaticField() || !requiresDeferredStaticInitialization(field)) {
                 continue;
             }
-            out.append("  jvm.classes[\"").append(cls.getClsName()).append("\"].staticFields[\"")
+            // ``_S["cls"]["field"]`` is the same ~20-char win as at
+            // GETSTATIC / PUTSTATIC sites; these deferred-init
+            // statements are emitted inside clinit bodies where the
+            // verbose ``jvm.classes[...].staticFields[...]`` form used
+            // to dominate the wire size.
+            out.append("  _S[\"").append(cls.getClsName()).append("\"][\"")
                     .append(field.getFieldName()).append("\"] = ").append(renderStaticConstant(field)).append(";\n");
         }
     }
@@ -427,10 +720,323 @@ final class JavascriptMethodGenerator {
         appendDeferredStaticFieldInitialization(out, cls);
         out.append("  return null;\n");
         out.append("}\n");
-        out.append("jvm.classes[\"").append(cls.getClsName()).append("\"].clinit = ").append(fn).append(";\n");
+        currentClassClinitFn = fn;
     }
 
     private static void appendMethod(StringBuilder out, StringBuilder regs, ByteCodeClass cls, BytecodeMethod method) {
+        currentEmissionClass = cls;
+        try {
+            // Emit into a local buffer so we can run a peephole pass
+            // over the assembled method body before flushing to the
+            // real output. The peephole collapses common push/pop
+            // dataflow patterns the emitter can't see across
+            // instructions (e.g., ALOAD + GETFIELD ≈ push X.Y).
+            StringBuilder methodOut = new StringBuilder();
+            appendMethodImpl(methodOut, regs, cls, method);
+            out.append(applyMethodPeephole(methodOut));
+        } finally {
+            currentEmissionClass = null;
+        }
+    }
+
+    /**
+     * Peephole pass over an emitted method body. Collapses common
+     * stack-dataflow patterns the per-instruction emitter can't see:
+     *
+     * <ul>
+     * <li>{@code stack.p(X),stack.p(stack.q().$F)} → {@code stack.p(X.$F)}
+     *     — push value, pop-and-getfield → push X.$F. ~2.9k sites.</li>
+     * </ul>
+     *
+     * Each rewrite keeps running until no further match, since the
+     * collapsed form can itself chain with a subsequent getfield
+     * (``.p(X.$F),.p(.q().$G)`` → ``.p(X.$F.$G)``).
+     */
+    private static String applyMethodPeephole(CharSequence body) {
+        String s = body.toString();
+        // Safe-strip has already elided pc advances between adjacent
+        // non-throwing instructions, so ALOAD + GETFIELD collapse to
+        // two consecutive ``stack.p(...)`` expressions separated by
+        // whitespace inside a single case block.
+        //
+        // push X; pop+getfield Y  ≡  push X.Y
+        //   ``stack.p(X) stack.p(stack.q()["$prop"])``
+        // →  ``stack.p(X["$prop"])``
+        //
+        // Chained GETFIELDs collapse further (e.g. ``push X; .$a; .$b``
+        // → ``push X[$a][$b]``) because the rewritten RHS still
+        // matches the pattern. Iterate until no more matches.
+        //
+        // X is conservatively captured as a short expression shape:
+        // identifier + optional bracket accesses. Anything more
+        // complicated (parens, commas, operators) bails out to the
+        // literal push.
+        String prev;
+        do {
+            prev = s;
+            // Field-name tokens at this pre-mangle stage look like
+            // ``cn1_java_lang_String_value`` (long ``cn1_*`` form).
+            // The mangler later rewrites them to ``$...``. We match
+            // the raw form here and preserve the quoted string so
+            // both sides of the substitution stay intact.
+            //
+            // Rule 1: ALOAD + GETFIELD → inline field access.
+            //   stack.p(X); stack.p(stack.q()["F"])  →  stack.p(X["F"])
+            // Chained field accesses collapse via iteration (the
+            // rewritten form with ``X["F"]`` matches the pattern for
+            // the next GETFIELD).
+            s = s.replaceAll(
+                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(stack\\.q\\(\\)\\[\"([\\w\\$]+)\"\\]\\)",
+                    "stack.p($1[\"$2\"])");
+            // Rule 2: ALOAD + const + PUTFIELD → inline field store.
+            //   stack.p(T); stack.p(V); { let v=stack.q(); stack.q()["F"]=v; pc=N; break; }
+            //     → T["F"]=V; pc=N; break;
+            // Value shape is conservative: simple identifier, literal
+            // number, ``jvm.classes...`` expr, or another simple
+            // identifier[prop] access.
+            s = s.replaceAll(
+                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(([^,;(){}]+)\\);?\\s*\\{\\s*let v = stack\\.q\\(\\);\\s*stack\\.q\\(\\)\\[\"([\\w\\$]+)\"\\] = v;\\s*(pc = \\d+; break;)\\s*\\}",
+                    "$1[\"$3\"] = $2; $4");
+            // Rule 3: ALOAD + ASTORE → locals[M] = locals[N].
+            //   stack.p(X); locals[N] = stack.q();
+            //     → locals[N] = X;
+            s = s.replaceAll(
+                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*)\\);?\\s*locals\\[(\\d+)\\] = stack\\.q\\(\\);",
+                    "locals[$2] = $1;");
+            // Rule 4: IADD/ISUB/IMUL/IAND/IOR/IXOR with int-coercion.
+            //   stack.p(X); stack.p(Y);
+            //   { let b = stack.q(); let a = stack.q(); stack.p((a|0) OP (b|0)); }
+            //     → stack.p(((X)|0) OP ((Y)|0));
+            // Conservative X/Y shape to avoid runaway matches.
+            s = s.replaceAll(
+                    "stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{\\s*let b = stack\\.q\\(\\);\\s*let a = stack\\.q\\(\\);\\s*stack\\.p\\(\\(a\\|0\\)\\s*([+\\-*&|\\^])\\s*\\(b\\|0\\)\\);\\s*\\}",
+                    "stack.p(($1|0)$3($2|0));");
+            // Rule 5: LADD/LSUB/LMUL/FADD/FSUB/FMUL/DADD/DSUB/DMUL
+            // plus LAND/LOR/LXOR (no int-coercion form).
+            //   stack.p(X); stack.p(Y);
+            //   { let b = stack.q(); let a = stack.q(); stack.p(a OP b); }
+            //     → stack.p((X) OP (Y));
+            s = s.replaceAll(
+                    "stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{\\s*let b = stack\\.q\\(\\);\\s*let a = stack\\.q\\(\\);\\s*stack\\.p\\(a\\s*([+\\-*&|\\^])\\s*b\\);\\s*\\}",
+                    "stack.p(($1)$3($2));");
+            // Rule 5b: ISHL/ISHR with (b & 31) shift-distance mask.
+            //   stack.p(X); stack.p(Y);
+            //   { let b=stack.q(); let a=stack.q(); stack.p((a|0) OP (b & 31)); }
+            //     → stack.p(((X)|0) OP ((Y) & 31));
+            s = s.replaceAll(
+                    "stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{\\s*let b = stack\\.q\\(\\);\\s*let a = stack\\.q\\(\\);\\s*stack\\.p\\(\\(a\\|0\\)\\s*(<<|>>)\\s*\\(b & 31\\)\\);\\s*\\}",
+                    "stack.p(($1|0)$3(($2) & 31));");
+            // Rule 5c: IUSHR with ((a >>> (b & 31)) | 0) canonicalisation.
+            s = s.replaceAll(
+                    "stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{\\s*let b = stack\\.q\\(\\);\\s*let a = stack\\.q\\(\\);\\s*stack\\.p\\(\\(a >>> \\(b & 31\\)\\) \\| 0\\);\\s*\\}",
+                    "stack.p((($1) >>> (($2) & 31)) | 0);");
+            // Rule 6: DUP preceded by a push — duplicate the value.
+            //   stack.p(X); stack.p(stack[stack.length - 1]);
+            //     → stack.p(X); stack.p(X);
+            // Simpler yet: we can't do ``X`` twice if X has side
+            // effects (e.g. a function call), so restrict to simple
+            // identifiers and bracket accesses.
+            s = s.replaceAll(
+                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(stack\\[stack\\.length - 1\\]\\);",
+                    "stack.p($1); stack.p($1);");
+            // Rule 7: inline 0-arg virtual dispatch when the target
+            // was just pushed.
+            //   stack.p(T); stack.p(yield* cn1_iv0(stack.q(), "mid"));
+            //     → stack.p(yield* cn1_iv0(T, "mid"));
+            // T restricted to simple identifier+index shape.
+            s = s.replaceAll(
+                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(yield\\* cn1_iv0\\(stack\\.q\\(\\), \"([^\"]+)\"\\)\\);",
+                    "stack.p(yield* cn1_iv0($1, \"$2\"));");
+            // Rule 8: inline 1-arg virtual dispatch when target+arg
+            // were just pushed.
+            //   stack.p(T); stack.p(A);
+            //   { let __arg0 = stack.q(); stack.p(yield* cn1_iv1(stack.q(), "mid", __arg0)); pc = N; break; }
+            //     → stack.p(yield* cn1_iv1(T, "mid", A)); pc = N; break;
+            s = s.replaceAll(
+                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{ let __arg0 = stack\\.q\\(\\); stack\\.p\\(yield\\* cn1_iv1\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0\\)\\); (pc = \\d+; break;) \\}",
+                    "stack.p(yield* cn1_iv1($1, \"$3\", $2)); $4");
+            // Rule 8b: extended arg pattern allowing ONE level of
+            // balanced parens inside the arg push — captures common
+            // shapes like ``_L("...")``, ``_O("...")``, ``_F(N)``,
+            // ``$fn(x)`` that the restrictive Rule 8 skips. The target
+            // push still requires the simple identifier/bracket shape
+            // so the rewrite stays safe. 2-level nested calls (e.g.
+            // ``yield* $fn(stack.q())``) stay on the slow path.
+            s = s.replaceAll(
+                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(((?:[^;{}()]|\\([^()]*\\))+)\\);?\\s*\\{ let __arg0 = stack\\.q\\(\\); stack\\.p\\(yield\\* cn1_iv1\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0\\)\\); (pc = \\d+; break;) \\}",
+                    "stack.p(yield* cn1_iv1($1, \"$3\", $2)); $4");
+            // Rule 9: same as Rule 8 but for void return.
+            s = s.replaceAll(
+                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{ let __arg0 = stack\\.q\\(\\); yield\\* cn1_iv1\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0\\); (pc = \\d+; break;) \\}",
+                    "yield* cn1_iv1($1, \"$3\", $2); $4");
+            // Rule 9b: extended arg — balanced-parens variant of Rule 9.
+            s = s.replaceAll(
+                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(((?:[^;{}()]|\\([^()]*\\))+)\\);?\\s*\\{ let __arg0 = stack\\.q\\(\\); yield\\* cn1_iv1\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0\\); (pc = \\d+; break;) \\}",
+                    "yield* cn1_iv1($1, \"$3\", $2); $4");
+            // Rule 10: 2-arg virtual with target + two args all pushed.
+            //   stack.p(T); stack.p(A0); stack.p(A1);
+            //   { let __arg1 = stack.q(); let __arg0 = stack.q(); stack.p(yield* cn1_iv2(stack.q(), "mid", __arg0, __arg1)); pc = N; break; }
+            //     → stack.p(yield* cn1_iv2(T, "mid", A0, A1)); pc = N; break;
+            s = s.replaceAll(
+                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{ let __arg1 = stack\\.q\\(\\); let __arg0 = stack\\.q\\(\\); stack\\.p\\(yield\\* cn1_iv2\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0, __arg1\\)\\); (pc = \\d+; break;) \\}",
+                    "stack.p(yield* cn1_iv2($1, \"$4\", $2, $3)); $5");
+            // Rule 10c: 2-arg virtual with balanced-parens args.
+            s = s.replaceAll(
+                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(((?:[^;{}()]|\\([^()]*\\))+)\\);?\\s*stack\\.p\\(((?:[^;{}()]|\\([^()]*\\))+)\\);?\\s*\\{ let __arg1 = stack\\.q\\(\\); let __arg0 = stack\\.q\\(\\); stack\\.p\\(yield\\* cn1_iv2\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0, __arg1\\)\\); (pc = \\d+; break;) \\}",
+                    "stack.p(yield* cn1_iv2($1, \"$4\", $2, $3)); $5");
+            // Rule 11: 0-arg INVOKESPECIAL with inline target.
+            //   stack.p(T); stack.p(yield* $ctor(stack.q())); pc = N; break;
+            //     → stack.p(yield* $ctor(T)); pc = N; break;
+            // Also the sync (no yield*) variant.
+            s = s.replaceAll(
+                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\((yield\\* )?([a-zA-Z_\\$][\\w\\$]*)\\(stack\\.q\\(\\)\\)\\);",
+                    "stack.p($2$3($1));");
+            // Rule 12: 0-arg INVOKESTATIC with inline arg.
+            //   stack.p(A); stack.p(yield* $fn(stack.q())); pc = N; break;
+            //     → stack.p(yield* $fn(A));
+            // (Already covered by Rule 11's shape since INVOKESTATIC
+            // 1-arg looks identical.)
+            // Rule 13: straight-line slot value-propagation.
+            //   sN = EXPR; sN = sN["$prop"];
+            //     → sN = EXPR["$prop"];
+            // Chains further through iteration (sN=X; sN=sN.a; sN=sN.b
+            // → sN=X.a.b). Matches only simple slot-to-slot flow where
+            // the next statement reads and writes the SAME slot.
+            s = s.replaceAll(
+                    "(\\s+s(\\d+) = )([^;]+);\\s+s\\2 = s\\2(\\[\"[\\w\\$]+\"\\]);",
+                    "$1$3$4;");
+            // Rule 14: straight-line slot-to-return chain.
+            //   sN = EXPR; return sN;
+            //     → return EXPR;
+            // The trailing slot assignment is dead — the return
+            // consumes the value directly.
+            s = s.replaceAll(
+                    "\\s+s(\\d+) = ([^;]+);\\s+return s\\1;",
+                    "\n  return $2;");
+            // Rule 14b: straight-line slot propagation into a same-slot
+            // function call (covers the common INVOKEVIRTUAL /
+            // INVOKEINTERFACE / INVOKESTATIC shape where the result
+            // overwrites the slot that supplied the receiver/first
+            // argument).
+            //   sN = EXPR;
+            //   sN = yield* fn(sN, extra-args);
+            //     → sN = yield* fn(EXPR, extra-args);
+            // EXPR is conservatively a simple identifier / field
+            // access / bracket path so we don't duplicate a call-site
+            // or ``yield*`` across the substitution.
+            s = s.replaceAll(
+                    "(\\s+s(\\d+) = )([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\]|\\[\"[\\w\\$]+\"\\]|\\.\\$?[\\w]+)*);\\s+s\\2 = ((?:yield\\* )?[\\w\\$]+(?:\\.[\\w\\$]+)*)\\(s\\2((?:, [^)]*)?)\\);",
+                    "$1$4($3$5);");
+            // Rule 14c: same as 14b but the wrapping statement
+            // doesn't reassign — it's a bare call (void method).
+            //   sN = EXPR;
+            //   fn(sN, ...);    or   yield* fn(sN, ...);
+            // → fn(EXPR, ...);
+            // Only safe when sN has no LATER reads — conservatively
+            // this rewrite assumes the next statement is the final
+            // use, which is a common straight-line shape. Skipping
+            // for now to avoid risk; Rule 14b covers the clear case
+            // where the slot is overwritten.
+            // Rule 15: 3-arg virtual with target + three args all pushed.
+            //   stack.p(T); stack.p(A0); stack.p(A1); stack.p(A2);
+            //   { let __arg2=q; let __arg1=q; let __arg0=q; stack.p(yield* cn1_iv3(q, "mid", __arg0, __arg1, __arg2)); pc=N; break; }
+            //     → stack.p(yield* cn1_iv3(T, "mid", A0, A1, A2)); pc=N; break;
+            s = s.replaceAll(
+                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{ let __arg2 = stack\\.q\\(\\); let __arg1 = stack\\.q\\(\\); let __arg0 = stack\\.q\\(\\); stack\\.p\\(yield\\* cn1_iv3\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0, __arg1, __arg2\\)\\); (pc = \\d+; break;) \\}",
+                    "stack.p(yield* cn1_iv3($1, \"$5\", $2, $3, $4)); $6");
+            // Rule 15b: void-return variant of Rule 15.
+            s = s.replaceAll(
+                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{ let __arg2 = stack\\.q\\(\\); let __arg1 = stack\\.q\\(\\); let __arg0 = stack\\.q\\(\\); yield\\* cn1_iv3\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0, __arg1, __arg2\\); (pc = \\d+; break;) \\}",
+                    "yield* cn1_iv3($1, \"$5\", $2, $3, $4); $6");
+            // Rule 16: 4-arg virtual with target + four args all pushed.
+            s = s.replaceAll(
+                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{ let __arg3 = stack\\.q\\(\\); let __arg2 = stack\\.q\\(\\); let __arg1 = stack\\.q\\(\\); let __arg0 = stack\\.q\\(\\); stack\\.p\\(yield\\* cn1_iv4\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0, __arg1, __arg2, __arg3\\)\\); (pc = \\d+; break;) \\}",
+                    "stack.p(yield* cn1_iv4($1, \"$6\", $2, $3, $4, $5)); $7");
+            // Rule 16b: void-return variant of Rule 16.
+            s = s.replaceAll(
+                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{ let __arg3 = stack\\.q\\(\\); let __arg2 = stack\\.q\\(\\); let __arg1 = stack\\.q\\(\\); let __arg0 = stack\\.q\\(\\); yield\\* cn1_iv4\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0, __arg1, __arg2, __arg3\\); (pc = \\d+; break;) \\}",
+                    "yield* cn1_iv4($1, \"$6\", $2, $3, $4, $5); $7");
+            // Rule 10b: void-return variant of Rule 10 (2-arg virtual).
+            s = s.replaceAll(
+                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{ let __arg1 = stack\\.q\\(\\); let __arg0 = stack\\.q\\(\\); yield\\* cn1_iv2\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0, __arg1\\); (pc = \\d+; break;) \\}",
+                    "yield* cn1_iv2($1, \"$4\", $2, $3); $5");
+            // Rule 17: array load (AALOAD/IALOAD/BALOAD/CALOAD/SALOAD)
+            // with inlined array + index pushes.
+            //   stack.p(A); stack.p(I);
+            //   { let idx=stack.q(); let arr=stack.q(); stack.p(_A(arr, idx)); pc=N; break; }
+            //     → stack.p(_A(A, I)); pc=N; break;
+            // _A can throw (AIOOBE / NPE) so we retain the pc advance.
+            s = s.replaceAll(
+                    "stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{ let idx = stack\\.q\\(\\); let arr = stack\\.q\\(\\); stack\\.p\\(_A\\(arr, idx\\)\\); (pc = \\d+; break;) \\}",
+                    "stack.p(_A($1, $2)); $3");
+        } while (!prev.equals(s));
+        // Post-pass: drop straight-line slot / local declarations
+        // (``let sN;`` / ``let lN;``) whose name is never referenced
+        // elsewhere in the method body. Rule 13 / 14 and the
+        // slot-propagation rewrites above often eliminate the only
+        // remaining use of a slot, leaving its bare declaration as
+        // dead bytes. Each dead decl is ~8 chars.
+        s = removeDeadLetDecls(s);
+        return s;
+    }
+
+
+    /**
+     * Scan ``body`` for ``let (s|l)N;`` declarations and drop any
+     * whose identifier doesn't appear anywhere else. The check uses a
+     * word-boundary regex so ``l1`` doesn't accidentally match inside
+     * ``l10``, ``locals1``, or similar. Runs once after the fixed-
+     * point peephole pass — dropping a decl can't enable further
+     * rewrites, so one pass suffices.
+     */
+    private static String removeDeadLetDecls(String body) {
+        java.util.regex.Pattern declPattern = java.util.regex.Pattern.compile(
+                "  let ([sl]\\d+);\\n");
+        java.util.regex.Matcher m = declPattern.matcher(body);
+        StringBuilder out = new StringBuilder(body.length());
+        int last = 0;
+        while (m.find()) {
+            String ident = m.group(1);
+            // Count word-boundary occurrences of ``ident`` in the
+            // WHOLE body (not just post-decl): a later assignment
+            // might reassign the slot without reading, in which case
+            // the decl is still dead. Any use (read or write)
+            // elsewhere keeps the decl alive.
+            int count = countWholeIdentifier(body, ident);
+            // The decl itself contributes one occurrence; anything
+            // else means the slot is used.
+            if (count > 1) {
+                continue;
+            }
+            out.append(body, last, m.start());
+            last = m.end();
+        }
+        if (last == 0) {
+            return body;
+        }
+        out.append(body, last, body.length());
+        return out.toString();
+    }
+
+    private static int countWholeIdentifier(String body, String ident) {
+        int count = 0;
+        int from = 0;
+        int len = ident.length();
+        while ((from = body.indexOf(ident, from)) >= 0) {
+            char before = from > 0 ? body.charAt(from - 1) : ' ';
+            int endIdx = from + len;
+            char after = endIdx < body.length() ? body.charAt(endIdx) : ' ';
+            boolean leftOk = !Character.isLetterOrDigit(before) && before != '_' && before != '$';
+            boolean rightOk = !Character.isLetterOrDigit(after) && after != '_' && after != '$';
+            if (leftOk && rightOk) {
+                count++;
+            }
+            from += len;
+        }
+        return count;
+    }
+
+    private static void appendMethodImpl(StringBuilder out, StringBuilder regs, ByteCodeClass cls, BytecodeMethod method) {
         List<Instruction> instructions = method.getInstructions();
         Map<Label, Integer> labelToIndex = buildLabelMap(instructions);
         String jsMethodName = jsMethodIdentifier(cls, method);
@@ -461,44 +1067,72 @@ final class JavascriptMethodGenerator {
         }
         out.append("){\n");
         if (!wrappedStaticMethod && method.isStatic() && !"__CLINIT__".equals(method.getMethodName())) {
-            out.append("  jvm.ensureClassInitialized(\"").append(cls.getClsName()).append("\");\n");
+            out.append("  _I(\"").append(cls.getClsName()).append("\");\n");
         }
         if ("__CLINIT__".equals(method.getMethodName())) {
             appendDeferredStaticFieldInitialization(out, cls);
         }
         if (appendStraightLineMethodBody(out, regs, cls, method, instructions, wrappedStaticMethod ? jsMethodBodyName : jsMethodName)) {
-            if (wrappedStaticMethod) {
+            if (wrappedStaticMethod && shouldEmitStaticWrapper(method)) {
                 appendWrappedStaticMethod(out, cls, method, jsMethodName, jsMethodBodyName);
             }
             return;
         }
-        boolean usesClassInitCache = hasClassInitSensitiveAccess(instructions);
-        // Virtual-dispatch caching is now handled globally by jvm.resolveVirtual
-        // (it owns resolvedVirtualCache keyed on className|methodId), so we no
-        // longer emit a per-method __cn1Virtual cache object. The cn1_iv*
-        // helpers in parparvm_runtime.js do the classDef fast-path + fallback.
-        // The old boolean is retained (hardcoded false) so the existing method
-        // signatures that plumb it through don't need cascading edits.
+        // Both per-method caches are gone now: the virtual-dispatch
+        // cache moved to a global ``resolvedVirtualCache`` keyed on
+        // className|methodId (see ``jvm.resolveVirtual``), and the
+        // class-init cache was dropped because
+        // ``jvm.ensureClassInitialized`` already early-returns on its
+        // own ``cls.initialized`` flag. The booleans are hard-coded
+        // here so the legacy ``appendInstruction(...,
+        // usesClassInitCache, usesVirtualDispatchCache)`` signatures
+        // don't need cascading edits.
+        boolean usesClassInitCache = false;
         boolean usesVirtualDispatchCache = false;
-        out.append("  const locals = new Array(").append(Math.max(1, method.getMaxLocals())).append(").fill(null);\n");
-        out.append("  const stack = [];\n");
-        out.append("  let pc = 0;\n");
-        if (usesClassInitCache) {
-            out.append("  const __cn1Init = Object.create(null);\n");
-            if (method.isStatic() && !"__CLINIT__".equals(method.getMethodName())) {
-                out.append("  __cn1Init[\"").append(cls.getClsName()).append("\"] = true;\n");
-            }
-        }
-        if (!method.isStatic()) {
-            out.append("  locals[0] = __cn1ThisObject;\n");
-        }
-        int localIndex = method.isStatic() ? 0 : 1;
+        // Compact frame setup: ``_F(N, thisOrNull, arg1, arg2, ...)``
+        // returns a size-N locals array with consecutive slots
+        // pre-populated. Saves ~15-30 chars per method vs the previous
+        // form of ``_N(N)`` + separate ``locals[i] = ...`` lines.
+        // For methods with long/double arguments the extra slot they
+        // consume stays as the default ``null`` from ``jvm.aN`` — no
+        // special padding needed because the corresponding ``__cn1ArgK``
+        // is still the long/double value, and the next ``__cn1ArgK+1``
+        // lands at ``localIndex + 2`` via the emitter below. We pass
+        // ``null`` in the skipped slot when a long/double arg is
+        // present so positional args after it line up correctly.
+        boolean hasDoubleOrLong = false;
         for (int i = 0; i < arguments.size(); i++) {
-            out.append("  locals[").append(localIndex).append("] = __cn1Arg").append(i + 1).append(";\n");
-            localIndex++;
-            if (arguments.get(i).isDoubleOrLong()) {
-                localIndex++;
+            if (arguments.get(i).isDoubleOrLong()) { hasDoubleOrLong = true; break; }
+        }
+        if (hasDoubleOrLong) {
+            // Keep the explicit-slot emission for long/double-bearing
+            // methods so slot layout stays correct without complicating
+            // jvm.fr.
+            out.append("  let locals = _N(").append(Math.max(1, method.getMaxLocals())).append(");\n");
+            out.append("  let stack = [];\n");
+            out.append("  let pc = 0;\n");
+            if (!method.isStatic()) {
+                out.append("  locals[0] = __cn1ThisObject;\n");
             }
+            int localIndex = method.isStatic() ? 0 : 1;
+            for (int i = 0; i < arguments.size(); i++) {
+                out.append("  locals[").append(localIndex).append("] = __cn1Arg").append(i + 1).append(";\n");
+                localIndex++;
+                if (arguments.get(i).isDoubleOrLong()) {
+                    localIndex++;
+                }
+            }
+        } else {
+            out.append("  let locals = _F(").append(Math.max(1, method.getMaxLocals()));
+            if (!method.isStatic()) {
+                out.append(",__cn1ThisObject");
+            }
+            for (int i = 0; i < arguments.size(); i++) {
+                out.append(",__cn1Arg").append(i + 1);
+            }
+            out.append(");\n");
+            out.append("  let stack = [];\n");
+            out.append("  let pc = 0;\n");
         }
         // Only emit the exception-dispatch scaffolding when the method
         // actually has a try/catch block. Many simple methods have no
@@ -511,13 +1145,17 @@ final class JavascriptMethodGenerator {
         // uncaught JS throws propagate naturally up through the
         // generator's ``yield*`` chain — identical observable
         // semantics without the boilerplate.
-        boolean hasTryCatch = methodHasTryCatch(instructions);
+        //
+        // Kill-switch: flip ``parparvm.js.tryelide.off`` to always
+        // emit the wrapper (matches the historical emission).
+        boolean forceTryWrapper = System.getProperty("parparvm.js.tryelide.off") != null;
+        boolean hasTryCatch = forceTryWrapper || methodHasTryCatch(instructions);
         if (hasTryCatch) {
             appendTryCatchTable(out, instructions, labelToIndex);
         }
         if (method.isSynchronizedMethod()) {
-            out.append("  const __cn1Monitor = ").append(method.isStatic() ? "jvm.getClassObject(\"" + cls.getClsName() + "\")" : "__cn1ThisObject").append(";\n");
-            out.append("  jvm.monitorEnter(jvm.currentThread, __cn1Monitor);\n");
+            out.append("  let __cn1Monitor = ").append(method.isStatic() ? "jvm.getClassObject(\"" + cls.getClsName() + "\")" : "__cn1ThisObject").append(";\n");
+            out.append("  _me(__cn1Monitor);\n");
             out.append("  try {\n");
         }
         out.append("  while (true) {\n");
@@ -536,11 +1174,43 @@ final class JavascriptMethodGenerator {
         // stack / local / field / invoke ops punctuated by occasional
         // jumps), this collapses hundreds of per-case ``pc = N+1;
         // break;`` tails and their closing braces into a single block.
-        java.util.Set<Integer> jumpTargets = computeJumpTargets(instructions, labelToIndex);
+        // Kill-switch for the case-merge optimization. When set, every
+        // non-no-op instruction emits its own ``case N: { ... }`` with
+        // a real ``pc = N+1; break;`` tail — the pre-merge emission
+        // shape. Flip via the JVM system property
+        // ``parparvm.js.merge.off``.
+        boolean mergeCases = System.getProperty("parparvm.js.merge.off") == null;
+        java.util.Set<Integer> jumpTargets = mergeCases
+                ? computeJumpTargets(instructions, labelToIndex)
+                : java.util.Collections.<Integer>emptySet();
         boolean blockOpen = false;
+        // True when the previous emission was a bare ``case N:`` label
+        // for a no-op instruction (line number, local var, try/catch
+        // range marker, label). The next substantive instruction must
+        // open a real block — it supplies the executable body for that
+        // no-op label, and control reaches it only via switch
+        // fall-through (so it's not in ``jumpTargets`` and would
+        // otherwise be elided as dead code).
+        boolean pendingBareLabel = false;
         for (int i = 0; i < instructions.size(); i++) {
             Instruction instruction = instructions.get(i);
-            boolean isTarget = i == 0 || jumpTargets.contains(i);
+            // When merging is disabled, treat every non-no-op PC as a
+            // jump target so each instruction gets its own
+            // self-contained case block.
+            boolean isTarget = !mergeCases || i == 0 || jumpTargets.contains(i);
+            if (!mergeCases) {
+                // Pre-merge path: every non-no-op instruction emits a
+                // fully-closed ``case N: { body }`` block with its own
+                // pc advance, matching the historical emission.
+                if (isPcSkippableNoOp(instruction) && i + 1 < instructions.size()) {
+                    out.append("      case ").append(i).append(":\n");
+                    continue;
+                }
+                out.append("      case ").append(i).append(": {\n");
+                appendInstruction(out, method, instructions, labelToIndex, instruction, i, usesClassInitCache, usesVirtualDispatchCache);
+                out.append("      }\n");
+                continue;
+            }
             if (isPcSkippableNoOp(instruction) && i + 1 < instructions.size()) {
                 // Emit just the case label — fall through into the next
                 // instruction's block (which supplies the executable
@@ -551,26 +1221,41 @@ final class JavascriptMethodGenerator {
                     out.append("      }\n");
                     blockOpen = false;
                 }
-                out.append("      case ").append(i).append(":\n");
+                // The bare ``case i:`` label is only reachable if
+                // something branches to pc=i (jumpTargets contains i),
+                // or if pc starts at i (i == 0). Line numbers and local
+                // var range markers are never branch targets, so their
+                // labels are dead code. Dropping them still sets
+                // pendingBareLabel so the next real instruction opens
+                // its own case block — preceding case labels (kept or
+                // elided) simply fall through to that block.
+                if (i == 0 || jumpTargets.contains(i)) {
+                    out.append("      case ").append(i).append(":\n");
+                }
+                pendingBareLabel = true;
                 continue;
             }
+            // SAFE STRIP: drop the trailing ``pc = N+1; break;`` when
+            // the current instruction is PROVABLY non-throwing AND the
+            // next pc isn't a branch target. A general strip is
+            // unsafe — if the later instruction in the merged block
+            // throws, the frame's pc would still reference the
+            // earlier one and exception dispatch might pick the wrong
+            // try-range. But when the earlier instruction cannot
+            // throw AT ALL (pure stack/local/compute ops, no memory
+            // access), conflating its pc with the next is harmless.
             boolean nextIsNewBlock = i + 1 >= instructions.size() || jumpTargets.contains(i + 1);
             boolean isTerminal = isTerminatingInstruction(instruction);
-            boolean strip = !isTerminal && !nextIsNewBlock;
-            if (isTarget) {
-                // Close any currently open block so the case label is
-                // at switch scope.
+            boolean strip = !isTerminal && !nextIsNewBlock && isNonThrowingInstruction(instruction);
+            if (isTarget || pendingBareLabel) {
                 if (blockOpen) {
                     out.append("      }\n");
                     blockOpen = false;
                 }
                 out.append("      case ").append(i).append(": {\n");
                 blockOpen = true;
+                pendingBareLabel = false;
             } else if (!blockOpen) {
-                // Dead code: this instruction has no case label and no
-                // preceding open block to fall through from (the
-                // previous instruction was a goto/throw/return that
-                // closed its block). Nothing can reach it, so skip.
                 continue;
             }
             if (strip) {
@@ -580,13 +1265,7 @@ final class JavascriptMethodGenerator {
             } else {
                 appendInstruction(out, method, instructions, labelToIndex, instruction, i, usesClassInitCache, usesVirtualDispatchCache);
             }
-            // Close the case block when this instruction terminates the
-            // run (either a branch/throw that sets pc itself, or the
-            // next instruction starts a new case). Only emit the
-            // closing brace if an opening brace is currently
-            // outstanding — earlier iterations may have closed it when
-            // emitting a bare no-op label.
-            if ((isTerminal || nextIsNewBlock) && blockOpen) {
+            if ((isTerminal || nextIsNewBlock || !strip) && blockOpen) {
                 out.append("      }\n");
                 blockOpen = false;
             }
@@ -595,41 +1274,68 @@ final class JavascriptMethodGenerator {
             out.append("      }\n");
             blockOpen = false;
         }
-        out.append("      default:\n");
-        out.append("        return null;\n");
-        out.append("    }\n");
-        if (hasTryCatch) {
-            out.append("    } catch (__cn1Error) {\n");
-            out.append("      const __handler = jvm.findExceptionHandler(__cn1TryCatch, pc, __cn1Error);\n");
-            out.append("      if (!__handler) {\n");
-            out.append("        throw __cn1Error;\n");
-            out.append("      }\n");
-            out.append("      stack.length = 0;\n");
-            out.append("      stack.push(__cn1Error);\n");
-            out.append("      pc = __handler.handler;\n");
+        // ``default`` is omitted — every real method exits via a
+        // ``return``/``throw``/``ATHROW`` somewhere, and the safe-strip
+        // pass guarantees each block's trailing ``pc = N; break;``
+        // points at another real case label. Falling through to
+        // ``default`` would only happen with a corrupted pc, which the
+        // translator doesn't produce. Skipping this saves ~14 chars
+        // × ~3k switch-based methods ≈ 42 KiB. Fallback kill-switch
+        // ``parparvm.js.defaultreturn.keep`` re-enables the explicit
+        // default for paranoid builds.
+        if (System.getProperty("parparvm.js.defaultreturn.keep") != null) {
+            out.append("      default:return}\n");
+        } else {
             out.append("    }\n");
+        }
+        if (hasTryCatch) {
+            // ``_E`` (runtime helper) wraps the repeated catch-block
+            // boilerplate: find the matching handler, rethrow if none,
+            // otherwise reset the stack to hold the pending exception
+            // and return the handler pc. Per-method cost drops from
+            // ~150 chars of inlined catch plumbing to ~30 chars.
+            out.append("    } catch (__cn1Error) { pc = _E(__cn1TryCatch, pc, __cn1Error, stack); }\n");
         }
         out.append("  }\n");
         if (method.isSynchronizedMethod()) {
             out.append("  } finally {\n");
-            out.append("    jvm.monitorExit(jvm.currentThread, __cn1Monitor);\n");
+            out.append("    _mx(__cn1Monitor);\n");
             out.append("  }\n");
         }
         out.append("}\n");
-        if (wrappedStaticMethod) {
+        if (wrappedStaticMethod && shouldEmitStaticWrapper(method)) {
             appendWrappedStaticMethod(out, cls, method, jsMethodName, jsMethodBodyName);
         }
         if ("__CLINIT__".equals(method.getMethodName())) {
-            out.append("jvm.classes[\"").append(cls.getClsName()).append("\"].clinit = ")
-                    .append(wrappedStaticMethod ? jsMethodBodyName : jsMethodName).append(";\n");
+            currentClassClinitFn = wrappedStaticMethod ? jsMethodBodyName : jsMethodName;
         }
         if (!method.isStatic() && !method.isConstructor()) {
-            appendPrimaryRegistration(regs, jsMethodName);
+            String dispatchId = JavascriptNameUtil.dispatchMethodIdentifier(method.getMethodName(), method.getSignature());
+            appendPrimaryRegistration(regs, dispatchId, jsMethodName);
         }
     }
 
     private static boolean isWrappedStaticMethod(BytecodeMethod method) {
         return method.isStatic() && !"__CLINIT__".equals(method.getMethodName());
+    }
+
+    /**
+     * Non-native static methods have their body emitted as
+     * ``$name__impl`` AND a public wrapper ``$name`` that did
+     * ``_I(className); return yield* $name__impl(args)``. Every
+     * INVOKESTATIC callsite that the emitter produces calls
+     * ``$name__impl`` directly (after its own ``_I`` elision logic),
+     * so the wrapper has no in-bundle callers. The only reason to
+     * keep it is NATIVE static methods, where the ``__impl`` name
+     * doesn't exist and the wrapper IS the entry point. Skip the
+     * wrapper for non-native statics entirely. Kill-switch
+     * ``parparvm.js.staticwrapper.keep`` restores the old behaviour.
+     */
+    private static boolean shouldEmitStaticWrapper(BytecodeMethod method) {
+        if (System.getProperty("parparvm.js.staticwrapper.keep") != null) {
+            return true;
+        }
+        return method.isNative();
     }
 
     private static void appendWrappedStaticMethod(StringBuilder out, ByteCodeClass cls, BytecodeMethod method, String wrapperName, String bodyName) {
@@ -641,7 +1347,7 @@ final class JavascriptMethodGenerator {
         out.append(suspending ? "function* " : "function ").append(wrapperName).append("(");
         appendMethodParameters(out, method);
         out.append("){\n");
-        out.append("  jvm.ensureClassInitialized(\"").append(cls.getClsName()).append("\");\n");
+        out.append("  _I(\"").append(cls.getClsName()).append("\");\n");
         out.append("  return ").append(suspending ? "yield* " : "").append(bodyName).append("(");
         appendMethodParameterArguments(out, method);
         out.append(");\n");
@@ -701,19 +1407,24 @@ final class JavascriptMethodGenerator {
             if (aliasName.equals(targetName)) {
                 continue;
             }
-            // Inherit the target's suspension: an inherited-alias
-            // wrapper does nothing but forward arguments to the
-            // upstream impl, so it can be sync when the impl is sync.
-            boolean targetSuspending = method.isJavascriptSuspending();
-            out.append(targetSuspending ? "function* " : "function ").append(aliasName).append("(");
-            appendMethodParameters(out, method);
-            out.append("){\n");
-            out.append("  return ").append(targetSuspending ? "yield* " : "").append(targetName).append("(");
-            appendMethodParameterArguments(out, method);
-            out.append(");\n");
-            out.append("}\n");
+            // An inherited-method bridge used to be emitted as a
+            // forwarding wrapper ``function* cn1_Child_m(args) { return
+            // yield* cn1_Parent_m(args); }`` plus a methods-map entry
+            // registering ``cn1_Child_m`` on the child's virtual table.
+            // ~60k such bridges accounted for ~3 MiB of Initializr's
+            // translated JS. Direct-by-name call sites never reach
+            // these bridges: ``resolveDirectInvokeOwner`` walks the
+            // hierarchy for INVOKESTATIC/INVOKESPECIAL and emits the
+            // actual declaring class's identifier. That leaves only
+            // the methods-map lookup used by virtual dispatch — and
+            // that lookup is happy with a plain alias entry
+            // ``cn1_Child_m: cn1_Parent_m`` pointing at the upstream
+            // impl. So we skip the wrapper function entirely and
+            // emit an alias registration instead. Both names are
+            // mangled independently but in lockstep with call sites,
+            // so the alias resolves correctly under mangling.
             if (!method.isStatic()) {
-                appendPrimaryRegistration(regs, aliasName);
+                appendAliasRegistration(regs, aliasName, targetName);
             }
         }
     }
@@ -859,11 +1570,14 @@ final class JavascriptMethodGenerator {
                 }
                 appendAliasRegistration(regs, ancestorMethodId, implMethodId);
             }
-            // Inherited-via-wrapper resolvable methods: cls doesn't
-            // declare them, but appendInheritedMethodAliases emitted
-            // a wrapper under cls's prefix. Walk cls's inherited set
-            // and, for each inherited method that's accessible via
-            // this ancestor, point the alias at the wrapper.
+            // Inherited resolvable methods: cls doesn't declare them,
+            // but inherits them from a base class or interface default.
+            // Previously ``appendInheritedMethodAliases`` emitted a
+            // forwarding wrapper under cls's prefix and we pointed the
+            // ancestor alias at that wrapper. The wrapper is gone now
+            // — we point the ancestor alias directly at the method's
+            // upstream declaring class's impl (``method.getClsName()``
+            // via methodIdentifier), skipping cls's prefix entirely.
             for (Map.Entry<String, BytecodeMethod> entry : inherited.entrySet()) {
                 BytecodeMethod method = entry.getValue();
                 if (method == null || method.isConstructor() || method.isAbstract() || method.isEliminated()
@@ -879,11 +1593,11 @@ final class JavascriptMethodGenerator {
                     continue;
                 }
                 String ancestorMethodId = JavascriptNameUtil.methodIdentifier(ancestorClassName, name, signature);
-                String implMethodId = JavascriptNameUtil.methodIdentifier(cls.getClsName(), name, signature);
-                if (ancestorMethodId.equals(implMethodId) || !emitted.add(ancestorMethodId)) {
+                String upstreamMethodId = JavascriptNameUtil.methodIdentifier(method.getClsName(), name, signature);
+                if (ancestorMethodId.equals(upstreamMethodId) || !emitted.add(ancestorMethodId)) {
                     continue;
                 }
-                appendAliasRegistration(regs, ancestorMethodId, implMethodId);
+                appendAliasRegistration(regs, ancestorMethodId, upstreamMethodId);
             }
             List<ByteCodeClass> parents = ancestor.getBaseInterfacesObject();
             if (parents != null) {
@@ -956,8 +1670,18 @@ final class JavascriptMethodGenerator {
             StringBuilder instructionBody = new StringBuilder();
             StringBuilder body = new StringBuilder();
             StraightLineContext ctx = new StraightLineContext(method.getMaxLocals(), method.getMaxStack());
-            if (isWrappedStaticMethod(method)) {
-                ctx.initializedClasses.add(cls.getClsName());
+            // The containing class (and every ancestor) is guaranteed
+            // to be initialized by the time any method on ``cls``
+            // runs. Pre-seed the straight-line emitter's
+            // ``initializedClasses`` set so ``jvm.eI`` emissions for
+            // these classes are elided — mirrors the logic in
+            // ``appendInterpreterEnsureClassInitialized`` for the
+            // switch-based emission path.
+            ByteCodeClass walk = cls;
+            int hops = 0;
+            while (walk != null && hops++ < 64) {
+                ctx.initializedClasses.add(walk.getClsName());
+                walk = walk.getBaseClassObject();
             }
             if (!method.isStatic()) {
                 setup.append("  let l0 = __cn1ThisObject;\n");
@@ -982,32 +1706,39 @@ final class JavascriptMethodGenerator {
                 }
             }
             body.append(setup);
+            // Stack slots and ``used but not arg-initialized`` locals
+            // are always written before they're read (bytecode-verifier
+            // invariant + no branches in a straight-line body), so the
+            // initial ``= null`` is dead ceremony. ``let sN;`` /
+            // ``let lN;`` saves 7 chars per declaration × ~5-10 per
+            // method × ~1k straight-line methods ≈ 30-70 KiB.
             for (int i = 0; i < method.getMaxLocals(); i++) {
                 if (!ctx.localsInitialized[i] && ctx.localsUsed[i]) {
-                    body.append("  let l").append(i).append(" = null;\n");
+                    body.append("  let l").append(i).append(";\n");
                 }
             }
             for (int i = 0; i < ctx.getMaxObservedStack(); i++) {
-                body.append("  let s").append(i).append(" = null;\n");
+                body.append("  let s").append(i).append(";\n");
             }
             if (method.isSynchronizedMethod()) {
-                body.append("  const __cn1Monitor = ").append(method.isStatic() ? "jvm.getClassObject(\"" + cls.getClsName() + "\")" : "__cn1ThisObject").append(";\n");
-                body.append("  jvm.monitorEnter(jvm.currentThread, __cn1Monitor);\n");
+                body.append("  let __cn1Monitor = ").append(method.isStatic() ? "jvm.getClassObject(\"" + cls.getClsName() + "\")" : "__cn1ThisObject").append(";\n");
+                body.append("  _me(__cn1Monitor);\n");
                 body.append("  try {\n");
             }
             body.append(instructionBody);
             if (method.isSynchronizedMethod()) {
                 body.append("  } finally {\n");
-                body.append("    jvm.monitorExit(jvm.currentThread, __cn1Monitor);\n");
+                body.append("    _mx(__cn1Monitor);\n");
                 body.append("  }\n");
             }
             out.append(body);
             out.append("}\n");
             if ("__CLINIT__".equals(method.getMethodName())) {
-                out.append("jvm.classes[\"").append(cls.getClsName()).append("\"].clinit = ").append(jsMethodName).append(";\n");
+                currentClassClinitFn = jsMethodName;
             }
             if (!method.isStatic() && !method.isConstructor()) {
-                appendPrimaryRegistration(regs, jsMethodName);
+                String dispatchId = JavascriptNameUtil.dispatchMethodIdentifier(method.getMethodName(), method.getSignature());
+                appendPrimaryRegistration(regs, dispatchId, jsMethodName);
             }
             return true;
         } catch (IllegalStateException ex) {
@@ -1018,12 +1749,35 @@ final class JavascriptMethodGenerator {
         }
     }
 
+    /**
+     * Word-boundary containment check — matches ``ident`` exactly so
+     * ``l1`` doesn't accidentally match inside ``l10``, ``locals1``,
+     * or similar. Used to decide whether a straight-line slot/local
+     * declaration is dead after peephole rewrites.
+     */
+    private static boolean containsWholeIdentifier(String body, String ident) {
+        int from = 0;
+        int len = ident.length();
+        while ((from = body.indexOf(ident, from)) >= 0) {
+            char before = from > 0 ? body.charAt(from - 1) : ' ';
+            int endIdx = from + len;
+            char after = endIdx < body.length() ? body.charAt(endIdx) : ' ';
+            boolean leftOk = !Character.isLetterOrDigit(before) && before != '_' && before != '$';
+            boolean rightOk = !Character.isLetterOrDigit(after) && after != '_' && after != '$';
+            if (leftOk && rightOk) {
+                return true;
+            }
+            from += len;
+        }
+        return false;
+    }
+
     private static boolean isStraightLineEligible(BytecodeMethod method, List<Instruction> instructions) {
         if (method.isSynchronizedMethod()) {
             return false;
         }
         // ATHROW is straight-line-friendly: we just emit ``throw
-        // stack.pop();`` and anything past it is dead. The earlier
+        // stack.q();`` and anything past it is dead. The earlier
         // exclusion was conservative; allowing it lets many simple
         // ``throw new Foo(msg)`` methods skip the full switch/case
         // interpreter scaffolding.
@@ -1151,7 +1905,7 @@ final class JavascriptMethodGenerator {
             case Opcodes.DUP: {
                 String value = ctx.peek(0);
                 String temp = ctx.nextTemp("__dup");
-                out.append("  const ").append(temp).append(" = ").append(value).append(";\n");
+                out.append("  let ").append(temp).append(" = ").append(value).append(";\n");
                 out.append("  ").append(ctx.push(temp)).append(";\n");
                 return true;
             }
@@ -1160,8 +1914,8 @@ final class JavascriptMethodGenerator {
                 String v2 = ctx.pop();
                 String t1 = ctx.nextTemp("__dup");
                 String t2 = ctx.nextTemp("__dup");
-                out.append("  const ").append(t1).append(" = ").append(v1).append(";\n");
-                out.append("  const ").append(t2).append(" = ").append(v2).append(";\n");
+                out.append("  let ").append(t1).append(" = ").append(v1).append(";\n");
+                out.append("  let ").append(t2).append(" = ").append(v2).append(";\n");
                 out.append("  ").append(ctx.push(t1)).append(";\n");
                 out.append("  ").append(ctx.push(t2)).append(";\n");
                 out.append("  ").append(ctx.push(t1)).append(";\n");
@@ -1174,9 +1928,9 @@ final class JavascriptMethodGenerator {
                 String t1 = ctx.nextTemp("__dup");
                 String t2 = ctx.nextTemp("__dup");
                 String t3 = ctx.nextTemp("__dup");
-                out.append("  const ").append(t1).append(" = ").append(v1).append(";\n");
-                out.append("  const ").append(t2).append(" = ").append(v2).append(";\n");
-                out.append("  const ").append(t3).append(" = ").append(v3).append(";\n");
+                out.append("  let ").append(t1).append(" = ").append(v1).append(";\n");
+                out.append("  let ").append(t2).append(" = ").append(v2).append(";\n");
+                out.append("  let ").append(t3).append(" = ").append(v3).append(";\n");
                 out.append("  ").append(ctx.push(t1)).append(";\n");
                 out.append("  ").append(ctx.push(t3)).append(";\n");
                 out.append("  ").append(ctx.push(t2)).append(";\n");
@@ -1188,8 +1942,8 @@ final class JavascriptMethodGenerator {
                 String v2 = ctx.pop();
                 String t1 = ctx.nextTemp("__dup");
                 String t2 = ctx.nextTemp("__dup");
-                out.append("  const ").append(t1).append(" = ").append(v1).append(";\n");
-                out.append("  const ").append(t2).append(" = ").append(v2).append(";\n");
+                out.append("  let ").append(t1).append(" = ").append(v1).append(";\n");
+                out.append("  let ").append(t2).append(" = ").append(v2).append(";\n");
                 out.append("  ").append(ctx.push(t2)).append(";\n");
                 out.append("  ").append(ctx.push(t1)).append(";\n");
                 out.append("  ").append(ctx.push(t2)).append(";\n");
@@ -1203,9 +1957,9 @@ final class JavascriptMethodGenerator {
                 String t1 = ctx.nextTemp("__dup");
                 String t2 = ctx.nextTemp("__dup");
                 String t3 = ctx.nextTemp("__dup");
-                out.append("  const ").append(t1).append(" = ").append(v1).append(";\n");
-                out.append("  const ").append(t2).append(" = ").append(v2).append(";\n");
-                out.append("  const ").append(t3).append(" = ").append(v3).append(";\n");
+                out.append("  let ").append(t1).append(" = ").append(v1).append(";\n");
+                out.append("  let ").append(t2).append(" = ").append(v2).append(";\n");
+                out.append("  let ").append(t3).append(" = ").append(v3).append(";\n");
                 out.append("  ").append(ctx.push(t2)).append(";\n");
                 out.append("  ").append(ctx.push(t1)).append(";\n");
                 out.append("  ").append(ctx.push(t3)).append(";\n");
@@ -1222,10 +1976,10 @@ final class JavascriptMethodGenerator {
                 String t2 = ctx.nextTemp("__dup");
                 String t3 = ctx.nextTemp("__dup");
                 String t4 = ctx.nextTemp("__dup");
-                out.append("  const ").append(t1).append(" = ").append(v1).append(";\n");
-                out.append("  const ").append(t2).append(" = ").append(v2).append(";\n");
-                out.append("  const ").append(t3).append(" = ").append(v3).append(";\n");
-                out.append("  const ").append(t4).append(" = ").append(v4).append(";\n");
+                out.append("  let ").append(t1).append(" = ").append(v1).append(";\n");
+                out.append("  let ").append(t2).append(" = ").append(v2).append(";\n");
+                out.append("  let ").append(t3).append(" = ").append(v3).append(";\n");
+                out.append("  let ").append(t4).append(" = ").append(v4).append(";\n");
                 out.append("  ").append(ctx.push(t2)).append(";\n");
                 out.append("  ").append(ctx.push(t1)).append(";\n");
                 out.append("  ").append(ctx.push(t4)).append(";\n");
@@ -1357,15 +2111,7 @@ final class JavascriptMethodGenerator {
             case Opcodes.SALOAD: {
                 String idx = ctx.pop();
                 String arr = ctx.pop();
-                String arrayTemp = ctx.nextTemp("__arr");
-                String indexTemp = ctx.nextTemp("__idx");
-                out.append("  { const ").append(arrayTemp).append(" = ").append(arr)
-                        .append("; const ").append(indexTemp).append(" = ").append(idx)
-                        .append("; if (!").append(arrayTemp).append(" || !").append(arrayTemp).append(".__array) throw new Error(\"Array expected: \" + (")
-                        .append(arrayTemp).append(" == null ? \"null\" : (").append(arrayTemp).append(".__class || typeof ").append(arrayTemp).append("))); if (")
-                        .append(indexTemp).append(" < 0 || ").append(indexTemp).append(" >= ").append(arrayTemp)
-                        .append(".length) throw new Error(\"ArrayIndexOutOfBoundsException\"); ")
-                        .append(ctx.push(arrayTemp + "[" + indexTemp + "]")).append("; }\n");
+                out.append("  ").append(ctx.push("_A(" + arr + ", " + idx + ")")).append(";\n");
                 return true;
             }
             case Opcodes.AASTORE:
@@ -1379,15 +2125,7 @@ final class JavascriptMethodGenerator {
                 String value = ctx.pop();
                 String idx = ctx.pop();
                 String arr = ctx.pop();
-                String arrayTemp = ctx.nextTemp("__arr");
-                String indexTemp = ctx.nextTemp("__idx");
-                out.append("  { const ").append(arrayTemp).append(" = ").append(arr)
-                        .append("; const ").append(indexTemp).append(" = ").append(idx)
-                        .append("; if (!").append(arrayTemp).append(" || !").append(arrayTemp).append(".__array) throw new Error(\"Array expected: \" + (")
-                        .append(arrayTemp).append(" == null ? \"null\" : (").append(arrayTemp).append(".__class || typeof ").append(arrayTemp).append("))); if (")
-                        .append(indexTemp).append(" < 0 || ").append(indexTemp).append(" >= ").append(arrayTemp)
-                        .append(".length) throw new Error(\"ArrayIndexOutOfBoundsException\"); ")
-                        .append(arrayTemp).append("[").append(indexTemp).append("] = ").append(value).append("; }\n");
+                out.append("  _T(").append(arr).append(", ").append(idx).append(", ").append(value).append(");\n");
                 return true;
             }
             default:
@@ -1426,7 +2164,7 @@ final class JavascriptMethodGenerator {
                 return true;
             case Opcodes.NEWARRAY: {
                 String size = ctx.pop();
-                out.append("  ").append(ctx.push("jvm.newArray(" + size + ", \"" + primitiveArrayType(instruction.getIndex()) + "\", 1)")).append(";\n");
+                out.append("  ").append(ctx.push("_j(" + size + ", \"" + primitiveArrayType(instruction.getIndex()) + "\", 1)")).append(";\n");
                 return true;
             }
             case Opcodes.ILOAD:
@@ -1453,7 +2191,7 @@ final class JavascriptMethodGenerator {
     private static boolean appendStraightLineLdcInstruction(StringBuilder out, Ldc instruction, StraightLineContext ctx) {
         Object value = instruction.getValue();
         if (value instanceof String) {
-            out.append("  ").append(ctx.push("jvm.createStringLiteral(\"" + JavascriptNameUtil.escapeJs((String) value) + "\")")).append(";\n");
+            out.append("  ").append(ctx.push("_L(\"" + JavascriptNameUtil.escapeJs((String) value) + "\")")).append(";\n");
             return true;
         }
         if (value instanceof Integer || value instanceof Long || value instanceof Float || value instanceof Double) {
@@ -1474,11 +2212,11 @@ final class JavascriptMethodGenerator {
         String typeName = JavascriptNameUtil.runtimeTypeName(instruction.getTypeName());
         switch (instruction.getOpcode()) {
             case Opcodes.NEW:
-                out.append("  ").append(ctx.push("jvm.newObject(\"" + typeName + "\")")).append(";\n");
+                out.append("  ").append(ctx.push("_O(\"" + typeName + "\")")).append(";\n");
                 return true;
             case Opcodes.ANEWARRAY: {
                 String size = ctx.pop();
-                out.append("  ").append(ctx.push("jvm.newArray(" + size + ", \"" + typeName + "\", 1)")).append(";\n");
+                out.append("  ").append(ctx.push("_j(" + size + ", \"" + typeName + "\", 1)")).append(";\n");
                 return true;
             }
             case Opcodes.CHECKCAST: {
@@ -1505,11 +2243,11 @@ final class JavascriptMethodGenerator {
         switch (field.getOpcode()) {
             case Opcodes.GETSTATIC:
                 appendStraightLineEnsureClassInitialized(out, ctx, owner);
-                out.append("  ").append(ctx.push("jvm.classes[\"" + owner + "\"].staticFields[\"" + fieldName + "\"]")).append(";\n");
+                out.append("  ").append(ctx.push("_S[\"" + owner + "\"][\"" + fieldName + "\"]")).append(";\n");
                 return true;
             case Opcodes.PUTSTATIC:
                 appendStraightLineEnsureClassInitialized(out, ctx, owner);
-                out.append("  jvm.classes[\"").append(owner).append("\"].staticFields[\"").append(fieldName).append("\"] = ")
+                out.append("  _S[\"").append(owner).append("\"][\"").append(fieldName).append("\"] = ")
                         .append(ctx.pop()).append(";\n");
                 return true;
             case Opcodes.GETFIELD: {
@@ -1530,7 +2268,7 @@ final class JavascriptMethodGenerator {
 
     private static void appendStraightLineEnsureClassInitialized(StringBuilder out, StraightLineContext ctx, String owner) {
         if (ctx.initializedClasses.add(owner)) {
-            out.append("  jvm.ensureClassInitialized(\"").append(owner).append("\");\n");
+            out.append("  _I(\"").append(owner).append("\");\n");
         }
     }
 
@@ -1565,28 +2303,42 @@ final class JavascriptMethodGenerator {
             // Straight-line INVOKEVIRTUAL / INVOKEINTERFACE: emit one cn1_iv*
             // helper call instead of __classDef/resolveVirtual boilerplate.
             // See appendCompactVirtualDispatch for the shared emission rules.
+            // Uses the class-free dispatch id so the runtime walk in
+            // ``resolveVirtual`` handles inheritance without per-class alias
+            // entries.
+            String dispatchId = JavascriptNameUtil.dispatchMethodIdentifier(invoke.getName(), invoke.getDesc());
             if (hasReturn) {
                 out.append("  {\n");
-                appendCompactVirtualDispatch(out, "    ", methodId, argValues.length, true, target, false, argValues);
+                appendCompactVirtualDispatch(out, "    ", dispatchId, argValues.length, true, target, false, argValues);
                 out.append("    ").append(ctx.push("__result")).append(";\n");
                 out.append("  }\n");
             } else {
-                appendCompactVirtualDispatch(out, "  ", methodId, argValues.length, false, target, false, argValues);
+                appendCompactVirtualDispatch(out, "  ", dispatchId, argValues.length, false, target, false, argValues);
             }
             return true;
         }
         if (invoke.getOpcode() == Opcodes.INVOKESTATIC) {
             appendStraightLineEnsureClassInitialized(out, ctx, owner);
         }
+        // For INVOKESTATIC, pick between the public wrapper and the
+        // ``__impl`` body at emit time based on whether the target is
+        // native. Non-native statics have a real ``__impl`` function
+        // (the body we want to call directly, skipping the wrapper's
+        // redundant ``jvm.eI`` — the interpreter already emitted one
+        // above). Native statics only have the public wrapper (their
+        // ``__impl`` name isn't declared), so calling that is the
+        // only safe option. Previously emitted
+        // ``typeof X==="function"?X:Y`` (~30 chars) at every site; now
+        // either ``methodBodyId`` or ``methodId`` directly.
         String invokedName = invoke.getOpcode() == Opcodes.INVOKESTATIC
-                ? "(" + staticInvocationTargetExpression(methodId, methodBodyId) + ")"
+                ? (isInvokeTargetNative(invoke) ? methodId : methodBodyId)
                 : methodId;
         // Sync targets are invoked directly; generator targets keep the
         // ``yield*`` ceremony so the cooperative scheduler can interleave
         // them with other threads.
         String yieldPrefix = isInvokeSuspending(invoke) ? "yield* " : "";
         if (hasReturn) {
-            out.append("  { const __result = ").append(yieldPrefix).append(invokedName).append("(");
+            out.append("  { let __result = ").append(yieldPrefix).append(invokedName).append("(");
         } else {
             out.append("  { ").append(yieldPrefix).append(invokedName).append("(");
         }
@@ -1665,7 +2417,11 @@ final class JavascriptMethodGenerator {
     }
 
     private static void appendTryCatchTable(StringBuilder out, List<Instruction> instructions, Map<Label, Integer> labelToIndex) {
-        out.append("  const __cn1TryCatch = [");
+        // Short property names (s/e/h/t for start/end/handler/type)
+        // save ~15 chars per entry × ~700 entries ≈ 10 KiB. Runtime
+        // ``findExceptionHandler`` / ``_E`` read the short names
+        // directly.
+        out.append("  let __cn1TryCatch = [");
         boolean first = true;
         for (int i = 0; i < instructions.size(); i++) {
             Instruction instruction = instructions.get(i);
@@ -1677,14 +2433,11 @@ final class JavascriptMethodGenerator {
                 out.append(", ");
             }
             first = false;
-            out.append("{ start: ").append(resolveLabelIndex(labelToIndex, tryCatch.getStart(), "try start"));
-            out.append(", end: ").append(resolveLabelIndex(labelToIndex, tryCatch.getEnd(), "try end"));
-            out.append(", handler: ").append(resolveLabelIndex(labelToIndex, tryCatch.getHandler(), "try handler"));
-            out.append(", type: ");
-            if (tryCatch.getType() == null) {
-                out.append("null");
-            } else {
-                out.append("\"").append(JavascriptNameUtil.runtimeTypeName(tryCatch.getType())).append("\"");
+            out.append("{s:").append(resolveLabelIndex(labelToIndex, tryCatch.getStart(), "try start"));
+            out.append(",e:").append(resolveLabelIndex(labelToIndex, tryCatch.getEnd(), "try end"));
+            out.append(",h:").append(resolveLabelIndex(labelToIndex, tryCatch.getHandler(), "try handler"));
+            if (tryCatch.getType() != null) {
+                out.append(",t:\"").append(JavascriptNameUtil.runtimeTypeName(tryCatch.getType())).append("\"");
             }
             out.append("}");
         }
@@ -1806,7 +2559,7 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
         }
         
         if (!isVoid) {
-            out.append("const __jsBodyResult = (function() { ").append(script).append(" }).call(this);\n");
+            out.append("let __jsBodyResult = (function() { ").append(script).append(" }).call(this);\n");
             String returnTypeName = returnType.getTypeName();
             String jsReturnType;
             if (returnTypeName != null) {
@@ -1887,11 +2640,16 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                 if (idx != null) {
                     targets.add(idx);
                 }
-                // The instruction right after a Jump re-enters the
-                // dispatch loop either via fall-through on a
-                // conditional or via some unrelated ``goto`` — in
-                // either case it needs a real case label.
-                if (i + 1 < instructions.size()) {
+                // Conditional jumps fall through to ``i+1`` when the
+                // predicate is false, so ``i+1`` must be a real case
+                // label. For ``GOTO`` (the unconditional branch in
+                // this family), control leaves the basic block via
+                // the target label and reaches ``i+1`` only if some
+                // OTHER instruction branches there — in which case
+                // that other instruction already adds it. JSR/RET are
+                // kept conservatively on the ``always add i+1`` path
+                // because subroutine return semantics are trickier.
+                if (instr.getOpcode() != Opcodes.GOTO && i + 1 < instructions.size()) {
                     targets.add(i + 1);
                 }
             } else if (instr instanceof SwitchInstruction) {
@@ -1925,9 +2683,6 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                 if (handler != null) targets.add(handler);
             } else if (instr instanceof BasicInstruction) {
                 int op = instr.getOpcode();
-                // Instructions that terminate the linear flow of a
-                // basic block — the next instruction can only be
-                // reached via a jump, so it too is a target.
                 if (op == Opcodes.ATHROW || op == Opcodes.RETURN || op == Opcodes.IRETURN
                         || op == Opcodes.LRETURN || op == Opcodes.FRETURN || op == Opcodes.DRETURN
                         || op == Opcodes.ARETURN) {
@@ -1960,6 +2715,132 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                     || op == Opcodes.FRETURN
                     || op == Opcodes.DRETURN
                     || op == Opcodes.ARETURN;
+        }
+        return false;
+    }
+
+    /**
+     * True when the instruction cannot throw any exception — i.e.
+     * merging it into a preceding case block without advancing pc
+     * preserves exception-dispatch semantics. If a later instruction
+     * in the same case block throws, the frame's pc still points at
+     * the earlier non-throwing op; but since that earlier op couldn't
+     * have thrown anything itself, the handler lookup at the earlier
+     * pc resolves to the same handler as the lookup at the later pc
+     * (the active try/catch set is the same throughout a basic block
+     * — try/catch start/end boundaries are already in jumpTargets, so
+     * nextIsNewBlock=true at those points and strip is suppressed).
+     *
+     * <p>Conservative: only pure-compute opcodes (local var load/store,
+     * stack manipulation, integer / float arithmetic without divide,
+     * integer widening, boolean comparisons, INSTANCEOF, IINC) are
+     * marked non-throwing. Anything that touches memory
+     * (GETFIELD/PUTFIELD, array ops), invokes a method, checks a
+     * cast, divides, throws, enters/exits a monitor, or triggers
+     * class init is considered throwing.
+     */
+    private static boolean isPrimitiveDescriptor(String desc) {
+        if (desc.length() == 1 && "ZCBSIFJD".indexOf(desc) >= 0) {
+            return true;
+        }
+        return desc.startsWith("JAVA_") && !desc.contains("[]");
+    }
+
+    private static boolean isNonThrowingInstruction(Instruction instruction) {
+        if (instruction instanceof Jump || instruction instanceof SwitchInstruction
+                || instruction instanceof Invoke || instruction instanceof Field
+                || instruction instanceof TypeInstruction || instruction instanceof MultiArray) {
+            return false;
+        }
+        if (instruction instanceof VarOp || instruction instanceof IInc || instruction instanceof Ldc) {
+            return true;
+        }
+        if (instruction instanceof BasicInstruction) {
+            int op = instruction.getOpcode();
+            switch (op) {
+                case Opcodes.NOP:
+                case Opcodes.ACONST_NULL:
+                case Opcodes.ICONST_M1:
+                case Opcodes.ICONST_0:
+                case Opcodes.ICONST_1:
+                case Opcodes.ICONST_2:
+                case Opcodes.ICONST_3:
+                case Opcodes.ICONST_4:
+                case Opcodes.ICONST_5:
+                case Opcodes.LCONST_0:
+                case Opcodes.LCONST_1:
+                case Opcodes.FCONST_0:
+                case Opcodes.FCONST_1:
+                case Opcodes.FCONST_2:
+                case Opcodes.DCONST_0:
+                case Opcodes.DCONST_1:
+                case Opcodes.BIPUSH:
+                case Opcodes.SIPUSH:
+                case Opcodes.POP:
+                case Opcodes.POP2:
+                case Opcodes.DUP:
+                case Opcodes.DUP_X1:
+                case Opcodes.DUP_X2:
+                case Opcodes.DUP2:
+                case Opcodes.DUP2_X1:
+                case Opcodes.DUP2_X2:
+                case Opcodes.SWAP:
+                case Opcodes.IADD:
+                case Opcodes.LADD:
+                case Opcodes.FADD:
+                case Opcodes.DADD:
+                case Opcodes.ISUB:
+                case Opcodes.LSUB:
+                case Opcodes.FSUB:
+                case Opcodes.DSUB:
+                case Opcodes.IMUL:
+                case Opcodes.LMUL:
+                case Opcodes.FMUL:
+                case Opcodes.DMUL:
+                case Opcodes.FDIV:
+                case Opcodes.DDIV:
+                case Opcodes.FREM:
+                case Opcodes.DREM:
+                case Opcodes.INEG:
+                case Opcodes.LNEG:
+                case Opcodes.FNEG:
+                case Opcodes.DNEG:
+                case Opcodes.ISHL:
+                case Opcodes.LSHL:
+                case Opcodes.ISHR:
+                case Opcodes.LSHR:
+                case Opcodes.IUSHR:
+                case Opcodes.LUSHR:
+                case Opcodes.IAND:
+                case Opcodes.LAND:
+                case Opcodes.IOR:
+                case Opcodes.LOR:
+                case Opcodes.IXOR:
+                case Opcodes.LXOR:
+                case Opcodes.I2L:
+                case Opcodes.I2F:
+                case Opcodes.I2D:
+                case Opcodes.L2I:
+                case Opcodes.L2F:
+                case Opcodes.L2D:
+                case Opcodes.F2I:
+                case Opcodes.F2L:
+                case Opcodes.F2D:
+                case Opcodes.D2I:
+                case Opcodes.D2L:
+                case Opcodes.D2F:
+                case Opcodes.I2B:
+                case Opcodes.I2C:
+                case Opcodes.I2S:
+                case Opcodes.LCMP:
+                case Opcodes.FCMPL:
+                case Opcodes.FCMPG:
+                case Opcodes.DCMPL:
+                case Opcodes.DCMPG:
+                    return true;
+                default:
+                    return false;
+            }
         }
         return false;
     }
@@ -2067,11 +2948,11 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
         int totalDimensions = arrayDescriptorDimensions(desc);
         String componentType = arrayDescriptorComponent(desc);
         int allocatedDimensions = instruction.getDimensionsToAllocate();
-        out.append("        { const sizes = new Array(").append(totalDimensions).append(");");
-        out.append(" for (let i = ").append(allocatedDimensions - 1).append("; i >= 0; i--) { sizes[i] = stack.pop() | 0; }");
+        out.append("        { let sizes = new Array(").append(totalDimensions).append(");");
+        out.append(" for (let i = ").append(allocatedDimensions - 1).append("; i >= 0; i--) { sizes[i] = stack.q() | 0; }");
         out.append(" for (let i = ").append(allocatedDimensions).append("; i < ").append(totalDimensions)
                 .append("; i++) { sizes[i] = -1; }");
-        out.append(" stack.push(jvm.newMultiArray(sizes, \"").append(componentType).append("\", ")
+        out.append(" stack.p(jvm.newMultiArray(sizes, \"").append(componentType).append("\", ")
                 .append(totalDimensions).append(")); pc = ").append(index + 1).append("; break; }\n");
     }
 
@@ -2112,7 +2993,7 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
     }
 
     private static void appendSwitchInstruction(StringBuilder out, SwitchInstruction instruction, Map<Label, Integer> labelToIndex, int index) {
-        out.append("        const __switchValue = stack.pop() | 0;\n");
+        out.append("        let __switchValue = stack.q() | 0;\n");
         out.append("        switch (__switchValue) {\n");
         int[] keys = instruction.getKeys();
         Label[] labels = instruction.getLabels();
@@ -2144,10 +3025,10 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                 out.append("        pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.ACONST_NULL:
-                out.append("        stack.push(null); pc = ").append(index + 1).append("; break;\n");
+                out.append("        stack.p(null); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.ICONST_M1:
-                out.append("        stack.push(-1); pc = ").append(index + 1).append("; break;\n");
+                out.append("        stack.p(-1); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.ICONST_0:
             case Opcodes.ICONST_1:
@@ -2155,172 +3036,172 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             case Opcodes.ICONST_3:
             case Opcodes.ICONST_4:
             case Opcodes.ICONST_5:
-                out.append("        stack.push(").append(instruction.getOpcode() - Opcodes.ICONST_0).append("); pc = ")
+                out.append("        stack.p(").append(instruction.getOpcode() - Opcodes.ICONST_0).append("); pc = ")
                         .append(index + 1).append("; break;\n");
                 return;
             case Opcodes.LCONST_0:
-                out.append("        stack.push(0); pc = ").append(index + 1).append("; break;\n");
+                out.append("        stack.p(0); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.LCONST_1:
-                out.append("        stack.push(1); pc = ").append(index + 1).append("; break;\n");
+                out.append("        stack.p(1); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.FCONST_0:
             case Opcodes.DCONST_0:
-                out.append("        stack.push(0.0); pc = ").append(index + 1).append("; break;\n");
+                out.append("        stack.p(0.0); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.FCONST_1:
             case Opcodes.DCONST_1:
-                out.append("        stack.push(1.0); pc = ").append(index + 1).append("; break;\n");
+                out.append("        stack.p(1.0); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.FCONST_2:
-                out.append("        stack.push(2.0); pc = ").append(index + 1).append("; break;\n");
+                out.append("        stack.p(2.0); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.BIPUSH:
             case Opcodes.SIPUSH:
-                out.append("        stack.push(").append(instruction.getValue()).append("); pc = ").append(index + 1).append("; break;\n");
+                out.append("        stack.p(").append(instruction.getValue()).append("); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.ILOAD:
             case Opcodes.LLOAD:
             case Opcodes.FLOAD:
             case Opcodes.DLOAD:
             case Opcodes.ALOAD:
-                out.append("        stack.push(locals[").append(instruction.getValue()).append("]); pc = ").append(index + 1).append("; break;\n");
+                out.append("        stack.p(locals[").append(instruction.getValue()).append("]); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.ISTORE:
             case Opcodes.LSTORE:
             case Opcodes.FSTORE:
             case Opcodes.DSTORE:
             case Opcodes.ASTORE:
-                out.append("        locals[").append(instruction.getValue()).append("] = stack.pop(); pc = ").append(index + 1).append("; break;\n");
+                out.append("        locals[").append(instruction.getValue()).append("] = stack.q(); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.POP:
-                out.append("        stack.pop(); pc = ").append(index + 1).append("; break;\n");
+                out.append("        stack.q(); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.POP2:
-                out.append("        stack.pop(); stack.pop(); pc = ").append(index + 1).append("; break;\n");
+                out.append("        stack.q(); stack.q(); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.DUP:
-                out.append("        stack.push(stack[stack.length - 1]); pc = ").append(index + 1).append("; break;\n");
+                out.append("        stack.p(stack[stack.length - 1]); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.DUP_X1:
-                out.append("        { const v1 = stack.pop(); const v2 = stack.pop(); stack.push(v1); stack.push(v2); stack.push(v1); pc = ")
+                out.append("        { let v1 = stack.q(); let v2 = stack.q(); stack.p(v1); stack.p(v2); stack.p(v1); pc = ")
                         .append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.DUP_X2:
-                out.append("        { const v1 = stack.pop(); const v2 = stack.pop(); const v3 = stack.pop(); stack.push(v1); stack.push(v3); stack.push(v2); stack.push(v1); pc = ")
+                out.append("        { let v1 = stack.q(); let v2 = stack.q(); let v3 = stack.q(); stack.p(v1); stack.p(v3); stack.p(v2); stack.p(v1); pc = ")
                         .append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.DUP2:
-                out.append("        { const v1 = stack.pop(); const v2 = stack.pop(); stack.push(v2); stack.push(v1); stack.push(v2); stack.push(v1); pc = ")
+                out.append("        { let v1 = stack.q(); let v2 = stack.q(); stack.p(v2); stack.p(v1); stack.p(v2); stack.p(v1); pc = ")
                         .append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.DUP2_X1:
-                out.append("        { const v1 = stack.pop(); const v2 = stack.pop(); const v3 = stack.pop(); stack.push(v2); stack.push(v1); stack.push(v3); stack.push(v2); stack.push(v1); pc = ")
+                out.append("        { let v1 = stack.q(); let v2 = stack.q(); let v3 = stack.q(); stack.p(v2); stack.p(v1); stack.p(v3); stack.p(v2); stack.p(v1); pc = ")
                         .append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.DUP2_X2:
-                out.append("        { const v1 = stack.pop(); const v2 = stack.pop(); const v3 = stack.pop(); const v4 = stack.pop(); stack.push(v2); stack.push(v1); stack.push(v4); stack.push(v3); stack.push(v2); stack.push(v1); pc = ")
+                out.append("        { let v1 = stack.q(); let v2 = stack.q(); let v3 = stack.q(); let v4 = stack.q(); stack.p(v2); stack.p(v1); stack.p(v4); stack.p(v3); stack.p(v2); stack.p(v1); pc = ")
                         .append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.SWAP:
-                out.append("        { const v1 = stack.pop(); const v2 = stack.pop(); stack.push(v1); stack.push(v2); pc = ")
+                out.append("        { let v1 = stack.q(); let v2 = stack.q(); stack.p(v1); stack.p(v2); pc = ")
                         .append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.IADD:
-                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push((a|0) + (b|0)); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p((a|0) + (b|0)); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.ISUB:
-                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push((a|0) - (b|0)); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p((a|0) - (b|0)); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.IMUL:
-                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push((a|0) * (b|0)); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p((a|0) * (b|0)); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.LADD:
-                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push(a + b); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(a + b); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.LSUB:
-                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push(a - b); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(a - b); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.LMUL:
-                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push(a * b); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(a * b); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.FADD:
             case Opcodes.DADD:
-                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push(a + b); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(a + b); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.FSUB:
             case Opcodes.DSUB:
-                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push(a - b); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(a - b); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.FMUL:
             case Opcodes.DMUL:
-                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push(a * b); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(a * b); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.IDIV:
-                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push(((a|0) / (b|0)) | 0); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(((a|0) / (b|0)) | 0); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.LDIV:
-                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push(Math.trunc(a / b)); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(Math.trunc(a / b)); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.FDIV:
             case Opcodes.DDIV:
-                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push(a / b); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(a / b); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.IREM:
-                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push((a|0) % (b|0)); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p((a|0) % (b|0)); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.LREM:
-                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push(a % b); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(a % b); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.FREM:
             case Opcodes.DREM:
-                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push(a % b); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(a % b); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.INEG:
-                out.append("        stack.push(-(stack.pop()|0)); pc = ").append(index + 1).append("; break;\n");
+                out.append("        stack.p(-(stack.q()|0)); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.LNEG:
-                out.append("        stack.push(-stack.pop()); pc = ").append(index + 1).append("; break;\n");
+                out.append("        stack.p(-stack.q()); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.FNEG:
             case Opcodes.DNEG:
-                out.append("        stack.push(-stack.pop()); pc = ").append(index + 1).append("; break;\n");
+                out.append("        stack.p(-stack.q()); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.ISHL:
-                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push((a|0) << (b & 31)); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p((a|0) << (b & 31)); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.LSHL:
-                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push(a * Math.pow(2, b & 63)); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(a * Math.pow(2, b & 63)); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.ISHR:
-                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push((a|0) >> (b & 31)); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p((a|0) >> (b & 31)); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.LSHR:
-                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push(Math.trunc(a / Math.pow(2, b & 63))); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(Math.trunc(a / Math.pow(2, b & 63))); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.IUSHR:
-                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push((a >>> (b & 31)) | 0); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p((a >>> (b & 31)) | 0); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.LUSHR:
-                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push(Math.floor((a < 0 ? a + 18446744073709551616 : a) / Math.pow(2, b & 63))); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(Math.floor((a < 0 ? a + 18446744073709551616 : a) / Math.pow(2, b & 63))); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.IAND:
-                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push((a|0) & (b|0)); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p((a|0) & (b|0)); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.LAND:
-                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push(a & b); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(a & b); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.IOR:
-                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push((a|0) | (b|0)); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p((a|0) | (b|0)); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.LOR:
-                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push(a | b); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(a | b); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.IXOR:
-                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push((a|0) ^ (b|0)); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p((a|0) ^ (b|0)); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.LXOR:
-                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push(a ^ b); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(a ^ b); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.I2L:
             case Opcodes.F2D:
@@ -2328,18 +3209,18 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                 out.append("        pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.I2B:
-                out.append("        stack.push((stack.pop() << 24) >> 24); pc = ").append(index + 1).append("; break;\n");
+                out.append("        stack.p((stack.q() << 24) >> 24); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.I2C:
-                out.append("        stack.push(stack.pop() & 65535); pc = ").append(index + 1).append("; break;\n");
+                out.append("        stack.p(stack.q() & 65535); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.I2S:
-                out.append("        stack.push((stack.pop() << 16) >> 16); pc = ").append(index + 1).append("; break;\n");
+                out.append("        stack.p((stack.q() << 16) >> 16); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.L2I:
             case Opcodes.F2I:
             case Opcodes.D2I:
-                out.append("        stack.push(stack.pop() | 0); pc = ").append(index + 1).append("; break;\n");
+                out.append("        stack.p(stack.q() | 0); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.I2F:
             case Opcodes.I2D:
@@ -2350,16 +3231,16 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                 out.append("        pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.LCMP:
-                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push(a < b ? -1 : (a > b ? 1 : 0)); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(a < b ? -1 : (a > b ? 1 : 0)); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.FCMPL:
             case Opcodes.DCMPL:
-                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push((isNaN(a) || isNaN(b)) ? -1 : (a < b ? -1 : (a > b ? 1 : 0))); pc = ")
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p((isNaN(a) || isNaN(b)) ? -1 : (a < b ? -1 : (a > b ? 1 : 0))); pc = ")
                         .append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.FCMPG:
             case Opcodes.DCMPG:
-                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push((isNaN(a) || isNaN(b)) ? 1 : (a < b ? -1 : (a > b ? 1 : 0))); pc = ")
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p((isNaN(a) || isNaN(b)) ? 1 : (a < b ? -1 : (a > b ? 1 : 0))); pc = ")
                         .append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.IRETURN:
@@ -2367,16 +3248,18 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             case Opcodes.LRETURN:
             case Opcodes.FRETURN:
             case Opcodes.DRETURN:
-                out.append("        return stack.pop();\n");
+                out.append("        return stack.q();\n");
                 return;
             case Opcodes.ATHROW:
-                out.append("        throw stack.pop();\n");
+                out.append("        throw stack.q();\n");
                 return;
             case Opcodes.RETURN:
-                out.append("        return null;\n");
+                // Void RETURN — emit ``return`` without ``null``. Java
+                // callers of void methods ignore the return value.
+                out.append("        return;\n");
                 return;
             case Opcodes.ARRAYLENGTH:
-                out.append("        { const arr = stack.pop(); stack.push(arr.length); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { let arr = stack.q(); stack.p(arr.length); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.AALOAD:
             case Opcodes.IALOAD:
@@ -2386,7 +3269,7 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             case Opcodes.BALOAD:
             case Opcodes.CALOAD:
             case Opcodes.SALOAD:
-                out.append("        { const idx = stack.pop(); const arr = stack.pop(); if (!arr || !arr.__array) throw new Error(\"Array expected: \" + (arr == null ? \"null\" : (arr.__class || typeof arr))); if (idx < 0 || idx >= arr.length) throw new Error(\"ArrayIndexOutOfBoundsException\"); stack.push(arr[idx]); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { let idx = stack.q(); let arr = stack.q(); stack.p(_A(arr, idx)); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.AASTORE:
             case Opcodes.IASTORE:
@@ -2396,13 +3279,13 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             case Opcodes.BASTORE:
             case Opcodes.CASTORE:
             case Opcodes.SASTORE:
-                out.append("        { const value = stack.pop(); const idx = stack.pop(); const arr = stack.pop(); if (!arr || !arr.__array) throw new Error(\"Array expected: \" + (arr == null ? \"null\" : (arr.__class || typeof arr))); if (idx < 0 || idx >= arr.length) throw new Error(\"ArrayIndexOutOfBoundsException\"); arr[idx] = value; pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { let value = stack.q(); let idx = stack.q(); let arr = stack.q(); _T(arr, idx, value); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.MONITORENTER:
-                out.append("        jvm.monitorEnter(jvm.currentThread, stack.pop()); pc = ").append(index + 1).append("; break;\n");
+                out.append("        _me(stack.q()); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.MONITOREXIT:
-                out.append("        jvm.monitorExit(jvm.currentThread, stack.pop()); pc = ").append(index + 1).append("; break;\n");
+                out.append("        _mx(stack.q()); pc = ").append(index + 1).append("; break;\n");
                 return;
             default:
                 throw new IllegalArgumentException("Unsupported basic opcode " + instruction.getOpcode()
@@ -2414,26 +3297,26 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
         switch (instruction.getOpcode()) {
             case Opcodes.BIPUSH:
             case Opcodes.SIPUSH:
-                out.append("        stack.push(").append(instruction.getIndex()).append("); pc = ").append(index + 1).append("; break;\n");
+                out.append("        stack.p(").append(instruction.getIndex()).append("); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.NEWARRAY:
-                out.append("        { const size = stack.pop(); stack.push(jvm.newArray(size, \"")
+                out.append("        stack.p(_j(stack.q(), \"")
                         .append(primitiveArrayType(instruction.getIndex())).append("\", 1)); pc = ")
-                        .append(index + 1).append("; break; }\n");
+                        .append(index + 1).append("; break;\n");
                 return;
             case Opcodes.ILOAD:
             case Opcodes.LLOAD:
             case Opcodes.FLOAD:
             case Opcodes.DLOAD:
             case Opcodes.ALOAD:
-                out.append("        stack.push(locals[").append(instruction.getIndex()).append("]); pc = ").append(index + 1).append("; break;\n");
+                out.append("        stack.p(locals[").append(instruction.getIndex()).append("]); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.ISTORE:
             case Opcodes.LSTORE:
             case Opcodes.FSTORE:
             case Opcodes.DSTORE:
             case Opcodes.ASTORE:
-                out.append("        locals[").append(instruction.getIndex()).append("] = stack.pop(); pc = ").append(index + 1).append("; break;\n");
+                out.append("        locals[").append(instruction.getIndex()).append("] = stack.q(); pc = ").append(index + 1).append("; break;\n");
                 return;
             default:
                 throw new IllegalArgumentException("Unsupported var opcode " + instruction.getOpcode());
@@ -2466,18 +3349,18 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
     private static void appendLdcInstruction(StringBuilder out, Ldc instruction, int index) {
         Object value = instruction.getValue();
         if (value instanceof String) {
-            out.append("        stack.push(jvm.createStringLiteral(\"")
+            out.append("        stack.p(_L(\"")
                     .append(JavascriptNameUtil.escapeJs((String) value)).append("\")); pc = ").append(index + 1).append("; break;\n");
             return;
         }
         if (value instanceof Integer || value instanceof Long || value instanceof Float || value instanceof Double) {
-            out.append("        stack.push(").append(value.toString()).append("); pc = ").append(index + 1).append("; break;\n");
+            out.append("        stack.p(").append(value.toString()).append("); pc = ").append(index + 1).append("; break;\n");
             return;
         }
         if (value instanceof Type) {
             Type type = (Type) value;
             if (type.getSort() == Type.OBJECT) {
-                out.append("        stack.push(jvm.getClassObject(\"").append(JavascriptNameUtil.sanitizeClassName(type.getInternalName()))
+                out.append("        stack.p(jvm.getClassObject(\"").append(JavascriptNameUtil.sanitizeClassName(type.getInternalName()))
                         .append("\")); pc = ").append(index + 1).append("; break;\n");
                 return;
             }
@@ -2489,20 +3372,28 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
         String typeName = JavascriptNameUtil.runtimeTypeName(instruction.getTypeName());
         switch (instruction.getOpcode()) {
             case Opcodes.NEW:
-                out.append("        stack.push(jvm.newObject(\"").append(typeName).append("\")); pc = ").append(index + 1).append("; break;\n");
+                out.append("        stack.p(_O(\"").append(typeName).append("\")); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.ANEWARRAY:
-                out.append("        { const size = stack.pop(); stack.push(jvm.newArray(size, \"").append(typeName)
-                        .append("\", 1)); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        stack.p(_j(stack.q(), \"").append(typeName)
+                        .append("\", 1)); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.CHECKCAST:
-                out.append("        { const value = stack[stack.length - 1]; ");
-                appendDirectCheckCast(out, "", "value", typeName, "throw new Error(\"ClassCastException\")");
-                out.append(" pc = ").append(index + 1).append("; break; }\n");
+                // Peek TOS and run the cast check inline — no temp let
+                // binding or extra braces. ``_C`` evaluates its first
+                // argument exactly once (standard JS semantics), so
+                // reading ``stack[stack.length - 1]`` here produces the
+                // same value the next instruction will pop.
+                out.append("        _C(stack[stack.length - 1], \"").append(typeName).append("\"); pc = ")
+                        .append(index + 1).append("; break;\n");
                 return;
             case Opcodes.INSTANCEOF:
-                out.append("        { const value = stack.pop(); stack.push(").append(directInstanceOfExpression("value", typeName))
-                        .append(" ? 1 : 0); pc = ").append(index + 1).append("; break; }\n");
+                // Inline: pop directly into the ``_D`` (instanceOf)
+                // call, push the boolean-as-int result. Same eval
+                // order as the old let-binding form, ~15 chars
+                // shorter per call site.
+                out.append("        stack.p(").append(directInstanceOfExpression("stack.q()", typeName))
+                        .append(" ? 1 : 0); pc = ").append(index + 1).append("; break;\n");
                 return;
             default:
                 throw new IllegalArgumentException("Unsupported type opcode " + instruction.getOpcode());
@@ -2510,24 +3401,25 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
     }
 
     private static void appendDirectCheckCast(StringBuilder out, String indent, String valueExpression, String typeName, String failureStatement) {
-        out.append(indent).append("if (").append(valueExpression).append(" != null) { const __classDef = ").append(valueExpression)
-                .append(".__classDef; if (").append(valueExpression).append(".__class !== \"").append(typeName)
-                .append("\" && !(__classDef && __classDef.assignableTo && __classDef.assignableTo[\"").append(typeName)
-                .append("\"])) {")
-                .append(" if (").append(valueExpression).append(".__jsValue !== undefined) {")
-                .append(" jvm.enhanceJsWrapper(").append(valueExpression).append(", \"").append(typeName).append("\");")
-                .append(" const __enhancedClassDef = ").append(valueExpression).append(".__classDef;")
-                .append(" if (").append(valueExpression).append(".__class !== \"").append(typeName)
-                .append("\" && !(__enhancedClassDef && __enhancedClassDef.assignableTo && __enhancedClassDef.assignableTo[\"").append(typeName)
-                .append("\"])) ").append(failureStatement).append(";")
-                .append(" } else ").append(failureStatement).append(";")
-                .append(" } }\n");
+        // CHECKCAST used to expand to ~280 chars of inline type-check
+        // boilerplate per call site (null guard, assignableTo lookup,
+        // enhanceJsWrapper fallback, second assignableTo lookup, throw).
+        // ~2200 call sites in Initializr, ~300 KiB total. Factored into
+        // a single ``_C(value, typeName)`` helper in the runtime
+        // that encodes the same sequence and throws ClassCastException
+        // on failure; emitted call site collapses to ~30 chars.
+        // ``failureStatement`` is always the ClassCastException throw
+        // — the only caller that ever passes anything else is dead
+        // code; we encode it in the helper directly.
+        out.append(indent).append("_C(").append(valueExpression).append(", \"").append(typeName).append("\");\n");
     }
 
     private static String directInstanceOfExpression(String valueExpression, String typeName) {
-        return "(" + valueExpression + " != null && (" + valueExpression + ".__class === \"" + typeName
-                + "\" || (" + valueExpression + ".__classDef && " + valueExpression + ".__classDef.assignableTo && "
-                + valueExpression + ".__classDef.assignableTo[\"" + typeName + "\"])))";
+        // ``jvm.iO`` (instanceOf) encodes the ~110-char inline chain
+        // as a helper call, halving call-site size across ~360
+        // INSTANCEOF sites. Returns 1/0 directly so emission doesn't
+        // need to wrap the result in a ``? 1 : 0`` ternary.
+        return "_D(" + valueExpression + ", \"" + typeName + "\")";
     }
 
     private static void appendFieldInstruction(StringBuilder out, Field field, int index, boolean usesStaticFieldInitCache) {
@@ -2547,21 +3439,33 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
         switch (field.getOpcode()) {
             case Opcodes.GETSTATIC:
                 appendInterpreterEnsureClassInitialized(out, owner, usesStaticFieldInitCache);
-                out.append("        stack.push(jvm.classes[\"").append(owner).append("\"].staticFields[\"")
+                // ``_S["owner"]["fieldName"]`` (runtime-maintained
+                // per-class staticFields map) is ~18 chars shorter per
+                // call site than the equivalent
+                // ``jvm.classes["owner"].staticFields["fieldName"]``
+                // expansion; the map is populated at defineClass time.
+                out.append("        stack.p(_S[\"").append(owner).append("\"][\"")
                         .append(fieldName).append("\"]); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.PUTSTATIC:
                 appendInterpreterEnsureClassInitialized(out, owner, usesStaticFieldInitCache);
-                out.append("        jvm.classes[\"").append(owner).append("\"].staticFields[\"").append(fieldName)
-                        .append("\"] = stack.pop(); pc = ").append(index + 1).append("; break;\n");
+                out.append("        _S[\"").append(owner).append("\"][\"").append(fieldName)
+                        .append("\"] = stack.q(); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.GETFIELD:
-                out.append("        { const target = stack.pop(); stack.push(target[\"").append(propertyName)
-                        .append("\"]); pc = ").append(index + 1).append("; break; }\n");
+                // Inline: evaluate pop() first, then field access. Same
+                // NPE semantics as the previous ``{const t=pop();
+                // push(t[prop])}`` form but shorter after minification
+                // (~10 chars saved per site × ~5k GETFIELDs).
+                out.append("        stack.p(stack.q()[\"").append(propertyName)
+                        .append("\"]); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.PUTFIELD:
-                out.append("        { const value = stack.pop(); const target = stack.pop(); target[\"").append(propertyName)
-                        .append("\"] = value; pc = ").append(index + 1).append("; break; }\n");
+                // Capture value first, then use a block-scoped temp for
+                // target so the emitted form stays readable under
+                // minification while still popping in stack order.
+                out.append("        { let v = stack.q(); stack.q()[\"").append(propertyName)
+                        .append("\"] = v; pc = ").append(index + 1).append("; break; }\n");
                 return;
             default:
                 throw new IllegalArgumentException("Unsupported field opcode " + field.getOpcode());
@@ -2569,12 +3473,34 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
     }
 
     private static void appendInterpreterEnsureClassInitialized(StringBuilder out, String owner, boolean usesStaticFieldInitCache) {
-        if (usesStaticFieldInitCache) {
-            out.append("        if (!__cn1Init[\"").append(owner).append("\"]) { jvm.ensureClassInitialized(\"")
-                    .append(owner).append("\"); __cn1Init[\"").append(owner).append("\"] = true; }\n");
+        // Skip ``_I("owner")`` when ``owner`` is the class we're
+        // currently emitting a method for — or any of its ancestors.
+        // The JVM spec guarantees a class's supertypes are initialized
+        // before the class itself, which in turn is initialized before
+        // any of its methods can run, so both are already live by the
+        // time this method body executes. ~30% of the 7.7k ``jvm.eI``
+        // sites resolve to the containing class or its ancestors.
+        if (isClassAlreadyInitializedForCurrentEmission(owner)) {
             return;
         }
-        out.append("        jvm.ensureClassInitialized(\"").append(owner).append("\");\n");
+        out.append("        _I(\"").append(owner).append("\");\n");
+    }
+
+    private static boolean isClassAlreadyInitializedForCurrentEmission(String owner) {
+        ByteCodeClass cls = currentEmissionClass;
+        if (cls == null || owner == null) {
+            return false;
+        }
+        String target = JavascriptNameUtil.sanitizeClassName(owner);
+        ByteCodeClass walk = cls;
+        int hops = 0;
+        while (walk != null && hops++ < 64) {
+            if (target.equals(walk.getClsName())) {
+                return true;
+            }
+            walk = walk.getBaseClassObject();
+        }
+        return false;
     }
 
     private static boolean hasClassInitSensitiveAccess(List<Instruction> instructions) {
@@ -2614,52 +3540,52 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                 out.append("        pc = ").append(target.intValue()).append("; break;\n");
                 return;
             case Opcodes.IFEQ:
-                out.append("        pc = ((stack.pop()|0) == 0) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break;\n");
+                out.append("        pc = ((stack.q()|0) == 0) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.IFNE:
-                out.append("        pc = ((stack.pop()|0) != 0) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break;\n");
+                out.append("        pc = ((stack.q()|0) != 0) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.IFLT:
-                out.append("        pc = ((stack.pop()|0) < 0) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break;\n");
+                out.append("        pc = ((stack.q()|0) < 0) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.IFLE:
-                out.append("        pc = ((stack.pop()|0) <= 0) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break;\n");
+                out.append("        pc = ((stack.q()|0) <= 0) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.IFGT:
-                out.append("        pc = ((stack.pop()|0) > 0) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break;\n");
+                out.append("        pc = ((stack.q()|0) > 0) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.IFGE:
-                out.append("        pc = ((stack.pop()|0) >= 0) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break;\n");
+                out.append("        pc = ((stack.q()|0) >= 0) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.IFNULL:
-                out.append("        pc = (stack.pop() == null) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break;\n");
+                out.append("        pc = (stack.q() == null) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.IFNONNULL:
-                out.append("        pc = (stack.pop() != null) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break;\n");
+                out.append("        pc = (stack.q() != null) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.IF_ICMPEQ:
-                out.append("        { const b = stack.pop(); const a = stack.pop(); pc = ((a|0) == (b|0)) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); pc = ((a|0) == (b|0)) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.IF_ICMPNE:
-                out.append("        { const b = stack.pop(); const a = stack.pop(); pc = ((a|0) != (b|0)) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); pc = ((a|0) != (b|0)) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.IF_ICMPLT:
-                out.append("        { const b = stack.pop(); const a = stack.pop(); pc = ((a|0) < (b|0)) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); pc = ((a|0) < (b|0)) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.IF_ICMPLE:
-                out.append("        { const b = stack.pop(); const a = stack.pop(); pc = ((a|0) <= (b|0)) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); pc = ((a|0) <= (b|0)) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.IF_ICMPGT:
-                out.append("        { const b = stack.pop(); const a = stack.pop(); pc = ((a|0) > (b|0)) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); pc = ((a|0) > (b|0)) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.IF_ICMPGE:
-                out.append("        { const b = stack.pop(); const a = stack.pop(); pc = ((a|0) >= (b|0)) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); pc = ((a|0) >= (b|0)) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.IF_ACMPEQ:
-                out.append("        { const b = stack.pop(); const a = stack.pop(); pc = (a === b) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); pc = (a === b) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.IF_ACMPNE:
-                out.append("        { const b = stack.pop(); const a = stack.pop(); pc = (a !== b) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); pc = (a !== b) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break; }\n");
                 return;
             default:
                 throw new IllegalArgumentException("Unsupported jump opcode " + jump.getOpcode());
@@ -2675,6 +3601,13 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                 ? declaredOwner
                 : directOwner;
         String methodId = JavascriptNameUtil.methodIdentifier(methodOwner, invoke.getName(), invoke.getDesc());
+        // Virtual / interface dispatch uses a class-free ``dispatch`` id
+        // so every class that implements a given Java method stores it
+        // under the same key. The runtime's hierarchy walk in
+        // ``resolveVirtual`` handles inheritance without the translator
+        // emitting explicit alias entries — which used to account for
+        // ~25% of Initializr's translated JS.
+        String dispatchId = JavascriptNameUtil.dispatchMethodIdentifier(invoke.getName(), invoke.getDesc());
         String methodBodyId = jsStaticMethodBodyIdentifier(methodOwner, invoke.getName(), invoke.getDesc());
         List<String> args = JavascriptNameUtil.argumentTypes(invoke.getDesc());
         boolean hasReturn = invoke.getDesc().charAt(invoke.getDesc().length() - 1) != 'V';
@@ -2691,43 +3624,177 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
         }
 
         if (invoke.getOpcode() == Opcodes.INVOKEVIRTUAL || invoke.getOpcode() == Opcodes.INVOKEINTERFACE) {
-            // Virtual-dispatch call site. We used to emit ~15 lines of inline
-            // __classDef lookup + resolveVirtual fallback + per-method cache
-            // around every single INVOKEVIRTUAL / INVOKEINTERFACE; on Initializr
-            // that pattern alone weighed ~24 MiB across 35k call sites. The
-            // runtime now ships cn1_iv0..cn1_iv4 / cn1_ivN helpers that
-            // collapse that boilerplate into one call, with the same fast-path
-            // (classDef.methods lookup) and fallback (jvm.resolveVirtual has
-            // its own class-wide cache) semantics.
+            // Fast path for 0-arg virtual dispatch: inline the
+            // target pop into the iv0 call. Pops TOS inside the
+            // invoke's arg list, so the full block collapses to a
+            // single statement — saves ~25 chars × thousands of
+            // call sites.
+            if (argCount == 0) {
+                if (hasReturn) {
+                    out.append("        stack.p(yield* cn1_iv0(stack.q(), \"").append(dispatchId).append("\"));\n");
+                } else {
+                    out.append("        yield* cn1_iv0(stack.q(), \"").append(dispatchId).append("\");\n");
+                }
+                out.append("        pc = ").append(index + 1).append("; break;\n");
+                return;
+            }
+            if (argCount == 1) {
+                out.append("        { let __arg0 = stack.q(); ");
+                if (hasReturn) {
+                    out.append("stack.p(yield* cn1_iv1(stack.q(), \"").append(dispatchId).append("\", __arg0));");
+                } else {
+                    out.append("yield* cn1_iv1(stack.q(), \"").append(dispatchId).append("\", __arg0);");
+                }
+                out.append(" pc = ").append(index + 1).append("; break; }\n");
+                return;
+            }
+            if (argCount == 2) {
+                out.append("        { let __arg1 = stack.q(); let __arg0 = stack.q(); ");
+                if (hasReturn) {
+                    out.append("stack.p(yield* cn1_iv2(stack.q(), \"").append(dispatchId).append("\", __arg0, __arg1));");
+                } else {
+                    out.append("yield* cn1_iv2(stack.q(), \"").append(dispatchId).append("\", __arg0, __arg1);");
+                }
+                out.append(" pc = ").append(index + 1).append("; break; }\n");
+                return;
+            }
+            if (argCount == 3) {
+                out.append("        { let __arg2 = stack.q(); let __arg1 = stack.q(); let __arg0 = stack.q(); ");
+                if (hasReturn) {
+                    out.append("stack.p(yield* cn1_iv3(stack.q(), \"").append(dispatchId).append("\", __arg0, __arg1, __arg2));");
+                } else {
+                    out.append("yield* cn1_iv3(stack.q(), \"").append(dispatchId).append("\", __arg0, __arg1, __arg2);");
+                }
+                out.append(" pc = ").append(index + 1).append("; break; }\n");
+                return;
+            }
+            if (argCount == 4) {
+                out.append("        { let __arg3 = stack.q(); let __arg2 = stack.q(); let __arg1 = stack.q(); let __arg0 = stack.q(); ");
+                if (hasReturn) {
+                    out.append("stack.p(yield* cn1_iv4(stack.q(), \"").append(dispatchId).append("\", __arg0, __arg1, __arg2, __arg3));");
+                } else {
+                    out.append("yield* cn1_iv4(stack.q(), \"").append(dispatchId).append("\", __arg0, __arg1, __arg2, __arg3);");
+                }
+                out.append(" pc = ").append(index + 1).append("; break; }\n");
+                return;
+            }
+            // Virtual-dispatch call site for arity ≥ 2. We used to
+            // emit ~15 lines of inline __classDef lookup +
+            // resolveVirtual fallback + per-method cache around
+            // every INVOKEVIRTUAL / INVOKEINTERFACE; the
+            // ``cn1_iv2..cn1_iv4 / cn1_ivN`` helpers collapse that
+            // into one call with the same fast-path / fallback
+            // semantics.
             out.append("        {\n");
-            appendInvocationArgumentBindings(out, argCount, "          ", "stack.pop()");
-            out.append("          const __target = stack.pop();\n");
-            appendCompactVirtualDispatch(out, "          ", methodId, argCount, hasReturn, "__target", true);
+            appendInvocationArgumentBindings(out, argCount, "          ", "stack.q()");
+            out.append("          let __target = stack.q();\n");
+            appendCompactVirtualDispatch(out, "          ", dispatchId, argCount, hasReturn, "__target", true);
             out.append("          pc = ").append(index + 1).append("; break;\n");
             out.append("        }\n");
             return;
         }
 
+        // For INVOKESTATIC, pick between the public wrapper and the
+        // ``__impl`` body at emit time based on whether the target is
+        // native. Non-native statics have a real ``__impl`` function
+        // (the body we want to call directly, skipping the wrapper's
+        // redundant ``jvm.eI`` — the interpreter already emitted one
+        // above). Native statics only have the public wrapper (their
+        // ``__impl`` name isn't declared), so calling that is the
+        // only safe option. Previously emitted
+        // ``typeof X==="function"?X:Y`` (~30 chars) at every site; now
+        // either ``methodBodyId`` or ``methodId`` directly.
+        String invokedName = invoke.getOpcode() == Opcodes.INVOKESTATIC
+                ? (isInvokeTargetNative(invoke) ? methodId : methodBodyId)
+                : methodId;
+        String interpYieldPrefix = isInvokeSuspending(invoke) ? "yield* " : "";
+        // Fast path for 0-arg + static invoke: eI(), call, push. No
+        // arg bindings needed, no ``let __target`` (INVOKESTATIC
+        // doesn't consume a receiver from the stack).
+        if (argCount == 0 && invoke.getOpcode() == Opcodes.INVOKESPECIAL) {
+            // INVOKESPECIAL 0-arg (mostly constructor calls where the
+            // class has already been new'd): pop target, call as
+            // non-virtual.
+            if (hasReturn) {
+                out.append("        stack.p(").append(interpYieldPrefix).append(invokedName).append("(stack.q()));\n");
+            } else {
+                out.append("        ").append(interpYieldPrefix).append(invokedName).append("(stack.q());\n");
+            }
+            out.append("        pc = ").append(index + 1).append("; break;\n");
+            return;
+        }
+        if (argCount == 0 && invoke.getOpcode() == Opcodes.INVOKESTATIC) {
+            appendInterpreterEnsureClassInitialized(out, owner, usesClassInitCache);
+            if (hasReturn) {
+                out.append("        stack.p(").append(interpYieldPrefix).append(invokedName).append("());\n");
+            } else {
+                out.append("        ").append(interpYieldPrefix).append(invokedName).append("();\n");
+            }
+            out.append("        pc = ").append(index + 1).append("; break;\n");
+            return;
+        }
+        // Fast path for 1-arg INVOKESPECIAL: pop arg (preserve eval
+        // order via let), inline target pop.
+        if (argCount == 1 && invoke.getOpcode() == Opcodes.INVOKESPECIAL) {
+            out.append("        { let __arg0 = stack.q(); ");
+            if (hasReturn) {
+                out.append("stack.p(").append(interpYieldPrefix).append(invokedName).append("(stack.q(), __arg0));");
+            } else {
+                out.append(interpYieldPrefix).append(invokedName).append("(stack.q(), __arg0);");
+            }
+            out.append(" pc = ").append(index + 1).append("; break; }\n");
+            return;
+        }
+        // Fast path for 1-arg INVOKESTATIC: eI(), pop arg, call.
+        if (argCount == 1 && invoke.getOpcode() == Opcodes.INVOKESTATIC) {
+            appendInterpreterEnsureClassInitialized(out, owner, usesClassInitCache);
+            if (hasReturn) {
+                out.append("        stack.p(").append(interpYieldPrefix).append(invokedName).append("(stack.q()));\n");
+            } else {
+                out.append("        ").append(interpYieldPrefix).append(invokedName).append("(stack.q());\n");
+            }
+            out.append("        pc = ").append(index + 1).append("; break;\n");
+            return;
+        }
+        // Fast path for 2-arg INVOKESPECIAL.
+        if (argCount == 2 && invoke.getOpcode() == Opcodes.INVOKESPECIAL) {
+            out.append("        { let __arg1 = stack.q(); let __arg0 = stack.q(); ");
+            if (hasReturn) {
+                out.append("stack.p(").append(interpYieldPrefix).append(invokedName).append("(stack.q(), __arg0, __arg1));");
+            } else {
+                out.append(interpYieldPrefix).append(invokedName).append("(stack.q(), __arg0, __arg1);");
+            }
+            out.append(" pc = ").append(index + 1).append("; break; }\n");
+            return;
+        }
+        // Fast path for 2-arg INVOKESTATIC.
+        if (argCount == 2 && invoke.getOpcode() == Opcodes.INVOKESTATIC) {
+            appendInterpreterEnsureClassInitialized(out, owner, usesClassInitCache);
+            out.append("        { let __arg1 = stack.q(); ");
+            if (hasReturn) {
+                out.append("stack.p(").append(interpYieldPrefix).append(invokedName).append("(stack.q(), __arg1));");
+            } else {
+                out.append(interpYieldPrefix).append(invokedName).append("(stack.q(), __arg1);");
+            }
+            out.append(" pc = ").append(index + 1).append("; break; }\n");
+            return;
+        }
         out.append("        {\n");
-        appendInvocationArgumentBindings(out, argCount, "          ", "stack.pop()");
+        appendInvocationArgumentBindings(out, argCount, "          ", "stack.q()");
         if (invoke.getOpcode() != Opcodes.INVOKESTATIC) {
-            out.append("          const __target = stack.pop();\n");
+            out.append("          let __target = stack.q();\n");
         } else {
             appendInterpreterEnsureClassInitialized(out, owner, usesClassInitCache);
         }
-        String invokedName = invoke.getOpcode() == Opcodes.INVOKESTATIC
-                ? "(" + staticInvocationTargetExpression(methodId, methodBodyId) + ")"
-                : methodId;
-        String interpYieldPrefix = isInvokeSuspending(invoke) ? "yield* " : "";
         if (hasReturn) {
-            out.append("          const __result = ").append(interpYieldPrefix).append(invokedName).append("(");
+            out.append("          let __result = ").append(interpYieldPrefix).append(invokedName).append("(");
         } else {
             out.append("          ").append(interpYieldPrefix).append(invokedName).append("(");
         }
         appendInvocationArguments(out, invoke.getOpcode() != Opcodes.INVOKESTATIC, argCount);
         out.append(");\n");
         if (hasReturn) {
-            out.append("          stack.push(__result);\n");
+            out.append("          stack.p(__result);\n");
         }
         out.append("          pc = ").append(index + 1).append("; break;\n");
         out.append("        }\n");
@@ -2750,7 +3817,7 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
 
     private static void appendInvocationArgumentBindings(StringBuilder out, int argCount, String indent, String sourceExpression) {
         for (int i = argCount - 1; i >= 0; i--) {
-            out.append(indent).append("const __arg").append(i).append(" = ").append(sourceExpression).append(";\n");
+            out.append(indent).append("let __arg").append(i).append(" = ").append(sourceExpression).append(";\n");
         }
     }
 
@@ -2794,9 +3861,9 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
         }
         out.append(indent);
         if (hasReturn && argsFromStack) {
-            out.append("stack.push(yield* ").append(helper).append("(").append(targetExpr).append(", \"").append(methodId).append("\"");
+            out.append("stack.p(yield* ").append(helper).append("(").append(targetExpr).append(", \"").append(methodId).append("\"");
         } else if (hasReturn) {
-            out.append("const __result = yield* ").append(helper).append("(").append(targetExpr).append(", \"").append(methodId).append("\"");
+            out.append("let __result = yield* ").append(helper).append("(").append(targetExpr).append(", \"").append(methodId).append("\"");
         } else {
             out.append("yield* ").append(helper).append("(").append(targetExpr).append(", \"").append(methodId).append("\"");
         }
@@ -2821,7 +3888,43 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
     }
 
     private static String staticInvocationTargetExpression(String methodId, String methodBodyId) {
-        return "typeof " + methodBodyId + " === \"function\" ? " + methodBodyId + " : " + methodId;
+        return "typeof " + methodBodyId + "==\"function\"?" + methodBodyId + ":" + methodId;
+    }
+
+    /**
+     * True when the method targeted by an INVOKESTATIC is declared
+     * native — i.e. only the public wrapper exists at runtime and
+     * ``methodBodyId`` refers to an undefined identifier. Used to
+     * skip the ``typeof X==='function'?X:Y`` runtime check at call
+     * sites when the translator can tell statically whether the body
+     * exists.
+     */
+    private static boolean isInvokeTargetNative(Invoke invoke) {
+        String owner = invoke.getOwner();
+        if (owner == null) {
+            return false;
+        }
+        String sanitized = JavascriptNameUtil.sanitizeClassName(owner);
+        ByteCodeClass cls = Parser.getClassObject(sanitized);
+        BytecodeMethod resolved = resolveStaticMethodOnHierarchy(cls, invoke.getName(), invoke.getDesc());
+        return resolved != null && resolved.isNative();
+    }
+
+    private static BytecodeMethod resolveStaticMethodOnHierarchy(ByteCodeClass cls, String name, String desc) {
+        if (cls == null) {
+            return null;
+        }
+        List<BytecodeMethod> methods = cls.getMethods();
+        if (methods != null) {
+            for (BytecodeMethod method : methods) {
+                if (method.isStatic()
+                        && method.getMethodName().equals(name)
+                        && desc.equals(method.getSignature())) {
+                    return method;
+                }
+            }
+        }
+        return resolveStaticMethodOnHierarchy(cls.getBaseClassObject(), name, desc);
     }
 
     private static String resolveDirectInvokeOwner(Invoke invoke) {

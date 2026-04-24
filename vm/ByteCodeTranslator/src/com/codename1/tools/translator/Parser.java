@@ -455,7 +455,8 @@ public class Parser extends ClassVisitor {
             // different dispatch mechanics and may break under stricter
             // reachability.
             if (BytecodeMethod.optimizerOn
-                    && ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT) {
+                    && ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT
+                    && System.getProperty("parparvm.js.rta.off") == null) {
                 Date rtaStart = new Date();
                 int rtaEliminated = JavascriptReachability.run(classes, nativeSources);
                 Date rtaEnd = new Date();

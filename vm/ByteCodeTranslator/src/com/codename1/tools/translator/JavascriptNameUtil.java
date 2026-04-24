@@ -75,6 +75,33 @@ final class JavascriptNameUtil {
         return b.toString();
     }
 
+    /**
+     * Class-free dispatch identifier used as the KEY in virtual-method
+     * callsites ({@code cn1_iv*(target, "dispatchId", args)}) and the
+     * methods-map entries on each class. Built from {@code
+     * methodName + signature} (without the owner class) so that every
+     * class that implements a given Java method stores it under the
+     * same key — the runtime's natural hierarchy walk in
+     * {@code resolveVirtual} handles inheritance without any explicit
+     * alias entries. Prefix {@code cn1_s_} keeps the mangler treating
+     * these as regular {@code cn1_*} identifiers while ensuring no
+     * accidental collision with a class-specific {@code cn1_ClassName_method...}
+     * identifier.
+     */
+    static String dispatchMethodIdentifier(String name, String desc) {
+        StringBuilder b = new StringBuilder();
+        b.append(SYMBOL_PREFIX).append("s_");
+        if ("<init>".equals(name)) {
+            b.append("__INIT__");
+        } else if ("<clinit>".equals(name)) {
+            b.append("__CLINIT__");
+        } else {
+            b.append(identifierPart(name));
+        }
+        BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, b, new ArrayList<String>());
+        return b.toString();
+    }
+
     static String fieldProperty(String owner, String name) {
         return SYMBOL_PREFIX + identifierPart(sanitizeClassName(owner)) + "_" + identifierPart(name);
     }

@@ -719,33 +719,60 @@ function installMissingGlobalDelegate(symbol, delegateSymbol, marker) {
   return true;
 }
 
-// Accepts an array of [symbol, delegateSymbol, marker] triples with
-// pre-built identifier literals. Previously this took owner/suffix parts
-// and concatenated ``"cn1_" + owner + "_" + suffix`` at runtime, which
-// was incompatible with cross-file identifier mangling: the mangler
-// rewrites ``cn1_*`` literals in place but cannot intercept runtime
-// string builds, so the reconstructed identifiers would miss the
-// mangled globals. Callers now pass full symbols so each literal is
-// mangled verbatim.
-function installMissingOwnerDelegates(triples) {
-  for (let i = 0; i < triples.length; i++) {
-    const triple = triples[i];
-    installMissingGlobalDelegate(triple[0], triple[1], triple[2]);
+function installMissingOwnerDelegates(owner, delegateOwner, suffixes, markerPrefix) {
+  for (let i = 0; i < suffixes.length; i++) {
+    const suffix = suffixes[i];
+    installMissingGlobalDelegate(
+      "cn1_" + owner + "_" + suffix,
+      "cn1_" + delegateOwner + "_" + suffix,
+      markerPrefix + "." + suffix
+    );
   }
 }
 
-// Previously this scanned ``Object.keys(global)`` for ``cn1_*`` functions
-// and regex-extracted references to an owner's method suffixes from
-// ``Function.prototype.toString`` output to install missing delegates by
-// name. Diagnostic logs showed ``installed=0`` for every call site in
-// practice, and both of its assumptions (``cn1_``-prefixed identifier
-// shapes, source text matching those shapes) are broken by the
-// identifier mangler. Kept as a no-op so existing call sites remain
-// valid; real missing-override plumbing now lives in the explicit
-// ``installMissingGlobalDelegate`` / ``installMissingOwnerDelegates``
-// entries above.
-function installInferredMissingOwnerDelegates(_owner, _delegateOwner, _markerPrefix) {
-  return 0;
+function installInferredMissingOwnerDelegates(owner, delegateOwner, markerPrefix) {
+  const ownerPrefix = "cn1_" + owner + "_";
+  const delegatePrefix = "cn1_" + delegateOwner + "_";
+  const usagePattern = new RegExp(ownerPrefix + "([A-Za-z0-9_]+)", "g");
+  const suffixes = Object.create(null);
+  const keys = Object.keys(global);
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i];
+    if (typeof global[key] !== "function" || key.indexOf("cn1_") !== 0) {
+      continue;
+    }
+    let source = "";
+    try {
+      source = Function.prototype.toString.call(global[key]);
+    } catch (_err) {
+      source = "";
+    }
+    if (!source || source.indexOf(ownerPrefix) < 0) {
+      continue;
+    }
+    usagePattern.lastIndex = 0;
+    let match;
+    while ((match = usagePattern.exec(source)) !== null) {
+      if (match[1]) {
+        suffixes[match[1]] = true;
+      }
+    }
+  }
+  const names = Object.keys(suffixes);
+  let installed = 0;
+  for (let i = 0; i < names.length; i++) {
+    const suffix = names[i];
+    const symbol = ownerPrefix + suffix;
+    const delegate = delegatePrefix + suffix;
+    if (typeof global[symbol] === "function" || typeof global[delegate] !== "function") {
+      continue;
+    }
+    if (installMissingGlobalDelegate(symbol, delegate, markerPrefix + "." + suffix)) {
+      installed++;
+    }
+  }
+  emitDiagLine("PARPAR:DIAG:INIT:inferredMissingOwnerDelegates:" + owner + "->" + delegateOwner + ":installed=" + installed);
+  return installed;
 }
 
 installMissingGlobalDelegate(
@@ -793,35 +820,37 @@ installMissingGlobalDelegate(
   "cn1_com_codename1_ui_Component_initLaf_com_codename1_ui_plaf_UIManager",
   "Button.initLafMissing"
 );
-// Full-symbol triples so each ``cn1_*`` literal is rewritten verbatim
-// by the cross-file identifier mangler. See the comment on
-// ``installMissingOwnerDelegates`` above for background.
-installMissingOwnerDelegates([
-  ["cn1_com_codename1_ui_Container_animate_R_boolean", "cn1_com_codename1_ui_Component_animate_R_boolean", "Container.missing.animate_R_boolean"],
-  ["cn1_com_codename1_ui_Container_deinitialize", "cn1_com_codename1_ui_Component_deinitialize", "Container.missing.deinitialize"],
-  ["cn1_com_codename1_ui_Container_fireActionEvent", "cn1_com_codename1_ui_Component_fireActionEvent", "Container.missing.fireActionEvent"],
-  ["cn1_com_codename1_ui_Container_getComponentForm_R_com_codename1_ui_Form", "cn1_com_codename1_ui_Component_getComponentForm_R_com_codename1_ui_Form", "Container.missing.getComponentForm_R_com_codename1_ui_Form"],
-  ["cn1_com_codename1_ui_Container_getPreferredW_R_int", "cn1_com_codename1_ui_Component_getPreferredW_R_int", "Container.missing.getPreferredW_R_int"],
-  ["cn1_com_codename1_ui_Container_getPropertyValue_java_lang_String_R_java_lang_Object", "cn1_com_codename1_ui_Component_getPropertyValue_java_lang_String_R_java_lang_Object", "Container.missing.getPropertyValue_java_lang_String_R_java_lang_Object"],
-  ["cn1_com_codename1_ui_Container_initComponent", "cn1_com_codename1_ui_Component_initComponent", "Container.missing.initComponent"],
-  ["cn1_com_codename1_ui_Container_initUnselectedStyle_com_codename1_ui_plaf_Style", "cn1_com_codename1_ui_Component_initUnselectedStyle_com_codename1_ui_plaf_Style", "Container.missing.initUnselectedStyle_com_codename1_ui_plaf_Style"],
-  ["cn1_com_codename1_ui_Container_internalPaintImpl_com_codename1_ui_Graphics_boolean", "cn1_com_codename1_ui_Component_internalPaintImpl_com_codename1_ui_Graphics_boolean", "Container.missing.internalPaintImpl_com_codename1_ui_Graphics_boolean"],
-  ["cn1_com_codename1_ui_Container_isVisible_R_boolean", "cn1_com_codename1_ui_Component_isVisible_R_boolean", "Container.missing.isVisible_R_boolean"],
-  ["cn1_com_codename1_ui_Container_paintBackground_com_codename1_ui_Graphics", "cn1_com_codename1_ui_Component_paintBackground_com_codename1_ui_Graphics", "Container.missing.paintBackground_com_codename1_ui_Graphics"],
-  ["cn1_com_codename1_ui_Container_paintScrollbars_com_codename1_ui_Graphics", "cn1_com_codename1_ui_Component_paintScrollbars_com_codename1_ui_Graphics", "Container.missing.paintScrollbars_com_codename1_ui_Graphics"],
-  ["cn1_com_codename1_ui_Container_putClientProperty_java_lang_String_java_lang_Object", "cn1_com_codename1_ui_Component_putClientProperty_java_lang_String_java_lang_Object", "Container.missing.putClientProperty_java_lang_String_java_lang_Object"],
-  ["cn1_com_codename1_ui_Container_repaint_com_codename1_ui_Component", "cn1_com_codename1_ui_Component_repaint_com_codename1_ui_Component", "Container.missing.repaint_com_codename1_ui_Component"],
-  ["cn1_com_codename1_ui_Container_setHeight_int", "cn1_com_codename1_ui_Component_setHeight_int", "Container.missing.setHeight_int"],
-  ["cn1_com_codename1_ui_Container_setPropertyValue_java_lang_String_java_lang_Object_R_java_lang_String", "cn1_com_codename1_ui_Component_setPropertyValue_java_lang_String_java_lang_Object_R_java_lang_String", "Container.missing.setPropertyValue_java_lang_String_java_lang_Object_R_java_lang_String"],
-  ["cn1_com_codename1_ui_Container_setRTL_boolean", "cn1_com_codename1_ui_Component_setRTL_boolean", "Container.missing.setRTL_boolean"],
-  ["cn1_com_codename1_ui_Container_setScrollY_int", "cn1_com_codename1_ui_Component_setScrollY_int", "Container.missing.setScrollY_int"],
-  ["cn1_com_codename1_ui_Container_setUIID_java_lang_String", "cn1_com_codename1_ui_Component_setUIID_java_lang_String", "Container.missing.setUIID_java_lang_String"],
-  ["cn1_com_codename1_ui_Container_setUnselectedStyle_com_codename1_ui_plaf_Style", "cn1_com_codename1_ui_Component_setUnselectedStyle_com_codename1_ui_plaf_Style", "Container.missing.setUnselectedStyle_com_codename1_ui_plaf_Style"],
-  ["cn1_com_codename1_ui_Container_setWidth_int", "cn1_com_codename1_ui_Component_setWidth_int", "Container.missing.setWidth_int"],
-  ["cn1_com_codename1_ui_Container_setX_int", "cn1_com_codename1_ui_Component_setX_int", "Container.missing.setX_int"],
-  ["cn1_com_codename1_ui_Container_setY_int", "cn1_com_codename1_ui_Component_setY_int", "Container.missing.setY_int"],
-  ["cn1_com_codename1_ui_Container_styleChanged_java_lang_String_com_codename1_ui_plaf_Style", "cn1_com_codename1_ui_Component_styleChanged_java_lang_String_com_codename1_ui_plaf_Style", "Container.missing.styleChanged_java_lang_String_com_codename1_ui_plaf_Style"]
-]);
+installMissingOwnerDelegates(
+  "com_codename1_ui_Container",
+  "com_codename1_ui_Component",
+  [
+    "animate_R_boolean",
+    "deinitialize",
+    "fireActionEvent",
+    "getComponentForm_R_com_codename1_ui_Form",
+    "getPreferredW_R_int",
+    "getPropertyValue_java_lang_String_R_java_lang_Object",
+    "initComponent",
+    "initUnselectedStyle_com_codename1_ui_plaf_Style",
+    "internalPaintImpl_com_codename1_ui_Graphics_boolean",
+    "isVisible_R_boolean",
+    "paintBackground_com_codename1_ui_Graphics",
+    "paintScrollbars_com_codename1_ui_Graphics",
+    "putClientProperty_java_lang_String_java_lang_Object",
+    "repaint_com_codename1_ui_Component",
+    "setHeight_int",
+    "setPropertyValue_java_lang_String_java_lang_Object_R_java_lang_String",
+    "setRTL_boolean",
+    "setScrollY_int",
+    "setUIID_java_lang_String",
+    "setUnselectedStyle_com_codename1_ui_plaf_Style",
+    "setWidth_int",
+    "setX_int",
+    "setY_int",
+    "styleChanged_java_lang_String_com_codename1_ui_plaf_Style"
+  ],
+  "Container.missing"
+);
 installInferredMissingOwnerDelegates("com_codename1_ui_Label", "com_codename1_ui_Component", "Label.inferred");
 installInferredMissingOwnerDelegates("com_codename1_ui_Container", "com_codename1_ui_Component", "Container.inferred");
 installInferredMissingOwnerDelegates("com_codename1_ui_TextArea", "com_codename1_ui_Component", "TextArea.inferred");

@@ -103,6 +103,48 @@ function emitVmMessage(message) {
   }
   global.postMessage(safeMessage);
 }
+// An entry in ``cls.methods`` may be either a function (the common
+// case) or a STRING naming another translated function. Inherited
+// method aliases emit the latter form — the alias ``$childId`` points
+// at the declaring class's function name ``"$parentFn"`` as a string
+// literal so the object literal can be evaluated at file-load time
+// even if ``$parentFn`` is defined in a later-loaded chunk. At first
+// virtual-dispatch we resolve the string via ``global[name]``, write
+// the function back into the methods table in place of the string
+// (so subsequent lookups skip the resolution), and return it.
+function resolveMethodEntry(methods, methodId) {
+  let entry = methods[methodId];
+  if (typeof entry === "string") {
+    const resolved = global[entry];
+    if (typeof resolved === "function") {
+      methods[methodId] = resolved;
+      entry = resolved;
+    }
+  }
+  return entry;
+}
+// Format an arbitrary thrown value into a readable string for the
+// ERROR message we ship to the main thread. Native ``Error`` objects
+// already stringify to ``Name: message``; translated Java throwables
+// are plain JS objects whose ``toString`` yields ``[object Object]``,
+// so we pull the class name and ``Throwable.message`` field out by
+// hand. Anything else falls through to ``String(error)``.
+function formatErrorForVm(error) {
+  if (error instanceof Error) {
+    return (error.name || "Error") + ": " + (error.message || "");
+  }
+  if (error && typeof error === "object") {
+    const cls = error.__class || (error.__classDef && error.__classDef.name);
+    if (cls) {
+      let jmsg = error.cn1_java_lang_Throwable_message;
+      if (jmsg && typeof jmsg === "object") {
+        try { jmsg = jvm.toNativeString(jmsg); } catch (_fm) { jmsg = "[unserialisable]"; }
+      }
+      return "JavaThrow[" + cls + "]: " + (jmsg == null ? "(no-message)" : jmsg);
+    }
+  }
+  return "" + error;
+}
 const VM_TRACE_WAIT_LIMIT = 64;
 let vmTraceWaitCount = 0;
 let vmTraceWaitSuppressed = false;
@@ -369,9 +411,82 @@ const jvm = {
   lastVirtualFailure: null,
   firstFailure: null,
   defineClass(def) {
-    def.staticFields = def.staticFields || {};
-    def.instanceFields = def.instanceFields || [];
-    def.assignableTo = def.assignableTo || {};
+    // Translator emits short property names (n/b/i/I/A/a/f/s) to save
+    // ~60 chars per class × 1590 classes. Downstream runtime code
+    // still reads the long names, so remap them here at registration
+    // time. Hand-written runtime / port.js calls that still use the
+    // long names continue to work (the ``||`` fallback keeps both
+    // spellings valid).
+    if (def.n !== undefined) {
+      def.name = def.n;
+      // ``b`` omitted ⇒ base is java.lang.Object (translator's default
+      // for all direct-extends-Object classes; saves ~7 chars per
+      // entry). Object itself emits ``b: null`` to break the walk.
+      def.baseClass = def.b === undefined
+        ? (def.n === "java_lang_Object" ? null : "java_lang_Object")
+        : def.b;
+      def.interfaces = def.i || [];
+      def.isInterface = !!def.I;
+      def.isAbstract = !!def.A;
+      // ``a`` encodes either an explicit assignableTo map (debug /
+      // full mode) or — by default — is omitted entirely, asking
+      // us to auto-populate. The auto-populate unions self + every
+      // base class's + every interface's assignableTo. Each
+      // ancestor is already registered by the time we see a
+      // subclass, so the lookup is O(depth).
+      if (def.a === undefined || def.a === 1) {
+        const assignable = Object.create(null);
+        assignable[def.name] = 1;
+        assignable["java_lang_Object"] = 1;
+        let base = def.baseClass;
+        while (base) {
+          const baseDef = this.classes[base];
+          if (baseDef && baseDef.assignableTo) {
+            for (const k in baseDef.assignableTo) {
+              assignable[k] = 1;
+            }
+          }
+          base = baseDef ? baseDef.baseClass : null;
+        }
+        for (let i = 0; i < def.interfaces.length; i++) {
+          const ifaceName = def.interfaces[i];
+          const ifaceDef = this.classes[ifaceName];
+          if (ifaceDef && ifaceDef.assignableTo) {
+            for (const k in ifaceDef.assignableTo) {
+              assignable[k] = 1;
+            }
+          }
+          assignable[ifaceName] = 1;
+        }
+        def.assignableTo = assignable;
+      } else {
+        def.assignableTo = def.a || {};
+      }
+      // Packed instance-field encoding: ``f: "$a|$b:I|$c"`` is a
+      // pipe-separated list of ``name[:type]`` pairs; expand into
+      // the legacy [[name,type],[name],...] tuple array that
+      // ``initInstanceFields`` already understands. Keeps the
+      // hot-path code fast (no re-parse per object init) while
+      // shaving ~14 KiB of tuple-array brackets off the wire.
+      if (typeof def.f === "string") {
+        const parts = def.f ? def.f.split("|") : [];
+        const fields = new Array(parts.length);
+        for (let i = 0; i < parts.length; i++) {
+          const colon = parts[i].indexOf(":");
+          fields[i] = colon >= 0
+            ? [parts[i].substring(0, colon), parts[i].substring(colon + 1)]
+            : [parts[i]];
+        }
+        def.instanceFields = fields;
+      } else {
+        def.instanceFields = def.f || [];
+      }
+      def.staticFields = def.s || {};
+    } else {
+      def.staticFields = def.staticFields || {};
+      def.instanceFields = def.instanceFields || [];
+      def.assignableTo = def.assignableTo || {};
+    }
     def.methods = def.methods || {};
     def.classObject = {
       __class: "java_lang_Class",
@@ -382,6 +497,19 @@ const jvm = {
       cn1_staticFields: def.staticFields
     };
     this.classes[def.name] = def;
+    // ``def.c`` — inline clinit attachment. Replaces the old
+    // separate ``jvm.classes["cls"].clinit = $fn`` statement that
+    // used to follow ``_Z`` in the translated output.
+    if (def.c) {
+      def.clinit = def.c;
+    }
+    // Inline methods map: the class def may carry its virtual-method
+    // registrations directly (``m: {$sig:$fn,...}``) instead of
+    // requiring a separate ``_M("cls", {...})`` call afterwards.
+    // Consolidating the two cuts the per-class ``_M("cls",`` prefix.
+    if (def.m) {
+      this.applyMethodMap(def, def.m);
+    }
   },
   addVirtualMethod(className, methodId, fn) {
     const nativeOverride = this.nativeMethods[methodId];
@@ -398,11 +526,29 @@ const jvm = {
   // emission order, so native overrides take effect even when the
   // method's own entry lands in the table before the override is
   // registered: we consult ``jvm.nativeMethods`` for every entry.
-  m(className, methodMap) {
+  m(className, methodMapOrThunk) {
     const cls = this.classes[className];
     if (!cls) {
       return;
     }
+    // ``methodMapOrThunk`` is an arrow function returning the map,
+    // not the map itself. Evaluating it eagerly here would re-
+    // introduce the cross-chunk forward-reference problem that
+    // previously forced alias entries to be encoded as string
+    // literals. Store the thunk on the class and defer materialising
+    // the map until first virtual dispatch or
+    // ``applyNativeOverrides`` — both happen after every chunk has
+    // finished its top-level declarations.
+    if (typeof methodMapOrThunk === "function") {
+      cls.pendingMethods = cls.pendingMethods || [];
+      cls.pendingMethods.push(methodMapOrThunk);
+      return;
+    }
+    // Legacy path: plain object map (e.g., from hand-written
+    // runtime/port code).
+    this.applyMethodMap(cls, methodMapOrThunk);
+  },
+  applyMethodMap(cls, methodMap) {
     const methods = cls.methods;
     const natives = this.nativeMethods;
     const keys = Object.keys(methodMap);
@@ -410,6 +556,16 @@ const jvm = {
       const methodId = keys[i];
       const override = natives[methodId];
       methods[methodId] = typeof override === "function" ? override : methodMap[methodId];
+    }
+  },
+  flushPendingMethods(cls) {
+    const pending = cls.pendingMethods;
+    if (!pending || !pending.length) {
+      return;
+    }
+    cls.pendingMethods = null;
+    for (let i = 0; i < pending.length; i++) {
+      this.applyMethodMap(cls, pending[i]());
     }
   },
   setMain(className, methodName) {
@@ -476,10 +632,13 @@ const jvm = {
       this.initInstanceFields(obj, cls.baseClass);
     }
     for (const field of cls.instanceFields) {
-      obj[field.prop || (field.owner + "_" + field.name)] = null;
-      if (this.isPrimitiveFieldDescriptor(field.desc)) {
-        obj[field.prop || (field.owner + "_" + field.name)] = 0;
-      }
+      // Instance fields serialize as ``[prop, desc]`` tuples to cut
+      // ~30 chars per field vs the prior ``{owner,name,desc,prop}``
+      // form. Prop (index 0) is always present; desc (index 1) is
+      // used only by the primitive-descriptor test.
+      const prop = field[0];
+      const desc = field[1];
+      obj[prop] = this.isPrimitiveFieldDescriptor(desc) ? 0 : null;
     }
   },
   isPrimitiveFieldDescriptor(desc) {
@@ -499,36 +658,15 @@ const jvm = {
     return false;
   },
   initFieldAliases(obj, className) {
-    const hierarchy = [];
-    let current = className;
-    while (current) {
-      hierarchy.push(current);
-      const cls = this.classes[current];
-      current = cls ? cls.baseClass : null;
-    }
-    for (let i = hierarchy.length - 1; i >= 0; i--) {
-      const owner = hierarchy[i];
-      const cls = this.classes[owner];
-      if (!cls || !cls.instanceFields) {
-        continue;
-      }
-      for (let j = 0; j < cls.instanceFields.length; j++) {
-        const field = cls.instanceFields[j];
-        const canonicalProp = field.prop || this.fieldProperty(field.owner, field.name);
-        for (let k = 0; k < i; k++) {
-          const aliasProp = this.fieldProperty(hierarchy[k], field.name);
-          if (aliasProp === canonicalProp || Object.prototype.hasOwnProperty.call(obj, aliasProp)) {
-            continue;
-          }
-          Object.defineProperty(obj, aliasProp, {
-            configurable: true,
-            enumerable: false,
-            get: function() { return obj[canonicalProp]; },
-            set: function(value) { obj[canonicalProp] = value; }
-          });
-        }
-      }
-    }
+    // Former subclass field-alias shim: when field accesses still
+    // referenced subclass-qualified prop names at runtime
+    // (``cn1_Child_field``), this walked the hierarchy and installed
+    // getter/setter aliases onto each child-qualified key pointing at
+    // the canonical declaring-class prop. The translator now resolves
+    // field-access bytecode to the declaring class at emission time
+    // via ``resolveFieldOwner``, so every PUTFIELD/GETFIELD references
+    // the canonical prop directly and the aliases are never read. The
+    // hook is kept as a stub so emitted callers don't need to change.
   },
   fieldProperty(owner, name) {
     return "cn1_" + owner + "_" + name;
@@ -677,10 +815,11 @@ const jvm = {
       const cls = this.classes[current];
       if (cls) {
         visitedClassHierarchy = true;
+        if (cls.pendingMethods) { this.flushPendingMethods(cls); }
       }
       if (cls && cls.methods) {
         if (cls.methods[methodId]) {
-          cached = cls.methods[methodId];
+          cached = resolveMethodEntry(cls.methods, methodId);
           this.resolvedVirtualCache[cacheKey] = cached;
           return cached;
         }
@@ -690,7 +829,7 @@ const jvm = {
             remapAttempted = true;
           }
           if (cls.methods[remappedId]) {
-            cached = cls.methods[remappedId];
+            cached = resolveMethodEntry(cls.methods, remappedId);
             this.resolvedVirtualCache[cacheKey] = cached;
             return cached;
           }
@@ -722,9 +861,10 @@ const jvm = {
         continue;
       }
       visitedAnyInterface = true;
+      if (iface.pendingMethods) { this.flushPendingMethods(iface); }
       if (iface.methods) {
         if (iface.methods[methodId]) {
-          cached = iface.methods[methodId];
+          cached = resolveMethodEntry(iface.methods, methodId);
           this.resolvedVirtualCache[cacheKey] = cached;
           return cached;
         }
@@ -734,7 +874,7 @@ const jvm = {
             remapAttempted = true;
           }
           if (iface.methods[remappedId]) {
-            cached = iface.methods[remappedId];
+            cached = resolveMethodEntry(iface.methods, remappedId);
             this.resolvedVirtualCache[cacheKey] = cached;
             return cached;
           }
@@ -958,13 +1098,19 @@ const jvm = {
     const errorClassDef = error == null ? null : error.__classDef;
     for (let i = 0; i < entries.length; i++) {
       const entry = entries[i];
-      if (pc < entry.start || pc >= entry.end) {
+      // Short property names emitted by the translator (``s`` / ``e``
+      // / ``h`` / ``t``), with a legacy long-name fallback for any
+      // table constructed directly by hand-written runtime code.
+      const start = entry.s !== undefined ? entry.s : entry.start;
+      const end = entry.e !== undefined ? entry.e : entry.end;
+      const type = entry.t !== undefined ? entry.t : entry.type;
+      if (pc < start || pc >= end) {
         continue;
       }
-      if (entry.type == null) {
+      if (type == null) {
         return entry;
       }
-      if (errorClass === entry.type || (errorClassDef && errorClassDef.assignableTo && errorClassDef.assignableTo[entry.type])) {
+      if (errorClass === type || (errorClassDef && errorClassDef.assignableTo && errorClassDef.assignableTo[type])) {
         return entry;
       }
     }
@@ -1198,7 +1344,7 @@ const jvm = {
     emitVmMessage({ type: this.protocol.messages.RESULT, result: result });
   },
   fail(error) {
-    const message = "" + error;
+    const message = formatErrorForVm(error);
     let virtualFailure = this.lastVirtualFailure;
     if (!virtualFailure) {
       const parsed = parseMissingVirtualMessage(message);
@@ -1571,7 +1717,16 @@ const jvm = {
     const classNames = Object.keys(this.classes);
     for (let i = 0; i < classNames.length; i++) {
       const cls = this.classes[classNames[i]];
-      if (!cls || !cls.methods) {
+      if (!cls) {
+        continue;
+      }
+      // Force every deferred ``jvm.m`` thunk to run now so the map
+      // keys are visible to the native-override pass and later-
+      // fired dispatches don't have to redo the flush per class.
+      if (cls.pendingMethods) {
+        this.flushPendingMethods(cls);
+      }
+      if (!cls.methods) {
         continue;
       }
       const methodIds = Object.keys(cls.methods);
@@ -1683,6 +1838,140 @@ const jvm = {
 
 global.jvm = jvm;
 jvm.jsoRegistry = jsoRegistry;
+// Short-form aliases for the hottest ``jvm.*`` methods. The
+// translated_app*.js files invoke these tens of thousands of times
+// each (7.7k ``ensureClassInitialized``, 5.3k ``createStringLiteral``,
+// 3.1k ``newObject``) and the full property name dominates the raw
+// bundle — collapsing them to single-char identifiers saves ~500 KiB
+// of pre-gzip output. The long names are kept on the object for any
+// hand-written runtime / port code that references them directly.
+jvm.eI = jvm.ensureClassInitialized;
+jvm.sL = jvm.createStringLiteral;
+jvm.nO = jvm.newObject;
+// CHECKCAST: throw ClassCastException when ``value`` is non-null and
+// its class isn't assignable to ``className``. A null receiver is
+// always a valid cast per JVM spec. Replaces ~280 chars of inline
+// assignableTo/enhanceJsWrapper boilerplate at each of the ~2200
+// CHECKCAST call sites in Initializr.
+jvm.cC = function(value, className) {
+  if (value == null) return;
+  const cd = value.__classDef;
+  if (value.__class === className || (cd && cd.assignableTo && cd.assignableTo[className])) return;
+  if (value.__jsValue !== void 0) {
+    jvm.enhanceJsWrapper(value, className);
+    const cd2 = value.__classDef;
+    if (value.__class === className || (cd2 && cd2.assignableTo && cd2.assignableTo[className])) return;
+  }
+  throw new Error("ClassCastException");
+};
+// Array load / store helpers — factor the null+type+bounds checks
+// out of the ~3000 emitted array-access sites (~170 chars each).
+jvm.aL = function(arr, idx) {
+  if (!arr || !arr.__array) throw new Error("Array expected: " + (arr == null ? "null" : (arr.__class || typeof arr)));
+  if (idx < 0 || idx >= arr.length) throw new Error("ArrayIndexOutOfBoundsException");
+  return arr[idx];
+};
+jvm.aS = function(arr, idx, value) {
+  if (!arr || !arr.__array) throw new Error("Array expected: " + (arr == null ? "null" : (arr.__class || typeof arr)));
+  if (idx < 0 || idx >= arr.length) throw new Error("ArrayIndexOutOfBoundsException");
+  arr[idx] = value;
+};
+// Allocate a size-N array initialised to null. Used at the top of
+// every switch-interpreter method body to set up its ``locals``
+// slots (~3000 methods × 13 chars vs the inline
+// ``new Array(N).fill(null)``).
+jvm.aN = function(n) { return new Array(n).fill(null); };
+// Compact frame builder: allocate a size-N locals array and fill the
+// first K slots with the given args. Saves ~15-30 chars per method
+// vs the former ``jvm.aN(N)`` + separate ``locals[i] = ...`` lines.
+// Used only for methods without long/double args — those require the
+// explicit emission because a long/double occupies two local slots
+// but arrives as a single JS argument.
+jvm.fr = function(n) {
+  const a = new Array(n).fill(null);
+  for (let i = 1; i < arguments.length; i++) a[i - 1] = arguments[i];
+  return a;
+};
+// INSTANCEOF — returns truthy when ``value`` is non-null and assignable
+// to ``className`` via __class match or assignableTo table lookup.
+// Call sites wrap the result in ``? 1 : 0`` to match the JVM's int
+// return, so a truthy/falsy return here is sufficient.
+jvm.iO = function(value, className) {
+  if (value == null) return false;
+  if (value.__class === className) return true;
+  const cd = value.__classDef;
+  return !!(cd && cd.assignableTo && cd.assignableTo[className]);
+};
+// Top-level 2-char globals for the ~15k ``jvm.*`` call sites in
+// translated code. Dropping the ``jvm.`` prefix (4 chars) saves
+// ~60 KiB raw. ``_``-prefix names can never collide with a mangler-
+// assigned symbol (the mangler only produces ``$``-prefixed names).
+// Declared AFTER the ``jvm.cC``/``jvm.iO``/``jvm.aL``/``jvm.aS``/
+// ``jvm.aN``/``jvm.fr`` definitions above — an earlier placement
+// silently captured ``undefined`` because those assignments hadn't
+// run yet.
+global._I = (n) => jvm.ensureClassInitialized(n);
+global._L = (v) => jvm.createStringLiteral(v);
+global._O = (c) => jvm.newObject(c);
+global._C = jvm.cC;
+global._D = jvm.iO;
+global._A = jvm.aL;
+global._T = jvm.aS;
+global._N = jvm.aN;
+global._F = jvm.fr;
+// Class-registration aliases: ``_Z`` for defineClass (1592 calls, 15-char
+// prefix savings each) and ``_M`` for the methods-map registration
+// (1590 calls, 3-char savings).
+global._Z = (def) => jvm.defineClass(def);
+global._M = (className, factory) => jvm.m(className, factory);
+// Exception-dispatch helper: consolidates the per-method catch-block
+// boilerplate (``findExceptionHandler`` + rethrow + stack reset +
+// ``pc = handler``) into a single call. Saves ~100 chars × ~260
+// try/catch-bearing methods.
+// Per-class ``staticFields`` index. Every translated GETSTATIC /
+// PUTSTATIC goes through ``_S.<mangledClassName>.<field>`` instead of
+// ``jvm.classes.<className>.staticFields.<field>``, trimming ~20
+// chars × ~1500 call sites ≈ 30 KiB.
+global._S = Object.create(null);
+// Additional ``jvm.*`` shorthands for the high-frequency APIs called
+// from translated code. Each aliased call site drops ``jvm.`` plus
+// the method-name tail: ~13-16 chars saved per call. Net saving
+// across Initializr ≈ 18 KiB raw.
+global._j = (c,t,l) => jvm.newArray(c,t,l);    // jvm.newArray(count,type,dims)
+// ``jvm.currentThread`` is set by the scheduler AFTER this helper is
+// declared (it's ``null`` at load time), so we need a getter-style
+// function rather than a captured alias.
+global._g = () => jvm.currentThread;
+global._me = (m) => jvm.monitorEnter(jvm.currentThread, m);
+global._mx = (m) => jvm.monitorExit(jvm.currentThread, m);
+// Hook into ``defineClass`` to populate ``_S`` alongside the normal
+// ``jvm.classes`` registration. Done via a wrapping re-assignment so
+// we don't have to edit every call site inside the jvm object above.
+const __origDefineClass = jvm.defineClass.bind(jvm);
+jvm.defineClass = function(def) {
+  __origDefineClass(def);
+  const nm = def.n !== undefined ? def.n : def.name;
+  if (nm) {
+    global._S[nm] = def.staticFields;
+  }
+};
+global._E = function(table, pc, err, stack) {
+  const h = jvm.findExceptionHandler(table, pc, err);
+  if (!h) throw err;
+  stack.length = 0;
+  stack.p(err);
+  return h.h !== undefined ? h.h : h.handler;
+};
+// Two-char ``.p()`` / ``.q()`` aliases for the stack-push / -pop
+// operations that appear ~40k times across translated_app. Shaves
+// 3 bytes per push (``e.push(x)`` → ``e.p(x)``) and 3 per pop
+// (``e.pop()`` → ``e.q()``), roughly 120 KiB raw overall. We
+// intentionally pollute ``Array.prototype`` here rather than use
+// a dedicated subclass — the worker is translator-controlled and
+// no third-party code runs alongside, so clobbering ``.p`` / ``.q``
+// on arrays is safe.
+Array.prototype.p = Array.prototype.push;
+Array.prototype.q = Array.prototype.pop;
 global.bindNative = bindNative;
 global.global = global;
 global.__parparInstallNativeBindings = installNativeBindings;
@@ -1706,7 +1995,13 @@ function cn1_ivResolve(target, mid) {
   // throwNullPointerException() for the Java-spec-compliant NPE, which
   // cannot be done from a plain function.
   const classDef = target.__classDef;
+  if (classDef && classDef.pendingMethods) {
+    jvm.flushPendingMethods(classDef);
+  }
   let method = classDef && classDef.methods ? classDef.methods[mid] : null;
+  if (typeof method === "string") {
+    method = resolveMethodEntry(classDef.methods, mid);
+  }
   if (!method) {
     method = jvm.resolveVirtual(target.__class, mid);
   }
