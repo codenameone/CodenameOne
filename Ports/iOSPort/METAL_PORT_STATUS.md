@@ -35,13 +35,18 @@ Add a Metal-based rendering backend to the iOS port, gated by `#ifdef CN1_USE_ME
 
 Metal-specific golden images live in `scripts/ios/screenshots-metal/` (started as copies of `scripts/ios/screenshots/`). The `build-ios-metal` CI job compares the Metal-backed `scripts/hellocodenameone` output against that directory via `run-ios-ui-tests.sh`'s `SCREENSHOT_REF_DIR` env-var override. Rationale: pixel parity with the GL pipeline is **not** a goal — CoreText glyph positioning, gradient sampling, and other Metal-vs-GL differences are expected to drift. Tracking Metal's own baseline lets us accept intentional changes without regressing the GL validation. See `scripts/ios/screenshots-metal/README.md` for the update workflow.
 
-### Known issues for Phase 2 wrap-up
+### Landed (continued)
 
-- **ClipRect scissor coords (blocker for Phase 2 golden screenshots).** Temporarily disabled — returns `clipApplied=YES` without actually calling `CN1MetalSetScissor`. Leaving it enabled clipped the drawable to a small top strip (diagnosed by seeing the Form bg paint correctly once disabled). The scissor rect's coord space doesn't match the physical-pixel framebuffer Metal is using. Needs: audit what units `ClipRect` gets passed vs what `CN1MetalSetScissor` expects, adjust accordingly. Once fixed, non-rectangular (stencil) clipping for polygon/texture-mask clips is the next step after.
-- **DrawString not ported.** Text is invisible on the Metal path. Parity-level port uses `CGBitmapContext` rasterisation + `MTLTexture.replaceRegion:` upload + alpha-mask quad render; full glyph-atlas rewrite is Phase 4.
+- **ClipRect.** Enabled against a physical-pixel scissor rect. The tricky part turned out to be not ClipRect itself but `updateFrameBufferSize:h:` — when `layoutSubviews` updated the real view bounds (402×874 at 3x) mid-frame, any in-flight encoder kept referencing the xib-time 960×1380 screenTexture and the cached `currentFramebufferWidth/Height` in `CN1Metalcompat` stayed stale for the whole frame. Now `updateFrameBufferSize:h:` tears down any live encoder + command buffer before rebuilding the texture so the next `setFramebuffer` captures fresh dimensions.
+- **DrawString (parity level).** Whole-string texture approach — rasterise via `CGBitmapContext` + UIKit `drawAtPoint:withAttributes:`, upload as RGBA `MTLTexture`, render through the existing `TexturedRGBA` pipeline with alpha modulation. Simple round-robin cache capped at 128 entries keyed on `"str|font|color"`. CTM flipped before UIKit draws so text lands at the top-left of the bitmap buffer (Metal's V=0-at-top convention, vs OpenGL which tolerated unflipped CG because its tex coords use V=1-at-top). CoreText glyph atlas (Phase 4) will replace this.
+
+### Known issues / follow-ups
+
 - **GLUIImage MTLTexture caching.** `CN1MetalDrawImage` re-rasterises the `UIImage` on every draw. Cache the `MTLTexture` on `GLUIImage`.
-- **Gradient ops (`DrawGradient`, `RadialGradientPaint`).** Two more pipeline variants (`LinearGradient`, `RadialGradient`) are already defined in `CN1MetalShaders.metal` but the gradient ops don't call them yet.
+- **Gradient ops (`DrawGradient`, `RadialGradientPaint`).** Two more pipeline variants (`LinearGradient`, `RadialGradient`) are already declared in `CN1MetalShaders.metal` but the gradient ops don't call them yet.
 - **Path rendering (`DrawPath`, `DrawTextureAlphaMask`).** Paths are rasterised through `Renderer.c` to a pixel buffer; needs either a direct Metal port or an alpha-mask texture upload.
+- **Stencil clipping for non-rectangular clips.** Currently falls back to a bounding-box scissor — Form layout handles that OK but paths/textures-as-masks will clip incorrectly.
+- **Metal goldens still seeded from the GL set.** Once Phase 2 has produced visible-content CI output, copy the Metal-actual PNGs from the `ios-ui-tests-metal` artifact into `scripts/ios/screenshots-metal/` so the match count becomes a real regression metric.
 
 ## Phase 0 — Scaffolding (complete)
 
