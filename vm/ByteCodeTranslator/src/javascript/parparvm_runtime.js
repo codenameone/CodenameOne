@@ -2420,15 +2420,64 @@ function* throwNullPointerException() {
   throw ex.object;
 }
 function bindNative(names, fn) {
+  // bindNative callers still pass the class-specific ``cn1_<cls>_<m>_<sig>``
+  // name, but every class's ``methods`` map now keys on the class-free
+  // sig-based dispatch id ``cn1_s_<m>_<sig>`` (see
+  // JavascriptNameUtil.dispatchMethodIdentifier in fa4247a42). Rewrite
+  // the passed name to the dispatch-id form so the override actually
+  // lands on the emitted slot — the historical full-name key and the
+  // new sig-based key are both applied so either lookup style works.
+  function toDispatchId(name) {
+    if (typeof name !== "string") {
+      return null;
+    }
+    if (name.indexOf("cn1_s_") === 0) {
+      return name;
+    }
+    if (name.indexOf("cn1_") !== 0) {
+      return null;
+    }
+    // Strip the class component: everything from ``cn1_`` up to the
+    // last underscore that precedes the method name. The translator
+    // emits class-specific names as ``cn1_<classPath>_<method>_<sig>``
+    // where ``<classPath>`` itself contains underscores (``java_util_
+    // HashMap``). Walk the class index to find the longest matching
+    // prefix; the method tail is what remains.
+    const classes = jvm.classes || {};
+    let bestPrefix = null;
+    for (const className in classes) {
+      const prefix = "cn1_" + className + "_";
+      if (name.indexOf(prefix) === 0
+              && (bestPrefix == null || prefix.length > bestPrefix.length)) {
+        bestPrefix = prefix;
+      }
+    }
+    if (bestPrefix == null) {
+      return null;
+    }
+    return "cn1_s_" + name.substring(bestPrefix.length);
+  }
   function installVirtualOverride(name) {
     const classes = jvm.classes || {};
     const classNames = Object.keys(classes);
+    const dispatchId = toDispatchId(name);
     for (let i = 0; i < classNames.length; i++) {
       const cls = classes[classNames[i]];
-      if (!cls || !cls.methods || !Object.prototype.hasOwnProperty.call(cls.methods, name)) {
+      if (!cls || !cls.methods) {
         continue;
       }
-      cls.methods[name] = fn;
+      if (Object.prototype.hasOwnProperty.call(cls.methods, name)) {
+        cls.methods[name] = fn;
+      }
+      if (dispatchId && Object.prototype.hasOwnProperty.call(cls.methods, dispatchId)) {
+        cls.methods[dispatchId] = fn;
+      }
+    }
+    if (dispatchId) {
+      // Also stash under the dispatch id so ``resolveVirtual`` + the
+      // ``nativeMethods`` fallback path (line 901 onward) finds the
+      // binding when the m: entry was dropped by virtual-dispatch RTA.
+      jvm.nativeMethods[dispatchId] = fn;
     }
   }
   function rememberTranslatedMethod(name, existingFn) {
