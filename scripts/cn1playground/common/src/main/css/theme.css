@@ -1407,6 +1407,7 @@ PlaygroundBottomNavItem {
     font-family: "native:MainLight";
     font-size: 2mm;
     padding: 0.8mm;
+    text-align: center;
     text-decoration: none;
 }
 
@@ -1417,6 +1418,7 @@ PlaygroundBottomNavItemDark {
     font-family: "native:MainLight";
     font-size: 2mm;
     padding: 0.8mm;
+    text-align: center;
     text-decoration: none;
 }
 
@@ -1427,6 +1429,7 @@ PlaygroundBottomNavItemActive {
     font-family: "native:MainBold";
     font-size: 2mm;
     padding: 0.8mm;
+    text-align: center;
     text-decoration: none;
 }
 
@@ -1437,6 +1440,7 @@ PlaygroundBottomNavItemActiveDark {
     font-family: "native:MainBold";
     font-size: 2mm;
     padding: 0.8mm;
+    text-align: center;
     text-decoration: none;
 }
 

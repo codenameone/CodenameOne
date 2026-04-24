@@ -119,10 +119,6 @@ public class CN1Playground extends Lifecycle {
 
     @Override
     public void runApp() {
-        // Version marker so we can tell from the browser console whether the
-        // deployed build includes the mobile-shell fixes (Form.SOUTH nav,
-        // viewport-width breakpoint, post-show relayout + diagnostics).
-        Log.p("CN1Playground build marker: mobile-shell-v2 @ 2026-04-24");
         CN.setProperty("platformHint.javascript.beforeUnloadMessage", null);
         theme = Resources.getGlobalResources();
         currentScript = resolveInitialScript();
@@ -225,44 +221,15 @@ public class CN1Playground extends Lifecycle {
 
         appForm.show();
         notifyWebsiteUiReady();
-        installIframeBottomGuard();
 
+        // CN1's first paint on the HTML5 port sometimes settles before the
+        // canvas has its final CSS size. Force one more layout pass shortly
+        // after show() so the mobile shell lands at the correct breakpoint.
         UITimer.timer(150, false, appForm, () -> {
             lastLayout = LAYOUT_NONE;
             applyLayoutForCurrentSize();
             appForm.revalidate();
         });
-    }
-
-    /// On the HTML5 port the Monaco editor's iframe is a DOM peer that paints
-    /// above the CN1 canvas. When the viewport is below the mobile breakpoint,
-    /// the iframe's peer bounds can overshoot the editor's Java component
-    /// bounds and cover the bottom-nav band drawn on the canvas underneath.
-    ///
-    /// Mitigation: inject a global stylesheet that caps iframe max-height to
-    /// `calc(100vh - MOBILE_NAV_GUARD_PX)` so no iframe, regardless of its
-    /// peer-positioning logic, can extend into the bottom band reserved for
-    /// the Samples / Inspector / History buttons. Only applies on mobile;
-    /// removed when the layout is tablet or desktop.
-    private static final int MOBILE_NAV_GUARD_PX = 64;
-
-    private void installIframeBottomGuard() {
-        BrowserComponent js = CN.getSharedJavascriptContext();
-        if (js == null) {
-            return;
-        }
-        js.execute(
-                "callback.onSuccess((function(){"
-                        + "try {"
-                        + "var id='cn1-playground-iframe-guard';"
-                        + "var s=document.getElementById(id);"
-                        + "if(!s){s=document.createElement('style');s.id=id;document.head.appendChild(s);}"
-                        + "s.textContent='@media (max-width: 720px){iframe{max-height:calc(100vh - " + MOBILE_NAV_GUARD_PX + "px) !important;}}';"
-                        + "} catch(e){}"
-                        + "return true;"
-                        + "})())",
-                res -> {}
-        );
     }
 
     @Override
@@ -319,6 +286,10 @@ public class CN1Playground extends Lifecycle {
         boolean active = key.equals(currentActivity);
         btn.setUIID(uiidForBottomNavItem(active));
         btn.setTextPosition(Component.BOTTOM);
+        // Centre the icon+label stack inside the button cell. Button alignment
+        // defaults to LEFT, which leaves the glyph hugging the left padding on
+        // the HTML5 port instead of sitting above the label.
+        btn.setAlignment(Component.CENTER);
         // FontImage.setMaterialIcon bakes the glyph using whatever foreground
         // colour the style has at the moment of the call. UIID application is
         // sometimes deferred (seen on the HTML5 port), leaving the FG at its
@@ -405,8 +376,6 @@ public class CN1Playground extends Lifecycle {
             } else {
                 layout = LAYOUT_DESKTOP;
             }
-            Log.p("Playground layout: width=" + displayW + "px (" + ((int) widthMm) + "mm) -> "
-                    + (layout == LAYOUT_MOBILE ? "MOBILE" : layout == LAYOUT_TABLET ? "TABLET" : "DESKTOP"));
         }
         if (layout == lastLayout) {
             return;
@@ -521,12 +490,9 @@ public class CN1Playground extends Lifecycle {
 
         // Put bottomNav at the FORM's SOUTH slot (not inside bodyContainer) so
         // the Form-level BorderLayout carves out its height BEFORE allocating
-        // bodyContainer. The editor's BrowserComponent is a DOM iframe peer
-        // which paints above the canvas; if bodyContainer extends into the nav
-        // region, the iframe covers the bottomNav (user reported "flickering in
-        // for a second below the HTML component" during resize). Making nav a
-        // Form-level sibling guarantees bodyContainer can never extend into
-        // it, so the iframe's bounds also can never extend into it.
+        // bodyContainer to the editor + tab stack. Keeps the nav height out
+        // of the tab content region, so the Monaco iframe peers can't shrink
+        // or reflow it when the editor reports its own preferred size.
         detach(bottomNav);
         appForm.add(BorderLayout.SOUTH, bottomNav);
 
