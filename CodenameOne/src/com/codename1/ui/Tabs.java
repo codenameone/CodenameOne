@@ -166,9 +166,11 @@ public class Tabs extends Container {
             // tabsContainer where the theme asks (BOTTOM / LEFT / RIGHT
             // instead of the default TOP).
             int themePlacement = UIManager.getInstance().getThemeConstant("tabPlacementInt", -1);
+            System.out.println("CN1SS:INFO:TabsCtor themePlacement=" + themePlacement + " fieldBefore=" + tabPlacement);
             if (themePlacement != -1) {
                 tabPlacement = themePlacement;
             }
+            System.out.println("CN1SS:INFO:TabsCtor setTabPlacement=" + tabPlacement);
             setTabPlacement(tabPlacement);
         } else {
             setTabPlacement(tabP);
