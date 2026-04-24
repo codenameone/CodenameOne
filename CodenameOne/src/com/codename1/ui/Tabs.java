@@ -216,8 +216,17 @@ public class Tabs extends Container {
             }
         }
         changeTabContainerStyleOnFocus = manager.isThemeConstant("changeTabContainerStyleOnFocusBool", false);
-        if (tabPlace != -1) {
-            tabPlacement = tabPlace;
+        // tabPlacementInt is a theme constant that lets a theme dictate
+        // whether tabs live at TOP / BOTTOM / LEFT / RIGHT. The ctor
+        // already added tabsContainer to BorderLayout.NORTH from the
+        // default field value, so simply assigning the field here
+        // leaves the layout out of sync with the new placement.
+        // Route through setTabPlacement() to re-parent the container
+        // (only when the theme constant actually differs from the
+        // initialised default, otherwise we'd trigger an unnecessary
+        // revalidate cascade on every style refresh).
+        if (tabPlace != -1 && tabPlace != tabPlacement) {
+            setTabPlacement(tabPlace);
         }
     }
 
