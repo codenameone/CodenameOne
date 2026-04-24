@@ -807,6 +807,29 @@ const jvm = {
       vmDiag("VIRTUAL_FAIL", "receiverClass", missingReceiver.receiverClass);
       throw new Error("Missing virtual method " + methodId + " on " + className);
     }
+    // Legacy call-sites in port.js / parparvm_runtime.js still pass
+    // the class-specific methodId (``cn1_<declaringClass>_<method>_<sig>``)
+    // that pre-fa4247a42 emission produced. Every class's methods map
+    // now keys on the class-free dispatch id (``cn1_s_<method>_<sig>``)
+    // — translate the class-specific form to the dispatch id by
+    // stripping the owning-class prefix. Preserves behavior for
+    // callers that already pass the new form.
+    if (methodId && methodId.indexOf("cn1_") === 0 && methodId.indexOf("cn1_s_") !== 0) {
+      let bestPrefix = null;
+      for (const clsName in this.classes) {
+        const prefix = "cn1_" + clsName + "_";
+        if (methodId.indexOf(prefix) === 0
+                && (bestPrefix == null || prefix.length > bestPrefix.length)) {
+          bestPrefix = prefix;
+        }
+      }
+      if (bestPrefix != null) {
+        const dispatchId = "cn1_s_" + methodId.substring(bestPrefix.length);
+        if (dispatchId !== methodId) {
+          methodId = dispatchId;
+        }
+      }
+    }
     const cacheKey = className + "|" + methodId;
     let cached = this.resolvedVirtualCache[cacheKey];
     if (cached) {
@@ -2777,7 +2800,13 @@ bindNative(["cn1_java_lang_Thread_start", "cn1_java_lang_Thread_start__"], funct
   const target = __cn1ThisObject[CN1_THREAD_TARGET] || __cn1ThisObject;
   const generator = (function*() {
     try {
-      const runMethod = jvm.resolveVirtual(target.__class, "cn1_java_lang_Runnable_run");
+      // Post-fa4247a42 dispatch ids are class-free: every impl of
+      // ``run()V`` is keyed under ``cn1_s_run`` in its class's
+      // methods map, and ``resolveVirtual`` walks the hierarchy
+      // against that id. The legacy class-specific form
+      // ``cn1_java_lang_Runnable_run`` only existed as an alias in
+      // the pre-sig-id emission and is no longer present.
+      const runMethod = jvm.resolveVirtual(target.__class, "cn1_s_run");
       yield* adaptVirtualResult(runMethod(target));
     } catch (err) {
       jvm.fail(err);
