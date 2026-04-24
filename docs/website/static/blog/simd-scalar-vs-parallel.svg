@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 360" role="img"
+     aria-label="Diagram comparing scalar and SIMD execution: scalar processes one lane per cycle across four cycles, SIMD processes four lanes in a single cycle.">
+  <style>
+    .bg      { fill: #fafafa; }
+    .card    { fill: #ffffff; stroke: #cccccc; stroke-width: 1; }
+    .accent  { fill: #e8f0ff; stroke: #3478ef; stroke-width: 1.2; }
+    .ink     { fill: #1a1a1a; }
+    .muted   { fill: #555555; }
+    .div     { stroke: #bbbbbb; }
+    @media (prefers-color-scheme: dark) {
+      .bg     { fill: #1d1e20; }
+      .card   { fill: #28292c; stroke: #4a4b4f; }
+      .accent { fill: #1e2a44; stroke: #6aa2ff; }
+      .ink    { fill: #ececec; }
+      .muted  { fill: #a8a8a8; }
+      .div    { stroke: #4a4b4f; }
+    }
+    .title { font: 600 15px -apple-system, system-ui, sans-serif; }
+    .label { font: 500 12px -apple-system, system-ui, sans-serif; }
+    .sub   { font: 400 11px -apple-system, system-ui, sans-serif; }
+    .mono  { font: 500 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
+  </style>
+
+  <!-- Opaque background -->
+  <rect class="bg" x="0" y="0" width="760" height="360"/>
+
+  <!-- Left panel -->
+  <text x="30" y="30" class="title ink">Scalar: one lane per cycle</text>
+  <text x="30" y="48" class="sub muted">four operations, four cycles</text>
+
+  <g>
+    <rect class="card" x="30"  y="70"  width="180" height="32" rx="4"/>
+    <text class="mono ink"  x="42" y="90"  >a[0] + b[0]  =  r[0]</text>
+    <text class="sub muted" x="222" y="90" >cycle 1</text>
+
+    <rect class="card" x="30"  y="112" width="180" height="32" rx="4"/>
+    <text class="mono ink"  x="42" y="132">a[1] + b[1]  =  r[1]</text>
+    <text class="sub muted" x="222" y="132">cycle 2</text>
+
+    <rect class="card" x="30"  y="154" width="180" height="32" rx="4"/>
+    <text class="mono ink"  x="42" y="174">a[2] + b[2]  =  r[2]</text>
+    <text class="sub muted" x="222" y="174">cycle 3</text>
+
+    <rect class="card" x="30"  y="196" width="180" height="32" rx="4"/>
+    <text class="mono ink"  x="42" y="216">a[3] + b[3]  =  r[3]</text>
+    <text class="sub muted" x="222" y="216">cycle 4</text>
+  </g>
+
+  <text class="label ink" x="30" y="262">time →</text>
+  <line class="div" x1="70" y1="258" x2="260" y2="258" stroke-width="1.2"/>
+
+  <!-- Divider -->
+  <line class="div" x1="370" y1="60" x2="370" y2="280" stroke-width="1" stroke-dasharray="4 4"/>
+
+  <!-- Right panel -->
+  <text class="title ink"  x="410" y="30">SIMD: four lanes, one cycle</text>
+  <text class="sub muted"  x="410" y="48">one wide instruction over a 128-bit register</text>
+
+  <g>
+    <rect class="card" x="410" y="70" width="300" height="32" rx="4"/>
+    <text class="mono ink" x="422" y="90">a[0..3]</text>
+
+    <text class="title ink" x="560" y="124" text-anchor="middle">+</text>
+
+    <rect class="card" x="410" y="136" width="300" height="32" rx="4"/>
+    <text class="mono ink" x="422" y="156">b[0..3]</text>
+
+    <text class="title ink" x="560" y="190" text-anchor="middle">=</text>
+
+    <rect class="accent" x="410" y="202" width="300" height="32" rx="4"/>
+    <text class="mono ink" x="422" y="222">r[0..3]</text>
+  </g>
+
+  <text class="label ink" x="410" y="262">cycle 1</text>
+  <text class="sub muted" x="410" y="280">one NEON / SSE VADD or PADDD over all lanes</text>
+</svg>

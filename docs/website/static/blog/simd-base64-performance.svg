@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 360" role="img"
+     aria-label="Bar chart of Base64 iOS performance over 6000 iterations on an 8192-byte payload: native iOS encode 1078 ms, Codename One scalar encode 1224 ms, Codename One SIMD encode 379 ms; native iOS decode 713 ms, Codename One scalar decode 903 ms, Codename One SIMD decode 365 ms.">
+  <style>
+    .bg       { fill: #fafafa; }
+    .axis     { stroke: #bbbbbb; stroke-width: 1; }
+    .grid     { stroke: #e5e5e5; stroke-width: 1; }
+    .ink      { fill: #1a1a1a; }
+    .muted    { fill: #555555; }
+    .bar-nat  { fill: #9aa1ab; }
+    .bar-cn1  { fill: #c98b4b; }
+    .bar-simd { fill: #3478ef; }
+    @media (prefers-color-scheme: dark) {
+      .bg       { fill: #1d1e20; }
+      .axis     { stroke: #5a5b5f; }
+      .grid     { stroke: #353639; }
+      .ink      { fill: #ececec; }
+      .muted    { fill: #a8a8a8; }
+      .bar-nat  { fill: #8a94a3; }
+      .bar-cn1  { fill: #d6a370; }
+      .bar-simd { fill: #6aa2ff; }
+    }
+    .title { font: 600 15px -apple-system, system-ui, sans-serif; }
+    .label { font: 500 12px -apple-system, system-ui, sans-serif; }
+    .sub   { font: 400 11px -apple-system, system-ui, sans-serif; }
+    .num   { font: 500 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
+  </style>
+
+  <rect class="bg" x="0" y="0" width="760" height="360"/>
+
+  <!-- Title -->
+  <text class="title ink" x="30" y="28">Base64 on iOS — lower is better</text>
+  <text class="sub muted"  x="30" y="46">6000 iterations, 8192-byte payload, total time in milliseconds</text>
+
+  <!-- Plot area: 80..720 horizontally, 80..300 vertically -->
+  <!-- Max value ~1300 ms -->
+  <!-- Left axis labels (groups) -->
+  <text class="label ink" x="72" y="102" text-anchor="end">Encode</text>
+  <text class="label ink" x="72" y="222" text-anchor="end">Decode</text>
+
+  <!-- Axis line -->
+  <line class="axis" x1="80" y1="60" x2="80" y2="300"/>
+  <!-- Bottom scale axis -->
+  <line class="axis" x1="80" y1="300" x2="720" y2="300"/>
+
+  <!-- Grid & scale (0, 300, 600, 900, 1200) -->
+  <!-- scale: 1200ms -> 640px, so 1ms -> 0.5333 px -->
+  <g>
+    <line class="grid" x1="240" y1="60" x2="240" y2="300"/>
+    <line class="grid" x1="400" y1="60" x2="400" y2="300"/>
+    <line class="grid" x1="560" y1="60" x2="560" y2="300"/>
+    <line class="grid" x1="720" y1="60" x2="720" y2="300"/>
+    <text class="sub muted" x="80"  y="318" text-anchor="middle">0</text>
+    <text class="sub muted" x="240" y="318" text-anchor="middle">300</text>
+    <text class="sub muted" x="400" y="318" text-anchor="middle">600</text>
+    <text class="sub muted" x="560" y="318" text-anchor="middle">900</text>
+    <text class="sub muted" x="720" y="318" text-anchor="middle">1200 ms</text>
+  </g>
+
+  <!-- Encode group (y = 70..170) -->
+  <!-- Native 1078 -> width 575 -->
+  <rect class="bar-nat"  x="80" y="72"  width="575" height="22"/>
+  <text class="num ink"  x="665" y="88">1078</text>
+  <text class="sub muted" x="665" y="102">native iOS</text>
+
+  <!-- CN1 scalar 1224 -> width 653 -->
+  <rect class="bar-cn1"  x="80" y="108" width="653" height="22"/>
+  <text class="num ink"  x="665" y="124" text-anchor="end" fill="#ffffff" style="fill:#ffffff">1224</text>
+
+  <!-- CN1 SIMD 379 -> width 202 -->
+  <rect class="bar-simd" x="80" y="144" width="202" height="22"/>
+  <text class="num ink"  x="292" y="160">379</text>
+  <text class="sub muted" x="292" y="174">CN1 SIMD — 65% faster than native</text>
+
+  <!-- Decode group (y = 190..290) -->
+  <!-- Native 713 -> width 380 -->
+  <rect class="bar-nat"  x="80" y="192" width="380" height="22"/>
+  <text class="num ink"  x="470" y="208">713</text>
+  <text class="sub muted" x="470" y="222">native iOS</text>
+
+  <!-- CN1 scalar 903 -> width 482 -->
+  <rect class="bar-cn1"  x="80" y="228" width="482" height="22"/>
+  <text class="num ink"  x="572" y="244">903</text>
+
+  <!-- CN1 SIMD 365 -> width 195 -->
+  <rect class="bar-simd" x="80" y="264" width="195" height="22"/>
+  <text class="num ink"  x="285" y="280">365</text>
+  <text class="sub muted" x="285" y="294">CN1 SIMD — 49% faster than native</text>
+
+  <!-- Legend -->
+  <g transform="translate(30, 334)">
+    <rect class="bar-nat"  x="0"   y="0" width="14" height="12"/>
+    <text class="sub ink"  x="20"  y="10">native iOS</text>
+
+    <rect class="bar-cn1"  x="120" y="0" width="14" height="12"/>
+    <text class="sub ink"  x="140" y="10">Codename One (scalar)</text>
+
+    <rect class="bar-simd" x="330" y="0" width="14" height="12"/>
+    <text class="sub ink"  x="350" y="10">Codename One (SIMD)</text>
+  </g>
+</svg>
