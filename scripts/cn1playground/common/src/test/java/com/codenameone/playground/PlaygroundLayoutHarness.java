@@ -46,10 +46,16 @@ public final class PlaygroundLayoutHarness {
 
         CN1Playground app = new CN1Playground();
         final boolean[] done = new boolean[]{false};
+        final Throwable[] failure = new Throwable[]{null};
         CN.callSerially(new Runnable() {
             public void run() {
-                app.runApp();
-                done[0] = true;
+                try {
+                    app.runApp();
+                } catch (Throwable t) {
+                    failure[0] = t;
+                } finally {
+                    done[0] = true;
+                }
             }
         });
         // Spin the EDT briefly so runApp and the first layout pass can complete.
@@ -59,6 +65,11 @@ public final class PlaygroundLayoutHarness {
         }
         if (!done[0]) {
             System.err.println("[" + label + "] runApp did not complete within 3 s");
+            return 1;
+        }
+        if (failure[0] != null) {
+            System.err.println("[" + label + "] runApp threw:");
+            failure[0].printStackTrace();
             return 1;
         }
         // One more tick so pending layout passes settle.

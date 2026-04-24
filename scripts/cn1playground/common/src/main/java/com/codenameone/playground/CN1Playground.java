@@ -122,10 +122,15 @@ public class CN1Playground extends Lifecycle {
         appForm = new Form("Playground", new BorderLayout());
         appForm.setUIID("PlaygroundForm");
 
+        // getToolbar can return null in a headless Display.init(null) context
+        // (e.g. the layout harness) - guard so we don't NPE before the new
+        // chrome is constructed.
         Toolbar toolbar = appForm.getToolbar();
-        toolbar.setUIID("PlaygroundToolbar");
-        toolbar.setTitleCentered(false);
-        toolbar.hideToolbar();
+        if (toolbar != null) {
+            toolbar.setUIID("PlaygroundToolbar");
+            toolbar.setTitleCentered(false);
+            toolbar.hideToolbar();
+        }
 
         editor = new PlaygroundBrowserEditor(PlaygroundBrowserEditor.Mode.JAVA, currentScript, websiteDarkMode, this::handleSourceChanged);
         cssEditor = new PlaygroundBrowserEditor(PlaygroundBrowserEditor.Mode.CSS, currentCss, websiteDarkMode, this::handleCssChanged);
