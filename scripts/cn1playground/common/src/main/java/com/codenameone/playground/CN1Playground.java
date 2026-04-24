@@ -240,25 +240,51 @@ public class CN1Playground extends Lifecycle {
             } else {
                 Log.p("bottomNav: NOT ATTACHED to any parent");
             }
-            // Cross-check CN1's reported dimensions against the actual browser
-            // viewport. Mobile browsers (especially iOS Safari) often report
-            // window.innerHeight differently than window.visualViewport.height
-            // because of the dynamic URL bar: CN1 sizes the canvas to
-            // innerHeight, but the visible area may be shorter, which would
-            // hide the bottom nav behind the browser chrome.
+            // Viewport matches form (657*4=2628) so the nav is not hidden by
+            // browser chrome. Now interrogate the DOM: what element is ACTUALLY
+            // rendered on top at the centre of each nav cell, and what are the
+            // canvas/iframe bounds + z-indices? If elementFromPoint at the nav's
+            // centre returns an IFRAME, a peer is covering the nav. If it
+            // returns the canvas, the nav is drawn but invisible for a style
+            // reason. If it returns HTML/BODY, the canvas itself is clipped.
             BrowserComponent js = CN.getSharedJavascriptContext();
             if (js != null) {
+                final int navY = bottomNav != null && bottomNav.getParent() != null
+                        ? bottomNav.getAbsoluteY() + bottomNav.getHeight() / 2
+                        : -1;
                 js.execute(
                         "callback.onSuccess((function(){"
                                 + "try {"
-                                + "var vv=window.visualViewport;"
-                                + "return 'window=' + window.innerWidth + 'x' + window.innerHeight"
-                                + " + ' visualVP=' + (vv ? (Math.round(vv.width) + 'x' + Math.round(vv.height)) : 'unsupported')"
-                                + " + ' docHeight=' + document.documentElement.clientHeight"
-                                + " + ' dpr=' + (window.devicePixelRatio || 1);"
-                                + "} catch(e) { return 'err:' + e; }"
+                                + "var dpr = window.devicePixelRatio || 1;"
+                                + "var navYcss = " + navY + " / dpr;"
+                                + "var w = window.innerWidth;"
+                                + "var sample = function(x){"
+                                + "  var el = document.elementFromPoint(x, navYcss);"
+                                + "  if(!el) return 'null';"
+                                + "  var r = el.getBoundingClientRect();"
+                                + "  return el.tagName + '#' + (el.id||'?') + '.' + (el.className||'?').toString().substring(0,30)"
+                                + "    + ' z=' + (getComputedStyle(el).zIndex||'auto')"
+                                + "    + ' rect=' + Math.round(r.left) + ',' + Math.round(r.top) + ',' + Math.round(r.right) + ',' + Math.round(r.bottom);"
+                                + "};"
+                                + "var points = sample(w*0.17) + ' | ' + sample(w*0.5) + ' | ' + sample(w*0.83);"
+                                + "var iframes = document.getElementsByTagName('iframe');"
+                                + "var iframeInfo = '';"
+                                + "for(var i=0;i<iframes.length;i++){"
+                                + "  var ifr = iframes[i];"
+                                + "  var ir = ifr.getBoundingClientRect();"
+                                + "  var st = getComputedStyle(ifr);"
+                                + "  iframeInfo += ' ifr[' + i + ']=' + Math.round(ir.left) + ',' + Math.round(ir.top) + ',' + Math.round(ir.right) + ',' + Math.round(ir.bottom) + ' z=' + st.zIndex + ' vis=' + st.visibility + ' disp=' + st.display;"
+                                + "}"
+                                + "var canvas = document.getElementsByTagName('canvas')[0];"
+                                + "var canvasInfo = 'none';"
+                                + "if(canvas){"
+                                + "  var cr = canvas.getBoundingClientRect();"
+                                + "  canvasInfo = Math.round(cr.left) + ',' + Math.round(cr.top) + ',' + Math.round(cr.right) + ',' + Math.round(cr.bottom) + ' z=' + getComputedStyle(canvas).zIndex;"
+                                + "}"
+                                + "return 'navYcss=' + Math.round(navYcss) + ' canvas=' + canvasInfo + ' iframes=' + iframes.length + iframeInfo + ' atNav: ' + points;"
+                                + "} catch(e) { return 'err:' + e + ' stack:' + (e.stack||'?').substring(0,200); }"
                                 + "})())",
-                        res -> Log.p("viewport: " + res.getValue())
+                        res -> Log.p("domProbe: " + res.getValue())
                 );
             }
         });
