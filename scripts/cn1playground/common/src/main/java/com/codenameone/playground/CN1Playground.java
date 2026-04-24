@@ -240,74 +240,62 @@ public class CN1Playground extends Lifecycle {
             } else {
                 Log.p("bottomNav: NOT ATTACHED to any parent");
             }
-            // Previous probe proved CN1 IS painting the nav - the canvas pixels
-            // at nav Y are the expected navy UIID colour, fully opaque. So the
-            // bug is purely compositing: something on the DOM side is hiding
-            // the canvas-painted nav. Suspicious findings to dig into:
-            //   - BODY is position:fixed with bg=rgb(255,255,255). Unusual for
-            //     a page. If it creates a stacking context that beats the
-            //     canvas (z=auto in absolute positioning), its white paint
-            //     could occlude the canvas.
-            //   - HTML rect has height=0.
-            // This probe walks the entire DOM looking for elements whose rect
-            // overlaps the nav band (Y=605) AND are position:fixed/absolute/
-            // sticky. That should surface whatever fixed overlay (perhaps the
-            // Monaco editor chrome, a sticky footer, the website shell's cookie
-            // banner / drawer) is sitting on top of the nav. Also draws a red
-            // rect directly on the canvas at nav Y so if the user doesn't see
-            // red either, the canvas itself is being occluded as a whole.
+            // User sees a thin bar at the nav location that clicks as the
+            // correct tab, but the icons/text are missing. The canvas paints
+            // the nav background (confirmed) and nothing overlays the nav
+            // region. So the problem is the Button children: either they have
+            // zero size, or they paint but their icon/text glyphs don't show.
+            // Log each child's absolute geometry + UIID + icon+text, then
+            // sample canvas pixels inside the first button's icon area so we
+            // can tell whether the glyph is painted at all.
+            if (bottomNav != null && bottomNav.getComponentCount() > 0) {
+                for (int i = 0; i < bottomNav.getComponentCount(); i++) {
+                    Component child = bottomNav.getComponentAt(i);
+                    String desc = "navChild[" + i + "]: " + child.getClass().getSimpleName()
+                            + " uiid=" + child.getUIID()
+                            + " pos=(" + child.getAbsoluteX() + "," + child.getAbsoluteY() + ")"
+                            + " size=" + child.getWidth() + "x" + child.getHeight()
+                            + " pref=" + child.getPreferredW() + "x" + child.getPreferredH()
+                            + " vis=" + child.isVisible() + " hidden=" + child.isHidden();
+                    if (child instanceof Button) {
+                        Button b = (Button) child;
+                        desc += " text=\"" + b.getText() + "\" icon="
+                                + (b.getIcon() == null ? "null" : (b.getIcon().getWidth() + "x" + b.getIcon().getHeight()));
+                    }
+                    Log.p(desc);
+                }
+            }
             BrowserComponent js = CN.getSharedJavascriptContext();
-            if (js != null) {
-                final int navY0 = bottomNav != null && bottomNav.getParent() != null
-                        ? bottomNav.getAbsoluteY()
-                        : -1;
-                final int navH = bottomNav != null ? bottomNav.getHeight() : 0;
+            if (js != null && bottomNav != null && bottomNav.getComponentCount() > 0) {
+                StringBuilder coords = new StringBuilder("[");
+                for (int i = 0; i < bottomNav.getComponentCount(); i++) {
+                    Component c = bottomNav.getComponentAt(i);
+                    int cx = c.getAbsoluteX() + c.getWidth() / 2;
+                    int cy = c.getAbsoluteY() + c.getHeight() / 3;
+                    if (coords.length() > 1) {
+                        coords.append(",");
+                    }
+                    coords.append("[").append(cx).append(",").append(cy).append("]");
+                }
+                coords.append("]");
                 js.execute(
                         "callback.onSuccess((function(){"
                                 + "try {"
-                                + "var dpr = window.devicePixelRatio || 1;"
-                                + "var navTop = " + navY0 + " / dpr;"
-                                + "var navBot = navTop + (" + navH + " / dpr);"
-                                + "var w = window.innerWidth;"
-                                + "var scrollInfo = 'scroll(' + (window.scrollX||0) + ',' + (window.scrollY||0) + ') docScroll(' + (document.documentElement.scrollLeft||0) + ',' + (document.documentElement.scrollTop||0) + ')';"
-                                + "var overlappers = [];"
-                                + "var all = document.querySelectorAll('*');"
-                                + "for(var i=0;i<all.length;i++){"
-                                + "  var el = all[i];"
-                                + "  var s = getComputedStyle(el);"
-                                + "  if(s.position!=='fixed' && s.position!=='absolute' && s.position!=='sticky') continue;"
-                                + "  var r = el.getBoundingClientRect();"
-                                + "  if(r.bottom < navTop || r.top > navBot) continue;"
-                                + "  if(r.width === 0 || r.height === 0) continue;"
-                                + "  if(el.id==='cn1-peers-container') continue;"
-                                + "  if(el.id==='codenameone-canvas') continue;"
-                                + "  overlappers.push(el.tagName + '#' + (el.id||'?') + '.' + (el.className||'').toString().substring(0,20)"
-                                + "    + ' pos=' + s.position + ' z=' + s.zIndex + ' bg=' + s.backgroundColor + ' op=' + s.opacity + ' pe=' + s.pointerEvents"
-                                + "    + ' rect=' + Math.round(r.left) + ',' + Math.round(r.top) + ',' + Math.round(r.right) + ',' + Math.round(r.bottom));"
-                                + "  if(overlappers.length >= 12) break;"
-                                + "}"
                                 + "var cv = document.getElementById('codenameone-canvas') || document.getElementsByTagName('canvas')[0];"
-                                + "var paintMark = 'no-canvas';"
-                                + "if(cv){"
-                                + "  try{"
-                                + "    var ctx = cv.getContext('2d');"
-                                + "    var sy = cv.height / cv.getBoundingClientRect().height;"
-                                + "    ctx.save();"
-                                + "    ctx.fillStyle = 'rgb(255,0,0)';"
-                                + "    ctx.fillRect(0, Math.round(navTop * sy), cv.width, 8);"
-                                + "    ctx.fillStyle = 'rgb(0,255,0)';"
-                                + "    ctx.fillRect(0, Math.round(navBot * sy) - 8, cv.width, 8);"
-                                + "    ctx.restore();"
-                                + "    paintMark = 'painted red@navTop green@navBot';"
-                                + "  } catch(e3){ paintMark = 'paintErr:' + e3; }"
+                                + "if(!cv) return 'no-canvas';"
+                                + "var ctx = cv.getContext('2d');"
+                                + "var pts = " + coords + ";"
+                                + "var out = '';"
+                                + "for(var i=0;i<pts.length;i++){"
+                                + "  var bx = pts[i][0];"
+                                + "  var by = pts[i][1];"
+                                + "  var d = ctx.getImageData(bx, by, 1, 1).data;"
+                                + "  out += (i>0?' | ':'') + 'btn[' + i + ']@(' + bx + ',' + by + ')=rgba(' + d[0] + ',' + d[1] + ',' + d[2] + ',' + d[3] + ')';"
                                 + "}"
-                                + "return scrollInfo"
-                                + "  + ' navBand=' + Math.round(navTop) + '..' + Math.round(navBot)"
-                                + "  + ' overlappers(' + overlappers.length + '): ' + overlappers.join(' || ')"
-                                + "  + ' | ' + paintMark;"
-                                + "} catch(e) { return 'err:' + e + ' stack:' + (e.stack||'?').substring(0,200); }"
+                                + "return out;"
+                                + "} catch(e) { return 'err:' + e; }"
                                 + "})())",
-                        res -> Log.p("domProbe3: " + res.getValue())
+                        res -> Log.p("navBtnPixels: " + res.getValue())
                 );
             }
         });
