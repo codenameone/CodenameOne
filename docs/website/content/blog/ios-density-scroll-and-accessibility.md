@@ -4,15 +4,15 @@ date: '2026-04-24'
 author: Shai Almog
 slug: ios-density-scroll-and-accessibility
 url: /blog/ios-density-scroll-and-accessibility/
-description: If you have shipped to an iPhone 14 Pro or anything newer, your density calculations have been wrong until this week. That fix lines up with a proper iOS-matching scroll physics rewrite, localized launcher icons, a simulator menu for previewing Dynamic Type, and the new SIMD API.
-feed_html: '<img src="https://www.codenameone.com/blog/ios-density-scroll-and-accessibility.jpg" alt="iOS Density, Scroll Physics, and Accessibility" /> If you have shipped to an iPhone 14 Pro or anything newer, your density calculations have been wrong until this week. That fix lines up with a proper iOS-matching scroll physics rewrite, localized launcher icons, a simulator menu for previewing Dynamic Type, and the new SIMD API.'
+description: If you have shipped to an iPhone 14 Pro or anything newer, your density calculations have been wrong until this week. Also in this update, Codename One delivers the performance benefits that Java developers are still waiting on from the Vector API and Project Valhalla — available today, and already making our Base64 on iOS faster than Apple's own.
+feed_html: '<img src="https://www.codenameone.com/blog/ios-density-scroll-and-accessibility.jpg" alt="iOS Density, Scroll Physics, and Accessibility" /> If you have shipped to an iPhone 14 Pro or anything newer, your density calculations have been wrong until this week. Also in this update, Codename One delivers the performance benefits that Java developers are still waiting on from the Vector API and Project Valhalla — available today, and already making our Base64 on iOS faster than Apple''s own.'
 ---
 
 ![iOS Density, Scroll Physics, and Accessibility](/blog/ios-density-scroll-and-accessibility.jpg)
 
-Most weeks the blog post opens with a new API I want you to know about. This week I want to open with a correction instead, because if you shipped to an iPhone 14 Pro — or any iPhone newer than that — your density calculations have quietly been wrong until now.
+Most weeks the blog post opens with a new API I want you to know about. This week I want to open with a correction instead: if you shipped to an iPhone 14 Pro — or any iPhone newer than that — your density calculations have quietly been wrong until now.
 
-That is the headline fix. Alongside it we landed a proper iOS-matching scroll physics rewrite, per-locale launcher icons on iOS and Android, a simulator control for previewing Dynamic Type, a one-line API for scaling theme fonts, and — at the end of the post, because it is a deep topic that deserves real space — a new vectorised primitive called `Simd` that is already making Codename One's `Base64` meaningfully faster than iOS's own native implementation.
+The other thing worth calling out up front is that Codename One now delivers the performance benefits Java developers have been waiting on from Project Valhalla and the Vector API (JEP 460): portable SIMD, and hot-loop buffers that skip the heap entirely. Both of those are features I am genuinely looking forward to in standard Java. Neither is available to us today. Rather than wait, we built what we needed — and Codename One's `Base64` on iOS is now comfortably faster than Apple's native implementation as a result. That work is at the end of this post because it deserves real space.
 
 ## The iOS PPI Table Was Out of Date
 
@@ -32,15 +32,15 @@ The table is now current, and the fallback for unknown 3× devices defaults to 4
 
 If you were compensating for this in your own theme with magic numbers, this is a good moment to reassess.
 
-## The Simulator Can Now Preview Dynamic Type
+## Previewing Larger Fonts in the Simulator
 
-If the PPI fix quietly changes what your app looks like on hardware, the simulator's new *Simulate → Larger Text* menu lets you see the full Dynamic Type range without leaving your desk.
+A personal aside: my eyes are not what they used to be. Somewhere in the last few years I stopped being able to read small text on my phone/laptop the way I used to, and over time I have found myself quietly cranking the system font size up a notch, then another notch. This is extremely common. If your app has more than a handful of users over forty, a non-trivial percentage of them have the iOS text-size slider pushed well past its default, and some of them have the *Larger Accessibility Sizes* toggle turned on entirely.
 
-The menu exposes every iOS Dynamic Type stop, from *Extra Small* (`0.82×`) through *Large* (`1.00×`, the default) up to *Extra Extra Extra Large* (`1.35×`), plus the five *Larger Accessibility Sizes* that iOS unlocks when you enable that toggle in Settings → Accessibility → Display & Text Size. The accessibility stops go as high as `3.12×`. The simulator returns the exact same ratio that `UIFontMetrics` would report on the matching device, so what you see is what an iOS user sees, subject only to the underlying font metrics.
+The JavaSE simulator now has a *Simulate → Larger Text* menu that lets you preview exactly what those users see. It exposes every iOS text-size stop — from *Extra Small* (`0.82×`) through *Large* (`1.00×`, the default) up to *Extra Extra Extra Large* (`1.35×`), plus the five *Larger Accessibility Sizes* that go as high as `3.12×`. The simulator returns the same ratio `UIFontMetrics` would report on the matching device, so what you see in the simulator matches what shows up on hardware.
 
-The selected stop persists across simulator restarts, which turns this into something you can leave on a particular accessibility setting for a few days while you notice what breaks.
+The selected stop persists across simulator restarts. Leave it on an accessibility setting for a few days and the layout issues that never come up during your own daily testing will find you on their own.
 
-If you have ever had a user report that "the text is huge on my phone and the layout is broken" and not been able to reproduce it, this is the tool. On iOS the typical culprit is *Larger Accessibility Sizes* being enabled on the device, because those sizes start at `1.65×` and exceed what the standard Display & Brightness slider can reach. Preview stop AX1 through AX5 in the simulator and you will find the layout issue immediately.
+If you have ever had a user report that "the text is huge on my phone and the layout is broken" and failed to reproduce it, this is the tool. On iOS the usual culprit is *Larger Accessibility Sizes* being turned on, because those stops start at `1.65×` and exceed what the standard Display & Brightness slider can even reach.
 
 ## iOS Scroll, One More Time
 
@@ -89,13 +89,17 @@ System fonts are skipped because their size is fixed by the platform — there i
 
 Combined with the simulator's *Larger Text* menu, the pipeline for "show me what the app looks like for a user at accessibility text size 3" is now one preview click and, if needed, one line of code.
 
-## Playground Gets Better at Real Java
+## Playground: New UI, More Java
 
-The Playground has been moving fast, and a lot of this week's work on it sits in the BeanShell layer that runs user code.
+The biggest Playground change this week is visible the moment you open it. The whole UI has been redesigned.
 
-The practical impact: `try-with-resources` now parses and evaluates, including the no-catch/no-finally form and local `AutoCloseable` resources. Inline class declarations work for scripted classes, and superclass invocation correctly propagates checked exceptions and target exceptions. The rewriting pass that used to lean on reflection and regex has been replaced with Codename One's own `RE` and `StringUtil` — important because Playground snippets compile and run in the actual CN1 runtime, and the cleaner the surface, the closer the experiment is to the production code it will eventually become.
+![The redesigned Playground UI](/blog/playground-new-ui.jpg)
 
-Java language coverage and the Playground's design remain our top priorities, and this week's changes move the needle on both.
+The short version: it now feels like a modern developer tool. The design vocabulary is closer to the current IntelliJ or Visual Studio Code than to "scripting textarea with a preview pane bolted on." It just feels like a real product now.
+
+The piece I am most pleased about is the preview. Until this week, the preview area was essentially code rendered in a rectangle — functional, but it always *looked* like code the scripting runtime happened to be evaluating. The new preview shows your app inside a device skin with properly rounded corners, at a genuine device viewport, with device / tablet / desktop and orientation toggles sitting above it. It reads as "your app running on a phone", not as "some code a sandbox is running." A new bundled Android preview theme also means that toggling the preview to Android gives you a theme that actually resembles an Android app instead of the default iOS palette showing through.
+
+Underneath the new chrome, the BeanShell layer that runs user code also got better. `try-with-resources` now parses and evaluates — including the no-catch/no-finally form and local `AutoCloseable` resources. Inline class declarations work for scripted classes. Superclass invocation correctly propagates checked exceptions and target exceptions. And the rewriting pass that used to lean on reflection and regex has been replaced with Codename One's own `RE` and `StringUtil` — Playground snippets compile and run in the actual CN1 runtime, and the cleaner the surface, the closer the experiment is to the production code it will eventually become.
 
 ## The SIMD API — An Advanced Topic for Those Who Want to Dig Deep
 
@@ -113,11 +117,15 @@ The diagram below is the whole idea in one picture. On the left, a normal scalar
 
 For workloads where the operation per element is simple and identical — Base64 encode/decode, pixel blending, alpha masks, colour-channel manipulation, table lookups, UTF-8 validation, checksums — this typically means a 3× to 10× speedup over the scalar version. For workloads with per-element branching, pointer chasing, or buffers smaller than a single SIMD register, it means nothing. SIMD is a data-parallel hammer; it is not a general-purpose one.
 
-### What This Looks Like in Modern Java
+### The Benefits We Are Eagerly Waiting For in Java
 
-If you have been following recent OpenJDK work, this all sounds familiar. The Vector API ([JEP 460](https://openjdk.org/jeps/460) and its ongoing successors) has been incubating for several JDK releases and is on track to become a permanent standard API; it is, in essence, portable SIMD in Java. Separately, Project Valhalla is reshaping the JVM so that small value-type objects — and the buffers that hold them — can live on the stack or in registers rather than on the heap, eliminating allocation pressure in exactly the kind of tight loop where SIMD pays off.
+If you have been following recent OpenJDK work, this territory will sound familiar. The Vector API ([JEP 460](https://openjdk.org/jeps/460) and its successors) is still incubating in the JDK, and when it lands as a standard library it will give Java developers portable SIMD. Project Valhalla, separately, is reshaping the JVM so that value types and the buffers holding them can bypass heap allocation in hot paths — which matters precisely because SIMD workloads tend to live inside those hot paths.
 
-Codename One has both of those things today, because we control the translator. `com.codename1.util.Simd` is the portable SIMD API; the stack-allocation story is what we cover in the next subsection. None of this is a replacement for the Vector API or for Valhalla. It is the same set of ideas, delivered now, inside the existing Codename One runtime.
+Both of those are features I am looking forward to in standard Java. Neither is available to us today. The Vector API is still incubating, Valhalla is still years out. 
+
+For Codename One specifically, this is a huge problem. On Android it will be challenging to deliver something as ambitious as Valhalla or the Vector API. We need a route that will work today where the translator has to lower everything to C on iOS. So we built what was needed now.
+
+`com.codename1.util.Simd` delivers the SIMD benefit today. The allocation helpers in the next subsection deliver the heap-free-hot-loop benefit today. The mechanisms are different from what Java will eventually have, but the outcomes that matter in the inner loop are the same.
 
 ### Architecture
 
@@ -146,9 +154,9 @@ byte[]  scratch    = simd.allocaByte(64);
 
 `allocByte` / `allocInt` / `allocFloat` return ordinary heap arrays, just with alignment guarantees. Nothing unusual about their lifetime.
 
-`allocaByte` / `allocaInt` / `allocaFloat` — note the extra `a`, and yes, the name deliberately echoes C's `alloca()` — are a different beast. On ParparVM the translator is allowed to lower these into *stack-allocated* scratch buffers. No heap allocation. No GC pressure. No retained reference. The contents are undefined until you write them, and the moment the method returns, the backing memory is gone. This is the same core idea that Valhalla's escape analysis will eventually do for you automatically on the standard JVM.
+`allocaByte` / `allocaInt` / `allocaFloat` — note the extra `a`, and yes, the name deliberately echoes C's `alloca()` — are a different beast. On ParparVM the translator is allowed to lower these into *stack-allocated* scratch buffers. No heap allocation. No GC pressure. No retained reference. The contents are undefined until you write them, and the moment the method returns, the backing memory is gone. This delivers the outcome Valhalla is aiming at — a hot-loop buffer that never lands on the heap or adds GC pressure — today, via an explicit opt-in.
 
-For that to be safe, the value must never escape the method. The compliance mojo enforces this by walking the bytecode of any method that uses `alloca*`. If an alloca-derived value is:
+For that to be safe, the value must never escape the method. The [custom compliance validator we introduced a few weeks back to replace Proguard](/blog/compliance-improvements-simulator-updates-and-more/) enforces this by walking the bytecode of any method that uses `alloca*`. If an alloca-derived value is:
 
 - returned from the method
 - stored into a static field
@@ -157,9 +165,9 @@ For that to be safe, the value must never escape the method. The compliance mojo
 - passed to any method that is not on `Simd` itself
 - passed to an `invokedynamic` call site
 
-the build fails with `SIMD alloca value ...` and tells you where. The message is specifically `Keep SIMD alloca scratch arrays method-local and only pass them to Simd methods.`
+the compliance check fails with `SIMD alloca value ...` and tells you exactly where. The message is specifically `Keep SIMD alloca scratch arrays method-local and only pass them to Simd methods.`
 
-This is the bytecode-verification piece we added as part of the compliance work a few weeks back, applied to a new problem. The same infrastructure that rewrites unsupported API calls and catches platform-incompatible code now catches scratch buffers that try to escape. Without that verifier, `alloca*` would be too dangerous to ship. With it, the common case — scratch buffers for a hot inner loop — is both fast and safe.
+This is the same compliance check that rewrites `String.split()`, injects `StandardCharsets`, and catches calls to unsupported JavaSE APIs — applied to a new problem. Without it, `alloca*` would be too dangerous to ship. With it, the common case — scratch buffers for a hot inner loop — is both fast and safe.
 
 ### What You Get For It
 
@@ -198,11 +206,13 @@ Everywhere the operation is genuinely data-parallel, the speedup is in the 50–
 
 ## Closing Thoughts
 
-The through-line this week is that a lot of what landed affects what users actually see and feel on an iPhone: the physical size of things on screen, the way a flicked list settles, the launcher icon they see in their home-screen language, and the type scale they get when they crank up accessibility.
+For a long time Codename One's implicit pitch was "as good as native, but cross-platform." That was the right framing at the time. It is no longer the framing I want.
 
-The SIMD work is the odd one out in that list, and that is deliberate. It is infrastructure — the scalar-path performance work we did on `Base64` last month now has a vectorised floor underneath it, and the image-processing paths are steadily moving onto it too. Most apps will never call `Simd` directly. They just get faster.
+We have spent enough years narrowing the gap that the gap, in the areas we most care about, is gone or going. Performance: `Base64` on iOS is now faster in Codename One than in Apple's own implementation, and SIMD gives us the headroom to push that across more of the image and codec paths over the coming months. Ease of development: the compliance work, the Playground rebuild, the simulator's accessibility preview, and the way our tooling stays honest to the device — all of that adds up to a cross-platform loop that is meaningfully *easier* than wrangling two separate native toolchains and trying to keep them in sync. Next week I am hoping to push another part of the story forward in the area that has lagged the longest — look and feel — but more on that when it lands.
 
-Issue count is still hovering right around 500. We continue to chip away at it, and as before, if you have old issues in the tracker it is genuinely helpful to close what is no longer relevant and comment on what still matters.
+The pitch is no longer "as good as native." The pitch is that cross-platform should be the *better* choice. Better for developers, because you ship one codebase, own your toolchain, and iterate faster. Better for end users, because the performance is genuinely there, the look-and-feel gap is closing fast, and the accessibility and localisation story now extends all the way down to things like per-locale launcher icons and Dynamic Type previews.
+
+Next week we will talk more about the biggest pain point in Codename One: look and feel... and how it can exceed native too.
 
 ---
 
