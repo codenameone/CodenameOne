@@ -60,6 +60,38 @@ Each theme must declare these in `#Constants`:
   which is populated from the theme's `@media (prefers-color-scheme: dark)`
   blocks.
 
+## cn1-derive inheritance rule
+
+`cn1-derive` only works reliably when the derived UIID is a straightforward
+refinement of the base (child refines parent). Examples that are fine:
+
+- `SecondaryLabel { cn1-derive: Label; ... }`
+- `MainTitle { cn1-derive: Title; ... }`
+- `RaisedButton { cn1-derive: Button; ... }`
+- `SelectedTab { cn1-derive: Tab; ... }`
+
+Examples that were problematic and are now inlined:
+
+- `TitleArea -> Toolbar` hung the iOS UIManager style resolver after
+  `setThemeProps()` swapped in the theme mid-flight. Both themes inline
+  Toolbar's props directly into TitleArea.
+- `DialogTitle -> Title`, `DialogBody -> Dialog`, `PopupContent -> Dialog`
+  are cross-context (different UIIDs, not refinement). Inlined.
+- `TextArea -> TextField`, `RadioButton -> CheckBox` are specializations
+  rather than refinements. Inlined for simplicity.
+
+Rule of thumb: if a reader would have to check the base UIID to understand
+the derived one, inline instead.
+
+## Future: real backdrop-filter glass
+
+The iOS 26 tab bar (and equivalent Material 3 surfaces) use an OS-provided
+backdrop blur (UIVisualEffectView on iOS, RenderEffect on Android). The
+current CSS approximates it with a solid surface-container color on the
+tabs group; a real glass effect will need a new CSS primitive
+(`cn1-backdrop-filter: glass(<intensity>)`) and port-side code that maps
+it to UIVisualEffectView / RenderEffect. That lands in a separate PR.
+
 ## Rebuilding
 
 ```
