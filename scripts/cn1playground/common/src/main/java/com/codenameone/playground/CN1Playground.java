@@ -86,10 +86,16 @@ public class CN1Playground extends Lifecycle {
     private WebsiteThemeNative websiteThemeNative;
     private boolean websiteThemeInitialized;
 
-    private static final int LAYOUT_NONE = -1;
-    private static final int LAYOUT_MOBILE = 0;
-    private static final int LAYOUT_TABLET = 1;
-    private static final int LAYOUT_DESKTOP = 2;
+    static final int LAYOUT_NONE = -1;
+    static final int LAYOUT_MOBILE = 0;
+    static final int LAYOUT_TABLET = 1;
+    static final int LAYOUT_DESKTOP = 2;
+
+    /// Test-only: when set to one of the LAYOUT_* constants, applyLayoutForCurrentSize
+    /// bypasses Display.isDesktop / isTablet and uses this value. The harness can't
+    /// spoof CN1's platform-capability checks from outside so this hook gives it a
+    /// direct way to exercise each shell.
+    static int testOnlyForceLayout = LAYOUT_NONE;
 
     private int lastLayout = LAYOUT_NONE;
 
@@ -313,8 +319,13 @@ public class CN1Playground extends Lifecycle {
     }
 
     private void applyLayoutForCurrentSize() {
-        Display d = Display.getInstance();
-        int layout = d.isDesktop() ? LAYOUT_DESKTOP : d.isTablet() ? LAYOUT_TABLET : LAYOUT_MOBILE;
+        int layout;
+        if (testOnlyForceLayout != LAYOUT_NONE) {
+            layout = testOnlyForceLayout;
+        } else {
+            Display d = Display.getInstance();
+            layout = d.isDesktop() ? LAYOUT_DESKTOP : d.isTablet() ? LAYOUT_TABLET : LAYOUT_MOBILE;
+        }
         if (layout == lastLayout) {
             return;
         }

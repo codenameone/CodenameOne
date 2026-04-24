@@ -39,10 +39,11 @@ public final class PlaygroundLayoutHarness {
     }
 
     private static int runScenario(String label, boolean mobile) throws Exception {
-        // Hint the CN1 platform into desktop vs. mobile by forcing the tablet /
-        // desktop flags so computeBreakpoint() picks the right shell.
-        System.setProperty("cn1.desktop", Boolean.toString(!mobile));
-        System.setProperty("cn1.tablet", "false");
+        // Display.isDesktop / isTablet ignore external system properties, so we
+        // force the layout via the test-only hook on CN1Playground.
+        CN1Playground.testOnlyForceLayout = mobile
+                ? CN1Playground.LAYOUT_MOBILE
+                : CN1Playground.LAYOUT_DESKTOP;
 
         CN1Playground app = new CN1Playground();
         final boolean[] done = new boolean[]{false};
@@ -85,11 +86,14 @@ public final class PlaygroundLayoutHarness {
         failures += expectPresent(label, form, "PlaygroundTopBar", "PlaygroundTopBarDark");
         failures += expectPresent(label, form, "PlaygroundAppIcon", "PlaygroundAppIconDark");
         if (mobile) {
-            failures += expectPresent(label, form, "PlaygroundTopTabs", "PlaygroundTopTabsDark");
+            // On mobile the segmented top-tab control container is tagged with
+            // PlaygroundSegment{,Dark}, and the bottom nav with PlaygroundBottomNav.
+            failures += expectPresent(label, form, "PlaygroundSegment", "PlaygroundSegmentDark");
             failures += expectPresent(label, form, "PlaygroundBottomNav", "PlaygroundBottomNavDark");
         } else {
             failures += expectPresent(label, form, "PlaygroundActivityBar", "PlaygroundActivityBarDark");
         }
+        CN1Playground.testOnlyForceLayout = CN1Playground.LAYOUT_NONE;
         return failures;
     }
 
@@ -127,6 +131,13 @@ public final class PlaygroundLayoutHarness {
 
     private static Component findByUiid(Component root, String... uiids) {
         if (root == null) {
+            return null;
+        }
+        // Skip hidden subtrees - several UIIDs (e.g. PlaygroundSegment) are used
+        // by multiple Components (the top-bar Code/CSS toggle AND the mobile
+        // tab strip). On mobile the first match is the hidden toggle; we want
+        // the visible tab strip, so don't descend into hidden branches.
+        if (root.isHidden() || !root.isVisible()) {
             return null;
         }
         String uiid = root.getUIID();
