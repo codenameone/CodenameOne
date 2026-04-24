@@ -1,0 +1,475 @@
+== Native Modern Themes
+
+This chapter documents the CSS-driven iOS Modern (liquid glass) and
+Android Material 3 themes that ship with Codename One. These are
+optional, opt-in themes. The default on both platforms remains the
+legacy iOS 7 flat theme (iOS) and Android Holo Light theme (Android)
+so existing apps see no behaviour change until they opt in.
+
+=== Selecting a theme
+
+Three build hints control which native theme the framework installs
+at app startup. They are all optional; with none set, the legacy
+defaults apply.
+
+[cols="1,2,3", options="header"]
+|===
+|Hint |Values |Description
+
+|`ios.themeMode`
+|`auto` (default) +
+`modern` / `liquid` +
+`ios7` / `flat` +
+`legacy` / `iphone`
+|iOS theme mode. `auto` and `ios7` both load the iOS 7 flat theme
+(no change from the pre-refactor behaviour). `modern` or `liquid`
+opt in to the new liquid-glass theme built from
+`native-themes/ios-modern/theme.css`. `legacy` / `iphone` loads the
+pre-iOS 7 iPhone theme.
+
+|`cn1.androidTheme`
+|`hololight` (default) +
+`material` / `modern` +
+`legacy`
+|Android theme mode. Default is Holo Light (what Codename One
+shipped before this refactor). `material` / `modern` opts in to the
+Material 3 theme built from
+`native-themes/android-material/theme.css`. `legacy` loads the
+pre-Holo Android theme.
+
+|`cn1.nativeTheme`
+|`modern` +
+`legacy` +
+`custom`
+|Cross-platform meta hint. When set, sets both
+`ios.themeMode` and `cn1.androidTheme` together where those have not
+been set explicitly. `modern` = liquid glass + Material 3, `legacy`
+= iOS 7 + Holo Light, `custom` disables the framework native theme
+entirely so your own theme's `includeNativeBool` can own the base
+layer.
+|===
+
+NOTE: The framework intends to flip `auto` to `modern` in a future
+release. For now `auto` preserves the legacy behaviour to avoid
+disturbing existing apps and screenshot goldens.
+
+=== Deprecated / back-compat hints
+
+[cols="1,2,3", options="header"]
+|===
+|Hint |Values |Description
+
+|`and.hololight`
+|`true` / `false`
+|Legacy Android hint that is still honoured and maps to
+`cn1.androidTheme=hololight`.
+|===
+
+=== Dark mode
+
+Both modern themes ship dark-mode variants via
+`@media (prefers-color-scheme: dark)` blocks in their CSS. The CSS
+compiler rewrites each dark-mode rule into a `$Dark<UIID>` style
+entry. At runtime `UIManager` consults these entries whenever
+`CN.isDarkMode()` returns `true`, producing a live dark rendering
+without requiring a separate theme file.
+
+Set dark mode programmatically with
+`Display.getInstance().setDarkMode(Boolean)` (`null` = follow
+system). The simulator's Simulator menu exposes the same toggle.
+On a physical device the system appearance flips both iOS and
+Android automatically.
+
+=== Overriding the palette
+
+The shipped modern themes are designed to be overridable. Because
+native themes set `includeNativeBool: false` in their constants, a
+user theme that sets `includeNativeBool: true` will inherit from the
+native base and can layer its own UIID overrides on top without
+recursion.
+
+==== Static override — CSS
+
+In your app's `theme.css`, inherit from the native theme and override
+specific UIIDs or colours:
+
+[source,css]
+----
+#Constants {
+    includeNativeBool: true;   /* inherit from the installed native theme */
+    darkModeBool: true;
+}
+
+/* redefine the RaisedButton surface to your brand colour */
+RaisedButton {
+    cn1-derive: RaisedButton;
+    background-color: #d81b60;
+}
+----
+
+==== Dynamic override — runtime
+
+To flip a palette at runtime (brand switch, A/B test, user
+preference), push a Hashtable of theme props through
+`UIManager.addThemeProps` and refresh:
+
+[source,java]
+----
+Hashtable override = new Hashtable();
+override.put("RaisedButton.bgColor", "d81b60");
+override.put("RaisedButton.sel#bgColor", "b71c5c");
+UIManager.getInstance().addThemeProps(override);
+Form.getCurrentForm().refreshTheme();
+----
+
+See `scripts/hellocodenameone/.../PaletteOverrideThemeScreenshotTest`
+in the repository for a complete working example.
+
+=== Theme constants (@constants)
+
+The modern themes expose these `@constants` in their
+`#Constants { ... }` block. Override any of them by declaring the
+same constant in your own theme's `#Constants` block.
+
+[cols="2,1,1,3", options="header"]
+|===
+|Constant |iOS default |Android default |Meaning
+
+|`@includeNativeBool`
+|`false`
+|`false`
+|Mandatory for the native theme itself. User themes set this to
+`true` to inherit.
+
+|`@darkModeBool`
+|`true`
+|`true`
+|Enables resolution of `$Dark<UIID>` styles when
+`CN.isDarkMode() == true`.
+
+|`@commandBehavior`
+|`Native`
+|`Native`
+|Controls how command bars render - native (platform) vs
+Codename One lightweight.
+
+|`@paintsTitleBarBool`
+|`true`
+|`false`
+|iOS reserves the status-bar area for the TitleArea. Android lets
+the native status bar handle it.
+
+|`@tabPlacementInt`
+|`2` (BOTTOM)
+|unset (TOP)
+|Placement of `Tabs` - iOS 26 uses a bottom navigation bar; Material 3
+keeps the flat top-tab pattern.
+
+|`@tabsFillRowsBool`
+|`true`
+|`true`
+|Tabs distribute across the full row rather than flowing to their
+preferred widths.
+
+|`@tabsGridBool`
+|`true`
+|`true`
+|Tabs layout as a fixed 1xN grid so each tab gets equal width.
+
+|`@switchThumbPaddingInt`
+|`2`
+|`2`
+|Pixels of padding around the Switch thumb.
+
+|`@switchThumbScaleY`
+|`1.4`
+|`1.5`
+|Vertical scale of the Switch thumb (iOS is slightly smaller than
+Material).
+
+|`@switchTrackScaleY` / `@switchTrackScaleX`
+|`1.5` / `2.5`
+|`0.9` / `3`
+|Scale of the Switch track. Larger X gives a longer pill; larger Y
+gives a thicker track.
+
+|`@switchTrackOffOutlineWidthMM`
+|`0.25`
+|`0`
+|Outline thickness of the off-state track (iOS draws a faint ring;
+Material does not).
+
+|`@switchTrackOnOutlineWidthMM`
+|`0`
+|`0`
+|Outline thickness of the on-state track.
+
+|`@switchTrackOffOutlineColor`
+|`cccccc`
+|`79747e`
+|Outline colour of the off-state track.
+
+|`@switchThumbInsetMM`
+|`0.25`
+|`0`
+|Horizontal inset of the Switch thumb from the track ends.
+
+|`@ios7StatusBarHack`
+|`true`
+|-
+|iOS-only. Leaves room for the status bar under the TitleArea.
+|===
+
+=== Styled UIIDs
+
+The modern themes style this set of Codename One UIIDs. Any UIID
+not listed here falls through to Codename One's default component
+style.
+
+==== Base / structural
+
+[cols="1,3", options="header"]
+|===
+|UIID |Purpose
+
+|`Component`
+|Baseline style inherited by every component that has no more
+specific match.
+
+|`Container` / `ContentPane`
+|Form's main content area.
+
+|`Form`
+|Form background.
+|===
+
+==== Typography
+
+[cols="1,3", options="header"]
+|===
+|UIID |Purpose
+
+|`Label`
+|Standard single-line label.
+
+|`SecondaryLabel`
+|Muted secondary text (derives from `Label`).
+
+|`TertiaryLabel`
+|Even more muted label used for hint / legend text (derives from
+`Label`).
+
+|`SpanLabel` / `SpanLabelText`
+|Multi-line wrapped label (derives from `Label`).
+
+|`Title` / `MainTitle`
+|Title text inside `TitleArea`. `MainTitle` derives from `Title`.
+
+|`ListRenderer`
+|Single-line list item (derives from `Label`).
+
+|`MultiLine1` / `MultiLine2` / `MultiLine3` / `MultiLine4`
+|Line styles used by `MultiButton` (all derive from `Label`).
+
+|`TextHint`
+|Placeholder text inside a TextField.
+|===
+
+==== Buttons and command areas
+
+[cols="1,3", options="header"]
+|===
+|UIID |Purpose
+
+|`Button`
+|Default (text / link) button.
+
+|`RaisedButton`
+|Filled / accent button. Derives from `Button`.
+
+|`FlatButton`
+|Text-only button with no fill. Derives from `Button`.
+
+|`BackCommand` / `TitleCommand`
+|Toolbar nav / title-bar commands. Derive from `Button`.
+
+|`SideCommand`
+|Entry in a side-menu drawer. Derives from `Button`.
+
+|`MultiButton`
+|Composite button with icon + multi-line text. Derives from `Button`.
+
+|`FloatingActionButton`
+|Circular FAB. Uses `cn1-pill-border` so the circle scales with the
+component height.
+|===
+
+==== Inputs and selection
+
+[cols="1,3", options="header"]
+|===
+|UIID |Purpose
+
+|`TextField`
+|Single-line text input.
+
+|`TextArea`
+|Multi-line text input.
+
+|`CheckBox`
+|Checkbox (icon + label). `icon-gap: 2mm` provides spacing between
+the box and the label.
+
+|`RadioButton`
+|Radio button (icon + label).
+
+|`Switch` / `OnOffSwitch`
+|Pill-track toggle. Sizing is controlled by the `@switch*`
+constants listed above.
+|===
+
+==== Navigation and containers
+
+[cols="1,3", options="header"]
+|===
+|UIID |Purpose
+
+|`Toolbar`
+|Top command bar.
+
+|`TitleArea`
+|Region that contains `Title` / toolbar commands / status bar. Styled
+directly (not via `cn1-derive`) because cross-UIID derive to
+`Toolbar` is problematic on iOS.
+
+|`Tabs` / `TabsContainer`
+|Tab switcher widget. iOS modern styles `TabsContainer` as a
+pill-shaped group at the bottom of the form; Android keeps flat
+top tabs.
+
+|`Tab` / `SelectedTab` / `UnselectedTab`
+|Individual tab button. `SelectedTab` / `UnselectedTab` derive from
+`Tab` and only refine the foreground colour.
+
+|`SideNavigationPanel`
+|Drawer panel.
+
+|`List`
+|Container for a List component.
+|===
+
+==== Dialogs and overlays
+
+[cols="1,3", options="header"]
+|===
+|UIID |Purpose
+
+|`Dialog`
+|Outer dialog surface. Uses an elevated surface colour so it sits
+visibly above the form.
+
+|`DialogBody` / `DialogContentPane` / `DialogCommandArea`
+|Inner regions of a Dialog. Styled directly - they do not
+`cn1-derive` from `Dialog` so a single-hop cross-UIID derive chain
+is avoided.
+
+|`DialogTitle`
+|Dialog title text. Styled directly (does not derive from `Title`).
+
+|`PopupContent`
+|Popup content surface (e.g. lightweight picker bubble). Styled
+directly (does not derive from `Dialog`).
+
+|`Separator`
+|Thin divider line.
+|===
+
+=== cn1-derive rules
+
+`cn1-derive` is a powerful shortcut, but the style resolver treats
+each hop as a full recursive lookup. In practice it only works
+reliably when the derived UIID is a **refinement** of the base -
+i.e. the derived UIID conceptually "is-a" more specific version of
+the base.
+
+Examples of refinement (safe to use):
+
+[source,css]
+----
+SecondaryLabel { cn1-derive: Label; color: #3c3c43; }
+MainTitle { cn1-derive: Title; }
+RaisedButton { cn1-derive: Button; background-color: #007aff; }
+SelectedTab { cn1-derive: Tab; color: #007aff; }
+----
+
+Examples of cross-context relationships that the modern themes
+deliberately **do not** use (props are inlined instead):
+
+[source,css]
+----
+/* Do NOT do this - TitleArea is not a Toolbar, it's a different
+   container, and the iOS ParparVM style resolver hangs on this
+   particular chain after a mid-flight setThemeProps call. */
+TitleArea { cn1-derive: Toolbar; ... }
+
+/* Do NOT derive a Dialog sub-region from an unrelated UIID. */
+DialogTitle { cn1-derive: Title; ... }
+PopupContent { cn1-derive: Dialog; ... }
+
+/* Do NOT derive across specializations. TextArea is its own beast,
+   not a styled TextField. */
+TextArea { cn1-derive: TextField; ... }
+RadioButton { cn1-derive: CheckBox; ... }
+----
+
+**Rule of thumb:** if a reader would have to check the base UIID to
+understand what the derived UIID does, inline the properties
+instead of using `cn1-derive`.
+
+=== Platform constraints
+
+The modern themes compile under a CEF-free subset of the Codename
+One CSS compiler. This means they ship as pure property tables in
+the `.res` file - no rasterized 9-piece images - and are tiny on
+disk.
+
+Allowed (CEF-free):
+
+* Solid `color` / `background-color`.
+* `cn1-pill-border`, simple matched-side `border`.
+* `border-radius` **without** a visible `border`.
+* `padding`, `margin`, typography (`font-family`, `font-size`,
+  `font-weight`, `text-align`).
+* `icon-gap` for CheckBox / RadioButton / MultiButton.
+* `cn1-derive` (simple refinement only - see above).
+* `cn1-image-id`, `cn1-mutable-image`, `cn1-source-dpi` for images
+  that are also shipped as PNG assets.
+* `.pressed` / `.selected` / `.unselected` / `.disabled` state
+  selectors.
+* `@media (prefers-color-scheme: dark)` for dark-mode overrides.
+* `@constants { ... }` and `var(--x)`.
+
+Forbidden (trigger the 9-piece / CEF rasterization path):
+
+* `box-shadow` / `cn1-box-shadow-*`.
+* `border-radius` **combined** with a visible `border` (no matter
+  the colour).
+* Mixed-per-side `border-width` / `border-style` / `border-color`.
+* `filter`.
+* Complex `linear-gradient` / `radial-gradient` that cannot be
+  expressed as a native gradient type.
+
+If you need one of the forbidden effects in a shipped native theme,
+extend the CSS compiler and / or the `.res` format with a new
+native primitive rather than accepting a rasterized fallback.
+
+=== Future work: real backdrop glass
+
+The iOS 26 tab bar (and equivalent Material 3 surfaces) use an OS-provided
+backdrop blur (`UIVisualEffectView` on iOS, `RenderEffect` on
+Android). The current CSS approximates this with a solid
+surface-container colour on the tabs group; a real glass effect
+will need a new CSS primitive
+(`cn1-backdrop-filter: glass(<intensity>)`) plus port-side code
+that maps it to the platform native API. That work lands in a
+separate PR.
