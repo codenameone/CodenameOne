@@ -2529,6 +2529,46 @@ function installNativeBindings() {
   if (!jvm.translatedMethods) {
     jvm.translatedMethods = Object.create(null);
   }
+  const classes = jvm.classes || {};
+  const classNames = Object.keys(classes);
+  function overrideMethodMaps(name, fn) {
+    // bindNative calls during port.js load ran before translated_app.js
+    // emitted any ``_Z({..., m: {...}})`` blocks — ``jvm.classes`` was
+    // empty so the loop found nothing to override. Now that classes
+    // are registered, apply the override for both the class-specific
+    // ``name`` and its sig-based dispatch id form.
+    let dispatchId = null;
+    if (name.indexOf("cn1_") === 0 && name.indexOf("cn1_s_") !== 0) {
+      let bestPrefix = null;
+      for (let i = 0; i < classNames.length; i++) {
+        const prefix = "cn1_" + classNames[i] + "_";
+        if (name.indexOf(prefix) === 0
+                && (bestPrefix == null || prefix.length > bestPrefix.length)) {
+          bestPrefix = prefix;
+        }
+      }
+      if (bestPrefix != null) {
+        dispatchId = "cn1_s_" + name.substring(bestPrefix.length);
+      }
+    } else if (name.indexOf("cn1_s_") === 0) {
+      dispatchId = name;
+    }
+    for (let i = 0; i < classNames.length; i++) {
+      const cls = classes[classNames[i]];
+      if (!cls || !cls.methods) {
+        continue;
+      }
+      if (Object.prototype.hasOwnProperty.call(cls.methods, name)) {
+        cls.methods[name] = fn;
+      }
+      if (dispatchId && Object.prototype.hasOwnProperty.call(cls.methods, dispatchId)) {
+        cls.methods[dispatchId] = fn;
+      }
+    }
+    if (dispatchId) {
+      jvm.nativeMethods[dispatchId] = fn;
+    }
+  }
   const names = Object.keys(jvm.nativeMethods || {});
   for (let i = 0; i < names.length; i++) {
     const name = names[i];
@@ -2544,6 +2584,7 @@ function installNativeBindings() {
     }
     global[name] = nativeFn;
     jvm[name] = nativeFn;
+    overrideMethodMaps(name, nativeFn);
     if (!name.endsWith("__impl")) {
       const implName = name + "__impl";
       const existingImpl = global[implName];
