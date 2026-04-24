@@ -34,8 +34,14 @@
     darkModeBool: true;
     commandBehavior: Native;
     paintsTitleBarBool: false;
+    /* Material 3 navigation rail / bottom app bar is full-width at
+       the bottom of the form - mirror iOS modern here.
+       tabPlacementInt=2 is Component.BOTTOM; tabsFillRowsBool
+       distributes tabs across the full available horizontal space
+       so the rail is edge-to-edge. */
+    tabPlacementInt: 2;
+    tabsFillRowsBool: true;
     tabsGridBool: true;
-    tabsFillRowsBool: false;
     switchThumbPaddingInt: 2;
     switchThumbScaleY: "1.5";
     switchTrackScaleY: "0.9";
@@ -109,7 +115,16 @@ TextField {
 TextField.pressed { background-color: #e7e0ec; }
 TextField.disabled { color: #a5a0ab; background-color: #e0dce4; }
 
-TextArea { cn1-derive: TextField; padding: 2mm 3mm 2mm 3mm; }
+TextArea {
+    color: #1d1b20;
+    background-color: #f3edf7;
+    padding: 2mm 3mm 2mm 3mm;
+    margin: 1mm 2mm 1mm 2mm;
+    font-family: "native:MainRegular";
+    border-radius: 1mm;
+}
+TextArea.pressed { background-color: #e7e0ec; }
+TextArea.disabled { color: #a5a0ab; background-color: #e0dce4; }
 
 TextHint {
     color: #79747e;
@@ -118,19 +133,21 @@ TextHint {
 }
 
 CheckBox {
-    cn1-derive: Label;
     color: #1d1b20;
     background-color: transparent;
     padding: 1mm 2mm 1mm 2mm;
+    margin: 0;
+    font-family: "native:MainRegular";
 }
 CheckBox.selected { color: #6750a4; }
 CheckBox.disabled { color: #a5a0ab; background-color: #e0dce4; }
 
 RadioButton {
-    cn1-derive: CheckBox;
     color: #1d1b20;
     background-color: transparent;
     padding: 1mm 2mm 1mm 2mm;
+    margin: 0;
+    font-family: "native:MainRegular";
 }
 RadioButton.selected { color: #6750a4; }
 RadioButton.disabled { color: #a5a0ab; background-color: #e0dce4; }
@@ -159,33 +176,53 @@ Toolbar {
     padding: 1mm;
     margin: 0;
 }
-TitleArea { cn1-derive: Toolbar; padding: 1mm 2mm 1mm 2mm; }
+/* TitleArea inlined rather than cn1-derive'd to Toolbar - see the iOS
+   modern theme for the resolver-hang note. The two UIIDs serve
+   different purposes and keeping inheritance simple is safer. */
+TitleArea {
+    background-color: #fef7ff;
+    color: #1d1b20;
+    padding: 1mm 2mm 1mm 2mm;
+    margin: 0;
+}
 
 Title {
     color: #1d1b20;
+    background-color: #fef7ff;
     padding: 1mm;
     font-family: "native:MainBold";
+    font-size: 4.5mm;
 }
 MainTitle { cn1-derive: Title; }
 
 BackCommand { cn1-derive: Button; background-color: transparent; color: #6750a4; padding: 1mm 2mm 1mm 2mm; }
 TitleCommand { cn1-derive: Button; background-color: transparent; color: #6750a4; padding: 1mm 2mm 1mm 2mm; }
 
-Tabs { background-color: #fef7ff; padding: 0; margin: 0; }
-TabsContainer { background-color: #fef7ff; padding: 0; margin: 0; }
+/* Material 3 navigation-bar look: single pill-shaped group at the
+   bottom of the form, with each tab a transparent hit inside it.
+   Surface-container color on the group gives visible separation
+   from the form surface, and border-radius draws the pill. */
+Tabs { background-color: transparent; padding: 1mm 2mm 2mm 2mm; margin: 0; }
+TabsContainer {
+    background-color: #eaddff;
+    color: #1d1b20;
+    padding: 1mm;
+    margin: 2mm 3mm 2mm 3mm;
+    border-radius: 8mm;
+}
 
 Tab {
     color: #49454f;
-    background-color: #fef7ff;
+    background-color: transparent;
     padding: 2mm 3mm 2mm 3mm;
     margin: 0;
     font-family: "native:MainRegular";
     text-align: center;
 }
-Tab.selected { color: #6750a4; }
-Tab.pressed { color: #21005d; background-color: #eaddff; }
+Tab.selected { color: #21005d; background-color: #d0bcff; border-radius: 6mm; }
+Tab.pressed { color: #21005d; background-color: #eaddff; border-radius: 6mm; }
 
-SelectedTab { cn1-derive: Tab; color: #6750a4; }
+SelectedTab { cn1-derive: Tab; color: #21005d; }
 UnselectedTab { cn1-derive: Tab; color: #49454f; }
 
 SideNavigationPanel { background-color: #fef7ff; padding: 0; margin: 0; }
@@ -217,17 +254,33 @@ MultiLine2 { cn1-derive: Label; color: #49454f; }
 MultiLine3 { cn1-derive: Label; color: #79747e; }
 MultiLine4 { cn1-derive: Label; color: #79747e; }
 
+/* Material 3 dialogs use surface-container-highest (#e6e0e9) so the
+   dialog body sits visibly above the surface background (#fef7ff);
+   #f3edf7 was too close to the form bg and made the dialog look
+   like floating buttons. Inline DialogTitle/DialogBody props
+   rather than cn1-derive'ing - see the iOS resolver-hang note. */
 Dialog {
-    background-color: #f3edf7;
+    background-color: #e6e0e9;
     color: #1d1b20;
     padding: 3mm;
-    margin: 0;
-    border-radius: 6mm;
+    margin: 5mm;
+    border-radius: 7mm;
 }
-DialogBody { cn1-derive: Dialog; padding: 2mm; }
-DialogTitle { cn1-derive: Title; padding: 2mm; }
-DialogContentPane { background-color: #f3edf7; padding: 2mm; margin: 0; }
-DialogCommandArea { background-color: #f3edf7; padding: 1mm; }
+DialogBody {
+    background-color: #e6e0e9;
+    color: #1d1b20;
+    padding: 2mm;
+    margin: 0;
+}
+DialogTitle {
+    color: #1d1b20;
+    background-color: #e6e0e9;
+    padding: 2mm;
+    font-family: "native:MainBold";
+    font-size: 4.5mm;
+}
+DialogContentPane { background-color: #e6e0e9; padding: 2mm; margin: 0; }
+DialogCommandArea { background-color: #e6e0e9; padding: 1mm; }
 
 FloatingActionButton {
     color: #21005d;
@@ -240,7 +293,13 @@ FloatingActionButton {
 FloatingActionButton.pressed { background-color: #d0bcff; }
 
 Separator { background-color: #cac4d0; padding: 0; margin: 0; }
-PopupContent { cn1-derive: Dialog; padding: 2mm; }
+PopupContent {
+    background-color: #e6e0e9;
+    color: #1d1b20;
+    padding: 2mm;
+    margin: 0;
+    border-radius: 7mm;
+}
 
 @media (prefers-color-scheme: dark) {
     Component { color: #e6e0e9; background-color: #141218; }
@@ -293,12 +352,12 @@ PopupContent { cn1-derive: Dialog; padding: 2mm; }
     BackCommand { color: #d0bcff; background-color: transparent; }
     TitleCommand { color: #d0bcff; background-color: transparent; }
 
-    Tabs { background-color: #141218; }
-    TabsContainer { background-color: #141218; }
-    Tab { color: #cac4d0; background-color: #141218; }
-    Tab.selected { color: #d0bcff; }
+    Tabs { background-color: transparent; }
+    TabsContainer { background-color: #2b2930; color: #e6e0e9; }
+    Tab { color: #cac4d0; background-color: transparent; }
+    Tab.selected { color: #381e72; background-color: #d0bcff; }
     Tab.pressed { color: #eaddff; background-color: #4f378b; }
-    SelectedTab { color: #d0bcff; }
+    SelectedTab { color: #381e72; }
     UnselectedTab { color: #cac4d0; }
 
     SideNavigationPanel { background-color: #141218; }
