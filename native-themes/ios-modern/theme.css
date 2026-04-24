@@ -34,8 +34,13 @@
     commandBehavior: Native;
     ios7StatusBarHack: true;
     paintsTitleBarBool: true;
+    /* iOS 26 puts tab bars at the bottom, spanning full width with a
+       single pill-shaped glass group rather than individual tabs up
+       top. tabPlacementInt=2 is Component.BOTTOM; tabsFillRowsBool
+       distributes tabs across the available horizontal space. */
+    tabPlacementInt: 2;
+    tabsFillRowsBool: true;
     tabsGridBool: true;
-    tabsFillRowsBool: false;
     switchThumbPaddingInt: 2;
     switchThumbScaleY: "1.4";
     switchTrackScaleY: "1.5";
@@ -106,7 +111,16 @@ TextField {
 TextField.pressed { background-color: #e5e5ea; }
 TextField.disabled { color: #c7c7cc; background-color: #e5e5ea; }
 
-TextArea { cn1-derive: TextField; padding: 2mm 3mm 2mm 3mm; }
+TextArea {
+    color: #000000;
+    background-color: #ffffff;
+    padding: 2mm 3mm 2mm 3mm;
+    margin: 1mm 2mm 1mm 2mm;
+    font-family: "native:MainRegular";
+    border-radius: 2mm;
+}
+TextArea.pressed { background-color: #e5e5ea; }
+TextArea.disabled { color: #c7c7cc; background-color: #e5e5ea; }
 
 TextHint {
     color: #8e8e93;
@@ -115,19 +129,21 @@ TextHint {
 }
 
 CheckBox {
-    cn1-derive: Label;
     color: #000000;
     background-color: transparent;
     padding: 1mm 2mm 1mm 2mm;
+    margin: 0;
+    font-family: "native:MainRegular";
 }
 CheckBox.selected { color: #007aff; }
 CheckBox.disabled { color: #c7c7cc; background-color: #e5e5ea; }
 
 RadioButton {
-    cn1-derive: CheckBox;
     color: #000000;
     background-color: transparent;
     padding: 1mm 2mm 1mm 2mm;
+    margin: 0;
+    font-family: "native:MainRegular";
 }
 RadioButton.selected { color: #007aff; }
 RadioButton.disabled { color: #c7c7cc; background-color: #e5e5ea; }
@@ -170,27 +186,41 @@ TitleArea {
 
 Title {
     color: #000000;
+    background-color: #ffffff;
     padding: 1mm;
     font-family: "native:MainBold";
+    font-size: 4.5mm;
+    text-align: center;
 }
 MainTitle { cn1-derive: Title; }
 
 BackCommand { cn1-derive: Button; color: #007aff; padding: 1mm 2mm 1mm 2mm; }
 TitleCommand { cn1-derive: Button; color: #007aff; padding: 1mm 2mm 1mm 2mm; }
 
-Tabs { background-color: #ffffff; padding: 0; margin: 0; }
-TabsContainer { background-color: #ffffff; padding: 0; margin: 0; }
+/* iOS 26 tab-bar look: the TabsContainer is the visible pill group
+   hugging the bottom edge, with individual tabs rendered as
+   transparent hits inside it. The pill is semi-opaque white in
+   light mode (approximates frosted glass without a real backdrop
+   filter - closest we can get inside the CEF-free subset). */
+Tabs { background-color: transparent; padding: 1mm 2mm 2mm 2mm; margin: 0; }
+TabsContainer {
+    background-color: #f2f2f7;
+    color: #000000;
+    padding: 1mm;
+    margin: 2mm 3mm 2mm 3mm;
+    border-radius: 5mm;
+}
 
 Tab {
     color: #3c3c43;
-    background-color: #ffffff;
+    background-color: transparent;
     padding: 2mm 3mm 2mm 3mm;
     margin: 0;
     font-family: "native:MainRegular";
     text-align: center;
 }
-Tab.selected { color: #007aff; }
-Tab.pressed { color: #0064d1; background-color: #e5e5ea; }
+Tab.selected { color: #007aff; background-color: #ffffff; border-radius: 4mm; }
+Tab.pressed { color: #0064d1; background-color: #e5e5ea; border-radius: 4mm; }
 
 SelectedTab { cn1-derive: Tab; color: #007aff; }
 UnselectedTab { cn1-derive: Tab; color: #3c3c43; }
@@ -223,15 +253,34 @@ MultiLine2 { cn1-derive: Label; color: #3c3c43; }
 MultiLine3 { cn1-derive: Label; color: #8e8e93; }
 MultiLine4 { cn1-derive: Label; color: #8e8e93; }
 
+/* Dialog contrasts with the Form by painting pure surface white on
+   top of the grouped-form #f2f2f7 background. CEF-free subset rules
+   out box-shadow and border+radius together, so we rely on the
+   colour step alone for visible separation. Inline
+   DialogBody/DialogTitle/PopupContent props instead of
+   cn1-derive'ing Dialog/Title so a recurrence of the iOS TitleArea
+   resolver hang does not hit this path. */
 Dialog {
     background-color: #ffffff;
     color: #000000;
     padding: 3mm;
-    margin: 0;
-    border-radius: 3mm;
+    margin: 5mm;
+    border-radius: 4mm;
 }
-DialogBody { cn1-derive: Dialog; padding: 2mm; }
-DialogTitle { cn1-derive: Title; padding: 2mm; }
+DialogBody {
+    background-color: #ffffff;
+    color: #000000;
+    padding: 2mm;
+    margin: 0;
+}
+DialogTitle {
+    color: #000000;
+    background-color: #ffffff;
+    padding: 2mm;
+    font-family: "native:MainBold";
+    font-size: 4mm;
+    text-align: center;
+}
 DialogContentPane { background-color: #ffffff; padding: 2mm; margin: 0; }
 DialogCommandArea { background-color: #ffffff; padding: 1mm; }
 
@@ -246,7 +295,13 @@ FloatingActionButton {
 FloatingActionButton.pressed { background-color: #0064d1; }
 
 Separator { background-color: #c6c6c8; padding: 0; margin: 0; }
-PopupContent { cn1-derive: Dialog; padding: 2mm; }
+PopupContent {
+    background-color: #ffffff;
+    color: #000000;
+    padding: 2mm;
+    margin: 0;
+    border-radius: 4mm;
+}
 
 @media (prefers-color-scheme: dark) {
     Component { color: #ffffff; background-color: #000000; }
@@ -296,10 +351,10 @@ PopupContent { cn1-derive: Dialog; padding: 2mm; }
     BackCommand { color: #0a84ff; }
     TitleCommand { color: #0a84ff; }
 
-    Tabs { background-color: #000000; }
-    TabsContainer { background-color: #000000; }
-    Tab { color: #ebebf5; background-color: #000000; }
-    Tab.selected { color: #0a84ff; }
+    Tabs { background-color: transparent; }
+    TabsContainer { background-color: #2c2c2e; color: #ffffff; }
+    Tab { color: #ebebf5; background-color: transparent; }
+    Tab.selected { color: #0a84ff; background-color: #1c1c1e; }
     Tab.pressed { color: #64b1ff; background-color: #3a3a3c; }
     SelectedTab { color: #0a84ff; }
     UnselectedTab { color: #ebebf5; }
