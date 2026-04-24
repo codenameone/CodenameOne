@@ -158,6 +158,7 @@ int editComponentPadTop, editComponentPadLeft;
 BOOL firstTime = YES;
 BOOL retinaBug;
 float scaleValue = 1;
+extern BOOL isAppSuspended;
 
 static void updateDisplayMetricsFromView(UIView *view) {
     if (view == nil) {
@@ -2726,7 +2727,13 @@ BOOL prefersStatusBarHidden = NO;
 }
 
 -(void) viewWillTransitionToSize:(CGSize)size withTransitionCoordinator:(id)coordinator {
-    
+    // iOS fires this during its background snapshot pass on iPad with the
+    // opposite-orientation size. Publishing that would deliver a swapped
+    // screenSizeChanged to the EDT between stop and start.
+    if (isAppSuspended) {
+        return;
+    }
+
     if(editingComponent != nil) {
         // Since willRotateToInterfaceOrientation is deprecated, newer versions (tested 11.3)
         // don't call it anymore on rotation.
@@ -2789,7 +2796,10 @@ BOOL prefersStatusBarHidden = NO;
 }
 
 -(void)didRotateFromInterfaceOrientation:(UIInterfaceOrientation)fromInterfaceOrientation {
-    
+    if (isAppSuspended) {
+        return;
+    }
+
     [[self eaglView] updateFrameBufferSize:(int)self.view.bounds.size.width h:(int)self.view.bounds.size.height];
     [[self eaglView] deleteFramebuffer];
 
