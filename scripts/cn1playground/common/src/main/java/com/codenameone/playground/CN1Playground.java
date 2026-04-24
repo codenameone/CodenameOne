@@ -231,73 +231,6 @@ public class CN1Playground extends Lifecycle {
             lastLayout = LAYOUT_NONE;
             applyLayoutForCurrentSize();
             appForm.revalidate();
-            Log.p("Form: " + appForm.getWidth() + "x" + appForm.getHeight());
-            if (bottomNav != null && bottomNav.getParent() != null) {
-                Log.p("bottomNav: parent=" + bottomNav.getParent().getClass().getSimpleName()
-                        + " pos=(" + bottomNav.getAbsoluteX() + "," + bottomNav.getAbsoluteY() + ")"
-                        + " size=" + bottomNav.getWidth() + "x" + bottomNav.getHeight()
-                        + " visible=" + bottomNav.isVisible() + " hidden=" + bottomNav.isHidden());
-            } else {
-                Log.p("bottomNav: NOT ATTACHED to any parent");
-            }
-            // User sees a thin bar at the nav location that clicks as the
-            // correct tab, but the icons/text are missing. The canvas paints
-            // the nav background (confirmed) and nothing overlays the nav
-            // region. So the problem is the Button children: either they have
-            // zero size, or they paint but their icon/text glyphs don't show.
-            // Log each child's absolute geometry + UIID + icon+text, then
-            // sample canvas pixels inside the first button's icon area so we
-            // can tell whether the glyph is painted at all.
-            if (bottomNav != null && bottomNav.getComponentCount() > 0) {
-                for (int i = 0; i < bottomNav.getComponentCount(); i++) {
-                    Component child = bottomNav.getComponentAt(i);
-                    String desc = "navChild[" + i + "]: " + child.getClass().getSimpleName()
-                            + " uiid=" + child.getUIID()
-                            + " pos=(" + child.getAbsoluteX() + "," + child.getAbsoluteY() + ")"
-                            + " size=" + child.getWidth() + "x" + child.getHeight()
-                            + " pref=" + child.getPreferredW() + "x" + child.getPreferredH()
-                            + " vis=" + child.isVisible() + " hidden=" + child.isHidden();
-                    if (child instanceof Button) {
-                        Button b = (Button) child;
-                        desc += " text=\"" + b.getText() + "\" icon="
-                                + (b.getIcon() == null ? "null" : (b.getIcon().getWidth() + "x" + b.getIcon().getHeight()));
-                    }
-                    Log.p(desc);
-                }
-            }
-            BrowserComponent js = CN.getSharedJavascriptContext();
-            if (js != null && bottomNav != null && bottomNav.getComponentCount() > 0) {
-                StringBuilder coords = new StringBuilder("[");
-                for (int i = 0; i < bottomNav.getComponentCount(); i++) {
-                    Component c = bottomNav.getComponentAt(i);
-                    int cx = c.getAbsoluteX() + c.getWidth() / 2;
-                    int cy = c.getAbsoluteY() + c.getHeight() / 3;
-                    if (coords.length() > 1) {
-                        coords.append(",");
-                    }
-                    coords.append("[").append(cx).append(",").append(cy).append("]");
-                }
-                coords.append("]");
-                js.execute(
-                        "callback.onSuccess((function(){"
-                                + "try {"
-                                + "var cv = document.getElementById('codenameone-canvas') || document.getElementsByTagName('canvas')[0];"
-                                + "if(!cv) return 'no-canvas';"
-                                + "var ctx = cv.getContext('2d');"
-                                + "var pts = " + coords + ";"
-                                + "var out = '';"
-                                + "for(var i=0;i<pts.length;i++){"
-                                + "  var bx = pts[i][0];"
-                                + "  var by = pts[i][1];"
-                                + "  var d = ctx.getImageData(bx, by, 1, 1).data;"
-                                + "  out += (i>0?' | ':'') + 'btn[' + i + ']@(' + bx + ',' + by + ')=rgba(' + d[0] + ',' + d[1] + ',' + d[2] + ',' + d[3] + ')';"
-                                + "}"
-                                + "return out;"
-                                + "} catch(e) { return 'err:' + e; }"
-                                + "})())",
-                        res -> Log.p("navBtnPixels: " + res.getValue())
-                );
-            }
         });
     }
 
@@ -384,18 +317,39 @@ public class CN1Playground extends Lifecycle {
     private Button createBottomNavButton(String key, String label, char icon) {
         Button btn = new Button(label);
         boolean active = key.equals(currentActivity);
-        String uiid;
-        if (active) {
-            uiid = websiteDarkMode ? "PlaygroundBottomNavItemActiveDark" : "PlaygroundBottomNavItemActive";
-        } else {
-            uiid = websiteDarkMode ? "PlaygroundBottomNavItemDark" : "PlaygroundBottomNavItem";
-        }
-        btn.setUIID(uiid);
+        btn.setUIID(uiidForBottomNavItem(active));
         btn.setTextPosition(Component.BOTTOM);
+        // FontImage.setMaterialIcon bakes the glyph using whatever foreground
+        // colour the style has at the moment of the call. UIID application is
+        // sometimes deferred (seen on the HTML5 port), leaving the FG at its
+        // default for long enough that the baked glyph ends up invisible on
+        // top of the nav's navy background. Force the UIID's foreground inline
+        // so the bake always uses the intended colour. Same pattern as the
+        // top bar app icon in PlaygroundTopBar.applyAppIconStyle.
+        btn.getAllStyles().setFgColor(bottomNavItemFgColor(active, websiteDarkMode));
         FontImage.setMaterialIcon(btn, icon, 4f);
+        btn.putClientProperty("navIcon", Character.valueOf(icon));
         btn.putClientProperty("navKey", key);
         btn.addActionListener(e -> handleActivitySelected(key));
         return btn;
+    }
+
+    private String uiidForBottomNavItem(boolean active) {
+        if (active) {
+            return websiteDarkMode ? "PlaygroundBottomNavItemActiveDark" : "PlaygroundBottomNavItemActive";
+        }
+        return websiteDarkMode ? "PlaygroundBottomNavItemDark" : "PlaygroundBottomNavItem";
+    }
+
+    /// Mirrors the `color:` values on the bottom-nav item UIIDs in theme.css.
+    /// Kept in sync by hand so `FontImage.setMaterialIcon` bakes the glyph
+    /// against the exact colour the stylesheet claims, regardless of when the
+    /// UIID is actually applied to the component.
+    private static int bottomNavItemFgColor(boolean active, boolean dark) {
+        if (active) {
+            return dark ? 0x4D86FF : 0x2F6BFF;
+        }
+        return dark ? 0xA8B8DA : 0x7F8AA3;
     }
 
     private void refreshBottomNav() {
@@ -413,13 +367,18 @@ public class CN1Playground extends Lifecycle {
                 continue;
             }
             boolean active = keyObj.equals(currentActivity);
-            String uiid;
-            if (active) {
-                uiid = websiteDarkMode ? "PlaygroundBottomNavItemActiveDark" : "PlaygroundBottomNavItemActive";
-            } else {
-                uiid = websiteDarkMode ? "PlaygroundBottomNavItemDark" : "PlaygroundBottomNavItem";
+            btn.setUIID(uiidForBottomNavItem(active));
+            // Re-force the FG and re-bake the Material icon so the glyph
+            // colour follows the new active/inactive state. Same rationale as
+            // in createBottomNavButton - the UIID alone is unreliable because
+            // setMaterialIcon captures the FG at call time, and the icon
+            // image baked during construction would otherwise keep its old
+            // (inactive) colour forever.
+            btn.getAllStyles().setFgColor(bottomNavItemFgColor(active, websiteDarkMode));
+            Object iconKey = btn.getClientProperty("navIcon");
+            if (iconKey instanceof Character) {
+                FontImage.setMaterialIcon(btn, ((Character) iconKey).charValue(), 4f);
             }
-            btn.setUIID(uiid);
         }
         bottomNav.setUIID(websiteDarkMode ? "PlaygroundBottomNavDark" : "PlaygroundBottomNav");
         if (bottomNav.getComponentForm() != null) {
