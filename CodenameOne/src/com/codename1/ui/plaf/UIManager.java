@@ -1603,6 +1603,16 @@ public class UIManager {
         for (String key : themeProps.keySet()) {
             props.put(key, themeProps.get(key));
         }
+        // buildTheme strips `@`-prefixed constants into themeConstants and
+        // drops them from the main themeProps map. Round-tripping through
+        // setThemePropsImpl would therefore lose every constant - so
+        // re-add them from themeConstants with the `@` restored, matching
+        // the shape buildTheme expects on input.
+        if (themeConstants != null) {
+            for (String key : themeConstants.keySet()) {
+                props.put("@" + key, themeConstants.get(key));
+            }
+        }
         setThemePropsImpl(props);
     }
 
