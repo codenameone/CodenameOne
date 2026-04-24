@@ -49,6 +49,17 @@
     switchTrackOnOutlineWidthMM: "0";
     switchTrackOffOutlineColor: "cccccc";
     switchThumbInsetMM: "0.25";
+    /* iOS uses a circular mark for checkboxes (Reminders-style) and
+       keeps the circular radio button. These integer constants are
+       Material icon codepoints that DefaultLookAndFeel reads to
+       swap the default square check-box glyphs. CHECK_CIRCLE = E86C
+       (59500), CHECK_CIRCLE_OUTLINE = E92D (59693),
+       RADIO_BUTTON_CHECKED = E837 (59447), RADIO_BUTTON_UNCHECKED
+       = E836 (59446). */
+    checkBoxCheckedIconInt: 59500;
+    checkBoxUncheckedIconInt: 59693;
+    radioCheckedIconInt: 59447;
+    radioUncheckedIconInt: 59446;
 }
 
 Component {
@@ -246,19 +257,51 @@ List { background-color: #ffffff; padding: 0; margin: 0; }
 
 ListRenderer { cn1-derive: Label; padding: 2mm 3mm 2mm 3mm; }
 
+/* iOS Settings-style list row: opaque white surface, generous
+   vertical padding, bold primary line, lighter secondary lines,
+   pressed-state highlight. No borders - the separator is provided
+   by the parent List / Container layout. */
 MultiButton {
     cn1-derive: Button;
     background-color: #ffffff;
     color: #000000;
-    padding: 2mm 3mm 2mm 3mm;
+    padding: 3mm 4mm 3mm 4mm;
     margin: 0;
+    font-family: "native:MainRegular";
+    font-size: 4mm;
+    text-align: left;
+    icon-gap: 3mm;
 }
 MultiButton.pressed { background-color: #e5e5ea; }
 
-MultiLine1 { cn1-derive: Label; color: #000000; font-family: "native:MainBold"; }
-MultiLine2 { cn1-derive: Label; color: #3c3c43; }
-MultiLine3 { cn1-derive: Label; color: #8e8e93; }
-MultiLine4 { cn1-derive: Label; color: #8e8e93; }
+MultiLine1 {
+    cn1-derive: Label;
+    color: #000000;
+    font-family: "native:MainBold";
+    font-size: 4mm;
+    padding: 0 0 0.5mm 0;
+}
+MultiLine2 {
+    cn1-derive: Label;
+    color: #3c3c43;
+    font-family: "native:MainRegular";
+    font-size: 3.5mm;
+    padding: 0;
+}
+MultiLine3 {
+    cn1-derive: Label;
+    color: #8e8e93;
+    font-family: "native:MainRegular";
+    font-size: 3mm;
+    padding: 0.5mm 0 0 0;
+}
+MultiLine4 {
+    cn1-derive: Label;
+    color: #8e8e93;
+    font-family: "native:MainRegular";
+    font-size: 3mm;
+    padding: 0;
+}
 
 /* Dialog contrasts with the Form by painting pure surface white on
    top of the grouped-form #f2f2f7 background. CEF-free subset rules

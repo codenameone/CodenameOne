@@ -31,6 +31,13 @@ public class DialogThemeScreenshotTest extends DualAppearanceBaseTest {
     }
 
     @Override
+    protected boolean useTexturedBackdrop() {
+        // Dialog may have translucent tints in the modern theme - paint
+        // over a colourful texture so any see-through is visible.
+        return true;
+    }
+
+    @Override
     protected void populate(Form form, String suffix) {
         Container dialog = new Container(new BorderLayout());
         dialog.setUIID("Dialog");

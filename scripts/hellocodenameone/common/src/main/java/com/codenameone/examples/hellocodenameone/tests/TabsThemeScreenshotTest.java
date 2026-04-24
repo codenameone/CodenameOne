@@ -21,6 +21,14 @@ public class TabsThemeScreenshotTest extends DualAppearanceBaseTest {
     }
 
     @Override
+    protected boolean useTexturedBackdrop() {
+        // iOS liquid-glass Tabs group approximates frosted-glass with a
+        // semi-opaque fill; paint against a colourful backdrop so the
+        // translucency (once real backdrop-filter lands) is visible.
+        return true;
+    }
+
+    @Override
     protected void populate(Form form, String suffix) {
         Tabs tabs = new Tabs();
         Container first = new Container(new BorderLayout());

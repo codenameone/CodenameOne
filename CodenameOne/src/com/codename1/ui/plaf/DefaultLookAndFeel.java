@@ -2443,15 +2443,24 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             Style unsel = uim.createStyle("CheckBox.", "", false);
             Style sel = uim.createStyle("CheckBox.", "sel#", true);
             Style dis = uim.createStyle("CheckBox.", "dis#", false);
-            FontImage checkedDis = FontImage.createMaterial(FontImage.MATERIAL_CHECK_BOX, dis);
-            FontImage uncheckedDis = FontImage.createMaterial(FontImage.MATERIAL_CHECK_BOX_OUTLINE_BLANK, sel);
+            // Optional theme constants to swap the default Material
+            // check-box icons. Useful for platform-native looks (e.g.
+            // iOS modern uses CHECK_CIRCLE / RADIO_BUTTON_UNCHECKED
+            // for a rounded-circle aesthetic). Defaults to the legacy
+            // square check-box glyphs so existing themes are unaffected.
+            char checkedIcon = (char) uim.getThemeConstant(
+                    "checkBoxCheckedIconInt", FontImage.MATERIAL_CHECK_BOX);
+            char uncheckedIcon = (char) uim.getThemeConstant(
+                    "checkBoxUncheckedIconInt", FontImage.MATERIAL_CHECK_BOX_OUTLINE_BLANK);
+            FontImage checkedDis = FontImage.createMaterial(checkedIcon, dis);
+            FontImage uncheckedDis = FontImage.createMaterial(uncheckedIcon, sel);
             if (focus) {
-                FontImage checkedSelected = FontImage.createMaterial(FontImage.MATERIAL_CHECK_BOX, sel);
-                FontImage uncheckedSelected = FontImage.createMaterial(FontImage.MATERIAL_CHECK_BOX_OUTLINE_BLANK, sel);
+                FontImage checkedSelected = FontImage.createMaterial(checkedIcon, sel);
+                FontImage uncheckedSelected = FontImage.createMaterial(uncheckedIcon, sel);
                 setCheckBoxFocusImages(checkedSelected, uncheckedSelected, checkedDis, uncheckedDis);
             } else {
-                FontImage checkedUnselected = FontImage.createMaterial(FontImage.MATERIAL_CHECK_BOX, unsel);
-                FontImage uncheckedUnselected = FontImage.createMaterial(FontImage.MATERIAL_CHECK_BOX_OUTLINE_BLANK, unsel);
+                FontImage checkedUnselected = FontImage.createMaterial(checkedIcon, unsel);
+                FontImage uncheckedUnselected = FontImage.createMaterial(uncheckedIcon, unsel);
                 setCheckBoxImages(checkedUnselected, uncheckedUnselected, checkedDis, uncheckedDis);
             }
         }
@@ -2484,15 +2493,21 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             Style unsel = uim.createStyle("RadioButton.", "", false);
             Style sel = uim.createStyle("RadioButton.", "sel#", true);
             Style dis = uim.createStyle("RadioButton.", "dis#", false);
-            FontImage checkedDis = FontImage.createMaterial(FontImage.MATERIAL_RADIO_BUTTON_CHECKED, dis);
-            FontImage uncheckedDis = FontImage.createMaterial(FontImage.MATERIAL_RADIO_BUTTON_UNCHECKED, sel);
+            // Same override pattern as the check-box icons above -
+            // theme constants can swap the default circle glyphs.
+            char checkedIcon = (char) uim.getThemeConstant(
+                    "radioCheckedIconInt", FontImage.MATERIAL_RADIO_BUTTON_CHECKED);
+            char uncheckedIcon = (char) uim.getThemeConstant(
+                    "radioUncheckedIconInt", FontImage.MATERIAL_RADIO_BUTTON_UNCHECKED);
+            FontImage checkedDis = FontImage.createMaterial(checkedIcon, dis);
+            FontImage uncheckedDis = FontImage.createMaterial(uncheckedIcon, sel);
             if (focus) {
-                FontImage checkedSelected = FontImage.createMaterial(FontImage.MATERIAL_RADIO_BUTTON_CHECKED, sel);
-                FontImage uncheckedSelected = FontImage.createMaterial(FontImage.MATERIAL_RADIO_BUTTON_UNCHECKED, sel);
+                FontImage checkedSelected = FontImage.createMaterial(checkedIcon, sel);
+                FontImage uncheckedSelected = FontImage.createMaterial(uncheckedIcon, sel);
                 setRadioButtonFocusImages(checkedSelected, uncheckedSelected, checkedDis, uncheckedDis);
             } else {
-                FontImage checkedUnselected = FontImage.createMaterial(FontImage.MATERIAL_RADIO_BUTTON_CHECKED, unsel);
-                FontImage uncheckedUnselected = FontImage.createMaterial(FontImage.MATERIAL_RADIO_BUTTON_UNCHECKED, unsel);
+                FontImage checkedUnselected = FontImage.createMaterial(checkedIcon, unsel);
+                FontImage uncheckedUnselected = FontImage.createMaterial(uncheckedIcon, unsel);
                 setRadioButtonImages(checkedUnselected, uncheckedUnselected, checkedDis, uncheckedDis);
             }
         }

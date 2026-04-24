@@ -72,6 +72,17 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
         return true;
     }
 
+    /**
+     * Subclasses override (return true) when the widget under test has
+     * translucent aspects (Dialog, Tabs pill, PopupContent, ...). A
+     * colourful diagonal-stripe texture is painted behind the form
+     * so any see-through tint is visible in the screenshot rather than
+     * blending into a plain Form bg. Default: plain form background.
+     */
+    protected boolean useTexturedBackdrop() {
+        return false;
+    }
+
     private final List<Annotation> annotations = new ArrayList<Annotation>();
 
     /**
@@ -126,6 +137,14 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
             }
         };
         populate(form, suffix);
+        if (useTexturedBackdrop()) {
+            // Replace the Form's solid bg with a diagonal-stripe pattern
+            // so any translucent widget (Dialog, pill Tabs, Popup) shows
+            // its see-through tint against something visible instead of
+            // blending into a plain surface.
+            form.getUnselectedStyle().setBgPainter(new TextureBackdropPainter(dark));
+            form.getUnselectedStyle().setBgTransparency((byte) 0xff);
+        }
         if (!annotations.isEmpty()) {
             form.setGlassPane(new AnnotationPainter(annotations, dark));
             SpanLabel legend = buildLegend();
@@ -352,6 +371,72 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
                 g.fillRect(labelX - 2, labelY - 1, textW + 4, textH + 2);
                 g.setColor(edgeColor);
                 g.drawString(label, labelX, labelY);
+            }
+
+            g.setAlpha(prevAlpha);
+            g.setColor(prevColor);
+        }
+    }
+
+    /**
+     * Diagonal-stripe texture backdrop. Bright alternating bands behind
+     * the Form so a translucent widget above (Dialog, pill Tabs,
+     * PopupContent) reveals its see-through tint in the screenshot
+     * instead of painting over a plain surface that would make the
+     * translucency invisible.
+     */
+    private static final class TextureBackdropPainter implements Painter {
+        private final boolean dark;
+
+        TextureBackdropPainter(boolean dark) {
+            this.dark = dark;
+        }
+
+        @Override
+        public void paint(Graphics g, Rectangle rect) {
+            int prevColor = g.getColor();
+            int prevAlpha = g.getAlpha();
+            int x = rect.getX();
+            int y = rect.getY();
+            int w = rect.getWidth();
+            int h = rect.getHeight();
+
+            // Base fill - a neutral mid-tone so stripes have somewhere
+            // to sit. Dark mode uses a dark base, light uses a light base.
+            g.setAlpha(255);
+            g.setColor(dark ? 0x202030 : 0xf0e8f8);
+            g.fillRect(x, y, w, h);
+
+            // Diagonal stripes painted as rotated rectangles. 6mm-ish band
+            // width reads well at phone resolution. Palette is kept
+            // saturated so even a 10% translucent widget's tint is clearly
+            // picked up against it.
+            int pxPerMm = Math.max(1, Display.getInstance().convertToPixels(1f));
+            int bandW = pxPerMm * 6;
+            int[] lightPalette = { 0xff7eb2, 0x7ec8ff, 0xffd67e, 0x9affc8, 0xd8a0ff };
+            int[] darkPalette  = { 0x882244, 0x224488, 0x886622, 0x226644, 0x664488 };
+            int[] palette = dark ? darkPalette : lightPalette;
+            g.setAlpha(180);
+            int diagonalOffset = -h; // start off-screen so the pattern fills
+            int band = 0;
+            while (diagonalOffset < w + h) {
+                g.setColor(palette[band % palette.length]);
+                // diagonal band = a quad from (diagonalOffset, 0) to
+                // (diagonalOffset + bandW, 0) down to (diagonalOffset + bandW + h, h)
+                // / (diagonalOffset + h, h). Approximate with scanlines so
+                // this stays portable across ports that may lack fillPolygon.
+                for (int row = 0; row < h; row++) {
+                    int x0 = x + diagonalOffset + row;
+                    int x1 = x0 + bandW;
+                    if (x1 < x || x0 > x + w) {
+                        continue;
+                    }
+                    if (x0 < x) x0 = x;
+                    if (x1 > x + w) x1 = x + w;
+                    g.fillRect(x0, y + row, x1 - x0, 1);
+                }
+                diagonalOffset += bandW;
+                band++;
             }
 
             g.setAlpha(prevAlpha);

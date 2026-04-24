@@ -218,6 +218,23 @@ Material does not).
 |`true`
 |-
 |iOS-only. Leaves room for the status bar under the TitleArea.
+
+|`@checkBoxCheckedIconInt` / `@checkBoxUncheckedIconInt`
+|`E86C` (CHECK_CIRCLE) / +
+`E92D` (CHECK_CIRCLE_OUTLINE)
+|unset (Material square)
+|Integer Material icon codepoints used for the CheckBox glyph when
+no `checkBoxSelectedImage` is supplied. iOS modern swaps in circular
+marks (Reminders-app aesthetic); Android keeps the default square
+Material check-box.
+
+|`@radioCheckedIconInt` / `@radioUncheckedIconInt`
+|`E837` / `E836` +
+(RADIO_BUTTON_*)
+|unset (default circles)
+|Same pattern for RadioButton. Both defaults are circles; themes
+can swap in custom Material codepoints if the platform look calls
+for something different.
 |===
 
 === Styled UIIDs
