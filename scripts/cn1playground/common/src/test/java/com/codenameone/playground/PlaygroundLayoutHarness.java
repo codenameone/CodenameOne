@@ -86,15 +86,51 @@ public final class PlaygroundLayoutHarness {
         failures += expectPresent(label, form, "PlaygroundTopBar", "PlaygroundTopBarDark");
         failures += expectPresent(label, form, "PlaygroundAppIcon", "PlaygroundAppIconDark");
         if (mobile) {
-            // On mobile the segmented top-tab control container is tagged with
-            // PlaygroundSegment{,Dark}, and the bottom nav with PlaygroundBottomNav.
             failures += expectPresent(label, form, "PlaygroundSegment", "PlaygroundSegmentDark");
-            failures += expectPresent(label, form, "PlaygroundBottomNav", "PlaygroundBottomNavDark");
+            Component nav = expectFound(label, form, "PlaygroundBottomNav", "PlaygroundBottomNavDark");
+            if (nav != null) {
+                failures += expectPresent(label, form, "PlaygroundBottomNav", "PlaygroundBottomNavDark");
+                // Every bottom nav should carry three child buttons (Samples,
+                // Inspector, History). A present container with zero usable
+                // children is a regression the simple presence check misses.
+                int itemCount = countVisibleItems(nav);
+                if (itemCount != 3) {
+                    System.err.println("[" + label + "] PlaygroundBottomNav expected 3 visible items, got " + itemCount);
+                    failures++;
+                } else {
+                    System.out.println("[" + label + "] PlaygroundBottomNav item count OK (3)");
+                }
+            } else {
+                failures++;
+            }
         } else {
             failures += expectPresent(label, form, "PlaygroundActivityBar", "PlaygroundActivityBarDark");
         }
         CN1Playground.testOnlyForceLayout = CN1Playground.LAYOUT_NONE;
         return failures;
+    }
+
+    private static int countVisibleItems(Component root) {
+        if (!(root instanceof Container)) {
+            return 0;
+        }
+        Container c = (Container) root;
+        int n = 0;
+        for (int i = 0; i < c.getComponentCount(); i++) {
+            Component child = c.getComponentAt(i);
+            if (child.isVisible() && !child.isHidden() && child.getWidth() > 0 && child.getHeight() > 0) {
+                n++;
+            }
+        }
+        return n;
+    }
+
+    private static Component expectFound(String scenario, Form form, String... uiids) {
+        Component found = findByUiid(form, uiids);
+        if (found == null) {
+            System.err.println("[" + scenario + "] " + uiids[0] + " NOT FOUND in form tree");
+        }
+        return found;
     }
 
     private static int expectPresent(String scenario, Form form, String... uiids) {

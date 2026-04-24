@@ -324,7 +324,22 @@ public class CN1Playground extends Lifecycle {
             layout = testOnlyForceLayout;
         } else {
             Display d = Display.getInstance();
-            layout = d.isDesktop() ? LAYOUT_DESKTOP : d.isTablet() ? LAYOUT_TABLET : LAYOUT_MOBILE;
+            // Viewport-width breakpoints override Display's platform-capability
+            // flags so a narrowed desktop browser correctly falls into the
+            // mobile shell (< ~720 CSS px) instead of always showing the
+            // desktop chrome because isDesktop() is true.
+            float pxPerMm = d.convertToPixels(1f);
+            if (pxPerMm < 0.1f) {
+                pxPerMm = 4f;
+            }
+            float widthMm = d.getDisplayWidth() / pxPerMm;
+            if (widthMm < 190f) {
+                layout = LAYOUT_MOBILE;
+            } else if (widthMm < 291f || d.isTablet()) {
+                layout = LAYOUT_TABLET;
+            } else {
+                layout = LAYOUT_DESKTOP;
+            }
         }
         if (layout == lastLayout) {
             return;
