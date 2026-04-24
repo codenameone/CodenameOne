@@ -100,6 +100,7 @@ public final class PlaygroundLayoutHarness {
                 } else {
                     System.out.println("[" + label + "] PlaygroundBottomNav item count OK (3)");
                 }
+                failures += verifyBottomNavItems(label, nav);
             } else {
                 failures++;
             }
@@ -123,6 +124,42 @@ public final class PlaygroundLayoutHarness {
             }
         }
         return n;
+    }
+
+    /// Verifies each bottom-nav child has either an icon OR non-empty text.
+    /// An empty Button with zero rendering is a common way the bottom nav can
+    /// look "completely gone" even when the container reports 3 children.
+    private static int verifyBottomNavItems(String scenario, Component nav) {
+        if (!(nav instanceof Container)) {
+            return 1;
+        }
+        Container c = (Container) nav;
+        int failures = 0;
+        String[] expectedKeys = new String[]{"samples", "inspector", "history"};
+        int seen = 0;
+        for (int i = 0; i < c.getComponentCount(); i++) {
+            Component child = c.getComponentAt(i);
+            if (!(child instanceof com.codename1.ui.Button)) {
+                continue;
+            }
+            com.codename1.ui.Button btn = (com.codename1.ui.Button) child;
+            Object keyObj = btn.getClientProperty("navKey");
+            String text = btn.getText();
+            boolean hasIcon = btn.getIcon() != null;
+            boolean hasText = text != null && text.length() > 0;
+            if (!hasIcon && !hasText) {
+                System.err.println("[" + scenario + "] bottom-nav item " + i + " (key=" + keyObj
+                        + ") has no icon and no text");
+                failures++;
+            }
+            seen++;
+        }
+        if (seen < expectedKeys.length) {
+            System.err.println("[" + scenario + "] bottom-nav expected " + expectedKeys.length
+                    + " Button children, got " + seen);
+            failures++;
+        }
+        return failures;
     }
 
     private static Component expectFound(String scenario, Form form, String... uiids) {
