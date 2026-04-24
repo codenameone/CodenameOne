@@ -144,6 +144,16 @@ public class CN1Playground extends Lifecycle {
 
         editor = new PlaygroundBrowserEditor(PlaygroundBrowserEditor.Mode.JAVA, currentScript, websiteDarkMode, this::handleSourceChanged);
         cssEditor = new PlaygroundBrowserEditor(PlaygroundBrowserEditor.Mode.CSS, currentCss, websiteDarkMode, this::handleCssChanged);
+        // Hide both editors at construction. HTML5Peer adds the iframe to the
+        // DOM immediately in the BrowserComponent constructor; with
+        // removeOnDeinitialize=false the iframe never leaves even when the
+        // Component isn't in the CN1 tree. Without explicit setVisible(false),
+        // the unused editor's iframe sits at undefined (often full-screen)
+        // CSS bounds and paints above everything, including the bottom nav.
+        // attachEditorsToHost flips setVisible(true) on whichever editor is
+        // currently active.
+        editor.getComponent().setVisible(false);
+        cssEditor.getComponent().setVisible(false);
         inspector = new PlaygroundInspector(websiteDarkMode, (component, property, value) -> handlePropertyChanged(component));
 
         topBar = new PlaygroundTopBar(currentMode, websiteDarkMode, new PlaygroundTopBar.Actions() {
@@ -225,7 +235,6 @@ public class CN1Playground extends Lifecycle {
 
         appForm.show();
         notifyWebsiteUiReady();
-        installIframeBottomGuard();
 
         UITimer.timer(150, false, appForm, () -> {
             lastLayout = LAYOUT_NONE;
@@ -243,36 +252,6 @@ public class CN1Playground extends Lifecycle {
         });
     }
 
-    /// On the HTML5 port the Monaco editor's iframe is a DOM peer that paints
-    /// above the CN1 canvas. When the viewport is below the mobile breakpoint,
-    /// the iframe's peer bounds can overshoot the editor's Java component
-    /// bounds and cover the bottom-nav band drawn on the canvas underneath.
-    ///
-    /// Mitigation: inject a global stylesheet that caps iframe max-height to
-    /// `calc(100vh - MOBILE_NAV_GUARD_PX)` so no iframe, regardless of its
-    /// peer-positioning logic, can extend into the bottom band reserved for
-    /// the Samples / Inspector / History buttons. Only applies on mobile;
-    /// removed when the layout is tablet or desktop.
-    private static final int MOBILE_NAV_GUARD_PX = 64;
-
-    private void installIframeBottomGuard() {
-        BrowserComponent js = CN.getSharedJavascriptContext();
-        if (js == null) {
-            return;
-        }
-        js.execute(
-                "callback.onSuccess((function(){"
-                        + "try {"
-                        + "var id='cn1-playground-iframe-guard';"
-                        + "var s=document.getElementById(id);"
-                        + "if(!s){s=document.createElement('style');s.id=id;document.head.appendChild(s);}"
-                        + "s.textContent='@media (max-width: 720px){iframe{max-height:calc(100vh - " + MOBILE_NAV_GUARD_PX + "px) !important;}}';"
-                        + "} catch(e){}"
-                        + "return true;"
-                        + "})())",
-                res -> {}
-        );
-    }
 
     @Override
     protected void handleNetworkError(NetworkEvent err) {
@@ -531,6 +510,7 @@ public class CN1Playground extends Lifecycle {
         // later, but this keeps the mobile flow functional.
         Component mobilePanel = mobilePanelFor(currentActivity);
         if (mobilePanel != null) {
+            hideAllEditors();
             safeAddCenter(tabContent, mobilePanel);
             if (tabContent.getComponentForm() != null) {
                 tabContent.revalidate();
@@ -545,6 +525,7 @@ public class CN1Playground extends Lifecycle {
                 safeAddCenter(tabContent, editorHost);
                 break;
             case MOBILE_TAB_PREVIEW:
+                hideAllEditors();
                 if (previewColumn.getParent() != previewContainer) {
                     detach(previewColumn);
                     previewContainer.removeAll();
@@ -590,8 +571,30 @@ public class CN1Playground extends Lifecycle {
         detach(active);
         detach(other);
         editorHost.add(BorderLayout.CENTER, active);
+        // HTML5Peer for BrowserComponent keeps the iframe in the DOM across
+        // detach (because we set HTML5Peer.removeOnDeinitialize=false to
+        // preserve Monaco editor state). When a BrowserComponent is not
+        // currently in the CN1 tree, the peer has no Java bounds to sync
+        // against and its iframe sits at whatever CSS it was last given --
+        // typically covering everything including the bottom nav.
+        // setVisible(false) on the Component propagates to the peer and
+        // makes its iframe `display: none`, reliably removing it from the
+        // compositor until the Component is re-attached.
+        active.setVisible(true);
+        other.setVisible(false);
         if (editorHost.getComponentForm() != null) {
             editorHost.revalidate();
+        }
+    }
+
+    /// Mobile tab switch and bottom-nav panel open need the editor iframes
+    /// hidden entirely so neither's peer DOM covers the nav / preview / panel.
+    private void hideAllEditors() {
+        if (editor != null) {
+            editor.getComponent().setVisible(false);
+        }
+        if (cssEditor != null) {
+            cssEditor.getComponent().setVisible(false);
         }
     }
 
