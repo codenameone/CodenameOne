@@ -85,6 +85,7 @@ Button {
     font-family: "native:MainRegular";
     background-color: transparent;
     border-radius: 3mm;
+    text-align: center;
 }
 Button.pressed { color: #0064d1; background-color: #e5e5ea; }
 Button.disabled { color: #b3d4ff; }
@@ -94,8 +95,9 @@ RaisedButton {
     color: #ffffff;
     background-color: #007aff;
     border-radius: 3mm;
+    text-align: center;
 }
-RaisedButton.pressed { background-color: #0064d1; }
+RaisedButton.pressed { color: #ffffff; background-color: #0064d1; }
 RaisedButton.disabled { background-color: #b3d4ff; color: #ffffff; }
 
 FlatButton { cn1-derive: Button; }
@@ -134,6 +136,7 @@ CheckBox {
     padding: 1mm 2mm 1mm 2mm;
     margin: 0;
     font-family: "native:MainRegular";
+    icon-gap: 2mm;
 }
 CheckBox.selected { color: #007aff; }
 CheckBox.disabled { color: #c7c7cc; background-color: #e5e5ea; }
@@ -144,6 +147,7 @@ RadioButton {
     padding: 1mm 2mm 1mm 2mm;
     margin: 0;
     font-family: "native:MainRegular";
+    icon-gap: 2mm;
 }
 RadioButton.selected { color: #007aff; }
 RadioButton.disabled { color: #c7c7cc; background-color: #e5e5ea; }
@@ -199,16 +203,19 @@ TitleCommand { cn1-derive: Button; color: #007aff; padding: 1mm 2mm 1mm 2mm; }
 
 /* iOS 26 tab-bar look: the TabsContainer is the visible pill group
    hugging the bottom edge, with individual tabs rendered as
-   transparent hits inside it. The pill is semi-opaque white in
-   light mode (approximates frosted glass without a real backdrop
-   filter - closest we can get inside the CEF-free subset). */
+   transparent hits inside it. cn1-pill-border draws a true pill
+   (fully-rounded ends) independent of the container height, which
+   matches Apple's spec better than a fixed-radius rounded-rect.
+   The solid surface-container fill approximates frosted glass
+   inside the CEF-free subset; a real backdrop-filter is a
+   separate future PR (see native-themes/README.md). */
 Tabs { background-color: transparent; padding: 1mm 2mm 2mm 2mm; margin: 0; }
 TabsContainer {
     background-color: #f2f2f7;
     color: #000000;
     padding: 1mm;
     margin: 2mm 3mm 2mm 3mm;
-    border-radius: 5mm;
+    cn1-background-type: cn1-pill-border;
 }
 
 Tab {
@@ -219,8 +226,8 @@ Tab {
     font-family: "native:MainRegular";
     text-align: center;
 }
-Tab.selected { color: #007aff; background-color: #ffffff; border-radius: 4mm; }
-Tab.pressed { color: #0064d1; background-color: #e5e5ea; border-radius: 4mm; }
+Tab.selected { color: #007aff; background-color: #ffffff; cn1-background-type: cn1-pill-border; }
+Tab.pressed { color: #0064d1; background-color: #e5e5ea; cn1-background-type: cn1-pill-border; }
 
 SelectedTab { cn1-derive: Tab; color: #007aff; }
 UnselectedTab { cn1-derive: Tab; color: #3c3c43; }
@@ -372,12 +379,15 @@ PopupContent {
     MultiLine3 { color: #8e8e93; }
     MultiLine4 { color: #8e8e93; }
 
-    Dialog { background-color: #1c1c1e; color: #ffffff; }
-    DialogBody { background-color: #1c1c1e; color: #ffffff; }
-    DialogTitle { color: #ffffff; background-color: #1c1c1e; }
-    DialogContentPane { background-color: #1c1c1e; }
-    DialogCommandArea { background-color: #1c1c1e; }
-    PopupContent { background-color: #1c1c1e; color: #ffffff; }
+    /* Dialog sits visibly above the dark form (#1c1c1e) on an
+       elevated surface (#2c2c2e) so it doesn't blend into the
+       background. All dialog sub-UIIDs share the same fill. */
+    Dialog { background-color: #2c2c2e; color: #ffffff; }
+    DialogBody { background-color: #2c2c2e; color: #ffffff; }
+    DialogTitle { color: #ffffff; background-color: #2c2c2e; }
+    DialogContentPane { background-color: #2c2c2e; }
+    DialogCommandArea { background-color: #2c2c2e; }
+    PopupContent { background-color: #2c2c2e; color: #ffffff; }
 
     FloatingActionButton { color: #ffffff; background-color: #0a84ff; }
     FloatingActionButton.pressed { background-color: #64b1ff; }
