@@ -348,6 +348,143 @@ void CN1MetalDrawImage(id<MTLTexture> texture, int alpha, int x, int y, int widt
     drawQuad(CN1MetalPipelineTexturedRGBA, vertices, texcoords, tint, texture);
 }
 
+// --------------- Text rendering (parity level) ---------------
+
+// LRU cache mapping "str|font|color" -> {MTLTexture, stringWidth, stringHeight,
+// p2w, p2h}. Capped so long-running apps don't leak memory. Phase 4 will
+// replace this with a CoreText glyph atlas; this whole-string cache is a
+// direct port of what DrawStringTextureCache does on the GL path.
+#define CN1_METAL_TEXT_CACHE_MAX 128
+typedef struct {
+    NSString *key;
+    id<MTLTexture> texture;
+    int strWidth;
+    int strHeight;
+    int p2w;
+    int p2h;
+} CN1MetalTextCacheEntry;
+static CN1MetalTextCacheEntry textCache[CN1_METAL_TEXT_CACHE_MAX];
+static int textCacheCount = 0;
+static int textCacheNextEvict = 0;
+
+static int nextPowerOf2ForText(int v) {
+    int p = 1;
+    while (p < v) p <<= 1;
+    return p;
+}
+
+static CN1MetalTextCacheEntry *findOrBuildTextTexture(NSString *str, UIFont *font, int color) {
+    NSString *key = [NSString stringWithFormat:@"%@|%p|%08x", str, font, color];
+    for (int i = 0; i < textCacheCount; i++) {
+        if ([textCache[i].key isEqualToString:key]) {
+            return &textCache[i];
+        }
+    }
+    // Not cached — rasterise. Measure via sizeWithAttributes (sizeWithFont:
+    // was deprecated long ago; the GL path still uses it, but UIKit prints
+    // a warning on newer SDKs. Keep the same measurement for consistency).
+    NSDictionary *attrs = @{ NSFontAttributeName: font };
+    CGSize sz = [str sizeWithAttributes:attrs];
+    int w = (int)ceilf((float)sz.width);
+    int h = (int)ceilf((float)font.lineHeight + 1.0f);
+    if (w <= 0 || h <= 0) return NULL;
+    int p2w = nextPowerOf2ForText(w);
+    int p2h = nextPowerOf2ForText(h);
+
+    // Rasterise into an RGBA bitmap with the colour baked in (same scheme
+    // as DrawString.m's GL branch -- fragment shader just modulates alpha).
+    CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
+    size_t bytesPerRow = 4 * (size_t)p2w;
+    void *bitmap = calloc((size_t)p2h * bytesPerRow, 1);
+    CGContextRef ctx = CGBitmapContextCreate(bitmap, p2w, p2h, 8, bytesPerRow, cs,
+        kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big);
+    CGColorSpaceRelease(cs);
+
+    // UIGraphicsPushContext only sets the current context; it does NOT flip
+    // the CTM. Without a flip, UIKit's drawAtPoint: targets CG (0,0) which
+    // is the bottom of the bitmap, and characters render upside-down in
+    // buffer memory. The GL path tolerates that because its texcoords use
+    // V=1 at the top vertex and sample bottom-to-top; Metal's V=0-at-top
+    // convention doesn't compensate. Apply a y-axis flip so text ends up
+    // at the TOP-LEFT of the buffer, right-side-up, matching the texcoords
+    // I use in CN1MetalDrawString below.
+    CGContextTranslateCTM(ctx, 0, p2h);
+    CGContextScaleCTM(ctx, 1, -1);
+    UIGraphicsPushContext(ctx);
+    UIColor *uiColor = [UIColor colorWithRed:((color >> 16) & 0xff)/255.0f
+                                       green:((color >> 8)  & 0xff)/255.0f
+                                        blue:((color)       & 0xff)/255.0f
+                                       alpha:1.0f];
+    [uiColor set];
+    [str drawAtPoint:CGPointZero withAttributes:@{ NSFontAttributeName: font,
+                                                   NSForegroundColorAttributeName: uiColor }];
+    UIGraphicsPopContext();
+
+    id<MTLDevice> device = CN1MetalDevice();
+    if (device == nil) {
+        CGContextRelease(ctx);
+        free(bitmap);
+        return NULL;
+    }
+    MTLTextureDescriptor *desc = [MTLTextureDescriptor
+        texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm
+        width:p2w height:p2h mipmapped:NO];
+    desc.usage = MTLTextureUsageShaderRead;
+    id<MTLTexture> tex = [device newTextureWithDescriptor:desc];
+    [tex replaceRegion:MTLRegionMake2D(0, 0, p2w, p2h)
+           mipmapLevel:0
+             withBytes:bitmap
+           bytesPerRow:bytesPerRow];
+
+    CGContextRelease(ctx);
+    free(bitmap);
+
+    // Cache with simple round-robin eviction.
+    int slot;
+    if (textCacheCount < CN1_METAL_TEXT_CACHE_MAX) {
+        slot = textCacheCount++;
+    } else {
+        slot = textCacheNextEvict;
+        textCacheNextEvict = (textCacheNextEvict + 1) % CN1_METAL_TEXT_CACHE_MAX;
+        textCache[slot].key = nil;
+        textCache[slot].texture = nil;
+    }
+    textCache[slot].key = [key copy];
+    textCache[slot].texture = tex;
+    textCache[slot].strWidth = w;
+    textCache[slot].strHeight = h;
+    textCache[slot].p2w = p2w;
+    textCache[slot].p2h = p2h;
+    return &textCache[slot];
+}
+
+void CN1MetalDrawString(NSString *str, UIFont *font, int color, int alpha, int x, int y) {
+    if (str == nil || font == nil || str.length == 0) return;
+    CN1MetalTextCacheEntry *entry = findOrBuildTextTexture(str, font, color);
+    if (entry == NULL || entry->texture == nil) return;
+
+    // Texture-coord region: the text occupies the top-left (w,h) of a
+    // power-of-two bitmap. In Metal, tex (0,0) is the top-left, so we
+    // sample the rectangle [0, 0] .. [w/p2w, h/p2h].
+    float a = alpha / 255.0f;
+    simd_float4 tint = (simd_float4){ a, a, a, a };
+    float vertices[8] = {
+        (float)x,                      (float)y,
+        (float)(x + entry->strWidth),  (float)y,
+        (float)x,                      (float)(y + entry->strHeight),
+        (float)(x + entry->strWidth),  (float)(y + entry->strHeight)
+    };
+    float uMax = (float)entry->strWidth / (float)entry->p2w;
+    float vMax = (float)entry->strHeight / (float)entry->p2h;
+    float texcoords[8] = {
+        0.0f, 0.0f,
+        uMax, 0.0f,
+        0.0f, vMax,
+        uMax, vMax
+    };
+    drawQuad(CN1MetalPipelineTexturedRGBA, vertices, texcoords, tint, entry->texture);
+}
+
 // --------------- Texture helpers ---------------
 
 id<MTLTexture> CN1MetalTextureFromUIImage(UIImage *image) {

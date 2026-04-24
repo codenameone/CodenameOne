@@ -145,6 +145,13 @@ void CN1MetalFillPolygon(const float *xCoords, const float *yCoords, int num,
 // only for the current command buffer.
 void CN1MetalDrawImage(id<MTLTexture> texture, int alpha, int x, int y, int width, int height);
 
+// Draw a string at (x,y). The string is rasterised via CoreGraphics into
+// an RGBA MTLTexture with the colour baked in (matching the GL path's
+// approach) and then rendered as a textured quad with alpha modulation.
+// A small LRU cache keyed on (str, font, color) avoids re-rasterising per
+// frame. Phase 4 will replace this with a CoreText glyph atlas.
+void CN1MetalDrawString(NSString *str, UIFont *font, int color, int alpha, int x, int y);
+
 // -------- Texture helpers for GLUIImage --------
 
 // Lazily build an MTLTexture from a UIImage. Cached on the GLUIImage.
