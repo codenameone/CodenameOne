@@ -220,8 +220,7 @@ class JavascriptTargetIntegrationTest {
         Path distDir = outputDir.resolve("dist").resolve("JsStraightLine-js");
         String translatedApp = new String(Files.readAllBytes(distDir.resolve("translated_app.js")), StandardCharsets.UTF_8);
 
-        String marker = "function* cn1_JsStraightLine_add_int_int_R_int__impl(__cn1Arg1, __cn1Arg2){";
-        int start = translatedApp.indexOf(marker);
+        int start = findFunctionStart(translatedApp, "cn1_JsStraightLine_add_int_int_R_int__impl", "(__cn1Arg1, __cn1Arg2)");
         assertTrue(start >= 0, "Straight-line fixture should emit the add() method");
         int end = translatedApp.indexOf("\n}\n", start);
         assertTrue(end > start, "Straight-line fixture should have a bounded method body");
@@ -329,8 +328,10 @@ class JavascriptTargetIntegrationTest {
         Path distDir = outputDir.resolve("dist").resolve("JsStaticAccess-js");
         String translatedApp = new String(Files.readAllBytes(distDir.resolve("translated_app.js")), StandardCharsets.UTF_8);
 
-        String marker = "function* cn1_JsStaticAccess_twice_R_int__impl(){";
-        int start = translatedApp.indexOf(marker);
+        // twice() has no virtual/interface dispatch and no intrinsic
+        // suspension, so the CHA analysis emits it as a plain
+        // ``function`` rather than ``function*``. Accept either form.
+        int start = findFunctionStart(translatedApp, "cn1_JsStaticAccess_twice_R_int__impl", "()");
         assertTrue(start >= 0, "Static access fixture should emit the twice() method");
         int end = translatedApp.indexOf("\n}\n", start);
         assertTrue(end > start, "Static access fixture should have a bounded method body");
@@ -360,17 +361,27 @@ class JavascriptTargetIntegrationTest {
         Path distDir = outputDir.resolve("dist").resolve("JsStaticAccessFlow-js");
         String translatedApp = new String(Files.readAllBytes(distDir.resolve("translated_app.js")), StandardCharsets.UTF_8);
 
-        String marker = "function* cn1_JsStaticAccessFlow_pick_int_R_int__impl(__cn1Arg1){";
-        int start = translatedApp.indexOf(marker);
+        int start = findFunctionStart(translatedApp, "cn1_JsStaticAccessFlow_pick_int_R_int__impl", "(__cn1Arg1)");
         assertTrue(start >= 0, "Interpreter static access fixture should emit the pick() method");
         int end = translatedApp.indexOf("\n}\n", start);
         assertTrue(end > start, "Interpreter static access fixture should have a bounded method body");
         String methodBody = translatedApp.substring(start, end);
 
-        assertTrue(methodBody.contains("const __cn1Init = Object.create(null);"),
-                "Interpreter mode should allocate a method-level static init cache when static fields are used");
-        assertTrue(methodBody.contains("if (!__cn1Init[\"JsStaticAccessFlow\"]) { jvm.ensureClassInitialized(\"JsStaticAccessFlow\"); __cn1Init[\"JsStaticAccessFlow\"] = true; }"),
-                "Interpreter mode should guard repeated static field access behind the method-level init cache");
+        // The per-method ``__cn1Init`` cache was dropped in favour of a
+        // single ``_I(cls)`` call in the public wrapper: the ``__impl``
+        // body runs only through that wrapper (or through another method
+        // on the same class / ancestor, which the JVM spec guarantees is
+        // already initialised). Verify the wrapper still guards entry.
+        int wrapperStart = findFunctionStart(translatedApp, "cn1_JsStaticAccessFlow_pick_int_R_int", "(__cn1Arg1)");
+        assertTrue(wrapperStart >= 0,
+                "Interpreter static access fixture should emit a public pick() wrapper around pick()__impl");
+        int wrapperEnd = translatedApp.indexOf("\n}\n", wrapperStart);
+        assertTrue(wrapperEnd > wrapperStart,
+                "Interpreter static access fixture wrapper should have a bounded body");
+        String wrapperBody = translatedApp.substring(wrapperStart, wrapperEnd);
+        assertTrue(wrapperBody.contains("_I(\"JsStaticAccessFlow\")")
+                        || wrapperBody.contains("jvm.ensureClassInitialized(\"JsStaticAccessFlow\")"),
+                "Interpreter static access wrapper should guard class init before delegating to __impl");
     }
 
     @ParameterizedTest
@@ -392,22 +403,22 @@ class JavascriptTargetIntegrationTest {
         Path distDir = outputDir.resolve("dist").resolve("JsStaticInvokeFlow-js");
         String translatedApp = new String(Files.readAllBytes(distDir.resolve("translated_app.js")), StandardCharsets.UTF_8);
 
-        String callerMarker = "function* cn1_JsStaticInvokeFlow_pick_int_R_int__impl(__cn1Arg1){";
-        int callerStart = translatedApp.indexOf(callerMarker);
+        int callerStart = findFunctionStart(translatedApp, "cn1_JsStaticInvokeFlow_pick_int_R_int__impl", "(__cn1Arg1)");
         assertTrue(callerStart >= 0, "Static invoke fixture should emit an internal implementation for pick()");
         int callerEnd = translatedApp.indexOf("\n}\n", callerStart);
         assertTrue(callerEnd > callerStart, "Static invoke fixture should have a bounded pick() body");
         String callerBody = translatedApp.substring(callerStart, callerEnd);
 
-        assertTrue(callerBody.contains("const __cn1Init = Object.create(null);"),
-                "Interpreter static invoke caller should allocate a method-level init cache");
-        assertTrue(callerBody.contains("typeof cn1_JsStaticInvokeFlow_helper_R_int__impl === \"function\" ? cn1_JsStaticInvokeFlow_helper_R_int__impl : cn1_JsStaticInvokeFlow_helper_R_int"),
-                "Static invoke caller should target the internal implementation when available");
-        assertTrue(callerBody.contains("if (!__cn1Init[\"JsStaticInvokeFlow\"]) { jvm.ensureClassInitialized(\"JsStaticInvokeFlow\"); __cn1Init[\"JsStaticInvokeFlow\"] = true; }"),
-                "Static invoke caller should guard repeated class init through the method-level cache");
+        // Method-level ``__cn1Init`` cache removed; class-init for the
+        // containing class is elided entirely inside ``pick()`` because
+        // the JVM spec guarantees JsStaticAccessFlow's clinit has run by
+        // the time any of its methods execute. What matters is that the
+        // caller reaches the internal ``__impl`` body directly (no
+        // redundant wrapper that would re-run class init).
+        assertTrue(callerBody.contains("cn1_JsStaticInvokeFlow_helper_R_int__impl"),
+                "Static invoke caller should target the internal __impl implementation");
 
-        String calleeMarker = "function* cn1_JsStaticInvokeFlow_helper_R_int__impl(){";
-        int calleeStart = translatedApp.indexOf(calleeMarker);
+        int calleeStart = findFunctionStart(translatedApp, "cn1_JsStaticInvokeFlow_helper_R_int__impl", "()");
         assertTrue(calleeStart >= 0, "Static invoke fixture should emit an internal implementation for helper()");
         int calleeEnd = translatedApp.indexOf("\n}\n", calleeStart);
         assertTrue(calleeEnd > calleeStart, "Static invoke fixture should have a bounded helper() body");
@@ -436,20 +447,23 @@ class JavascriptTargetIntegrationTest {
         Path distDir = outputDir.resolve("dist").resolve("JsVirtualInvokeFlow-js");
         String translatedApp = new String(Files.readAllBytes(distDir.resolve("translated_app.js")), StandardCharsets.UTF_8);
 
-        String marker = "function* cn1_JsVirtualInvokeFlow_repeat_JsVirtualInvokeBase_int_R_int__impl(__cn1Arg1, __cn1Arg2){";
-        int start = translatedApp.indexOf(marker);
+        int start = findFunctionStart(translatedApp, "cn1_JsVirtualInvokeFlow_repeat_JsVirtualInvokeBase_int_R_int__impl", "(__cn1Arg1, __cn1Arg2)");
         assertTrue(start >= 0, "Virtual invoke fixture should emit the repeat() method");
         int end = translatedApp.indexOf("\n}\n", start);
         assertTrue(end > start, "Virtual invoke fixture should have a bounded repeat() body");
         String methodBody = translatedApp.substring(start, end);
 
-        assertTrue(methodBody.contains("const __cn1Virtual = Object.create(null);"),
-                "Interpreter-mode virtual dispatch should allocate a per-method cache");
-        assertTrue(methodBody.contains("const __cacheKey = __target.__class + \"|cn1_JsVirtualInvokeBase_value_R_int\";"),
-                "Virtual dispatch cache should key on runtime class and method id");
-        assertTrue(methodBody.contains("__method = __cn1Virtual[__cacheKey];")
-                        && methodBody.contains("__cn1Virtual[__cacheKey] = __method;"),
-                "Virtual dispatch cache should store and reuse resolved fallback methods");
+        // The per-method ``__cn1Virtual`` cache and its className|methodId
+        // cache-key pattern moved to a global ``resolvedVirtualCache`` on
+        // the runtime (see jvm.resolveVirtual in parparvm_runtime.js) —
+        // one cache per running app rather than one per emitted method.
+        // The bytecode-level INVOKEVIRTUAL emission simply calls the
+        // ``cn1_iv*`` helper, which consults the runtime cache. Assert
+        // that virtual dispatch still runs through that helper family.
+        assertTrue(methodBody.contains("cn1_iv0(") || methodBody.contains("cn1_iv1(")
+                        || methodBody.contains("cn1_iv2(") || methodBody.contains("cn1_iv3(")
+                        || methodBody.contains("cn1_iv4(") || methodBody.contains("cn1_ivN("),
+                "Interpreter-mode virtual dispatch should route through the cn1_iv* helper family");
     }
 
     static void compileAgainstJavaApi(CompilerHelper.CompilerConfig config, Path sourceDir, Path classesDir, Path javaApiDir) throws Exception {
@@ -517,6 +531,24 @@ class JavascriptTargetIntegrationTest {
         } finally {
             Parser.cleanup();
         }
+    }
+
+    /**
+     * Locate a translated method's body entry given its identifier and
+     * parameter list. Accepts either the ``function* name(args){`` or
+     * ``function name(args){`` shape — the JS suspension analysis may
+     * classify a method as synchronous and emit the non-generator form.
+     * Returns the index of the first character (``f`` of ``function``)
+     * or ``-1`` if neither form is found.
+     */
+    static int findFunctionStart(String translatedApp, String identifier, String parameterList) {
+        String generator = "function* " + identifier + parameterList + "{";
+        int idx = translatedApp.indexOf(generator);
+        if (idx >= 0) {
+            return idx;
+        }
+        String plain = "function " + identifier + parameterList + "{";
+        return translatedApp.indexOf(plain);
     }
 
     static String loadFixture(String name) throws Exception {

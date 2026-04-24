@@ -76,21 +76,46 @@ class JavascriptOpcodeCoverageTest {
         assertTrue(translatedApp.contains("castsAndTypes"), "Coverage fixture should translate CHECKCAST/INSTANCEOF methods");
         assertTrue(translatedApp.contains("dispatch"), "Coverage fixture should translate virtual/interface dispatch methods");
         assertTrue(translatedApp.contains("jvm.getClassObject(\"JsTypeImpl\")"), "Coverage fixture should translate class literals");
-        assertTrue(translatedApp.contains("assignableTo: {")
-                        && translatedApp.contains("\"JsTypeImpl\": true")
-                        && translatedApp.contains("\"JsTypeBase\": true")
-                        && translatedApp.contains("\"JsTypeIface\": true"),
-                "Class metadata should include static assignability information");
-        assertTrue(translatedApp.contains("const __classDef = __target.__classDef;")
-                        && translatedApp.contains("(__classDef && __classDef.methods) ? __classDef.methods["),
-                "Virtual/interface dispatch should use an exact-class method-table fast path");
-        assertTrue(translatedApp.contains("jvm.resolveVirtual(__target.__class"), "Dispatch should retain inheritance/interface fallback");
-        assertTrue(translatedApp.contains("__class !== \"JsTypeImpl\"")
-                        && translatedApp.contains("__classDef.assignableTo[\"JsTypeImpl\"]"),
-                "CHECKCAST should inline the exact-class and assignability check");
-        assertTrue(translatedApp.contains("__class === \"JsTypeImpl\"")
-                        && translatedApp.contains(".__classDef.assignableTo[\"JsTypeImpl\"]"),
-                "INSTANCEOF should inline the exact-class and assignability check");
+        // ``_Z({...})`` registers each class with the short-form
+        // metadata (``n=name``, ``b=baseClass``, ``i=interfaces``).
+        // ``assignableTo`` is populated lazily by ``defineClass`` at
+        // runtime from that base+interface graph, so the emitted
+        // source no longer contains an explicit ``assignableTo: {}``
+        // map. Verify the metadata that drives the runtime union.
+        assertTrue(translatedApp.contains("n: \"JsTypeImpl\"")
+                        && translatedApp.contains("b: \"JsTypeBase\"")
+                        && translatedApp.contains("i: [\"JsTypeIface\"]"),
+                "Class metadata should include the base/interface graph that drives runtime assignability");
+        // Virtual/interface dispatch previously inlined the classDef
+        // method-table fast path and the ``jvm.resolveVirtual`` fallback
+        // at every call site. Both now live in ``cn1_ivResolve`` inside
+        // parparvm_runtime.js — the translated app simply calls the
+        // shared ``cn1_iv*`` helper family with a (target, dispatchId)
+        // pair. Verify the call shape made it through, and that the
+        // classDef fast path + resolveVirtual fallback are still present
+        // (they migrated, not removed — see the runtime assertions).
+        assertTrue(translatedApp.contains("cn1_iv0(") || translatedApp.contains("cn1_iv1(")
+                        || translatedApp.contains("cn1_iv2(") || translatedApp.contains("cn1_iv3("),
+                "Virtual/interface dispatch should route through the cn1_iv* helper family");
+        assertTrue(runtime.contains("const classDef = target.__classDef;")
+                        && runtime.contains("classDef && classDef.methods ? classDef.methods[mid]"),
+                "Runtime virtual dispatch helper should use an exact-class method-table fast path");
+        assertTrue(runtime.contains("jvm.resolveVirtual(target.__class, mid)"),
+                "Runtime virtual dispatch helper should retain inheritance/interface fallback");
+        // CHECKCAST / INSTANCEOF used to inline the ``__class !== X &&
+        // __classDef.assignableTo[X]`` fast path at every call site. They
+        // now route through runtime helpers ``_C`` / ``_D`` (wrapping
+        // ``jvm.cC`` / ``jvm.iO`` in parparvm_runtime.js), which apply
+        // the same exact-class + assignability test but share one copy
+        // instead of repeating it at every site. Verify the translated
+        // app uses the helper and the helper still does the check.
+        assertTrue(translatedApp.contains("_C(") && translatedApp.contains("\"JsTypeImpl\""),
+                "CHECKCAST should route through the _C helper against the target type name");
+        assertTrue(translatedApp.contains("_D(") && translatedApp.contains("\"JsTypeImpl\""),
+                "INSTANCEOF should route through the _D helper against the target type name");
+        assertTrue(runtime.contains("value.__class === className")
+                        && runtime.contains("cd.assignableTo[className]"),
+                "Runtime _C/_D helpers should apply the exact-class and assignability check");
         assertTrue(!translatedApp.contains("jvm.instanceOf("),
                 "Translated object/type checks should avoid the generic runtime instanceof helper");
         assertTrue(runtime.contains("resolveVirtual(className, methodId)"), "Runtime should resolve virtual methods by class name");
@@ -101,7 +126,7 @@ class JavascriptOpcodeCoverageTest {
                         && runtime.contains("const remappedId = this.remappedMethodId(current, methodId, tail);"),
                 "Runtime virtual dispatch should cache both resolved lookups and remapped owner-specific ids");
         assertTrue(runtime.contains("obj.__classDef.assignableTo[className]"), "Runtime instanceof should use emitted class assignability tables");
-        assertTrue(runtime.contains("errorClass === entry.type || (errorClassDef && errorClassDef.assignableTo && errorClassDef.assignableTo[entry.type])"),
+        assertTrue(runtime.contains("errorClass === type || (errorClassDef && errorClassDef.assignableTo && errorClassDef.assignableTo[type])"),
                 "Runtime exception matching should use direct class and assignability checks");
         assertTrue(runtime.contains("arrayAssignableTo(componentClass, dimensions)") && runtime.contains("isPrimitiveComponent(componentClass)"),
                 "Runtime should keep array assignability limited to CN1-relevant cases");

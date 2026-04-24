@@ -2709,6 +2709,23 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                     }
                 }
             }
+            // Any non-terminal instruction whose emission keeps its
+            // ``pc = i + 1; break;`` tail implicitly jumps to ``i+1``.
+            // Safe-strip only elides that tail for non-throwing
+            // instructions, so throwing non-terminal ops (ANEWARRAY,
+            // NEW, CHECKCAST, INVOKE*, GETFIELD, PUTSTATIC, IDIV, …)
+            // always leave a runtime pc-jump to ``i+1``. Without this
+            // marker the case-merge pass assumes ``i+1`` is dead code
+            // and drops the instruction there — producing a switch
+            // whose body targets a missing case label and silently
+            // falls through to ``default:return``.
+            if (!(instr instanceof Jump) && !(instr instanceof SwitchInstruction)
+                    && !(instr instanceof LabelInstruction) && !(instr instanceof LineNumber)
+                    && !(instr instanceof LocalVariable) && !(instr instanceof TryCatch)
+                    && !isTerminatingInstruction(instr) && !isNonThrowingInstruction(instr)
+                    && i + 1 < instructions.size()) {
+                targets.add(i + 1);
+            }
         }
         return targets;
     }

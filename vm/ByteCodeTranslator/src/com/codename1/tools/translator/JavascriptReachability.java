@@ -175,6 +175,30 @@ final class JavascriptReachability {
         for (String root : RUNTIME_ROOT_CLASSES) {
             markClassInstantiated(root);
         }
+        // Thread.start() is a native stub that goes through ``jvm.spawn``
+        // on the JS runtime side. The runtime drives ``Thread.run()`` as
+        // a generator but that edge is invisible to bytecode-only RTA —
+        // main never literally invokes ``thread.run()``. Seed it so the
+        // Thread.run()V dispatch stays live, which in turn keeps every
+        // user-supplied ``Runnable.run()V`` (anonymous or otherwise)
+        // reachable via the INVOKEINTERFACE inside Thread.run()'s body.
+        seedRuntimeDispatched("java_lang_Thread", "run", "()V");
+        seedRuntimeDispatched("java_lang_Runnable", "run", "()V");
+    }
+
+    /**
+     * Treat {@code owner.methodName(desc)} as if the runtime invoked it
+     * on an instance of {@code owner}. Equivalent to the RTA seeing an
+     * ``INVOKEVIRTUAL owner.methodName(desc)`` on a freshly-instantiated
+     * {@code owner}: the static receiver plus every instantiated subtype
+     * becomes a dispatch target. Used for runtime-edge methods
+     * (Thread.run, etc.) that bytecode analysis cannot see.
+     */
+    private void seedRuntimeDispatched(String owner, String methodName, String desc) {
+        markClassInstantiated(owner);
+        VirtualCall call = new VirtualCall(owner, methodName, desc, false);
+        recordPending(call);
+        dispatchVirtualFromInstantiated(call);
     }
 
     private void enqueue(BytecodeMethod method) {

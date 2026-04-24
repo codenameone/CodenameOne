@@ -108,21 +108,25 @@ final class JavascriptSuspensionAnalysis {
                 if (m.isEliminated() || m.isAbstract()) {
                     continue;
                 }
-                // Only seed methods that are INTRINSICALLY suspending —
-                // native, synchronized, contain monitor ops, or live on
-                // a JSO-bridge class. Methods that merely have
-                // invokevirtual / invokeinterface are no longer seeded
-                // here; the propagate step does a CHA-style walk and
-                // only marks them suspending when at least one
-                // implementation of the targeted (name+sig) actually
-                // suspends. ~2.6k methods already classify as sync;
-                // this change lifts that count significantly by
-                // catching virtual calls whose dispatch set is
-                // entirely synchronous.
+                // Seed methods that are INTRINSICALLY suspending —
+                // native, synchronized, contain monitor ops, live on
+                // a JSO-bridge class, OR contain INVOKEVIRTUAL /
+                // INVOKEINTERFACE. The last category is forced
+                // suspending even when every concrete impl of the
+                // dispatched sig is sync: the emitter unconditionally
+                // emits ``yield* cn1_iv*(...)`` at virtual call sites
+                // (cn1_iv* is a generator that wraps the resolved
+                // target via ``adaptVirtualResult`` to handle both
+                // sync and async returns), so the caller MUST be a
+                // generator. A purely-CHA view that marks a caller
+                // sync when all virtual targets are sync contradicts
+                // the emission and produces ``ReferenceError: yield
+                // is not defined`` at runtime.
                 if (m.isNative()
                         || m.isSynchronizedMethod()
                         || hasMonitorOps(m)
-                        || clsIsJso) {
+                        || clsIsJso
+                        || hasVirtualDispatch(m)) {
                     suspending.add(m);
                 }
             }

@@ -251,6 +251,18 @@ function vmDiag(phase, key, value) {
   }
   vmTrace("DIAG:" + phase + ":" + key + "=" + diagValue(value));
 }
+// Always-on lifecycle log — writes to console.log regardless of the
+// parparDiag URL flag so a user who reports "stuck on Loading..., no
+// console output" can confirm whether the runtime even executed. Kept
+// minimal: a handful of single-line messages covering load → main
+// generator → spawn → drain. For deeper traces pass ``?parparDiag=1``
+// which enables the full vmDiag stream.
+function vmLifecycle(message) {
+  if (global.console && typeof global.console.log === "function") {
+    global.console.log("PARPAR-LIFECYCLE:" + message);
+  }
+}
+vmLifecycle("runtime-script-loaded");
 function shouldTraceThread(thread) {
   return VM_DIAG_ENABLED && !!thread && (thread.id | 0) <= VM_TRACE_THREAD_LIMIT;
 }
@@ -1456,6 +1468,20 @@ const jvm = {
     if (VM_DIAG_ENABLED && (thread.id | 0) > 1 && (thread.id | 0) <= 4) {
       vmTrace("runtime.spawn.stack.thread-" + thread.id + ":" + String(new Error().stack || ""));
     }
+    // Sync methods (translated to plain ``function`` instead of
+    // ``function*``) return non-iterable values — most commonly
+    // ``undefined`` for a ``void`` return. ``drain`` calls
+    // ``generator.next()`` and would explode on such a value, so
+    // short-circuit here: the method already ran to completion when
+    // the caller evaluated its arg, so the thread is done the moment
+    // it's spawned.
+    if (generator == null || typeof generator.next !== "function") {
+      thread.done = true;
+      if (threadObject) {
+        threadObject[CN1_THREAD_ALIVE] = 0;
+      }
+      return thread;
+    }
     this.enqueue(thread);
     return thread;
   },
@@ -1742,8 +1768,10 @@ const jvm = {
   },
   start() {
     if (!this.mainClass || !this.mainMethod) {
+      vmLifecycle("start-failed-no-main");
       throw new Error("No main class configured for javascript backend");
     }
+    vmLifecycle("start:mainClass=" + this.mainClass);
     vmDiag("LIFECYCLE_START", "mainClass", this.mainClass);
     this.applyNativeOverrides();
     ensureSystemPrintStreams();
@@ -1753,7 +1781,9 @@ const jvm = {
     mainThreadObject[CN1_THREAD_ALIVE] = 1;
     mainThreadObject[CN1_THREAD_NAME] = this.createStringLiteral("main");
     this.mainThreadObject = mainThreadObject;
+    vmLifecycle("start:invoking-main-method=" + this.mainMethod);
     const mainGenerator = global[this.mainMethod](mainArgs);
+    vmLifecycle("start:main-method-returned=" + (mainGenerator != null && typeof mainGenerator.next === "function" ? "generator" : "sync"));
     vmTrace("runtime.start.after-main-generator");
     const mainThread = this.spawn(mainThreadObject, mainGenerator);
     vmTrace("runtime.start.after-spawn");
@@ -1761,6 +1791,7 @@ const jvm = {
     vmTrace("runtime.start.before-drain");
     this.drain();
     vmTrace("runtime.start.after-drain");
+    vmLifecycle("start:drain-returned threads=" + this.threads.length);
   },
   describeProtocol() {
     return {
