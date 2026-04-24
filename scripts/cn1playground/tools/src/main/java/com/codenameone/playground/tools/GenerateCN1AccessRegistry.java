@@ -2605,19 +2605,13 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
                 || "finalize".equals(name);
     }
 
-    /// Qualified-name method exclusions. Use this when a specific API is
-    /// present in the CN1 release sources but is not yet available on one of
-    /// the runtime ports the playground deploys to, so the bean-shell
-    /// registry must not reference it. Keep the set small and temporary -
-    /// entries should come out as soon as the runtime catches up.
-    private static final Set<String> BLACKLISTED_QUALIFIED_METHODS = new HashSet<String>(Arrays.asList(
-            // UIManager.zoomFonts was added in 7.0.235 but the JavaScript
-            // cloud build doesn't have it yet, so linking against it from
-            // the access registry fails at runtime with
-            // "com.codename1.ui.plaf.UIManager.zoomFonts(F)V was not found".
-            // Remove this entry once the JS port ships with zoomFonts.
-            "com.codename1.ui.plaf.UIManager.zoomFonts"
-    ));
+    /// Qualified-name method exclusions. Reserved for APIs that are present
+    /// in the pinned registry version but still don't work on one of the
+    /// runtime ports the playground deploys to. Version-skew between the
+    /// release channel and the JS cloud build is handled structurally by
+    /// the cn1.registry.version pin in the POM, so this set should stay
+    /// empty unless a port-specific regression needs a surgical workaround.
+    private static final Set<String> BLACKLISTED_QUALIFIED_METHODS = new HashSet<String>();
 
     private static boolean isBlacklistedQualifiedMethod(String qualifiedClassName, String methodName) {
         if (qualifiedClassName == null) {

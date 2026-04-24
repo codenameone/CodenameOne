@@ -21,6 +21,14 @@
   <properties>
     <cn1.plugin.version>${cn1.version}</cn1.plugin.version>
     <cn1.version>7.0.235</cn1.version>
+    <!-- cn1.registry.version pins the bean-shell access registry one
+         release behind cn1.version. The registry is consumed by the
+         deployed JavaScript cloud build, which lags the release
+         channel, so generating against the current cn1.version
+         references APIs (zoomFonts, isSimdOptimizationsEnabled, ...)
+         that fail at shell-eval time with NoSuchMethod on JS. Bump
+         this deliberately as the JS port catches up. -->
+    <cn1.registry.version>7.0.234</cn1.registry.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <java.version>1.8</java.version>
     <java-tests.version>11</java-tests.version>

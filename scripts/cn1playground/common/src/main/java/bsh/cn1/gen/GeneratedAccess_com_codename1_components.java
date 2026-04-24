@@ -26614,27 +26614,15 @@ public final class GeneratedAccess_com_codename1_components {
             if (safeArgs.length == 0) {
                 typedTarget.disposeToTheLeft(); return null;
             }
-            if (matches(safeArgs, new Class<?>[]{java.lang.Runnable.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Runnable.class}, false);
-                typedTarget.disposeToTheLeft((java.lang.Runnable) adaptedArgs[0]); return null;
-            }
         }
         if ("disposeToTheRight".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.disposeToTheRight(); return null;
             }
-            if (matches(safeArgs, new Class<?>[]{java.lang.Runnable.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Runnable.class}, false);
-                typedTarget.disposeToTheRight((java.lang.Runnable) adaptedArgs[0]); return null;
-            }
         }
         if ("disposeToTheTop".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.disposeToTheTop(); return null;
-            }
-            if (matches(safeArgs, new Class<?>[]{java.lang.Runnable.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Runnable.class}, false);
-                typedTarget.disposeToTheTop((java.lang.Runnable) adaptedArgs[0]); return null;
             }
         }
         if ("drop".equals(name)) {
