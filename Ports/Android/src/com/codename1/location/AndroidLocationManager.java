@@ -139,7 +139,7 @@ public class AndroidLocationManager extends com.codename1.location.LocationManag
         return gnssStatusListener;
     }
 
-    public static AndroidLocationManager getInstance(Context context) {
+    public static synchronized AndroidLocationManager getInstance(Context context) {
         if (instance == null) {
             instance = new AndroidLocationManager(context);
         }

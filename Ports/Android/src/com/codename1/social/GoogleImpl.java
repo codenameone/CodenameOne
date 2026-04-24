@@ -197,15 +197,13 @@ public class GoogleImpl extends GoogleConnect implements
 
                     } else {
                         if (callback != null) {
-                            if (callback != null) {
-                                Display.getInstance().callSerially(new Runnable() {
+                            Display.getInstance().callSerially(new Runnable() {
 
-                                    @Override
-                                    public void run() {
-                                        callback.loginFailed(GooglePlayServicesUtil.getErrorString(result.getStatus().getStatusCode()));
-                                    }
-                                });
-                            }
+                                @Override
+                                public void run() {
+                                    callback.loginFailed(GooglePlayServicesUtil.getErrorString(result.getStatus().getStatusCode()));
+                                }
+                            });
                         }
                     }
 

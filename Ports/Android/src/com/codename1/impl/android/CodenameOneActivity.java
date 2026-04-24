@@ -542,7 +542,7 @@ public class CodenameOneActivity extends Activity {
     }
 
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-        if(grantResults != null || grantResults.length == 0) {
+        if(grantResults == null || grantResults.length == 0) {
             requestForPermission = false;
             return;
         }
