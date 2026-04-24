@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 380" role="img"
+     aria-label="Architecture diagram: user Java code calls com.codename1.util.Simd, which lowers to NEON intrinsics via ParparVM on iOS and falls back to JavaSESimd pure Java on Android and the JavaSE simulator.">
+  <style>
+    .bg      { fill: #fafafa; }
+    .card    { fill: #ffffff; stroke: #cccccc; stroke-width: 1; }
+    .accent  { fill: #e8f0ff; stroke: #3478ef; stroke-width: 1.2; }
+    .ink     { fill: #1a1a1a; }
+    .muted   { fill: #555555; }
+    .arrow   { stroke: #555555; fill: none; stroke-width: 1.3; }
+    .tri     { fill: #555555; }
+    @media (prefers-color-scheme: dark) {
+      .bg     { fill: #1d1e20; }
+      .card   { fill: #28292c; stroke: #4a4b4f; }
+      .accent { fill: #1e2a44; stroke: #6aa2ff; }
+      .ink    { fill: #ececec; }
+      .muted  { fill: #a8a8a8; }
+      .arrow  { stroke: #a8a8a8; }
+      .tri    { fill: #a8a8a8; }
+    }
+    .ttl  { font: 600 14px -apple-system, system-ui, sans-serif; }
+    .sub  { font: 400 12px -apple-system, system-ui, sans-serif; }
+    .mono { font: 500 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
+  </style>
+
+  <rect class="bg" x="0" y="0" width="760" height="380"/>
+
+  <!-- Layer 1: user code -->
+  <rect class="card" x="230" y="30" width="300" height="58" rx="6"/>
+  <text class="ttl ink"  x="380" y="52" text-anchor="middle">Your Java code</text>
+  <text class="mono ink" x="380" y="72" text-anchor="middle">simd.add(a, b, out, 64)</text>
+
+  <line class="arrow" x1="380" y1="88" x2="380" y2="116"/>
+  <polygon class="tri" points="376,116 384,116 380,124"/>
+
+  <!-- Layer 2: Simd API -->
+  <rect class="accent" x="180" y="126" width="400" height="58" rx="6"/>
+  <text class="ttl ink"  x="380" y="150" text-anchor="middle">com.codename1.util.Simd</text>
+  <text class="sub muted" x="380" y="170" text-anchor="middle">portable, cross-platform API with aligned buffers</text>
+
+  <!-- Split arrows -->
+  <path class="arrow" d="M 300 184 L 300 220 L 170 220 L 170 250"/>
+  <polygon class="tri" points="166,250 174,250 170,258"/>
+
+  <path class="arrow" d="M 460 184 L 460 220 L 590 220 L 590 250"/>
+  <polygon class="tri" points="586,250 594,250 590,258"/>
+
+  <!-- Layer 3a: iOS -->
+  <rect class="card" x="40" y="260" width="260" height="104" rx="6"/>
+  <text class="ttl ink"  x="170" y="282" text-anchor="middle">iOS (ParparVM)</text>
+  <text class="sub muted" x="170" y="304" text-anchor="middle">translator lowers calls to</text>
+  <text class="mono ink" x="170" y="322" text-anchor="middle">NEON / Advanced SIMD</text>
+  <text class="sub muted" x="170" y="344" text-anchor="middle">one instruction per 128-bit lane group</text>
+
+  <!-- Layer 3b: Fallback -->
+  <rect class="card" x="460" y="260" width="260" height="104" rx="6"/>
+  <text class="ttl ink"  x="590" y="282" text-anchor="middle">Android / JavaSE simulator</text>
+  <text class="sub muted" x="590" y="304" text-anchor="middle">pure-Java fallback in</text>
+  <text class="mono ink" x="590" y="322" text-anchor="middle">JavaSESimd</text>
+  <text class="sub muted" x="590" y="344" text-anchor="middle">same semantics, scalar execution</text>
+</svg>
