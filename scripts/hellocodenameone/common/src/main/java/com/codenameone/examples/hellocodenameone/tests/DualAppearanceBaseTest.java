@@ -97,9 +97,7 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
     }
 
     private void runAppearance(boolean dark, final String suffix, final Runnable next) {
-        logDiag("CN1SS:INFO:DualAppearance runAppearance.enter dark=" + dark + " test=" + baseName());
         Display.getInstance().setDarkMode(dark);
-        logDiag("CN1SS:INFO:DualAppearance setDarkMode.done dark=" + dark + " test=" + baseName());
         // UIManager caches resolved Style objects per UIID; without this call
         // the next lookup returns the Style that was resolved while the other
         // appearance was active, and the screenshot comes out in the wrong
@@ -108,29 +106,14 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
         // fresh components on the new Form pick up the correct $Dark<UIID>
         // entries (emitted by the native theme's @media dark block).
         UIManager.getInstance().refreshTheme();
-        logDiag("CN1SS:INFO:DualAppearance refreshTheme.done dark=" + dark + " test=" + baseName());
 
         annotations.clear();
 
         final String imageName = baseName() + "_" + suffix;
-        // Pre-resolve each UIID the Form constructor will touch in its field
-        // inits + ctor body. Any of these calls going into an infinite loop
-        // will be the one whose "done" line never shows up in the next log.
-        probeStyle("Component");
-        probeStyle("Container");
-        probeStyle("Form");
-        probeStyle("Title");
-        probeStyle("TitleArea");
-        probeStyle("Toolbar");
-        probeStyle("ContentPane");
-        probeStyle("StatusBar");
-        logDiag("CN1SS:INFO:DualAppearance form.newCtor.begin test=" + baseName());
-        Form form = new Form() {
+        Form form = new Form(baseName() + " / " + suffix, newLayout()) {
             @Override
             protected void onShowCompleted() {
-                logDiag("CN1SS:INFO:DualAppearance onShowCompleted test=" + baseName() + " image=" + imageName);
                 registerReadyCallback(this, () -> {
-                    logDiag("CN1SS:INFO:DualAppearance ready emit=" + imageName);
                     // Chain next.run() through emitCurrentFormScreenshot's
                     // onComplete callback. If we call next.run() inline the
                     // dark-appearance flow kicks off Form2.show() before the
@@ -142,14 +125,7 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
                 });
             }
         };
-        logDiag("CN1SS:INFO:DualAppearance form.newCtor.done test=" + baseName());
-        form.setLayout(newLayout());
-        logDiag("CN1SS:INFO:DualAppearance form.setLayout.done test=" + baseName());
-        form.setTitle(baseName() + " / " + suffix);
-        logDiag("CN1SS:INFO:DualAppearance form.setTitle.done test=" + baseName());
-        logDiag("CN1SS:INFO:DualAppearance form.created test=" + baseName());
         populate(form, suffix);
-        logDiag("CN1SS:INFO:DualAppearance form.populated test=" + baseName() + " annotations=" + annotations.size());
         if (!annotations.isEmpty()) {
             form.setGlassPane(new AnnotationPainter(annotations, dark));
             SpanLabel legend = buildLegend();
@@ -157,9 +133,7 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
                 form.add(legend);
             }
         }
-        logDiag("CN1SS:INFO:DualAppearance form.show test=" + baseName());
         form.show();
-        logDiag("CN1SS:INFO:DualAppearance form.show.returned test=" + baseName());
     }
 
     private SpanLabel buildLegend() {
@@ -259,20 +233,6 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
     private static void logDiag(String message) {
         System.out.println(message);
         Log.p(message);
-    }
-
-    // Narrowing step: resolve a named UIID's Style before we touch Form.
-    // If one of these probes never returns we've found the UIID whose
-    // style resolution is looping against the freshly-installed modern
-    // theme on iOS.
-    private void probeStyle(String uiid) {
-        logDiag("CN1SS:INFO:DualAppearance probeStyle.begin uiid=" + uiid + " test=" + baseName());
-        try {
-            UIManager.getInstance().getComponentStyle(uiid);
-        } catch (Throwable t) {
-            logDiag("CN1SS:ERR:DualAppearance probeStyle.failed uiid=" + uiid + " err=" + t);
-        }
-        logDiag("CN1SS:INFO:DualAppearance probeStyle.done uiid=" + uiid + " test=" + baseName());
     }
 
     private String pickModernThemeResource() {
