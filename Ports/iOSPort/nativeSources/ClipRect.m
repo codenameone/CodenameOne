@@ -96,8 +96,16 @@ static CGRect drawingRect;
 
 -(void)execute {
 #ifdef CN1_USE_METAL
-    // DEBUG: disable Metal ClipRect to see if scissor is clipping
-    clipApplied = YES;
+    // Phase 2: handle only the rectangular scissor case via Metal's
+    // setScissorRect. Stencil-based clipping for texture/polygon clips
+    // is deferred to a later phase -- those currently fall back to a
+    // bounding-box scissor (incorrect for non-rectangular masks but
+    // does not crash).
+    int sx = x, sy = y, sw = width, sh = height;
+    if (sx < 0) { sw += sx; sx = 0; }
+    if (sy < 0) { sh += sy; sy = 0; }
+    CN1MetalSetScissor(sx, sy, sw, sh);
+    clipApplied = (sw > 0 && sh > 0);
     return;
 #endif
 #ifdef USE_ES2

@@ -180,6 +180,23 @@ extern BOOL isRetinaBug();
     if (pw == framebufferWidth && ph == framebufferHeight) {
         return;
     }
+    // An encoder may be mid-frame (awakeFromNib fires setFramebuffer before
+    // layoutSubviews, so the first encoder references the xib's placeholder
+    // bounds). Tear it down cleanly so the next setFramebuffer creates a
+    // fresh encoder against the new screenTexture. Otherwise draws land on
+    // a texture we're about to replace, and the stale dimensions get cached
+    // inside CN1Metalcompat (breaking scissor clamping etc.).
+    if (self.renderCommandEncoder != nil) {
+        CN1MetalEndFrame();
+        [self.renderCommandEncoder endEncoding];
+        self.renderCommandEncoder = nil;
+    }
+    if (self.commandBuffer != nil) {
+        [self.commandBuffer commit];
+        self.commandBuffer = nil;
+        self.renderPassDescriptor = nil;
+        self.drawable = nil;
+    }
     framebufferWidth = pw;
     framebufferHeight = ph;
     // Match iOS UIKit's Y-down convention: origin at top-left.
