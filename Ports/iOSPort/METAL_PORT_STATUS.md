@@ -35,6 +35,13 @@ Add a Metal-based rendering backend to the iOS port, gated by `#ifdef CN1_USE_ME
 
 Metal-specific golden images live in `scripts/ios/screenshots-metal/` (started as copies of `scripts/ios/screenshots/`). The `build-ios-metal` CI job compares the Metal-backed `scripts/hellocodenameone` output against that directory via `run-ios-ui-tests.sh`'s `SCREENSHOT_REF_DIR` env-var override. Rationale: pixel parity with the GL pipeline is **not** a goal — CoreText glyph positioning, gradient sampling, and other Metal-vs-GL differences are expected to drift. Tracking Metal's own baseline lets us accept intentional changes without regressing the GL validation. See `scripts/ios/screenshots-metal/README.md` for the update workflow.
 
+**Current baseline status** (refreshed `cee97d7fe` → validated `<next-run>`): 37 PNGs from the Metal pipeline post-DrawString work. Four GL-era orphans (`GraphicsPipeline`, `GraphicsShapesAndGradients`, `GraphicsStateAndText`, `GraphicsTransformations`) deleted because the Metal test run no longer captures them. Known drift to watch:
+
+- `landscape` — ~11.6% pixel diff between consecutive CI runs, concentrated in the right-side column band (col band 7: 22% / col band 8: 74%). The rest of the frame is clean. Looks like content-state non-determinism specific to the rotation test (a right-side panel captured at slightly different state across runs), not a rendering regression. If this keeps drifting across multiple stable runs, investigate the test's capture-timing.
+- `graphics-fill-round-rect` — ~2.3% pixel diff confined to a ~65px strip at the right edge (x ≥ 1113 of 1179). Plausible drawable-edge sampling noise; monitor.
+
+**Baseline integrity note:** PNGs copied out of the workflow artifact can come through with truncated-CRC chunks that `file`/`sips` accept but Pillow's strict reader (used by `run-ios-ui-tests.sh`) rejects as "PNG chunk truncated before CRC". Happened once on `graphics-transform-rotation`. When refreshing baselines, prefer files downloaded via `gh run download` over anything that routed through a browser or tar step that may have re-encoded.
+
 ### Landed (continued)
 
 - **ClipRect.** Enabled against a physical-pixel scissor rect. The tricky part turned out to be not ClipRect itself but `updateFrameBufferSize:h:` — when `layoutSubviews` updated the real view bounds (402×874 at 3x) mid-frame, any in-flight encoder kept referencing the xib-time 960×1380 screenTexture and the cached `currentFramebufferWidth/Height` in `CN1Metalcompat` stayed stale for the whole frame. Now `updateFrameBufferSize:h:` tears down any live encoder + command buffer before rebuilding the texture so the next `setFramebuffer` captures fresh dimensions.
@@ -46,7 +53,7 @@ Metal-specific golden images live in `scripts/ios/screenshots-metal/` (started a
 - **Gradient ops (`DrawGradient`, `RadialGradientPaint`).** Two more pipeline variants (`LinearGradient`, `RadialGradient`) are already declared in `CN1MetalShaders.metal` but the gradient ops don't call them yet.
 - **Path rendering (`DrawPath`, `DrawTextureAlphaMask`).** Paths are rasterised through `Renderer.c` to a pixel buffer; needs either a direct Metal port or an alpha-mask texture upload.
 - **Stencil clipping for non-rectangular clips.** Currently falls back to a bounding-box scissor — Form layout handles that OK but paths/textures-as-masks will clip incorrectly.
-- **Metal goldens still seeded from the GL set.** Once Phase 2 has produced visible-content CI output, copy the Metal-actual PNGs from the `ios-ui-tests-metal` artifact into `scripts/ios/screenshots-metal/` so the match count becomes a real regression metric.
+- **`landscape` test non-determinism.** See "Current baseline status" above — this one mismatches run-to-run by ~11% in a specific column band. Needs either a more stable capture point in the test, or accepting it in the comparator with a per-region tolerance.
 
 ## Phase 0 — Scaffolding (complete)
 
