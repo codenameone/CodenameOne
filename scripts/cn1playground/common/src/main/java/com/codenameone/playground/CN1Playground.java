@@ -221,6 +221,25 @@ public class CN1Playground extends Lifecycle {
 
         appForm.show();
         notifyWebsiteUiReady();
+
+        // Post-show layout pass: at runApp time the form may not yet report its
+        // true display dimensions (browsers sometimes report a placeholder size
+        // before the layout settles). Force a fresh breakpoint compute + layout
+        // once the form has had a chance to settle, then log final positions.
+        UITimer.timer(150, false, appForm, () -> {
+            lastLayout = LAYOUT_NONE;
+            applyLayoutForCurrentSize();
+            appForm.revalidate();
+            Log.p("Form: " + appForm.getWidth() + "x" + appForm.getHeight());
+            if (bottomNav != null && bottomNav.getParent() != null) {
+                Log.p("bottomNav: parent=" + bottomNav.getParent().getClass().getSimpleName()
+                        + " pos=(" + bottomNav.getAbsoluteX() + "," + bottomNav.getAbsoluteY() + ")"
+                        + " size=" + bottomNav.getWidth() + "x" + bottomNav.getHeight()
+                        + " visible=" + bottomNav.isVisible() + " hidden=" + bottomNav.isHidden());
+            } else {
+                Log.p("bottomNav: NOT ATTACHED to any parent");
+            }
+        });
     }
 
     @Override
@@ -324,15 +343,12 @@ public class CN1Playground extends Lifecycle {
             layout = testOnlyForceLayout;
         } else {
             Display d = Display.getInstance();
-            // Viewport-width breakpoints override Display's platform-capability
-            // flags so a narrowed desktop browser correctly falls into the
-            // mobile shell (< ~720 CSS px) instead of always showing the
-            // desktop chrome because isDesktop() is true.
             float pxPerMm = d.convertToPixels(1f);
             if (pxPerMm < 0.1f) {
                 pxPerMm = 4f;
             }
-            float widthMm = d.getDisplayWidth() / pxPerMm;
+            int displayW = d.getDisplayWidth();
+            float widthMm = displayW / pxPerMm;
             if (widthMm < 190f) {
                 layout = LAYOUT_MOBILE;
             } else if (widthMm < 291f || d.isTablet()) {
@@ -340,6 +356,8 @@ public class CN1Playground extends Lifecycle {
             } else {
                 layout = LAYOUT_DESKTOP;
             }
+            Log.p("Playground layout: width=" + displayW + "px (" + ((int) widthMm) + "mm) -> "
+                    + (layout == LAYOUT_MOBILE ? "MOBILE" : layout == LAYOUT_TABLET ? "TABLET" : "DESKTOP"));
         }
         if (layout == lastLayout) {
             return;
