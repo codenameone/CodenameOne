@@ -31,6 +31,10 @@ Add a Metal-based rendering backend to the iOS port, gated by `#ifdef CN1_USE_ME
 - Drawable only acquired at present time — minimises dwell and avoids `nextDrawable` stalls.
 - Ported `DrawLine`, `DrawRect`, `FillPolygon`, and `Scale` to Metal. `Rotate` and `ResetAffine` were already working via `SetTransform`.
 
+### Screenshot baselines
+
+Metal-specific golden images live in `scripts/ios/screenshots-metal/` (started as copies of `scripts/ios/screenshots/`). The `build-ios-metal` CI job compares the Metal-backed `scripts/hellocodenameone` output against that directory via `run-ios-ui-tests.sh`'s `SCREENSHOT_REF_DIR` env-var override. Rationale: pixel parity with the GL pipeline is **not** a goal — CoreText glyph positioning, gradient sampling, and other Metal-vs-GL differences are expected to drift. Tracking Metal's own baseline lets us accept intentional changes without regressing the GL validation. See `scripts/ios/screenshots-metal/README.md` for the update workflow.
+
 ### Known issues for Phase 2 wrap-up
 
 - **ClipRect scissor coords (blocker for Phase 2 golden screenshots).** Temporarily disabled — returns `clipApplied=YES` without actually calling `CN1MetalSetScissor`. Leaving it enabled clipped the drawable to a small top strip (diagnosed by seeing the Form bg paint correctly once disabled). The scissor rect's coord space doesn't match the physical-pixel framebuffer Metal is using. Needs: audit what units `ClipRect` gets passed vs what `CN1MetalSetScissor` expects, adjust accordingly. Once fixed, non-rectangular (stencil) clipping for polygon/texture-mask clips is the next step after.

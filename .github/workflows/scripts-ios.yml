@@ -15,6 +15,7 @@ on:
       - 'scripts/hellocodenameone/**'
       - 'scripts/ios/tests/**'
       - 'scripts/ios/screenshots/**'
+      - 'scripts/ios/screenshots-metal/**'
       - 'scripts/templates/**'
       - '!scripts/templates/**/*.md'
       - 'CodenameOne/src/**'
@@ -43,6 +44,7 @@ on:
       - 'scripts/hellocodenameone/**'
       - 'scripts/ios/tests/**'
       - 'scripts/ios/screenshots/**'
+      - 'scripts/ios/screenshots-metal/**'
       - 'scripts/templates/**'
       - '!scripts/templates/**/*.md'
       - 'CodenameOne/src/**'
@@ -293,12 +295,18 @@ jobs:
       - name: Run iOS UI screenshot tests (Metal)
         env:
           ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/ios-ui-tests-metal
+          # Compare Metal output against the Metal-specific golden set.
+          # See scripts/ios/screenshots-metal/README.md for the rationale:
+          # the Metal backend will not be pixel-identical to the GL
+          # baselines (especially once CoreText glyph rendering lands).
+          SCREENSHOT_REF_DIR: ${{ github.workspace }}/scripts/ios/screenshots-metal
         run: |
           set -euo pipefail
           mkdir -p "${ARTIFACTS_DIR}"
 
           echo "workspace='${{ steps.build-ios-app.outputs.workspace }}'"
           echo "scheme='${{ steps.build-ios-app.outputs.scheme }}'"
+          echo "reference dir='${SCREENSHOT_REF_DIR}'"
 
           ./scripts/run-ios-ui-tests.sh \
             "${{ steps.build-ios-app.outputs.workspace }}" \
@@ -322,7 +330,7 @@ jobs:
             echo "## iOS Metal screenshot comparison"
             echo
             echo "Ran against \`scripts/hellocodenameone\` on the iOS simulator with \`codename1.arg.ios.metal=true\`."
-            echo "Golden images: \`scripts/ios/screenshots/\` (shared with the GL job)."
+            echo "Golden images: \`scripts/ios/screenshots-metal/\` (Metal-specific baseline; see README there for why it's separate from the GL set)."
             echo
             if [ -s "$COMPARE_JSON" ] && command -v python3 >/dev/null 2>&1; then
               python3 <<'PY'

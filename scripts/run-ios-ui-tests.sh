@@ -163,7 +163,22 @@ fi
 SCHEME="$REQUESTED_SCHEME"
 ri_log "Using scheme $SCHEME"
 
-SCREENSHOT_REF_DIR="$SCRIPT_DIR/ios/screenshots"
+# The golden-image directory defaults to scripts/ios/screenshots for the
+# OpenGL backend. Callers can override via SCREENSHOT_REF_DIR (absolute or
+# relative to the repo root) so parallel backends -- like the Metal port --
+# can ship their own golden set. See Ports/iOSPort/METAL_PORT_STATUS.md.
+if [ -n "${SCREENSHOT_REF_DIR:-}" ]; then
+  if [ ! -d "$SCREENSHOT_REF_DIR" ]; then
+    ri_log "SCREENSHOT_REF_DIR override '$SCREENSHOT_REF_DIR' is not a directory" >&2
+    exit 3
+  fi
+  # Convert to absolute so downstream tools (cn1ss-helpers, etc.) don't
+  # trip over cwd changes.
+  SCREENSHOT_REF_DIR="$(cd "$SCREENSHOT_REF_DIR" && pwd)"
+  ri_log "Using screenshot reference dir from SCREENSHOT_REF_DIR: $SCREENSHOT_REF_DIR"
+else
+  SCREENSHOT_REF_DIR="$SCRIPT_DIR/ios/screenshots"
+fi
 SCREENSHOT_TMP_DIR="$(mktemp -d "${TMPDIR}/cn1-ios-tests-XXXXXX" 2>/dev/null || echo "${TMPDIR}/cn1-ios-tests")"
 SCREENSHOT_RAW_DIR="$SCREENSHOT_TMP_DIR/raw"
 SCREENSHOT_PREVIEW_DIR="$SCREENSHOT_TMP_DIR/previews"
