@@ -315,11 +315,13 @@ jobs:
         timeout-minutes: 30
 
       - name: Publish Metal screenshot summary
-        # Surfaces run-ios-ui-tests.sh's comparison result (the same one the
-        # GL job produces) in the job's GitHub Actions summary page so the
-        # status of the Metal port is visible at a glance without digging
-        # into the artifact zip. Always runs so a failed/cancelled tests
-        # step still shows whatever got captured.
+        # Surfaces run-ios-ui-tests.sh's comparison result in the job's
+        # GitHub Actions summary page so the Metal port status is visible
+        # at a glance without digging into the artifact zip. Always runs
+        # so a failed or cancelled tests step still reports whatever got
+        # captured. The Python helper lives in scripts/ci/ because
+        # embedding Python heredocs inside a YAML "run: |" block is
+        # fragile -- unindented Python breaks the block scalar.
         if: always()
         env:
           COMPARE_JSON: ${{ github.workspace }}/artifacts/ios-ui-tests-metal/screenshot-compare.json
@@ -330,46 +332,21 @@ jobs:
             echo "## iOS Metal screenshot comparison"
             echo
             echo "Ran against \`scripts/hellocodenameone\` on the iOS simulator with \`codename1.arg.ios.metal=true\`."
-            echo "Golden images: \`scripts/ios/screenshots-metal/\` (Metal-specific baseline; see README there for why it's separate from the GL set)."
+            echo "Golden images: \`scripts/ios/screenshots-metal/\` (Metal-specific baseline; see the README there for why it is separate from the GL set)."
             echo
-            if [ -s "$COMPARE_JSON" ] && command -v python3 >/dev/null 2>&1; then
-              python3 <<'PY'
-import json, os, sys
-with open(os.environ["COMPARE_JSON"]) as f:
-    data = json.load(f)
-results = data.get("results", [])
-total = len(results)
-matched = sum(1 for r in results if r.get("status") == "equal")
-different = sum(1 for r in results if r.get("status") == "different")
-other = total - matched - different
-print(f"**Headline:** {matched}/{total} matched, {different} differ, {other} other.\n")
-print("| Test | Status | Mismatch % |")
-print("| --- | --- | --- |")
-for r in results:
-    mm = ""
-    if r.get("status") == "different":
-        mm = "{:.1f}%".format(r.get("details", {}).get("mismatch_percent", 0.0))
-    print(f"| {r['test']} | {r['status']} | {mm} |")
-PY
+            if [ -s "$COMPARE_JSON" ]; then
+              python3 scripts/ci/metal-screenshot-summary.py --markdown "$COMPARE_JSON"
             elif [ -s "$COMMENT_MD" ]; then
               cat "$COMMENT_MD"
             else
               echo "_No screenshot comparison artifact was produced. See the upload step output for details._"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
-          # Also emit a ::notice so the headline shows on the workflow run page.
-          if [ -s "$COMPARE_JSON" ] && command -v python3 >/dev/null 2>&1; then
-            NOTICE=$(python3 <<'PY'
-import json, os
-with open(os.environ["COMPARE_JSON"]) as f:
-    data = json.load(f)
-results = data.get("results", [])
-total = len(results)
-matched = sum(1 for r in results if r.get("status") == "equal")
-print(f"{matched}/{total} matched against golden images")
-PY
-)
-            echo "::notice title=Metal screenshot comparison::${NOTICE}"
+          if [ -s "$COMPARE_JSON" ]; then
+            NOTICE="$(python3 scripts/ci/metal-screenshot-summary.py --headline "$COMPARE_JSON" || true)"
+            if [ -n "$NOTICE" ]; then
+              echo "::notice title=Metal screenshot comparison::${NOTICE}"
+            fi
           fi
 
       - name: Upload iOS Metal artifacts
