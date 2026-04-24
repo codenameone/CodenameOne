@@ -24,6 +24,7 @@ final class PlaygroundTopBar extends Container {
 
     private final Actions actions;
     private final Label appIcon;
+    private final Container iconColumn;
     private final Label wordmark;
     private final PlaygroundSegmented modeToggle;
     private final PlaygroundStatusPill statusPill;
@@ -86,10 +87,9 @@ final class PlaygroundTopBar extends Container {
         });
 
         // Wrap the app icon in a fixed-width column that matches the activity
-        // bar (13 mm) so the top-bar icon sits directly above the activity bar
-        // icons and the wordmark lines up with whatever panel title is open
-        // in the left side panel.
-        Container iconColumn = new Container(new FlowLayout(Component.CENTER, Component.CENTER));
+        // bar so the top-bar icon sits directly above the activity bar icons
+        // and the wordmark lines up with whatever panel title is open.
+        iconColumn = new Container(new FlowLayout(Component.CENTER, Component.CENTER));
         iconColumn.getAllStyles().setBgTransparency(0);
         iconColumn.setPreferredW(Display.getInstance().convertToPixels(11f));
         iconColumn.add(appIcon);
@@ -135,7 +135,12 @@ final class PlaygroundTopBar extends Container {
             return;
         }
         this.compact = compact;
+        // setVisible alone leaves the wordmark's preferred width reserved,
+        // which eats ~30 mm of horizontal space on mobile and pushes the
+        // Live pill / Share / Download off-screen. setHidden() collapses it
+        // to 0 preferred width so the remaining siblings fit.
         wordmark.setVisible(!compact);
+        wordmark.setHidden(compact);
         if (compact) {
             shareButton.setText("");
             downloadButton.setText("");
@@ -149,8 +154,10 @@ final class PlaygroundTopBar extends Container {
     }
 
     /// Mobile strips further than compact: the Code/CSS mode toggle is hidden
-    /// (the tab strip under the top bar takes its role) and the status pill
-    /// collapses to its dot-only compact form.
+    /// (the tab strip under the top bar takes its role), the status pill
+    /// collapses to its dot-only compact form, the icon column shrinks to 8mm
+    /// so the remaining siblings have room, and the Share/Download icon sizes
+    /// drop from 3mm to 2.2mm.
     void setMobile(boolean mobile) {
         if (this.mobile == mobile) {
             return;
@@ -159,6 +166,12 @@ final class PlaygroundTopBar extends Container {
         modeToggle.setVisible(!mobile);
         modeToggle.setHidden(mobile);
         statusPill.setCompactDot(mobile);
+        if (iconColumn != null) {
+            iconColumn.setPreferredW(Display.getInstance().convertToPixels(mobile ? 8f : 11f));
+        }
+        float iconMm = mobile ? 2.2f : 3f;
+        FontImage.setMaterialIcon(shareButton, FontImage.MATERIAL_IOS_SHARE, iconMm);
+        FontImage.setMaterialIcon(downloadButton, FontImage.MATERIAL_DOWNLOAD, iconMm);
         if (getComponentForm() != null) {
             revalidate();
         }
