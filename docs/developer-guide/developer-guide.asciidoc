@@ -53,6 +53,8 @@ include::Theme-Basics.asciidoc[]
 
 include::Advanced-Theming.asciidoc[]
 
+include::Native-Themes.asciidoc[]
+
 include::css.asciidoc[]
 
 include::The-Components-Of-Codename-One.asciidoc[]
