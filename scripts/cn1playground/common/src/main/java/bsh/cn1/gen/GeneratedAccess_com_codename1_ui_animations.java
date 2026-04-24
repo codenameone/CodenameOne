@@ -233,6 +233,12 @@ public final class GeneratedAccess_com_codename1_ui_animations {
     }
 
     private static Object invokeStatic4(String name, Object[] safeArgs) throws Exception {
+        if ("createCriticalDampedSpringMotion".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                return com.codename1.ui.animations.Motion.createCriticalDampedSpringMotion(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]));
+            }
+        }
         if ("createCubicBezierMotion".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class}, false);
