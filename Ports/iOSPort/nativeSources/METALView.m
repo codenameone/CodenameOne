@@ -205,6 +205,20 @@ extern BOOL isRetinaBug();
     // (bottom). That avoids the _glScalef(1,-1,1) + _glTranslatef(0,-h,0)
     // workaround the GL path does in CodenameOne_GLViewController.drawFrame.
     projectionMatrix = CN1MetalOrtho(0.0f, (float)pw, (float)ph, 0.0f, -1.0f, 1.0f);
+    // Half-pixel offset for pixel-perfect 2D rendering. Without this, geometry
+    // at integer eye-space coords lands exactly on pixel BOUNDARIES (e.g.,
+    // y_input=246 → window_y=246.0, the top edge of pixel 246, not its centre).
+    // For 1-pixel-tall geometry like titleArea bottom borders / list-row
+    // separators, the rasteriser's coverage rule on these boundaries differs
+    // between Metal and OpenGL ES, leaving visible 1-px white+grey strips on
+    // Metal that the GL path doesn't show. Shifting the projection's
+    // translation column by +0.5 device-pixel in window space (= +1/dim in
+    // clip space, signed by the axis orientation: +x for X-right, -y for
+    // Y-down) lands integer eye-space coords on pixel CENTRES, where the
+    // rasteriser is unambiguous. Equivalent to the canonical "Direct3D 9
+    // pixel-perfect" trick adapted to Metal's NDC.
+    projectionMatrix.columns[3].x += 1.0f / (float)pw;
+    projectionMatrix.columns[3].y -= 1.0f / (float)ph;
     CAMetalLayer *layer = (CAMetalLayer*)self.layer;
     layer.drawableSize = CGSizeMake(pw, ph);
 
