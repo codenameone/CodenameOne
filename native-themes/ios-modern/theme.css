@@ -71,7 +71,12 @@ Component {
 
 Form { background-color: #f2f2f7; padding: 0; margin: 0; }
 ContentPane { background-color: #f2f2f7; padding: 0; margin: 0; }
-Container { padding: 0; margin: 0; }
+/* Container has no surface of its own; specific UIIDs that need a
+   fill (Form, Dialog, Tab, etc.) declare it explicitly. Transparent
+   default means a SpanLabel / FlowLayout / generic wrapper inside a
+   translucent Dialog or pill Tabs lets the parent's surface show
+   through instead of painting an opaque white block over it. */
+Container { background-color: transparent; padding: 0; margin: 0; }
 
 Label {
     color: #000000;
