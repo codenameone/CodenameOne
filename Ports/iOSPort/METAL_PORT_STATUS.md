@@ -15,7 +15,7 @@ Add a Metal-based rendering backend to the iOS port, gated by `#ifdef CN1_USE_ME
 | 0 | Unblock the Metal stub; scaffolding + compile | **complete** |
 | 1 | `CN1Metalcompat` + MVP ops (`FillRect`, `DrawImage`, `ClipRect`, `SetTransform`, `ClearRect`) | **complete (MVP)** |
 | 2 | Remaining `ExecutableOp`s + parity text + coordinate-system calibration | **complete (modulo flaky tests + image-scaling rasterisation differences)** |
-| 3 | Unify mutable image rendering onto Metal | **scaffolding landed; activation pending** |
+| 3 | Unify mutable image rendering onto Metal | **scaffolding landed; activation attempted, reverted (threading)** |
 | 4 | CoreText glyph atlas | not started |
 | 5 | Harden (colour space, drawable throttling, memory, lifecycle) | not started |
 
@@ -96,17 +96,24 @@ The 1-pixel separator artifact (white+grey 2-row strip at titleArea boundary, li
 - `CN1MetalCommandQueue()` exposed for non-screen command buffer allocation (mutable-image work shares the queue with screen drawing).
 - A per-mutable-image projection helper (`mutableProjection`) builds a Y-down ortho with the same half-pixel offset the screen projection uses.
 
-### Pending (activation)
+### Activation attempt + revert (2026-04-25)
 
-- Wire `Java_com_codename1_impl_ios_IOSImplementation_startDrawingOnImageImpl` and `finishDrawingOnImageImpl` to call the Metal API instead of `UIGraphicsBeginImageContextWithOptions` + `UIGraphicsGetImageFromCurrentImageContext`.
-- Each `nativeXxxMutableImpl` (FillRect, DrawLine, DrawImage, FillRoundRect, DrawString, FillArc, etc.) needs a `#ifdef CN1_USE_METAL` branch that calls the corresponding `CN1Metal*` op (which routes to the active encoder = the mutable encoder while a mutable draw is in progress).
-- `imageRgbToIntArrayImpl` needs to call `CN1MetalReadMutableImagePixels` instead of `CGContextDrawImage` into a managed buffer.
-- `toBase64JPEG` / `toPNG` paths (in `IOSNative.m`) need to flush mutable images before extracting their pixels.
-- A `toImage` that's called on a mutable image while another mutable image is being drawn into needs an `MTLEvent` dependency rather than a CPU wait — covered by the deferred-commit + dependency-graph design but not yet implemented.
+Activation was attempted in commits `b1aef94b5` (full activation) and `8f880a6d2` (compile fix for two duplicate-variable errors in the JNI functions). The build succeeded after the compile fix, but the test run **hung at the second test** (`DrawLine`, the first AbstractGraphicsScreenshotTest) — only `MainActivity.png` was captured before the macOS test runner SIGTERM'd the process at the 5-minute timeout.
 
-The CG-backed mutable-image paths in `CodenameOne_GLViewController.m` (`nativeFillRectMutableImpl` etc.) are untouched by this commit. The activation is intentionally separated: scaffolding lands first, then each op port + JNI wiring follows. A regression-test for `Image.getGraphics().drawXxx(...) → image.getRGB(...)` round-trips needs to land alongside the activation work.
+Most likely cause: **threading mismatch on `activeEncoder`.** The Metal compat layer holds a single static `id<MTLRenderCommandEncoder> activeEncoder`. The screen path runs on the main thread (CADisplayLink → drawFrame → setFramebuffer → CN1MetalBeginFrame); the mutable path runs on CN1's EDT (cleanPaint → Image.getGraphics → startDrawingOnImage → CN1MetalBeginMutableImageDraw). When both threads race on the global encoder pointer, encoded commands can be lost, deferred-commit semantics break, and the GPU pipeline can stall waiting on a half-encoded buffer.
 
-When the full Phase 3 activation lands, the mutable-image Y-flip workaround in `CN1MetalTextureFromUIImage` becomes obsolete (the CG round-trip is gone), and `nativeFillRectMutableImpl` / siblings can be `#ifdef`-removed on the Metal build.
+The GL/CG path doesn't have this problem because `UIGraphicsGetCurrentContext()` is thread-local — each thread sees its own current context.
+
+To re-attempt activation safely, one of:
+1. **Serialise all mutable Metal API calls onto the main queue** (`dispatch_sync(dispatch_get_main_queue(), ^{...})` around each `nativeXxxMutableImpl` body). Simple, but adds a sync per draw and risks main-thread deadlock if the EDT call chain ever crosses other dispatch_sync boundaries.
+2. **Thread-local active encoder.** Use pthread or `__thread` for `activeEncoder` / `mutableActive` / matrix state so each thread sees its own. Cleaner, but requires care around CN1MetalBeginFrame which still needs to publish the screen encoder visible to whichever thread executes ops (the upcoming queue is drained on main).
+3. **Force mutable rendering onto the main thread** by delivering each mutable JNI call to `dispatch_sync(main)` from EDT. Same as (1) but at the JNI boundary rather than per-op.
+
+Option 2 is closer to the GL path's semantics (each thread has its own state). Option 1 is simplest. Either way the readback path (`CN1MetalReadMutableImagePixels`) needs to commit + wait on the same thread that opened the buffer.
+
+Reverted in `8270e4d1d` and `36e9e291b`. The scaffolding (commit `961cc32d5`) remains: GLUIImage's mutable-state ivars, `CN1MetalBeginMutableImageDraw` / `Finish` / `Flush` / `ReadMutableImagePixels`, and the `mutableProjection` helper. The CG-backed mutable paths in `CodenameOne_GLViewController.m` are unchanged on Metal builds.
+
+When activation resumes, the mutable-image Y-flip workaround in `CN1MetalTextureFromUIImage` becomes obsolete (the CG round-trip is gone), and `nativeFillRectMutableImpl` / siblings can be `#ifdef`-removed on the Metal build.
 
 ## Phase 0 — Scaffolding (complete)
 
