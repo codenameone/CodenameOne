@@ -78,9 +78,11 @@ static CN1MetalThreadState *threadState(void) {
     if (s == NULL) {
         s = (CN1MetalThreadState *)calloc(1, sizeof(CN1MetalThreadState));
         // Identity-init transforms so the first frame doesn't draw with a zero matrix.
-        simd_float4x4 I = (simd_float4x4){{ {1,0,0,0}, {0,1,0,0}, {0,0,1,0}, {0,0,0,1} }};
-        s->currentTransform = I;
-        s->currentModelView = I;
+        // Note: variable name avoids 'I' which is the C99 imaginary-unit macro
+        // from <complex.h> (pulled in transitively by simd headers).
+        simd_float4x4 ident = (simd_float4x4){{ {1,0,0,0}, {0,1,0,0}, {0,0,1,0}, {0,0,0,1} }};
+        s->currentTransform = ident;
+        s->currentModelView = ident;
         pthread_setspecific(threadStateKey, s);
     }
     return s;
