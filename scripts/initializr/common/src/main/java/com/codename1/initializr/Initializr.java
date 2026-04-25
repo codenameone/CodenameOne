@@ -10,8 +10,12 @@ import com.codename1.initializr.model.IDE;
 import com.codename1.initializr.model.ProjectOptions;
 import com.codename1.initializr.model.Template;
 import com.codename1.initializr.ui.TemplatePreviewPanel;
+import com.codename1.io.Log;
 import com.codename1.system.Lifecycle;
 import com.codename1.system.NativeLookup;
+import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.util.Resources;
+import java.util.Hashtable;
 import com.codename1.ui.Button;
 import com.codename1.ui.ButtonGroup;
 import com.codename1.ui.CheckBox;
@@ -35,6 +39,31 @@ import com.codename1.util.StringUtil;
 
 public class Initializr extends Lifecycle {
     private boolean websiteDarkMode;
+
+    /// Force the iOS Modern (liquid-glass) native theme on top of whatever
+    /// the host port supplied. The initializr ships in the JavaScript port,
+    /// which doesn't yet auto-load the modern themes - so the live preview
+    /// would otherwise inherit the legacy iOS7 base. Layering the modern
+    /// theme here makes the preview match what a generated project actually
+    /// renders at runtime.
+    @Override
+    public void init(Object context) {
+        super.init(context);
+        try {
+            Resources modern = Resources.openLayered("/iOSModernTheme");
+            if (modern != null) {
+                String[] names = modern.getThemeResourceNames();
+                if (names != null && names.length > 0) {
+                    Hashtable props = modern.getTheme(names[0]);
+                    if (props != null && !props.isEmpty()) {
+                        UIManager.getInstance().addThemeProps(props);
+                    }
+                }
+            }
+        } catch (java.io.IOException ex) {
+            Log.p("iOS Modern theme unavailable for initializr preview: " + ex);
+        }
+    }
 
     @Override
     public void runApp() {

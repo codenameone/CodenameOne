@@ -1003,35 +1003,23 @@ public class CN1Playground extends Lifecycle {
             try {
                 androidTheme = Resources.openLayered("/AndroidMaterialTheme");
             } catch (java.io.IOException ex) {
-                try {
-                    androidTheme = Resources.open("/androidTheme.res");
-                } catch (java.io.IOException ex2) {
-                    Log.p("Android theme unavailable: " + ex2);
-                    return;
-                }
+                Log.p("Android Material theme unavailable: " + ex);
+                return;
             }
         }
         applyThemeOverlay(androidTheme);
     }
 
-    /// Layers the builtin iPhone native theme on top of the playground base.
-    /// Prefers the modern liquid-glass theme bundled with the runtime; falls
-    /// back to the legacy iOS7/iPhone themes only if it isn't on the classpath.
+    /// Layers the iOS Modern (liquid-glass) native theme on top of the
+    /// playground base so the iPhone preview matches what a generated
+    /// project will render at runtime.
     private void layerIosTheme() {
         if (iosTheme == null) {
             try {
                 iosTheme = Resources.openLayered("/iOSModernTheme");
             } catch (java.io.IOException ex) {
-                try {
-                    iosTheme = Resources.openLayered("/iOS7Theme");
-                } catch (java.io.IOException ex2) {
-                    try {
-                        iosTheme = Resources.openLayered("/iPhoneTheme");
-                    } catch (java.io.IOException ex3) {
-                        Log.p("iOS theme unavailable: " + ex3);
-                        return;
-                    }
-                }
+                Log.p("iOS Modern theme unavailable: " + ex);
+                return;
             }
         }
         applyThemeOverlay(iosTheme);

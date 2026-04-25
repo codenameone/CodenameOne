@@ -41,12 +41,12 @@
     tabPlacementInt: 2;
     tabsFillRowsBool: true;
     tabsGridBool: true;
-    /* The floating pill is positioned with bottom margin so the home
-       indicator clears beneath it; reserving the safe-area inset *inside*
-       the pill would leave the selected tab orphaned at the top with
-       empty space below. Disable internal safe-area padding for this
-       design. Themes painting a flush, full-width tab strip should leave
-       this true (the framework default). */
+    /* For a floating-pill tab bar, Tabs wraps the pill in a host
+       container that absorbs the safe-area inset as bottom padding -
+       pushing the pill UP, away from the home indicator, without
+       extending the pill's own background into the indicator zone.
+       Themes painting a flush full-width tab strip leave this true (the
+       framework default) so the tab strip itself reserves the inset. */
     tabsSafeAreaBool: false;
     switchThumbPaddingInt: 2;
     switchThumbScaleY: "1.4";
@@ -256,19 +256,17 @@ TabsContainer {
     background-color: rgba(242,242,247,0.7);
     color: #000000;
     padding: 0.5mm;
-    /* Bottom margin must clear the iPhone home indicator since
-       tabsSafeAreaBool is false (see #Constants for the rationale). 5mm
-       is a comfortable clearance over the ~3-4mm indicator strip on
-       iPhoneX-class devices and is harmless on older devices without an
-       indicator. */
-    margin: 1mm 3mm 5mm 3mm;
+    /* Bottom margin only buys visual breathing room above the home
+       indicator; the actual safe-area inset is absorbed by Tabs's host
+       wrapper because tabsSafeAreaBool=false (see #Constants). */
+    margin: 1mm 3mm 1mm 3mm;
     cn1-background-type: cn1-pill-border;
 }
 
 Tab {
     color: #000000;
     background-color: transparent;
-    padding: 0.5mm 2mm 0.5mm 2mm;
+    padding: 1mm 2mm 1mm 2mm;
     margin: 0;
     font-family: "native:MainRegular";
     text-align: center;
