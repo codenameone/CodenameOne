@@ -157,14 +157,34 @@ id<MTLRenderCommandEncoder> CN1MetalActiveEncoder(void) {
 int CN1MetalFramebufferWidth(void) { return currentFramebufferWidth; }
 int CN1MetalFramebufferHeight(void) { return currentFramebufferHeight; }
 
+// Cache the device + queue so EDT can fetch them without walking through
+// METALView's UIKit chain. Walking the chain on a non-main thread (CALayer
+// .device, UIView .commandQueue ivar via a UIView accessor) was suspected
+// of returning garbage on EDT during Phase 3 mutable rendering, causing
+// the mutable encoder to come out nil and all draws to silently no-op.
+// Both objects are immutable after METALView's init, so a one-time main-
+// thread populate + thread-safe reads is correct.
+static id<MTLDevice> _cachedMetalDevice = nil;
+static id<MTLCommandQueue> _cachedMetalCommandQueue = nil;
+
+static void populateMetalSingletonsIfNeeded(void) {
+    if (_cachedMetalDevice != nil) return;
+    @synchronized([METALView class]) {
+        if (_cachedMetalDevice != nil) return;
+        METALView *mv = (METALView *)[[CodenameOne_GLViewController instance] eaglView];
+        _cachedMetalDevice = ((CAMetalLayer *)mv.layer).device;
+        _cachedMetalCommandQueue = mv.commandQueue;
+    }
+}
+
 id<MTLDevice> CN1MetalDevice(void) {
-    METALView *mv = (METALView *)[[CodenameOne_GLViewController instance] eaglView];
-    return ((CAMetalLayer *)mv.layer).device;
+    populateMetalSingletonsIfNeeded();
+    return _cachedMetalDevice;
 }
 
 id<MTLCommandQueue> CN1MetalCommandQueue(void) {
-    METALView *mv = (METALView *)[[CodenameOne_GLViewController instance] eaglView];
-    return mv.commandQueue;
+    populateMetalSingletonsIfNeeded();
+    return _cachedMetalCommandQueue;
 }
 
 // --------------- Matrix state ---------------
