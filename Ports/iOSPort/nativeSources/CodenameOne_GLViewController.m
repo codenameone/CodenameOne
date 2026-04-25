@@ -1175,18 +1175,16 @@ void com_codename1_impl_ios_IOSImplementation_nativeSetTransformMutableImpl___fl
                                                                                                                                                                                )
 {
 #ifdef CN1_USE_METAL
-    {
-        // On Metal builds the mutable transform flows through the same
-        // currentTransform state as the screen transform. Begin/Finish
-        // already saved/restored that state around the mutable draw, so
-        // setting it here only affects the active mutable rendering pass.
-        GLKMatrix4 mm = GLKMatrix4MakeAndTranspose(a0,a1,a2,a3,
-                                                   b0,b1,b2,b3,
-                                                   c0,c1,c2,c3,
-                                                   d0,d1,d2,d3);
-        CN1MetalSetTransform(mm);
-        return;
-    }
+    // On Metal builds the mutable transform flows through the same
+    // currentTransform state as the screen transform. Begin/Finish
+    // already saved/restored that state around the mutable draw, so
+    // setting it here only affects the active mutable rendering pass.
+    GLKMatrix4 m = GLKMatrix4MakeAndTranspose(a0,a1,a2,a3,
+                                              b0,b1,b2,b3,
+                                              c0,c1,c2,c3,
+                                              d0,d1,d2,d3);
+    CN1MetalSetTransform(m);
+    return;
 #endif
 #ifdef USE_ES2
     POOL_BEGIN();
@@ -1808,15 +1806,13 @@ void Java_com_codename1_impl_ios_IOSImplementation_startDrawingOnImageImpl
 
 void* Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl() {
 #ifdef CN1_USE_METAL
-    {
-        GLUIImage *mglu = [CodenameOne_GLViewController instance].currentMutableImage;
-        if (mglu != nil) {
-            CN1MetalFinishMutableImageDraw((BRIDGE_CAST void*)mglu);
-        }
-        [CodenameOne_GLViewController instance].currentMutableImage = nil;
-        currentMutableTransformSet = NO;
-        return (BRIDGE_CAST void*)mglu;
+    GLUIImage *gl = [CodenameOne_GLViewController instance].currentMutableImage;
+    if (gl != nil) {
+        CN1MetalFinishMutableImageDraw((BRIDGE_CAST void*)gl);
     }
+    [CodenameOne_GLViewController instance].currentMutableImage = nil;
+    currentMutableTransformSet = NO;
+    return (BRIDGE_CAST void*)gl;
 #endif
     UIImage* img = UIGraphicsGetImageFromCurrentImageContext();
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl %i", ((int)img));
