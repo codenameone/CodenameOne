@@ -23,6 +23,9 @@
 #import "TileImage.h"
 #import "CodenameOne_GLViewController.h"
 #include "xmlvm.h"
+#ifdef CN1_USE_METAL
+#import "CN1Metalcompat.h"
+#endif
 
 
 #ifdef USE_ES2
@@ -145,6 +148,18 @@ GLfloat* createVertexArray(int x, int y, int imageWidth, int imageHeight) {
     if (width <= 0 || height <= 0) {
         return;
     }
+#ifdef CN1_USE_METAL
+    {
+        UIImage *src = [img getImage];
+        int imageWidth = (int)src.size.width;
+        int imageHeight = (int)src.size.height;
+        if (imageWidth > 0 && imageHeight > 0) {
+            id<MTLTexture> tex = CN1MetalTextureFromUIImage(src);
+            CN1MetalTileImage(tex, alpha, x, y, width, height, imageWidth, imageHeight);
+        }
+        return;
+    }
+#endif
     glUseProgram(getOGLProgram());
     GLKVector4 color = GLKVector4Make(((float)alpha) / 255.0f, ((float)alpha) / 255.0f, ((float)alpha) / 255.0f, ((float)alpha) / 255.0f);
     

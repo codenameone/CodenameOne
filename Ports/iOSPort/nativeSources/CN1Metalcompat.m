@@ -349,6 +349,40 @@ void CN1MetalDrawImage(id<MTLTexture> texture, int alpha, int x, int y, int widt
     drawQuad(CN1MetalPipelineTexturedRGBA, vertices, texcoords, tint, texture);
 }
 
+void CN1MetalTileImage(id<MTLTexture> texture, int alpha,
+                       int x, int y, int width, int height,
+                       int imageWidth, int imageHeight) {
+    if (texture == nil || width <= 0 || height <= 0 || imageWidth <= 0 || imageHeight <= 0) return;
+    float a = alpha / 255.0f;
+    simd_float4 tint = (simd_float4){ a, a, a, a };
+
+    for (int yPos = 0; yPos < height; yPos += imageHeight) {
+        int dh = imageHeight;
+        if (yPos + dh > height) dh = height - yPos;
+        float vMax = (float)dh / (float)imageHeight;
+        for (int xPos = 0; xPos < width; xPos += imageWidth) {
+            int dw = imageWidth;
+            if (xPos + dw > width) dw = width - xPos;
+            float uMax = (float)dw / (float)imageWidth;
+            int dx = x + xPos;
+            int dy = y + yPos;
+            float vertices[8] = {
+                (float)dx,        (float)dy,
+                (float)(dx + dw), (float)dy,
+                (float)dx,        (float)(dy + dh),
+                (float)(dx + dw), (float)(dy + dh)
+            };
+            float texcoords[8] = {
+                0.0f, 0.0f,
+                uMax, 0.0f,
+                0.0f, vMax,
+                uMax, vMax
+            };
+            drawQuad(CN1MetalPipelineTexturedRGBA, vertices, texcoords, tint, texture);
+        }
+    }
+}
+
 // --------------- Text rendering (parity level) ---------------
 
 // LRU cache mapping "str|font|color" -> {MTLTexture, stringWidth, stringHeight,

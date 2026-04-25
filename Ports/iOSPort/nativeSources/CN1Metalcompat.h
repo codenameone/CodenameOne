@@ -145,6 +145,14 @@ void CN1MetalFillPolygon(const float *xCoords, const float *yCoords, int num,
 // only for the current command buffer.
 void CN1MetalDrawImage(id<MTLTexture> texture, int alpha, int x, int y, int width, int height);
 
+// Tile an RGBA image across (x,y,w,h). imageWidth/imageHeight are the
+// natural size of the source UIImage. Issues one textured quad per
+// tile (full or clipped at the right/bottom edges); a future batched
+// version could pack into a single draw call.
+void CN1MetalTileImage(id<MTLTexture> texture, int alpha,
+                       int x, int y, int width, int height,
+                       int imageWidth, int imageHeight);
+
 // Draw a string at (x,y). The string is rasterised via CoreGraphics into
 // an RGBA MTLTexture with the colour baked in (matching the GL path's
 // approach) and then rendered as a textured quad with alpha modulation.
