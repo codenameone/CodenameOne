@@ -29,18 +29,34 @@
 #import "GLUIImage.h"
 
 // --------------- Static state ---------------
+//
+// All rendering state is THREAD-LOCAL via __thread. Phase 3 mutable-image
+// rendering runs on CN1's EDT while screen rendering runs on the main thread
+// (CADisplayLink → drawFrame). Earlier activation attempts hung in CI because
+// both threads raced on a single global activeEncoder. Making the state
+// per-thread mirrors the GL path's implicit per-thread CG context model
+// (UIGraphicsGetCurrentContext is thread-local) and removes the race without
+// adding locks or dispatch_sync (which would risk deadlock against CN1's
+// runOnEDTAndWait patterns).
+//
+// __thread on iOS supports POD types and __unsafe_unretained Obj-C pointers
+// (ARC cannot manage thread-locals). The pipeline cache stays shared since
+// it's read-only after init.
 
-static __unsafe_unretained id<MTLRenderCommandEncoder> activeEncoder = nil;
-static simd_float4x4 currentProjection;
-static simd_float4x4 currentModelView;
-static simd_float4x4 currentTransform;
-static int currentFramebufferWidth = 0;
-static int currentFramebufferHeight = 0;
+static __thread __unsafe_unretained id<MTLRenderCommandEncoder> activeEncoder = nil;
+static __thread simd_float4x4 currentProjection;
+static __thread simd_float4x4 currentModelView;
+static __thread simd_float4x4 currentTransform;
+static __thread int currentFramebufferWidth = 0;
+static __thread int currentFramebufferHeight = 0;
+// Pipeline cache is shared across threads (read-only after first build).
+// The first-time build is racy but pipelineFor in CN1MetalPipelineCache is
+// itself thread-safe (lazy-builds each variant under a lock).
 static CN1MetalPipelineCache *pipelineCache = nil;
 
 #define CN1_MATRIX_STACK_DEPTH 32
-static simd_float4x4 modelViewStack[CN1_MATRIX_STACK_DEPTH];
-static int modelViewStackTop = 0;
+static __thread simd_float4x4 modelViewStack[CN1_MATRIX_STACK_DEPTH];
+static __thread int modelViewStackTop = 0;
 
 static simd_float4x4 identityMatrix(void) {
     return (simd_float4x4){{
@@ -808,9 +824,12 @@ typedef struct {
     simd_float4x4 savedTransform;
 } CN1MetalEncoderState;
 
-static CN1MetalEncoderState screenStateBeforeMutable;
-static BOOL mutableActive = NO;
-static __unsafe_unretained GLUIImage *mutableActivePeer = nil;
+// Per-thread mutable-image state. EDT and main thread each have their own
+// "is mutable rendering in progress on this thread?" flag and saved
+// pre-mutable encoder state. See the rationale at the top of the file.
+static __thread CN1MetalEncoderState screenStateBeforeMutable;
+static __thread BOOL mutableActive = NO;
+static __thread __unsafe_unretained GLUIImage *mutableActivePeer = nil;
 
 // Build a Y-down ortho projection for a (w x h) framebuffer. Mirrors
 // METALView's CN1MetalOrtho call -- if that one ever changes (e.g. adds
