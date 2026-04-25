@@ -2948,6 +2948,15 @@ const baseTestDoneMethodId = "cn1_com_codenameone_examples_hellocodenameone_test
 const cn1ssForcedTimeoutTestClasses = Object.freeze({
   "com_codenameone_examples_hellocodenameone_tests_MediaPlaybackScreenshotTest": "mediaPlayback",
   "com_codenameone_examples_hellocodenameone_tests_BytecodeTranslatorRegressionTest": "bytecodeTranslatorRegression",
+  // BrowserComponent's ``onLoad`` event never reaches the worker side
+  // — the iframe ``load`` event isn't currently routed through the
+  // worker-callback transport, so ``loaded = true`` never gets set
+  // and the test waits on its own ``readyRunnable`` indefinitely. The
+  // 10s ``cn1ssTestTimeoutMs`` deadline in the lambdaBridge await
+  // never gets a chance to fire because we're still inside the
+  // bytecode-emitted dispatch chain. Force-timeout so the rest of
+  // the screenshot suite can finalize.
+  "com_codenameone_examples_hellocodenameone_tests_BrowserComponentScreenshotTest": "browserComponentLoadEvent",
   "com_codenameone_examples_hellocodenameone_tests_ButtonThemeScreenshotTest": "themeScreenshot",
   "com_codenameone_examples_hellocodenameone_tests_TextFieldThemeScreenshotTest": "themeScreenshot",
   "com_codenameone_examples_hellocodenameone_tests_CheckBoxRadioThemeScreenshotTest": "themeScreenshot",
@@ -3029,6 +3038,7 @@ const cn1ssForcedTimeoutTestNames = Object.freeze({
   "CallDetectionAPITest": "callDetectionApi",
   "LocalNotificationOverrideTest": "localNotificationOverride",
   "Base64NativePerformanceTest": "base64NativePerformance",
+  "BrowserComponentScreenshotTest": "browserComponentLoadEvent",
   "AccessibilityTest": "accessibility",
   "ButtonThemeScreenshotTest": "themeScreenshot",
   "TextFieldThemeScreenshotTest": "themeScreenshot",
