@@ -52,8 +52,15 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
       GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
       ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/javascript-ui-tests
-      CN1_JS_TIMEOUT_SECONDS: "180"
-      CN1_JS_BROWSER_LIFETIME_SECONDS: "150"
+      # CN1_JS_TIMEOUT_SECONDS guards the per-suite SUITE:FINISHED wait.
+      # The structural-optimization landing slowed cooperative-scheduler
+      # progress on bytecode-translator output; with cn1_ivAdapt wrapping
+      # at every hand-written port.js dispatch site, the screenshot suite
+      # now reaches the runTest phase but needs more wall-clock time on
+      # CI than the previous 180s budget. 360s gives ~2× headroom over a
+      # local successful run.
+      CN1_JS_TIMEOUT_SECONDS: "360"
+      CN1_JS_BROWSER_LIFETIME_SECONDS: "330"
       CN1SS_SKIP_COVERAGE: "1"
       CN1SS_FAIL_ON_MISMATCH: "1"
       BROWSER_CMD: "node \"$GITHUB_WORKSPACE/scripts/run-javascript-headless-browser.mjs\""
