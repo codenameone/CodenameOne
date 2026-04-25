@@ -685,7 +685,12 @@ function ensureKotlinUnitShim() {
     classObject: null
   });
   function* cn1_kotlin_Unit___INIT__(__cn1ThisObject) {
-    yield* cn1_java_lang_Object___INIT__(__cn1ThisObject);
+    // Object's <init> is empty bytecode → CHA classifies sync →
+    // emitted as plain ``function`` returning undefined. yield* on
+    // that throws ``not iterable``. Adapt via cn1_ivAdapt so the
+    // call works regardless of how the translator classified the
+    // target.
+    yield* cn1_ivAdapt(cn1_java_lang_Object___INIT__(__cn1ThisObject));
     return null;
   }
   function* cn1_kotlin_Unit_toString_R_java_lang_String() {

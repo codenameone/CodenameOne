@@ -3079,7 +3079,10 @@ bindNative(["cn1_java_lang_String_bytesToChars_byte_1ARRAY_int_int_java_lang_Str
   return createArrayFromNativeString(text);
 });
 bindNative(["cn1_java_io_InputStreamReader_bytesToChars_byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY"], function*(bytes, off, len, encoding) {
-  return yield* cn1_java_lang_String_bytesToChars_byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY(bytes, off, len, encoding);
+  // Adapt the call result so a CHA-sync classification of the
+  // String.bytesToChars body doesn't tip ``yield*`` into a
+  // ``not iterable`` TypeError.
+  return yield* adaptVirtualResult(cn1_java_lang_String_bytesToChars_byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY(bytes, off, len, encoding));
 });
 bindNative(["cn1_java_lang_String_charsToBytes_char_1ARRAY_char_1ARRAY_R_byte_1ARRAY"], function*(chars) {
   let text = "";
@@ -3282,14 +3285,14 @@ bindNative(["cn1_java_util_HashMap_areEqualKeys_java_lang_Object_java_lang_Objec
     return 0;
   }
   const equalsMethod = jvm.resolveVirtual(key1.__class, "cn1_java_lang_Object_equals_java_lang_Object_R_boolean");
-  return (yield* equalsMethod(key1, key2)) ? 1 : 0;
+  return (yield* adaptVirtualResult(equalsMethod(key1, key2))) ? 1 : 0;
 });
 bindNative(["cn1_java_util_HashMap_findNonNullKeyEntry_java_lang_Object_int_int_R_java_util_HashMap_Entry"], function*(__cn1ThisObject, key, index, keyHash) {
   const buckets = __cn1ThisObject[CN1_HASHMAP_ELEMENT_DATA];
   let entry = buckets == null ? null : buckets[index | 0];
   while (entry != null) {
     if (((entry.cn1_java_util_HashMap_Entry_origKeyHash | 0) === (keyHash | 0))
-            && (yield* cn1_java_util_HashMap_areEqualKeys_java_lang_Object_java_lang_Object_R_boolean(key, entry[CN1_HASHMAP_ENTRY_KEY]))) {
+            && (yield* adaptVirtualResult(cn1_java_util_HashMap_areEqualKeys_java_lang_Object_java_lang_Object_R_boolean(key, entry[CN1_HASHMAP_ENTRY_KEY])))) {
       return entry;
     }
     entry = entry[CN1_HASHMAP_ENTRY_NEXT];
@@ -3297,10 +3300,10 @@ bindNative(["cn1_java_util_HashMap_findNonNullKeyEntry_java_lang_Object_int_int_
   return null;
 });
 bindNative(["cn1_java_util_LinkedHashMap_findNonNullKeyEntry_java_lang_Object_int_int_R_java_util_HashMap_Entry"], function*(__cn1ThisObject, key, index, keyHash) {
-  return yield* cn1_java_util_HashMap_findNonNullKeyEntry_java_lang_Object_int_int_R_java_util_HashMap_Entry(__cn1ThisObject, key, index, keyHash);
+  return yield* adaptVirtualResult(cn1_java_util_HashMap_findNonNullKeyEntry_java_lang_Object_int_int_R_java_util_HashMap_Entry(__cn1ThisObject, key, index, keyHash));
 });
 bindNative(["cn1_java_io_NSLogOutputStream_write_byte_1ARRAY_int_int"], function*(__cn1ThisObject, bytes, off, len) {
-  const chars = yield* cn1_java_lang_String_bytesToChars_byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY(bytes, off, len, createJavaString("utf-8"));
+  const chars = yield* adaptVirtualResult(cn1_java_lang_String_bytesToChars_byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY(bytes, off, len, createJavaString("utf-8")));
   jvm.log(nativeStringFromCharArray(chars));
   return null;
 });
