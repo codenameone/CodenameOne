@@ -337,13 +337,14 @@ void CN1MetalDrawImage(id<MTLTexture> texture, int alpha, int x, int y, int widt
         (float)x,         (float)(y+height),
         (float)(x+width), (float)(y+height)
     };
-    // GL textures rendered in Codename One use inverted-Y texture coords
-    // (matching the GL path's DrawImage textureCoordinates array).
+    // CN1MetalTextureFromUIImage rasterises with a Y-flipped CTM so the
+    // texture stores display-row-0 at memory-row-0; with Metal's V=0-at-top
+    // convention, sampling top-of-quad at V=0 gives the top of the image.
     static const float texcoords[8] = {
-        0, 1,
-        1, 1,
         0, 0,
-        1, 0
+        1, 0,
+        0, 1,
+        1, 1
     };
     drawQuad(CN1MetalPipelineTexturedRGBA, vertices, texcoords, tint, texture);
 }
@@ -496,13 +497,17 @@ id<MTLTexture> CN1MetalTextureFromUIImage(UIImage *image) {
     if (w <= 0 || h <= 0) return nil;
 
     // Rasterize UIImage into a CGBitmapContext then upload as MTLTexture.
-    // Same pattern as GLUIImage.getTexture; eventually GLUIImage should
-    // cache the MTLTexture so this isn't recomputed per draw.
+    // CTM flip so display-row-0 lands at memory-row-0 — matches GLUIImage.
+    // getTexture's pattern, and matches the text-cache path. Mutable images
+    // (UIGraphicsGetImageFromCurrentImageContext output) and disk-loaded
+    // UIImages both come through here right-side-up after this flip.
     CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
     void *rawData = calloc(h * w * 4, sizeof(uint8_t));
     CGContextRef ctx = CGBitmapContextCreate(rawData, w, h, 8, w * 4, cs,
         kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big);
     CGColorSpaceRelease(cs);
+    CGContextTranslateCTM(ctx, 0, h);
+    CGContextScaleCTM(ctx, 1, -1);
     CGContextDrawImage(ctx, CGRectMake(0, 0, w, h), image.CGImage);
     CGContextRelease(ctx);
 
