@@ -393,7 +393,7 @@ function spawnVirtualCallback(receiver, methodId, args, pendingFlagKey) {
   }
   function* run() {
     try {
-      return yield* method.apply(null, [receiver].concat(args || []));
+      return yield* cn1_ivAdapt(method.apply(null, [receiver].concat(args || [])));
     } finally {
       if (pendingFlagKey) {
         receiver[pendingFlagKey] = false;
@@ -425,7 +425,7 @@ function* stringifyThrowable(throwable) {
   }
   try {
     const toStringMethod = jvm.resolveVirtual(throwable.__class, "cn1_java_lang_Throwable_toString_R_java_lang_String");
-    const value = yield* toStringMethod(throwable);
+    const value = yield* cn1_ivAdapt(toStringMethod(throwable));
     if (value && value.__class === "java_lang_String") {
       pieces.push(jvm.toNativeString(value));
     }
@@ -434,7 +434,7 @@ function* stringifyThrowable(throwable) {
   }
   try {
     const messageMethod = jvm.resolveVirtual(throwable.__class, "cn1_java_lang_Throwable_getMessage_R_java_lang_String");
-    const message = yield* messageMethod(throwable);
+    const message = yield* cn1_ivAdapt(messageMethod(throwable));
     if (message && message.__class === "java_lang_String") {
       pieces.push("message=" + jvm.toNativeString(message));
     }
@@ -443,7 +443,7 @@ function* stringifyThrowable(throwable) {
   }
   try {
     const printStackTraceMethod = jvm.resolveVirtual(throwable.__class, "cn1_java_lang_Throwable_printStackTrace");
-    yield* printStackTraceMethod(throwable);
+    yield* cn1_ivAdapt(printStackTraceMethod(throwable));
     pieces.push("stack=printed");
   } catch (_err) {
     // Best effort diagnostic path only.
@@ -571,7 +571,7 @@ function wrapVirtualMethodWithDiag(className, methodId, marker) {
   const wrapped = function*() {
     emitDiagLine("PARPAR:DIAG:" + marker + ":enter");
     try {
-      const result = yield* original.apply(this, arguments);
+      const result = yield* cn1_ivAdapt(original.apply(this, arguments));
       emitDiagLine("PARPAR:DIAG:" + marker + ":exit");
       return result;
     } catch (err) {
@@ -596,7 +596,7 @@ function wrapGlobalGeneratorWithDiag(symbol, marker) {
   const wrapped = function*() {
     emitDiagLine("PARPAR:DIAG:" + marker + ":enter");
     try {
-      const result = yield* original.apply(this, arguments);
+      const result = yield* cn1_ivAdapt(original.apply(this, arguments));
       emitDiagLine("PARPAR:DIAG:" + marker + ":exit");
       return result;
     } catch (err) {
@@ -715,7 +715,7 @@ function installMissingGlobalDelegate(symbol, delegateSymbol, marker) {
     emitCiFallbackMarker(marker, "HIT");
     const delegate = global[delegateSymbol];
     if (typeof delegate === "function") {
-      return yield* delegate.apply(this, arguments);
+      return yield* cn1_ivAdapt(delegate.apply(this, arguments));
     }
     return null;
   };
@@ -874,14 +874,14 @@ if (typeof global.cn1_com_codename1_ui_Container_setVisible_boolean !== "functio
       ? containerClass.methods["cn1_com_codename1_ui_Container_setVisible_boolean"]
       : null;
     if (typeof containerMethod === "function") {
-      return yield* containerMethod(__cn1ThisObject, visible);
+      return yield* cn1_ivAdapt(containerMethod(__cn1ThisObject, visible));
     }
     const componentClass = jvm.classes && jvm.classes["com_codename1_ui_Component"];
     const componentMethod = componentClass && componentClass.methods
       ? componentClass.methods["cn1_com_codename1_ui_Component_setVisible_boolean"]
       : null;
     if (typeof componentMethod === "function") {
-      return yield* componentMethod(__cn1ThisObject, visible);
+      return yield* cn1_ivAdapt(componentMethod(__cn1ThisObject, visible));
     }
     return null;
   };
@@ -897,14 +897,14 @@ if (typeof global.cn1_com_codename1_ui_Container_setAlwaysTensile_boolean !== "f
       ? containerClass.methods["cn1_com_codename1_ui_Container_setAlwaysTensile_boolean"]
       : null;
     if (typeof containerMethod === "function") {
-      return yield* containerMethod(__cn1ThisObject, enabled);
+      return yield* cn1_ivAdapt(containerMethod(__cn1ThisObject, enabled));
     }
     const componentClass = jvm.classes && jvm.classes["com_codename1_ui_Component"];
     const componentMethod = componentClass && componentClass.methods
       ? componentClass.methods["cn1_com_codename1_ui_Component_setAlwaysTensile_boolean"]
       : null;
     if (typeof componentMethod === "function") {
-      return yield* componentMethod(__cn1ThisObject, enabled);
+      return yield* cn1_ivAdapt(componentMethod(__cn1ThisObject, enabled));
     }
     return null;
   };
@@ -917,7 +917,7 @@ if (typeof global.cn1_com_codename1_ui_PeerComponent_styleChanged_java_lang_Stri
     }
     const componentStyleChanged = global.cn1_com_codename1_ui_Component_styleChanged_java_lang_String_com_codename1_ui_plaf_Style;
     if (typeof componentStyleChanged === "function") {
-      return yield* componentStyleChanged(__cn1ThisObject, propertyName, style);
+      return yield* cn1_ivAdapt(componentStyleChanged(__cn1ThisObject, propertyName, style));
     }
     return null;
   };
@@ -1767,7 +1767,7 @@ bindCiFallback("NativeFont.getCSSNullSafe", [
     return jvm.createStringLiteral("16px sans-serif");
   }
   try {
-    return yield* original(__cn1ThisObject);
+    return yield* cn1_ivAdapt(original(__cn1ThisObject));
   } catch (err) {
     const message = String(err && err.message ? err.message : err || "");
     if (message.indexOf("__classDef") >= 0) {
@@ -1786,7 +1786,7 @@ bindCiFallback("NativeFont.charWidthNullSafe", [
     return 8;
   }
   try {
-    return yield* original(__cn1ThisObject, chr);
+    return yield* cn1_ivAdapt(original(__cn1ThisObject, chr));
   } catch (err) {
     emitCiFallbackMarker("NativeFont.charWidthDefaulted", "HIT");
     return 8;
@@ -1817,7 +1817,7 @@ bindCiFallback("HTML5Implementation.determineFontHeightCoerce", [
 ], function*(fontStyle) {
   if (typeof determineFontHeightOriginal === "function") {
     try {
-      return yield* determineFontHeightOriginal(fontStyle);
+      return yield* cn1_ivAdapt(determineFontHeightOriginal(fontStyle));
     } catch (err) {
       const message = String(err && err.message ? err.message : err || "");
       if (message.indexOf("indexOf is not a function") < 0) {
@@ -1859,7 +1859,7 @@ bindCiFallback("HashMap.computeHashCodeNullKey", [
   }
   // Try the original captured at port.js load time first.
   if (typeof hashMapComputeHashCodeOriginal === "function") {
-    return yield* hashMapComputeHashCodeOriginal(key);
+    return yield* cn1_ivAdapt(hashMapComputeHashCodeOriginal(key));
   }
   // Original wasn't available yet (translated_app.js loads after port.js).
   // computeHashCode(key) is just key.hashCode(), so call hashCode directly
@@ -1867,7 +1867,7 @@ bindCiFallback("HashMap.computeHashCodeNullKey", [
   var hashCodeMethod = jvm.resolveVirtual(key.__class || "java_lang_Object",
     "cn1_java_lang_Object_hashCode_R_int");
   if (typeof hashCodeMethod === "function") {
-    return yield* hashCodeMethod(key);
+    return yield* cn1_ivAdapt(hashCodeMethod(key));
   }
   return 0;
 });
@@ -1878,7 +1878,7 @@ if (typeof global[hashMapComputeHashCodeImplMethodId] === "function") {
       emitDiagLine("PARPAR:DIAG:FALLBACK:hashMapComputeHashCodeDirect:nullKey=1");
       return 0;
     }
-    return yield* originalHashMapComputeHashCodeImpl(key);
+    return yield* cn1_ivAdapt(originalHashMapComputeHashCodeImpl(key));
   };
   emitDiagLine("PARPAR:DIAG:INIT:shim=hashMapComputeHashCodeImplNullKey");
 }
@@ -1889,7 +1889,7 @@ if (typeof global[hashMapComputeHashCodeMethodId] === "function") {
       emitDiagLine("PARPAR:DIAG:FALLBACK:hashMapComputeHashCodeDirect:nullKey=1");
       return 0;
     }
-    return yield* originalHashMapComputeHashCode(key);
+    return yield* cn1_ivAdapt(originalHashMapComputeHashCode(key));
   };
   emitDiagLine("PARPAR:DIAG:INIT:shim=hashMapComputeHashCodeNullKey");
 }
@@ -1901,7 +1901,7 @@ if (hashMapClassDef && hashMapClassDef.methods && typeof hashMapClassDef.methods
       emitDiagLine("PARPAR:DIAG:FALLBACK:hashMapComputeHashCodeClass:nullKey=1");
       return 0;
     }
-    return yield* originalClassHashMapComputeHashCode(__cn1ThisObject, key);
+    return yield* cn1_ivAdapt(originalClassHashMapComputeHashCode(__cn1ThisObject, key));
   };
   emitDiagLine("PARPAR:DIAG:INIT:shim=hashMapComputeHashCodeClassNullKey");
 }
@@ -1965,7 +1965,7 @@ function installGlobalArrayReturnCoerce(symbol, className, marker) {
     return false;
   }
   const wrapped = function*() {
-    const result = yield* original.apply(this, arguments);
+    const result = yield* cn1_ivAdapt(original.apply(this, arguments));
     const coerced = ensureJavaByteArray4(result);
     if (result !== coerced) {
       emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":coerced=1");
@@ -1988,7 +1988,7 @@ bindCiFallback("Style.setPaddingUnitArrayCoerce", [
   if (typeof original !== "function") {
     return null;
   }
-  return yield* original(__cn1ThisObject, ensureJavaByteArray4(arr));
+  return yield* cn1_ivAdapt(original(__cn1ThisObject, ensureJavaByteArray4(arr)));
 });
 
 bindCiFallback("Style.setMarginUnitArrayCoerce", [
@@ -1998,7 +1998,7 @@ bindCiFallback("Style.setMarginUnitArrayCoerce", [
   if (typeof original !== "function") {
     return null;
   }
-  return yield* original(__cn1ThisObject, ensureJavaByteArray4(arr));
+  return yield* cn1_ivAdapt(original(__cn1ThisObject, ensureJavaByteArray4(arr)));
 });
 
 bindCiFallback("Style.convertUnitArrayCoerce", [
@@ -2015,7 +2015,7 @@ bindCiFallback("Style.convertUnitArrayCoerce", [
     }
     return 0;
   }
-  return yield* original(__cn1ThisObject, ensureJavaByteArray4(arr), value, side);
+  return yield* cn1_ivAdapt(original(__cn1ThisObject, ensureJavaByteArray4(arr), value, side));
 });
 
 installGlobalArrayReturnCoerce(
@@ -2106,7 +2106,7 @@ function isLikelyFormObject(value) {
 function* safeInitLafPath(form, uiManager, lookAndFeel) {
   const containerInitLaf = global.cn1_com_codename1_ui_Container_initLaf_com_codename1_ui_plaf_UIManager;
   if (typeof containerInitLaf === "function") {
-    yield* containerInitLaf(form, uiManager);
+    yield* cn1_ivAdapt(containerInitLaf(form, uiManager));
   }
   let effectiveLookAndFeel = lookAndFeel || null;
   if (!effectiveLookAndFeel && uiManager && uiManager.__class) {
@@ -2115,7 +2115,7 @@ function* safeInitLafPath(form, uiManager, lookAndFeel) {
         uiManager.__class,
         "cn1_com_codename1_ui_plaf_UIManager_getLookAndFeel_R_com_codename1_ui_plaf_LookAndFeel"
       );
-      effectiveLookAndFeel = yield* getLookAndFeel(uiManager);
+      effectiveLookAndFeel = yield* cn1_ivAdapt(getLookAndFeel(uiManager));
     } catch (_err) {
       effectiveLookAndFeel = null;
     }
@@ -2126,7 +2126,7 @@ function* safeInitLafPath(form, uiManager, lookAndFeel) {
       || global.cn1_com_codename1_ui_MenuBar___INIT__;
     if (typeof menuBarCtor === "function") {
       menuBar = jvm.newObject("com_codename1_ui_MenuBar");
-      yield* menuBarCtor(menuBar);
+      yield* cn1_ivAdapt(menuBarCtor(menuBar));
       form["cn1_com_codename1_ui_Form_menuBar"] = menuBar;
     }
   }
@@ -2136,7 +2136,7 @@ function* safeInitLafPath(form, uiManager, lookAndFeel) {
         menuBar.__class,
         "cn1_com_codename1_ui_MenuBar_initMenuBar_com_codename1_ui_Form"
       );
-      yield* initMenuBar(menuBar, form);
+      yield* cn1_ivAdapt(initMenuBar(menuBar, form));
     } catch (_err) {
       // best effort
     }
@@ -2147,7 +2147,7 @@ function* safeInitLafPath(form, uiManager, lookAndFeel) {
         effectiveLookAndFeel.__class,
         "cn1_com_codename1_ui_plaf_LookAndFeel_getDefaultFormTintColor_R_int"
       );
-      form["cn1_com_codename1_ui_Form_tintColor"] = yield* getTint(effectiveLookAndFeel);
+      form["cn1_com_codename1_ui_Form_tintColor"] = yield* cn1_ivAdapt(getTint(effectiveLookAndFeel));
     } catch (_err) {
       // best effort
     }
@@ -2170,7 +2170,7 @@ function* recoverInitFocusedNullReceiver(form) {
   if (formLayeredPane && formLayeredPane.__class) {
     try {
       const findFirstFocusable = jvm.resolveVirtual(formLayeredPane.__class, containerFindFirstFocusableMethodId);
-      focusCandidate = yield* findFirstFocusable(formLayeredPane);
+      focusCandidate = yield* cn1_ivAdapt(findFirstFocusable(formLayeredPane));
     } catch (_err) {
       focusCandidate = null;
     }
@@ -2179,7 +2179,7 @@ function* recoverInitFocusedNullReceiver(form) {
     let pane = null;
     try {
       const getActualPane = jvm.resolveVirtual(form.__class, formGetActualPaneMethodId);
-      pane = yield* getActualPane(form);
+      pane = yield* cn1_ivAdapt(getActualPane(form));
     } catch (_err) {
       pane = null;
     }
@@ -2192,7 +2192,7 @@ function* recoverInitFocusedNullReceiver(form) {
       yield* ensureContainerLayout(pane, false, "formInitFocused:pane");
       try {
         const findFirstFocusable = jvm.resolveVirtual(pane.__class, containerFindFirstFocusableMethodId);
-        focusCandidate = yield* findFirstFocusable(pane);
+        focusCandidate = yield* cn1_ivAdapt(findFirstFocusable(pane));
       } catch (_err) {
         focusCandidate = null;
       }
@@ -2200,7 +2200,7 @@ function* recoverInitFocusedNullReceiver(form) {
   }
   try {
     const setFocused = jvm.resolveVirtual(form.__class, formSetFocusedMethodId);
-    yield* setFocused(form, focusCandidate);
+    yield* cn1_ivAdapt(setFocused(form, focusCandidate));
   } catch (_err) {
     form["cn1_com_codename1_ui_Form_focused"] = focusCandidate || null;
   }
@@ -2208,10 +2208,10 @@ function* recoverInitFocusedNullReceiver(form) {
   try {
     const getDisplay = global[displayGetInstanceMethodId + "__impl"] || global[displayGetInstanceMethodId];
     if (typeof getDisplay === "function") {
-      const display = yield* getDisplay();
+      const display = yield* cn1_ivAdapt(getDisplay());
       if (display && display.__class) {
         const shouldRenderSelectionFn = jvm.resolveVirtual(display.__class, displayShouldRenderSelectionMethodId);
-        shouldRenderSelection = (yield* shouldRenderSelectionFn(display)) | 0;
+        shouldRenderSelection = (yield* cn1_ivAdapt(shouldRenderSelectionFn(display))) | 0;
       }
     }
   } catch (_err) {
@@ -2220,7 +2220,7 @@ function* recoverInitFocusedNullReceiver(form) {
   if (shouldRenderSelection) {
     try {
       const layoutContainer = jvm.resolveVirtual(form.__class, formLayoutContainerMethodId);
-      yield* layoutContainer(form);
+      yield* cn1_ivAdapt(layoutContainer(form));
     } catch (_err) {
       // Best effort.
     }
@@ -2275,7 +2275,7 @@ bindCiFallback("Form.initLafNullUiManagerBridge", [
     const getInstance = global.cn1_com_codename1_ui_plaf_UIManager_getInstance_R_com_codename1_ui_plaf_UIManager__impl
       || global.cn1_com_codename1_ui_plaf_UIManager_getInstance_R_com_codename1_ui_plaf_UIManager;
     if (typeof getInstance === "function") {
-      effectiveUiManager = yield* getInstance();
+      effectiveUiManager = yield* cn1_ivAdapt(getInstance());
     }
   }
   if (!effectiveUiManager) {
@@ -2288,7 +2288,7 @@ bindCiFallback("Form.initLafNullUiManagerBridge", [
       effectiveUiManager.__class,
       "cn1_com_codename1_ui_plaf_UIManager_getLookAndFeel_R_com_codename1_ui_plaf_LookAndFeel"
     );
-    lookAndFeel = yield* getLookAndFeel(effectiveUiManager);
+    lookAndFeel = yield* cn1_ivAdapt(getLookAndFeel(effectiveUiManager));
   } catch (_err) {
     lookAndFeel = null;
   }
@@ -2301,7 +2301,7 @@ bindCiFallback("Form.initLafNullUiManagerBridge", [
       || global.cn1_com_codename1_ui_plaf_DefaultLookAndFeel___INIT___com_codename1_ui_plaf_UIManager;
     if (typeof defaultLookAndFeelCtor === "function") {
       const defaultLookAndFeel = jvm.newObject("com_codename1_ui_plaf_DefaultLookAndFeel");
-      yield* defaultLookAndFeelCtor(defaultLookAndFeel, effectiveUiManager);
+      yield* cn1_ivAdapt(defaultLookAndFeelCtor(defaultLookAndFeel, effectiveUiManager));
       effectiveUiManager["cn1_com_codename1_ui_plaf_UIManager_current"] = defaultLookAndFeel;
       emitFormInitLafDiag("PARPAR:DIAG:FALLBACK:formInitLaf:defaultLookAndFeelInjected=1");
     } else {
@@ -2313,7 +2313,7 @@ bindCiFallback("Form.initLafNullUiManagerBridge", [
       || global.cn1_com_codename1_ui_MenuBar___INIT__;
     if (typeof menuBarCtor === "function") {
       const menuBar = jvm.newObject("com_codename1_ui_MenuBar");
-      yield* menuBarCtor(menuBar);
+      yield* cn1_ivAdapt(menuBarCtor(menuBar));
       effectiveSelf["cn1_com_codename1_ui_Form_menuBar"] = menuBar;
       emitFormInitLafDiag("PARPAR:DIAG:FALLBACK:formInitLaf:menuBarInjected=1");
     } else {
@@ -2326,7 +2326,7 @@ bindCiFallback("Form.initLafNullUiManagerBridge", [
   }
   emitFormInitLafDiag("PARPAR:DIAG:FALLBACK:formInitLaf:invokeOriginal=1");
   try {
-    return yield* formInitLafOriginalMethod(effectiveSelf, effectiveUiManager);
+    return yield* cn1_ivAdapt(formInitLafOriginalMethod(effectiveSelf, effectiveUiManager));
   } catch (err) {
     const message = String(err && err.message ? err.message : err || "");
     if (message.indexOf("__classDef") >= 0) {
@@ -2349,7 +2349,7 @@ bindCiFallback("Form.initFocusedNullPaneGuard", [
     return yield* recoverInitFocusedNullReceiver(__cn1ThisObject);
   }
   try {
-    return yield* formInitFocusedOriginalMethod(__cn1ThisObject);
+    return yield* cn1_ivAdapt(formInitFocusedOriginalMethod(__cn1ThisObject));
   } catch (err) {
     const message = String(err && err.message ? err.message : err || "");
     if (message.indexOf("__classDef") >= 0) {
@@ -2373,7 +2373,7 @@ bindCiFallback("Form.flushRevalidateQueueNullGuard", [
   }
   if (typeof formFlushRevalidateQueueOriginalMethod === "function") {
     try {
-      return yield* formFlushRevalidateQueueOriginalMethod(__cn1ThisObject);
+      return yield* cn1_ivAdapt(formFlushRevalidateQueueOriginalMethod(__cn1ThisObject));
     } catch (err) {
       const message = String(err && err.message ? err.message : err || "");
       if (message.indexOf("__classDef") >= 0) {
@@ -2399,7 +2399,7 @@ bindCiFallback("Form.deinitializeImplAnimManagerNullGuard", [
   }
   if (typeof formDeinitializeImplOriginalMethod === "function") {
     try {
-      return yield* formDeinitializeImplOriginalMethod(__cn1ThisObject);
+      return yield* cn1_ivAdapt(formDeinitializeImplOriginalMethod(__cn1ThisObject));
     } catch (err) {
       const message = String(err && err.message ? err.message : err || "");
       if (message.indexOf("__classDef") >= 0) {
@@ -2454,7 +2454,7 @@ function* ensureContainerComponentsList(container, marker) {
   let list = null;
   try {
     list = jvm.newObject("java_util_ArrayList");
-    yield* arrayListCtor(list);
+    yield* cn1_ivAdapt(arrayListCtor(list));
   } catch (err) {
     emitDiagLine(
       "PARPAR:DIAG:FALLBACK:" + marker + ":componentsCtorErr="
@@ -2481,7 +2481,7 @@ function* ensureComponentBounds(component, marker) {
     return null;
   }
   try {
-    yield* componentCtor(component);
+    yield* cn1_ivAdapt(componentCtor(component));
   } catch (err) {
     emitDiagLine(
       "PARPAR:DIAG:FALLBACK:" + marker + ":componentCtorErr="
@@ -2501,7 +2501,7 @@ function* createLayoutInstance(layoutClassId, ctorMethodId, marker) {
   }
   const layout = jvm.newObject(layoutClassId);
   try {
-    yield* ctor(layout);
+    yield* cn1_ivAdapt(ctor(layout));
   } catch (err) {
     emitDiagLine(
       "PARPAR:DIAG:FALLBACK:" + marker + ":layoutCtorErr="
@@ -2539,7 +2539,7 @@ function* ensureContainerLayout(container, preferBorderLayout, marker) {
   let applied = false;
   try {
     const setLayout = jvm.resolveVirtual(container.__class, containerSetLayoutMethodId);
-    yield* setLayout(container, layout);
+    yield* cn1_ivAdapt(setLayout(container, layout));
     applied = true;
   } catch (_setLayoutErr) {
     // Fall through to direct field patch.
@@ -2564,7 +2564,7 @@ function* ensureFormRevalidateQueues(form, marker) {
     if (typeof hashSetCtor === "function") {
       try {
         const pending = jvm.newObject("java_util_HashSet");
-        yield* hashSetCtor(pending);
+        yield* cn1_ivAdapt(hashSetCtor(pending));
         form[formPendingRevalidateQueueFieldId] = pending;
         emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":pendingRevalidateQueueInjected=1");
       } catch (err) {
@@ -2579,7 +2579,7 @@ function* ensureFormRevalidateQueues(form, marker) {
     if (typeof arrayListCtor === "function") {
       try {
         const queue = jvm.newObject("java_util_ArrayList");
-        yield* arrayListCtor(queue);
+        yield* cn1_ivAdapt(arrayListCtor(queue));
         form[formRevalidateQueueFieldId] = queue;
         emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":revalidateQueueInjected=1");
       } catch (err) {
@@ -2607,7 +2607,7 @@ function* ensureFormAnimationManager(form, marker) {
   }
   try {
     const manager = jvm.newObject("com_codename1_ui_AnimationManager");
-    yield* ctor(manager, form);
+    yield* cn1_ivAdapt(ctor(manager, form));
     form[formAnimationManagerFieldId] = manager;
     emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":animManagerInjected=1");
     return manager;
@@ -2639,7 +2639,7 @@ function* ensureFormContentPane(form, marker) {
   }
   contentPane = jvm.newObject("com_codename1_ui_Container");
   try {
-    yield* containerCtor(contentPane);
+    yield* cn1_ivAdapt(containerCtor(contentPane));
   } catch (err) {
     emitDiagLine(
       "PARPAR:DIAG:FALLBACK:" + marker + ":contentPaneCtorErr="
@@ -2670,7 +2670,7 @@ function* recoverFormCtorIllegalState(self, title, layout, marker) {
     const defaultCtor = global[formDefaultCtorMethodId + "__impl"] || global[formDefaultCtorMethodId];
     if (typeof defaultCtor === "function") {
       try {
-        yield* defaultCtor(self);
+        yield* cn1_ivAdapt(defaultCtor(self));
         ctorApplied = true;
       } catch (ctorErr) {
         emitDiagLine("PARPAR:DIAG:FALLBACK:" + marker + ":recoverCtorError=" + String(ctorErr && ctorErr.__class ? ctorErr.__class : ctorErr));
@@ -2680,7 +2680,7 @@ function* recoverFormCtorIllegalState(self, title, layout, marker) {
       let layoutApplied = false;
       try {
         const setLayout = jvm.resolveVirtual(self.__class, containerSetLayoutMethodId);
-        yield* setLayout(self, layout);
+        yield* cn1_ivAdapt(setLayout(self, layout));
         layoutApplied = true;
       } catch (_setLayoutErr) {
         // Fall through to direct field patch.
@@ -2693,7 +2693,7 @@ function* recoverFormCtorIllegalState(self, title, layout, marker) {
       let titleApplied = false;
       try {
         const setTitle = jvm.resolveVirtual(self.__class, formSetTitleMethodId);
-        yield* setTitle(self, title);
+        yield* cn1_ivAdapt(setTitle(self, title));
         titleApplied = true;
       } catch (_setTitleErr) {
         // Fall through to direct field patch.
@@ -2732,7 +2732,7 @@ function installGlobalIllegalStateBypass(symbol, marker) {
       emitDisplayInitDiag("POST_EDT_ENSURE_" + marker);
     }
     try {
-      return yield* original.apply(this, arguments);
+      return yield* cn1_ivAdapt(original.apply(this, arguments));
     } catch (err) {
       const classId = String(err && err.__class ? err.__class : "");
       if (classId === "java_lang_IllegalStateException") {
@@ -2784,7 +2784,7 @@ bindCiFallback("Form.layoutCtorIllegalStateBypass", [
     emitDisplayInitDiag("POST_EDT_ENSURE_formCtorLayout");
   }
   try {
-    return yield* formCtorLayoutOriginal(__cn1ThisObject, layout);
+    return yield* cn1_ivAdapt(formCtorLayoutOriginal(__cn1ThisObject, layout));
   } catch (err) {
     const classId = String(err && err.__class ? err.__class : "");
     if (classId === "java_lang_IllegalStateException") {
@@ -2832,7 +2832,7 @@ bindCiFallback("Form.titleLayoutCtorIllegalStateBypass", [
     emitDisplayInitDiag("POST_EDT_ENSURE_formCtorTitleLayout");
   }
   try {
-    return yield* formCtorTitleLayoutOriginal(__cn1ThisObject, title, layout);
+    return yield* cn1_ivAdapt(formCtorTitleLayoutOriginal(__cn1ThisObject, title, layout));
   } catch (err) {
     const classId = String(err && err.__class ? err.__class : "");
     if (classId === "java_lang_IllegalStateException") {
@@ -2914,7 +2914,7 @@ bindCiFallbackWithMethodId("Form.addComponentNullContentPaneGuard", formAddCompo
   for (let i = 2; i < arguments.length; i++) {
     args.push(arguments[i]);
   }
-  return yield* original.apply(null, args);
+  return yield* cn1_ivAdapt(original.apply(null, args));
 });
 
 const cn1ssCompleteMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerHelper_complete_java_lang_Runnable";
@@ -3129,7 +3129,7 @@ bindCiFallback("HTML5Implementation.hideSplashNoJQueryGuard", [
     emitDiagLine("PARPAR:DIAG:FALLBACK:hideSplash:jQueryMissing=1");
     return null;
   }
-  return yield* html5HideSplashOriginal(__cn1ThisObject);
+  return yield* cn1_ivAdapt(html5HideSplashOriginal(__cn1ThisObject));
 });
 
 bindCiFallback("BaseTest.createFormNullGuard", [
@@ -3144,7 +3144,7 @@ bindCiFallback("BaseTest.createFormNullGuard", [
   let form = null;
   if (typeof baseTestCreateFormOriginal === "function") {
     try {
-      form = yield* baseTestCreateFormOriginal(__cn1ThisObject, title, layout, imageName);
+      form = yield* cn1_ivAdapt(baseTestCreateFormOriginal(__cn1ThisObject, title, layout, imageName));
       if (form && form.__class) {
         return form;
       }
@@ -3161,7 +3161,7 @@ bindCiFallback("BaseTest.createFormNullGuard", [
     form = jvm.newObject(baseTestFormSubclassClassId);
     const ctor = global[baseTestFormSubclassCtorMethodId];
     if (form && typeof ctor === "function") {
-      yield* ctor(form, __cn1ThisObject, title, layout, imageName);
+      yield* cn1_ivAdapt(ctor(form, __cn1ThisObject, title, layout, imageName));
       if (form && form.__class) {
         emitDiagLine("PARPAR:DIAG:FALLBACK:baseTestCreateForm:recoveredSubclassCtor=1");
         return form;
@@ -3177,7 +3177,7 @@ bindCiFallback("BaseTest.createFormNullGuard", [
       ? global[formCtorTitleLayoutMethodId]
       : global[formCtorTitleLayoutMethodId + "__impl"];
     if (form && typeof fallbackCtor === "function") {
-      yield* fallbackCtor(form, title, layout);
+      yield* cn1_ivAdapt(fallbackCtor(form, title, layout));
       emitDiagLine("PARPAR:DIAG:FALLBACK:baseTestCreateForm:degradedPlainForm=1");
       return form;
     }
@@ -3378,13 +3378,13 @@ function* runCn1ssResolvedTest(callTarget, effectiveTestObject, effectiveTestNam
     try {
       const finalizeMethod = jvm.resolveVirtual(callTarget.__class, cn1ssRunnerFinalizeTestMethodId);
       if (typeof finalizeMethod === "function") {
-        return yield* finalizeMethod(
+        return yield* cn1_ivAdapt(finalizeMethod(
           callTarget,
           effectiveIndex,
           effectiveTestObject,
           normalizedTestName,
           1
-        );
+        ));
       }
     } catch (_finalizeErr) {
       const finalizeErrDetail = yield* stringifyThrowable(_finalizeErr);
@@ -3446,7 +3446,7 @@ function* runCn1ssResolvedTest(callTarget, effectiveTestObject, effectiveTestNam
     try {
       const failMethod = jvm.resolveVirtual(effectiveTestObject.__class, baseTestFailMethodId);
       if (typeof failMethod === "function") {
-        yield* failMethod(effectiveTestObject, cn1ssToJavaString(errText));
+        yield* cn1_ivAdapt(failMethod(effectiveTestObject, cn1ssToJavaString(errText)));
       }
     } catch (_failErr) {
       // Best effort only.
@@ -3461,13 +3461,13 @@ function* runCn1ssResolvedTest(callTarget, effectiveTestObject, effectiveTestNam
     const awaitMethod = jvm.resolveVirtual(callTarget.__class, cn1ssRunnerAwaitTestCompletionMethodId);
     if (typeof awaitMethod === "function") {
       const deadline = Date.now() + cn1ssTestTimeoutMs;
-      return yield* awaitMethod(
+      return yield* cn1_ivAdapt(awaitMethod(
         callTarget,
         effectiveIndex,
         effectiveTestObject,
         normalizedTestName,
         deadline
-      );
+      ));
     }
     emitLambdaBridgeDiag("PARPAR:DIAG:FALLBACK:lambdaBridge:awaitTestCompletionMissing=1");
   } catch (_awaitErr) {
@@ -3478,13 +3478,13 @@ function* runCn1ssResolvedTest(callTarget, effectiveTestObject, effectiveTestNam
   try {
     const finalizeMethod = jvm.resolveVirtual(callTarget.__class, cn1ssRunnerFinalizeTestMethodId);
     if (typeof finalizeMethod === "function") {
-      return yield* finalizeMethod(
+      return yield* cn1_ivAdapt(finalizeMethod(
         callTarget,
         effectiveIndex,
         effectiveTestObject,
         normalizedTestName,
         0
-      );
+      ));
     }
     return yield* forceAdvanceCn1ssRunner(callTarget, effectiveIndex, "directFinalizeMissing");
   } catch (_finalizeAfterRunErr) {
@@ -3532,7 +3532,7 @@ bindCiFallback("Cn1ssDeviceRunner.lambda2RunBridge", [
     "PARPAR:DIAG:FALLBACK:lambda2RunBridge:dispatch:index=" + String(index == null ? "null" : (index | 0))
     + ":test=" + (testObject && testObject.__class ? testObject.__class : "null")
   );
-  return yield* awaitLambdaMethod(runner, index | 0, testObject, testName, deadline);
+  return yield* cn1_ivAdapt(awaitLambdaMethod(runner, index | 0, testObject, testName, deadline));
 });
 
 function emitGuaranteedConsole(line) {
@@ -3547,7 +3547,7 @@ function* invokeCn1ssFinishSuite(runner, reason) {
     const finishSuiteMethod = jvm.resolveVirtual(runner.__class, cn1ssRunnerFinishSuiteMethodId);
     if (typeof finishSuiteMethod === "function") {
       emitGuaranteedConsole("CN1SS:INFO:lambda3RunBridge:finishSuiteInvoked reason=" + String(reason || "unknown"));
-      return yield* finishSuiteMethod(runner);
+      return yield* cn1_ivAdapt(finishSuiteMethod(runner));
     }
     emitGuaranteedConsole("CN1SS:ERR:lambda3RunBridge:finishSuiteMissing reason=" + String(reason || "unknown"));
   } catch (err) {
@@ -3601,7 +3601,7 @@ bindCiFallback("Cn1ssDeviceRunner.lambda3RunBridge", [
     }
     const runNextTestMethod = jvm.resolveVirtual(runner.__class, cn1ssRunnerRunNextTestMethodId);
     if (typeof runNextTestMethod === "function") {
-      return yield* runNextTestMethod(runner, nextIndex);
+      return yield* cn1_ivAdapt(runNextTestMethod(runner, nextIndex));
     }
     emitGuaranteedConsole("CN1SS:ERR:lambda3RunBridge:runNextTestMissing nextIndex=" + nextIndex);
   } catch (err) {
@@ -3636,7 +3636,7 @@ function* forceAdvanceCn1ssRunner(callTarget, currentIndex, reason) {
   try {
     const runNextTestMethod = jvm.resolveVirtual(callTarget.__class, cn1ssRunnerRunNextTestMethodId);
     if (typeof runNextTestMethod === "function") {
-      return yield* runNextTestMethod(callTarget, nextIndex);
+      return yield* cn1_ivAdapt(runNextTestMethod(callTarget, nextIndex));
     }
   } catch (advanceErr) {
     emitGuaranteedConsole(
@@ -3809,7 +3809,7 @@ bindCiFallbackWithMethodId("Cn1ssDeviceRunner.lambdaRunNextTestBridge", cn1ssLam
   }
   callTarget.__cn1LambdaBridgeDispatching = true;
   try {
-    return yield* cn1ssLambdaBridgeOriginalRunnerMethod(callTarget, effectiveTestName, effectiveTestObject, effectiveIndex);
+    return yield* cn1_ivAdapt(cn1ssLambdaBridgeOriginalRunnerMethod(callTarget, effectiveTestName, effectiveTestObject, effectiveIndex));
   } finally {
     callTarget.__cn1LambdaBridgeDispatching = false;
   }
@@ -4094,7 +4094,7 @@ function* invokeFirstResolvableInstanceMethod(receiver, methodIds) {
     try {
       const method = jvm.resolveVirtual(receiver.__class, methodId);
       if (typeof method === "function") {
-        yield* method(receiver);
+        yield* cn1_ivAdapt(method(receiver));
         return methodId;
       }
     } catch (_err) {
@@ -4214,7 +4214,7 @@ bindCiFallback("Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshotDom", [
   if (completion && completion.__class) {
     try {
       const runMethod = jvm.resolveVirtual(completion.__class, "cn1_java_lang_Runnable_run");
-      yield* runMethod(completion);
+      yield* cn1_ivAdapt(runMethod(completion));
       completionRunnableRan = true;
     } catch (err) {
       emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:completionRunErr=" + String(err && err.message ? err.message : err));
@@ -4227,10 +4227,10 @@ bindCiFallback("Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshotDom", [
   if (effectiveBaseTest && effectiveBaseTest.__class) {
     try {
       const isDoneMethod = jvm.resolveVirtual(effectiveBaseTest.__class, "cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_isDone_R_boolean");
-      const alreadyDone = ((yield* isDoneMethod(effectiveBaseTest)) | 0) !== 0;
+      const alreadyDone = ((yield* cn1_ivAdapt(isDoneMethod(effectiveBaseTest))) | 0) !== 0;
       if (!alreadyDone) {
         const doneMethod = jvm.resolveVirtual(effectiveBaseTest.__class, baseTestDoneMethodId);
-        yield* doneMethod(effectiveBaseTest);
+        yield* cn1_ivAdapt(doneMethod(effectiveBaseTest));
         emitDiagLine(
           "PARPAR:DIAG:FALLBACK:cn1ssEmitCurrentFormScreenshotDom:forcedDone=1:completionRun="
           + (completionRunnableRan ? "1" : "0")
@@ -4291,7 +4291,7 @@ bindCiFallback("Cn1ssDeviceRunnerHelper.completeNullRunnableGuard", [
     return null;
   }
   const runMethod = jvm.resolveVirtual(completion.__class, "cn1_java_lang_Runnable_run");
-  return yield* runMethod(completion);
+  return yield* cn1_ivAdapt(runMethod(completion));
 });
 
 bindCiFallback("BaseTest.registerReadyCallbackImmediate", [
@@ -4325,7 +4325,7 @@ bindCiFallback("BaseTest.registerReadyCallbackImmediate", [
     return null;
   }
   const runMethod = jvm.resolveVirtual(callback.__class, "cn1_java_lang_Runnable_run");
-  return yield* runMethod(callback);
+  return yield* cn1_ivAdapt(runMethod(callback));
 });
 
 const baseTestOnShowLambdaMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_1_lambda_onShowCompleted_0_java_lang_String";
@@ -4354,7 +4354,7 @@ function installBaseTestOnShowLambdaShim() {
     if (!method) {
       method = jvm.resolveVirtual(target.__class, baseTestOnShowLambdaMethodId);
     }
-    return yield* method(target, onShowMessage);
+    return yield* cn1_ivAdapt(method(target, onShowMessage));
   });
   emitDiagLine("PARPAR:DIAG:INIT:shim=baseTestOnShowLambdaDispatch");
   return true;
@@ -4400,7 +4400,7 @@ bindCiFallback("CodenameOneImplementation.initImplSafe", [
 ], function*(__cn1ThisObject, m) {
   if (typeof initImplOriginal === "function") {
     try {
-      return yield* initImplOriginal(__cn1ThisObject, m);
+      return yield* cn1_ivAdapt(initImplOriginal(__cn1ThisObject, m));
     } catch (err) {
       const message = String(err && err.message ? err.message : err || "");
       if (message.indexOf("__classDef") >= 0 || message.indexOf("lastIndexOf") >= 0 || message.indexOf("substring") >= 0) {
@@ -4423,7 +4423,7 @@ bindCiFallback("CodenameOneImplementation.initImplSafe", [
   try {
     const initMethod2 = jvm.resolveVirtual(__cn1ThisObject.__class, initMethodId2);
     if (typeof initMethod2 === "function") {
-      yield* initMethod2(__cn1ThisObject, m);
+      yield* cn1_ivAdapt(initMethod2(__cn1ThisObject, m));
     }
   } catch (_ignore) {
     // Best effort – init may already have been called
