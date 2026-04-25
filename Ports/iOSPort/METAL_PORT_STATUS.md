@@ -14,8 +14,8 @@ Add a Metal-based rendering backend to the iOS port, gated by `#ifdef CN1_USE_ME
 |-------|-------|--------|
 | 0 | Unblock the Metal stub; scaffolding + compile | **complete** |
 | 1 | `CN1Metalcompat` + MVP ops (`FillRect`, `DrawImage`, `ClipRect`, `SetTransform`, `ClearRect`) | **complete (MVP)** |
-| 2 | Remaining `ExecutableOp`s + parity text + coordinate-system calibration | **in progress — Form bg renders** |
-| 3 | Unify mutable image rendering onto Metal | not started |
+| 2 | Remaining `ExecutableOp`s + parity text + coordinate-system calibration | **complete (modulo flaky tests + image-scaling rasterisation differences)** |
+| 3 | Unify mutable image rendering onto Metal | **scaffolding landed; activation pending** |
 | 4 | CoreText glyph atlas | not started |
 | 5 | Harden (colour space, drawable throttling, memory, lifecycle) | not started |
 
@@ -78,6 +78,35 @@ Across consecutive builds on this branch (run `5e461a42` → `a22ef251`):
 - **Two flaky screenshot tests** (`landscape`, `graphics-fill-round-rect`). See "Current baseline status" above — test-level non-determinism, not Metal rendering problems.
 - **CI capture flakiness.** Seen on `graphics-draw-arc` (run A) and `graphics-draw-gradient` (run B) — the iOS device-runner occasionally produces a PNG missing its IEND chunk. Comparator now reports this clearly. Root cause likely in the screenshot-capture / encode path on iOS. Pre-existing.
 - **`graphics-fill-polygon` dropped from compare pipeline.** When the JPEG preview exceeds 20 KB (test produces 72 KB), the runner drops the test from the comparison even though the full PNG was captured. Pre-existing tooling issue.
+
+### Pixel-perfect projection (separator-line artifact fix)
+
+The 1-pixel separator artifact (white+grey 2-row strip at titleArea boundary, list dividers) was rooted in Metal's diamond-exit line rasterisation rule landing on integer-Y pixel boundaries. Fix: `METALView.m`'s `updateFrameBufferSize:h:` now applies the canonical "Direct3D 9 pixel-perfect" half-pixel offset to the projection matrix's translation column (`+1/pw` in clip-space X, `-1/ph` in clip-space Y, signed by Y-down orientation). Integer eye-space coordinates now map to pixel CENTRES instead of pixel boundaries, where the rasteriser is unambiguous. FillRect output is unchanged for the typical case (geometry well inside the framebuffer); drawLine at integer Y now reliably covers the intended row.
+
+## Phase 3 — Unify mutable-image rendering onto Metal (in progress)
+
+### Scaffolding landed
+
+- `GLUIImage` carries new ivars under `CN1_USE_METAL`: `mtlMutableTexture`, `mtlMutableCommandBuffer`, `mtlMutableEncoder`, `mtlMutableWidth`, `mtlMutableHeight`. `getMTLTexture` prefers the mutable texture when present, so any screen-side `DrawImage` of a still-being-drawn mutable image picks up its latest pixels without a CG round-trip.
+- `CN1Metalcompat` exposes the mutable-image lifecycle API:
+  - `CN1MetalBeginMutableImageDraw(width, height, peer)` allocates (or reuses) the `MTLTexture`, opens a render encoder against it, saves the screen rendering state (encoder, projection, framebuffer dims, modelView, transform) on a single-slot stack, and switches the global active encoder to the mutable one. Subsequent `CN1MetalFillRect` / `DrawImage` / `SetTransform` calls go through the mutable encoder transparently.
+  - `CN1MetalFinishMutableImageDraw(peer)` ends the encoder and restores the saved screen state. The command buffer stays alive uncommitted for **deferred-commit semantics** — burst draws cost no GPU sync.
+  - `CN1MetalFlushMutableImage(peer)` commits and waits, called only from pixel-reading paths.
+  - `CN1MetalReadMutableImagePixels(peer, outARGB, x, y, w, h, ...)` does the canonical Shared `MTLBuffer` + `MTLBlitCommandEncoder` readback and unpacks `BGRA8Unorm` to `0xAARRGGBB`.
+- `CN1MetalCommandQueue()` exposed for non-screen command buffer allocation (mutable-image work shares the queue with screen drawing).
+- A per-mutable-image projection helper (`mutableProjection`) builds a Y-down ortho with the same half-pixel offset the screen projection uses.
+
+### Pending (activation)
+
+- Wire `Java_com_codename1_impl_ios_IOSImplementation_startDrawingOnImageImpl` and `finishDrawingOnImageImpl` to call the Metal API instead of `UIGraphicsBeginImageContextWithOptions` + `UIGraphicsGetImageFromCurrentImageContext`.
+- Each `nativeXxxMutableImpl` (FillRect, DrawLine, DrawImage, FillRoundRect, DrawString, FillArc, etc.) needs a `#ifdef CN1_USE_METAL` branch that calls the corresponding `CN1Metal*` op (which routes to the active encoder = the mutable encoder while a mutable draw is in progress).
+- `imageRgbToIntArrayImpl` needs to call `CN1MetalReadMutableImagePixels` instead of `CGContextDrawImage` into a managed buffer.
+- `toBase64JPEG` / `toPNG` paths (in `IOSNative.m`) need to flush mutable images before extracting their pixels.
+- A `toImage` that's called on a mutable image while another mutable image is being drawn into needs an `MTLEvent` dependency rather than a CPU wait — covered by the deferred-commit + dependency-graph design but not yet implemented.
+
+The CG-backed mutable-image paths in `CodenameOne_GLViewController.m` (`nativeFillRectMutableImpl` etc.) are untouched by this commit. The activation is intentionally separated: scaffolding lands first, then each op port + JNI wiring follows. A regression-test for `Image.getGraphics().drawXxx(...) → image.getRGB(...)` round-trips needs to land alongside the activation work.
+
+When the full Phase 3 activation lands, the mutable-image Y-flip workaround in `CN1MetalTextureFromUIImage` becomes obsolete (the CG round-trip is gone), and `nativeFillRectMutableImpl` / siblings can be `#ifdef`-removed on the Metal build.
 
 ## Phase 0 — Scaffolding (complete)
 
