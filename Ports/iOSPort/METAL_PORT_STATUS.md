@@ -15,7 +15,7 @@ Add a Metal-based rendering backend to the iOS port, gated by `#ifdef CN1_USE_ME
 | 0 | Unblock the Metal stub; scaffolding + compile | **complete** |
 | 1 | `CN1Metalcompat` + MVP ops (`FillRect`, `DrawImage`, `ClipRect`, `SetTransform`, `ClearRect`) | **complete (MVP)** |
 | 2 | Remaining `ExecutableOp`s + parity text + coordinate-system calibration | **complete (modulo flaky tests + image-scaling rasterisation differences)** |
-| 3 | Unify mutable image rendering onto Metal | **scaffolding landed; activation attempted, reverted (threading)** |
+| 3 | Unify mutable image rendering onto Metal | **activation in progress with thread-local state** |
 | 4 | CoreText glyph atlas | not started |
 | 5 | Harden (colour space, drawable throttling, memory, lifecycle) | not started |
 
@@ -96,24 +96,13 @@ The 1-pixel separator artifact (white+grey 2-row strip at titleArea boundary, li
 - `CN1MetalCommandQueue()` exposed for non-screen command buffer allocation (mutable-image work shares the queue with screen drawing).
 - A per-mutable-image projection helper (`mutableProjection`) builds a Y-down ortho with the same half-pixel offset the screen projection uses.
 
-### Activation attempt + revert (2026-04-25)
+### Activation timeline
 
-Activation was attempted in commits `b1aef94b5` (full activation) and `8f880a6d2` (compile fix for two duplicate-variable errors in the JNI functions). The build succeeded after the compile fix, but the test run **hung at the second test** (`DrawLine`, the first AbstractGraphicsScreenshotTest) — only `MainActivity.png` was captured before the macOS test runner SIGTERM'd the process at the 5-minute timeout.
+- **First attempt** (`b1aef94b5` + compile fix `8f880a6d2`): build OK, but the test run hung at `DrawLine` — only `MainActivity.png` captured before the 5-minute test-runner SIGTERM. Root cause: threading race on the single static `activeEncoder`. Screen path runs on main (CADisplayLink); mutable path runs on CN1's EDT. Both threads wrote to the same global. Reverted in `8270e4d1d` + `36e9e291b`.
 
-Most likely cause: **threading mismatch on `activeEncoder`.** The Metal compat layer holds a single static `id<MTLRenderCommandEncoder> activeEncoder`. The screen path runs on the main thread (CADisplayLink → drawFrame → setFramebuffer → CN1MetalBeginFrame); the mutable path runs on CN1's EDT (cleanPaint → Image.getGraphics → startDrawingOnImage → CN1MetalBeginMutableImageDraw). When both threads race on the global encoder pointer, encoded commands can be lost, deferred-commit semantics break, and the GPU pipeline can stall waiting on a half-encoded buffer.
+- **Second attempt** (`41aa3253e` + reapplied activation `bd405c8f7` + `ac9acd65e`): all rendering statics (`activeEncoder`, projection / matrix / framebuffer dims / matrix stack / mutable-active / saved-screen-state) made thread-local via `__thread`. This mirrors the GL path's implicit per-thread CG context model — each thread sees its own state automatically; no locks, no `dispatch_sync` (which would have risked deadlock against CN1's `runOnEDTAndWait`). Pipeline cache stays shared (read-only after first build, lazy-built per pipeline variant under its own lock).
 
-The GL/CG path doesn't have this problem because `UIGraphicsGetCurrentContext()` is thread-local — each thread sees its own current context.
-
-To re-attempt activation safely, one of:
-1. **Serialise all mutable Metal API calls onto the main queue** (`dispatch_sync(dispatch_get_main_queue(), ^{...})` around each `nativeXxxMutableImpl` body). Simple, but adds a sync per draw and risks main-thread deadlock if the EDT call chain ever crosses other dispatch_sync boundaries.
-2. **Thread-local active encoder.** Use pthread or `__thread` for `activeEncoder` / `mutableActive` / matrix state so each thread sees its own. Cleaner, but requires care around CN1MetalBeginFrame which still needs to publish the screen encoder visible to whichever thread executes ops (the upcoming queue is drained on main).
-3. **Force mutable rendering onto the main thread** by delivering each mutable JNI call to `dispatch_sync(main)` from EDT. Same as (1) but at the JNI boundary rather than per-op.
-
-Option 2 is closer to the GL path's semantics (each thread has its own state). Option 1 is simplest. Either way the readback path (`CN1MetalReadMutableImagePixels`) needs to commit + wait on the same thread that opened the buffer.
-
-Reverted in `8270e4d1d` and `36e9e291b`. The scaffolding (commit `961cc32d5`) remains: GLUIImage's mutable-state ivars, `CN1MetalBeginMutableImageDraw` / `Finish` / `Flush` / `ReadMutableImagePixels`, and the `mutableProjection` helper. The CG-backed mutable paths in `CodenameOne_GLViewController.m` are unchanged on Metal builds.
-
-When activation resumes, the mutable-image Y-flip workaround in `CN1MetalTextureFromUIImage` becomes obsolete (the CG round-trip is gone), and `nativeFillRectMutableImpl` / siblings can be `#ifdef`-removed on the Metal build.
+When activation lands cleanly, the mutable-image Y-flip workaround in `CN1MetalTextureFromUIImage` becomes obsolete (the CG round-trip is gone), and `nativeFillRectMutableImpl` / siblings can be `#ifdef`-removed on the Metal build.
 
 ## Phase 0 — Scaffolding (complete)
 
