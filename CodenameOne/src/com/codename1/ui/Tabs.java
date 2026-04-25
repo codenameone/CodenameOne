@@ -162,7 +162,7 @@ public class Tabs extends Container {
             // when initLaf runs polymorphically from Component()'s super
             // ctor - at that point the Tabs subclass fields haven't been
             // initialised yet and writes to them are brittle.
-            int themePlacement = UIManager.getInstance().getThemeConstant("tabPlacementInt", -1);
+            int themePlacement = getUIManager().getThemeConstant("tabPlacementInt", -1);
             if (themePlacement != -1) {
                 tabPlacement = themePlacement;
             }

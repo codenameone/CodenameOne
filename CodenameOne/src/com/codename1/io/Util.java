@@ -208,43 +208,12 @@ public final class Util {
         try {
             copyNoClose(i, o, bufferSize);
         } finally {
-            CodenameOneImplementation impl = Util.getImplementation();
-            if (impl != null) {
-                impl.cleanup(o);
-                impl.cleanup(i);
-            } else {
-                // Headless callers (e.g. the css-compiler native-themes build)
-                // use this method before Display is initialized. Fall back to
-                // closing the streams directly so we do not NPE.
-                closeQuietly(o);
-                closeQuietly(i);
-            }
+            Util.getImplementation().cleanup(o);
+            Util.getImplementation().cleanup(i);
         }
     }
 
-    private static void closeQuietly(InputStream c) {
-        if (c == null) {
-            return;
-        }
-        try {
-            c.close();
-        } catch (IOException e) {
-            System.err.println("Util.copy: ignoring " + e);
-        }
-    }
-
-    private static void closeQuietly(OutputStream c) {
-        if (c == null) {
-            return;
-        }
-        try {
-            c.close();
-        } catch (IOException e) {
-            System.err.println("Util.copy: ignoring " + e);
-        }
-    }
-
-    /// Closes the object (connection, stream etc.) without throwing any exception, even if the
+/// Closes the object (connection, stream etc.) without throwing any exception, even if the
     /// object is null
     ///
     /// #### Parameters
