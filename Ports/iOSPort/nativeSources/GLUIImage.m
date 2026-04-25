@@ -168,10 +168,31 @@ extern int nextPowerOf2(int val);
 #ifdef CN1_USE_METAL
 -(id<MTLTexture>)getMTLTexture {
     if (mtlTexture != nil) return mtlTexture;
+    // Phase 3: if a mutable render target exists, the freshest pixels live
+    // there. Use that texture directly so read-side draws (e.g., a screen
+    // DrawImage of this mutable image) get the latest content without going
+    // through CG.
+    if (mtlMutableTexture != nil) return mtlMutableTexture;
     if (img == nil) return nil;
     mtlTexture = CN1MetalTextureFromUIImage(img);
     return mtlTexture;
 }
+
+-(id<MTLTexture>)mtlMutableTexture { return mtlMutableTexture; }
+-(void)setMtlMutableTexture:(id<MTLTexture>)t width:(int)w height:(int)h {
+    mtlMutableTexture = t;
+    mtlMutableWidth = w;
+    mtlMutableHeight = h;
+    // The cached read-only texture is now stale -- reads should pull from
+    // the mutable texture, which we route to via getMTLTexture above.
+    mtlTexture = nil;
+}
+-(id<MTLCommandBuffer>)mtlMutableCommandBuffer { return mtlMutableCommandBuffer; }
+-(void)setMtlMutableCommandBuffer:(id<MTLCommandBuffer>)cb { mtlMutableCommandBuffer = cb; }
+-(id<MTLRenderCommandEncoder>)mtlMutableEncoder { return mtlMutableEncoder; }
+-(void)setMtlMutableEncoder:(id<MTLRenderCommandEncoder>)e { mtlMutableEncoder = e; }
+-(int)mtlMutableWidth { return mtlMutableWidth; }
+-(int)mtlMutableHeight { return mtlMutableHeight; }
 #endif
 
 -(void)dealloc {

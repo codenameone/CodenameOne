@@ -198,5 +198,63 @@ id<MTLTexture> CN1MetalTextureFromUIImage(UIImage *image);
 // who needs to allocate Metal resources.
 id<MTLDevice> CN1MetalDevice(void);
 
+// Global Metal command queue (from METALView). Mutable-image command buffers
+// allocate from this queue so they share scheduling with screen drawing.
+id<MTLCommandQueue> CN1MetalCommandQueue(void);
+
+// -------- Phase 3: unified mutable-image rendering --------
+//
+// On the Metal build, mutable images (`Image.createImage(w,h).getGraphics()`)
+// no longer round-trip through CoreGraphics. Each mutable image owns a
+// dedicated MTLTexture that the CN1 op queue draws into directly, sharing
+// the same encoder/draw primitives as the screen path. The CG-backed
+// shim in CodenameOne_GLViewController.m's nativeXxxMutableImpl functions
+// remains untouched for the GL build.
+//
+// Lifecycle:
+//   1. Java calls Image.getGraphics() -> JNI startDrawingOnImageImpl ->
+//      CN1MetalBeginMutableImageDraw(width, height, peer). This allocates
+//      (or reuses) an MTLTexture for the image, opens a command buffer +
+//      render encoder against it, and redirects subsequent draw primitives
+//      to the mutable encoder.
+//   2. Each draw op (FillRect, DrawImage, ...) goes through the same
+//      CN1MetalActiveEncoder() lookup as the screen path. While a mutable
+//      draw is active, the active encoder is the mutable one; the screen
+//      encoder is preserved and restored in finish.
+//   3. Java calls a finishing operation (Graphics is reset / image used)
+//      -> JNI finishDrawingOnImageImpl -> CN1MetalFinishMutableImageDraw()
+//      ends the mutable encoder. Pixels live on the GPU; the command
+//      buffer is **deferred** -- not committed until a readback or
+//      cross-image consume forces commit-and-wait.
+//   4. Pixel-reading paths (Image.getRGB, PNG/JPEG encode, toImage):
+//      CN1MetalReadMutableImagePixels commits the deferred command buffer
+//      and waitUntilCompleted before reading.
+
+// Begin a Metal render pass into the mutable image identified by `peer`
+// (a GLUIImage*). Allocates the MTLTexture lazily and saves the screen
+// encoder if one is active. Subsequent CN1MetalFillRect / DrawImage /
+// SetTransform / etc. calls render into this texture instead of the
+// screen. Returns YES on success; NO if the device is unavailable or
+// allocation fails (caller should fall back to the CG path).
+BOOL CN1MetalBeginMutableImageDraw(int width, int height, void *peer);
+
+// End the active mutable-image render pass. Restores the previous screen
+// encoder (if there was one) and leaves the mutable image's command
+// buffer uncommitted. The buffer is committed lazily on read or when
+// reused as a source for a screen draw.
+void CN1MetalFinishMutableImageDraw(void *peer);
+
+// Force-commit and wait on a mutable image's pending command buffer (if
+// any). Called before any pixel-reading path so the GPU work has
+// finished before we sample the texture. Safe to call when no work is
+// pending (no-op).
+void CN1MetalFlushMutableImage(void *peer);
+
+// Read a region of a mutable image's MTLTexture into an int[] buffer in
+// 0xAARRGGBB format. Forces a flush first. Returns YES on success.
+BOOL CN1MetalReadMutableImagePixels(void *peer, int *outARGB,
+                                    int x, int y, int w, int h,
+                                    int imgWidth, int imgHeight);
+
 #endif /* CN1_USE_METAL */
 #endif /* CN1Metalcompat_h */

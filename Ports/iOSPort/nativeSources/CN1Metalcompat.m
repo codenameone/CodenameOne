@@ -26,6 +26,7 @@
 #import "CN1MetalPipelineCache.h"
 #import "METALView.h"
 #import "CodenameOne_GLViewController.h"
+#import "GLUIImage.h"
 
 // --------------- Static state ---------------
 
@@ -101,6 +102,11 @@ int CN1MetalFramebufferHeight(void) { return currentFramebufferHeight; }
 id<MTLDevice> CN1MetalDevice(void) {
     METALView *mv = (METALView *)[[CodenameOne_GLViewController instance] eaglView];
     return ((CAMetalLayer *)mv.layer).device;
+}
+
+id<MTLCommandQueue> CN1MetalCommandQueue(void) {
+    METALView *mv = (METALView *)[[CodenameOne_GLViewController instance] eaglView];
+    return mv.commandQueue;
 }
 
 // --------------- Matrix state ---------------
@@ -785,6 +791,206 @@ id<MTLTexture> CN1MetalTextureFromUIImage(UIImage *image) {
                bytesPerRow:w * 4];
     free(rawData);
     return texture;
+}
+
+// --------------- Phase 3: mutable-image rendering ---------------
+
+// State saved when switching the active encoder from screen rendering to
+// mutable-image rendering. Single-slot stack -- nesting is not supported
+// (matches the GL path's UIGraphicsBeginImageContext semantics, which use a
+// global current-context).
+typedef struct {
+    __unsafe_unretained id<MTLRenderCommandEncoder> savedEncoder;
+    simd_float4x4 savedProjection;
+    int savedFramebufferWidth;
+    int savedFramebufferHeight;
+    simd_float4x4 savedModelView;
+    simd_float4x4 savedTransform;
+} CN1MetalEncoderState;
+
+static CN1MetalEncoderState screenStateBeforeMutable;
+static BOOL mutableActive = NO;
+static __unsafe_unretained GLUIImage *mutableActivePeer = nil;
+
+// Build a Y-down ortho projection for a (w x h) framebuffer with the same
+// half-pixel offset that METALView's CN1MetalOrtho applies to the screen
+// projection (kept in sync by hand -- if you change one, change the other).
+static simd_float4x4 mutableProjection(int w, int h) {
+    float invW = 1.0f / (float)w;
+    float invH = 1.0f / (float)h;
+    return (simd_float4x4){{
+        { 2.0f * invW,           0.0f,                  0.0f,    0.0f },
+        { 0.0f,                  -2.0f * invH,          0.0f,    0.0f },
+        { 0.0f,                  0.0f,                  0.5f,    0.0f },
+        { -1.0f + invW,          1.0f - invH,           0.5f,    1.0f }
+    }};
+}
+
+BOOL CN1MetalBeginMutableImageDraw(int width, int height, void *peer) {
+    if (peer == NULL || width <= 0 || height <= 0) return NO;
+    if (mutableActive) {
+        // Concurrent mutable draws aren't supported (matches GL's global
+        // UIGraphics context). Force-finish whatever was active so we
+        // don't leak the encoder, then re-enter.
+        NSLog(@"CN1Metal: nested CN1MetalBeginMutableImageDraw -- forcing finish on previous peer");
+        CN1MetalFinishMutableImageDraw((__bridge void *)mutableActivePeer);
+    }
+    GLUIImage *gl = (__bridge GLUIImage *)peer;
+    id<MTLDevice> device = CN1MetalDevice();
+    if (device == nil) return NO;
+    ensurePipelineCache();
+
+    // Allocate (or reuse) the mutable texture. Reuse only if dimensions
+    // match -- otherwise the existing pixels and any deferred cmd buffer
+    // are stale.
+    id<MTLTexture> tex = [gl mtlMutableTexture];
+    if (tex == nil || [gl mtlMutableWidth] != width || [gl mtlMutableHeight] != height) {
+        MTLTextureDescriptor *desc = [MTLTextureDescriptor
+            texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm
+            width:(NSUInteger)width height:(NSUInteger)height mipmapped:NO];
+        desc.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
+        desc.storageMode = MTLStorageModePrivate;
+        tex = [device newTextureWithDescriptor:desc];
+        if (tex == nil) return NO;
+        // Clear new texture to transparent black -- matches
+        // UIGraphicsBeginImageContextWithOptions(opaque=NO) behaviour.
+        id<MTLCommandBuffer> clearCb = [CN1MetalCommandQueue() commandBuffer];
+        MTLRenderPassDescriptor *clearPass = [MTLRenderPassDescriptor renderPassDescriptor];
+        clearPass.colorAttachments[0].texture = tex;
+        clearPass.colorAttachments[0].loadAction = MTLLoadActionClear;
+        clearPass.colorAttachments[0].storeAction = MTLStoreActionStore;
+        clearPass.colorAttachments[0].clearColor = MTLClearColorMake(0.0, 0.0, 0.0, 0.0);
+        [[clearCb renderCommandEncoderWithDescriptor:clearPass] endEncoding];
+        [clearCb commit];
+        [gl setMtlMutableTexture:tex width:width height:height];
+        [gl setMtlMutableCommandBuffer:nil];
+    }
+
+    // Open (or extend) the deferred command buffer and start an encoder
+    // against the mutable texture. MTLLoadActionLoad preserves any pixels
+    // already drawn in earlier render passes against this texture.
+    id<MTLCommandBuffer> cb = [gl mtlMutableCommandBuffer];
+    if (cb == nil) {
+        cb = [CN1MetalCommandQueue() commandBuffer];
+        [gl setMtlMutableCommandBuffer:cb];
+    }
+    MTLRenderPassDescriptor *desc = [MTLRenderPassDescriptor renderPassDescriptor];
+    desc.colorAttachments[0].texture = tex;
+    desc.colorAttachments[0].loadAction = MTLLoadActionLoad;
+    desc.colorAttachments[0].storeAction = MTLStoreActionStore;
+    id<MTLRenderCommandEncoder> enc = [cb renderCommandEncoderWithDescriptor:desc];
+    [enc setViewport:(MTLViewport){0.0, 0.0, (double)width, (double)height, 0.0, 1.0}];
+    [gl setMtlMutableEncoder:enc];
+
+    // Save the screen rendering state and switch the global CN1Metal state
+    // so subsequent CN1MetalFillRect / CN1MetalDrawImage / SetTransform
+    // calls go through the mutable encoder transparently.
+    screenStateBeforeMutable.savedEncoder = activeEncoder;
+    screenStateBeforeMutable.savedProjection = currentProjection;
+    screenStateBeforeMutable.savedFramebufferWidth = currentFramebufferWidth;
+    screenStateBeforeMutable.savedFramebufferHeight = currentFramebufferHeight;
+    screenStateBeforeMutable.savedModelView = currentModelView;
+    screenStateBeforeMutable.savedTransform = currentTransform;
+
+    activeEncoder = enc;
+    currentProjection = mutableProjection(width, height);
+    currentFramebufferWidth = width;
+    currentFramebufferHeight = height;
+    currentModelView = identityMatrix();
+    currentTransform = identityMatrix();
+
+    mutableActive = YES;
+    mutableActivePeer = gl;
+    return YES;
+}
+
+void CN1MetalFinishMutableImageDraw(void *peer) {
+    if (!mutableActive || peer == NULL) return;
+    GLUIImage *gl = (__bridge GLUIImage *)peer;
+    if (gl != mutableActivePeer) {
+        NSLog(@"CN1Metal: finishMutableImageDraw on non-active peer -- ignoring");
+        return;
+    }
+    id<MTLRenderCommandEncoder> enc = [gl mtlMutableEncoder];
+    if (enc != nil) {
+        [enc endEncoding];
+        [gl setMtlMutableEncoder:nil];
+    }
+    activeEncoder = screenStateBeforeMutable.savedEncoder;
+    currentProjection = screenStateBeforeMutable.savedProjection;
+    currentFramebufferWidth = screenStateBeforeMutable.savedFramebufferWidth;
+    currentFramebufferHeight = screenStateBeforeMutable.savedFramebufferHeight;
+    currentModelView = screenStateBeforeMutable.savedModelView;
+    currentTransform = screenStateBeforeMutable.savedTransform;
+    mutableActive = NO;
+    mutableActivePeer = nil;
+    // Command buffer stays alive (uncommitted) so further appendable draws
+    // are cheap. CN1MetalFlushMutableImage forces commit on read.
+}
+
+void CN1MetalFlushMutableImage(void *peer) {
+    if (peer == NULL) return;
+    GLUIImage *gl = (__bridge GLUIImage *)peer;
+    id<MTLCommandBuffer> cb = [gl mtlMutableCommandBuffer];
+    if (cb == nil) return;
+    // Defensive: end encoder if still open (caller should have called
+    // finish, but a screen-side consumer of this image might call flush
+    // directly without going through finish).
+    id<MTLRenderCommandEncoder> enc = [gl mtlMutableEncoder];
+    if (enc != nil) {
+        [enc endEncoding];
+        [gl setMtlMutableEncoder:nil];
+    }
+    [cb commit];
+    [cb waitUntilCompleted];
+    [gl setMtlMutableCommandBuffer:nil];
+}
+
+BOOL CN1MetalReadMutableImagePixels(void *peer, int *outARGB,
+                                    int x, int y, int w, int h,
+                                    int imgWidth, int imgHeight) {
+    (void)imgWidth; (void)imgHeight; // reserved for future scaling; matches GL signature
+    if (peer == NULL || outARGB == NULL || w <= 0 || h <= 0) return NO;
+    GLUIImage *gl = (__bridge GLUIImage *)peer;
+    CN1MetalFlushMutableImage(peer);
+    id<MTLTexture> tex = [gl mtlMutableTexture];
+    if (tex == nil) return NO;
+    int tw = (int)tex.width;
+    int th = (int)tex.height;
+    if (x < 0 || y < 0 || x + w > tw || y + h > th) return NO;
+
+    id<MTLDevice> device = CN1MetalDevice();
+    NSUInteger bytesPerRow = (NSUInteger)w * 4;
+    id<MTLBuffer> staging = [device newBufferWithLength:bytesPerRow * (NSUInteger)h
+                                                options:MTLResourceStorageModeShared];
+    id<MTLCommandBuffer> cb = [CN1MetalCommandQueue() commandBuffer];
+    id<MTLBlitCommandEncoder> blit = [cb blitCommandEncoder];
+    [blit copyFromTexture:tex
+              sourceSlice:0
+              sourceLevel:0
+             sourceOrigin:MTLOriginMake((NSUInteger)x, (NSUInteger)y, 0)
+               sourceSize:MTLSizeMake((NSUInteger)w, (NSUInteger)h, 1)
+                 toBuffer:staging
+        destinationOffset:0
+   destinationBytesPerRow:bytesPerRow
+ destinationBytesPerImage:bytesPerRow * (NSUInteger)h];
+    [blit endEncoding];
+    [cb commit];
+    [cb waitUntilCompleted];
+    // Texture stores BGRA8Unorm: byte[0]=B byte[1]=G byte[2]=R byte[3]=A.
+    // Java ARGB int packing: 0xAARRGGBB.
+    uint8_t *src = (uint8_t *)[staging contents];
+    for (int row = 0; row < h; row++) {
+        for (int col = 0; col < w; col++) {
+            int off = row * (int)bytesPerRow + col * 4;
+            uint8_t b = src[off + 0];
+            uint8_t gV = src[off + 1];
+            uint8_t r = src[off + 2];
+            uint8_t a = src[off + 3];
+            outARGB[row * w + col] = ((int)a << 24) | ((int)r << 16) | ((int)gV << 8) | (int)b;
+        }
+    }
+    return YES;
 }
 
 #endif /* CN1_USE_METAL */

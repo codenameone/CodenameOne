@@ -40,7 +40,21 @@
     int textureWidth;
     int textureHeight;
 #ifdef CN1_USE_METAL
+    // Cached read-only texture, built lazily from `img` for screen-side
+    // DrawImage / TileImage. Invalidated by setImage:.
     id<MTLTexture> mtlTexture;
+
+    // Phase 3: Metal-backed mutable-image storage. When this image is the
+    // target of a startDrawingOnImage call, ops render into mtlMutableTexture
+    // via mtlMutableEncoder. After finishDrawingOnImage the encoder ends but
+    // the command buffer stays uncommitted (deferred); pixel-reading paths
+    // commit-and-wait via -flushMutable. The texture is the source of truth
+    // for pixels until a UIImage snapshot is requested.
+    id<MTLTexture> mtlMutableTexture;
+    id<MTLCommandBuffer> mtlMutableCommandBuffer;
+    id<MTLRenderCommandEncoder> mtlMutableEncoder;
+    int mtlMutableWidth;
+    int mtlMutableHeight;
 #endif
 }
 -(id)initWithImage:(UIImage*)i;
@@ -55,5 +69,17 @@
 // this image. Invalidated automatically by setImage:. nil if the device
 // is unavailable or the image is empty.
 -(id<MTLTexture>)getMTLTexture;
+
+// Phase 3 mutable-image accessors. Implementation in GLUIImage.m; the
+// CN1Metalcompat.m mutable-image API is the public surface that callers
+// outside this file should use.
+-(id<MTLTexture>)mtlMutableTexture;
+-(void)setMtlMutableTexture:(id<MTLTexture>)t width:(int)w height:(int)h;
+-(id<MTLCommandBuffer>)mtlMutableCommandBuffer;
+-(void)setMtlMutableCommandBuffer:(id<MTLCommandBuffer>)cb;
+-(id<MTLRenderCommandEncoder>)mtlMutableEncoder;
+-(void)setMtlMutableEncoder:(id<MTLRenderCommandEncoder>)e;
+-(int)mtlMutableWidth;
+-(int)mtlMutableHeight;
 #endif
 @end
