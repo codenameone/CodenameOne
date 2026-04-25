@@ -169,18 +169,10 @@ extern int nextPowerOf2(int val);
 -(id<MTLTexture>)getMTLTexture {
     if (mtlTexture != nil) return mtlTexture;
     // Phase 3: if a mutable render target exists, the freshest pixels live
-    // there. Force-flush any pending command buffer so the texture has
-    // finalised pixels by the time the screen-side consumer samples it
-    // (the consumer's own command buffer might execute on a different
-    // queue / earlier than the mutable's deferred commit). A future
-    // optimisation could replace the CPU sync with an MTLEvent dependency
-    // between the producer and consumer command buffers.
-    if (mtlMutableTexture != nil) {
-        if (mtlMutableCommandBuffer != nil) {
-            CN1MetalFlushMutableImage((__bridge void*)self);
-        }
-        return mtlMutableTexture;
-    }
+    // there. Use that texture directly so read-side draws (e.g., a screen
+    // DrawImage of this mutable image) get the latest content without going
+    // through CG.
+    if (mtlMutableTexture != nil) return mtlMutableTexture;
     if (img == nil) return nil;
     mtlTexture = CN1MetalTextureFromUIImage(img);
     return mtlTexture;

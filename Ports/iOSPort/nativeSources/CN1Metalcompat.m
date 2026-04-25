@@ -946,50 +946,6 @@ void CN1MetalFlushMutableImage(void *peer) {
     [gl setMtlMutableCommandBuffer:nil];
 }
 
-BOOL CN1MetalIsMutableActive(void) {
-    return mutableActive;
-}
-
-void CN1MetalDrawCGRasterizedRect(int dx, int dy, int w, int h,
-                                  void (^cgBlock)(CGContextRef ctx)) {
-    if (w <= 0 || h <= 0 || cgBlock == NULL) return;
-    id<MTLDevice> device = CN1MetalDevice();
-    if (device == nil) return;
-
-    // Build a CGBitmapContext sized to the geometry; orient with a CTM flip
-    // so display-row-0 ends up at memory-row-0 (matches CN1MetalTextureFromUIImage
-    // and the text-cache rasterisation convention).
-    CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
-    void *bytes = calloc((size_t)h * (size_t)w * 4, 1);
-    CGContextRef ctx = CGBitmapContextCreate(bytes, w, h, 8, w * 4, cs,
-        kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big);
-    CGColorSpaceRelease(cs);
-    CGContextTranslateCTM(ctx, 0, h);
-    CGContextScaleCTM(ctx, 1, -1);
-
-    // UIKit-aware drawing inside the block (so [color set] on the supplied
-    // ctx works as expected) -- push as the current UIGraphics context.
-    UIGraphicsPushContext(ctx);
-    cgBlock(ctx);
-    UIGraphicsPopContext();
-
-    // Upload as MTLTexture and draw through CN1MetalDrawImage. Goes through
-    // the active encoder, which during a mutable draw is the mutable encoder.
-    MTLTextureDescriptor *desc = [MTLTextureDescriptor
-        texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm
-        width:(NSUInteger)w height:(NSUInteger)h mipmapped:NO];
-    desc.usage = MTLTextureUsageShaderRead;
-    id<MTLTexture> tex = [device newTextureWithDescriptor:desc];
-    [tex replaceRegion:MTLRegionMake2D(0, 0, w, h)
-           mipmapLevel:0
-             withBytes:bytes
-           bytesPerRow:w * 4];
-    CGContextRelease(ctx);
-    free(bytes);
-
-    CN1MetalDrawImage(tex, 255, dx, dy, w, h);
-}
-
 BOOL CN1MetalReadMutableImagePixels(void *peer, int *outARGB,
                                     int x, int y, int w, int h,
                                     int imgWidth, int imgHeight) {

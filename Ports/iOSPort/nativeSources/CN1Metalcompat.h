@@ -256,27 +256,5 @@ BOOL CN1MetalReadMutableImagePixels(void *peer, int *outARGB,
                                     int x, int y, int w, int h,
                                     int imgWidth, int imgHeight);
 
-// Returns YES while a Metal mutable-image draw pass is open between
-// CN1MetalBeginMutableImageDraw and CN1MetalFinishMutableImageDraw. Used
-// by JNI mutable-image entry points to decide whether to route through
-// Metal or fall back to the GL/CG path (the latter is dead on Metal
-// builds during this transition but the symbol is still referenced).
-BOOL CN1MetalIsMutableActive(void);
-
-// Rasterise an arbitrary CoreGraphics drawing block into a temporary
-// CGBitmapContext sized (w x h), upload it as an MTLTexture, and draw
-// it through the active encoder at (dx, dy, w, h). Used by mutable-image
-// ops that don't yet have native Metal equivalents (fillRoundRect,
-// fillArc, drawArc, fillRadialGradient, ...) so they can keep their
-// existing CG drawing semantics while bridging into the Metal pipeline.
-// The block draws into the temporary context with the origin at (0, 0)
-// of an h-tall bitmap; the shim handles upload + dispatch. CTM flip is
-// applied so display-row-0 lands at memory-row-0 (matches the
-// orientation convention used by every other texture producer in this
-// file). Caller is responsible for setting fill / stroke colours on
-// the supplied context.
-void CN1MetalDrawCGRasterizedRect(int dx, int dy, int w, int h,
-                                  void (^cgBlock)(CGContextRef ctx));
-
 #endif /* CN1_USE_METAL */
 #endif /* CN1Metalcompat_h */
