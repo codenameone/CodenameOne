@@ -1320,7 +1320,17 @@ public class UIManager {
             themeProps.put("CommandList.sel#border", Border.createLineBorder(1));
         }
 
-        if (installedTheme == null || !installedTheme.containsKey("Toolbar.derive")) {
+        // The default Toolbar.derive=TitleArea was historically added so
+        // legacy themes that styled TitleArea got the same look on Toolbar
+        // for free. The modern themes (and any user theme that wires
+        // TitleArea.derive=Toolbar) flips the relationship the other way -
+        // setting both directions creates a cycle that infinite-loops
+        // createStyle when the resolver follows derive recursively. Skip
+        // the legacy default in that case.
+        boolean userDeclaredTitleAreaDerivesToolbar = installedTheme != null
+                && "Toolbar".equals(installedTheme.get("TitleArea.derive"));
+        if (!userDeclaredTitleAreaDerivesToolbar
+                && (installedTheme == null || !installedTheme.containsKey("Toolbar.derive"))) {
             themeProps.put("Toolbar.derive", "TitleArea");
         }
         if (installedTheme == null || !installedTheme.containsKey("FloatingActionButton.derive")) {

@@ -193,17 +193,12 @@ Toolbar {
     padding: 1mm;
     margin: 0;
 }
-/* NOTE: iOS hangs in getComponentStyle when TitleArea uses cn1-derive to
-   resolve a sibling UIID (Toolbar) that was just swapped in via
-   setThemeProps - the ParparVM-side style resolver appears to loop on
-   the first post-swap Title/TitleArea probe. Inline Toolbar's props
-   here instead of using cn1-derive until the port is fixed. */
-TitleArea {
-    background-color: #ffffff;
-    color: #000000;
-    padding: 1mm 2mm 1mm 2mm;
-    margin: 0;
-}
+/* TitleArea derives from Toolbar so theme overrides on Toolbar cascade
+   to TitleArea. UIManager used to install a defensive
+   Toolbar.derive=TitleArea default that produced a cycle when paired
+   with TitleArea.derive=Toolbar; the framework now skips that default
+   when the user theme has already wired TitleArea -> Toolbar. */
+TitleArea { cn1-derive: Toolbar; padding: 1mm 2mm 1mm 2mm; }
 
 Title {
     color: #000000;
@@ -222,29 +217,39 @@ TitleCommand { cn1-derive: Button; color: #007aff; padding: 1mm 2mm 1mm 2mm; }
    hugging the bottom edge, with individual tabs rendered as
    transparent hits inside it. cn1-pill-border draws a true pill;
    rgba on the fill approximates frosted glass within the CEF-free
-   subset. A real backdrop-filter is future work. */
-Tabs { background-color: transparent; padding: 1mm 2mm 2mm 2mm; margin: 0; }
+   subset. A real backdrop-filter is future work.
+
+   Text + icons stay neutral (black light / white dark) regardless of
+   selection state - selected vs unselected differ by background fill,
+   not foreground colour. The selected pill uses surface-tertiary
+   (#e5e5ea) for visible contrast against the frosted glass group. */
+Tabs { background-color: transparent; padding: 0; margin: 0; }
+/* TabbedPane is the inner content area where the active tab page
+   renders. It sits below the floating pill group (TabsContainer)
+   and stays opaque on the form's surface colour - the pill is the
+   only translucent element. */
+TabbedPane { background-color: #f2f2f7; padding: 0; margin: 0; }
 TabsContainer {
     background-color: rgba(242,242,247,0.7);
     color: #000000;
-    padding: 1mm;
-    margin: 2mm 3mm 2mm 3mm;
+    padding: 0.5mm;
+    margin: 1mm 3mm 1mm 3mm;
     cn1-background-type: cn1-pill-border;
 }
 
 Tab {
-    color: #3c3c43;
+    color: #000000;
     background-color: transparent;
-    padding: 2mm 3mm 2mm 3mm;
+    padding: 1mm 2mm 1mm 2mm;
     margin: 0;
     font-family: "native:MainRegular";
     text-align: center;
 }
-Tab.selected { color: #007aff; background-color: rgba(255,255,255,0.85); cn1-background-type: cn1-pill-border; }
-Tab.pressed { color: #0064d1; background-color: rgba(229,229,234,0.85); cn1-background-type: cn1-pill-border; }
+Tab.selected { color: #000000; background-color: #e5e5ea; cn1-background-type: cn1-pill-border; }
+Tab.pressed { color: #000000; background-color: rgba(229,229,234,0.85); cn1-background-type: cn1-pill-border; }
 
-SelectedTab { cn1-derive: Tab; color: #007aff; }
-UnselectedTab { cn1-derive: Tab; color: #3c3c43; }
+SelectedTab { cn1-derive: Tab; color: #000000; }
+UnselectedTab { cn1-derive: Tab; color: #000000; }
 
 SideNavigationPanel { background-color: #ffffff; padding: 0; margin: 0; }
 
@@ -407,12 +412,13 @@ PopupContent {
     TitleCommand { color: #0a84ff; }
 
     Tabs { background-color: transparent; }
+    TabbedPane { background-color: #1c1c1e; }
     TabsContainer { background-color: rgba(44,44,46,0.7); color: #ffffff; }
-    Tab { color: #ebebf5; background-color: transparent; }
-    Tab.selected { color: #0a84ff; background-color: rgba(28,28,30,0.9); }
-    Tab.pressed { color: #64b1ff; background-color: rgba(58,58,60,0.9); }
-    SelectedTab { color: #0a84ff; }
-    UnselectedTab { color: #ebebf5; }
+    Tab { color: #ffffff; background-color: transparent; }
+    Tab.selected { color: #ffffff; background-color: #3a3a3c; }
+    Tab.pressed { color: #ffffff; background-color: rgba(58,58,60,0.9); }
+    SelectedTab { color: #ffffff; }
+    UnselectedTab { color: #ffffff; }
 
     SideNavigationPanel { background-color: #000000; }
     SideCommand { color: #ffffff; }
@@ -427,18 +433,17 @@ PopupContent {
     MultiLine3 { color: #8e8e93; }
     MultiLine4 { color: #8e8e93; }
 
-    /* Dark Dialog: translucent elevated surface over the dark form
-       so the textured backdrop reads through. DialogBody / Title /
-       ContentPane / CommandArea stay transparent so the Dialog
-       surface is the single colour they all share - this avoids the
-       previous double-paint that read as a visible white-edged
-       frame in dark mode captures. */
-    Dialog { background-color: rgba(44,44,46,0.78); color: #ffffff; }
+    /* Dark Dialog: nearly opaque so white text stays readable - a
+       lower opacity over the textured test backdrop made bright
+       stripes bleed through and obscure the text. DialogBody /
+       Title / ContentPane / CommandArea stay transparent so the
+       Dialog surface is the single colour they all share. */
+    Dialog { background-color: rgba(44,44,46,0.95); color: #ffffff; }
     DialogBody { background-color: transparent; color: #ffffff; }
     DialogTitle { color: #ffffff; background-color: transparent; }
     DialogContentPane { background-color: transparent; }
     DialogCommandArea { background-color: transparent; }
-    PopupContent { background-color: rgba(44,44,46,0.78); color: #ffffff; }
+    PopupContent { background-color: rgba(44,44,46,0.95); color: #ffffff; }
 
     FloatingActionButton { color: #ffffff; background-color: #0a84ff; }
     FloatingActionButton.pressed { background-color: #64b1ff; }
