@@ -1495,8 +1495,17 @@ public final class Display extends CN1Constants {
         if (edt == null) {
             throw new IllegalStateException("Initialize must be invoked before setCurrent!");
         }
-        Form current = impl.getCurrentForm();
 
+        if (!isEdt()) {
+            // when not running callSerially executes synchronously and would recurse here forever (#4811)
+            if (!codenameOneRunning) {
+                throw new IllegalStateException("Display.setCurrent must be invoked after Codename One has started running. Call it from start() or via callSerially.");
+            }
+            callSerially(new RunnableWrapper(newForm, null, reverse));
+            return;
+        }
+
+        Form current = impl.getCurrentForm();
 
         if (autoFoldVKBOnFormSwitch && !(newForm instanceof Dialog)) {
             setShowVirtualKeyboard(false);
@@ -1526,11 +1535,6 @@ public final class Display extends CN1Constants {
                 default:
                     break;
             }
-        }
-
-        if (!isEdt()) {
-            callSerially(new RunnableWrapper(newForm, null, reverse));
-            return;
         }
 
         if (current != null) {
