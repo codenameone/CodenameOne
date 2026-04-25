@@ -281,12 +281,19 @@ final class JavascriptMethodGenerator {
 
     static String generateClassJavascript(ByteCodeClass cls, List<ByteCodeClass> allClasses) {
         // Populate the resolution index lazily on first call and keep it
-        // alive for the rest of the generation pass. Translator callers
-        // hand the same ``allClasses`` list to every generateClassJavascript
-        // invocation, so a pointer-identity check is enough to avoid
-        // rebuilding the map on every class while still recovering
-        // correctly if a future orchestrator swaps the list out.
-        if (classIndex == null || classIndex.size() != (allClasses == null ? 0 : allClasses.size())) {
+        // alive for the rest of the generation pass. The size check is
+        // not enough to detect a fresh translator run: when test
+        // harnesses (Parser.cleanup() between fixtures) feed the same
+        // total class count from a different ByteCodeClass instance
+        // set, the stale index points at the previous run's classes —
+        // which can be missing methods that only the new instances
+        // have (e.g. javac 17+ enum ``$values()`` synthetics emitted by
+        // the second compile but not the first). Rebuild whenever the
+        // index doesn't already contain the EXACT class instance we're
+        // about to emit, which catches both "first time" and "swapped
+        // list" without iterating the full list on every call.
+        if (classIndex == null || classIndex.size() != (allClasses == null ? 0 : allClasses.size())
+                || (cls != null && classIndex.get(cls.getClsName()) != cls)) {
             setClassIndex(allClasses);
         }
         StringBuilder out = new StringBuilder();

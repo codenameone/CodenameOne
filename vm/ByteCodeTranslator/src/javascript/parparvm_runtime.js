@@ -442,14 +442,26 @@ const jvm = {
       def.isAbstract = !!def.A;
       // ``a`` encodes either an explicit assignableTo map (debug /
       // full mode) or — by default — is omitted entirely, asking
-      // us to auto-populate. The auto-populate unions self + every
-      // base class's + every interface's assignableTo. Each
-      // ancestor is already registered by the time we see a
-      // subclass, so the lookup is O(depth).
+      // us to auto-populate. The auto-populate unions self + the
+      // direct baseClass + every interface (plus their already-
+      // computed assignableTo unions). The classes are NOT emitted
+      // in inheritance order — IllegalStateException can land in
+      // translated_app.js BEFORE RuntimeException, so a naive walk
+      // of ``this.classes[base].baseClass`` would terminate after
+      // one hop and miss every grandparent. Always pin the direct
+      // baseClass name unconditionally so a later ``instanceOf X``
+      // check at least matches the immediate parent; the
+      // {@link findAncestorAssignable} fallback handles the deeper
+      // ancestors lazily by walking the baseClass-string chain at
+      // query time, when every ancestor is guaranteed to be
+      // registered.
       if (def.a === undefined || def.a === 1) {
         const assignable = Object.create(null);
         assignable[def.name] = 1;
         assignable["java_lang_Object"] = 1;
+        if (def.baseClass) {
+          assignable[def.baseClass] = 1;
+        }
         let base = def.baseClass;
         while (base) {
           const baseDef = this.classes[base];
@@ -1138,7 +1150,60 @@ const jvm = {
     return cached;
   },
   instanceOf(obj, className) {
-    return !!(obj && obj.__classDef && obj.__classDef.assignableTo && obj.__classDef.assignableTo[className]);
+    if (!obj || !obj.__classDef || !obj.__classDef.assignableTo) {
+      return false;
+    }
+    if (obj.__classDef.assignableTo[className]) {
+      return true;
+    }
+    if (obj.__class && this.assignableViaAncestors(obj.__class, className)) {
+      obj.__classDef.assignableTo[className] = 1;
+      return true;
+    }
+    return false;
+  },
+  /**
+   * Lazy fallback for the {@code defineClass} auto-populate when
+   * the translator emits classes out of inheritance order. Walks
+   * the {@code baseClass} string chain and the implemented
+   * interfaces, looking for {@code targetType} either as a name
+   * along the chain or as an entry in any ancestor's already-
+   * populated {@code assignableTo} map. The caller caches the
+   * result back into the original class's {@code assignableTo} so
+   * subsequent lookups stay O(1).
+   */
+  assignableViaAncestors(className, targetType) {
+    if (className == null || targetType == null) {
+      return false;
+    }
+    const visited = Object.create(null);
+    const queue = [className];
+    while (queue.length) {
+      const current = queue.shift();
+      if (current == null || visited[current]) {
+        continue;
+      }
+      visited[current] = true;
+      if (current === targetType) {
+        return true;
+      }
+      const cls = this.classes[current];
+      if (!cls) {
+        continue;
+      }
+      if (cls.assignableTo && cls.assignableTo[targetType]) {
+        return true;
+      }
+      if (cls.baseClass) {
+        queue.push(cls.baseClass);
+      }
+      if (cls.interfaces) {
+        for (let i = 0; i < cls.interfaces.length; i++) {
+          queue.push(cls.interfaces[i]);
+        }
+      }
+    }
+    return false;
   },
   findExceptionHandler(entries, pc, error) {
     if (!entries || !entries.length) {
@@ -1161,6 +1226,21 @@ const jvm = {
         return entry;
       }
       if (errorClass === type || (errorClassDef && errorClassDef.assignableTo && errorClassDef.assignableTo[type])) {
+        return entry;
+      }
+      // assignableTo is auto-populated at defineClass time from
+      // baseDef.assignableTo unions. When the error's class was
+      // defined BEFORE its baseClass (translator emits classes in
+      // file order, not inheritance order — IllegalStateException
+      // can land before RuntimeException), the union is partial:
+      // the immediate baseClass name was pinned but transitive
+      // ancestors are missing. Walk the baseClass string chain at
+      // query time and union those classes' (now-fully-populated)
+      // assignableTo maps before declaring "no match".
+      if (errorClass != null && this.assignableViaAncestors(errorClass, type)) {
+        if (errorClassDef && errorClassDef.assignableTo) {
+          errorClassDef.assignableTo[type] = 1;
+        }
         return entry;
       }
     }
@@ -1926,6 +2006,10 @@ jvm.cC = function(value, className) {
   if (value == null) return;
   const cd = value.__classDef;
   if (value.__class === className || (cd && cd.assignableTo && cd.assignableTo[className])) return;
+  if (value.__class && jvm.assignableViaAncestors(value.__class, className)) {
+    if (cd && cd.assignableTo) cd.assignableTo[className] = 1;
+    return;
+  }
   if (value.__jsValue !== void 0) {
     jvm.enhanceJsWrapper(value, className);
     const cd2 = value.__classDef;
@@ -1969,7 +2053,12 @@ jvm.iO = function(value, className) {
   if (value == null) return false;
   if (value.__class === className) return true;
   const cd = value.__classDef;
-  return !!(cd && cd.assignableTo && cd.assignableTo[className]);
+  if (cd && cd.assignableTo && cd.assignableTo[className]) return true;
+  if (value.__class && jvm.assignableViaAncestors(value.__class, className)) {
+    if (cd && cd.assignableTo) cd.assignableTo[className] = 1;
+    return true;
+  }
+  return false;
 };
 // Top-level 2-char globals for the ~15k ``jvm.*`` call sites in
 // translated code. Dropping the ``jvm.`` prefix (4 chars) saves
