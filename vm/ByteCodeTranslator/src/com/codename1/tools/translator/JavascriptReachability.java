@@ -416,6 +416,76 @@ final class JavascriptReachability {
             String base = cls.getBaseClass();
             current = base == null ? null : JavascriptNameUtil.sanitizeClassName(base);
         }
+        // Java 8+ interface default methods: when no concrete impl is
+        // found by walking the extends-chain, the dispatch resolves to
+        // the (single, by spec) non-abstract method on an implemented
+        // interface. RTA must keep that method alive too — otherwise
+        // a lambda whose target functional interface only declares an
+        // abstract sig (like ``BaseFormatter.process``) but inherits a
+        // concrete default method (like ``BaseFormatter.format``) sees
+        // the default method culled, and the runtime
+        // ``resolveVirtual`` walk turns into ``Missing virtual method``
+        // at the call site.
+        enqueueInterfaceDefault(startClass, normalizedName, desc, new HashSet<String>());
+    }
+
+    /**
+     * Walk every interface implemented by {@code clsName} and its
+     * supertypes, looking for a concrete (non-abstract,
+     * non-eliminated) method matching {@code name + desc}. Enqueues
+     * the first match — Java's interface-resolution spec requires at
+     * most one maximally-specific concrete default method on the
+     * inheritance lattice for any given signature.
+     */
+    private void enqueueInterfaceDefault(String clsName, String methodName, String desc, Set<String> visited) {
+        if (clsName == null || !visited.add(clsName)) {
+            return;
+        }
+        ByteCodeClass cls = byName.get(clsName);
+        if (cls == null) {
+            return;
+        }
+        List<String> ifaces = cls.getBaseInterfaces();
+        if (ifaces != null) {
+            for (String iface : ifaces) {
+                String sanitized = JavascriptNameUtil.sanitizeClassName(iface);
+                if (enqueueInterfaceMethod(sanitized, methodName, desc, visited)) {
+                    return;
+                }
+            }
+        }
+        String base = cls.getBaseClass();
+        if (base != null) {
+            enqueueInterfaceDefault(JavascriptNameUtil.sanitizeClassName(base), methodName, desc, visited);
+        }
+    }
+
+    private boolean enqueueInterfaceMethod(String ifaceName, String methodName, String desc, Set<String> visited) {
+        if (ifaceName == null || !visited.add(ifaceName)) {
+            return false;
+        }
+        ByteCodeClass iface = byName.get(ifaceName);
+        if (iface == null) {
+            return false;
+        }
+        for (BytecodeMethod m : iface.getMethods()) {
+            if (m.isEliminated() || m.isAbstract()) {
+                continue;
+            }
+            if (methodName.equals(m.getMethodName()) && desc.equals(m.getSignature())) {
+                enqueue(m);
+                return true;
+            }
+        }
+        List<String> superIfaces = iface.getBaseInterfaces();
+        if (superIfaces != null) {
+            for (String superIface : superIfaces) {
+                if (enqueueInterfaceMethod(JavascriptNameUtil.sanitizeClassName(superIface), methodName, desc, visited)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private int eliminate(List<ByteCodeClass> classes) {
