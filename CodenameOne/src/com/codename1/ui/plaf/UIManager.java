@@ -551,6 +551,7 @@ public class UIManager {
     private Style getComponentStyleImpl(String id, boolean selected, String prefix) {
         try {
             Style style = null;
+            Log.p("CN1SS:DIAG:getComponentStyleImpl.enter id=" + id + " selected=" + selected + " prefix=" + prefix);
 
             if (id == null || id.length() == 0) {
                 //if no id return the default style
@@ -2069,9 +2070,12 @@ public class UIManager {
         if (useDarkStyle) {
             id = "$Dark" + id;
         }
+        Log.p("CN1SS:DIAG:createStyle.enter id=" + id + " selected=" + selected + " allowDark=" + allowDarkStyle);
 
         String baseStyle = (String) themeProps.get(id + "derive");
+        Log.p("CN1SS:DIAG:createStyle.derive id=" + id + " baseStyle=" + baseStyle);
         if (baseStyle == null && useDarkStyle) {
+            Log.p("CN1SS:DIAG:createStyle.darkRecurse id=" + id);
             style = new Style(createStyle(originalId, prefix, selected, false));
         } else {
             style = null;
@@ -2086,9 +2090,13 @@ public class UIManager {
                 if (pos > -1) {
                     String baseId = baseStyle.substring(0, pos);
                     String basePrefix = baseStyle.substring(pos + 1);
+                    Log.p("CN1SS:DIAG:createStyle.deriveImpl id=" + id + " -> " + baseId + " prefix=" + basePrefix);
                     style = new Style(getComponentStyleImpl(baseId, basePrefix.indexOf("sel") > -1, basePrefix));
+                    Log.p("CN1SS:DIAG:createStyle.deriveImpl.done id=" + id);
                 } else {
+                    Log.p("CN1SS:DIAG:createStyle.deriveBase id=" + id + " -> getComponentStyle(" + baseStyle + ")");
                     style = new Style(getComponentStyle(baseStyle));
+                    Log.p("CN1SS:DIAG:createStyle.deriveBase.done id=" + id);
                 }
             } else {
                 if (selected) {
@@ -2104,6 +2112,7 @@ public class UIManager {
                 style = new Style(defaultStyle);
             }
         }
+        Log.p("CN1SS:DIAG:createStyle.props id=" + id);
         if (themeProps != null) {
             String bgColor;
             String fgColor;
