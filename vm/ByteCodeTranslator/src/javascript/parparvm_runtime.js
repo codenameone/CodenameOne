@@ -33,7 +33,14 @@ const VM_PROTOCOL = Object.freeze({
     PROTOCOL: "protocol",
     LOG: "log",
     RESULT: "result",
-    ERROR: "error"
+    ERROR: "error",
+    // ``LIFECYCLE`` is a worker→main signal that decouples the
+    // main-thread test harness's ``cn1Started`` flag from the
+    // WORKER-side ``window.cn1Started = true`` set inside the
+    // bootstrap's @JSBody. Sent once when the main thread
+    // generator completes (Lifecycle.init + Lifecycle.start both
+    // returned) so the bridge can flip its own cn1Started flag.
+    LIFECYCLE: "lifecycle"
   })
 });
 const PRIMITIVE_INFO = {
@@ -1513,6 +1520,14 @@ const jvm = {
     if (!pending) {
       return false;
     }
+    // Always-on log so a stuck-on-host-callback failure mode (host
+    // never replied — e.g. the main thread bridge missing the
+    // requested symbol) is distinguishable from a "host replied but
+    // worker logic doesn't progress" mode in test reports.
+    if (pending.thread === this.mainThread
+            || (this.mainThreadObject && pending.thread && pending.thread.object === this.mainThreadObject)) {
+      vmLifecycle("main-host-callback:id=" + id + (success ? ":ok" : ":err"));
+    }
     delete this.pendingHostCalls[id];
     if (success) {
       this.enqueue(pending.thread, value);
@@ -1660,6 +1675,22 @@ const jvm = {
         thread.resumeValue = undefined;
         if (result.done) {
           thread.done = true;
+          // Always-on lifecycle log: when the MAIN thread completes,
+          // ParparVMBootstrap.run() has finished — i.e. lifecycle.init,
+          // lifecycle.start, and runApp() all returned. We post a
+          // ``lifecycle`` VM message back to the main-thread bridge
+          // so it can flip ``window.cn1Started = true`` (the @JSBody-
+          // driven flag set inside ParparVMBootstrap.setStarted lives
+          // on the WORKER's window, not the main thread's, so the
+          // headless-test ``page.evaluate(() => window.cn1Started)``
+          // would never see it without this round trip).
+          if (thread === this.mainThread || (this.mainThreadObject && thread.object === this.mainThreadObject)) {
+            vmLifecycle("main-thread-completed");
+            emitVmMessage({
+              type: this.protocol.messages.LIFECYCLE || "lifecycle",
+              phase: "started"
+            });
+          }
           if (thread.object) {
             thread.object[CN1_THREAD_ALIVE] = 0;
             this.notifyAll(thread.object);
@@ -1904,6 +1935,10 @@ const jvm = {
     vmLifecycle("start:main-method-returned=" + (mainGenerator != null && typeof mainGenerator.next === "function" ? "generator" : "sync"));
     vmTrace("runtime.start.after-main-generator");
     const mainThread = this.spawn(mainThreadObject, mainGenerator);
+    // Stash the main thread + object so the drain loop can identify
+    // when the main bytecode completes vs when an auxiliary thread
+    // (e.g. a CN1SS test runner Thread or worker callback) finishes.
+    this.mainThread = mainThread;
     vmTrace("runtime.start.after-spawn");
     this.currentThread = mainThread;
     vmTrace("runtime.start.before-drain");

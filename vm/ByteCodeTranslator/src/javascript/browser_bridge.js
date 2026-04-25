@@ -1636,6 +1636,19 @@
       global.cn1Started = true;
       return;
     }
+    if (data.type === 'lifecycle' && data.phase === 'started') {
+      // Worker emits this once when the main bytecode generator
+      // completes — Lifecycle.init and Lifecycle.start both
+      // returned. The pre-existing fallbacks (CN1JS:.runApp log
+      // probe + ``type: result`` System.exit hook) only fire for
+      // the screenshot test fixtures (which run an explicit suite)
+      // and the unit-test System.exit pattern. A regular app that
+      // reaches its first form and waits for input never produced
+      // either signal — manifested as ``cn1Started`` staying false
+      // forever in the lifecycle test harness.
+      global.cn1Started = true;
+      return;
+    }
     if (data.type === 'error') {
       global.__parparError = data;
       // ALWAYS surface runtime errors to the main-thread console — this is

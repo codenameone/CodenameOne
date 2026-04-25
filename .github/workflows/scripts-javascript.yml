@@ -7,6 +7,8 @@ on:
       - 'scripts/run-javascript-browser-tests.sh'
       - 'scripts/run-javascript-screenshot-tests.sh'
       - 'scripts/run-javascript-headless-browser.mjs'
+      - 'scripts/run-javascript-lifecycle-tests.mjs'
+      - 'scripts/run-javascript-lifecycle-tests.sh'
       - 'scripts/build-javascript-port-hellocodenameone.sh'
       - 'scripts/javascript_browser_harness.py'
       - 'scripts/javascript/screenshots/**'
@@ -25,6 +27,8 @@ on:
       - 'scripts/run-javascript-browser-tests.sh'
       - 'scripts/run-javascript-screenshot-tests.sh'
       - 'scripts/run-javascript-headless-browser.mjs'
+      - 'scripts/run-javascript-lifecycle-tests.mjs'
+      - 'scripts/run-javascript-lifecycle-tests.sh'
       - 'scripts/build-javascript-port-hellocodenameone.sh'
       - 'scripts/javascript_browser_harness.py'
       - 'scripts/javascript/screenshots/**'
@@ -153,6 +157,40 @@ jobs:
             exit 1
           fi
           echo "bundle=$bundle" >> "$GITHUB_OUTPUT"
+
+      - name: Run JavaScript lifecycle test
+        # Validates that the bundled app reaches both ``cn1Initialized``
+        # and ``cn1Started`` lifecycle flags within a per-bundle timeout
+        # — i.e. ``Lifecycle.init`` and ``Lifecycle.start`` both
+        # complete without throwing or hanging. Captures every
+        # ``PARPAR-LIFECYCLE`` marker and the most recent
+        # ``PARPAR:DIAG:FIRST_FAILURE`` so a stuck boot is visible
+        # without having to download the full screenshot-test
+        # browser log. Runs BEFORE the screenshot suite because if
+        # the lifecycle test fails the screenshots are doomed to
+        # time out anyway, and we want fast feedback for boot
+        # regressions.
+        env:
+          CN1_LIFECYCLE_TIMEOUT_SECONDS: "120"
+          CN1_LIFECYCLE_REPORT_DIR: ${{ github.workspace }}/artifacts/javascript-lifecycle-tests
+        run: |
+          mkdir -p "${CN1_LIFECYCLE_REPORT_DIR}"
+          # Only the HelloCodenameOne bundle is built locally in this
+          # workflow; the Initializr bundle goes through the cloud
+          # build and isn't available on the runner. Pass the local
+          # bundle explicitly so the test doesn't try to rebuild
+          # missing artifacts.
+          node scripts/run-javascript-lifecycle-tests.mjs \
+            "${{ steps.locate_bundle.outputs.bundle }}"
+
+      - name: Upload JavaScript lifecycle artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: javascript-lifecycle-tests
+          path: artifacts/javascript-lifecycle-tests
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Run JavaScript screenshot browser tests
         run: |
