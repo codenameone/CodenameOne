@@ -152,6 +152,19 @@ void CN1MetalDrawImage(id<MTLTexture> texture, int alpha, int x, int y, int widt
 // frame. Phase 4 will replace this with a CoreText glyph atlas.
 void CN1MetalDrawString(NSString *str, UIFont *font, int color, int alpha, int x, int y);
 
+// Draw a linear or radial gradient filling (x,y,w,h). type is one of
+// GRADIENT_TYPE_HORIZONTAL / GRADIENT_TYPE_VERTICAL / GRADIENT_TYPE_RADIAL
+// (defined in DrawGradient.h). startColor/endColor are 0xAARRGGBB. The
+// gradient is rasterised via CGContextDrawLinearGradient or
+// CGContextDrawRadialGradient (matching the GL path's DrawGradient.m and
+// RadialGradientPaint.m exactly), uploaded as an MTLTexture, cached on
+// (type,start,end,w,h,relX,relY,relSize), and rendered as a textured
+// quad through the existing TexturedRGBA pipeline. relativeX/Y/Size are
+// only used for radial gradients.
+void CN1MetalDrawGradient(int type, int startColor, int endColor,
+                          int x, int y, int width, int height,
+                          float relativeX, float relativeY, float relativeSize);
+
 // -------- Texture helpers for GLUIImage --------
 
 // Lazily build an MTLTexture from a UIImage. Cached on the GLUIImage.
