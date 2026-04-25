@@ -812,9 +812,9 @@ static CN1MetalEncoderState screenStateBeforeMutable;
 static BOOL mutableActive = NO;
 static __unsafe_unretained GLUIImage *mutableActivePeer = nil;
 
-// Build a Y-down ortho projection for a (w x h) framebuffer with the same
-// half-pixel offset that METALView's CN1MetalOrtho applies to the screen
-// projection (kept in sync by hand -- if you change one, change the other).
+// Build a Y-down ortho projection for a (w x h) framebuffer. Mirrors
+// METALView's CN1MetalOrtho call -- if that one ever changes (e.g. adds
+// a half-pixel offset for pixel-perfect rendering), update this in lockstep.
 static simd_float4x4 mutableProjection(int w, int h) {
     float invW = 1.0f / (float)w;
     float invH = 1.0f / (float)h;
@@ -822,7 +822,7 @@ static simd_float4x4 mutableProjection(int w, int h) {
         { 2.0f * invW,           0.0f,                  0.0f,    0.0f },
         { 0.0f,                  -2.0f * invH,          0.0f,    0.0f },
         { 0.0f,                  0.0f,                  0.5f,    0.0f },
-        { -1.0f + invW,          1.0f - invH,           0.5f,    1.0f }
+        { -1.0f,                 1.0f,                  0.5f,    1.0f }
     }};
 }
 
