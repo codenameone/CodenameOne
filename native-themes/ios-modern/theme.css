@@ -78,8 +78,15 @@ ContentPane { background-color: #f2f2f7; padding: 0; margin: 0; }
    through instead of painting an opaque white block over it. */
 Container { background-color: transparent; padding: 0; margin: 0; }
 
+/* Label transparent so it sits cleanly over its parent's surface
+   (Form, Dialog, Tab pill). UIIDs that need a colored label
+   (RaisedButton, FloatingActionButton, etc.) declare their own
+   bgColor explicitly. Note SpanLabel's internal TextArea is
+   styled with UIID="Label" so this transparency also fixes the
+   visible block behind dialog body text. */
 Label {
     color: #000000;
+    background-color: transparent;
     padding: 1mm 2mm 1mm 2mm;
     margin: 0;
     font-family: "native:MainRegular";

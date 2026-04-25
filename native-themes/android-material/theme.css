@@ -65,8 +65,12 @@ ContentPane { background-color: #fef7ff; padding: 0; margin: 0; }
    through instead of painting an opaque block over it. */
 Container { background-color: transparent; padding: 0; margin: 0; }
 
+/* Label transparent so it sits cleanly over its parent's surface.
+   SpanLabel's internal TextArea uses UIID="Label" so this also
+   fixes the visible block behind dialog body text. */
 Label {
     color: #1d1b20;
+    background-color: transparent;
     padding: 0.5mm 1.5mm 0.5mm 1.5mm;
     margin: 0;
     font-family: "native:MainRegular";
