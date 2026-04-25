@@ -27,36 +27,76 @@
 #import "METALView.h"
 #import "CodenameOne_GLViewController.h"
 #import "GLUIImage.h"
+#include <pthread.h>
 
 // --------------- Static state ---------------
 //
-// All rendering state is THREAD-LOCAL via __thread. Phase 3 mutable-image
+// All rendering state is THREAD-LOCAL via pthread_key_t. Phase 3 mutable-image
 // rendering runs on CN1's EDT while screen rendering runs on the main thread
-// (CADisplayLink → drawFrame). Earlier activation attempts hung in CI because
-// both threads raced on a single global activeEncoder. Making the state
-// per-thread mirrors the GL path's implicit per-thread CG context model
-// (UIGraphicsGetCurrentContext is thread-local) and removes the race without
-// adding locks or dispatch_sync (which would risk deadlock against CN1's
-// runOnEDTAndWait patterns).
+// (CADisplayLink → drawFrame). A previous attempt used __thread but the
+// observed effect (mutable textures stayed cleared even though Begin/Finish
+// ran cleanly) suggests __thread isolation didn't take effect under this
+// build's compiler/deployment-target combination. pthread_key is more explicit
+// and battle-tested. The accessor goes through a lazy pthread_once init so
+// calling threadState() from any thread is safe.
 //
-// __thread on iOS supports POD types and __unsafe_unretained Obj-C pointers
-// (ARC cannot manage thread-locals). The pipeline cache stays shared since
-// it's read-only after init.
-
-static __thread __unsafe_unretained id<MTLRenderCommandEncoder> activeEncoder = nil;
-static __thread simd_float4x4 currentProjection;
-static __thread simd_float4x4 currentModelView;
-static __thread simd_float4x4 currentTransform;
-static __thread int currentFramebufferWidth = 0;
-static __thread int currentFramebufferHeight = 0;
-// Pipeline cache is shared across threads (read-only after first build).
-// The first-time build is racy but pipelineFor in CN1MetalPipelineCache is
-// itself thread-safe (lazy-builds each variant under a lock).
-static CN1MetalPipelineCache *pipelineCache = nil;
+// Pipeline cache stays shared since it's read-only after first build.
 
 #define CN1_MATRIX_STACK_DEPTH 32
-static __thread simd_float4x4 modelViewStack[CN1_MATRIX_STACK_DEPTH];
-static __thread int modelViewStackTop = 0;
+
+typedef struct {
+    __unsafe_unretained id<MTLRenderCommandEncoder> activeEncoder;
+    simd_float4x4 currentProjection;
+    simd_float4x4 currentModelView;
+    simd_float4x4 currentTransform;
+    int currentFramebufferWidth;
+    int currentFramebufferHeight;
+    simd_float4x4 modelViewStack[CN1_MATRIX_STACK_DEPTH];
+    int modelViewStackTop;
+    // Mutable-image draw state (per-thread because mutable rendering happens
+    // on EDT while screen rendering happens on main).
+    BOOL mutableActive;
+    __unsafe_unretained GLUIImage *mutableActivePeer;
+    // Saved screen state during a mutable-image render pass on this thread.
+    __unsafe_unretained id<MTLRenderCommandEncoder> savedEncoderBeforeMutable;
+    simd_float4x4 savedProjectionBeforeMutable;
+    int savedFramebufferWidthBeforeMutable;
+    int savedFramebufferHeightBeforeMutable;
+    simd_float4x4 savedModelViewBeforeMutable;
+    simd_float4x4 savedTransformBeforeMutable;
+} CN1MetalThreadState;
+
+static pthread_key_t threadStateKey;
+static pthread_once_t threadStateKeyOnce = PTHREAD_ONCE_INIT;
+
+static void freeThreadState(void *p) { free(p); }
+static void initThreadStateKey(void) { pthread_key_create(&threadStateKey, freeThreadState); }
+
+static CN1MetalThreadState *threadState(void) {
+    pthread_once(&threadStateKeyOnce, initThreadStateKey);
+    CN1MetalThreadState *s = (CN1MetalThreadState *)pthread_getspecific(threadStateKey);
+    if (s == NULL) {
+        s = (CN1MetalThreadState *)calloc(1, sizeof(CN1MetalThreadState));
+        // Identity-init transforms so the first frame doesn't draw with a zero matrix.
+        simd_float4x4 I = (simd_float4x4){{ {1,0,0,0}, {0,1,0,0}, {0,0,1,0}, {0,0,0,1} }};
+        s->currentTransform = I;
+        s->currentModelView = I;
+        pthread_setspecific(threadStateKey, s);
+    }
+    return s;
+}
+
+// Macros so the rest of this file reads as if these were plain statics.
+#define activeEncoder (threadState()->activeEncoder)
+#define currentProjection (threadState()->currentProjection)
+#define currentModelView (threadState()->currentModelView)
+#define currentTransform (threadState()->currentTransform)
+#define currentFramebufferWidth (threadState()->currentFramebufferWidth)
+#define currentFramebufferHeight (threadState()->currentFramebufferHeight)
+#define modelViewStack (threadState()->modelViewStack)
+#define modelViewStackTop (threadState()->modelViewStackTop)
+
+static CN1MetalPipelineCache *pipelineCache = nil;
 
 static simd_float4x4 identityMatrix(void) {
     return (simd_float4x4){{
@@ -811,25 +851,17 @@ id<MTLTexture> CN1MetalTextureFromUIImage(UIImage *image) {
 
 // --------------- Phase 3: mutable-image rendering ---------------
 
-// State saved when switching the active encoder from screen rendering to
-// mutable-image rendering. Single-slot stack -- nesting is not supported
-// (matches the GL path's UIGraphicsBeginImageContext semantics, which use a
-// global current-context).
-typedef struct {
-    __unsafe_unretained id<MTLRenderCommandEncoder> savedEncoder;
-    simd_float4x4 savedProjection;
-    int savedFramebufferWidth;
-    int savedFramebufferHeight;
-    simd_float4x4 savedModelView;
-    simd_float4x4 savedTransform;
-} CN1MetalEncoderState;
-
-// Per-thread mutable-image state. EDT and main thread each have their own
-// "is mutable rendering in progress on this thread?" flag and saved
-// pre-mutable encoder state. See the rationale at the top of the file.
-static __thread CN1MetalEncoderState screenStateBeforeMutable;
-static __thread BOOL mutableActive = NO;
-static __thread __unsafe_unretained GLUIImage *mutableActivePeer = nil;
+// Per-thread mutable-image state lives on the threadState() struct (see top
+// of file). These macros let the function bodies below read as if they were
+// plain statics.
+#define mutableActive (threadState()->mutableActive)
+#define mutableActivePeer (threadState()->mutableActivePeer)
+#define screenStateBeforeMutable_savedEncoder (threadState()->savedEncoderBeforeMutable)
+#define screenStateBeforeMutable_savedProjection (threadState()->savedProjectionBeforeMutable)
+#define screenStateBeforeMutable_savedFramebufferWidth (threadState()->savedFramebufferWidthBeforeMutable)
+#define screenStateBeforeMutable_savedFramebufferHeight (threadState()->savedFramebufferHeightBeforeMutable)
+#define screenStateBeforeMutable_savedModelView (threadState()->savedModelViewBeforeMutable)
+#define screenStateBeforeMutable_savedTransform (threadState()->savedTransformBeforeMutable)
 
 // Build a Y-down ortho projection for a (w x h) framebuffer. Mirrors
 // METALView's CN1MetalOrtho call -- if that one ever changes (e.g. adds
@@ -901,15 +933,15 @@ BOOL CN1MetalBeginMutableImageDraw(int width, int height, void *peer) {
     [enc setViewport:(MTLViewport){0.0, 0.0, (double)width, (double)height, 0.0, 1.0}];
     [gl setMtlMutableEncoder:enc];
 
-    // Save the screen rendering state and switch the global CN1Metal state
-    // so subsequent CN1MetalFillRect / CN1MetalDrawImage / SetTransform
-    // calls go through the mutable encoder transparently.
-    screenStateBeforeMutable.savedEncoder = activeEncoder;
-    screenStateBeforeMutable.savedProjection = currentProjection;
-    screenStateBeforeMutable.savedFramebufferWidth = currentFramebufferWidth;
-    screenStateBeforeMutable.savedFramebufferHeight = currentFramebufferHeight;
-    screenStateBeforeMutable.savedModelView = currentModelView;
-    screenStateBeforeMutable.savedTransform = currentTransform;
+    // Save the screen rendering state and switch the per-thread CN1Metal
+    // state so subsequent CN1MetalFillRect / CN1MetalDrawImage / SetTransform
+    // calls on this thread go through the mutable encoder transparently.
+    screenStateBeforeMutable_savedEncoder = activeEncoder;
+    screenStateBeforeMutable_savedProjection = currentProjection;
+    screenStateBeforeMutable_savedFramebufferWidth = currentFramebufferWidth;
+    screenStateBeforeMutable_savedFramebufferHeight = currentFramebufferHeight;
+    screenStateBeforeMutable_savedModelView = currentModelView;
+    screenStateBeforeMutable_savedTransform = currentTransform;
 
     activeEncoder = enc;
     currentProjection = mutableProjection(width, height);
@@ -935,12 +967,12 @@ void CN1MetalFinishMutableImageDraw(void *peer) {
         [enc endEncoding];
         [gl setMtlMutableEncoder:nil];
     }
-    activeEncoder = screenStateBeforeMutable.savedEncoder;
-    currentProjection = screenStateBeforeMutable.savedProjection;
-    currentFramebufferWidth = screenStateBeforeMutable.savedFramebufferWidth;
-    currentFramebufferHeight = screenStateBeforeMutable.savedFramebufferHeight;
-    currentModelView = screenStateBeforeMutable.savedModelView;
-    currentTransform = screenStateBeforeMutable.savedTransform;
+    activeEncoder = screenStateBeforeMutable_savedEncoder;
+    currentProjection = screenStateBeforeMutable_savedProjection;
+    currentFramebufferWidth = screenStateBeforeMutable_savedFramebufferWidth;
+    currentFramebufferHeight = screenStateBeforeMutable_savedFramebufferHeight;
+    currentModelView = screenStateBeforeMutable_savedModelView;
+    currentTransform = screenStateBeforeMutable_savedTransform;
     mutableActive = NO;
     mutableActivePeer = nil;
     // Command buffer stays alive (uncommitted) so further appendable draws
