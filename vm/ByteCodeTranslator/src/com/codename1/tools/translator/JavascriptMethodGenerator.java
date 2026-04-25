@@ -1253,6 +1253,25 @@ final class JavascriptMethodGenerator {
                     blockOpen = false;
                 }
                 out.append("      case ").append(i).append(": {\n");
+                // Pin pc to this block's instruction index BEFORE the
+                // body runs. When prior bare-case labels (line numbers,
+                // try-range markers) fell through into this block, the
+                // pc variable still holds whichever case label the
+                // enclosing switch entered on. That's fine for normal
+                // control flow — the body's trailing ``pc = N+1; break``
+                // overwrites pc before the next switch dispatch — but
+                // fatal for exception handling: a throw mid-body invokes
+                // ``_E(table, pc, err, ...)`` with the stale entry pc,
+                // and findExceptionHandler skips the (otherwise matching)
+                // try-range entry whose [s, e) interval starts at a
+                // later pc than the bare-case label. Surfaced as
+                // InterruptedException uncaught when Thread.sleep
+                // threw inside a method whose try-range began past the
+                // first merged label. ~7 chars per case block; the
+                // correctness win outweighs the size hit.
+                if (mergeCases && hasExceptionHandlers(method) && needsPcPin(instructions, i)) {
+                    out.append("        pc = ").append(i).append(";\n");
+                }
                 blockOpen = true;
                 pendingBareLabel = false;
             } else if (!blockOpen) {
@@ -2737,6 +2756,42 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
      * cannot participate in case-merging because stripping a tail
      * that isn't there corrupts their control flow.
      */
+    private static boolean hasExceptionHandlers(BytecodeMethod method) {
+        List<Instruction> insns = method.getInstructions();
+        if (insns == null) {
+            return false;
+        }
+        for (Instruction instr : insns) {
+            if (instr instanceof TryCatch) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * True when the case block at {@code blockStart} contains at least
+     * one instruction that can throw (i.e. needs an accurate {@code pc}
+     * for {@link findExceptionHandler} dispatch). Pure no-op /
+     * non-throwing blocks don't need the pin and we save the bytes.
+     */
+    private static boolean needsPcPin(List<Instruction> instructions, int blockStart) {
+        for (int j = blockStart; j < instructions.size(); j++) {
+            Instruction instr = instructions.get(j);
+            if (instr instanceof Jump || instr instanceof SwitchInstruction
+                    || isTerminatingInstruction(instr)) {
+                return false;
+            }
+            if (!isNonThrowingInstruction(instr)) {
+                return true;
+            }
+            // Stop scanning once we hit something that obviously
+            // ends the block — non-throwing terminating ops won't
+            // benefit from a pc pin anyway.
+        }
+        return false;
+    }
+
     private static boolean isTerminatingInstruction(Instruction instruction) {
         if (instruction instanceof Jump || instruction instanceof SwitchInstruction) {
             return true;
