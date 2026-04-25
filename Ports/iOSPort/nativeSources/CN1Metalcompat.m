@@ -295,7 +295,7 @@ static void drawQuad(CN1MetalPipeline pipeline,
     // actually reaching this function with a live activeEncoder during
     // Phase 3 mutable rendering.
     if ((diagDrawQuadCount++ % 200) == 0) {
-        NSLog(@"CN1Metal:DIAG drawQuad #%d thread=%p activeEncoder=%p pipeline=%ld state=%p",
+        NSLog(@"CN1SS:METAL_DIAG drawQuad #%d thread=%p activeEncoder=%p pipeline=%ld state=%p",
               diagDrawQuadCount, (void*)pthread_self(),
               (__bridge void*)activeEncoder, (long)pipeline, (void*)threadState());
     }
@@ -953,12 +953,12 @@ BOOL CN1MetalBeginMutableImageDraw(int width, int height, void *peer) {
     // its own buffer rather than accumulating many encoders on one buffer.
     id<MTLCommandQueue> queue = CN1MetalCommandQueue();
     if (queue == nil) {
-        NSLog(@"CN1Metal:DIAG Begin: command queue is nil on thread %p", (void*)pthread_self());
+        NSLog(@"CN1SS:METAL_DIAG Begin: command queue is nil on thread %p", (void*)pthread_self());
         return NO;
     }
     id<MTLCommandBuffer> cb = [queue commandBuffer];
     if (cb == nil) {
-        NSLog(@"CN1Metal:DIAG Begin: commandBuffer returned nil on thread %p", (void*)pthread_self());
+        NSLog(@"CN1SS:METAL_DIAG Begin: commandBuffer returned nil on thread %p", (void*)pthread_self());
         return NO;
     }
     [gl setMtlMutableCommandBuffer:cb];
@@ -968,13 +968,13 @@ BOOL CN1MetalBeginMutableImageDraw(int width, int height, void *peer) {
     desc.colorAttachments[0].storeAction = MTLStoreActionStore;
     id<MTLRenderCommandEncoder> enc = [cb renderCommandEncoderWithDescriptor:desc];
     if (enc == nil) {
-        NSLog(@"CN1Metal:DIAG Begin: renderCommandEncoder returned nil on thread %p (tex=%p w=%d h=%d)",
+        NSLog(@"CN1SS:METAL_DIAG Begin: renderCommandEncoder returned nil on thread %p (tex=%p w=%d h=%d)",
               (void*)pthread_self(), (__bridge void*)tex, width, height);
         return NO;
     }
     [enc setViewport:(MTLViewport){0.0, 0.0, (double)width, (double)height, 0.0, 1.0}];
     [gl setMtlMutableEncoder:enc];
-    NSLog(@"CN1Metal:DIAG Begin OK: thread=%p enc=%p tex=%p %dx%d state=%p",
+    NSLog(@"CN1SS:METAL_DIAG Begin OK: thread=%p enc=%p tex=%p %dx%d state=%p",
           (void*)pthread_self(), (__bridge void*)enc, (__bridge void*)tex, width, height,
           (void*)threadState());
 
