@@ -181,30 +181,64 @@ _CLASSDEF_ASSIGNABLE_TAIL_PATTERN = re.compile(
     r'(?:a|assignableTo):\s*\{([^}]*)\}'
 )
 _JSO_BRIDGE_MARKER = "com_codename1_html5_js_JSObject"
+# Class-name prefixes that the runtime's ``jsoRegistry.classPrefixes``
+# already treats as JSO bridge classes (see ``port.js`` —
+# ``jsoRegistry.classPrefixes.push("com_codename1_html5_js_",
+# "com_codename1_impl_html5_JSOImplementations_")``). Mangling these
+# class names (or the ``cn1_<class>_*`` member identifiers under them)
+# breaks two things at runtime:
+#   1. ``isJsoBridgeClass(className)`` walks the same prefixes — if we
+#      mangle ``com_codename1_html5_js_browser_Window`` to ``$eW``, the
+#      class no longer matches any prefix and the JSO bridge fallback
+#      never kicks in. ``resolveVirtual`` throws ``Missing virtual
+#      method $ny on com_codename1_html5_js_browser_Window`` (the
+#      receiver class still carries the FULL name because
+#      ``browser_bridge.js`` on the main thread tags hosted objects via
+#      hand-written ``Qe(e)`` mappings that aren't mangled).
+#   2. ``parseJsoBridgeMethod(className, methodId)`` recovers the DOM
+#      member name (``createElement``, ``appendChild`` etc.) by
+#      stripping a ``cn1_<className>_`` prefix off the methodId. Mangling
+#      the class name OR member name leaves a ``$a``-style stub that the
+#      host throws "Missing JS member $a" on.
+# These prefixes are the safety net for the ``assignableTo`` walk below,
+# which used to handle this on its own — until the structural-
+# optimization landing made ``defineClass`` auto-compute ``assignableTo``
+# from ``baseClass + interfaces`` and stop emitting the explicit ``a:{}``
+# block. With no ``a:{}`` to scan, the marker walk silently misses
+# every JSO bridge class. Keeping a prefix-based fallback restores the
+# exclusion without depending on what the translator currently chooses
+# to materialise per class.
+_JSO_BRIDGE_CLASS_PREFIXES = (
+    "com_codename1_html5_js_",
+    "com_codename1_impl_html5_JSOImplementations_",
+)
 
 
 def _collect_jso_bridge_class_names(files: list[Path]) -> set[str]:
     """Find every class whose ``assignableTo`` set contains the JSO bridge
-    marker. These classes go through ``jvm.invokeJsoBridge`` at runtime,
-    which uses ``parseJsoBridgeMethod(className, methodId)`` — an explicit
-    string split of ``methodId`` against ``"cn1_" + className + "_"`` — to
-    recover the DOM member name the call is targeting (getter / setter /
-    method). That split ONLY works when the method id is the unmangled
-    ``cn1_<class>_<member>_<sig>`` form, because the host receiver has
-    real JS properties named ``createElement`` / ``appendChild`` / etc.
-    Mangling those ids to ``$a`` makes the runtime pass ``$a`` as the
-    member name and the host throws "Missing JS member $a for host
-    receiver". Returning the class names here lets the caller exclude
-    every ``cn1_<jsoClass>_*`` identifier from the mangle pass.
+    marker, plus every class whose name matches one of the runtime's
+    JSO bridge prefixes. These classes go through ``jvm.invokeJsoBridge``
+    at runtime, which uses ``parseJsoBridgeMethod(className, methodId)``
+    — an explicit string split of ``methodId`` against ``"cn1_" +
+    className + "_"`` — to recover the DOM member name the call is
+    targeting (getter / setter / method). That split ONLY works when
+    the method id is the unmangled ``cn1_<class>_<member>_<sig>`` form,
+    because the host receiver has real JS properties named
+    ``createElement`` / ``appendChild`` / etc. Returning the class
+    names here lets the caller exclude every ``cn1_<jsoClass>_*``
+    identifier from the mangle pass.
     """
     jso_classes: set[str] = set()
     for path in files:
         data = path.read_text(encoding="utf-8")
         for match in _CLASSDEF_NAME_PATTERN.finditer(data):
             class_name = match.group(1)
-            # Peek ahead at the assignableTo block for this defineClass
-            # call. We bound the search to a reasonable window so runaway
-            # scans on giant one-line-minified output don't degrade.
+            if class_name.startswith(_JSO_BRIDGE_CLASS_PREFIXES):
+                jso_classes.add(class_name)
+                continue
+            # ``a:{}`` is no longer emitted for most classes (defineClass
+            # auto-populates assignableTo from baseClass + interfaces),
+            # but when it IS present the explicit marker still wins.
             window = data[match.end(): match.end() + 4096]
             tail = _CLASSDEF_ASSIGNABLE_TAIL_PATTERN.search(window)
             if tail and _JSO_BRIDGE_MARKER in tail.group(1):
