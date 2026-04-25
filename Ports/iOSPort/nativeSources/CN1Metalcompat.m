@@ -919,14 +919,13 @@ BOOL CN1MetalBeginMutableImageDraw(int width, int height, void *peer) {
         [gl setMtlMutableCommandBuffer:nil];
     }
 
-    // Open (or extend) the deferred command buffer and start an encoder
-    // against the mutable texture. MTLLoadActionLoad preserves any pixels
-    // already drawn in earlier render passes against this texture.
-    id<MTLCommandBuffer> cb = [gl mtlMutableCommandBuffer];
-    if (cb == nil) {
-        cb = [CN1MetalCommandQueue() commandBuffer];
-        [gl setMtlMutableCommandBuffer:cb];
-    }
+    // Allocate a fresh command buffer for this draw pass. We commit + wait
+    // in Finish (sync model, like the GL CG path), so each begin/finish gets
+    // its own buffer rather than accumulating many encoders on one buffer.
+    // Earlier deferred-commit prototype hung in CI -- 945+ drawLine calls
+    // on a single buffer + cross-thread commit interaction was the suspect.
+    id<MTLCommandBuffer> cb = [CN1MetalCommandQueue() commandBuffer];
+    [gl setMtlMutableCommandBuffer:cb];
     MTLRenderPassDescriptor *desc = [MTLRenderPassDescriptor renderPassDescriptor];
     desc.colorAttachments[0].texture = tex;
     desc.colorAttachments[0].loadAction = MTLLoadActionLoad;
@@ -969,6 +968,17 @@ void CN1MetalFinishMutableImageDraw(void *peer) {
         [enc endEncoding];
         [gl setMtlMutableEncoder:nil];
     }
+    // Sync model: commit + wait so the texture has finalised pixels by the
+    // time control returns to the caller. This matches the GL CG path's
+    // semantics (mutable rendering is synchronous from the user's POV).
+    // Bounds the per-buffer work and avoids cross-thread commit issues that
+    // bit the deferred-commit prototype.
+    id<MTLCommandBuffer> cb = [gl mtlMutableCommandBuffer];
+    if (cb != nil) {
+        [cb commit];
+        [cb waitUntilCompleted];
+        [gl setMtlMutableCommandBuffer:nil];
+    }
     activeEncoder = screenStateBeforeMutable_savedEncoder;
     currentProjection = screenStateBeforeMutable_savedProjection;
     currentFramebufferWidth = screenStateBeforeMutable_savedFramebufferWidth;
@@ -977,26 +987,25 @@ void CN1MetalFinishMutableImageDraw(void *peer) {
     currentTransform = screenStateBeforeMutable_savedTransform;
     mutableActive = NO;
     mutableActivePeer = nil;
-    // Command buffer stays alive (uncommitted) so further appendable draws
-    // are cheap. CN1MetalFlushMutableImage forces commit on read.
 }
 
 void CN1MetalFlushMutableImage(void *peer) {
     if (peer == NULL) return;
     GLUIImage *gl = (__bridge GLUIImage *)peer;
-    id<MTLCommandBuffer> cb = [gl mtlMutableCommandBuffer];
-    if (cb == nil) return;
-    // Defensive: end encoder if still open (caller should have called
-    // finish, but a screen-side consumer of this image might call flush
-    // directly without going through finish).
+    // With sync-on-finish semantics, the cmd buffer is already committed and
+    // waited by the time anyone calls flush. Defensive cleanup if a caller
+    // reaches here with a stuck encoder anyway.
     id<MTLRenderCommandEncoder> enc = [gl mtlMutableEncoder];
     if (enc != nil) {
         [enc endEncoding];
         [gl setMtlMutableEncoder:nil];
     }
-    [cb commit];
-    [cb waitUntilCompleted];
-    [gl setMtlMutableCommandBuffer:nil];
+    id<MTLCommandBuffer> cb = [gl mtlMutableCommandBuffer];
+    if (cb != nil) {
+        [cb commit];
+        [cb waitUntilCompleted];
+        [gl setMtlMutableCommandBuffer:nil];
+    }
 }
 
 BOOL CN1MetalIsMutableActive(void) {
