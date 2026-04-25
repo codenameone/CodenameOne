@@ -82,8 +82,12 @@ Label {
 
 SecondaryLabel { cn1-derive: Label; color: #3c3c43; }
 TertiaryLabel { cn1-derive: Label; color: #8e8e93; }
-SpanLabel { cn1-derive: Label; }
-SpanLabelText { cn1-derive: Label; }
+/* SpanLabel + its inner SpanLabelText render transparent so when
+   placed on a translucent surface (Dialog, PopupContent) the
+   parent's background shows through cleanly without a hard-edged
+   white block behind the wrapped text. */
+SpanLabel { cn1-derive: Label; background-color: transparent; }
+SpanLabelText { cn1-derive: Label; background-color: transparent; }
 
 /* iOS rounded-rect button style. Using border-radius (RoundRectBorder,
    CEF-free) rather than cn1-pill-border so short-text buttons don't

@@ -71,8 +71,11 @@ Label {
 
 SecondaryLabel { cn1-derive: Label; color: #49454f; }
 TertiaryLabel { cn1-derive: Label; color: #79747e; }
-SpanLabel { cn1-derive: Label; }
-SpanLabelText { cn1-derive: Label; }
+/* SpanLabel + SpanLabelText transparent so they sit cleanly over a
+   translucent / coloured parent (Dialog, PopupContent) without
+   painting their own surface fill. */
+SpanLabel { cn1-derive: Label; background-color: transparent; }
+SpanLabelText { cn1-derive: Label; background-color: transparent; }
 
 /* Material 3 button: fully-rounded (~5mm corner radius on a ~10mm-tall
    button approximates the M3 "full" shape). Using border-radius
