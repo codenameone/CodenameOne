@@ -1610,8 +1610,8 @@ public class UIManager {
             return;
         }
         Hashtable props = new Hashtable();
-        for (String key : themeProps.keySet()) {
-            props.put(key, themeProps.get(key));
+        for (java.util.Map.Entry<String, Object> e : themeProps.entrySet()) {
+            props.put(e.getKey(), e.getValue());
         }
         // buildTheme strips `@`-prefixed constants into themeConstants and
         // drops them from the main themeProps map. Round-tripping through
@@ -1619,8 +1619,8 @@ public class UIManager {
         // re-add them from themeConstants with the `@` restored, matching
         // the shape buildTheme expects on input.
         if (themeConstants != null) {
-            for (String key : themeConstants.keySet()) {
-                props.put("@" + key, themeConstants.get(key));
+            for (java.util.Map.Entry<String, Object> e : themeConstants.entrySet()) {
+                props.put("@" + e.getKey(), e.getValue());
             }
         }
         setThemePropsImpl(props);

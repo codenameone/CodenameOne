@@ -1001,30 +1001,36 @@ public class CN1Playground extends Lifecycle {
     private void layerAndroidTheme() {
         if (androidTheme == null) {
             try {
-                androidTheme = Resources.open("/androidTheme.res");
+                androidTheme = Resources.openLayered("/AndroidMaterialTheme");
             } catch (java.io.IOException ex) {
-                Log.p("Android theme unavailable: " + ex);
-                return;
+                try {
+                    androidTheme = Resources.open("/androidTheme.res");
+                } catch (java.io.IOException ex2) {
+                    Log.p("Android theme unavailable: " + ex2);
+                    return;
+                }
             }
         }
         applyThemeOverlay(androidTheme);
     }
 
     /// Layers the builtin iPhone native theme on top of the playground base.
-    /// `iOS7Theme.res` ships with the Codename One distribution; we load it from the
-    /// classpath instead of copying a local copy into the project resources.
-    /// If the resource isn't on the runtime classpath (falls back silently) the
-    /// iPhone skin renders with the playground base theme only.
+    /// Prefers the modern liquid-glass theme bundled with the runtime; falls
+    /// back to the legacy iOS7/iPhone themes only if it isn't on the classpath.
     private void layerIosTheme() {
         if (iosTheme == null) {
             try {
-                iosTheme = Resources.openLayered("/iOS7Theme");
+                iosTheme = Resources.openLayered("/iOSModernTheme");
             } catch (java.io.IOException ex) {
                 try {
-                    iosTheme = Resources.openLayered("/iPhoneTheme");
+                    iosTheme = Resources.openLayered("/iOS7Theme");
                 } catch (java.io.IOException ex2) {
-                    Log.p("iOS theme unavailable: " + ex2);
-                    return;
+                    try {
+                        iosTheme = Resources.openLayered("/iPhoneTheme");
+                    } catch (java.io.IOException ex3) {
+                        Log.p("iOS theme unavailable: " + ex3);
+                        return;
+                    }
                 }
             }
         }

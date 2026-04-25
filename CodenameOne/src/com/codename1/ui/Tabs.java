@@ -151,7 +151,12 @@ public class Tabs extends Container {
         contentPane.setUIID("TabbedPane");
         super.addComponent(BorderLayout.CENTER, contentPane);
         tabsContainer = new Container();
-        tabsContainer.setSafeArea(true);
+        // A floating-pill tab bar (e.g. iOS Modern) positions itself above the
+        // home-indicator with its own bottom margin; reserving the safe-area
+        // inset *inside* the pill leaves the selected tab orphaned at the top
+        // with empty space below. Themes that paint a flush full-width tab
+        // strip leave this true so the tabs clear the indicator from inside.
+        tabsContainer.setSafeArea(getUIManager().isThemeConstant("tabsSafeAreaBool", true));
         tabsContainer.setUIID("TabsContainer");
         tabsContainer.setScrollVisible(false);
         tabsContainer.getStyle().setMargin(0, 0, 0, 0);
