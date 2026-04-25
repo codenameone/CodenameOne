@@ -111,17 +111,13 @@ final class JavascriptSuspensionAnalysis {
                 // Seed methods that are INTRINSICALLY suspending —
                 // native, synchronized, contain monitor ops, live on
                 // a JSO-bridge class, OR contain INVOKEVIRTUAL /
-                // INVOKEINTERFACE. The last category is forced
-                // suspending even when every concrete impl of the
-                // dispatched sig is sync: the emitter unconditionally
-                // emits ``yield* cn1_iv*(...)`` at virtual call sites
-                // (cn1_iv* is a generator that wraps the resolved
-                // target via ``adaptVirtualResult`` to handle both
-                // sync and async returns), so the caller MUST be a
-                // generator. A purely-CHA view that marks a caller
-                // sync when all virtual targets are sync contradicts
-                // the emission and produces ``ReferenceError: yield
-                // is not defined`` at runtime.
+                // INVOKEINTERFACE. Forcing every method to be
+                // suspending costs ~17× per-call overhead in the
+                // cooperative scheduler (measured on the lifecycle
+                // harness: from 1.6 host callbacks/s down to 0.09/s)
+                // so we keep the CHA-sync optimization but pair it
+                // with ``cn1_ivAdapt`` wrappers at every hand-written
+                // ``yield* translatedFn(args)`` call site.
                 if (m.isNative()
                         || m.isSynchronizedMethod()
                         || hasMonitorOps(m)
