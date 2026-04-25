@@ -154,8 +154,7 @@ GLfloat* createVertexArray(int x, int y, int imageWidth, int imageHeight) {
         int imageWidth = (int)src.size.width;
         int imageHeight = (int)src.size.height;
         if (imageWidth > 0 && imageHeight > 0) {
-            id<MTLTexture> tex = CN1MetalTextureFromUIImage(src);
-            CN1MetalTileImage(tex, alpha, x, y, width, height, imageWidth, imageHeight);
+            CN1MetalTileImage([img getMTLTexture], alpha, x, y, width, height, imageWidth, imageHeight);
         }
         return;
     }

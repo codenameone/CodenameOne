@@ -28,6 +28,10 @@
 #import <OpenGLES/ES2/gl.h>
 #import <OpenGLES/ES2/glext.h>
 #import <UIKit/UIKit.h>
+#import "CN1ES2compat.h"
+#ifdef CN1_USE_METAL
+@import Metal;
+#endif
 
 @interface GLUIImage : NSObject {
     UIImage* img;
@@ -35,6 +39,9 @@
     NSString* name;
     int textureWidth;
     int textureHeight;
+#ifdef CN1_USE_METAL
+    id<MTLTexture> mtlTexture;
+#endif
 }
 -(id)initWithImage:(UIImage*)i;
 -(UIImage*)getImage;
@@ -43,4 +50,10 @@
 -(void)setImage:(UIImage*)i;
 -(int)getTextureWidth;
 -(int)getTextureHeight;
+#ifdef CN1_USE_METAL
+// Lazily build (and cache on the GLUIImage instance) an MTLTexture for
+// this image. Invalidated automatically by setImage:. nil if the device
+// is unavailable or the image is empty.
+-(id<MTLTexture>)getMTLTexture;
+#endif
 @end

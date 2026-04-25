@@ -24,6 +24,9 @@
 #import "CodenameOne_GLViewController.h"
 #import <UIKit/UIKit.h>
 #include "xmlvm.h"
+#ifdef CN1_USE_METAL
+#import "CN1Metalcompat.h"
+#endif
 
 extern int nextPowerOf2(int val);
 
@@ -132,6 +135,12 @@ extern int nextPowerOf2(int val);
 #ifndef CN1_USE_ARC
     [img retain];
 #endif
+#ifdef CN1_USE_METAL
+    // Invalidate the cached MTLTexture — it was built from the previous
+    // UIImage's pixels. ARC handles release; under MRC the texture is
+    // owned by the device and freed when references drop.
+    mtlTexture = nil;
+#endif
     if(textureName != 0) {
         int tname = textureName;
         textureName = 0;
@@ -155,6 +164,15 @@ extern int nextPowerOf2(int val);
     [name retain];
 #endif
 }
+
+#ifdef CN1_USE_METAL
+-(id<MTLTexture>)getMTLTexture {
+    if (mtlTexture != nil) return mtlTexture;
+    if (img == nil) return nil;
+    mtlTexture = CN1MetalTextureFromUIImage(img);
+    return mtlTexture;
+}
+#endif
 
 -(void)dealloc {
     if(name != nil) {

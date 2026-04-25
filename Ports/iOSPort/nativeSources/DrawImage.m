@@ -108,11 +108,7 @@ static GLuint getOGLProgram(){
 #ifdef USE_ES2
 -(void)execute {
 #ifdef CN1_USE_METAL
-    // Phase 1: rasterize the UIImage into an MTLTexture on every draw.
-    // This is slow; Phase 1.5 will cache the MTLTexture on GLUIImage so
-    // repeated DrawImage hits for the same image reuse the texture.
-    id<MTLTexture> texture = CN1MetalTextureFromUIImage([img getImage]);
-    CN1MetalDrawImage(texture, alpha, x, y, width, height);
+    CN1MetalDrawImage([img getMTLTexture], alpha, x, y, width, height);
     return;
 #endif
     glUseProgram(getOGLProgram());
