@@ -23,7 +23,6 @@
  */
 package com.codename1.ui;
 
-import com.codename1.impl.CodenameOneImplementation;
 
 import java.util.HashMap;
 import java.util.Hashtable;
