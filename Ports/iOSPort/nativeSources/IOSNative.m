@@ -28,6 +28,9 @@
 #include "xmlvm.h"
 #include "java_lang_String.h"
 #import "CN1ES2compat.h"
+#ifdef CN1_USE_METAL
+#import "CN1Metalcompat.h"
+#endif
 #import <objc/runtime.h>
 
 #ifndef NEW_CODENAME_ONE_VM
@@ -8382,16 +8385,23 @@ void com_codename1_impl_ios_IOSNative_nativeDrawPath___int_int_long(CN1_THREAD_S
     
 }
 
-extern void Java_com_codename1_impl_ios_IOSImplementation_drawTextureAlphaMaskImpl(GLuint textureName, int color, int alpha, int x, int y, int w, int h);
+extern void Java_com_codename1_impl_ios_IOSImplementation_drawTextureAlphaMaskImpl(JAVA_LONG textureName, int color, int alpha, int x, int y, int w, int h);
 void com_codename1_impl_ios_IOSNative_drawTextureAlphaMask___long_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG textureName, JAVA_INT color, JAVA_INT alpha, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h)
 {
-    Java_com_codename1_impl_ios_IOSImplementation_drawTextureAlphaMaskImpl((GLuint)textureName, color, alpha, x, y, w, h);
-    
-    
+    Java_com_codename1_impl_ios_IOSImplementation_drawTextureAlphaMaskImpl(textureName, color, alpha, x, y, w, h);
+
+
 }
 
 void com_codename1_impl_ios_IOSNative_nativeDeleteTexture___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG textureName)
 {
+    if (textureName == 0) return;
+#ifdef CN1_USE_METAL
+    // Texture handle is a CFBridgingRetain'd id<MTLTexture>; release it to
+    // drop the retain that nativePathRendererCreateTexture took.
+    CFBridgingRelease((CFTypeRef)(void *)(uintptr_t)textureName);
+    return;
+#endif
     dispatch_async(dispatch_get_main_queue(), ^{
         GLuint tex = (GLuint)textureName;
         //POOL_BEGIN();
@@ -8467,8 +8477,35 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_nativePathRendererToARGB___long_int
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathRendererCreateTexture___long(JAVA_OBJECT instanceObject, JAVA_LONG renderer)
 {
+#ifdef CN1_USE_METAL
+    {
+        Renderer *r = (Renderer*)renderer;
+        JAVA_INT outputBounds[4];
+        Renderer_getOutputBounds(renderer, (JAVA_INT*)&outputBounds);
+        if (outputBounds[2] < 0 || outputBounds[3] < 0) return 0;
+        JAVA_INT x = min(outputBounds[0], outputBounds[2]);
+        JAVA_INT y = min(outputBounds[1], outputBounds[3]);
+        JAVA_INT width = outputBounds[2] - outputBounds[0];
+        JAVA_INT height = outputBounds[3] - outputBounds[1];
+        if (width < 0) width = -width;
+        if (height < 0) height = -height;
+        if (width == 0 || height == 0) return 0;
+        AlphaConsumer ac;
+        ac.originX = x; ac.originY = y; ac.width = width; ac.height = height;
+        jbyte *maskArray = malloc(sizeof(jbyte) * ac.width * ac.height);
+        ac.alphas = maskArray;
+        Renderer_produceAlphas(renderer, &ac);
+        // Build R8 MTLTexture from the alpha bytes; CFBridgingRetain so the
+        // Java-side handle (returned as JAVA_LONG) keeps the texture alive
+        // until nativeDeleteTexture releases it.
+        id<MTLTexture> tex = CN1MetalCreateAlphaMaskTexture((const uint8_t *)maskArray, width, height);
+        free(maskArray);
+        if (tex == nil) return 0;
+        return (JAVA_LONG)(uintptr_t)CFBridgingRetain(tex);
+    }
+#endif
 #ifdef USE_ES2
-    
+
     __block JAVA_LONG outTexture = NULL;
     
     dispatch_sync(dispatch_get_main_queue(), ^{

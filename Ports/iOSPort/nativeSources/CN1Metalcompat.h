@@ -160,6 +160,21 @@ void CN1MetalTileImage(id<MTLTexture> texture, int alpha,
 // frame. Phase 4 will replace this with a CoreText glyph atlas.
 void CN1MetalDrawString(NSString *str, UIFont *font, int color, int alpha, int x, int y);
 
+// Build an MTLTexture from a single-channel (R8/alpha-only) bitmap. The
+// alpha bytes are produced by Renderer.c (Renderer_produceAlphas) when
+// rasterising a path; the resulting texture is sampled by the AlphaMask
+// pipeline. Caller bridge-retains the returned id<MTLTexture> through
+// JAVA_LONG so the same handle can flow through the existing TextureAlphaMask
+// path on the Java side. Returns nil on failure.
+id<MTLTexture> CN1MetalCreateAlphaMaskTexture(const uint8_t *bytes, int width, int height);
+
+// Render an alpha-mask texture (R8 or A8) at (x,y,w,h) tinted by the given
+// premultiplied color+alpha. Wrapper for the AlphaMask pipeline; equivalent
+// to the GL DrawTextureAlphaMask basic shader path. Used by fillArc /
+// fillShape / drawShape after Renderer.c rasterises the path.
+void CN1MetalDrawAlphaMask(id<MTLTexture> texture, int color, int alpha,
+                           int x, int y, int width, int height);
+
 // Draw a linear or radial gradient filling (x,y,w,h). type is one of
 // GRADIENT_TYPE_HORIZONTAL / GRADIENT_TYPE_VERTICAL / GRADIENT_TYPE_RADIAL
 // (defined in DrawGradient.h). startColor/endColor are 0xAARRGGBB. The

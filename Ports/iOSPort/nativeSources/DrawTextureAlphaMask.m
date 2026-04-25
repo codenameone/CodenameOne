@@ -25,6 +25,9 @@
 #import "PaintOp.h"
 #import "RadialGradientPaint.h"
 #import "CodenameOne_GLViewController.h"
+#ifdef CN1_USE_METAL
+#import "CN1Metalcompat.h"
+#endif
 
 #ifdef USE_ES2
 extern GLKMatrix4 CN1modelViewMatrix;
@@ -275,7 +278,7 @@ static DrawTextureAlphaMaskOGLProgram* getOGLProgram() {
 
 @implementation DrawTextureAlphaMask
 
--(id)initWithArgs:(GLuint)pTextName color:(int)pColor alpha:(int)pAlpha x:(int)pX y:(int)pY w:(int)pW h:(int)pH
+-(id)initWithArgs:(JAVA_LONG)pTextName color:(int)pColor alpha:(int)pAlpha x:(int)pX y:(int)pY w:(int)pW h:(int)pH
 {
     textureName = pTextName;
     color = pColor;
@@ -289,15 +292,26 @@ static DrawTextureAlphaMaskOGLProgram* getOGLProgram() {
 #ifdef USE_ES2
 -(void)execute
 {
-    
+#ifdef CN1_USE_METAL
+    if (textureName == 0) {
+        CN1Log(@"Attempt to draw null alpha-mask texture. Skipping");
+        return;
+    }
+    // textureName is a CFBridgingRetain'd id<MTLTexture> set up by
+    // IOSNative.m's nativePathRendererCreateTexture under Metal. Just bridge
+    // back to the Obj-C handle (no transfer of ownership) and dispatch.
+    id<MTLTexture> tex = (__bridge id<MTLTexture>)(void *)(uintptr_t)textureName;
+    CN1MetalDrawAlphaMask(tex, color, alpha, x, y, w, h);
+    return;
+#endif
     //RadialGradientPaint * gp = [[RadialGradientPaint alloc ]initWithArgs:0 y:0 width:[CodenameOne_GLViewController instance].view.bounds.size.width*2 height:[CodenameOne_GLViewController instance].view.bounds.size.height*2 startColor:0x0 endColor:0xffffff];
     //[PaintOp setCurrent:gp];
-    
+
     if ( textureName == 0 ){
         CN1Log(@"Attempt to draw null texture.  Skipping");
     }
     DrawTextureAlphaMaskOGLProgram* p = getOGLProgram();
-    
+
     glUseProgram(p.program);
     float alph = ((float)alpha)/255.0;
     GLKVector4 colorV = GLKVector4Make(((float)((color >> 16) & 0xff))/255.0*alph, \
@@ -313,7 +327,7 @@ static DrawTextureAlphaMaskOGLProgram* getOGLProgram() {
     
     glActiveTexture(GL_TEXTURE0);
     GLErrorLog;
-    glBindTexture(GL_TEXTURE_2D, textureName);
+    glBindTexture(GL_TEXTURE_2D, (GLuint)textureName);
     GLErrorLog;
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     GLErrorLog;

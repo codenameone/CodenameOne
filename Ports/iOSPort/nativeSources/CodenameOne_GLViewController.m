@@ -1088,15 +1088,15 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawPathImpl
 }
 
 
-void Java_com_codename1_impl_ios_IOSImplementation_drawTextureAlphaMaskImpl(GLuint textureName, int color, int alpha, int x, int y, int w, int h)
+void Java_com_codename1_impl_ios_IOSImplementation_drawTextureAlphaMaskImpl(JAVA_LONG textureName, int color, int alpha, int x, int y, int w, int h)
 {
-    
+
     DrawTextureAlphaMask *f = [[DrawTextureAlphaMask alloc] initWithArgs:textureName color:color alpha:alpha x:x y:y w:w h:h];
     [CodenameOne_GLViewController upcoming:f];
 #ifndef CN1_USE_ARC
     [f release];
 #endif
-    
+
 }
 
 // END ES2 ADDITION -------------------------------------------------------------------------------------------------

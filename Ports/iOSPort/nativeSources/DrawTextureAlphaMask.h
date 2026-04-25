@@ -21,14 +21,20 @@
  * need additional information or have any questions.
  */
 #import "ExecutableOp.h"
+#import "xmlvm.h"
 #ifdef USE_ES2
 #import <OpenGLES/ES2/gl.h>
 #else
 #import <OpenGLES/ES1/gl.h>
 #endif
 
+// textureName is a 64-bit handle:
+//   - On the GL build it's a GLuint zero-extended to JAVA_LONG.
+//   - On the Metal build it's a CFBridgingRetain'd id<MTLTexture> pointer
+//     (set up by IOSNative.m's nativePathRendererCreateTexture under
+//     CN1_USE_METAL and freed by nativeDeleteTexture).
 @interface DrawTextureAlphaMask : ExecutableOp {
-    GLuint textureName;
+    JAVA_LONG textureName;
     int color;
     int alpha;
     int x;
@@ -37,7 +43,7 @@
     int h;
 }
 
--(id)initWithArgs:(GLuint)pTextName color:(int)pColor alpha:(int)pAlpha x:(int)pX y:(int)pY w:(int)pW h:(int)pH;
+-(id)initWithArgs:(JAVA_LONG)pTextName color:(int)pColor alpha:(int)pAlpha x:(int)pX y:(int)pY w:(int)pW h:(int)pH;
 -(void)execute;
 
 @end

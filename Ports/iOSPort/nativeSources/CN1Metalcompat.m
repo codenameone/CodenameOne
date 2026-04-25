@@ -703,6 +703,52 @@ void CN1MetalDrawGradient(int type, int startColor, int endColor,
     drawQuad(CN1MetalPipelineTexturedRGBA, vertices, texcoords, tint, e->texture);
 }
 
+// --------------- Alpha mask rendering (path-based shapes) ---------------
+
+id<MTLTexture> CN1MetalCreateAlphaMaskTexture(const uint8_t *bytes, int width, int height) {
+    if (bytes == NULL || width <= 0 || height <= 0) return nil;
+    id<MTLDevice> device = CN1MetalDevice();
+    if (device == nil) return nil;
+    MTLTextureDescriptor *desc = [MTLTextureDescriptor
+        texture2DDescriptorWithPixelFormat:MTLPixelFormatR8Unorm
+        width:width height:height mipmapped:NO];
+    desc.usage = MTLTextureUsageShaderRead;
+    id<MTLTexture> tex = [device newTextureWithDescriptor:desc];
+    if (tex == nil) return nil;
+    [tex replaceRegion:MTLRegionMake2D(0, 0, width, height)
+           mipmapLevel:0
+             withBytes:bytes
+           bytesPerRow:width];
+    return tex;
+}
+
+void CN1MetalDrawAlphaMask(id<MTLTexture> texture, int color, int alpha,
+                           int x, int y, int width, int height) {
+    if (texture == nil) return;
+    // The AlphaMask fragment shader (cn1_fs_alpha_mask) does:
+    //   float a = sample(tex).r;
+    //   return float4(color.rgb * a, color.a * a);
+    // For premultiplied-alpha blending we need (R*a, G*a, B*a, a) where a is
+    // (alpha/255) and (R,G,B) are color components. The shader multiplies by
+    // tex.r once; we pass color premultiplied by alpha so the final out is
+    // (R*alpha*a, G*alpha*a, B*alpha*a, alpha*a) which matches GL's
+    // DrawTextureAlphaMask basic shader.
+    simd_float4 colorV = premultipliedColor(color, alpha);
+    float vertices[8] = {
+        (float)x,           (float)y,
+        (float)(x + width), (float)y,
+        (float)x,           (float)(y + height),
+        (float)(x + width), (float)(y + height)
+    };
+    static const float texcoords[8] = {
+        0.0f, 0.0f,
+        1.0f, 0.0f,
+        0.0f, 1.0f,
+        1.0f, 1.0f
+    };
+    drawQuad(CN1MetalPipelineAlphaMask, vertices, texcoords, colorV, texture);
+}
+
 // --------------- Texture helpers ---------------
 
 id<MTLTexture> CN1MetalTextureFromUIImage(UIImage *image) {
