@@ -171,7 +171,11 @@ jobs:
         # time out anyway, and we want fast feedback for boot
         # regressions.
         env:
-          CN1_LIFECYCLE_TIMEOUT_SECONDS: "120"
+          # CI runners process bytecode-translator output noticeably
+          # slower than local — locally HelloCodenameOne reaches
+          # ``main-thread-completed`` after ~180s of cooperative-
+          # scheduling host callbacks. 240s gives ~30% headroom.
+          CN1_LIFECYCLE_TIMEOUT_SECONDS: "240"
           CN1_LIFECYCLE_REPORT_DIR: ${{ github.workspace }}/artifacts/javascript-lifecycle-tests
         run: |
           mkdir -p "${CN1_LIFECYCLE_REPORT_DIR}"

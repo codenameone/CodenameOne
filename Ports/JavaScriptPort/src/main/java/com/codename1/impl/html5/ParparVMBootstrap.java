@@ -31,10 +31,34 @@ public final class ParparVMBootstrap implements Runnable {
         bootstrap.run();
     }
 
+    // ``window.cn1Initialized = true`` lands on the worker's global
+    // (window === self inside the worker), but the headless test
+    // harness and every other main-thread consumer reads its own
+    // ``window.cn1Initialized``. The bridge (browser_bridge.js)
+    // already flips its main-thread copy when ``startParparVmApp``
+    // runs, so the worker side is best-effort — the real signal
+    // travels through the message-passing channel instead.
     @JSBody(params = {}, script = "window.cn1Initialized = true;")
     private static native void setInitialized();
 
-    @JSBody(params = {}, script = "window.cn1Started = true;")
+    // For ``cn1Started`` we need the same main-thread signal but
+    // there's no ``startParparVmApp``-style hook on this side. The
+    // worker emits a ``{type: 'lifecycle', phase: 'started'}`` VM
+    // message at the same time so ``browser_bridge.js`` can flip
+    // its own ``cn1Started``. Fall back gracefully when neither
+    // ``parentPort`` (Node worker_threads) nor ``self.postMessage``
+    // (browser Worker) is available — that path applies to direct
+    // in-page invocations from the JavaScript-port simulator.
+    @JSBody(params = {}, script = ""
+            + "window.cn1Started = true;"
+            + "var __cn1LifecycleMsg = {type: 'lifecycle', phase: 'started'};"
+            + "if (typeof parentPort !== 'undefined' && parentPort && typeof parentPort.postMessage === 'function') {"
+            + "  parentPort.postMessage(__cn1LifecycleMsg);"
+            + "} else if (typeof self !== 'undefined' && self !== this && typeof self.postMessage === 'function') {"
+            + "  self.postMessage(__cn1LifecycleMsg);"
+            + "} else if (typeof postMessage === 'function') {"
+            + "  postMessage(__cn1LifecycleMsg);"
+            + "}")
     private static native void setStarted();
 
     @Override
