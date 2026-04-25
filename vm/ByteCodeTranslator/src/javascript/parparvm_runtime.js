@@ -2243,6 +2243,15 @@ global.cn1_iv1 = cn1_iv1;
 global.cn1_iv2 = cn1_iv2;
 global.cn1_iv3 = cn1_iv3;
 global.cn1_iv4 = cn1_iv4;
+// External callers (port.js, browser_bridge.js, anything that
+// dispatches via ``jvm.resolveVirtual`` and yield-delegates to the
+// result) must tolerate the CHA classifying overrides as plain
+// synchronous functions — those return raw values, not iterators,
+// and ``yield* sync(...)`` throws ``TypeError: ... is not iterable``.
+// ``cn1_ivAdapt`` is the same generator wrapper ``cn1_iv*`` uses
+// internally: forwards iterator results via yield*, returns sync
+// results unchanged.
+global.cn1_ivAdapt = adaptVirtualResult;
 global.cn1_ivN = cn1_ivN;
 
 vmDiag("BOOT", "runtime", "loaded");

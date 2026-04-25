@@ -3391,14 +3391,19 @@ function* runCn1ssResolvedTest(callTarget, effectiveTestObject, effectiveTestNam
   let runErrored = false;
   let runPhase = "prepare";
   try {
+    // CHA-classified-sync overrides (e.g. AbstractTest.prepare's empty
+    // body) translate to plain functions that return ``undefined``.
+    // ``yield* undefined`` throws ``TypeError: ... is not iterable``,
+    // so route the dispatch result through ``cn1_ivAdapt``: forwards
+    // iterator results via yield*, returns sync results unchanged.
     const prepareMethod = jvm.resolveVirtual(effectiveTestObject.__class, baseTestPrepareMethodId);
     if (typeof prepareMethod === "function") {
-      yield* prepareMethod(effectiveTestObject);
+      yield* cn1_ivAdapt(prepareMethod(effectiveTestObject));
     }
     runPhase = "runTest";
     const runTestMethod = jvm.resolveVirtual(effectiveTestObject.__class, baseTestRunTestMethodId);
     if (typeof runTestMethod === "function") {
-      yield* runTestMethod(effectiveTestObject);
+      yield* cn1_ivAdapt(runTestMethod(effectiveTestObject));
     }
   } catch (err) {
     runErrored = true;
