@@ -163,11 +163,17 @@ RadioButton {
 RadioButton.selected { color: #007aff; }
 RadioButton.disabled { color: #c7c7cc; background-color: #e5e5ea; }
 
+/* Switch's track-left needs to land at the same x as the Label
+   text-left of the row above so the column reads as aligned.
+   Label text starts at margin-left + padding-left = 0 + 2mm = 2mm.
+   Switch track starts at margin-left + padding-left so we keep
+   margin-left at 2mm and zero out padding. */
 Switch {
     color: #ffffff;
     background-color: #ffffff;
-    padding: 1mm;
+    padding: 0;
     margin: 1mm 2mm 1mm 2mm;
+    text-align: left;
 }
 Switch.selected { color: #ffffff; background-color: #34c759; }
 Switch.disabled { color: #c7c7cc; background-color: #e5e5ea; }
@@ -214,15 +220,12 @@ TitleCommand { cn1-derive: Button; color: #007aff; padding: 1mm 2mm 1mm 2mm; }
 
 /* iOS 26 tab-bar look: the TabsContainer is the visible pill group
    hugging the bottom edge, with individual tabs rendered as
-   transparent hits inside it. cn1-pill-border draws a true pill
-   (fully-rounded ends) independent of the container height, which
-   matches Apple's spec better than a fixed-radius rounded-rect.
-   The solid surface-container fill approximates frosted glass
-   inside the CEF-free subset; a real backdrop-filter is a
-   separate future PR (see native-themes/README.md). */
+   transparent hits inside it. cn1-pill-border draws a true pill;
+   rgba on the fill approximates frosted glass within the CEF-free
+   subset. A real backdrop-filter is future work. */
 Tabs { background-color: transparent; padding: 1mm 2mm 2mm 2mm; margin: 0; }
 TabsContainer {
-    background-color: #f2f2f7;
+    background-color: rgba(242,242,247,0.7);
     color: #000000;
     padding: 1mm;
     margin: 2mm 3mm 2mm 3mm;
@@ -237,8 +240,8 @@ Tab {
     font-family: "native:MainRegular";
     text-align: center;
 }
-Tab.selected { color: #007aff; background-color: #ffffff; cn1-background-type: cn1-pill-border; }
-Tab.pressed { color: #0064d1; background-color: #e5e5ea; cn1-background-type: cn1-pill-border; }
+Tab.selected { color: #007aff; background-color: rgba(255,255,255,0.85); cn1-background-type: cn1-pill-border; }
+Tab.pressed { color: #0064d1; background-color: rgba(229,229,234,0.85); cn1-background-type: cn1-pill-border; }
 
 SelectedTab { cn1-derive: Tab; color: #007aff; }
 UnselectedTab { cn1-derive: Tab; color: #3c3c43; }
@@ -257,20 +260,21 @@ List { background-color: #ffffff; padding: 0; margin: 0; }
 
 ListRenderer { cn1-derive: Label; padding: 2mm 3mm 2mm 3mm; }
 
-/* iOS Settings-style list row: opaque white surface, generous
-   vertical padding, bold primary line, lighter secondary lines,
-   pressed-state highlight. No borders - the separator is provided
-   by the parent List / Container layout. */
+/* iOS Settings-style list row: translucent white surface, generous
+   vertical padding, bold primary line, lighter secondary lines.
+   Margins keep each row floating slightly off the form edge and
+   away from the next row, mimicking iOS 26 grouped-list cards. */
 MultiButton {
     cn1-derive: Button;
-    background-color: #ffffff;
+    background-color: rgba(255,255,255,0.85);
     color: #000000;
     padding: 3mm 4mm 3mm 4mm;
-    margin: 0;
+    margin: 1mm 3mm 1mm 3mm;
     font-family: "native:MainRegular";
     font-size: 4mm;
     text-align: left;
     icon-gap: 3mm;
+    border-radius: 3mm;
 }
 MultiButton.pressed { background-color: #e5e5ea; }
 
@@ -303,36 +307,37 @@ MultiLine4 {
     padding: 0;
 }
 
-/* Dialog contrasts with the Form by painting pure surface white on
-   top of the grouped-form #f2f2f7 background. CEF-free subset rules
-   out box-shadow and border+radius together, so we rely on the
-   colour step alone for visible separation. Inline
-   DialogBody/DialogTitle/PopupContent props instead of
-   cn1-derive'ing Dialog/Title so a recurrence of the iOS TitleArea
-   resolver hang does not hit this path. */
+/* Dialog uses a translucent surface so any backdrop (form bg or
+   the test harness's diagonal-stripe texture) reads through -
+   approximates the iOS 26 vibrancy effect within the CEF-free
+   subset. DialogBody is left fully transparent: it was previously
+   painting its own opaque shade on top of Dialog and reading as a
+   visibly different colour. All Dialog sub-UIIDs share the same
+   translucent surface (or stay transparent so Dialog's surface
+   shows through). */
 Dialog {
-    background-color: #ffffff;
+    background-color: rgba(255,255,255,0.78);
     color: #000000;
     padding: 3mm;
     margin: 5mm;
     border-radius: 4mm;
 }
 DialogBody {
-    background-color: #ffffff;
+    background-color: transparent;
     color: #000000;
     padding: 2mm;
     margin: 0;
 }
 DialogTitle {
     color: #000000;
-    background-color: #ffffff;
+    background-color: transparent;
     padding: 2mm;
     font-family: "native:MainBold";
     font-size: 4mm;
     text-align: center;
 }
-DialogContentPane { background-color: #ffffff; padding: 2mm; margin: 0; }
-DialogCommandArea { background-color: #ffffff; padding: 1mm; }
+DialogContentPane { background-color: transparent; padding: 2mm; margin: 0; }
+DialogCommandArea { background-color: transparent; padding: 1mm; }
 
 FloatingActionButton {
     color: #ffffff;
@@ -402,10 +407,10 @@ PopupContent {
     TitleCommand { color: #0a84ff; }
 
     Tabs { background-color: transparent; }
-    TabsContainer { background-color: #2c2c2e; color: #ffffff; }
+    TabsContainer { background-color: rgba(44,44,46,0.7); color: #ffffff; }
     Tab { color: #ebebf5; background-color: transparent; }
-    Tab.selected { color: #0a84ff; background-color: #1c1c1e; }
-    Tab.pressed { color: #64b1ff; background-color: #3a3a3c; }
+    Tab.selected { color: #0a84ff; background-color: rgba(28,28,30,0.9); }
+    Tab.pressed { color: #64b1ff; background-color: rgba(58,58,60,0.9); }
     SelectedTab { color: #0a84ff; }
     UnselectedTab { color: #ebebf5; }
 
@@ -422,15 +427,18 @@ PopupContent {
     MultiLine3 { color: #8e8e93; }
     MultiLine4 { color: #8e8e93; }
 
-    /* Dialog sits visibly above the dark form (#1c1c1e) on an
-       elevated surface (#2c2c2e) so it doesn't blend into the
-       background. All dialog sub-UIIDs share the same fill. */
-    Dialog { background-color: #2c2c2e; color: #ffffff; }
-    DialogBody { background-color: #2c2c2e; color: #ffffff; }
-    DialogTitle { color: #ffffff; background-color: #2c2c2e; }
-    DialogContentPane { background-color: #2c2c2e; }
-    DialogCommandArea { background-color: #2c2c2e; }
-    PopupContent { background-color: #2c2c2e; color: #ffffff; }
+    /* Dark Dialog: translucent elevated surface over the dark form
+       so the textured backdrop reads through. DialogBody / Title /
+       ContentPane / CommandArea stay transparent so the Dialog
+       surface is the single colour they all share - this avoids the
+       previous double-paint that read as a visible white-edged
+       frame in dark mode captures. */
+    Dialog { background-color: rgba(44,44,46,0.78); color: #ffffff; }
+    DialogBody { background-color: transparent; color: #ffffff; }
+    DialogTitle { color: #ffffff; background-color: transparent; }
+    DialogContentPane { background-color: transparent; }
+    DialogCommandArea { background-color: transparent; }
+    PopupContent { background-color: rgba(44,44,46,0.78); color: #ffffff; }
 
     FloatingActionButton { color: #ffffff; background-color: #0a84ff; }
     FloatingActionButton.pressed { background-color: #64b1ff; }

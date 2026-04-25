@@ -11,15 +11,37 @@
 package com.codename1.impl.javase;
 
 /**
- * Registers BuildHintEditor schema defaults for the native-theme build
- * hints introduced in the CSS-driven native-themes work. The editor
- * (BuildHintEditor) discovers known hints by scanning System properties
- * matching {@code codename1.arg.{{ HintName }}.<field>}; cn1libs and the
- * framework itself can register hints by setting such properties before
- * the editor loads.
+ * Registers schema metadata for the native-theme build hints
+ * (ios.themeMode, cn1.androidTheme, cn1.nativeTheme) so that the
+ * Build Hints UI inside the Codename One Simulator can show them as
+ * labelled Select dropdowns instead of opaque key/value entries.
  *
- * <p>Called from {@link Simulator#main(String[])} so the Native Theme
- * group appears in the Build Hints dialog by default.
+ * <p><b>Why this class exists:</b> {@link com.codename1.impl.javase.BuildHintEditor}
+ * is the dialog that lets developers set build hints from the
+ * Simulator menu (Project &rarr; Build Hints). It populates its rows by
+ * scanning system properties whose keys match
+ * {@code codename1.arg.{{ HintName }}.<field>} (label / type / values
+ * / description / group). Hints contributed by cn1libs typically
+ * register themselves via that property convention from the cn1lib's
+ * own code, but the three hints introduced by the CSS-driven
+ * native-themes work are framework-level - they are not part of any
+ * cn1lib - and need to be visible to every project, including the
+ * very first one a new developer creates. Without this class the
+ * dropdowns would not appear and users would have to type the hint
+ * name and value by hand into {@code codenameone_settings.properties},
+ * which most developers would never discover.
+ *
+ * <p>This is <b>not</b> related to live CSS recompilation. The CSS
+ * watcher in the Simulator is a separate component; this class only
+ * publishes the build-hint schema.
+ *
+ * <p><b>Lifecycle:</b> {@link #register()} is invoked once from
+ * {@code Simulator.main(String[])} during simulator startup, before
+ * the BuildHintEditor reads its registry. Re-invoking is harmless -
+ * each {@link System#setProperty(String, String)} call simply
+ * overwrites the previous value. Hints set here can still be
+ * overridden by per-project properties or by a cn1lib that registers
+ * the same key with different metadata.
  */
 final class BuildHintSchemaDefaults {
 

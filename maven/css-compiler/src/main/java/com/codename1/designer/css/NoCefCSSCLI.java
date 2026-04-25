@@ -25,6 +25,12 @@ import java.net.URL;
 public class NoCefCSSCLI {
 
     public static void main(String[] args) throws Exception {
+        // Headless theme build: install a minimal CodenameOneImplementation
+        // before any CSSTheme code touches Display / Font / Util. Avoids
+        // peppering CN1 core with `if (impl == null)` fallbacks - the
+        // unit-test module follows the same pattern with
+        // TestCodenameOneImplementation.
+        installHeadlessImplementation();
         if (hasArg(args, "help") || hasArg(args, "h") || args.length == 0) {
             printUsage();
             return;
@@ -114,6 +120,23 @@ public class NoCefCSSCLI {
             }
         }
         return null;
+    }
+
+    private static void installHeadlessImplementation() throws Exception {
+        // Display.impl is package-private and there is no public installer.
+        // Reflect into the field once at startup; mirrors the pattern used
+        // by the unit-test DisplayContext helper. Util keeps its own copy of
+        // the implementation reference (Util.implInstance) which is normally
+        // pushed via Util.setImplementation - that one is public so we use
+        // it directly.
+        HeadlessCssCompilerImplementation stub = new HeadlessCssCompilerImplementation();
+        Class<?> displayCls = Class.forName("com.codename1.ui.Display");
+        java.lang.reflect.Field implField = displayCls.getDeclaredField("impl");
+        implField.setAccessible(true);
+        if (implField.get(null) == null) {
+            implField.set(null, stub);
+        }
+        com.codename1.io.Util.setImplementation(stub);
     }
 
     private static void printUsage() {
