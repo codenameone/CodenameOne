@@ -2573,9 +2573,21 @@ function installNativeBindings() {
     // bindNative calls during port.js load ran before translated_app.js
     // emitted any ``_Z({..., m: {...}})`` blocks — ``jvm.classes`` was
     // empty so the loop found nothing to override. Now that classes
-    // are registered, apply the override for both the class-specific
-    // ``name`` and its sig-based dispatch id form.
+    // are registered, re-apply the override.
+    //
+    // CRITICAL: ``cn1_<class>_<method>_<sig>`` always maps to the
+    // override ON THAT EXACT CLASS — never on subclasses or other
+    // classes that happen to inherit / re-implement the same method.
+    // The pre-fa4247a42 emission gave each class its own
+    // ``cn1_<X>_<m>`` entry, so installing one bindNative could only
+    // touch the one class. After fa4247a42, every class's methods
+    // map keys on the class-free ``cn1_s_<m>_<sig>`` dispatch id —
+    // a single override under that key would clobber every subclass's
+    // own implementation. So override the dispatch id ONLY on the
+    // exact class extracted from the bindNative name; everywhere else
+    // the existing emitted entry stays intact.
     let dispatchId = null;
+    let targetClassName = null;
     if (name.indexOf("cn1_") === 0 && name.indexOf("cn1_s_") !== 0) {
       let bestPrefix = null;
       for (let i = 0; i < classNames.length; i++) {
@@ -2583,13 +2595,12 @@ function installNativeBindings() {
         if (name.indexOf(prefix) === 0
                 && (bestPrefix == null || prefix.length > bestPrefix.length)) {
           bestPrefix = prefix;
+          targetClassName = classNames[i];
         }
       }
       if (bestPrefix != null) {
         dispatchId = "cn1_s_" + name.substring(bestPrefix.length);
       }
-    } else if (name.indexOf("cn1_s_") === 0) {
-      dispatchId = name;
     }
     for (let i = 0; i < classNames.length; i++) {
       const cls = classes[classNames[i]];
@@ -2599,12 +2610,13 @@ function installNativeBindings() {
       if (Object.prototype.hasOwnProperty.call(cls.methods, name)) {
         cls.methods[name] = fn;
       }
-      if (dispatchId && Object.prototype.hasOwnProperty.call(cls.methods, dispatchId)) {
-        cls.methods[dispatchId] = fn;
-      }
     }
-    if (dispatchId) {
-      jvm.nativeMethods[dispatchId] = fn;
+    if (targetClassName && dispatchId) {
+      const targetCls = classes[targetClassName];
+      if (targetCls && targetCls.methods
+              && Object.prototype.hasOwnProperty.call(targetCls.methods, dispatchId)) {
+        targetCls.methods[dispatchId] = fn;
+      }
     }
   }
   const names = Object.keys(jvm.nativeMethods || {});
