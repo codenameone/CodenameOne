@@ -331,13 +331,8 @@ PopupContent {
 
 @media (prefers-color-scheme: dark) {
     Component { color: #e6e0e9; background-color: #141218; }
-    /* Form must paint a fully opaque surface in every appearance - it's the
-       root of every screen and there's nothing meaningful behind it. The
-       explicit transparency override defends against the dark style
-       resolver dropping the implicit bgTransparency that the light
-       declaration carried. */
-    Form { background-color: #141218; transparency: 255; padding: 0; margin: 0; }
-    ContentPane { background-color: #141218; transparency: 255; padding: 0; margin: 0; }
+    Form { background-color: #141218; padding: 0; margin: 0; }
+    ContentPane { background-color: #141218; padding: 0; margin: 0; }
 
     Label { color: #e6e0e9; background-color: transparent; }
     SecondaryLabel { color: #cac4d0; background-color: transparent; }

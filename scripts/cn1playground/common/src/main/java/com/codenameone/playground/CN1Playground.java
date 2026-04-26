@@ -212,21 +212,7 @@ public class CN1Playground extends Lifecycle {
         applyActivity(currentActivity);
 
         applyWebsiteTheme(appForm, websiteDarkMode);
-        // Record the active device key so subsequent device-switch callbacks
-        // see a real previous value, but DO NOT call applyDeviceTheme here.
-        // The JS port's installNativeTheme has already loaded the iOS Modern
-        // theme based on ios.themeMode=modern, and the cn1playground host UI
-        // is built right above (lines 187-208) against that combination of
-        // host CSS + iOS Modern native. Running applyDeviceTheme at this
-        // point would invoke setThemeProps multiple times, each of which
-        // re-runs installNativeTheme, clears constants and image caches,
-        // and fires theme-change listeners that re-style the host UI's
-        // PlaygroundStatusPill / PlaygroundShareButton / icon glyphs into
-        // a state that no longer matches what the host CSS describes.
-        // The first applyCurrentCss call inside executeRunScript (after
-        // the user script finishes building the preview) will stage the
-        // device + custom CSS overlay and refresh the preview tree.
-        activeDeviceThemeKey = previewColumn.getDevice();
+        applyDeviceTheme(previewColumn.getDevice());
         runScript(appForm);
         initWebsiteThemeSync(appForm);
 
@@ -948,14 +934,7 @@ public class CN1Playground extends Lifecycle {
         if (appForm == null) {
             return;
         }
-        // Stage host CSS + the active device theme + the user's custom CSS in
-        // the global UIManager just long enough to refresh the preview tree
-        // (which caches the merged styles into its components' Style refs).
-        // Then restore the host CSS only - so any cn1playground host UI
-        // created or refreshed afterwards (toasts, dialogs, dynamic mode
-        // panels) keeps the playground's own design instead of inheriting
-        // the device theme overlay that's intended only for the preview.
-        stageHostThemeWithDeviceOverlay();
+        restoreThemeDefaults();
         List<PlaygroundRunner.Diagnostic> diagnostics = new ArrayList<PlaygroundRunner.Diagnostic>();
         List<PlaygroundRunner.InlineMessage> messages = new ArrayList<PlaygroundRunner.InlineMessage>();
         try {
@@ -977,13 +956,9 @@ public class CN1Playground extends Lifecycle {
         if (previewColumn != null) {
             previewColumn.refreshPreviewTheme();
         }
-        restoreHostThemeOnly();
     }
 
-    /// Wipes the global UIManager state to the cn1playground host CSS theme
-    /// alone (no device overlay). Called after each preview refresh so future
-    /// host UI components keep the playground's own brand styling.
-    private void restoreHostThemeOnly() {
+    private void restoreThemeDefaults() {
         if (theme == null) {
             return;
         }
@@ -995,14 +970,6 @@ public class CN1Playground extends Lifecycle {
         if (baseTheme != null) {
             UIManager.getInstance().setThemeProps(baseTheme);
         }
-    }
-
-    /// Sets host CSS and layers the active device theme on top so the next
-    /// `refreshTheme()` on the preview tree picks up modern iOS / Android
-    /// styling. Always paired with `restoreHostThemeOnly()` once the preview
-    /// refresh is done.
-    private void stageHostThemeWithDeviceOverlay() {
-        restoreHostThemeOnly();
         if (PlaygroundPreviewColumn.DEVICE_PIXEL.equals(activeDeviceThemeKey)) {
             layerAndroidTheme();
         } else {
@@ -1020,9 +987,15 @@ public class CN1Playground extends Lifecycle {
             return;
         }
         activeDeviceThemeKey = device;
-        // applyCurrentCss handles the host+device staging, preview refresh,
-        // and host-only revert end-to-end.
+        restoreThemeDefaults();
         applyCurrentCss();
+        // Only refresh the user's preview content subtree. refreshTheme() walks by UIID
+        // and would overwrite the bezel's programmatic RoundRectBorder and the
+        // corner-mask overlay's transparent background since those UIIDs have no
+        // matching declarations in theme.css.
+        if (previewColumn != null) {
+            previewColumn.refreshPreviewTheme();
+        }
     }
 
     private void layerAndroidTheme() {

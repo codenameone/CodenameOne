@@ -7029,12 +7029,29 @@ public class CSSTheme {
         int len = block.length();
         int pos = 0;
         while (pos < len) {
+            // Whitespace and `/* ... */` block comments are pass-through:
+            // they're emitted verbatim and consumed BEFORE the next selector
+            // string is captured. Without this, a comment immediately
+            // preceding a rule like `/* note */ Form { ... }` would be
+            // treated as part of the selector text and prefixed as
+            // `CN1DARK_/* note */ Form`, which Flute then rejects as a
+            // malformed selector and silently drops the entire rule.
             while (pos < len && Character.isWhitespace(block.charAt(pos))) {
                 out.append(block.charAt(pos));
                 pos++;
             }
             if (pos >= len) {
                 break;
+            }
+            if (pos + 1 < len && block.charAt(pos) == '/' && block.charAt(pos + 1) == '*') {
+                int commentEnd = block.indexOf("*/", pos + 2);
+                if (commentEnd < 0) {
+                    out.append(block.substring(pos));
+                    break;
+                }
+                out.append(block, pos, commentEnd + 2);
+                pos = commentEnd + 2;
+                continue;
             }
             int open = block.indexOf('{', pos);
             if (open < 0) {
