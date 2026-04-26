@@ -266,15 +266,22 @@ List { background-color: #fef7ff; padding: 0; margin: 0; }
 
 ListRenderer { cn1-derive: Label; padding: 1.5mm 2mm 1.5mm 2mm; }
 
+/* MultiButton is a list-row component with multi-line content, NOT a
+   bordered pill. Don't cn1-derive from Button - that pulls in
+   cn1-pill-border which then renders as an outline only on certain
+   surfaces (visible in dark mode against the panel surface, invisible
+   in light mode against white). Inline a clean rectangular row look
+   instead. */
 MultiButton {
-    cn1-derive: Button;
     background-color: #fef7ff;
     color: #1d1b20;
-    padding: 1.5mm 2.5mm 1.5mm 2.5mm;
+    padding: 2mm 3mm 2mm 3mm;
     margin: 0;
+    font-family: "native:MainRegular";
     font-size: 3.5mm;
 }
 MultiButton.pressed { background-color: #eaddff; }
+MultiButton.disabled { color: #a5a0ab; background-color: #e0dce4; }
 
 MultiLine1 { cn1-derive: Label; color: #1d1b20; font-family: "native:MainBold"; }
 MultiLine2 { cn1-derive: Label; color: #49454f; }

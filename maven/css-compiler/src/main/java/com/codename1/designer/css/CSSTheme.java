@@ -5948,9 +5948,27 @@ public class CSSTheme {
                                 case "radial-gradient" :
                                     style.put("background", value);
                                     break;
+                                case "rgb" :
+                                case "rgba" :
+                                case "cn1rgb" :
+                                case "cn1rgba" :
+                                    // SAC reports `rgba()` (and `rgb()`) as
+                                    // SAC_FUNCTION rather than SAC_RGBCOLOR,
+                                    // so the previous default-throw silently
+                                    // dropped the entire `background:`
+                                    // shorthand on rules like
+                                    // `background: rgba(11,32,85,0.75)` -
+                                    // leaving the UIID with no bgColor /
+                                    // transparency, which fell back to the
+                                    // theme's Component default (often a
+                                    // very visible white in dark mode).
+                                    // Treat them the same as SAC_RGBCOLOR
+                                    // and route to background-color.
+                                    apply(style, "background-color", value);
+                                    break;
                                 default:
                                     throw new RuntimeException("Unsupported function in background property");
-                                    
+
                             }
                         break;
                         
