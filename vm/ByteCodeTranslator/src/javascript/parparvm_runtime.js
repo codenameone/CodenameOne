@@ -1107,7 +1107,28 @@ const jvm = {
     if (!hasParameters && member.indexOf("is") === 0 && member.length > 2) {
       return { kind: "getter", member: lowerFirst(member.substring(2)), returnClass: returnClass || "boolean" };
     }
-    if (member.indexOf("set") === 0 && member.length > 3 && remainder.indexOf("_") > -1 && member !== "setAttribute" && member !== "setProperty") {
+    // Setter detection is heuristic — Java only emits the bare method
+    // name in dispatch ids, so we infer ``@JSProperty void setX(X)``
+    // from the ``setXxx`` shape. The catch is that any DOM /
+    // localforage / etc. method whose name happens to start with
+    // ``set`` and takes exactly one arg looks identical to a setter.
+    // We special-case the common false positives (DOM methods that
+    // are actually multi-arg ``setAttribute(name, value)`` /
+    // ``setProperty(...)``, plus the localforage SAM methods like
+    // ``setItem(key, value, callback)`` whose third arg is a SAM
+    // functor that we round-trip via the worker-callback bridge).
+    // Detection rule: any method with a return value (``_R_<class>``
+    // tail present) is treated as a real method — true setters are
+    // ``void``. And anything in the explicit deny-list below is
+    // forced to ``method`` regardless of name shape.
+    const SETTER_DENY_LIST = {
+      setAttribute: 1, setProperty: 1, setItem: 1, setDriver: 1,
+      setStoreName: 1, setVersion: 1, setSize: 1, setDescription: 1
+    };
+    if (member.indexOf("set") === 0 && member.length > 3
+            && remainder.indexOf("_") > -1
+            && returnClass == null
+            && !SETTER_DENY_LIST[member]) {
       return { kind: "setter", member: lowerFirst(member.substring(3)), returnClass: returnClass };
     }
     return { kind: "method", member: member, returnClass: returnClass };
