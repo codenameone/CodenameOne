@@ -1753,7 +1753,33 @@ public class UIManager {
             themelisteners.fireActionEvent(new ActionEvent(themeProps, ActionEvent.Type.Theme));
         }
         buildTheme(themeProps);
+        breakTitleAreaToolbarDeriveCycle();
         current.refreshTheme(true);
+    }
+
+    /// resetThemeProps decides whether to install the legacy
+    /// `Toolbar.derive=TitleArea` default by inspecting only the *immediate*
+    /// installedTheme it was handed. When a user theme has
+    /// `@includeNativeBool: true`, buildTheme later layers in a native theme
+    /// (e.g. iOS Modern's `TitleArea.derive=Toolbar`) and the user theme on
+    /// top - and those layers can flip the derive direction without the
+    /// outer reset noticing. Once both `Toolbar.derive=TitleArea` and
+    /// `TitleArea.derive=Toolbar` exist in the merged themeProps,
+    /// `createStyle` recurses indefinitely and Logs `Error creating style
+    /// TitleArea` (the catch returns a default style, but the cycle leaves
+    /// the chrome unstyled and the app effectively stuck). Drop the legacy
+    /// default once we can see the merged state.
+    private void breakTitleAreaToolbarDeriveCycle() {
+        if (themeProps == null) {
+            return;
+        }
+        Object titleAreaDerive = themeProps.get("TitleArea.derive");
+        if ("Toolbar".equals(titleAreaDerive)) {
+            Object toolbarDerive = themeProps.get("Toolbar.derive");
+            if ("TitleArea".equals(toolbarDerive)) {
+                themeProps.remove("Toolbar.derive");
+            }
+        }
     }
 
     private void buildTheme(Hashtable themeProps) {
