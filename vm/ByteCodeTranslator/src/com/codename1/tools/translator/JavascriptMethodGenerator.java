@@ -164,9 +164,69 @@ final class JavascriptMethodGenerator {
                 }
             }
         }
+        // JSO bridge methods are dispatched from the host (JS) at
+        // runtime, NOT via INVOKEVIRTUAL / INVOKEINTERFACE in the
+        // bundle — the worker yields a host-bridge call, the host
+        // looks up the dispatch id on the receiver wrapper's m: map,
+        // and round-trips back through ``worker-callback``. The scan
+        // above only sees bytecode-visible call sites, so SAM impls
+        // like ``LocalForage$1.callback`` would be skipped by
+        // ``appendPrimaryRegistration`` (which gates the m: entry on
+        // ``referencedDispatchIds``) even though RTA un-elimination
+        // kept the function body alive. Without the m: entry the
+        // host-side dispatch lookup misses and the calling Java
+        // thread deadlocks on the corresponding wait/notify pair.
+        // Tag every method on a JSO bridge type as referenced so the
+        // entry survives.
+        for (ByteCodeClass c : allClasses) {
+            if (c == null || !isJsoBridgeType(c, index)) continue;
+            for (BytecodeMethod m : c.getMethods()) {
+                if (m == null || m.isStatic()) continue;
+                String name = m.getMethodName();
+                String desc = m.getSignature();
+                if (name == null || desc == null) continue;
+                if ("__INIT__".equals(name) || "__CLINIT__".equals(name)) continue;
+                dispatchRefs.add(JavascriptNameUtil.dispatchMethodIdentifier(name, desc));
+            }
+        }
         referencedStaticFields = fieldRefs;
         referencedInstanceFields = instanceRefs;
         referencedDispatchIds = dispatchRefs;
+    }
+
+    /**
+     * True if {@code cls}'s ancestry contains
+     * ``com_codename1_html5_js_JSObject`` (transitively via
+     * baseClass / interfaces). Mirrors the same walk
+     * ``JavascriptReachability.isJsoBridgeType`` /
+     * ``JavascriptBundleWriter.isJsoBridgeClass`` use; here we
+     * consult the local class index so we can flag every method on
+     * a JSO bridge type as runtime-referenced (the host invokes them
+     * via the JSO bridge, not via bytecode visible to the
+     * INVOKEVIRTUAL / INVOKEINTERFACE scan above).
+     */
+    private static boolean isJsoBridgeType(ByteCodeClass cls, Map<String, ByteCodeClass> idx) {
+        java.util.Set<String> seen = new java.util.HashSet<String>();
+        java.util.Deque<ByteCodeClass> stack = new java.util.ArrayDeque<ByteCodeClass>();
+        stack.push(cls);
+        while (!stack.isEmpty()) {
+            ByteCodeClass current = stack.pop();
+            if (current == null || !seen.add(current.getClsName())) continue;
+            if ("com_codename1_html5_js_JSObject".equals(current.getClsName())) return true;
+            String base = current.getBaseClass();
+            if (base != null) {
+                ByteCodeClass baseObj = idx.get(JavascriptNameUtil.sanitizeClassName(base));
+                if (baseObj != null) stack.push(baseObj);
+            }
+            List<String> ifaces = current.getBaseInterfaces();
+            if (ifaces != null) {
+                for (String iface : ifaces) {
+                    ByteCodeClass ifaceObj = idx.get(JavascriptNameUtil.sanitizeClassName(iface));
+                    if (ifaceObj != null) stack.push(ifaceObj);
+                }
+            }
+        }
+        return false;
     }
 
     /**
