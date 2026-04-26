@@ -1111,25 +1111,42 @@ const jvm = {
     // name in dispatch ids, so we infer ``@JSProperty void setX(X)``
     // from the ``setXxx`` shape. The catch is that any DOM /
     // localforage / etc. method whose name happens to start with
-    // ``set`` and takes exactly one arg looks identical to a setter.
-    // We special-case the common false positives (DOM methods that
-    // are actually multi-arg ``setAttribute(name, value)`` /
-    // ``setProperty(...)``, plus the localforage SAM methods like
-    // ``setItem(key, value, callback)`` whose third arg is a SAM
-    // functor that we round-trip via the worker-callback bridge).
-    // Detection rule: any method with a return value (``_R_<class>``
-    // tail present) is treated as a real method — true setters are
-    // ``void``. And anything in the explicit deny-list below is
-    // forced to ``method`` regardless of name shape.
+    // ``set`` and takes more than one arg looks identical to a setter
+    // (``setItem(key, value, callback)``,
+    // ``setAttribute(name, value)``, etc.).
+    //
+    // Detection rules:
+    //   1. Methods that return a value are never setters — true
+    //      setters are ``void``. Reject when ``returnClass`` is set.
+    //   2. Count the number of parameter-start prefixes after the
+    //      member name. ``cn1_s_setX_<type>`` has exactly one
+    //      parameter type prefix (``java_``, ``com_`` etc.); a
+    //      multi-arg method has multiple. Two or more means it's a
+    //      method, regardless of how the name happens to begin.
+    //   3. Static deny-list as a final safety net for cases the
+    //      heuristic can't disambiguate (e.g. when the parameter
+    //      type is itself prefix-less like a primitive).
     const SETTER_DENY_LIST = {
       setAttribute: 1, setProperty: 1, setItem: 1, setDriver: 1,
-      setStoreName: 1, setVersion: 1, setSize: 1, setDescription: 1
+      setStoreName: 1, setVersion: 1, setSize: 1, setDescription: 1,
+      setSelectionRange: 1, setTimeout: 1, setInterval: 1,
+      setRequestHeader: 1
     };
     if (member.indexOf("set") === 0 && member.length > 3
             && remainder.indexOf("_") > -1
             && returnClass == null
             && !SETTER_DENY_LIST[member]) {
-      return { kind: "setter", member: lowerFirst(member.substring(3)), returnClass: returnClass };
+      // Count the number of parameter-type-start prefixes after the
+      // member name. ``cn1_s_setX_java_lang_String`` has 1 (``_java_``);
+      // a multi-arg method like ``cn1_s_setItem_java_lang_String_com_codename1_html5_js_JSObject_<callbackClass>``
+      // has 3+. The translator emits each parameter type as a fully-
+      // qualified package path, so the count of leading-package
+      // tokens correlates 1-to-1 with parameter count.
+      const argSection = remainder.substring(member.length);
+      const typeStarts = argSection.match(/_(?:java|com|org|kotlin|sun|javax)_/g) || [];
+      if (typeStarts.length <= 1) {
+        return { kind: "setter", member: lowerFirst(member.substring(3)), returnClass: returnClass };
+      }
     }
     return { kind: "method", member: member, returnClass: returnClass };
   },
