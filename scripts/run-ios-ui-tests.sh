@@ -856,4 +856,29 @@ if [ -n "$BASE64_BENCHMARK_FAILURE_LINE" ]; then
   exit 16
 fi
 
+# Guard: the suite must produce at least this many screenshots. A bug in
+# the rendering pipeline (e.g. a hang during one test) used to surface as
+# "Compared 1 screenshot" -- the suite would silently exit early after
+# SIGTERM and we'd accept the run as green. The threshold is intentionally
+# below the current suite size (~37 graphics tests) to allow legitimate
+# additions/removals; raise it deliberately when adding tests.
+MIN_SCREENSHOTS="${CN1SS_MIN_SCREENSHOTS:-30}"
+if [ -s "$COMPARE_JSON" ]; then
+  ACTUAL_COUNT="$(python3 -c "import json,sys
+try:
+    with open(sys.argv[1]) as f:
+        d = json.load(f)
+    print(len(d.get('results', [])))
+except Exception as e:
+    print(0)" "$COMPARE_JSON" 2>/dev/null || echo 0)"
+else
+  ACTUAL_COUNT=0
+fi
+if [ "$ACTUAL_COUNT" -lt "$MIN_SCREENSHOTS" ]; then
+  ri_log "STAGE:SCREENSHOT_COUNT_REGRESSION -> got $ACTUAL_COUNT, expected >= $MIN_SCREENSHOTS"
+  ri_log "Suite likely hung or crashed early; check device-runner.log for SIGTERM and the last CN1SS:METAL_DIAG / CN1SS:INFO:suite entries."
+  exit 17
+fi
+ri_log "Screenshot count check passed: $ACTUAL_COUNT >= $MIN_SCREENSHOTS"
+
 exit $comment_rc
