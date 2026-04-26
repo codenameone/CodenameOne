@@ -21,6 +21,11 @@
  * need additional information or have any questions.
  */
 #import <Foundation/Foundation.h>
+// CN1ES2compat.h gates CN1_USE_METAL (the iOS builder uncomments
+// //#define CN1_USE_METAL at the top). The ExecutableOp.target ivar
+// and accessors below are conditional on CN1_USE_METAL, so .h and .m
+// must both see the same definition. Importing here ensures that.
+#import "CN1ES2compat.h"
 
 extern void logGlErrorAt(const char *f, int l);
 extern int nextPowerOf2(int val);
