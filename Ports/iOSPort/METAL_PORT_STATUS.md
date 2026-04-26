@@ -83,26 +83,56 @@ Across consecutive builds on this branch (run `5e461a42` → `a22ef251`):
 
 The 1-pixel separator artifact (white+grey 2-row strip at titleArea boundary, list dividers) was rooted in Metal's diamond-exit line rasterisation rule landing on integer-Y pixel boundaries. Fix: `METALView.m`'s `updateFrameBufferSize:h:` now applies the canonical "Direct3D 9 pixel-perfect" half-pixel offset to the projection matrix's translation column (`+1/pw` in clip-space X, `-1/ph` in clip-space Y, signed by Y-down orientation). Integer eye-space coordinates now map to pixel CENTRES instead of pixel boundaries, where the rasteriser is unambiguous. FillRect output is unchanged for the typical case (geometry well inside the framebuffer); drawLine at integer Y now reliably covers the intended row.
 
-## Phase 3 — Unify mutable-image rendering onto Metal (in progress)
+## Phase 3 — Unify mutable-image rendering onto Metal (complete in v2)
 
-### Scaffolding landed
+### Phase 3 v1 — abandoned
 
-- `GLUIImage` carries new ivars under `CN1_USE_METAL`: `mtlMutableTexture`, `mtlMutableCommandBuffer`, `mtlMutableEncoder`, `mtlMutableWidth`, `mtlMutableHeight`. `getMTLTexture` prefers the mutable texture when present, so any screen-side `DrawImage` of a still-being-drawn mutable image picks up its latest pixels without a CG round-trip.
-- `CN1Metalcompat` exposes the mutable-image lifecycle API:
-  - `CN1MetalBeginMutableImageDraw(width, height, peer)` allocates (or reuses) the `MTLTexture`, opens a render encoder against it, saves the screen rendering state (encoder, projection, framebuffer dims, modelView, transform) on a single-slot stack, and switches the global active encoder to the mutable one. Subsequent `CN1MetalFillRect` / `DrawImage` / `SetTransform` calls go through the mutable encoder transparently.
-  - `CN1MetalFinishMutableImageDraw(peer)` ends the encoder and restores the saved screen state. The command buffer stays alive uncommitted for **deferred-commit semantics** — burst draws cost no GPU sync.
-  - `CN1MetalFlushMutableImage(peer)` commits and waits, called only from pixel-reading paths.
-  - `CN1MetalReadMutableImagePixels(peer, outARGB, x, y, w, h, ...)` does the canonical Shared `MTLBuffer` + `MTLBlitCommandEncoder` readback and unpacks `BGRA8Unorm` to `0xAARRGGBB`.
-- `CN1MetalCommandQueue()` exposed for non-screen command buffer allocation (mutable-image work shares the queue with screen drawing).
-- A per-mutable-image projection helper (`mutableProjection`) builds a Y-down ortho with the same half-pixel offset the screen projection uses.
+The first activation attempt encoded Metal commands directly from CN1's
+EDT during the JNI mutable callbacks. The screen path runs encoders on
+main (`CADisplayLink → drawFrame`); mutable JNI ran them on EDT.
+Several iterations tried to reconcile this:
+- Single static `activeEncoder` (race; first attempt, `b1aef94b5`)
+- `__thread` thread-local state (didn't isolate reliably)
+- `pthread_key_t` + per-call scope swap (`5e48b215c` and successors)
 
-### Activation timeline
+All exhibited the same failure mode: mutable rendering caused the
+simulator to hang at the second mutable image's `Begin OK` and the
+test runner SIGTERM'd after the 10-minute deadline. Only 1–2
+screenshots ever captured before termination. The root cause was
+likely Metal command-buffer/encoder allocation contention between
+EDT and main on the same `MTLCommandQueue`, but we never produced a
+specific diagnosis before reverting the entire approach in
+`1dbce5805`.
 
-- **First attempt** (`b1aef94b5` + compile fix `8f880a6d2`): build OK, but the test run hung at `DrawLine` — only `MainActivity.png` captured before the 5-minute test-runner SIGTERM. Root cause: threading race on the single static `activeEncoder`. Screen path runs on main (CADisplayLink); mutable path runs on CN1's EDT. Both threads wrote to the same global. Reverted in `8270e4d1d` + `36e9e291b`.
+A `CN1SS_MIN_SCREENSHOTS=30` guard was added (`06608fa40`) to catch
+similar regressions in future — the workflow used to report
+"completed success" when only 1 screenshot was compared.
 
-- **Second attempt** (`41aa3253e` + reapplied activation `bd405c8f7` + `ac9acd65e`): all rendering statics (`activeEncoder`, projection / matrix / framebuffer dims / matrix stack / mutable-active / saved-screen-state) made thread-local via `__thread`. This mirrors the GL path's implicit per-thread CG context model — each thread sees its own state automatically; no locks, no `dispatch_sync` (which would have risked deadlock against CN1's `runOnEDTAndWait`). Pipeline cache stays shared (read-only after first build, lazy-built per pipeline variant under its own lock).
+### Phase 3 v2 — async-dispatched mutable ops (landed `7fd4b2377` + follow-ups)
 
-When activation lands cleanly, the mutable-image Y-flip workaround in `CN1MetalTextureFromUIImage` becomes obsolete (the CG round-trip is gone), and `nativeFillRectMutableImpl` / siblings can be `#ifdef`-removed on the Metal build.
+Mutable rendering now mirrors the screen pipeline exactly:
+
+- `ExecutableOp.target` is `nil` for screen ops, non-nil (a `GLUIImage*`) for mutable ops.
+- Mutable JNI funcs (`Java_..._nativeXxxMutableImpl`) build the SAME `ExecutableOp` subclass as their `Global` counterpart, tag it with the current mutable target, and append to the existing `upcomingTarget` queue. EDT touches Metal **zero** times.
+- `drawFrame` (main thread) walks the queue. When the target field changes between ops, it ends the previous mutable encoder + commits its command buffer (no CPU wait), opens a fresh encoder against the new target's `MTLTexture`, and continues. Screen ops use the encoder set up by `setFramebuffer`.
+- `CN1MetalBeginMutableImageDraw / CN1MetalEndMutableImageDraw` save+restore the screen encoder + projection on a single-slot stack so the side-trip is transparent.
+- Each mutable image owns its `mtlMutableTexture` (lazily allocated by `CN1MetalEnsureMutableTexture` in `startDrawingOnImage`) and its most-recently-committed `mtlMutableCommandBuffer`. Screen-side `getMTLTexture` returns the mutable texture preferentially.
+- Pixel-reading paths (`Image.getRGB`, etc.) call `CN1MetalReadMutableImagePixels`: trigger a `flushBuffer` to drain pending ops, `waitUntilCompleted` on the image's CB, blit `MTLStorageModePrivate → Shared`, `getBytes`, convert `BGRA→ARGB`. EDT is the only place that ever blocks on a CB, and only when the caller actually reads pixels.
+- The CG mutable path is **deleted** on Metal builds. No fallback. Round-rect / arc / fill-arc ops still rasterise via CG (no Metal-native shader yet) but the CG bitmap is captured into a temp `GLUIImage` and queued as a `DrawImage` op tagged `target=mutable` — same async dispatch, no per-op `MTLRenderCommandEncoder` work on EDT.
+
+### Verified in CI (run `24963318234`, commit `8412add54`)
+
+- Build succeeds with `-Dcodename1.arg.ios.metal=true`.
+- Suite runs to `CN1SS:SUITE:FINISHED` cleanly; no SIGTERM mid-test.
+- 37 screenshots captured (vs 1–2 during v1 hang).
+- `CN1SS_MIN_SCREENSHOTS=30` guard passes.
+- `graphics-draw-line.png` BL/BR mutable panels match GL baseline visually; same for `graphics-fill-rect.png` and the rest of the simple ops.
+
+### Known follow-ups
+
+- **`FillRoundRect` / `DrawRoundRect` test timeouts.** The tests draw 267 round rects per panel × 4 panels in a tight loop. Each round rect on the mutable Metal path costs ~5 ms on EDT (CG bitmap alloc + `UIImage` alloc + `GLUIImage` alloc + `DrawImage` op queueing), so the 1.5-second post-paint timer can't fire within the 10-second test deadline. Screenshots ARE captured (the screenshot path runs from a delayed callback that does fire eventually) — only the test's `done()` flag misses the deadline. Fix path: a Metal-native round-rect shader (SDF) so each round rect is just a quad draw. Out-of-scope for this milestone.
+- **Baseline screenshots.** Every comparison shows "0 matched, 37 updated" — the `scripts/ios/screenshots-metal/` baselines were captured during the broken Phase 3 v1 era. They need re-baselining once we're confident in v2's pixel correctness.
+- **Step 6 readback test coverage.** `Image.getRGB` paths go through `CN1MetalReadMutableImagePixels` but the screenshot suite captures via `cn1_captureView` (Metal layer grab), so the readback path isn't exercised by CI today.
 
 ## Phase 0 — Scaffolding (complete)
 
