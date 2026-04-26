@@ -48,6 +48,14 @@
     switchTrackOnOutlineWidthMM: "0";
     switchTrackOffOutlineColor: "79747e";
     switchThumbInsetMM: "0";
+    /* Dialog sizing/layout constants - see iOS Modern theme for the
+       rationale. Without these the framework falls back to a wider
+       default Dialog layout that ballooned Dialog.show() to near-full
+       screen with the body floating in empty space. */
+    hideEmptyTitleBool: true;
+    shrinkPopupTitleBool: true;
+    dialogButtonCommandsBool: true;
+    dlgCommandGridBool: true;
 }
 
 Component {

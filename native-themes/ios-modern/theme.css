@@ -74,6 +74,15 @@
     checkBoxUncheckedIconInt: 59693;
     radioCheckedIconInt: 59447;
     radioUncheckedIconInt: 59446;
+    /* Dialog sizing/layout constants the legacy iOS7 theme set and
+       the modern theme had been missing. Without these the framework
+       falls back to a wider default Dialog layout that left
+       Dialog.show("Clicked","Clicked item N","OK",null) ballooning to
+       near-full screen with the body floating in empty space. */
+    hideEmptyTitleBool: true;
+    shrinkPopupTitleBool: true;
+    dialogButtonCommandsBool: true;
+    dlgCommandGridBool: true;
 }
 
 Component {
