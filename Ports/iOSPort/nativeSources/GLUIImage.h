@@ -46,15 +46,18 @@
 
     // Phase 3: Metal-backed mutable-image storage. When this image is the
     // target of a startDrawingOnImage call, ops render into mtlMutableTexture
-    // via mtlMutableEncoder. After finishDrawingOnImage the encoder ends but
-    // the command buffer stays uncommitted (deferred); pixel-reading paths
-    // commit-and-wait via -flushMutable. The texture is the source of truth
-    // for pixels until a UIImage snapshot is requested.
+    // via mtlMutableEncoder. After finishDrawingOnImage the encoder ends and
+    // the command buffer commits + waits (sync model). Pixel-reading paths
+    // sample mtlMutableTexture directly.
     id<MTLTexture> mtlMutableTexture;
     id<MTLCommandBuffer> mtlMutableCommandBuffer;
     id<MTLRenderCommandEncoder> mtlMutableEncoder;
     int mtlMutableWidth;
     int mtlMutableHeight;
+    // Transform applied to mutable draws (set by nativeSetTransformMutableImpl).
+    // Stored as 16 floats so we can put it in a plain ivar without dragging
+    // GLKMatrix4 into the header. Defaults to identity in initWithImage:.
+    float mtlMutableTransform[16];
 #endif
 }
 -(id)initWithImage:(UIImage*)i;
@@ -81,5 +84,8 @@
 -(void)setMtlMutableEncoder:(id<MTLRenderCommandEncoder>)e;
 -(int)mtlMutableWidth;
 -(int)mtlMutableHeight;
+// Pointer to the 16-float transform array (GLKMatrix4-shaped). Allows
+// CN1Metalcompat to read/write without copying or boxing.
+-(float*)mtlMutableTransformPtr;
 #endif
 @end

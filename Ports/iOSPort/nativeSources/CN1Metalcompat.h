@@ -263,6 +263,35 @@ BOOL CN1MetalReadMutableImagePixels(void *peer, int *outARGB,
 // builds during this transition but the symbol is still referenced).
 BOOL CN1MetalIsMutableActive(void);
 
+// Per-JNI-call save/restore around a mutable draw. CN1's iOS port can
+// dispatch startDrawingOnImage on one thread and the actual draw JNI calls
+// on another (CI diagnostic showed Begin on one pthread, drawQuad on a
+// different one). Per-thread state alone can't bridge that, so each mutable
+// JNI call must hijack the calling thread's activeEncoder + projection +
+// framebuffer dims for the duration of that call -- pulling them from the
+// active mutable GLUIImage rather than the saved Begin-thread state.
+typedef struct {
+    void *_savedEnc;          // __unsafe_unretained id<MTLRenderCommandEncoder>
+    float _savedProj[16];     // simd_float4x4
+    int _savedFw;
+    int _savedFh;
+    float _savedTransform[16];
+    BOOL _valid;
+} CN1MetalMutableScope;
+
+// Enters a mutable-rendering scope on the calling thread. Looks up the
+// active mutable image (set by Begin), saves the calling thread's screen
+// state, swaps to the mutable image's encoder/projection/dims/transform.
+// Returns scope with _valid=NO if no mutable in flight or encoder is nil.
+CN1MetalMutableScope CN1MetalEnterMutableScope(void);
+
+// Restores the calling thread's screen state saved by EnterMutableScope.
+void CN1MetalLeaveMutableScope(CN1MetalMutableScope scope);
+
+// Stores the transform that nativeSetTransformMutableImpl received onto
+// the active mutable image so subsequent EnterMutableScope picks it up.
+void CN1MetalSetMutableImageTransform(const float matrix[16]);
+
 // Rasterise an arbitrary CoreGraphics drawing block into a temporary
 // CGBitmapContext sized (w x h), upload it as an MTLTexture, and draw
 // it through the active encoder at (dx, dy, w, h). Used by mutable-image

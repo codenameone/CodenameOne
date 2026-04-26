@@ -285,20 +285,11 @@ static CN1MetalMatrices currentMatrices(void) {
     return m;
 }
 
-static int diagDrawQuadCount = 0;
 static void drawQuad(CN1MetalPipeline pipeline,
                      const float vertices[8],
                      const float *texcoords, // may be NULL
                      simd_float4 color,
                      id<MTLTexture> texture) {
-    // Diagnostic: log every 100th call so we can tell if EDT-side draws are
-    // actually reaching this function with a live activeEncoder during
-    // Phase 3 mutable rendering.
-    if ((diagDrawQuadCount++ % 200) == 0) {
-        NSLog(@"CN1SS:METAL_DIAG drawQuad #%d thread=%p activeEncoder=%p pipeline=%ld state=%p",
-              diagDrawQuadCount, (void*)pthread_self(),
-              (__bridge void*)activeEncoder, (long)pipeline, (void*)threadState());
-    }
     if (activeEncoder == nil || pipelineCache == nil) return;
     id<MTLRenderPipelineState> state = [pipelineCache pipelineFor:pipeline];
     if (state == nil) return;
@@ -882,17 +873,21 @@ id<MTLTexture> CN1MetalTextureFromUIImage(UIImage *image) {
 
 // --------------- Phase 3: mutable-image rendering ---------------
 
-// Per-thread mutable-image state lives on the threadState() struct (see top
-// of file). These macros let the function bodies below read as if they were
-// plain statics.
-#define mutableActive (threadState()->mutableActive)
-#define mutableActivePeer (threadState()->mutableActivePeer)
-#define screenStateBeforeMutable_savedEncoder (threadState()->savedEncoderBeforeMutable)
-#define screenStateBeforeMutable_savedProjection (threadState()->savedProjectionBeforeMutable)
-#define screenStateBeforeMutable_savedFramebufferWidth (threadState()->savedFramebufferWidthBeforeMutable)
-#define screenStateBeforeMutable_savedFramebufferHeight (threadState()->savedFramebufferHeightBeforeMutable)
-#define screenStateBeforeMutable_savedModelView (threadState()->savedModelViewBeforeMutable)
-#define screenStateBeforeMutable_savedTransform (threadState()->savedTransformBeforeMutable)
+// CN1's iOS port can run startDrawingOnImage on a different thread than the
+// actual draw JNI calls (CI diagnostic showed Begin on pthread A, drawQuad
+// on pthread B). Per-thread state on the Begin thread is invisible to the
+// drawing thread. The fix: store the encoder + dimensions + transform ON the
+// active mutable image (a regular Obj-C object visible to all threads) and
+// have each mutable JNI call hijack the calling thread's activeEncoder via
+// CN1MetalEnterMutableScope / LeaveMutableScope.
+//
+// `_mutableActiveGl` is set globally by Begin and cleared by Finish. It's
+// the same object as [CodenameOne_GLViewController instance].currentMutableImage
+// but kept here for clarity and to avoid a UIView-touching round-trip from
+// arbitrary threads.
+static __unsafe_unretained GLUIImage *_mutableActiveGl = nil;
+static int _mutableActiveWidth = 0;
+static int _mutableActiveHeight = 0;
 
 // Build a Y-down ortho projection for a (w x h) framebuffer. Mirrors
 // METALView's CN1MetalOrtho call -- if that one ever changes (e.g. adds
@@ -910,21 +905,25 @@ static simd_float4x4 mutableProjection(int w, int h) {
 
 BOOL CN1MetalBeginMutableImageDraw(int width, int height, void *peer) {
     if (peer == NULL || width <= 0 || height <= 0) return NO;
-    if (mutableActive) {
-        // Concurrent mutable draws aren't supported (matches GL's global
-        // UIGraphics context). Force-finish whatever was active so we
-        // don't leak the encoder, then re-enter.
+    if (_mutableActiveGl != nil) {
         NSLog(@"CN1Metal: nested CN1MetalBeginMutableImageDraw -- forcing finish on previous peer");
-        CN1MetalFinishMutableImageDraw((__bridge void *)mutableActivePeer);
+        CN1MetalFinishMutableImageDraw((__bridge void *)_mutableActiveGl);
     }
     GLUIImage *gl = (__bridge GLUIImage *)peer;
     id<MTLDevice> device = CN1MetalDevice();
     if (device == nil) return NO;
     ensurePipelineCache();
 
-    // Allocate (or reuse) the mutable texture. Reuse only if dimensions
-    // match -- otherwise the existing pixels and any deferred cmd buffer
-    // are stale.
+    // Reset the mutable transform to identity at the start of every draw
+    // pass (matches CG's behaviour: a fresh CGContext starts with identity
+    // CTM). nativeSetTransformMutableImpl will overwrite as the user calls
+    // setTransform.
+    float *t = [gl mtlMutableTransformPtr];
+    for (int r = 0; r < 4; r++)
+        for (int c = 0; c < 4; c++)
+            t[r*4 + c] = (r == c) ? 1.0f : 0.0f;
+
+    // Allocate (or reuse) the mutable texture.
     id<MTLTexture> tex = [gl mtlMutableTexture];
     if (tex == nil || [gl mtlMutableWidth] != width || [gl mtlMutableHeight] != height) {
         MTLTextureDescriptor *desc = [MTLTextureDescriptor
@@ -948,89 +947,94 @@ BOOL CN1MetalBeginMutableImageDraw(int width, int height, void *peer) {
         [gl setMtlMutableCommandBuffer:nil];
     }
 
-    // Allocate a fresh command buffer for this draw pass. We commit + wait
-    // in Finish (sync model, like the GL CG path), so each begin/finish gets
-    // its own buffer rather than accumulating many encoders on one buffer.
+    // Allocate a fresh command buffer for this draw pass. Each begin/finish
+    // gets its own buffer (sync-on-finish: commit+wait in Finish). Crucially,
+    // EnterMutableScope/LeaveMutableScope pulls the encoder OFF the GLUIImage
+    // (not from per-thread state), so the actual draw thread doesn't need to
+    // be the same as the Begin thread.
     id<MTLCommandQueue> queue = CN1MetalCommandQueue();
-    if (queue == nil) {
-        NSLog(@"CN1SS:METAL_DIAG Begin: command queue is nil on thread %p", (void*)pthread_self());
-        return NO;
-    }
+    if (queue == nil) return NO;
     id<MTLCommandBuffer> cb = [queue commandBuffer];
-    if (cb == nil) {
-        NSLog(@"CN1SS:METAL_DIAG Begin: commandBuffer returned nil on thread %p", (void*)pthread_self());
-        return NO;
-    }
+    if (cb == nil) return NO;
     [gl setMtlMutableCommandBuffer:cb];
     MTLRenderPassDescriptor *desc = [MTLRenderPassDescriptor renderPassDescriptor];
     desc.colorAttachments[0].texture = tex;
     desc.colorAttachments[0].loadAction = MTLLoadActionLoad;
     desc.colorAttachments[0].storeAction = MTLStoreActionStore;
     id<MTLRenderCommandEncoder> enc = [cb renderCommandEncoderWithDescriptor:desc];
-    if (enc == nil) {
-        NSLog(@"CN1SS:METAL_DIAG Begin: renderCommandEncoder returned nil on thread %p (tex=%p w=%d h=%d)",
-              (void*)pthread_self(), (__bridge void*)tex, width, height);
-        return NO;
-    }
+    if (enc == nil) return NO;
     [enc setViewport:(MTLViewport){0.0, 0.0, (double)width, (double)height, 0.0, 1.0}];
     [gl setMtlMutableEncoder:enc];
-    NSLog(@"CN1SS:METAL_DIAG Begin OK: thread=%p enc=%p tex=%p %dx%d state=%p",
-          (void*)pthread_self(), (__bridge void*)enc, (__bridge void*)tex, width, height,
-          (void*)threadState());
 
-    // Save the screen rendering state and switch the per-thread CN1Metal
-    // state so subsequent CN1MetalFillRect / CN1MetalDrawImage / SetTransform
-    // calls on this thread go through the mutable encoder transparently.
-    screenStateBeforeMutable_savedEncoder = activeEncoder;
-    screenStateBeforeMutable_savedProjection = currentProjection;
-    screenStateBeforeMutable_savedFramebufferWidth = currentFramebufferWidth;
-    screenStateBeforeMutable_savedFramebufferHeight = currentFramebufferHeight;
-    screenStateBeforeMutable_savedModelView = currentModelView;
-    screenStateBeforeMutable_savedTransform = currentTransform;
-
-    activeEncoder = enc;
-    currentProjection = mutableProjection(width, height);
-    currentFramebufferWidth = width;
-    currentFramebufferHeight = height;
-    currentModelView = identityMatrix();
-    currentTransform = identityMatrix();
-
-    mutableActive = YES;
-    mutableActivePeer = gl;
+    _mutableActiveGl = gl;
+    _mutableActiveWidth = width;
+    _mutableActiveHeight = height;
     return YES;
 }
 
 void CN1MetalFinishMutableImageDraw(void *peer) {
-    if (!mutableActive || peer == NULL) return;
+    if (peer == NULL) return;
     GLUIImage *gl = (__bridge GLUIImage *)peer;
-    if (gl != mutableActivePeer) {
-        NSLog(@"CN1Metal: finishMutableImageDraw on non-active peer -- ignoring");
-        return;
-    }
+    if (gl != _mutableActiveGl) return;
     id<MTLRenderCommandEncoder> enc = [gl mtlMutableEncoder];
     if (enc != nil) {
         [enc endEncoding];
         [gl setMtlMutableEncoder:nil];
     }
     // Sync model: commit + wait so the texture has finalised pixels by the
-    // time control returns to the caller. This matches the GL CG path's
-    // semantics (mutable rendering is synchronous from the user's POV).
-    // Bounds the per-buffer work and avoids cross-thread commit issues that
-    // bit the deferred-commit prototype.
+    // time control returns to the caller. Matches GL CG path's semantics.
     id<MTLCommandBuffer> cb = [gl mtlMutableCommandBuffer];
     if (cb != nil) {
         [cb commit];
         [cb waitUntilCompleted];
         [gl setMtlMutableCommandBuffer:nil];
     }
-    activeEncoder = screenStateBeforeMutable_savedEncoder;
-    currentProjection = screenStateBeforeMutable_savedProjection;
-    currentFramebufferWidth = screenStateBeforeMutable_savedFramebufferWidth;
-    currentFramebufferHeight = screenStateBeforeMutable_savedFramebufferHeight;
-    currentModelView = screenStateBeforeMutable_savedModelView;
-    currentTransform = screenStateBeforeMutable_savedTransform;
-    mutableActive = NO;
-    mutableActivePeer = nil;
+    _mutableActiveGl = nil;
+    _mutableActiveWidth = 0;
+    _mutableActiveHeight = 0;
+}
+
+CN1MetalMutableScope CN1MetalEnterMutableScope(void) {
+    CN1MetalMutableScope s = {0};
+    GLUIImage *gl = _mutableActiveGl;
+    if (gl == nil) return s;
+    id<MTLRenderCommandEncoder> mEnc = [gl mtlMutableEncoder];
+    if (mEnc == nil) return s;
+
+    // Save current thread's state into the scope.
+    s._savedEnc = (__bridge void *)activeEncoder;
+    memcpy(s._savedProj, &currentProjection, sizeof(simd_float4x4));
+    s._savedFw = currentFramebufferWidth;
+    s._savedFh = currentFramebufferHeight;
+    memcpy(s._savedTransform, &currentTransform, sizeof(simd_float4x4));
+    s._valid = YES;
+
+    // Switch this thread's view to the mutable image's encoder + projection
+    // + dims + transform.
+    activeEncoder = mEnc;
+    simd_float4x4 mp = mutableProjection(_mutableActiveWidth, _mutableActiveHeight);
+    currentProjection = mp;
+    currentFramebufferWidth = _mutableActiveWidth;
+    currentFramebufferHeight = _mutableActiveHeight;
+    float *t = [gl mtlMutableTransformPtr];
+    memcpy(&currentTransform, t, sizeof(simd_float4x4));
+    return s;
+}
+
+void CN1MetalLeaveMutableScope(CN1MetalMutableScope scope) {
+    if (!scope._valid) return;
+    activeEncoder = (__bridge id<MTLRenderCommandEncoder>)scope._savedEnc;
+    memcpy(&currentProjection, scope._savedProj, sizeof(simd_float4x4));
+    currentFramebufferWidth = scope._savedFw;
+    currentFramebufferHeight = scope._savedFh;
+    memcpy(&currentTransform, scope._savedTransform, sizeof(simd_float4x4));
+}
+
+void CN1MetalSetMutableImageTransform(const float matrix[16]) {
+    GLUIImage *gl = _mutableActiveGl;
+    if (gl == nil) return;
+    float *t = [gl mtlMutableTransformPtr];
+    memcpy(t, matrix, sizeof(float) * 16);
 }
 
 void CN1MetalFlushMutableImage(void *peer) {
@@ -1053,7 +1057,7 @@ void CN1MetalFlushMutableImage(void *peer) {
 }
 
 BOOL CN1MetalIsMutableActive(void) {
-    return mutableActive;
+    return _mutableActiveGl != nil;
 }
 
 void CN1MetalDrawCGRasterizedRect(int dx, int dy, int w, int h,

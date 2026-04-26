@@ -40,6 +40,12 @@ extern int nextPowerOf2(int val);
     textureName = 0;
     textureWidth = -1;
     textureHeight = -1;
+#ifdef CN1_USE_METAL
+    // Identity transform for any future mutable-image draw.
+    for (int r = 0; r < 4; r++)
+        for (int c = 0; c < 4; c++)
+            mtlMutableTransform[r*4 + c] = (r == c) ? 1.0f : 0.0f;
+#endif
     return self;
 }
 
@@ -201,6 +207,7 @@ extern int nextPowerOf2(int val);
 -(void)setMtlMutableEncoder:(id<MTLRenderCommandEncoder>)e { mtlMutableEncoder = e; }
 -(int)mtlMutableWidth { return mtlMutableWidth; }
 -(int)mtlMutableHeight { return mtlMutableHeight; }
+-(float*)mtlMutableTransformPtr { return mtlMutableTransform; }
 #endif
 
 -(void)dealloc {
