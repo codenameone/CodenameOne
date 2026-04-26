@@ -1671,6 +1671,16 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineMutableImpl
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineGlobalImpl
 (int color, int alpha, int x1, int y1, int x2, int y2) {
+#ifdef CN1_USE_METAL
+    {
+        static int diagDrawLineGlobalCount = 0;
+        if (diagDrawLineGlobalCount < 6) {
+            NSLog(@"CN1SS:METAL_DIAG JNI nativeDrawLineGlobalImpl #%d color=%d a=%d (%d,%d)->(%d,%d) thread=%p",
+                  diagDrawLineGlobalCount, color, alpha, x1, y1, x2, y2, (void*)pthread_self());
+            diagDrawLineGlobalCount++;
+        }
+    }
+#endif
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineGlobalImpl started");
     DrawLine* f = [[DrawLine alloc] initWithArgs:color a:alpha xpos1:x1 ypos1:y1 xpos2:x2 ypos2:y2];
     [CodenameOne_GLViewController upcoming:f];
@@ -1752,6 +1762,16 @@ void Java_com_codename1_impl_ios_IOSImplementation_clearRectGlobal(int x, int y,
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectGlobalImpl
 (int color, int alpha, int x, int y, int width, int height) {
+#ifdef CN1_USE_METAL
+    {
+        static int diagFillRectGlobalCount = 0;
+        if (diagFillRectGlobalCount < 6) {
+            NSLog(@"CN1SS:METAL_DIAG JNI nativeFillRectGlobalImpl #%d color=%d a=%d (%d,%d %dx%d) thread=%p",
+                  diagFillRectGlobalCount, color, alpha, x, y, width, height, (void*)pthread_self());
+            diagFillRectGlobalCount++;
+        }
+    }
+#endif
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectGlobalImpl started");
     FillRect* f = [[FillRect alloc] initWithArgs:color a:alpha xpos:x ypos:y w:width h:height];
     [CodenameOne_GLViewController upcoming:f];
