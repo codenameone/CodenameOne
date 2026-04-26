@@ -30,8 +30,9 @@ import com.codename1.util.MathUtil;
 /// another. This class can be subclassed to implement any motion equation for
 /// appropriate physics effects.
 ///
-/// This class relies on the System.currentTimeMillis() method to provide
-/// transitions between coordinates. The motion can be subclassed to provide every
+/// This class relies on [AnimationTime.now()][AnimationTime#now()] to provide
+/// transitions between coordinates, allowing the underlying clock to be
+/// overridden for deterministic playback or custom animation pacing. The motion can be subclassed to provide every
 /// type of motion feel from parabolic motion to spline and linear motion. The default
 /// implementation provides a simple algorithm giving the feel of acceleration and
 /// deceleration.
@@ -357,7 +358,7 @@ public class Motion {
                 motion.destinationValue < motion.sourceValue
                         ? Math.min(motion.destinationValue, maxDestinationValue)
                         : Math.max(motion.destinationValue, maxDestinationValue),
-                (int) Math.min(maxDuration, motion.duration - (System.currentTimeMillis() - motion.startTime))
+                (int) Math.min(maxDuration, motion.duration - (AnimationTime.now() - motion.startTime))
         );
     }
 
@@ -396,7 +397,7 @@ public class Motion {
     /// Sends the motion to the end time instantly which is useful for flushing an animation
     public void finish() {
         if (!isFinished()) {
-            startTime = System.currentTimeMillis() - duration;
+            startTime = AnimationTime.now() - duration;
             currentMotionTime = -1;
             previousCurrentMotionTime = -1;
         }
@@ -404,17 +405,17 @@ public class Motion {
 
     /// Sets the start time to the current time
     public void start() {
-        startTime = System.currentTimeMillis();
+        startTime = AnimationTime.now();
     }
 
     /// Returns the current time within the motion relative to start time
     ///
     /// #### Returns
     ///
-    /// long value representing System.currentTimeMillis() - startTime
+    /// long value representing AnimationTime.now() - startTime
     public long getCurrentMotionTime() {
         if (currentMotionTime < 0) {
-            return System.currentTimeMillis() - startTime;
+            return AnimationTime.now() - startTime;
         }
         return currentMotionTime;
     }
@@ -444,7 +445,7 @@ public class Motion {
     ///
     /// #### Returns
     ///
-    /// true if System.currentTimeMillis() > duration + startTime or the last returned value is the destination value
+    /// true if AnimationTime.now() > duration + startTime or the last returned value is the destination value
     public boolean isFinished() {
         return getCurrentMotionTime() > duration || destinationValue == lastReturnedValue || (EXPONENTIAL_DECAY == motionType && previousLastReturnedValue[0] == lastReturnedValue);
     }

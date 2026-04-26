@@ -145,7 +145,7 @@ public final class Timeline extends Image implements Animation, Painter {
         if (!pause) {
             if (time >= 0 && time <= duration) {
                 this.time = time;
-                currentTime = System.currentTimeMillis();
+                currentTime = AnimationTime.now();
             }
         }
     }
@@ -161,11 +161,11 @@ public final class Timeline extends Image implements Animation, Painter {
     public boolean animate() {
         if (!pause) {
             if (currentTime < 0) {
-                currentTime = System.currentTimeMillis();
+                currentTime = AnimationTime.now();
                 setTime(0);
                 return true;
             } else {
-                long newCurrentTime = System.currentTimeMillis();
+                long newCurrentTime = AnimationTime.now();
                 if (newCurrentTime - currentTime >= animationDelay) {
                     int newTime = (int) (time + (newCurrentTime - currentTime));
                     currentTime = newCurrentTime;
