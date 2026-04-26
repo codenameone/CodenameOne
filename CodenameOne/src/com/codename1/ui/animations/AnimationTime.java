@@ -30,7 +30,7 @@ package com.codename1.ui.animations;
 /// manually.
 ///
 /// All methods are static and the class holds only primitive state to keep the
-/// hot path cheap — `now()` is invoked from every animation tick.
+/// hot path cheap - `now()` is invoked from every animation tick.
 ///
 /// @author Shai Almog
 public final class AnimationTime {
