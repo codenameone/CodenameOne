@@ -30,9 +30,18 @@
   }
   var STORE_PREFIX = "cn1lf:";
   function namespacedKey(key) { return STORE_PREFIX + String(key); }
-  function async(fn) {
-    return Promise.resolve().then(fn);
-  }
+  // The Java side blocks on ``done.wait()`` after queueing the setItem
+  // request. In TeaVM-land the localforage library returns a Promise
+  // and the callback fires asynchronously via setTimeout(0); the
+  // ParparVM JS port doesn't have an event-loop pump between the
+  // worker-side wait and the host bridge's response, so deferring the
+  // callback through ``Promise.resolve().then(...)`` causes Thread A
+  // to enter ``done.wait()`` BEFORE the callback's
+  // ``done.notifyAll()`` fires (the microtask runs after the bridge
+  // has already returned). Drive the callback synchronously: by the
+  // time setItem returns, the worker callback proxy has already
+  // posted the ``worker-callback`` message and the worker will pick
+  // it up the moment Thread A yields on ``done.wait``.
   function callBack(callback, error, value) {
     if (typeof callback === "function") {
       try { callback(error || null, value); }
@@ -87,27 +96,27 @@
     LOCALSTORAGE: "localstorage",
     config: function(_opts) { return true; },
     setItem: function(key, value, callback) {
-      return async(function() {
+      return (function() {
         var stored = setItemImpl(key, value);
         callBack(callback, null, stored);
         return stored;
       });
     },
     getItem: function(key, callback) {
-      return async(function() {
+      return (function() {
         var value = getItemImpl(key);
         callBack(callback, null, value);
         return value;
       });
     },
     removeItem: function(key, callback) {
-      return async(function() {
+      return (function() {
         window.localStorage.removeItem(namespacedKey(key));
         callBack(callback, null);
       });
     },
     clear: function(callback) {
-      return async(function() {
+      return (function() {
         var doomed = [];
         eachKey(function(k) { doomed.push(k); });
         for (var i = 0; i < doomed.length; i++) {
@@ -117,7 +126,7 @@
       });
     },
     length: function(callback) {
-      return async(function() {
+      return (function() {
         var n = 0;
         eachKey(function() { n++; });
         callBack(callback, null, n);
@@ -125,7 +134,7 @@
       });
     },
     keys: function(callback) {
-      return async(function() {
+      return (function() {
         var out = [];
         eachKey(function(k) { out.push(k); });
         callBack(callback, null, out);
@@ -133,7 +142,7 @@
       });
     },
     iterate: function(iteratorCallback, successCallback) {
-      return async(function() {
+      return (function() {
         var stopped = false;
         var idx = 1;
         eachKey(function(k) {
