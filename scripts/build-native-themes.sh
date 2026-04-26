@@ -58,21 +58,27 @@ ensure_jar() {
   local jar
   if jar="$(locate_jar)"; then
     log "Using CSS compiler jar: $jar"
-    echo "$jar"
+    printf '%s\n' "$jar"
     return
   fi
   log "CSS compiler jar not found; building it via Maven."
   local mvn="${MAVEN_HOME:+$MAVEN_HOME/bin/mvn}"
   mvn="${mvn:-mvn}"
+  # Redirect Maven output to stderr - otherwise its stdout gets captured
+  # by the calling `jar="$(ensure_jar)"` and ends up concatenated with
+  # the jar path, which `java -jar` then chokes on. The parent pom
+  # initialise antrun also clones cn1-binaries with failonerror unset,
+  # so a benign `[ERROR] [exec] Result: 128` (already-exists clone)
+  # would pollute stdout if we let it through.
   (
     cd "$REPO_ROOT/maven"
     "$mvn" -pl css-compiler -am -q -DskipTests install
-  )
+  ) >&2
   if jar="$(locate_jar)"; then
-    echo "$jar"
+    printf '%s\n' "$jar"
     return
   fi
-  log "FAILED: CSS compiler jar could not be located after build." >&2
+  log "FAILED: CSS compiler jar could not be located after build."
   exit 1
 }
 
