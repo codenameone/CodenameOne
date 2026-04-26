@@ -223,21 +223,12 @@ Toolbar {
     padding: 1mm;
     margin: 0;
 }
-/* Toolbar properties are inlined here rather than using `cn1-derive:
-   Toolbar`. The framework's resetThemeProps unconditionally installs a
-   `Toolbar.derive=TitleArea` default in older CN1 builds (anything
-   shipped before this work landed). Pairing that legacy default with
-   `TitleArea.derive=Toolbar` creates a cycle - createStyle recurses
-   forever and logs `Error creating style TitleArea`, leaving the
-   chrome unstyled. Inlining keeps the look identical and is
-   forward/backward compatible with every framework version that
-   reads the .res file. */
-TitleArea {
-    background-color: #ffffff;
-    color: #000000;
-    padding: 1mm 2mm 1mm 2mm;
-    margin: 0;
-}
+/* TitleArea derives from Toolbar so theme overrides on Toolbar cascade
+   to TitleArea. UIManager used to install a defensive
+   Toolbar.derive=TitleArea default that produced a cycle when paired
+   with TitleArea.derive=Toolbar; the framework now skips that default
+   when the user theme has already wired TitleArea -> Toolbar. */
+TitleArea { cn1-derive: Toolbar; padding: 1mm 2mm 1mm 2mm; }
 
 Title {
     color: #000000;

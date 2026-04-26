@@ -1035,8 +1035,50 @@ public class CN1Playground extends Lifecycle {
         }
         Hashtable props = res.getTheme(names[0]);
         if (props != null && !props.isEmpty()) {
-            UIManager.getInstance().addThemeProps(props);
+            UIManager.getInstance().addThemeProps(forwardCompatTitleAreaDerive(props));
         }
+    }
+
+    /// Forward-compatible patch for the `TitleArea` <-> `Toolbar` derive
+    /// cycle that the modern themes hit on older CN1 frameworks.
+    ///
+    /// `UIManager.resetThemeProps` in CN1 builds shipped before the
+    /// rebuild-themes work unconditionally installs `Toolbar.derive=TitleArea`
+    /// as a legacy default. The modern iOS / Material themes flip the
+    /// relationship the other way (`TitleArea.derive=Toolbar`) and the
+    /// pairing makes `createStyle` recurse - the playground freezes at boot
+    /// with `Error creating style TitleArea` in the console.
+    ///
+    /// We can't change UIManager itself in the deployed playground (it's
+    /// pinned to the published `cn1.version`), so we patch the theme props
+    /// before they reach `addThemeProps`: when the modern overlay declares
+    /// `TitleArea.derive=Toolbar`, we explicitly point `Toolbar.derive` at
+    /// `Component`. That overrides the legacy default with a target that
+    /// can't ever cycle back to TitleArea, and Toolbar's own explicit
+    /// properties (bgColor, padding, ...) still win during style resolution
+    /// so the visual outcome is unchanged.
+    ///
+    /// Forward-compat: when the framework's own `breakTitleAreaToolbarDeriveCycle`
+    /// post-build cleanup ships in a future CN1 release, this preview-side
+    /// patch keeps applying without conflict - the framework only removes
+    /// `Toolbar.derive` when its value is exactly `TitleArea`, while we set
+    /// it to `Component`. The patch becomes harmless duplication.
+    private static Hashtable forwardCompatTitleAreaDerive(Hashtable props) {
+        if (!"Toolbar".equals(props.get("TitleArea.derive"))) {
+            return props;
+        }
+        // Defensive copy so we don't mutate the cached Resources theme map.
+        Hashtable patched = new Hashtable();
+        java.util.Enumeration e = props.keys();
+        while (e.hasMoreElements()) {
+            Object k = e.nextElement();
+            patched.put(k, props.get(k));
+        }
+        patched.put("Toolbar.derive", "Component");
+        patched.put("Toolbar.sel#derive", "Component.sel");
+        patched.put("Toolbar.press#derive", "Component.press");
+        patched.put("Toolbar.dis#derive", "Component.dis");
+        return patched;
     }
 
     private void applyCssToPreview(Form form, String css) {
