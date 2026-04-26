@@ -9,10 +9,17 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Deque;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 
 final class JavascriptBundleWriter {
     private static final String RESOURCE_ROOT = "/javascript/";
@@ -28,6 +35,88 @@ final class JavascriptBundleWriter {
         writeBrowserBridge(outputDirectory);
         writeIndex(outputDirectory);
         writeProtocol(outputDirectory);
+        writeJsoBridgeManifest(outputDirectory, classes);
+    }
+
+    /**
+     * Emit a sidecar manifest listing every signature-based dispatch id
+     * (``cn1_s_<method>_<sig>``) that corresponds to a method declared on
+     * a JSO bridge class — i.e. any class transitively assignable to
+     * ``com_codename1_html5_js_JSObject``. The mangle script reads this
+     * file to keep these dispatch ids unmangled, otherwise call sites
+     * end up reaching ``invokeJsoBridge`` with a ``$``-prefixed mangled
+     * member name and the host throws ``Missing JS member $X for host
+     * receiver`` at the first DOM bridge call.
+     *
+     * <p>The structural-optimization landing made the translator switch
+     * from per-class ``cn1_<class>_<method>_<sig>`` ids to a class-free
+     * ``cn1_s_<method>_<sig>`` form for INVOKEVIRTUAL / INVOKEINTERFACE
+     * call sites. The legacy form was naturally name-spaced by the
+     * class portion (the mangle script uses ``cn1_<jsoClass>_*`` as
+     * the exclusion key), but the new form drops the class entirely
+     * and flows alongside ordinary identifiers — without a manifest
+     * the mangle pass can't tell which sig-based ids belong to JSO
+     * bridge interfaces.
+     */
+    private static void writeJsoBridgeManifest(File outputDirectory, List<ByteCodeClass> classes) throws IOException {
+        Map<String, ByteCodeClass> byName = new HashMap<String, ByteCodeClass>();
+        for (ByteCodeClass cls : classes) {
+            byName.put(cls.getClsName(), cls);
+        }
+        Set<String> dispatchIds = new TreeSet<String>();
+        for (ByteCodeClass cls : classes) {
+            if (!isJsoBridgeClass(cls, byName)) {
+                continue;
+            }
+            for (BytecodeMethod m : cls.getMethods()) {
+                if (m.isEliminated() || m.isStatic()) {
+                    continue;
+                }
+                String name = m.getMethodName();
+                String desc = m.getSignature();
+                if (name == null || desc == null) {
+                    continue;
+                }
+                dispatchIds.add(JavascriptNameUtil.dispatchMethodIdentifier(name, desc));
+            }
+        }
+        StringBuilder out = new StringBuilder();
+        for (String id : dispatchIds) {
+            out.append(id).append('\n');
+        }
+        Files.write(new File(outputDirectory, "jso-bridge-dispatch-ids.txt").toPath(),
+                out.toString().getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static boolean isJsoBridgeClass(ByteCodeClass cls, Map<String, ByteCodeClass> byName) {
+        Set<String> seen = new HashSet<String>();
+        Deque<ByteCodeClass> stack = new ArrayDeque<ByteCodeClass>();
+        stack.push(cls);
+        while (!stack.isEmpty()) {
+            ByteCodeClass current = stack.pop();
+            if (current == null || !seen.add(current.getClsName())) {
+                continue;
+            }
+            if ("com_codename1_html5_js_JSObject".equals(current.getClsName())) {
+                return true;
+            }
+            String base = current.getBaseClass();
+            if (base != null) {
+                ByteCodeClass baseObj = byName.get(JavascriptNameUtil.sanitizeClassName(base));
+                if (baseObj != null) {
+                    stack.push(baseObj);
+                }
+            }
+            if (current.getBaseInterfaces() != null) {
+                for (String iface : current.getBaseInterfaces()) {
+                    ByteCodeClass ifaceObj = byName.get(JavascriptNameUtil.sanitizeClassName(iface));
+                    if (ifaceObj != null) {
+                        stack.push(ifaceObj);
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     private static void writeRuntime(File outputDirectory) throws IOException {

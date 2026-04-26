@@ -246,7 +246,38 @@ def _collect_jso_bridge_class_names(files: list[Path]) -> set[str]:
     return jso_classes
 
 
-def collect_counts(files: list[Path]) -> tuple[Counter, frozenset[str]]:
+_JSO_BRIDGE_MANIFEST_FILENAME = "jso-bridge-dispatch-ids.txt"
+
+
+def _load_jso_bridge_dispatch_ids(directory: Path) -> set[str]:
+    """Load the sig-based dispatch ids that the translator emitted for
+    methods declared on JSO bridge classes (anything assignable to
+    ``com_codename1_html5_js_JSObject``). The file is written by
+    ``JavascriptBundleWriter.writeJsoBridgeManifest`` with one id per
+    line, e.g. ``cn1_s_addEventListener_java_lang_String_com_codename1_html5_js_dom_EventListener``.
+
+    Why a translator-side manifest: post-fa4247a4, INVOKEVIRTUAL /
+    INVOKEINTERFACE call sites use a class-free ``cn1_s_<m>_<sig>``
+    dispatch id. The mangle pass otherwise treats those as ordinary
+    ``cn1_*`` identifiers and renames them. ``parseJsoBridgeMethod``
+    on the receiving side strips the ``cn1_s_`` prefix to recover the
+    DOM member name; if the id has been mangled to ``$nr`` the host
+    bridge throws ``Missing JS member $nr for host receiver`` on the
+    first DOM call. Reading the manifest lets us preserve exactly the
+    ids that need to round-trip the JSO bridge readable.
+    """
+    manifest = directory / _JSO_BRIDGE_MANIFEST_FILENAME
+    if not manifest.is_file():
+        return set()
+    out: set[str] = set()
+    for line in manifest.read_text(encoding="utf-8").splitlines():
+        token = line.strip()
+        if token:
+            out.add(token)
+    return out
+
+
+def collect_counts(files: list[Path], directory: Path) -> tuple[Counter, frozenset[str]]:
     counts: Counter = Counter()
     for path in files:
         data = path.read_text(encoding="utf-8")
@@ -256,14 +287,24 @@ def collect_counts(files: list[Path]) -> tuple[Counter, frozenset[str]]:
         counts.pop(name, None)
 
     jso_bridge_classes = _collect_jso_bridge_class_names(files)
+    jso_bridge_dispatch_ids = _load_jso_bridge_dispatch_ids(directory)
     # Exclude every ``cn1_<jsoClass>_*`` method id so ``parseJsoBridgeMethod``
     # keeps working against host DOM receivers. Also exclude the class name
     # itself, both because it flows through the runtime as a plain string
     # (the ``className`` argument of ``invokeJsoBridge`` / ``isJsoBridgeClass``
     # / ``classes[...]`` lookup) and so runtime-built ``"cn1_" + className +
     # "_"`` prefixes still match the unmangled method ids we just excluded.
+    # In addition, exclude every sig-based dispatch id the translator
+    # tagged as a JSO bridge method via ``jso-bridge-dispatch-ids.txt``
+    # — those ids reach ``parseJsoBridgeMethod`` for receivers whose
+    # ``__class`` resolves through ``isJsoBridgeClass`` and need to keep
+    # their original ``cn1_s_<method>_<sig>`` shape so the prefix strip
+    # recovers a real DOM member name.
     to_exclude: set[str] = set()
     for name in list(counts.keys()):
+        if name in jso_bridge_dispatch_ids:
+            to_exclude.add(name)
+            continue
         for cls in jso_bridge_classes:
             if name.startswith("cn1_" + cls + "_") or name.startswith("cn1_" + cls + "__"):
                 to_exclude.add(name)
@@ -273,7 +314,7 @@ def collect_counts(files: list[Path]) -> tuple[Counter, frozenset[str]]:
     for name in to_exclude:
         counts.pop(name, None)
 
-    preserved = frozenset(to_exclude | set(EXCLUDE) | jso_bridge_classes)
+    preserved = frozenset(to_exclude | set(EXCLUDE) | jso_bridge_classes | jso_bridge_dispatch_ids)
     return counts, preserved
 
 
@@ -396,7 +437,7 @@ def main() -> int:
         print("[mangle] no eligible .js files in output dir", file=sys.stderr)
         return 0
 
-    counts, preserved = collect_counts(files)
+    counts, preserved = collect_counts(files, out_dir)
     # An identifier that appears once at all can't be shrunk (the one
     # definition site is its one use; mangling makes the file bigger by
     # the length of the mapping entry unless we're willing to write a
