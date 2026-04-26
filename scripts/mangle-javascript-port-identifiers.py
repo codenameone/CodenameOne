@@ -80,6 +80,17 @@ EXCLUDE = frozenset({
     "cn1_debug_flags",
     "cn1_registerPush",
     "cn1_get_device_pixel_ratio",
+    # Runtime string constants that the JSO bridge uses to detect / strip
+    # dispatch-id prefixes. ``parseJsoBridgeMethod`` does
+    # ``methodId.indexOf("cn1_s_") === 0`` to recognise sig-based dispatch
+    # ids; if the literal ``"cn1_s_"`` gets mangled to ``"$tT"`` the strip
+    # never matches and parseJsoBridgeMethod misinterprets every JSO call.
+    # ``"cn1_"`` is similarly used as the legacy class-prefix anchor by
+    # ``inferJsoBridgeMember`` and ``methodTail``. These are not user-
+    # facing identifiers but the ``cn1_<word>+`` regex matches them as
+    # if they were, so list them here so the mangler skips both.
+    "cn1_s_",
+    "cn1_",
 })
 
 
