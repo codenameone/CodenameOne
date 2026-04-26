@@ -2187,7 +2187,22 @@ function cn1_ivResolve(target, mid) {
   // callers (cn1_iv0..4 / cn1_ivN below) are generators and delegate to
   // throwNullPointerException() for the Java-spec-compliant NPE, which
   // cannot be done from a plain function.
-  const classDef = target.__classDef;
+  //
+  // Class-object special case: a Class instance carries
+  // ``__classDef`` pointing at the REPRESENTED class's def
+  // (so ``getName`` / ``getSimpleName`` / static-field access through
+  // ``__classDef`` keep working without an extra hop). For VIRTUAL
+  // method dispatch on a Class instance we want ``java.lang.Class``'s
+  // method table — not the represented class's. Without this short-
+  // circuit, ``someDouble.getClass().equals(Double.class)`` resolves
+  // ``equals`` against Double.methods (because the receiver's
+  // ``__classDef`` IS the Double def) and returns Double.equals,
+  // which then re-runs the same dispatch on its own ``getClass()``
+  // and recurses until ``RangeError: Maximum call stack size``.
+  // Use the receiver's ``__class`` ("java_lang_Class") so the slow
+  // path resolves against the Class def's methods table where
+  // ``equals`` / ``hashCode`` / ``toString`` / etc. actually live.
+  const classDef = target.__isClassObject ? jvm.classes[target.__class] : target.__classDef;
   if (classDef && classDef.pendingMethods) {
     jvm.flushPendingMethods(classDef);
   }
