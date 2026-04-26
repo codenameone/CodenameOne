@@ -1005,7 +1005,7 @@ CN1MetalMutableScope CN1MetalEnterMutableScope(void) {
     CN1MetalMutableScope s = {0};
     GLUIImage *gl = _mutableActiveGl;
     int n = diagEnterCount++;
-    if ((n % 200) == 0) {
+    if (n < 5) {
         NSLog(@"CN1SS:METAL_DIAG Enter #%d thread=%p _mutableActiveGl=%p enc=%p",
               n, (void*)pthread_self(), (__bridge void*)gl,
               (__bridge void*)(gl ? [gl mtlMutableEncoder] : nil));

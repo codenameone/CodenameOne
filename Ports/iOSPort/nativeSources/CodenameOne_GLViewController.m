@@ -1642,6 +1642,11 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineMutableImpl
 (int color, int alpha, int x1, int y1, int x2, int y2) {
 #ifdef CN1_USE_METAL
     {
+        static int diagDrawLineCount = 0;
+        if (diagDrawLineCount < 3) {
+            NSLog(@"CN1SS:METAL_DIAG JNI nativeDrawLineMutableImpl #%d thread=%p", diagDrawLineCount, (void*)pthread_self());
+            diagDrawLineCount++;
+        }
         CN1MetalMutableScope s = CN1MetalEnterMutableScope();
         if (s._valid) {
             CN1MetalDrawLine(color, alpha, x1, y1, x2, y2);
@@ -1690,6 +1695,11 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectMutableImpl
 (int color, int alpha, int x, int y, int width, int height) {
 #ifdef CN1_USE_METAL
     {
+        static int diagFillRectCount = 0;
+        if (diagFillRectCount < 3) {
+            NSLog(@"CN1SS:METAL_DIAG JNI nativeFillRectMutableImpl #%d thread=%p", diagFillRectCount, (void*)pthread_self());
+            diagFillRectCount++;
+        }
         CN1MetalMutableScope s = CN1MetalEnterMutableScope();
         if (s._valid) {
             CN1MetalFillRect(color, alpha, x, y, width, height);
