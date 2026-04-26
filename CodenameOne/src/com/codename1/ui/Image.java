@@ -27,6 +27,7 @@ import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.io.FileSystemStorage;
 import com.codename1.io.Log;
 import com.codename1.io.Util;
+import com.codename1.ui.animations.AnimationTime;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.ActionSource;
@@ -1969,10 +1970,10 @@ public class Image implements ActionSource {
     /// `true` if the animation state changed.
     public boolean animate() {
         if (imageTime == -1) {
-            imageTime = System.currentTimeMillis();
+            imageTime = AnimationTime.now();
         }
         boolean val = Display.impl.animateImage(image, imageTime);
-        imageTime = System.currentTimeMillis();
+        imageTime = AnimationTime.now();
         return val;
     }
 

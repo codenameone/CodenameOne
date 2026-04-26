@@ -24,6 +24,7 @@
 package com.codename1.ui;
 
 import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.ui.animations.AnimationTime;
 import com.codename1.ui.animations.ComponentAnimation;
 import com.codename1.ui.animations.Motion;
 import com.codename1.ui.animations.Transition;
@@ -4497,7 +4498,7 @@ public class Container extends Component implements Iterable<Component> {
         private Component scrollTo;
 
         public MorphAnimation(Container thisContainer, int duration, Motion[][] motions) {
-            startTime = System.currentTimeMillis();
+            startTime = AnimationTime.now();
             this.duration = duration;
             if (Motion.isSlowMotion()) {
                 this.duration *= 50;
@@ -4566,7 +4567,7 @@ public class Container extends Component implements Iterable<Component> {
                 thisContainer.setSmoothScrolling(s);
             }
             thisContainer.repaint();
-            if (System.currentTimeMillis() - startTime >= duration) {
+            if (AnimationTime.now() - startTime >= duration) {
                 setEnableLayoutOnPaint(true);
                 thisContainer.dontRecurseContainer = false;
                 Form f = thisContainer.getComponentForm();
