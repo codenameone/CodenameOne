@@ -2531,11 +2531,9 @@ public class Toolbar extends Container {
         if (getUIManager().isThemeConstant("paintsTitleBarBool", false)) {
             // check if its already added:
             if (((BorderLayout) getLayout()).getNorth() == null) {
-                Component bar;
+                Container bar = new Container();
                 if (getUIManager().isThemeConstant("statusBarScrollsUpBool", true)) {
-                    Button btn = new Button();
-                    btn.setShowEvenIfBlank(true);
-                    btn.addActionListener(new ActionListener() {
+                    bar.addPointerReleasedListener(new ActionListener() {
                         @Override
                         public void actionPerformed(ActionEvent evt) {
                             Form parent = getComponentForm();
@@ -2547,11 +2545,6 @@ public class Toolbar extends Container {
                             }
                         }
                     });
-                    bar = btn;
-                } else {
-                    Container c = new Container();
-                    c.setSafeArea(true);
-                    bar = c;
                 }
                 if (getUIManager().isThemeConstant("landscapeTitleUiidBool", false)) {
                     bar.setUIID("StatusBar", "StatusBarLandscape");
@@ -2559,6 +2552,7 @@ public class Toolbar extends Container {
                     bar.setUIID("StatusBar");
                 }
                 reallocateVerticalPaddingAndMarginsToTop(bar);
+                bar.setSafeArea(true);
                 addComponent(BorderLayout.NORTH, bar);
             }
         } else {
