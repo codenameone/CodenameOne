@@ -230,17 +230,53 @@ final class JavascriptReachability {
         if (base != null) {
             markClassInstantiated(JavascriptNameUtil.sanitizeClassName(base));
         }
-        // Resolve any pending virtual calls whose receiver type is
-        // now this class or any supertype.
-        resolvePendingFor(clsName);
+        // Resolve any pending virtual calls whose receiver type is this
+        // class OR any of its (transitive) supertypes — including bases
+        // that were already instantiated before us.
+        //
+        // Bug we used to have: virtual call sites are recorded by their
+        // STATIC receiver (e.g. ``cmp.paint(g)`` inside Component records
+        // pending under ``Component``); when the first Component subtype
+        // (say ``Form``) becomes instantiated we run
+        // ``dispatchVirtualSubtree`` once, which targets the snapshot of
+        // instantiated subtypes seen at THAT moment. A later
+        // instantiation deeper in the hierarchy (Scene, via the
+        // anonymous Spinner3D$1) ran ``markClassInstantiated`` whose
+        // recursion early-exited at the first already-instantiated base
+        // (Container), so ``resolvePendingFor("Component")`` never
+        // re-fired and Scene.paint stayed culled. The visible symptom
+        // was the Spinner3D area painting only the Container default
+        // (no row text, no scene-graph) — the LightweightPicker baseline
+        // shows the date wheel, the regressed bundle shows a blank
+        // panel.
+        //
+        // Walking the full ancestor chain (not just the direct base /
+        // interfaces) on every instantiation re-resolves every pending
+        // receiver type that the new class transitively satisfies, so
+        // late-arriving subtypes pick up the existing pending calls.
+        Set<String> ancestorChain = new HashSet<String>();
+        collectTransitiveAncestors(clsName, ancestorChain);
+        for (String ancestor : ancestorChain) {
+            resolvePendingFor(ancestor);
+        }
+    }
+
+    private void collectTransitiveAncestors(String clsName, Set<String> out) {
+        if (clsName == null || !out.add(clsName)) {
+            return;
+        }
+        ByteCodeClass cls = byName.get(clsName);
+        if (cls == null) {
+            return;
+        }
+        String base = cls.getBaseClass();
         if (base != null) {
-            resolvePendingFor(JavascriptNameUtil.sanitizeClassName(base));
+            collectTransitiveAncestors(JavascriptNameUtil.sanitizeClassName(base), out);
         }
         List<String> ifaces = cls.getBaseInterfaces();
         if (ifaces != null) {
             for (String iface : ifaces) {
-                String sanitized = JavascriptNameUtil.sanitizeClassName(iface);
-                resolvePendingFor(sanitized);
+                collectTransitiveAncestors(JavascriptNameUtil.sanitizeClassName(iface), out);
             }
         }
     }
