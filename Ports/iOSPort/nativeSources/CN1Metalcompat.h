@@ -292,6 +292,13 @@ void CN1MetalLeaveMutableScope(CN1MetalMutableScope scope);
 // the active mutable image so subsequent EnterMutableScope picks it up.
 void CN1MetalSetMutableImageTransform(const float matrix[16]);
 
+// Stores the clip rect that setNativeClippingMutableImpl received onto the
+// active mutable image. Subsequent EnterMutableScope reads it and calls
+// setScissorRect on the encoder *on the draw thread* (MTLRenderCommandEncoder
+// is not thread-safe, so we cannot setScissor on the EDT then drawPrimitives
+// on main). w<=0 or h<=0 means "no clip" (full framebuffer).
+void CN1MetalSetMutableImageClip(int x, int y, int w, int h);
+
 // Rasterise an arbitrary CoreGraphics drawing block into a temporary
 // CGBitmapContext sized (w x h), upload it as an MTLTexture, and draw
 // it through the active encoder at (dx, dy, w, h). Used by mutable-image

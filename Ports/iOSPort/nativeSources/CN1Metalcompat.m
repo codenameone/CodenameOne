@@ -1031,6 +1031,18 @@ CN1MetalMutableScope CN1MetalEnterMutableScope(void) {
     currentFramebufferHeight = _mutableActiveHeight;
     float *t = [gl mtlMutableTransformPtr];
     memcpy(&currentTransform, t, sizeof(simd_float4x4));
+
+    // Apply pending clip on the draw thread. setNativeClippingMutableImpl
+    // stashed it via setMtlMutableClipX:y:w:h: at applyClip() time. We MUST
+    // run setScissorRect on the same thread that issues the subsequent
+    // drawPrimitives -- MTLRenderCommandEncoder is single-threaded. If no
+    // clip was set, fall back to the full framebuffer scissor.
+    int cx, cy, cw, ch;
+    if ([gl getMtlMutableClipX:&cx y:&cy w:&cw h:&ch]) {
+        CN1MetalSetScissor(cx, cy, cw, ch);
+    } else {
+        CN1MetalSetScissor(0, 0, _mutableActiveWidth, _mutableActiveHeight);
+    }
     return s;
 }
 
@@ -1048,6 +1060,16 @@ void CN1MetalSetMutableImageTransform(const float matrix[16]) {
     if (gl == nil) return;
     float *t = [gl mtlMutableTransformPtr];
     memcpy(t, matrix, sizeof(float) * 16);
+}
+
+void CN1MetalSetMutableImageClip(int x, int y, int w, int h) {
+    GLUIImage *gl = _mutableActiveGl;
+    if (gl == nil) return;
+    if (w <= 0 || h <= 0) {
+        [gl clearMtlMutableClip];
+    } else {
+        [gl setMtlMutableClipX:x y:y w:w h:h];
+    }
 }
 
 void CN1MetalFlushMutableImage(void *peer) {

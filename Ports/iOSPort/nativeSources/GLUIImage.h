@@ -58,6 +58,15 @@
     // Stored as 16 floats so we can put it in a plain ivar without dragging
     // GLKMatrix4 into the header. Defaults to identity in initWithImage:.
     float mtlMutableTransform[16];
+    // Pending clip rect from setNativeClippingMutableImpl. We can't safely
+    // setScissorRect on the encoder from one thread and draw on another, so
+    // we stash it here and EnterMutableScope applies it on the draw thread.
+    // mtlMutableClipValid==NO means "no clip" (full framebuffer scissor).
+    int mtlMutableClipX;
+    int mtlMutableClipY;
+    int mtlMutableClipW;
+    int mtlMutableClipH;
+    BOOL mtlMutableClipValid;
 #endif
 }
 -(id)initWithImage:(UIImage*)i;
@@ -87,5 +96,11 @@
 // Pointer to the 16-float transform array (GLKMatrix4-shaped). Allows
 // CN1Metalcompat to read/write without copying or boxing.
 -(float*)mtlMutableTransformPtr;
+// Pending mutable-image clip accessors. setMutableClip stores; getMutableClip
+// fills (x,y,w,h) and returns YES if a clip was set. EnterMutableScope reads
+// and applies via setScissorRect on the encoder.
+-(void)setMtlMutableClipX:(int)x y:(int)y w:(int)w h:(int)h;
+-(BOOL)getMtlMutableClipX:(int*)x y:(int*)y w:(int*)w h:(int*)h;
+-(void)clearMtlMutableClip;
 #endif
 @end

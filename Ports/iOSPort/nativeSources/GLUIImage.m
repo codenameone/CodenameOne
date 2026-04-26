@@ -208,6 +208,22 @@ extern int nextPowerOf2(int val);
 -(int)mtlMutableWidth { return mtlMutableWidth; }
 -(int)mtlMutableHeight { return mtlMutableHeight; }
 -(float*)mtlMutableTransformPtr { return mtlMutableTransform; }
+-(void)setMtlMutableClipX:(int)x y:(int)y w:(int)w h:(int)h {
+    mtlMutableClipX = x;
+    mtlMutableClipY = y;
+    mtlMutableClipW = w;
+    mtlMutableClipH = h;
+    mtlMutableClipValid = YES;
+}
+-(BOOL)getMtlMutableClipX:(int*)x y:(int*)y w:(int*)w h:(int*)h {
+    if (!mtlMutableClipValid) return NO;
+    if (x) *x = mtlMutableClipX;
+    if (y) *y = mtlMutableClipY;
+    if (w) *w = mtlMutableClipW;
+    if (h) *h = mtlMutableClipH;
+    return YES;
+}
+-(void)clearMtlMutableClip { mtlMutableClipValid = NO; }
 #endif
 
 -(void)dealloc {

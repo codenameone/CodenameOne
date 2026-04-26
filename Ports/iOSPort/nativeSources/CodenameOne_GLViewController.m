@@ -1564,6 +1564,23 @@ void Java_com_codename1_impl_ios_IOSImplementation_flushBufferImpl
 
 void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingMutableImpl
 (int x, int y, int width, int height, int clipApplied) {
+#ifdef CN1_USE_METAL
+    {
+        // Metal: there is no current CGContext on the mutable path. Stash the
+        // clip on the active mutable image; EnterMutableScope reads it and
+        // calls setScissorRect on the encoder on the draw thread (encoders
+        // are not thread-safe). The clipApplied flag (used by CG to balance
+        // GState save/restore) is irrelevant on Metal.
+        static int diagSetClipMut = 0;
+        if (diagSetClipMut < 3) {
+            NSLog(@"CN1SS:METAL_DIAG setNativeClippingMutableImpl #%d (%d,%d %dx%d)",
+                  diagSetClipMut, x, y, width, height);
+            diagSetClipMut++;
+        }
+        CN1MetalSetMutableImageClip(x, y, width, height);
+        return;
+    }
+#endif
     CGContextRef context = UIGraphicsGetCurrentContext();
     //CN1Log(@"Native mutable clipping applied %i on context %i x: %i y: %i width: %i height: %i", clipApplied, (int)context, x, y, width, height);
     //if(clipApplied) {
@@ -1577,6 +1594,13 @@ void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingMutableImpl
 void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingShapeMutableImpl
 (int numCommands, JAVA_OBJECT commands, int numPoints, JAVA_OBJECT points)
 {
+#ifdef CN1_USE_METAL
+    // Metal: shape clipping is not supported via scissor (Metal scissor is
+    // axis-aligned only). For now treat shape clip as "no clip" so subsequent
+    // draws on a mutable image still render. A future improvement would
+    // rasterise the shape into a stencil/alpha-mask and gate the pipeline.
+    return;
+#endif
     CGContextRef context = UIGraphicsGetCurrentContext();
     //CN1Log(@"Native mutable clipping applied %i on context %i x: %i y: %i width: %i height: %i", clipApplied, (int)context, x, y, width, height);
     //if(clipApplied) {
