@@ -85,24 +85,25 @@ TertiaryLabel { cn1-derive: Label; color: #79747e; }
 SpanLabel { cn1-derive: Label; background-color: transparent; }
 SpanLabelText { cn1-derive: Label; background-color: transparent; }
 
-/* Material 3 button: fully-rounded (~5mm corner radius on a ~10mm-tall
-   button approximates the M3 "full" shape). Using border-radius
-   (RoundRectBorder, CEF-free) rather than cn1-pill-border so short-text
-   buttons don't degenerate to a circle when width<=height - the
-   underlying RoundBorder paints a circle in that case, border-radius
-   always keeps the corner radius. */
+/* Material 3 button: fully-rounded "pill" shape via cn1-pill-border
+   (RoundBorder, CEF-free). border-radius (RoundRectBorder) was leaving
+   visible artefacts when the button height didn't divide cleanly - the
+   pill border paints a single rounded fill that scales correctly.
+   Generous horizontal padding so short labels still get clear pill
+   ends. cn1-derive doesn't carry cn1-background-type forward, so the
+   derived UIIDs (RaisedButton, FlatButton) re-declare it explicitly. */
 Button {
     color: #ffffff;
     background-color: #6750a4;
-    padding: 1.5mm 3mm 1.5mm 3mm;
+    padding: 1.5mm 4mm 1.5mm 4mm;
     margin: 0.8mm;
     font-family: "native:MainRegular";
     font-size: 3.5mm;
-    border-radius: 5mm;
+    cn1-background-type: cn1-pill-border;
     text-align: center;
 }
-Button.pressed { background-color: #d0bcff; color: #21005d; }
-Button.disabled { color: #a5a0ab; background-color: #e0dce4; }
+Button.pressed { background-color: #d0bcff; color: #21005d; cn1-background-type: cn1-pill-border; }
+Button.disabled { color: #a5a0ab; background-color: #e0dce4; cn1-background-type: cn1-pill-border; }
 
 /* RaisedButton: bumped surface (M3 "elevated" tone) to keep it
    visibly distinct from the default filled Button, including in
@@ -111,18 +112,19 @@ RaisedButton {
     cn1-derive: Button;
     color: #21005d;
     background-color: #eaddff;
+    cn1-background-type: cn1-pill-border;
 }
-RaisedButton.pressed { color: #21005d; background-color: #d0bcff; }
-RaisedButton.disabled { background-color: #e0dce4; color: #a5a0ab; }
+RaisedButton.pressed { color: #21005d; background-color: #d0bcff; cn1-background-type: cn1-pill-border; }
+RaisedButton.disabled { background-color: #e0dce4; color: #a5a0ab; cn1-background-type: cn1-pill-border; }
 
 FlatButton {
     cn1-derive: Button;
     background-color: transparent;
     color: #6750a4;
-    border-radius: 5mm;
+    cn1-background-type: cn1-pill-border;
     text-align: center;
 }
-FlatButton.pressed { background-color: #eaddff; color: #21005d; }
+FlatButton.pressed { background-color: #eaddff; color: #21005d; cn1-background-type: cn1-pill-border; }
 
 TextField {
     color: #1d1b20;
@@ -329,8 +331,13 @@ PopupContent {
 
 @media (prefers-color-scheme: dark) {
     Component { color: #e6e0e9; background-color: #141218; }
-    Form { background-color: #141218; }
-    ContentPane { background-color: #141218; }
+    /* Form must paint a fully opaque surface in every appearance - it's the
+       root of every screen and there's nothing meaningful behind it. The
+       explicit transparency override defends against the dark style
+       resolver dropping the implicit bgTransparency that the light
+       declaration carried. */
+    Form { background-color: #141218; transparency: 255; padding: 0; margin: 0; }
+    ContentPane { background-color: #141218; transparency: 255; padding: 0; margin: 0; }
 
     Label { color: #e6e0e9; background-color: transparent; }
     SecondaryLabel { color: #cac4d0; background-color: transparent; }
@@ -338,16 +345,19 @@ PopupContent {
     SpanLabel { color: #e6e0e9; background-color: transparent; }
     SpanLabelText { color: #e6e0e9; background-color: transparent; }
 
-    Button { color: #381e72; background-color: #d0bcff; }
-    Button.pressed { background-color: #4f378b; color: #eaddff; }
-    Button.disabled { color: #5c5967; background-color: #2b2930; }
+    /* Re-declare cn1-background-type on each dark Button override -
+       the compiler doesn't carry the light declaration's pill border
+       forward into the $Dark<UIID> entries. */
+    Button { color: #381e72; background-color: #d0bcff; cn1-background-type: cn1-pill-border; }
+    Button.pressed { background-color: #4f378b; color: #eaddff; cn1-background-type: cn1-pill-border; }
+    Button.disabled { color: #5c5967; background-color: #2b2930; cn1-background-type: cn1-pill-border; }
 
-    RaisedButton { color: #eaddff; background-color: #4f378b; }
-    RaisedButton.pressed { color: #eaddff; background-color: #6750a4; }
-    RaisedButton.disabled { background-color: #2b2930; color: #5c5967; }
+    RaisedButton { color: #eaddff; background-color: #4f378b; cn1-background-type: cn1-pill-border; }
+    RaisedButton.pressed { color: #eaddff; background-color: #6750a4; cn1-background-type: cn1-pill-border; }
+    RaisedButton.disabled { background-color: #2b2930; color: #5c5967; cn1-background-type: cn1-pill-border; }
 
-    FlatButton { color: #d0bcff; background-color: transparent; }
-    FlatButton.pressed { background-color: #4f378b; color: #eaddff; }
+    FlatButton { color: #d0bcff; background-color: transparent; cn1-background-type: cn1-pill-border; }
+    FlatButton.pressed { background-color: #4f378b; color: #eaddff; cn1-background-type: cn1-pill-border; }
 
     TextField { color: #e6e0e9; background-color: #211f26; }
     TextField.pressed { background-color: #49454f; }

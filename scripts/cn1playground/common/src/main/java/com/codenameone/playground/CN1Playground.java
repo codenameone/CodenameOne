@@ -212,7 +212,21 @@ public class CN1Playground extends Lifecycle {
         applyActivity(currentActivity);
 
         applyWebsiteTheme(appForm, websiteDarkMode);
-        applyDeviceTheme(previewColumn.getDevice());
+        // Record the active device key so subsequent device-switch callbacks
+        // see a real previous value, but DO NOT call applyDeviceTheme here.
+        // The JS port's installNativeTheme has already loaded the iOS Modern
+        // theme based on ios.themeMode=modern, and the cn1playground host UI
+        // is built right above (lines 187-208) against that combination of
+        // host CSS + iOS Modern native. Running applyDeviceTheme at this
+        // point would invoke setThemeProps multiple times, each of which
+        // re-runs installNativeTheme, clears constants and image caches,
+        // and fires theme-change listeners that re-style the host UI's
+        // PlaygroundStatusPill / PlaygroundShareButton / icon glyphs into
+        // a state that no longer matches what the host CSS describes.
+        // The first applyCurrentCss call inside executeRunScript (after
+        // the user script finishes building the preview) will stage the
+        // device + custom CSS overlay and refresh the preview tree.
+        activeDeviceThemeKey = previewColumn.getDevice();
         runScript(appForm);
         initWebsiteThemeSync(appForm);
 
