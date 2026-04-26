@@ -1633,10 +1633,19 @@ const jvm = {
           const self = this;
           const className = value.__class;
           const wrapper = function() {
-            const args = Array.prototype.slice.call(arguments);
+            // Wrap each arg as a JSObject, mirroring port.js's
+            // ``__nativeEventListener`` (which calls
+            // ``jvm.wrapJsResult(event, "com_codename1_html5_js_dom_Event")``
+            // before dispatch). The translated SAM method body
+            // expects Java-shaped args, not the raw host values
+            // posted through the worker-callback bridge.
+            const wrappedArgs = [];
+            for (let i = 0; i < arguments.length; i++) {
+              wrappedArgs.push(self.wrapJsResult(arguments[i], "com_codename1_html5_js_JSObject"));
+            }
             try {
               const method = self.resolveVirtual(className, samMethodId);
-              self.spawn(null, method.apply(null, [value].concat(args)));
+              self.spawn(null, method.apply(null, [value].concat(wrappedArgs)));
             } catch (err) {
               if (typeof console !== "undefined" && typeof console.error === "function") {
                 try { console.error("PARPAR:sam-callback-error:" + (err && err.message ? err.message : String(err))); }
