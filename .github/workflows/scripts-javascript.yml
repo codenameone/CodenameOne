@@ -179,10 +179,15 @@ jobs:
         # regressions.
         env:
           # CI runners process bytecode-translator output noticeably
-          # slower than local — locally HelloCodenameOne reaches
-          # ``main-thread-completed`` after ~180s of cooperative-
-          # scheduling host callbacks. 240s gives ~30% headroom.
-          CN1_LIFECYCLE_TIMEOUT_SECONDS: "240"
+          # slower than local, and shared GitHub Actions runners can
+          # vary by 5-10× in cooperative-scheduler throughput. The
+          # passing runs converge around 90-100 host callbacks in
+          # 240s; on a slow runner the same boot stalls below 20
+          # callbacks in the same window, far short of
+          # ``main-thread-completed``. 480s eats the worst case
+          # without hiding regressions (the passing path returns
+          # within ~30s either way).
+          CN1_LIFECYCLE_TIMEOUT_SECONDS: "480"
           CN1_LIFECYCLE_REPORT_DIR: ${{ github.workspace }}/artifacts/javascript-lifecycle-tests
         run: |
           mkdir -p "${CN1_LIFECYCLE_REPORT_DIR}"
