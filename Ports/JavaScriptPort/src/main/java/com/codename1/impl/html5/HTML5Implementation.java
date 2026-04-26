@@ -7619,12 +7619,30 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 return rootStream;
             }
         }
-        if (!"icon.png".equals(resource)) {
-            resource = "assets/"+resource;
+        String assetPath = "icon.png".equals(resource) ? resource : ("assets/" + resource);
+        InputStream out = getStream(assetPath);
+        if (out != null) {
+            notifyProgressLoaderThatResourceIsLoaded(assetPath);
+            return out;
         }
-        InputStream out = getStream(resource);
-        notifyProgressLoaderThatResourceIsLoaded(resource);
-        return out;
+        // Fall back to the bundle root for resources the translator drops
+        // there directly (most ``.properties`` resource bundles, for one —
+        // ``ParparVMBootstrap`` mirrors the jar layout and only the explicit
+        // relocations in ``build-javascript-port-initializr.sh`` /
+        // ``build-javascript-port-hellocodenameone.sh`` move things into
+        // ``assets/``). Without this fallback every
+        // ``ResourceBundle.getResourceAsStream("/messages_xx.properties")``
+        // call returns null, the ``Resources.getL10N`` lookup throws (or
+        // returns null), and any UI that catches the throw and logs via
+        // ``Log.e`` floods the console with ``Exception: null`` — see
+        // ``initializr/common/.../TemplatePreviewPanel.loadBundleProperties``.
+        InputStream rootFallback = getStream(resource);
+        if (rootFallback != null) {
+            notifyProgressLoaderThatResourceIsLoaded(resource);
+            return rootFallback;
+        }
+        notifyProgressLoaderThatResourceIsLoaded(assetPath);
+        return null;
 
     }
 
