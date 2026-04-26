@@ -2549,9 +2549,7 @@ public class Toolbar extends Container {
                     });
                     bar = btn;
                 } else {
-                    Container c = new Container();
-                    c.setSafeArea(true);
-                    bar = c;
+                    bar = new Container();
                 }
                 if (getUIManager().isThemeConstant("landscapeTitleUiidBool", false)) {
                     bar.setUIID("StatusBar", "StatusBarLandscape");
@@ -2559,6 +2557,7 @@ public class Toolbar extends Container {
                     bar.setUIID("StatusBar");
                 }
                 reallocateVerticalPaddingAndMarginsToTop(bar);
+                bar.setSafeArea(true);
                 addComponent(BorderLayout.NORTH, bar);
             }
         } else {
