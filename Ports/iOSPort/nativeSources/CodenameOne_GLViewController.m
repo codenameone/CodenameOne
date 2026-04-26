@@ -1964,6 +1964,23 @@ void* Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl() {
 
 void Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayImpl
 (void* peer, int* arr, int x, int y, int width, int height, int imgWidth, int imgHeight) {
+#ifdef CN1_USE_METAL
+    {
+        // Phase 3 v2: if the image has a mutable MTLTexture, the freshest
+        // pixels live there (the cached UIImage is stale post-Phase-3).
+        // Drain pending ops via flushBuffer-equivalent dispatch_sync, wait
+        // on the image's command buffer, then read pixels via Metal blit.
+        GLUIImage *gl = (BRIDGE_CAST GLUIImage*)peer;
+        if ([gl mtlMutableTexture] != nil) {
+            // Trigger a drain of pending mutable ops by issuing a
+            // synchronous render frame on the main thread. flushBuffer
+            // already does dispatch_sync(main, drawFrame) so call it.
+            [[CodenameOne_GLViewController instance] flushBuffer:nil x:0 y:0 width:displayWidth height:displayHeight];
+            CN1MetalReadMutableImagePixels(gl, arr, x, y, width, height, imgWidth, imgHeight);
+            return;
+        }
+    }
+#endif
     BOOL currentlyDrawing = NO;
     BOOL oldCurrentMutableTransformSet = currentMutableTransformSet;
     if(((BRIDGE_CAST void*)[CodenameOne_GLViewController instance].currentMutableImage) == peer) {

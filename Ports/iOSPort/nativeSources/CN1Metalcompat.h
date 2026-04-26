@@ -250,5 +250,14 @@ void CN1MetalEndMutableImageDraw(GLUIImage *image);
 // is pending. Safe to call on any thread.
 void CN1MetalFlushMutableImageSync(GLUIImage *image);
 
+// Read a region of the mutable image's MTLTexture into a CPU int array
+// in 0xAARRGGBB format (matches Image.getRGB / NativeImage layout).
+// Forces a flush + waitUntilCompleted on the image's command buffer
+// first so the GPU work is finalised. Returns YES on success; NO if
+// no mutable texture exists or device/blit allocation failed.
+BOOL CN1MetalReadMutableImagePixels(GLUIImage *image, int *outARGB,
+                                     int x, int y, int w, int h,
+                                     int imgWidth, int imgHeight);
+
 #endif /* CN1_USE_METAL */
 #endif /* CN1Metalcompat_h */

@@ -927,4 +927,77 @@ void CN1MetalFlushMutableImageSync(GLUIImage *image) {
     // buffer should be no-op-fast (waitUntilCompleted is idempotent).
 }
 
+BOOL CN1MetalReadMutableImagePixels(GLUIImage *image, int *outARGB,
+                                     int x, int y, int w, int h,
+                                     int imgWidth, int imgHeight) {
+    if (image == nil || outARGB == NULL || w <= 0 || h <= 0) return NO;
+    id<MTLTexture> tex = [image mtlMutableTexture];
+    if (tex == nil) return NO;
+
+    // Ensure GPU work for this image is finished before sampling.
+    CN1MetalFlushMutableImageSync(image);
+
+    int texW = (int)tex.width;
+    int texH = (int)tex.height;
+
+    id<MTLDevice> device = CN1MetalDevice();
+    if (device == nil) return NO;
+    id<MTLCommandQueue> queue = CN1MetalCommandQueue();
+    if (queue == nil) return NO;
+
+    // Private storage textures can't be getBytes'd directly on iOS. Blit
+    // into a shared-storage scratch texture, wait, then read.
+    MTLTextureDescriptor *desc = [MTLTextureDescriptor
+        texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm
+        width:(NSUInteger)texW height:(NSUInteger)texH mipmapped:NO];
+    desc.usage = MTLTextureUsageShaderRead;
+    desc.storageMode = MTLStorageModeShared;
+    id<MTLTexture> shared = [device newTextureWithDescriptor:desc];
+    if (shared == nil) return NO;
+
+    id<MTLCommandBuffer> blitCb = [queue commandBuffer];
+    id<MTLBlitCommandEncoder> blit = [blitCb blitCommandEncoder];
+    [blit copyFromTexture:tex sourceSlice:0 sourceLevel:0
+              sourceOrigin:MTLOriginMake(0, 0, 0)
+                sourceSize:MTLSizeMake((NSUInteger)texW, (NSUInteger)texH, 1)
+                 toTexture:shared destinationSlice:0 destinationLevel:0
+         destinationOrigin:MTLOriginMake(0, 0, 0)];
+    [blit endEncoding];
+    [blitCb commit];
+    [blitCb waitUntilCompleted];
+
+    // Read shared texture into a temp BGRA buffer, then convert + scale
+    // into outARGB. Texture dims equal imgWidth/imgHeight when the
+    // mutable was created via Image.createImage(w, h) but the API allows
+    // for arbitrary scaling; honour it.
+    NSUInteger rowBytes = (NSUInteger)(texW * 4);
+    uint8_t *bytes = (uint8_t *)malloc(rowBytes * (NSUInteger)texH);
+    if (bytes == NULL) return NO;
+    [shared getBytes:bytes bytesPerRow:rowBytes
+          fromRegion:MTLRegionMake2D(0, 0, (NSUInteger)texW, (NSUInteger)texH)
+         mipmapLevel:0];
+
+    float scaleX = (imgWidth  > 0) ? ((float)texW / (float)imgWidth)  : 1.0f;
+    float scaleY = (imgHeight > 0) ? ((float)texH / (float)imgHeight) : 1.0f;
+    for (int row = 0; row < h; row++) {
+        for (int col = 0; col < w; col++) {
+            int srcX = (int)((x + col) * scaleX);
+            int srcY = (int)((y + row) * scaleY);
+            int dstIdx = row * w + col;
+            if (srcX < 0 || srcX >= texW || srcY < 0 || srcY >= texH) {
+                outARGB[dstIdx] = 0;
+                continue;
+            }
+            int srcIdx = srcY * (int)rowBytes + srcX * 4;
+            uint8_t b = bytes[srcIdx + 0];
+            uint8_t g = bytes[srcIdx + 1];
+            uint8_t r = bytes[srcIdx + 2];
+            uint8_t a = bytes[srcIdx + 3];
+            outARGB[dstIdx] = ((int)a << 24) | ((int)r << 16) | ((int)g << 8) | (int)b;
+        }
+    }
+    free(bytes);
+    return YES;
+}
+
 #endif /* CN1_USE_METAL */
