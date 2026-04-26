@@ -1046,6 +1046,18 @@ const jvm = {
             result = fn.apply(receiver, nativeArgs);
           } else if (!nativeArgs.length && Object.prototype.hasOwnProperty.call(receiver, bridge.member)) {
             result = receiver[bridge.member];
+          } else if (typeof receiver === "function") {
+            // Functional-interface (SAM) receivers: the JSO interface
+            // declares one abstract method (e.g. EventListener.handleEvent,
+            // Runnable.run, AnimationFrameCallback.onAnimationFrame) and
+            // the wrapped JS value is itself a function — DOM
+            // ``addEventListener(type, fn)`` and friends pass plain
+            // functions, JSObject.cast(fn, EventListener.class) wraps
+            // them as a JSO-typed reference. Calling the SAM dispatches
+            // the function directly. Without this fallback the bridge
+            // throws ``Missing JS member handleEvent`` because a
+            // function value has no ``handleEvent`` property of its own.
+            result = receiver.apply(null, nativeArgs);
           } else {
             throw new Error("Missing JS member " + bridge.member + " for " + methodId);
           }

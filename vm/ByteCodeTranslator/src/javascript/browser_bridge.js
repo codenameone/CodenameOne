@@ -627,6 +627,16 @@
           value = fn.apply(receiver, args);
         } else if (!args.length && Object.prototype.hasOwnProperty.call(receiver, member)) {
           value = receiver[member];
+        } else if (typeof receiver === 'function') {
+          // Functional-interface (SAM) receivers — see parparvm_runtime.js
+          // ``invokeJsoBridge`` for the full rationale. Plain JS function
+          // wrapped as e.g. an EventListener / Runnable / SuccessCallback
+          // gets dispatched by calling the function itself; ``handleEvent``
+          // / ``run`` / ``onSuccess`` aren't properties of a function
+          // value. Without this fallback, every ``addEventListener(type,
+          // fn)`` whose listener round-trips back into the worker as a
+          // SAM call fails with ``Missing JS member handleEvent``.
+          value = receiver.apply(null, args);
         } else {
           throw new Error('Missing JS member ' + member + ' for host receiver');
         }
