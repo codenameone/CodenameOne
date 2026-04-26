@@ -61,6 +61,7 @@ final class PlaygroundExamples {
     static final String DATE_PICKER_SCRIPT = """
             import com.codename1.ui.*;
             import com.codename1.ui.layouts.*;
+            import com.codename1.ui.spinner.*;
 
             Container root = new Container(BoxLayout.y());
             Picker datePicker = new Picker();
