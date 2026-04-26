@@ -31,6 +31,7 @@ import com.codename1.ui.animations.Transition;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.ScrollListener;
+import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.Layout;
@@ -2530,14 +2531,34 @@ public class Toolbar extends Container {
         if (getUIManager().isThemeConstant("paintsTitleBarBool", false)) {
             // check if its already added:
             if (((BorderLayout) getLayout()).getNorth() == null) {
-                Container bar = new Container();
+                Component bar;
+                if (getUIManager().isThemeConstant("statusBarScrollsUpBool", true)) {
+                    Button btn = new Button();
+                    btn.setShowEvenIfBlank(true);
+                    btn.addActionListener(new ActionListener() {
+                        @Override
+                        public void actionPerformed(ActionEvent evt) {
+                            Form parent = getComponentForm();
+                            if (parent != null) {
+                                Component c = parent.findScrollableChild(parent.getContentPane());
+                                if (c != null) {
+                                    c.scrollRectToVisible(new Rectangle(0, 0, 10, 10), c);
+                                }
+                            }
+                        }
+                    });
+                    bar = btn;
+                } else {
+                    Container c = new Container();
+                    c.setSafeArea(true);
+                    bar = c;
+                }
                 if (getUIManager().isThemeConstant("landscapeTitleUiidBool", false)) {
                     bar.setUIID("StatusBar", "StatusBarLandscape");
                 } else {
                     bar.setUIID("StatusBar");
                 }
                 reallocateVerticalPaddingAndMarginsToTop(bar);
-                bar.setSafeArea(true);
                 addComponent(BorderLayout.NORTH, bar);
             }
         } else {
