@@ -48,6 +48,13 @@
        Themes painting a flush full-width tab strip leave this true (the
        framework default) so the tab strip itself reserves the inset. */
     tabsSafeAreaBool: false;
+    /* Route the Tab icon's styling through a separate UIID. FontImage
+       copies the Button's bgColor/transparency into the rendered glyph
+       image; over the cn1-pill-border selected pill that paints a
+       visible square fill behind the glyph that doesn't follow the
+       rounded shape. Declaring TabIcon as transparent below means only
+       the glyph itself paints. */
+    tabIconUIID: TabIcon;
     switchThumbPaddingInt: 2;
     switchThumbScaleY: "1.4";
     switchTrackScaleY: "1.5";
@@ -277,6 +284,15 @@ Tab.pressed { color: #000000; background-color: rgba(229,229,234,0.85); cn1-back
 SelectedTab { cn1-derive: Tab; color: #000000; }
 UnselectedTab { cn1-derive: Tab; color: #000000; }
 
+/* TabIcon: separate UIID applied via tabIconUIID so the icon's glyph
+   image paints with no fill behind it. Without this the FontImage
+   inherits the Tab.selected background color and renders a visible
+   square inside the pill. Color (light/dark) inherits from the parent
+   Tab via Style.fgColor at icon-render time. */
+TabIcon { background-color: transparent; padding: 0; margin: 0; }
+TabIcon.selected { background-color: transparent; }
+TabIcon.pressed { background-color: transparent; }
+
 SideNavigationPanel { background-color: #ffffff; padding: 0; margin: 0; }
 
 SideCommand {
@@ -449,6 +465,13 @@ PopupContent {
     Tab.pressed { color: #ffffff; background-color: rgba(58,58,60,0.9); cn1-background-type: cn1-pill-border; }
     SelectedTab { color: #ffffff; }
     UnselectedTab { color: #ffffff; }
+
+    /* Dark overrides for the icon-only UIID. Background stays transparent
+       so the pill shows through; only the glyph (fgColor) is forced
+       white. */
+    TabIcon { color: #ffffff; background-color: transparent; }
+    TabIcon.selected { color: #ffffff; background-color: transparent; }
+    TabIcon.pressed { color: #ffffff; background-color: transparent; }
 
     SideNavigationPanel { background-color: #000000; }
     SideCommand { color: #ffffff; }

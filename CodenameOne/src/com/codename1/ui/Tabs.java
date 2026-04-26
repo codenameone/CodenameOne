@@ -633,9 +633,26 @@ public class Tabs extends Container {
         if (tabUIID != null) {
             b.setUIID(tabUIID);
         }
+        applyTabIconUIID(b);
         b.setFontIcon(font, icon, size);
         createTabImpl(b);
         return b;
+    }
+
+    /// Detaches the tab's icon style from the Button's selection-state styles.
+    /// FontImage.setIcon copies the Button's unselected/selected/pressed styles
+    /// to render four icon variants - which means the icon image carries the
+    /// Button's bgColor and bgTransparency. With a `cn1-pill-border` selected
+    /// background, that produces a visible square fill behind the glyph that
+    /// doesn't follow the pill's rounded shape. Reading `tabIconUIID` from the
+    /// theme lets a theme route the icon styling to a separate UIID
+    /// (typically `TabIcon`) where it can be declared transparent. Themes that
+    /// don't define the constant get the legacy behavior unchanged.
+    private void applyTabIconUIID(Component b) {
+        String iconUiid = getUIManager().getThemeConstant("tabIconUIID", null);
+        if (iconUiid != null && iconUiid.length() > 0 && b instanceof Label) {
+            ((Label) b).setIconUIID(iconUiid);
+        }
     }
 
     /// Creates a tab component by default this is a RadioButton but subclasses can use this to return anything
@@ -651,6 +668,7 @@ public class Tabs extends Container {
     /// component instance
     protected Component createTab(String title, Image icon) {
         RadioButton b = new RadioButton(title != null ? title : "", icon);
+        applyTabIconUIID(b);
         createTabImpl(b);
         return b;
     }
