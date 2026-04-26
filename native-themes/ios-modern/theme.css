@@ -362,11 +362,16 @@ MultiLine4 {
    visibly different colour. All Dialog sub-UIIDs share the same
    translucent surface (or stay transparent so Dialog's surface
    shows through). */
+/* margin: 0 - CN1's Dialog uses its own UIID margin as a positioning
+   hint; a non-zero value here makes Dialog.show() lay the dialog out
+   at screen-minus-margin (looks correct for a small modal but for
+   `Dialog.show("title", "body", "OK", null)` it grows to ~full
+   screen with empty space around the body). */
 Dialog {
     background-color: rgba(255,255,255,0.78);
     color: #000000;
     padding: 3mm;
-    margin: 5mm;
+    margin: 0;
     border-radius: 4mm;
 }
 DialogBody {

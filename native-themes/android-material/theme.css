@@ -294,11 +294,14 @@ MultiLine4 { cn1-derive: Label; color: #79747e; }
    transparent so the Dialog's surface paints once - otherwise each
    sub-region's bgColor draws over Dialog's and reads as a
    visibly different shade in the rounded corners. */
+/* margin: 0 - see iOS Modern Dialog rule for the rationale. A non-zero
+   margin here forced Dialog.show() to grow the dialog to screen size
+   with the body floating in mostly empty space. */
 Dialog {
     background-color: #e6e0e9;
     color: #1d1b20;
     padding: 2mm;
-    margin: 4mm;
+    margin: 0;
     border-radius: 6mm;
 }
 DialogBody {
