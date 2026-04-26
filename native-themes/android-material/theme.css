@@ -36,8 +36,16 @@
     paintsTitleBarBool: false;
     /* Material 3 Tabs stay at the top, edge-to-edge. The Material 3
        bottom-nav-rail is a separate component (NavigationBar) and
-       is not what Codename One's Tabs widget represents. Leaving
-       tabPlacementInt unset so Tabs keeps its default TOP position. */
+       is not what Codename One's Tabs widget represents.
+       tabPlacementInt is set explicitly so flipping the playground
+       device toggle from iOS Modern (which sets it to BOTTOM=2)
+       back to Android resets it to TOP=0; without an explicit value
+       the iOS constant would leak across themes after a reload.
+       tabsSafeAreaBool is the framework default (true) - Material
+       tab strip is full-width and reserves the indicator space
+       internally, no host wrapper needed. */
+    tabPlacementInt: 0;
+    tabsSafeAreaBool: true;
     tabsFillRowsBool: true;
     tabsGridBool: true;
     switchThumbPaddingInt: 2;
@@ -100,6 +108,15 @@ SpanLabelText { cn1-derive: Label; background-color: transparent; }
    Generous horizontal padding so short labels still get clear pill
    ends. cn1-derive doesn't carry cn1-background-type forward, so the
    derived UIIDs (RaisedButton, FlatButton) re-declare it explicitly. */
+/* Re-declare every state-affecting property (padding, margin, font,
+   text-align) on `.pressed` and `.disabled` so the compiled $press#
+   / $dis# style entries keep IDENTICAL geometry to the base. Without
+   the re-declaration the framework's per-state Style merge introduces
+   a subtle vertical drift while a button is held - text "jumps" by
+   a pixel or two between unselected and pressed. cn1-derive on a
+   state selector wouldn't help here (the compiler's getThemeDerive
+   only honours base-level cn1-derive), so explicit values are the
+   reliable fix. */
 Button {
     color: #ffffff;
     background-color: #6750a4;
@@ -110,8 +127,26 @@ Button {
     cn1-background-type: cn1-pill-border;
     text-align: center;
 }
-Button.pressed { background-color: #d0bcff; color: #21005d; cn1-background-type: cn1-pill-border; }
-Button.disabled { color: #a5a0ab; background-color: #e0dce4; cn1-background-type: cn1-pill-border; }
+Button.pressed {
+    color: #21005d;
+    background-color: #d0bcff;
+    padding: 1.5mm 4mm 1.5mm 4mm;
+    margin: 0.8mm;
+    font-family: "native:MainRegular";
+    font-size: 3.5mm;
+    cn1-background-type: cn1-pill-border;
+    text-align: center;
+}
+Button.disabled {
+    color: #a5a0ab;
+    background-color: #e0dce4;
+    padding: 1.5mm 4mm 1.5mm 4mm;
+    margin: 0.8mm;
+    font-family: "native:MainRegular";
+    font-size: 3.5mm;
+    cn1-background-type: cn1-pill-border;
+    text-align: center;
+}
 
 /* RaisedButton: bumped surface (M3 "elevated" tone) to keep it
    visibly distinct from the default filled Button, including in
@@ -120,10 +155,33 @@ RaisedButton {
     cn1-derive: Button;
     color: #21005d;
     background-color: #eaddff;
+    padding: 1.5mm 4mm 1.5mm 4mm;
+    margin: 0.8mm;
+    font-family: "native:MainRegular";
+    font-size: 3.5mm;
     cn1-background-type: cn1-pill-border;
+    text-align: center;
 }
-RaisedButton.pressed { color: #21005d; background-color: #d0bcff; cn1-background-type: cn1-pill-border; }
-RaisedButton.disabled { background-color: #e0dce4; color: #a5a0ab; cn1-background-type: cn1-pill-border; }
+RaisedButton.pressed {
+    color: #21005d;
+    background-color: #d0bcff;
+    padding: 1.5mm 4mm 1.5mm 4mm;
+    margin: 0.8mm;
+    font-family: "native:MainRegular";
+    font-size: 3.5mm;
+    cn1-background-type: cn1-pill-border;
+    text-align: center;
+}
+RaisedButton.disabled {
+    color: #a5a0ab;
+    background-color: #e0dce4;
+    padding: 1.5mm 4mm 1.5mm 4mm;
+    margin: 0.8mm;
+    font-family: "native:MainRegular";
+    font-size: 3.5mm;
+    cn1-background-type: cn1-pill-border;
+    text-align: center;
+}
 
 FlatButton {
     cn1-derive: Button;

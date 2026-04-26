@@ -19,13 +19,7 @@ final class PlaygroundExamples {
             import com.codename1.components.*;
             import com.codename1.ui.plaf.*;
 
-            // The preview switches between iOS Modern (liquid-glass) and
-            // Android Material 3 themes. Standard UIIDs render with each
-            // platform's native flair - try the device toggle in the
-            // toolbar to see Buttons, Switches, FloatingActionButton, etc.
-            // restyle automatically.
             Form form = new Form("Welcome", BoxLayout.y());
-            form.setScrollable(true);
 
             form.add(new SpanLabel(
                 "Codename One Playground - tap the device toggle above to flip between iOS and Android themes."));
@@ -38,7 +32,7 @@ final class PlaygroundExamples {
             form.add(raised);
 
             Switch wifi = new Switch();
-            wifi.setOn(true);
+            wifi.setValue(true);
             form.add(BoxLayout.encloseX(new Label("Wi-Fi"), new Label(" "), wifi));
 
             CheckBox subscribe = new CheckBox("Subscribe");
@@ -120,7 +114,6 @@ final class PlaygroundExamples {
             import com.codename1.components.*;
 
             Form form = new Form("Profile", BoxLayout.y());
-            form.setScrollable(true);
 
             form.add(new SpanLabel(
                 "Modern theme inputs adapt automatically to the active device skin."));
@@ -150,25 +143,18 @@ final class PlaygroundExamples {
             import com.codename1.ui.layouts.*;
             import com.codename1.components.*;
 
-            String[] icons = {"INBOX", "STAR", "ARCHIVE", "SCHEDULE", "FOLDER", "SETTINGS"};
-            int[] codes = {
-                FontImage.MATERIAL_INBOX, FontImage.MATERIAL_STAR,
-                FontImage.MATERIAL_ARCHIVE, FontImage.MATERIAL_SCHEDULE,
-                FontImage.MATERIAL_FOLDER, FontImage.MATERIAL_SETTINGS
-            };
+            String[] titles = {"Inbox", "Starred", "Archive", "Snoozed", "Folders", "Settings"};
             String[] subtitles = {
                 "12 unread", "Starred messages", "Older threads",
                 "Snoozed for later", "Shared with the team", "Account & preferences"
             };
 
             Form form = new Form("Menu", BoxLayout.y());
-            form.setScrollable(true);
-            for (int i = 0; i < icons.length; i++) {
+            for (int i = 0; i < titles.length; i++) {
                 int idx = i;
-                MultiButton row = new MultiButton(icons[i]);
+                MultiButton row = new MultiButton(titles[i]);
                 row.setTextLine2(subtitles[i]);
-                row.setIcon(FontImage.createMaterial(codes[i], "MultiLine1", 5));
-                row.addActionListener(e -> Dialog.show(icons[idx], subtitles[idx], "OK", null));
+                row.addActionListener(e -> Dialog.show(titles[idx], subtitles[idx], "OK", null));
                 form.add(row);
             }
             ctx.log("List sample loaded");
@@ -179,13 +165,10 @@ final class PlaygroundExamples {
             import com.codename1.ui.*;
             import com.codename1.ui.layouts.*;
             import com.codename1.components.*;
+            import com.codename1.ui.spinner.*;
 
-            // Showcase of the modern theme's UIIDs - flip the device toggle
-            // to compare iOS Modern (liquid-glass) and Android Material 3.
             Form form = new Form("UI Showcase", BoxLayout.y());
-            form.setScrollable(true);
 
-            // Buttons
             form.add(new Label("Buttons"));
             Button flat = new Button("Flat");
             Button raised = new Button("Raised");
@@ -194,7 +177,6 @@ final class PlaygroundExamples {
             disabled.setEnabled(false);
             form.add(BoxLayout.encloseX(flat, raised, disabled));
 
-            // Toggles
             form.add(new Label("Toggles"));
             CheckBox check = new CheckBox("Notifications");
             check.setSelected(true);
@@ -203,22 +185,19 @@ final class PlaygroundExamples {
             radioB.setSelected(true);
             ButtonGroup g = new ButtonGroup(radioA, radioB);
             Switch sw = new Switch();
-            sw.setOn(true);
+            sw.setValue(true);
             form.add(check);
             form.add(BoxLayout.encloseX(radioA, radioB));
             form.add(BoxLayout.encloseX(new Label("Dark mode"), sw));
 
-            // Inputs
             form.add(new Label("Inputs"));
             form.add(new TextField("ada@analytical.engine", "Email"));
             form.add(new TextArea("First programmer.", 2, 28));
 
-            // Picker
             Picker date = new Picker();
             date.setType(Display.PICKER_TYPE_DATE);
             form.add(BoxLayout.encloseX(new Label("Birthday"), date));
 
-            // FAB
             FloatingActionButton fab = FloatingActionButton.createFAB(FontImage.MATERIAL_EDIT);
             fab.bindFabToContainer(form.getContentPane());
             fab.addActionListener(e -> Dialog.show("Edit", "FAB tapped.", "OK", null));
