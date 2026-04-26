@@ -56,11 +56,18 @@ jobs:
       # The structural-optimization landing slowed cooperative-scheduler
       # progress on bytecode-translator output; with cn1_ivAdapt wrapping
       # at every hand-written port.js dispatch site, the screenshot suite
-      # now reaches the runTest phase but needs more wall-clock time on
-      # CI than the previous 180s budget. 360s gives ~2× headroom over a
-      # local successful run.
-      CN1_JS_TIMEOUT_SECONDS: "360"
-      CN1_JS_BROWSER_LIFETIME_SECONDS: "330"
+      # now reaches the runTest phase. Once the RTA fix landed and
+      # Spinner3D started rendering its full date-wheel content (instead
+      # of the blank no-op the previous build emitted), the
+      # LightweightPicker / ValidatorLightweightPicker tests went from
+      # ~instant to ~30s each on shared GHA runners — the real paint
+      # path through SpinnerNode.layoutChildren / TextPainter.paint
+      # adds wall-clock work that the blank fallback skipped. 720s
+      # gives the slow-runner tail enough headroom to complete the
+      # full 35-test suite without re-introducing the blank-spinner
+      # regression as a workaround.
+      CN1_JS_TIMEOUT_SECONDS: "720"
+      CN1_JS_BROWSER_LIFETIME_SECONDS: "660"
       CN1SS_SKIP_COVERAGE: "1"
       CN1SS_FAIL_ON_MISMATCH: "1"
       BROWSER_CMD: "node \"$GITHUB_WORKSPACE/scripts/run-javascript-headless-browser.mjs\""
