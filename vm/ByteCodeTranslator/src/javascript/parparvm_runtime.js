@@ -2182,27 +2182,30 @@ global.__parparInstallNativeBindings = installNativeBindings;
 // jvm.resolveVirtual which has its own className|methodId-keyed cache, then
 // yield* into the resolved generator.
 function cn1_ivResolve(target, mid) {
+  // Class-object short-circuit (must run BEFORE the fast-path so we
+  // don't index the represented class's methods map). A Class instance
+  // carries ``__classDef`` pointing at the REPRESENTED class's def
+  // (so ``getName`` / ``getSimpleName`` / static-field access through
+  // ``__classDef`` keep working without an extra hop), but VIRTUAL
+  // method dispatch on a Class instance MUST resolve against
+  // ``java.lang.Class``'s method table — not the represented class's.
+  // Without this short-circuit, ``someDouble.getClass().equals(
+  // Double.class)`` resolves ``equals`` against Double.methods
+  // (the receiver's ``__classDef`` IS the Double def) and returns
+  // Double.equals, which re-runs ``getClass().equals(...)`` on its
+  // own this and recurses until ``RangeError: Maximum call stack
+  // size``. Routing through ``jvm.resolveVirtual(target.__class,
+  // mid)`` uses ``"java_lang_Class"`` and lands on Class's own
+  // ``equals`` / ``hashCode`` / ``toString`` slots.
+  if (target.__isClassObject) {
+    return jvm.resolveVirtual(target.__class, mid);
+  }
   // Fast-path: direct method on the target's classDef. This mirrors the
   // inline form that used to live at every call site. No null check here —
   // callers (cn1_iv0..4 / cn1_ivN below) are generators and delegate to
   // throwNullPointerException() for the Java-spec-compliant NPE, which
   // cannot be done from a plain function.
-  //
-  // Class-object special case: a Class instance carries
-  // ``__classDef`` pointing at the REPRESENTED class's def
-  // (so ``getName`` / ``getSimpleName`` / static-field access through
-  // ``__classDef`` keep working without an extra hop). For VIRTUAL
-  // method dispatch on a Class instance we want ``java.lang.Class``'s
-  // method table — not the represented class's. Without this short-
-  // circuit, ``someDouble.getClass().equals(Double.class)`` resolves
-  // ``equals`` against Double.methods (because the receiver's
-  // ``__classDef`` IS the Double def) and returns Double.equals,
-  // which then re-runs the same dispatch on its own ``getClass()``
-  // and recurses until ``RangeError: Maximum call stack size``.
-  // Use the receiver's ``__class`` ("java_lang_Class") so the slow
-  // path resolves against the Class def's methods table where
-  // ``equals`` / ``hashCode`` / ``toString`` / etc. actually live.
-  const classDef = target.__isClassObject ? jvm.classes[target.__class] : target.__classDef;
+  const classDef = target.__classDef;
   if (classDef && classDef.pendingMethods) {
     jvm.flushPendingMethods(classDef);
   }

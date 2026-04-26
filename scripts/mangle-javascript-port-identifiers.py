@@ -91,6 +91,20 @@ EXCLUDE = frozenset({
     # if they were, so list them here so the mangler skips both.
     "cn1_s_",
     "cn1_",
+    # JSO bridge class-name prefixes pushed into ``jsoRegistry.classPrefixes``
+    # by port.js's ``(function(global) { ... })(self)`` IIFE. The runtime
+    # walks them in ``isJsoBridgeClass(className)`` doing
+    # ``className.indexOf(prefix) === 0`` — the ``className`` is always
+    # the unmangled JSO class name (host bridges tag receivers with the
+    # full ``com_codename1_html5_js_dom_HTMLCanvasElement`` form via
+    # browser_bridge.js's ``Qe(e)``). If the prefixes themselves get
+    # mangled to ``$c9H`` / ``$c9I`` the prefix check never matches any
+    # actual class name and ``createJsoBridgeMethod`` never fires, so
+    # the first ``cn1_iv*(canvas, "cn1_s_getStyle_R_..")`` call dies
+    # with ``Missing virtual method`` before the JSO host dispatch
+    # path gets a chance to run.
+    "com_codename1_html5_js_",
+    "com_codename1_impl_html5_JSOImplementations_",
 })
 
 
