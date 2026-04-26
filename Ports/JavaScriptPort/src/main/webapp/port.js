@@ -1682,9 +1682,17 @@ bindCiFallback("Log.print", [
   return null;
 });
 
+// ``Log.e(Throwable)`` is a *static* method, so the translated bytecode
+// invokes it with a single argument (the throwable). Earlier versions of
+// this fallback declared ``function*(__cn1ThisObject, throwable)`` — that
+// shifted the parameter by one slot, ``throwable`` was always
+// ``undefined``, and ``stringifyThrowable`` printed ``"null"``. Real
+// caught exceptions then surfaced in the browser console as the
+// infamous ``Exception: null`` flood. Keep the signature as ``(throwable)``
+// so the actual class/message/stack survives the round-trip.
 bindCiFallback("Log.e", [
   "cn1_com_codename1_io_Log_e_java_lang_Throwable"
-], function*(__cn1ThisObject, throwable) {
+], function*(throwable) {
   if (global.console && typeof global.console.error === "function") {
     global.console.error("Exception: " + (yield* stringifyThrowable(throwable)));
   }
@@ -1845,9 +1853,6 @@ bindCiFallback("HTML5Implementation.determineFontHeightCoerce", [
 
 const hashMapComputeHashCodeImplMethodId = "cn1_java_util_HashMap_computeHashCode_java_lang_Object_R_int__impl";
 const hashMapComputeHashCodeMethodId = "cn1_java_util_HashMap_computeHashCode_java_lang_Object_R_int";
-const hashMapComputeHashCodeOriginal = typeof global[hashMapComputeHashCodeImplMethodId] === "function"
-  ? global[hashMapComputeHashCodeImplMethodId]
-  : (typeof global[hashMapComputeHashCodeMethodId] === "function" ? global[hashMapComputeHashCodeMethodId] : null);
 
 bindCiFallback("HashMap.computeHashCodeNullKey", [
   hashMapComputeHashCodeImplMethodId,
@@ -1857,15 +1862,42 @@ bindCiFallback("HashMap.computeHashCodeNullKey", [
     emitDiagLine("PARPAR:DIAG:FALLBACK:hashMapComputeHashCode:nullKey=1");
     return 0;
   }
-  // Try the original captured at port.js load time first.
-  if (typeof hashMapComputeHashCodeOriginal === "function") {
-    return yield* cn1_ivAdapt(hashMapComputeHashCodeOriginal(key));
+  // Resolve the translator-generated original lazily — port.js evaluates
+  // before translated_app.js, so a snapshot taken at load time would be
+  // null and force every non-null lookup down the resolveVirtual fallback.
+  // jvm.translatedMethods is populated by bindNative when registering
+  // the native overrides; checking it last preserves any port-specific
+  // override of the same method.
+  let original = null;
+  if (jvm && jvm.translatedMethods) {
+    original = jvm.translatedMethods[hashMapComputeHashCodeImplMethodId]
+      || jvm.translatedMethods[hashMapComputeHashCodeMethodId]
+      || null;
   }
-  // Original wasn't available yet (translated_app.js loads after port.js).
-  // computeHashCode(key) is just key.hashCode(), so call hashCode directly
-  // via virtual dispatch to avoid recursion back into computeHashCode.
+  if (typeof original !== "function") {
+    if (typeof global[hashMapComputeHashCodeImplMethodId] === "function"
+        && !global[hashMapComputeHashCodeImplMethodId].__cn1CiFallbackSymbol) {
+      original = global[hashMapComputeHashCodeImplMethodId];
+    } else if (typeof global[hashMapComputeHashCodeMethodId] === "function"
+        && !global[hashMapComputeHashCodeMethodId].__cn1CiFallbackSymbol) {
+      original = global[hashMapComputeHashCodeMethodId];
+    }
+  }
+  if (typeof original === "function") {
+    return yield* cn1_ivAdapt(original(key));
+  }
+  // Last-ditch path when the translated original genuinely isn't
+  // available. ``computeHashCode(key)`` is just ``key.hashCode()`` —
+  // dispatch via the SHARED dispatch id (``cn1_s_hashCode_R_int``), not
+  // the legacy class-specific name. Every translated class registers its
+  // ``hashCode`` slot under the shared key after the dispatch-id
+  // refactor; resolving against ``cn1_java_lang_Object_hashCode_R_int``
+  // skips that slot and silently returns the inherited Object.hashCode
+  // (identity hash), which made every String key in CSSBorder.STYLE_MAP
+  // store under its identity hash and every subsequent ``get("solid")``
+  // miss the entry.
   var hashCodeMethod = jvm.resolveVirtual(key.__class || "java_lang_Object",
-    "cn1_java_lang_Object_hashCode_R_int");
+    "cn1_s_hashCode_R_int");
   if (typeof hashCodeMethod === "function") {
     return yield* cn1_ivAdapt(hashCodeMethod(key));
   }
@@ -3141,23 +3173,45 @@ if (jvm && typeof jvm.addVirtualMethod === "function" && jvm.classes && jvm.clas
   }
 }
 
-bindCiFallback("HTML5Implementation.hideSplashNoJQueryGuard", [
-  html5HideSplashMethodId
-], function*(__cn1ThisObject) {
-  const html5HideSplashOriginal = resolveCurrentTranslatedMethod(
-    [html5HideSplashMethodId],
-    "com_codename1_impl_html5_HTML5Implementation",
-    "HTML5Implementation.hideSplashNoJQueryGuard"
-  );
-  if (typeof html5HideSplashOriginal !== "function") {
+// The translated body of ``HTML5Implementation.hideSplash`` is a
+// one-line ``jQuery("div#cn1-splash").fadeOut(...)``, which only
+// works when it runs on the main thread (where the DOM and jQuery
+// live). In the new ParparVM JS port, runtime code runs in a Worker
+// — the ``jQuery`` global isn't visible from there, so calling the
+// translated body inline throws ``ReferenceError: jQuery is not
+// defined`` and the splash stays on screen forever (covering the
+// app UI).
+//
+// The bytecode emits the call as ``yield* $ajc()`` (a direct
+// global-function reference, NOT a virtual dispatch), so a
+// ``bindCiFallback`` on the dispatch id doesn't intercept it. Replace
+// the global function directly: the worker-side override yields a
+// host-bridge call to the matching ``__cn1_hide_splash__`` handler in
+// browser_bridge.js, which does the actual splash removal on the main
+// thread.
+const html5HideSplashWorkerSymbol = "cn1_com_codename1_impl_html5_HTML5Implementation_hideSplash";
+(function installHideSplashWorkerOverride() {
+  const replacement = function*() {
+    if (typeof globalThis !== "undefined" && typeof globalThis.jQuery === "function") {
+      try {
+        globalThis.jQuery("div#cn1-splash").fadeOut(100, function() {
+          globalThis.jQuery(this).remove();
+        });
+        return null;
+      } catch (_e) { /* fall through */ }
+    }
+    if (typeof jvm !== "undefined" && typeof jvm.invokeHostNative === "function") {
+      yield jvm.invokeHostNative("__cn1_hide_splash__", []);
+    }
     return null;
+  };
+  global[html5HideSplashWorkerSymbol] = replacement;
+  if (jvm && jvm.nativeMethods) {
+    jvm.nativeMethods["cn1_s_hideSplash"] = replacement;
+    jvm.nativeMethods[html5HideSplashWorkerSymbol] = replacement;
   }
-  if (typeof globalThis !== "undefined" && typeof globalThis.jQuery !== "function") {
-    emitDiagLine("PARPAR:DIAG:FALLBACK:hideSplash:jQueryMissing=1");
-    return null;
-  }
-  return yield* cn1_ivAdapt(html5HideSplashOriginal(__cn1ThisObject));
-});
+})();
+
 
 bindCiFallback("BaseTest.createFormNullGuard", [
   baseTestCreateFormMethodId,

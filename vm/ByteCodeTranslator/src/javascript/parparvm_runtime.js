@@ -19,6 +19,12 @@ const CN1_ENUM_NAME = "cn1_java_lang_Enum_name";
 const CN1_HASHMAP_ELEMENT_DATA = "cn1_java_util_HashMap_elementData";
 const CN1_HASHMAP_ENTRY_NEXT = "cn1_java_util_HashMap_Entry_next";
 const CN1_HASHMAP_ENTRY_KEY = "cn1_java_util_MapEntry_key";
+// Shared dispatch id for ``Object.clone()`` post the dispatch-id refactor.
+// The mangler rewrites the literal in lockstep with every call site so
+// equality against ``methodId`` keeps matching after mangling — the
+// regex-based ``isArrayCloneMethodId`` fallback below silently breaks
+// because regex bodies aren't mangled (they're literal patterns).
+const CN1_CLONE_DISPATCH_ID = "cn1_s_clone_R_java_lang_Object";
 const VM_PROTOCOL_VERSION = 1;
 const VM_PROTOCOL = Object.freeze({
   version: VM_PROTOCOL_VERSION,
@@ -1173,6 +1179,15 @@ const jvm = {
   isArrayCloneMethodId(methodId) {
     if (typeof methodId !== "string" || methodId.length === 0) {
       return false;
+    }
+    // Mangling rewrites identifier *literals* but leaves regex bodies
+    // alone, so the legacy regex never matches a mangled methodId
+    // (e.g. ``$Yj``). Compare against ``CN1_CLONE_DISPATCH_ID`` first —
+    // that constant moves through the mangler in lockstep with every
+    // call site. Keep the regex as a fallback for the unmangled
+    // pre-build path and any historical ``cn1_<class>_clone_..`` form.
+    if (methodId === CN1_CLONE_DISPATCH_ID) {
+      return true;
     }
     return /(?:^|_)clone_R_java_lang_Object$/.test(methodId);
   },
@@ -2579,7 +2594,10 @@ function* runtimeToNativeString(value) {
     return jvm.toNativeString(value);
   }
   if (value && value.__class) {
-    const toStringMethod = jvm.resolveVirtual(value.__class, "cn1_java_lang_Object_toString_R_java_lang_String");
+    // Shared dispatch id; class-specific names get mangled to opaque
+    // symbols that no longer survive the ``$au``-style methods table
+    // lookup.
+    const toStringMethod = jvm.resolveVirtual(value.__class, "cn1_s_toString_R_java_lang_String");
     return jvm.toNativeString(yield* adaptVirtualResult(toStringMethod(value)));
   }
   return String(value);
@@ -3071,7 +3089,10 @@ bindNative([
     return 0;
   }
   if (a && a.__class) {
-    const equalsMethod = jvm.resolveVirtual(a.__class, "cn1_java_lang_Object_equals_java_lang_Object_R_boolean");
+    // Use the shared dispatch id — class-specific method IDs survive
+    // the mangler as opaque ``$aaw``-style symbols and don't match the
+    // ``$au``-style keys the post-fa4247a42 method tables use.
+    const equalsMethod = jvm.resolveVirtual(a.__class, "cn1_s_equals_java_lang_Object_R_boolean");
     return yield* adaptVirtualResult(equalsMethod(a, b));
   }
   return a === b ? 1 : 0;
@@ -3500,7 +3521,9 @@ bindNative(["cn1_java_util_HashMap_areEqualKeys_java_lang_Object_java_lang_Objec
   if (!key1.__class) {
     return 0;
   }
-  const equalsMethod = jvm.resolveVirtual(key1.__class, "cn1_java_lang_Object_equals_java_lang_Object_R_boolean");
+  // Shared dispatch id — see the equivalent change in
+  // ``cn1_java_lang_Object_equals_java_lang_Object_R_boolean`` above.
+  const equalsMethod = jvm.resolveVirtual(key1.__class, "cn1_s_equals_java_lang_Object_R_boolean");
   return (yield* adaptVirtualResult(equalsMethod(key1, key2))) ? 1 : 0;
 });
 bindNative(["cn1_java_util_HashMap_findNonNullKeyEntry_java_lang_Object_int_int_R_java_util_HashMap_Entry"], function*(__cn1ThisObject, key, index, keyHash) {

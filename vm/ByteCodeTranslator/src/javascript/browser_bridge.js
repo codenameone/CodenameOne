@@ -656,6 +656,39 @@
     return hostResult(value);
   });
 
+  // Hide the splash element on the main thread. The translated
+  // ``HTML5Implementation.hideSplash`` body uses ``jQuery(...)``
+  // directly, but the worker context has no jQuery (and no DOM).
+  // The corresponding worker-side ``bindCiFallback`` in port.js
+  // detects the missing jQuery and routes to this host handler so
+  // the actual splash removal happens on the main thread where
+  // jQuery / the DOM are available. Falls back to a manual remove
+  // when jQuery isn't loaded on the main thread either (e.g. when
+  // the bundle is served standalone without the website wrapper).
+  hostBridge.register('__cn1_hide_splash__', function() {
+    var doc = (global.window || global).document || global.document;
+    if (!doc) {
+      return null;
+    }
+    var splash = doc.getElementById('cn1-splash');
+    if (!splash) {
+      return null;
+    }
+    var jq = (global.window || global).jQuery || global.jQuery;
+    if (typeof jq === 'function') {
+      try {
+        jq(splash).fadeOut(100, function() { jq(this).remove(); });
+        return null;
+      } catch (_e) {
+        // Fall through to manual remove on jQuery error.
+      }
+    }
+    if (splash.parentNode) {
+      splash.parentNode.removeChild(splash);
+    }
+    return null;
+  });
+
   hostBridge.register('__cn1_create_custom_event__', function(request) {
     var payload = request || {};
     var type = payload.type == null ? '' : String(payload.type);
