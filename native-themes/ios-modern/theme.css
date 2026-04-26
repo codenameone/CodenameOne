@@ -441,8 +441,12 @@ PopupContent {
     TabbedPane { background-color: #1c1c1e; }
     TabsContainer { background-color: rgba(44,44,46,0.7); color: #ffffff; }
     Tab { color: #ffffff; background-color: transparent; }
-    Tab.selected { color: #ffffff; background-color: #3a3a3c; }
-    Tab.pressed { color: #ffffff; background-color: rgba(58,58,60,0.9); }
+    /* Re-declare cn1-background-type on the dark overrides - the
+       compiler doesn't carry it forward from the light Tab.selected
+       style, so without this the selected pill renders as a flat
+       rectangular block instead of a rounded pill in dark mode. */
+    Tab.selected { color: #ffffff; background-color: #3a3a3c; cn1-background-type: cn1-pill-border; }
+    Tab.pressed { color: #ffffff; background-color: rgba(58,58,60,0.9); cn1-background-type: cn1-pill-border; }
     SelectedTab { color: #ffffff; }
     UnselectedTab { color: #ffffff; }
 
