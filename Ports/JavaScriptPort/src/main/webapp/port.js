@@ -196,7 +196,7 @@
       value.__nativeEventListener = function(event) {
         try {
           const wrappedEvent = jvm.wrapJsResult(event, "com_codename1_html5_js_dom_Event");
-          const method = jvm.resolveVirtual(value.__class, "cn1_com_codename1_html5_js_dom_EventListener_handleEvent_com_codename1_html5_js_dom_Event");
+          const method = jvm.resolveVirtual(value.__class, "cn1_s_handleEvent_com_codename1_html5_js_dom_Event");
           jvm.spawn(null, method(value, wrappedEvent));
         } catch (err) {
           jvm.fail(err);
@@ -212,7 +212,7 @@
         try {
           spawnVirtualCallback(
             value,
-            "cn1_com_codename1_html5_js_browser_AnimationFrameCallback_onAnimationFrame_double",
+            "cn1_s_onAnimationFrame_double",
             [+time],
             "__cn1RafCallbackPending"
           );
@@ -424,7 +424,7 @@ function* stringifyThrowable(throwable) {
     }
   }
   try {
-    const toStringMethod = jvm.resolveVirtual(throwable.__class, "cn1_java_lang_Throwable_toString_R_java_lang_String");
+    const toStringMethod = jvm.resolveVirtual(throwable.__class, "cn1_s_toString_R_java_lang_String");
     const value = yield* cn1_ivAdapt(toStringMethod(throwable));
     if (value && value.__class === "java_lang_String") {
       pieces.push(jvm.toNativeString(value));
@@ -433,7 +433,7 @@ function* stringifyThrowable(throwable) {
     // Best effort diagnostic path only.
   }
   try {
-    const messageMethod = jvm.resolveVirtual(throwable.__class, "cn1_java_lang_Throwable_getMessage_R_java_lang_String");
+    const messageMethod = jvm.resolveVirtual(throwable.__class, "cn1_s_getMessage_R_java_lang_String");
     const message = yield* cn1_ivAdapt(messageMethod(throwable));
     if (message && message.__class === "java_lang_String") {
       pieces.push("message=" + jvm.toNativeString(message));
@@ -442,7 +442,7 @@ function* stringifyThrowable(throwable) {
     // Best effort diagnostic path only.
   }
   try {
-    const printStackTraceMethod = jvm.resolveVirtual(throwable.__class, "cn1_java_lang_Throwable_printStackTrace");
+    const printStackTraceMethod = jvm.resolveVirtual(throwable.__class, "cn1_s_printStackTrace");
     yield* cn1_ivAdapt(printStackTraceMethod(throwable));
     pieces.push("stack=printed");
   } catch (_err) {
@@ -1523,7 +1523,7 @@ bindNative([
     try {
       spawnVirtualCallback(
         handler,
-        "cn1_com_codename1_impl_html5_JavaScriptAnimationFrameCallback_onAnimationFrame_double",
+        "cn1_s_onAnimationFrame_double",
         [+time],
         "__cn1RafCallbackPending"
       );
@@ -2033,12 +2033,23 @@ const formInitLafMethodId = "cn1_com_codename1_ui_Form_initLaf_com_codename1_ui_
 const formInitFocusedMethodId = "cn1_com_codename1_ui_Form_initFocused";
 const formFlushRevalidateQueueMethodId = "cn1_com_codename1_ui_Form_flushRevalidateQueue";
 const formDeinitializeImplMethodId = "cn1_com_codename1_ui_Form_deinitializeImpl";
-const formGetActualPaneMethodId = "cn1_com_codename1_ui_Form_getActualPane_R_com_codename1_ui_Container";
-const formSetFocusedMethodId = "cn1_com_codename1_ui_Form_setFocused_com_codename1_ui_Component";
-const formLayoutContainerMethodId = "cn1_com_codename1_ui_Form_layoutContainer";
-const containerFindFirstFocusableMethodId = "cn1_com_codename1_ui_Container_findFirstFocusable_R_com_codename1_ui_Component";
+// Sig-based dispatch ids — match the keys the translator uses in
+// each class's ``m:{}`` map (post-fa4247a4 INVOKEVIRTUAL /
+// INVOKEINTERFACE emission). The class-specific
+// ``cn1_<class>_<method>_<sig>`` form would have to round-trip the
+// runtime's legacy→sig conversion in resolveVirtual, but that
+// conversion only fires when the methodId still STARTS with
+// ``cn1_`` — once the mangle pass renames the literal to ``$X`` the
+// conversion silently no-ops and the dispatch misses the method
+// table key. Using the sig-based literal up front keeps port.js's
+// resolveVirtual-fed identifiers in lockstep with the m: keys both
+// before and after mangling.
+const formGetActualPaneMethodId = "cn1_s_getActualPane_R_com_codename1_ui_Container";
+const formSetFocusedMethodId = "cn1_s_setFocused_com_codename1_ui_Component";
+const formLayoutContainerMethodId = "cn1_s_layoutContainer";
+const containerFindFirstFocusableMethodId = "cn1_s_findFirstFocusable_R_com_codename1_ui_Component";
 const displayGetInstanceMethodId = "cn1_com_codename1_ui_Display_getInstance_R_com_codename1_ui_Display";
-const displayShouldRenderSelectionMethodId = "cn1_com_codename1_ui_Display_shouldRenderSelection_R_boolean";
+const displayShouldRenderSelectionMethodId = "cn1_s_shouldRenderSelection_R_boolean";
 let formInitLafDiagCount = 0;
 function emitFormInitLafDiag(line) {
   if (formInitLafDiagCount >= 80) {
@@ -2421,8 +2432,12 @@ const formAddComponentMethodIds = [
   "cn1_com_codename1_ui_Form_addComponent_int_com_codename1_ui_Component"
 ];
 const formDefaultCtorMethodId = "cn1_com_codename1_ui_Form___INIT__";
-const formSetTitleMethodId = "cn1_com_codename1_ui_Form_setTitle_java_lang_String";
-const containerSetLayoutMethodId = "cn1_com_codename1_ui_Container_setLayout_com_codename1_ui_layouts_Layout";
+// Sig-based dispatch ids (see comment above). These reach
+// jvm.resolveVirtual as the methodId argument, so they MUST match
+// the ``cn1_s_<method>_<sig>`` keys the translator emits in
+// ``m:{}`` for the receiver's class.
+const formSetTitleMethodId = "cn1_s_setTitle_java_lang_String";
+const containerSetLayoutMethodId = "cn1_s_setLayout_com_codename1_ui_layouts_Layout";
 const containerDefaultCtorMethodId = "cn1_com_codename1_ui_Container___INIT__";
 const componentDefaultCtorMethodId = "cn1_com_codename1_ui_Component___INIT__";
 const arrayListDefaultCtorMethodId = "cn1_java_util_ArrayList___INIT__";
@@ -2941,10 +2956,12 @@ const cn1ssRunnerLambda1RunMethodId = "cn1_com_codenameone_examples_hellocodenam
 const cn1ssRunnerLambda2RunMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_2_run";
 const cn1ssRunnerLambda3RunMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_3_run";
 const cn1ssLambdaRunNextTest0MethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_runNextTest_0_java_lang_String_com_codenameone_examples_hellocodenameone_tests_BaseTest_int";
-const baseTestPrepareMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_prepare";
-const baseTestRunTestMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_runTest_R_boolean";
-const baseTestFailMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_fail_java_lang_String";
-const baseTestDoneMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_done";
+// Sig-based dispatch ids (see comment above) — these go to
+// jvm.resolveVirtual.
+const baseTestPrepareMethodId = "cn1_s_prepare";
+const baseTestRunTestMethodId = "cn1_s_runTest_R_boolean";
+const baseTestFailMethodId = "cn1_s_fail_java_lang_String";
+const baseTestDoneMethodId = "cn1_s_done";
 const cn1ssForcedTimeoutTestClasses = Object.freeze({
   "com_codenameone_examples_hellocodenameone_tests_MediaPlaybackScreenshotTest": "mediaPlayback",
   "com_codenameone_examples_hellocodenameone_tests_BytecodeTranslatorRegressionTest": "bytecodeTranslatorRegression",
@@ -4223,7 +4240,7 @@ bindCiFallback("Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshotDom", [
   let completionRunnableRan = false;
   if (completion && completion.__class) {
     try {
-      const runMethod = jvm.resolveVirtual(completion.__class, "cn1_java_lang_Runnable_run");
+      const runMethod = jvm.resolveVirtual(completion.__class, "cn1_s_run");
       yield* cn1_ivAdapt(runMethod(completion));
       completionRunnableRan = true;
     } catch (err) {
@@ -4236,7 +4253,7 @@ bindCiFallback("Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshotDom", [
     : (cn1ssActiveTestObject && cn1ssActiveTestObject.__class ? cn1ssActiveTestObject : null);
   if (effectiveBaseTest && effectiveBaseTest.__class) {
     try {
-      const isDoneMethod = jvm.resolveVirtual(effectiveBaseTest.__class, "cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_isDone_R_boolean");
+      const isDoneMethod = jvm.resolveVirtual(effectiveBaseTest.__class, "cn1_s_isDone_R_boolean");
       const alreadyDone = ((yield* cn1_ivAdapt(isDoneMethod(effectiveBaseTest))) | 0) !== 0;
       if (!alreadyDone) {
         const doneMethod = jvm.resolveVirtual(effectiveBaseTest.__class, baseTestDoneMethodId);
@@ -4300,7 +4317,7 @@ bindCiFallback("Cn1ssDeviceRunnerHelper.completeNullRunnableGuard", [
     emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssComplete:nullOrClasslessRunnable=1");
     return null;
   }
-  const runMethod = jvm.resolveVirtual(completion.__class, "cn1_java_lang_Runnable_run");
+  const runMethod = jvm.resolveVirtual(completion.__class, "cn1_s_run");
   return yield* cn1_ivAdapt(runMethod(completion));
 });
 
@@ -4334,7 +4351,7 @@ bindCiFallback("BaseTest.registerReadyCallbackImmediate", [
   if (!callback || !callback.__class) {
     return null;
   }
-  const runMethod = jvm.resolveVirtual(callback.__class, "cn1_java_lang_Runnable_run");
+  const runMethod = jvm.resolveVirtual(callback.__class, "cn1_s_run");
   return yield* cn1_ivAdapt(runMethod(callback));
 });
 
@@ -4429,7 +4446,7 @@ bindCiFallback("CodenameOneImplementation.initImplSafe", [
     }
   }
   // No original method found – perform safe init inline
-  const initMethodId2 = "cn1_com_codename1_impl_CodenameOneImplementation_init_java_lang_Object";
+  const initMethodId2 = "cn1_s_init_java_lang_Object";
   try {
     const initMethod2 = jvm.resolveVirtual(__cn1ThisObject.__class, initMethodId2);
     if (typeof initMethod2 === "function") {
