@@ -343,6 +343,9 @@ build_developer_guide_for_site() {
   rm -f "${WEBSITE_DIR}/static/developer-guide.html"
   mkdir -p "${html_out}" "${guide_dir}" "${generated_dir}"
 
+  local build_date
+  build_date="$(date +%Y-%m-%d)"
+
   (
     cd "${REPO_ROOT}"
     asciidoctor \
@@ -350,6 +353,7 @@ build_developer_guide_for_site() {
       -a linkcss \
       -a copycss \
       -a rouge-css=style \
+      -a revdate="${build_date}" \
       -D "${html_out}" \
       -o developer-guide-full.html \
       docs/developer-guide/developer-guide.asciidoc
