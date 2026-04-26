@@ -766,12 +766,19 @@ PlaygroundEmbeddedFormDark {
     background: #1c1c1e;
 }
 
+/* Title area sits on top of the embedded Form's surface. Painting an
+   opaque colour here would draw a visible band across the top of the
+   form (the host's previous navy contrasted with the legacy iOS7 form
+   bg by design, but against the modern Form surface it just reads as
+   "two different shades of dark"). Keep the title area transparent so
+   the form's surface paints uniformly underneath - the user's Title
+   text is what styles the title visually. */
 PlaygroundEmbeddedTitleArea {
-    background: #F3F4F7;
+    background-color: transparent;
 }
 
 PlaygroundEmbeddedTitleAreaDark {
-    background: #000000;
+    background-color: transparent;
 }
 
 /* ----- Inspector ----- */
