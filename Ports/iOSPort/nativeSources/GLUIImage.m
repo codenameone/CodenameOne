@@ -167,11 +167,29 @@ extern int nextPowerOf2(int val);
 
 #ifdef CN1_USE_METAL
 -(id<MTLTexture>)getMTLTexture {
+    // Phase 3 v2: a mutable-image render target, if present, is the freshest
+    // pixel source. Screen-side DrawImage samples this; the cached UIImage-
+    // derived mtlTexture is only relevant for never-drawn-into images.
+    if (mtlMutableTexture != nil) return mtlMutableTexture;
     if (mtlTexture != nil) return mtlTexture;
     if (img == nil) return nil;
     mtlTexture = CN1MetalTextureFromUIImage(img);
     return mtlTexture;
 }
+
+-(id<MTLTexture>)mtlMutableTexture { return mtlMutableTexture; }
+-(void)setMtlMutableTexture:(id<MTLTexture>)t width:(int)w height:(int)h {
+    mtlMutableTexture = t;
+    mtlMutableWidth = w;
+    mtlMutableHeight = h;
+    // Stale cached read-only texture: future getMTLTexture should sample
+    // mtlMutableTexture instead of the UIImage-derived one.
+    mtlTexture = nil;
+}
+-(int)mtlMutableWidth { return mtlMutableWidth; }
+-(int)mtlMutableHeight { return mtlMutableHeight; }
+-(id<MTLCommandBuffer>)mtlMutableCommandBuffer { return mtlMutableCommandBuffer; }
+-(void)setMtlMutableCommandBuffer:(id<MTLCommandBuffer>)cb { mtlMutableCommandBuffer = cb; }
 #endif
 
 -(void)dealloc {

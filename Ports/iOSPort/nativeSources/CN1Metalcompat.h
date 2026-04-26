@@ -198,5 +198,57 @@ id<MTLTexture> CN1MetalTextureFromUIImage(UIImage *image);
 // who needs to allocate Metal resources.
 id<MTLDevice> CN1MetalDevice(void);
 
+// Global Metal command queue (from METALView). Mutable-image command
+// buffers allocate from this queue so they share scheduling with screen
+// drawing.
+id<MTLCommandQueue> CN1MetalCommandQueue(void);
+
+// -------- Phase 3 v2: mutable-image rendering --------
+//
+// Mutable images render via the same ExecutableOp queue as the screen.
+// nativeXxxMutableImpl JNI funcs build the same op as their Global
+// counterpart, tag it with target = current GLUIImage, and append to
+// the upcoming queue. drawFrame drains the queue. When it crosses a
+// target boundary it ends the previous encoder, opens a new one against
+// the new target's texture (or restores the screen encoder for nil
+// target), and continues. Mutable command buffers are committed (no
+// wait) at end-of-target and stored on the GLUIImage; readback paths
+// call CN1MetalFlushMutableImageSync to waitUntilCompleted before
+// sampling pixels.
+//
+// The forward-declared GLUIImage is opaque here; the implementation
+// imports GLUIImage.h directly.
+
+@class GLUIImage;
+
+// Allocate (or reuse) a mutable render-target texture sized (w x h) on
+// the given GLUIImage. Clears to transparent black on first allocation
+// to mirror the CG path's UIGraphicsBeginImageContextWithOptions(opaque=NO)
+// initial state. Idempotent if texture already exists with same dims.
+// Must be called on the main thread (allocates Metal resources).
+void CN1MetalEnsureMutableTexture(GLUIImage *image, int width, int height);
+
+// Open a render encoder against the mutable image's texture. Allocates
+// a fresh command buffer, sets viewport, publishes the encoder + a
+// Y-down ortho projection sized to the texture to the active-encoder
+// slot so subsequent ExecutableOp.execute calls draw into this texture.
+// MUST be paired with CN1MetalEndMutableImageDraw on the same thread.
+// Returns YES if the encoder was opened; NO if device/queue/encoder
+// allocation failed (caller should skip ops with this target).
+BOOL CN1MetalBeginMutableImageDraw(GLUIImage *image);
+
+// End the active mutable-image encoder, commit its command buffer, and
+// store the command buffer on the GLUIImage so readback paths can wait
+// on it. Restores any saved screen encoder + projection so the drain
+// loop can continue with screen-targeted ops. No CPU wait here -- the
+// commit is deferred-aware; read paths call FlushMutableImageSync.
+void CN1MetalEndMutableImageDraw(GLUIImage *image);
+
+// Wait until the GPU has finished writing to this mutable image's
+// texture. Called before any pixel-reading path (Image.getRGB, PNG/JPEG
+// encode, toImage, cross-image consumption). No-op if no command buffer
+// is pending. Safe to call on any thread.
+void CN1MetalFlushMutableImageSync(GLUIImage *image);
+
 #endif /* CN1_USE_METAL */
 #endif /* CN1Metalcompat_h */

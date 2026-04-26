@@ -26,6 +26,7 @@
 #import "CN1MetalPipelineCache.h"
 #import "METALView.h"
 #import "CodenameOne_GLViewController.h"
+#import "GLUIImage.h"
 
 // --------------- Static state ---------------
 
@@ -101,6 +102,11 @@ int CN1MetalFramebufferHeight(void) { return currentFramebufferHeight; }
 id<MTLDevice> CN1MetalDevice(void) {
     METALView *mv = (METALView *)[[CodenameOne_GLViewController instance] eaglView];
     return ((CAMetalLayer *)mv.layer).device;
+}
+
+id<MTLCommandQueue> CN1MetalCommandQueue(void) {
+    METALView *mv = (METALView *)[[CodenameOne_GLViewController instance] eaglView];
+    return mv.commandQueue;
 }
 
 // --------------- Matrix state ---------------
@@ -785,6 +791,140 @@ id<MTLTexture> CN1MetalTextureFromUIImage(UIImage *image) {
                bytesPerRow:w * 4];
     free(rawData);
     return texture;
+}
+
+// --------------- Phase 3 v2: mutable-image rendering ---------------
+
+// Saved screen state during a mutable-image drain. drawFrame opens the
+// screen encoder via setFramebuffer (publishing it into activeEncoder).
+// When draining a mutable target we side-trip: save these globals, swap
+// to the mutable encoder, encode the mutable's ops, then restore.
+// Single-threaded: drawFrame is the only drainer; nested mutable side-trips
+// are not supported (and not needed -- ops are flat in a single queue).
+static __unsafe_unretained id<MTLRenderCommandEncoder> savedScreenEncoder = nil;
+static simd_float4x4 savedScreenProjection;
+static int savedScreenFw = 0;
+static int savedScreenFh = 0;
+static BOOL savedScreenStateValid = NO;
+
+// Build a Y-down ortho projection for an offscreen (w x h) framebuffer.
+// Mirrors METALView's CN1MetalOrtho -- if that one ever changes, update
+// this in lockstep.
+static simd_float4x4 mutableProjection(int w, int h) {
+    float invW = 1.0f / (float)w;
+    float invH = 1.0f / (float)h;
+    return (simd_float4x4){{
+        { 2.0f * invW,           0.0f,                  0.0f,    0.0f },
+        { 0.0f,                  -2.0f * invH,          0.0f,    0.0f },
+        { 0.0f,                  0.0f,                  0.5f,    0.0f },
+        { -1.0f,                 1.0f,                  0.5f,    1.0f }
+    }};
+}
+
+void CN1MetalEnsureMutableTexture(GLUIImage *image, int width, int height) {
+    if (image == nil || width <= 0 || height <= 0) return;
+    id<MTLTexture> existing = [image mtlMutableTexture];
+    if (existing != nil &&
+        [image mtlMutableWidth] == width &&
+        [image mtlMutableHeight] == height) {
+        return;
+    }
+    id<MTLDevice> device = CN1MetalDevice();
+    if (device == nil) return;
+    MTLTextureDescriptor *desc = [MTLTextureDescriptor
+        texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm
+        width:(NSUInteger)width height:(NSUInteger)height mipmapped:NO];
+    desc.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
+    desc.storageMode = MTLStorageModePrivate;
+    id<MTLTexture> tex = [device newTextureWithDescriptor:desc];
+    if (tex == nil) return;
+    // Clear new texture to transparent black -- mirrors CG's
+    // UIGraphicsBeginImageContextWithOptions(opaque=NO) initial state.
+    id<MTLCommandQueue> queue = CN1MetalCommandQueue();
+    if (queue != nil) {
+        id<MTLCommandBuffer> clearCb = [queue commandBuffer];
+        MTLRenderPassDescriptor *clearPass = [MTLRenderPassDescriptor renderPassDescriptor];
+        clearPass.colorAttachments[0].texture = tex;
+        clearPass.colorAttachments[0].loadAction = MTLLoadActionClear;
+        clearPass.colorAttachments[0].storeAction = MTLStoreActionStore;
+        clearPass.colorAttachments[0].clearColor = MTLClearColorMake(0.0, 0.0, 0.0, 0.0);
+        [[clearCb renderCommandEncoderWithDescriptor:clearPass] endEncoding];
+        [clearCb commit];
+    }
+    [image setMtlMutableTexture:tex width:width height:height];
+}
+
+BOOL CN1MetalBeginMutableImageDraw(GLUIImage *image) {
+    if (image == nil) return NO;
+    id<MTLTexture> tex = [image mtlMutableTexture];
+    if (tex == nil) return NO;
+    int w = [image mtlMutableWidth];
+    int h = [image mtlMutableHeight];
+    id<MTLCommandQueue> queue = CN1MetalCommandQueue();
+    if (queue == nil) return NO;
+    id<MTLCommandBuffer> cb = [queue commandBuffer];
+    if (cb == nil) return NO;
+    MTLRenderPassDescriptor *desc = [MTLRenderPassDescriptor renderPassDescriptor];
+    desc.colorAttachments[0].texture = tex;
+    // Load existing pixels so successive frames accumulate -- the GL/CG path
+    // semantically holds an "image buffer" that persists between draws into
+    // the same Image.getGraphics().
+    desc.colorAttachments[0].loadAction = MTLLoadActionLoad;
+    desc.colorAttachments[0].storeAction = MTLStoreActionStore;
+    id<MTLRenderCommandEncoder> enc = [cb renderCommandEncoderWithDescriptor:desc];
+    if (enc == nil) return NO;
+    [enc setViewport:(MTLViewport){0.0, 0.0, (double)w, (double)h, 0.0, 1.0}];
+
+    // Save current screen state (drawFrame opened the screen encoder via
+    // setFramebuffer before starting drain) and swap in the mutable's.
+    savedScreenEncoder = activeEncoder;
+    savedScreenProjection = currentProjection;
+    savedScreenFw = currentFramebufferWidth;
+    savedScreenFh = currentFramebufferHeight;
+    savedScreenStateValid = YES;
+
+    activeEncoder = enc;
+    currentProjection = mutableProjection(w, h);
+    currentFramebufferWidth = w;
+    currentFramebufferHeight = h;
+
+    // Stash the cb on the image so End can commit + readback can wait.
+    [image setMtlMutableCommandBuffer:cb];
+    return YES;
+}
+
+void CN1MetalEndMutableImageDraw(GLUIImage *image) {
+    if (image == nil) return;
+    if (activeEncoder != nil) {
+        [activeEncoder endEncoding];
+    }
+    id<MTLCommandBuffer> cb = [image mtlMutableCommandBuffer];
+    if (cb != nil) {
+        [cb commit];
+        // Keep the cb on the image so readback paths can waitUntilCompleted.
+        // It will be released when a subsequent Begin overwrites it (the
+        // Metal driver releases the buffer once GPU work is done).
+    }
+
+    // Restore screen state so subsequent screen-target ops on the drain
+    // queue continue to use the screen encoder.
+    if (savedScreenStateValid) {
+        activeEncoder = savedScreenEncoder;
+        currentProjection = savedScreenProjection;
+        currentFramebufferWidth = savedScreenFw;
+        currentFramebufferHeight = savedScreenFh;
+        savedScreenEncoder = nil;
+        savedScreenStateValid = NO;
+    }
+}
+
+void CN1MetalFlushMutableImageSync(GLUIImage *image) {
+    if (image == nil) return;
+    id<MTLCommandBuffer> cb = [image mtlMutableCommandBuffer];
+    if (cb == nil) return;
+    [cb waitUntilCompleted];
+    // Don't nil the cb -- multiple readbacks of the same already-completed
+    // buffer should be no-op-fast (waitUntilCompleted is idempotent).
 }
 
 #endif /* CN1_USE_METAL */

@@ -41,6 +41,21 @@
     int textureHeight;
 #ifdef CN1_USE_METAL
     id<MTLTexture> mtlTexture;
+    // Phase 3 v2: mutable-image render target. Allocated lazily by
+    // CN1MetalEnsureMutableTexture sized to the mutable image's logical
+    // dimensions. drawFrame opens an MTLRenderCommandEncoder against this
+    // texture for any queued op whose target == this GLUIImage. Pixels
+    // accumulate across frames via MTLLoadActionLoad. The screen-side
+    // drawImage pipeline samples this texture (getMTLTexture returns it
+    // when present, else falls back to building from the UIImage).
+    id<MTLTexture> mtlMutableTexture;
+    int mtlMutableWidth;
+    int mtlMutableHeight;
+    // The most-recently-committed command buffer that wrote to
+    // mtlMutableTexture. Readback paths (Image.getRGB, PNG/JPEG encode,
+    // toImage, cross-image consumption) call waitUntilCompleted on this
+    // before sampling the texture. nil = no pending GPU work, safe to read.
+    id<MTLCommandBuffer> mtlMutableCommandBuffer;
 #endif
 }
 -(id)initWithImage:(UIImage*)i;
@@ -53,7 +68,20 @@
 #ifdef CN1_USE_METAL
 // Lazily build (and cache on the GLUIImage instance) an MTLTexture for
 // this image. Invalidated automatically by setImage:. nil if the device
-// is unavailable or the image is empty.
+// is unavailable or the image is empty. If a mutable texture exists
+// (Phase 3 mutable-image render target), that is returned instead -- it
+// is the freshest pixel source.
 -(id<MTLTexture>)getMTLTexture;
+
+// Phase 3 v2 mutable-image accessors. CN1Metalcompat owns the lifecycle;
+// these are the storage hooks. Accessors only -- consumers outside this
+// file route through the CN1Metal*MutableImage API rather than poking
+// these directly.
+-(id<MTLTexture>)mtlMutableTexture;
+-(void)setMtlMutableTexture:(id<MTLTexture>)t width:(int)w height:(int)h;
+-(int)mtlMutableWidth;
+-(int)mtlMutableHeight;
+-(id<MTLCommandBuffer>)mtlMutableCommandBuffer;
+-(void)setMtlMutableCommandBuffer:(id<MTLCommandBuffer>)cb;
 #endif
 @end
