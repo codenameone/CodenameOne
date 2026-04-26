@@ -205,6 +205,18 @@ _CLASSDEF_NAME_PATTERN = re.compile(
 _CLASSDEF_ASSIGNABLE_TAIL_PATTERN = re.compile(
     r'(?:a|assignableTo):\s*\{([^}]*)\}'
 )
+# Capture the ``i:[...]`` (interfaces) and ``b:"..."`` (baseClass)
+# fields of a classdef so we can walk the JSObject ancestry without
+# relying on the explicit ``a:{}`` block. The JS translator emits
+# these as plain JSON-shape literals, so a non-greedy match against
+# the next closing bracket / quote is safe.
+_CLASSDEF_INTERFACES_PATTERN = re.compile(
+    r'(?:i|interfaces):\s*\[([^\]]*)\]'
+)
+_CLASSDEF_BASECLASS_PATTERN = re.compile(
+    r'(?:b|baseClass):\s*"([A-Za-z0-9_]+)"'
+)
+_INTERFACE_NAME_PATTERN = re.compile(r'"([A-Za-z0-9_]+)"')
 _JSO_BRIDGE_MARKER = "com_codename1_html5_js_JSObject"
 # Class-name prefixes that the runtime's ``jsoRegistry.classPrefixes``
 # already treats as JSO bridge classes (see ``port.js`` —
@@ -240,10 +252,10 @@ _JSO_BRIDGE_CLASS_PREFIXES = (
 
 
 def _collect_jso_bridge_class_names(files: list[Path]) -> set[str]:
-    """Find every class whose ``assignableTo`` set contains the JSO bridge
-    marker, plus every class whose name matches one of the runtime's
-    JSO bridge prefixes. These classes go through ``jvm.invokeJsoBridge``
-    at runtime, which uses ``parseJsoBridgeMethod(className, methodId)``
+    """Find every class whose ancestry contains the JSO bridge marker,
+    plus every class whose name matches one of the runtime's JSO bridge
+    prefixes. These classes go through ``jvm.invokeJsoBridge`` at
+    runtime, which uses ``parseJsoBridgeMethod(className, methodId)``
     — an explicit string split of ``methodId`` against ``"cn1_" +
     className + "_"`` — to recover the DOM member name the call is
     targeting (getter / setter / method). That split ONLY works when
@@ -251,23 +263,75 @@ def _collect_jso_bridge_class_names(files: list[Path]) -> set[str]:
     because the host receiver has real JS properties named
     ``createElement`` / ``appendChild`` / etc. Returning the class
     names here lets the caller exclude every ``cn1_<jsoClass>_*``
-    identifier from the mangle pass.
+    identifier from the mangle pass — and (critically) the class name
+    itself, so the wrapped ``__class`` the runtime sets on JSO bridge
+    return values matches the registered classdef key.
     """
-    jso_classes: set[str] = set()
+    # First pass: index every classdef by name and collect direct
+    # interfaces / base class. ``a:{}`` is no longer emitted for most
+    # classes (``defineClass`` auto-populates ``assignableTo`` from
+    # ``baseClass + interfaces``) so the explicit marker walk silently
+    # misses every JSO bridge class. We rebuild the same walk from
+    # ``i:[...]`` + ``b:"..."`` instead, which the translator still
+    # emits per class.
+    parents: dict[str, set[str]] = {}
     for path in files:
         data = path.read_text(encoding="utf-8")
-        for match in _CLASSDEF_NAME_PATTERN.finditer(data):
+        matches = list(_CLASSDEF_NAME_PATTERN.finditer(data))
+        for idx, match in enumerate(matches):
             class_name = match.group(1)
-            if class_name.startswith(_JSO_BRIDGE_CLASS_PREFIXES):
-                jso_classes.add(class_name)
-                continue
-            # ``a:{}`` is no longer emitted for most classes (defineClass
-            # auto-populates assignableTo from baseClass + interfaces),
-            # but when it IS present the explicit marker still wins.
-            window = data[match.end(): match.end() + 4096]
+            # Limit the window to the current ``_Z({...})`` block: the
+            # next class def starts the next ``_Z({`` token, so use that
+            # as the upper bound. esbuild's whitespace-strip emits the
+            # whole bundle on one line, so without this bound the 4096
+            # char window slurps in interface lists from neighbouring
+            # classdefs and falsely tags the current class as a JSO
+            # bridge type (which preserves its identifier from
+            # mangling, breaking dispatch when the same identifier is
+            # used elsewhere as a property name).
+            window_end = matches[idx + 1].start() if idx + 1 < len(matches) else len(data)
+            window_end = min(window_end, match.end() + 4096)
+            window = data[match.end(): window_end]
+            ancestry: set[str] = set()
+            interfaces_match = _CLASSDEF_INTERFACES_PATTERN.search(window)
+            if interfaces_match:
+                for iface_match in _INTERFACE_NAME_PATTERN.finditer(interfaces_match.group(1)):
+                    ancestry.add(iface_match.group(1))
+            base_match = _CLASSDEF_BASECLASS_PATTERN.search(window)
+            if base_match:
+                ancestry.add(base_match.group(1))
+            # Older bundles still ship ``a:{...}``; honour it as an
+            # additional source of ancestry hints.
             tail = _CLASSDEF_ASSIGNABLE_TAIL_PATTERN.search(window)
-            if tail and _JSO_BRIDGE_MARKER in tail.group(1):
+            if tail:
+                for assignable_match in _INTERFACE_NAME_PATTERN.finditer(tail.group(1)):
+                    ancestry.add(assignable_match.group(1))
+            parents.setdefault(class_name, set()).update(ancestry)
+
+    jso_classes: set[str] = set()
+    for class_name in parents:
+        if class_name.startswith(_JSO_BRIDGE_CLASS_PREFIXES):
+            jso_classes.add(class_name)
+
+    # BFS from JSObject down the ``parents`` graph: any class whose
+    # ancestry transitively contains JSObject (via either ``i:`` or
+    # ``b:``) is a JSO bridge type and must round-trip its name +
+    # member identifiers unmangled. Without this, classes like
+    # ``com_codename1_teavm_ext_localforage_LocalForage_LocalForageImpl``
+    # (which extend JSObject but don't sit under one of the prefix-
+    # based namespaces) get mangled to ``$doA``, the JSO bridge wraps
+    # the host result with ``__class = unmangled``, ``resolveVirtual``
+    # then can't find the registered (mangled) classdef and the
+    # runtime throws ``missing_receiver`` on the next dispatch.
+    changed = True
+    while changed:
+        changed = False
+        for class_name, ancestors in parents.items():
+            if class_name in jso_classes:
+                continue
+            if _JSO_BRIDGE_MARKER in ancestors or any(a in jso_classes for a in ancestors):
                 jso_classes.add(class_name)
+                changed = True
     return jso_classes
 
 

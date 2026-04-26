@@ -562,9 +562,6 @@ final class JavascriptReachability {
                 return;
             }
             for (BytecodeMethod m : cls.getMethods()) {
-                if (m.isEliminated()) {
-                    continue;
-                }
                 if (!normalizedName.equals(m.getMethodName()) || !desc.equals(m.getSignature())) {
                     continue;
                 }
@@ -577,6 +574,24 @@ final class JavascriptReachability {
                         return;
                     }
                     break;
+                }
+                // Resurrect methods the legacy ``MethodDependencyGraph``
+                // culler over-eliminated. RTA has strictly more
+                // information than the conservative graph because it
+                // honours the ``instantiated`` set + the JSO bridge
+                // interface seeds — anonymous SAM impls (e.g.
+                // ``LocalForage$1.callback`` for an
+                // ``impl.setItem(key, val, new SetItemCallback() {})``
+                // call) get culled by the legacy pass because nothing
+                // in bytecode invokes ``callback`` directly, but the
+                // host bridge invokes them at runtime via the seeded
+                // pending dispatch on ``SetItemCallback``. Without
+                // un-eliminating, ``LocalForage$1.callback`` stays
+                // dropped, ``done.notifyAll()`` never fires, and the
+                // calling Java thread waits on ``done.wait()``
+                // forever.
+                if (m.isEliminated()) {
+                    m.setEliminated(false);
                 }
                 enqueue(m);
                 return;

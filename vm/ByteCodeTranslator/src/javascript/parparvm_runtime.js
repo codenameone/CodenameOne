@@ -1559,7 +1559,22 @@ const jvm = {
     }
     return true;
   },
-  toHostTransferArg(value) {
+  toHostTransferArg(value, _depth, _seen) {
+    if (_depth == null) _depth = 0;
+    if (_seen == null) _seen = new Set();
+    // Cycle break: if we've already serialised this exact object,
+    // return null to avoid infinite recursion. This shows up most
+    // visibly when a Java SAM wrapper without a recognised dispatch
+    // id falls through to the object iteration path — the wrapper's
+    // ``__classDef`` graph is shared and self-referential. Returning
+    // null preserves the call shape so the host doesn't blow up but
+    // signals "no callable callback" upstream.
+    if (value && typeof value === "object" && _seen.has(value)) {
+      return null;
+    }
+    if (value && typeof value === "object") {
+      _seen.add(value);
+    }
     if (value == null) {
       return value;
     }
@@ -1589,7 +1604,7 @@ const jvm = {
     if (Array.isArray(value)) {
       const out = new Array(value.length);
       for (let i = 0; i < value.length; i++) {
-        out[i] = this.toHostTransferArg(value[i]);
+        out[i] = this.toHostTransferArg(value[i], _depth + 1, _seen);
       }
       return out;
     }
@@ -1599,16 +1614,126 @@ const jvm = {
         : { __cn1HostRef: value.__cn1HostRef };
     }
     if (value.__jsValue !== undefined) {
-      return this.toHostTransferArg(value.__jsValue);
+      return this.toHostTransferArg(value.__jsValue, _depth + 1, _seen);
+    }
+    // CN1 wrapper for a Java object (has ``__classDef`` but neither
+    // ``__cn1HostRef`` nor ``__jsValue``). The most common case is a
+    // Java callback (``EventListener``, ``SetItemCallback``, etc.)
+    // being passed as an argument to a host bridge call. We can't
+    // serialise the wrapper itself — the ``classDef`` graph is
+    // shared, mutable, and cyclic — so mint a worker callback that
+    // dispatches the wrapper's single abstract method (if it has one)
+    // when the host invokes it. This is the same SAM-functor escape
+    // hatch ``port.js`` uses for ``EventListener.handleEvent`` /
+    // ``AnimationFrameCallback.onAnimationFrame``, just generalised.
+    if (value.__classDef && value.__class) {
+      const samMethodId = this.findSamDispatchId(value.__classDef);
+      if (samMethodId) {
+        if (value.__cn1WorkerCallbackId == null) {
+          const self = this;
+          const className = value.__class;
+          const wrapper = function() {
+            const args = Array.prototype.slice.call(arguments);
+            try {
+              const method = self.resolveVirtual(className, samMethodId);
+              self.spawn(null, method.apply(null, [value].concat(args)));
+            } catch (err) {
+              if (typeof console !== "undefined" && typeof console.error === "function") {
+                try { console.error("PARPAR:sam-callback-error:" + (err && err.message ? err.message : String(err))); }
+                catch (_e) {}
+              }
+            }
+          };
+          wrapper.__cn1WorkerCallbackId = this.nextWorkerCallbackId++;
+          value.__cn1WorkerCallbackId = wrapper.__cn1WorkerCallbackId;
+          this.workerCallbacks[wrapper.__cn1WorkerCallbackId] = wrapper;
+        }
+        return { __cn1WorkerCallback: value.__cn1WorkerCallbackId };
+      }
     }
     if (type === "object") {
       const out = {};
       const keys = Object.keys(value);
       for (let i = 0; i < keys.length; i++) {
         const key = keys[i];
-        out[key] = this.toHostTransferArg(value[key]);
+        // Skip CN1-internal wrapper bookkeeping. ``__classDef`` /
+        // ``__monitor`` are shared mutable graphs that don't survive
+        // structured-clone postMessage; iterating them creates the
+        // cycle we just guarded against. The host never reads any of
+        // these — the bridge only cares about user data.
+        if (key === "__class" || key === "__classDef" || key === "__id"
+                || key === "__monitor" || key === "__jsValue"
+                || key === "__cn1WorkerCallbackId") {
+          continue;
+        }
+        out[key] = this.toHostTransferArg(value[key], _depth + 1, _seen);
       }
       return out;
+    }
+    return null;
+  },
+  /**
+   * Find the dispatch id of the single abstract method on a JSO bridge
+   * interface in {@code classDef}'s ancestry. SAM JSO functors (e.g.
+   * ``EventListener.handleEvent``, ``SetItemCallback.callback``) have
+   * exactly one method on the interface itself; once the impl class
+   * survives RTA un-elimination its ``m:`` map carries the dispatch id,
+   * so we can recover the SAM by inspecting the IMPL'S methods,
+   * filtered to those declared on a JSO bridge interface in the
+   * ancestry. The interface defs themselves don't carry the abstract
+   * method ids (no method bodies → no ``m:`` entries on the interface
+   * classdef), but the JSO bridge dispatch ids manifest does — and the
+   * impl method picks up the same ``cn1_s_<method>_<sig>`` key.
+   */
+  findSamDispatchId(classDef) {
+    if (!classDef) return null;
+    // Walk ancestry collecting interface names. If the ancestry has
+    // exactly ONE non-marker JSO bridge interface, the impl is a SAM
+    // wrapper and we can use its single method.
+    const interfaceNames = Object.create(null);
+    const visited = Object.create(null);
+    const stack = [classDef];
+    let hasJsoBridge = false;
+    while (stack.length) {
+      const def = stack.pop();
+      if (!def || visited[def.name]) continue;
+      visited[def.name] = true;
+      if (def.isInterface
+          && def.name !== "com_codename1_html5_js_JSObject"
+          && def.name !== classDef.name) {
+        interfaceNames[def.name] = true;
+      }
+      if (def.name === "com_codename1_html5_js_JSObject") {
+        hasJsoBridge = true;
+      }
+      if (def.interfaces) {
+        for (let i = 0; i < def.interfaces.length; i++) {
+          const ifaceDef = this.classes[def.interfaces[i]];
+          if (ifaceDef) stack.push(ifaceDef);
+        }
+      }
+      if (def.baseClass) {
+        const baseDef = this.classes[def.baseClass];
+        if (baseDef) stack.push(baseDef);
+      }
+    }
+    if (!hasJsoBridge) return null;
+    // Inspect the impl class's m: — these are the methods that survived
+    // RTA. A SAM impl typically has __INIT__ + the single SAM method.
+    // Filter out ctors / clinit and pick the remaining single entry.
+    if (classDef.pendingMethods) this.flushPendingMethods(classDef);
+    if (!classDef.methods) return null;
+    const candidateIds = [];
+    const allMethodIds = Object.keys(classDef.methods);
+    for (let i = 0; i < allMethodIds.length; i++) {
+      const id = allMethodIds[i];
+      if (id.indexOf("__INIT__") >= 0 || id.indexOf("__CLINIT__") >= 0) {
+        continue;
+      }
+      candidateIds.push(id);
+    }
+    if (candidateIds.length === 1) {
+      return candidateIds[0];
     }
     return null;
   },
