@@ -905,6 +905,8 @@ static simd_float4x4 mutableProjection(int w, int h) {
 
 BOOL CN1MetalBeginMutableImageDraw(int width, int height, void *peer) {
     if (peer == NULL || width <= 0 || height <= 0) return NO;
+    NSLog(@"CN1SS:METAL_DIAG Begin enter thread=%p peer=%p w=%d h=%d _mutableActiveGl=%p",
+          (void*)pthread_self(), peer, width, height, (__bridge void*)_mutableActiveGl);
     if (_mutableActiveGl != nil) {
         NSLog(@"CN1Metal: nested CN1MetalBeginMutableImageDraw -- forcing finish on previous peer");
         CN1MetalFinishMutableImageDraw((__bridge void *)_mutableActiveGl);
@@ -969,12 +971,16 @@ BOOL CN1MetalBeginMutableImageDraw(int width, int height, void *peer) {
     _mutableActiveGl = gl;
     _mutableActiveWidth = width;
     _mutableActiveHeight = height;
+    NSLog(@"CN1SS:METAL_DIAG Begin OK thread=%p peer=%p enc=%p tex=%p",
+          (void*)pthread_self(), (__bridge void*)gl, (__bridge void*)enc, (__bridge void*)tex);
     return YES;
 }
 
 void CN1MetalFinishMutableImageDraw(void *peer) {
     if (peer == NULL) return;
     GLUIImage *gl = (__bridge GLUIImage *)peer;
+    NSLog(@"CN1SS:METAL_DIAG Finish thread=%p peer=%p _mutableActiveGl=%p match=%d",
+          (void*)pthread_self(), peer, (__bridge void*)_mutableActiveGl, gl == _mutableActiveGl);
     if (gl != _mutableActiveGl) return;
     id<MTLRenderCommandEncoder> enc = [gl mtlMutableEncoder];
     if (enc != nil) {
@@ -994,9 +1000,16 @@ void CN1MetalFinishMutableImageDraw(void *peer) {
     _mutableActiveHeight = 0;
 }
 
+static int diagEnterCount = 0;
 CN1MetalMutableScope CN1MetalEnterMutableScope(void) {
     CN1MetalMutableScope s = {0};
     GLUIImage *gl = _mutableActiveGl;
+    int n = diagEnterCount++;
+    if ((n % 200) == 0) {
+        NSLog(@"CN1SS:METAL_DIAG Enter #%d thread=%p _mutableActiveGl=%p enc=%p",
+              n, (void*)pthread_self(), (__bridge void*)gl,
+              (__bridge void*)(gl ? [gl mtlMutableEncoder] : nil));
+    }
     if (gl == nil) return s;
     id<MTLRenderCommandEncoder> mEnc = [gl mtlMutableEncoder];
     if (mEnc == nil) return s;
