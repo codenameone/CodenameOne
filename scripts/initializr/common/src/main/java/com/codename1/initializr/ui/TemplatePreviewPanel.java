@@ -35,6 +35,11 @@ public class TemplatePreviewPanel {
     private ProjectOptions options = ProjectOptions.defaults();
     private Form lastLiveForm;
     private Button lastLiveHelloButton;
+    /// Cached iOS Modern theme used to overlay the preview Form so it
+    /// matches what a generated project renders. Loaded lazily on first
+    /// use; left null if the resource isn't on the classpath (the preview
+    /// then falls back to the host's CSS theme alone).
+    private Resources modernPreviewTheme;
 
     public TemplatePreviewPanel(Template template) {
         this.template = template;
@@ -80,6 +85,14 @@ public class TemplatePreviewPanel {
 
     private Form createBarebonesPreviewForm(ProjectOptions options) {
         restoreThemeDefaults();
+        // Layer the iOS Modern native theme on top of the host's CSS theme
+        // so the preview matches what a generated project will render. The
+        // overlay is added AFTER the initializr's host UI was already
+        // styled at startup, so existing host components keep their
+        // initializr-branded styling - only the preview Form (built fresh
+        // below) and `form.refreshTheme()` inside applyCustomCssToPreview
+        // resolve against the merged host+modern themeProps.
+        applyModernThemeOverlay();
         installBundle(options);
         Form form = new Form("Hi World", BoxLayout.y());
         Button helloButton = new Button("Hello World");
@@ -210,6 +223,28 @@ public class TemplatePreviewPanel {
             return;
         }
         UIManager.getInstance().setThemeProps(resources.getTheme(names[0]));
+    }
+
+    private void applyModernThemeOverlay() {
+        if (modernPreviewTheme == null) {
+            try {
+                modernPreviewTheme = Resources.openLayered("/iOSModernTheme");
+            } catch (java.io.IOException ex) {
+                Log.p("iOS Modern theme unavailable for initializr preview: " + ex);
+                return;
+            }
+        }
+        if (modernPreviewTheme == null) {
+            return;
+        }
+        String[] names = modernPreviewTheme.getThemeResourceNames();
+        if (names == null || names.length == 0) {
+            return;
+        }
+        Hashtable props = modernPreviewTheme.getTheme(names[0]);
+        if (props != null && !props.isEmpty()) {
+            UIManager.getInstance().addThemeProps(props);
+        }
     }
 
     private void updateMode() {
