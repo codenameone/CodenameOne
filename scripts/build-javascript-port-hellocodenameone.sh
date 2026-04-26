@@ -299,7 +299,14 @@ if [ "${SKIP_JS_MINIFICATION:-0}" != "1" ]; then
         browser_bridge.js|port.js|worker.js|sw.js) continue ;;
         *_native_handlers.js) continue ;;
       esac
-      if npx --yes esbuild --minify --log-level=error --allow-overwrite \
+      # esbuild's ``--minify`` flag bundles ``--minify-identifiers`` —
+      # which renames top-level bindings on a per-file basis. Worker-side
+      # files share global scope via ``importScripts``, so renaming a
+      # top-level function in (say) ``parparvm_runtime.js`` orphans
+      # every cross-file reference. Stick to ``--minify-syntax``
+      # + ``--minify-whitespace`` — those collapse the bytes
+      # without touching identifier names.
+      if npx --yes esbuild --minify-syntax --minify-whitespace --log-level=error --allow-overwrite \
           --target=es2020 "$js" --outfile="$js" >/dev/null 2>&1; then
         minified_count=$((minified_count + 1))
       else

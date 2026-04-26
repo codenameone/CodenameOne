@@ -13,7 +13,9 @@ package com.codename1.tools.translator;
 import com.codename1.tools.translator.bytecodes.Field;
 import com.codename1.tools.translator.bytecodes.Instruction;
 import com.codename1.tools.translator.bytecodes.Invoke;
+import com.codename1.tools.translator.bytecodes.Ldc;
 import com.codename1.tools.translator.bytecodes.TypeInstruction;
+import org.objectweb.asm.Type;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -184,6 +186,94 @@ final class JavascriptReachability {
         // reachable via the INVOKEINTERFACE inside Thread.run()'s body.
         seedRuntimeDispatched("java_lang_Thread", "run", "()V");
         seedRuntimeDispatched("java_lang_Runnable", "run", "()V");
+        // JSO bridge methods are reachable via hand-written port.js
+        // dispatch sites that the bytecode-only RTA can't see (e.g.
+        // ``__nativeEventListener`` in port.js calls
+        // ``EventListener.handleEvent`` from JS when the DOM fires
+        // an event). For every interface in the JSObject family,
+        // seed all of its declared methods as runtime-dispatched so
+        // the impl methods on instantiated implementing Java classes
+        // stay live. Without this, ``handleEvent`` /
+        // ``onAnimationFrame`` on user EventListener / callback
+        // anonymous classes get culled, the m: lookup misses, and
+        // ``resolveVirtual`` falls back to the JSO bridge — which
+        // throws "Missing JS member handleEvent" because the
+        // receiver is a Java object, not a JS handler.
+        seedJsoBridgeInterfaceMethods(classes);
+    }
+
+    /**
+     * For every JSObject-derived interface, treat every declared
+     * (non-static) method as a runtime-dispatched virtual call. The
+     * receiver is the interface itself; ``markClassInstantiated`` on
+     * any implementing class re-resolves these pending calls and
+     * enqueues the concrete override.
+     */
+    private void seedJsoBridgeInterfaceMethods(List<ByteCodeClass> classes) {
+        for (ByteCodeClass cls : classes) {
+            if (!isJsoBridgeType(cls)) {
+                continue;
+            }
+            String owner = cls.getClsName();
+            for (BytecodeMethod m : cls.getMethods()) {
+                if (m.isStatic()) {
+                    continue;
+                }
+                String name = m.getMethodName();
+                String desc = m.getSignature();
+                if (name == null || desc == null) {
+                    continue;
+                }
+                // ``<init>`` / ``<clinit>`` would be normalised to
+                // ``__INIT__`` / ``__CLINIT__`` here; static-init isn't a
+                // virtual dispatch target and ctors aren't called via
+                // the JSO bridge, so skip them.
+                if ("__INIT__".equals(name) || "__CLINIT__".equals(name)) {
+                    continue;
+                }
+                VirtualCall call = new VirtualCall(owner, name, desc, true);
+                recordPending(call);
+                dispatchVirtualFromInstantiated(call);
+            }
+        }
+    }
+
+    /**
+     * True if {@code cls} extends or implements
+     * ``com_codename1_html5_js_JSObject`` transitively (or is JSObject
+     * itself). Mirrors ``JavascriptBundleWriter.isJsoBridgeClass`` /
+     * ``JavascriptSuspensionAnalysis.isJsoBridgeClass``.
+     */
+    private boolean isJsoBridgeType(ByteCodeClass cls) {
+        Set<String> seen = new HashSet<String>();
+        Deque<ByteCodeClass> stack = new ArrayDeque<ByteCodeClass>();
+        stack.push(cls);
+        while (!stack.isEmpty()) {
+            ByteCodeClass current = stack.pop();
+            if (current == null || !seen.add(current.getClsName())) {
+                continue;
+            }
+            if ("com_codename1_html5_js_JSObject".equals(current.getClsName())) {
+                return true;
+            }
+            String base = current.getBaseClass();
+            if (base != null) {
+                ByteCodeClass baseObj = byName.get(JavascriptNameUtil.sanitizeClassName(base));
+                if (baseObj != null) {
+                    stack.push(baseObj);
+                }
+            }
+            List<String> ifaces = current.getBaseInterfaces();
+            if (ifaces != null) {
+                for (String iface : ifaces) {
+                    ByteCodeClass ifaceObj = byName.get(JavascriptNameUtil.sanitizeClassName(iface));
+                    if (ifaceObj != null) {
+                        stack.push(ifaceObj);
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     /**
@@ -307,7 +397,8 @@ final class JavascriptReachability {
         if (instructions == null) {
             return;
         }
-        for (Instruction instr : instructions) {
+        for (int i = 0; i < instructions.size(); i++) {
+            Instruction instr = instructions.get(i);
             if (instr instanceof TypeInstruction) {
                 int op = instr.getOpcode();
                 if (op == Opcodes.NEW) {
@@ -328,7 +419,48 @@ final class JavascriptReachability {
                     markClassInstantiated(JavascriptNameUtil.sanitizeClassName(f.getOwner()));
                 }
             } else if (instr instanceof Invoke) {
-                handleInvoke((Invoke) instr);
+                Invoke inv = (Invoke) instr;
+                handleInvoke(inv);
+                // ``NativeLookup.register(stub.class, impl.class)``
+                // instantiates the impl class via reflection inside
+                // ``NativeLookup.create()`` — which RTA can't see. The
+                // impl class only appears in the bytecode as an LDC
+                // operand to register, so its methods get culled and
+                // the runtime throws "Missing virtual method" the first
+                // time framework code dispatches into the native
+                // interface. Treat the LDC class operand to register as
+                // an instantiation marker, mirroring what would happen
+                // if the launcher had a literal ``new ImplClass()``.
+                if (inv.getOpcode() == Opcodes.INVOKESTATIC
+                        && "com/codename1/system/NativeLookup".equals(inv.getOwner())
+                        && "register".equals(inv.getName())) {
+                    markRecentLdcClasses(instructions, i);
+                }
+            }
+        }
+    }
+
+    /**
+     * Walk backwards from {@code invokeIndex} collecting the two most
+     * recent ``LDC class`` operands (the two arguments of
+     * ``NativeLookup.register(Class, Class)V``) and mark each as
+     * instantiated. Stops walking past control-flow boundaries — a
+     * label or jump means the LDC is not in the same straight-line
+     * region as the invoke.
+     */
+    private void markRecentLdcClasses(List<Instruction> instructions, int invokeIndex) {
+        int needed = 2;
+        for (int j = invokeIndex - 1; j >= 0 && needed > 0; j--) {
+            Instruction prev = instructions.get(j);
+            if (prev instanceof Ldc) {
+                Object cst = ((Ldc) prev).getValue();
+                if (cst instanceof Type) {
+                    Type t = (Type) cst;
+                    if (t.getSort() == Type.OBJECT) {
+                        markClassInstantiated(JavascriptNameUtil.sanitizeClassName(t.getInternalName()));
+                        needed--;
+                    }
+                }
             }
         }
     }

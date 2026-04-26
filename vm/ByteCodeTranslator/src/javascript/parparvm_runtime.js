@@ -1517,10 +1517,18 @@ const jvm = {
       vmDiag("FIRST_FAILURE", "methodId", this.firstFailure.methodId || "none");
       vmDiag("FIRST_FAILURE", "receiverClass", this.firstFailure.receiverClass || "none");
     }
+    let stack = error && error.stack ? error.stack : null;
+    if (!stack && error && typeof error === "object") {
+      const javaStack = error[CN1_THROWABLE_STACK];
+      if (javaStack) {
+        try { stack = jvm.toNativeString(javaStack); }
+        catch (_es) { stack = String(javaStack); }
+      }
+    }
     emitVmMessage({
       type: this.protocol.messages.ERROR,
       message: message,
-      stack: error && error.stack ? error.stack : null,
+      stack: stack,
       virtualFailure: virtualFailure || null
     });
   },
@@ -3004,7 +3012,13 @@ bindNative(["cn1_java_lang_System_isHighFrequencyGC_R_boolean", "cn1_java_lang_S
 bindNative(["cn1_java_lang_System_exit_int", "cn1_java_lang_System_exit___int"], function*(status) { jvm.finish(status); return null; });
 bindNative(["cn1_java_lang_Runtime_totalMemoryImpl_R_long"], function*() { return 67108864; });
 bindNative(["cn1_java_lang_Runtime_freeMemoryImpl_R_long"], function*() { return 33554432; });
-bindNative(["cn1_java_lang_Throwable_fillInStack"], function*(__cn1ThisObject) { __cn1ThisObject[CN1_THROWABLE_STACK] = createJavaString(new Error().stack || ""); return null; });
+bindNative(["cn1_java_lang_Throwable_fillInStack"], function*(__cn1ThisObject) {
+  const prevLimit = Error.stackTraceLimit;
+  try { Error.stackTraceLimit = 200; } catch (_l) {}
+  __cn1ThisObject[CN1_THROWABLE_STACK] = createJavaString(new Error().stack || "");
+  try { Error.stackTraceLimit = prevLimit; } catch (_l) {}
+  return null;
+});
 bindNative(["cn1_java_lang_Throwable_getStack_R_java_lang_String"], function*(__cn1ThisObject) { return __cn1ThisObject[CN1_THROWABLE_STACK] || createJavaString(""); });
 bindNative(["cn1_java_lang_Math_abs_double_R_double"], function*(v) { return Math.abs(v); });
 bindNative(["cn1_java_lang_Math_abs_float_R_float"], function*(v) { return Math.abs(v); });

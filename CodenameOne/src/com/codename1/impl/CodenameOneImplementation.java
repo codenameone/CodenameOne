@@ -339,7 +339,8 @@ public abstract class CodenameOneImplementation {
         init(m);
         if (m != null) {
             String clsName = m.getClass().getName();
-            packageName = clsName.substring(0, clsName.lastIndexOf('.'));
+            int dotIdx = clsName.lastIndexOf('.');
+            packageName = dotIdx >= 0 ? clsName.substring(0, dotIdx) : "";
         }
         initiailized = true;
     }
