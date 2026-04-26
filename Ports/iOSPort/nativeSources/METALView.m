@@ -205,14 +205,6 @@ extern BOOL isRetinaBug();
     // (bottom). That avoids the _glScalef(1,-1,1) + _glTranslatef(0,-h,0)
     // workaround the GL path does in CodenameOne_GLViewController.drawFrame.
     projectionMatrix = CN1MetalOrtho(0.0f, (float)pw, (float)ph, 0.0f, -1.0f, 1.0f);
-    // (A half-pixel projection offset was tried as a fix for the separator-
-    // line artifact at row 246-247 -- it shifted ALL geometry off-grid by
-    // half a device-pixel, which simply *moved* the artifact instead of
-    // removing it and inflated aggregate Metal-vs-GL diff by ~12% across
-    // tests. Reverted; the artifact is documented as a known issue. The
-    // mutable-image projection in CN1Metalcompat.m's mutableProjection()
-    // was kept consistent with this -- if a future genuine fix lands here,
-    // mirror it there too.)
     CAMetalLayer *layer = (CAMetalLayer*)self.layer;
     layer.drawableSize = CGSizeMake(pw, ph);
 

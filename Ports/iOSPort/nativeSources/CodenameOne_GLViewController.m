@@ -23,9 +23,6 @@
 #import <objc/runtime.h>
 #import <QuartzCore/QuartzCore.h>
 #import "CodenameOne_GLViewController.h"
-#ifdef CN1_USE_METAL
-#import "CN1Metalcompat.h"
-#endif
 #import "EAGLView.h"
 #ifdef CN1_USE_METAL
 #import "METALView.h"
@@ -853,18 +850,6 @@ CGContextRef roundRect(CGContextRef context, int color, int alpha, int x, int y,
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRoundRectMutableImpl
 (int color, int alpha, int x, int y, int width, int height, int arcWidth, int arcHeight) {
-#ifdef CN1_USE_METAL
-    {
-        CN1MetalMutableScope s = CN1MetalEnterMutableScope();
-        if (s._valid) {
-            CN1MetalDrawCGRasterizedRect(x, y, width, height, ^(CGContextRef ctx) {
-                CGContextStrokePath(roundRect(ctx, color, alpha, 0, 0, width, height, arcWidth, arcHeight));
-            });
-            CN1MetalLeaveMutableScope(s);
-        }
-        return;
-    }
-#endif
     CGContextRef context = UIGraphicsGetCurrentContext();
     if (currentMutableTransformSet) {
         CGContextSaveGState(context);
@@ -878,15 +863,6 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRoundRectMutableImp
 
 void Java_com_codename1_impl_ios_IOSImplementation_setAntiAliasedMutableImpl
 (JAVA_BOOLEAN antialiased) {
-#ifdef CN1_USE_METAL
-    // Metal's polygon/line rasteriser is always antialiased per pipeline
-    // state; CG's runtime AA toggle has no direct equivalent. The CG shim
-    // path used by CN1MetalDrawCGRasterizedRect for round-rect / arc /
-    // gradient ops creates fresh contexts that default to AA on, so the
-    // visible behaviour matches "antialiased=YES" everywhere on Metal.
-    (void)antialiased;
-    return;
-#endif
     CGContextRef context = UIGraphicsGetCurrentContext();
     CGContextSetAllowsAntialiasing(context, antialiased);
 }
@@ -930,18 +906,6 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRoundRectGlobalImpl
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRoundRectMutableImpl
 (int color, int alpha, int x, int y, int width, int height, int arcWidth, int arcHeight) {
-#ifdef CN1_USE_METAL
-    {
-        CN1MetalMutableScope s = CN1MetalEnterMutableScope();
-        if (s._valid) {
-            CN1MetalDrawCGRasterizedRect(x, y, width, height, ^(CGContextRef ctx) {
-                CGContextFillPath(roundRect(ctx, color, alpha, 0, 0, width, height, arcWidth, arcHeight));
-            });
-            CN1MetalLeaveMutableScope(s);
-        }
-        return;
-    }
-#endif
     CGContextRef context = UIGraphicsGetCurrentContext();
     if (currentMutableTransformSet) {
         CGContextSaveGState(context);
@@ -1017,18 +981,6 @@ CGContextRef drawArc(CGContextRef context, int color, int alpha, int x, int y, i
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawArcMutableImpl
 (int color, int alpha, int x, int y, int width, int height, int startAngle, int angle) {
-#ifdef CN1_USE_METAL
-    {
-        CN1MetalMutableScope s = CN1MetalEnterMutableScope();
-        if (s._valid) {
-            CN1MetalDrawCGRasterizedRect(x, y, width, height, ^(CGContextRef ctx) {
-                CGContextStrokePath(drawArc(ctx, color, alpha, 0, 0, width, height, startAngle, angle, NO));
-            });
-            CN1MetalLeaveMutableScope(s);
-        }
-        return;
-    }
-#endif
     CGContextRef context = UIGraphicsGetCurrentContext();
     if (currentMutableTransformSet) {
         CGContextSaveGState(context);
@@ -1071,24 +1023,6 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRadialGradientMutab
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeFillArcMutableImpl
 (int color, int alpha, int x, int y, int width, int height, int startAngle, int angle) {
-#ifdef CN1_USE_METAL
-    {
-        CN1MetalMutableScope s = CN1MetalEnterMutableScope();
-        if (s._valid) {
-            CN1MetalDrawCGRasterizedRect(x, y, width, height, ^(CGContextRef ctx) {
-                if ([PaintOp getCurrentMutable] != NULL && [[PaintOp getCurrentMutable] isKindOfClass:[RadialGradientPaint class]]) {
-                    Java_com_codename1_impl_ios_IOSImplementation_nativeFillRadialGradientMutableImpl(
-                        ctx, (RadialGradientPaint*)[PaintOp getCurrentMutable], 0, 0, width, height, startAngle, angle
-                    );
-                } else {
-                    CGContextFillPath(drawArc(ctx, color, alpha, 0, 0, width, height, startAngle, angle, YES));
-                }
-            });
-            CN1MetalLeaveMutableScope(s);
-        }
-        return;
-    }
-#endif
     CGContextRef context = UIGraphicsGetCurrentContext();
     if (currentMutableTransformSet) {
         CGContextSaveGState(context);
@@ -1198,20 +1132,6 @@ void com_codename1_impl_ios_IOSImplementation_nativeSetTransformMutableImpl___fl
                                                                                                                                                                                JAVA_INT originX, JAVA_INT originY
                                                                                                                                                                                )
 {
-#ifdef CN1_USE_METAL
-    {
-        // Phase 3 transform-on-GLUIImage: this setter can be called on any
-        // thread (CN1's paint dispatch is multi-threaded). Persist the
-        // transform on the active mutable image; subsequent EnterMutableScope
-        // calls (on whatever draw thread) read it from there.
-        GLKMatrix4 mm = GLKMatrix4MakeAndTranspose(a0,a1,a2,a3,
-                                                   b0,b1,b2,b3,
-                                                   c0,c1,c2,c3,
-                                                   d0,d1,d2,d3);
-        CN1MetalSetMutableImageTransform(mm.m);
-        return;
-    }
-#endif
 #ifdef USE_ES2
     POOL_BEGIN();
     currentMutableTransformSet = NO;
@@ -1227,7 +1147,7 @@ void com_codename1_impl_ios_IOSImplementation_nativeSetTransformMutableImpl___fl
     for(int i=0; i<16; i++) caMatrix[i] = glMatrix[i]; //this will do the typecast if needed
 
     output = *((CATransform3D *)caMatrix);
-
+    
     if (!CATransform3DIsIdentity(output)) {
         CGAffineTransform affine = CATransform3DGetAffineTransform(output);
         currentMutableTransform = affine;
@@ -1414,20 +1334,7 @@ void Java_com_codename1_impl_ios_IOSNative_nativeDrawShadowMutable(CN1_THREAD_ST
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageMutableImpl
 (void* peer, int alpha, int x, int y, int width, int height, int renderingHints) {
-#ifdef CN1_USE_METAL
-    {
-        // Source image's mtlMutable buffer should be sync-finished by now
-        // (Phase 3 commits-and-waits in Finish), so getMTLTexture returns a
-        // settled texture without further sync.
-        GLUIImage *src = (BRIDGE_CAST GLUIImage*)peer;
-        CN1MetalMutableScope s = CN1MetalEnterMutableScope();
-        if (s._valid) {
-            CN1MetalDrawImage([src getMTLTexture], alpha, x, y, width, height);
-            CN1MetalLeaveMutableScope(s);
-        }
-        return;
-    }
-#endif
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageMutableImpl %i started at %i, %i", (int)peer, x, y);
     UIImage* i = [(BRIDGE_CAST GLUIImage*)peer getImage];
     CGContextRef context = UIGraphicsGetCurrentContext();
     if (currentMutableTransformSet) {
@@ -1442,6 +1349,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageMutableImpl
     if (currentMutableTransformSet) {
         CGContextRestoreGState(context);
     }
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageMutableImpl finished");
 }
 
 int Java_com_codename1_impl_ios_IOSImplementation_stringWidthNativeImpl
@@ -1564,23 +1472,6 @@ void Java_com_codename1_impl_ios_IOSImplementation_flushBufferImpl
 
 void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingMutableImpl
 (int x, int y, int width, int height, int clipApplied) {
-#ifdef CN1_USE_METAL
-    {
-        // Metal: there is no current CGContext on the mutable path. Stash the
-        // clip on the active mutable image; EnterMutableScope reads it and
-        // calls setScissorRect on the encoder on the draw thread (encoders
-        // are not thread-safe). The clipApplied flag (used by CG to balance
-        // GState save/restore) is irrelevant on Metal.
-        static int diagSetClipMut = 0;
-        if (diagSetClipMut < 3) {
-            NSLog(@"CN1SS:METAL_DIAG setNativeClippingMutableImpl #%d (%d,%d %dx%d)",
-                  diagSetClipMut, x, y, width, height);
-            diagSetClipMut++;
-        }
-        CN1MetalSetMutableImageClip(x, y, width, height);
-        return;
-    }
-#endif
     CGContextRef context = UIGraphicsGetCurrentContext();
     //CN1Log(@"Native mutable clipping applied %i on context %i x: %i y: %i width: %i height: %i", clipApplied, (int)context, x, y, width, height);
     //if(clipApplied) {
@@ -1594,13 +1485,6 @@ void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingMutableImpl
 void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingShapeMutableImpl
 (int numCommands, JAVA_OBJECT commands, int numPoints, JAVA_OBJECT points)
 {
-#ifdef CN1_USE_METAL
-    // Metal: shape clipping is not supported via scissor (Metal scissor is
-    // axis-aligned only). For now treat shape clip as "no clip" so subsequent
-    // draws on a mutable image still render. A future improvement would
-    // rasterise the shape into a stencil/alpha-mask and gate the pipeline.
-    return;
-#endif
     CGContextRef context = UIGraphicsGetCurrentContext();
     //CN1Log(@"Native mutable clipping applied %i on context %i x: %i y: %i width: %i height: %i", clipApplied, (int)context, x, y, width, height);
     //if(clipApplied) {
@@ -1664,21 +1548,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingPolygonGloba
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineMutableImpl
 (int color, int alpha, int x1, int y1, int x2, int y2) {
-#ifdef CN1_USE_METAL
-    {
-        static int diagDrawLineCount = 0;
-        if (diagDrawLineCount < 3) {
-            NSLog(@"CN1SS:METAL_DIAG JNI nativeDrawLineMutableImpl #%d thread=%p", diagDrawLineCount, (void*)pthread_self());
-            diagDrawLineCount++;
-        }
-        CN1MetalMutableScope s = CN1MetalEnterMutableScope();
-        if (s._valid) {
-            CN1MetalDrawLine(color, alpha, x1, y1, x2, y2);
-            CN1MetalLeaveMutableScope(s);
-        }
-        return;
-    }
-#endif
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineMutableImpl started");
     [UIColorFromRGB(color, alpha) set];
     CGContextRef context = UIGraphicsGetCurrentContext();
     if (currentMutableTransformSet) {
@@ -1691,20 +1561,11 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineMutableImpl
     if (currentMutableTransformSet) {
         CGContextRestoreGState(context);
     }
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineMutableImpl finished");
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineGlobalImpl
 (int color, int alpha, int x1, int y1, int x2, int y2) {
-#ifdef CN1_USE_METAL
-    {
-        static int diagDrawLineGlobalCount = 0;
-        if (diagDrawLineGlobalCount < 6) {
-            NSLog(@"CN1SS:METAL_DIAG JNI nativeDrawLineGlobalImpl #%d color=%d a=%d (%d,%d)->(%d,%d) thread=%p",
-                  diagDrawLineGlobalCount, color, alpha, x1, y1, x2, y2, (void*)pthread_self());
-            diagDrawLineGlobalCount++;
-        }
-    }
-#endif
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineGlobalImpl started");
     DrawLine* f = [[DrawLine alloc] initWithArgs:color a:alpha xpos1:x1 ypos1:y1 xpos2:x2 ypos2:y2];
     [CodenameOne_GLViewController upcoming:f];
@@ -1727,21 +1588,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeRotateGlobalImpl
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectMutableImpl
 (int color, int alpha, int x, int y, int width, int height) {
-#ifdef CN1_USE_METAL
-    {
-        static int diagFillRectCount = 0;
-        if (diagFillRectCount < 3) {
-            NSLog(@"CN1SS:METAL_DIAG JNI nativeFillRectMutableImpl #%d thread=%p", diagFillRectCount, (void*)pthread_self());
-            diagFillRectCount++;
-        }
-        CN1MetalMutableScope s = CN1MetalEnterMutableScope();
-        if (s._valid) {
-            CN1MetalFillRect(color, alpha, x, y, width, height);
-            CN1MetalLeaveMutableScope(s);
-        }
-        return;
-    }
-#endif
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectMutableImpl started");
     [UIColorFromRGB(color, alpha) set];
     CGContextRef context = UIGraphicsGetCurrentContext();
     if (currentMutableTransformSet) {
@@ -1752,19 +1599,10 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectMutableImpl
     if (currentMutableTransformSet) {
         CGContextRestoreGState(context);
     }
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectMutableImpl finished");
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_clearRectMutable(int x, int y, int w, int h) {
-#ifdef CN1_USE_METAL
-    {
-        CN1MetalMutableScope s = CN1MetalEnterMutableScope();
-        if (s._valid) {
-            CN1MetalClearRect(x, y, w, h);
-            CN1MetalLeaveMutableScope(s);
-        }
-        return;
-    }
-#endif
     CGContextRef context = UIGraphicsGetCurrentContext();
     if (currentMutableTransformSet) {
         CGContextSaveGState(context);
@@ -1774,6 +1612,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_clearRectMutable(int x, int y
     if (currentMutableTransformSet) {
         CGContextRestoreGState(context);
     }
+    
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_clearRectGlobal(int x, int y, int w, int h) {
@@ -1786,16 +1625,6 @@ void Java_com_codename1_impl_ios_IOSImplementation_clearRectGlobal(int x, int y,
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectGlobalImpl
 (int color, int alpha, int x, int y, int width, int height) {
-#ifdef CN1_USE_METAL
-    {
-        static int diagFillRectGlobalCount = 0;
-        if (diagFillRectGlobalCount < 6) {
-            NSLog(@"CN1SS:METAL_DIAG JNI nativeFillRectGlobalImpl #%d color=%d a=%d (%d,%d %dx%d) thread=%p",
-                  diagFillRectGlobalCount, color, alpha, x, y, width, height, (void*)pthread_self());
-            diagFillRectGlobalCount++;
-        }
-    }
-#endif
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectGlobalImpl started");
     FillRect* f = [[FillRect alloc] initWithArgs:color a:alpha xpos:x ypos:y w:width h:height];
     [CodenameOne_GLViewController upcoming:f];
@@ -1807,16 +1636,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectGlobalImpl
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRectMutableImpl
 (int color, int alpha, int x, int y, int width, int height) {
-#ifdef CN1_USE_METAL
-    {
-        CN1MetalMutableScope s = CN1MetalEnterMutableScope();
-        if (s._valid) {
-            CN1MetalDrawRect(color, alpha, x, y, width, height);
-            CN1MetalLeaveMutableScope(s);
-        }
-        return;
-    }
-#endif
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRectMutableImpl started");
     [UIColorFromRGB(color, alpha) set];
     CGContextRef context = UIGraphicsGetCurrentContext();
     if (currentMutableTransformSet) {
@@ -1827,6 +1647,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRectMutableImpl
     if (currentMutableTransformSet) {
         CGContextRestoreGState(context);
     }
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRectMutableImpl finished");
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRectGlobalImpl
@@ -1842,17 +1663,9 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRectGlobalImpl
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringMutableImpl
 (int color, int alpha, void* fontPeer, NSString* str, int x, int y) {
-#ifdef CN1_USE_METAL
-    {
-        CN1MetalMutableScope s = CN1MetalEnterMutableScope();
-        if (s._valid) {
-            CN1MetalDrawString(str, (BRIDGE_CAST UIFont*)fontPeer, color, alpha, x, y);
-            CN1MetalLeaveMutableScope(s);
-        }
-        return;
-    }
-#endif
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringMutableImpl started");
     [[CodenameOne_GLViewController instance] drawString:color alpha:alpha font:(BRIDGE_CAST UIFont*)fontPeer str:str x:x y:y];
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringMutableImpl finished");
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringGlobalImpl
@@ -1883,27 +1696,13 @@ void* Java_com_codename1_impl_ios_IOSImplementation_createNativeMutableImageImpl
 
 void Java_com_codename1_impl_ios_IOSImplementation_startDrawingOnImageImpl
 (int width, int height, void *peer) {
-#ifdef CN1_USE_METAL
-    // Phase 3: open a Metal render pass against the GLUIImage's backing
-    // MTLTexture instead of a CG image context. Subsequent
-    // nativeXxxMutableImpl calls route through the Metal active encoder
-    // (which CN1MetalBeginMutableImageDraw set to the mutable encoder).
-    if (!CN1MetalBeginMutableImageDraw(width, height, peer)) {
-        // Allocation failed; mark no current mutable image so subsequent
-        // ops no-op rather than crash.
-        [CodenameOne_GLViewController instance].currentMutableImage = nil;
-        return;
-    }
-    [CodenameOne_GLViewController instance].currentMutableImage = (BRIDGE_CAST GLUIImage*)peer;
-    currentMutableTransformSet = NO;
-    return;
-#endif
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_startDrawingOnImageImpl");
     UIImage* original = [(BRIDGE_CAST GLUIImage*)peer getImage];
     UIGraphicsBeginImageContextWithOptions(CGSizeMake(width, height), NO, 1.0);
     if(original != NULL) {
         [original drawAtPoint:CGPointZero];
     }
-
+    
     CGContextRef context = UIGraphicsGetCurrentContext();
     CGContextSaveGState(context);
     [CodenameOne_GLViewController instance].currentMutableImage = (BRIDGE_CAST GLUIImage*)peer;
@@ -1912,17 +1711,6 @@ void Java_com_codename1_impl_ios_IOSImplementation_startDrawingOnImageImpl
 }
 
 void* Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl() {
-#ifdef CN1_USE_METAL
-    {
-        GLUIImage *mglu = [CodenameOne_GLViewController instance].currentMutableImage;
-        if (mglu != nil) {
-            CN1MetalFinishMutableImageDraw((BRIDGE_CAST void*)mglu);
-        }
-        [CodenameOne_GLViewController instance].currentMutableImage = nil;
-        currentMutableTransformSet = NO;
-        return (BRIDGE_CAST void*)mglu;
-    }
-#endif
     UIImage* img = UIGraphicsGetImageFromCurrentImageContext();
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl %i", ((int)img));
     UIGraphicsEndImageContext();
@@ -1935,31 +1723,6 @@ void* Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl() {
 
 void Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayImpl
 (void* peer, int* arr, int x, int y, int width, int height, int imgWidth, int imgHeight) {
-#ifdef CN1_USE_METAL
-    // Phase 3: read from the mutable MTLTexture. Force-flush any pending
-    // command buffer so the texture has finalised pixels first. If the
-    // image was never drawn into via Metal (no mutable texture exists),
-    // fall through to the GL/CG path which reads from the cached UIImage.
-    {
-        GLUIImage *gl = (BRIDGE_CAST GLUIImage*)peer;
-        if ([gl mtlMutableTexture] != nil) {
-            // If this image is the current mutable target with an open
-            // encoder, end the encoder so the flush sees all queued ops.
-            // Re-open after the read so a caller's drawing flow continues
-            // (matches the GL-path's currentlyDrawing/restart semantics).
-            BOOL wasDrawing =
-                ((BRIDGE_CAST void*)[CodenameOne_GLViewController instance].currentMutableImage) == peer;
-            if (wasDrawing) {
-                Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl();
-            }
-            CN1MetalReadMutableImagePixels(peer, arr, x, y, width, height, imgWidth, imgHeight);
-            if (wasDrawing) {
-                Java_com_codename1_impl_ios_IOSImplementation_startDrawingOnImageImpl(imgWidth, imgHeight, peer);
-            }
-            return;
-        }
-    }
-#endif
     BOOL currentlyDrawing = NO;
     BOOL oldCurrentMutableTransformSet = currentMutableTransformSet;
     if(((BRIDGE_CAST void*)[CodenameOne_GLViewController instance].currentMutableImage) == peer) {

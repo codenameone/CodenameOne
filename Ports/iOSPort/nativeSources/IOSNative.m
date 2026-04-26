@@ -856,15 +856,6 @@ void com_codename1_impl_ios_IOSNative_setAntiAliasedMutable___boolean(CN1_THREAD
 void com_codename1_impl_ios_IOSNative_nativeDrawLineMutable___int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_nativeDrawLineMutable___int_int_int_int_int_int]
-#ifdef CN1_USE_METAL
-    {
-        static int diagWrapperDrawLineMut = 0;
-        if (diagWrapperDrawLineMut < 3) {
-            NSLog(@"CN1SS:METAL_DIAG WRAP nativeDrawLineMutable #%d", diagWrapperDrawLineMut);
-            diagWrapperDrawLineMut++;
-        }
-    }
-#endif
     POOL_BEGIN();
     Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineMutableImpl(n1, n2, n3, n4, n5, n6);
     POOL_END();
@@ -874,15 +865,6 @@ void com_codename1_impl_ios_IOSNative_nativeDrawLineMutable___int_int_int_int_in
 void com_codename1_impl_ios_IOSNative_nativeDrawLineGlobal___int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_nativeDrawLineGlobal___int_int_int_int_int_int]
-#ifdef CN1_USE_METAL
-    {
-        static int diagWrapperDrawLineGlb = 0;
-        if (diagWrapperDrawLineGlb < 3) {
-            NSLog(@"CN1SS:METAL_DIAG WRAP nativeDrawLineGlobal #%d", diagWrapperDrawLineGlb);
-            diagWrapperDrawLineGlb++;
-        }
-    }
-#endif
     POOL_BEGIN();
     Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineGlobalImpl(n1, n2, n3, n4, n5, n6);
     POOL_END();
@@ -1149,16 +1131,6 @@ void com_codename1_impl_ios_IOSNative_nativeDrawImageMutable___long_int_int_int_
 void com_codename1_impl_ios_IOSNative_nativeDrawImageGlobal___long_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1, JAVA_INT alpha, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT renderingHints)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_nativeDrawImageGlobal___long_int_int_int_int]
-#ifdef CN1_USE_METAL
-    {
-        static int diagDrawImageGlb = 0;
-        if (diagDrawImageGlb < 6) {
-            NSLog(@"CN1SS:METAL_DIAG WRAP nativeDrawImageGlobal #%d peer=%p alpha=%d (%d,%d %dx%d)",
-                  diagDrawImageGlb, (void*)n1, alpha, n2, n3, n4, n5);
-            diagDrawImageGlb++;
-        }
-    }
-#endif
     POOL_BEGIN();
     Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalImpl((void *)n1, alpha, n2, n3, n4, n5, renderingHints);
     POOL_END();

@@ -40,12 +40,6 @@ extern int nextPowerOf2(int val);
     textureName = 0;
     textureWidth = -1;
     textureHeight = -1;
-#ifdef CN1_USE_METAL
-    // Identity transform for any future mutable-image draw.
-    for (int r = 0; r < 4; r++)
-        for (int c = 0; c < 4; c++)
-            mtlMutableTransform[r*4 + c] = (r == c) ? 1.0f : 0.0f;
-#endif
     return self;
 }
 
@@ -174,56 +168,10 @@ extern int nextPowerOf2(int val);
 #ifdef CN1_USE_METAL
 -(id<MTLTexture>)getMTLTexture {
     if (mtlTexture != nil) return mtlTexture;
-    // Phase 3: if a mutable render target exists, the freshest pixels live
-    // there. Force-flush any pending command buffer so the texture has
-    // finalised pixels by the time the screen-side consumer samples it
-    // (the consumer's own command buffer might execute on a different
-    // queue / earlier than the mutable's deferred commit). A future
-    // optimisation could replace the CPU sync with an MTLEvent dependency
-    // between the producer and consumer command buffers.
-    if (mtlMutableTexture != nil) {
-        if (mtlMutableCommandBuffer != nil) {
-            CN1MetalFlushMutableImage((__bridge void*)self);
-        }
-        return mtlMutableTexture;
-    }
     if (img == nil) return nil;
     mtlTexture = CN1MetalTextureFromUIImage(img);
     return mtlTexture;
 }
-
--(id<MTLTexture>)mtlMutableTexture { return mtlMutableTexture; }
--(void)setMtlMutableTexture:(id<MTLTexture>)t width:(int)w height:(int)h {
-    mtlMutableTexture = t;
-    mtlMutableWidth = w;
-    mtlMutableHeight = h;
-    // The cached read-only texture is now stale -- reads should pull from
-    // the mutable texture, which we route to via getMTLTexture above.
-    mtlTexture = nil;
-}
--(id<MTLCommandBuffer>)mtlMutableCommandBuffer { return mtlMutableCommandBuffer; }
--(void)setMtlMutableCommandBuffer:(id<MTLCommandBuffer>)cb { mtlMutableCommandBuffer = cb; }
--(id<MTLRenderCommandEncoder>)mtlMutableEncoder { return mtlMutableEncoder; }
--(void)setMtlMutableEncoder:(id<MTLRenderCommandEncoder>)e { mtlMutableEncoder = e; }
--(int)mtlMutableWidth { return mtlMutableWidth; }
--(int)mtlMutableHeight { return mtlMutableHeight; }
--(float*)mtlMutableTransformPtr { return mtlMutableTransform; }
--(void)setMtlMutableClipX:(int)x y:(int)y w:(int)w h:(int)h {
-    mtlMutableClipX = x;
-    mtlMutableClipY = y;
-    mtlMutableClipW = w;
-    mtlMutableClipH = h;
-    mtlMutableClipValid = YES;
-}
--(BOOL)getMtlMutableClipX:(int*)x y:(int*)y w:(int*)w h:(int*)h {
-    if (!mtlMutableClipValid) return NO;
-    if (x) *x = mtlMutableClipX;
-    if (y) *y = mtlMutableClipY;
-    if (w) *w = mtlMutableClipW;
-    if (h) *h = mtlMutableClipH;
-    return YES;
-}
--(void)clearMtlMutableClip { mtlMutableClipValid = NO; }
 #endif
 
 -(void)dealloc {

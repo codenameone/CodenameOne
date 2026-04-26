@@ -1818,33 +1818,12 @@ public class IOSImplementation extends CodenameOneImplementation {
         nativeInstance.nativeDrawLineGlobal(color, alpha, x1, y1, x2, y2);
     }
 
-    private static int diagDrawLineJavaCount = 0;
-    private static int diagDrawLineMutCount = 0;
     public void drawLine(Object graphics, int x1, int y1, int x2, int y2) {
         NativeGraphics ng = (NativeGraphics)graphics;
-        boolean mut = ng.associatedImage != null;
-        boolean trace = diagDrawLineJavaCount < 6 || (mut && diagDrawLineMutCount < 3);
-        if (trace) {
-            int n = diagDrawLineJavaCount++;
-            if (mut) diagDrawLineMutCount++;
-            System.out.println("CN1SS:METAL_DIAG JAVA drawLine #" + n + " mut=" + mut + " class=" + ng.getClass().getName() + " x1=" + x1 + " y1=" + y1);
-        }
-        try {
-            ng.checkControl();
-            if (trace && mut) System.out.println("CN1SS:METAL_DIAG JAVA drawLine after checkControl");
-            ng.applyTransform();
-            if (trace && mut) System.out.println("CN1SS:METAL_DIAG JAVA drawLine after applyTransform");
-            ng.applyClip();
-            if (trace && mut) System.out.println("CN1SS:METAL_DIAG JAVA drawLine after applyClip");
-            ng.nativeDrawLine(ng.color, ng.alpha, x1, y1, x2, y2);
-            if (trace && mut) System.out.println("CN1SS:METAL_DIAG JAVA drawLine after nativeDrawLine");
-        } catch (RuntimeException re) {
-            if (trace) System.out.println("CN1SS:METAL_DIAG JAVA drawLine THROW " + re.getClass().getName() + " " + re.getMessage());
-            throw re;
-        } catch (Error err) {
-            if (trace) System.out.println("CN1SS:METAL_DIAG JAVA drawLine THROW " + err.getClass().getName() + " " + err.getMessage());
-            throw err;
-        }
+        ng.checkControl();
+        ng.applyTransform();
+        ng.applyClip();
+        ng.nativeDrawLine(ng.color, ng.alpha, x1, y1, x2, y2);
     }
     
 
@@ -1860,13 +1839,8 @@ public class IOSImplementation extends CodenameOneImplementation {
         nativeInstance.nativeClearRectGlobal(x, y, width, height);
     }
 
-    private static int diagFillRectJavaCount = 0;
     public void fillRect(Object graphics, int x, int y, int width, int height) {
         NativeGraphics ng = (NativeGraphics)graphics;
-        if (diagFillRectJavaCount < 6) {
-            int n = diagFillRectJavaCount++;
-            System.out.println("CN1SS:METAL_DIAG JAVA fillRect #" + n + " mut=" + (ng.associatedImage != null) + " class=" + ng.getClass().getName() + " (" + x + "," + y + " " + width + "x" + height + ") alpha=" + ng.alpha);
-        }
         if(ng.alpha == 0) {
             return;
         }
