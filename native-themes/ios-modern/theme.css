@@ -1,0 +1,519 @@
+/*
+ * iOS modern (liquid-glass) native theme.
+ *
+ * CEF-free subset of the Codename One CSS compiler: solid fills, native
+ * rounded/pill borders, state selectors via .pressed / .selected /
+ * .disabled. Light and dark palettes live at the bottom of this file
+ * in a prefers-color-scheme block the compiler rewrites into $DarkUIID
+ * entries. Colors are inlined (not CSS variables) because the rewriter
+ * operates at string level and doesn't re-scope :root declarations.
+ *
+ * Apple system palette reference (light / dark):
+ *   accent            007aff / 0a84ff
+ *   accent-pressed    0064d1 / 64b1ff
+ *   accent-disabled   b3d4ff / 004a99
+ *   text-primary      000000 / ffffff
+ *   text-secondary    3c3c43 / ebebf5
+ *   text-tertiary     8e8e93 / 8e8e93
+ *   text-disabled     c7c7cc / 48484a
+ *   surface           ffffff / 000000
+ *   surface-grouped   f2f2f7 / 1c1c1e
+ *   surface-tertiary  e5e5ea / 2c2c2e
+ *   separator         c6c6c8 / 38383a
+ *   success           34c759 / 30d158
+ *
+ * Overridable palette: user apps layer their own theme.css or runtime
+ * UIManager.addThemeProps on top of this theme - see
+ * PaletteOverrideThemeScreenshotTest for a working example that flips
+ * the accent to magenta at runtime.
+ */
+
+#Constants {
+    includeNativeBool: false;
+    darkModeBool: true;
+    commandBehavior: Native;
+    ios7StatusBarHack: true;
+    paintsTitleBarBool: true;
+    /* iOS 26 puts tab bars at the bottom, spanning full width with a
+       single pill-shaped glass group rather than individual tabs up
+       top. tabPlacementInt=2 is Component.BOTTOM; tabsFillRowsBool
+       distributes tabs across the available horizontal space. */
+    tabPlacementInt: 2;
+    tabsFillRowsBool: true;
+    tabsGridBool: true;
+    /* For a floating-pill tab bar, Tabs wraps the pill in a host
+       container that absorbs the safe-area inset as bottom padding -
+       pushing the pill UP, away from the home indicator, without
+       extending the pill's own background into the indicator zone.
+       Themes painting a flush full-width tab strip leave this true (the
+       framework default) so the tab strip itself reserves the inset. */
+    tabsSafeAreaBool: false;
+    /* Route the Tab icon's styling through a separate UIID. FontImage
+       copies the Button's bgColor/transparency into the rendered glyph
+       image; over the cn1-pill-border selected pill that paints a
+       visible square fill behind the glyph that doesn't follow the
+       rounded shape. Declaring TabIcon as transparent below means only
+       the glyph itself paints. */
+    tabIconUIID: TabIcon;
+    switchThumbPaddingInt: 2;
+    switchThumbScaleY: "1.4";
+    switchTrackScaleY: "1.5";
+    switchTrackScaleX: "2.5";
+    switchTrackOffOutlineWidthMM: "0.25";
+    switchTrackOnOutlineWidthMM: "0";
+    switchTrackOffOutlineColor: "cccccc";
+    switchThumbInsetMM: "0.25";
+    /* iOS uses a circular mark for checkboxes (Reminders-style) and
+       keeps the circular radio button. These integer constants are
+       Material icon codepoints that DefaultLookAndFeel reads to
+       swap the default square check-box glyphs. CHECK_CIRCLE = E86C
+       (59500), CHECK_CIRCLE_OUTLINE = E92D (59693),
+       RADIO_BUTTON_CHECKED = E837 (59447), RADIO_BUTTON_UNCHECKED
+       = E836 (59446). */
+    checkBoxCheckedIconInt: 59500;
+    checkBoxUncheckedIconInt: 59693;
+    radioCheckedIconInt: 59447;
+    radioUncheckedIconInt: 59446;
+    /* Dialog sizing/layout constants the legacy iOS7 theme set and
+       the modern theme had been missing. Without these the framework
+       falls back to a wider default Dialog layout that left
+       Dialog.show("Clicked","Clicked item N","OK",null) ballooning to
+       near-full screen with the body floating in empty space. */
+    hideEmptyTitleBool: true;
+    shrinkPopupTitleBool: true;
+    dialogButtonCommandsBool: true;
+    dlgCommandGridBool: true;
+}
+
+Component {
+    color: #000000;
+    background-color: #ffffff;
+    padding: 0;
+    margin: 0;
+}
+
+Form { background-color: #f2f2f7; padding: 0; margin: 0; }
+ContentPane { background-color: #f2f2f7; padding: 0; margin: 0; }
+/* Container has no surface of its own; specific UIIDs that need a
+   fill (Form, Dialog, Tab, etc.) declare it explicitly. Transparent
+   default means a SpanLabel / FlowLayout / generic wrapper inside a
+   translucent Dialog or pill Tabs lets the parent's surface show
+   through instead of painting an opaque white block over it. */
+Container { background-color: transparent; padding: 0; margin: 0; }
+
+/* Label transparent so it sits cleanly over its parent's surface
+   (Form, Dialog, Tab pill). UIIDs that need a colored label
+   (RaisedButton, FloatingActionButton, etc.) declare their own
+   bgColor explicitly. Note SpanLabel's internal TextArea is
+   styled with UIID="Label" so this transparency also fixes the
+   visible block behind dialog body text. */
+Label {
+    color: #000000;
+    background-color: transparent;
+    padding: 1mm 2mm 1mm 2mm;
+    margin: 0;
+    font-family: "native:MainRegular";
+}
+
+SecondaryLabel { cn1-derive: Label; color: #3c3c43; }
+TertiaryLabel { cn1-derive: Label; color: #8e8e93; }
+/* SpanLabel + its inner SpanLabelText render transparent so when
+   placed on a translucent surface (Dialog, PopupContent) the
+   parent's background shows through cleanly without a hard-edged
+   white block behind the wrapped text. */
+SpanLabel { cn1-derive: Label; background-color: transparent; }
+SpanLabelText { cn1-derive: Label; background-color: transparent; }
+
+/* iOS rounded-rect button style. Using border-radius (RoundRectBorder,
+   CEF-free) rather than cn1-pill-border so short-text buttons don't
+   degenerate to a circle when width<=height - RoundBorder paints a
+   circle in that case, border-radius always keeps the corner radius. */
+Button {
+    color: #007aff;
+    padding: 2mm 4mm 2mm 4mm;
+    margin: 1mm;
+    font-family: "native:MainRegular";
+    background-color: transparent;
+    border-radius: 3mm;
+    text-align: center;
+}
+Button.pressed { color: #0064d1; background-color: #e5e5ea; }
+Button.disabled { color: #b3d4ff; }
+
+RaisedButton {
+    cn1-derive: Button;
+    color: #ffffff;
+    background-color: #007aff;
+    border-radius: 3mm;
+    text-align: center;
+}
+RaisedButton.pressed { color: #ffffff; background-color: #0064d1; }
+RaisedButton.disabled { background-color: #b3d4ff; color: #ffffff; }
+
+FlatButton { cn1-derive: Button; }
+
+TextField {
+    color: #000000;
+    background-color: #ffffff;
+    padding: 2mm 3mm 2mm 3mm;
+    margin: 1mm 2mm 1mm 2mm;
+    font-family: "native:MainRegular";
+    border-radius: 2mm;
+}
+TextField.pressed { background-color: #e5e5ea; }
+TextField.disabled { color: #c7c7cc; background-color: #e5e5ea; }
+
+TextArea {
+    color: #000000;
+    background-color: #ffffff;
+    padding: 2mm 3mm 2mm 3mm;
+    margin: 1mm 2mm 1mm 2mm;
+    font-family: "native:MainRegular";
+    border-radius: 2mm;
+}
+TextArea.pressed { background-color: #e5e5ea; }
+TextArea.disabled { color: #c7c7cc; background-color: #e5e5ea; }
+
+TextHint {
+    color: #8e8e93;
+    padding: 2mm 3mm 2mm 3mm;
+    font-family: "native:MainRegular";
+}
+
+CheckBox {
+    color: #000000;
+    background-color: transparent;
+    padding: 1mm 2mm 1mm 2mm;
+    margin: 0;
+    font-family: "native:MainRegular";
+    icon-gap: 2mm;
+}
+CheckBox.selected { color: #007aff; }
+CheckBox.disabled { color: #c7c7cc; background-color: #e5e5ea; }
+
+RadioButton {
+    color: #000000;
+    background-color: transparent;
+    padding: 1mm 2mm 1mm 2mm;
+    margin: 0;
+    font-family: "native:MainRegular";
+    icon-gap: 2mm;
+}
+RadioButton.selected { color: #007aff; }
+RadioButton.disabled { color: #c7c7cc; background-color: #e5e5ea; }
+
+/* Switch's track-left needs to land at the same x as the Label
+   text-left of the row above so the column reads as aligned.
+   Label text starts at margin-left + padding-left = 0 + 2mm = 2mm.
+   Switch track starts at margin-left + padding-left so we keep
+   margin-left at 2mm and zero out padding. */
+Switch {
+    color: #ffffff;
+    background-color: #ffffff;
+    padding: 0;
+    margin: 1mm 2mm 1mm 2mm;
+    text-align: left;
+}
+Switch.selected { color: #ffffff; background-color: #34c759; }
+Switch.disabled { color: #c7c7cc; background-color: #e5e5ea; }
+
+OnOffSwitch {
+    cn1-derive: Label;
+    color: #007aff;
+    background-color: #e5e5ea;
+    padding: 1mm 2mm 1mm 2mm;
+    cn1-background-type: cn1-pill-border;
+}
+OnOffSwitch.selected { background-color: #34c759; color: #ffffff; }
+
+Toolbar {
+    background-color: #ffffff;
+    color: #000000;
+    padding: 1mm;
+    margin: 0;
+}
+/* TitleArea derives from Toolbar so theme overrides on Toolbar cascade
+   to TitleArea. UIManager used to install a defensive
+   Toolbar.derive=TitleArea default that produced a cycle when paired
+   with TitleArea.derive=Toolbar; the framework now skips that default
+   when the user theme has already wired TitleArea -> Toolbar. */
+TitleArea { cn1-derive: Toolbar; padding: 1mm 2mm 1mm 2mm; }
+
+Title {
+    color: #000000;
+    background-color: #ffffff;
+    padding: 1mm;
+    font-family: "native:MainBold";
+    font-size: 4.5mm;
+    text-align: center;
+}
+MainTitle { cn1-derive: Title; }
+
+BackCommand { cn1-derive: Button; color: #007aff; padding: 1mm 2mm 1mm 2mm; }
+TitleCommand { cn1-derive: Button; color: #007aff; padding: 1mm 2mm 1mm 2mm; }
+
+/* iOS 26 tab-bar look: the TabsContainer is the visible pill group
+   hugging the bottom edge, with individual tabs rendered as
+   transparent hits inside it. cn1-pill-border draws a true pill;
+   rgba on the fill approximates frosted glass within the CEF-free
+   subset. A real backdrop-filter is future work.
+
+   Text + icons stay neutral (black light / white dark) regardless of
+   selection state - selected vs unselected differ by background fill,
+   not foreground colour. The selected pill uses surface-tertiary
+   (#e5e5ea) for visible contrast against the frosted glass group. */
+Tabs { background-color: transparent; padding: 0; margin: 0; }
+/* TabbedPane is the inner content area where the active tab page
+   renders. It sits below the floating pill group (TabsContainer)
+   and stays opaque on the form's surface colour - the pill is the
+   only translucent element. */
+TabbedPane { background-color: #f2f2f7; padding: 0; margin: 0; }
+TabsContainer {
+    background-color: rgba(242,242,247,0.7);
+    color: #000000;
+    padding: 0.5mm;
+    /* Bottom margin only buys visual breathing room above the home
+       indicator; the actual safe-area inset is absorbed by Tabs's host
+       wrapper because tabsSafeAreaBool=false (see #Constants). */
+    margin: 1mm 3mm 1mm 3mm;
+    cn1-background-type: cn1-pill-border;
+}
+
+Tab {
+    color: #000000;
+    background-color: transparent;
+    padding: 1mm 2mm 1mm 2mm;
+    margin: 0;
+    font-family: "native:MainRegular";
+    text-align: center;
+}
+Tab.selected { color: #000000; background-color: #e5e5ea; cn1-background-type: cn1-pill-border; }
+Tab.pressed { color: #000000; background-color: rgba(229,229,234,0.85); cn1-background-type: cn1-pill-border; }
+
+SelectedTab { cn1-derive: Tab; color: #000000; }
+UnselectedTab { cn1-derive: Tab; color: #000000; }
+
+/* TabIcon: separate UIID applied via tabIconUIID so the icon's glyph
+   image paints with no fill behind it. Without this the FontImage
+   inherits the Tab.selected background color and renders a visible
+   square inside the pill. Color (light/dark) inherits from the parent
+   Tab via Style.fgColor at icon-render time. */
+TabIcon { background-color: transparent; padding: 0; margin: 0; }
+TabIcon.selected { background-color: transparent; }
+TabIcon.pressed { background-color: transparent; }
+
+SideNavigationPanel { background-color: #ffffff; padding: 0; margin: 0; }
+
+SideCommand {
+    cn1-derive: Button;
+    color: #000000;
+    padding: 2mm 3mm 2mm 3mm;
+    margin: 0;
+}
+SideCommand.pressed { background-color: #e5e5ea; }
+
+List { background-color: #ffffff; padding: 0; margin: 0; }
+
+ListRenderer { cn1-derive: Label; padding: 2mm 3mm 2mm 3mm; }
+
+/* iOS Settings-style list row: translucent white surface, generous
+   vertical padding, bold primary line, lighter secondary lines.
+   Margins keep each row floating slightly off the form edge and
+   away from the next row, mimicking iOS 26 grouped-list cards. */
+MultiButton {
+    cn1-derive: Button;
+    background-color: rgba(255,255,255,0.85);
+    color: #000000;
+    padding: 3mm 4mm 3mm 4mm;
+    margin: 1mm 3mm 1mm 3mm;
+    font-family: "native:MainRegular";
+    font-size: 4mm;
+    text-align: left;
+    icon-gap: 3mm;
+    border-radius: 3mm;
+}
+MultiButton.pressed { background-color: #e5e5ea; }
+
+MultiLine1 {
+    cn1-derive: Label;
+    color: #000000;
+    font-family: "native:MainBold";
+    font-size: 4mm;
+    padding: 0 0 0.5mm 0;
+}
+MultiLine2 {
+    cn1-derive: Label;
+    color: #3c3c43;
+    font-family: "native:MainRegular";
+    font-size: 3.5mm;
+    padding: 0;
+}
+MultiLine3 {
+    cn1-derive: Label;
+    color: #8e8e93;
+    font-family: "native:MainRegular";
+    font-size: 3mm;
+    padding: 0.5mm 0 0 0;
+}
+MultiLine4 {
+    cn1-derive: Label;
+    color: #8e8e93;
+    font-family: "native:MainRegular";
+    font-size: 3mm;
+    padding: 0;
+}
+
+/* Dialog uses a translucent surface so any backdrop (form bg or
+   the test harness's diagonal-stripe texture) reads through -
+   approximates the iOS 26 vibrancy effect within the CEF-free
+   subset. DialogBody is left fully transparent: it was previously
+   painting its own opaque shade on top of Dialog and reading as a
+   visibly different colour. All Dialog sub-UIIDs share the same
+   translucent surface (or stay transparent so Dialog's surface
+   shows through). */
+/* margin: 0 - CN1's Dialog uses its own UIID margin as a positioning
+   hint; a non-zero value here makes Dialog.show() lay the dialog out
+   at screen-minus-margin (looks correct for a small modal but for
+   `Dialog.show("title", "body", "OK", null)` it grows to ~full
+   screen with empty space around the body). */
+Dialog {
+    background-color: rgba(255,255,255,0.78);
+    color: #000000;
+    padding: 3mm;
+    margin: 0;
+    border-radius: 4mm;
+}
+DialogBody {
+    background-color: transparent;
+    color: #000000;
+    padding: 2mm;
+    margin: 0;
+}
+DialogTitle {
+    color: #000000;
+    background-color: transparent;
+    padding: 2mm;
+    font-family: "native:MainBold";
+    font-size: 4mm;
+    text-align: center;
+}
+DialogContentPane { background-color: transparent; padding: 2mm; margin: 0; }
+DialogCommandArea { background-color: transparent; padding: 1mm; }
+
+FloatingActionButton {
+    color: #ffffff;
+    background-color: #007aff;
+    padding: 3mm;
+    margin: 3mm;
+    font-family: "native:MainBold";
+    cn1-background-type: cn1-pill-border;
+}
+FloatingActionButton.pressed { background-color: #0064d1; }
+
+Separator { background-color: #c6c6c8; padding: 0; margin: 0; }
+PopupContent {
+    background-color: #ffffff;
+    color: #000000;
+    padding: 2mm;
+    margin: 0;
+    border-radius: 4mm;
+}
+
+@media (prefers-color-scheme: dark) {
+    Component { color: #ffffff; background-color: #000000; }
+    Form { background-color: #1c1c1e; padding: 0; margin: 0; }
+    ContentPane { background-color: #1c1c1e; padding: 0; margin: 0; }
+
+    Label { color: #ffffff; background-color: transparent; }
+    SecondaryLabel { color: #ebebf5; background-color: transparent; }
+    TertiaryLabel { color: #8e8e93; background-color: transparent; }
+    SpanLabel { color: #ffffff; background-color: transparent; }
+    SpanLabelText { color: #ffffff; background-color: transparent; }
+
+    Button { color: #0a84ff; }
+    Button.pressed { color: #64b1ff; background-color: #3a3a3c; }
+    Button.disabled { color: #004a99; }
+
+    RaisedButton { color: #ffffff; background-color: #0a84ff; }
+    RaisedButton.pressed { background-color: #64b1ff; }
+    RaisedButton.disabled { background-color: #004a99; }
+
+    TextField { color: #ffffff; background-color: #1c1c1e; }
+    TextField.pressed { background-color: #2c2c2e; }
+    TextField.disabled { color: #48484a; background-color: #2c2c2e; }
+    TextArea { color: #ffffff; background-color: #1c1c1e; }
+    TextArea.pressed { background-color: #2c2c2e; }
+    TextArea.disabled { color: #48484a; background-color: #2c2c2e; }
+    TextHint { color: #8e8e93; }
+
+    CheckBox { color: #ffffff; background-color: transparent; }
+    CheckBox.selected { color: #0a84ff; }
+    CheckBox.disabled { color: #48484a; background-color: #2c2c2e; }
+    RadioButton { color: #ffffff; background-color: transparent; }
+    RadioButton.selected { color: #0a84ff; }
+    RadioButton.disabled { color: #48484a; background-color: #2c2c2e; }
+
+    Switch { color: #ffffff; background-color: #2c2c2e; }
+    Switch.selected { color: #ffffff; background-color: #30d158; }
+    Switch.disabled { color: #48484a; background-color: #2c2c2e; }
+
+    OnOffSwitch { color: #0a84ff; background-color: #2c2c2e; }
+    OnOffSwitch.selected { background-color: #30d158; color: #ffffff; }
+
+    Toolbar { background-color: #000000; color: #ffffff; }
+    TitleArea { background-color: #000000; color: #ffffff; }
+    Title { color: #ffffff; background-color: #000000; }
+    MainTitle { color: #ffffff; background-color: #000000; }
+    BackCommand { color: #0a84ff; }
+    TitleCommand { color: #0a84ff; }
+
+    Tabs { background-color: transparent; }
+    TabbedPane { background-color: #1c1c1e; }
+    TabsContainer { background-color: rgba(44,44,46,0.7); color: #ffffff; }
+    Tab { color: #ffffff; background-color: transparent; }
+    /* Re-declare cn1-background-type on the dark overrides - the
+       compiler doesn't carry it forward from the light Tab.selected
+       style, so without this the selected pill renders as a flat
+       rectangular block instead of a rounded pill in dark mode. */
+    Tab.selected { color: #ffffff; background-color: #3a3a3c; cn1-background-type: cn1-pill-border; }
+    Tab.pressed { color: #ffffff; background-color: rgba(58,58,60,0.9); cn1-background-type: cn1-pill-border; }
+    SelectedTab { color: #ffffff; }
+    UnselectedTab { color: #ffffff; }
+
+    /* Dark overrides for the icon-only UIID. Background stays transparent
+       so the pill shows through; only the glyph (fgColor) is forced
+       white. */
+    TabIcon { color: #ffffff; background-color: transparent; }
+    TabIcon.selected { color: #ffffff; background-color: transparent; }
+    TabIcon.pressed { color: #ffffff; background-color: transparent; }
+
+    SideNavigationPanel { background-color: #000000; }
+    SideCommand { color: #ffffff; }
+    SideCommand.pressed { background-color: #3a3a3c; }
+
+    List { background-color: #000000; }
+    ListRenderer { color: #ffffff; background-color: transparent; }
+    MultiButton { background-color: #000000; color: #ffffff; }
+    MultiButton.pressed { background-color: #3a3a3c; }
+    MultiLine1 { color: #ffffff; }
+    MultiLine2 { color: #ebebf5; }
+    MultiLine3 { color: #8e8e93; }
+    MultiLine4 { color: #8e8e93; }
+
+    /* Dark Dialog: nearly opaque so white text stays readable - a
+       lower opacity over the textured test backdrop made bright
+       stripes bleed through and obscure the text. DialogBody /
+       Title / ContentPane / CommandArea stay transparent so the
+       Dialog surface is the single colour they all share. */
+    Dialog { background-color: rgba(44,44,46,0.95); color: #ffffff; }
+    DialogBody { background-color: transparent; color: #ffffff; }
+    DialogTitle { color: #ffffff; background-color: transparent; }
+    DialogContentPane { background-color: transparent; }
+    DialogCommandArea { background-color: transparent; }
+    PopupContent { background-color: rgba(44,44,46,0.95); color: #ffffff; }
+
+    FloatingActionButton { color: #ffffff; background-color: #0a84ff; }
+    FloatingActionButton.pressed { background-color: #64b1ff; }
+
+    Separator { background-color: #38383a; }
+}

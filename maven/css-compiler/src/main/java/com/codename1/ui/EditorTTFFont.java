@@ -108,6 +108,14 @@ public class EditorTTFFont extends Font {
                             throw new IllegalArgumentException("Unsupported native font type: " + nativeFontName);
                     }
                     InputStream is = getClass().getResourceAsStream("/com/codename1/impl/javase/Roboto-" + res + ".ttf");
+                    if (is == null) {
+                        // Headless css-compiler run (native-themes build) does
+                        // not ship the Roboto TTF resources from javase. The
+                        // serialized .res stores the nativeFontName; the native
+                        // handle is recreated at app runtime when a full CN1
+                        // implementation is available.
+                        return;
+                    }
                     try {
                         f = java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, is);
                         is.close();

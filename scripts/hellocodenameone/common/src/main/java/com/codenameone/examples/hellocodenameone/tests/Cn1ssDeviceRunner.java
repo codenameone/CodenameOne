@@ -82,6 +82,22 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new ValidatorLightweightPickerScreenshotTest(),
             new LightweightPickerButtonsScreenshotTest(),
             new ToastBarTopPositionScreenshotTest(),
+            // Native-theme fidelity tests (Phase 7): each emits a light+dark PNG pair
+            // so the iOS Modern and Android Material themes get exercised per UIID.
+            new ButtonThemeScreenshotTest(),
+            new TextFieldThemeScreenshotTest(),
+            new CheckBoxRadioThemeScreenshotTest(),
+            new SwitchThemeScreenshotTest(),
+            new PickerThemeScreenshotTest(),
+            new ToolbarThemeScreenshotTest(),
+            new TabsThemeScreenshotTest(),
+            new MultiButtonThemeScreenshotTest(),
+            new ListThemeScreenshotTest(),
+            new DialogThemeScreenshotTest(),
+            new FloatingActionButtonThemeScreenshotTest(),
+            new SpanLabelThemeScreenshotTest(),
+            new DarkLightShowcaseThemeScreenshotTest(),
+            new PaletteOverrideThemeScreenshotTest(),
             // Keep this as the last screenshot test; orientation changes can leak into subsequent screenshots.
             new OrientationLockScreenshotTest(),
             new InPlaceEditViewTest(),
@@ -154,7 +170,27 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 || "CallDetectionAPITest".equals(testName)
                 || "LocalNotificationOverrideTest".equals(testName)
                 || "Base64NativePerformanceTest".equals(testName)
-                || "AccessibilityTest".equals(testName);
+                || "AccessibilityTest".equals(testName)
+                // The native-theme fidelity tests (each emits a light+dark PNG
+                // pair) matter for iOS/Android/JavaSE where the user actually
+                // looks at visual output. The JS port run has a tight 150s
+                // browser-lifetime budget that doesn't accommodate another
+                // 13 x 2 captures; skip them here. Re-enable selectively when
+                // we move the JS port to a longer-lived harness.
+                || "ButtonThemeScreenshotTest".equals(testName)
+                || "TextFieldThemeScreenshotTest".equals(testName)
+                || "CheckBoxRadioThemeScreenshotTest".equals(testName)
+                || "SwitchThemeScreenshotTest".equals(testName)
+                || "PickerThemeScreenshotTest".equals(testName)
+                || "ToolbarThemeScreenshotTest".equals(testName)
+                || "TabsThemeScreenshotTest".equals(testName)
+                || "MultiButtonThemeScreenshotTest".equals(testName)
+                || "ListThemeScreenshotTest".equals(testName)
+                || "DialogThemeScreenshotTest".equals(testName)
+                || "FloatingActionButtonThemeScreenshotTest".equals(testName)
+                || "SpanLabelThemeScreenshotTest".equals(testName)
+                || "DarkLightShowcaseThemeScreenshotTest".equals(testName)
+                || "PaletteOverrideThemeScreenshotTest".equals(testName);
     }
 
     private void awaitTestCompletion(int index, BaseTest testClass, String testName, long deadline) {

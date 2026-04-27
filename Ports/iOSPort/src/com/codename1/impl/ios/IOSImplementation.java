@@ -1341,8 +1341,25 @@ public class IOSImplementation extends CodenameOneImplementation {
     public void installNativeTheme() {
         try {
             Resources r;
-            
-            if(iosMode.equals("modern")) {
+            String mode = iosMode == null ? "auto" : iosMode.toLowerCase();
+            // Modern (liquid-glass) theme is opt-in via ios.themeMode=modern /
+            // liquid / material. Keep the default ("auto" or unset) on the
+            // legacy iOS 7 / pre-flat theme so existing apps and screenshot
+            // goldens aren't disturbed. Apps that want the new look set
+            // ios.themeMode=modern in their build hints or via
+            // Display.setProperty("ios.themeMode", "modern") before the
+            // first Form is shown.
+            if(mode.equals("modern") || mode.equals("liquid")) {
+                InputStream in = getResourceAsStream("/iOSModernTheme.res");
+                if (in != null) {
+                    r = Resources.open(in);
+                    UIManager.getInstance().setThemeProps(r.getTheme(r.getThemeResourceNames()[0]));
+                    return;
+                }
+                // Modern theme isn't in the jar (e.g. framework build hasn't
+                // generated it yet) - fall back to iOS 7 so the app still boots.
+            }
+            if(mode.equals("ios7") || mode.equals("flat") || mode.equals("auto") || mode.equals("modern") || mode.equals("liquid")) {
                 r = Resources.open("/iOS7Theme.res");
                 Hashtable tp = r.getTheme(r.getThemeResourceNames()[0]);
                 if(!nativeInstance.isIOS7()) {
@@ -1351,20 +1368,16 @@ public class IOSImplementation extends CodenameOneImplementation {
                 UIManager.getInstance().setThemeProps(tp);
                 return;
             }
-            if(iosMode.equals("auto")) {
-                if(nativeInstance.isIOS7()) {
-                    r = Resources.open("/iOS7Theme.res");
-                } else {
-                    r = Resources.open("/iPhoneTheme.res");
-                }
-                UIManager.getInstance().setThemeProps(r.getTheme(r.getThemeResourceNames()[0]));
-                return;
-            }
+            // "legacy" / "iphone" / anything else: pre-flat iPhone theme.
             r = Resources.open("/iPhoneTheme.res");
             UIManager.getInstance().setThemeProps(r.getTheme(r.getThemeResourceNames()[0]));
         } catch (IOException ex) {
             ex.printStackTrace();
-        }        
+        }
+    }
+
+    private InputStream getResourceAsStream(String name) {
+        return IOSImplementation.class.getResourceAsStream(name);
     }
 
     private long getNSData(InputStream i) {

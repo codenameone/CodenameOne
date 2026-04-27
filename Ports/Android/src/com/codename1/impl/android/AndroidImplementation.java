@@ -4925,23 +4925,52 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      */
     public void installNativeTheme() {
         hasNativeTheme();
-        if (nativeThemeAvailable) {
-            try {
-                InputStream is;
-                if (android.os.Build.VERSION.SDK_INT < 14 && !isTablet() || Display.getInstance().getProperty("and.hololight", "false").equals("true")) {
-                    is = getResourceAsStream(getClass(), "/androidTheme.res");
+        if (!nativeThemeAvailable) {
+            return;
+        }
+        try {
+            // Resolve desired theme flavor. cn1.androidTheme is the new per-CN1
+            // hint (material | hololight | legacy). The Material 3 modern theme
+            // is opt-in via cn1.androidTheme=material / modern. Default is
+            // android_holo_light - what master shipped and what existing
+            // screenshot goldens are anchored against. The ancient pre-Holo
+            // androidTheme.res is only reached via explicit and.hololight=true
+            // (historical back-compat) or cn1.androidTheme=legacy.
+            String mode = Display.getInstance().getProperty("cn1.androidTheme", null);
+            if (mode == null) {
+                if ("true".equalsIgnoreCase(Display.getInstance().getProperty("and.hololight", "false"))) {
+                    mode = "legacy";
                 } else {
-                    is = getResourceAsStream(getClass(), "/android_holo_light.res");
+                    mode = "hololight";
                 }
-                Resources r = Resources.open(is);
-                Hashtable h = r.getTheme(r.getThemeResourceNames()[0]);
-                h.put("@commandBehavior", "Native");
-                UIManager.getInstance().setThemeProps(h);
-                is.close();
-                Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_NATIVE);
-            } catch (IOException ex) {
-                ex.printStackTrace();
+            } else {
+                mode = mode.toLowerCase();
             }
+
+            String resPath;
+            if ("material".equals(mode) || "modern".equals(mode)) {
+                resPath = "/AndroidMaterialTheme.res";
+            } else if ("hololight".equals(mode) || "holo".equals(mode)) {
+                resPath = "/android_holo_light.res";
+            } else {
+                resPath = "/androidTheme.res";
+            }
+
+            InputStream is = getResourceAsStream(getClass(), resPath);
+            if (is == null) {
+                // Modern theme may not be in the apk if the framework build
+                // skipped native-themes generation. Fall back to Holo Light
+                // (master's default) so the app still boots with a known look.
+                is = getResourceAsStream(getClass(), "/android_holo_light.res");
+            }
+            Resources r = Resources.open(is);
+            Hashtable h = r.getTheme(r.getThemeResourceNames()[0]);
+            h.put("@commandBehavior", "Native");
+            UIManager.getInstance().setThemeProps(h);
+            is.close();
+            Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_NATIVE);
+        } catch (IOException ex) {
+            ex.printStackTrace();
         }
     }
 

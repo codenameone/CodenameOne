@@ -1001,31 +1001,25 @@ public class CN1Playground extends Lifecycle {
     private void layerAndroidTheme() {
         if (androidTheme == null) {
             try {
-                androidTheme = Resources.open("/androidTheme.res");
+                androidTheme = Resources.openLayered("/AndroidMaterialTheme");
             } catch (java.io.IOException ex) {
-                Log.p("Android theme unavailable: " + ex);
+                Log.p("Android Material theme unavailable: " + ex);
                 return;
             }
         }
         applyThemeOverlay(androidTheme);
     }
 
-    /// Layers the builtin iPhone native theme on top of the playground base.
-    /// `iOS7Theme.res` ships with the Codename One distribution; we load it from the
-    /// classpath instead of copying a local copy into the project resources.
-    /// If the resource isn't on the runtime classpath (falls back silently) the
-    /// iPhone skin renders with the playground base theme only.
+    /// Layers the iOS Modern (liquid-glass) native theme on top of the
+    /// playground base so the iPhone preview matches what a generated
+    /// project will render at runtime.
     private void layerIosTheme() {
         if (iosTheme == null) {
             try {
-                iosTheme = Resources.openLayered("/iOS7Theme");
+                iosTheme = Resources.openLayered("/iOSModernTheme");
             } catch (java.io.IOException ex) {
-                try {
-                    iosTheme = Resources.openLayered("/iPhoneTheme");
-                } catch (java.io.IOException ex2) {
-                    Log.p("iOS theme unavailable: " + ex2);
-                    return;
-                }
+                Log.p("iOS Modern theme unavailable: " + ex);
+                return;
             }
         }
         applyThemeOverlay(iosTheme);
@@ -1041,8 +1035,50 @@ public class CN1Playground extends Lifecycle {
         }
         Hashtable props = res.getTheme(names[0]);
         if (props != null && !props.isEmpty()) {
-            UIManager.getInstance().addThemeProps(props);
+            UIManager.getInstance().addThemeProps(forwardCompatTitleAreaDerive(props));
         }
+    }
+
+    /// Forward-compatible patch for the `TitleArea` <-> `Toolbar` derive
+    /// cycle that the modern themes hit on older CN1 frameworks.
+    ///
+    /// `UIManager.resetThemeProps` in CN1 builds shipped before the
+    /// rebuild-themes work unconditionally installs `Toolbar.derive=TitleArea`
+    /// as a legacy default. The modern iOS / Material themes flip the
+    /// relationship the other way (`TitleArea.derive=Toolbar`) and the
+    /// pairing makes `createStyle` recurse - the playground freezes at boot
+    /// with `Error creating style TitleArea` in the console.
+    ///
+    /// We can't change UIManager itself in the deployed playground (it's
+    /// pinned to the published `cn1.version`), so we patch the theme props
+    /// before they reach `addThemeProps`: when the modern overlay declares
+    /// `TitleArea.derive=Toolbar`, we explicitly point `Toolbar.derive` at
+    /// `Component`. That overrides the legacy default with a target that
+    /// can't ever cycle back to TitleArea, and Toolbar's own explicit
+    /// properties (bgColor, padding, ...) still win during style resolution
+    /// so the visual outcome is unchanged.
+    ///
+    /// Forward-compat: when the framework's own `breakTitleAreaToolbarDeriveCycle`
+    /// post-build cleanup ships in a future CN1 release, this preview-side
+    /// patch keeps applying without conflict - the framework only removes
+    /// `Toolbar.derive` when its value is exactly `TitleArea`, while we set
+    /// it to `Component`. The patch becomes harmless duplication.
+    private static Hashtable forwardCompatTitleAreaDerive(Hashtable props) {
+        if (!"Toolbar".equals(props.get("TitleArea.derive"))) {
+            return props;
+        }
+        // Defensive copy so we don't mutate the cached Resources theme map.
+        Hashtable patched = new Hashtable();
+        java.util.Enumeration e = props.keys();
+        while (e.hasMoreElements()) {
+            Object k = e.nextElement();
+            patched.put(k, props.get(k));
+        }
+        patched.put("Toolbar.derive", "Component");
+        patched.put("Toolbar.sel#derive", "Component.sel");
+        patched.put("Toolbar.press#derive", "Component.press");
+        patched.put("Toolbar.dis#derive", "Component.dis");
+        return patched;
     }
 
     private void applyCssToPreview(Form form, String css) {

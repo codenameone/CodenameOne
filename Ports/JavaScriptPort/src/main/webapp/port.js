@@ -2783,7 +2783,21 @@ const baseTestFailMethodId = "cn1_com_codenameone_examples_hellocodenameone_test
 const baseTestDoneMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_BaseTest_done";
 const cn1ssForcedTimeoutTestClasses = Object.freeze({
   "com_codenameone_examples_hellocodenameone_tests_MediaPlaybackScreenshotTest": "mediaPlayback",
-  "com_codenameone_examples_hellocodenameone_tests_BytecodeTranslatorRegressionTest": "bytecodeTranslatorRegression"
+  "com_codenameone_examples_hellocodenameone_tests_BytecodeTranslatorRegressionTest": "bytecodeTranslatorRegression",
+  "com_codenameone_examples_hellocodenameone_tests_ButtonThemeScreenshotTest": "themeScreenshot",
+  "com_codenameone_examples_hellocodenameone_tests_TextFieldThemeScreenshotTest": "themeScreenshot",
+  "com_codenameone_examples_hellocodenameone_tests_CheckBoxRadioThemeScreenshotTest": "themeScreenshot",
+  "com_codenameone_examples_hellocodenameone_tests_SwitchThemeScreenshotTest": "themeScreenshot",
+  "com_codenameone_examples_hellocodenameone_tests_PickerThemeScreenshotTest": "themeScreenshot",
+  "com_codenameone_examples_hellocodenameone_tests_ToolbarThemeScreenshotTest": "themeScreenshot",
+  "com_codenameone_examples_hellocodenameone_tests_TabsThemeScreenshotTest": "themeScreenshot",
+  "com_codenameone_examples_hellocodenameone_tests_MultiButtonThemeScreenshotTest": "themeScreenshot",
+  "com_codenameone_examples_hellocodenameone_tests_ListThemeScreenshotTest": "themeScreenshot",
+  "com_codenameone_examples_hellocodenameone_tests_DialogThemeScreenshotTest": "themeScreenshot",
+  "com_codenameone_examples_hellocodenameone_tests_FloatingActionButtonThemeScreenshotTest": "themeScreenshot",
+  "com_codenameone_examples_hellocodenameone_tests_SpanLabelThemeScreenshotTest": "themeScreenshot",
+  "com_codenameone_examples_hellocodenameone_tests_DarkLightShowcaseThemeScreenshotTest": "themeScreenshot",
+  "com_codenameone_examples_hellocodenameone_tests_PaletteOverrideThemeScreenshotTest": "themeScreenshot"
 });
 const cn1ssForcedTimeoutTestNames = Object.freeze({
   "MediaPlaybackScreenshotTest": "mediaPlayback",
@@ -2793,7 +2807,21 @@ const cn1ssForcedTimeoutTestNames = Object.freeze({
   "CallDetectionAPITest": "callDetectionApi",
   "LocalNotificationOverrideTest": "localNotificationOverride",
   "Base64NativePerformanceTest": "base64NativePerformance",
-  "AccessibilityTest": "accessibility"
+  "AccessibilityTest": "accessibility",
+  "ButtonThemeScreenshotTest": "themeScreenshot",
+  "TextFieldThemeScreenshotTest": "themeScreenshot",
+  "CheckBoxRadioThemeScreenshotTest": "themeScreenshot",
+  "SwitchThemeScreenshotTest": "themeScreenshot",
+  "PickerThemeScreenshotTest": "themeScreenshot",
+  "ToolbarThemeScreenshotTest": "themeScreenshot",
+  "TabsThemeScreenshotTest": "themeScreenshot",
+  "MultiButtonThemeScreenshotTest": "themeScreenshot",
+  "ListThemeScreenshotTest": "themeScreenshot",
+  "DialogThemeScreenshotTest": "themeScreenshot",
+  "FloatingActionButtonThemeScreenshotTest": "themeScreenshot",
+  "SpanLabelThemeScreenshotTest": "themeScreenshot",
+  "DarkLightShowcaseThemeScreenshotTest": "themeScreenshot",
+  "PaletteOverrideThemeScreenshotTest": "themeScreenshot"
 });
 
 if (jvm && typeof jvm.addVirtualMethod === "function" && jvm.classes && jvm.classes["java_lang_String"]) {

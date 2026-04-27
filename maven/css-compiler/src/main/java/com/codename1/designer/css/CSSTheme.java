@@ -117,7 +117,15 @@ public class CSSTheme {
     EditableResources res;
     private String themeName = "Theme";
     private ImagesMetadata imagesMetadata = new ImagesMetadata();
-    
+
+    /**
+     * When true, {@link #createImageBorders(WebViewProvider)} refuses to rasterize any
+     * style via CEF and instead throws an {@link IllegalStateException} listing offending
+     * rules. Used by the native-themes build to guarantee that shipped platform themes
+     * contain no rasterized fallback images (which would bloat the .res file).
+     */
+    public static boolean strictNoCef = false;
+
     private List<FontFace> fontFaces = new ArrayList<FontFace>();
     public static final int DEFAULT_TARGET_DENSITY = com.codename1.ui.Display.DENSITY_HD;
     public static final String[] supportedNativeBorderTypes = new String[]{
@@ -2611,9 +2619,50 @@ public class CSSTheme {
         com.codename1.ui.BrowserComponent getWebView();
     }
     private static String currentId;
+
+    private void enforceNoCef() {
+        List<String> offenders = new ArrayList<String>();
+        String[] states = new String[] {"unselected", "selected", "pressed", "disabled"};
+        for (String id : elements.keySet()) {
+            if (!isModified(id)) {
+                continue;
+            }
+            Element e = (Element) elements.get(id);
+            Element[] stateElements = new Element[] {
+                e.getUnselected(), e.getSelected(), e.getPressed(), e.getDisabled()
+            };
+            for (int i = 0; i < stateElements.length; i++) {
+                Map<String, LexicalUnit> styles =
+                        (Map<String, LexicalUnit>) stateElements[i].getFlattenedStyle();
+                if (e.requiresImageBorder(styles)) {
+                    offenders.add(id + "." + states[i] + " (image border)");
+                } else if (e.requiresBackgroundImageGeneration(styles)) {
+                    offenders.add(id + "." + states[i] + " (background image)");
+                }
+            }
+        }
+        if (!offenders.isEmpty()) {
+            StringBuilder sb = new StringBuilder();
+            sb.append("CSS rules require CEF-backed image rasterization, which is disabled ");
+            sb.append("in no-cef mode (native-themes build). Offending rules:\n");
+            for (String o : offenders) {
+                sb.append("  - ").append(o).append("\n");
+            }
+            sb.append("Fix: avoid box-shadow, border-radius combined with a visible border, ");
+            sb.append("mixed-side borders, filter, and complex gradients. ");
+            sb.append("Use cn1-round-border / cn1-pill-border or solid backgrounds instead. ");
+            sb.append("If the effect is genuinely required, extend the CSS compiler and/or ");
+            sb.append("the resource format with a native primitive rather than rasterizing.");
+            throw new IllegalStateException(sb.toString());
+        }
+    }
+
     public void createImageBorders(WebViewProvider webviewProvider) {
         if (res == null) {
             res = new EditableResourcesForCSS(resourceFile);
+        }
+        if (strictNoCef) {
+            enforceNoCef();
         }
         ArrayList<Border> borders = new ArrayList<Border>();
         
@@ -5899,9 +5948,27 @@ public class CSSTheme {
                                 case "radial-gradient" :
                                     style.put("background", value);
                                     break;
+                                case "rgb" :
+                                case "rgba" :
+                                case "cn1rgb" :
+                                case "cn1rgba" :
+                                    // SAC reports `rgba()` (and `rgb()`) as
+                                    // SAC_FUNCTION rather than SAC_RGBCOLOR,
+                                    // so the previous default-throw silently
+                                    // dropped the entire `background:`
+                                    // shorthand on rules like
+                                    // `background: rgba(11,32,85,0.75)` -
+                                    // leaving the UIID with no bgColor /
+                                    // transparency, which fell back to the
+                                    // theme's Component default (often a
+                                    // very visible white in dark mode).
+                                    // Treat them the same as SAC_RGBCOLOR
+                                    // and route to background-color.
+                                    apply(style, "background-color", value);
+                                    break;
                                 default:
                                     throw new RuntimeException("Unsupported function in background property");
-                                    
+
                             }
                         break;
                         
@@ -6947,7 +7014,7 @@ public class CSSTheme {
         int len = css.length();
         int pos = 0;
         while (pos < len) {
-            int mediaPos = css.indexOf("@media", pos);
+            int mediaPos = indexOfOutsideComments(css, "@media", pos);
             if (mediaPos < 0) {
                 out.append(css.substring(pos));
                 break;
@@ -6980,12 +7047,29 @@ public class CSSTheme {
         int len = block.length();
         int pos = 0;
         while (pos < len) {
+            // Whitespace and `/* ... */` block comments are pass-through:
+            // they're emitted verbatim and consumed BEFORE the next selector
+            // string is captured. Without this, a comment immediately
+            // preceding a rule like `/* note */ Form { ... }` would be
+            // treated as part of the selector text and prefixed as
+            // `CN1DARK_/* note */ Form`, which Flute then rejects as a
+            // malformed selector and silently drops the entire rule.
             while (pos < len && Character.isWhitespace(block.charAt(pos))) {
                 out.append(block.charAt(pos));
                 pos++;
             }
             if (pos >= len) {
                 break;
+            }
+            if (pos + 1 < len && block.charAt(pos) == '/' && block.charAt(pos + 1) == '*') {
+                int commentEnd = block.indexOf("*/", pos + 2);
+                if (commentEnd < 0) {
+                    out.append(block.substring(pos));
+                    break;
+                }
+                out.append(block, pos, commentEnd + 2);
+                pos = commentEnd + 2;
+                continue;
             }
             int open = block.indexOf('{', pos);
             if (open < 0) {
@@ -7004,6 +7088,13 @@ public class CSSTheme {
         return out.toString();
     }
 
+    /// SAC / Flute rejects `$` as a selector-name starter, so we can't
+    /// emit `$DarkButton { ... }` directly or the parser silently drops
+    /// the whole rule with a "Skipping" warning. Emit a Flute-valid
+    /// identifier prefix (`CN1DARK_`) here and rename the elements back
+    /// to `$Dark...` in `renameDarkElements` after parsing completes.
+    static final String DARK_PLACEHOLDER = "CN1DARK_";
+
     private static String toDarkSelectors(String selectors) {
         StringBuilder out = new StringBuilder();
         String[] parts = selectors.split(",");
@@ -7012,7 +7103,7 @@ public class CSSTheme {
                 out.append(',');
             }
             String selector = parts[i].trim();
-            if (selector.length() == 0 || selector.startsWith("$Dark")) {
+            if (selector.length() == 0 || selector.startsWith("$Dark") || selector.startsWith(DARK_PLACEHOLDER)) {
                 out.append(parts[i]);
                 continue;
             }
@@ -7031,9 +7122,59 @@ public class CSSTheme {
             if ("*".equals(base) || base.length() == 0) {
                 base = "Component";
             }
-            out.append("$Dark").append(base).append(suffix);
+            out.append(DARK_PLACEHOLDER).append(base).append(suffix);
         }
         return out.toString();
+    }
+
+    /// After the Flute parser populates `theme.elements` with keys like
+    /// `CN1DARK_Button`, rename them to `$DarkButton` so `updateResources`
+    /// emits the proper `$Dark<UIID>.fgColor` entries the runtime UIManager
+    /// consults via `shouldUseDarkStyle`.
+    private static void renameDarkElements(CSSTheme theme) {
+        if (theme == null || theme.elements == null) {
+            return;
+        }
+        LinkedHashMap<String, Element> renamed = new LinkedHashMap<String, Element>();
+        boolean changed = false;
+        for (Map.Entry<String, Element> e : theme.elements.entrySet()) {
+            String k = e.getKey();
+            if (k != null && k.startsWith(DARK_PLACEHOLDER)) {
+                renamed.put("$Dark" + k.substring(DARK_PLACEHOLDER.length()), e.getValue());
+                changed = true;
+            } else {
+                renamed.put(k, e.getValue());
+            }
+        }
+        if (changed) {
+            theme.elements = renamed;
+        }
+    }
+
+    /// Finds the next occurrence of `needle` in `css` starting at `fromPos`,
+    /// skipping over any `/* ... */` block-comment regions. Used by the
+    /// dark-mode rewriter so a literal "@media" token documented inside a
+    /// header comment isn't mistaken for a real media block.
+    private static int indexOfOutsideComments(String css, String needle, int fromPos) {
+        int len = css.length();
+        int pos = fromPos;
+        while (pos < len) {
+            int commentStart = css.indexOf("/*", pos);
+            int hit = css.indexOf(needle, pos);
+            if (hit < 0) {
+                return -1;
+            }
+            if (commentStart < 0 || hit < commentStart) {
+                return hit;
+            }
+            int commentEnd = css.indexOf("*/", commentStart + 2);
+            if (commentEnd < 0) {
+                // Unterminated comment - everything from here on is comment.
+                return -1;
+            }
+            pos = commentEnd + 2;
+        }
+        return -1;
     }
 
     private static int findMatchingBrace(String css, int openPos) {
@@ -7312,6 +7453,7 @@ public class CSSTheme {
             
             parser.parseStyleSheet(source);
             stream.close();
+            renameDarkElements(theme);
             return theme;
         } catch (ClassNotFoundException ex) {
             Logger.getLogger(CSSTheme.class.getName()).log(Level.SEVERE, null, ex);
@@ -7320,11 +7462,12 @@ public class CSSTheme {
         } catch (InstantiationException ex) {
             Logger.getLogger(CSSTheme.class.getName()).log(Level.SEVERE, null, ex);
         } catch (NullPointerException ex) {
-            if (ex.getMessage().contains("encoding properties")) {
+            String msg = ex.getMessage();
+            if (msg != null && msg.contains("encoding properties")) {
                 // This error always happens and there doesn't seem to be a way to fix it... so let's just hide
                 // it .  Doesn't seem to hurt anything.
             } else {
-                //Logger.getLogger(CSSTheme.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(CSSTheme.class.getName()).log(Level.SEVERE, "Failed to load CSS theme", ex);
             }
         } catch (ClassCastException ex) {
             Logger.getLogger(CSSTheme.class.getName()).log(Level.SEVERE, null, ex);

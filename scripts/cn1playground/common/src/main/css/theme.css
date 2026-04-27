@@ -120,7 +120,7 @@ PlaygroundAppIcon {
 }
 
 PlaygroundAppIconDark {
-    background: rgba(255, 255, 255, 0.1);
+    background-color: rgba(255, 255, 255, 0.1);
     color: #FFFFFF;
     padding: 0.5mm 1mm 0.5mm 1mm;
     margin: 0 0.5mm 0 0.5mm;
@@ -211,7 +211,7 @@ PlaygroundSegmentOptionSelectedDark {
 /* ----- Status pill ----- */
 
 PlaygroundStatusPill {
-    background: rgba(240, 242, 247, 0.75);
+    background-color: rgba(240, 242, 247, 0.75);
     color: #112247;
     border: 1px solid #E1E4EA;
     border-radius: 3mm;
@@ -223,7 +223,7 @@ PlaygroundStatusPill {
 }
 
 PlaygroundStatusPillDark {
-    background: rgba(11, 32, 85, 0.75);
+    background-color: rgba(11, 32, 85, 0.75);
     color: #F5F8FF;
     border: 1px solid #253B73;
     border-radius: 3mm;
@@ -235,7 +235,7 @@ PlaygroundStatusPillDark {
 }
 
 PlaygroundStatusPillError {
-    background: rgba(251, 230, 230, 0.75);
+    background-color: rgba(251, 230, 230, 0.75);
     color: #D93636;
     border: 1px solid #F0C2C2;
     border-radius: 3mm;
@@ -247,7 +247,7 @@ PlaygroundStatusPillError {
 }
 
 PlaygroundStatusPillErrorDark {
-    background: rgba(58, 21, 21, 0.75);
+    background-color: rgba(58, 21, 21, 0.75);
     color: #FF6B6B;
     border: 1px solid #5A2525;
     border-radius: 3mm;
@@ -756,16 +756,29 @@ PlaygroundEmbeddedForm {
     background: #F7F8FB;
 }
 
+/* Embedded form / title area dark backgrounds aligned with the modern
+   iOS / Material themes (Form #1c1c1e on iOS, Toolbar #000 on iOS).
+   The previous navy palette belonged to the legacy iOS7 / Holo Light
+   bezel and clashed visibly against the modern dark Form fill that
+   the preview Form now uses, leaving a wide blue band around the
+   actual app surface. */
 PlaygroundEmbeddedFormDark {
-    background: #112247;
+    background: #1c1c1e;
 }
 
+/* Title area sits on top of the embedded Form's surface. Painting an
+   opaque colour here would draw a visible band across the top of the
+   form (the host's previous navy contrasted with the legacy iOS7 form
+   bg by design, but against the modern Form surface it just reads as
+   "two different shades of dark"). Keep the title area transparent so
+   the form's surface paints uniformly underneath - the user's Title
+   text is what styles the title visually. */
 PlaygroundEmbeddedTitleArea {
-    background: #F3F4F7;
+    background-color: transparent;
 }
 
 PlaygroundEmbeddedTitleAreaDark {
-    background: #163575;
+    background-color: transparent;
 }
 
 /* ----- Inspector ----- */

@@ -60,6 +60,7 @@
         <module>java-runtime</module>
         <module>core</module>
         <module>factory</module>
+        <module>css-compiler</module>
         <module>sqlite-jdbc</module>
         <module>javase</module>
         <module>javase-svg</module>
@@ -91,6 +92,11 @@
             <dependency>
                 <groupId>com.codenameone</groupId>
                 <artifactId>codenameone-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-css-compiler</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

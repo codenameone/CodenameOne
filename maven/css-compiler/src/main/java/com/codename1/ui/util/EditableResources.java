@@ -25,16 +25,6 @@
 package com.codename1.ui.util;
 
 import com.codename1.ui.Display;
-import com.codename1.designer.ResourceEditorView;
-import com.codename1.designer.DataEditor;
-import com.codename1.designer.FontEditor;
-import com.codename1.designer.ImageMultiEditor;
-import com.codename1.designer.ImageRGBEditor;
-import com.codename1.designer.L10nEditor;
-import com.codename1.designer.MultiImageSVGEditor;
-import com.codename1.designer.ThemeEditor;
-import com.codename1.designer.TimelineEditor;
-import com.codename1.designer.UserInterfaceEditor;
 import com.codename1.ui.EditorFont;
 import com.codename1.ui.EditorTTFFont;
 import com.codename1.ui.EncodedImage;
@@ -44,12 +34,9 @@ import com.codename1.ui.animations.AnimationAccessor;
 import com.codename1.ui.animations.AnimationObject;
 import com.codename1.ui.animations.Motion;
 import com.codename1.ui.animations.Timeline;
-import com.codename1.impl.javase.SVG;
 import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.Accessor;
 import com.codename1.ui.plaf.Style;
-import com.codename1.designer.ResourceEditorApp;
-import com.codename1.impl.javase.JavaSEPortWithSVGSupport;
 import com.codename1.ui.plaf.CSSBorder;
 import com.codename1.ui.plaf.RoundBorder;
 import com.codename1.ui.plaf.RoundRectBorder;
@@ -93,7 +80,6 @@ import java.util.List;
 import java.util.Map;
 import javax.imageio.ImageIO;
 import javax.swing.Icon;
-import javax.swing.JComponent;
 import javax.swing.JFrame;
 import javax.swing.JOptionPane;
 import javax.swing.JPasswordField;
@@ -112,10 +98,16 @@ public class EditableResources extends Resources implements TreeModel {
     private static final short MINOR_VERSION = 12;
     private static final short MAJOR_VERSION = 1;
 
+    private static final boolean IS_MAC;
+    static {
+        String osName = System.getProperty("os.name", "");
+        IS_MAC = osName.toLowerCase().contains("mac");
+    }
+
     private boolean modified;
     private boolean loadingMode = false;
     private boolean xmlUI;
-    
+
     private boolean ignoreSVGMode;
     private boolean ignorePNGMode;
 
@@ -123,8 +115,77 @@ public class EditableResources extends Resources implements TreeModel {
     private File overrideFile;
     private EditableResources parentResource;
     private static boolean xmlEnabled;
-    
+
     private HashSet themeLoadingErrors;
+
+    /**
+     * Optional file context used to resolve relative TTF font paths embedded in
+     * the resource. The Designer subclass wires this to the currently loaded
+     * resource file; headless callers (e.g. the CSS native-themes build) leave
+     * it null and treat the legacy-font fallback as unavailable.
+     */
+    private File loadedBaseFile;
+
+    public void setLoadedBaseFile(File loadedBaseFile) {
+        this.loadedBaseFile = loadedBaseFile;
+    }
+
+    /**
+     * Returns the base file used for TTF font path resolution, or null when
+     * no resource is currently anchored to a file. Overridable by the Designer
+     * subclass to query its GUI-managed loaded-file state.
+     */
+    protected File getLoadedFile() {
+        return loadedBaseFile;
+    }
+
+    /**
+     * Serialize a freshly-loaded UI container to the binary resource format.
+     * Called during openFile() when reading an XML-sourced resource. Throws
+     * in the base class: UI container persistence lives in the Designer
+     * editor subclass, which has the UserInterfaceEditor on its classpath.
+     */
+    protected byte[] persistUIContainer(com.codename1.ui.Container cnt) {
+        throw new UnsupportedOperationException(
+                "UI container persistence requires EditableResourcesEditor");
+    }
+
+    /**
+     * Materialize a UI container from an XML component description. Called
+     * during openFile() when the resource was saved as XML. Returns null in
+     * the base class so openFile falls back to reading the binary UI blob;
+     * the Designer subclass overrides to drive UIBuilderOverride.
+     */
+    protected com.codename1.ui.Container loadUIContainerFromXml(com.codename1.ui.util.xml.comps.ComponentEntry uiXMLData) {
+        return null;
+    }
+
+    /**
+     * Materialize a UI container from a named binary UI resource so the
+     * containing resource can be re-serialized as XML. The Designer subclass
+     * overrides this with UIBuilderOverride; headless callers never hit the
+     * XML save path.
+     */
+    protected com.codename1.ui.Container materializeUIContainer(String resourceName) {
+        throw new UnsupportedOperationException(
+                "UI container materialization for XML save requires EditableResourcesEditor");
+    }
+
+    /**
+     * Invoked at the end of openFile(). The Designer subclass overrides this
+     * to reset GUI-side theme caches; headless callers do nothing.
+     */
+    protected void onOpenFileComplete() {
+    }
+
+    /**
+     * Returns the runtime native theme as an EditableResources (may be null).
+     * The Designer subclass queries JavaSEPortWithSVGSupport; headless callers
+     * have no runtime theme so the base returns null.
+     */
+    protected EditableResources getRuntimeNativeTheme() {
+        return null;
+    }
     
     public static void setXMLEnabled(boolean b) {
         xmlEnabled = b;
@@ -836,9 +897,8 @@ public class EditableResources extends Resources implements TreeModel {
                                     }
                                 });
                                 for(ComponentEntry uiXMLData : guiElements) {
-                                    UIBuilderOverride uib = new UIBuilderOverride();
-                                    com.codename1.ui.Container cnt = uib.createInstance(uiXMLData, this);
-                                    
+                                    com.codename1.ui.Container cnt = loadUIContainerFromXml(uiXMLData);
+
                                     // encountered an error loading the component fallback to loading with the binary types
                                     if(cnt == null) {
                                         for(Ui ui : xmlData.getUi()) {
@@ -846,7 +906,7 @@ public class EditableResources extends Resources implements TreeModel {
                                         }
                                         break;
                                     } else {
-                                        byte[] data = UserInterfaceEditor.persistContainer(cnt, this);
+                                        byte[] data = persistUIContainer(cnt);
                                         setResource(uiXMLData.getName(), MAGIC_UI, data);
                                     }
                                 }
@@ -982,7 +1042,7 @@ public class EditableResources extends Resources implements TreeModel {
                             case 0xf5:
                             // multiimage with SVG
                             case 0xf7:
-                                SVG s = (SVG)image.getSVGDocument();
+                                SvgBridge s = SvgBridge.of(image.getSVGDocument());
                                 writeToFile(s.getSvgData(), new File(resourcesDir, normalizeFileName(resourceNames[iter])));
 
                                 if(s.getBaseURL() != null && s.getBaseURL().length() > 0) {
@@ -1414,8 +1474,7 @@ public class EditableResources extends Resources implements TreeModel {
                     }
                     case MAGIC_UI: {
                         File uiXML = new File(resourcesDir, resourceNames[iter] + ".ui");
-                        UIBuilderOverride u = new UIBuilderOverride();
-                        com.codename1.ui.Container cnt = u.createContainer(this, resourceNames[iter]);
+                        com.codename1.ui.Container cnt = materializeUIContainer(resourceNames[iter]);
                         FileOutputStream fos = new FileOutputStream(uiXML);
                         writeUIXml(cnt, fos);
                         fos.close();
@@ -1463,14 +1522,14 @@ public class EditableResources extends Resources implements TreeModel {
         }
     }
     
-    private void writeUIXml(com.codename1.ui.Container cnt, FileOutputStream dest) throws IOException {
-        Writer w = new OutputStreamWriter(dest, "UTF-8");
-        w.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\n");
-
-        StringBuilder bld = new StringBuilder();
-        UserInterfaceEditor.persistToXML(cnt, cnt, bld, this, "");
-        w.write(bld.toString());
-        w.flush();
+    /**
+     * Writes a UI container as XML to the given stream. Overridden by the
+     * Designer editor subclass; the base class throws because the XML
+     * persister lives in the Designer module.
+     */
+    protected void writeUIXml(com.codename1.ui.Container cnt, FileOutputStream dest) throws IOException {
+        throw new UnsupportedOperationException(
+                "UI container XML persistence requires EditableResourcesEditor");
     }
 
     public void saveXML(File resFile) throws IOException {
@@ -1511,7 +1570,7 @@ public class EditableResources extends Resources implements TreeModel {
             undoQueue.clear();
             redoQueue.clear();
         }
-        ThemeEditor.resetThemeLoaded();
+        onOpenFileComplete();
     }
 
     /**
@@ -1574,7 +1633,7 @@ public class EditableResources extends Resources implements TreeModel {
             overrideResource.updateModified();
             return;
         }
-        if(ResourceEditorApp.IS_MAC) {
+        if(IS_MAC) {
             for(java.awt.Window w : java.awt.Frame.getWindows()) {
                 if(w instanceof JFrame) {
                     if(modified) {
@@ -1933,13 +1992,14 @@ public class EditableResources extends Resources implements TreeModel {
     
     com.codename1.ui.Font createTrueTypeFont(com.codename1.ui.Font f, String fontName, String fileName, float fontSize, int sizeSetting) {
         // workaround for NPE in case of people doing stupid things like moving the res file.
-        if(ResourceEditorView.getLoadedFile() == null && !fileName.startsWith("native:")) {
+        File loadedFile = getLoadedFile();
+        if(loadedFile == null && !fileName.startsWith("native:")) {
             return f;
         }
         if(fileName.startsWith("native:")) {
-            return new EditorTTFFont(fileName, sizeSetting, fontSize, f);            
+            return new EditorTTFFont(fileName, sizeSetting, fontSize, f);
         }
-        File fontFile = new File(ResourceEditorView.getLoadedFile().getParentFile(), fileName);
+        File fontFile = new File(loadedFile.getParentFile(), fileName);
         if(fontFile.exists()) {
             return new EditorTTFFont(fontFile, sizeSetting, fontSize, f);
         }
@@ -2594,7 +2654,7 @@ public class EditableResources extends Resources implements TreeModel {
     }
 
     private void saveSVG(DataOutputStream out, Image i, boolean isMultiImage) throws IOException {
-        SVG s = (SVG)i.getSVGDocument();
+        SvgBridge s = SvgBridge.of(i.getSVGDocument());
         out.writeInt(s.getSvgData().length);
         out.write(s.getSvgData());
         if(s.getBaseURL() == null) {
@@ -2634,7 +2694,7 @@ public class EditableResources extends Resources implements TreeModel {
     }
 
     private MultiImage svgToMulti(Image image) throws IOException {
-        SVG s = (SVG)image.getSVGDocument();
+        SvgBridge s = SvgBridge.of(image.getSVGDocument());
         MultiImage mi = new MultiImage();
         mi.dpi = s.getDpis();
         if(mi.dpi == null || mi.dpi.length == 0) {
@@ -2654,7 +2714,7 @@ public class EditableResources extends Resources implements TreeModel {
     @Override
     com.codename1.ui.Image createSVG(boolean animated, byte[] data) throws IOException {
         com.codename1.ui.Image img = super.createSVG(animated, data);
-        SVG s = (SVG)img.getSVGDocument();
+        SvgBridge s = SvgBridge.of(img.getSVGDocument());
         if(s != null) {
             s.setDpis(dpisLoaded);
             s.setWidthForDPI(widthForDPI);
@@ -2730,7 +2790,7 @@ public class EditableResources extends Resources implements TreeModel {
     Image createImage() throws IOException {
         Image i = super.createImage();
         if(i.isSVG()) {
-            SVG s = (SVG)i.getSVGDocument();
+            SvgBridge s = SvgBridge.of(i.getSVGDocument());
             s.setRatioH(ratioH);
             s.setRatioW(ratioW);
         }
@@ -2741,7 +2801,7 @@ public class EditableResources extends Resources implements TreeModel {
     Image createImage(DataInputStream input) throws IOException {
         Image i = super.createImage(input);
         if(i.isSVG()) {
-            SVG s = (SVG)i.getSVGDocument();
+            SvgBridge s = SvgBridge.of(i.getSVGDocument());
             s.setRatioH(ratioH);
             s.setRatioW(ratioW);
         }
@@ -2835,7 +2895,7 @@ public class EditableResources extends Resources implements TreeModel {
     }
 
     public void setSVGDPIs(final String name, final int[] dpi, final int[] widths, final int[] heights) {
-        final SVG sv = (SVG)getImage(name).getSVGDocument();
+        final SvgBridge sv = SvgBridge.of(getImage(name).getSVGDocument());
         final int[] currentDPIs = sv.getDpis();
         final int[] currentWidths = sv.getWidthForDPI();
         final int[] currentHeights = sv.getHeightForDPI();
@@ -3191,7 +3251,7 @@ public class EditableResources extends Resources implements TreeModel {
     }
     
     public void refreshThemeMultiImages() {
-        EditableResources ed = (EditableResources)JavaSEPortWithSVGSupport.getNativeTheme();
+        EditableResources ed = getRuntimeNativeTheme();
         if(ed != null && ed != this) {
             ed.refreshThemeMultiImages();
         }
@@ -3344,58 +3404,11 @@ public class EditableResources extends Resources implements TreeModel {
         return super.getResourceType(name);
     }
 
-    public JComponent getResourceEditor(String name, ResourceEditorView  view) {
-        byte magic = getResourceType(name);
-        switch(magic) {
-            case MAGIC_IMAGE:
-            case MAGIC_IMAGE_LEGACY:
-                Image i = getImage(name);
-                if(getResourceObject(name) instanceof MultiImage) {
-                    ImageMultiEditor tl = new ImageMultiEditor(this, name, view);
-                    tl.setImage((MultiImage)getResourceObject(name));
-                    return tl;
-                }
-                if(i instanceof Timeline) {
-                    TimelineEditor tl = new TimelineEditor(this, name, view);
-                    tl.setImage((Timeline)i);
-                    return tl;
-                }
-                if(i.isSVG()) {
-                    MultiImageSVGEditor img = new MultiImageSVGEditor(this, name);
-                    img.setImage(i);
-                    return img;
-                }
-                ImageRGBEditor img = new ImageRGBEditor(this, name, view);
-                img.setImage(i);
-                return img;
-            case MAGIC_TIMELINE:
-                TimelineEditor tl = new TimelineEditor(this, name, view);
-                tl.setImage((Timeline)getImage(name));
-                return tl;
-            case MAGIC_THEME:
-            case MAGIC_THEME_LEGACY:
-                ThemeEditor theme = new ThemeEditor(this, name, getTheme(name), view);
-                return theme;
-            case MAGIC_FONT:
-            case MAGIC_FONT_LEGACY:
-            case MAGIC_INDEXED_FONT_LEGACY:
-                FontEditor fonts = new FontEditor(this, getFont(name), name);
-                return fonts;
-            case MAGIC_DATA:
-                DataEditor data = new DataEditor(this, name);
-                return data;
-            case MAGIC_UI:
-                UserInterfaceEditor uie = new UserInterfaceEditor(name, this, view.getProjectGeneratorSettings(), view);
-                return uie;
-            case MAGIC_L10N:
-                // we are cheating this isn't a theme but it should work since
-                // this is a hashtable that will include the nested locales
-                L10nEditor l10n = new L10nEditor(this, name);
-                return l10n;
-            default:
-                throw new IllegalArgumentException("Unrecognized magic number: " + Integer.toHexString(magic & 0xff));
-        }
-    }
+    // getResourceEditor(String, ResourceEditorView) lives on EditableResourcesEditor,
+    // which extends this class inside the Designer module. Headless callers (e.g.
+    // the native-themes CSS build) never open a GUI editor, so keeping it out of
+    // the base class lets this module compile without the Designer GUI on its
+    // classpath.
 
     public static EditableResources open(InputStream resource) throws IOException {
         return new EditableResources(resource);
@@ -3629,6 +3642,54 @@ public class EditableResources extends Resources implements TreeModel {
                 }
             }
             return getInternalImages()[bestFitOffset];
+        }
+    }
+
+    /**
+     * Reflective bridge to the javase-svg SVG class. Kept internal so that
+     * neither core nor the css-compiler module has to expose an SVG-facing
+     * public API, and so that neither module has to name the SVG class at
+     * compile time (it lives in javase-svg). The reflection paths are cold
+     * in the headless css-compiler run - they execute only when the resource
+     * being serialized actually contains SVG images.
+     */
+    static final class SvgBridge {
+        private final Object svg;
+
+        private SvgBridge(Object svg) {
+            this.svg = svg;
+        }
+
+        static SvgBridge of(Object svg) {
+            return svg == null ? null : new SvgBridge(svg);
+        }
+
+        byte[] getSvgData() { return (byte[]) call("getSvgData"); }
+        String getBaseURL() { return (String) call("getBaseURL"); }
+        float getRatioW() { return ((Number) call("getRatioW")).floatValue(); }
+        float getRatioH() { return ((Number) call("getRatioH")).floatValue(); }
+        int[] getDpis() { return (int[]) call("getDpis"); }
+        int[] getWidthForDPI() { return (int[]) call("getWidthForDPI"); }
+        int[] getHeightForDPI() { return (int[]) call("getHeightForDPI"); }
+
+        void setRatioW(float v) { call("setRatioW", new Class[]{float.class}, v); }
+        void setRatioH(float v) { call("setRatioH", new Class[]{float.class}, v); }
+        void setDpis(int[] v) { call("setDpis", new Class[]{int[].class}, (Object) v); }
+        void setWidthForDPI(int[] v) { call("setWidthForDPI", new Class[]{int[].class}, (Object) v); }
+        void setHeightForDPI(int[] v) { call("setHeightForDPI", new Class[]{int[].class}, (Object) v); }
+
+        private Object call(String method) {
+            return call(method, new Class[0]);
+        }
+
+        private Object call(String method, Class<?>[] ptypes, Object... args) {
+            try {
+                return svg.getClass().getMethod(method, ptypes).invoke(svg, args);
+            } catch (Exception e) {
+                throw new RuntimeException(
+                        "SVG bridge failed to invoke " + method + " on "
+                        + (svg == null ? "null" : svg.getClass().getName()), e);
+            }
         }
     }
 }

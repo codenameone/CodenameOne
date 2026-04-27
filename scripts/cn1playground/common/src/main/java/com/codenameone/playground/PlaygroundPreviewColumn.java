@@ -250,7 +250,7 @@ final class PlaygroundPreviewColumn extends Container {
             contentHost.setUIID(darkMode ? "PlaygroundNoSkinStageDark" : "PlaygroundNoSkinStage");
             stageWrapper.setUIID(darkMode ? "PlaygroundNoSkinStageDark" : "PlaygroundNoSkinStage");
             if (currentPreview != null) {
-                contentHost.add(BorderLayout.CENTER, currentPreview);
+                contentHost.add(BorderLayout.CENTER, wrapNonFormWithFormBackdrop(currentPreview));
             }
             dimensionsLabel.setText("Fills preview");
         } else {
@@ -268,6 +268,23 @@ final class PlaygroundPreviewColumn extends Container {
         if (getComponentForm() != null) {
             revalidate();
         }
+    }
+
+    /// When the user's preview is something other than a Form (e.g. a Container
+    /// from `new Container(BoxLayout.y())`), the preview is rendered directly
+    /// inside the playground's device screen and there's no Form to paint a
+    /// surface behind it. Wrap such previews in a tiny BorderLayout container
+    /// styled with the `Form` UIID so the surrounding skin shows the same
+    /// surface the active native theme paints behind a real Form. Forms pass
+    /// through unchanged - they paint their own surface.
+    private static Component wrapNonFormWithFormBackdrop(Component preview) {
+        if (preview == null || preview instanceof com.codename1.ui.Form) {
+            return preview;
+        }
+        Container wrapper = new Container(new BorderLayout());
+        wrapper.setUIID("Form");
+        wrapper.add(BorderLayout.CENTER, preview);
+        return wrapper;
     }
 
     private void detachPreview() {
@@ -320,7 +337,7 @@ final class PlaygroundPreviewColumn extends Container {
         Container content = new Container(new BorderLayout());
         content.setUIID(darkMode ? "PlaygroundDeviceScreenDark" : "PlaygroundDeviceScreen");
         if (currentPreview != null) {
-            content.add(BorderLayout.CENTER, currentPreview);
+            content.add(BorderLayout.CENTER, wrapNonFormWithFormBackdrop(currentPreview));
         }
 
         CornerMaskOverlay cornerMask = new CornerMaskOverlay(BEZEL_FILL_COLOR, screenCornerPx);

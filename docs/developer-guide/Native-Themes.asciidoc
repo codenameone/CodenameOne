@@ -1,0 +1,419 @@
+== Native Modern Themes
+
+Codename One ships an iOS Modern (liquid-glass) theme and an Android
+Material 3 theme that you can opt your app into with a single build
+hint. Both are fully overridable - their colour palettes, type
+ramps, and state-specific styles are all reachable from your own
+`theme.css` and from runtime API.
+
+The legacy iOS 7 (iOS) and Holo Light (Android) themes remain the
+default so existing apps see no behaviour change.
+
+=== Selecting a theme
+
+Three build hints control the platform native theme. None of them
+are required; with all three unset every app continues to load the
+legacy theme it always did.
+
+[cols="1,2,3", options="header"]
+|===
+|Hint |Values |Description
+
+|`ios.themeMode`
+|`auto` (default) +
+`modern` / `liquid` +
+`ios7` / `flat` +
+`legacy` / `iphone`
+|`auto` and `ios7` both load the iOS 7 flat theme. `modern` /
+`liquid` opts in to the modern theme generated from
+`native-themes/ios-modern/theme.css`. `legacy` / `iphone` loads the
+pre-iOS 7 theme. The `auto` -> `modern` flip is planned for a
+future release.
+
+|`cn1.androidTheme`
+|`hololight` (default) +
+`material` / `modern` +
+`legacy`
+|`hololight` is Android Holo Light. `material` / `modern` opts in
+to the modern theme generated from
+`native-themes/android-material/theme.css`. `legacy` is the
+pre-Holo theme.
+
+|`cn1.nativeTheme`
+|`modern` / `legacy` / `custom`
+|Cross-platform shortcut that sets both `ios.themeMode` and
+`cn1.androidTheme` together. `modern` = liquid glass + Material 3,
+`legacy` = iOS 7 + Holo Light, `custom` disables the framework
+theme entirely so your own `theme.css` owns the base layer.
+|===
+
+The legacy `and.hololight=true` hint still works and maps to
+`cn1.androidTheme=hololight`.
+
+=== Light and dark mode
+
+Both modern themes ship a dark variant via a
+`@media (prefers-color-scheme: dark)` block in their CSS. The CSS
+compiler rewrites each rule inside that block into a `$Dark<UIID>`
+style entry; UIManager picks them up whenever
+`CN.isDarkMode() == true`.
+
+`Display.getInstance().setDarkMode(Boolean)` controls the active
+appearance:
+
+* `null` (the default) - follow the device. iOS reads
+  `UITraitCollection`, Android reads `Configuration.uiMode`. When
+  the user toggles light / dark in system settings the app reflects
+  the change.
+* `true` / `false` - force the app into one mode regardless of
+  system setting (useful for theme-preview screens or accessibility
+  toggles).
+
+=== Material 3 colour palette (Android)
+
+The Android Material 3 theme is built around the Material Design 3
+"baseline" palette. Each colour is referenced from one or more
+UIIDs; if you change a colour the change ripples to every UIID that
+inherits from it.
+
+[cols="1,1,1,2", options="header"]
+|===
+|Role |Light |Dark |Used by
+
+|primary
+|`#6750a4`
+|`#d0bcff`
+|Default `Button` fill, `BackCommand` / `TitleCommand` text,
+`SelectedTab` text colour.
+
+|on-primary
+|`#ffffff`
+|`#381e72`
+|Text printed on top of the primary fill.
+
+|primary-container
+|`#eaddff`
+|`#4f378b`
+|`RaisedButton` (the elevated tone), `Button.pressed` and
+`MultiButton.pressed` highlight, `FloatingActionButton`.
+
+|surface
+|`#fef7ff`
+|`#141218`
+|`Form`, `ContentPane`, `Toolbar`, `TitleArea`, `List`, `Tabs`,
+`SideNavigationPanel`. The "page" colour.
+
+|on-surface
+|`#1d1b20`
+|`#e6e0e9`
+|Body text on surfaces (`Label`, `Title`, `MultiLine1`).
+
+|surface-variant
+|`#e7e0ec`
+|`#49454f`
+|Track of the off-state `Switch`.
+
+|on-surface-variant
+|`#49454f`
+|`#cac4d0`
+|Secondary text (`SecondaryLabel`, `MultiLine2`,
+`UnselectedTab` text).
+
+|surface-container
+|`#f3edf7`
+|`#211f26`
+|`TextField` / `TextArea` filled background.
+
+|surface-container-highest
+|`#e6e0e9`
+|`#211f26`
+|`Dialog`, `PopupContent`. Sits one elevation step above
+`surface` so dialogs read as raised cards.
+
+|outline / outline-variant
+|`#79747e` / `#cac4d0`
+|`#938f99` / `#49454f`
+|`Separator`, `TertiaryLabel`, disabled-text muting.
+
+|state-pressed
+|`#d0bcff`
+|`#4f378b`
+|All `.pressed` overrides on Button-family UIIDs.
+
+|state-disabled / on-disabled
+|`#e0dce4` / `#a5a0ab`
+|`#2b2930` / `#5c5967`
+|All `.disabled` overrides.
+|===
+
+To rebrand the app, override the colour at the role level rather
+than touching every UIID. For example, to flip the primary
+container palette to teal:
+
+[source,css]
+----
+#Constants {
+    includeNativeBool: true;
+    darkModeBool: true;
+}
+
+/* Touch the four UIIDs that paint with primary / primary-container.
+   The role-as-rule pattern keeps brand changes localised. */
+Button { background-color: #00796b; }
+Button.pressed { background-color: #4db6ac; color: #00251a; }
+RaisedButton { background-color: #b2dfdb; color: #00251a; }
+RaisedButton.pressed { background-color: #80cbc4; }
+SelectedTab { color: #00796b; }
+BackCommand { color: #00796b; }
+TitleCommand { color: #00796b; }
+----
+
+=== iOS modern colour palette
+
+The iOS modern theme follows Apple's system palette.
+
+[cols="1,1,1,2", options="header"]
+|===
+|Role |Light |Dark |Used by
+
+|accent
+|`#007aff`
+|`#0a84ff`
+|`Button` text, `RaisedButton` fill, `SelectedTab` text,
+`BackCommand` / `TitleCommand`, `FloatingActionButton`.
+
+|accent-pressed
+|`#0064d1`
+|`#64b1ff`
+|All `.pressed` accent overrides.
+
+|accent-disabled
+|`#b3d4ff`
+|`#004a99`
+|All `.disabled` accent overrides.
+
+|surface
+|`#ffffff`
+|`#000000`
+|Pure surface used by `Toolbar`, `TitleArea`, `Title`, `List`.
+
+|surface-grouped
+|`#f2f2f7`
+|`#1c1c1e`
+|Form / ContentPane (the iOS "grouped" form bg). `Dialog` /
+`Tabs` use this colour at reduced opacity for the liquid-glass
+look.
+
+|surface-tertiary
+|`#e5e5ea`
+|`#2c2c2e`
+|`Button.pressed` highlight, elevated dark Dialog surface.
+
+|text-primary
+|`#000000`
+|`#ffffff`
+|`Label`, `MultiLine1`, `Title`, primary body text.
+
+|text-secondary
+|`#3c3c43`
+|`#ebebf5`
+|`SecondaryLabel`, `MultiLine2`, unselected tabs.
+
+|text-tertiary / text-disabled
+|`#8e8e93` / `#c7c7cc`
+|`#8e8e93` / `#48484a`
+|`TertiaryLabel`, `MultiLine3-4`, disabled-state text.
+
+|separator
+|`#c6c6c8`
+|`#38383a`
+|`Separator`.
+
+|success
+|`#34c759`
+|`#30d158`
+|`Switch.selected`, `OnOffSwitch.selected`.
+|===
+
+To layer a brand colour on top, override `RaisedButton` and
+accent-driven UIIDs the same way as Android above. The colour names
+match Apple's `UIColor.systemBlue` etc. so you can mirror the SF
+Symbols semantics if you want.
+
+=== Runtime palette override
+
+Push a Hashtable of theme props through `UIManager.addThemeProps`
+to flip the palette live, without recompiling the theme:
+
+[source,java]
+----
+Hashtable override = new Hashtable();
+override.put("RaisedButton.bgColor", "d81b60");
+override.put("RaisedButton.sel#bgColor", "b71c5c");
+override.put("RaisedButton.press#bgColor", "ad1457");
+override.put("BackCommand.fgColor", "d81b60");
+UIManager.getInstance().addThemeProps(override);
+Form.getCurrentForm().refreshTheme();
+----
+
+Common cases are demonstrated by the `PaletteOverrideThemeScreenshotTest`
+in the hellocodenameone test suite, which flips the primary accent
+to magenta at runtime and re-renders the same form.
+
+=== Platform-specific UIIDs
+
+A handful of UIIDs exist only because one platform draws them
+differently from the other. They are still safe to override; you
+just want to know which platform's screen the override is going to
+land on.
+
+iOS-only behaviour:
+
+* `Toolbar`, `TitleArea`, `Title` paint over the status-bar area.
+  iOS reserves room above for the notch / status bar; in your
+  capture this reads as a coloured strip at the very top of the
+  Form. In production the device fills it with system content
+  (signal, battery, time).
+* `MultiButton` is styled as an iOS Settings row (multi-line text
+  ramp + chevron). Compare against Material 3's denser list-item
+  pattern.
+
+Android-only behaviour:
+
+* `Toolbar` does not paint over the system status bar; the native
+  Android status bar handles that.
+* `Tabs` use Material 3 top tabs (flat, underline-by-color). iOS
+  modern renders Tabs as a bottom-anchored pill group via the
+  `tabPlacementInt` constant - that constant is intentionally only
+  set in the iOS theme so behaviour stays consistent on each
+  platform.
+
+=== Switching CheckBox / RadioButton glyphs
+
+The default check / radio glyphs are Material icons drawn by
+`DefaultLookAndFeel`. The theme can swap them via four optional
+constants (Material codepoints):
+
+[cols="1,1,3", options="header"]
+|===
+|Constant |Default |Notes
+
+|`@checkBoxCheckedIconInt`
+|`MATERIAL_CHECK_BOX` (`E834`)
+|Override to e.g. `MATERIAL_CHECK_CIRCLE` (`E86C` / `59500`) for an
+iOS-style filled circle. The iOS modern theme does this.
+
+|`@checkBoxUncheckedIconInt`
+|`MATERIAL_CHECK_BOX_OUTLINE_BLANK` (`E835`)
+|Match the empty version of whatever you chose above.
+
+|`@radioCheckedIconInt`
+|`MATERIAL_RADIO_BUTTON_CHECKED` (`E837`)
+|Filled circle with dot.
+
+|`@radioUncheckedIconInt`
+|`MATERIAL_RADIO_BUTTON_UNCHECKED` (`E836`)
+|Empty circle.
+|===
+
+Set these in your `#Constants { ... }` block; the icons rebuild on
+the next style refresh.
+
+=== Component-specific tuning constants
+
+[cols="2,3", options="header"]
+|===
+|Constant |Effect
+
+|`@switchTrackScaleX`, `@switchTrackScaleY`
+|Stretches the Switch track. Larger X = longer pill, larger Y =
+thicker. iOS uses 2.5 / 1.5; Material uses 3.0 / 0.9.
+
+|`@switchThumbScaleY`
+|Scales the Switch thumb relative to the track. iOS 1.4, Material
+1.5.
+
+|`@switchThumbPaddingInt`, `@switchThumbInsetMM`
+|Pixels of breathing room between thumb and track.
+
+|`@switchTrackOffOutlineWidthMM`, `@switchTrackOffOutlineColor`
+|iOS draws a faint ring around the off-state track; Material does
+not.
+
+|`@tabPlacementInt`
+|`Component.TOP` (`0`), `Component.BOTTOM` (`2`),
+`Component.LEFT` (`1`), `Component.RIGHT` (`3`). Where the
+`Tabs` widget anchors its tab bar. Set in iOS modern theme to
+`2` for the iOS 26 bottom-bar look; unset on Android (Tabs at
+top).
+
+|`@tabsFillRowsBool`, `@tabsGridBool`
+|Distribute tabs evenly across the bar.
+
+|`@darkModeBool`
+|`true` enables `$DarkUIID` resolution when the app is in dark
+mode. Both modern themes set this; user themes that want dark
+mode also need to set it.
+|===
+
+=== Customising in your own theme
+
+Your app's `theme.css` inherits from the installed native theme:
+
+[source,css]
+----
+#Constants {
+    includeNativeBool: true;
+    darkModeBool: true;
+}
+
+/* Tweak only what's different. Everything you do not redeclare
+   keeps coming from the native theme. */
+RaisedButton { background-color: #d81b60; }
+RaisedButton.pressed { background-color: #b71c5c; }
+RaisedButton.disabled { background-color: #ffd6e2; color: #ffffff; }
+
+@media (prefers-color-scheme: dark) {
+    RaisedButton { background-color: #ff80ab; color: #4a0026; }
+    RaisedButton.pressed { background-color: #f06292; }
+}
+----
+
+The user's CSS is layered on top of the native theme at app launch,
+so refresh / restart picks the override up.
+
+=== Inheriting from a native UIID
+
+`cn1-derive` lets a custom UIID start from one of the native
+theme's UIIDs and refine it:
+
+[source,css]
+----
+DangerButton {
+    cn1-derive: RaisedButton;
+    background-color: #d32f2f;
+}
+DangerButton.pressed {
+    cn1-derive: RaisedButton;
+    background-color: #b71c1c;
+}
+----
+
+`cn1-derive` works best when the relationship is *child refines
+parent*. Avoid deriving across unrelated UIIDs (e.g. a TitleArea
+that derives from Toolbar) - inline the properties instead.
+
+=== Translucency, glass effects, and the test harness
+
+The iOS modern Dialog and Tabs use translucent surfaces (rgba with
+alpha < 1) so any backdrop reads through the widget. To exercise
+this in screenshot tests, the hellocodenameone fidelity tests
+opt-in to a diagonal-stripe textured backdrop on the form
+(`useTexturedBackdrop()` in `DualAppearanceBaseTest`). Translucent
+widgets show their see-through tint against the stripes; opaque
+widgets cover the stripes entirely.
+
+A real backdrop blur (`UIVisualEffectView` on iOS, `RenderEffect` on
+Android) lands as a separate native primitive in a future release.
+The current rgba approximation is the closest the framework can do
+without that primitive.

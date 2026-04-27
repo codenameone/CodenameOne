@@ -89,6 +89,14 @@ jobs:
           cd maven
           mvn clean verify -DunitTests=true -pl core-unittests -am -Dmaven.javadoc.skip=true -Plocal-dev-javase $MVN_ARGS
           cd ..
+      - name: Build CSS compiler and smoke native-themes
+        run: |
+          cd maven
+          mvn -B -pl css-compiler -am install -DskipTests -Dmaven.javadoc.skip=true -Plocal-dev-javase
+          cd ..
+          ./scripts/build-native-themes.sh
+          test -f Themes/iOSModernTheme.res || { echo "missing Themes/iOSModernTheme.res"; exit 1; }
+          test -f Themes/AndroidMaterialTheme.res || { echo "missing Themes/AndroidMaterialTheme.res"; exit 1; }
       - name: Prepare Codename One binaries for Maven plugin tests
         run: |
           set -euo pipefail

@@ -2769,6 +2769,48 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             platformName = props.getProperty("platformName", "se");
             platformOverrides = props.getProperty("overrideNames", "").split(",");
+
+            // Native theme override: the simulator ships all shipped-with-
+            // framework themes (iOSModernTheme.res, AndroidMaterialTheme.res,
+            // plus the legacy ones). The user can override via the
+            // Simulator's "Native Theme" submenu (stored in the
+            // simulatorNativeTheme Preference) or the cn1.forceSimulatorTheme
+            // system property. If neither is set, platformName maps ios ->
+            // iOSModernTheme and and -> AndroidMaterialTheme. Anything else
+            // keeps whatever the skin archive embedded.
+            String overrideTheme = System.getProperty("cn1.forceSimulatorTheme",
+                    Preferences.userNodeForPackage(JavaSEPort.class)
+                            .get("simulatorNativeTheme", null));
+            if (overrideTheme == null || overrideTheme.isEmpty() || "auto".equalsIgnoreCase(overrideTheme)) {
+                if ("ios".equals(platformName)) {
+                    overrideTheme = "iOSModernTheme";
+                } else if ("and".equals(platformName)) {
+                    overrideTheme = "AndroidMaterialTheme";
+                } else {
+                    overrideTheme = null;
+                }
+            } else if ("embedded".equalsIgnoreCase(overrideTheme)) {
+                // Explicit "keep the skin's embedded theme".
+                overrideTheme = null;
+            }
+            if (overrideTheme != null) {
+                InputStream bundled = JavaSEPort.class.getResourceAsStream("/" + overrideTheme + ".res");
+                if (bundled != null) {
+                    try {
+                        ByteArrayOutputStream bo = new ByteArrayOutputStream();
+                        byte[] buf = new byte[4096];
+                        int n;
+                        while ((n = bundled.read(buf)) > 0) {
+                            bo.write(buf, 0, n);
+                        }
+                        nativeThemeData = bo.toByteArray();
+                    } catch (IOException ioErr) {
+                        ioErr.printStackTrace();
+                    } finally {
+                        try { bundled.close(); } catch (IOException ignored) { System.err.println("close: " + ignored); }
+                    }
+                }
+            }
             String ua = null;
             if (platformName.equals("and")) {
                 ua = "Mozilla/5.0 (Linux; U; Android 2.2; en-us; Nexus One Build/FRF91) AppleWebKit/533.1 (KHTML, like Gecko) Version/4.0 Mobile Safari/533.1";
@@ -4629,6 +4671,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             bar.add(simulateMenu);
             bar.add(toolsMenu);
             bar.add(skinMenu);
+            bar.add(createNativeThemeMenu());
             bar.add(helpMenu);
         }
 
@@ -4736,6 +4779,49 @@ public class JavaSEPort extends CodenameOneImplementation {
          return skin;
     }
     
+    /**
+     * Build the Native Theme override menu. By default the simulator picks a
+     * theme from the current skin's platformName ("ios" -&gt; iOSModernTheme,
+     * "and" -&gt; AndroidMaterialTheme); this menu lets the user force one
+     * of the shipped themes or "Use skin's embedded theme" to bypass the
+     * heuristic entirely. Selection is written to the simulatorNativeTheme
+     * Preference and the simulator is reloaded.
+     */
+    private JMenu createNativeThemeMenu() {
+        JMenu m = new JMenu("Native Theme");
+        m.setDoubleBuffered(true);
+        String[][] items = {
+            {"auto", "Auto (based on skin)"},
+            {"iOSModernTheme", "iOS Modern (Liquid Glass)"},
+            {"iOS7Theme", "iOS 7 (Flat)"},
+            {"iPhoneTheme", "iPhone (Pre-Flat)"},
+            {"AndroidMaterialTheme", "Android Material"},
+            {"android_holo_light", "Android Holo Light"},
+            {"androidTheme", "Android Legacy"},
+            {"embedded", "Use skin's embedded theme"}
+        };
+        String current = Preferences.userNodeForPackage(JavaSEPort.class)
+                .get("simulatorNativeTheme", "auto");
+        ButtonGroup group = new ButtonGroup();
+        for (final String[] entry : items) {
+            JRadioButtonMenuItem mi = new JRadioButtonMenuItem(entry[1]);
+            mi.setSelected(current.equals(entry[0]));
+            mi.addActionListener(new ActionListener() {
+                public void actionPerformed(ActionEvent e) {
+                    Preferences.userNodeForPackage(JavaSEPort.class)
+                            .put("simulatorNativeTheme", entry[0]);
+                    System.setProperty("reload.simulator", "true");
+                    if (window != null) {
+                        window.dispose();
+                    }
+                }
+            });
+            group.add(mi);
+            m.add(mi);
+        }
+        return m;
+    }
+
     private JMenu createSkinsMenu(final JFrame frm, final JMenu menu) throws MalformedURLException {
         JMenu m;
         if (menu == null) {
