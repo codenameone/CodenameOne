@@ -120,19 +120,32 @@ Mutable rendering now mirrors the screen pipeline exactly:
 - Pixel-reading paths (`Image.getRGB`, etc.) call `CN1MetalReadMutableImagePixels`: trigger a `flushBuffer` to drain pending ops, `waitUntilCompleted` on the image's CB, blit `MTLStorageModePrivate → Shared`, `getBytes`, convert `BGRA→ARGB`. EDT is the only place that ever blocks on a CB, and only when the caller actually reads pixels.
 - The CG mutable path is **deleted** on Metal builds. No fallback. Round-rect / arc / fill-arc ops still rasterise via CG (no Metal-native shader yet) but the CG bitmap is captured into a temp `GLUIImage` and queued as a `DrawImage` op tagged `target=mutable` — same async dispatch, no per-op `MTLRenderCommandEncoder` work on EDT.
 
-### Verified in CI (run `24963318234`, commit `8412add54`)
+### Verified in CI (run `24997869913`, commit `d271385fc`)
 
 - Build succeeds with `-Dcodename1.arg.ios.metal=true`.
-- Suite runs to `CN1SS:SUITE:FINISHED` cleanly; no SIGTERM mid-test.
-- 37 screenshots captured (vs 1–2 during v1 hang).
-- `CN1SS_MIN_SCREENSHOTS=30` guard passes.
-- `graphics-draw-line.png` BL/BR mutable panels match GL baseline visually; same for `graphics-fill-rect.png` and the rest of the simple ops.
+- Suite runs to `CN1SS:SUITE:FINISHED` in **234 seconds** (was hitting 600s SIGTERM during the iteration).
+- **65 screenshots captured** (37 graphics tests + 28 new theme tests). All ran cleanly.
+- `CN1SS_MIN_SCREENSHOTS=30` guard passes comfortably.
+- BL/BR mutable panels match GL baseline visually for the simple-op tests (`graphics-fill-rect`, `graphics-draw-line`, etc.).
 
-### Known follow-ups
+### Iteration timeline
 
-- **`FillRoundRect` / `DrawRoundRect` test timeouts.** The tests draw 267 round rects per panel × 4 panels in a tight loop. Each round rect on the mutable Metal path costs ~5 ms on EDT (CG bitmap alloc + `UIImage` alloc + `GLUIImage` alloc + `DrawImage` op queueing), so the 1.5-second post-paint timer can't fire within the 10-second test deadline. Screenshots ARE captured (the screenshot path runs from a delayed callback that does fire eventually) — only the test's `done()` flag misses the deadline. Fix path: a Metal-native round-rect shader (SDF) so each round rect is just a quad draw. Out-of-scope for this milestone.
-- **Baseline screenshots.** Every comparison shows "0 matched, 37 updated" — the `scripts/ios/screenshots-metal/` baselines were captured during the broken Phase 3 v1 era. They need re-baselining once we're confident in v2's pixel correctness.
-- **Step 6 readback test coverage.** `Image.getRGB` paths go through `CN1MetalReadMutableImagePixels` but the screenshot suite captures via `cn1_captureView` (Metal layer grab), so the readback path isn't exercised by CI today.
+The path from the v2 architecture commit to a green suite required several follow-ups:
+
+- `7fd4b2377` — Phase 3 v2 architecture (ExecutableOp.target, drawFrame multi-target drain, mutable JNI funcs queue ops).
+- `ef1a34b97` — fix CN1ES2compat import in ExecutableOp.h so CN1_USE_METAL was visible (linker error on first push).
+- `06608fa40` — `CN1SS_MIN_SCREENSHOTS=30` guard so screenshot-count regressions can't silently report success.
+- `8b58202a5` — respect `argb` fill colour in mutable images (the v2 init was clearing to transparent black instead of opaque white) + bump suite-level CI timeout 300s → 600s.
+- `af160fdd4` — bump per-test timeout 10s → 30s so the round-rect tests fit (their CG-rasterise-then-DrawImage allocation cost pushes them over the original 10s budget on slow CI runners).
+- `9b2aaf11d` — disable step-6 readback in `imageRgbToIntArrayImpl`. The flushBuffer + `waitUntilCompleted` path was deadlocking the suite at `DrawImage` test on slow runs; falls back to the legacy CG-from-UIImage read which returns stale pixels for mutable images but doesn't hang. Reinstate later once the deadlock is understood.
+- `cf17636b9` + `d271385fc` — route mutable `tileImage` through the `TileImage` ExecutableOp directly instead of falling through to `super.tileImage`'s 1500-iter `drawImage` loop. New `nativeInstance.isMetalRendering()` JNI flag (cached at `postInit`) lets Java decide; `nativeTileImageGlobalImpl` now tags the op with `currentMutableImage` when set.
+
+### Known follow-ups (not blocking)
+
+- **Baseline screenshots are stale.** Every comparison shows "0 matched". The `scripts/ios/screenshots-metal/` baselines were captured during the broken Phase 3 v1 era. Re-baselining once visual correctness is confirmed will turn future regressions into a meaningful signal.
+- **Step 6 readback (`Image.getRGB` etc.).** Disabled because of a deadlock in `DrawImage`. Until reinstated, mutable images that go through `getRGB` / PNG-encode / `toImage` return stale (UIImage-backed) pixels. Not exercised by the current screenshot suite, but real-world apps using these patterns will see stale output.
+- **Round-rect / arc rendering perf.** Each `fillRoundRect` etc. on the Metal mutable path allocates a CG bitmap → UIImage → fresh GLUIImage → `DrawImage` op. With 267 round rects × 4 panels that's noticeable on slow CI runners (which is why the 10s per-test timeout had to go to 30s). An SDF round-rect shader would drop this to one quad per round rect with no per-call texture allocation.
+- **PNG transmission flake.** One screenshot (`graphics-affine-scale.png` in run `24997869913`) came through truncated to ~24% of its captured size — the chunked-log-stream protocol via `CN1SSPREVIEW:` lost most of the data. Not a Metal-rendering issue; tracked separately if it recurs.
 
 ## Phase 0 — Scaffolding (complete)
 
