@@ -658,6 +658,27 @@ const jvm = {
     const obj = { __class: className, __classDef: classDef, __id: this.nextIdentity++, __monitor: this.createMonitor() };
     this.initInstanceFields(obj, className);
     this.initFieldAliases(obj, className);
+    // If this object is a Throwable, capture ``new Error().stack`` into
+    // ``Throwable.stack`` right away. The Codename One ``Throwable``
+    // constructors don't invoke ``fillInStack`` themselves (every other
+    // port lazy-fills via ``printStackTrace``'s native), so without this
+    // every translated ``throw new Foo(...)``-shape exception arrives at
+    // the catch site with no stack — and the browser console line for
+    // anything routed through ``Log.e`` collapses to a bare
+    // ``Exception: <class>``. Capturing here covers BOTH the runtime's
+    // ``createException`` path (NPE / ClassCastException / etc.) and
+    // bytecode-emitted ``_O(<class>) + ctor`` paths uniformly.
+    if (classDef && classDef.assignableTo && classDef.assignableTo["java_lang_Throwable"]) {
+      try {
+        const prevLimit = Error.stackTraceLimit;
+        try { Error.stackTraceLimit = 200; } catch (_l) {}
+        const stack = new Error().stack || "";
+        try { Error.stackTraceLimit = prevLimit; } catch (_l) {}
+        obj[CN1_THROWABLE_STACK] = createJavaString(stack);
+      } catch (_err) {
+        // Best effort; an empty stack field is fine.
+      }
+    }
     return obj;
   },
   initInstanceFields(obj, className) {
