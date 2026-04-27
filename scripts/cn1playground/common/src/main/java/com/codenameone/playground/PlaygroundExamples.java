@@ -130,10 +130,12 @@ final class PlaygroundExamples {
 
             Button save = new Button("Save");
             save.setUIID("RaisedButton");
+            FontImage.setMaterialIcon(save, FontImage.MATERIAL_SAVE);
             save.addActionListener(e -> Dialog.show("Saved", "Profile updated.", "OK", null));
             form.add(save);
 
             Button cancel = new Button("Cancel");
+            FontImage.setMaterialIcon(cancel, FontImage.MATERIAL_CLOSE);
             form.add(cancel);
 
             form;
@@ -149,12 +151,17 @@ final class PlaygroundExamples {
                 "12 unread", "Starred messages", "Older threads",
                 "Snoozed for later", "Shared with the team", "Account & preferences"
             };
+            char[] icons = {
+                FontImage.MATERIAL_INBOX, FontImage.MATERIAL_STAR, FontImage.MATERIAL_ARCHIVE,
+                FontImage.MATERIAL_SNOOZE, FontImage.MATERIAL_FOLDER, FontImage.MATERIAL_SETTINGS
+            };
 
             Form form = new Form("Menu", BoxLayout.y());
             for (int i = 0; i < titles.length; i++) {
                 int idx = i;
                 MultiButton row = new MultiButton(titles[i]);
                 row.setTextLine2(subtitles[i]);
+                FontImage.setMaterialIcon(row, icons[i]);
                 row.addActionListener(e -> Dialog.show(titles[idx], subtitles[idx], "OK", null));
                 form.add(row);
             }
@@ -262,6 +269,7 @@ final class PlaygroundExamples {
             root.setScrollableY(true);
             SpanLabel output = new SpanLabel("Tap fetch to load https://www.codenameone.com/feed.xml");
             Button fetch = new Button("Fetch Feed XML");
+            FontImage.setMaterialIcon(fetch, FontImage.MATERIAL_CLOUD_DOWNLOAD);
             fetch.addActionListener(new ActionListener() {
                 public void actionPerformed(ActionEvent evt) {
                     ConnectionRequest req = new ConnectionRequest();
@@ -296,6 +304,7 @@ final class PlaygroundExamples {
             root.setScrollableY(true);
             SpanLabel output = new SpanLabel("Tap load to fetch XML as text via RequestBuilder.");
             Button load = new Button("Load codenameone.com");
+            FontImage.setMaterialIcon(load, FontImage.MATERIAL_CLOUD_DOWNLOAD);
             load.addActionListener(() -> {
                 RequestBuilder builder = Rest.get("https://www.codenameone.com/feed.xml");
                 builder.fetchAsString(response -> {
@@ -320,6 +329,7 @@ final class PlaygroundExamples {
             Label status = new Label("Ready to use camera features");
             root.add(new SpanLabel("Use this sample on device or simulator targets that support capture."));
             Button photo = new Button("Capture Photo");
+            FontImage.setMaterialIcon(photo, FontImage.MATERIAL_PHOTO_CAMERA);
             photo.addActionListener(new ActionListener() {
                 public void actionPerformed(ActionEvent evt) {
                     String path = Capture.capturePhoto();
@@ -329,6 +339,7 @@ final class PlaygroundExamples {
                 }
             });
             Button audio = new Button("Record Audio");
+            FontImage.setMaterialIcon(audio, FontImage.MATERIAL_MIC);
             audio.addActionListener(new ActionListener() {
                 public void actionPerformed(ActionEvent evt) {
                     String path = Capture.captureAudio();
