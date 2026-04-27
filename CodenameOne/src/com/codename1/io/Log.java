@@ -396,49 +396,54 @@ public class Log {
                 // is silently swallowed. Wrap each step so we can identify
                 // which sub-call fails AND so the caught ``evt.getSource()``
                 // throwable still reaches ``Log.e`` even when a preceding
-                // line dies. Remove this granular wrapping once the JS-port
+                // line dies. Use ``Log.p(s, 1)`` (level=INFO) for the
+                // markers so they survive the JS port's
+                // ``console.error``-only echo path — the worker-side
+                // ``System.out.println`` route is gated behind the
+                // ``?parparDiag=1`` flag and gets dropped on the live
+                // preview. Remove this granular wrapping once the JS-port
                 // root cause is fixed.
-                System.out.println("[edtErr] enter listener");
+                p("[edtErr] enter listener", 1);
                 Object source = null;
                 try {
                     source = evt.getSource();
-                    System.out.println("[edtErr] source-class=" + (source == null ? "null" : source.getClass().getName()));
+                    p("[edtErr] source-class=" + (source == null ? "null" : source.getClass().getName()), 1);
                 } catch (Throwable t) {
-                    System.out.println("[edtErr] getSource threw: " + t);
+                    p("[edtErr] getSource threw: " + t, 1);
                 }
                 if (consumeError) {
                     try { evt.consume(); }
-                    catch (Throwable t) { System.out.println("[edtErr] consume threw: " + t); }
+                    catch (Throwable t) { p("[edtErr] consume threw: " + t, 1); }
                 }
                 try {
                     p("Exception in " + Display.getInstance().getProperty("AppName", "app") + " version " + Display.getInstance().getProperty("AppVersion", "Unknown"));
-                } catch (Throwable t) { System.out.println("[edtErr] appName/version threw: " + t); }
+                } catch (Throwable t) { p("[edtErr] appName/version threw: " + t, 1); }
                 try {
                     p("OS " + Display.getInstance().getPlatformName());
-                } catch (Throwable t) { System.out.println("[edtErr] platformName threw: " + t); }
+                } catch (Throwable t) { p("[edtErr] platformName threw: " + t, 1); }
                 try {
                     p("Error " + source);
-                } catch (Throwable t) { System.out.println("[edtErr] sourceLog threw: " + t); }
+                } catch (Throwable t) { p("[edtErr] sourceLog threw: " + t, 1); }
                 try {
                     if (Display.getInstance().getCurrent() != null) {
                         p("Current Form " + Display.getInstance().getCurrent().getName());
                     } else {
                         p("Before the first form!");
                     }
-                } catch (Throwable t) { System.out.println("[edtErr] currentForm threw: " + t); }
+                } catch (Throwable t) { p("[edtErr] currentForm threw: " + t, 1); }
                 try {
                     if (source instanceof Throwable) {
                         e((Throwable) source);
                     } else {
-                        System.out.println("[edtErr] source not Throwable, skipping Log.e");
+                        p("[edtErr] source not Throwable, skipping Log.e", 1);
                     }
-                } catch (Throwable t) { System.out.println("[edtErr] Log.e threw: " + t); }
+                } catch (Throwable t) { p("[edtErr] Log.e threw: " + t, 1); }
                 try {
                     if (getUniqueDeviceKey() != null) {
                         sendLog();
                     }
-                } catch (Throwable t) { System.out.println("[edtErr] sendLog threw: " + t); }
-                System.out.println("[edtErr] exit listener");
+                } catch (Throwable t) { p("[edtErr] sendLog threw: " + t, 1); }
+                p("[edtErr] exit listener", 1);
             }
         });
         crashBound = true;
