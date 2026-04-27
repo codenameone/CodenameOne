@@ -3000,7 +3000,9 @@ final class PlaygroundRunner {
             String candidate = current.getMessage();
             if (candidate != null && candidate.length() > 0) {
                 candidate = simplifyMessage(candidate);
-                if (candidate.indexOf("Generated ") >= 0
+                if (candidate.indexOf("No matching instance method") >= 0
+                        || candidate.indexOf("did you mean:") >= 0
+                        || candidate.indexOf("Generated ") >= 0
                         || candidate.indexOf("not implemented") >= 0
                         || candidate.indexOf("Class or variable not found:") >= 0
                         || candidate.indexOf("Script must return") >= 0

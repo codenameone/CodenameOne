@@ -104,12 +104,95 @@ public final class Reflect {
             } catch (Exception ex) {
                 Object fallback = invokeWellKnownInterfaceMethod(object, methodName, args);
                 if (fallback != FALLBACK_MISS) return fallback;
-                throw new EvalError("Error invoking method " + methodName + ": " + ex.getMessage(),
+                throw new EvalError(formatInstanceDispatchFailure(object, methodName, args, ex),
                         callerInfo, callstack, ex);
             }
         } finally {
             CN1LambdaSupport.setCurrentNameSpace(prevNs);
         }
+    }
+
+    /** Build a human-readable message for an instance method dispatch
+     * miss. The registry's raw "Generated instance dispatch not
+     * implemented" wording reads like an internal bug; this rephrases it
+     * as a no-such-method error and, when the missing call matches a
+     * known static utility (e.g. {@code FontImage.setMaterialIcon(target,
+     * char)}), suggests it. PlaygroundRunner.safeMessage prefers this
+     * message over the cause via the "did you mean:" / "No matching
+     * instance method" markers. */
+    private static String formatInstanceDispatchFailure(Object object, String methodName,
+            Object[] args, Exception cause) {
+        StringBuilder msg = new StringBuilder();
+        msg.append("No matching instance method ")
+                .append(StringUtil.methodString(methodName, Types.getTypes(args)))
+                .append(" on ").append(object.getClass().getName());
+        String hint = suggestStaticUtilityMethods(object, methodName);
+        if (hint != null) {
+            msg.append(" — did you mean: ").append(hint).append("?");
+        }
+        return msg.toString();
+    }
+
+    /** Curated list of CN1 utility classes whose static helpers commonly
+     * take a Component-or-similar target as their first argument. When an
+     * instance method dispatch fails, we check these classes for a static
+     * method by the same name and surface them as a "did you mean"
+     * suggestion. Reflection (Class.getMethods etc.) isn't available in
+     * the playground's compliance-checked code path, so we rely on the
+     * registry's name-only signature index — that's lossy on parameter
+     * types but accurate enough to point the user at the right class. */
+    private static final String[] STATIC_UTILITY_CLASSES = {
+            "com.codename1.ui.FontImage",
+            "com.codename1.ui.ComponentSelector",
+            "com.codename1.ui.layouts.BorderLayout",
+            "com.codename1.ui.layouts.BoxLayout",
+            "com.codename1.ui.layouts.FlowLayout",
+            "com.codename1.ui.layouts.GridLayout",
+            "com.codename1.ui.layouts.LayeredLayout",
+            "com.codename1.ui.CN",
+            "com.codename1.ui.Display",
+            "com.codename1.ui.util.Resources"
+    };
+
+    /** Searches the curated utility classes for a method named
+     * {@code methodName}. Each match is rendered as
+     * {@code SimpleName.method(...)}; up to three matches are joined with
+     * commas. The exact mistake this catches: a user writes
+     * {@code row.setMaterialIcon(FontImage.MATERIAL_ADD_CIRCLE)} and gets
+     * a confusing "Generated instance dispatch not implemented" error
+     * instead of being pointed at the static
+     * {@code FontImage.setMaterialIcon(target, char)} helper. Returns
+     * {@code null} when no candidate is found. */
+    static String suggestStaticUtilityMethods(Object target, String methodName) {
+        if (target == null || methodName == null || methodName.isEmpty()) return null;
+        bsh.cn1.CN1Access registry = CN1AccessRegistry.getInstance();
+        if (!(registry instanceof bsh.cn1.GeneratedCN1Access)) return null;
+        bsh.cn1.GeneratedCN1Access gen = (bsh.cn1.GeneratedCN1Access) registry;
+        String targetClassName = target.getClass().getName();
+        String namePrefix = methodName + "(";
+        java.util.List<String> picks = new java.util.ArrayList<String>();
+        for (int i = 0; i < STATIC_UTILITY_CLASSES.length; i++) {
+            String className = STATIC_UTILITY_CLASSES[i];
+            if (className.equals(targetClassName)) continue;
+            String[] sigs = gen.getMethodSignatures(className);
+            if (sigs == null || sigs.length == 0) continue;
+            for (int s = 0; s < sigs.length; s++) {
+                String sig = sigs[s];
+                if (sig == null || !sig.startsWith(namePrefix)) continue;
+                String simple = className.substring(className.lastIndexOf('.') + 1);
+                String suggestion = simple + "." + sig;
+                if (!picks.contains(suggestion)) picks.add(suggestion);
+                if (picks.size() >= 3) break;
+            }
+            if (picks.size() >= 3) break;
+        }
+        if (picks.isEmpty()) return null;
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < picks.size(); i++) {
+            if (i > 0) out.append(", ");
+            out.append(picks.get(i));
+        }
+        return out.toString();
     }
 
     private static final Object FALLBACK_MISS = new Object();
