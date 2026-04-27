@@ -35,15 +35,15 @@ import com.codenameone.examples.hellocodenameone.tests.graphics.TransformTransla
 import com.codenameone.examples.hellocodenameone.tests.accessibility.AccessibilityTest;
 
 public final class Cn1ssDeviceRunner extends DeviceRunner {
-    // Previously 30_000. In the JavaScript port each test's onShowCompleted -> UITimer
-    // -> emitCurrentFormScreenshot -> done() chain typically completes in ~1500ms
-    // (see BaseTest.registerReadyCallback). Tests that never reach done() shouldn't
-    // block the whole suite for 30s each — the overall CI browser lifetime is only
-    // ~150s, so even three stuck tests used to consume the entire budget and prevent
-    // later tests from ever running. 10s is still 6× the normal budget which is plenty
-    // of margin for the rare genuinely slow form; iOS/Android are unaffected (they use
-    // their own deadline logic in their respective runners).
-    private static final int TEST_TIMEOUT_MS = 10000;
+    // Previously 30_000, then 10_000 to fit the JS budget (~150s total). The
+    // iOS Metal port's mutable rendering allocates a temp UIImage + MTLTexture
+    // per round rect / arc / gradient call (the CG-rasterise-then-DrawImage
+    // bridge), so FillRoundRect / DrawRoundRect and DrawImage on slow CI
+    // simulators legitimately blow past the 10s budget while still making
+    // forward progress. 30s lets the suite continue (vs. SIGTERMing the
+    // whole simulator) on those runs. JS unaffected (its tests are well
+    // under 10s); Android has its own deadline.
+    private static final int TEST_TIMEOUT_MS = 30000;
     private static final int TEST_POLL_INTERVAL_MS = 50;
 
     private static final BaseTest[] DEFAULT_TEST_CLASSES = new BaseTest[]{
