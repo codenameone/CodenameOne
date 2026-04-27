@@ -1905,6 +1905,15 @@ void* Java_com_codename1_impl_ios_IOSImplementation_createNativeMutableImageImpl
     //[img retain];
     //CN1Log(@"createNativeMutableImageImpl finished %i ", (int)img);
     GLUIImage* gl = [[GLUIImage alloc] initWithImage:img];
+#ifdef CN1_USE_METAL
+    // Phase 3 v2: stash the fill colour so when startDrawingOnImage
+    // lazily allocates the Metal render-target texture (via
+    // CN1MetalEnsureMutableTexture), the clear pass uses this colour
+    // instead of (0,0,0,0). Mirrors UIRectFill(argb) above for the CG
+    // backing, so screen-side DrawImage of a freshly-created mutable
+    // sees the same starting pixels regardless of which backing wins.
+    [gl setMtlMutableInitialARGB:argb];
+#endif
     return (BRIDGE_CAST void*)gl;
 }
 

@@ -838,8 +838,15 @@ void CN1MetalEnsureMutableTexture(GLUIImage *image, int width, int height) {
     desc.storageMode = MTLStorageModePrivate;
     id<MTLTexture> tex = [device newTextureWithDescriptor:desc];
     if (tex == nil) return;
-    // Clear new texture to transparent black -- mirrors CG's
-    // UIGraphicsBeginImageContextWithOptions(opaque=NO) initial state.
+    // Clear new texture to the fill colour stashed by createNativeMutableImage.
+    // Default Image.createImage(w, h) → 0xffffffff opaque white; createImage(w, h, argb)
+    // honours the user's fill. Sentinel 0 (uninitialised ivar) keeps the prior
+    // transparent-black behaviour for non-mutable getMTLTexture paths.
+    int argb = [image mtlMutableInitialARGB];
+    double a = ((argb >> 24) & 0xff) / 255.0;
+    double r = ((argb >> 16) & 0xff) / 255.0;
+    double g = ((argb >> 8)  & 0xff) / 255.0;
+    double b = ( argb        & 0xff) / 255.0;
     id<MTLCommandQueue> queue = CN1MetalCommandQueue();
     if (queue != nil) {
         id<MTLCommandBuffer> clearCb = [queue commandBuffer];
@@ -847,7 +854,7 @@ void CN1MetalEnsureMutableTexture(GLUIImage *image, int width, int height) {
         clearPass.colorAttachments[0].texture = tex;
         clearPass.colorAttachments[0].loadAction = MTLLoadActionClear;
         clearPass.colorAttachments[0].storeAction = MTLStoreActionStore;
-        clearPass.colorAttachments[0].clearColor = MTLClearColorMake(0.0, 0.0, 0.0, 0.0);
+        clearPass.colorAttachments[0].clearColor = MTLClearColorMake(r, g, b, a);
         [[clearCb renderCommandEncoderWithDescriptor:clearPass] endEncoding];
         [clearCb commit];
     }

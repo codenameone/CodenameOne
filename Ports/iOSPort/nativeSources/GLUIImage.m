@@ -190,6 +190,8 @@ extern int nextPowerOf2(int val);
 -(int)mtlMutableHeight { return mtlMutableHeight; }
 -(id<MTLCommandBuffer>)mtlMutableCommandBuffer { return mtlMutableCommandBuffer; }
 -(void)setMtlMutableCommandBuffer:(id<MTLCommandBuffer>)cb { mtlMutableCommandBuffer = cb; }
+-(int)mtlMutableInitialARGB { return mtlMutableInitialARGB; }
+-(void)setMtlMutableInitialARGB:(int)argb { mtlMutableInitialARGB = argb; }
 #endif
 
 -(void)dealloc {

@@ -56,6 +56,15 @@
     // toImage, cross-image consumption) call waitUntilCompleted on this
     // before sampling the texture. nil = no pending GPU work, safe to read.
     id<MTLCommandBuffer> mtlMutableCommandBuffer;
+    // Initial fill colour passed to createNativeMutableImage(w, h, argb)
+    // -- 0xAARRGGBB. CN1MetalEnsureMutableTexture clears the freshly-
+    // allocated mtlMutableTexture to this colour so mutable images behave
+    // like the CG path's UIRectFill(argb). Sentinel 0 means "honor
+    // CN1's createImage(w,h) default of 0xffffffff opaque white" --
+    // a literal argb of 0 (fully transparent black) is also the Metal
+    // texture's natural cleared state, so the sentinel collision is a
+    // no-op in practice.
+    int mtlMutableInitialARGB;
 #endif
 }
 -(id)initWithImage:(UIImage*)i;
@@ -83,5 +92,7 @@
 -(int)mtlMutableHeight;
 -(id<MTLCommandBuffer>)mtlMutableCommandBuffer;
 -(void)setMtlMutableCommandBuffer:(id<MTLCommandBuffer>)cb;
+-(int)mtlMutableInitialARGB;
+-(void)setMtlMutableInitialARGB:(int)argb;
 #endif
 @end

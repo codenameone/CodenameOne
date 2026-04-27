@@ -678,7 +678,13 @@ APP_PROCESS_NAME="${WRAPPER_NAME%.app}"
   echo "App Launch : $(( (LAUNCH_END - LAUNCH_START) * 1000 )) ms" >> "$ARTIFACTS_DIR/ios-test-stats.txt"
 
 END_MARKER="CN1SS:SUITE:FINISHED"
-TIMEOUT_SECONDS=300
+# 600s budget for the entire suite. Was 300s, but iOS simulator perf
+# varies between CI runners and the 37-test suite plus a couple of
+# 10-second test timeouts (FillRoundRect / DrawRoundRect on the Metal
+# build) was hitting the cap intermittently -- producing 10 screenshots
+# instead of 37 when the simulator was slow that day. 600s is still well
+# under any reasonable CI slot length and gives headroom for outliers.
+TIMEOUT_SECONDS=600
 START_TIME="$(date +%s)"
 ri_log "Waiting for DeviceRunner completion marker ($END_MARKER)"
 while true; do
