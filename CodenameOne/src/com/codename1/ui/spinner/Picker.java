@@ -134,11 +134,13 @@ public class Picker extends Button {
         private final String text;
         private final Runnable action;
         private final int placement;
+        private final int alignment;
 
-        private LightweightPopupButton(String text, Runnable action, int placement) {
+        private LightweightPopupButton(String text, Runnable action, int placement, int alignment) {
             this.text = text;
             this.action = action;
             this.placement = placement;
+            this.alignment = alignment;
         }
     }
 
@@ -757,15 +759,12 @@ public class Picker extends Button {
     }
 
     private Container createLightweightPopupButtonRow(final InternalPickerWidget spinner, int placement, boolean isTablet) {
-        Container row = null;
+        Container left = null;
+        Container center = null;
+        Container right = null;
         for (LightweightPopupButton entry : lightweightPopupButtons) {
             if (entry.placement != placement) {
                 continue;
-            }
-            if (row == null) {
-                row = new Container(BoxLayout.x());
-                row.setUIID(isTablet ? "PickerButtonBarTablet" : "PickerButtonBar");
-                $(row).selectAllStyles().setMargin(0).setPadding(0).setBorder(Border.createEmpty()).setBgTransparency(0);
             }
             final LightweightPopupButton popupButton = entry;
             Button button = new Button(popupButton.text, isTablet ? "PickerButtonTablet" : "PickerButton");
@@ -779,8 +778,36 @@ public class Picker extends Button {
                     updateValue();
                 }
             });
-            row.add(button);
+            switch (entry.alignment) {
+                case Component.CENTER:
+                    if (center == null) {
+                        center = new Container(BoxLayout.x());
+                        $(center).selectAllStyles().setMargin(0).setPadding(0).setBorder(Border.createEmpty()).setBgTransparency(0);
+                    }
+                    center.add(button);
+                    break;
+                case Component.RIGHT:
+                    if (right == null) {
+                        right = new Container(BoxLayout.x());
+                        $(right).selectAllStyles().setMargin(0).setPadding(0).setBorder(Border.createEmpty()).setBgTransparency(0);
+                    }
+                    right.add(button);
+                    break;
+                default:
+                    if (left == null) {
+                        left = new Container(BoxLayout.x());
+                        $(left).selectAllStyles().setMargin(0).setPadding(0).setBorder(Border.createEmpty()).setBgTransparency(0);
+                    }
+                    left.add(button);
+                    break;
+            }
         }
+        if (left == null && center == null && right == null) {
+            return null;
+        }
+        Container row = BorderLayout.centerEastWest(center, right, left);
+        row.setUIID(isTablet ? "PickerButtonBarTablet" : "PickerButtonBar");
+        $(row).selectAllStyles().setMargin(0).setPadding(0).setBorder(Border.createEmpty()).setBgTransparency(0);
         return row;
     }
 
@@ -795,7 +822,8 @@ public class Picker extends Button {
         addLightweightPopupButton(text, action, LightweightPopupButtonPlacement.BETWEEN_CANCEL_AND_DONE);
     }
 
-    /// Adds a custom button to the lightweight picker popup.
+    /// Adds a custom button to the lightweight picker popup with the default
+    /// `Component#LEFT` alignment.
     ///
     /// #### Parameters
     ///
@@ -804,7 +832,24 @@ public class Picker extends Button {
     /// - `placement`: One of `LightweightPopupButtonPlacement#BETWEEN_CANCEL_AND_DONE`,
     ///   `LightweightPopupButtonPlacement#ABOVE_SPINNER`, or `LightweightPopupButtonPlacement#BELOW_SPINNER`.
     public void addLightweightPopupButton(String text, Runnable action, int placement) {
-        lightweightPopupButtons.add(new LightweightPopupButton(text, action, placement));
+        addLightweightPopupButton(text, action, placement, Component.LEFT);
+    }
+
+    /// Adds a custom button to the lightweight picker popup at a specific
+    /// horizontal alignment within its row. Buttons that share the same
+    /// `placement` and `alignment` are packed in declaration order; mixing
+    /// alignments lets you put some buttons on the left and others on the
+    /// right of the same row.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: Button label.
+    /// - `action`: Action to run when the button is pressed.
+    /// - `placement`: One of `LightweightPopupButtonPlacement#BETWEEN_CANCEL_AND_DONE`,
+    ///   `LightweightPopupButtonPlacement#ABOVE_SPINNER`, or `LightweightPopupButtonPlacement#BELOW_SPINNER`.
+    /// - `alignment`: One of `Component#LEFT`, `Component#CENTER`, or `Component#RIGHT`.
+    public void addLightweightPopupButton(String text, Runnable action, int placement, int alignment) {
+        lightweightPopupButtons.add(new LightweightPopupButton(text, action, placement, alignment));
     }
 
     /// Removes all custom lightweight popup buttons that were previously added with
