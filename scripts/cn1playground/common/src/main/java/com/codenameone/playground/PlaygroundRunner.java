@@ -3023,16 +3023,37 @@ final class PlaygroundRunner {
         return throwable.getClass().getSimpleName();
     }
 
+    /** Trims bsh's verbose "Sourced file: inline evaluation of: ... '' : "
+     * prefix and " : at Line: N : in file: ... '' : <text>" /
+     * "\nCalled from method: ..." suffix from an EvalError message
+     * once we've located our actionable marker. The marker text itself
+     * (e.g. "No matching instance method ...") carries everything the
+     * user needs; the bsh trace just makes the error look like an
+     * internal stack dump. The line + source-text are still available
+     * via Diagnostic.line, which the editor uses to highlight the call. */
     private String simplifyMessage(String message) {
-        int generated = message.indexOf("Generated ");
-        if (generated >= 0) {
-            return message.substring(generated);
+        int found = -1;
+        String[] markers = {
+                "No matching instance method ",
+                "Generated ",
+                "Class or variable not found:"
+        };
+        for (int i = 0; i < markers.length; i++) {
+            int idx = message.indexOf(markers[i]);
+            if (idx >= 0 && (found < 0 || idx < found)) {
+                found = idx;
+            }
         }
-        int classMissing = message.indexOf("Class or variable not found:");
-        if (classMissing >= 0) {
-            return message.substring(classMissing);
+        String core = found >= 0 ? message.substring(found) : message;
+        int trace = core.indexOf(" : at Line: ");
+        if (trace > 0) {
+            core = core.substring(0, trace);
         }
-        return message;
+        int callFrom = core.indexOf("\nCalled from method");
+        if (callFrom > 0) {
+            core = core.substring(0, callFrom);
+        }
+        return core;
     }
 
     private String formatParseMessage(ParseException ex) {

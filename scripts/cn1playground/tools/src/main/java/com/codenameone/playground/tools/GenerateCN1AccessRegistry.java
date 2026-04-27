@@ -1797,8 +1797,44 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
         return new ArrayList<String>(names);
     }
 
+    /** Render a method signature for the registry's editor index in the
+     * form {@code name(type1, type2)} using simple type names. The
+     * runtime "did you mean" diagnostic mines this string to surface
+     * concrete overload signatures (e.g.
+     * {@code MultiButton.setMaterialIcon(char, float)}); collapsing all
+     * non-empty parameter lists to {@code (...)} loses that information.
+     * Keep the format whitespace-free so prefix-name extraction (split
+     * on '(') stays trivial for existing consumers. */
     private static String editorMethodSignature(ApiMethod method) {
-        return method.paramTypes.isEmpty() && !method.varArgs ? method.name + "()" : method.name + "(...)";
+        if (method.paramTypes.isEmpty() && !method.varArgs) {
+            return method.name + "()";
+        }
+        StringBuilder out = new StringBuilder();
+        out.append(method.name).append('(');
+        for (int i = 0; i < method.paramTypes.size(); i++) {
+            if (i > 0) {
+                out.append(", ");
+            }
+            ApiType type = method.paramTypes.get(i);
+            String base = simpleTypeName(type.baseName);
+            out.append(base);
+            for (int d = 0; d < type.arrayDepth; d++) {
+                out.append("[]");
+            }
+            if (i == method.paramTypes.size() - 1 && method.varArgs) {
+                out.append("...");
+            }
+        }
+        out.append(')');
+        return out.toString();
+    }
+
+    private static String simpleTypeName(String qualified) {
+        if (qualified == null || qualified.isEmpty()) return qualified;
+        int lt = qualified.indexOf('<');
+        String head = lt > 0 ? qualified.substring(0, lt) : qualified;
+        int dot = head.lastIndexOf('.');
+        return dot >= 0 ? head.substring(dot + 1) : head;
     }
 
     private static String joinMembers(List<String> members) {

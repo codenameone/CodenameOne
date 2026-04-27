@@ -291,14 +291,20 @@ public final class PlaygroundSmokeHarness {
                 "Error message should name the missing instance method, got: " + summary);
         require(summary.indexOf("did you mean:") >= 0,
                 "Error message should include 'did you mean:', got: " + summary);
-        int sameClassIdx = summary.indexOf("MultiButton.setMaterialIcon(...) with different parameters");
+        int sameClassIdx = summary.indexOf("MultiButton.setMaterialIcon(char, float)");
         require(sameClassIdx >= 0,
-                "Error message should suggest MultiButton.setMaterialIcon overload, got: " + summary);
-        int staticIdx = summary.indexOf("FontImage.setMaterialIcon");
+                "Error message should suggest MultiButton.setMaterialIcon(char, float), got: " + summary);
+        int staticIdx = summary.indexOf("FontImage.setMaterialIcon(MultiButton");
         require(staticIdx >= 0,
-                "Error message should suggest FontImage.setMaterialIcon, got: " + summary);
+                "Error message should suggest FontImage.setMaterialIcon(MultiButton, ...), got: " + summary);
         require(sameClassIdx < staticIdx,
                 "Same-class hint must come before static utility hint, got: " + summary);
+        require(summary.indexOf("FontImage.setMaterialIcon(Label") < 0
+                        && summary.indexOf("FontImage.setMaterialIcon(SpanLabel") < 0,
+                "Static suggestions must be filtered to overloads applicable to the target, got: " + summary);
+        require(summary.indexOf("Sourced file:") < 0
+                        && summary.indexOf(" : at Line: ") < 0,
+                "Bsh trace chrome should be stripped, got: " + summary);
         require(summary.indexOf("Generated instance dispatch not implemented") < 0,
                 "Raw 'Generated instance dispatch' message should be replaced, got: " + summary);
     }
