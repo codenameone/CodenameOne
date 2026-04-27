@@ -46,6 +46,14 @@ public final class IOSNative {
     
     //native void startMainThread(Runnable r);
     native void initVM();
+
+    /// Returns true on iOS builds compiled with -Dios.metal=true (i.e.
+    /// CN1_USE_METAL is defined in CN1ES2compat.h). Java-side code that
+    /// needs to branch between the GL and Metal mutable-image rendering
+    /// paths queries this once at init -- there is no other reliable
+    /// source of truth on the Java side since the build flag only
+    /// affects native compilation.
+    native boolean isMetalRendering();
     static native void deinitializeVM();
     native boolean isPainted();
     native int getDisplayWidth();

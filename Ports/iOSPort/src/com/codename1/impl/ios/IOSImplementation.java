@@ -137,6 +137,11 @@ public class IOSImplementation extends CodenameOneImplementation {
     private NativeGraphics currentlyDrawingOn;
     //private NativeImage backBuffer;
     private NativeGraphics globalGraphics;
+    /// True when iOS was built with -Dios.metal=true. Phase 3 v2 mutable-
+    /// image rendering paths (tileImage etc.) need to know this to choose
+    /// between queueing an op and falling through to the CG-loop super
+    /// implementation. Initialised in postInit() via nativeInstance.isMetalRendering().
+    private boolean metalRendering;
     static IOSImplementation instance;
     private TextArea currentEditing;
     private static boolean initialized;
@@ -199,6 +204,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     public void postInit() {
         nativeInstance.initVM();
+        metalRendering = nativeInstance.isMetalRendering();
         super.postInit();
     }
     
@@ -2006,6 +2012,21 @@ public class IOSImplementation extends CodenameOneImplementation {
         if (img == null) return;
         NativeGraphics ng = (NativeGraphics)graphics;
         if(ng instanceof GlobalGraphics) {
+            ng.checkControl();
+            ng.applyTransform();
+            ng.applyClip();
+            NativeImage nm = (NativeImage)img;
+            nativeInstance.nativeTileImageGlobal(nm.peer, ng.alpha, x, y, w, h);
+        } else if (metalRendering) {
+            // Phase 3 v2: queue a single TileImage op tagged with the
+            // current mutable image as target. nativeTileImageGlobal's
+            // C side picks up [GLViewController.instance.currentMutableImage]
+            // and tags accordingly. Mirrors the GlobalGraphics branch
+            // above, except that ng.checkControl already ran on the
+            // mutable so currentMutableImage is set. Avoids
+            // super.tileImage's 1500-iter drawImage loop which queues
+            // ~1500 ops per panel and stalls the EDT past the test
+            // timeout on slow CI runners.
             ng.checkControl();
             ng.applyTransform();
             ng.applyClip();

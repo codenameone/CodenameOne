@@ -2038,6 +2038,18 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeTileImageGlobalImpl
         Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl();
     }
     TileImage* f = [[TileImage alloc] initWithArgs:alpha xpos:x ypos:y i:(BRIDGE_CAST GLUIImage*)peer w:width h:height];
+#ifdef CN1_USE_METAL
+    // Phase 3 v2: if a mutable target is currently active, tag the op
+    // so drawFrame's drain routes it to the mutable's encoder. Java's
+    // tileImage(graphics, ...) sets this up by calling ng.checkControl
+    // before the JNI -- on the mutable branch, currentMutableImage =
+    // panelImg; on the screen branch, the GlobalGraphics.checkControl
+    // path cleared it via finishDrawingOnImage so it's nil here.
+    GLUIImage *target = [CodenameOne_GLViewController instance].currentMutableImage;
+    if (target != nil) {
+        [f setTarget:target];
+    }
+#endif
     [CodenameOne_GLViewController upcoming:f];
 #ifndef CN1_USE_ARC
     [f release];

@@ -440,6 +440,15 @@ void com_codename1_impl_ios_IOSNative_initVM__(CN1_THREAD_STATE_MULTI_ARG JAVA_O
     POOL_END();
 }
 
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isMetalRendering__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject)
+{
+#ifdef CN1_USE_METAL
+    return JAVA_TRUE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+
 void xmlvm_init_native_com_codename1_impl_ios_IOSNative()
 {
 }
