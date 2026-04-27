@@ -104,13 +104,213 @@ public final class Reflect {
             } catch (Exception ex) {
                 Object fallback = invokeWellKnownInterfaceMethod(object, methodName, args);
                 if (fallback != FALLBACK_MISS) return fallback;
-                throw new EvalError("Error invoking method " + methodName + ": " + ex.getMessage(),
+                throw new EvalError(formatInstanceDispatchFailure(object, methodName, args, ex),
                         callerInfo, callstack, ex);
             }
         } finally {
             CN1LambdaSupport.setCurrentNameSpace(prevNs);
         }
     }
+
+    /** Build a human-readable message for an instance method dispatch
+     * miss. The registry's raw "Generated instance dispatch not
+     * implemented" wording reads like an internal bug; this rephrases it
+     * as a no-such-method error and offers two kinds of "did you mean"
+     * hints — same-class overloads (the user already picked the right
+     * class but has the wrong number/type of arguments, e.g. forgetting
+     * the size float on {@code MultiButton.setMaterialIcon(char, float)})
+     * and static utility helpers (the user reached for an instance
+     * method that actually lives on {@code FontImage} etc., filtered to
+     * those whose first parameter accepts the target's type).
+     * Same-class suggestions come first because they're a stronger
+     * signal — the user is already on the right type.
+     * PlaygroundRunner.safeMessage prefers this message over the cause
+     * via the "did you mean:" / "No matching instance method" markers. */
+    private static String formatInstanceDispatchFailure(Object object, String methodName,
+            Object[] args, Exception cause) {
+        StringBuilder msg = new StringBuilder();
+        msg.append("No matching instance method ")
+                .append(StringUtil.methodString(methodName, Types.getTypes(args)))
+                .append(" on ").append(object.getClass().getName());
+        java.util.List<String> picks = new java.util.ArrayList<String>();
+        collectSameClassOverloads(picks, object, methodName);
+        collectStaticUtilityOverloads(picks, object, methodName);
+        if (!picks.isEmpty()) {
+            msg.append(" — did you mean: ");
+            for (int i = 0; i < picks.size(); i++) {
+                if (i > 0) msg.append(", ");
+                msg.append(picks.get(i));
+            }
+        }
+        return msg.toString();
+    }
+
+    /** Adds overloads of {@code methodName} declared on the target's
+     * runtime class (or any indexed supertype) to {@code picks}. Each
+     * entry is rendered as {@code SimpleName.method(type1, type2)} —
+     * the registry's signature index now carries simple parameter type
+     * names, so we surface the actual overload rather than
+     * {@code (...)}. We can't walk the class hierarchy via
+     * {@code Class.getSuperclass()} (CN1 compliance forbids it), so
+     * we iterate the indexed classes and use {@code Class.isInstance} —
+     * which is allowed — to find supertype matches. The leaf class is
+     * checked first so direct matches are O(1); only when the leaf
+     * has no overload do we fall back to the broader scan, stopping
+     * at the most-specific declaring class. */
+    private static void collectSameClassOverloads(java.util.List<String> picks,
+            Object target, String methodName) {
+        if (target == null || methodName == null || methodName.isEmpty()) return;
+        bsh.cn1.CN1Access registry = CN1AccessRegistry.getInstance();
+        if (!(registry instanceof bsh.cn1.GeneratedCN1Access)) return;
+        bsh.cn1.GeneratedCN1Access gen = (bsh.cn1.GeneratedCN1Access) registry;
+        String namePrefix = methodName + "(";
+        Class<?> targetClass = target.getClass();
+
+        if (addMatchingOverloads(picks, targetClass.getSimpleName(),
+                gen.getMethodSignatures(targetClass.getName()), namePrefix, 3)) {
+            return;
+        }
+        String[] classes = gen.getIndexedClassNames();
+        if (classes == null) return;
+        for (int i = 0; i < classes.length; i++) {
+            String className = classes[i];
+            if (className == null || className.equals(targetClass.getName())) continue;
+            String[] sigs = gen.getMethodSignatures(className);
+            if (!signaturesContain(sigs, namePrefix)) continue;
+            Class<?> candidate = gen.findClass(className);
+            if (candidate == null || !candidate.isInstance(target)) continue;
+            if (addMatchingOverloads(picks, candidate.getSimpleName(), sigs, namePrefix, 3)) {
+                return;
+            }
+        }
+    }
+
+    /** Adds static-utility overloads of {@code methodName} to
+     * {@code picks}, filtered to overloads whose first parameter
+     * accepts the target's runtime type. Filtering is essential
+     * because static utility classes like {@code FontImage} have a
+     * separate {@code setMaterialIcon} overload for each component
+     * subtype (Label, MultiButton, SpanButton, ...) — surfacing the
+     * Label overload as a "did you mean" for a MultiButton target is
+     * misleading. We compute the set of simple class names that the
+     * target {@code isInstance} of by walking the registry's class
+     * index, then keep only signatures whose first param falls in
+     * that set. */
+    private static void collectStaticUtilityOverloads(java.util.List<String> picks,
+            Object target, String methodName) {
+        if (target == null || methodName == null || methodName.isEmpty()) return;
+        bsh.cn1.CN1Access registry = CN1AccessRegistry.getInstance();
+        if (!(registry instanceof bsh.cn1.GeneratedCN1Access)) return;
+        bsh.cn1.GeneratedCN1Access gen = (bsh.cn1.GeneratedCN1Access) registry;
+        String targetClassName = target.getClass().getName();
+        String namePrefix = methodName + "(";
+
+        java.util.Set<String> applicableSimpleNames = collectApplicableSimpleNames(gen, target);
+        int cap = picks.size() + 3;
+        for (int i = 0; i < STATIC_UTILITY_CLASSES.length && picks.size() < cap; i++) {
+            String className = STATIC_UTILITY_CLASSES[i];
+            if (className.equals(targetClassName)) continue;
+            String[] sigs = gen.getMethodSignatures(className);
+            if (sigs == null || sigs.length == 0) continue;
+            String simple = className.substring(className.lastIndexOf('.') + 1);
+            for (int s = 0; s < sigs.length && picks.size() < cap; s++) {
+                String sig = sigs[s];
+                if (sig == null || !sig.startsWith(namePrefix)) continue;
+                if (!firstParamIsApplicable(sig, namePrefix, applicableSimpleNames)) continue;
+                String suggestion = simple + "." + sig;
+                if (!picks.contains(suggestion)) picks.add(suggestion);
+            }
+        }
+    }
+
+    /** Builds the set of simple class names {@code target} is an
+     * instance of by walking the registry's class index. Used to
+     * filter static-utility overloads to those whose first parameter
+     * actually accepts the target — without it, the diagnostic would
+     * suggest e.g. {@code FontImage.setMaterialIcon(Label, char)}
+     * for a MultiButton target. */
+    private static java.util.Set<String> collectApplicableSimpleNames(
+            bsh.cn1.GeneratedCN1Access gen, Object target) {
+        java.util.Set<String> result = new java.util.HashSet<String>();
+        result.add(target.getClass().getSimpleName());
+        String[] indexed = gen.getIndexedClassNames();
+        if (indexed == null) return result;
+        for (int i = 0; i < indexed.length; i++) {
+            Class<?> c = gen.findClass(indexed[i]);
+            if (c != null && c.isInstance(target)) {
+                result.add(c.getSimpleName());
+            }
+        }
+        return result;
+    }
+
+    /** Returns true when the signature's first parameter type — as
+     * encoded in the registry — names a class that's a supertype (by
+     * simple name) of the target. Signatures lack array brackets only
+     * if the param is a non-array type; we strip a trailing
+     * {@code "[]"} and {@code "..."} to compare just the base type. */
+    private static boolean firstParamIsApplicable(String sig, String namePrefix,
+            java.util.Set<String> applicableSimpleNames) {
+        int paramsStart = namePrefix.length();
+        int paramsEnd = sig.indexOf(')', paramsStart);
+        if (paramsEnd <= paramsStart) return false;
+        String first = sig.substring(paramsStart, paramsEnd);
+        int comma = first.indexOf(',');
+        if (comma > 0) first = first.substring(0, comma);
+        first = first.trim();
+        if (first.endsWith("...")) first = first.substring(0, first.length() - 3);
+        while (first.endsWith("[]")) first = first.substring(0, first.length() - 2);
+        return applicableSimpleNames.contains(first);
+    }
+
+    private static boolean signaturesContain(String[] sigs, String namePrefix) {
+        if (sigs == null) return false;
+        for (int i = 0; i < sigs.length; i++) {
+            String s = sigs[i];
+            if (s != null && s.startsWith(namePrefix)) return true;
+        }
+        return false;
+    }
+
+    /** Adds matches from {@code sigs} prefixed with {@code namePrefix}
+     * into {@code picks} as {@code SimpleName.method(...)}, returning
+     * true when at least one match was added. */
+    private static boolean addMatchingOverloads(java.util.List<String> picks,
+            String simpleClassName, String[] sigs, String namePrefix, int maxFromThisClass) {
+        if (sigs == null) return false;
+        int added = 0;
+        for (int i = 0; i < sigs.length && added < maxFromThisClass; i++) {
+            String s = sigs[i];
+            if (s == null || !s.startsWith(namePrefix)) continue;
+            String suggestion = simpleClassName + "." + s;
+            if (!picks.contains(suggestion)) {
+                picks.add(suggestion);
+                added++;
+            }
+        }
+        return added > 0;
+    }
+
+    /** Curated list of CN1 utility classes whose static helpers commonly
+     * take a Component-or-similar target as their first argument. When an
+     * instance method dispatch fails, we check these classes for a static
+     * method by the same name and surface them as a "did you mean"
+     * suggestion. Reflection (Class.getMethods etc.) isn't available in
+     * the playground's compliance-checked code path, so we rely on the
+     * registry's name-only signature index — that's lossy on parameter
+     * types but accurate enough to point the user at the right class. */
+    private static final String[] STATIC_UTILITY_CLASSES = {
+            "com.codename1.ui.FontImage",
+            "com.codename1.ui.ComponentSelector",
+            "com.codename1.ui.layouts.BorderLayout",
+            "com.codename1.ui.layouts.BoxLayout",
+            "com.codename1.ui.layouts.FlowLayout",
+            "com.codename1.ui.layouts.GridLayout",
+            "com.codename1.ui.layouts.LayeredLayout",
+            "com.codename1.ui.CN",
+            "com.codename1.ui.Display",
+            "com.codename1.ui.util.Resources"
+    };
 
     private static final Object FALLBACK_MISS = new Object();
 
