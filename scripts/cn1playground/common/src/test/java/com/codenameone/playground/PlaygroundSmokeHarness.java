@@ -252,12 +252,15 @@ public final class PlaygroundSmokeHarness {
                 "UIManager import snippet should produce a Container: " + summarizeMessages(result));
     }
 
-    /** Regression: calling a static utility as if it were an instance
-     * method (the classic {@code row.setMaterialIcon(FontImage.MATERIAL_X)}
-     * mistake) used to surface "Generated instance dispatch not implemented",
-     * which read like an internal bug. The runner should now produce a
-     * "did you mean: FontImage.setMaterialIcon(...)?" hint that points at
-     * the actual static helper. */
+    /** Regression: calling {@code row.setMaterialIcon(FontImage.MATERIAL_X)}
+     * on a MultiButton fails because the only instance overload is
+     * {@code (char, float)} — the user forgot the size. It used to surface
+     * "Generated instance dispatch not implemented", which read like an
+     * internal bug. The runner should now produce a hint that names
+     * the same-class overload first ("MultiButton.setMaterialIcon(...)
+     * with different parameters") and the static utility helpers second
+     * ("FontImage.setMaterialIcon(...)") — same-class is a stronger
+     * signal because the user is already on the right type. */
     private static void smokeInstanceDispatchSuggestsStaticUtility() {
         Display.init(null);
 
@@ -286,9 +289,16 @@ public final class PlaygroundSmokeHarness {
         String summary = summarizeMessages(result);
         require(summary.indexOf("No matching instance method") >= 0,
                 "Error message should name the missing instance method, got: " + summary);
-        require(summary.indexOf("did you mean:") >= 0
-                        && summary.indexOf("FontImage.setMaterialIcon") >= 0,
+        require(summary.indexOf("did you mean:") >= 0,
+                "Error message should include 'did you mean:', got: " + summary);
+        int sameClassIdx = summary.indexOf("MultiButton.setMaterialIcon(...) with different parameters");
+        require(sameClassIdx >= 0,
+                "Error message should suggest MultiButton.setMaterialIcon overload, got: " + summary);
+        int staticIdx = summary.indexOf("FontImage.setMaterialIcon");
+        require(staticIdx >= 0,
                 "Error message should suggest FontImage.setMaterialIcon, got: " + summary);
+        require(sameClassIdx < staticIdx,
+                "Same-class hint must come before static utility hint, got: " + summary);
         require(summary.indexOf("Generated instance dispatch not implemented") < 0,
                 "Raw 'Generated instance dispatch' message should be replaced, got: " + summary);
     }

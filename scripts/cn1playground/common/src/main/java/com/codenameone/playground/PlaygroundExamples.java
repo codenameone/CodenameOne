@@ -161,7 +161,7 @@ final class PlaygroundExamples {
                 int idx = i;
                 MultiButton row = new MultiButton(titles[i]);
                 row.setTextLine2(subtitles[i]);
-                FontImage.setMaterialIcon(row, icons[i]);
+                row.setMaterialIcon(icons[i], 5);
                 row.addActionListener(e -> Dialog.show(titles[idx], subtitles[idx], "OK", null));
                 form.add(row);
             }

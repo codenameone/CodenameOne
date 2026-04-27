@@ -115,22 +115,94 @@ public final class Reflect {
     /** Build a human-readable message for an instance method dispatch
      * miss. The registry's raw "Generated instance dispatch not
      * implemented" wording reads like an internal bug; this rephrases it
-     * as a no-such-method error and, when the missing call matches a
-     * known static utility (e.g. {@code FontImage.setMaterialIcon(target,
-     * char)}), suggests it. PlaygroundRunner.safeMessage prefers this
-     * message over the cause via the "did you mean:" / "No matching
-     * instance method" markers. */
+     * as a no-such-method error and offers two kinds of "did you mean"
+     * hints — same-class overloads (the user already picked the right
+     * class but has the wrong number/type of arguments, e.g. forgetting
+     * the size float on {@code MultiButton.setMaterialIcon(char,float)})
+     * and static utility helpers (the user reached for an instance
+     * method that actually lives on {@code FontImage} etc.). Same-class
+     * suggestions come first because they're a stronger signal — the
+     * user is already on the right type. PlaygroundRunner.safeMessage
+     * prefers this message over the cause via the "did you mean:" /
+     * "No matching instance method" markers. */
     private static String formatInstanceDispatchFailure(Object object, String methodName,
             Object[] args, Exception cause) {
         StringBuilder msg = new StringBuilder();
         msg.append("No matching instance method ")
                 .append(StringUtil.methodString(methodName, Types.getTypes(args)))
                 .append(" on ").append(object.getClass().getName());
-        String hint = suggestStaticUtilityMethods(object, methodName);
-        if (hint != null) {
-            msg.append(" — did you mean: ").append(hint).append("?");
+        String sameClass = suggestSameClassOverload(object, methodName);
+        String staticHint = suggestStaticUtilityMethods(object, methodName);
+        if (sameClass != null || staticHint != null) {
+            msg.append(" — did you mean: ");
+            if (sameClass != null) {
+                msg.append(sameClass).append(".").append(methodName)
+                        .append("(...) with different parameters");
+            }
+            if (staticHint != null) {
+                if (sameClass != null) msg.append(", or ");
+                msg.append(staticHint);
+            }
+            msg.append("?");
         }
         return msg.toString();
+    }
+
+    /** Searches the registry's class index for any indexed class that
+     * (a) is a supertype of {@code target} and (b) declares a method
+     * named {@code methodName}. Returns the simple class name of the
+     * first match (so the suggestion reads "MultiButton.foo(...) with
+     * different parameters" rather than the full FQN), or {@code null}
+     * when no overload is found. We can't walk the class hierarchy via
+     * {@code Class.getSuperclass()} (CN1 compliance forbids it), so we
+     * iterate the indexed classes and use {@code Class.isInstance} —
+     * which is allowed — to find supertype matches. The leaf class is
+     * checked first so direct matches are O(1); only when the leaf
+     * has no entry do we fall back to the broader scan. The registry
+     * signatures are name-only, so we can't tell the user which
+     * overload to pick — but we can confidently say "this method exists
+     * on this class with a different signature", which is the
+     * actionable hint. */
+    static String suggestSameClassOverload(Object target, String methodName) {
+        if (target == null || methodName == null || methodName.isEmpty()) return null;
+        bsh.cn1.CN1Access registry = CN1AccessRegistry.getInstance();
+        if (!(registry instanceof bsh.cn1.GeneratedCN1Access)) return null;
+        bsh.cn1.GeneratedCN1Access gen = (bsh.cn1.GeneratedCN1Access) registry;
+        String namePrefix = methodName + "(";
+        Class<?> targetClass = target.getClass();
+
+        // Fast path: leaf-class lookup. CN1's per-class signature lists
+        // include declared methods only, so this hits when the user
+        // calls a method declared directly on the runtime type.
+        if (signaturesContain(gen.getMethodSignatures(targetClass.getName()), namePrefix)) {
+            return targetClass.getSimpleName();
+        }
+
+        // Slow path: scan the indexed classes for any supertype with a
+        // declared method matching the name. Cap at one match — we just
+        // need a class name to mention.
+        String[] classes = gen.getIndexedClassNames();
+        if (classes == null) return null;
+        for (int i = 0; i < classes.length; i++) {
+            String className = classes[i];
+            if (className == null || className.equals(targetClass.getName())) continue;
+            if (!signaturesContain(gen.getMethodSignatures(className), namePrefix)) continue;
+            Class<?> candidate = gen.findClass(className);
+            if (candidate == null) continue;
+            if (candidate.isInstance(target)) {
+                return candidate.getSimpleName();
+            }
+        }
+        return null;
+    }
+
+    private static boolean signaturesContain(String[] sigs, String namePrefix) {
+        if (sigs == null) return false;
+        for (int i = 0; i < sigs.length; i++) {
+            String s = sigs[i];
+            if (s != null && s.startsWith(namePrefix)) return true;
+        }
+        return false;
     }
 
     /** Curated list of CN1 utility classes whose static helpers commonly
