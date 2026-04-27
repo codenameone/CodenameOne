@@ -38,7 +38,16 @@ public final class JavaScriptPortBootstrap implements Runnable {
     @JSBody(params = {}, script = "window.cn1Started = true;")
     private static native void setStarted();
 
-    @JSBody(params = {"url"}, script = "var l = window.location; var base=l.protocol+'//'+l.hostname+(l.port?':':'')+l.port; return url.indexOf(base)===0;")
+    // The @JSBody body runs against the raw worker-side argument. In the
+    // ParparVM JS port a Java ``String`` arrives as a wrapped object
+    // ({__class:"java_lang_String", cn1_..._value: char[]}), not a native
+    // JS string — calling ``url.indexOf`` directly throws
+    // ``TypeError: url.indexOf is not a function`` and bubbles up through
+    // ``proxifyUrl`` → ``ImplementationFactory.proxifyURL`` whenever the
+    // app loads any image off the theme. Coerce to a native string up
+    // front (mirrors the pattern already in place for the
+    // ``measureAscent`` / ``measureDescent`` @JSBody helpers).
+    @JSBody(params = {"url"}, script = "var s = String(url == null ? '' : url); var l = window.location; var base=l.protocol+'//'+l.hostname+(l.port?':':'')+l.port; return s.indexOf(base)===0;")
     private static native boolean urlIsSameDomain(String url);
 
     public static String proxifyUrl(Display display, String url) {
