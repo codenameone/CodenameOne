@@ -270,6 +270,26 @@ static simd_float4 premultipliedColor(int color, int alpha) {
 // --------------- Public draw primitives ---------------
 
 void CN1MetalFillRect(int color, int alpha, int x, int y, int width, int height) {
+    // Diagnostic: log fillRects at the title-bar artifact location (rows 240-260)
+    // OR with the artifact colors (white 0xffffff or grey 0xb2b2b2 ≈ 178).
+    // Capped count so we don't drown the log; the goal is to see which CN1
+    // component draws at this row range so we can fix the source op.
+    {
+        static int diagFillRectAt246Count = 0;
+        static int diagFillRectColorCount = 0;
+        BOOL inArtifactRowRange = (y >= 240 && y <= 260);
+        int rch = (color >> 16) & 0xff, gch = (color >> 8) & 0xff, bch = color & 0xff;
+        BOOL artifactColor = (color == 0xffffff) || (rch == gch && gch == bch && rch >= 170 && rch <= 185);
+        if (inArtifactRowRange && diagFillRectAt246Count < 30) {
+            NSLog(@"CN1SS:METAL_DIAG FillRect@row %d color=0x%06x alpha=%d (%d,%d %dx%d)",
+                  diagFillRectAt246Count, color, alpha, x, y, width, height);
+            diagFillRectAt246Count++;
+        } else if (artifactColor && diagFillRectColorCount < 20) {
+            NSLog(@"CN1SS:METAL_DIAG FillRect@col #%d color=0x%06x alpha=%d (%d,%d %dx%d)",
+                  diagFillRectColorCount, color, alpha, x, y, width, height);
+            diagFillRectColorCount++;
+        }
+    }
     simd_float4 colorV = premultipliedColor(color, alpha);
     float vertices[8] = {
         (float)x,         (float)y,
@@ -281,6 +301,17 @@ void CN1MetalFillRect(int color, int alpha, int x, int y, int width, int height)
 }
 
 void CN1MetalDrawLine(int color, int alpha, int x1, int y1, int x2, int y2) {
+    {
+        static int diagDrawLineCount = 0;
+        BOOL inArtifactRowRange = ((y1 >= 240 && y1 <= 260) || (y2 >= 240 && y2 <= 260));
+        int rch = (color >> 16) & 0xff, gch = (color >> 8) & 0xff, bch = color & 0xff;
+        BOOL artifactColor = (color == 0xffffff) || (rch == gch && gch == bch && rch >= 170 && rch <= 185);
+        if ((inArtifactRowRange || artifactColor) && diagDrawLineCount < 20) {
+            NSLog(@"CN1SS:METAL_DIAG DrawLine #%d color=0x%06x alpha=%d (%d,%d)->(%d,%d)",
+                  diagDrawLineCount, color, alpha, x1, y1, x2, y2);
+            diagDrawLineCount++;
+        }
+    }
     simd_float4 colorV = premultipliedColor(color, alpha);
     float vertices[4] = { (float)x1, (float)y1, (float)x2, (float)y2 };
     drawSolidPrimitive(MTLPrimitiveTypeLine, vertices, 2, colorV);
