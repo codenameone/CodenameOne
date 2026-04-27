@@ -388,21 +388,57 @@ public class Log {
         Display.getInstance().addEdtErrorHandler(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent evt) {
+                // TEMPORARY DIAGNOSTIC INSTRUMENTATION (PR #4795): the ParparVM
+                // JS port currently surfaces every original EDT exception as a
+                // bare ``Exception: <class>`` line because *this* listener
+                // throws an NPE while trying to format the report — the
+                // formatting NPE is the one that ends up logged, the original
+                // is silently swallowed. Wrap each step so we can identify
+                // which sub-call fails AND so the caught ``evt.getSource()``
+                // throwable still reaches ``Log.e`` even when a preceding
+                // line dies. Remove this granular wrapping once the JS-port
+                // root cause is fixed.
+                System.out.println("[edtErr] enter listener");
+                Object source = null;
+                try {
+                    source = evt.getSource();
+                    System.out.println("[edtErr] source-class=" + (source == null ? "null" : source.getClass().getName()));
+                } catch (Throwable t) {
+                    System.out.println("[edtErr] getSource threw: " + t);
+                }
                 if (consumeError) {
-                    evt.consume();
+                    try { evt.consume(); }
+                    catch (Throwable t) { System.out.println("[edtErr] consume threw: " + t); }
                 }
-                p("Exception in " + Display.getInstance().getProperty("AppName", "app") + " version " + Display.getInstance().getProperty("AppVersion", "Unknown"));
-                p("OS " + Display.getInstance().getPlatformName());
-                p("Error " + evt.getSource());
-                if (Display.getInstance().getCurrent() != null) {
-                    p("Current Form " + Display.getInstance().getCurrent().getName());
-                } else {
-                    p("Before the first form!");
-                }
-                e((Throwable) evt.getSource());
-                if (getUniqueDeviceKey() != null) {
-                    sendLog();
-                }
+                try {
+                    p("Exception in " + Display.getInstance().getProperty("AppName", "app") + " version " + Display.getInstance().getProperty("AppVersion", "Unknown"));
+                } catch (Throwable t) { System.out.println("[edtErr] appName/version threw: " + t); }
+                try {
+                    p("OS " + Display.getInstance().getPlatformName());
+                } catch (Throwable t) { System.out.println("[edtErr] platformName threw: " + t); }
+                try {
+                    p("Error " + source);
+                } catch (Throwable t) { System.out.println("[edtErr] sourceLog threw: " + t); }
+                try {
+                    if (Display.getInstance().getCurrent() != null) {
+                        p("Current Form " + Display.getInstance().getCurrent().getName());
+                    } else {
+                        p("Before the first form!");
+                    }
+                } catch (Throwable t) { System.out.println("[edtErr] currentForm threw: " + t); }
+                try {
+                    if (source instanceof Throwable) {
+                        e((Throwable) source);
+                    } else {
+                        System.out.println("[edtErr] source not Throwable, skipping Log.e");
+                    }
+                } catch (Throwable t) { System.out.println("[edtErr] Log.e threw: " + t); }
+                try {
+                    if (getUniqueDeviceKey() != null) {
+                        sendLog();
+                    }
+                } catch (Throwable t) { System.out.println("[edtErr] sendLog threw: " + t); }
+                System.out.println("[edtErr] exit listener");
             }
         });
         crashBound = true;

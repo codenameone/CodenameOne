@@ -441,31 +441,21 @@ function* stringifyThrowable(throwable) {
   } catch (_err) {
     // Best effort diagnostic path only.
   }
-  // Read the cached stack-trace string straight off the Throwable when
-  // present. ``Throwable.fillInStack`` is supposed to populate this
-  // field with ``new Error().stack``, but the Codename One Throwable
-  // constructors don't call it (every other Java port lazy-fills via
-  // their printStackTrace native), so almost all worker-side throwables
-  // arrive here with the field unset. Fall back to a fresh
-  // ``new Error().stack`` captured at the Log.e call site — that frame
-  // list points to the catch block one frame above ``Log.e``, which is
-  // still enough to triage where the exception was caught and handed
-  // to ``Log.e``. Without this fallback every exception line in the
-  // browser console collapses to ``Exception: <class> | <class>``
-  // with no frames at all.
+  // Read the cached stack-trace string when ``Throwable.fillInStack``
+  // populated it (rare in this port — the Codename One ``Throwable``
+  // constructors don't call ``fillInStack``). Skip the fresh
+  // ``new Error().stack`` fallback: the giant per-exception stack dump
+  // it produced was useful once, for the bindCrashProtection diagnosis,
+  // but it's far too noisy to keep on. With the targeted
+  // instrumentation now in ``Log.bindCrashProtection`` we don't need
+  // every Log.e call to ship its caller stack any more.
   try {
     const stackField = throwable.cn1_java_lang_Throwable_stack;
-    let stackText = null;
     if (stackField && stackField.__class === "java_lang_String") {
-      stackText = jvm.toNativeString(stackField);
-    }
-    if (!stackText) {
-      stackText = (new Error()).stack || null;
+      const stackText = jvm.toNativeString(stackField);
       if (stackText) {
-        pieces.push("captured-at-Log.e-stack=" + stackText);
+        pieces.push("stack=" + stackText);
       }
-    } else {
-      pieces.push("stack=" + stackText);
     }
   } catch (_err) {
     // Best effort diagnostic path only.
