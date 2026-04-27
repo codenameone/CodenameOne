@@ -270,24 +270,28 @@ static simd_float4 premultipliedColor(int color, int alpha) {
 // --------------- Public draw primitives ---------------
 
 void CN1MetalFillRect(int color, int alpha, int x, int y, int width, int height) {
-    // Diagnostic: log fillRects at the title-bar artifact location (rows 240-260)
-    // OR with the artifact colors (white 0xffffff or grey 0xb2b2b2 ≈ 178).
-    // Capped count so we don't drown the log; the goal is to see which CN1
-    // component draws at this row range so we can fix the source op.
+    // Diagnostic: log fillRects whose top OR bottom edge lands at the
+    // artifact rows 246-247 -- those are the ones that could PAINT the
+    // visible artifact rows. Plus log thin (h <= 2) fillRects with
+    // near-grey-178 colours regardless of position. Higher caps so the
+    // log gets the relevant draws even after early test transitions
+    // exhaust the cheap rate-limit.
     {
-        static int diagFillRectAt246Count = 0;
-        static int diagFillRectColorCount = 0;
-        BOOL inArtifactRowRange = (y >= 240 && y <= 260);
+        static int diagFillRectArtifactCount = 0;
+        static int diagFillRectThinGreyCount = 0;
+        int yBottom = y + height;
+        BOOL touchesArtifactRow = (y == 246 || y == 247 || yBottom == 247 || yBottom == 248);
         int rch = (color >> 16) & 0xff, gch = (color >> 8) & 0xff, bch = color & 0xff;
-        BOOL artifactColor = (color == 0xffffff) || (rch == gch && gch == bch && rch >= 170 && rch <= 185);
-        if (inArtifactRowRange && diagFillRectAt246Count < 30) {
-            NSLog(@"CN1SS:METAL_DIAG FillRect@row %d color=0x%06x alpha=%d (%d,%d %dx%d)",
-                  diagFillRectAt246Count, color, alpha, x, y, width, height);
-            diagFillRectAt246Count++;
-        } else if (artifactColor && diagFillRectColorCount < 20) {
-            NSLog(@"CN1SS:METAL_DIAG FillRect@col #%d color=0x%06x alpha=%d (%d,%d %dx%d)",
-                  diagFillRectColorCount, color, alpha, x, y, width, height);
-            diagFillRectColorCount++;
+        BOOL nearGrey178 = (rch == gch && gch == bch && rch >= 170 && rch <= 185);
+        BOOL nearWhite = (color & 0xffffff) >= 0xfafafa;
+        if (touchesArtifactRow && diagFillRectArtifactCount < 60) {
+            NSLog(@"CN1SS:METAL_DIAG FillRect@artifact #%d color=0x%06x alpha=%d (%d,%d %dx%d) yBottom=%d",
+                  diagFillRectArtifactCount, color, alpha, x, y, width, height, yBottom);
+            diagFillRectArtifactCount++;
+        } else if (height <= 2 && (nearGrey178 || nearWhite) && diagFillRectThinGreyCount < 40) {
+            NSLog(@"CN1SS:METAL_DIAG FillRect@thin #%d color=0x%06x alpha=%d (%d,%d %dx%d)",
+                  diagFillRectThinGreyCount, color, alpha, x, y, width, height);
+            diagFillRectThinGreyCount++;
         }
     }
     simd_float4 colorV = premultipliedColor(color, alpha);
@@ -302,14 +306,12 @@ void CN1MetalFillRect(int color, int alpha, int x, int y, int width, int height)
 
 void CN1MetalDrawLine(int color, int alpha, int x1, int y1, int x2, int y2) {
     {
-        static int diagDrawLineCount = 0;
-        BOOL inArtifactRowRange = ((y1 >= 240 && y1 <= 260) || (y2 >= 240 && y2 <= 260));
-        int rch = (color >> 16) & 0xff, gch = (color >> 8) & 0xff, bch = color & 0xff;
-        BOOL artifactColor = (color == 0xffffff) || (rch == gch && gch == bch && rch >= 170 && rch <= 185);
-        if ((inArtifactRowRange || artifactColor) && diagDrawLineCount < 20) {
-            NSLog(@"CN1SS:METAL_DIAG DrawLine #%d color=0x%06x alpha=%d (%d,%d)->(%d,%d)",
-                  diagDrawLineCount, color, alpha, x1, y1, x2, y2);
-            diagDrawLineCount++;
+        static int diagDrawLineArtifactCount = 0;
+        BOOL touchesArtifactRow = (y1 == 246 || y1 == 247 || y2 == 246 || y2 == 247);
+        if (touchesArtifactRow && diagDrawLineArtifactCount < 30) {
+            NSLog(@"CN1SS:METAL_DIAG DrawLine@artifact #%d color=0x%06x alpha=%d (%d,%d)->(%d,%d)",
+                  diagDrawLineArtifactCount, color, alpha, x1, y1, x2, y2);
+            diagDrawLineArtifactCount++;
         }
     }
     simd_float4 colorV = premultipliedColor(color, alpha);
