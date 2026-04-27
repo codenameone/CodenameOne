@@ -270,30 +270,6 @@ static simd_float4 premultipliedColor(int color, int alpha) {
 // --------------- Public draw primitives ---------------
 
 void CN1MetalFillRect(int color, int alpha, int x, int y, int width, int height) {
-    // Diagnostic: log fillRects whose top OR bottom edge lands at the
-    // artifact rows 246-247 -- those are the ones that could PAINT the
-    // visible artifact rows. Plus log thin (h <= 2) fillRects with
-    // near-grey-178 colours regardless of position. Higher caps so the
-    // log gets the relevant draws even after early test transitions
-    // exhaust the cheap rate-limit.
-    {
-        static int diagFillRectArtifactCount = 0;
-        static int diagFillRectThinGreyCount = 0;
-        int yBottom = y + height;
-        BOOL touchesArtifactRow = (y == 246 || y == 247 || yBottom == 247 || yBottom == 248);
-        int rch = (color >> 16) & 0xff, gch = (color >> 8) & 0xff, bch = color & 0xff;
-        BOOL nearGrey178 = (rch == gch && gch == bch && rch >= 170 && rch <= 185);
-        BOOL nearWhite = (color & 0xffffff) >= 0xfafafa;
-        if (touchesArtifactRow && diagFillRectArtifactCount < 60) {
-            NSLog(@"CN1SS:METAL_DIAG FillRect@artifact #%d color=0x%06x alpha=%d (%d,%d %dx%d) yBottom=%d",
-                  diagFillRectArtifactCount, color, alpha, x, y, width, height, yBottom);
-            diagFillRectArtifactCount++;
-        } else if (height <= 2 && (nearGrey178 || nearWhite) && diagFillRectThinGreyCount < 40) {
-            NSLog(@"CN1SS:METAL_DIAG FillRect@thin #%d color=0x%06x alpha=%d (%d,%d %dx%d)",
-                  diagFillRectThinGreyCount, color, alpha, x, y, width, height);
-            diagFillRectThinGreyCount++;
-        }
-    }
     simd_float4 colorV = premultipliedColor(color, alpha);
     float vertices[8] = {
         (float)x,         (float)y,
@@ -305,15 +281,6 @@ void CN1MetalFillRect(int color, int alpha, int x, int y, int width, int height)
 }
 
 void CN1MetalDrawLine(int color, int alpha, int x1, int y1, int x2, int y2) {
-    {
-        static int diagDrawLineArtifactCount = 0;
-        BOOL touchesArtifactRow = (y1 == 246 || y1 == 247 || y2 == 246 || y2 == 247);
-        if (touchesArtifactRow && diagDrawLineArtifactCount < 30) {
-            NSLog(@"CN1SS:METAL_DIAG DrawLine@artifact #%d color=0x%06x alpha=%d (%d,%d)->(%d,%d)",
-                  diagDrawLineArtifactCount, color, alpha, x1, y1, x2, y2);
-            diagDrawLineArtifactCount++;
-        }
-    }
     simd_float4 colorV = premultipliedColor(color, alpha);
     float vertices[4] = { (float)x1, (float)y1, (float)x2, (float)y2 };
     drawSolidPrimitive(MTLPrimitiveTypeLine, vertices, 2, colorV);
@@ -366,20 +333,6 @@ void CN1MetalClearRect(int x, int y, int width, int height) {
 
 void CN1MetalDrawImage(id<MTLTexture> texture, int alpha, int x, int y, int width, int height) {
     if (texture == nil) return;
-    {
-        // Diagnostic: log DrawImage calls whose dest Y range covers
-        // the title-bar artifact rows 246-247. Helps identify which
-        // textured quad paints the visible white+grey strip.
-        static int diagDrawImgArtCount = 0;
-        int yBottom = y + height;
-        BOOL coversArtifact = (y <= 247 && yBottom >= 247);
-        if (coversArtifact && diagDrawImgArtCount < 30) {
-            NSLog(@"CN1SS:METAL_DIAG DrawImage@artifact #%d alpha=%d (%d,%d %dx%d) tex=%p texSize=%lux%lu",
-                  diagDrawImgArtCount, alpha, x, y, width, height,
-                  (void*)texture, (unsigned long)texture.width, (unsigned long)texture.height);
-            diagDrawImgArtCount++;
-        }
-    }
     float a = alpha / 255.0f;
     // Texture tint uses straight alpha modulator (no premultiplication here;
     // the fragment shader handles it).
@@ -390,9 +343,14 @@ void CN1MetalDrawImage(id<MTLTexture> texture, int alpha, int x, int y, int widt
         (float)x,         (float)(y+height),
         (float)(x+width), (float)(y+height)
     };
-    // CN1MetalTextureFromUIImage rasterises with a Y-flipped CTM so the
-    // texture stores display-row-0 at memory-row-0; with Metal's V=0-at-top
-    // convention, sampling top-of-quad at V=0 gives the top of the image.
+    // V=0-at-top sampling: memory_row_0 lands at the top vertex. For
+    // UIImage-backed sources, CN1MetalTextureFromUIImage stores them in the
+    // GL-compatible layout (memory_row_0 = source's visual BOTTOM), so this
+    // mapping renders the source upside-down vs. its natural orientation —
+    // matching what GL does for assets designed against its V=1-at-top
+    // convention. For mutable-image targets, Phase 3 renders into the texture
+    // with user-y=0 at memory_row_0, so V=0-at-top correctly puts the
+    // mutable's own top at dest top.
     static const float texcoords[8] = {
         0, 0,
         1, 0,
@@ -778,16 +736,6 @@ id<MTLTexture> CN1MetalCreateAlphaMaskTexture(const uint8_t *bytes, int width, i
 void CN1MetalDrawAlphaMask(id<MTLTexture> texture, int color, int alpha,
                            int x, int y, int width, int height) {
     if (texture == nil) return;
-    {
-        static int diagDrawAlphaMaskArtCount = 0;
-        int yBottom = y + height;
-        BOOL coversArtifact = (y <= 247 && yBottom >= 247);
-        if (coversArtifact && diagDrawAlphaMaskArtCount < 20) {
-            NSLog(@"CN1SS:METAL_DIAG DrawAlphaMask@artifact #%d color=0x%06x alpha=%d (%d,%d %dx%d)",
-                  diagDrawAlphaMaskArtCount, color, alpha, x, y, width, height);
-            diagDrawAlphaMaskArtCount++;
-        }
-    }
     // The AlphaMask fragment shader (cn1_fs_alpha_mask) does:
     //   float a = sample(tex).r;
     //   return float4(color.rgb * a, color.a * a);
@@ -822,18 +770,23 @@ id<MTLTexture> CN1MetalTextureFromUIImage(UIImage *image) {
     int h = (int)image.size.height * image.scale;
     if (w <= 0 || h <= 0) return nil;
 
-    // Rasterize UIImage into a CGBitmapContext then upload as MTLTexture.
-    // CTM flip so display-row-0 lands at memory-row-0 — matches GLUIImage.
-    // getTexture's pattern, and matches the text-cache path. Mutable images
-    // (UIGraphicsGetImageFromCurrentImageContext output) and disk-loaded
-    // UIImages both come through here right-side-up after this flip.
+    // Rasterize UIImage into a CGBitmapContext, then upload as MTLTexture.
+    // No CTM flip: with default CG (Y-up) coords, CGContextDrawImage lays the
+    // source's row 0 at the BOTTOM of memory and the source's last row at
+    // memory_row_0 — i.e. the texture is stored upside-down in memory order.
+    // That mirrors GLUIImage.getTexture's POW2 layout (modulo padding) and is
+    // the orientation cn1's iOS theme assets are designed for: GL's V=1-at-top
+    // sampling renders them right-side-up; Metal's V=0-at-top sampling on this
+    // same memory layout reproduces GL's pixels exactly. Flipping the CTM
+    // here (the original implementation) made source row 0 land at
+    // memory_row_0 and produced a 1-pixel decoration leak at the title-bar
+    // top edge (rows 246-247) because cn1 9-patch slices put their drop-shadow
+    // row at source row 0 — which GL has always rendered at dest BOTTOM.
     CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
     void *rawData = calloc(h * w * 4, sizeof(uint8_t));
     CGContextRef ctx = CGBitmapContextCreate(rawData, w, h, 8, w * 4, cs,
         kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big);
     CGColorSpaceRelease(cs);
-    CGContextTranslateCTM(ctx, 0, h);
-    CGContextScaleCTM(ctx, 1, -1);
     CGContextDrawImage(ctx, CGRectMake(0, 0, w, h), image.CGImage);
     CGContextRelease(ctx);
 

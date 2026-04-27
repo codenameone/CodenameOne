@@ -1980,8 +1980,6 @@ void Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayImpl
     // UIImage read which returns stale pixels for mutable images on
     // Metal but doesn't hang. Tracked: reinstate after the underlying
     // deadlock is understood.
-    NSLog(@"CN1SS:METAL_DIAG imageRgbToIntArrayImpl peer=%p (%d,%d %dx%d of %dx%d)",
-          peer, x, y, width, height, imgWidth, imgHeight);
 #endif
     BOOL currentlyDrawing = NO;
     BOOL oldCurrentMutableTransformSet = currentMutableTransformSet;
