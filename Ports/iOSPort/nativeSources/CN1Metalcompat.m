@@ -366,6 +366,20 @@ void CN1MetalClearRect(int x, int y, int width, int height) {
 
 void CN1MetalDrawImage(id<MTLTexture> texture, int alpha, int x, int y, int width, int height) {
     if (texture == nil) return;
+    {
+        // Diagnostic: log DrawImage calls whose dest Y range covers
+        // the title-bar artifact rows 246-247. Helps identify which
+        // textured quad paints the visible white+grey strip.
+        static int diagDrawImgArtCount = 0;
+        int yBottom = y + height;
+        BOOL coversArtifact = (y <= 247 && yBottom >= 247);
+        if (coversArtifact && diagDrawImgArtCount < 30) {
+            NSLog(@"CN1SS:METAL_DIAG DrawImage@artifact #%d alpha=%d (%d,%d %dx%d) tex=%p texSize=%lux%lu",
+                  diagDrawImgArtCount, alpha, x, y, width, height,
+                  (void*)texture, (unsigned long)texture.width, (unsigned long)texture.height);
+            diagDrawImgArtCount++;
+        }
+    }
     float a = alpha / 255.0f;
     // Texture tint uses straight alpha modulator (no premultiplication here;
     // the fragment shader handles it).
@@ -764,6 +778,16 @@ id<MTLTexture> CN1MetalCreateAlphaMaskTexture(const uint8_t *bytes, int width, i
 void CN1MetalDrawAlphaMask(id<MTLTexture> texture, int color, int alpha,
                            int x, int y, int width, int height) {
     if (texture == nil) return;
+    {
+        static int diagDrawAlphaMaskArtCount = 0;
+        int yBottom = y + height;
+        BOOL coversArtifact = (y <= 247 && yBottom >= 247);
+        if (coversArtifact && diagDrawAlphaMaskArtCount < 20) {
+            NSLog(@"CN1SS:METAL_DIAG DrawAlphaMask@artifact #%d color=0x%06x alpha=%d (%d,%d %dx%d)",
+                  diagDrawAlphaMaskArtCount, color, alpha, x, y, width, height);
+            diagDrawAlphaMaskArtCount++;
+        }
+    }
     // The AlphaMask fragment shader (cn1_fs_alpha_mask) does:
     //   float a = sample(tex).r;
     //   return float4(color.rgb * a, color.a * a);
