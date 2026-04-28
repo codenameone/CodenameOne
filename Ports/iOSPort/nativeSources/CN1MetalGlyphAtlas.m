@@ -44,9 +44,17 @@ static NSMutableDictionary<NSString *, CN1MetalGlyphAtlas *> *atlasCache = nil;
 @implementation CN1MetalGlyphAtlas
 
 + (nullable instancetype)atlasForFont:(nonnull UIFont *)font {
+    static int s_top = 0;
+    if (s_top < 100) { NSLog(@"CN1SS:METAL_DIAG atlasForFont top #%d", s_top); s_top++; }
     if (atlasCache == nil) atlasCache = [NSMutableDictionary dictionary];
+    static int s_keyPre = 0;
+    if (s_keyPre < 100) { NSLog(@"CN1SS:METAL_DIAG atlasForFont keyPre #%d fontName=%@ pt=%g", s_keyPre, font.fontName, (double)font.pointSize); s_keyPre++; }
     NSString *key = [NSString stringWithFormat:@"%@|%g", font.fontName, (double)font.pointSize];
+    static int s_keyPost = 0;
+    if (s_keyPost < 100) { NSLog(@"CN1SS:METAL_DIAG atlasForFont keyPost #%d key=%@", s_keyPost, key); s_keyPost++; }
     CN1MetalGlyphAtlas *cached = atlasCache[key];
+    static int s_lookup = 0;
+    if (s_lookup < 100) { NSLog(@"CN1SS:METAL_DIAG atlasForFont lookup #%d hit=%d", s_lookup, cached != nil); s_lookup++; }
     if (cached != nil) return cached;
     NSLog(@"CN1SS:METAL_DIAG atlasForFont enter key=%@", key);
     CN1MetalGlyphAtlas *fresh = [[CN1MetalGlyphAtlas alloc] initWithFont:font key:key];
