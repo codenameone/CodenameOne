@@ -2,6 +2,7 @@
 //
 // Phase 4 implementation. See header for design rationale.
 
+#import "CN1ES2compat.h"
 #ifdef CN1_USE_METAL
 #import "CN1MetalGlyphAtlas.h"
 
