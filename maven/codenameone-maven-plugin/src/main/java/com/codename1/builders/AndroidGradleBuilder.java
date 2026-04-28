@@ -4497,7 +4497,15 @@ public class AndroidGradleBuilder extends Executor {
     }
 
     private File makeLocalizedDir(File resDir, String baseDirName, String qualifier, String childFileName) {
-        File dir = new File(resDir, baseDirName + qualifier);
+        // Android requires resource qualifiers in a fixed order: locale must come
+        // before density. Insert the locale qualifier right after the base name so
+        // "drawable-xhdpi" becomes "drawable-<locale>-xhdpi" rather than the
+        // invalid "drawable-xhdpi-<locale>".
+        int dash = baseDirName.indexOf('-');
+        String dirName = dash < 0
+                ? baseDirName + qualifier
+                : baseDirName.substring(0, dash) + qualifier + baseDirName.substring(dash);
+        File dir = new File(resDir, dirName);
         dir.mkdirs();
         return new File(dir, childFileName);
     }
