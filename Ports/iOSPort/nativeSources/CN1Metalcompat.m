@@ -24,9 +24,11 @@
 #ifdef CN1_USE_METAL
 #import "CN1Metalcompat.h"
 #import "CN1MetalPipelineCache.h"
+#import "CN1MetalGlyphAtlas.h"
 #import "METALView.h"
 #import "CodenameOne_GLViewController.h"
 #import "GLUIImage.h"
+#import <CoreText/CoreText.h>
 
 // --------------- Static state ---------------
 
@@ -504,14 +506,12 @@ static CN1MetalTextCacheEntry *findOrBuildTextTexture(NSString *str, UIFont *fon
     return &textCache[slot];
 }
 
-void CN1MetalDrawString(NSString *str, UIFont *font, int color, int alpha, int x, int y) {
-    if (str == nil || font == nil || str.length == 0) return;
+// Phase-2 fallback: same whole-string LRU rendering kept for the case where
+// the Phase-4 glyph atlas can't be created (no MTLDevice etc.) so text
+// always shows up even if the atlas path is unavailable.
+static void drawStringWholeStringFallback(NSString *str, UIFont *font, int color, int alpha, int x, int y) {
     CN1MetalTextCacheEntry *entry = findOrBuildTextTexture(str, font, color);
     if (entry == NULL || entry->texture == nil) return;
-
-    // Texture-coord region: the text occupies the top-left (w,h) of a
-    // power-of-two bitmap. In Metal, tex (0,0) is the top-left, so we
-    // sample the rectangle [0, 0] .. [w/p2w, h/p2h].
     float a = alpha / 255.0f;
     simd_float4 tint = (simd_float4){ a, a, a, a };
     float vertices[8] = {
@@ -529,6 +529,121 @@ void CN1MetalDrawString(NSString *str, UIFont *font, int color, int alpha, int x
         uMax, vMax
     };
     drawQuad(CN1MetalPipelineTexturedRGBA, vertices, texcoords, tint, entry->texture);
+}
+
+void CN1MetalDrawString(NSString *str, UIFont *font, int color, int alpha, int x, int y) {
+    if (str == nil || font == nil || str.length == 0) return;
+
+    // Phase 4: shape the string with CTLine and emit one alpha-mask quad
+    // per glyph against a per-(font, point-size) R8 atlas. Falls back to
+    // the whole-string LRU path if the atlas can't be created (no
+    // MTLDevice, CTFont creation failed, etc.) so text always renders.
+    CN1MetalGlyphAtlas *atlas = [CN1MetalGlyphAtlas atlasForFont:font];
+    if (atlas == nil) {
+        drawStringWholeStringFallback(str, font, color, alpha, x, y);
+        return;
+    }
+
+    NSDictionary *attrs = @{ (__bridge NSString *)kCTFontAttributeName: (__bridge id)atlas.ctFont };
+    CFAttributedStringRef attrStr = CFAttributedStringCreate(NULL,
+                                                             (__bridge CFStringRef)str,
+                                                             (__bridge CFDictionaryRef)attrs);
+    if (attrStr == NULL) {
+        drawStringWholeStringFallback(str, font, color, alpha, x, y);
+        return;
+    }
+    CTLineRef line = CTLineCreateWithAttributedString(attrStr);
+    CFRelease(attrStr);
+    if (line == NULL) {
+        drawStringWholeStringFallback(str, font, color, alpha, x, y);
+        return;
+    }
+
+    // cn1's drawString convention: (x, y) is the TOP-LEFT of the line bbox
+    // in Y-down screen coords (matches the GL path's whole-string-bitmap
+    // approach where drawAtPoint:withAttributes: puts line TOP at the given
+    // point). UIKit's drawAtPoint then places the baseline at point.y +
+    // font.ascender; we mirror that exactly so per-glyph positioning lines
+    // up with the Phase-2 fallback and with GL output. Using UIFont.ascender
+    // (not CTFontGetAscent) is intentional — UIKit's metric is what
+    // drawAtPoint references and the values can disagree slightly across
+    // fonts.
+    float baselineY = (float)y + (float)font.ascender;
+
+    simd_float4 colorV = premultipliedColor(color, alpha);
+    int textureW = atlas.textureWidth;
+    int textureH = atlas.textureHeight;
+    id<MTLTexture> atlasTex = atlas.texture;
+
+    CFArrayRef runs = CTLineGetGlyphRuns(line);
+    CFIndex runCount = CFArrayGetCount(runs);
+    for (CFIndex r = 0; r < runCount; r++) {
+        CTRunRef run = CFArrayGetValueAtIndex(runs, r);
+        CFIndex glyphCount = CTRunGetGlyphCount(run);
+        if (glyphCount == 0) continue;
+
+        const CGGlyph *glyphPtr = CTRunGetGlyphsPtr(run);
+        CGGlyph *glyphBuf = NULL;
+        if (glyphPtr == NULL) {
+            glyphBuf = (CGGlyph *)malloc(sizeof(CGGlyph) * (size_t)glyphCount);
+            CTRunGetGlyphs(run, CFRangeMake(0, glyphCount), glyphBuf);
+            glyphPtr = glyphBuf;
+        }
+        const CGPoint *posPtr = CTRunGetPositionsPtr(run);
+        CGPoint *posBuf = NULL;
+        if (posPtr == NULL) {
+            posBuf = (CGPoint *)malloc(sizeof(CGPoint) * (size_t)glyphCount);
+            CTRunGetPositions(run, CFRangeMake(0, glyphCount), posBuf);
+            posPtr = posBuf;
+        }
+
+        for (CFIndex i = 0; i < glyphCount; i++) {
+            CGGlyph g = glyphPtr[i];
+            CN1MetalGlyphSlot *slot = [atlas slotForGlyph:g];
+            if (slot == nil) continue;          // atlas full
+            if (slot.width == 0) continue;      // empty glyph (space, control)
+
+            // Slot bitmap covers (bbox + 2px padding). Place the slot's
+            // top-left so the glyph art lines up with where CT expects:
+            //   bbox-left-on-screen  = x + posX + bearingX
+            //   bbox-top-on-screen   = baselineY - posY - (bearingY + bbox.height)
+            // Slot extends 1px above and to the left of the bbox.
+            float gx = (float)x + (float)posPtr[i].x + slot.bearingX - 1.0f;
+            float gy = baselineY - (float)posPtr[i].y
+                       - (slot.bearingY + slot.bboxHeight) - 1.0f;
+            float gw = (float)slot.width;
+            float gh = (float)slot.height;
+
+            float vertices[8] = {
+                gx,        gy,
+                gx + gw,   gy,
+                gx,        gy + gh,
+                gx + gw,   gy + gh
+            };
+
+            // CN1MetalGlyphAtlas rasterises with default Y-up CG; the
+            // glyph ends up right-side-up in raster memory order with
+            // memory_row_0 at the slot's TOP edge. V=0-at-top sampling
+            // maps the slot rect to the dest quad without a flip.
+            float u0 = (float)slot.atlasX / (float)textureW;
+            float u1 = (float)(slot.atlasX + slot.width) / (float)textureW;
+            float v0 = (float)slot.atlasY / (float)textureH;
+            float v1 = (float)(slot.atlasY + slot.height) / (float)textureH;
+            float texcoords[8] = {
+                u0, v0,
+                u1, v0,
+                u0, v1,
+                u1, v1,
+            };
+
+            drawQuad(CN1MetalPipelineAlphaMask, vertices, texcoords, colorV, atlasTex);
+        }
+
+        if (glyphBuf) free(glyphBuf);
+        if (posBuf) free(posBuf);
+    }
+
+    CFRelease(line);
 }
 
 // --------------- Gradient rendering ---------------
