@@ -24,11 +24,9 @@
 #ifdef CN1_USE_METAL
 #import "CN1Metalcompat.h"
 #import "CN1MetalPipelineCache.h"
-#import "CN1MetalGlyphAtlas.h"
 #import "METALView.h"
 #import "CodenameOne_GLViewController.h"
 #import "GLUIImage.h"
-#import <CoreText/CoreText.h>
 
 // --------------- Static state ---------------
 
@@ -396,125 +394,141 @@ void CN1MetalTileImage(id<MTLTexture> texture, int alpha,
     }
 }
 
-// --------------- Text rendering (Phase 4: CoreText glyph atlas) ---------------
-//
-// Replaces Phase 2's whole-string LRU cache. Strings are shaped with
-// CTLine — letting CoreText handle BiDi, ligatures, fallback fonts, and
-// sub-pixel positioning — and each glyph is rasterised once into a per-
-// (font, point-size) R8 atlas. Per-frame texture rebuilds disappear: the
-// second-and-later use of a glyph is just another textured quad sampling
-// an already-resident atlas region. Colour is decoupled from the atlas
-// (atlas stores alpha only); colourisation happens in cn1_fs_alpha_mask.
-//
-// CoreText emits glyph positions relative to the line's baseline, with
-// CG/CT's Y-up convention (positive y = above baseline). UIKit / cn1
-// uses Y-down screen coords; we convert per-glyph below.
+// --------------- Text rendering (parity level) ---------------
+
+// LRU cache mapping "str|font|color" -> {MTLTexture, stringWidth, stringHeight,
+// p2w, p2h}. Capped so long-running apps don't leak memory. Phase 4 will
+// replace this with a CoreText glyph atlas; this whole-string cache is a
+// direct port of what DrawStringTextureCache does on the GL path.
+#define CN1_METAL_TEXT_CACHE_MAX 128
+typedef struct {
+    NSString *key;
+    id<MTLTexture> texture;
+    int strWidth;
+    int strHeight;
+    int p2w;
+    int p2h;
+} CN1MetalTextCacheEntry;
+static CN1MetalTextCacheEntry textCache[CN1_METAL_TEXT_CACHE_MAX];
+static int textCacheCount = 0;
+static int textCacheNextEvict = 0;
+
+static int nextPowerOf2ForText(int v) {
+    int p = 1;
+    while (p < v) p <<= 1;
+    return p;
+}
+
+static CN1MetalTextCacheEntry *findOrBuildTextTexture(NSString *str, UIFont *font, int color) {
+    NSString *key = [NSString stringWithFormat:@"%@|%p|%08x", str, font, color];
+    for (int i = 0; i < textCacheCount; i++) {
+        if ([textCache[i].key isEqualToString:key]) {
+            return &textCache[i];
+        }
+    }
+    // Not cached — rasterise. Measure via sizeWithAttributes (sizeWithFont:
+    // was deprecated long ago; the GL path still uses it, but UIKit prints
+    // a warning on newer SDKs. Keep the same measurement for consistency).
+    NSDictionary *attrs = @{ NSFontAttributeName: font };
+    CGSize sz = [str sizeWithAttributes:attrs];
+    int w = (int)ceilf((float)sz.width);
+    int h = (int)ceilf((float)font.lineHeight + 1.0f);
+    if (w <= 0 || h <= 0) return NULL;
+    int p2w = nextPowerOf2ForText(w);
+    int p2h = nextPowerOf2ForText(h);
+
+    // Rasterise into an RGBA bitmap with the colour baked in (same scheme
+    // as DrawString.m's GL branch -- fragment shader just modulates alpha).
+    CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
+    size_t bytesPerRow = 4 * (size_t)p2w;
+    void *bitmap = calloc((size_t)p2h * bytesPerRow, 1);
+    CGContextRef ctx = CGBitmapContextCreate(bitmap, p2w, p2h, 8, bytesPerRow, cs,
+        kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big);
+    CGColorSpaceRelease(cs);
+
+    // UIGraphicsPushContext only sets the current context; it does NOT flip
+    // the CTM. Without a flip, UIKit's drawAtPoint: targets CG (0,0) which
+    // is the bottom of the bitmap, and characters render upside-down in
+    // buffer memory. The GL path tolerates that because its texcoords use
+    // V=1 at the top vertex and sample bottom-to-top; Metal's V=0-at-top
+    // convention doesn't compensate. Apply a y-axis flip so text ends up
+    // at the TOP-LEFT of the buffer, right-side-up, matching the texcoords
+    // I use in CN1MetalDrawString below.
+    CGContextTranslateCTM(ctx, 0, p2h);
+    CGContextScaleCTM(ctx, 1, -1);
+    UIGraphicsPushContext(ctx);
+    UIColor *uiColor = [UIColor colorWithRed:((color >> 16) & 0xff)/255.0f
+                                       green:((color >> 8)  & 0xff)/255.0f
+                                        blue:((color)       & 0xff)/255.0f
+                                       alpha:1.0f];
+    [uiColor set];
+    [str drawAtPoint:CGPointZero withAttributes:@{ NSFontAttributeName: font,
+                                                   NSForegroundColorAttributeName: uiColor }];
+    UIGraphicsPopContext();
+
+    id<MTLDevice> device = CN1MetalDevice();
+    if (device == nil) {
+        CGContextRelease(ctx);
+        free(bitmap);
+        return NULL;
+    }
+    MTLTextureDescriptor *desc = [MTLTextureDescriptor
+        texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm
+        width:p2w height:p2h mipmapped:NO];
+    desc.usage = MTLTextureUsageShaderRead;
+    id<MTLTexture> tex = [device newTextureWithDescriptor:desc];
+    [tex replaceRegion:MTLRegionMake2D(0, 0, p2w, p2h)
+           mipmapLevel:0
+             withBytes:bitmap
+           bytesPerRow:bytesPerRow];
+
+    CGContextRelease(ctx);
+    free(bitmap);
+
+    // Cache with simple round-robin eviction.
+    int slot;
+    if (textCacheCount < CN1_METAL_TEXT_CACHE_MAX) {
+        slot = textCacheCount++;
+    } else {
+        slot = textCacheNextEvict;
+        textCacheNextEvict = (textCacheNextEvict + 1) % CN1_METAL_TEXT_CACHE_MAX;
+        textCache[slot].key = nil;
+        textCache[slot].texture = nil;
+    }
+    textCache[slot].key = [key copy];
+    textCache[slot].texture = tex;
+    textCache[slot].strWidth = w;
+    textCache[slot].strHeight = h;
+    textCache[slot].p2w = p2w;
+    textCache[slot].p2h = p2h;
+    return &textCache[slot];
+}
 
 void CN1MetalDrawString(NSString *str, UIFont *font, int color, int alpha, int x, int y) {
     if (str == nil || font == nil || str.length == 0) return;
+    CN1MetalTextCacheEntry *entry = findOrBuildTextTexture(str, font, color);
+    if (entry == NULL || entry->texture == nil) return;
 
-    CN1MetalGlyphAtlas *atlas = [CN1MetalGlyphAtlas atlasForFont:font];
-    if (atlas == nil) return;
-
-    // Shape the string using the atlas's CTFontRef so the typesetter
-    // produces glyph IDs that match what we'll rasterise. Skip the
-    // explicit colour attribute -- it has no effect on glyph IDs and we
-    // colourise via the alpha-mask shader anyway.
-    NSDictionary *attrs = @{ (__bridge NSString *)kCTFontAttributeName: (__bridge id)atlas.ctFont };
-    CFAttributedStringRef attrStr = CFAttributedStringCreate(NULL,
-                                                             (__bridge CFStringRef)str,
-                                                             (__bridge CFDictionaryRef)attrs);
-    if (attrStr == NULL) return;
-    CTLineRef line = CTLineCreateWithAttributedString(attrStr);
-    CFRelease(attrStr);
-    if (line == NULL) return;
-
-    // cn1's drawString convention: (x, y) is the TOP-LEFT of the text bbox
-    // in iOS-down screen coords. CTLine emits glyphs whose origins are at
-    // baseline level. Baseline-y in screen coords = y + ascent.
-    CGFloat ascent = CTFontGetAscent(atlas.ctFont);
-    float baselineY = (float)y + (float)ascent;
-
-    simd_float4 colorV = premultipliedColor(color, alpha);
-    int textureW = atlas.textureWidth;
-    int textureH = atlas.textureHeight;
-    id<MTLTexture> atlasTex = atlas.texture;
-
-    CFArrayRef runs = CTLineGetGlyphRuns(line);
-    CFIndex runCount = CFArrayGetCount(runs);
-    for (CFIndex r = 0; r < runCount; r++) {
-        CTRunRef run = CFArrayGetValueAtIndex(runs, r);
-        CFIndex glyphCount = CTRunGetGlyphCount(run);
-        if (glyphCount == 0) continue;
-
-        // Read glyphs+positions in bulk; fall back to copy if pointer
-        // access isn't supported (rare; some run types don't expose it).
-        const CGGlyph *glyphPtr = CTRunGetGlyphsPtr(run);
-        CGGlyph *glyphBuf = NULL;
-        if (glyphPtr == NULL) {
-            glyphBuf = (CGGlyph *)malloc(sizeof(CGGlyph) * (size_t)glyphCount);
-            CTRunGetGlyphs(run, CFRangeMake(0, glyphCount), glyphBuf);
-            glyphPtr = glyphBuf;
-        }
-        const CGPoint *posPtr = CTRunGetPositionsPtr(run);
-        CGPoint *posBuf = NULL;
-        if (posPtr == NULL) {
-            posBuf = (CGPoint *)malloc(sizeof(CGPoint) * (size_t)glyphCount);
-            CTRunGetPositions(run, CFRangeMake(0, glyphCount), posBuf);
-            posPtr = posBuf;
-        }
-
-        for (CFIndex i = 0; i < glyphCount; i++) {
-            CGGlyph g = glyphPtr[i];
-            CN1MetalGlyphSlot *slot = [atlas slotForGlyph:g];
-            if (slot == nil || slot.width == 0) continue;  // empty (space) or atlas-full
-
-            // Glyph TOP-LEFT in screen coords. CT y is up-from-baseline so
-            // we negate it to get screen y. The slot's bitmap covers
-            // bbox + 1px padding; subtracting padding (= 1) compensates so
-            // the glyph art lines up with where CT placed it.
-            float gx = (float)x + (float)posPtr[i].x + slot.bearingX
-                       - (float)1 /*padding*/;
-            float gy = baselineY - (float)posPtr[i].y
-                       - (slot.bearingY + (float)slot.height - 2.0f /*padding both sides*/)
-                       - (float)1 /*padding*/;
-            float gw = (float)slot.width;
-            float gh = (float)slot.height;
-
-            float vertices[8] = {
-                gx,        gy,
-                gx + gw,   gy,
-                gx,        gy + gh,
-                gx + gw,   gy + gh
-            };
-
-            // Texcoord rect over the slot's atlas region. CN1MetalGlyphAtlas
-            // rasterises with default Y-up CG, drawing the glyph at user-y
-            // = padding..padding+bbox.height; in raster memory that lands in
-            // rows 1..bbox.height with row 0 holding the top padding band
-            // (empty) and row gh-1 the bottom padding band (also empty).
-            // memory_row_0 is therefore the slot's TOP edge — Metal's
-            // V=0-at-top sampling lines the glyph up on screen without a
-            // V flip.
-            float u0 = (float)slot.atlasX / (float)textureW;
-            float u1 = (float)(slot.atlasX + slot.width) / (float)textureW;
-            float v0 = (float)slot.atlasY / (float)textureH;
-            float v1 = (float)(slot.atlasY + slot.height) / (float)textureH;
-            float texcoords[8] = {
-                u0, v0,    // dest top-left -> slot TOP
-                u1, v0,
-                u0, v1,    // dest bottom-left -> slot BOTTOM
-                u1, v1,
-            };
-
-            drawQuad(CN1MetalPipelineAlphaMask, vertices, texcoords, colorV, atlasTex);
-        }
-
-        if (glyphBuf) free(glyphBuf);
-        if (posBuf) free(posBuf);
-    }
-
-    CFRelease(line);
+    // Texture-coord region: the text occupies the top-left (w,h) of a
+    // power-of-two bitmap. In Metal, tex (0,0) is the top-left, so we
+    // sample the rectangle [0, 0] .. [w/p2w, h/p2h].
+    float a = alpha / 255.0f;
+    simd_float4 tint = (simd_float4){ a, a, a, a };
+    float vertices[8] = {
+        (float)x,                      (float)y,
+        (float)(x + entry->strWidth),  (float)y,
+        (float)x,                      (float)(y + entry->strHeight),
+        (float)(x + entry->strWidth),  (float)(y + entry->strHeight)
+    };
+    float uMax = (float)entry->strWidth / (float)entry->p2w;
+    float vMax = (float)entry->strHeight / (float)entry->p2h;
+    float texcoords[8] = {
+        0.0f, 0.0f,
+        uMax, 0.0f,
+        0.0f, vMax,
+        uMax, vMax
+    };
+    drawQuad(CN1MetalPipelineTexturedRGBA, vertices, texcoords, tint, entry->texture);
 }
 
 // --------------- Gradient rendering ---------------
