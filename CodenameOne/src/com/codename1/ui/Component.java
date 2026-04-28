@@ -186,6 +186,20 @@ public class Component implements Animation, StyleListener, Editable {
     private static boolean paintLockEnableChecked;
     private static boolean paintLockEnabled;
 
+    // TEMPORARY DIAGNOSTIC (PR #4795): tracks which Component subclasses
+    // we've already seen with a null ``bounds`` field so the warning
+    // fires once per class rather than once per call. The ParparVM JS
+    // port currently produces some Component instance whose
+    // ``Component.<init>`` field-initializer for ``bounds`` (declared
+    // ``private final Rectangle bounds = new Rectangle(0, 0, ...)``)
+    // didn't run — pointer-event hit-testing then NPEs in ``getX()`` /
+    // ``getY()`` and the EDT swallows every click. The defensive
+    // ``bounds == null`` guards in those getters keep the EDT alive;
+    // this map names the offending class so we can fix the underlying
+    // construction path. Remove the map and the guards once the JS-port
+    // root cause is fixed.
+    private static java.util.Set<String> nullBoundsClassesReported;
+
     // Cached platform check for iOS-style scroll motion. Platform name is constant per
     // process, so we cache it lazily to avoid repeated string comparisons in the drag hot path.
     private static Boolean iosPlatformCached;
@@ -205,6 +219,29 @@ public class Component implements Animation, StyleListener, Editable {
             iosPlatformCached = cached;
         }
         return cached;
+    }
+
+    /// TEMPORARY DIAGNOSTIC (PR #4795): logs once per Component subclass
+    /// when its ``bounds`` field is observed null in a getter. See the
+    /// comment on ``nullBoundsClassesReported`` above for the full story.
+    /// Remove together with the ``bounds == null`` guards in
+    /// ``getX``/``getY``/``getWidth``/``getHeight`` once the JS-port
+    /// root cause is fixed.
+    private void reportNullBounds(String getter) {
+        try {
+            String cls = getClass() == null ? "null" : getClass().getName();
+            if (nullBoundsClassesReported == null) {
+                nullBoundsClassesReported = new java.util.HashSet<String>();
+            }
+            String key = cls + "#" + getter;
+            if (nullBoundsClassesReported.contains(key)) {
+                return;
+            }
+            nullBoundsClassesReported.add(key);
+            Log.p("[nullBounds] " + cls + "." + getter + "() observed null bounds — Component.<init> field initializer didn't run", 1);
+        } catch (Throwable ignored) {
+            // Diagnostic must never throw.
+        }
     }
 
     /// iOS-style rubber-band compression: given a raw over-edge distance and the viewport
@@ -1084,6 +1121,10 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// the current x coordinate of the components origin
     public int getX() {
+        if (bounds == null) {
+            reportNullBounds("getX");
+            return 0;
+        }
         return bounds.getX();
     }
 
@@ -1127,6 +1168,10 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// the current y coordinate of the components origin
     public int getY() {
+        if (bounds == null) {
+            reportNullBounds("getY");
+            return 0;
+        }
         return bounds.getY();
     }
 
@@ -1359,6 +1404,10 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// the component width
     public int getWidth() {
+        if (bounds == null) {
+            reportNullBounds("getWidth");
+            return 0;
+        }
         return bounds.getSize().getWidth();
     }
 
@@ -1403,6 +1452,10 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// the component height
     public int getHeight() {
+        if (bounds == null) {
+            reportNullBounds("getHeight");
+            return 0;
+        }
         return bounds.getSize().getHeight();
     }
 
