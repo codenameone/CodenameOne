@@ -540,6 +540,22 @@ const jvm = {
     if (def.c) {
       def.clinit = def.c;
     }
+    // ``def.t`` — inline no-arg constructor attachment. Reflective
+    // construction paths (``Class.newInstance()`` /
+    // ``jvm.createException()``) used to look up the constructor as
+    // ``global["cn1_" + def.name + "___INIT__"]``, but ``def.name``
+    // is the *mangled* short class symbol while the actual ctor
+    // global was renamed by the post-translation mangler to a
+    // different short symbol — so the string-concat lookup never
+    // matches and ``newInstance`` returns objects whose constructors
+    // never ran (most visibly: every reflectively-created Component
+    // arrives with ``bounds = null`` and trips an NPE on the first
+    // pointer-event hit-test). The translator now passes the ctor as
+    // a direct function reference under ``t:``; pin it onto the
+    // classDef under ``noArgCtor`` for the reflective callers.
+    if (def.t) {
+      def.noArgCtor = def.t;
+    }
     // Inline methods map: the class def may carry its virtual-method
     // registrations directly (``m: {$sig:$fn,...}``) instead of
     // requiring a separate ``_M("cls", {...})`` call afterwards.
@@ -2136,7 +2152,17 @@ const jvm = {
   },
   createException(className) {
     const ex = this.newObject(className);
-    const ctor = global["cn1_" + className + "___INIT__"];
+    // Prefer the direct function reference attached at ``defineClass``
+    // time (``def.t`` → ``def.noArgCtor``). Fall back to the legacy
+    // string-concat lookup for any class that wasn't emitted with a
+    // ``t:`` field — it still won't resolve a real ctor under
+    // mangling, but matches prior behaviour for any pre-existing
+    // callers that relied on the side-effect-free no-op.
+    const def = this.classes[className];
+    let ctor = def && def.noArgCtor ? def.noArgCtor : null;
+    if (typeof ctor !== "function") {
+      ctor = global["cn1_" + className + "___INIT__"];
+    }
     return { object: ex, ctor: ctor };
   },
   applyNativeOverrides() {
@@ -3496,7 +3522,14 @@ bindNative(["cn1_java_lang_Class_newInstanceImpl_R_java_lang_Object"], function*
     return null;
   }
   const obj = jvm.newObject(def.name);
-  const ctor = global["cn1_" + def.name + "___INIT__"];
+  // Prefer the direct ctor reference attached at ``defineClass`` time
+  // (``def.t`` → ``def.noArgCtor``). The legacy ``global["cn1_<name>___INIT__"]``
+  // lookup doesn't resolve under the post-translation mangler — see
+  // the comment on ``def.noArgCtor`` in ``defineClass``.
+  let ctor = def.noArgCtor;
+  if (typeof ctor !== "function") {
+    ctor = global["cn1_" + def.name + "___INIT__"];
+  }
   if (typeof ctor === "function") {
     yield* adaptVirtualResult(ctor(obj));
   }

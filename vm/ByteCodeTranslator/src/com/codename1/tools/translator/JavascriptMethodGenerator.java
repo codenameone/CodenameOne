@@ -625,8 +625,36 @@ final class JavascriptMethodGenerator {
         // ``function*`` declarations hoist) with the ``_Z({...})``
         // class def following, without the clinit attachment trying
         // to write to a not-yet-registered ``jvm.classes["cls"]``.
-        if (clinitFn != null) {
-            out.append("  c: ").append(clinitFn).append("\n");
+        //
+        // ``t:`` inlines the no-arg constructor function reference.
+        // Without this, the runtime's reflective ``Class.newInstance()``
+        // and ``jvm.createException()`` paths build the lookup string
+        // as ``"cn1_" + def.name + "___INIT__"`` and read
+        // ``global[...]`` — but ``def.name`` is the *mangled* short
+        // class symbol (e.g. ``$cm`` for MenuBar) while the actual
+        // ``cn1_<class>___INIT__`` global was renamed by the mangler
+        // to a different short-form symbol. The lookup never matches
+        // anything and ``newInstance`` returns an object whose
+        // constructor never ran. That's how every reflectively-created
+        // Component (most commonly
+        // ``laf.getMenuBarClass().newInstance()`` in
+        // ``Form.installMenuBar``) ends up with ``bounds == null`` and
+        // trips an NPE the first time pointer-event hit-testing calls
+        // ``getX()``. Emit the ctor as a direct function reference so
+        // the runtime can store it on the classDef and skip the broken
+        // string-concat path.
+        BytecodeMethod noArgCtor = findNoArgConstructor(cls);
+        boolean hasClinit = (clinitFn != null);
+        boolean hasNoArgCtor = (noArgCtor != null);
+        if (hasClinit) {
+            out.append("  c: ").append(clinitFn);
+            if (hasNoArgCtor) {
+                out.append(",");
+            }
+            out.append("\n");
+        }
+        if (hasNoArgCtor) {
+            out.append("  t: ").append(jsMethodIdentifier(cls, noArgCtor)).append("\n");
         }
         // ``methods`` and ``classObject`` are always populated/
         // overwritten by the runtime (defineClass creates the
@@ -2546,6 +2574,32 @@ final class JavascriptMethodGenerator {
             out.append("}");
         }
         out.append("];\n");
+    }
+
+    /**
+     * Locate the no-arg ``<init>`` constructor on this class, if one
+     * survives RTA. Used by {@link #appendClassRegistration} to attach
+     * a direct function reference to the class def under ``t:`` so
+     * reflective construction (``Class.newInstance()``,
+     * ``jvm.createException()``) doesn't have to reconstruct the
+     * mangled global name from a string concat that no longer matches
+     * after the post-translation identifier mangler runs.
+     */
+    private static BytecodeMethod findNoArgConstructor(ByteCodeClass cls) {
+        for (BytecodeMethod method : cls.getMethods()) {
+            if (!"__INIT__".equals(method.getMethodName())) {
+                continue;
+            }
+            if (method.isEliminated() || method.isAbstract() || method.isNative()) {
+                continue;
+            }
+            // Empty parameter list = ``()V`` descriptor. ``isStatic`` is
+            // always false for ``<init>`` (constructors aren't static).
+            if (method.getArguments() == null || method.getArguments().isEmpty()) {
+                return method;
+            }
+        }
+        return null;
     }
 
     private static String jsMethodIdentifier(ByteCodeClass cls, BytecodeMethod method) {
