@@ -60,6 +60,29 @@ const sym = {
   menuBarField: mangledFor('cn1_com_codename1_ui_Form_menuBar'),
   menuBarCtor: mangledFor('cn1_com_codename1_ui_MenuBar___INIT__'),
   menuBarOuterParent: mangledFor('cn1_com_codename1_ui_SideMenuBar_parent'),
+  // OK-button-doesn't-dismiss diagnostics:
+  buttonReleased: mangledFor('cn1_com_codename1_ui_Button_released_int_int'),
+  buttonFireActionEvent: mangledFor('cn1_com_codename1_ui_Button_fireActionEvent_int_int'),
+  implSetCurrentForm: mangledFor('cn1_com_codename1_impl_CodenameOneImplementation_setCurrentForm_com_codename1_ui_Form'),
+  displaySetCurrent: mangledFor('cn1_com_codename1_ui_Display_setCurrent_com_codename1_ui_Form_boolean'),
+  formInitTransition: mangledFor('cn1_com_codename1_ui_Display_initTransition_com_codename1_ui_animations_Transition_com_codename1_ui_Form_com_codename1_ui_Form_R_boolean'),
+  formShow: mangledFor('cn1_com_codename1_ui_Form_show'),
+  dialogShow: mangledFor('cn1_com_codename1_ui_Dialog_show'),
+  dialogShowImpl: mangledFor('cn1_com_codename1_ui_Dialog_showImpl_boolean'),
+  formShowBoolean: mangledFor('cn1_com_codename1_ui_Form_show_boolean'),
+  formShowModal: mangledFor('cn1_com_codename1_ui_Form_showModal_int_int_int_int_boolean_boolean_boolean'),
+  displaySetCurrentForm: mangledFor('cn1_com_codename1_ui_Display_setCurrentForm_com_codename1_ui_Form'),
+  formPointerReleased: mangledFor('cn1_com_codename1_ui_Form_pointerReleased_int_int'),
+  formPointerPressed: mangledFor('cn1_com_codename1_ui_Form_pointerPressed_int_int'),
+  formGetComponentAt: mangledFor('cn1_com_codename1_ui_Form_getResponderAt_int_int_R_com_codename1_ui_Component'),
+  containerGetComponentAt: mangledFor('cn1_com_codename1_ui_Container_getComponentAt_int_int_R_com_codename1_ui_Component'),
+  formActionCommandImplNoRecurse: mangledFor('cn1_com_codename1_ui_Form_actionCommandImplNoRecurseComponent_com_codename1_ui_Command_com_codename1_ui_events_ActionEvent'),
+  dialogActionCommand: mangledFor('cn1_com_codename1_ui_Dialog_actionCommand_com_codename1_ui_Command'),
+  formActionCommand: mangledFor('cn1_com_codename1_ui_Form_actionCommand_com_codename1_ui_Command'),
+  dialogDispose: mangledFor('cn1_com_codename1_ui_Dialog_dispose'),
+  dialogIsDisposed: mangledFor('cn1_com_codename1_ui_Dialog_isDisposed_R_boolean'),
+  formIsDisposed: mangledFor('cn1_com_codename1_ui_Form_isDisposed_R_boolean'),
+  disposedField: mangledFor('cn1_com_codename1_ui_Dialog_disposed'),
 };
 console.log('symbols:', sym);
 
@@ -125,6 +148,7 @@ self.__cn1InstallHooks = function() {
     const jvm = self.jvm;
     if (!jvm || !jvm.classes) return;
     let count = 0;
+    const summary = {};
     for (const clsName in jvm.classes) {
       const cls = jvm.classes[clsName];
       if (!cls || !cls.methods) continue;
@@ -134,6 +158,7 @@ self.__cn1InstallHooks = function() {
           if (entry === wrappedTargets[targetName].orig) {
             cls.methods[dispatchId] = wrappedTargets[targetName].wrapped;
             count++;
+            summary[targetName] = (summary[targetName] || 0) + 1;
           }
         }
       }
@@ -141,7 +166,11 @@ self.__cn1InstallHooks = function() {
     if (jvm.resolvedVirtualCache) {
       jvm.resolvedVirtualCache = Object.create(null);
     }
-    console.log('[trace] rewired ' + count + ' dispatch entries');
+    console.log('[trace] rewired ' + count + ' dispatch entries summary=' + JSON.stringify(summary));
+    // Log targets that NEVER got rewired - these are the wraps that never fire via virtual dispatch
+    for (const t in wrappedTargets) {
+      if (!summary[t]) console.log('[trace] WARN: wrap ' + t + ' was never matched in any cls.methods entry');
+    }
   }
   // Backwards-compatible wrapGen alias for the old code below.
   function wrapGen(name, label, preFn, postFn) { defineWrap(name, label, preFn, postFn); }
@@ -177,6 +206,33 @@ self.__cn1InstallHooks = function() {
   ${sym.formSetMenuBar ? `wrapGen(${JSON.stringify(sym.formSetMenuBar)}, 'Form.setMenuBar',
     args => __push({ k: 'enter:Form.setMenuBar', form: __idOf(args[0]), newMenuBar: __idOf(args[1]) })
   );` : ''}
+  ${sym.formPointerPressed ? `wrapGen(${JSON.stringify(sym.formPointerPressed)}, 'Form.pointerPressed',
+    args => __push({ k: 'enter:Form.pointerPressed', form: __idOf(args[0]), x: args[1], y: args[2] })
+  );` : ''}
+  ${sym.formPointerReleased ? `wrapGen(${JSON.stringify(sym.formPointerReleased)}, 'Form.pointerReleased',
+    args => __push({ k: 'enter:Form.pointerReleased', form: __idOf(args[0]), x: args[1], y: args[2] })
+  );` : ''}
+  ${sym.buttonReleased ? `wrapGen(${JSON.stringify(sym.buttonReleased)}, 'Button.released',
+    args => __push({ k: 'enter:Button.released', btn: __idOf(args[0]), x: args[1], y: args[2] })
+  );` : ''}
+  ${sym.buttonFireActionEvent ? `wrapGen(${JSON.stringify(sym.buttonFireActionEvent)}, 'Button.fireActionEvent',
+    args => __push({ k: 'enter:Button.fireActionEvent', btn: __idOf(args[0]) })
+  );` : ''}
+  ${sym.formActionCommandImplNoRecurse ? `wrapGen(${JSON.stringify(sym.formActionCommandImplNoRecurse)}, 'Form.actionCommandImplNoRecurseComponent',
+    args => __push({ k: 'enter:Form.actionCommandImplNoRecurseComponent', form: __idOf(args[0]), cmd: __idOf(args[1]) })
+  );` : ''}
+  ${sym.formActionCommand ? `wrapGen(${JSON.stringify(sym.formActionCommand)}, 'Form.actionCommand',
+    args => __push({ k: 'enter:Form.actionCommand', form: __idOf(args[0]), cmd: __idOf(args[1]) })
+  );` : ''}
+  ${sym.dialogActionCommand ? `wrapGen(${JSON.stringify(sym.dialogActionCommand)}, 'Dialog.actionCommand',
+    args => __push({ k: 'enter:Dialog.actionCommand', dlg: __idOf(args[0]), cmd: __idOf(args[1]) })
+  );` : ''}
+  ${sym.dialogDispose ? `wrapGen(${JSON.stringify(sym.dialogDispose)}, 'Dialog.dispose',
+    args => __push({ k: 'enter:Dialog.dispose', dlg: __idOf(args[0]), disposed_field: args[0] && args[0][${JSON.stringify(sym.disposedField)}] })
+  );` : ''}
+  ${sym.dialogIsDisposed ? `wrapGen(${JSON.stringify(sym.dialogIsDisposed)}, 'Dialog.isDisposed',
+    args => __push({ k: 'enter:Dialog.isDisposed', dlg: __idOf(args[0]), disposed_field: args[0] && args[0][${JSON.stringify(sym.disposedField)}] })
+  );` : ''}
   rewireDispatchTables();
   console.log('[trace] hooks installed');
 };
@@ -201,8 +257,14 @@ const PORT = 8772;
 const server = spawn('python3', ['-m', 'http.server', String(PORT), '--directory', distDir], { stdio: 'pipe' });
 await new Promise(r => setTimeout(r, 1500));
 
+// Match a typical macOS Retina viewer (DPR=2). Several painters and the
+// pointer-event coord transformer multiply/divide by DPR; bugs that
+// only appear at non-1 DPR get missed at the headless default.
 const browser = await chromium.launch({ headless: true });
-const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+const page = await browser.newPage({
+  viewport: { width: 1280, height: 900 },
+  deviceScaleFactor: 2,
+});
 const messages = [];
 page.on('console', msg => { messages.push(`[${msg.type()}] ${msg.text()}`); });
 page.on('pageerror', err => messages.push(`[error] ${err.message}`));
@@ -234,6 +296,11 @@ const beforePng = await snapshotCanvas('before-click');
 console.log('saved:', beforePng);
 
 // Get hash of canvas data so we can detect black-square-style corruption.
+// The user-reported bug is: a region of the canvas gets cleared (alpha=0
+// or fully transparent) and never repainted, so the iframe parent's dark
+// background shows through. ``blackFrac`` counts opaque-black pixels;
+// ``transparentFrac`` counts genuinely cleared pixels — the latter is the
+// real signal for the reported regression.
 async function canvasSignature() {
   return await page.evaluate(() => {
     const c = document.querySelector('canvas');
@@ -243,7 +310,7 @@ async function canvasSignature() {
     const img = ctx.getImageData(0, 0, w, h).data;
     const sx = Math.floor(w / 16), sy = Math.floor(h / 16);
     let s = '';
-    let blackPixels = 0, totalSamples = 0;
+    let blackPixels = 0, transparentPixels = 0, totalSamples = 0;
     for (let y = 0; y < 16; y++) {
       for (let x = 0; x < 16; x++) {
         const px = (y * sy * w + x * sx) * 4;
@@ -251,9 +318,14 @@ async function canvasSignature() {
         s += lum.toString(16).padStart(2, '0');
         totalSamples++;
         if (lum < 8 && img[px + 3] > 0) blackPixels++;
+        if (img[px + 3] === 0) transparentPixels++;
       }
     }
-    return { sig: s, blackFrac: blackPixels / totalSamples };
+    return {
+      sig: s,
+      blackFrac: blackPixels / totalSamples,
+      transparentFrac: transparentPixels / totalSamples,
+    };
   });
 }
 
@@ -264,12 +336,8 @@ console.log('black fraction pre-click:', sigBefore && sigBefore.blackFrac.toFixe
 // === Test 1: Dialog freeze ===
 console.log('\n=== Test 1: Dialog.show via Hello World button ===');
 const messagesBeforeClick = messages.length;
-const helloCandidates = [[936, 141], [936, 145], [936, 138], [946, 141], [926, 141]];
-for (const [hx, hy] of helloCandidates) {
-  await page.mouse.click(hx, hy);
-  await new Promise(r => setTimeout(r, 600));
-}
-await new Promise(r => setTimeout(r, 3000));
+await page.mouse.click(936, 141);
+await new Promise(r => setTimeout(r, 4000));
 
 const newMessages = messages.slice(messagesBeforeClick);
 const helloDialogShown = newMessages.some(m => m.includes('Hello Codename One') || m.includes('Welcome to Codename One'));
@@ -282,14 +350,47 @@ expect(exceptionsAfterClick === 0, `Test 1: Dialog click triggered ${exceptionsA
 const afterHelloPng = await snapshotCanvas('after-hello-click');
 console.log('saved:', afterHelloPng);
 
-// Try to click an OK button in the dialog to dismiss
+// Try to click the OK button in the dialog to dismiss. The dialog
+// renders centered horizontally around the page mid-x; OK lives at the
+// bottom of the dialog. The user reports OK doesn't dismiss — verify
+// by checking whether the canvas signature changes back toward the
+// pre-dialog state after clicking OK. If it doesn't, the dispose chain
+// is broken.
 await new Promise(r => setTimeout(r, 1000));
 const messagesBeforeOk = messages.length;
-await page.mouse.click(640, 450);
-await new Promise(r => setTimeout(r, 1500));
+const sigWithDialog = await canvasSignature();
+console.log('canvas-with-dialog blackFrac:', sigWithDialog.blackFrac.toFixed(3));
+// At DPR=2 in a 1280x900 viewport, the OK label sits roughly at CSS
+// (574, 455). Click ONCE and give the worker a long time to process.
+await page.mouse.move(574, 455);
+await new Promise(r => setTimeout(r, 100));
+await page.mouse.down();
+await new Promise(r => setTimeout(r, 200));
+await page.mouse.up();
+await new Promise(r => setTimeout(r, 3000));
+const sigAfterOk = await canvasSignature();
+console.log('canvas-after-OK blackFrac:', sigAfterOk.blackFrac.toFixed(3));
+// If the dialog dismissed, the canvas signature should differ
+// significantly from "with-dialog". Compute hamming distance over the
+// 16x16 luminance grid.
+function sigHamming(a, b) {
+  if (!a || !b) return -1;
+  let diff = 0;
+  for (let i = 0; i < a.sig.length; i += 2) {
+    if (a.sig.substring(i, i+2) !== b.sig.substring(i, i+2)) diff++;
+  }
+  return diff;
+}
+const dialogToOk = sigHamming(sigWithDialog, sigAfterOk);
+const okToBefore = sigHamming(sigBefore, sigAfterOk);
+console.log('grid-cells-changed dialog->after-OK:', dialogToOk, 'after-OK vs before-click:', okToBefore);
 const newAfterOk = messages.slice(messagesBeforeOk);
 expect(newAfterOk.filter(m => m.includes('Exception:')).length === 0,
   `Test 1: clicking dialog OK position triggered exceptions`);
+// The dialog dismissing should bring the canvas closer to the original
+// (pre-dialog) state than to the with-dialog state.
+expect(okToBefore < dialogToOk,
+  `Test 1: OK click did NOT dismiss the dialog (after-OK still looks like with-dialog: ${dialogToOk} vs ${okToBefore} cells changed)`);
 
 // === Test 2: Repeated interaction — black squares ===
 // Beefed up: more iterations, longer drags, drags that move *across* the
@@ -346,6 +447,57 @@ addInteraction('keyboard-input', async () => {
   await page.keyboard.type('TestProject123', { delay: 30 });
 });
 
+// User report: clicking the "Main Class" text field and typing makes
+// the corresponding label go black. The label sits above the field, and
+// the dark square shifts with the click position. Try every textfield
+// region in the form: click, focus, type, screenshot, then look for a
+// dark band that appeared *above* the click point. We also save a wider
+// PNG (full canvas) so a human reviewer can spot the artifact.
+addInteraction('click-textfield-and-type', async () => {
+  // The form layout has labels above each input. Walk down the form and
+  // click candidate "input row" Y-coordinates one at a time, typing into
+  // each, screenshotting after every step.
+  const fieldYs = [225, 290, 355, 420, 485, 550, 615, 680];
+  for (let i = 0; i < fieldYs.length; i++) {
+    const y = fieldYs[i];
+    const x = 300; // form is on left side, this is roughly mid-field
+    await page.mouse.click(x, y);
+    await new Promise(r => setTimeout(r, 250));
+    await page.keyboard.type('Foo', { delay: 60 });
+    await new Promise(r => setTimeout(r, 150));
+    // Look at a vertical strip 100px tall above the click for darkening.
+    const stripDark = await page.evaluate(({ cx, cy }) => {
+      const c = document.querySelector('canvas');
+      if (!c) return 0;
+      const ctx = c.getContext('2d');
+      const dpr = window.devicePixelRatio || 1;
+      const px = Math.floor(cx * dpr);
+      const py = Math.floor(cy * dpr);
+      const stripH = Math.floor(80 * dpr);
+      const stripW = Math.floor(160 * dpr);
+      let blackPixels = 0;
+      let total = 0;
+      try {
+        const img = ctx.getImageData(Math.max(0, px - stripW/2), Math.max(0, py - stripH), stripW, stripH).data;
+        for (let p = 0; p < img.length; p += 4) {
+          total++;
+          const lum = (img[p] + img[p+1] + img[p+2]) / 3 | 0;
+          if (lum < 8 && img[p+3] > 0) blackPixels++;
+        }
+      } catch (_) {}
+      return total > 0 ? blackPixels / total : 0;
+    }, { cx: x, cy: y });
+    console.log(`    field-strip y=${y}: blackFrac-above=${stripDark.toFixed(3)}`);
+    if (stripDark > 0.05) {
+      console.log(`      ↑ DARK BAND DETECTED above click y=${y}`);
+      await snapshotCanvas(`dark-band-y${y}`);
+    }
+    // dismiss focus / commit value
+    await page.keyboard.press('Tab');
+    await new Promise(r => setTimeout(r, 100));
+  }
+});
+
 // Quick wheel scroll
 addInteraction('wheel-scroll', async () => {
   await page.mouse.move(640, 500);
@@ -372,6 +524,8 @@ addInteraction('quick-clicks-on-preview', async () => {
 });
 
 const blackFractions = [];
+let transparentFrames = 0;
+let maxTransparentDelta = 0;
 for (let i = 0; i < interactions.length; i++) {
   const t = interactions[i];
   console.log(`  interaction ${i}: ${t.label}`);
@@ -379,20 +533,23 @@ for (let i = 0; i < interactions.length; i++) {
   await new Promise(r => setTimeout(r, 350));
   const sig = await canvasSignature();
   if (sig && baseSig) {
-    blackFractions.push({ label: t.label, frac: sig.blackFrac });
+    blackFractions.push({ label: t.label, blackFrac: sig.blackFrac, transparentFrac: sig.transparentFrac });
     const delta = sig.blackFrac - baseSig.blackFrac;
+    const tdelta = sig.transparentFrac - baseSig.transparentFrac;
     maxDelta = Math.max(maxDelta, delta);
-    if (delta > 0.05) {
-      darkenedFrames++;
-      console.log(`    blackFrac=${sig.blackFrac.toFixed(3)} (delta=+${delta.toFixed(3)}) — DARKENED`);
-      await snapshotCanvas(`dark-${i}-${t.label}`);
-    } else {
-      console.log(`    blackFrac=${sig.blackFrac.toFixed(3)} (delta=${delta >= 0 ? '+' : ''}${delta.toFixed(3)})`);
-    }
+    maxTransparentDelta = Math.max(maxTransparentDelta, tdelta);
+    const tag = (delta > 0.05) ? ' DARKENED' : '';
+    const ttag = (tdelta > 0.02) ? ' TRANSPARENT-HOLE' : '';
+    if (delta > 0.05) darkenedFrames++;
+    if (tdelta > 0.02) transparentFrames++;
+    console.log(`    blackFrac=${sig.blackFrac.toFixed(3)} (delta=${delta >= 0 ? '+' : ''}${delta.toFixed(3)}) transparentFrac=${sig.transparentFrac.toFixed(3)} (delta=${tdelta >= 0 ? '+' : ''}${tdelta.toFixed(3)})${tag}${ttag}`);
+    if (tag || ttag) await snapshotCanvas(`anomaly-${i}-${t.label}`);
   }
 }
 console.log(`darkened frames: ${darkenedFrames}/${interactions.length}, maxDelta=${maxDelta.toFixed(3)}`);
+console.log(`transparent-hole frames: ${transparentFrames}/${interactions.length}, maxTransparentDelta=${maxTransparentDelta.toFixed(3)}`);
 expect(darkenedFrames < 2, `Test 2: ${darkenedFrames}/${interactions.length} interactions caused unusual blackness — likely black-square corruption`);
+expect(transparentFrames < 2, `Test 2: ${transparentFrames}/${interactions.length} interactions left transparent holes — canvas-cleared-but-not-repainted regression`);
 
 await snapshotCanvas('after-many-interactions');
 
