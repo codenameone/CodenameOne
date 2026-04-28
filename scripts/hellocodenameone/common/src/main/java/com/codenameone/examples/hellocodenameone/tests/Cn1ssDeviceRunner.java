@@ -62,6 +62,11 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new AnimateLayoutScreenshotTest(),
             new AnimateHierarchyScreenshotTest(),
             new AnimateUnlayoutScreenshotTest(),
+            new SmoothScrollScreenshotTest(),
+            new TensileBounceScreenshotTest(),
+            new ComponentReplaceFadeScreenshotTest(),
+            new ComponentReplaceSlideScreenshotTest(),
+            new ComponentReplaceFlipScreenshotTest(),
             new MotionShowcaseScreenshotTest(),
             new DrawLine(),
             new FillRect(),
@@ -221,6 +226,11 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 || "AnimateLayoutScreenshotTest".equals(testName)
                 || "AnimateHierarchyScreenshotTest".equals(testName)
                 || "AnimateUnlayoutScreenshotTest".equals(testName)
+                || "SmoothScrollScreenshotTest".equals(testName)
+                || "TensileBounceScreenshotTest".equals(testName)
+                || "ComponentReplaceFadeScreenshotTest".equals(testName)
+                || "ComponentReplaceSlideScreenshotTest".equals(testName)
+                || "ComponentReplaceFlipScreenshotTest".equals(testName)
                 || "MotionShowcaseScreenshotTest".equals(testName);
     }
 
