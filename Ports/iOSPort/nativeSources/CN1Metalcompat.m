@@ -545,21 +545,33 @@ void CN1MetalDrawString(NSString *str, UIFont *font, int color, int alpha, int x
     // per glyph against a per-(font, point-size) R8 atlas. Falls back to
     // the whole-string LRU path if the atlas can't be created (no
     // MTLDevice, CTFont creation failed, etc.) so text always renders.
+    static int s_atlasReq = 0;
+    if (s_atlasReq < 100) { NSLog(@"CN1SS:METAL_DIAG DrawStr step=atlasReq #%d", s_atlasReq); s_atlasReq++; }
     CN1MetalGlyphAtlas *atlas = [CN1MetalGlyphAtlas atlasForFont:font];
+    static int s_atlasGot = 0;
+    if (s_atlasGot < 100) { NSLog(@"CN1SS:METAL_DIAG DrawStr step=atlasGot #%d ok=%d", s_atlasGot, atlas != nil); s_atlasGot++; }
     if (atlas == nil) {
         drawStringWholeStringFallback(str, font, color, alpha, x, y);
         return;
     }
 
+    static int s_attrPre = 0;
+    if (s_attrPre < 100) { NSLog(@"CN1SS:METAL_DIAG DrawStr step=attrPre #%d", s_attrPre); s_attrPre++; }
     NSDictionary *attrs = @{ (__bridge NSString *)kCTFontAttributeName: (__bridge id)atlas.ctFont };
     CFAttributedStringRef attrStr = CFAttributedStringCreate(NULL,
                                                              (__bridge CFStringRef)str,
                                                              (__bridge CFDictionaryRef)attrs);
+    static int s_attrPost = 0;
+    if (s_attrPost < 100) { NSLog(@"CN1SS:METAL_DIAG DrawStr step=attrPost #%d ok=%d", s_attrPost, attrStr != NULL); s_attrPost++; }
     if (attrStr == NULL) {
         drawStringWholeStringFallback(str, font, color, alpha, x, y);
         return;
     }
+    static int s_linePre = 0;
+    if (s_linePre < 100) { NSLog(@"CN1SS:METAL_DIAG DrawStr step=linePre #%d", s_linePre); s_linePre++; }
     CTLineRef line = CTLineCreateWithAttributedString(attrStr);
+    static int s_linePost = 0;
+    if (s_linePost < 100) { NSLog(@"CN1SS:METAL_DIAG DrawStr step=linePost #%d ok=%d", s_linePost, line != NULL); s_linePost++; }
     CFRelease(attrStr);
     if (line == NULL) {
         drawStringWholeStringFallback(str, font, color, alpha, x, y);
