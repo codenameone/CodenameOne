@@ -2363,18 +2363,18 @@ bindCiFallback("Form.initLafNullUiManagerBridge", [
       emitFormInitLafDiag("PARPAR:DIAG:FALLBACK:formInitLaf:defaultLookAndFeelCtorMissing=1");
     }
   }
-  if (!effectiveSelf["cn1_com_codename1_ui_Form_menuBar"]) {
-    const menuBarCtor = global.cn1_com_codename1_ui_MenuBar___INIT____impl
-      || global.cn1_com_codename1_ui_MenuBar___INIT__;
-    if (typeof menuBarCtor === "function") {
-      const menuBar = jvm.newObject("com_codename1_ui_MenuBar");
-      yield* cn1_ivAdapt(menuBarCtor(menuBar));
-      effectiveSelf["cn1_com_codename1_ui_Form_menuBar"] = menuBar;
-      emitFormInitLafDiag("PARPAR:DIAG:FALLBACK:formInitLaf:menuBarInjected=1");
-    } else {
-      emitFormInitLafDiag("PARPAR:DIAG:FALLBACK:formInitLaf:menuBarCtorMissing=1");
-    }
-  }
+  // Don't pre-inject a MenuBar here. The original Form.initLaf body
+  // creates one via ``laf.getMenuBarClass().newInstance()`` AND calls
+  // ``initMenuBar(this)`` to populate ``MenuBar.parent``. Pre-injecting
+  // a fresh MenuBar via ``jvm.newObject + __INIT__`` (no initMenuBar)
+  // and then handing off to the original would make the original's
+  // ``if (menuBar == null || !menuBar.getClass().equals(laf.getMenuBarClass()))``
+  // check fall through (menuBar non-null AND class matches) — so
+  // initMenuBar never runs and ``MenuBar.parent`` stays null. Any later
+  // ``MenuBar.setBackCommand`` (e.g. ``Dialog.show("Hello", "...", "OK", null)``
+  // → ``Form.setBackCommand`` → ``MenuBar.setBackCommand``) NPEs on
+  // ``parent.getToolbar()``. Leave the field untouched and let the
+  // original constructor pathway initialize both fields together.
   if (typeof formInitLafOriginalMethod !== "function") {
     emitFormInitLafDiag("PARPAR:DIAG:FALLBACK:formInitLaf:originalMissing=1");
     return yield* safeInitLafPath(effectiveSelf, effectiveUiManager, lookAndFeel);
