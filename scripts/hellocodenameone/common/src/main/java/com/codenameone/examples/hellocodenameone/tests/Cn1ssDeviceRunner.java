@@ -48,6 +48,21 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
 
     private static final BaseTest[] DEFAULT_TEST_CLASSES = new BaseTest[]{
             new MainScreenScreenshotTest(),
+            // Animation/transition grid tests: each emits a 2x3 frame grid driven
+            // by the AnimationTime override so iOS/Android/JavaSE produce identical
+            // pixels regardless of wall-clock pacing.
+            new SlideHorizontalTransitionTest(),
+            new SlideHorizontalBackTransitionTest(),
+            new SlideVerticalTransitionTest(),
+            new SlideFadeTitleTransitionTest(),
+            new CoverHorizontalTransitionTest(),
+            new UncoverHorizontalTransitionTest(),
+            new FadeTransitionTest(),
+            new FlipTransitionTest(),
+            new AnimateLayoutScreenshotTest(),
+            new AnimateHierarchyScreenshotTest(),
+            new AnimateUnlayoutScreenshotTest(),
+            new MotionShowcaseScreenshotTest(),
             new DrawLine(),
             new FillRect(),
             new DrawRect(),
@@ -190,7 +205,23 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 || "FloatingActionButtonThemeScreenshotTest".equals(testName)
                 || "SpanLabelThemeScreenshotTest".equals(testName)
                 || "DarkLightShowcaseThemeScreenshotTest".equals(testName)
-                || "PaletteOverrideThemeScreenshotTest".equals(testName);
+                || "PaletteOverrideThemeScreenshotTest".equals(testName)
+                // Animation grid tests render six full-form frames each. Like the
+                // theme screenshots above, they exceed the JS port's 150s
+                // browser-lifetime budget and the value is already covered on
+                // iOS/Android/JavaSE.
+                || "SlideHorizontalTransitionTest".equals(testName)
+                || "SlideHorizontalBackTransitionTest".equals(testName)
+                || "SlideVerticalTransitionTest".equals(testName)
+                || "SlideFadeTitleTransitionTest".equals(testName)
+                || "CoverHorizontalTransitionTest".equals(testName)
+                || "UncoverHorizontalTransitionTest".equals(testName)
+                || "FadeTransitionTest".equals(testName)
+                || "FlipTransitionTest".equals(testName)
+                || "AnimateLayoutScreenshotTest".equals(testName)
+                || "AnimateHierarchyScreenshotTest".equals(testName)
+                || "AnimateUnlayoutScreenshotTest".equals(testName)
+                || "MotionShowcaseScreenshotTest".equals(testName);
     }
 
     private void awaitTestCompletion(int index, BaseTest testClass, String testName, long deadline) {
