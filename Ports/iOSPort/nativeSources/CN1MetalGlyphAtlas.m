@@ -139,8 +139,8 @@ static NSMutableDictionary<NSString *, CN1MetalGlyphAtlas *> *atlasCache = nil;
     if (cached != nil) return cached;
 
     static int slotCount = 0;
-    if (slotCount < 6) {
-        NSLog(@"CN1SS:METAL_DIAG slotForGlyph #%d glyph=%u", slotCount, (unsigned)glyph);
+    if (slotCount < 800) {
+        NSLog(@"CN1SS:METAL_DIAG slotForGlyph #%d glyph=%u key=%@", slotCount, (unsigned)glyph, _fontKey);
         slotCount++;
     }
 
@@ -217,22 +217,31 @@ static NSMutableDictionary<NSString *, CN1MetalGlyphAtlas *> *atlasCache = nil;
     CGPoint origin = CGPointMake((CGFloat)CN1_METAL_ATLAS_PADDING - bbox.origin.x,
                                  (CGFloat)CN1_METAL_ATLAS_PADDING - bbox.origin.y);
     static int drawCount = 0;
-    if (drawCount < 6) {
-        NSLog(@"CN1SS:METAL_DIAG CTFontDrawGlyphs entering #%d glyph=%u gw=%d gh=%d",
-              drawCount, (unsigned)glyph, gw, gh);
+    if (drawCount < 800) {
+        NSLog(@"CN1SS:METAL_DIAG CTFontDrawGlyphs entering #%d glyph=%u gw=%d gh=%d key=%@",
+              drawCount, (unsigned)glyph, gw, gh, _fontKey);
     }
     CTFontDrawGlyphs(_ctFont, &glyph, &origin, 1, ctx);
-    if (drawCount < 6) {
+    if (drawCount < 800) {
         NSLog(@"CN1SS:METAL_DIAG CTFontDrawGlyphs returned #%d", drawCount);
         drawCount++;
     }
     CGContextRelease(ctx);
+    static int uploadCount = 0;
+    if (uploadCount < 800) {
+        NSLog(@"CN1SS:METAL_DIAG replaceRegion entering #%d at (%d,%d %dx%d)",
+              uploadCount, slotX, slotY, gw, gh);
+    }
 
     [_texture replaceRegion:MTLRegionMake2D((NSUInteger)slotX, (NSUInteger)slotY,
                                             (NSUInteger)gw, (NSUInteger)gh)
                 mipmapLevel:0
                   withBytes:pixels
                 bytesPerRow:bytesPerRow];
+    if (uploadCount < 800) {
+        NSLog(@"CN1SS:METAL_DIAG replaceRegion returned #%d", uploadCount);
+        uploadCount++;
+    }
     free(pixels);
 
     CN1MetalGlyphSlot *slot = [[CN1MetalGlyphSlot alloc] init];

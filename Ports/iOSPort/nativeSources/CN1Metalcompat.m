@@ -535,7 +535,7 @@ void CN1MetalDrawString(NSString *str, UIFont *font, int color, int alpha, int x
     if (str == nil || font == nil || str.length == 0) return;
 
     static int callCount = 0;
-    if (callCount < 4) {
+    if (callCount < 100) {
         NSLog(@"CN1SS:METAL_DIAG DrawString #%d str=\"%@\" font=%@/%g at (%d,%d)",
               callCount, str, font.fontName, (double)font.pointSize, x, y);
         callCount++;
@@ -643,7 +643,15 @@ void CN1MetalDrawString(NSString *str, UIFont *font, int color, int alpha, int x
                 u1, v1,
             };
 
+            static int quadCount = 0;
+            if (quadCount < 800) {
+                NSLog(@"CN1SS:METAL_DIAG drawQuad pre #%d", quadCount);
+            }
             drawQuad(CN1MetalPipelineAlphaMask, vertices, texcoords, colorV, atlasTex);
+            if (quadCount < 800) {
+                NSLog(@"CN1SS:METAL_DIAG drawQuad post #%d", quadCount);
+                quadCount++;
+            }
         }
 
         if (glyphBuf) free(glyphBuf);
