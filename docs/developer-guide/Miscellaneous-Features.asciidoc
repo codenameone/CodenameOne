@@ -464,8 +464,8 @@ Supply a square source image at least 432×432 pixels (the largest size emitted 
 
 On Android the build generates locale-qualified drawable resources at every density so the platform picks the right icon automatically based on the device's current locale:
 
-* `drawable-<lang>[-r<COUNTRY>]/icon.png` at 36, 48, 72, 96, 128, 144 and 192 pixels for legacy launchers.
-* When `android.enableAdaptiveIcons=true` the same variants are also written as `mipmap-<dpi>-<lang>[-r<COUNTRY>]/ic_launcher.png` and `ic_launcher_foreground.png`. The default adaptive background and the `mipmap-anydpi-v26/ic_launcher.xml` definition are reused as-is.
+* `drawable-<lang>[-r<COUNTRY>][-<dpi>]/icon.png` at 36, 48, 72, 96, 128, 144 and 192 pixels for legacy launchers.
+* When `android.enableAdaptiveIcons=true` the same variants are also written as `mipmap-<lang>[-r<COUNTRY>]-<dpi>/ic_launcher.png` and `ic_launcher_foreground.png`. The default adaptive background and the `mipmap-anydpi-v26/ic_launcher.xml` definition are reused as-is.
 
 No code changes are required — Android's resource framework switches icons when the locale changes.
 
