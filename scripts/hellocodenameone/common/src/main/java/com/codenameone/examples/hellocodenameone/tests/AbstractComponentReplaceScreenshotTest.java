@@ -4,6 +4,7 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.animations.ComponentAnimation;
 import com.codename1.ui.animations.Transition;
@@ -12,10 +13,15 @@ import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.Style;
 
 /// Drives a component-scoped `Container.replace` transition through six
-/// deterministic frames. The transition only morphs a single child (the "card")
-/// in the middle of an otherwise static form, so the surrounding chrome stays
-/// put while the swapped content animates.
+/// deterministic frames focused on just the card being replaced - the
+/// surrounding form chrome is rendered only as context for the transition's
+/// absolute coordinates and is then cropped out before the cell is composed.
+/// Frame 0 paints the source card directly (pre-animation), the last frame
+/// paints the destination card directly (post-animation), and the four middle
+/// frames render the transition at evenly spaced progress.
 public abstract class AbstractComponentReplaceScreenshotTest extends AbstractAnimationScreenshotTest {
+    private static final int LAST_FRAME_INDEX = 5;
+
     private Form replaceHost;
     private Container slot;
     private Component currentCard;
@@ -96,17 +102,52 @@ public abstract class AbstractComponentReplaceScreenshotTest extends AbstractAni
 
     @Override
     protected void renderFrame(Graphics g, int width, int height, double progress, int frameIndex) {
-        if (replaceAnim != null) {
-            // First call lazily invokes Transition.init / initTransition;
-            // subsequent calls advance Transition.animate using AnimationTime.
-            replaceAnim.updateAnimationState();
+        int cardW = Math.max(1, currentCard.getWidth());
+        int cardH = Math.max(1, currentCard.getHeight());
+        int cardAbsX = currentCard.getAbsoluteX();
+        int cardAbsY = currentCard.getAbsoluteY();
+
+        // Render the card-sized region into a temp image. We translate the
+        // graphics so anything painted at the card's absolute coords lands at
+        // (0, 0) in this buffer; the result is a tightly cropped screenshot
+        // of just the swapped component instead of the whole form.
+        Image cardImg = Image.createImage(cardW, cardH, 0xffffffff);
+        Graphics cg = cardImg.getGraphics();
+        cg.setColor(0xffffff);
+        cg.fillRect(0, 0, cardW, cardH);
+        cg.translate(-cardAbsX, -cardAbsY);
+
+        if (frameIndex == 0) {
+            // Pre-animation: pure source card.
+            currentCard.paintComponent(cg, true);
+        } else if (frameIndex == LAST_FRAME_INDEX) {
+            // Post-animation: pure destination card.
+            nextCard.paintComponent(cg, true);
+        } else {
+            if (replaceAnim != null) {
+                // First call lazily invokes Transition.init / initTransition;
+                // subsequent calls advance Transition.animate using AnimationTime.
+                replaceAnim.updateAnimationState();
+            }
+            // The transition expects the surrounding container background to
+            // already be drawn; paint the slot first so we don't see whatever
+            // the previous frame left in the buffer leaking through.
+            slot.paintComponent(cg, true);
+            if (transition != null) {
+                transition.paint(cg);
+            }
         }
-        // Repaint the static surroundings, then overlay the transition
-        // (its paint() clips itself to the source component's rect).
-        replaceHost.paintComponent(g, true);
-        if (transition != null) {
-            transition.paint(g);
+
+        // Scale the cropped card up to fill the grid frame so the action is
+        // legible inside its small cell.
+        if (cardW == width && cardH == height) {
+            g.drawImage(cardImg, 0, 0);
+        } else {
+            Image scaled = cardImg.scaled(width, height);
+            g.drawImage(scaled, 0, 0);
+            scaled.dispose();
         }
+        cardImg.dispose();
     }
 
     @Override

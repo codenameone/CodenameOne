@@ -11,10 +11,13 @@ import com.codename1.ui.layouts.Layout;
 import com.codename1.ui.plaf.Style;
 
 /// Visualises the tensile bounce-back: a critically-damped spring eases the
-/// scroll position from a value past the top edge (-tensilePull) back to 0.
+/// scroll position from a value past the top edge back to 0.
 /// `Component.startTensile` is package-private and only fires from real touch
 /// release events, so we mirror its math (same Motion factory and duration
 /// calculation) and apply it via a Container subclass exposing setScrollY.
+/// The over-pull is a substantial fraction of the viewport so the gap above
+/// the first tile is plainly visible in every intermediate frame and snaps
+/// closed by the last.
 public class TensileBounceScreenshotTest extends AbstractAnimationScreenshotTest {
     private static class ScrollContainer extends Container {
         ScrollContainer(Layout l) {
@@ -27,7 +30,8 @@ public class TensileBounceScreenshotTest extends AbstractAnimationScreenshotTest
         }
     }
 
-    private static final int OVER_PULL = 80;
+    private static final int OVER_PULL_FRACTION = 3;
+    private static final int TILE_COUNT = 18;
 
     private Form scrollHost;
     private ScrollContainer scrollContainer;
@@ -35,7 +39,7 @@ public class TensileBounceScreenshotTest extends AbstractAnimationScreenshotTest
 
     @Override
     protected int getAnimationDurationMillis() {
-        return 600;
+        return 700;
     }
 
     @Override
@@ -49,25 +53,30 @@ public class TensileBounceScreenshotTest extends AbstractAnimationScreenshotTest
 
         scrollContainer = new ScrollContainer(BoxLayout.y());
         Style cs = scrollContainer.getAllStyles();
-        cs.setBgColor(0xfafafa);
+        // A bold backdrop colour so the bounce gap reads as obvious empty space
+        // above the tiles rather than blending into a pale page background.
+        cs.setBgColor(0x0b132b);
         cs.setBgTransparency(255);
         cs.setPadding(4, 4, 4, 4);
-        for (int i = 0; i < 12; i++) {
+        for (int i = 0; i < TILE_COUNT; i++) {
             Label tile = new Label("Pulled " + (i + 1));
             Style ts = tile.getAllStyles();
-            ts.setBgColor(0x118ab2);
+            ts.setBgColor(rowColor(i));
             ts.setFgColor(0xffffff);
             ts.setBgTransparency(255);
             ts.setMargin(2, 2, 2, 2);
-            ts.setPadding(14, 14, 12, 12);
+            ts.setPadding(18, 18, 16, 16);
             scrollContainer.add(tile);
         }
         scrollHost.add(BorderLayout.CENTER, scrollContainer);
         scrollHost.layoutContainer();
 
-        // Critically-damped spring matches the framework's iOS-style tensile
-        // configuration in Component.startTensile.
-        bounceMotion = Motion.createCriticalDampedSpringMotion(-OVER_PULL, 0, getAnimationDurationMillis());
+        // Pull a third of the visible viewport - matching what a user can drag
+        // past the top edge before lifting off in iOS. Anything smaller (<10%)
+        // ends up as a single row of whitespace that disappears in scaled-down
+        // grid cells.
+        int overPull = Math.max(1, scrollContainer.getHeight() / OVER_PULL_FRACTION);
+        bounceMotion = Motion.createCriticalDampedSpringMotion(-overPull, 0, getAnimationDurationMillis());
         bounceMotion.start();
     }
 
@@ -83,5 +92,10 @@ public class TensileBounceScreenshotTest extends AbstractAnimationScreenshotTest
         scrollContainer = null;
         bounceMotion = null;
         super.finishCapture();
+    }
+
+    private static int rowColor(int i) {
+        int[] palette = {0x118ab2, 0x06d6a0, 0xffd166, 0xef476f, 0x8338ec, 0xfb5607};
+        return palette[i % palette.length];
     }
 }

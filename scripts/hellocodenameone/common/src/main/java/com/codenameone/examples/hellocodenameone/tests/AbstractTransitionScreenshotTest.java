@@ -11,10 +11,16 @@ import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.Style;
 
 /// Drives a `Transition` from a source form to a destination form through six
-/// deterministic frames. Subclasses provide the `Transition` instance and may
-/// customize the source/destination forms; defaults give a simple coloured form
-/// pair so individual transitions are easy to add.
+/// deterministic frames. Frame 0 paints the source form directly (pre-animation
+/// state) and the last frame paints the destination form directly
+/// (post-animation state); the four middle frames render
+/// `transition.animate()` + `transition.paint()` at evenly spaced progress
+/// fractions. Bookending with a direct paint of source/dest means the row from
+/// left-to-right reads as "before -> during -> after" the way a user would see
+/// it, and any pixel difference between the last animated frame and the final
+/// destination paint flags an artifact left behind by the transition.
 public abstract class AbstractTransitionScreenshotTest extends AbstractAnimationScreenshotTest {
+    private static final int LAST_FRAME_INDEX = 5;
     private Form sourceForm;
     private Form destForm;
     private Transition transition;
@@ -90,6 +96,18 @@ public abstract class AbstractTransitionScreenshotTest extends AbstractAnimation
 
     @Override
     protected void renderFrame(Graphics g, int width, int height, double progress, int frameIndex) {
+        if (frameIndex == 0) {
+            // Pre-animation: paint the source as the user would see it just
+            // before triggering the transition.
+            sourceForm.paintComponent(g, true);
+            return;
+        }
+        if (frameIndex == LAST_FRAME_INDEX) {
+            // Post-animation: paint the destination as the user would see it
+            // after the transition finishes.
+            destForm.paintComponent(g, true);
+            return;
+        }
         transition.animate();
         transition.paint(g);
     }

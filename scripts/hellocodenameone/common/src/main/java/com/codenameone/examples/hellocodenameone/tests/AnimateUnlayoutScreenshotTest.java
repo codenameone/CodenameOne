@@ -7,9 +7,9 @@ import com.codename1.ui.animations.ComponentAnimation;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.Style;
 
-/// Demonstrates `Container.createAnimateUnlayout` - the components start at their
-/// natural positions (top of the grid) and animate out to off-screen positions
-/// the test sets manually before kicking off the animation. The container is
+/// Demonstrates `Container.createAnimateUnlayout` - the components start at
+/// their natural positions and animate out to off-screen destinations the test
+/// stamps onto each child before kicking off the animation. The container is
 /// left in an "invalid" state at the end on purpose; the typical caller follows
 /// up with `removeAll` + `revalidate` to settle it.
 public class AnimateUnlayoutScreenshotTest extends AbstractContainerAnimationScreenshotTest {
@@ -37,13 +37,20 @@ public class AnimateUnlayoutScreenshotTest extends AbstractContainerAnimationScr
 
     @Override
     protected ComponentAnimation startAnimation(Container container, int duration) {
-        // Push every child above the visible area; createAnimateUnlayout will
-        // capture these as the "destination" positions and animate from the
-        // current natural layout to them, so we see the tiles fly upward.
-        int containerHeight = container.getHeight();
+        // Match the docstring example: every child slides up to roughly its own
+        // height above the natural y. animateUnlayout uses an ease-in motion
+        // (slow start, fast finish) so a destination at the entire container
+        // height vanishes everything by the third frame; sliding by a single
+        // tile height keeps the bottom tiles on-screen for the full sequence
+        // and lets the upper tiles disappear into the top edge.
+        if (container.getComponentCount() == 0) {
+            return container.createAnimateUnlayout(duration, 0, null);
+        }
+        int liftDistance = container.getComponentAt(0).getHeight();
+        int targetY = -liftDistance;
         for (int i = 0; i < container.getComponentCount(); i++) {
             Component child = container.getComponentAt(i);
-            child.setY(-containerHeight);
+            child.setY(targetY);
         }
         return container.createAnimateUnlayout(duration, 0, null);
     }
