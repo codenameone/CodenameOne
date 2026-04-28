@@ -668,7 +668,30 @@ const jvm = {
     // ``Exception: <class>``. Capturing here covers BOTH the runtime's
     // ``createException`` path (NPE / ClassCastException / etc.) and
     // bytecode-emitted ``_O(<class>) + ctor`` paths uniformly.
-    if (classDef && classDef.assignableTo && classDef.assignableTo["java_lang_Throwable"]) {
+    //
+    // The fast ``assignableTo[Throwable]`` check fails for most concrete
+    // exception classes (NPE / IllegalArgumentException / ...) because
+    // ``defineClass`` only seeds ``assignableTo`` with self + Object +
+    // direct baseClass. Throwable lives several levels up
+    // (NPE → RuntimeException → Exception → Throwable), and the walk in
+    // ``defineClass`` aborts the moment it can't find an ancestor's
+    // classDef in ``this.classes`` (which happens when subclasses are
+    // emitted before their ancestors — the comment above
+    // ``defineClass`` calls this out explicitly). So fall back to
+    // ``assignableViaAncestors``, which walks the baseClass chain at
+    // query time when every ancestor is guaranteed to be registered,
+    // and cache the answer on the classDef so subsequent throws of
+    // the same exception type stay O(1).
+    let isThrowable = false;
+    if (classDef && classDef.assignableTo) {
+      if (classDef.assignableTo["java_lang_Throwable"]) {
+        isThrowable = true;
+      } else if (this.assignableViaAncestors(className, "java_lang_Throwable")) {
+        isThrowable = true;
+        classDef.assignableTo["java_lang_Throwable"] = 1;
+      }
+    }
+    if (isThrowable) {
       try {
         const prevLimit = Error.stackTraceLimit;
         try { Error.stackTraceLimit = 200; } catch (_l) {}
