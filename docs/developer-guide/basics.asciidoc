@@ -1050,73 +1050,41 @@ Because the CSS compiler produces the final resource file, you should treat the 
 
 === GUI Builder
 
-The GUI builder allows you to arrange components visually within a UI using drag and drop, property sheets etc. With the GUI builder you can create elaborate, rich UI's without writing the layout code.
-
-.Why two GUI Builders?
-****
-Codename One originally shipped with a GUI builder that generated a `Statemachine` class and stored its data directly inside the resource file. That legacy tool targeted very constrained devices and has since been deprecated. Modern projects should rely on the standalone GUI builder launched from the IDE, which is the focus of the remainder of this section. The current builder includes an auto layout mode (introduced in version 3.7) that lets you freely position and resize components on a canvas while using `LayeredLayout` behind the scenes.
-****
+The GUI builder allows you to arrange components visually within a UI using drag and drop, property sheets etc. With the GUI builder you can create elaborate, rich UI's without writing the layout code. Forms designed in the builder use auto-layout mode by default, which lets you freely position and resize components on a canvas while using `LayeredLayout` behind the scenes.
 
 ==== Hello World
 
-Creating a hello world app in the new GUI builder is actually pretty trivial, you need to start with a regular handcoded
-application. Not a GUI builder application as it refers to the old GUI builder!
+The GUI builder is invoked through the Codename One Maven plugin and works the same way regardless of which IDE you use to edit the surrounding Java code. There are two goals to know about:
 
-This is the exact same hello world application you created before...
+- `cn1:create-gui-form` generates a new GUI form (the `.gui` XML file plus the matching Java source).
+- `cn1:guibuilder` opens the GUI builder so you can edit an existing form.
 
-Following are the instructions for creating a form and launching the GUI builder. While they are similar there
-are minor IDE differences. Usage of the GUI builder is identical in all IDE's as the GUI builder is a separate
-application.
+Both goals accept a `className` parameter that points at the fully-qualified class name of the form. From the root of a multi-module Codename One project, create a new form like this:
 
-===== NetBeans
+[source,bash]
+----
+mvn cn1:create-gui-form -DclassName=com.example.MyForm
+----
 
-In NetBeans you need to follow these 4 steps:
+This generates two files inside the `common` module:
 
-.Right click the package select #New# -> #Other#
-image::img/netbeans-gui-builder-step-1.png[Right click the package select New -> Other,scaledwidth=50%]
+. `common/src/main/guibuilder/com/example/MyForm.gui`
+. `common/src/main/java/com/example/MyForm.java`
 
-.In the Codename One section select the GUI builder form
-image::img/netbeans-gui-builder-step-2.png[In the Codename One section select the GUI builder form,scaledwidth=50%]
+NOTE: If you run the goal from inside the `common` submodule the files are written directly under that module's `src/main/...` directory. By default the goal creates a `Form`; pass `-DguiType=Dialog` or `-DguiType=Container` to generate one of the other types, and pass `-DautoLayout=false` to opt out of auto-layout mode.
 
-.Type in the name of the form and click finish, you can change the type to be a Container or Dialog
-image::img/netbeans-gui-builder-step-3.png[Type in the name of the form and click finish, you can change the type to be a Container or Dialog,scaledwidth=50%]
+To open the form in the GUI builder:
 
-.Launch the GUI builder thru the right click menu on the newly created file
-image::img/netbeans-gui-builder-step-4.png[Launch the GUI builder thru the right click menu on the newly created file,scaledwidth=50%]
+[source,bash]
+----
+mvn cn1:guibuilder -DclassName=com.example.MyForm
+----
 
-===== IntelliJ/IDEA
-
-In IntelliJ you need to follow these 3 steps:
-
-.Right click the package select #New# -> #Codename One AutoLayout Form# (or Dialog/Container)
-image::img/intellij-gui-builder-step-1.png[Right click the package select New -> Codename One Form (or Dialog/Container),scaledwidth=50%]
-
-.Type in a name for the new form
-image::img/intellij-gui-builder-step-2.png[Type in a name for the new form,scaledwidth=50%]
-
-.Launch the GUI builder thru the right click menu on the newly created file
-image::img/intellij-gui-builder-step-3.png[Launch the GUI builder thru the right click menu on the newly created file,scaledwidth=50%]
-
-===== Eclipse
-
-In Eclipse you need to follow these 4 steps:
-
-.Right click the package select #New# -> #Other#
-image::img/eclipse-gui-builder-step-1.png[Right click the package select New -> Other,scaledwidth=50%]
-
-.In the Codename One section select the GUI builder option
-image::img/eclipse-gui-builder-step-2.png[In the Codename One section select the GUI builder option,scaledwidth=50%]
-
-.Type in the name of the form and click finish, you can change the type to be a Container or Dialog
-image::img/eclipse-gui-builder-step-3.png[Type in the name of the form and click finish, you can change the type to be a Container or Dialog,scaledwidth=50%]
-
-.Launch the GUI builder thru the right click menu on the newly created file
-image::img/eclipse-gui-builder-step-4.png[Launch the GUI builder thru the right click menu on the newly created file,scaledwidth=50%]
-
+The full goal reference, including every parameter, lives in <<create-gui-form>> and <<guibuilder>> in the Maven goals appendix.
 
 ===== Basic Usage
 
-Notice that the UI of the new GUIBuilder might change in various ways but the basic concepts should remain the
+Notice that the UI of the GUIBuilder might change in various ways but the basic concepts should remain the
 same.
 
 The GUI builder is controlled through it's main toolbar, notice that your changes will be applied when you click
@@ -1225,7 +1193,7 @@ flowLayoutValign="0"  title="My new title" name="MyForm">
 </component>
 ----
 
-This format is relatively simple and is roughly the same format used by the old GUI builder which makes the migration to the new GUI builder possible. This file triggers the following Java source file:
+This format is relatively simple. The file triggers the following Java source file:
 
 [source,java]
 ----
@@ -1374,7 +1342,7 @@ This control pad also includes game-pad-like controls (up, down, left, right), t
 
 In some cases, you may need to add sub-containers to your form to aid in grouping your components together. You can drag a container onto your form using the "Container" palette item (under "Core Components"). The default layout the subcontainer will be LayeredLayout so that you're able to position components within the sub-container with precision, like on the root container.
 
-You can also change the layout of subcontainers to another classical layout manager (for example: grid layout, box layout, etc..) and drag components directly into it as you did with the old GUI builder. This is useful if parts of your form lend themselves. As an example, let's drag a container onto the canvas that uses BoxLayout Y. (You can find this under the "Containers" section of the component palette).
+You can also change the layout of subcontainers to another classical layout manager (for example: grid layout, box layout, etc..) and drag components directly into it. This is useful if parts of your form lend themselves to a different layout. As an example, let's drag a container onto the canvas that uses BoxLayout Y. (You can find this under the "Containers" section of the component palette).
 
 Drag the button (that was previously on the form) over that container, and you should see a drop-zone become highlighted.
 
@@ -1388,4 +1356,4 @@ image::img/guibuilder-2-subcontainer-add-child-2.png[Box Layout Y dropping 2nd c
 
 ===== The Canvas Resize Tool
 
-When designing a UI with the new GUI builder it's ** important that you periodically test the form's "resizing" behavior so that you know how it will behave on different devices. Components may appear to be positioned correctly when the canvas is one size, but become out of whack when the container is resized. After nearly every manipulation you perform, it's good practice to drag the canvas resize tool (the button in the lower right corner of the GUI builder) smaller and bigger so you can see how the positions are changed. If things grow out of whack, you may need to toggle an inset between fixed and auto, or add a link between some of the components so that the resizing behavior matches your expectations.
+When designing a UI with the GUI builder it's ** important that you periodically test the form's "resizing" behavior so that you know how it will behave on different devices. Components may appear to be positioned correctly when the canvas is one size, but become out of whack when the container is resized. After nearly every manipulation you perform, it's good practice to drag the canvas resize tool (the button in the lower right corner of the GUI builder) smaller and bigger so you can see how the positions are changed. If things grow out of whack, you may need to toggle an inset between fixed and auto, or add a link between some of the components so that the resizing behavior matches your expectations.
