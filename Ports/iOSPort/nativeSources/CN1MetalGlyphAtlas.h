@@ -24,7 +24,6 @@
 // Gated by CN1_USE_METAL: this header is only included from
 // CN1Metalcompat.m and must not appear in the GL build.
 
-#import "CN1ES2compat.h"
 #ifdef CN1_USE_METAL
 #import <Foundation/Foundation.h>
 #import <CoreText/CoreText.h>
