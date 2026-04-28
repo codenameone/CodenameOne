@@ -16,7 +16,7 @@ Add a Metal-based rendering backend to the iOS port, gated by `#ifdef CN1_USE_ME
 | 1 | `CN1Metalcompat` + MVP ops (`FillRect`, `DrawImage`, `ClipRect`, `SetTransform`, `ClearRect`) | **complete (MVP)** |
 | 2 | Remaining `ExecutableOp`s + parity text + coordinate-system calibration | **complete (modulo flaky tests + image-scaling rasterisation differences)** |
 | 3 | Unify mutable image rendering onto Metal | **activation in progress with thread-local state** |
-| 4 | CoreText glyph atlas | not started |
+| 4 | CoreText glyph atlas | first attempt reverted; needs local-test infrastructure before retry |
 | 5 | Harden (colour space, drawable throttling, memory, lifecycle) | not started |
 
 ## Phase 2 — Coord fixes, persistent render target, more ops (in progress)
@@ -148,6 +148,25 @@ The path from the v2 architecture commit to a green suite required several follo
 - **Step 6 readback (`Image.getRGB` etc.).** Disabled because of a deadlock in `DrawImage`. Until reinstated, mutable images that go through `getRGB` / PNG-encode / `toImage` return stale (UIImage-backed) pixels. Not exercised by the current screenshot suite, but real-world apps using these patterns will see stale output.
 - **Round-rect / arc rendering perf.** Each `fillRoundRect` etc. on the Metal mutable path allocates a CG bitmap → UIImage → fresh GLUIImage → `DrawImage` op. With 267 round rects × 4 panels that's noticeable on slow CI runners (which is why the 10s per-test timeout had to go to 30s). An SDF round-rect shader would drop this to one quad per round rect with no per-call texture allocation.
 - **PNG transmission flake.** One screenshot (`graphics-affine-scale.png` in run `24997869913`) came through truncated to ~24% of its captured size — the chunked-log-stream protocol via `CN1SSPREVIEW:` lost most of the data. Not a Metal-rendering issue; tracked separately if it recurs.
+
+## Phase 4 — CoreText glyph atlas (first attempt reverted)
+
+First implementation: commits `f15baba36` + `5d381f67c` (reverted in `2febc0fd6` + `3fd1fc02e`). Created `CN1MetalGlyphAtlas.{h,m}` with a per-(font, point-size) R8 atlas, shelf packer, and a `CN1MetalDrawString` rewrite that shaped strings via `CTLineCreateWithAttributedString` and emitted one alpha-mask quad per glyph.
+
+The build itself was clean (after fixing the same `#import "CN1ES2compat.h"` foot-gun documented in Phase 0 — without that import, the `#ifdef CN1_USE_METAL` body evaluates to empty and the linker fails on `_OBJC_CLASS_$_CN1MetalGlyphAtlas`). But the Metal screenshot suite hung at the **first** test (`KotlinUiTest`): the device-runner emitted `INFO:suite starting` and then nothing for the full 600s timeout. No crash, no further chunks, no markers — a silent hang in (most likely) the very first `CN1MetalDrawString` call.
+
+Suspected culprits, none confirmed:
+
+- The atlas allocates a 1024×1024 `MTLPixelFormatR8Unorm` MTLTexture during the first DrawString. If the device or sim is slow to honor that, the first frame stalls.
+- The CG bitmap context for glyph rasterisation used `kCGImageAlphaOnly` with a `NULL` colorspace. That's a documented combo on macOS but iOS sims have shipped quirks before; the proven pattern is `CGColorSpaceCreateDeviceGray()` + `kCGImageAlphaNone` + `CGContextSetGrayFillColor(ctx, 1.0, 1.0)` (white fill on grayscale). Try that next time.
+- `CTFontGetBoundingRectsForGlyphs` could in theory return huge bboxes for unusual glyph IDs, blowing up the local pixel buffer allocation. Add a sanity clamp (`gw > 256 || gh > 256 → return nil`).
+
+What to do differently when retrying:
+
+1. **Test locally first.** This branch's CI cycle is ~25-40 min per attempt; a hang in the test runner is too slow to debug remotely. Get a local iOS-simulator path working before pushing.
+2. **Keep the whole-string LRU cache as a fallback** so a glyph-atlas regression doesn't remove all text from the screen. Gate the new path on a build flag or a short-string heuristic.
+3. **Use the proven CG pattern** above for glyph rasterisation.
+4. **Add bounds checks** for unreasonably large glyph metrics, NaN/Inf positions, etc.
 
 ## Phase 0 — Scaffolding (complete)
 
