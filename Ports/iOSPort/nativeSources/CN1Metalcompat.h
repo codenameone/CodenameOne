@@ -153,11 +153,10 @@ void CN1MetalTileImage(id<MTLTexture> texture, int alpha,
                        int x, int y, int width, int height,
                        int imageWidth, int imageHeight);
 
-// Draw a string at (x,y). The string is rasterised via CoreGraphics into
-// an RGBA MTLTexture with the colour baked in (matching the GL path's
-// approach) and then rendered as a textured quad with alpha modulation.
-// A small LRU cache keyed on (str, font, color) avoids re-rasterising per
-// frame. Phase 4 will replace this with a CoreText glyph atlas.
+// Draw a string at (x,y) where (x,y) is the top-left corner of the line in
+// screen coords. Shapes the string with CTLine and emits one alpha-mask
+// quad per glyph against the per-(font, point-size) glyph atlas; colour is
+// modulated through cn1_fs_alpha_mask. See CN1MetalGlyphAtlas.h.
 void CN1MetalDrawString(NSString *str, UIFont *font, int color, int alpha, int x, int y);
 
 // Build an MTLTexture from a single-channel (R8/alpha-only) bitmap. The
