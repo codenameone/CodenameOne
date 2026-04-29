@@ -2441,6 +2441,31 @@ void com_codename1_impl_ios_IOSNative_fillLinearGradientGlobal___int_int_int_int
 }
 
 void com_codename1_impl_ios_IOSNative_fillRectRadialGradientMutable___int_int_int_int_int_int_float_float_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT width, JAVA_INT height, JAVA_FLOAT relativeX, JAVA_FLOAT relativeY, JAVA_FLOAT relativeSize) {
+#ifdef CN1_USE_METAL
+    {
+        // Phase 3 v2: route through ExecutableOp queue. type=1 is
+        // GRAD_TYPE_RADIAL inside DrawGradient; CN1MetalDrawGradient
+        // handles the radial branch identically to the global path.
+        GLUIImage *target = [CodenameOne_GLViewController instance].currentMutableImage;
+        if (target == nil) return;
+        DrawGradient *d = [[DrawGradient alloc] initWithArgs:1
+                                                  startColorA:n1
+                                                    endColorA:n2
+                                                          xA:n3
+                                                          yA:n4
+                                                       widthA:width
+                                                      heightA:height
+                                                   relativeXA:relativeX
+                                                   relativeYA:relativeY
+                                                relativeSizeA:relativeSize];
+        [d setTarget:target];
+        [CodenameOne_GLViewController upcoming:d];
+#ifndef CN1_USE_ARC
+        [d release];
+#endif
+        return;
+    }
+#endif
     POOL_BEGIN();
     float alpha1 = 1.0;
     if (((n1 >> 24) & 0xff) != 0) {
@@ -2479,6 +2504,32 @@ void com_codename1_impl_ios_IOSNative_fillRectRadialGradientMutable___int_int_in
 }
 
 void com_codename1_impl_ios_IOSNative_fillLinearGradientMutable___int_int_int_int_int_int_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT width, JAVA_INT height, JAVA_BOOLEAN n7) {
+#ifdef CN1_USE_METAL
+    {
+        // Phase 3 v2: route the mutable linear-gradient through the
+        // ExecutableOp queue so it lands in the mutable's MTLTexture,
+        // not the now-nil UIGraphicsGetCurrentContext(). 2 = horizontal,
+        // 3 = vertical -- matches DrawGradient's enum.
+        GLUIImage *target = [CodenameOne_GLViewController instance].currentMutableImage;
+        if (target == nil) return;
+        DrawGradient *d = [[DrawGradient alloc] initWithArgs:(n7 ? 2 : 3)
+                                                  startColorA:n1
+                                                    endColorA:n2
+                                                          xA:n3
+                                                          yA:n4
+                                                       widthA:width
+                                                      heightA:height
+                                                   relativeXA:0
+                                                   relativeYA:0
+                                                relativeSizeA:0];
+        [d setTarget:target];
+        [CodenameOne_GLViewController upcoming:d];
+#ifndef CN1_USE_ARC
+        [d release];
+#endif
+        return;
+    }
+#endif
     POOL_BEGIN();
 
     float alpha1 = 1.0;
