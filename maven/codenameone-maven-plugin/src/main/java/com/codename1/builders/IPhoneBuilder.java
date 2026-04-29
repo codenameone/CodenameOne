@@ -3159,18 +3159,36 @@ public class IPhoneBuilder extends Executor {
     }
 
     private String buildLocalizedIconsPlistFragment() {
-        StringBuilder alternateIcons = new StringBuilder();
+        // iOS resolves alternate icons by appending @2x/@3x/~ipad to each basename
+        // listed in CFBundleIconFiles. The iPhone basename catches AppIcon_<loc>@2x.png
+        // (120) and AppIcon_<loc>@3x.png (180); the iPad basename catches
+        // AppIcon_<loc>@2x~ipad.png (152). The 167x167 iPad Pro size cannot be
+        // expressed via @-modifiers, so it is referenced through its explicit
+        // 83.5x83.5 basename.
+        StringBuilder iphoneAlternate = new StringBuilder();
+        StringBuilder ipadAlternate = new StringBuilder();
         for (Map.Entry<String, String> entry : localizedIcons.entrySet()) {
             String iconName = entry.getKey();
-            alternateIcons.append("        <key>").append(iconName).append("</key>\n");
-            alternateIcons.append("        <dict>\n");
-            alternateIcons.append("            <key>CFBundleIconFiles</key>\n");
-            alternateIcons.append("            <array>\n");
-            alternateIcons.append("                <string>").append(iconName).append("</string>\n");
-            alternateIcons.append("            </array>\n");
-            alternateIcons.append("            <key>UIPrerenderedIcon</key>\n");
-            alternateIcons.append("            <false/>\n");
-            alternateIcons.append("        </dict>\n");
+            iphoneAlternate.append("        <key>").append(iconName).append("</key>\n");
+            iphoneAlternate.append("        <dict>\n");
+            iphoneAlternate.append("            <key>CFBundleIconFiles</key>\n");
+            iphoneAlternate.append("            <array>\n");
+            iphoneAlternate.append("                <string>").append(iconName).append("</string>\n");
+            iphoneAlternate.append("            </array>\n");
+            iphoneAlternate.append("            <key>UIPrerenderedIcon</key>\n");
+            iphoneAlternate.append("            <false/>\n");
+            iphoneAlternate.append("        </dict>\n");
+
+            ipadAlternate.append("        <key>").append(iconName).append("</key>\n");
+            ipadAlternate.append("        <dict>\n");
+            ipadAlternate.append("            <key>CFBundleIconFiles</key>\n");
+            ipadAlternate.append("            <array>\n");
+            ipadAlternate.append("                <string>").append(iconName).append("</string>\n");
+            ipadAlternate.append("                <string>").append(iconName).append("83.5x83.5</string>\n");
+            ipadAlternate.append("            </array>\n");
+            ipadAlternate.append("            <key>UIPrerenderedIcon</key>\n");
+            ipadAlternate.append("            <false/>\n");
+            ipadAlternate.append("        </dict>\n");
         }
         StringBuilder out = new StringBuilder();
         out.append("\n<key>CFBundleIcons</key>\n");
@@ -3185,7 +3203,7 @@ public class IPhoneBuilder extends Executor {
         out.append("    </dict>\n");
         out.append("    <key>CFBundleAlternateIcons</key>\n");
         out.append("    <dict>\n");
-        out.append(alternateIcons);
+        out.append(iphoneAlternate);
         out.append("    </dict>\n");
         out.append("</dict>\n");
         out.append("<key>CFBundleIcons~ipad</key>\n");
@@ -3200,7 +3218,7 @@ public class IPhoneBuilder extends Executor {
         out.append("    </dict>\n");
         out.append("    <key>CFBundleAlternateIcons</key>\n");
         out.append("    <dict>\n");
-        out.append(alternateIcons);
+        out.append(ipadAlternate);
         out.append("    </dict>\n");
         out.append("</dict>\n");
         return out.toString();
@@ -3370,9 +3388,15 @@ public class IPhoneBuilder extends Executor {
                 candidate.delete();
                 continue;
             }
-            createIconFile(new File(resDir, iconName + "60x60@2x.png"), img, 120, 120);
-            createIconFile(new File(resDir, iconName + "60x60@3x.png"), img, 180, 180);
-            createIconFile(new File(resDir, iconName + "76x76@2x~ipad.png"), img, 152, 152);
+            // File names must match the basenames listed in CFBundleIconFiles so iOS
+            // can resolve them via the standard @2x/@3x/~ipad modifiers; the
+            // 83.5x83.5 iPad Pro icon cannot be expressed via modifiers and so
+            // carries the size in the file name and is referenced explicitly in
+            // buildLocalizedIconsPlistFragment.
+            createIconFile(new File(resDir, iconName + "@2x.png"), img, 120, 120);
+            createIconFile(new File(resDir, iconName + "@3x.png"), img, 180, 180);
+            createIconFile(new File(resDir, iconName + "@2x~ipad.png"), img, 152, 152);
+            createIconFile(new File(resDir, iconName + "83.5x83.5@2x~ipad.png"), img, 167, 167);
             localizedIcons.put(iconName, localeKey);
             // Remove the original so it isn't bundled as a stray resource.
             candidate.delete();
