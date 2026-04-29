@@ -17,7 +17,7 @@ Add a Metal-based rendering backend to the iOS port, gated by `#ifdef CN1_USE_ME
 | 2 | Remaining `ExecutableOp`s + parity text + coordinate-system calibration | **complete (modulo flaky tests + image-scaling rasterisation differences)** |
 | 3 | Unify mutable image rendering onto Metal | **activation in progress with thread-local state** |
 | 4 | CoreText glyph atlas | **complete** — landed in commit `4de8cb028` after fixing two MRR autorelease lifetime bugs |
-| 5 | Harden (colour space, drawable throttling, memory, lifecycle) | not started |
+| 5 | Harden (colour space, drawable throttling, memory, lifecycle) | **complete** — landed in commit `e132cde9d` |
 
 ## Phase 2 — Coord fixes, persistent render target, more ops (in progress)
 
@@ -163,6 +163,20 @@ Both bugs reproduced reliably on CI's iPhone 17 Pro sim and on the same sim loca
 Local iteration loop: `scripts/setup-workspace.sh` builds the JDK/Maven toolchain into `${TMPDIR}/codenameone-tools`. After that, `/tmp/local-metal-cycle.sh` runs `build-ios-port.sh → build-ios-app.sh → run-ios-ui-tests.sh` end-to-end on the simulator (~5 min per cycle), giving fast-enough feedback to chase MRR-only failures without 30-min CI round-trips. `IOS_SIM_DESTINATION=platform=iOS Simulator,id=...,name=iPhone 17 Pro` forces the same device CI uses.
 
 Final golden refresh in `fe5972cd1` (39 screenshots updated; max channel delta 4 across all of them — sub-pixel CoreText vs UIKit drawAtPoint differences, well within the comparator's tolerance).
+
+## Phase 5 — Harden (complete)
+
+Landed in commit `e132cde9d`:
+
+- **sRGB colorspace.** `CAMetalLayer.colorspace = kCGColorSpaceSRGB`. Without it, CG-rasterised textures (DeviceRGB-tagged) render brighter on Metal than on the GL/CAEAGLLayer path because the layer treats the bytes as linear-RGB instead of sRGB-encoded.
+- **Drawable cap.** `CAMetalLayer.maximumDrawableCount = 3` (iOS default). Combined with the existing skip-frame guard for `nextDrawable == nil` in `presentFramebuffer`, this keeps the pipeline non-blocking under pressure.
+- **Memory pressure.** `METALView` observes `UIApplicationDidReceiveMemoryWarningNotification` and calls `CN1MetalReleaseCaches`, which drops:
+  - the whole-string text cache (Phase-2 fallback path);
+  - the gradient texture cache;
+  - every per-(font, point-size) glyph atlas (`CN1MetalGlyphAtlasReleaseAll`).
+  Pipeline state cache is *not* cleared — those are precious to rebuild and small. Caches re-fill lazily on the next frame.
+- **Atlas dealloc.** `CN1MetalGlyphAtlas.dealloc` now releases `_fontKey`, `_texture`, and `_slots` (the per-glyph dictionary). Without these, dropping an atlas under memory pressure leaked the 1-2 MB MTLTexture + slot dictionary.
+- **Lifecycle.** Backgrounding/foregrounding rides on the existing `CADisplayLink` lifecycle in `CodenameOne_GLViewController` — UIKit pauses the display link automatically on background, so Metal's `drawFrame` stops being called. Rotation/resize is already handled by `METALView.layoutSubviews` calling `updateFrameBufferSize:`, which tears down any in-flight encoder, recreates the persistent `screenTexture` at the new physical-pixel size, and updates the projection.
 
 ## Phase 0 — Scaffolding (complete)
 
