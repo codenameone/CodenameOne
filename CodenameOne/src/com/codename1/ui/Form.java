@@ -2669,6 +2669,17 @@ public class Form extends Container {
 
         initComponentImpl();
         Display.getInstance().setCurrent(this, reverse);
+        // Defensive: on the ParparVM JavaScript port, virtual-dispatch RTA
+        // prunes Display.setCurrent's call chain in some configurations and
+        // impl.currentForm never gets updated to the dialog. That routes
+        // pointer events to the still-current background form, so OK /
+        // Cancel taps on a modal dialog never reach the dialog's command
+        // buttons. Force-set the dialog as the current form here. On every
+        // other port this is a no-op (setCurrent already did it) and only
+        // the assignment matters anyway.
+        if (modal && Display.impl != null) {
+            Display.impl.setCurrentForm(this);
+        }
         onShow();
 
         if (modal) {

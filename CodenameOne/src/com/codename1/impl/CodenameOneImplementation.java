@@ -338,9 +338,17 @@ public abstract class CodenameOneImplementation {
     public final void initImpl(Object m) {
         init(m);
         if (m != null) {
-            String clsName = m.getClass().getName();
-            int dotIdx = clsName.lastIndexOf('.');
-            packageName = dotIdx >= 0 ? clsName.substring(0, dotIdx) : "";
+            // Defensive: ParparVM JS port surfaces ArrayIndexOutOfBoundsException
+            // here when getName()/lastIndexOf interact with mangled class names.
+            // Failing the whole boot for a packageName lookup is wrong; fall
+            // back to "" if anything throws.
+            try {
+                String clsName = m.getClass().getName();
+                int dotIdx = clsName.lastIndexOf('.');
+                packageName = dotIdx >= 0 ? clsName.substring(0, dotIdx) : "";
+            } catch (Throwable t) {
+                packageName = "";
+            }
         }
         initiailized = true;
     }
