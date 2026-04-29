@@ -15,8 +15,8 @@ import com.codename1.ui.layouts.BorderLayout;
 /// reading the clock land on identical pixels regardless of the runtime.
 public abstract class AbstractAnimationScreenshotTest extends BaseTest {
     private static final int FRAME_COUNT = 6;
-    private static final int GRID_COLS = 2;
-    private static final int GRID_ROWS = 3;
+    protected static final int GRID_COLS = 2;
+    protected static final int GRID_ROWS = 3;
     private static final long ANIM_BASE_TIME = 5_000_000L;
 
     private Form host;
@@ -42,7 +42,7 @@ public abstract class AbstractAnimationScreenshotTest extends BaseTest {
         int height = Math.max(1, host.getHeight());
         Image grid;
         try {
-            grid = buildGrid(width, height);
+            grid = buildScreenshot(width, height);
         } catch (Throwable t) {
             System.out.println("CN1SS:ERR:test=" + getImageName() + " animation_grid_failed=" + t);
             t.printStackTrace();
@@ -51,6 +51,15 @@ public abstract class AbstractAnimationScreenshotTest extends BaseTest {
             AnimationTime.reset();
         }
         Cn1ssDeviceRunnerHelper.emitImage(grid, getImageName(), this::done);
+    }
+
+    /// Build the final screenshot Image. The default implementation runs the
+    /// per-frame grid composition (calling [renderFrame] six times); subclasses
+    /// with a different capture strategy (e.g. composing six in-place animation
+    /// instances onto a single form paint) can override this to skip the
+    /// per-frame loop entirely.
+    protected Image buildScreenshot(int width, int height) {
+        return buildGrid(width, height);
     }
 
     private Image buildGrid(int width, int height) {
@@ -167,7 +176,11 @@ public abstract class AbstractAnimationScreenshotTest extends BaseTest {
     protected void finishCapture() {
     }
 
-    protected abstract void renderFrame(Graphics g, int width, int height, double progress, int frameIndex);
+    /// Paint a single animation frame. Subclasses using the default per-frame
+    /// grid strategy must override this; subclasses overriding [buildScreenshot]
+    /// can leave this as a no-op since the grid loop won't be invoked.
+    protected void renderFrame(Graphics g, int width, int height, double progress, int frameIndex) {
+    }
 
     protected String getImageName() {
         return getClass().getSimpleName();

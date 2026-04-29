@@ -6,165 +6,196 @@ import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
+import com.codename1.ui.animations.AnimationTime;
 import com.codename1.ui.animations.ComponentAnimation;
 import com.codename1.ui.animations.Transition;
+import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
-import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.plaf.Style;
 
-/// Drives a component-scoped `Container.replace` transition through six
-/// deterministic frames focused on just the card being replaced - the
-/// surrounding form chrome is rendered only as context for the transition's
-/// absolute coordinates and is then cropped out before the cell is composed.
-/// Frame 0 paints the source card directly (pre-animation), the last frame
-/// paints the destination card directly (post-animation), and the four middle
-/// frames render the transition at evenly spaced progress.
+/// Component-scoped `Container.replace` screenshot tests.
+///
+/// The composite is built in one paint, not six. We assemble a host form whose
+/// content pane is itself a `GridLayout(GRID_ROWS, GRID_COLS)` with six
+/// independent slots. Each slot owns its own `currentCard` / `nextCard` /
+/// `Transition` triple. By staggering each transition's start time via
+/// [AnimationTime] before triggering its first `updateAnimationState`, every
+/// transition can run "in parallel" yet land on a different progress fraction
+/// (0%, 20%, 40%, 60%, 80%, 100%) when the global clock is set to a single
+/// shared end time. The resulting screenshot is a single paint of the form
+/// with the four mid-progress transitions overlaid - no per-cell capture and
+/// no scaling.
+///
+/// Frame 0 paints just the source card (no transition wired), the last frame
+/// paints just the destination card, and the four middle frames render the
+/// source card with the transition overlaid at the appropriate progress.
 public abstract class AbstractComponentReplaceScreenshotTest extends AbstractAnimationScreenshotTest {
+    private static final int FRAME_COUNT = 6;
     private static final int LAST_FRAME_INDEX = 5;
 
     private Form replaceHost;
-    private Container slot;
-    private Component currentCard;
-    private Component nextCard;
-    private Transition transition;
-    private ComponentAnimation replaceAnim;
+    private final Container[] slots = new Container[FRAME_COUNT];
+    private final Component[] currentCards = new Component[FRAME_COUNT];
+    private final Component[] nextCards = new Component[FRAME_COUNT];
+    private final Transition[] transitions = new Transition[FRAME_COUNT];
+    private final ComponentAnimation[] anims = new ComponentAnimation[FRAME_COUNT];
 
     protected abstract Transition createTransition(int duration);
 
     /// Build the component being replaced. Default returns a coloured "Before"
-    /// card; override for a different layout or content.
+    /// card; override for a different layout or content. A fresh instance must
+    /// be returned every call because each cell needs its own independent
+    /// component graph.
     protected Component buildCurrentCard() {
         return makeCard("Before", 0x1f4068, 0xffffff);
     }
 
-    /// Build the replacement component. Default returns a coloured "After" card.
+    /// Build the replacement component. Default returns a coloured "After"
+    /// card. As with [buildCurrentCard] a new instance must be returned every
+    /// call.
     protected Component buildNextCard() {
         return makeCard("After", 0x9c1d1d, 0xffffff);
     }
 
     private static Container makeCard(String label, int bgColor, int fgColor) {
-        Container card = new Container(BoxLayout.y());
+        // GridLayout(3, 1) splits the cell vertically into three equal bands so
+        // the heading/body/footer stay visually balanced no matter what aspect
+        // ratio the host's grid cell turns out to be.
+        Container card = new Container(new GridLayout(3, 1));
         Style cs = card.getAllStyles();
         cs.setBgColor(bgColor);
         cs.setBgTransparency(255);
-        cs.setPadding(18, 18, 18, 18);
-        cs.setMargin(8, 8, 8, 8);
+        cs.setPadding(16, 16, 14, 14);
+        cs.setMargin(6, 6, 6, 6);
+
         Label heading = new Label(label);
         heading.getAllStyles().setFgColor(fgColor);
-        Label body = new Label("Card content");
-        body.getAllStyles().setFgColor(fgColor);
         card.add(heading);
+
+        Label body = new Label("Card body");
+        body.getAllStyles().setFgColor(fgColor);
         card.add(body);
+
+        Label footer = new Label("Tap to act");
+        footer.getAllStyles().setFgColor(fgColor);
+        card.add(footer);
         return card;
     }
 
     @Override
-    protected void prepareCapture(int frameWidth, int frameHeight) {
-        super.prepareCapture(frameWidth, frameHeight);
-        replaceHost = new Form("Component Replace");
-        replaceHost.setLayout(new BorderLayout());
-        replaceHost.setWidth(frameWidth);
-        replaceHost.setHeight(frameHeight);
+    protected Image buildScreenshot(int width, int height) {
+        replaceHost = new Form();
+        replaceHost.setWidth(width);
+        replaceHost.setHeight(height);
         replaceHost.setVisible(true);
+        // Strip the title chrome so the content pane fills the entire form,
+        // making each grid cell exactly width/GRID_COLS x height/GRID_ROWS.
+        stripFormChrome(replaceHost);
+        replaceHost.setLayout(new GridLayout(GRID_ROWS, GRID_COLS));
 
-        Container chrome = new Container(BoxLayout.y());
-        Style chromeStyle = chrome.getAllStyles();
-        chromeStyle.setBgColor(0xeeeeee);
-        chromeStyle.setBgTransparency(255);
-        chromeStyle.setPadding(8, 8, 8, 8);
-        Label header = new Label("Static surroundings");
-        header.getAllStyles().setFgColor(0x222222);
-        chrome.add(header);
+        // Bookend cells (frame 0 and frame LAST) skip the transition entirely:
+        // frame 0 just shows the source card, frame LAST just shows the
+        // destination card. Middle cells start with the source card and the
+        // transition will be overlaid at paint time.
+        for (int i = 0; i < FRAME_COUNT; i++) {
+            slots[i] = new Container(new BorderLayout());
+            Style slotStyle = slots[i].getAllStyles();
+            slotStyle.setBgColor(0xffffff);
+            slotStyle.setBgTransparency(255);
 
-        slot = new Container(new BorderLayout());
-        Style slotStyle = slot.getAllStyles();
-        slotStyle.setBgColor(0xffffff);
-        slotStyle.setBgTransparency(255);
-
-        currentCard = buildCurrentCard();
-        slot.add(BorderLayout.CENTER, currentCard);
-        chrome.add(slot);
-
-        Label footer = new Label("Footer stays put");
-        footer.getAllStyles().setFgColor(0x222222);
-        chrome.add(footer);
-
-        replaceHost.add(BorderLayout.CENTER, chrome);
+            if (i == LAST_FRAME_INDEX) {
+                nextCards[i] = buildNextCard();
+                slots[i].add(BorderLayout.CENTER, nextCards[i]);
+            } else {
+                currentCards[i] = buildCurrentCard();
+                slots[i].add(BorderLayout.CENTER, currentCards[i]);
+            }
+            replaceHost.add(slots[i]);
+        }
         replaceHost.layoutContainer();
 
-        nextCard = buildNextCard();
-        transition = createTransition(getAnimationDurationMillis());
-        // createReplaceTransition wires nextCard's parent to slot internally
-        // (setParent is package-private) and returns a ComponentAnimation we
-        // can drive frame-by-frame instead of letting the manager run it.
-        replaceAnim = slot.createReplaceTransition(currentCard, nextCard, transition);
-    }
+        int duration = getAnimationDurationMillis();
+        long endTime = getAnimationStartTime() + duration;
 
-    @Override
-    protected void renderFrame(Graphics g, int width, int height, double progress, int frameIndex) {
-        int cardW = Math.max(1, currentCard.getWidth());
-        int cardH = Math.max(1, currentCard.getHeight());
-        int cardAbsX = currentCard.getAbsoluteX();
-        int cardAbsY = currentCard.getAbsoluteY();
+        // Stagger each middle cell's transition start time so that, when the
+        // shared clock is later parked at endTime, each motion has elapsed
+        // exactly progress * duration. Initialising while the clock is at
+        // startTime[i] makes Motion.start() (called lazily inside
+        // TransitionAnimation.updateState's first call) capture that value as
+        // its baseline.
+        for (int i = 1; i < LAST_FRAME_INDEX; i++) {
+            double progress = (double) i / (double) (FRAME_COUNT - 1);
+            long startTime = endTime - (long) Math.round(progress * (double) duration);
+            AnimationTime.setTime(startTime);
 
-        // Render the card-sized region into a temp image. We translate the
-        // graphics so anything painted at the card's absolute coords lands at
-        // (0, 0) in this buffer; the result is a tightly cropped screenshot
-        // of just the swapped component instead of the whole form.
-        Image cardImg = Image.createImage(cardW, cardH, 0xffffffff);
-        Graphics cg = cardImg.getGraphics();
-        cg.setColor(0xffffff);
-        cg.fillRect(0, 0, cardW, cardH);
-        cg.translate(-cardAbsX, -cardAbsY);
-
-        if (frameIndex == 0) {
-            // Pre-animation: pure source card.
-            currentCard.paintComponent(cg, true);
-        } else if (frameIndex == LAST_FRAME_INDEX) {
-            // Post-animation: pure destination card.
-            nextCard.paintComponent(cg, true);
-        } else {
-            if (replaceAnim != null) {
-                // First call lazily invokes Transition.init / initTransition;
-                // subsequent calls advance Transition.animate using AnimationTime.
-                replaceAnim.updateAnimationState();
-            }
-            // The transition expects the surrounding container background to
-            // already be drawn; paint the slot first so we don't see whatever
-            // the previous frame left in the buffer leaking through.
-            slot.paintComponent(cg, true);
-            if (transition != null) {
-                transition.paint(cg);
+            nextCards[i] = buildNextCard();
+            transitions[i] = createTransition(duration);
+            anims[i] = slots[i].createReplaceTransition(currentCards[i], nextCards[i], transitions[i]);
+            if (anims[i] != null) {
+                // Lazily invokes Transition.init / initTransition.
+                anims[i].updateAnimationState();
             }
         }
 
-        // Scale the cropped card up to fill the grid frame so the action is
-        // legible inside its small cell.
-        if (cardW == width && cardH == height) {
-            g.drawImage(cardImg, 0, 0);
-        } else {
-            Image scaled = cardImg.scaled(width, height);
-            g.drawImage(scaled, 0, 0);
-            scaled.dispose();
+        // Park the global clock at endTime so each motion advances to its
+        // pre-staged progress fraction in a single call.
+        AnimationTime.setTime(endTime);
+        for (int i = 1; i < LAST_FRAME_INDEX; i++) {
+            if (anims[i] != null) {
+                anims[i].updateAnimationState();
+            }
         }
-        cardImg.dispose();
+
+        Image screenshot = Image.createImage(width, height, 0xffffffff);
+        Graphics g = screenshot.getGraphics();
+        // Single full-form paint - the cells are already sized correctly by
+        // GridLayout and will be drawn at native resolution.
+        replaceHost.paintComponent(g, true);
+
+        // Container.paint doesn't paint cmpTransitions automatically (those
+        // normally render via Display.repaint(t) in the running app); since
+        // we're not in the live paint loop we have to overlay each transition
+        // ourselves. Each transition.paint() uses its own source.absoluteX/Y
+        // so they land on the correct cell.
+        for (int i = 1; i < LAST_FRAME_INDEX; i++) {
+            if (transitions[i] != null) {
+                transitions[i].paint(g);
+            }
+        }
+
+        cleanupTransitions();
+        return screenshot;
     }
 
-    @Override
-    protected void finishCapture() {
-        if (transition != null) {
-            try {
-                transition.cleanup();
-            } catch (Throwable ignore) {
-                // best effort cleanup
+    private void cleanupTransitions() {
+        for (int i = 0; i < FRAME_COUNT; i++) {
+            if (transitions[i] != null) {
+                try {
+                    transitions[i].cleanup();
+                } catch (Throwable ignore) {
+                    // best effort
+                }
+                transitions[i] = null;
             }
+            slots[i] = null;
+            currentCards[i] = null;
+            nextCards[i] = null;
+            anims[i] = null;
         }
         replaceHost = null;
-        slot = null;
-        currentCard = null;
-        nextCard = null;
-        transition = null;
-        replaceAnim = null;
-        super.finishCapture();
+    }
+
+    private static void stripFormChrome(Form form) {
+        Container titleArea = form.getTitleArea();
+        titleArea.removeAll();
+        titleArea.setVisible(false);
+        titleArea.setPreferredSize(new Dimension(0, 0));
+        Style titleStyle = titleArea.getAllStyles();
+        titleStyle.setPadding(0, 0, 0, 0);
+        titleStyle.setMargin(0, 0, 0, 0);
+        Style contentStyle = form.getContentPane().getAllStyles();
+        contentStyle.setPadding(0, 0, 0, 0);
+        contentStyle.setMargin(0, 0, 0, 0);
     }
 }
