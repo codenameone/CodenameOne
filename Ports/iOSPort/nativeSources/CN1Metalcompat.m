@@ -1132,4 +1132,32 @@ BOOL CN1MetalReadMutableImagePixels(GLUIImage *image, int *outARGB,
     return YES;
 }
 
+// --------------- Memory-pressure cache release ---------------
+//
+// METALView observes UIApplicationDidReceiveMemoryWarning and calls
+// this. We drop the lazy texture caches (whole-string text, gradient,
+// per-(font,size) glyph atlases) but keep the pipeline state cache —
+// rebuilding pipelines is expensive and they're tiny. The screen
+// texture stays too; updateFrameBufferSize: handles its replacement
+// on resize. Cleared caches re-fill on demand on the next frame.
+
+extern void CN1MetalGlyphAtlasReleaseAll(void);
+
+void CN1MetalReleaseCaches(void) {
+    for (int i = 0; i < textCacheCount; i++) {
+        textCache[i].key = nil;
+        textCache[i].texture = nil;
+    }
+    textCacheCount = 0;
+    textCacheNextEvict = 0;
+
+    for (int i = 0; i < gradCacheCount; i++) {
+        gradCache[i].texture = nil;
+    }
+    gradCacheCount = 0;
+    gradCacheNextEvict = 0;
+
+    CN1MetalGlyphAtlasReleaseAll();
+}
+
 #endif /* CN1_USE_METAL */

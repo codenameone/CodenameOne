@@ -138,18 +138,51 @@ extern BOOL isRetinaBug();
         metalLayer.opaque = TRUE;
         metalLayer.pixelFormat = MTLPixelFormatBGRA8Unorm;
         metalLayer.framebufferOnly = YES;
+        // sRGB colourspace so colours match the GL path's CAEAGLLayer
+        // output. Without this, CG-rasterised images and gradients
+        // (DeviceRGB-tagged in their CGBitmapContext) display slightly
+        // brighter on Metal because the layer treats their bytes as
+        // linear-RGB instead of sRGB-encoded.
+        CGColorSpaceRef cs = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
+        if (cs != NULL) {
+            metalLayer.colorspace = cs;
+            CGColorSpaceRelease(cs);
+        }
+        // Cap drawable pool to 3 so the GPU has at most one render in
+        // flight while CPU prepares the next two. Higher counts trade
+        // smoothness for latency and memory; 3 is the iOS default for
+        // most CAMetalLayer use cases. Combined with our nextDrawable
+        // skip-frame fallback in presentFramebuffer this keeps the
+        // pipeline non-blocking under pressure.
+        metalLayer.maximumDrawableCount = 3;
         // `makeCommandQueue` is the Swift name; Objective-C uses `newCommandQueue`.
         self.commandQueue = [metalLayer.device newCommandQueue];
         CGSize sz = self.bounds.size;
         CGFloat s = self.contentScaleFactor;
         [self updateFrameBufferSize:(int)(sz.width * s) h:(int)(sz.height * s)];
+
+        // Drop the glyph atlas + text cache + gradient cache on memory
+        // pressure. Pipeline state cache stays — those are precious to
+        // rebuild and small. The screen texture also stays; updateFrame-
+        // BufferSize: handles its replacement on resize.
+        [[NSNotificationCenter defaultCenter]
+            addObserver:self
+               selector:@selector(memoryWarning)
+                   name:UIApplicationDidReceiveMemoryWarningNotification
+                 object:nil];
     }
 
     return self;
 }
 
+- (void)memoryWarning {
+    extern void CN1MetalReleaseCaches(void);
+    CN1MetalReleaseCaches();
+}
+
 - (void)dealloc
 {
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
 #ifndef CN1_USE_ARC
     [super dealloc];
 #endif

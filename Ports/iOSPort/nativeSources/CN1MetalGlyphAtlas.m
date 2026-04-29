@@ -123,6 +123,17 @@ static int                     atlasCacheCount = 0;
         CFRelease(_ctFont);
         _ctFont = NULL;
     }
+    // Non-ARC: release the +1 retains held by these ivars. _fontKey was
+    // [key copy] (+1), _texture was [device newTextureWithDescriptor:]
+    // (the "new" prefix returns +1), _slots was [[NSMutableDictionary
+    // alloc] init] (+1). Without these releases the MTLTexture and slot
+    // dictionary leak each time CN1MetalReleaseCaches drops an atlas.
+    [_fontKey release]; _fontKey = nil;
+    [_texture release]; _texture = nil;
+    [_slots release];   _slots = nil;
+#ifndef CN1_USE_ARC
+    [super dealloc];
+#endif
 }
 
 - (id<MTLTexture>)texture { return _texture; }
@@ -257,5 +268,20 @@ static int                     atlasCacheCount = 0;
 }
 
 @end
+
+// Drop every cached atlas. Called by CN1MetalReleaseCaches on
+// UIApplicationDidReceiveMemoryWarning. Each entry's key (NSString,
+// retained via [copy]) and atlas (CN1MetalGlyphAtlas, retained via the
+// alloc/init +1 transferred in atlasForFont:) own +1 retains under
+// MRR; release them explicitly. Subsequent lookups re-create on demand.
+void CN1MetalGlyphAtlasReleaseAll(void) {
+    for (int i = 0; i < atlasCacheCount; i++) {
+        [atlasCacheEntries[i].key release];
+        [atlasCacheEntries[i].atlas release];
+        atlasCacheEntries[i].key = nil;
+        atlasCacheEntries[i].atlas = nil;
+    }
+    atlasCacheCount = 0;
+}
 
 #endif // CN1_USE_METAL
