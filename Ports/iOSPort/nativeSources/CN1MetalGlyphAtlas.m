@@ -104,7 +104,13 @@ static int                     atlasCacheCount = 0;
         return nil;
     }
 
-    _slots = [NSMutableDictionary dictionary];
+    // alloc+init (NOT [NSMutableDictionary dictionary]) so the +1 retain
+    // is owned by us and survives the next autorelease pool drain. This
+    // file builds without ARC and direct ivar assignment doesn't auto-
+    // retain. Same bug as the static atlasCache had — discovered when
+    // CI hung at the runs loop in CN1MetalDrawString because slotForGlyph
+    // dereferenced a deallocated _slots dictionary.
+    _slots = [[NSMutableDictionary alloc] init];
     _shelfY = CN1_METAL_ATLAS_PADDING;
     _shelfHeight = 0;
     _cursorX = CN1_METAL_ATLAS_PADDING;
