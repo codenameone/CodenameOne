@@ -34,11 +34,6 @@ import com.codenameone.examples.hellocodenameone.tests.graphics.TransformRotatio
 import com.codenameone.examples.hellocodenameone.tests.graphics.TransformTranslation;
 import com.codenameone.examples.hellocodenameone.tests.accessibility.AccessibilityTest;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
 
 public final class Cn1ssDeviceRunner extends DeviceRunner {
     // Previously 30_000. In the JavaScript port each test's onShowCompleted -> UITimer
@@ -52,40 +47,34 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     private static final int TEST_TIMEOUT_MS = 10000;
     private static final int TEST_POLL_INTERVAL_MS = 50;
 
-    private static final BaseTest[] DEFAULT_TEST_CLASSES = buildDefaultTestClasses();
-
-    /// Builds the default test list. Animation/transition tests fail to build
-    /// on the JavaScript port today (the bytecode->JS translator doesn't yet
-    /// handle some of the new AnimationTime-driven flows); skip instantiating
-    /// them on HTML5 entirely so the JS suite isn't blocked. Address the port
-    /// issue in a follow-up so this branch can be removed.
-    private static BaseTest[] buildDefaultTestClasses() {
-        boolean isHtml5 = "HTML5".equals(Display.getInstance().getPlatformName());
-        List<BaseTest> tests = new ArrayList<>();
-        tests.add(new MainScreenScreenshotTest());
-        if (!isHtml5) {
+    // Calling Display.getInstance() at static-init time was tripping the iOS
+    // class loader (Cn1ssDeviceRunner failed to load before runSuite could
+    // log a single starting test=...). Keep the array as a plain literal -
+    // every test ends up in the jar regardless, and the platform-specific
+    // skipping is handled at runtime by shouldForceTimeoutInHtml5 below.
+    private static final BaseTest[] DEFAULT_TEST_CLASSES = new BaseTest[]{
+            new MainScreenScreenshotTest(),
             // Animation/transition grid tests: each emits a 2x3 frame grid driven
             // by the AnimationTime override so iOS/Android/JavaSE produce identical
-            // pixels regardless of wall-clock pacing.
-            tests.add(new SlideHorizontalTransitionTest());
-            tests.add(new SlideHorizontalBackTransitionTest());
-            tests.add(new SlideVerticalTransitionTest());
-            tests.add(new SlideFadeTitleTransitionTest());
-            tests.add(new CoverHorizontalTransitionTest());
-            tests.add(new UncoverHorizontalTransitionTest());
-            tests.add(new FadeTransitionTest());
-            tests.add(new FlipTransitionTest());
-            tests.add(new AnimateLayoutScreenshotTest());
-            tests.add(new AnimateHierarchyScreenshotTest());
-            tests.add(new AnimateUnlayoutScreenshotTest());
-            tests.add(new SmoothScrollScreenshotTest());
-            tests.add(new TensileBounceScreenshotTest());
-            tests.add(new ComponentReplaceFadeScreenshotTest());
-            tests.add(new ComponentReplaceSlideScreenshotTest());
-            tests.add(new ComponentReplaceFlipScreenshotTest());
-            tests.add(new MotionShowcaseScreenshotTest());
-        }
-        BaseTest[] rest = new BaseTest[]{
+            // pixels regardless of wall-clock pacing. Skipped on HTML5 via the
+            // HTML5_SKIP_TESTS set.
+            new SlideHorizontalTransitionTest(),
+            new SlideHorizontalBackTransitionTest(),
+            new SlideVerticalTransitionTest(),
+            new SlideFadeTitleTransitionTest(),
+            new CoverHorizontalTransitionTest(),
+            new UncoverHorizontalTransitionTest(),
+            new FadeTransitionTest(),
+            new FlipTransitionTest(),
+            new AnimateLayoutScreenshotTest(),
+            new AnimateHierarchyScreenshotTest(),
+            new AnimateUnlayoutScreenshotTest(),
+            new SmoothScrollScreenshotTest(),
+            new TensileBounceScreenshotTest(),
+            new ComponentReplaceFadeScreenshotTest(),
+            new ComponentReplaceSlideScreenshotTest(),
+            new ComponentReplaceFlipScreenshotTest(),
+            new MotionShowcaseScreenshotTest(),
             new DrawLine(),
             new FillRect(),
             new DrawRect(),
@@ -150,12 +139,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new LocalNotificationOverrideTest(),
             new Base64NativePerformanceTest(),
             new AccessibilityTest()
-        };
-        for (BaseTest t : rest) {
-            tests.add(t);
-        }
-        return tests.toArray(new BaseTest[0]);
-    }
+    };
 
     private static BaseTest prependedTest;
 
@@ -202,117 +186,125 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
         });
     }
 
-    private static final Set<String> HTML5_SKIP_TESTS = buildHtml5SkipTests();
+    private boolean shouldForceTimeoutInHtml5(String testName) {
+        if (!"HTML5".equals(Display.getInstance().getPlatformName())) {
+            return false;
+        }
+        // The list is intentionally an inline `||` chain rather than a static
+        // HashSet/Set field. Earlier revisions of this file used a static
+        // collection initialised via a static method call (or a method-call
+        // initializer for DEFAULT_TEST_CLASSES); both broke iOS class loading
+        // - Cn1ssDeviceRunner failed to load before runSuite() could even log
+        // a single starting test=... entry, leaving the suite to time out at
+        // the 300s end-marker deadline. Keep all skip lookups inline to avoid
+        // triggering the same static-init failure path.
+        return isJsSkippedNativeTest(testName)
+                || isJsSkippedThemeTest(testName)
+                || isJsSkippedAnimationTest(testName)
+                || isJsSkippedScreenshotTest(testName);
+    }
 
-    private static Set<String> buildHtml5SkipTests() {
-        Set<String> set = new HashSet<>();
-        set.addAll(Arrays.asList(
-                // Native APIs that aren't wired on the JavaScript port.
-                "MediaPlaybackScreenshotTest",
-                "BytecodeTranslatorRegressionTest",
-                "BackgroundThreadUiAccessTest",
-                "VPNDetectionAPITest",
-                "CallDetectionAPITest",
-                "LocalNotificationOverrideTest",
-                "Base64NativePerformanceTest",
-                "AccessibilityTest"
-        ));
+    private static boolean isJsSkippedNativeTest(String testName) {
+        // Native APIs that aren't wired on the JavaScript port.
+        return "MediaPlaybackScreenshotTest".equals(testName)
+                || "BytecodeTranslatorRegressionTest".equals(testName)
+                || "BackgroundThreadUiAccessTest".equals(testName)
+                || "VPNDetectionAPITest".equals(testName)
+                || "CallDetectionAPITest".equals(testName)
+                || "LocalNotificationOverrideTest".equals(testName)
+                || "Base64NativePerformanceTest".equals(testName)
+                || "AccessibilityTest".equals(testName);
+    }
+
+    private static boolean isJsSkippedThemeTest(String testName) {
         // The native-theme fidelity tests (each emits a light+dark PNG pair)
         // matter for iOS/Android/JavaSE where the user actually looks at
         // visual output. The JS port run has a tight 150s browser-lifetime
         // budget that doesn't accommodate another 13 x 2 captures; skip them
         // here. Re-enable selectively when we move the JS port to a
         // longer-lived harness.
-        set.addAll(Arrays.asList(
-                "ButtonThemeScreenshotTest",
-                "TextFieldThemeScreenshotTest",
-                "CheckBoxRadioThemeScreenshotTest",
-                "SwitchThemeScreenshotTest",
-                "PickerThemeScreenshotTest",
-                "ToolbarThemeScreenshotTest",
-                "TabsThemeScreenshotTest",
-                "MultiButtonThemeScreenshotTest",
-                "ListThemeScreenshotTest",
-                "DialogThemeScreenshotTest",
-                "FloatingActionButtonThemeScreenshotTest",
-                "SpanLabelThemeScreenshotTest",
-                "DarkLightShowcaseThemeScreenshotTest",
-                "PaletteOverrideThemeScreenshotTest"
-        ));
+        return "ButtonThemeScreenshotTest".equals(testName)
+                || "TextFieldThemeScreenshotTest".equals(testName)
+                || "CheckBoxRadioThemeScreenshotTest".equals(testName)
+                || "SwitchThemeScreenshotTest".equals(testName)
+                || "PickerThemeScreenshotTest".equals(testName)
+                || "ToolbarThemeScreenshotTest".equals(testName)
+                || "TabsThemeScreenshotTest".equals(testName)
+                || "MultiButtonThemeScreenshotTest".equals(testName)
+                || "ListThemeScreenshotTest".equals(testName)
+                || "DialogThemeScreenshotTest".equals(testName)
+                || "FloatingActionButtonThemeScreenshotTest".equals(testName)
+                || "SpanLabelThemeScreenshotTest".equals(testName)
+                || "DarkLightShowcaseThemeScreenshotTest".equals(testName)
+                || "PaletteOverrideThemeScreenshotTest".equals(testName);
+    }
+
+    private static boolean isJsSkippedAnimationTest(String testName) {
         // Animation grid tests render six full-form frames each. They exceed
         // the JS port's 150s browser-lifetime budget and the value is already
         // covered on iOS/Android/JavaSE.
-        set.addAll(Arrays.asList(
-                "SlideHorizontalTransitionTest",
-                "SlideHorizontalBackTransitionTest",
-                "SlideVerticalTransitionTest",
-                "SlideFadeTitleTransitionTest",
-                "CoverHorizontalTransitionTest",
-                "UncoverHorizontalTransitionTest",
-                "FadeTransitionTest",
-                "FlipTransitionTest",
-                "AnimateLayoutScreenshotTest",
-                "AnimateHierarchyScreenshotTest",
-                "AnimateUnlayoutScreenshotTest",
-                "SmoothScrollScreenshotTest",
-                "TensileBounceScreenshotTest",
-                "ComponentReplaceFadeScreenshotTest",
-                "ComponentReplaceSlideScreenshotTest",
-                "ComponentReplaceFlipScreenshotTest",
-                "MotionShowcaseScreenshotTest"
-        ));
+        return "SlideHorizontalTransitionTest".equals(testName)
+                || "SlideHorizontalBackTransitionTest".equals(testName)
+                || "SlideVerticalTransitionTest".equals(testName)
+                || "SlideFadeTitleTransitionTest".equals(testName)
+                || "CoverHorizontalTransitionTest".equals(testName)
+                || "UncoverHorizontalTransitionTest".equals(testName)
+                || "FadeTransitionTest".equals(testName)
+                || "FlipTransitionTest".equals(testName)
+                || "AnimateLayoutScreenshotTest".equals(testName)
+                || "AnimateHierarchyScreenshotTest".equals(testName)
+                || "AnimateUnlayoutScreenshotTest".equals(testName)
+                || "SmoothScrollScreenshotTest".equals(testName)
+                || "TensileBounceScreenshotTest".equals(testName)
+                || "ComponentReplaceFadeScreenshotTest".equals(testName)
+                || "ComponentReplaceSlideScreenshotTest".equals(testName)
+                || "ComponentReplaceFlipScreenshotTest".equals(testName)
+                || "MotionShowcaseScreenshotTest".equals(testName);
+    }
+
+    private static boolean isJsSkippedScreenshotTest(String testName) {
         // Screenshot-emitting tests whose chunk streams the JS port truncates
         // under logcat-style line drops. The Cn1ssChunkTools gap-detection
         // (added in 963dd5af "Improved image emission") correctly fails these
-        // captures because the reassembled PNG is missing bytes; this skip is
-        // the test infrastructure refusing to attempt them on HTML5 until the
-        // port emits chunks reliably. The validation stays on iOS/Android so
-        // dropped chunks still surface as failures there.
-        set.addAll(Arrays.asList(
-                "KotlinUiTest",
-                "MainScreenScreenshotTest",
-                "SheetScreenshotTest",
-                "ImageViewerNavigationScreenshotTest",
-                "TabsScreenshotTest",
-                "TextAreaAlignmentScreenshotTest",
-                "ToastBarTopPositionScreenshotTest",
-                "ValidatorLightweightPickerScreenshotTest",
-                "LightweightPickerButtonsScreenshotTest",
+        // captures because the reassembled PNG is missing bytes; this skip
+        // refuses to attempt them on HTML5 until the port emits chunks
+        // reliably. The validation stays on iOS/Android so dropped chunks
+        // still surface as failures there.
+        return "KotlinUiTest".equals(testName)
+                || "MainScreenScreenshotTest".equals(testName)
+                || "SheetScreenshotTest".equals(testName)
+                || "ImageViewerNavigationScreenshotTest".equals(testName)
+                || "TabsScreenshotTest".equals(testName)
+                || "TextAreaAlignmentScreenshotTest".equals(testName)
+                || "ToastBarTopPositionScreenshotTest".equals(testName)
+                || "ValidatorLightweightPickerScreenshotTest".equals(testName)
+                || "LightweightPickerButtonsScreenshotTest".equals(testName)
                 // graphics tests
-                "AffineScale",
-                "Clip",
-                "DrawArc",
-                "DrawGradient",
-                "DrawImage",
-                "DrawLine",
-                "DrawRect",
-                "DrawRoundRect",
-                "DrawShape",
-                "DrawString",
-                "DrawStringDecorated",
-                "FillArc",
-                "FillPolygon",
-                "FillRect",
-                "FillRoundRect",
-                "FillShape",
-                "FillTriangle",
-                "Rotate",
-                "Scale",
-                "StrokeTest",
-                "TileImage",
-                "TransformCamera",
-                "TransformPerspective",
-                "TransformRotation",
-                "TransformTranslation"
-        ));
-        return set;
-    }
-
-    private boolean shouldForceTimeoutInHtml5(String testName) {
-        if (!"HTML5".equals(Display.getInstance().getPlatformName())) {
-            return false;
-        }
-        return HTML5_SKIP_TESTS.contains(testName);
+                || "AffineScale".equals(testName)
+                || "Clip".equals(testName)
+                || "DrawArc".equals(testName)
+                || "DrawGradient".equals(testName)
+                || "DrawImage".equals(testName)
+                || "DrawLine".equals(testName)
+                || "DrawRect".equals(testName)
+                || "DrawRoundRect".equals(testName)
+                || "DrawShape".equals(testName)
+                || "DrawString".equals(testName)
+                || "DrawStringDecorated".equals(testName)
+                || "FillArc".equals(testName)
+                || "FillPolygon".equals(testName)
+                || "FillRect".equals(testName)
+                || "FillRoundRect".equals(testName)
+                || "FillShape".equals(testName)
+                || "FillTriangle".equals(testName)
+                || "Rotate".equals(testName)
+                || "Scale".equals(testName)
+                || "StrokeTest".equals(testName)
+                || "TileImage".equals(testName)
+                || "TransformCamera".equals(testName)
+                || "TransformPerspective".equals(testName)
+                || "TransformRotation".equals(testName)
+                || "TransformTranslation".equals(testName);
     }
 
     private void awaitTestCompletion(int index, BaseTest testClass, String testName, long deadline) {
