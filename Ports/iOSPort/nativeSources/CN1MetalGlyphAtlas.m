@@ -22,7 +22,17 @@
 
 extern id<MTLDevice> CN1MetalDevice(void);
 
-static NSMutableDictionary<NSString *, CN1MetalGlyphAtlas *> *atlasCache = nil;
+// Simple fixed-size array cache (linear scan). Replaced an
+// NSMutableDictionary that was hanging on CI's iPhone 17 Pro sim during
+// the second lookup of the same key — issue reproduced with diagnostic
+// logging in commit 330fcdc10. Linear scan over <=16 entries is fine.
+#define CN1_METAL_ATLAS_CACHE_MAX 16
+typedef struct {
+    NSString             *key;
+    CN1MetalGlyphAtlas   *atlas;
+} CN1MetalAtlasCacheEntry;
+static CN1MetalAtlasCacheEntry atlasCacheEntries[CN1_METAL_ATLAS_CACHE_MAX];
+static int                     atlasCacheCount = 0;
 
 @implementation CN1MetalGlyphSlot
 @end
@@ -44,42 +54,43 @@ static NSMutableDictionary<NSString *, CN1MetalGlyphAtlas *> *atlasCache = nil;
 @implementation CN1MetalGlyphAtlas
 
 + (nullable instancetype)atlasForFont:(nonnull UIFont *)font {
-    static int s_top = 0;
-    if (s_top < 100) { NSLog(@"CN1SS:METAL_DIAG atlasForFont top #%d", s_top); s_top++; }
-    if (atlasCache == nil) atlasCache = [NSMutableDictionary dictionary];
-    static int s_keyPre = 0;
-    if (s_keyPre < 100) { NSLog(@"CN1SS:METAL_DIAG atlasForFont keyPre #%d fontName=%@ pt=%g", s_keyPre, font.fontName, (double)font.pointSize); s_keyPre++; }
     NSString *key = [NSString stringWithFormat:@"%@|%g", font.fontName, (double)font.pointSize];
-    static int s_keyPost = 0;
-    if (s_keyPost < 100) { NSLog(@"CN1SS:METAL_DIAG atlasForFont keyPost #%d key=%@", s_keyPost, key); s_keyPost++; }
-    CN1MetalGlyphAtlas *cached = atlasCache[key];
-    static int s_lookup = 0;
-    if (s_lookup < 100) { NSLog(@"CN1SS:METAL_DIAG atlasForFont lookup #%d hit=%d", s_lookup, cached != nil); s_lookup++; }
-    if (cached != nil) return cached;
-    NSLog(@"CN1SS:METAL_DIAG atlasForFont enter key=%@", key);
+    for (int i = 0; i < atlasCacheCount; i++) {
+        if ([atlasCacheEntries[i].key isEqualToString:key]) {
+            return atlasCacheEntries[i].atlas;
+        }
+    }
+    if (atlasCacheCount >= CN1_METAL_ATLAS_CACHE_MAX) return nil;
     CN1MetalGlyphAtlas *fresh = [[CN1MetalGlyphAtlas alloc] initWithFont:font key:key];
-    NSLog(@"CN1SS:METAL_DIAG atlasForFont %@ key=%@", fresh ? @"created" : @"FAILED", key);
     if (fresh == nil) return nil;
-    atlasCache[key] = fresh;
+    // Note: this file builds without ARC (cn1's iOS port keeps
+    // CLANG_ENABLE_OBJC_ARC=NO; see METALView.m's #ifndef CN1_USE_ARC).
+    // The static C-struct pointers therefore do NOT auto-retain — we
+    // own a strong reference to each cached entry by transferring the
+    // alloc/init +1 (for `fresh`) and the [copy] +1 (for `key`)
+    // straight into the cache. The previous NSMutableDictionary cache
+    // hung on its second lookup because the dictionary itself, created
+    // via [NSMutableDictionary dictionary] (autoreleased), was
+    // deallocated when the autorelease pool drained between frames.
+    atlasCacheEntries[atlasCacheCount].key = [key copy];
+    atlasCacheEntries[atlasCacheCount].atlas = fresh;
+    atlasCacheCount++;
     return fresh;
 }
 
 - (instancetype)initWithFont:(UIFont *)uifont key:(NSString *)key {
     self = [super init];
     if (self == nil) return nil;
-    NSLog(@"CN1SS:METAL_DIAG atlas init step=device key=%@", key);
     id<MTLDevice> device = CN1MetalDevice();
-    if (device == nil) { NSLog(@"CN1SS:METAL_DIAG atlas init FAIL: device=nil"); return nil; }
+    if (device == nil) return nil;
 
     _fontKey = [key copy];
-    NSLog(@"CN1SS:METAL_DIAG atlas init step=ctfont name=%@ size=%g", uifont.fontName, (double)uifont.pointSize);
     _ctFont = CTFontCreateWithName((__bridge CFStringRef)uifont.fontName, uifont.pointSize, NULL);
-    if (_ctFont == NULL) { NSLog(@"CN1SS:METAL_DIAG atlas init FAIL: ctFont=NULL"); return nil; }
+    if (_ctFont == NULL) return nil;
 
     _textureWidth = CN1_METAL_ATLAS_INITIAL_W;
     _textureHeight = CN1_METAL_ATLAS_INITIAL_H;
 
-    NSLog(@"CN1SS:METAL_DIAG atlas init step=texture %dx%d", _textureWidth, _textureHeight);
     MTLTextureDescriptor *desc = [MTLTextureDescriptor
         texture2DDescriptorWithPixelFormat:MTLPixelFormatR8Unorm
         width:(NSUInteger)_textureWidth
@@ -88,12 +99,10 @@ static NSMutableDictionary<NSString *, CN1MetalGlyphAtlas *> *atlasCache = nil;
     desc.usage = MTLTextureUsageShaderRead;
     _texture = [device newTextureWithDescriptor:desc];
     if (_texture == nil) {
-        NSLog(@"CN1SS:METAL_DIAG atlas init FAIL: newTextureWithDescriptor=nil");
         CFRelease(_ctFont);
         _ctFont = NULL;
         return nil;
     }
-    NSLog(@"CN1SS:METAL_DIAG atlas init done key=%@", key);
 
     _slots = [NSMutableDictionary dictionary];
     _shelfY = CN1_METAL_ATLAS_PADDING;
@@ -145,12 +154,6 @@ static NSMutableDictionary<NSString *, CN1MetalGlyphAtlas *> *atlasCache = nil;
     NSNumber *key = @(glyph);
     CN1MetalGlyphSlot *cached = _slots[key];
     if (cached != nil) return cached;
-
-    static int slotCount = 0;
-    if (slotCount < 800) {
-        NSLog(@"CN1SS:METAL_DIAG slotForGlyph #%d glyph=%u key=%@", slotCount, (unsigned)glyph, _fontKey);
-        slotCount++;
-    }
 
     CGRect bbox = CGRectZero;
     CGSize advance = CGSizeZero;
@@ -224,32 +227,14 @@ static NSMutableDictionary<NSString *, CN1MetalGlyphAtlas *> *atlasCache = nil;
 
     CGPoint origin = CGPointMake((CGFloat)CN1_METAL_ATLAS_PADDING - bbox.origin.x,
                                  (CGFloat)CN1_METAL_ATLAS_PADDING - bbox.origin.y);
-    static int drawCount = 0;
-    if (drawCount < 800) {
-        NSLog(@"CN1SS:METAL_DIAG CTFontDrawGlyphs entering #%d glyph=%u gw=%d gh=%d key=%@",
-              drawCount, (unsigned)glyph, gw, gh, _fontKey);
-    }
     CTFontDrawGlyphs(_ctFont, &glyph, &origin, 1, ctx);
-    if (drawCount < 800) {
-        NSLog(@"CN1SS:METAL_DIAG CTFontDrawGlyphs returned #%d", drawCount);
-        drawCount++;
-    }
     CGContextRelease(ctx);
-    static int uploadCount = 0;
-    if (uploadCount < 800) {
-        NSLog(@"CN1SS:METAL_DIAG replaceRegion entering #%d at (%d,%d %dx%d)",
-              uploadCount, slotX, slotY, gw, gh);
-    }
 
     [_texture replaceRegion:MTLRegionMake2D((NSUInteger)slotX, (NSUInteger)slotY,
                                             (NSUInteger)gw, (NSUInteger)gh)
                 mipmapLevel:0
                   withBytes:pixels
                 bytesPerRow:bytesPerRow];
-    if (uploadCount < 800) {
-        NSLog(@"CN1SS:METAL_DIAG replaceRegion returned #%d", uploadCount);
-        uploadCount++;
-    }
     free(pixels);
 
     CN1MetalGlyphSlot *slot = [[CN1MetalGlyphSlot alloc] init];
