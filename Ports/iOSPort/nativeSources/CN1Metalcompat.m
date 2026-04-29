@@ -552,15 +552,23 @@ void CN1MetalDrawString(NSString *str, UIFont *font, int color, int alpha, int x
         return;
     }
 
+    static int s_attrPre = 0;
+    if (s_attrPre < 50) { NSLog(@"CN1SS:METAL_DIAG DrawString.attrPre #%d", s_attrPre); s_attrPre++; }
     NSDictionary *attrs = @{ (__bridge NSString *)kCTFontAttributeName: (__bridge id)atlas.ctFont };
     CFAttributedStringRef attrStr = CFAttributedStringCreate(NULL,
                                                              (__bridge CFStringRef)str,
                                                              (__bridge CFDictionaryRef)attrs);
+    static int s_attrPost = 0;
+    if (s_attrPost < 50) { NSLog(@"CN1SS:METAL_DIAG DrawString.attrPost #%d ok=%d", s_attrPost, attrStr != NULL); s_attrPost++; }
     if (attrStr == NULL) {
         drawStringWholeStringFallback(str, font, color, alpha, x, y);
         return;
     }
+    static int s_linePre = 0;
+    if (s_linePre < 50) { NSLog(@"CN1SS:METAL_DIAG DrawString.linePre #%d", s_linePre); s_linePre++; }
     CTLineRef line = CTLineCreateWithAttributedString(attrStr);
+    static int s_linePost = 0;
+    if (s_linePost < 50) { NSLog(@"CN1SS:METAL_DIAG DrawString.linePost #%d ok=%d", s_linePost, line != NULL); s_linePost++; }
     CFRelease(attrStr);
     if (line == NULL) {
         drawStringWholeStringFallback(str, font, color, alpha, x, y);
@@ -644,7 +652,11 @@ void CN1MetalDrawString(NSString *str, UIFont *font, int color, int alpha, int x
                 u1, v1,
             };
 
+            static int s_qPre = 0;
+            if (s_qPre < 200) { NSLog(@"CN1SS:METAL_DIAG drawQuad.pre #%d slot=(%d,%d %dx%d)", s_qPre, slot.atlasX, slot.atlasY, slot.width, slot.height); s_qPre++; }
             drawQuad(CN1MetalPipelineAlphaMask, vertices, texcoords, colorV, atlasTex);
+            static int s_qPost = 0;
+            if (s_qPost < 200) { NSLog(@"CN1SS:METAL_DIAG drawQuad.post #%d", s_qPost); s_qPost++; }
         }
 
         if (glyphBuf) free(glyphBuf);
