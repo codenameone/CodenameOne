@@ -5,6 +5,7 @@ import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.animations.AnimationTime;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.util.UITimer;
 
 /// Base class for tests that capture an animation as a single screenshot
 /// containing a 2x3 grid of frames (start, four intermediate, end).
@@ -23,6 +24,17 @@ public abstract class AbstractAnimationScreenshotTest extends BaseTest {
 
     protected final Form getHostForm() {
         return host;
+    }
+
+    @Override
+    protected void registerReadyCallback(Form parent, Runnable run) {
+        // BaseTest's default of 1500ms is needed to let real form contents
+        // settle before the screenshot fires (Android in particular drops
+        // images when the wait is shorter). Animation/transition tests render
+        // entirely off-screen into an Image and don't depend on the host form's
+        // contents - shrinking this to 200ms saves ~22s across the 17 grid
+        // tests, keeping the iOS suite under its 300s end-marker budget.
+        UITimer.timer(200, false, parent, run);
     }
 
     @Override
