@@ -69,6 +69,8 @@ const sym = {
   formShow: mangledFor('cn1_com_codename1_ui_Form_show'),
   dialogShow: mangledFor('cn1_com_codename1_ui_Dialog_show'),
   dialogShowImpl: mangledFor('cn1_com_codename1_ui_Dialog_showImpl_boolean'),
+  implCurrentFormField: mangledFor('cn1_com_codename1_impl_CodenameOneImplementation_currentForm'),
+  displayAnimationQueue: mangledFor('cn1_com_codename1_ui_Display_animationQueue'),
   formShowBoolean: mangledFor('cn1_com_codename1_ui_Form_show_boolean'),
   formShowModal: mangledFor('cn1_com_codename1_ui_Form_showModal_int_int_int_int_boolean_boolean_boolean'),
   displaySetCurrentForm: mangledFor('cn1_com_codename1_ui_Display_setCurrentForm_com_codename1_ui_Form'),
@@ -234,6 +236,63 @@ self.__cn1InstallHooks = function() {
     args => __push({ k: 'enter:Dialog.isDisposed', dlg: __idOf(args[0]), disposed_field: args[0] && args[0][${JSON.stringify(sym.disposedField)}] })
   );` : ''}
   rewireDispatchTables();
+  let lastSeen = 'NOT-INIT';
+  let pollErrCount = 0;
+  let pollTickCount = 0;
+  const currentFormField = ${JSON.stringify(sym.implCurrentFormField || '$aI5')};
+  setInterval(function() {
+    pollTickCount++;
+    try {
+      const jvm = self.jvm;
+      if (!jvm || !jvm.classes) {
+        if (lastSeen === 'NOT-INIT' && pollTickCount % 30 === 1) console.log('[trace] currentForm poll: no jvm');
+        return;
+      }
+      // jvm.classes is keyed on mangled class symbols. Walk it once and
+      // pick the entry whose def.name suggests Display.
+      let dispCls = null;
+      for (const k in jvm.classes) {
+        const c = jvm.classes[k];
+        if (c && c.staticFields && c.staticFields.INSTANCE !== undefined && c.staticFields.lock !== undefined && c.staticFields.impl !== undefined) {
+          // Display has these three statics — likely it.
+          dispCls = c;
+          break;
+        }
+      }
+      if (!dispCls) {
+        if (lastSeen === 'NOT-INIT' && pollTickCount % 30 === 1) console.log('[trace] currentForm poll: no Display class found');
+        return;
+      }
+      // Display.impl is a static field on the Display class.
+      const impl = dispCls.staticFields.impl;
+      if (!impl) {
+        if (lastSeen === 'NOT-INIT' && pollTickCount % 30 === 1) console.log('[trace] currentForm poll: Display.impl is null');
+        return;
+      }
+      const cur = impl[currentFormField];
+      const sig = cur ? (cur.__class + '#' + (cur.__id || '?')) : 'null';
+      // Also examine the Display animationQueue — a queued transition
+      // is what defers setCurrentForm in the show flow.
+      let aqSig = '?';
+      try {
+        const aqField = ${JSON.stringify(sym.displayAnimationQueue || '')};
+        if (aqField) {
+          const inst = dispCls.staticFields.INSTANCE;
+          if (inst) {
+            const aq = inst[aqField];
+            aqSig = aq ? ('len=' + (aq.cn1_java_util_ArrayList_size != null ? aq.cn1_java_util_ArrayList_size : '?')) : 'null';
+          }
+        }
+      } catch (_) {}
+      if (sig !== lastSeen) {
+        console.log('[trace] currentForm CHANGED from=' + lastSeen + ' to=' + sig + ' aq=' + aqSig);
+        lastSeen = sig;
+      }
+    } catch (e) {
+      pollErrCount++;
+      if (pollErrCount <= 3) console.log('[trace] currentForm poll err: ' + (e && e.message ? e.message : e));
+    }
+  }, 200);
   console.log('[trace] hooks installed');
 };
 `;
