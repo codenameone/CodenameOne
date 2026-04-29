@@ -237,6 +237,7 @@ self.__cn1InstallHooks = function() {
   );` : ''}
   rewireDispatchTables();
   let lastSeen = 'NOT-INIT';
+  const pollHistory = [];
   let pollErrCount = 0;
   let pollTickCount = 0;
   const currentFormField = ${JSON.stringify(sym.implCurrentFormField || '$aI5')};
@@ -286,13 +287,14 @@ self.__cn1InstallHooks = function() {
       } catch (_) {}
       if (sig !== lastSeen) {
         console.log('[trace] currentForm CHANGED from=' + lastSeen + ' to=' + sig + ' aq=' + aqSig);
+        pollHistory.push({ t: Date.now(), sig: sig, aq: aqSig });
         lastSeen = sig;
       }
     } catch (e) {
       pollErrCount++;
       if (pollErrCount <= 3) console.log('[trace] currentForm poll err: ' + (e && e.message ? e.message : e));
     }
-  }, 200);
+  }, 25);
   console.log('[trace] hooks installed');
 };
 `;
