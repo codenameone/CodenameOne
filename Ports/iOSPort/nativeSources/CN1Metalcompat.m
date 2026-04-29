@@ -534,11 +534,19 @@ static void drawStringWholeStringFallback(NSString *str, UIFont *font, int color
 void CN1MetalDrawString(NSString *str, UIFont *font, int color, int alpha, int x, int y) {
     if (str == nil || font == nil || str.length == 0) return;
 
+    static int s_dbg = 0;
+    if (s_dbg < 6) {
+        NSLog(@"CN1SS:METAL_DIAG DrawString.enter #%d str=\"%@\"", s_dbg, str);
+    }
     // Phase 4: shape the string with CTLine and emit one alpha-mask quad
     // per glyph against a per-(font, point-size) R8 atlas. Falls back to
     // the whole-string LRU path if the atlas can't be created (no
     // MTLDevice, CTFont creation failed, etc.) so text always renders.
     CN1MetalGlyphAtlas *atlas = [CN1MetalGlyphAtlas atlasForFont:font];
+    if (s_dbg < 6) {
+        NSLog(@"CN1SS:METAL_DIAG DrawString.atlasOk #%d ok=%d", s_dbg, atlas != nil);
+        s_dbg++;
+    }
     if (atlas == nil) {
         drawStringWholeStringFallback(str, font, color, alpha, x, y);
         return;
