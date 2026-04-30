@@ -28,30 +28,22 @@ on:
       - '!docs/**'
 
 jobs:
-  packaging-matrix:
+  packaging:
     permissions:
       contents: read
     runs-on: macos-15
     timeout-minutes: 75
-    strategy:
-      fail-fast: false
-      matrix:
-        packaging:
-          - name: pods-only
-            args: >-
-              -Dcodename1.arg.ios.dependencyManager=cocoapods
-              -Dcodename1.arg.ios.pods=AFNetworking
-          - name: spm-only
-            args: >-
-              -Dcodename1.arg.ios.dependencyManager=spm
-              -Dcodename1.arg.ios.spm.packages=swift-collections|https://github.com/apple/swift-collections.git|from:1.1.0
-              -Dcodename1.arg.ios.spm.products.swift-collections=Collections
-          - name: both
-            args: >-
-              -Dcodename1.arg.ios.dependencyManager=both
-              -Dcodename1.arg.ios.pods=AFNetworking
-              -Dcodename1.arg.ios.spm.packages=swift-collections|https://github.com/apple/swift-collections.git|from:1.1.0
-              -Dcodename1.arg.ios.spm.products.swift-collections=Collections
+    # Exercises both CocoaPods and SPM in a single Xcode project. Catches
+    # regressions in either dependency manager (each pathway runs end to end)
+    # and additionally validates that they coexist correctly. The pods-only
+    # and spm-only matrix entries previously here were proper subsets of this
+    # configuration, so they were dropped to halve macOS runner consumption.
+    env:
+      IOS_DEPENDENCY_ARGS: >-
+        -Dcodename1.arg.ios.dependencyManager=both
+        -Dcodename1.arg.ios.pods=AFNetworking
+        -Dcodename1.arg.ios.spm.packages=swift-collections|https://github.com/apple/swift-collections.git|from:1.1.0
+        -Dcodename1.arg.ios.spm.products.swift-collections=Collections
 
     steps:
       - uses: actions/checkout@v4
@@ -124,14 +116,12 @@ jobs:
 
       - name: Build sample iOS app
         id: build_ios_app
-        env:
-          IOS_DEPENDENCY_ARGS: ${{ matrix.packaging.args }}
         run: ./scripts/build-ios-app.sh -q -DskipTests
         timeout-minutes: 30
 
       - name: Run iOS UI smoke
         env:
-          ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/${{ matrix.packaging.name }}
+          ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/ios-packaging
         run: |
           set -euo pipefail
           mkdir -p "${ARTIFACTS_DIR}"
@@ -142,9 +132,8 @@ jobs:
         timeout-minutes: 30
 
       - name: Run native iOS notification tests
-        if: matrix.packaging.name == 'both'
         env:
-          ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/${{ matrix.packaging.name }}-native
+          ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/ios-packaging-native
         run: |
           set -euo pipefail
           mkdir -p "${ARTIFACTS_DIR}"
@@ -157,7 +146,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ios-packaging-${{ matrix.packaging.name }}
+          name: ios-packaging
           path: artifacts
           if-no-files-found: warn
           retention-days: 14
