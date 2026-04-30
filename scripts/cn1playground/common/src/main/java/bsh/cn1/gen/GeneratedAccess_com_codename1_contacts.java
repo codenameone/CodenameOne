@@ -387,18 +387,12 @@ public final class GeneratedAccess_com_codename1_contacts {
                 typedTarget.addItem((java.lang.Object) adaptedArgs[0]); return null;
             }
         }
-        if ("addItemAtIndex".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class}, false);
-                typedTarget.addItemAtIndex((java.lang.Object) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
-            }
-        }
         if ("addSelectedIndices".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{int[].class}, true)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class}, true);
                 int[] varArgs = new int[adaptedArgs.length - 0];
                 for (int i = 0; i < adaptedArgs.length; i++) {
-                    varArgs[i - 0] = ((Number) adaptedArgs[i]).intValue();
+                    varArgs[i - 0] = toIntValue(adaptedArgs[i]);
                 }
                 typedTarget.addSelectedIndices(varArgs); return null;
             }
@@ -412,7 +406,7 @@ public final class GeneratedAccess_com_codename1_contacts {
         if ("getItemAt".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getItemAt(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.getItemAt(toIntValue(adaptedArgs[0]));
             }
         }
         if ("getList".equals(name)) {
@@ -454,7 +448,7 @@ public final class GeneratedAccess_com_codename1_contacts {
         if ("removeItem".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.removeItem(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.removeItem(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("removeSelectedIndices".equals(name)) {
@@ -462,7 +456,7 @@ public final class GeneratedAccess_com_codename1_contacts {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class}, true);
                 int[] varArgs = new int[adaptedArgs.length - 0];
                 for (int i = 0; i < adaptedArgs.length; i++) {
-                    varArgs[i - 0] = ((Number) adaptedArgs[i]).intValue();
+                    varArgs[i - 0] = toIntValue(adaptedArgs[i]);
                 }
                 typedTarget.removeSelectedIndices(varArgs); return null;
             }
@@ -471,12 +465,6 @@ public final class GeneratedAccess_com_codename1_contacts {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.SelectionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.SelectionListener.class}, false);
                 typedTarget.removeSelectionListener((com.codename1.ui.events.SelectionListener) adaptedArgs[0]); return null;
-            }
-        }
-        if ("setItem".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Object.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Object.class}, false);
-                typedTarget.setItem(((Number) adaptedArgs[0]).intValue(), (java.lang.Object) adaptedArgs[1]); return null;
             }
         }
         if ("setMultiSelectionMode".equals(name)) {
@@ -494,7 +482,7 @@ public final class GeneratedAccess_com_codename1_contacts {
         if ("setSelectedIndex".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setSelectedIndex(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setSelectedIndex(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setSelectedIndices".equals(name)) {
@@ -502,7 +490,7 @@ public final class GeneratedAccess_com_codename1_contacts {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class}, true);
                 int[] varArgs = new int[adaptedArgs.length - 0];
                 for (int i = 0; i < adaptedArgs.length; i++) {
-                    varArgs[i - 0] = ((Number) adaptedArgs[i]).intValue();
+                    varArgs[i - 0] = toIntValue(adaptedArgs[i]);
                 }
                 typedTarget.setSelectedIndices(varArgs); return null;
             }
@@ -665,7 +653,19 @@ public final class GeneratedAccess_com_codename1_contacts {
         if (!(value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue)) {
             return value;
         }
+        // Direct fit when LambdaValue already implements the target SAM
+        // (Runnable, Function, Comparator, ...).
+        if (type.isInstance(value)) {
+            return value;
+        }
         return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
+    }
+
+    private static int toIntValue(Object value) {
+        if (value instanceof Number) return ((Number) value).intValue();
+        if (value instanceof Character) return (int) ((Character) value).charValue();
+        throw new ClassCastException("Cannot coerce "
+            + (value == null ? "null" : value.getClass().getName()) + " to int");
     }
 
     private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
@@ -720,10 +720,15 @@ public final class GeneratedAccess_com_codename1_contacts {
         if ("byte".equals(type.getName()) || type == Byte.class || "short".equals(type.getName()) || type == Short.class
                 || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
                 || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
-            return value instanceof Number;
+            // Java widens char to int implicitly, so accept Character
+            // for any int-or-larger numeric slot.
+            return value instanceof Number || value instanceof Character;
         }
         if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
-            return isSamInterface(type);
+            // LambdaValue implements common SAMs directly (Runnable,
+            // Function, Predicate, Comparator, ...). Also accept any
+            // CN1 SAM the listener-bridge knows how to wrap.
+            return type.isInstance(value) || isSamInterface(type);
         }
         return type.isInstance(value);
     }

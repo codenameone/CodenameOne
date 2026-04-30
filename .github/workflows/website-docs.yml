@@ -166,7 +166,13 @@ jobs:
       - name: Validate internal links and images
         uses: lycheeverse/lychee-action@v2
         with:
-          lycheeVersion: latest
+          # Pin to v0.23.0. lychee v0.24.0 renamed its release assets
+          # from `lychee-<arch>-unknown-linux-gnu.tar.gz` to
+          # `lychee-lychee-v0.24.0-<arch>-unknown-linux-gnu.tar.gz`,
+          # and `lychee-action@v2` still constructs the old URL, so
+          # `lycheeVersion: latest` 404s and breaks this job with
+          # curl exit code 22. Bump once the action catches up.
+          lycheeVersion: v0.23.0
           workingDirectory: docs/website
           args: >-
             --offline

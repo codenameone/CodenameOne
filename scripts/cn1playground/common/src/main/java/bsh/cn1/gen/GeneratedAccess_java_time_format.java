@@ -37,7 +37,7 @@ public final class GeneratedAccess_java_time_format {
         if (type == java.time.format.DateTimeParseException.class) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.CharSequence.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.CharSequence.class, java.lang.Integer.class}, false);
-                return new java.time.format.DateTimeParseException((java.lang.String) adaptedArgs[0], (java.lang.CharSequence) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue());
+                return new java.time.format.DateTimeParseException((java.lang.String) adaptedArgs[0], (java.lang.CharSequence) adaptedArgs[1], toIntValue(adaptedArgs[2]));
             }
         }
         throw unsupportedConstruct(type, safeArgs);
@@ -117,15 +117,18 @@ public final class GeneratedAccess_java_time_format {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == java.time.format.DateTimeFormatter.class) {
-            if ("ISO_INSTANT".equals(name)) return java.time.format.DateTimeFormatter.ISO_INSTANT;
-            if ("ISO_LOCAL_DATE".equals(name)) return java.time.format.DateTimeFormatter.ISO_LOCAL_DATE;
-            if ("ISO_LOCAL_DATE_TIME".equals(name)) return java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME;
-            if ("ISO_LOCAL_TIME".equals(name)) return java.time.format.DateTimeFormatter.ISO_LOCAL_TIME;
-            if ("ISO_OFFSET_DATE_TIME".equals(name)) return java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME;
-            if ("ISO_ZONED_DATE_TIME".equals(name)) return java.time.format.DateTimeFormatter.ISO_ZONED_DATE_TIME;
-        }
+        if (type == java.time.format.DateTimeFormatter.class) return getStaticField0(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("ISO_INSTANT".equals(name)) return java.time.format.DateTimeFormatter.ISO_INSTANT;
+        if ("ISO_LOCAL_DATE".equals(name)) return java.time.format.DateTimeFormatter.ISO_LOCAL_DATE;
+        if ("ISO_LOCAL_DATE_TIME".equals(name)) return java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME;
+        if ("ISO_LOCAL_TIME".equals(name)) return java.time.format.DateTimeFormatter.ISO_LOCAL_TIME;
+        if ("ISO_OFFSET_DATE_TIME".equals(name)) return java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME;
+        if ("ISO_ZONED_DATE_TIME".equals(name)) return java.time.format.DateTimeFormatter.ISO_ZONED_DATE_TIME;
+        throw unsupportedStaticField(java.time.format.DateTimeFormatter.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {
@@ -279,7 +282,19 @@ public final class GeneratedAccess_java_time_format {
         if (!(value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue)) {
             return value;
         }
+        // Direct fit when LambdaValue already implements the target SAM
+        // (Runnable, Function, Comparator, ...).
+        if (type.isInstance(value)) {
+            return value;
+        }
         return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
+    }
+
+    private static int toIntValue(Object value) {
+        if (value instanceof Number) return ((Number) value).intValue();
+        if (value instanceof Character) return (int) ((Character) value).charValue();
+        throw new ClassCastException("Cannot coerce "
+            + (value == null ? "null" : value.getClass().getName()) + " to int");
     }
 
     private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
@@ -334,10 +349,15 @@ public final class GeneratedAccess_java_time_format {
         if ("byte".equals(type.getName()) || type == Byte.class || "short".equals(type.getName()) || type == Short.class
                 || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
                 || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
-            return value instanceof Number;
+            // Java widens char to int implicitly, so accept Character
+            // for any int-or-larger numeric slot.
+            return value instanceof Number || value instanceof Character;
         }
         if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
-            return isSamInterface(type);
+            // LambdaValue implements common SAMs directly (Runnable,
+            // Function, Predicate, Comparator, ...). Also accept any
+            // CN1 SAM the listener-bridge knows how to wrap.
+            return type.isInstance(value) || isSamInterface(type);
         }
         return type.isInstance(value);
     }

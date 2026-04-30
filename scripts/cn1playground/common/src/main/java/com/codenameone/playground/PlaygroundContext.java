@@ -1,10 +1,14 @@
 package com.codenameone.playground;
 
+import com.codename1.ui.CN;
+import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Form;
-import com.codename1.ui.CN;
 import com.codename1.ui.util.Resources;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Host objects and helpers exposed to user scripts.
@@ -21,6 +25,9 @@ public class PlaygroundContext {
     private final Resources theme;
     private final Logger logger;
     private Form shownForm;
+    private final List<Component> createdComponents = new ArrayList<Component>();
+    private Form firstCreatedForm;
+    private Component firstCreatedComponent;
 
     public PlaygroundContext(Form hostForm, Container previewRoot, Resources theme, Logger logger) {
         this.hostForm = hostForm;
@@ -56,6 +63,17 @@ public class PlaygroundContext {
     public static void debug(String message) {
     }
 
+    public static void notifyConstructed(Object instance) {
+        if (!(instance instanceof Component)) {
+            return;
+        }
+        PlaygroundContext context = CURRENT.get();
+        if (context == null) {
+            return;
+        }
+        context.recordCreatedComponent((Component) instance);
+    }
+
     public static boolean interceptMethodInvocation(Object target, String methodName, Object[] args) {
         PlaygroundContext context = CURRENT.get();
         if (context == null) {
@@ -89,6 +107,37 @@ public class PlaygroundContext {
 
     public void clearShownForm() {
         shownForm = null;
+    }
+
+    public void recordCreatedComponent(Component component) {
+        if (component == null || component == hostForm || component == previewRoot) {
+            return;
+        }
+        if (firstCreatedComponent == null) {
+            firstCreatedComponent = component;
+        }
+        if (firstCreatedForm == null && component instanceof Form) {
+            firstCreatedForm = (Form) component;
+        }
+        createdComponents.add(component);
+    }
+
+    public Component getFirstCreatedComponent() {
+        return firstCreatedComponent;
+    }
+
+    public Form getFirstCreatedForm() {
+        return firstCreatedForm;
+    }
+
+    public List<Component> getCreatedComponents() {
+        return createdComponents;
+    }
+
+    public void clearCreatedComponents() {
+        createdComponents.clear();
+        firstCreatedForm = null;
+        firstCreatedComponent = null;
     }
 
     public void clearPreview() {

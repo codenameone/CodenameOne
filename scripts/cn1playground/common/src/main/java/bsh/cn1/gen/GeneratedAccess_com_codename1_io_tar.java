@@ -80,25 +80,25 @@ public final class GeneratedAccess_com_codename1_io_tar {
         if ("getCheckSumOctalBytes".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Long.class, byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Long.class, byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return com.codename1.io.tar.Octal.getCheckSumOctalBytes(((Number) adaptedArgs[0]).longValue(), (byte[]) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue());
+                return com.codename1.io.tar.Octal.getCheckSumOctalBytes(((Number) adaptedArgs[0]).longValue(), (byte[]) adaptedArgs[1], toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3]));
             }
         }
         if ("getLongOctalBytes".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Long.class, byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Long.class, byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return com.codename1.io.tar.Octal.getLongOctalBytes(((Number) adaptedArgs[0]).longValue(), (byte[]) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue());
+                return com.codename1.io.tar.Octal.getLongOctalBytes(((Number) adaptedArgs[0]).longValue(), (byte[]) adaptedArgs[1], toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3]));
             }
         }
         if ("getOctalBytes".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Long.class, byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Long.class, byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return com.codename1.io.tar.Octal.getOctalBytes(((Number) adaptedArgs[0]).longValue(), (byte[]) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue());
+                return com.codename1.io.tar.Octal.getOctalBytes(((Number) adaptedArgs[0]).longValue(), (byte[]) adaptedArgs[1], toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3]));
             }
         }
         if ("parseOctal".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return com.codename1.io.tar.Octal.parseOctal((byte[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
+                return com.codename1.io.tar.Octal.parseOctal((byte[]) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]));
             }
         }
         throw unsupportedStatic(com.codename1.io.tar.Octal.class, name, safeArgs);
@@ -108,13 +108,13 @@ public final class GeneratedAccess_com_codename1_io_tar {
         if ("getNameBytes".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.StringBuffer.class, byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.StringBuffer.class, byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return com.codename1.io.tar.TarHeader.getNameBytes((java.lang.StringBuffer) adaptedArgs[0], (byte[]) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue());
+                return com.codename1.io.tar.TarHeader.getNameBytes((java.lang.StringBuffer) adaptedArgs[0], (byte[]) adaptedArgs[1], toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3]));
             }
         }
         if ("parseName".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return com.codename1.io.tar.TarHeader.parseName((byte[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
+                return com.codename1.io.tar.TarHeader.parseName((byte[]) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]));
             }
         }
         throw unsupportedStatic(com.codename1.io.tar.TarHeader.class, name, safeArgs);
@@ -249,7 +249,7 @@ public final class GeneratedAccess_com_codename1_io_tar {
         if ("setGroupId".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setGroupId(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setGroupId(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setGroupName".equals(name)) {
@@ -261,7 +261,7 @@ public final class GeneratedAccess_com_codename1_io_tar {
         if ("setIds".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.setIds(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.setIds(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("setModTime".equals(name)) {
@@ -289,7 +289,7 @@ public final class GeneratedAccess_com_codename1_io_tar {
         if ("setUserId".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setUserId(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setUserId(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setUserName".equals(name)) {
@@ -366,7 +366,7 @@ public final class GeneratedAccess_com_codename1_io_tar {
         if ("mark".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.mark(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.mark(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("markSupported".equals(name)) {
@@ -384,7 +384,7 @@ public final class GeneratedAccess_com_codename1_io_tar {
             }
             if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.read((byte[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
+                return typedTarget.read((byte[]) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]));
             }
         }
         if ("reset".equals(name)) {
@@ -425,7 +425,7 @@ public final class GeneratedAccess_com_codename1_io_tar {
         if ("setYield".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setYield(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setYield(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("skip".equals(name)) {
@@ -499,7 +499,7 @@ public final class GeneratedAccess_com_codename1_io_tar {
         if ("write".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.write(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.write(toIntValue(adaptedArgs[0])); return null;
             }
             if (matches(safeArgs, new Class<?>[]{byte[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class}, false);
@@ -507,43 +507,49 @@ public final class GeneratedAccess_com_codename1_io_tar {
             }
             if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.write((byte[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue()); return null;
+                typedTarget.write((byte[]) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2])); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == com.codename1.io.tar.TarConstants.class) {
-            if ("DATA_BLOCK".equals(name)) return com.codename1.io.tar.TarConstants.DATA_BLOCK;
-            if ("EOF_BLOCK".equals(name)) return com.codename1.io.tar.TarConstants.EOF_BLOCK;
-            if ("HEADER_BLOCK".equals(name)) return com.codename1.io.tar.TarConstants.HEADER_BLOCK;
-        }
-        if (type == com.codename1.io.tar.TarHeader.class) {
-            if ("CHKSUMLEN".equals(name)) return com.codename1.io.tar.TarHeader.CHKSUMLEN;
-            if ("DEVLEN".equals(name)) return com.codename1.io.tar.TarHeader.DEVLEN;
-            if ("GIDLEN".equals(name)) return com.codename1.io.tar.TarHeader.GIDLEN;
-            if ("GNAMELEN".equals(name)) return com.codename1.io.tar.TarHeader.GNAMELEN;
-            if ("GNU_TMAGIC".equals(name)) return com.codename1.io.tar.TarHeader.GNU_TMAGIC;
-            if ("LF_BLK".equals(name)) return com.codename1.io.tar.TarHeader.LF_BLK;
-            if ("LF_CHR".equals(name)) return com.codename1.io.tar.TarHeader.LF_CHR;
-            if ("LF_CONTIG".equals(name)) return com.codename1.io.tar.TarHeader.LF_CONTIG;
-            if ("LF_DIR".equals(name)) return com.codename1.io.tar.TarHeader.LF_DIR;
-            if ("LF_FIFO".equals(name)) return com.codename1.io.tar.TarHeader.LF_FIFO;
-            if ("LF_LINK".equals(name)) return com.codename1.io.tar.TarHeader.LF_LINK;
-            if ("LF_NORMAL".equals(name)) return com.codename1.io.tar.TarHeader.LF_NORMAL;
-            if ("LF_OLDNORM".equals(name)) return com.codename1.io.tar.TarHeader.LF_OLDNORM;
-            if ("LF_SYMLINK".equals(name)) return com.codename1.io.tar.TarHeader.LF_SYMLINK;
-            if ("MAGICLEN".equals(name)) return com.codename1.io.tar.TarHeader.MAGICLEN;
-            if ("MODELEN".equals(name)) return com.codename1.io.tar.TarHeader.MODELEN;
-            if ("MODTIMELEN".equals(name)) return com.codename1.io.tar.TarHeader.MODTIMELEN;
-            if ("NAMELEN".equals(name)) return com.codename1.io.tar.TarHeader.NAMELEN;
-            if ("SIZELEN".equals(name)) return com.codename1.io.tar.TarHeader.SIZELEN;
-            if ("TMAGIC".equals(name)) return com.codename1.io.tar.TarHeader.TMAGIC;
-            if ("UIDLEN".equals(name)) return com.codename1.io.tar.TarHeader.UIDLEN;
-            if ("UNAMELEN".equals(name)) return com.codename1.io.tar.TarHeader.UNAMELEN;
-        }
+        if (type == com.codename1.io.tar.TarConstants.class) return getStaticField0(name);
+        if (type == com.codename1.io.tar.TarHeader.class) return getStaticField1(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("DATA_BLOCK".equals(name)) return com.codename1.io.tar.TarConstants.DATA_BLOCK;
+        if ("EOF_BLOCK".equals(name)) return com.codename1.io.tar.TarConstants.EOF_BLOCK;
+        if ("HEADER_BLOCK".equals(name)) return com.codename1.io.tar.TarConstants.HEADER_BLOCK;
+        throw unsupportedStaticField(com.codename1.io.tar.TarConstants.class, name);
+    }
+
+    private static Object getStaticField1(String name) throws Exception {
+        if ("CHKSUMLEN".equals(name)) return com.codename1.io.tar.TarHeader.CHKSUMLEN;
+        if ("DEVLEN".equals(name)) return com.codename1.io.tar.TarHeader.DEVLEN;
+        if ("GIDLEN".equals(name)) return com.codename1.io.tar.TarHeader.GIDLEN;
+        if ("GNAMELEN".equals(name)) return com.codename1.io.tar.TarHeader.GNAMELEN;
+        if ("GNU_TMAGIC".equals(name)) return com.codename1.io.tar.TarHeader.GNU_TMAGIC;
+        if ("LF_BLK".equals(name)) return com.codename1.io.tar.TarHeader.LF_BLK;
+        if ("LF_CHR".equals(name)) return com.codename1.io.tar.TarHeader.LF_CHR;
+        if ("LF_CONTIG".equals(name)) return com.codename1.io.tar.TarHeader.LF_CONTIG;
+        if ("LF_DIR".equals(name)) return com.codename1.io.tar.TarHeader.LF_DIR;
+        if ("LF_FIFO".equals(name)) return com.codename1.io.tar.TarHeader.LF_FIFO;
+        if ("LF_LINK".equals(name)) return com.codename1.io.tar.TarHeader.LF_LINK;
+        if ("LF_NORMAL".equals(name)) return com.codename1.io.tar.TarHeader.LF_NORMAL;
+        if ("LF_OLDNORM".equals(name)) return com.codename1.io.tar.TarHeader.LF_OLDNORM;
+        if ("LF_SYMLINK".equals(name)) return com.codename1.io.tar.TarHeader.LF_SYMLINK;
+        if ("MAGICLEN".equals(name)) return com.codename1.io.tar.TarHeader.MAGICLEN;
+        if ("MODELEN".equals(name)) return com.codename1.io.tar.TarHeader.MODELEN;
+        if ("MODTIMELEN".equals(name)) return com.codename1.io.tar.TarHeader.MODTIMELEN;
+        if ("NAMELEN".equals(name)) return com.codename1.io.tar.TarHeader.NAMELEN;
+        if ("SIZELEN".equals(name)) return com.codename1.io.tar.TarHeader.SIZELEN;
+        if ("TMAGIC".equals(name)) return com.codename1.io.tar.TarHeader.TMAGIC;
+        if ("UIDLEN".equals(name)) return com.codename1.io.tar.TarHeader.UIDLEN;
+        if ("UNAMELEN".equals(name)) return com.codename1.io.tar.TarHeader.UNAMELEN;
+        throw unsupportedStaticField(com.codename1.io.tar.TarHeader.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {
@@ -575,19 +581,19 @@ public final class GeneratedAccess_com_codename1_io_tar {
         if (target instanceof com.codename1.io.tar.TarHeader) {
             com.codename1.io.tar.TarHeader typedTarget = (com.codename1.io.tar.TarHeader) target;
             if ("checkSum".equals(name)) {
-                typedTarget.checkSum = ((Number) value).intValue();
+                typedTarget.checkSum = toIntValue(value);
                 return;
             }
             if ("devMajor".equals(name)) {
-                typedTarget.devMajor = ((Number) value).intValue();
+                typedTarget.devMajor = toIntValue(value);
                 return;
             }
             if ("devMinor".equals(name)) {
-                typedTarget.devMinor = ((Number) value).intValue();
+                typedTarget.devMinor = toIntValue(value);
                 return;
             }
             if ("groupId".equals(name)) {
-                typedTarget.groupId = ((Number) value).intValue();
+                typedTarget.groupId = toIntValue(value);
                 return;
             }
             if ("groupName".equals(name)) {
@@ -595,7 +601,7 @@ public final class GeneratedAccess_com_codename1_io_tar {
                 return;
             }
             if ("linkFlag".equals(name)) {
-                typedTarget.linkFlag = ((Number) value).byteValue();
+                typedTarget.linkFlag = (byte) toIntValue(value);
                 return;
             }
             if ("linkName".equals(name)) {
@@ -611,7 +617,7 @@ public final class GeneratedAccess_com_codename1_io_tar {
                 return;
             }
             if ("mode".equals(name)) {
-                typedTarget.mode = ((Number) value).intValue();
+                typedTarget.mode = toIntValue(value);
                 return;
             }
             if ("name".equals(name)) {
@@ -623,7 +629,7 @@ public final class GeneratedAccess_com_codename1_io_tar {
                 return;
             }
             if ("userId".equals(name)) {
-                typedTarget.userId = ((Number) value).intValue();
+                typedTarget.userId = toIntValue(value);
                 return;
             }
             if ("userName".equals(name)) {
@@ -773,7 +779,19 @@ public final class GeneratedAccess_com_codename1_io_tar {
         if (!(value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue)) {
             return value;
         }
+        // Direct fit when LambdaValue already implements the target SAM
+        // (Runnable, Function, Comparator, ...).
+        if (type.isInstance(value)) {
+            return value;
+        }
         return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
+    }
+
+    private static int toIntValue(Object value) {
+        if (value instanceof Number) return ((Number) value).intValue();
+        if (value instanceof Character) return (int) ((Character) value).charValue();
+        throw new ClassCastException("Cannot coerce "
+            + (value == null ? "null" : value.getClass().getName()) + " to int");
     }
 
     private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
@@ -828,10 +846,15 @@ public final class GeneratedAccess_com_codename1_io_tar {
         if ("byte".equals(type.getName()) || type == Byte.class || "short".equals(type.getName()) || type == Short.class
                 || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
                 || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
-            return value instanceof Number;
+            // Java widens char to int implicitly, so accept Character
+            // for any int-or-larger numeric slot.
+            return value instanceof Number || value instanceof Character;
         }
         if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
-            return isSamInterface(type);
+            // LambdaValue implements common SAMs directly (Runnable,
+            // Function, Predicate, Comparator, ...). Also accept any
+            // CN1 SAM the listener-bridge knows how to wrap.
+            return type.isInstance(value) || isSamInterface(type);
         }
         return type.isInstance(value);
     }

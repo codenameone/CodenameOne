@@ -53,14 +53,21 @@ public class DrawString extends AbstractGraphicsScreenshotTest {
         float derivedSize = base.getHeight() + 1;
         Font derived = base.derive(derivedSize, Font.STYLE_PLAIN);
         Hashtable<Font, String> cache = new Hashtable<Font, String>();
+        int baseHashBeforePut = base.hashCode();
         cache.put(base, "base");
         cache.put(derived, "derived");
         Font baseCopy = Font.createTrueTypeFont("native:MainRegular", 4);
         assertTrue(base.equals(baseCopy), "Expected native font instances to be equal.");
+        assertTrue(baseHashBeforePut == base.hashCode(),
+                "Expected native font hashCode to remain stable.");
+        assertTrue(base.hashCode() == baseCopy.hashCode(),
+                "Expected equal native font instances to share hashCode.");
         assertTrue("base".equals(cache.get(baseCopy)),
                 "Expected native font hash/equals to match Hashtable lookup.");
         Font derivedCopy = baseCopy.derive(derivedSize, Font.STYLE_PLAIN);
         assertTrue(derived.equals(derivedCopy), "Expected derived native font instances to be equal.");
+        assertTrue(derived.hashCode() == derivedCopy.hashCode(),
+                "Expected equal derived native font instances to share hashCode.");
         assertTrue("derived".equals(cache.get(derivedCopy)),
                 "Expected derived font hash/equals to match Hashtable lookup.");
     }

@@ -28,6 +28,7 @@ import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.CN;
 import com.codename1.ui.Display;
 import com.codename1.ui.util.EditableResources;
+import com.codename1.ui.util.EditableResourcesEditor;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
@@ -165,7 +166,7 @@ public class CN1CSSCompiler implements DocumentHandler {
     public void startDocument(InputSource is) throws CSSException {
         //props = new Properties();
         theme = new Hashtable();
-        res = new EditableResources();
+        res = new EditableResourcesEditor();
         includedDensities.clear();
         includedDensities.addAll(defaultDensities);
     }
@@ -206,7 +207,7 @@ public class CN1CSSCompiler implements DocumentHandler {
             //cn1.addTheme(theme);
             //cn1.execute();
             
-            EditableResources output = new EditableResources();
+            EditableResources output = new EditableResourcesEditor();
             
             theme.addToResources(output);
             System.out.println(output.getTheme(inputFile.getName()));
@@ -225,7 +226,7 @@ public class CN1CSSCompiler implements DocumentHandler {
         
         
         /*
-        EditableResources output = new EditableResources();
+        EditableResources output = new EditableResourcesEditor();
         Hashtable theme = new Hashtable();
         for (String key : props.stringPropertyNames()) {
             theme.put(key, props.get(key));

@@ -124,7 +124,7 @@ public final class GeneratedAccess_com_codename1_push {
                 for (int i = 7; i < adaptedArgs.length; i++) {
                     varArgs[i - 7] = (java.lang.String) adaptedArgs[i];
                 }
-                return com.codename1.push.Push.sendPushMessage((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], ((Boolean) adaptedArgs[2]).booleanValue(), (java.lang.String) adaptedArgs[3], (java.lang.String) adaptedArgs[4], (java.lang.String) adaptedArgs[5], ((Number) adaptedArgs[6]).intValue(), varArgs);
+                return com.codename1.push.Push.sendPushMessage((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], ((Boolean) adaptedArgs[2]).booleanValue(), (java.lang.String) adaptedArgs[3], (java.lang.String) adaptedArgs[4], (java.lang.String) adaptedArgs[5], toIntValue(adaptedArgs[6]), varArgs);
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.Boolean.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.Boolean.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class}, false);
@@ -231,7 +231,7 @@ public final class GeneratedAccess_com_codename1_push {
         if ("setType".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                com.codename1.push.PushContent.setType(((Number) adaptedArgs[0]).intValue()); return null;
+                com.codename1.push.PushContent.setType(toIntValue(adaptedArgs[0])); return null;
             }
         }
         throw unsupportedStatic(com.codename1.push.PushContent.class, name, safeArgs);
@@ -311,7 +311,7 @@ public final class GeneratedAccess_com_codename1_push {
         if ("pushType".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.pushType(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.pushType(toIntValue(adaptedArgs[0]));
             }
         }
         if ("send".equals(name)) {
@@ -380,7 +380,7 @@ public final class GeneratedAccess_com_codename1_push {
         if ("badge".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.badge(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.badge(toIntValue(adaptedArgs[0]));
             }
         }
         if ("body".equals(name)) {
@@ -431,7 +431,7 @@ public final class GeneratedAccess_com_codename1_push {
         if ("type".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.type(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.type(toIntValue(adaptedArgs[0]));
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -500,7 +500,7 @@ public final class GeneratedAccess_com_codename1_push {
         if ("pushRegistrationError".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
-                typedTarget.pushRegistrationError((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.pushRegistrationError((java.lang.String) adaptedArgs[0], toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("registeredForPush".equals(name)) {
@@ -513,18 +513,24 @@ public final class GeneratedAccess_com_codename1_push {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == com.codename1.push.Push.class) {
-            if ("GOOGLE_PUSH_KEY".equals(name)) return com.codename1.push.Push.GOOGLE_PUSH_KEY;
-        }
-        if (type == com.codename1.push.PushCallback.class) {
-            if ("REGISTRATION_ACCOUNT_MISSING".equals(name)) return com.codename1.push.PushCallback.REGISTRATION_ACCOUNT_MISSING;
-            if ("REGISTRATION_AUTHENTICATION_FAILED".equals(name)) return com.codename1.push.PushCallback.REGISTRATION_AUTHENTICATION_FAILED;
-            if ("REGISTRATION_ERROR_SERVICE_NOT_AVAILABLE".equals(name)) return com.codename1.push.PushCallback.REGISTRATION_ERROR_SERVICE_NOT_AVAILABLE;
-            if ("REGISTRATION_INVALID_SENDER".equals(name)) return com.codename1.push.PushCallback.REGISTRATION_INVALID_SENDER;
-            if ("REGISTRATION_PHONE_REGISTRATION_ERROR".equals(name)) return com.codename1.push.PushCallback.REGISTRATION_PHONE_REGISTRATION_ERROR;
-            if ("REGISTRATION_TOO_MANY_REGISTRATIONS".equals(name)) return com.codename1.push.PushCallback.REGISTRATION_TOO_MANY_REGISTRATIONS;
-        }
+        if (type == com.codename1.push.Push.class) return getStaticField0(name);
+        if (type == com.codename1.push.PushCallback.class) return getStaticField1(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("GOOGLE_PUSH_KEY".equals(name)) return com.codename1.push.Push.GOOGLE_PUSH_KEY;
+        throw unsupportedStaticField(com.codename1.push.Push.class, name);
+    }
+
+    private static Object getStaticField1(String name) throws Exception {
+        if ("REGISTRATION_ACCOUNT_MISSING".equals(name)) return com.codename1.push.PushCallback.REGISTRATION_ACCOUNT_MISSING;
+        if ("REGISTRATION_AUTHENTICATION_FAILED".equals(name)) return com.codename1.push.PushCallback.REGISTRATION_AUTHENTICATION_FAILED;
+        if ("REGISTRATION_ERROR_SERVICE_NOT_AVAILABLE".equals(name)) return com.codename1.push.PushCallback.REGISTRATION_ERROR_SERVICE_NOT_AVAILABLE;
+        if ("REGISTRATION_INVALID_SENDER".equals(name)) return com.codename1.push.PushCallback.REGISTRATION_INVALID_SENDER;
+        if ("REGISTRATION_PHONE_REGISTRATION_ERROR".equals(name)) return com.codename1.push.PushCallback.REGISTRATION_PHONE_REGISTRATION_ERROR;
+        if ("REGISTRATION_TOO_MANY_REGISTRATIONS".equals(name)) return com.codename1.push.PushCallback.REGISTRATION_TOO_MANY_REGISTRATIONS;
+        throw unsupportedStaticField(com.codename1.push.PushCallback.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {
@@ -678,7 +684,19 @@ public final class GeneratedAccess_com_codename1_push {
         if (!(value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue)) {
             return value;
         }
+        // Direct fit when LambdaValue already implements the target SAM
+        // (Runnable, Function, Comparator, ...).
+        if (type.isInstance(value)) {
+            return value;
+        }
         return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
+    }
+
+    private static int toIntValue(Object value) {
+        if (value instanceof Number) return ((Number) value).intValue();
+        if (value instanceof Character) return (int) ((Character) value).charValue();
+        throw new ClassCastException("Cannot coerce "
+            + (value == null ? "null" : value.getClass().getName()) + " to int");
     }
 
     private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
@@ -733,10 +751,15 @@ public final class GeneratedAccess_com_codename1_push {
         if ("byte".equals(type.getName()) || type == Byte.class || "short".equals(type.getName()) || type == Short.class
                 || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
                 || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
-            return value instanceof Number;
+            // Java widens char to int implicitly, so accept Character
+            // for any int-or-larger numeric slot.
+            return value instanceof Number || value instanceof Character;
         }
         if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
-            return isSamInterface(type);
+            // LambdaValue implements common SAMs directly (Runnable,
+            // Function, Predicate, Comparator, ...). Also accept any
+            // CN1 SAM the listener-bridge knows how to wrap.
+            return type.isInstance(value) || isSamInterface(type);
         }
         return type.isInstance(value);
     }

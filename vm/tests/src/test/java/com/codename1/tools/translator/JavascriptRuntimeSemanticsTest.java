@@ -24,6 +24,24 @@ class JavascriptRuntimeSemanticsTest {
 
     @ParameterizedTest
     @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void parseDoubleAppliesExponentFromStringToRealSplit(CompilerHelper.CompilerConfig config) throws Exception {
+        // Regression guard for the parparvm_runtime.js parseDblImpl binding.
+        // StringToReal.parseDouble("1.4") strips the decimal point and hands
+        // parseDblImpl("14", -1) to the native; the JS binding must apply 10^-1
+        // to the integer value. A stale binding that ignored the exponent was
+        // the root cause of Kotlin Switch pills rendering at ~600x300 instead
+        // of ~50x25: Switch.getTrackScaleX() parses theme "2.5" via
+        // Double.parseDouble, and 2.5 -> 25 made track width 10x too big.
+        WorkerRunResult result = translateAndRunFixture(config, "JsDoubleParseApp.java", "JsDoubleParseApp");
+
+        assertEquals(511, result.result,
+                "parseDouble must apply the exponent split out by StringToReal (1.4 must not resolve to 14). raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
     void executesLocaleTimeZoneAndDateFormatInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
         WorkerRunResult result = translateAndRunFixture(config, "JsLocaleTimeZoneApp.java", "JsLocaleTimeZoneApp");
 
@@ -46,6 +64,176 @@ class JavascriptRuntimeSemanticsTest {
         WorkerRunResult result = translateAndRunFixture(config, "JsJavaApiCoverageApp.java", "JsJavaApiCoverageApp");
 
         assertEquals(511, result.result, "Translated runtime should execute the broader JavaAPI coverage fixture");
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void preservesSuperInvokeInsideConstructorInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsSuperInvokeInCtorApp.java", "JsSuperInvokeInCtorApp");
+
+        assertEquals(1209, result.result,
+                "Translated runtime should preserve constructor-time super invokes without routing through the override. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void preservesFieldInitializersAlongsideSuperInvokeInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsFieldInitializerAndSuperInvokeApp.java", "JsFieldInitializerAndSuperInvokeApp");
+
+        assertEquals(111, result.result,
+                "Translated runtime should preserve both field initializers and constructor-time super invokes. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void preservesFormLikeSuperAddPathInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsFormLikeSuperAddApp.java", "JsFormLikeSuperAddApp");
+
+        assertEquals(15, result.result,
+                "Translated runtime should preserve the Form-like super-add path, including virtual callbacks during the superclass add flow. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void preservesInvokeSpecialOwnerResolutionAcrossInheritedMethodGapsInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsInvokeSpecialInheritedOwnerApp.java", "JsInvokeSpecialInheritedOwnerApp");
+
+        assertEquals(110, result.result,
+                "Translated runtime should resolve invokespecial owners to the actual declaring class when the direct superclass inherits the method. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void preservesIteratorDispatchSemanticsInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsIteratorDispatchApp.java", "JsIteratorDispatchApp");
+
+        assertEquals(63, result.result,
+                "Translated runtime should preserve iterator segment ordering and coordinates through interface dispatch. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void preservesIteratorTypeDispatchWithoutCoordinateCopyInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsIteratorTypeDispatchApp.java", "JsIteratorTypeDispatchApp");
+
+        assertEquals(63, result.result,
+                "Translated runtime should preserve iterator segment types through interface dispatch even without coordinate copy. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void preservesPrimitiveArrayLiteralAndCopySemanticsInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsPrimitiveArraySemanticsApp.java", "JsPrimitiveArraySemanticsApp");
+
+        assertEquals(255, result.result,
+                "Translated runtime should preserve primitive byte[]/float[] literals and System.arraycopy semantics. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void preservesCapturingLambdaDispatchInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsCapturingLambdaDispatchApp.java", "JsCapturingLambdaDispatchApp");
+
+        // base(11) + seed(7)*3 + "sheet".length()(5) = 37. If the lambda synthesis
+        // emits spurious aload_0 BasicInstructions (the pre-fix Parser bug), the
+        // lambda's run() method dispatches on the wrong captured field and either
+        // throws a VIRTUAL_FAIL or records the wrong value in out[0].
+        assertEquals(37, result.result,
+                "Translated lambda run() must dispatch on its first capture (enclosing this), "
+                        + "not shift down to subsequent captures. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void preservesIteratorCoordinateCopyWithHardcodedSegmentCountsInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsIteratorCoordinateCopyApp.java", "JsIteratorCoordinateCopyApp");
+
+        assertEquals(63, result.result,
+                "Translated runtime should preserve coordinate copying through interface dispatch when segment counts are hardcoded. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void preservesIteratorPointShiftLookupInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsIteratorPointShiftDispatchApp.java", "JsIteratorPointShiftDispatchApp");
+
+        assertEquals(63, result.result,
+                "Translated runtime should preserve POINT_SHIFT[type] lookup through interface dispatch. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void preservesGeneralPathQuadSegmentTypesInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsGeneralPathQuadIteratorApp.java", "JsGeneralPathQuadIteratorApp");
+
+        assertEquals(127, result.result,
+                "Translated runtime should preserve real GeneralPath quad segment types and coordinates. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void preservesGeneralPathArcSegmentsInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsGeneralPathArcIteratorApp.java", "JsGeneralPathArcIteratorApp");
+
+        assertEquals(511, result.result,
+                "Translated runtime should preserve GeneralPath.arc() segment types and endpoints. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void preservesInterfaceObjectBridgeDispatchInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsInterfaceObjectBridgeApp.java", "JsInterfaceObjectBridgeApp");
+
+        assertEquals(511, result.result,
+                "Translated runtime should preserve object-returning interface bridge dispatch used by the HTML5 render adapters. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void preservesGenericSinkBridgeDispatchInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsGenericSinkBridgeApp.java", "JsGenericSinkBridgeApp");
+
+        assertEquals(2047, result.result,
+                "Translated runtime should preserve generic sink bridge dispatch used by the HTML5 buffered render queue. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void preservesAnonymousCapturedSinkDispatchInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsAnonymousSinkCaptureApp.java", "JsAnonymousSinkCaptureApp");
+
+        assertEquals(2047, result.result,
+                "Translated runtime should preserve anonymous captured sink dispatch used by BufferedGraphics. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
         assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
     }
 
@@ -374,8 +562,9 @@ class JavascriptRuntimeSemanticsTest {
     }
 
     private static String extractJsonString(String json, String key) {
+        json = extractLastJsonObject(json);
         String marker = "\"" + key + "\":\"";
-        int start = json.indexOf(marker);
+        int start = json.lastIndexOf(marker);
         if (start < 0) {
             return null;
         }
@@ -385,8 +574,9 @@ class JavascriptRuntimeSemanticsTest {
     }
 
     private static String extractJsonNumber(String json, String key) {
+        json = extractLastJsonObject(json);
         String marker = "\"" + key + "\":";
-        int start = json.indexOf(marker);
+        int start = json.lastIndexOf(marker);
         if (start < 0) {
             return null;
         }
@@ -400,6 +590,20 @@ class JavascriptRuntimeSemanticsTest {
             end++;
         }
         return json.substring(start, end);
+    }
+
+    private static String extractLastJsonObject(String output) {
+        if (output == null || output.isEmpty()) {
+            return "";
+        }
+        String[] lines = output.split("\\R");
+        for (int i = lines.length - 1; i >= 0; i--) {
+            String line = lines[i].trim();
+            if (line.startsWith("{") && line.endsWith("}") && line.contains("\"type\"")) {
+                return line;
+            }
+        }
+        return output;
     }
 
     private static String workerHarnessSource(Path distDir, String appName) {

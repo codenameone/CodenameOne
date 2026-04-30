@@ -107,6 +107,31 @@ public abstract class UITestBase {
             }
         } catch (Exception ignored) {
         }
+
+        // Reset pointer/drag state on the Display so a prior test that simulated a drag
+        // doesn't silently swallow action events in the next test (List.fireActionEvent
+        // short-circuits when Display.hasDragOccured() is true).
+        resetDisplayBooleanField("dragOccured", false);
+        resetDisplayBooleanField("pointerPressedAndNotReleasedOrDragged", false);
+        resetDisplayIntField("dragPathLength", 0);
+    }
+
+    private void resetDisplayBooleanField(String name, boolean value) {
+        try {
+            Field f = Display.class.getDeclaredField(name);
+            f.setAccessible(true);
+            f.setBoolean(display, value);
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void resetDisplayIntField(String name, int value) {
+        try {
+            Field f = Display.class.getDeclaredField(name);
+            f.setAccessible(true);
+            f.setInt(display, value);
+        } catch (Exception ignored) {
+        }
     }
 
     @AfterAll

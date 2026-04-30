@@ -31,9 +31,12 @@ public class BSHAutoCloseable extends BSHTypedVariableDeclaration {
         renderTypeNode();
         this.type = evalType(callstack, interpreter);
 
-        if (!AutoCloseable.class.isAssignableFrom(this.getType()))
+        // `var` and untyped resources resolve to null; defer the
+        // AutoCloseable check to runtime after the initializer has run.
+        if (this.type != null && !AutoCloseable.class.isAssignableFrom(this.type)) {
             throw new EvalException("The resource type "+ this.type.getName()
                 +" does not implement java.lang.AutoCloseable.", this, callstack);
+        }
 
         this.name = this.getDeclarators()[0].name;
 
@@ -46,6 +49,22 @@ public class BSHAutoCloseable extends BSHTypedVariableDeclaration {
             throw e.toEvalError("Unable to evaluate the try-with-resource "
                 + this.getName() + ". With message:" + e.getMessage(),
                 this, callstack);
+        }
+
+        // Verify the bound value is actually AutoCloseable when the type was
+        // inferred (var) rather than declared.
+        if (this.type == null && this.varThis != null) {
+            try {
+                Object value = this.varThis.getValue();
+                if (value != null && !(value instanceof AutoCloseable)) {
+                    throw new EvalException("The resource value "
+                            + value.getClass().getName()
+                            + " does not implement java.lang.AutoCloseable.",
+                            this, callstack);
+                }
+            } catch (UtilEvalError e) {
+                throw e.toEvalError(this, callstack);
+            }
         }
 
         return Primitive.VOID;

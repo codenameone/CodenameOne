@@ -1,5 +1,5 @@
 [appendix]
-== Maven Goals
+== Maven goals
 
 include::appendix_goal_build.adoc[]
 

@@ -15,7 +15,19 @@ import java.io.IOException;
 interface Cn1ssDeviceRunnerHelper {
     int CHUNK_SIZE_ANDROID = 500;
     int CHUNK_SIZE_DEFAULT = 900;
-    int DELAY_ANDROID = 20;
+    // Throttle introduced in 763bd6676 (#4253). The 20ms value was tuned
+    // against the original ~10-test screenshot suite; with 17 animation grid
+    // tests added each emitting ~150KB PNGs (~400 chunks each), the JDK 21
+    // Android job started flaking with one random "PNG chunk truncated before
+    // CRC" per run on different tests across runs (SlideHorizontalTransitionTest
+    // on one CI run, MultiButtonTheme_dark on the next). Bumping to 30ms gave
+    // logcat extra drain time. With three more screenshot tests added by
+    // the sticky-headers PR (#4829) the JDK 21 entry started flaking again
+    // (one random theme stream truncated per run). Bumping to 50ms; the
+    // Cn1ssDeviceRunner per-test deadline is now 30s on native platforms so
+    // the slower emission still completes inside the budget for a dual
+    // appearance test (~14s for two captures).
+    int DELAY_ANDROID = 50;
     int MAX_PREVIEW_BYTES = 20 * 1024;
     String PREVIEW_CHANNEL = "PREVIEW";
     int[] PREVIEW_QUALITIES = new int[] {60, 50, 40, 35, 30, 25, 20, 18, 16, 14, 12, 10, 8, 6, 5, 4, 3, 2, 1};
@@ -24,53 +36,44 @@ interface Cn1ssDeviceRunnerHelper {
         Display display = Display.getInstance();
         if (display.isEdt()) {
             runnable.run();
+        } else if (isHtml5()) {
+            display.callSerially(runnable);
         } else {
             display.callSeriallyAndWait(runnable);
         }
     }
 
     static void emitCurrentFormScreenshot(String testName) {
+        emitCurrentFormScreenshot(testName, null);
+    }
+
+    static void emitImage(Image image, String testName, Runnable onComplete) {
         String safeName = sanitizeTestName(testName);
-        Form current = Display.getInstance().getCurrent();
-        if (current == null) {
-            println("CN1SS:ERR:test=" + safeName + " message=Current form is null");
-            println("CN1SS:END:" + safeName);
+        if (image == null) {
+            println("CN1SS:ERR:test=" + safeName + " message=Image is null");
+            emitPlaceholderScreenshot(safeName);
+            complete(onComplete);
+            return;
         }
-        int width = Math.max(1, current.getWidth());
-        int height = Math.max(1, current.getHeight());
-        Image[] img = new Image[1];
-        Display.getInstance().screenshot(screen -> img[0] = screen);
-        long time = System.currentTimeMillis();
-        Display.getInstance().invokeAndBlock(() -> {
-            while(img[0] == null) {
-                Util.sleep(50);
-                // timeout
-                if (System.currentTimeMillis() - time > 2000) {
-                    return;
-                }
-            }
-        });
-        if (img[0] == null) {
-            println("CN1SS:ERR:test=" + safeName + " message=Screenshot process timed out");
-            println("CN1SS:END:" + safeName);
-        }
-        Image screenshot = img[0];
         try {
             ImageIO io = ImageIO.getImageIO();
             if (io == null || !io.isFormatSupported(ImageIO.FORMAT_PNG)) {
                 println("CN1SS:ERR:test=" + safeName + " message=PNG encoding unavailable");
-                println("CN1SS:END:" + safeName);
+                emitPlaceholderScreenshot(safeName);
+                return;
             }
-            if(Display.getInstance().isSimulator()) {
-                io.save(screenshot, Storage.getInstance().createOutputStream(safeName + ".png"), ImageIO.FORMAT_PNG, 1);
+            int width = Math.max(1, image.getWidth());
+            int height = Math.max(1, image.getHeight());
+            if (Display.getInstance().isSimulator()) {
+                io.save(image, Storage.getInstance().createOutputStream(safeName + ".png"), ImageIO.FORMAT_PNG, 1);
             }
             ByteArrayOutputStream pngOut = new ByteArrayOutputStream(Math.max(1024, width * height / 2));
-            io.save(screenshot, pngOut, ImageIO.FORMAT_PNG, 1f);
+            io.save(image, pngOut, ImageIO.FORMAT_PNG, 1f);
             byte[] pngBytes = pngOut.toByteArray();
             println("CN1SS:INFO:test=" + safeName + " png_bytes=" + pngBytes.length);
             emitChannel(pngBytes, safeName, "");
 
-            byte[] preview = encodePreview(io, screenshot, safeName);
+            byte[] preview = encodePreview(io, image, safeName);
             if (preview != null && preview.length > 0) {
                 emitChannel(preview, safeName, PREVIEW_CHANNEL);
             } else {
@@ -79,10 +82,63 @@ interface Cn1ssDeviceRunnerHelper {
         } catch (IOException ex) {
             println("CN1SS:ERR:test=" + safeName + " message=" + ex);
             Log.e(ex);
-            println("CN1SS:END:" + safeName);
+            emitPlaceholderScreenshot(safeName);
         } finally {
-            screenshot.dispose();
+            image.dispose();
+            complete(onComplete);
         }
+    }
+
+    static void emitCurrentFormScreenshot(String testName, Runnable onComplete) {
+        String safeName = sanitizeTestName(testName);
+        Form current = Display.getInstance().getCurrent();
+        if (current == null) {
+            println("CN1SS:ERR:test=" + safeName + " message=Current form is null");
+            emitPlaceholderScreenshot(safeName);
+            complete(onComplete);
+            return;
+        }
+        int width = Math.max(1, current.getWidth());
+        int height = Math.max(1, current.getHeight());
+        Display.getInstance().screenshot(screen -> {
+            if (screen == null) {
+                println("CN1SS:ERR:test=" + safeName + " message=Screenshot callback returned null");
+                emitPlaceholderScreenshot(safeName);
+                complete(onComplete);
+                return;
+            }
+            Image screenshot = screen;
+            try {
+                ImageIO io = ImageIO.getImageIO();
+                if (io == null || !io.isFormatSupported(ImageIO.FORMAT_PNG)) {
+                    println("CN1SS:ERR:test=" + safeName + " message=PNG encoding unavailable");
+                    emitPlaceholderScreenshot(safeName);
+                    return;
+                }
+                if(Display.getInstance().isSimulator()) {
+                    io.save(screenshot, Storage.getInstance().createOutputStream(safeName + ".png"), ImageIO.FORMAT_PNG, 1);
+                }
+                ByteArrayOutputStream pngOut = new ByteArrayOutputStream(Math.max(1024, width * height / 2));
+                io.save(screenshot, pngOut, ImageIO.FORMAT_PNG, 1f);
+                byte[] pngBytes = pngOut.toByteArray();
+                println("CN1SS:INFO:test=" + safeName + " png_bytes=" + pngBytes.length);
+                emitChannel(pngBytes, safeName, "");
+
+                byte[] preview = encodePreview(io, screenshot, safeName);
+                if (preview != null && preview.length > 0) {
+                    emitChannel(preview, safeName, PREVIEW_CHANNEL);
+                } else {
+                    println("CN1SS:INFO:test=" + safeName + " preview_jpeg_bytes=0 preview_quality=0");
+                }
+            } catch (IOException ex) {
+                println("CN1SS:ERR:test=" + safeName + " message=" + ex);
+                Log.e(ex);
+                emitPlaceholderScreenshot(safeName);
+            } finally {
+                screenshot.dispose();
+                complete(onComplete);
+            }
+        });
     }
 
     static byte[] encodePreview(ImageIO io, Image screenshot, String safeName) throws IOException {
@@ -187,5 +243,38 @@ interface Cn1ssDeviceRunnerHelper {
 
     static void println(String line) {
         System.out.println(line);
+    }
+
+    static void emitPlaceholderScreenshot(String safeName) {
+        try {
+            ImageIO io = ImageIO.getImageIO();
+            if (io == null || !io.isFormatSupported(ImageIO.FORMAT_PNG)) {
+                println("CN1SS:END:" + safeName);
+                return;
+            }
+            Image placeholder = Image.createImage(1, 1, 0xffffffff);
+            try {
+                ByteArrayOutputStream pngOut = new ByteArrayOutputStream(128);
+                io.save(placeholder, pngOut, ImageIO.FORMAT_PNG, 1f);
+                byte[] pngBytes = pngOut.toByteArray();
+                println("CN1SS:INFO:test=" + safeName + " png_bytes=" + pngBytes.length + " placeholder=1");
+                emitChannel(pngBytes, safeName, "");
+            } finally {
+                placeholder.dispose();
+            }
+        } catch (Throwable t) {
+            println("CN1SS:ERR:test=" + safeName + " message=placeholder_emit_failed " + t);
+            println("CN1SS:END:" + safeName);
+        }
+    }
+
+    static void complete(Runnable runnable) {
+        if (runnable != null) {
+            runnable.run();
+        }
+    }
+
+    static boolean isHtml5() {
+        return "HTML5".equals(Display.getInstance().getPlatformName());
     }
 }

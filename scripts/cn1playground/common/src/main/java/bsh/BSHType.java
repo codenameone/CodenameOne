@@ -123,6 +123,24 @@ class BSHType extends SimpleNode implements BshClassManager.Listener {
         return descriptor;
     }
 
+    private static boolean resolvesToScriptedClass(Node node, CallStack callstack) {
+        if (callstack == null) return false;
+        try {
+            String text = node.getText();
+            if (text == null) return false;
+            text = text.trim();
+            int lt = text.indexOf('<');
+            if (lt >= 0) text = text.substring(0, lt).trim();
+            if (text.length() == 0 || text.indexOf('.') >= 0) return false;
+            NameSpace top = callstack.top();
+            if (top == null) return false;
+            Object v = top.getVariable(text);
+            return v instanceof ScriptedClass;
+        } catch (UtilEvalError ex) {
+            return false;
+        }
+    }
+
     public Class<?> getType( CallStack callstack, Interpreter interpreter )
         throws EvalError
     {
@@ -134,6 +152,14 @@ class BSHType extends SimpleNode implements BshClassManager.Listener {
         Node node = getTypeNode();
         if ( node instanceof BSHPrimitiveType )
             baseType = ((BSHPrimitiveType)node).getType();
+        else if (resolvesToScriptedClass(node, callstack)) {
+            // A locally-declared scripted class shadows any imported Java
+            // class of the same simple name (e.g. a user-declared
+            // `record Point(...)` should win over com.codename1.ui.geom.Point).
+            // We use Object.class so the assignment is loose; runtime checks
+            // happen at method-call sites.
+            baseType = Object.class;
+        }
         else
             try {
             baseType = ((BSHAmbiguousName)node).toClass(

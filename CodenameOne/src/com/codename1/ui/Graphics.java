@@ -36,7 +36,6 @@ import com.codename1.ui.geom.Shape;
 /// using either a paint callback or a mutable image. There is no supported  way to create this
 /// object directly.
 public final class Graphics {
-
     /// Rendering hint to indicate that the context should prefer to render
     /// primitives in a quick way, at the cost of quality, if there is an
     /// expensive operation.

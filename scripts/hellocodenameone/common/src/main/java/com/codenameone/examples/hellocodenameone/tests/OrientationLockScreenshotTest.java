@@ -1,6 +1,7 @@
 package com.codenameone.examples.hellocodenameone.tests;
 
 import com.codename1.ui.CN;
+import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BoxLayout;
@@ -12,15 +13,24 @@ public class OrientationLockScreenshotTest extends BaseTest {
 
     @Override
     public boolean runTest() {
+        if ("HTML5".equals(Display.getInstance().getPlatformName())) {
+            // Browsers expose only Screen Orientation API, which requires fullscreen
+            // in a worker-hosted Codename One app the port cannot satisfy. Skip with
+            // no screenshot rather than producing a broken capture.
+            System.out.println("CN1SS:INFO:test=OrientationLockScreenshotTest status=SKIPPED reason=platform-unsupported");
+            done();
+            return true;
+        }
         Form hi = new Form("Orientation Lock", new BoxLayout(BoxLayout.Y_AXIS)) {
             @Override
             protected void onShowCompleted() {
                 CN.lockOrientation(false);
                 waitForOrientation(this, false, () -> {
                     waitFor(50);
-                    Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot("landscape");
-                    CN.lockOrientation(true);
-                    waitForOrientation(this, true, OrientationLockScreenshotTest.this::done);
+                    Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot("landscape", () -> {
+                        CN.lockOrientation(true);
+                        waitForOrientation(this, true, OrientationLockScreenshotTest.this::done);
+                    });
                 });
             }
         };

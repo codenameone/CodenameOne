@@ -102,12 +102,336 @@ public final class Reflect {
                 return Primitive.wrap(CN1AccessRegistry.getInstance().invoke(object, methodName, unwrapArgs(args)),
                         null);
             } catch (Exception ex) {
-                throw new EvalError("Error invoking method " + methodName + ": " + ex.getMessage(),
+                Object fallback = invokeWellKnownInterfaceMethod(object, methodName, args);
+                if (fallback != FALLBACK_MISS) return fallback;
+                throw new EvalError(formatInstanceDispatchFailure(object, methodName, args, ex),
                         callerInfo, callstack, ex);
             }
         } finally {
             CN1LambdaSupport.setCurrentNameSpace(prevNs);
         }
+    }
+
+    /** Build a human-readable message for an instance method dispatch
+     * miss. The registry's raw "Generated instance dispatch not
+     * implemented" wording reads like an internal bug; this rephrases it
+     * as a no-such-method error and offers two kinds of "did you mean"
+     * hints — same-class overloads (the user already picked the right
+     * class but has the wrong number/type of arguments, e.g. forgetting
+     * the size float on {@code MultiButton.setMaterialIcon(char, float)})
+     * and static utility helpers (the user reached for an instance
+     * method that actually lives on {@code FontImage} etc., filtered to
+     * those whose first parameter accepts the target's type).
+     * Same-class suggestions come first because they're a stronger
+     * signal — the user is already on the right type.
+     * PlaygroundRunner.safeMessage prefers this message over the cause
+     * via the "did you mean:" / "No matching instance method" markers. */
+    private static String formatInstanceDispatchFailure(Object object, String methodName,
+            Object[] args, Exception cause) {
+        StringBuilder msg = new StringBuilder();
+        msg.append("No matching instance method ")
+                .append(StringUtil.methodString(methodName, Types.getTypes(args)))
+                .append(" on ").append(object.getClass().getName());
+        java.util.List<String> picks = new java.util.ArrayList<String>();
+        collectSameClassOverloads(picks, object, methodName);
+        collectStaticUtilityOverloads(picks, object, methodName);
+        if (!picks.isEmpty()) {
+            msg.append(" — did you mean: ");
+            for (int i = 0; i < picks.size(); i++) {
+                if (i > 0) msg.append(", ");
+                msg.append(picks.get(i));
+            }
+        }
+        return msg.toString();
+    }
+
+    /** Adds overloads of {@code methodName} declared on the target's
+     * runtime class (or any indexed supertype) to {@code picks}. Each
+     * entry is rendered as {@code SimpleName.method(type1, type2)} —
+     * the registry's signature index now carries simple parameter type
+     * names, so we surface the actual overload rather than
+     * {@code (...)}. We can't walk the class hierarchy via
+     * {@code Class.getSuperclass()} (CN1 compliance forbids it), so
+     * we iterate the indexed classes and use {@code Class.isInstance} —
+     * which is allowed — to find supertype matches. The leaf class is
+     * checked first so direct matches are O(1); only when the leaf
+     * has no overload do we fall back to the broader scan, stopping
+     * at the most-specific declaring class. */
+    private static void collectSameClassOverloads(java.util.List<String> picks,
+            Object target, String methodName) {
+        if (target == null || methodName == null || methodName.isEmpty()) return;
+        bsh.cn1.CN1Access registry = CN1AccessRegistry.getInstance();
+        if (!(registry instanceof bsh.cn1.GeneratedCN1Access)) return;
+        bsh.cn1.GeneratedCN1Access gen = (bsh.cn1.GeneratedCN1Access) registry;
+        String namePrefix = methodName + "(";
+        Class<?> targetClass = target.getClass();
+
+        if (addMatchingOverloads(picks, targetClass.getSimpleName(),
+                gen.getMethodSignatures(targetClass.getName()), namePrefix, 3)) {
+            return;
+        }
+        String[] classes = gen.getIndexedClassNames();
+        if (classes == null) return;
+        for (int i = 0; i < classes.length; i++) {
+            String className = classes[i];
+            if (className == null || className.equals(targetClass.getName())) continue;
+            String[] sigs = gen.getMethodSignatures(className);
+            if (!signaturesContain(sigs, namePrefix)) continue;
+            Class<?> candidate = gen.findClass(className);
+            if (candidate == null || !candidate.isInstance(target)) continue;
+            if (addMatchingOverloads(picks, candidate.getSimpleName(), sigs, namePrefix, 3)) {
+                return;
+            }
+        }
+    }
+
+    /** Adds static-utility overloads of {@code methodName} to
+     * {@code picks}, filtered to overloads whose first parameter
+     * accepts the target's runtime type. Filtering is essential
+     * because static utility classes like {@code FontImage} have a
+     * separate {@code setMaterialIcon} overload for each component
+     * subtype (Label, MultiButton, SpanButton, ...) — surfacing the
+     * Label overload as a "did you mean" for a MultiButton target is
+     * misleading. We compute the set of simple class names that the
+     * target {@code isInstance} of by walking the registry's class
+     * index, then keep only signatures whose first param falls in
+     * that set. */
+    private static void collectStaticUtilityOverloads(java.util.List<String> picks,
+            Object target, String methodName) {
+        if (target == null || methodName == null || methodName.isEmpty()) return;
+        bsh.cn1.CN1Access registry = CN1AccessRegistry.getInstance();
+        if (!(registry instanceof bsh.cn1.GeneratedCN1Access)) return;
+        bsh.cn1.GeneratedCN1Access gen = (bsh.cn1.GeneratedCN1Access) registry;
+        String targetClassName = target.getClass().getName();
+        String namePrefix = methodName + "(";
+
+        java.util.Set<String> applicableSimpleNames = collectApplicableSimpleNames(gen, target);
+        int cap = picks.size() + 3;
+        for (int i = 0; i < STATIC_UTILITY_CLASSES.length && picks.size() < cap; i++) {
+            String className = STATIC_UTILITY_CLASSES[i];
+            if (className.equals(targetClassName)) continue;
+            String[] sigs = gen.getMethodSignatures(className);
+            if (sigs == null || sigs.length == 0) continue;
+            String simple = className.substring(className.lastIndexOf('.') + 1);
+            for (int s = 0; s < sigs.length && picks.size() < cap; s++) {
+                String sig = sigs[s];
+                if (sig == null || !sig.startsWith(namePrefix)) continue;
+                if (!firstParamIsApplicable(sig, namePrefix, applicableSimpleNames)) continue;
+                String suggestion = simple + "." + sig;
+                if (!picks.contains(suggestion)) picks.add(suggestion);
+            }
+        }
+    }
+
+    /** Builds the set of simple class names {@code target} is an
+     * instance of by walking the registry's class index. Used to
+     * filter static-utility overloads to those whose first parameter
+     * actually accepts the target — without it, the diagnostic would
+     * suggest e.g. {@code FontImage.setMaterialIcon(Label, char)}
+     * for a MultiButton target. */
+    private static java.util.Set<String> collectApplicableSimpleNames(
+            bsh.cn1.GeneratedCN1Access gen, Object target) {
+        java.util.Set<String> result = new java.util.HashSet<String>();
+        result.add(target.getClass().getSimpleName());
+        String[] indexed = gen.getIndexedClassNames();
+        if (indexed == null) return result;
+        for (int i = 0; i < indexed.length; i++) {
+            Class<?> c = gen.findClass(indexed[i]);
+            if (c != null && c.isInstance(target)) {
+                result.add(c.getSimpleName());
+            }
+        }
+        return result;
+    }
+
+    /** Returns true when the signature's first parameter type — as
+     * encoded in the registry — names a class that's a supertype (by
+     * simple name) of the target. Signatures lack array brackets only
+     * if the param is a non-array type; we strip a trailing
+     * {@code "[]"} and {@code "..."} to compare just the base type. */
+    private static boolean firstParamIsApplicable(String sig, String namePrefix,
+            java.util.Set<String> applicableSimpleNames) {
+        int paramsStart = namePrefix.length();
+        int paramsEnd = sig.indexOf(')', paramsStart);
+        if (paramsEnd <= paramsStart) return false;
+        String first = sig.substring(paramsStart, paramsEnd);
+        int comma = first.indexOf(',');
+        if (comma > 0) first = first.substring(0, comma);
+        first = first.trim();
+        if (first.endsWith("...")) first = first.substring(0, first.length() - 3);
+        while (first.endsWith("[]")) first = first.substring(0, first.length() - 2);
+        return applicableSimpleNames.contains(first);
+    }
+
+    private static boolean signaturesContain(String[] sigs, String namePrefix) {
+        if (sigs == null) return false;
+        for (int i = 0; i < sigs.length; i++) {
+            String s = sigs[i];
+            if (s != null && s.startsWith(namePrefix)) return true;
+        }
+        return false;
+    }
+
+    /** Adds matches from {@code sigs} prefixed with {@code namePrefix}
+     * into {@code picks} as {@code SimpleName.method(...)}, returning
+     * true when at least one match was added. */
+    private static boolean addMatchingOverloads(java.util.List<String> picks,
+            String simpleClassName, String[] sigs, String namePrefix, int maxFromThisClass) {
+        if (sigs == null) return false;
+        int added = 0;
+        for (int i = 0; i < sigs.length && added < maxFromThisClass; i++) {
+            String s = sigs[i];
+            if (s == null || !s.startsWith(namePrefix)) continue;
+            String suggestion = simpleClassName + "." + s;
+            if (!picks.contains(suggestion)) {
+                picks.add(suggestion);
+                added++;
+            }
+        }
+        return added > 0;
+    }
+
+    /** Curated list of CN1 utility classes whose static helpers commonly
+     * take a Component-or-similar target as their first argument. When an
+     * instance method dispatch fails, we check these classes for a static
+     * method by the same name and surface them as a "did you mean"
+     * suggestion. Reflection (Class.getMethods etc.) isn't available in
+     * the playground's compliance-checked code path, so we rely on the
+     * registry's name-only signature index — that's lossy on parameter
+     * types but accurate enough to point the user at the right class. */
+    private static final String[] STATIC_UTILITY_CLASSES = {
+            "com.codename1.ui.FontImage",
+            "com.codename1.ui.ComponentSelector",
+            "com.codename1.ui.layouts.BorderLayout",
+            "com.codename1.ui.layouts.BoxLayout",
+            "com.codename1.ui.layouts.FlowLayout",
+            "com.codename1.ui.layouts.GridLayout",
+            "com.codename1.ui.layouts.LayeredLayout",
+            "com.codename1.ui.CN",
+            "com.codename1.ui.Display",
+            "com.codename1.ui.util.Resources"
+    };
+
+    private static final Object FALLBACK_MISS = new Object();
+
+    /** Last-resort dispatch for well-known Java interface methods that
+     * don't have a registry entry on the concrete type. Covers the
+     * common case of java.util.Map.Entry (implementation is
+     * HashMap$Node / TreeMap$Entry / etc., none of which are in the
+     * registry) and Collection.stream() (CN1's Collection backport
+     * doesn't expose stream — we route to a minimal CN1StreamBridge
+     * shim). Only uses direct virtual calls — no reflection. */
+    @SuppressWarnings("unchecked")
+    private static Object invokeWellKnownInterfaceMethod(
+            Object object, String methodName, Object[] args) {
+        if (object instanceof java.util.Map.Entry) {
+            java.util.Map.Entry entry = (java.util.Map.Entry) object;
+            if (args == null || args.length == 0) {
+                if ("getKey".equals(methodName)) return entry.getKey();
+                if ("getValue".equals(methodName)) return entry.getValue();
+            } else if (args.length == 1 && "setValue".equals(methodName)) {
+                return entry.setValue(unwrapArgs(args)[0]);
+            }
+        }
+        if (object instanceof java.util.Collection
+                && "stream".equals(methodName)
+                && (args == null || args.length == 0)) {
+            return new bsh.cn1.CN1StreamBridge((java.util.Collection<?>) object);
+        }
+        if (object instanceof bsh.cn1.CN1StreamBridge) {
+            Object dispatched = dispatchStreamBridge((bsh.cn1.CN1StreamBridge) object, methodName, unwrapArgs(args));
+            if (dispatched != FALLBACK_MISS) return dispatched;
+        }
+        return FALLBACK_MISS;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Object dispatchStreamBridge(bsh.cn1.CN1StreamBridge sb, String methodName, Object[] unwrapped) {
+        int n = unwrapped.length;
+        if ("filter".equals(methodName) && n == 1
+                && unwrapped[0] instanceof java.util.function.Predicate) {
+            return sb.filter((java.util.function.Predicate<Object>) unwrapped[0]);
+        }
+        if ("map".equals(methodName) && n == 1
+                && unwrapped[0] instanceof java.util.function.Function) {
+            return sb.map((java.util.function.Function<Object, Object>) unwrapped[0]);
+        }
+        if ("flatMap".equals(methodName) && n == 1
+                && unwrapped[0] instanceof java.util.function.Function) {
+            return sb.flatMap((java.util.function.Function<Object, Object>) unwrapped[0]);
+        }
+        if ("peek".equals(methodName) && n == 1
+                && unwrapped[0] instanceof java.util.function.Consumer) {
+            return sb.peek((java.util.function.Consumer<Object>) unwrapped[0]);
+        }
+        if ("sorted".equals(methodName)) {
+            if (n == 0) return sb.sorted();
+            if (n == 1 && unwrapped[0] instanceof java.util.Comparator) {
+                return sb.sorted((java.util.Comparator<Object>) unwrapped[0]);
+            }
+        }
+        if ("distinct".equals(methodName) && n == 0) return sb.distinct();
+        if ("limit".equals(methodName) && n == 1 && unwrapped[0] instanceof Number) {
+            return sb.limit(((Number) unwrapped[0]).longValue());
+        }
+        if ("skip".equals(methodName) && n == 1 && unwrapped[0] instanceof Number) {
+            return sb.skip(((Number) unwrapped[0]).longValue());
+        }
+        if ("forEach".equals(methodName) && n == 1
+                && unwrapped[0] instanceof java.util.function.Consumer) {
+            sb.forEach((java.util.function.Consumer<Object>) unwrapped[0]);
+            return null;
+        }
+        if ("count".equals(methodName) && n == 0) return Long.valueOf(sb.count());
+        if ("anyMatch".equals(methodName) && n == 1
+                && unwrapped[0] instanceof java.util.function.Predicate) {
+            return Boolean.valueOf(sb.anyMatch((java.util.function.Predicate<Object>) unwrapped[0]));
+        }
+        if ("allMatch".equals(methodName) && n == 1
+                && unwrapped[0] instanceof java.util.function.Predicate) {
+            return Boolean.valueOf(sb.allMatch((java.util.function.Predicate<Object>) unwrapped[0]));
+        }
+        if ("noneMatch".equals(methodName) && n == 1
+                && unwrapped[0] instanceof java.util.function.Predicate) {
+            return Boolean.valueOf(sb.noneMatch((java.util.function.Predicate<Object>) unwrapped[0]));
+        }
+        if ("findFirst".equals(methodName) && n == 0) return sb.findFirst();
+        if ("findAny".equals(methodName) && n == 0) return sb.findAny();
+        if ("min".equals(methodName)) {
+            if (n == 0) return sb.min();
+            if (n == 1 && unwrapped[0] instanceof java.util.Comparator) {
+                return sb.min((java.util.Comparator<Object>) unwrapped[0]);
+            }
+        }
+        if ("max".equals(methodName)) {
+            if (n == 0) return sb.max();
+            if (n == 1 && unwrapped[0] instanceof java.util.Comparator) {
+                return sb.max((java.util.Comparator<Object>) unwrapped[0]);
+            }
+        }
+        if ("reduce".equals(methodName)) {
+            java.util.function.BinaryOperator<Object> binaryOp = null;
+            int opIndex = -1;
+            if (n == 1) opIndex = 0;
+            else if (n == 2) opIndex = 1;
+            if (opIndex >= 0) {
+                if (unwrapped[opIndex] instanceof java.util.function.BinaryOperator) {
+                    binaryOp = (java.util.function.BinaryOperator<Object>) unwrapped[opIndex];
+                } else if (unwrapped[opIndex] instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
+                    binaryOp = bsh.cn1.CN1LambdaSupport.asBinaryOperator(
+                            (bsh.cn1.CN1LambdaSupport.LambdaValue) unwrapped[opIndex]);
+                }
+            }
+            if (binaryOp != null) {
+                if (n == 1) return sb.reduce(binaryOp);
+                return sb.reduce(unwrapped[0], binaryOp);
+            }
+        }
+        if ("toArray".equals(methodName) && n == 0) return sb.toArray();
+        if ("toList".equals(methodName) && n == 0) return sb.toList();
+        if ("collect".equals(methodName) && n == 1) return sb.collect(unwrapped[0]);
+        if ("iterator".equals(methodName) && n == 0) return sb.iterator();
+        return FALLBACK_MISS;
     }
 
     static TargetError targetErrorFromTargetException(Throwable e,
@@ -138,8 +462,11 @@ public final class Reflect {
                 return Primitive.wrap(CN1AccessRegistry.getInstance().invokeStatic(clas, methodName, unwrapArgs(args)),
                         null);
             } catch (Exception ex) {
-                throw new ReflectError("Static method " + StringUtil.methodString(methodName, Types.getTypes(args))
-                        + " not found in class '" + clas.getName() + "'", ex);
+                String hint = suggestNearestMethod(clas, methodName);
+                String msg = "Static method " + StringUtil.methodString(methodName, Types.getTypes(args))
+                        + " not found in class '" + clas.getName() + "'";
+                if (hint != null) msg += " (did you mean: " + hint + "?)";
+                throw new ReflectError(msg, ex);
             }
         } finally {
             CN1LambdaSupport.setCurrentNameSpace(prevNs);
@@ -151,7 +478,118 @@ public final class Reflect {
         try {
             return Primitive.wrap(CN1AccessRegistry.getInstance().getStaticField(clas, fieldName), null);
         } catch (Exception ex) {
-            throw new ReflectError("No such field: " + fieldName + " for class: " + clas.getName(), ex);
+            // Nested class/interface fallback: treat `Outer.Inner` as a
+            // reference to the nested Java class `Outer$Inner`. The CN1
+            // registry indexes nested types by their full dotted name; try
+            // that first, then fall back to a JVM-form class lookup.
+            Class<?> nested = lookupNestedJavaClass(clas, fieldName);
+            if (nested != null) {
+                return new ClassIdentifier(nested);
+            }
+            // Repackage the registry's terse exception with a "did you
+            // mean" suggestion. We re-throw an unchecked RuntimeException
+            // so the suggestion-bearing message is what surfaces through
+            // BSH's evaluation chain (which would otherwise swallow our
+            // wrapped ReflectError on the static-field property fallback
+            // path and surface the registry's original message instead).
+            String hint = suggestNearestField(clas, fieldName);
+            String original = ex.getMessage() == null ? "" : ex.getMessage();
+            String msg = original.isEmpty() ? "No such field: " + fieldName : original;
+            if (hint != null) msg += " (did you mean: " + hint + "?)";
+            throw new RuntimeException(msg, ex);
+        }
+    }
+
+    /** Compare the requested name against the registry's known field
+     * names for this class and return a comma-separated list of the
+     * closest matches (case-insensitive prefix or short edit
+     * distance). Returns {@code null} when no known names are available
+     * or no name is plausibly close. */
+    static String suggestNearestField(Class<?> clas, String requested) {
+        if (clas == null || requested == null) return null;
+        bsh.cn1.CN1Access registry = CN1AccessRegistry.getInstance();
+        if (!(registry instanceof bsh.cn1.GeneratedCN1Access)) return null;
+        try {
+            String[] names = ((bsh.cn1.GeneratedCN1Access) registry).getFieldNames(clas.getName());
+            return pickSuggestions(names, requested, 3);
+        } catch (Throwable ignore) {
+            return null;
+        }
+    }
+
+    static String suggestNearestMethod(Class<?> clas, String requested) {
+        if (clas == null || requested == null) return null;
+        bsh.cn1.CN1Access registry = CN1AccessRegistry.getInstance();
+        if (!(registry instanceof bsh.cn1.GeneratedCN1Access)) return null;
+        try {
+            String[] names = ((bsh.cn1.GeneratedCN1Access) registry).getMethodSignatures(clas.getName());
+            return pickSuggestions(names, requested, 3);
+        } catch (Throwable ignore) {
+            return null;
+        }
+    }
+
+    private static String pickSuggestions(String[] candidates, String requested, int max) {
+        if (candidates == null || candidates.length == 0) return null;
+        String lowerReq = requested.toLowerCase();
+        java.util.List<String> exact = new java.util.ArrayList<String>();
+        java.util.List<String> close = new java.util.ArrayList<String>();
+        for (String c : candidates) {
+            if (c == null) continue;
+            String lc = c.toLowerCase();
+            if (lc.equals(lowerReq) || lc.startsWith(lowerReq) || lowerReq.startsWith(lc)) {
+                exact.add(c);
+            } else if (editDistance(lc, lowerReq) <= Math.max(2, requested.length() / 3)) {
+                close.add(c);
+            }
+        }
+        java.util.List<String> picks = exact.isEmpty() ? close : exact;
+        if (picks.isEmpty()) return null;
+        StringBuilder out = new StringBuilder();
+        int n = Math.min(max, picks.size());
+        for (int i = 0; i < n; i++) {
+            if (i > 0) out.append(", ");
+            out.append(picks.get(i));
+        }
+        return out.toString();
+    }
+
+    /** Cheap iterative Levenshtein. The candidate sets are bounded by
+     * the registry size for one class (typically dozens), so the
+     * O(m·n) cost per name is fine. */
+    private static int editDistance(String a, String b) {
+        int la = a.length();
+        int lb = b.length();
+        if (la == 0) return lb;
+        if (lb == 0) return la;
+        int[] prev = new int[lb + 1];
+        int[] curr = new int[lb + 1];
+        for (int j = 0; j <= lb; j++) prev[j] = j;
+        for (int i = 1; i <= la; i++) {
+            curr[0] = i;
+            for (int j = 1; j <= lb; j++) {
+                int cost = a.charAt(i - 1) == b.charAt(j - 1) ? 0 : 1;
+                curr[j] = Math.min(Math.min(curr[j - 1] + 1, prev[j] + 1), prev[j - 1] + cost);
+            }
+            int[] tmp = prev; prev = curr; curr = tmp;
+        }
+        return prev[lb];
+    }
+
+    private static Class<?> lookupNestedJavaClass(Class<?> outer, String nestedName) {
+        // Try the CN1 registry first (uses dotted nested names).
+        try {
+            Class<?> viaRegistry = CN1AccessRegistry.getInstance()
+                    .findClass(outer.getName() + "." + nestedName);
+            if (viaRegistry != null) return viaRegistry;
+        } catch (Exception ignore) {
+        }
+        // Fall back to the JVM's `$`-separated form, which works for any
+        // public nested type regardless of registry coverage.
+        try {
+            return Class.forName(outer.getName() + "$" + nestedName);
+        } catch (ClassNotFoundException ignore) {
+            return null;
         }
     }
 

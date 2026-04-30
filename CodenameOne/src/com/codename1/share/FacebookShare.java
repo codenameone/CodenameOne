@@ -41,6 +41,13 @@ import java.io.InputStream;
 /// Facebook sharing service
 ///
 /// @author Chen
+///
+/// @deprecated This share service relies on the legacy [com.codename1.facebook.FaceBookAccess]
+/// OAuth/Graph flow which is no longer supported by Facebook. Use a [com.codename1.ui.BrowserComponent]
+/// pointed at a Facebook share URL, or delegate to the native share sheet. This class will be
+/// removed in a future release.
+@Deprecated
+@SuppressWarnings("deprecation")
 public class FacebookShare extends ShareService {
 
     private String token;

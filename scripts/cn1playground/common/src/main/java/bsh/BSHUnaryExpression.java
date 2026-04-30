@@ -79,6 +79,25 @@ class BSHUnaryExpression extends SimpleNode implements ParserConstants
         if ( op instanceof Boolean )
             op = (Boolean) op ? Primitive.TRUE : Primitive.FALSE;
 
+        // Array-element access (a[0] on an int[]) and field reads on
+        // generated types yield a boxed wrapper rather than a Primitive.
+        // Wrap numeric/char wrappers so postfix/prefix `++`/`--` on
+        // subscripted elements works.
+        if ( op instanceof Integer )
+            op = new Primitive(((Integer) op).intValue());
+        else if ( op instanceof Long )
+            op = new Primitive(((Long) op).longValue());
+        else if ( op instanceof Short )
+            op = new Primitive(((Short) op).shortValue());
+        else if ( op instanceof Byte )
+            op = new Primitive(((Byte) op).byteValue());
+        else if ( op instanceof Float )
+            op = new Primitive(((Float) op).floatValue());
+        else if ( op instanceof Double )
+            op = new Primitive(((Double) op).doubleValue());
+        else if ( op instanceof Character )
+            op = new Primitive(((Character) op).charValue());
+
         if ( !(op instanceof Primitive) )
             throw new UtilEvalError( "Unary operation " + tokenImage[kind]
                 + " inappropriate for object" );

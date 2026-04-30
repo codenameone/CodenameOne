@@ -197,14 +197,17 @@ public final class GeneratedAccess_com_codename1_processing {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == com.codename1.processing.Result.class) {
-            if ("ARRAY_END".equals(name)) return com.codename1.processing.Result.ARRAY_END;
-            if ("ARRAY_START".equals(name)) return com.codename1.processing.Result.ARRAY_START;
-            if ("JSON".equals(name)) return com.codename1.processing.Result.JSON;
-            if ("SEPARATOR".equals(name)) return com.codename1.processing.Result.SEPARATOR;
-            if ("XML".equals(name)) return com.codename1.processing.Result.XML;
-        }
+        if (type == com.codename1.processing.Result.class) return getStaticField0(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("ARRAY_END".equals(name)) return com.codename1.processing.Result.ARRAY_END;
+        if ("ARRAY_START".equals(name)) return com.codename1.processing.Result.ARRAY_START;
+        if ("JSON".equals(name)) return com.codename1.processing.Result.JSON;
+        if ("SEPARATOR".equals(name)) return com.codename1.processing.Result.SEPARATOR;
+        if ("XML".equals(name)) return com.codename1.processing.Result.XML;
+        throw unsupportedStaticField(com.codename1.processing.Result.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {
@@ -358,7 +361,19 @@ public final class GeneratedAccess_com_codename1_processing {
         if (!(value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue)) {
             return value;
         }
+        // Direct fit when LambdaValue already implements the target SAM
+        // (Runnable, Function, Comparator, ...).
+        if (type.isInstance(value)) {
+            return value;
+        }
         return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
+    }
+
+    private static int toIntValue(Object value) {
+        if (value instanceof Number) return ((Number) value).intValue();
+        if (value instanceof Character) return (int) ((Character) value).charValue();
+        throw new ClassCastException("Cannot coerce "
+            + (value == null ? "null" : value.getClass().getName()) + " to int");
     }
 
     private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
@@ -413,10 +428,15 @@ public final class GeneratedAccess_com_codename1_processing {
         if ("byte".equals(type.getName()) || type == Byte.class || "short".equals(type.getName()) || type == Short.class
                 || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
                 || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
-            return value instanceof Number;
+            // Java widens char to int implicitly, so accept Character
+            // for any int-or-larger numeric slot.
+            return value instanceof Number || value instanceof Character;
         }
         if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
-            return isSamInterface(type);
+            // LambdaValue implements common SAMs directly (Runnable,
+            // Function, Predicate, Comparator, ...). Also accept any
+            // CN1 SAM the listener-bridge knows how to wrap.
+            return type.isInstance(value) || isSamInterface(type);
         }
         return type.isInstance(value);
     }

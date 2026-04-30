@@ -26,9 +26,9 @@
 package bsh;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.HashMap;
 
 /**
     What's in a name?  I'll tell you...
@@ -436,6 +436,26 @@ class Name implements java.io.Serializable
             return completeRound( field, suffix(evalName), obj );
         }
 
+        // Scripted-class instances expose fields via their backing namespace.
+        if (evalBaseObject instanceof ScriptedInstance) {
+            Object obj = ((ScriptedInstance) evalBaseObject).getField(field);
+            if (obj != Primitive.VOID) {
+                return completeRound( field, suffix(evalName), obj );
+            }
+        }
+        // Static fields / enum constants on a scripted class.
+        if (evalBaseObject instanceof ScriptedClass) {
+            try {
+                Object obj = ((ScriptedClass) evalBaseObject)
+                        .getStaticNameSpace().getVariable(field);
+                if (obj != Primitive.VOID) {
+                    return completeRound( field, suffix(evalName), obj );
+                }
+            } catch (UtilEvalError ex) {
+                // fall through to error path
+            }
+        }
+
         // Check for field on object
         // Note: could eliminate throwing the exception somehow
         try {
@@ -707,6 +727,27 @@ class Name implements java.io.Serializable
                     "Can't assign to special variable: "+evalName );
 
             Interpreter.debug("found This reference evaluating LHS");
+            // Scripted-class `this.x = v` inside an instance method:
+            // BSH's resolveThisFieldReference returns the innermost This
+            // (the method's local-scope This), so a plain VARIABLE LHS
+            // ends up mutating a local variable rather than the instance
+            // field. Walk the namespace chain for a user-bound
+            // ScriptedInstance and target its instance namespace instead.
+            NameSpace thisNs = ((This) obj).namespace;
+            NameSpace walk = thisNs;
+            while (walk != null) {
+                try {
+                    Object inner = walk.getVariable("this");
+                    if (inner instanceof ScriptedInstance) {
+                        return new LHS(
+                                ((ScriptedInstance) inner).getInstanceNameSpace(),
+                                evalName, true);
+                    }
+                } catch (UtilEvalError ignore) {
+                    // try the parent namespace
+                }
+                walk = walk.getParent();
+            }
             /*
                 If this was a literal "super" reference then we allow recursion
                 in setting the variable to get the normal effect of finding the
@@ -723,6 +764,34 @@ class Name implements java.io.Serializable
 
         if ( evalName != null )
         {
+            // Scripted-class field LHS: route through the instance's
+            // namespace as a VARIABLE LHS so assignment updates the field
+            // value without falling to Reflect.setObjectProperty (which
+            // invokes getter/setter methods on a null callstack).
+            if ( obj instanceof ScriptedInstance ) {
+                return new LHS(((ScriptedInstance) obj).getInstanceNameSpace(),
+                        evalName, true);
+            }
+            if ( obj instanceof ScriptedClass ) {
+                return new LHS(((ScriptedClass) obj).getStaticNameSpace(),
+                        evalName, true);
+            }
+            // When `this` resolves through BSH's builtin (returning a
+            // bsh.This whose namespace contains a user-bound ScriptedInstance
+            // under the variable name "this"), route the assignment to the
+            // ScriptedInstance's instance namespace too.
+            if ( obj instanceof This ) {
+                try {
+                    Object inner = ((This) obj).namespace.getVariable("this");
+                    if ( inner instanceof ScriptedInstance ) {
+                        return new LHS(
+                                ((ScriptedInstance) inner).getInstanceNameSpace(),
+                                evalName, true);
+                    }
+                } catch (UtilEvalError ex) {
+                    // fall through
+                }
+            }
             try {
                 if ( obj instanceof ClassIdentifier )
                 {
@@ -765,6 +834,23 @@ class Name implements java.io.Serializable
             java.lang.Integer.getInteger("foo");
         </pre>
     */
+    /** Walk up the callstack to find a NameSpace whose `this` binding is a
+     * ScriptedInstance. Used to back-out the receiver for `super.foo()`
+     * dispatch from inside a scripted-class method body. */
+    private static ScriptedInstance findScriptedThis(CallStack callstack) {
+        if (callstack == null) return null;
+        for (int i = 0; i < callstack.depth(); i++) {
+            NameSpace ns = callstack.get(i);
+            try {
+                Object t = ns.getVariable("this");
+                if (t instanceof ScriptedInstance) return (ScriptedInstance) t;
+            } catch (UtilEvalError ex) {
+                // continue walking
+            }
+        }
+        return null;
+    }
+
     public Object invokeMethod(
         Interpreter interpreter, Object[] args, CallStack callstack,
         Node callerInfo
@@ -800,6 +886,35 @@ class Name implements java.io.Serializable
 
         // Superclass method invocation? (e.g. super.foo())
         if ( prefix.equals("super") && Name.countParts(value) == 2 ) {
+            // Scripted-class super dispatch: walk up the callstack to find the
+            // bound ScriptedInstance and invoke the parent's method template.
+            // The "current dispatch class" override is consulted first so
+            // that chained super calls through multi-level inheritance
+            // advance up the chain instead of looping on the same parent.
+            ScriptedInstance scriptedThis = findScriptedThis(callstack);
+            if (scriptedThis != null) {
+                ScriptedClass dispatchClass = ScriptedClass.currentDispatchClass();
+                if (dispatchClass == null) {
+                    dispatchClass = scriptedThis.getScriptedClass();
+                }
+                ScriptedClass parentClass = dispatchClass.getParent();
+                ScriptedClass.MethodTemplate parentTpl = parentClass == null
+                        ? null
+                        : parentClass.findInstanceMethodTemplate(methodName, args);
+                if (parentTpl != null) {
+                    BshMethod bound = parentTpl.bind(scriptedThis.getInstanceNameSpace());
+                    ScriptedClass.pushDispatchClass(parentClass);
+                    try {
+                        return bound.invoke(args, interpreter, callstack, callerInfo, false);
+                    } finally {
+                        ScriptedClass.popDispatchClass();
+                    }
+                }
+                throw new UtilEvalError("No super method "
+                        + scriptedThis.getScriptedClass().getName()
+                        + "." + methodName + "/"
+                        + (args == null ? 0 : args.length));
+            }
             // Allow getThis() to work through block namespaces first
             This ths = namespace.getThis( interpreter );
             NameSpace thisNameSpace = ths.getNameSpace();
@@ -829,6 +944,26 @@ class Name implements java.io.Serializable
                     throw new UtilTargetError( new NullPointerException(
                         "Null Pointer in Method Invocation of " +methodName
                             +"() on variable: "+targetName) );
+
+            // Scripted-class instances dispatch through their own descriptor,
+            // not through the CN1 access registry.
+            if ( obj instanceof ScriptedInstance ) {
+                return ((ScriptedInstance) obj).invokeMethod(
+                        methodName, args, interpreter, callstack, callerInfo);
+            }
+            // Static-method dispatch on a scripted class or interface or enum.
+            if ( obj instanceof ScriptedClass ) {
+                ScriptedClass sc = (ScriptedClass) obj;
+                BshMethod m = sc.findStaticMethod(methodName, args);
+                if (m != null) {
+                    return m.invoke(args, interpreter, callstack, callerInfo);
+                }
+                Object builtin = sc.invokeEnumBuiltinStatic(methodName, args);
+                if (builtin != null) return builtin;
+                throw new UtilEvalError("No static method " + sc.getName()
+                        + "." + methodName + "/"
+                        + (args == null ? 0 : args.length));
+            }
 
             // enum block members will be in namespace only
             if ( obj.getClass().isEnum() ) {
@@ -915,6 +1050,36 @@ class Name implements java.io.Serializable
                     && !isNoOverride(meth.getName());
 
             return meth.invoke( args, interpreter, callstack, callerInfo, overrideChild );
+        }
+
+        // super(args) inside a scripted-class constructor: forward to the
+        // matching ctor on the parent ScriptedClass, or if the parent is a
+        // Java class, construct a delegate Java instance and stash it on
+        // the ScriptedInstance so subsequent method calls can fall through
+        // to the real Java parent (common for Exception subclasses).
+        if ("super".equals(methodName)) {
+            ScriptedInstance scriptedThis = findScriptedThis(callstack);
+            if (scriptedThis != null) {
+                ScriptedClass sc = scriptedThis.getScriptedClass();
+                if (sc.getParent() != null) {
+                    ScriptedClass.MethodTemplate ctor = sc.getParent().findConstructorTemplate(args);
+                    if (ctor != null) {
+                        BshMethod bound = ctor.bind(scriptedThis.getInstanceNameSpace());
+                        return bound.invoke(args, interpreter, callstack, callerInfo, false);
+                    }
+                }
+                if (sc.getJavaParent() != null) {
+                    try {
+                        Object delegate = Reflect.constructObject(sc.getJavaParent(), args);
+                        scriptedThis.setJavaDelegate(delegate);
+                        return Primitive.VOID;
+                    } catch (ReflectError ex) {
+                        throw new EvalError("super() for Java parent "
+                                + sc.getJavaParent().getName() + " failed: " + ex.getMessage(),
+                                callerInfo, callstack);
+                    }
+                }
+            }
         }
 
         // Look for a BeanShell command

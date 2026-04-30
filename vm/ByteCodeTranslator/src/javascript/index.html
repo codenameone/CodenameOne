@@ -2,22 +2,24 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>ParparVM JS</title>
+<title>Codename One JavaScript Port</title>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
+<div id="cn1-splash">
+  <p>Loading...</p>
+</div>
+<canvas id="codenameone-canvas" width="320" height="480"></canvas>
 <script>
-const worker = new Worker('worker.js');
-window.__parparMessages = [];
-worker.onmessage = function(event) {
-  window.__parparMessages.push(event.data);
-  if (event.data && event.data.type === 'result') {
-    window.__parparResult = event.data;
-  }
-  if (event.data && event.data.type === 'error') {
-    window.__parparError = event.data;
-  }
+window.cn1LoadedFiles = window.cn1LoadedFiles || [];
+window.cn1LoadedFile = window.cn1LoadedFile || function(filename) {
+  window.cn1LoadedFiles.push(String(filename || ""));
 };
-worker.postMessage({ type: 'start' });
 </script>
+<script src="js/push.js"></script>
+<script src="js/jquery.min.js"></script>
+<script src="js/fontmetrics.js"></script>
+<script src="js/bootstrap.min.js"></script>
+<script src="browser_bridge.js"></script>
 </body>
 </html>

@@ -1029,6 +1029,16 @@ def main() -> None:
                 print(f"  - {v.rule}: {v.location} - {v.message}")
             exit(1)
 
+    checkstyle = parse_checkstyle()
+    if checkstyle:
+        violations = [f for f in checkstyle.findings if f.severity == "Error"]
+        if violations:
+            print("\n❌ Build failed due to Checkstyle errors:")
+            for v in violations:
+                rule = v.rule or "unknown"
+                print(f"  - {rule}: {v.location} - {v.message}")
+            exit(1)
+
 
 if __name__ == "__main__":
     main()

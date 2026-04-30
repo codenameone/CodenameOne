@@ -145,22 +145,17 @@ public class CodenameOneView {
     }
 
     public void visibilityChangedTo(boolean visible) {
-        boolean changed = visible;
-        if (this.implementation.getCurrentForm() != null && changed) {
-            if (visible) {
-                this.implementation.showNotifyPublic();
-                /**
-                 * request a full repaint as our surfaceview is most likely
-                 * black if this app comes back from the background.
-                 */
-                this.implementation.getCurrentForm().repaint();
-                //android.os.Debug.startMethodTracing("calc");
-            } else {
-                this.implementation.hideNotifyPublic();
-                //android.os.Debug.stopMethodTracing();
-            }
+        if (this.implementation.getCurrentForm() == null) {
+            return;
         }
-        //flushGraphics();
+        if (visible) {
+            this.implementation.showNotifyPublic();
+            // request a full repaint as our surfaceview is most likely
+            // black if this app comes back from the background.
+            this.implementation.getCurrentForm().repaint();
+        } else {
+            this.implementation.hideNotifyPublic();
+        }
     }
 
     private void updateSafeArea() {

@@ -22,6 +22,24 @@ function javascript {
   
   "$MVNW" "package" "-DskipTests" "-Dcodename1.platform=javascript" "-Dcodename1.buildTarget=javascript" "-U" "-e"
 }
+function javascript_compare {
+  "javascript"
+  local legacy_zip=""
+  legacy_zip="$(ls -1 javascript/target/result.zip javascript/target/cn1playground-javascript-*.zip 2>/dev/null | head -n1 || true)"
+  if [ -z "$legacy_zip" ] || [ ! -f "$legacy_zip" ]; then
+    echo "Legacy Playground JavaScript bundle not found under javascript/target" >&2
+    exit 3
+  fi
+  if [ -z "${PLAYGROUND_PARPARVM_BUNDLE:-}" ]; then
+    echo "Set PLAYGROUND_PARPARVM_BUNDLE to the ParparVM bundle directory or archive to compare against." >&2
+    exit 3
+  fi
+  local summary_out="${PLAYGROUND_COMPARE_SUMMARY:-javascript/target/parparvm-bundle-compare.txt}"
+  "$(cd "$(dirname "$0")" && pwd)/tools/compare-javascript-bundles.sh" \
+    --legacy "$legacy_zip" \
+    --parparvm "$PLAYGROUND_PARPARVM_BUNDLE" \
+    --summary-out "$summary_out"
+}
 function android {
   
   "$MVNW" "package" "-DskipTests" "-Dcodename1.platform=android" "-Dcodename1.buildTarget=android-device" "-U" "-e"
@@ -86,6 +104,8 @@ function help {
   "echo" "-e" "  javascript"
   "echo" "-e" "    Builds as a web app."
   "echo" "-e" "    *Javascript builds are an Enterprise user feature"
+  "echo" "-e" "  javascript_compare"
+  "echo" "-e" "    Builds the legacy Playground JavaScript bundle and compares it against PLAYGROUND_PARPARVM_BUNDLE."
 }
 function settings {
   

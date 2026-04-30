@@ -301,7 +301,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     static CodenameOneActivity activity;
     static ComponentName activityComponentName;
     private static PowerManager.WakeLock pushWakeLock;
-    public static void acquirePushWakeLock(long timeout) {
+    public static synchronized void acquirePushWakeLock(long timeout) {
         if (getContext() == null) return;
         try {
             if (pushWakeLock == null) {
@@ -1062,6 +1062,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     private static AndroidImplementation instance;
+    private static final String INTENT_PROPERTY_PREFIX = "android.intent.";
+    private static final String INTENT_EXTRA_PROPERTY_PREFIX = "android.intent.extra.";
+    private static final Set<String> intentPropertyKeys = new HashSet<String>();
+    private static final Object intentPropertyLock = new Object();
+    private static Intent lastPublishedIntent;
 
     public static AndroidImplementation getInstance() {
         return instance;
@@ -1070,6 +1075,72 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public static void clearAppArg() {
         if (instance != null) {
             instance.setAppArg(null);
+            clearIntentProperties();
+        }
+    }
+
+    private static void clearIntentProperties() {
+        synchronized (intentPropertyLock) {
+            if (Display.isInitialized()) {
+                for (String key : new ArrayList<String>(intentPropertyKeys)) {
+                    Display.getInstance().setProperty(key, null);
+                }
+            }
+            intentPropertyKeys.clear();
+            lastPublishedIntent = null;
+        }
+    }
+
+    private static void publishIntentProperties(Activity activity, Intent intent) {
+        if (intent == null) {
+            return;
+        }
+
+        synchronized (intentPropertyLock) {
+            if (intent == lastPublishedIntent) {
+                return;
+            }
+
+            Map<String, String> nextProperties = new HashMap<String, String>();
+            nextProperties.put(INTENT_PROPERTY_PREFIX + "action", intent.getAction());
+            nextProperties.put(INTENT_PROPERTY_PREFIX + "data", intent.getDataString());
+            nextProperties.put(INTENT_PROPERTY_PREFIX + "type", intent.getType());
+
+            // Only getCallingPackage() is a verified caller identity.  Referrer values are caller-controlled.
+            String callerPackage = activity.getCallingPackage();
+            nextProperties.put(INTENT_PROPERTY_PREFIX + "caller", callerPackage);
+            nextProperties.put(INTENT_PROPERTY_PREFIX + "caller.verified", callerPackage != null ? "true" : "false");
+
+            Bundle extras = intent.getExtras();
+            if (extras != null) {
+                for (String key : extras.keySet()) {
+                    Object value = extras.get(key);
+                    String propertyKey = key.startsWith(INTENT_EXTRA_PROPERTY_PREFIX) ? key : INTENT_EXTRA_PROPERTY_PREFIX + key;
+                    nextProperties.put(propertyKey, value == null ? null : String.valueOf(value));
+                }
+            }
+
+            if (Display.isInitialized()) {
+                ArrayList<String> keysToRemove = new ArrayList<String>();
+                for (String key : intentPropertyKeys) {
+                    if (!nextProperties.containsKey(key)) {
+                        keysToRemove.add(key);
+                    }
+                }
+                for (String key : keysToRemove) {
+                    Display.getInstance().setProperty(key, null);
+                    intentPropertyKeys.remove(key);
+                }
+                for (Map.Entry<String, String> entry : nextProperties.entrySet()) {
+                    Display.getInstance().setProperty(entry.getKey(), entry.getValue());
+                    intentPropertyKeys.add(entry.getKey());
+                }
+            } else {
+                intentPropertyKeys.clear();
+                intentPropertyKeys.addAll(nextProperties.keySet());
+            }
+
+            lastPublishedIntent = intent;
         }
     }
 
@@ -1336,35 +1407,27 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             metrics = getContext().getResources().getDisplayMetrics();
         }
 
-        if(metrics.densityDpi < DisplayMetrics.DENSITY_MEDIUM) {
+        int dpi = metrics.densityDpi;
+        if (dpi < DisplayMetrics.DENSITY_MEDIUM) {
             return Display.DENSITY_LOW;
         }
-
-        if(metrics.densityDpi < 213) {
+        if (dpi < 213) {
             return Display.DENSITY_MEDIUM;
         }
-
         // 213 == TV
-        if(metrics.densityDpi >= 213 &&  metrics.densityDpi <= DisplayMetrics.DENSITY_HIGH) {
+        if (dpi <= DisplayMetrics.DENSITY_HIGH) {
             return Display.DENSITY_HIGH;
         }
-
-        if(metrics.densityDpi > DisplayMetrics.DENSITY_HIGH && metrics.densityDpi < 400) {
+        if (dpi < 400) {
             return Display.DENSITY_VERY_HIGH;
         }
-
-        if(metrics.densityDpi >= 400 && metrics.densityDpi < 560) {
+        if (dpi < 560) {
             return Display.DENSITY_HD;
         }
-
-        if(metrics.densityDpi >= 560 && metrics.densityDpi <= 640) {
+        if (dpi <= 640) {
             return Display.DENSITY_2HD;
         }
-        if(metrics.densityDpi > 640) {
-            return Display.DENSITY_4K;
-        }
-
-        return Display.DENSITY_MEDIUM;
+        return Display.DENSITY_4K;
     }
 
     public static boolean isImmersive() {
@@ -2926,6 +2989,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         android.content.Intent intent = getActivity().getIntent();
         if (intent != null) {
+            publishIntentProperties(getActivity(), intent);
             String sharedText = intent.getStringExtra(Intent.EXTRA_TEXT);
             intent.removeExtra(Intent.EXTRA_TEXT);
             Uri u = intent.getData();
@@ -3019,7 +3083,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private boolean isRunningOnAndroidStudioEmulator() {
         return Build.FINGERPRINT.startsWith("google/sdk_gphone")
                 && Build.FINGERPRINT.endsWith(":user/release-keys")
-                && Build.MANUFACTURER == "Google" && Build.PRODUCT.startsWith("sdk_gphone") && Build.BRAND == "google"
+                && "Google".equals(Build.MANUFACTURER) && Build.PRODUCT.startsWith("sdk_gphone") && "google".equals(Build.BRAND)
                 && Build.MODEL.startsWith("sdk_gphone");
     }
 
@@ -3465,7 +3529,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public void playBuiltinSound(String soundIdentifier) {
-        if (getActivity() != null && Display.SOUND_TYPE_BUTTON_PRESS == soundIdentifier) {
+        if (getActivity() != null && Display.SOUND_TYPE_BUTTON_PRESS.equals(soundIdentifier)) {
             getActivity().runOnUiThread(new Runnable() {
                 public void run() {
                     if (myView != null) {
@@ -4861,23 +4925,52 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      */
     public void installNativeTheme() {
         hasNativeTheme();
-        if (nativeThemeAvailable) {
-            try {
-                InputStream is;
-                if (android.os.Build.VERSION.SDK_INT < 14 && !isTablet() || Display.getInstance().getProperty("and.hololight", "false").equals("true")) {
-                    is = getResourceAsStream(getClass(), "/androidTheme.res");
+        if (!nativeThemeAvailable) {
+            return;
+        }
+        try {
+            // Resolve desired theme flavor. cn1.androidTheme is the new per-CN1
+            // hint (material | hololight | legacy). The Material 3 modern theme
+            // is opt-in via cn1.androidTheme=material / modern. Default is
+            // android_holo_light - what master shipped and what existing
+            // screenshot goldens are anchored against. The ancient pre-Holo
+            // androidTheme.res is only reached via explicit and.hololight=true
+            // (historical back-compat) or cn1.androidTheme=legacy.
+            String mode = Display.getInstance().getProperty("cn1.androidTheme", null);
+            if (mode == null) {
+                if ("true".equalsIgnoreCase(Display.getInstance().getProperty("and.hololight", "false"))) {
+                    mode = "legacy";
                 } else {
-                    is = getResourceAsStream(getClass(), "/android_holo_light.res");
+                    mode = "hololight";
                 }
-                Resources r = Resources.open(is);
-                Hashtable h = r.getTheme(r.getThemeResourceNames()[0]);
-                h.put("@commandBehavior", "Native");
-                UIManager.getInstance().setThemeProps(h);
-                is.close();
-                Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_NATIVE);
-            } catch (IOException ex) {
-                ex.printStackTrace();
+            } else {
+                mode = mode.toLowerCase();
             }
+
+            String resPath;
+            if ("material".equals(mode) || "modern".equals(mode)) {
+                resPath = "/AndroidMaterialTheme.res";
+            } else if ("hololight".equals(mode) || "holo".equals(mode)) {
+                resPath = "/android_holo_light.res";
+            } else {
+                resPath = "/androidTheme.res";
+            }
+
+            InputStream is = getResourceAsStream(getClass(), resPath);
+            if (is == null) {
+                // Modern theme may not be in the apk if the framework build
+                // skipped native-themes generation. Fall back to Holo Light
+                // (master's default) so the app still boots with a known look.
+                is = getResourceAsStream(getClass(), "/android_holo_light.res");
+            }
+            Resources r = Resources.open(is);
+            Hashtable h = r.getTheme(r.getThemeResourceNames()[0]);
+            h.put("@commandBehavior", "Native");
+            UIManager.getInstance().setThemeProps(h);
+            is.close();
+            Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_NATIVE);
+        } catch (IOException ex) {
+            ex.printStackTrace();
         }
     }
 
@@ -5487,7 +5580,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         mgr.removeAllCookie();
     }
     private static CookieManager cookieManager;
-    private static CookieManager getCookieManager() {
+    private static synchronized CookieManager getCookieManager() {
         if (android.os.Build.VERSION.SDK_INT > 28) {
             return CookieManager.getInstance();
         }
@@ -8976,8 +9069,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
         }
 
-        boolean has = hasAndroidMarket();
-        if (!has) {
+        if (!hasAndroidMarket()) {
             Log.d("Codename One", "Device doesn't have Android market/google play can't register for push!");
             return;
         }
@@ -8985,15 +9077,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (id == null) {
             id = Display.getInstance().getProperty("gcm.sender_id", null);
         }
-        if(has) {
-            Log.d("Codename One", "Sending async push request for id: " + id);
-            ((CodenameOneActivity) getActivity()).registerForPush(id);
-        } else {
-            PushNotificationService.forceStartService(getActivity().getPackageName() + ".PushNotificationService", getActivity());
-            if(!registerServerPush(id, getApplicationKey(), (byte)10, "", getPackageName())) {
-                sendPushRegistrationError("Server registration error", 1);
-            }
-        }
+        Log.d("Codename One", "Sending async push request for id: " + id);
+        ((CodenameOneActivity) getActivity()).registerForPush(id);
     }
 
     public static void stopPollingLoop() {
@@ -9164,7 +9249,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 @Override
                 public void save(InputStream image, OutputStream response, String format, int width, int height, float quality) throws IOException {
                     Bitmap.CompressFormat f = Bitmap.CompressFormat.PNG;
-                    if (format == FORMAT_JPEG) {
+                    if (FORMAT_JPEG.equals(format)) {
                         f = Bitmap.CompressFormat.JPEG;
                     }
                     Image img = Image.createImage(image).scaled(width, height);
@@ -9251,7 +9336,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 @Override
                 protected void saveImage(Image img, OutputStream response, String format, float quality) throws IOException {
                     Bitmap.CompressFormat f = Bitmap.CompressFormat.PNG;
-                    if (format == FORMAT_JPEG) {
+                    if (FORMAT_JPEG.equals(format)) {
                         f = Bitmap.CompressFormat.JPEG;
                     }
                     Bitmap b = (Bitmap) img.getImage();
@@ -9260,7 +9345,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
                 @Override
                 public boolean isFormatSupported(String format) {
-                    return format == FORMAT_JPEG || format == FORMAT_PNG;
+                    return FORMAT_JPEG.equals(format) || FORMAT_PNG.equals(format);
                 }
             };
         }

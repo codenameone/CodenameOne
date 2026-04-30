@@ -52,7 +52,7 @@ public final class GeneratedAccess_com_codename1_l10n {
         if (type == com.codename1.l10n.ParseException.class) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
-                return new com.codename1.l10n.ParseException((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
+                return new com.codename1.l10n.ParseException((java.lang.String) adaptedArgs[0], toIntValue(adaptedArgs[1]));
             }
         }
         if (type == com.codename1.l10n.SimpleDateFormat.class) {
@@ -83,13 +83,13 @@ public final class GeneratedAccess_com_codename1_l10n {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return com.codename1.l10n.DateFormat.getDateInstance(((Number) adaptedArgs[0]).intValue());
+                return com.codename1.l10n.DateFormat.getDateInstance(toIntValue(adaptedArgs[0]));
             }
         }
         if ("getDateTimeInstance".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return com.codename1.l10n.DateFormat.getDateTimeInstance(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return com.codename1.l10n.DateFormat.getDateTimeInstance(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
         if ("getInstance".equals(name)) {
@@ -103,7 +103,7 @@ public final class GeneratedAccess_com_codename1_l10n {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return com.codename1.l10n.DateFormat.getTimeInstance(((Number) adaptedArgs[0]).intValue());
+                return com.codename1.l10n.DateFormat.getTimeInstance(toIntValue(adaptedArgs[0]));
             }
         }
         throw unsupportedStatic(com.codename1.l10n.DateFormat.class, name, safeArgs);
@@ -429,11 +429,11 @@ public final class GeneratedAccess_com_codename1_l10n {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.format(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.format(toIntValue(adaptedArgs[0]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Integer.class}, false);
-                return typedTarget.format(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.format(((Number) adaptedArgs[0]).doubleValue(), toIntValue(adaptedArgs[1]));
             }
         }
         if ("formatCurrency".equals(name)) {
@@ -553,31 +553,50 @@ public final class GeneratedAccess_com_codename1_l10n {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == com.codename1.l10n.DateFormat.class) {
-            if ("DEFAULT".equals(name)) return com.codename1.l10n.DateFormat.DEFAULT;
-            if ("FULL".equals(name)) return com.codename1.l10n.DateFormat.FULL;
-            if ("LONG".equals(name)) return com.codename1.l10n.DateFormat.LONG;
-            if ("MEDIUM".equals(name)) return com.codename1.l10n.DateFormat.MEDIUM;
-            if ("SHORT".equals(name)) return com.codename1.l10n.DateFormat.SHORT;
-        }
-        if (type == com.codename1.l10n.DateFormatPatterns.class) {
-            if ("ISO8601".equals(name)) return com.codename1.l10n.DateFormatPatterns.ISO8601;
-            if ("RFC2822".equals(name)) return com.codename1.l10n.DateFormatPatterns.RFC2822;
-            if ("RFC822".equals(name)) return com.codename1.l10n.DateFormatPatterns.RFC822;
-            if ("TWITTER_SEARCH".equals(name)) return com.codename1.l10n.DateFormatPatterns.TWITTER_SEARCH;
-            if ("TWITTER_TIMELINE".equals(name)) return com.codename1.l10n.DateFormatPatterns.TWITTER_TIMELINE;
-            if ("VERBOSE_DATE".equals(name)) return com.codename1.l10n.DateFormatPatterns.VERBOSE_DATE;
-            if ("VERBOSE_TIME".equals(name)) return com.codename1.l10n.DateFormatPatterns.VERBOSE_TIME;
-            if ("VERBOSE_TIMESTAMP".equals(name)) return com.codename1.l10n.DateFormatPatterns.VERBOSE_TIMESTAMP;
-        }
-        if (type == com.codename1.l10n.DateFormatSymbols.class) {
-            if ("ZONE_ID".equals(name)) return com.codename1.l10n.DateFormatSymbols.ZONE_ID;
-            if ("ZONE_LONGNAME".equals(name)) return com.codename1.l10n.DateFormatSymbols.ZONE_LONGNAME;
-            if ("ZONE_LONGNAME_DST".equals(name)) return com.codename1.l10n.DateFormatSymbols.ZONE_LONGNAME_DST;
-            if ("ZONE_SHORTNAME".equals(name)) return com.codename1.l10n.DateFormatSymbols.ZONE_SHORTNAME;
-            if ("ZONE_SHORTNAME_DST".equals(name)) return com.codename1.l10n.DateFormatSymbols.ZONE_SHORTNAME_DST;
-        }
+        if (type == com.codename1.l10n.DateFormat.class) return getStaticField0(name);
+        if (type == com.codename1.l10n.DateFormatPatterns.class) return getStaticField1(name);
+        if (type == com.codename1.l10n.DateFormatSymbols.class) return getStaticField2(name);
+        if (type == com.codename1.l10n.SimpleDateFormat.class) return getStaticField3(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("DEFAULT".equals(name)) return com.codename1.l10n.DateFormat.DEFAULT;
+        if ("FULL".equals(name)) return com.codename1.l10n.DateFormat.FULL;
+        if ("LONG".equals(name)) return com.codename1.l10n.DateFormat.LONG;
+        if ("MEDIUM".equals(name)) return com.codename1.l10n.DateFormat.MEDIUM;
+        if ("SHORT".equals(name)) return com.codename1.l10n.DateFormat.SHORT;
+        throw unsupportedStaticField(com.codename1.l10n.DateFormat.class, name);
+    }
+
+    private static Object getStaticField1(String name) throws Exception {
+        if ("ISO8601".equals(name)) return com.codename1.l10n.DateFormatPatterns.ISO8601;
+        if ("RFC2822".equals(name)) return com.codename1.l10n.DateFormatPatterns.RFC2822;
+        if ("RFC822".equals(name)) return com.codename1.l10n.DateFormatPatterns.RFC822;
+        if ("TWITTER_SEARCH".equals(name)) return com.codename1.l10n.DateFormatPatterns.TWITTER_SEARCH;
+        if ("TWITTER_TIMELINE".equals(name)) return com.codename1.l10n.DateFormatPatterns.TWITTER_TIMELINE;
+        if ("VERBOSE_DATE".equals(name)) return com.codename1.l10n.DateFormatPatterns.VERBOSE_DATE;
+        if ("VERBOSE_TIME".equals(name)) return com.codename1.l10n.DateFormatPatterns.VERBOSE_TIME;
+        if ("VERBOSE_TIMESTAMP".equals(name)) return com.codename1.l10n.DateFormatPatterns.VERBOSE_TIMESTAMP;
+        throw unsupportedStaticField(com.codename1.l10n.DateFormatPatterns.class, name);
+    }
+
+    private static Object getStaticField2(String name) throws Exception {
+        if ("ZONE_ID".equals(name)) return com.codename1.l10n.DateFormatSymbols.ZONE_ID;
+        if ("ZONE_LONGNAME".equals(name)) return com.codename1.l10n.DateFormatSymbols.ZONE_LONGNAME;
+        if ("ZONE_LONGNAME_DST".equals(name)) return com.codename1.l10n.DateFormatSymbols.ZONE_LONGNAME_DST;
+        if ("ZONE_SHORTNAME".equals(name)) return com.codename1.l10n.DateFormatSymbols.ZONE_SHORTNAME;
+        if ("ZONE_SHORTNAME_DST".equals(name)) return com.codename1.l10n.DateFormatSymbols.ZONE_SHORTNAME_DST;
+        throw unsupportedStaticField(com.codename1.l10n.DateFormatSymbols.class, name);
+    }
+
+    private static Object getStaticField3(String name) throws Exception {
+        if ("DEFAULT".equals(name)) return com.codename1.l10n.SimpleDateFormat.DEFAULT;
+        if ("FULL".equals(name)) return com.codename1.l10n.SimpleDateFormat.FULL;
+        if ("LONG".equals(name)) return com.codename1.l10n.SimpleDateFormat.LONG;
+        if ("MEDIUM".equals(name)) return com.codename1.l10n.SimpleDateFormat.MEDIUM;
+        if ("SHORT".equals(name)) return com.codename1.l10n.SimpleDateFormat.SHORT;
+        throw unsupportedStaticField(com.codename1.l10n.SimpleDateFormat.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {
@@ -731,7 +750,19 @@ public final class GeneratedAccess_com_codename1_l10n {
         if (!(value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue)) {
             return value;
         }
+        // Direct fit when LambdaValue already implements the target SAM
+        // (Runnable, Function, Comparator, ...).
+        if (type.isInstance(value)) {
+            return value;
+        }
         return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
+    }
+
+    private static int toIntValue(Object value) {
+        if (value instanceof Number) return ((Number) value).intValue();
+        if (value instanceof Character) return (int) ((Character) value).charValue();
+        throw new ClassCastException("Cannot coerce "
+            + (value == null ? "null" : value.getClass().getName()) + " to int");
     }
 
     private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
@@ -786,10 +817,15 @@ public final class GeneratedAccess_com_codename1_l10n {
         if ("byte".equals(type.getName()) || type == Byte.class || "short".equals(type.getName()) || type == Short.class
                 || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
                 || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
-            return value instanceof Number;
+            // Java widens char to int implicitly, so accept Character
+            // for any int-or-larger numeric slot.
+            return value instanceof Number || value instanceof Character;
         }
         if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
-            return isSamInterface(type);
+            // LambdaValue implements common SAMs directly (Runnable,
+            // Function, Predicate, Comparator, ...). Also accept any
+            // CN1 SAM the listener-bridge knows how to wrap.
+            return type.isInstance(value) || isSamInterface(type);
         }
         return type.isInstance(value);
     }

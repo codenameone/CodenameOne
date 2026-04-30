@@ -1973,6 +1973,11 @@ if (jjtc001) {
     case INSTANCEOF:{
       t = jj_consume_token(INSTANCEOF);
       Type();
+      // Pattern-matching binding: `o instanceof T name`
+      Token bindingToken = null;
+      if ((jj_ntk == -1 ? jj_ntk_f() : jj_ntk) == IDENTIFIER) {
+        bindingToken = jj_consume_token(IDENTIFIER);
+      }
 BSHBinaryExpression jjtn001 = new BSHBinaryExpression(JJTBINARYEXPRESSION);
                              boolean jjtc001 = true;
                              jjtree.openNodeScope(jjtn001);
@@ -1984,6 +1989,7 @@ jjtree.closeNodeScope(jjtn001,  2);
                               jjtreeCloseNodeScope(jjtn001);
                              }
 jjtn001.kind = t.kind;
+if (bindingToken != null) jjtn001.instanceofBinding = bindingToken.image;
       } finally {
 if (jjtc001) {
                                jjtree.closeNodeScope(jjtn001,  2);
@@ -4546,6 +4552,7 @@ if (jjtc000) {
       switch (jj_ntk == -1 ? jj_ntk_f() : jj_ntk) {
       case LPAREN:{
         TryWithResources();
+closed = true;
         break;
         }
       default:
@@ -4710,6 +4717,10 @@ if (jjtc000) {
           break label_35;
         }
         jj_consume_token(SEMICOLON);
+        // Allow an optional trailing semicolon before the closing paren.
+        if ((jj_ntk == -1 ? jj_ntk_f() : jj_ntk) == RPAREN) {
+          break label_35;
+        }
         AutoCloseable();
       }
       jj_consume_token(RPAREN);

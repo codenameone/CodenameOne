@@ -26,6 +26,12 @@ class Operators implements ParserConstants {
     /** Constructor private no instance required. */
     private Operators() {}
 
+    private static boolean isShiftOp(int kind) {
+        return kind == LSHIFT || kind == LSHIFTX
+                || kind == RSIGNEDSHIFT || kind == RSIGNEDSHIFTX
+                || kind == RUNSIGNEDSHIFT || kind == RUNSIGNEDSHIFTX;
+    }
+
     /** Binary operations on arbitrary objects.
      * @param lhs left hand side value
      * @param rhs right hand side value
@@ -138,6 +144,30 @@ class Operators implements ParserConstants {
         // Unwrap primitives
         Object lhs = Primitive.unwrap(obj1);
         Object rhs = Primitive.unwrap(obj2);
+
+        // Java shift semantics: result width follows lhs width. If lhs is int-sized
+        // (byte/short/char/int) we must do the shift as an int — promoting to long
+        // changes the meaning of `>>>` and `>>` for negative values.
+        if (isShiftOp(kind) && Types.isNumeric(lhs) && Types.isNumeric(rhs)
+                && !(lhs instanceof Long) && !Types.isFloatingpoint(lhs)) {
+            int l = promoteToInteger(lhs).intValue();
+            int r = promoteToInteger(rhs).intValue();
+            int res;
+            switch (kind) {
+                case LSHIFT: case LSHIFTX:
+                    res = l << r; break;
+                case RSIGNEDSHIFT: case RSIGNEDSHIFTX:
+                    res = l >> r; break;
+                case RUNSIGNEDSHIFT: case RUNSIGNEDSHIFTX:
+                    res = l >>> r; break;
+                default:
+                    throw new UtilEvalError("Unimplemented int shift kind");
+            }
+            Object result = Integer.valueOf(res);
+            if (obj1 instanceof Primitive && obj2 instanceof Primitive)
+                return Primitive.shrinkWrap(result);
+            return Primitive.shrinkWrap(result).getValue();
+        }
 
         if ( Types.isNumeric(lhs) && Types.isNumeric(rhs) ) {
             Object[] operands = promotePrimitives(lhs, rhs);

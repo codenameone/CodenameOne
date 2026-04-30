@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html data-cn1-app-version="{APP_VERSION}">
+  <head>
+    <!-- BEFORE-HEAD-INCLUDES -->
+    <title>{APP_TITLE}</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge"> 
+    <script>
+        window.cn1_debug_flags = {
+              disableTouchstart: false,
+              disableTouchend: false,
+              disableHover: false,
+              disableMouseup: false,
+              disableMousedown: false,
+              disableWheel: false,
+              debugLog: false,
+              useNativeQueue: false
+        };
+   (function(){
+    var cn1ToLoad = {
+        /*
+         'file1' : {size:1000, loaded:false},
+         'file2' : {size:1045, loaded:false},
+         'file3' : {size:1000, loaded:false},
+         'file4' : {size:10450, loaded:false},
+         'file5' : {size:1000, loaded:false},
+         'file6' : {size:1045, loaded:false},
+        */
+    
+    };
+    
+    /* CN1-TO-LOAD-PLACEHOLDER */
+    var cn1LoadingProgressHandle = window.setInterval(function() {
+        if (!window.jQuery) return;
+        if (jQuery('#cn1-splash').length == 0) {
+            clearInterval(cn1LoadingProgressHandle);
+            return;
+        }
+        var bytesRequired = 0;
+        var bytesLoaded = 0;
+        for (var f in cn1ToLoad) {
+            bytesRequired += cn1ToLoad[f].size;
+            if (cn1ToLoad[f].loaded) {
+                bytesLoaded += cn1ToLoad[f].size;
+            }
+        }
+        var progressBar = jQuery('#cn1-splash > .progress-bar');
+        //jQuery('#cn1-splash > img.progress').hide();
+        progressBar.show();
+        var percentLoaded = Math.round(bytesLoaded / bytesRequired * 100.0)+'%';
+        jQuery('.progress-bar-internal', progressBar).css('width', percentLoaded);
+    }, 200);
+    
+    window.cn1LoadedFile = function(filename) {
+        if (filename.indexOf('?') >= 0) {
+            filename = filename.substring(0, filename.indexOf('?'));
+        }
+        
+        if (cn1ToLoad[filename]) {
+            cn1ToLoad[filename].loaded = true;
+        }
+    };
+    })();
+   </script>
+    <link rel="icon" type="image/png" href="icon.png?v={APP_VERSION}">
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+    <meta name="apple-mobile-web-app-capable" content="yes"/>
+    <meta name="mobile-web-app-capable" content="yes" />
+    <!--<meta name="viewport" content="user-scalable=no" />-->
+    <meta name="viewport"
+      content="
+        height = device-height,
+        width = device-width,
+        initial-scale = 1.0,
+        minimum-scale = 1.0,
+        maximum-scale = 1.0,
+        user-scalable = no,
+        target-densitydpi = device-dpi
+        " />
+    
+    <!-- Latest compiled and minified CSS -->
+    <link rel="stylesheet" href="css/bootstrap.min.css?v={APP_VERSION}">
+
+    <!-- Optional theme -->
+    <link rel="stylesheet" href="css/bootstrap-theme.min.css?v={APP_VERSION}">
+
+    
+    
+    <link rel="stylesheet" type="text/css" href="style.css?v={APP_VERSION}">
+    <link rel="manifest" href="manifest.json?v={APP_VERSION}"/>
+
+    <!-- Pre-register the material icon font up front so Toolbar/Tabs/Picker icons
+         render without waiting for the worker-side TTF load path, which in the
+         current worker-only architecture cannot reach document/@font-face. The
+         font is bundled at assets/material-design-font.ttf (relocated by
+         scripts/build-javascript-port-hellocodenameone.sh). FontImage.java asks
+         for font-family "Material Icons" so that name must match. -->
+    <style type="text/css">
+    @font-face {
+        font-family: 'Material Icons';
+        src: url('assets/material-design-font.ttf?v={APP_VERSION}') format('truetype');
+        font-weight: normal;
+        font-style: normal;
+        font-display: block;
+    }
+    </style>
+    
+    <!-- CN1-CSS-INCLUDES -->
+    
+    <!-- 
+        This value points to the location of the proxy servlet that allows us to 
+        avoid cross origin policy issues! You will need to deploy a proxy servlet 
+        or equivalent on your server.  If you are using the .war distribution for
+        your app, then a compatible proxy comes bundled already.  It will be 
+        accessible at the URL http://yourdomain.com/yourapp/cn1-cors-proxy.
+    
+        If you are deploying on App Engine, you should use the GAE proxy instead
+        which is also bundled with the .war distribution and is accessible at
+        http://yourdomain.com/yourapp/cn1-gae-cors-proxy.
+    
+        By default, your application will be configured to use this bundled 
+        proxy.  You can disable it using the build hint:
+            javascript.inject_proxy=false
+        
+        Alternatively you are not using the .war distribution or you want to use
+        the proxy separately, you can specify the build hint:
+            javascript.proxy.url=http://yourdomain.com/yourapp/cn1-cors-proxy?_target=
+    
+        You can also set this value inside your application using:
+    
+            Display.getInstance().setProperty("javascript.proxy.url", "http://yourdomain.com/yourapp/cn1-cors-proxy?_target=");
+    
+        For more information about the CORS proxy, see https://github.com/shannah/cors-proxy
+    -->
+    <script type="text/javascript">
+        //INJECT-DEFAULT-PROXY
+        
+        //Uncomment the following line to specify the URL to your proxy.
+        //window.cn1CORSProxyURL='/cn1-cors-proxy?_target=';
+        
+    </script>
+    <!-- AFTER-HEAD-INCLUDES -->
+  </head>
+  <body>
+    <!-- BEFORE-BODY-INCLUDES -->
+    <div id="cn1-splash">
+        <img class="icon" src="icon.png"/>
+        <div style="display:none" class='progress-bar'>
+            <div class='progress-bar-internal'> </div>
+        </div>
+        <img class="progress" src="progress.gif"/>
+        <p>...Loading...</p>
+    </div>
+    <canvas width="375" height="667" id="codenameone-canvas"></canvas>
+    <script type="text/javascript" charset="utf-8" src="js/push.js?v={APP_VERSION}"></script>
+    <script>window.cn1LoadedFile('js/push.js')</script>
+    <script type="text/javascript" charset="utf-8" src="js/jquery.min.js?v={APP_VERSION}"></script>
+    <script>window.cn1LoadedFile('js/jquery.min.js')</script>
+    <script type="text/javascript" charset="utf-8" src="js/fontmetrics.js?v={APP_VERSION}"></script>
+    <script>window.cn1LoadedFile('js/fontmetrics.js')</script>
+    <!-- As of 0.6.0-cn1003 runtime.js is merged with classes.js -->
+    <!--<script type="text/javascript" charset="utf-8" src="teavm/runtime.js?v={APP_VERSION}"></script>-->
+    <script type="text/javascript" charset="utf-8" src="teavm/classes.js?v={APP_VERSION}"></script>
+    <script>window.cn1LoadedFile('teavm/classes.js')</script>
+    <script>jQuery(document).ready(function() {main()});</script>
+    <!-- CN1-JS-INCLUDES -->
+
+    <!-- Latest compiled and minified JavaScript -->
+    <script src="js/bootstrap.min.js?v={APP_VERSION}"></script>
+    <script>window.cn1LoadedFile('js/bootstrap.min.js')</script>
+    <script src="js/upup.min.js?v={APP_VERSION}"></script>
+    <script>window.cn1LoadedFile('js/upup.min.js')</script>
+    <!-- OMIT-FOR-OFFLINE -->
+    <script>
+    (function() {
+        /*
+        if ('serviceWorker' in navigator) {
+            var script = document.createElement('script');
+            script.setAttribute('src', 'js/pwa.js?v={APP_VERSION}');
+            $('body').append(script);
+        }*/
+        window.loadServiceWorker = function() {
+            if ('UpUp' in window && window.UpUp && 'start' in window.UpUp && window.UpUp.start) {
+                //window.addEventListener('load', function() {
+                    setTimeout(function() {
+
+                        UpUp.start({
+                            'content-url': 'offline.html',
+                            'assets': [
+                                'css/bootstrap.min.css?v={APP_VERSION}', 
+                                'css/bootstrap-theme.min.css?v={APP_VERSION}', 
+                                'style.css?v={APP_VERSION}', 
+                                'js/push.js?v={APP_VERSION}',  
+                                'js/jquery.min.js?v={APP_VERSION}', 
+                                'js/fontmetrics.js?v={APP_VERSION}',
+                                'js/manup.js?v={APP_VERSION}',
+                                'teavm/classes.js?v={APP_VERSION}',
+                                'js/bootstrap.min.js?v={APP_VERSION}',
+                                'js/upup.min.js?v={APP_VERSION}',
+                                'progress.gif?v={APP_VERSION}',
+                                'icon.png?v={APP_VERSION}'
+                                /* UPUP_ASSETS_LIST */
+
+                            ],
+                            'service-worker-url': 'sw.js',
+                            'cache-version' : '{APP_VERSION}'
+                        });
+                    }, 15000);
+                //});
+            }
+        };
+    })();
+    
+    </script>
+    <!-- /OMIT-FOR-OFFLINE -->
+    <script src="js/manup.js?v={APP_VERSION}"></script>
+    <script>window.cn1LoadedFile('js/manup.js')</script>
+    <!-- AFTER-BODY-INCLUDES -->
+  </body>
+</html>

@@ -77,7 +77,11 @@
       minimap: { enabled: false },
       scrollBeyondLastLine: false,
       wordWrap: "off",
-      glyphMargin: true,
+      glyphMargin: false,
+      // Narrower, lighter line-number gutter.
+      lineNumbersMinChars: 2,
+      lineDecorationsWidth: 4,
+      renderLineHighlight: "none",
       quickSuggestions: {
         other: true,
         comments: false,
@@ -106,8 +110,9 @@
       colors: {
         "editor.background": "#FAFAFC",
         "editor.foreground": "#112247",
-        "editorLineNumber.foreground": "#7F8AA3",
-        "editorLineNumber.activeForeground": "#112247",
+        "editorGutter.background": "#FAFAFC",
+        "editorLineNumber.foreground": "#C5CBD6",
+        "editorLineNumber.activeForeground": "#8692A8",
         "editorCursor.foreground": "#2F6BFF",
         "editor.selectionBackground": "#E8F0FF",
         "editor.inactiveSelectionBackground": "#E8F0FFAA",
@@ -122,8 +127,9 @@
       colors: {
         "editor.background": "#112F70",
         "editor.foreground": "#F5F8FF",
-        "editorLineNumber.foreground": "#A8B8DA",
-        "editorLineNumber.activeForeground": "#F5F8FF",
+        "editorGutter.background": "#112F70",
+        "editorLineNumber.foreground": "#6E80A6",
+        "editorLineNumber.activeForeground": "#D0DBEF",
         "editorCursor.foreground": "#4D86FF",
         "editor.selectionBackground": "#4D86FF33",
         "editor.inactiveSelectionBackground": "#4D86FF22",

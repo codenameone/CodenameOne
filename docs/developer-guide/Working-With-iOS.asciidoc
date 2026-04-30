@@ -4,16 +4,16 @@
 
 If you've access to a Mac, connect the device, open Xcode, and use the device explorer console to inspect messages that may explain what went wrong. If not, check the following:
 
-- Make sure you built the debug version and not the App Store version. The App Store version won't install on the device and can be distributed through Apple's store or TestFlight.
+- Make sure the build is the debug version and not the App Store version. The App Store version won't install on the device and can be distributed through Apple's store or TestFlight.
 
 - Check that the UDID is correct. If you got the UDID from an app, it's probably wrong because apps no longer have access to the device UDID. Get it from the iOS Settings app or iTunes.
 
 - Make sure the device isn't locked for installing third-party apps. This can happen on devices configured with parental controls.
 
-- Check that you own the package name. For example, if you previously installed an app with the same package name but a different certificate, a new install will fail. This is true for Android too. If you installed the kitchen sink from the store and then built your own app with the same package name, the install will collide.
+- Check that you own the package name. For example, if you earlier installed an app with the same package name but a different certificate, a new install will fail. This is true for Android too. If you installed the kitchen sink from the store and then built your own app with the same package name, the install will collide.
 - This can be a problem if you use a generic package name that someone else already claimed, so use your own domain.
 
-- Make sure the device has a recent enough version of iOS for the dependencies. As of 2024, Codename One builds target iOS 12.0 or newer by default. You can raise the requirement with the `ios.deployment_target` build hint if a library needs a newer version.
+- Make sure the device has a recent enough version of iOS for the dependencies. As of 2024, Codename One builds target iOS 12.0 or newer by default. You can raise the need with the `ios.deployment_target` build hint if a library needs a newer version.
 
 - Verify that you're using Safari when installing on the device. If you used a cable, that isn't a problem. Some developers had issues with Firefox not launching the install process.
 
@@ -24,7 +24,7 @@ If you've access to a Mac, connect the device, open Xcode, and use the device ex
 
 Launch screen storyboards are the default approach for Codename One iOS builds. Apple requires a storyboard-based launch experience for modern devices, so the legacy screenshot generator was removed in favour of a single adaptive layout. You can still opt back into the old behaviour by setting the `ios.generateSplashScreens=true` build hint, but it's best to use a storyboard unless your use case can't be expressed with Auto Layout.
 
-==== Key Files
+==== Key files
 
 The build server provides a minimal launch storyboard automatically. Customize it by adding any of the following files under your project's `native/ios` directory:
 
@@ -34,7 +34,7 @@ The build server provides a minimal launch storyboard automatically. Customize i
 
 IMPORTANT: Make sure to add the `ios.multitasking=true` build hint or your launch storyboard won't be used.
 
-==== Designing a Flexible Layout
+==== Designing a flexible Layout
 
 Keep the launch storyboard simple and static. The layout is rendered before your app code runs, so avoid views that depend on live data or animation. Follow these guidelines when editing `LaunchScreen.storyboard` in Xcode:
 
@@ -43,7 +43,7 @@ Keep the launch storyboard simple and static. The layout is rendered before your
 * Reserve text for short taglines or status messages that don't need localization at launch. Dynamic localization isn't available.
 * Avoid referencing application delegate outlets or custom classes. Only design-time UIKit elements are supported.
 
-==== Asset Reference
+==== Asset reference
 
 The default storyboard expects PNG assets with the following characteristics. All sizes are specified in points (pt). Supply @2x and @3x variants for Retina displays when possible.
 
@@ -71,15 +71,15 @@ The default storyboard expects PNG assets with the following characteristics. Al
 
 NOTE: Changes to the launch screen don't take effect until the device has been restarted. If you install your app on a device, then change the launch screen and update the app, the launch screen won't change until the device is restarted.
 
-When iterating locally with a Mac, open the generated Xcode project and run it on a device or simulator to verify that the layout adapts correctly. On Windows or Linux, submit a TestFlight or Ad Hoc build and validate on hardware before shipping.
+When iterating locally with a Mac, open the generated Xcode project and run it on a device or simulator to verify that the layout adapts. On Windows or Linux, submit a TestFlight or Ad Hoc build and check on hardware before shipping.
 
-=== Local Notifications on iOS and Android
+=== Local notifications on iOS and Android
 
-Local notifications are similar to push notifications, except that they are initiated locally by the app, rather than remotely. They are useful for communicating information to the user while the app is running in the background, since they manifest themselves as pop-up notifications on supported devices.
+Local notifications are like push notifications, except that they are initiated locally by the app, rather than remotely. They are useful for communicating information to the user while the app is running in the background, since they manifest themselves as pop-up notifications on supported devices.
 
-TIP: To set the notification icon on Android place a 24x24 icon named `ic_stat_notify.png` under the `native/android` folder of the app. The icon can be white with transparency areas
+TIP: To set the notification icon on Android place a 24×24 icon named `ic_stat_notify.png` under the `native/android` folder of the app. The icon can be white with transparency areas
 
-==== Sending Notifications
+==== Sending notifications
 
 The process for sending a notification is:
 
@@ -88,7 +88,7 @@ The process for sending a notification is:
 
 Notifications can either be set up as one-time or as repeating.
 
-===== Example Sending Notification
+===== Example sending notification
 
 [source,java]
 -----
@@ -105,7 +105,7 @@ Display.getInstance().scheduleLocalNotification(
 );
 -----
 
-NOTE: On iOS, scheduling a local notification with an `id` that already exists now replaces the previously scheduled notification with that same `id` instead of keeping duplicates.
+NOTE: On iOS, scheduling a local notification with an `id` that already exists now replaces the earlier scheduled notification with that same `id` instead of keeping duplicates.
 
 The resulting notification will look like
 
@@ -113,9 +113,9 @@ The resulting notification will look like
 image::img/f7200840-677e-11e5-8fd7-41eb027f8a6c.png[Resulting notification in iOS,scaledwidth=20%]
 
 
-==== Receiving Notifications
+==== Receiving notifications
 
-The API for receiving/handling local notifications is also similar to push. Your application's main lifecycle class needs to implement the `com.codename1.notifications.LocalNotificationCallback` interface which includes a single method:
+The API for receiving/handling local notifications is also like push. Your application's main lifecycle class needs to implement the `com.codename1.notifications.LocalNotificationCallback` interface which includes a single method:
 
 [source,java]
 -----
@@ -124,7 +124,7 @@ public void localNotificationReceived(String notificationId)
 
 The `notificationId` parameter will match the `id` value of the notification as set using `LocalNotification.setId()`.
 
-===== Example Receiving Notification
+===== Example receiving notification
 
 [source,java]
 -----
@@ -156,7 +156,7 @@ public class BackgroundLocationDemo implements LocalNotificationCallback {
 
 NOTE: `localNotificationReceived()` is called when the user responds to the notification by tapping on the alert. If the user doesn't click on the notification, then this event handler will never be fired.
 
-==== Canceling Notifications
+==== Canceling notifications
 
 Repeating notifications will continue until they are canceled by the app. You can cancel a single notification by calling:
 
@@ -168,7 +168,7 @@ Display.getInstance().cancelLocalNotification(notificationId);
 Where `notificationId` is the string id that was set for the notification using `LocalNotification.setId()`.
 
 
-=== iOS Beta Testing (Testflight)
+=== iOS beta testing (testflight)
 
 Apple provides the ability to distribute beta versions of your application to beta testers using testflight. This allows you to recruit up to 1000 beta testers without the typical UDID limits a typical Apple account has.
 
@@ -177,9 +177,9 @@ NOTE: This is supported for pro users as part of the crash protection feature.
 To take advantage of that capability use the build hint `ios.testFlight=true` and then submit the app to the store for
 beta testing. Make sure to use a release build target.
 
-=== Accessing Insecure URL's
+=== Accessing insecure URL's
 
-Due to security exploits Apple blocked some access to insecure URL's which means that http code that worked before could stop working for you on iOS 9+. This is generally a good move, you should use https and avoid http as much as possible but that's sometimes impractical especially when working with an internal or debug environment.
+Due to security exploits Apple blocked some access to insecure URL's which means that http code that worked before could stop working for you on iOS 9+. This is a good move, you should use https and avoid http as much as possible but that's sometimes impractical when working with an internal or debug environment.
 
 You can disable the strict URL checks from Apple by using the venerable `ios.plistInject` build hint and setting it to:
 
@@ -212,7 +212,7 @@ ios.pods=AFNetworking ~> 3.0
 
 For full versioning syntax specifying pods see the https://guides.cocoapods.org/syntax/podfile.html#pod[Podfile spec for the "pod" directive].
 
-==== Including Multiple Pods
+==== Including multiple pods
 
 Multiple pods can be separated by either commas or semi-colons in the value of the `ios.pods` build hint. For example: To include GoogleMaps and AFNetworking, you could:
 
@@ -226,13 +226,13 @@ Or specifying versions:
 ios.pods=AFNetworking ~> 3.0,GoogleMaps
 ----
 
-==== Other Pod Related Build Hints
+==== Other pod related build hints
 
-`ios.pods.platform` : The minimum platform to target. In some cases, Cocoapods require functionality that isn't in older version of iOS. For example, the GoogleMaps pod requires iOS 7.0 or higher, so you would need to add the `ios.pods.platform=7.0` build hint.
+`ios.pods.platform` : The least platform to target. Sometimes, Cocoapods require functionality that isn't in older version of iOS. For example, the GoogleMaps pod requires iOS 7.0 or higher, so you would need to add the `ios.pods.platform=7.0` build hint.
 
 `ios.pods.sources` : Some pods require that you specify a URL for the source of the pod spec. This may be optional if the spec is hosted in the central CocoaPods source (`https://github.com/CocoaPods/Specs.git`).
 
-==== Converting PodFile To Build Hints
+==== Converting PodFile to build hints
 
 Most documentation for Cocoapods "pods" provide instructions on what you need to add to your Xcode project's PodFile. Here is an example from the GoogleMaps cocoapod to show you how a PodFile can be converted into equivalent build hints in a Codename One project.
 
@@ -254,9 +254,9 @@ ios.pods=GoogleMaps
 
 (Note that the `ios.pods.sources` directive is optional).
 
-=== Using Swift Package Manager
+=== Using Swift package manager
 
-Swift Package Manager can be used as an alternative to CocoaPods for remote Swift package dependencies on iOS. Select the dependency path with `ios.dependencyManager`. Supported values are `auto`, `cocoapods`, `spm`, and `both`.
+Swift Package Manager can be used as an alternative to CocoaPods for remote Swift package dependencies on iOS. Select the dependency path with `ios.dependencyManager`. Supported values are `auto`, `CocoaPods`, `spm`, and `both`.
 
 For an SPM-only configuration, declare the packages in `ios.spm.packages` using the format `<identity>|<url>|<requirement>` and then declare the products to link using `ios.spm.products.<identity>`.
 
@@ -266,14 +266,14 @@ ios.spm.packages=swift-collections|https://github.com/apple/swift-collections.gi
 ios.spm.products.swift-collections=Collections
 ----
 
-Supported requirement formats are `from:`, `exact:`, `branch:`, `revision:`, and `range:`.
+Supported need formats are `from:`, `exact:`, `branch:`, `revision:`, and `range:`.
 
 `ios.dependencyManager=auto` preserves backward compatibility. Existing projects with `ios.pods` continue to use CocoaPods. Projects with `ios.spm.*` use SPM. If both hint families are present, both are applied.
 
-=== Including Dynamic Frameworks
+=== Including dynamic frameworks
 
-If you need to use a dynamic framework (for example: SomeThirdPartySDK.framework), and it isn't available through cocoapods, then you can add it to your project by simply zipping up the framework and copying it to your native/ios directory.
+If you need to use a dynamic framework (for example: SomeThirdPartySDK.framework), and it isn't available through CocoaPods, then you can add it to your project by zipping up the framework and copying it to your native/ios directory.
 
 for example: native/ios/SomeThirdPartySDK.framework.zip
 
-There are no build hints necessary for this approach. The build server will automatically detect the framework and link it into your app.
+no build hints necessary for this approach. The build server will automatically detect the framework and link it into your app.

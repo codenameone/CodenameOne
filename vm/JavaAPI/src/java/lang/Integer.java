@@ -206,7 +206,7 @@ public final class Integer extends Number implements Comparable<Integer> {
         }  while ((i >>>= 1) != 0);
 
         //return new String(cursor, bufLen - cursor, buf);
-        return new String(cursor, bufLen - cursor, buf);
+        return new String(buf, cursor, bufLen - cursor);
     }
 
 
@@ -233,7 +233,7 @@ public final class Integer extends Number implements Comparable<Integer> {
             buf[--cursor] = digits[i & 0xf];
         } while ((i >>>= 4) != 0 || (bufLen - cursor < minWidth));
 
-        return new String(cursor, bufLen - cursor, buf);
+        return new String(buf, cursor, bufLen - cursor);
     }
     
     public static String intToOctalString(int i) {
@@ -245,7 +245,7 @@ public final class Integer extends Number implements Comparable<Integer> {
             buf[--cursor] = DIGITS[i & 7];
         } while ((i >>>= 3) != 0);
 
-        return new String(cursor, bufLen - cursor, buf);
+        return new String(buf, cursor, bufLen - cursor);
     }
 
     /**

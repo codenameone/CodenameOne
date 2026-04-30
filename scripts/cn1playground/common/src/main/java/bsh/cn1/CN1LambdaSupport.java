@@ -112,7 +112,25 @@ public final class CN1LambdaSupport {
         return null;
     }
 
-    public static final class LambdaValue {
+    /** A LambdaValue implements the most common single-method-interface (SAM)
+     * types directly so that simple lambda assignments — {@code Runnable r = () -> ...},
+     * {@code Function<T,R> f = ...}, {@code Supplier<T> s = ...} — work
+     * without needing a per-target listener bridge. We can't use
+     * java.lang.reflect.Proxy (forbidden in CN1) so each interface we want to
+     * support has to be declared statically here. */
+    // We can only implement SAMs whose default methods don't conflict.
+    // Function/BiFunction/UnaryOperator/BinaryOperator share an `andThen`
+    // (incompatible return types). Predicate/BiPredicate share `negate()`
+    // (also incompatible). Pick the one-arg variant in each pair since
+    // it's far more common in practice.
+    public static final class LambdaValue implements
+            Runnable,
+            java.util.function.Supplier,
+            java.util.function.Consumer,
+            java.util.function.BiConsumer,
+            java.util.function.Function,
+            java.util.function.Predicate,
+            java.util.Comparator {
         private final Interpreter interpreter;
         private final NameSpace parentNameSpace;
         private final String[] parameterNames;
@@ -123,6 +141,60 @@ public final class CN1LambdaSupport {
             this.parentNameSpace = parentNameSpace;
             this.parameterNames = parameterNames;
             this.bodySource = bodySource;
+        }
+
+        /** Runnable adapter — zero-arg lambda. */
+        public void run() {
+            invokeChecked(new Object[0]);
+        }
+
+        /** Supplier#get — zero-arg lambda returning a value. */
+        public Object get() {
+            return invokeChecked(new Object[0]);
+        }
+
+        /** Consumer#accept and BiConsumer#accept — args ignored as void. */
+        public void accept(Object a) {
+            invokeChecked(new Object[]{a});
+        }
+
+        public void accept(Object a, Object b) {
+            invokeChecked(new Object[]{a, b});
+        }
+
+        /** Function#apply — one-arg dispatch returning a value. */
+        public Object apply(Object a) {
+            return invokeChecked(new Object[]{a});
+        }
+
+        /** Two-arg invocation exposed for {@code reduce(identity, op)}-style
+         * call sites. Not part of any implemented SAM (adding
+         * {@code BinaryOperator} would collide with
+         * {@code Function#andThen}). Callers that need a
+         * {@code java.util.function.BinaryOperator} should wrap via
+         * {@link #asBinaryOperator(LambdaValue)}. */
+        public Object applyBinary(Object a, Object b) {
+            return invokeChecked(new Object[]{a, b});
+        }
+
+        /** Predicate#test — boolean-returning one-arg. */
+        public boolean test(Object a) {
+            Object r = invokeChecked(new Object[]{a});
+            return r instanceof Boolean && (Boolean) r;
+        }
+
+        /** Comparator#compare — int-returning two-arg lambda. */
+        public int compare(Object a, Object b) {
+            Object r = invokeChecked(new Object[]{a, b});
+            return r instanceof Number ? ((Number) r).intValue() : 0;
+        }
+
+        private Object invokeChecked(Object[] args) {
+            try {
+                return invoke(args);
+            } catch (EvalError ex) {
+                throw new RuntimeException(ex.getMessage(), ex);
+            }
         }
 
         public Object invoke(Object[] args) throws EvalError {
@@ -157,5 +229,18 @@ public final class CN1LambdaSupport {
                 }
             }
         }
+    }
+
+    /** Adapt a {@link LambdaValue} to a {@link java.util.function.BinaryOperator}
+     * for call sites (e.g. {@code stream().reduce}) whose target SAM is
+     * {@code BinaryOperator}. We can't make {@code LambdaValue} implement
+     * {@code BinaryOperator} directly because its default
+     * {@code andThen} collides with {@code Function#andThen}. */
+    public static java.util.function.BinaryOperator<Object> asBinaryOperator(final LambdaValue lambda) {
+        return new java.util.function.BinaryOperator<Object>() {
+            public Object apply(Object a, Object b) {
+                return lambda.applyBinary(a, b);
+            }
+        };
     }
 }

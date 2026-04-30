@@ -34,8 +34,7 @@ public abstract class BaseTest extends AbstractTest {
             @Override
             protected void onShowCompleted() {
                 registerReadyCallback(this, () -> {
-                    Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot(imageName);
-                    done();
+                    Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot(imageName, BaseTest.this::done);
                 });
             }
         };

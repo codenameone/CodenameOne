@@ -30,8 +30,17 @@ public final class GeneratedAccess_com_codename1_media {
         if ("AsyncMedia".equals(simpleName)) {
             return com.codename1.media.AsyncMedia.class;
         }
+        if ("MediaErrorType".equals(simpleName)) {
+            return com.codename1.media.AsyncMedia.MediaErrorType.class;
+        }
+        if ("State".equals(simpleName)) {
+            return com.codename1.media.AsyncMedia.State.class;
+        }
         if ("AudioBuffer".equals(simpleName)) {
             return com.codename1.media.AudioBuffer.class;
+        }
+        if ("AudioBufferCallback".equals(simpleName)) {
+            return com.codename1.media.AudioBuffer.AudioBufferCallback.class;
         }
         if ("Media".equals(simpleName)) {
             return com.codename1.media.Media.class;
@@ -58,13 +67,13 @@ public final class GeneratedAccess_com_codename1_media {
         if (type == com.codename1.media.AudioBuffer.class) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return new com.codename1.media.AudioBuffer(((Number) adaptedArgs[0]).intValue());
+                return new com.codename1.media.AudioBuffer(toIntValue(adaptedArgs[0]));
             }
         }
         if (type == com.codename1.media.WAVWriter.class) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.io.File.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.io.File.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return new com.codename1.media.WAVWriter((com.codename1.io.File) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue());
+                return new com.codename1.media.WAVWriter((com.codename1.io.File) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3]));
             }
         }
         throw unsupportedConstruct(type, safeArgs);
@@ -144,7 +153,7 @@ public final class GeneratedAccess_com_codename1_media {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class, java.lang.Integer.class}, false);
-                return com.codename1.media.MediaManager.getAudioBuffer((java.lang.String) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue(), ((Number) adaptedArgs[2]).intValue());
+                return com.codename1.media.MediaManager.getAudioBuffer((java.lang.String) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue(), toIntValue(adaptedArgs[2]));
             }
         }
         if ("getAvailableRecordingMimeTypes".equals(name)) {
@@ -235,9 +244,16 @@ public final class GeneratedAccess_com_codename1_media {
                 unsupported = ex;
             }
         }
+        if (target instanceof com.codename1.media.AudioBuffer.AudioBufferCallback) {
+            try {
+                return invoke7((com.codename1.media.AudioBuffer.AudioBufferCallback) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
         if (target instanceof com.codename1.media.Media) {
             try {
-                return invoke7((com.codename1.media.Media) target, name, safeArgs);
+                return invoke8((com.codename1.media.Media) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
@@ -375,7 +391,7 @@ public final class GeneratedAccess_com_codename1_media {
         if ("setTime".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setTime(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setTime(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setVariable".equals(name)) {
@@ -387,7 +403,7 @@ public final class GeneratedAccess_com_codename1_media {
         if ("setVolume".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setVolume(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setVolume(toIntValue(adaptedArgs[0])); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -407,11 +423,11 @@ public final class GeneratedAccess_com_codename1_media {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, float[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, float[].class}, false);
-                typedTarget.copyFrom(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), (float[]) adaptedArgs[2]); return null;
+                typedTarget.copyFrom(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), (float[]) adaptedArgs[2]); return null;
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, float[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, float[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.copyFrom(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), (float[]) adaptedArgs[2], ((Number) adaptedArgs[3]).intValue(), ((Number) adaptedArgs[4]).intValue()); return null;
+                typedTarget.copyFrom(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), (float[]) adaptedArgs[2], toIntValue(adaptedArgs[3]), toIntValue(adaptedArgs[4])); return null;
             }
         }
         if ("copyTo".equals(name)) {
@@ -425,13 +441,13 @@ public final class GeneratedAccess_com_codename1_media {
             }
             if (matches(safeArgs, new Class<?>[]{float[].class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{float[].class, java.lang.Integer.class}, false);
-                typedTarget.copyTo((float[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.copyTo((float[]) adaptedArgs[0], toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("downSample".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.downSample(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.downSample(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("getMaxSize".equals(name)) {
@@ -520,7 +536,7 @@ public final class GeneratedAccess_com_codename1_media {
         if ("setNumTracks".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setNumTracks(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setNumTracks(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setSubtitle".equals(name)) {
@@ -538,7 +554,7 @@ public final class GeneratedAccess_com_codename1_media {
         if ("setTrackNumber".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setTrackNumber(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setTrackNumber(toIntValue(adaptedArgs[0])); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -548,13 +564,13 @@ public final class GeneratedAccess_com_codename1_media {
         if ("audioChannels".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.audioChannels(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.audioChannels(toIntValue(adaptedArgs[0]));
             }
         }
         if ("bitRate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.bitRate(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.bitRate(toIntValue(adaptedArgs[0]));
             }
         }
         if ("build".equals(name)) {
@@ -613,7 +629,7 @@ public final class GeneratedAccess_com_codename1_media {
         if ("samplingRate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.samplingRate(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.samplingRate(toIntValue(adaptedArgs[0]));
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -694,7 +710,7 @@ public final class GeneratedAccess_com_codename1_media {
         if ("write".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{float[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{float[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.write((float[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue()); return null;
+                typedTarget.write((float[]) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2])); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -827,7 +843,7 @@ public final class GeneratedAccess_com_codename1_media {
         if ("setTime".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setTime(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setTime(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setVariable".equals(name)) {
@@ -839,13 +855,23 @@ public final class GeneratedAccess_com_codename1_media {
         if ("setVolume".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setVolume(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setVolume(toIntValue(adaptedArgs[0])); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke7(com.codename1.media.Media typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke7(com.codename1.media.AudioBuffer.AudioBufferCallback typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("frameReceived".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.media.AudioBuffer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.media.AudioBuffer.class}, false);
+                typedTarget.frameReceived((com.codename1.media.AudioBuffer) adaptedArgs[0]); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke8(com.codename1.media.Media typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("cleanup".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.cleanup(); return null;
@@ -927,7 +953,7 @@ public final class GeneratedAccess_com_codename1_media {
         if ("setTime".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setTime(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setTime(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setVariable".equals(name)) {
@@ -939,23 +965,72 @@ public final class GeneratedAccess_com_codename1_media {
         if ("setVolume".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setVolume(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setVolume(toIntValue(adaptedArgs[0])); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == com.codename1.media.Media.class) {
-            if ("VARIABLE_BACKGROUND_ALBUM_COVER".equals(name)) return com.codename1.media.Media.VARIABLE_BACKGROUND_ALBUM_COVER;
-            if ("VARIABLE_BACKGROUND_ARTIST".equals(name)) return com.codename1.media.Media.VARIABLE_BACKGROUND_ARTIST;
-            if ("VARIABLE_BACKGROUND_DURATION".equals(name)) return com.codename1.media.Media.VARIABLE_BACKGROUND_DURATION;
-            if ("VARIABLE_BACKGROUND_POSITION".equals(name)) return com.codename1.media.Media.VARIABLE_BACKGROUND_POSITION;
-            if ("VARIABLE_BACKGROUND_SUPPORTED".equals(name)) return com.codename1.media.Media.VARIABLE_BACKGROUND_SUPPORTED;
-            if ("VARIABLE_BACKGROUND_TITLE".equals(name)) return com.codename1.media.Media.VARIABLE_BACKGROUND_TITLE;
-            if ("VARIABLE_NATIVE_CONTRLOLS_EMBEDDED".equals(name)) return com.codename1.media.Media.VARIABLE_NATIVE_CONTRLOLS_EMBEDDED;
-        }
+        if (type == com.codename1.media.AbstractMedia.class) return getStaticField0(name);
+        if (type == com.codename1.media.AsyncMedia.class) return getStaticField1(name);
+        if (type == com.codename1.media.AsyncMedia.MediaErrorType.class) return getStaticField2(name);
+        if (type == com.codename1.media.AsyncMedia.State.class) return getStaticField3(name);
+        if (type == com.codename1.media.Media.class) return getStaticField4(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("VARIABLE_ANDROID_SEEK_PREVIEW_WORKAROUND".equals(name)) return com.codename1.media.AbstractMedia.VARIABLE_ANDROID_SEEK_PREVIEW_WORKAROUND;
+        if ("VARIABLE_BACKGROUND_ALBUM_COVER".equals(name)) return com.codename1.media.AbstractMedia.VARIABLE_BACKGROUND_ALBUM_COVER;
+        if ("VARIABLE_BACKGROUND_ARTIST".equals(name)) return com.codename1.media.AbstractMedia.VARIABLE_BACKGROUND_ARTIST;
+        if ("VARIABLE_BACKGROUND_DURATION".equals(name)) return com.codename1.media.AbstractMedia.VARIABLE_BACKGROUND_DURATION;
+        if ("VARIABLE_BACKGROUND_POSITION".equals(name)) return com.codename1.media.AbstractMedia.VARIABLE_BACKGROUND_POSITION;
+        if ("VARIABLE_BACKGROUND_SUPPORTED".equals(name)) return com.codename1.media.AbstractMedia.VARIABLE_BACKGROUND_SUPPORTED;
+        if ("VARIABLE_BACKGROUND_TITLE".equals(name)) return com.codename1.media.AbstractMedia.VARIABLE_BACKGROUND_TITLE;
+        if ("VARIABLE_NATIVE_CONTRLOLS_EMBEDDED".equals(name)) return com.codename1.media.AbstractMedia.VARIABLE_NATIVE_CONTRLOLS_EMBEDDED;
+        throw unsupportedStaticField(com.codename1.media.AbstractMedia.class, name);
+    }
+
+    private static Object getStaticField1(String name) throws Exception {
+        if ("VARIABLE_ANDROID_SEEK_PREVIEW_WORKAROUND".equals(name)) return com.codename1.media.AsyncMedia.VARIABLE_ANDROID_SEEK_PREVIEW_WORKAROUND;
+        if ("VARIABLE_BACKGROUND_ALBUM_COVER".equals(name)) return com.codename1.media.AsyncMedia.VARIABLE_BACKGROUND_ALBUM_COVER;
+        if ("VARIABLE_BACKGROUND_ARTIST".equals(name)) return com.codename1.media.AsyncMedia.VARIABLE_BACKGROUND_ARTIST;
+        if ("VARIABLE_BACKGROUND_DURATION".equals(name)) return com.codename1.media.AsyncMedia.VARIABLE_BACKGROUND_DURATION;
+        if ("VARIABLE_BACKGROUND_POSITION".equals(name)) return com.codename1.media.AsyncMedia.VARIABLE_BACKGROUND_POSITION;
+        if ("VARIABLE_BACKGROUND_SUPPORTED".equals(name)) return com.codename1.media.AsyncMedia.VARIABLE_BACKGROUND_SUPPORTED;
+        if ("VARIABLE_BACKGROUND_TITLE".equals(name)) return com.codename1.media.AsyncMedia.VARIABLE_BACKGROUND_TITLE;
+        if ("VARIABLE_NATIVE_CONTRLOLS_EMBEDDED".equals(name)) return com.codename1.media.AsyncMedia.VARIABLE_NATIVE_CONTRLOLS_EMBEDDED;
+        throw unsupportedStaticField(com.codename1.media.AsyncMedia.class, name);
+    }
+
+    private static Object getStaticField2(String name) throws Exception {
+        if ("Aborted".equals(name)) return com.codename1.media.AsyncMedia.MediaErrorType.Aborted;
+        if ("Decode".equals(name)) return com.codename1.media.AsyncMedia.MediaErrorType.Decode;
+        if ("Encode".equals(name)) return com.codename1.media.AsyncMedia.MediaErrorType.Encode;
+        if ("LineUnavailable".equals(name)) return com.codename1.media.AsyncMedia.MediaErrorType.LineUnavailable;
+        if ("Network".equals(name)) return com.codename1.media.AsyncMedia.MediaErrorType.Network;
+        if ("SrcNotSupported".equals(name)) return com.codename1.media.AsyncMedia.MediaErrorType.SrcNotSupported;
+        if ("Unknown".equals(name)) return com.codename1.media.AsyncMedia.MediaErrorType.Unknown;
+        throw unsupportedStaticField(com.codename1.media.AsyncMedia.MediaErrorType.class, name);
+    }
+
+    private static Object getStaticField3(String name) throws Exception {
+        if ("Paused".equals(name)) return com.codename1.media.AsyncMedia.State.Paused;
+        if ("Playing".equals(name)) return com.codename1.media.AsyncMedia.State.Playing;
+        throw unsupportedStaticField(com.codename1.media.AsyncMedia.State.class, name);
+    }
+
+    private static Object getStaticField4(String name) throws Exception {
+        if ("VARIABLE_ANDROID_SEEK_PREVIEW_WORKAROUND".equals(name)) return com.codename1.media.Media.VARIABLE_ANDROID_SEEK_PREVIEW_WORKAROUND;
+        if ("VARIABLE_BACKGROUND_ALBUM_COVER".equals(name)) return com.codename1.media.Media.VARIABLE_BACKGROUND_ALBUM_COVER;
+        if ("VARIABLE_BACKGROUND_ARTIST".equals(name)) return com.codename1.media.Media.VARIABLE_BACKGROUND_ARTIST;
+        if ("VARIABLE_BACKGROUND_DURATION".equals(name)) return com.codename1.media.Media.VARIABLE_BACKGROUND_DURATION;
+        if ("VARIABLE_BACKGROUND_POSITION".equals(name)) return com.codename1.media.Media.VARIABLE_BACKGROUND_POSITION;
+        if ("VARIABLE_BACKGROUND_SUPPORTED".equals(name)) return com.codename1.media.Media.VARIABLE_BACKGROUND_SUPPORTED;
+        if ("VARIABLE_BACKGROUND_TITLE".equals(name)) return com.codename1.media.Media.VARIABLE_BACKGROUND_TITLE;
+        if ("VARIABLE_NATIVE_CONTRLOLS_EMBEDDED".equals(name)) return com.codename1.media.Media.VARIABLE_NATIVE_CONTRLOLS_EMBEDDED;
+        throw unsupportedStaticField(com.codename1.media.Media.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {
@@ -1109,7 +1184,19 @@ public final class GeneratedAccess_com_codename1_media {
         if (!(value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue)) {
             return value;
         }
+        // Direct fit when LambdaValue already implements the target SAM
+        // (Runnable, Function, Comparator, ...).
+        if (type.isInstance(value)) {
+            return value;
+        }
         return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
+    }
+
+    private static int toIntValue(Object value) {
+        if (value instanceof Number) return ((Number) value).intValue();
+        if (value instanceof Character) return (int) ((Character) value).charValue();
+        throw new ClassCastException("Cannot coerce "
+            + (value == null ? "null" : value.getClass().getName()) + " to int");
     }
 
     private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
@@ -1164,10 +1251,15 @@ public final class GeneratedAccess_com_codename1_media {
         if ("byte".equals(type.getName()) || type == Byte.class || "short".equals(type.getName()) || type == Short.class
                 || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
                 || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
-            return value instanceof Number;
+            // Java widens char to int implicitly, so accept Character
+            // for any int-or-larger numeric slot.
+            return value instanceof Number || value instanceof Character;
         }
         if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
-            return isSamInterface(type);
+            // LambdaValue implements common SAMs directly (Runnable,
+            // Function, Predicate, Comparator, ...). Also accept any
+            // CN1 SAM the listener-bridge knows how to wrap.
+            return type.isInstance(value) || isSamInterface(type);
         }
         return type.isInstance(value);
     }

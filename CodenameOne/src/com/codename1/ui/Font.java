@@ -23,7 +23,6 @@
  */
 package com.codename1.ui;
 
-import com.codename1.impl.CodenameOneImplementation;
 
 import java.util.HashMap;
 import java.util.Hashtable;
@@ -171,9 +170,7 @@ public class Font extends CN {
     }
 
     Font(int face, int style, int size) {
-        Display d = Display.getInstance();
-        CodenameOneImplementation i = d.getImplementation();
-        font = i.createFont(face, style, size);
+        font = Display.getInstance().getImplementation().createFont(face, style, size);
     }
 
     /// Returns a previously loaded bitmap font from cache

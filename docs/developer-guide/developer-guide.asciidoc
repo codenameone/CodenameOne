@@ -53,6 +53,8 @@ include::Theme-Basics.asciidoc[]
 
 include::Advanced-Theming.asciidoc[]
 
+include::Native-Themes.asciidoc[]
+
 include::css.asciidoc[]
 
 include::The-Components-Of-Codename-One.asciidoc[]
@@ -77,6 +79,7 @@ include::Monetization.asciidoc[]
 
 include::Advanced-Topics-Under-The-Hood.asciidoc[]
 
+
 include::security.asciidoc[]
 
 include::signing.asciidoc[]
@@ -99,7 +102,7 @@ include::Maven-Appendix-Control-Center.adoc[]
 
 include::Maven-Appendix-Rich-Properties.adoc[]
 
-= Historical Reference
+= Historical reference
 
 include::Working-with-UWP.asciidoc[]
 

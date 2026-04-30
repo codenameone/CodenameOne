@@ -677,7 +677,6 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         int res = p.waitFor();
         //error occurred
         if(res > 0){
-            StringBuilder msg = new StringBuilder();
             final InputStream input = p.getInputStream();
             final InputStream stream = p.getErrorStream();
 
@@ -686,14 +685,12 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             while (i > -1) {
                 String str = new String(buffer, 0, i, StandardCharsets.UTF_8);
                 System.out.print(str);
-                msg.append(str);
                 i = stream.read(buffer);
             }
             i = stream.read(buffer);
             while (i > -1) {
                 String str = new String(buffer, 0, i, StandardCharsets.UTF_8);
                 System.out.print(str);
-                msg.append(str);
                 i = stream.read(buffer);
             }
 

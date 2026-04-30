@@ -31,6 +31,7 @@ import com.codename1.ui.animations.Transition;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.ScrollListener;
+import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.Layout;
@@ -446,15 +447,18 @@ public class Toolbar extends Container {
     public void closeLeftSideMenu() {
         if (onTopSideMenu) {
             if (sidemenuDialog != null && sidemenuDialog.isShowing()) {
+                final Container cnt = getComponentForm().getFormLayeredPane(Toolbar.class, false);
+                Runnable onDisposed = new Runnable() {
+                    @Override
+                    public void run() {
+                        detachToolbarLayeredPane(cnt);
+                    }
+                };
                 if (!isRTL()) {
-                    sidemenuDialog.disposeToTheLeft();
+                    sidemenuDialog.disposeToTheLeft(onDisposed);
                 } else {
-                    sidemenuDialog.disposeToTheRight();
+                    sidemenuDialog.disposeToTheRight(onDisposed);
                 }
-                Container cnt = getComponentForm().getFormLayeredPane(Toolbar.class, false);
-                Style s = cnt.getUnselectedStyle();
-                s.setBgTransparency(0);
-                cnt.remove();
             }
         } else {
             SideMenuBar.closeCurrentMenu();
@@ -465,17 +469,45 @@ public class Toolbar extends Container {
     public void closeRightSideMenu() {
         if (onTopSideMenu) {
             if (rightSidemenuDialog != null && rightSidemenuDialog.isShowing()) {
+                final Container cnt = getComponentForm().getFormLayeredPane(Toolbar.class, false);
+                Runnable onDisposed = new Runnable() {
+                    @Override
+                    public void run() {
+                        detachToolbarLayeredPane(cnt);
+                    }
+                };
                 if (!isRTL()) {
-                    rightSidemenuDialog.disposeToTheRight();
+                    rightSidemenuDialog.disposeToTheRight(onDisposed);
                 } else {
-                    rightSidemenuDialog.disposeToTheLeft();
+                    rightSidemenuDialog.disposeToTheLeft(onDisposed);
                 }
-                Container cnt = getComponentForm().getFormLayeredPane(Toolbar.class, false);
-                Style s = cnt.getUnselectedStyle();
-                s.setBgTransparency(0);
-                cnt.remove();
             }
         }
+    }
+
+    /// Detaches the Toolbar's shared FormLayeredPane once the side-menu
+    /// dispose animation has finished. Called from the dispose
+    /// onFinish callback so the Dialog's own peer-removal logic runs
+    /// against a still-attached parent. Detaching the layered pane
+    /// synchronously (which was the previous behaviour) left orphan
+    /// peer DOM elements on the JavaScript port because the Dialog's
+    /// animation callback ran after its parent had already been
+    /// removed. Only detach when the side-menu Dialog is the only
+    /// remaining child of the layered pane; otherwise another side
+    /// menu (e.g. the opposite-side one) is still showing.
+    private void detachToolbarLayeredPane(Container cnt) {
+        if (cnt == null) {
+            return;
+        }
+        if (sidemenuDialog != null && sidemenuDialog.isShowing()) {
+            return;
+        }
+        if (rightSidemenuDialog != null && rightSidemenuDialog.isShowing()) {
+            return;
+        }
+        Style s = cnt.getUnselectedStyle();
+        s.setBgTransparency(0);
+        cnt.remove();
     }
 
     /// Returns the Toolbar title Component.
@@ -2500,6 +2532,20 @@ public class Toolbar extends Container {
             // check if its already added:
             if (((BorderLayout) getLayout()).getNorth() == null) {
                 Container bar = new Container();
+                if (getUIManager().isThemeConstant("statusBarScrollsUpBool", true)) {
+                    bar.addPointerReleasedListener(new ActionListener() {
+                        @Override
+                        public void actionPerformed(ActionEvent evt) {
+                            Form parent = getComponentForm();
+                            if (parent != null) {
+                                Component c = parent.findScrollableChild(parent.getContentPane());
+                                if (c != null) {
+                                    c.scrollRectToVisible(new Rectangle(0, 0, 10, 10), c);
+                                }
+                            }
+                        }
+                    });
+                }
                 if (getUIManager().isThemeConstant("landscapeTitleUiidBool", false)) {
                     bar.setUIID("StatusBar", "StatusBarLandscape");
                 } else {

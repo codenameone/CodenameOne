@@ -30,8 +30,23 @@ public final class GeneratedAccess_com_codename1_charts_compat {
         if ("GradientDrawable".equals(simpleName)) {
             return com.codename1.charts.compat.GradientDrawable.class;
         }
+        if ("Orientation".equals(simpleName)) {
+            return com.codename1.charts.compat.GradientDrawable.Orientation.class;
+        }
         if ("Paint".equals(simpleName)) {
             return com.codename1.charts.compat.Paint.class;
+        }
+        if ("Align".equals(simpleName)) {
+            return com.codename1.charts.compat.Paint.Align.class;
+        }
+        if ("Cap".equals(simpleName)) {
+            return com.codename1.charts.compat.Paint.Cap.class;
+        }
+        if ("Join".equals(simpleName)) {
+            return com.codename1.charts.compat.Paint.Join.class;
+        }
+        if ("Style".equals(simpleName)) {
+            return com.codename1.charts.compat.Paint.Style.class;
         }
         if ("PathMeasure".equals(simpleName)) {
             return com.codename1.charts.compat.PathMeasure.class;
@@ -216,7 +231,7 @@ public final class GeneratedAccess_com_codename1_charts_compat {
         if ("setBounds".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.setBounds(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue()); return null;
+                typedTarget.setBounds(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3])); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -267,7 +282,7 @@ public final class GeneratedAccess_com_codename1_charts_compat {
         if ("getTextBounds".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.ui.geom.Rectangle2D.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.ui.geom.Rectangle2D.class}, false);
-                typedTarget.getTextBounds((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), (com.codename1.ui.geom.Rectangle2D) adaptedArgs[3]); return null;
+                typedTarget.getTextBounds((java.lang.String) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), (com.codename1.ui.geom.Rectangle2D) adaptedArgs[3]); return null;
             }
         }
         if ("getTextSize".equals(name)) {
@@ -293,7 +308,7 @@ public final class GeneratedAccess_com_codename1_charts_compat {
             }
             if (matches(safeArgs, new Class<?>[]{char[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{char[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.measureText((char[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
+                return typedTarget.measureText((char[]) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]));
             }
         }
         if ("setAntiAlias".equals(name)) {
@@ -305,19 +320,19 @@ public final class GeneratedAccess_com_codename1_charts_compat {
         if ("setColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setColor(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setColor(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setStrokeCap".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setStrokeCap(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setStrokeCap(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setStrokeJoin".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setStrokeJoin(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setStrokeJoin(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setStrokeMiter".equals(name)) {
@@ -341,7 +356,7 @@ public final class GeneratedAccess_com_codename1_charts_compat {
         if ("setTextAlign".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setTextAlign(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setTextAlign(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setTextSize".equals(name)) {
@@ -373,14 +388,59 @@ public final class GeneratedAccess_com_codename1_charts_compat {
         if ("getPosTan".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, float[].class, float[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, float[].class, float[].class}, false);
-                typedTarget.getPosTan(((Number) adaptedArgs[0]).intValue(), (float[]) adaptedArgs[1], (float[]) adaptedArgs[2]); return null;
+                typedTarget.getPosTan(toIntValue(adaptedArgs[0]), (float[]) adaptedArgs[1], (float[]) adaptedArgs[2]); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
+        if (type == com.codename1.charts.compat.GradientDrawable.Orientation.class) return getStaticField0(name);
+        if (type == com.codename1.charts.compat.Paint.Align.class) return getStaticField1(name);
+        if (type == com.codename1.charts.compat.Paint.Cap.class) return getStaticField2(name);
+        if (type == com.codename1.charts.compat.Paint.Join.class) return getStaticField3(name);
+        if (type == com.codename1.charts.compat.Paint.Style.class) return getStaticField4(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("BL_TR".equals(name)) return com.codename1.charts.compat.GradientDrawable.Orientation.BL_TR;
+        if ("BOTTOM_TOP".equals(name)) return com.codename1.charts.compat.GradientDrawable.Orientation.BOTTOM_TOP;
+        if ("BR_TL".equals(name)) return com.codename1.charts.compat.GradientDrawable.Orientation.BR_TL;
+        if ("LEFT_RIGHT".equals(name)) return com.codename1.charts.compat.GradientDrawable.Orientation.LEFT_RIGHT;
+        if ("RIGHT_LEFT".equals(name)) return com.codename1.charts.compat.GradientDrawable.Orientation.RIGHT_LEFT;
+        if ("TL_BR".equals(name)) return com.codename1.charts.compat.GradientDrawable.Orientation.TL_BR;
+        if ("TOP_BOTTOM".equals(name)) return com.codename1.charts.compat.GradientDrawable.Orientation.TOP_BOTTOM;
+        if ("TR_BL".equals(name)) return com.codename1.charts.compat.GradientDrawable.Orientation.TR_BL;
+        throw unsupportedStaticField(com.codename1.charts.compat.GradientDrawable.Orientation.class, name);
+    }
+
+    private static Object getStaticField1(String name) throws Exception {
+        if ("CENTER".equals(name)) return com.codename1.charts.compat.Paint.Align.CENTER;
+        if ("LEFT".equals(name)) return com.codename1.charts.compat.Paint.Align.LEFT;
+        if ("RIGHT".equals(name)) return com.codename1.charts.compat.Paint.Align.RIGHT;
+        throw unsupportedStaticField(com.codename1.charts.compat.Paint.Align.class, name);
+    }
+
+    private static Object getStaticField2(String name) throws Exception {
+        if ("BUTT".equals(name)) return com.codename1.charts.compat.Paint.Cap.BUTT;
+        if ("ROUND".equals(name)) return com.codename1.charts.compat.Paint.Cap.ROUND;
+        if ("SQUARE".equals(name)) return com.codename1.charts.compat.Paint.Cap.SQUARE;
+        throw unsupportedStaticField(com.codename1.charts.compat.Paint.Cap.class, name);
+    }
+
+    private static Object getStaticField3(String name) throws Exception {
+        if ("BEVEL".equals(name)) return com.codename1.charts.compat.Paint.Join.BEVEL;
+        if ("MITER".equals(name)) return com.codename1.charts.compat.Paint.Join.MITER;
+        if ("ROUND".equals(name)) return com.codename1.charts.compat.Paint.Join.ROUND;
+        throw unsupportedStaticField(com.codename1.charts.compat.Paint.Join.class, name);
+    }
+
+    private static Object getStaticField4(String name) throws Exception {
+        if ("FILL".equals(name)) return com.codename1.charts.compat.Paint.Style.FILL;
+        if ("FILL_AND_STROKE".equals(name)) return com.codename1.charts.compat.Paint.Style.FILL_AND_STROKE;
+        if ("STROKE".equals(name)) return com.codename1.charts.compat.Paint.Style.STROKE;
+        throw unsupportedStaticField(com.codename1.charts.compat.Paint.Style.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {
@@ -402,11 +462,11 @@ public final class GeneratedAccess_com_codename1_charts_compat {
         if (target instanceof com.codename1.charts.compat.Canvas) {
             com.codename1.charts.compat.Canvas typedTarget = (com.codename1.charts.compat.Canvas) target;
             if ("absoluteX".equals(name)) {
-                typedTarget.absoluteX = ((Number) value).intValue();
+                typedTarget.absoluteX = toIntValue(value);
                 return;
             }
             if ("absoluteY".equals(name)) {
-                typedTarget.absoluteY = ((Number) value).intValue();
+                typedTarget.absoluteY = toIntValue(value);
                 return;
             }
             if ("bounds".equals(name)) {
@@ -560,7 +620,19 @@ public final class GeneratedAccess_com_codename1_charts_compat {
         if (!(value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue)) {
             return value;
         }
+        // Direct fit when LambdaValue already implements the target SAM
+        // (Runnable, Function, Comparator, ...).
+        if (type.isInstance(value)) {
+            return value;
+        }
         return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
+    }
+
+    private static int toIntValue(Object value) {
+        if (value instanceof Number) return ((Number) value).intValue();
+        if (value instanceof Character) return (int) ((Character) value).charValue();
+        throw new ClassCastException("Cannot coerce "
+            + (value == null ? "null" : value.getClass().getName()) + " to int");
     }
 
     private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
@@ -615,10 +687,15 @@ public final class GeneratedAccess_com_codename1_charts_compat {
         if ("byte".equals(type.getName()) || type == Byte.class || "short".equals(type.getName()) || type == Short.class
                 || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
                 || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
-            return value instanceof Number;
+            // Java widens char to int implicitly, so accept Character
+            // for any int-or-larger numeric slot.
+            return value instanceof Number || value instanceof Character;
         }
         if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
-            return isSamInterface(type);
+            // LambdaValue implements common SAMs directly (Runnable,
+            // Function, Predicate, Comparator, ...). Also accept any
+            // CN1 SAM the listener-bridge knows how to wrap.
+            return type.isInstance(value) || isSamInterface(type);
         }
         return type.isInstance(value);
     }

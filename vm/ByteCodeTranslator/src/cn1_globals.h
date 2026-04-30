@@ -10,6 +10,7 @@
 #include <setjmp.h>
 #include <math.h>
 #include <stdatomic.h>
+#include <stdint.h>
 
 //#define DEBUG_GC_ALLOCATIONS
 
@@ -1085,7 +1086,98 @@ extern void arrayFinalizerFunction(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array)
 extern void gcReleaseObj(JAVA_OBJECT o);
 
 extern JAVA_OBJECT allocArray(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type, int primitiveSize, int dim);
+extern JAVA_OBJECT allocArrayAligned(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type, int primitiveSize, int dim, int alignment);
 extern JAVA_OBJECT allocMultiArray(int* lengths, struct clazz* type, int primitiveSize, int dim);
+#define CN1_SIMD_ALIGNMENT 16
+#define CN1_SIMD_STACK_PRIMITIVE_ARRAY(length, arrayClass, primitiveSize) \
+    __extension__ ({ \
+        int __cn1StackLength = (length); \
+        const int __cn1Alignment = CN1_SIMD_ALIGNMENT; \
+        int __cn1ActualSize = __cn1StackLength * (primitiveSize); \
+        /* header + embedded data pointer slot + payload + alignment slack for the payload start */ \
+        char* __cn1StackMem = (char*)__builtin_alloca(sizeof(struct JavaArrayPrototype) + sizeof(void*) + __cn1ActualSize + __cn1Alignment - 1); \
+        JAVA_ARRAY __cn1StackArray = (JAVA_ARRAY)__cn1StackMem; \
+        *__cn1StackArray = (struct JavaArrayPrototype){DEBUG_GC_INIT (arrayClass), 0, 0, 0, 0, 0, __cn1StackLength, 1, (primitiveSize), 0}; \
+        if (__cn1ActualSize > 0) { \
+            char* __cn1Data = (char*)(&(__cn1StackArray->data)); \
+            __cn1Data += sizeof(void*); \
+            /* round the payload start up by adding alignment-1 then masking off the low bits */ \
+            uintptr_t __cn1Aligned = (((uintptr_t)__cn1Data) + ((uintptr_t)__cn1Alignment - 1)) & ~((uintptr_t)__cn1Alignment - 1); \
+            __cn1StackArray->data = (void*)__cn1Aligned; \
+        } else { \
+            __cn1StackArray->data = 0; \
+        } \
+        (JAVA_OBJECT)__cn1StackArray; \
+    })
+#define CN1_SIMD_ALLOCA_BYTE(length) CN1_SIMD_STACK_PRIMITIVE_ARRAY((length), &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE))
+#define CN1_SIMD_ALLOCA_INT(length) CN1_SIMD_STACK_PRIMITIVE_ARRAY((length), &class_array1__JAVA_INT, sizeof(JAVA_ARRAY_INT))
+#define CN1_SIMD_ALLOCA_FLOAT(length) CN1_SIMD_STACK_PRIMITIVE_ARRAY((length), &class_array1__JAVA_FLOAT, sizeof(JAVA_ARRAY_FLOAT))
+#define CN1_SIMD_ALLOCA_BYTE_ZEROED(length) \
+    __extension__ ({ \
+        int __cn1InitLength = (length); \
+        JAVA_ARRAY __cn1StackArray = (JAVA_ARRAY)CN1_SIMD_ALLOCA_BYTE(__cn1InitLength); \
+        if (__cn1InitLength > 0) { \
+            memset(__cn1StackArray->data, 0, (size_t)__cn1InitLength); \
+        } \
+        (JAVA_OBJECT)__cn1StackArray; \
+    })
+#define CN1_SIMD_ALLOCA_INT_ZEROED(length) \
+    __extension__ ({ \
+        int __cn1InitLength = (length); \
+        JAVA_ARRAY __cn1StackArray = (JAVA_ARRAY)CN1_SIMD_ALLOCA_INT(__cn1InitLength); \
+        if (__cn1InitLength > 0) { \
+            memset(__cn1StackArray->data, 0, (size_t)__cn1InitLength * sizeof(JAVA_ARRAY_INT)); \
+        } \
+        (JAVA_OBJECT)__cn1StackArray; \
+    })
+#define CN1_SIMD_ALLOCA_FLOAT_ZEROED(length) \
+    __extension__ ({ \
+        int __cn1InitLength = (length); \
+        JAVA_ARRAY __cn1StackArray = (JAVA_ARRAY)CN1_SIMD_ALLOCA_FLOAT(__cn1InitLength); \
+        if (__cn1InitLength > 0) { \
+            memset(__cn1StackArray->data, 0, (size_t)__cn1InitLength * sizeof(JAVA_ARRAY_FLOAT)); \
+        } \
+        (JAVA_OBJECT)__cn1StackArray; \
+    })
+#define CN1_SIMD_ALLOCA_BYTE_FILLED(length, value) \
+    __extension__ ({ \
+        int __cn1InitLength = (length); \
+        JAVA_ARRAY __cn1StackArray = (JAVA_ARRAY)CN1_SIMD_ALLOCA_BYTE(__cn1InitLength); \
+        if (__cn1InitLength > 0) { \
+            memset(__cn1StackArray->data, (value), (size_t)__cn1InitLength); \
+        } \
+        (JAVA_OBJECT)__cn1StackArray; \
+    })
+#define CN1_SIMD_ALLOCA_INT_FILLED(length, value) \
+    __extension__ ({ \
+        int __cn1InitLength = (length); \
+        JAVA_ARRAY_INT __cn1InitValue = (value); \
+        JAVA_ARRAY __cn1StackArray = (JAVA_ARRAY)CN1_SIMD_ALLOCA_INT(__cn1InitLength); \
+        JAVA_ARRAY_INT* __cn1Data = (JAVA_ARRAY_INT*)__cn1StackArray->data; \
+        if (__cn1InitValue == 0 && __cn1InitLength > 0) { \
+            memset(__cn1StackArray->data, 0, (size_t)__cn1InitLength * sizeof(JAVA_ARRAY_INT)); \
+        } else { \
+            for (int __cn1FillIndex = 0; __cn1FillIndex < __cn1InitLength; __cn1FillIndex++) { \
+                __cn1Data[__cn1FillIndex] = __cn1InitValue; \
+            } \
+        } \
+        (JAVA_OBJECT)__cn1StackArray; \
+    })
+#define CN1_SIMD_ALLOCA_FLOAT_FILLED(length, value) \
+    __extension__ ({ \
+        int __cn1InitLength = (length); \
+        JAVA_ARRAY_FLOAT __cn1InitValue = (value); \
+        JAVA_ARRAY __cn1StackArray = (JAVA_ARRAY)CN1_SIMD_ALLOCA_FLOAT(__cn1InitLength); \
+        JAVA_ARRAY_FLOAT* __cn1Data = (JAVA_ARRAY_FLOAT*)__cn1StackArray->data; \
+        if (__cn1InitValue == 0.0f && __cn1InitLength > 0) { \
+            memset(__cn1StackArray->data, 0, (size_t)__cn1InitLength * sizeof(JAVA_ARRAY_FLOAT)); \
+        } else { \
+            for (int __cn1FillIndex = 0; __cn1FillIndex < __cn1InitLength; __cn1FillIndex++) { \
+                __cn1Data[__cn1FillIndex] = __cn1InitValue; \
+            } \
+        } \
+        (JAVA_OBJECT)__cn1StackArray; \
+    })
 extern JAVA_OBJECT alloc2DArray(CODENAME_ONE_THREAD_STATE, int length1, int length2, struct clazz* parentType, struct clazz* childType, int primitiveSize);
 extern JAVA_OBJECT alloc3DArray(CODENAME_ONE_THREAD_STATE, int length1, int length2, int length3, struct clazz* parentType, struct clazz* childType, struct clazz* grandChildType, int primitiveSize);
 

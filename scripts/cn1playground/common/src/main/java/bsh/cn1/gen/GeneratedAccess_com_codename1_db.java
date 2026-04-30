@@ -297,7 +297,7 @@ public final class GeneratedAccess_com_codename1_db {
         if ("getColumnName".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getColumnName(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.getColumnName(toIntValue(adaptedArgs[0]));
             }
         }
         if ("getPosition".equals(name)) {
@@ -323,7 +323,7 @@ public final class GeneratedAccess_com_codename1_db {
         if ("position".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.position(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.position(toIntValue(adaptedArgs[0]));
             }
         }
         if ("prev".equals(name)) {
@@ -338,43 +338,43 @@ public final class GeneratedAccess_com_codename1_db {
         if ("getBlob".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getBlob(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.getBlob(toIntValue(adaptedArgs[0]));
             }
         }
         if ("getDouble".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getDouble(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.getDouble(toIntValue(adaptedArgs[0]));
             }
         }
         if ("getFloat".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getFloat(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.getFloat(toIntValue(adaptedArgs[0]));
             }
         }
         if ("getInteger".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getInteger(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.getInteger(toIntValue(adaptedArgs[0]));
             }
         }
         if ("getLong".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getLong(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.getLong(toIntValue(adaptedArgs[0]));
             }
         }
         if ("getShort".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getShort(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.getShort(toIntValue(adaptedArgs[0]));
             }
         }
         if ("getString".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getString(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.getString(toIntValue(adaptedArgs[0]));
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -384,43 +384,43 @@ public final class GeneratedAccess_com_codename1_db {
         if ("getBlob".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getBlob(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.getBlob(toIntValue(adaptedArgs[0]));
             }
         }
         if ("getDouble".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getDouble(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.getDouble(toIntValue(adaptedArgs[0]));
             }
         }
         if ("getFloat".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getFloat(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.getFloat(toIntValue(adaptedArgs[0]));
             }
         }
         if ("getInteger".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getInteger(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.getInteger(toIntValue(adaptedArgs[0]));
             }
         }
         if ("getLong".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getLong(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.getLong(toIntValue(adaptedArgs[0]));
             }
         }
         if ("getShort".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getShort(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.getShort(toIntValue(adaptedArgs[0]));
             }
         }
         if ("getString".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getString(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.getString(toIntValue(adaptedArgs[0]));
             }
         }
         if ("wasNull".equals(name)) {
@@ -586,7 +586,19 @@ public final class GeneratedAccess_com_codename1_db {
         if (!(value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue)) {
             return value;
         }
+        // Direct fit when LambdaValue already implements the target SAM
+        // (Runnable, Function, Comparator, ...).
+        if (type.isInstance(value)) {
+            return value;
+        }
         return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
+    }
+
+    private static int toIntValue(Object value) {
+        if (value instanceof Number) return ((Number) value).intValue();
+        if (value instanceof Character) return (int) ((Character) value).charValue();
+        throw new ClassCastException("Cannot coerce "
+            + (value == null ? "null" : value.getClass().getName()) + " to int");
     }
 
     private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
@@ -641,10 +653,15 @@ public final class GeneratedAccess_com_codename1_db {
         if ("byte".equals(type.getName()) || type == Byte.class || "short".equals(type.getName()) || type == Short.class
                 || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
                 || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
-            return value instanceof Number;
+            // Java widens char to int implicitly, so accept Character
+            // for any int-or-larger numeric slot.
+            return value instanceof Number || value instanceof Character;
         }
         if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
-            return isSamInterface(type);
+            // LambdaValue implements common SAMs directly (Runnable,
+            // Function, Predicate, Comparator, ...). Also accept any
+            // CN1 SAM the listener-bridge knows how to wrap.
+            return type.isInstance(value) || isSamInterface(type);
         }
         return type.isInstance(value);
     }

@@ -193,7 +193,7 @@ public final class GeneratedAccess_com_codename1_maps_layers {
         if ("lineColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.lineColor(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.lineColor(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("paint".equals(name)) {
@@ -205,19 +205,19 @@ public final class GeneratedAccess_com_codename1_maps_layers {
         if ("setArrowHeight".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setArrowHeight(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setArrowHeight(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setArrowSegmentLength".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setArrowSegmentLength(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setArrowSegmentLength(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setArrowWidth".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setArrowWidth(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setArrowWidth(toIntValue(adaptedArgs[0])); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -248,7 +248,7 @@ public final class GeneratedAccess_com_codename1_maps_layers {
         if ("lineColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.lineColor(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.lineColor(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("paint".equals(name)) {
@@ -617,7 +617,19 @@ public final class GeneratedAccess_com_codename1_maps_layers {
         if (!(value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue)) {
             return value;
         }
+        // Direct fit when LambdaValue already implements the target SAM
+        // (Runnable, Function, Comparator, ...).
+        if (type.isInstance(value)) {
+            return value;
+        }
         return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
+    }
+
+    private static int toIntValue(Object value) {
+        if (value instanceof Number) return ((Number) value).intValue();
+        if (value instanceof Character) return (int) ((Character) value).charValue();
+        throw new ClassCastException("Cannot coerce "
+            + (value == null ? "null" : value.getClass().getName()) + " to int");
     }
 
     private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
@@ -672,10 +684,15 @@ public final class GeneratedAccess_com_codename1_maps_layers {
         if ("byte".equals(type.getName()) || type == Byte.class || "short".equals(type.getName()) || type == Short.class
                 || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
                 || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
-            return value instanceof Number;
+            // Java widens char to int implicitly, so accept Character
+            // for any int-or-larger numeric slot.
+            return value instanceof Number || value instanceof Character;
         }
         if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
-            return isSamInterface(type);
+            // LambdaValue implements common SAMs directly (Runnable,
+            // Function, Predicate, Comparator, ...). Also accept any
+            // CN1 SAM the listener-bridge knows how to wrap.
+            return type.isInstance(value) || isSamInterface(type);
         }
         return type.isInstance(value);
     }

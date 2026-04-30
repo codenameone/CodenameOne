@@ -30,8 +30,9 @@ import com.codename1.util.MathUtil;
 /// another. This class can be subclassed to implement any motion equation for
 /// appropriate physics effects.
 ///
-/// This class relies on the System.currentTimeMillis() method to provide
-/// transitions between coordinates. The motion can be subclassed to provide every
+/// This class relies on [AnimationTime.now()][AnimationTime#now()] to provide
+/// transitions between coordinates, allowing the underlying clock to be
+/// overridden for deterministic playback or custom animation pacing. The motion can be subclassed to provide every
 /// type of motion feel from parabolic motion to spline and linear motion. The default
 /// implementation provides a simple algorithm giving the feel of acceleration and
 /// deceleration.
@@ -46,6 +47,7 @@ public class Motion {
     private static final int CUBIC = 4;
     private static final int COLOR_LINEAR = 5;
     private static final int EXPONENTIAL_DECAY = 6;
+    private static final int CRITICAL_DAMPED_SPRING = 7;
     private static boolean slowMotion;
     private final int[] previousLastReturnedValue = new int[3];
     private final long[] previousLastReturnedValueTime = new long[3];
@@ -313,6 +315,30 @@ public class Motion {
         return deceleration;
     }
 
+    /// Creates a critically-damped spring motion from source to destination. This is the
+    /// envelope of a second-order critically damped system step response:
+    /// `x(t) = dst - (dst - src) * (1 + w*t) * e^(-w*t)` where w is chosen so the residual
+    /// at t=duration is about 2%. Produces a quick initial approach with a soft settling
+    /// tail, closer in feel to the iOS rubber-band snap-back than the quadratic
+    /// `createDecelerationMotion` curve.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sourceValue`: the number from which we are starting
+    ///
+    /// - `destinationValue`: the number to which we are heading
+    ///
+    /// - `duration`: the length in milliseconds of the motion
+    ///
+    /// #### Returns
+    ///
+    /// new motion object
+    public static Motion createCriticalDampedSpringMotion(int sourceValue, int destinationValue, int duration) {
+        Motion m = new Motion(sourceValue, destinationValue, duration);
+        m.motionType = CRITICAL_DAMPED_SPRING;
+        return m;
+    }
+
     /// Creates a deceleration motion starting from the current position of another motion.
     ///
     /// #### Parameters
@@ -332,7 +358,7 @@ public class Motion {
                 motion.destinationValue < motion.sourceValue
                         ? Math.min(motion.destinationValue, maxDestinationValue)
                         : Math.max(motion.destinationValue, maxDestinationValue),
-                (int) Math.min(maxDuration, motion.duration - (System.currentTimeMillis() - motion.startTime))
+                (int) Math.min(maxDuration, motion.duration - (AnimationTime.now() - motion.startTime))
         );
     }
 
@@ -371,7 +397,7 @@ public class Motion {
     /// Sends the motion to the end time instantly which is useful for flushing an animation
     public void finish() {
         if (!isFinished()) {
-            startTime = System.currentTimeMillis() - duration;
+            startTime = AnimationTime.now() - duration;
             currentMotionTime = -1;
             previousCurrentMotionTime = -1;
         }
@@ -379,17 +405,17 @@ public class Motion {
 
     /// Sets the start time to the current time
     public void start() {
-        startTime = System.currentTimeMillis();
+        startTime = AnimationTime.now();
     }
 
     /// Returns the current time within the motion relative to start time
     ///
     /// #### Returns
     ///
-    /// long value representing System.currentTimeMillis() - startTime
+    /// long value representing AnimationTime.now() - startTime
     public long getCurrentMotionTime() {
         if (currentMotionTime < 0) {
-            return System.currentTimeMillis() - startTime;
+            return AnimationTime.now() - startTime;
         }
         return currentMotionTime;
     }
@@ -419,7 +445,7 @@ public class Motion {
     ///
     /// #### Returns
     ///
-    /// true if System.currentTimeMillis() > duration + startTime or the last returned value is the destination value
+    /// true if AnimationTime.now() > duration + startTime or the last returned value is the destination value
     public boolean isFinished() {
         return getCurrentMotionTime() > duration || destinationValue == lastReturnedValue || (EXPONENTIAL_DECAY == motionType && previousLastReturnedValue[0] == lastReturnedValue);
     }
@@ -529,6 +555,9 @@ public class Motion {
                 break;
             case EXPONENTIAL_DECAY:
                 lastReturnedValue = getExponentialDecay();
+                break;
+            case CRITICAL_DAMPED_SPRING:
+                lastReturnedValue = getCriticalDampedSpring();
                 break;
             default:
                 lastReturnedValue = getLinear();
@@ -712,6 +741,31 @@ public class Motion {
             x = Math.max(destinationValue, x);
         }
         return x;
+    }
+
+    // Critically damped second-order step response: produces a fast initial approach
+    // with a soft tail, no overshoot. Omega*duration = 5.83 so residual is ~2% at t=duration.
+    private static final double CRITICAL_DAMPED_OMEGA_T = 5.83d;
+
+    private int getCriticalDampedSpring() {
+        if (isFinished()) {
+            return destinationValue;
+        }
+        float totalTime = duration;
+        float currentTime = (int) getCurrentMotionTime();
+        if (currentMotionTime > -1) {
+            currentTime -= startTime;
+            totalTime -= startTime;
+        }
+        if (totalTime <= 0) {
+            return destinationValue;
+        }
+        if (currentTime > totalTime) {
+            currentTime = totalTime;
+        }
+        double omegaT = CRITICAL_DAMPED_OMEGA_T * (currentTime / (double) totalTime);
+        double residual = (1.0d + omegaT) * MathUtil.exp(-omegaT);
+        return (int) Math.round(destinationValue - (destinationValue - sourceValue) * residual);
     }
 
     /// The number from which we are starting (usually indicating animation start position)

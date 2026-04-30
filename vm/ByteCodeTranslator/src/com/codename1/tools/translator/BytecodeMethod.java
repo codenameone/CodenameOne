@@ -112,6 +112,8 @@ public class BytecodeMethod implements SignatureSet {
     private boolean disableNullAndArrayBoundsChecks;
     private boolean fastMethodStackInUse;
     private boolean fastMethodStackPrimitiveOnly;
+    private String jsBodyScript;
+    private String[] jsBodyParams;
 
     
     static boolean optimizerOn;
@@ -356,7 +358,7 @@ public class BytecodeMethod implements SignatureSet {
     public boolean useFastReturnRelease() {
         return fastMethodStackInUse && !TryCatch.isTryCatchInMethod();
     }
-    
+
     public BytecodeMethod(String clsName, int access, String name, String desc, String signature, String[] exceptions) {
         methodName = name;
         this.clsName = clsName;
@@ -936,7 +938,7 @@ public class BytecodeMethod implements SignatureSet {
             
         b.append(declaration);
         boolean fastMethodStackCandidate = canUseFastMethodStack();
-        
+
         boolean hasInstructions = true;
         if(optimizerOn) {
             hasInstructions = optimize();
@@ -1631,8 +1633,6 @@ public class BytecodeMethod implements SignatureSet {
 
 
     private int varCounter = 0;
-    
-    
     boolean optimize() {
         int instructionCount = instructions.size();
         
@@ -2520,6 +2520,26 @@ public class BytecodeMethod implements SignatureSet {
     @Override
     public SignatureSet nextSignature() {
         return null;
+    }
+
+    public String getJsBodyScript() {
+        return jsBodyScript;
+    }
+
+    public void setJsBodyScript(String jsBodyScript) {
+        this.jsBodyScript = jsBodyScript;
+    }
+
+    public String[] getJsBodyParams() {
+        return jsBodyParams;
+    }
+
+    public void setJsBodyParams(String[] jsBodyParams) {
+        this.jsBodyParams = jsBodyParams;
+    }
+
+    public boolean isJsBodyMethod() {
+        return jsBodyScript != null;
     }
 
 

@@ -29,6 +29,9 @@ package java.nio.charset;
 public class Charset implements Comparable<Charset> {
 
     private String name;
+    private static final Charset UTF8 = new SimpleCharset("UTF-8");
+    private static final Charset USASCII = new SimpleCharset("US-ASCII");
+    private static final Charset ISO88591 = new SimpleCharset("ISO-8859-1");
     protected Charset(String canonicalName, String[] aliases) {
         name = canonicalName;
     }
@@ -42,7 +45,26 @@ public class Charset implements Comparable<Charset> {
     }
     
     public static Charset forName(String name) {
-        throw new UnsupportedOperationException("Charset.forName not implemented on this platform");
+        if (name == null) {
+            throw new NullPointerException();
+        }
+        String normalized = name.toUpperCase().replace('_', '-');
+        if ("UTF-8".equals(normalized)) {
+            return UTF8;
+        }
+        if ("US-ASCII".equals(normalized) || "ASCII".equals(normalized)) {
+            return USASCII;
+        }
+        if ("ISO-8859-1".equals(normalized) || "ISO8859-1".equals(normalized)) {
+            return ISO88591;
+        }
+        throw new UnsupportedOperationException("Charset.forName not implemented on this platform: " + name);
+    }
+
+    private static final class SimpleCharset extends Charset {
+        private SimpleCharset(String canonicalName) {
+            super(canonicalName, new String[0]);
+        }
     }
     
 }

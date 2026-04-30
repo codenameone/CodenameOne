@@ -184,11 +184,52 @@ body.dark .cn1-developer-guide {
 }
 
 .cn1-developer-guide table.tableblock,
+.cn1-developer-guide table.tableblock thead,
+.cn1-developer-guide table.tableblock tfoot,
+.cn1-developer-guide table.tableblock tbody,
+.cn1-developer-guide table.tableblock tr,
 .cn1-developer-guide table.tableblock td,
 .cn1-developer-guide table.tableblock th {
   border-color: var(--dg-border) !important;
   color: var(--dg-fg) !important;
   background: transparent !important;
+}
+
+.cn1-developer-guide table.tableblock thead tr th,
+.cn1-developer-guide table.tableblock thead tr td,
+.cn1-developer-guide table.tableblock tfoot tr th,
+.cn1-developer-guide table.tableblock tfoot tr td {
+  background: transparent !important;
+  color: var(--dg-fg) !important;
+}
+
+.cn1-developer-guide table.tableblock tr.even,
+.cn1-developer-guide table.tableblock tr.alt,
+.cn1-developer-guide table.tableblock.stripes-all > * > tr,
+.cn1-developer-guide table.tableblock.stripes-odd > * > tr:nth-of-type(odd),
+.cn1-developer-guide table.tableblock.stripes-even > * > tr:nth-of-type(even),
+.cn1-developer-guide table.tableblock.stripes-hover > * > tr:hover {
+  background: var(--dg-panel) !important;
+}
+
+.cn1-developer-guide table.tableblock {
+  table-layout: fixed;
+  width: 100%;
+  max-width: 100%;
+}
+
+.cn1-developer-guide table.tableblock td,
+.cn1-developer-guide table.tableblock th {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.cn1-developer-guide table.tableblock td code,
+.cn1-developer-guide table.tableblock th code,
+.cn1-developer-guide table.tableblock td a,
+.cn1-developer-guide table.tableblock th a {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 body.dark .cn1-developer-guide .imageblock img,

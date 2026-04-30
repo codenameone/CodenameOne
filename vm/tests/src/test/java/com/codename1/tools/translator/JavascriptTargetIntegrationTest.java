@@ -40,11 +40,16 @@ class JavascriptTargetIntegrationTest {
         assertTrue(Files.exists(distDir.resolve("parparvm_runtime.js")), "Translator should emit a JS runtime");
         assertTrue(Files.exists(distDir.resolve("translated_app.js")), "Translator should emit translated classes");
         assertTrue(Files.exists(distDir.resolve("vm_protocol.md")), "Translator should emit the VM protocol contract artifact");
+        assertTrue(Files.exists(distDir.resolve("browser_bridge.js")), "Translator should emit a browser bootstrap bridge");
+        assertTrue(Files.exists(distDir.resolve(Paths.get("js", "fontmetrics.js"))), "Translator should copy JavaScript port font metrics support");
+        assertTrue(Files.exists(distDir.resolve("style.css")), "Translator should copy the JavaScript port stylesheet");
 
         String translatedApp = new String(Files.readAllBytes(distDir.resolve("translated_app.js")), StandardCharsets.UTF_8);
         String runtime = new String(Files.readAllBytes(distDir.resolve("parparvm_runtime.js")), StandardCharsets.UTF_8);
         String worker = new String(Files.readAllBytes(distDir.resolve("worker.js")), StandardCharsets.UTF_8);
         String protocolDoc = new String(Files.readAllBytes(distDir.resolve("vm_protocol.md")), StandardCharsets.UTF_8);
+        String index = new String(Files.readAllBytes(distDir.resolve("index.html")), StandardCharsets.UTF_8);
+        String browserBridge = new String(Files.readAllBytes(distDir.resolve("browser_bridge.js")), StandardCharsets.UTF_8);
 
         assertTrue(translatedApp.contains("function*") && translatedApp.contains("JsHello"),
                 "Main class should contribute translated JS generator functions");
@@ -52,6 +57,12 @@ class JavascriptTargetIntegrationTest {
                 "Bundle should register the translated main entrypoint");
         assertTrue(runtime.contains("cn1_java_lang_Thread_start") || runtime.contains("cn1_java_lang_Thread_start__"),
                 "Runtime should provide JS native implementations for thread start");
+        assertTrue(runtime.contains("cn1_java_lang_Object_getClass_R_java_lang_Class")
+                        && runtime.contains("cn1_java_lang_Object_getClassImpl_R_java_lang_Class"),
+                "Runtime should bind both Object.getClass() and its native getClassImpl() helper");
+        assertTrue(runtime.contains("cn1_java_io_PrintStream_println_java_lang_String")
+                        && runtime.contains("cn1_java_io_PrintStream_println_java_lang_Object"),
+                "Runtime should bind PrintStream output methods so browser harness logs can observe CN1SS markers");
         assertTrue(runtime.contains("cn1_java_lang_Object_wait_long_int") || runtime.contains("cn1_java_lang_Object_wait___long_int"),
                 "Runtime should provide JS native implementations for wait()");
         assertTrue(!translatedApp.contains("Missing javascript native method cn1_java_lang_Object_wait_long_int"),
@@ -71,6 +82,14 @@ class JavascriptTargetIntegrationTest {
                 "Unsupported filesystem natives should fail with an explicit JS-mode message when translated");
         assertTrue(worker.contains("importScripts('parparvm_runtime.js');"),
                 "Worker bootstrap should load the runtime first");
+        assertTrue(worker.contains("importScripts('port.js');"),
+                "Worker bootstrap should load JavaScriptPort native bindings");
+        assertTrue(worker.contains("__parparInstallNativeBindings"),
+                "Worker bootstrap should reapply runtime native bindings after translated app load");
+        assertTrue(index.contains("browser_bridge.js") && index.contains("js/fontmetrics.js") && index.contains("codenameone-canvas"),
+                "Generated host page should use the JavaScript port browser shell assets");
+        assertTrue(browserBridge.contains("cn1HostBridge") && browserBridge.contains("host-callback") && browserBridge.contains("host-call"),
+                "Browser bridge should expose host-call plumbing for the JavaScript port shell");
         assertTrue(protocolDoc.contains("Version: 1")
                         && protocolDoc.contains("host-call")
                         && protocolDoc.contains("host-callback")
@@ -214,6 +233,81 @@ class JavascriptTargetIntegrationTest {
                 "Straight-line lowering should avoid stack-array indexing");
         assertTrue(!methodBody.contains("const locals = new Array") && !methodBody.contains("const stack = []") && !methodBody.contains("let pc = 0"),
                 "Straight-line lowering should avoid the interpreter locals/stack/pc loop");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void syntheticAccessorAnonymousRunnableFallsBackWithoutCrashing(CompilerHelper.CompilerConfig config) throws Exception {
+        Parser.cleanup();
+
+        Path sourceDir = Files.createTempDirectory("js-captured-runnable-sources");
+        Path classesDir = Files.createTempDirectory("js-captured-runnable-classes");
+        Path javaApiDir = Files.createTempDirectory("java-api-captured-runnable-classes");
+
+        Files.write(sourceDir.resolve("JsCapturedRunnable.java"), loadFixture("JsCapturedRunnable.java").getBytes(StandardCharsets.UTF_8));
+
+        compileAgainstJavaApi(config, sourceDir, classesDir, javaApiDir);
+
+        Path outputDir = Files.createTempDirectory("js-captured-runnable-output");
+        runJavascriptTranslator(classesDir, outputDir, "JsCapturedRunnable");
+
+        Path distDir = outputDir.resolve("dist").resolve("JsCapturedRunnable-js");
+        String translatedApp = new String(Files.readAllBytes(distDir.resolve("translated_app.js")), StandardCharsets.UTF_8);
+
+        assertTrue(translatedApp.contains("JsCapturedRunnable"),
+                "Translator should emit a bundle for the synthetic-accessor runnable fixture");
+        assertTrue(translatedApp.contains("jvm.setMain(\"JsCapturedRunnable\""),
+                "Translator should complete bundle generation for the synthetic-accessor runnable fixture");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void auxiliaryMainMethodsDoNotOverrideBundleEntrypoint(CompilerHelper.CompilerConfig config) throws Exception {
+        Parser.cleanup();
+
+        Path sourceDir = Files.createTempDirectory("js-aux-main-sources");
+        Path classesDir = Files.createTempDirectory("js-aux-main-classes");
+        Path javaApiDir = Files.createTempDirectory("java-api-aux-main-classes");
+
+        Files.write(sourceDir.resolve("JsAuxiliaryMainApp.java"), loadFixture("JsAuxiliaryMainApp.java").getBytes(StandardCharsets.UTF_8));
+
+        compileAgainstJavaApi(config, sourceDir, classesDir, javaApiDir);
+
+        Path outputDir = Files.createTempDirectory("js-aux-main-output");
+        runJavascriptTranslator(classesDir, outputDir, "JsAuxiliaryMainApp");
+
+        Path distDir = outputDir.resolve("dist").resolve("JsAuxiliaryMainApp-js");
+        String translatedApp = new String(Files.readAllBytes(distDir.resolve("translated_app.js")), StandardCharsets.UTF_8);
+
+        assertTrue(translatedApp.contains("jvm.setMain(\"JsAuxiliaryMainApp\""),
+                "Translator should keep the first application main as the bundle entrypoint");
+        assertTrue(translatedApp.contains("HelperMain"),
+                "Translator should still include auxiliary classes that happen to declare a main()");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void lambdaConstructorShapeTranslatesWithoutBasicVarOpcodeFailure(CompilerHelper.CompilerConfig config) throws Exception {
+        Parser.cleanup();
+
+        Path sourceDir = Files.createTempDirectory("js-lambda-capture-sources");
+        Path classesDir = Files.createTempDirectory("js-lambda-capture-classes");
+        Path javaApiDir = Files.createTempDirectory("java-api-lambda-capture-classes");
+
+        Files.write(sourceDir.resolve("JsLambdaCapture.java"), loadFixture("JsLambdaCapture.java").getBytes(StandardCharsets.UTF_8));
+
+        compileAgainstJavaApi(config, sourceDir, classesDir, javaApiDir);
+
+        Path outputDir = Files.createTempDirectory("js-lambda-capture-output");
+        runJavascriptTranslator(classesDir, outputDir, "JsLambdaCapture");
+
+        Path distDir = outputDir.resolve("dist").resolve("JsLambdaCapture-js");
+        String translatedApp = new String(Files.readAllBytes(distDir.resolve("translated_app.js")), StandardCharsets.UTF_8);
+
+        assertTrue(translatedApp.contains("jvm.setMain(\"JsLambdaCapture\""),
+                "Translator should complete bundle generation for the lambda-capture fixture");
+        assertTrue(translatedApp.contains("JsLambdaCapture"),
+                "Translated output should include the lambda-capture fixture classes");
     }
 
     @ParameterizedTest

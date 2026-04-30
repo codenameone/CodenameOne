@@ -207,4 +207,49 @@ class ToolbarTest extends UITestBase {
 
         assertEquals(1, overflowInvocation[0], "Overflow command should be invoked");
     }
+
+    /// Regression test for the JavaScript port "ghost side menu +
+    /// previous preview visible as background" bug. closeLeftSideMenu
+    /// used to synchronously detach the Toolbar's FormLayeredPane
+    /// while the sidemenu dialog was still mid-animation, leaving the
+    /// dialog's peer tree orphaned on the JS port. The fix defers the
+    /// layered-pane detach until the dispose animation completes. The
+    /// assertion here is the behaviour shift: immediately after
+    /// closeLeftSideMenu returns (synchronously, before the dispose
+    /// animation can have run to completion), the pane must still be
+    /// attached. The old code detached synchronously.
+    @FormTest
+    void closeLeftSideMenuKeepsLayeredPaneAttachedDuringDispose() {
+        implementation.setBuiltinSoundsEnabled(false);
+        Toolbar.setOnTopSideMenu(true);
+
+        Form form = Display.getInstance().getCurrent();
+        Toolbar toolbar = new Toolbar();
+        form.setToolbar(toolbar);
+        form.show();
+        form.getAnimationManager().flush();
+        flushSerialCalls();
+
+        toolbar.addCommandToSideMenu("Entry", null, evt -> { });
+
+        toolbar.openSideMenu();
+        form.getAnimationManager().flush();
+        flushSerialCalls();
+        awaitAnimations(form);
+        assertTrue(toolbar.isSideMenuShowing(), "Side menu should be showing after open");
+
+        Container pane = form.getFormLayeredPane(Toolbar.class, false);
+        assertNotNull(pane, "Toolbar layered pane must exist while menu is open");
+        assertNotNull(pane.getParent(), "Layered pane must be attached to the form tree while menu is open");
+
+        toolbar.closeLeftSideMenu();
+
+        // Pane must still be attached — the detach is deferred to the
+        // dispose onFinish so the dialog's peer teardown runs against
+        // a still-attached parent. The old pre-fix code would have
+        // nulled pane.getParent() before returning.
+        assertNotNull(pane.getParent(),
+                "Layered pane should stay attached while the dispose animation runs "
+                        + "(deferred detach regression — see Toolbar.detachToolbarLayeredPane)");
+    }
 }

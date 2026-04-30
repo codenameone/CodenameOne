@@ -1324,7 +1324,7 @@ public class InPlaceEditView extends FrameLayout{
                                 return;
                             }
                             com.codename1.ui.Font font = sInstance.mEditText.mTextArea.getStyle().getFont();
-                            float fontSize = (font != null || font.getPixelSize() == 0) ? font.getPixelSize() : Display.getInstance().convertToPixels(4);
+                            float fontSize = (font == null || font.getPixelSize() == 0) ? Display.getInstance().convertToPixels(4) : font.getPixelSize();
                             com.codename1.ui.geom.Rectangle visibleRect = getVisibleRect(sInstance.mEditText.mTextArea);
                             Rect r = new Rect();
                             AndroidImplementation.getInstance().relativeLayout.getGlobalVisibleRect(r);

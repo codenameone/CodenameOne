@@ -51,6 +51,7 @@ import java.awt.Color;
 import java.awt.Cursor;
 import java.awt.Desktop;
 import java.awt.Dimension;
+import java.awt.EventQueue;
 import java.awt.FileDialog;
 import java.awt.FontFormatException;
 import javax.swing.JFrame;
@@ -60,6 +61,7 @@ import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.Toolkit;
+import java.awt.Window;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.event.*;
 import java.awt.font.FontRenderContext;
@@ -118,6 +120,7 @@ import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.UITimer;
 import com.codename1.util.AsyncResource;
 import com.codename1.util.Callback;
+import com.codename1.util.Simd;
 import com.jhlabs.image.GaussianFilter;
 import java.awt.*;
 import java.awt.datatransfer.Clipboard;
@@ -199,6 +202,9 @@ public class JavaSEPort extends CodenameOneImplementation {
     private Boolean darkMode;
     private AutoLocalizationBundle autoLocalizationBundle;
     private boolean autoUpdateDefaultResourceBundle;
+    private float largerTextScale = 1.0f;
+    private boolean largerTextEnabled = false;
+    private static final String PREF_LARGER_TEXT_SCALE = "cn1.simulator.largerTextScale";
 
     static {
         IOS_NATIVE_FONT_CANDIDATES.put("native:MainThin", new String[] {
@@ -2789,6 +2795,48 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             platformName = props.getProperty("platformName", "se");
             platformOverrides = props.getProperty("overrideNames", "").split(",");
+
+            // Native theme override: the simulator ships all shipped-with-
+            // framework themes (iOSModernTheme.res, AndroidMaterialTheme.res,
+            // plus the legacy ones). The user can override via the
+            // Simulator's "Native Theme" submenu (stored in the
+            // simulatorNativeTheme Preference) or the cn1.forceSimulatorTheme
+            // system property. If neither is set, platformName maps ios ->
+            // iOSModernTheme and and -> AndroidMaterialTheme. Anything else
+            // keeps whatever the skin archive embedded.
+            String overrideTheme = System.getProperty("cn1.forceSimulatorTheme",
+                    Preferences.userNodeForPackage(JavaSEPort.class)
+                            .get("simulatorNativeTheme", null));
+            if (overrideTheme == null || overrideTheme.isEmpty() || "auto".equalsIgnoreCase(overrideTheme)) {
+                if ("ios".equals(platformName)) {
+                    overrideTheme = "iOSModernTheme";
+                } else if ("and".equals(platformName)) {
+                    overrideTheme = "AndroidMaterialTheme";
+                } else {
+                    overrideTheme = null;
+                }
+            } else if ("embedded".equalsIgnoreCase(overrideTheme)) {
+                // Explicit "keep the skin's embedded theme".
+                overrideTheme = null;
+            }
+            if (overrideTheme != null) {
+                InputStream bundled = JavaSEPort.class.getResourceAsStream("/" + overrideTheme + ".res");
+                if (bundled != null) {
+                    try {
+                        ByteArrayOutputStream bo = new ByteArrayOutputStream();
+                        byte[] buf = new byte[4096];
+                        int n;
+                        while ((n = bundled.read(buf)) > 0) {
+                            bo.write(buf, 0, n);
+                        }
+                        nativeThemeData = bo.toByteArray();
+                    } catch (IOException ioErr) {
+                        ioErr.printStackTrace();
+                    } finally {
+                        try { bundled.close(); } catch (IOException ignored) { System.err.println("close: " + ignored); }
+                    }
+                }
+            }
             String ua = null;
             if (platformName.equals("and")) {
                 ua = "Mozilla/5.0 (Linux; U; Android 2.2; en-us; Nexus One Build/FRF91) AppleWebKit/533.1 (KHTML, like Gecko) Version/4.0 Mobile Safari/533.1";
@@ -4486,6 +4534,8 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         });
 
+        installLargerTextMenu(simulateMenu, pref, frm);
+
         pause = new JMenuItem("Pause App");
         simulateMenu.addSeparator();
         simulateMenu.add(pause);
@@ -4647,6 +4697,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             bar.add(simulateMenu);
             bar.add(toolsMenu);
             bar.add(skinMenu);
+            bar.add(createNativeThemeMenu());
             bar.add(helpMenu);
         }
 
@@ -4754,6 +4805,49 @@ public class JavaSEPort extends CodenameOneImplementation {
          return skin;
     }
     
+    /**
+     * Build the Native Theme override menu. By default the simulator picks a
+     * theme from the current skin's platformName ("ios" -&gt; iOSModernTheme,
+     * "and" -&gt; AndroidMaterialTheme); this menu lets the user force one
+     * of the shipped themes or "Use skin's embedded theme" to bypass the
+     * heuristic entirely. Selection is written to the simulatorNativeTheme
+     * Preference and the simulator is reloaded.
+     */
+    private JMenu createNativeThemeMenu() {
+        JMenu m = new JMenu("Native Theme");
+        m.setDoubleBuffered(true);
+        String[][] items = {
+            {"auto", "Auto (based on skin)"},
+            {"iOSModernTheme", "iOS Modern (Liquid Glass)"},
+            {"iOS7Theme", "iOS 7 (Flat)"},
+            {"iPhoneTheme", "iPhone (Pre-Flat)"},
+            {"AndroidMaterialTheme", "Android Material"},
+            {"android_holo_light", "Android Holo Light"},
+            {"androidTheme", "Android Legacy"},
+            {"embedded", "Use skin's embedded theme"}
+        };
+        String current = Preferences.userNodeForPackage(JavaSEPort.class)
+                .get("simulatorNativeTheme", "auto");
+        ButtonGroup group = new ButtonGroup();
+        for (final String[] entry : items) {
+            JRadioButtonMenuItem mi = new JRadioButtonMenuItem(entry[1]);
+            mi.setSelected(current.equals(entry[0]));
+            mi.addActionListener(new ActionListener() {
+                public void actionPerformed(ActionEvent e) {
+                    Preferences.userNodeForPackage(JavaSEPort.class)
+                            .put("simulatorNativeTheme", entry[0]);
+                    System.setProperty("reload.simulator", "true");
+                    if (window != null) {
+                        window.dispose();
+                    }
+                }
+            });
+            group.add(mi);
+            m.add(mi);
+        }
+        return m;
+    }
+
     private JMenu createSkinsMenu(final JFrame frm, final JMenu menu) throws MalformedURLException {
         JMenu m;
         if (menu == null) {
@@ -5256,6 +5350,20 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+    private void selectAppFramePanel(String panelId) {
+        if (appFrame == null || panelId == null) {
+            return;
+        }
+        AppPanel panel = appFrame.getAppPanelById(panelId);
+        if (panel == null) {
+            return;
+        }
+        java.awt.Container parent = panel.getParent();
+        if (parent instanceof JTabbedPane) {
+            ((JTabbedPane) parent).setSelectedComponent(panel);
+        }
+    }
+
     private void showPerformanceMonitor() {
         if (perfMonitor == null) {
             perfMonitor = new PerformanceMonitor();
@@ -5300,6 +5408,75 @@ public class JavaSEPort extends CodenameOneImplementation {
         return Math.min(h1, w1);
     }
     
+    private void installLargerTextMenu(JMenu parent, final Preferences pref, final JFrame frm) {
+        // Standard iOS Dynamic Type stops with their actual body-text point sizes.
+        // The simulator returns ratio = bodyPt / 17pt, matching what iOS reports.
+        final String[] labels = {
+            "Extra Small",
+            "Small",
+            "Medium",
+            "Large (default)",
+            "Extra Large",
+            "Extra Extra Large",
+            "Extra Extra Extra Large",
+            "Accessibility 1",
+            "Accessibility 2",
+            "Accessibility 3",
+            "Accessibility 4",
+            "Accessibility 5"
+        };
+        final float[] scales = {
+            14f / 17f,   // XS
+            15f / 17f,   // S
+            16f / 17f,   // M
+            17f / 17f,   // L (iOS default)
+            19f / 17f,   // XL
+            21f / 17f,   // XXL
+            23f / 17f,   // XXXL (largest non-accessibility)
+            28f / 17f,   // AX1
+            33f / 17f,   // AX2
+            40f / 17f,   // AX3
+            47f / 17f,   // AX4
+            53f / 17f    // AX5
+        };
+
+        JMenu largerTextMenu = new JMenu("Larger Text");
+        registerMenuWithBlit(largerTextMenu);
+
+        float saved = pref.getFloat(PREF_LARGER_TEXT_SCALE, 1.0f);
+        largerTextScale = saved;
+        largerTextEnabled = saved > 1.0f + 0.001f;
+
+        ButtonGroup group = new ButtonGroup();
+        for (int i = 0; i < labels.length; i++) {
+            final float scale = scales[i];
+            JRadioButtonMenuItem item = new JRadioButtonMenuItem(labels[i],
+                    Math.abs(saved - scale) < 0.001f);
+            item.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    largerTextScale = scale;
+                    largerTextEnabled = scale > 1.0f + 0.001f;
+                    pref.putFloat(PREF_LARGER_TEXT_SCALE, scale);
+                    refreshSkin(frm);
+                }
+            });
+            group.add(item);
+            largerTextMenu.add(item);
+        }
+        parent.add(largerTextMenu);
+    }
+
+    @Override
+    public boolean isLargerTextEnabled() {
+        return largerTextEnabled;
+    }
+
+    @Override
+    public float getLargerTextScale() {
+        return largerTextScale;
+    }
+
     private void refreshSkin(final JFrame frm) {
         Display.getInstance().callSerially(new Runnable() {
 
@@ -5528,6 +5705,57 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             });
         }
+        if (Boolean.getBoolean("cn1.simulator.autoNetworkMonitor")) {
+            delayedTasks.add(new Runnable() {
+                public void run() {
+                    showNetworkMonitor();
+                    selectAppFramePanel("NetworkMonitor");
+                }
+            });
+        }
+        if (Boolean.getBoolean("cn1.simulator.autoComponentInspector") && appFrame == null) {
+            delayedTasks.add(new Runnable() {
+                public void run() {
+                    final ComponentTreeInspector inspector = getOrCreateComponentTreeInspector();
+                    inspector.showInFrame();
+                    Display.getInstance().callSerially(new Runnable() {
+                        public void run() {
+                            Form current = Display.getInstance().getCurrent();
+                            if (current == null) {
+                                return;
+                            }
+                            com.codename1.ui.Component target = current;
+                            if (current.getContentPane() != null && current.getContentPane().getComponentCount() > 0) {
+                                target = current.getContentPane().getComponentAt(Math.max(1, current.getWidth() / 2), Math.max(1, current.getHeight() / 3));
+                            }
+                            inspector.inspectComponent(target);
+                        }
+                    });
+                }
+            });
+        }
+        if (Boolean.getBoolean("cn1.simulator.autoTestRecorder")) {
+            delayedTasks.add(new Runnable() {
+                public void run() {
+                    showTestRecorder();
+                    if (Boolean.getBoolean("cn1.simulator.autoTestRecorderRecord") && testRecorder != null) {
+                        testRecorder.startRecordingForAutomation();
+                        Display.getInstance().callSerially(new Runnable() {
+                            public void run() {
+                                Form current = Display.getInstance().getCurrent();
+                                if (current == null) {
+                                    return;
+                                }
+                                int x = Math.max(5, current.getWidth() / 2);
+                                int y = Math.max(5, current.getHeight() / 2);
+                                testRecorder.eventPointerPressed(x, y);
+                                testRecorder.eventPointerReleased(x, y);
+                            }
+                        });
+                    }
+                }
+            });
+        }
         if (!blockMonitors && pref.getBoolean("PushSimulator", false)) {
             pushSimulation = new PushSimulator();
             pushSimulation.setVisible(true);
@@ -5732,7 +5960,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             window.setLocationByPlatform(true);
 
             android6PermissionsFlag = pref.getBoolean("Android6Permissions", false);
-            
+
+            largerTextScale = pref.getFloat(PREF_LARGER_TEXT_SCALE, 1.0f);
+            largerTextEnabled = largerTextScale > 1.0f + 0.001f;
+
             alwaysOnTop = pref.getBoolean("AlwaysOnTop", false);
             if (appFrame == null) window.setAlwaysOnTop(alwaysOnTop);
             
@@ -9224,6 +9455,18 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void exitApplication() {        
+        if (Boolean.getBoolean("cn1.javase.noExit")) {
+            EventQueue.invokeLater(new Runnable() {
+                public void run() {
+                    for (Window w : Window.getWindows()) {
+                        if (w != null && w.isDisplayable()) {
+                            w.dispose();
+                        }
+                    }
+                }
+            });
+            return;
+        }
         // causes a simulator with a dialog open to freeze
         /*try {
             Executor.stopApp();
@@ -10777,6 +11020,11 @@ public class JavaSEPort extends CodenameOneImplementation {
             return "win";
         }
         return platformName;
+    }
+
+    @Override
+    public Simd createSimd() {
+        return new JavaSESimd();
     }
 
     /**

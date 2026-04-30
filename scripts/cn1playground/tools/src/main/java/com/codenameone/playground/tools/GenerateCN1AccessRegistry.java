@@ -50,7 +50,16 @@ public final class GenerateCN1AccessRegistry {
     private static final Map<String, Boolean> RUNTIME_PUBLIC_TYPE_CACHE = new HashMap<String, Boolean>();
     private static final Set<String> INTERNAL_CN1_TYPES = new HashSet<String>(Arrays.asList(
             "com.codename1.ui.Accessor",
-            "com.codename1.io.IOAccessor"
+            "com.codename1.io.IOAccessor",
+            // Simd's allocaByte/allocaInt/allocaFloat (+ the *Zeroed/*Filled
+            // variants) return method-local scratch arrays that the ParparVM
+            // lowering may place on the C stack. CN1's compliance check
+            // forbids letting such an array escape the method that allocated
+            // it, and the generated reflection bridge inherently does escape
+            // it by returning it from invokeN. Exclude the whole class from
+            // the bean-shell registry - Simd is a low-level SIMD primitives
+            // API that playground scripts are extremely unlikely to need.
+            "com.codename1.util.Simd"
     ));
 
     private static final String[] INDEX_PACKAGE_PREFIXES = new String[]{
@@ -233,15 +242,52 @@ public final class GenerateCN1AccessRegistry {
             List<String> superTypes = resolveSuperTypes(unresolved);
             topLevelClasses.add(new SourceClass(packageName, simpleName, qualifiedName, classTree,
                     explicitImports, wildcardImports, nestedTypes, typeParameterBounds, superTypes));
+            // Also emit nested public classes as first-class ApiClass
+            // entries. Callers reach them as `Outer.Inner` and expect
+            // the static fields / methods declared there to dispatch
+            // through the registry.
+            collectNestedSourceClasses(classTree, packageName, qualifiedName, explicitImports,
+                    wildcardImports, nestedTypes, topLevelClasses);
         }
         return new SourceUnit(packageName, topLevelClasses);
+    }
+
+    private static void collectNestedSourceClasses(ClassTree enclosing, String packageName, String enclosingQualifiedName,
+            Map<String, String> explicitImports, List<String> wildcardImports, Map<String, String> enclosingNestedTypes,
+            List<SourceClass> sink) {
+        for (Tree member : enclosing.getMembers()) {
+            if (!(member instanceof ClassTree)) continue;
+            ClassTree nested = (ClassTree) member;
+            if (!isNestedPublicType(nested, enclosing)) continue;
+            // Only static nested types can be constructed and have static
+            // members accessible by Outer.Inner name. Inner (non-static)
+            // classes require an enclosing instance, so flattening them
+            // would produce uncompilable `new Outer.Inner(...)` callsites.
+            if (!isNestedStaticType(nested)) continue;
+            String nestedSimpleName = nested.getSimpleName().toString();
+            String nestedQualifiedName = enclosingQualifiedName + "." + nestedSimpleName;
+            Map<String, String> nestedNestedTypes = new LinkedHashMap<String, String>(enclosingNestedTypes);
+            collectNestedTypes(nested, nestedQualifiedName, nestedNestedTypes);
+            Map<String, String> nestedTypeParameterBounds = resolveTypeParameterBounds(packageName, nestedSimpleName,
+                    nestedQualifiedName, nested, explicitImports, wildcardImports, nestedNestedTypes);
+            SourceClass unresolved = new SourceClass(packageName, nestedSimpleName, nestedQualifiedName, nested,
+                    explicitImports, wildcardImports, nestedNestedTypes, nestedTypeParameterBounds,
+                    Collections.<String>emptyList());
+            List<String> nestedSuperTypes = resolveSuperTypes(unresolved);
+            sink.add(new SourceClass(packageName, nestedSimpleName, nestedQualifiedName, nested,
+                    explicitImports, wildcardImports, nestedNestedTypes, nestedTypeParameterBounds, nestedSuperTypes));
+            collectNestedSourceClasses(nested, packageName, nestedQualifiedName, explicitImports, wildcardImports,
+                    nestedNestedTypes, sink);
+        }
     }
 
     private static Map<String, String> resolveTypeParameterBounds(String packageName, String simpleName, String qualifiedName,
             ClassTree classTree, Map<String, String> explicitImports, List<String> wildcardImports,
             Map<String, String> nestedTypes) {
         if (classTree.getTypeParameters().isEmpty()) {
-            return Collections.emptyMap();
+            // Return a mutable map — parseMethod needs to push transient
+            // method-level type parameter bounds here.
+            return new LinkedHashMap<String, String>();
         }
         SourceClass sourceClass = new SourceClass(packageName, simpleName, qualifiedName, classTree,
                 explicitImports, wildcardImports, nestedTypes, Collections.<String, String>emptyMap(),
@@ -511,6 +557,7 @@ public final class GenerateCN1AccessRegistry {
 
         LinkedHashMap<String, ApiMethod> inheritedMethods = new LinkedHashMap<String, ApiMethod>();
         LinkedHashMap<String, ApiField> inheritedFields = new LinkedHashMap<String, ApiField>();
+        LinkedHashMap<String, ApiField> inheritedStaticFields = new LinkedHashMap<String, ApiField>();
         for (String superType : apiClass.superTypes) {
             ApiClass superClass = classIndex.get(superType);
             if (superClass == null) {
@@ -519,20 +566,24 @@ public final class GenerateCN1AccessRegistry {
             ApiClass resolvedSuper = resolveInheritedMembers(superClass, classIndex, resolved, visiting, typeHierarchy);
             mergeInheritedMethods(inheritedMethods, resolvedSuper.instanceMethods);
             mergeInheritedFields(inheritedFields, resolvedSuper.instanceFields);
+            mergeInheritedFields(inheritedStaticFields, resolvedSuper.staticFields);
         }
 
         mergeDeclaredMethods(inheritedMethods, apiClass.instanceMethods);
         mergeDeclaredFields(inheritedFields, apiClass.instanceFields);
+        mergeDeclaredFields(inheritedStaticFields, apiClass.staticFields);
 
         List<ApiMethod> instanceMethods = filterBridgeLikeMethods(new ArrayList<ApiMethod>(inheritedMethods.values()), typeHierarchy);
         instanceMethods = filterGenericInheritedMethods(apiClass.qualifiedName, instanceMethods);
         List<ApiField> instanceFields = new ArrayList<ApiField>(inheritedFields.values());
+        List<ApiField> staticFields = new ArrayList<ApiField>(inheritedStaticFields.values());
         sortMethods(instanceMethods);
         sortFields(instanceFields);
+        sortFields(staticFields);
 
         ApiClass merged = new ApiClass(apiClass.packageName, apiClass.simpleName, apiClass.qualifiedName, apiClass.superTypes,
                 apiClass.isInterface, apiClass.isAbstract, apiClass.constructors, apiClass.staticMethods, instanceMethods,
-                apiClass.staticFields, instanceFields);
+                staticFields, instanceFields);
         visiting.remove(apiClass.qualifiedName);
         resolved.put(apiClass.qualifiedName, merged);
         return merged;
@@ -750,30 +801,56 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
             return false;
         }
         try {
-            Method runtimeMethod = runtimeClass.getMethod(method.name, paramTypes);
+            Method runtimeMethod;
+            try {
+                runtimeMethod = runtimeClass.getMethod(method.name, paramTypes);
+            } catch (NoClassDefFoundError ex) {
+                // Some CN1 classes reference optional dependencies (e.g.
+                // JavaFX in the desktop simulator). When that class isn't on
+                // the classpath, conservatively skip the method.
+                return false;
+            }
             if (java.lang.reflect.Modifier.isStatic(runtimeMethod.getModifiers()) != method.isStatic) {
                 return false;
             }
             if (runtimeMethod.isBridge()) {
                 return false;
             }
-            if (hasGenericTypeParameters(runtimeMethod, paramTypes)) {
+            // We used to drop every method with a TypeVariable parameter to
+            // avoid emitting a `(Object)` cast that would fail to compile
+            // against narrowed-generic subclasses (e.g. com.codename1.io.
+            // Properties extends HashMap<String,String> overrides put's K,V
+            // to String,String — emitting `typedTarget.put((Object) a, ...)`
+            // fails the type check because Properties is seen as
+            // HashMap<String,String>). Now we only skip when the inherited
+            // method actually crosses a narrowed-generic boundary; for
+            // methods declared directly on the runtimeClass we keep them so
+            // that ArrayList.add, HashMap.put, etc. are dispatched.
+            if (isNarrowedInheritedGenericMethod(runtimeClass, runtimeMethod, paramTypes)) {
                 return false;
             }
-            return (returnType == null || runtimeMethod.getReturnType() == returnType)
-                    && throwsOnlySupportedExceptions(runtimeMethod.getExceptionTypes());
+            try {
+                return (returnType == null || runtimeMethod.getReturnType() == returnType)
+                        && throwsOnlySupportedExceptions(runtimeMethod.getExceptionTypes());
+            } catch (NoClassDefFoundError ex) {
+                return false;
+            }
         } catch (NoSuchMethodException ex) {
             return false;
         }
     }
 
-    private static boolean hasGenericTypeParameters(Method method, Class<?>[] paramTypes) {
+    private static boolean isNarrowedInheritedGenericMethod(Class<?> runtimeClass, Method method, Class<?>[] paramTypes) {
+        if (runtimeClass == method.getDeclaringClass()) {
+            return false;
+        }
         java.lang.reflect.Type[] genericParamTypes = method.getGenericParameterTypes();
         if (genericParamTypes.length != paramTypes.length) {
             return false;
         }
         for (int i = 0; i < paramTypes.length; i++) {
-            if (paramTypes[i] == Object.class && genericParamTypes[i] instanceof java.lang.reflect.TypeVariable) {
+            if (paramTypes[i] == Object.class
+                    && genericParamTypes[i] instanceof java.lang.reflect.TypeVariable) {
                 return true;
             }
         }
@@ -934,19 +1011,52 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
     }
 
     private static ApiMethod parseMethod(SourceClass sourceClass, MethodTree methodTree, Resolver resolver, boolean enclosingInterface) {
-        if (!isPublicMethod(methodTree, enclosingInterface) || isBlacklistedMethod(methodTree.getName().toString())) {
+        String methodName = methodTree.getName().toString();
+        if (!isPublicMethod(methodTree, enclosingInterface) || isBlacklistedMethod(methodName)
+                || isBlacklistedQualifiedMethod(sourceClass.qualifiedName, methodName)) {
             return null;
         }
-        ApiType returnType = resolver.resolveType(methodTree.getReturnType().toString());
-        if (!isSupportedType(returnType)) {
-            return null;
+        // Push method-level type parameter bounds into the resolver
+        // so that `<C extends Component> void foo(C c)` resolves `C`
+        // to Component (and not Object) in the parameter types. Class-
+        // level parameters remain visible where they aren't shadowed.
+        Map<String, String> savedBounds = new LinkedHashMap<String, String>();
+        List<String> pushedKeys = new ArrayList<String>();
+        for (TypeParameterTree tp : methodTree.getTypeParameters()) {
+            String name = tp.getName().toString();
+            String bound = "java.lang.Object";
+            if (!tp.getBounds().isEmpty()) {
+                ApiType resolvedBound = resolver.resolveType(tp.getBounds().get(0).toString());
+                if (resolvedBound != null && resolvedBound.baseName != null) {
+                    bound = resolvedBound.baseName;
+                }
+            }
+            if (sourceClass.typeParameterBounds.containsKey(name)) {
+                savedBounds.put(name, sourceClass.typeParameterBounds.get(name));
+            }
+            sourceClass.typeParameterBounds.put(name, bound);
+            pushedKeys.add(name);
         }
-        ApiSignature signature = resolveSignature(methodTree.getParameters(), resolver);
-        if (signature == null) {
-            return null;
+        try {
+            ApiType returnType = resolver.resolveType(methodTree.getReturnType().toString());
+            if (!isSupportedType(returnType)) {
+                return null;
+            }
+            ApiSignature signature = resolveSignature(methodTree.getParameters(), resolver);
+            if (signature == null) {
+                return null;
+            }
+            boolean isStatic = methodTree.getModifiers().getFlags().contains(Modifier.STATIC);
+            return new ApiMethod(methodTree.getName().toString(), returnType, signature.paramTypes, signature.varArgs, isStatic);
+        } finally {
+            for (String key : pushedKeys) {
+                if (savedBounds.containsKey(key)) {
+                    sourceClass.typeParameterBounds.put(key, savedBounds.get(key));
+                } else {
+                    sourceClass.typeParameterBounds.remove(key);
+                }
+            }
         }
-        boolean isStatic = methodTree.getModifiers().getFlags().contains(Modifier.STATIC);
-        return new ApiMethod(methodTree.getName().toString(), returnType, signature.paramTypes, signature.varArgs, isStatic);
     }
 
     private static ApiField parseField(SourceClass sourceClass, VariableTree variableTree, Resolver resolver,
@@ -1005,6 +1115,16 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
         return enclosing.getKind() == Tree.Kind.INTERFACE || enclosing.getKind() == Tree.Kind.ANNOTATION_TYPE;
     }
 
+    /** Static context: explicit `static`, enum, interface, or annotation
+     * member. Enums, interfaces, and annotations are implicitly static. */
+    private static boolean isNestedStaticType(ClassTree nested) {
+        if (nested.getKind() == Tree.Kind.ENUM || nested.getKind() == Tree.Kind.INTERFACE
+                || nested.getKind() == Tree.Kind.ANNOTATION_TYPE) {
+            return true;
+        }
+        return nested.getModifiers().getFlags().contains(Modifier.STATIC);
+    }
+
     private static boolean isNamedType(ClassTree classTree) {
         String name = classTree.getSimpleName().toString();
         return name != null && name.length() > 0;
@@ -1030,9 +1150,7 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
     private static boolean isSupportedJavaDispatchPackage(String packageName) {
         return packageName.startsWith("java.")
                 && !isPackageOrChild(packageName, "java.lang.annotation")
-                && !isPackageOrChild(packageName, "java.lang.invoke")
-                && !isPackageOrChild(packageName, "java.util.function")
-                && !isPackageOrChild(packageName, "java.util.stream");
+                && !isPackageOrChild(packageName, "java.lang.invoke");
     }
 
     private static boolean isSupportedType(ApiType type) {
@@ -1060,9 +1178,7 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
                 && !name.startsWith("java.net.")
                 && !name.startsWith("java.nio.")
                 && !name.startsWith("java.security.")
-                && !name.startsWith("java.util.concurrent.")
-                && !name.startsWith("java.util.function.")
-                && !name.startsWith("java.util.stream.");
+                && !name.startsWith("java.util.concurrent.");
     }
 
     private static boolean isPublicRuntimeType(String className) {
@@ -1280,19 +1396,40 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
     private static void writeRootFindClass(Writer writer, List<GeneratedPackage> packages) throws IOException {
         writer.write("    @Override\n");
         writer.write("    public Class<?> findClass(String name) {\n");
-        writer.write("        if (name == null) {\n");
-        writer.write("            return null;\n");
+        writer.write("        if (name == null) return null;\n");
+        writer.write("        // Dispatch per package. Nested classes like\n");
+        writer.write("        // com.codename1.ui.Picker.LightweightPopupButtonPlacement\n");
+        writer.write("        // are resolved by walking the dotted name back until a\n");
+        writer.write("        // known package prefix matches. Only the matched package's\n");
+        writer.write("        // helper class loads — the rest stay cold. That removes the\n");
+        writer.write("        // eager Map<String, Class<?>> build from <clinit> time.\n");
+        writer.write("        String candidate = name;\n");
+        writer.write("        while (candidate != null) {\n");
+        writer.write("            int lastDot = candidate.lastIndexOf('.');\n");
+        writer.write("            if (lastDot < 0) return null;\n");
+        writer.write("            String pkg = candidate.substring(0, lastDot);\n");
+        writer.write("            Class<?> found = findClassInPackage(pkg, name);\n");
+        writer.write("            if (found != null) return found;\n");
+        writer.write("            candidate = pkg;\n");
         writer.write("        }\n");
-        writer.write("        return CLASS_INDEX.get(name);\n");
+        writer.write("        return null;\n");
+        writer.write("    }\n\n");
+        writer.write("    private static Class<?> findClassInPackage(String packageName, String fullName) {\n");
+        for (GeneratedPackage generatedPackage : packages) {
+            writer.write("        if (\"" + generatedPackage.packageName + "\".equals(packageName)) {\n");
+            writer.write("            return " + generatedPackage.helperClassName + ".findClass(fullName);\n");
+            writer.write("        }\n");
+        }
+        writer.write("        return null;\n");
         writer.write("    }\n\n");
         writer.write("    public String[] getIndexedClassNames() {\n");
         writer.write("        return INDEXED_CLASS_NAMES.clone();\n");
         writer.write("    }\n\n");
         writer.write("    public String[] getMethodSignatures(String name) {\n");
-        writer.write("        return copyStrings(METHOD_INDEX.get(name));\n");
+        writer.write("        return copyStrings(MethodIndexHolder.INDEX.get(name));\n");
         writer.write("    }\n\n");
         writer.write("    public String[] getFieldNames(String name) {\n");
-        writer.write("        return copyStrings(FIELD_INDEX.get(name));\n");
+        writer.write("        return copyStrings(FieldIndexHolder.INDEX.get(name));\n");
         writer.write("    }\n\n");
     }
 
@@ -1309,28 +1446,19 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
             writer.write(i + 1 < classes.size() ? ",\n" : "\n");
         }
         writer.write("    };\n\n");
-        writer.write("    private static final Map<String, Class<?>> CLASS_INDEX = buildClassIndex();\n\n");
-        writer.write("    private static final Map<String, String[]> METHOD_INDEX = buildMethodIndex();\n\n");
-        writer.write("    private static final Map<String, String[]> FIELD_INDEX = buildFieldIndex();\n\n");
-        writer.write("    private static Map<String, Class<?>> buildClassIndex() {\n");
-        writer.write("        Map<String, Class<?>> index = new LinkedHashMap<String, Class<?>>();\n");
+        // Initialization-on-demand holder idiom: the METHOD_INDEX and
+        // FIELD_INDEX tables stay cold until a "did you mean"
+        // suggestion is requested — they're diagnostic-only and the
+        // cold-start win is measurable. Class lookup no longer goes
+        // through a prebuilt map; findClass dispatches per package so
+        // only the hit package's helper class loads.
+        writer.write("    private static final class MethodIndexHolder {\n");
+        writer.write("        static final Map<String, String[]> INDEX = buildMethodIndex();\n");
+        writer.write("    }\n\n");
+        writer.write("    private static final class FieldIndexHolder {\n");
+        writer.write("        static final Map<String, String[]> INDEX = buildFieldIndex();\n");
+        writer.write("    }\n\n");
         int chunkCount = (classes.size() + FIND_CLASS_CHUNK_SIZE - 1) / FIND_CLASS_CHUNK_SIZE;
-        for (int i = 0; i < chunkCount; i++) {
-            writer.write("        fillClassIndex" + i + "(index);\n");
-        }
-        writer.write("        return index;\n");
-        writer.write("    }\n");
-        for (int i = 0; i < chunkCount; i++) {
-            int fromIndex = i * FIND_CLASS_CHUNK_SIZE;
-            int toIndex = Math.min(classes.size(), fromIndex + FIND_CLASS_CHUNK_SIZE);
-            writer.write("\n");
-            writer.write("    private static void fillClassIndex" + i + "(Map<String, Class<?>> index) {\n");
-            for (int j = fromIndex; j < toIndex; j++) {
-                ApiClass apiClass = classes.get(j);
-                writer.write("        index.put(\"" + apiClass.qualifiedName + "\", " + typeLiteral(apiClass.qualifiedName) + ");\n");
-            }
-            writer.write("    }\n");
-        }
         writer.write("\n");
         writer.write("    private static Map<String, String[]> buildMethodIndex() {\n");
         writer.write("        Map<String, String[]> index = new LinkedHashMap<String, String[]>();\n");
@@ -1669,8 +1797,44 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
         return new ArrayList<String>(names);
     }
 
+    /** Render a method signature for the registry's editor index in the
+     * form {@code name(type1, type2)} using simple type names. The
+     * runtime "did you mean" diagnostic mines this string to surface
+     * concrete overload signatures (e.g.
+     * {@code MultiButton.setMaterialIcon(char, float)}); collapsing all
+     * non-empty parameter lists to {@code (...)} loses that information.
+     * Keep the format whitespace-free so prefix-name extraction (split
+     * on '(') stays trivial for existing consumers. */
     private static String editorMethodSignature(ApiMethod method) {
-        return method.paramTypes.isEmpty() && !method.varArgs ? method.name + "()" : method.name + "(...)";
+        if (method.paramTypes.isEmpty() && !method.varArgs) {
+            return method.name + "()";
+        }
+        StringBuilder out = new StringBuilder();
+        out.append(method.name).append('(');
+        for (int i = 0; i < method.paramTypes.size(); i++) {
+            if (i > 0) {
+                out.append(", ");
+            }
+            ApiType type = method.paramTypes.get(i);
+            String base = simpleTypeName(type.baseName);
+            out.append(base);
+            for (int d = 0; d < type.arrayDepth; d++) {
+                out.append("[]");
+            }
+            if (i == method.paramTypes.size() - 1 && method.varArgs) {
+                out.append("...");
+            }
+        }
+        out.append(')');
+        return out.toString();
+    }
+
+    private static String simpleTypeName(String qualified) {
+        if (qualified == null || qualified.isEmpty()) return qualified;
+        int lt = qualified.indexOf('<');
+        String head = lt > 0 ? qualified.substring(0, lt) : qualified;
+        int dot = head.lastIndexOf('.');
+        return dot >= 0 ? head.substring(dot + 1) : head;
     }
 
     private static String joinMembers(List<String> members) {
@@ -1789,20 +1953,36 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
     }
 
     private static void writeGetStaticField(Writer writer, List<ApiClass> classes) throws IOException {
+        // Emit a per-class helper so each class's static-field dispatch
+        // stays under the 64KB method-code limit once inherited fields
+        // are folded in.
         writer.write("    public static Object getStaticField(Class<?> type, String name) throws Exception {\n");
+        int helperIndex = 0;
         for (ApiClass apiClass : classes) {
             if (apiClass.isLookupOnly() || apiClass.staticFields.isEmpty()) {
                 continue;
             }
-            writer.write("        if (type == " + typeLiteral(apiClass.qualifiedName) + ") {\n");
-            for (ApiField field : apiClass.staticFields) {
-                writer.write("            if (\"" + field.name + "\".equals(name)) return "
-                        + apiClass.qualifiedName + "." + field.name + ";\n");
-            }
-            writer.write("        }\n");
+            writer.write("        if (type == " + typeLiteral(apiClass.qualifiedName) + ") return getStaticField"
+                    + helperIndex + "(name);\n");
+            helperIndex++;
         }
         writer.write("        throw unsupportedStaticField(type, name);\n");
         writer.write("    }\n\n");
+
+        helperIndex = 0;
+        for (ApiClass apiClass : classes) {
+            if (apiClass.isLookupOnly() || apiClass.staticFields.isEmpty()) {
+                continue;
+            }
+            writer.write("    private static Object getStaticField" + helperIndex + "(String name) throws Exception {\n");
+            for (ApiField field : apiClass.staticFields) {
+                writer.write("        if (\"" + field.name + "\".equals(name)) return "
+                        + apiClass.qualifiedName + "." + field.name + ";\n");
+            }
+            writer.write("        throw unsupportedStaticField(" + typeLiteral(apiClass.qualifiedName) + ", name);\n");
+            writer.write("    }\n\n");
+            helperIndex++;
+        }
     }
 
     private static void writeGetField(Writer writer, List<ApiClass> classes) throws IOException {
@@ -1925,7 +2105,18 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
         writer.write("        if (!(value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue)) {\n");
         writer.write("            return value;\n");
         writer.write("        }\n");
+        writer.write("        // Direct fit when LambdaValue already implements the target SAM\n");
+        writer.write("        // (Runnable, Function, Comparator, ...).\n");
+        writer.write("        if (type.isInstance(value)) {\n");
+        writer.write("            return value;\n");
+        writer.write("        }\n");
         writer.write("        return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);\n");
+        writer.write("    }\n\n");
+        writer.write("    private static int toIntValue(Object value) {\n");
+        writer.write("        if (value instanceof Number) return ((Number) value).intValue();\n");
+        writer.write("        if (value instanceof Character) return (int) ((Character) value).charValue();\n");
+        writer.write("        throw new ClassCastException(\"Cannot coerce \"\n");
+        writer.write("            + (value == null ? \"null\" : value.getClass().getName()) + \" to int\");\n");
         writer.write("    }\n\n");
         writer.write("    private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {\n");
         writer.write("        if (!varArgs) {\n");
@@ -1978,10 +2169,15 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
         writer.write("        if (\"byte\".equals(type.getName()) || type == Byte.class || \"short\".equals(type.getName()) || type == Short.class\n");
         writer.write("                || \"int\".equals(type.getName()) || type == Integer.class || \"long\".equals(type.getName()) || type == Long.class\n");
         writer.write("                || \"float\".equals(type.getName()) || type == Float.class || \"double\".equals(type.getName()) || type == Double.class) {\n");
-        writer.write("            return value instanceof Number;\n");
+        writer.write("            // Java widens char to int implicitly, so accept Character\n");
+        writer.write("            // for any int-or-larger numeric slot.\n");
+        writer.write("            return value instanceof Number || value instanceof Character;\n");
         writer.write("        }\n");
         writer.write("        if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {\n");
-        writer.write("            return isSamInterface(type);\n");
+        writer.write("            // LambdaValue implements common SAMs directly (Runnable,\n");
+        writer.write("            // Function, Predicate, Comparator, ...). Also accept any\n");
+        writer.write("            // CN1 SAM the listener-bridge knows how to wrap.\n");
+        writer.write("            return type.isInstance(value) || isSamInterface(type);\n");
         writer.write("        }\n");
         writer.write("        return type.isInstance(value);\n");
         writer.write("    }\n\n");
@@ -2358,23 +2554,24 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
         if ("java.lang.Character".equals(type.baseName)) {
             return "Character.valueOf(((Character) " + expression + ").charValue())";
         }
+        // Numeric slots accept Character too (Java widens char to int).
         if ("byte".equals(type.baseName)) {
-            return "((Number) " + expression + ").byteValue()";
+            return "(byte) toIntValue(" + expression + ")";
         }
         if ("java.lang.Byte".equals(type.baseName)) {
-            return "Byte.valueOf(((Number) " + expression + ").byteValue())";
+            return "Byte.valueOf((byte) toIntValue(" + expression + "))";
         }
         if ("short".equals(type.baseName)) {
-            return "((Number) " + expression + ").shortValue()";
+            return "(short) toIntValue(" + expression + ")";
         }
         if ("java.lang.Short".equals(type.baseName)) {
-            return "Short.valueOf(((Number) " + expression + ").shortValue())";
+            return "Short.valueOf((short) toIntValue(" + expression + "))";
         }
         if ("int".equals(type.baseName)) {
-            return "((Number) " + expression + ").intValue()";
+            return "toIntValue(" + expression + ")";
         }
         if ("java.lang.Integer".equals(type.baseName)) {
-            return "Integer.valueOf(((Number) " + expression + ").intValue())";
+            return "Integer.valueOf(toIntValue(" + expression + "))";
         }
         if ("long".equals(type.baseName)) {
             return "((Number) " + expression + ").longValue()";
@@ -2442,6 +2639,21 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
                 || "getClass".equals(name)
                 || "clone".equals(name)
                 || "finalize".equals(name);
+    }
+
+    /// Qualified-name method exclusions. Reserved for APIs that are present
+    /// in the pinned registry version but still don't work on one of the
+    /// runtime ports the playground deploys to. Version-skew between the
+    /// release channel and the JS cloud build is handled structurally by
+    /// the cn1.registry.version pin in the POM, so this set should stay
+    /// empty unless a port-specific regression needs a surgical workaround.
+    private static final Set<String> BLACKLISTED_QUALIFIED_METHODS = new HashSet<String>();
+
+    private static boolean isBlacklistedQualifiedMethod(String qualifiedClassName, String methodName) {
+        if (qualifiedClassName == null) {
+            return false;
+        }
+        return BLACKLISTED_QUALIFIED_METHODS.contains(qualifiedClassName + "." + methodName);
     }
 
     private static void collectJavaFiles(File root, List<File> out) {
@@ -2684,7 +2896,27 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
             if (wildcard != null) {
                 return wildcard;
             }
+            // Method-level type parameters (e.g. `<T>` on `Arrays.asList`)
+            // aren't in the class-level typeParameterBounds. By convention
+            // such names are a single uppercase letter (or letter plus
+            // digits). Treat them as java.lang.Object so the method is
+            // emitted with erased types rather than dropped entirely.
+            if (looksLikeMethodTypeParameter(simpleName)) {
+                return "java.lang.Object";
+            }
             return null;
+        }
+
+        private static boolean looksLikeMethodTypeParameter(String name) {
+            if (name == null || name.isEmpty()) return false;
+            char c = name.charAt(0);
+            if (!Character.isUpperCase(c)) return false;
+            if (name.length() > 3) return false;
+            for (int i = 0; i < name.length(); i++) {
+                char k = name.charAt(i);
+                if (!(Character.isUpperCase(k) || Character.isDigit(k))) return false;
+            }
+            return true;
         }
 
         private String resolveWildcard(String simpleName) {
@@ -2889,7 +3121,11 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
         }
 
         boolean isLookupOnly() {
-            return "java.lang.StringBuilder".equals(qualifiedName);
+            // Historically StringBuilder was lookup-only because the old
+            // registry emitter couldn't express its final varargs append
+            // overloads. The current emitter handles those — allow full
+            // dispatch so `new StringBuilder()` / `.append(...)` work.
+            return false;
         }
     }
 

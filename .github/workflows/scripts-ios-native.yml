@@ -114,8 +114,6 @@ jobs:
 
       - name: Build sample iOS app
         id: build_ios_app
-        env:
-          IOS_UISCENE: "false"
         run: ./scripts/build-ios-app.sh -q -DskipTests
         timeout-minutes: 30
 

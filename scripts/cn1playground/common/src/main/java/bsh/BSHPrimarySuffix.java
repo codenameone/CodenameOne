@@ -163,13 +163,44 @@ class BSHPrimarySuffix extends SimpleNode
                     throw new EvalError(
                         "Can't assign array length", this, callstack );
                 else
-                    return new Primitive(((Object[]) obj).length);
+                    return new Primitive(BshArray.arrayLength(obj));
             }
 
             // field access
             if ( jjtGetNumChildren() == 0 ) {
                 // Validate if can get this field
                 Interpreter.mainSecurityGuard.canGetField(obj, field);
+
+                // Scripted-class field access goes through the instance namespace.
+                if (obj instanceof ScriptedInstance) {
+                    ScriptedInstance si = (ScriptedInstance) obj;
+                    if (toLHS) {
+                        // Use VARIABLE LHS (setVariable) so an assignment
+                        // updates a pre-declared field's value without
+                        // re-typing it. LOOSETYPE_FIELD calls setTypedVariable
+                        // which can fail to overwrite an Object-typed field
+                        // with a concrete ScriptedInstance.
+                        return new LHS(si.getInstanceNameSpace(), field, true);
+                    }
+                    Object v = si.getField(field);
+                    return v == Primitive.VOID ? Primitive.VOID : v;
+                }
+                // Static field/constant access on a scripted class or enum.
+                if (obj instanceof ScriptedClass) {
+                    ScriptedClass sc = (ScriptedClass) obj;
+                    NameSpace staticNs = sc.getStaticNameSpace();
+                    if (toLHS) {
+                        return new LHS(staticNs, field);
+                    }
+                    try {
+                        Object v = staticNs.getVariable(field);
+                        if (v != Primitive.VOID) return v;
+                    } catch (UtilEvalError ex) {
+                        // fall through
+                    }
+                    throw new EvalError("No static field " + sc.getName()
+                            + "." + field, this, callstack);
+                }
 
                 if ( toLHS ) try {
                     return Reflect.getLHSObjectField(obj, field);
@@ -194,6 +225,25 @@ class BSHPrimarySuffix extends SimpleNode
 
             // Validate if can invoke this method
             Interpreter.mainSecurityGuard.canInvokeMethod(obj, field, oa);
+
+            // Scripted-class method dispatch.
+            if (obj instanceof ScriptedInstance) {
+                return ((ScriptedInstance) obj).invokeMethod(
+                        field, oa, interpreter, callstack, this);
+            }
+            // Static-method dispatch on a scripted class/interface/enum.
+            if (obj instanceof ScriptedClass) {
+                ScriptedClass sc = (ScriptedClass) obj;
+                BshMethod m = sc.findStaticMethod(field, oa);
+                if (m != null) {
+                    return m.invoke(oa, interpreter, callstack, this, false);
+                }
+                Object builtin = sc.invokeEnumBuiltinStatic(field, oa);
+                if (builtin != null) return builtin;
+                throw new EvalError("No static method " + sc.getName()
+                        + "." + field + "/"
+                        + (oa == null ? 0 : oa.length), this, callstack);
+            }
 
             return Reflect.invokeObjectMethod(
                 obj, field, oa, interpreter, callstack, this );
@@ -262,7 +312,7 @@ class BSHPrimarySuffix extends SimpleNode
             throw new EvalError("Not an array or List type", this, callstack );
 
         int length = obj instanceof List
-                ? ((List) obj).size() : ((Object[]) obj).length;
+                ? ((List) obj).size() : BshArray.arrayLength(obj);
 
         int index = length + 1;
         // allow index access for a Map.Entry array.

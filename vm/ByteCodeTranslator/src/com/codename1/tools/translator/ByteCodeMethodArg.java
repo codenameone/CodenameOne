@@ -135,6 +135,14 @@ public class ByteCodeMethodArg {
         return arrayDimensions;
     }
     
+    public String getTypeName() {
+        return type;
+    }
+    
+    public Class getPrimitiveType() {
+        return primitiveType;
+    }
+    
     public boolean isObject() {
         return arrayDimensions > 0 || primitiveType == null;
     }

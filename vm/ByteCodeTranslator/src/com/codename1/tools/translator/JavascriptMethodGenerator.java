@@ -17,6 +17,7 @@ import com.codename1.tools.translator.bytecodes.TypeInstruction;
 import com.codename1.tools.translator.bytecodes.VarOp;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -38,6 +39,7 @@ final class JavascriptMethodGenerator {
             }
             appendMethod(out, cls, method);
         }
+        appendInheritedMethodAliases(out, cls);
         for (BytecodeMethod method : cls.getMethods()) {
             if (!method.isNative() || method.isEliminated()) {
                 continue;
@@ -87,9 +89,10 @@ final class JavascriptMethodGenerator {
                 out.append(", ");
             }
             first = false;
+            String desc = field.getRuntimeDescriptor();
             out.append("{ owner: \"").append(field.getClsName()).append("\", name: \"")
                     .append(field.getFieldName()).append("\", desc: \"")
-                    .append(JavascriptNameUtil.escapeJs(field.getType() == null ? "" : field.getType())).append("\", prop: \"")
+                    .append(JavascriptNameUtil.escapeJs(desc == null ? "" : desc)).append("\", prop: \"")
                     .append(JavascriptNameUtil.fieldProperty(field.getClsName(), field.getFieldName())).append("\" }");
         }
         out.append("],\n");
@@ -186,14 +189,14 @@ final class JavascriptMethodGenerator {
         if (value instanceof Number) {
             return value.toString();
         }
-        return JavascriptNameUtil.defaultValue(field.getType());
+        return JavascriptNameUtil.defaultValue(field.getRuntimeDescriptor());
     }
 
     private static String renderStaticFieldInitialValue(ByteCodeField field) {
         if (requiresDeferredStaticInitialization(field)) {
-            return JavascriptNameUtil.defaultValue(field.getType());
+            return JavascriptNameUtil.defaultValue(field.getRuntimeDescriptor());
         }
-        return field.getValue() == null ? JavascriptNameUtil.defaultValue(field.getType()) : renderStaticConstant(field);
+        return field.getValue() == null ? JavascriptNameUtil.defaultValue(field.getRuntimeDescriptor()) : renderStaticConstant(field);
     }
 
     private static boolean requiresDeferredStaticInitialization(ByteCodeField field) {
@@ -392,70 +395,143 @@ final class JavascriptMethodGenerator {
         }
     }
 
+    private static void appendInheritedMethodAliases(StringBuilder out, ByteCodeClass cls) {
+        Map<String, BytecodeMethod> inherited = new LinkedHashMap<String, BytecodeMethod>();
+        collectInheritedMethodAliases(cls.getBaseClassObject(), inherited, new HashSet<ByteCodeClass>());
+        List<ByteCodeClass> baseInterfaces = cls.getBaseInterfacesObject();
+        if (baseInterfaces != null) {
+            for (ByteCodeClass iface : baseInterfaces) {
+                collectInheritedMethodAliases(iface, inherited, new HashSet<ByteCodeClass>());
+            }
+        }
+        for (BytecodeMethod method : inherited.values()) {
+            if (method == null || method.isConstructor() || method.isAbstract() || method.isEliminated()) {
+                continue;
+            }
+            if (declaresMethod(cls, method.getMethodName(), method.getSignature())) {
+                continue;
+            }
+            String aliasName = JavascriptNameUtil.methodIdentifier(cls.getClsName(), method.getMethodName(), method.getSignature());
+            String targetName = JavascriptNameUtil.methodIdentifier(method.getClsName(), method.getMethodName(), method.getSignature());
+            if (aliasName.equals(targetName)) {
+                continue;
+            }
+            out.append("function* ").append(aliasName).append("(");
+            appendMethodParameters(out, method);
+            out.append("){\n");
+            out.append("  return yield* ").append(targetName).append("(");
+            appendMethodParameterArguments(out, method);
+            out.append(");\n");
+            out.append("}\n");
+            if (!method.isStatic()) {
+                out.append("jvm.addVirtualMethod(\"").append(cls.getClsName()).append("\", \"")
+                        .append(aliasName).append("\", ").append(aliasName).append(");\n");
+            }
+        }
+    }
+
+    private static void collectInheritedMethodAliases(ByteCodeClass owner, Map<String, BytecodeMethod> out, Set<ByteCodeClass> visited) {
+        if (owner == null || !visited.add(owner)) {
+            return;
+        }
+        for (BytecodeMethod method : owner.getMethods()) {
+            if (method == null || method.isConstructor() || method.isAbstract() || method.isEliminated()) {
+                continue;
+            }
+            String key = method.getMethodName() + method.getSignature();
+            if (!out.containsKey(key)) {
+                out.put(key, method);
+            }
+        }
+        collectInheritedMethodAliases(owner.getBaseClassObject(), out, visited);
+        List<ByteCodeClass> baseInterfaces = owner.getBaseInterfacesObject();
+        if (baseInterfaces != null) {
+            for (ByteCodeClass iface : baseInterfaces) {
+                collectInheritedMethodAliases(iface, out, visited);
+            }
+        }
+    }
+
+    private static boolean declaresMethod(ByteCodeClass cls, String name, String signature) {
+        for (BytecodeMethod method : cls.getMethods()) {
+            if (method.getMethodName().equals(name) && signature.equals(method.getSignature())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static boolean appendStraightLineMethodBody(StringBuilder out, ByteCodeClass cls, BytecodeMethod method,
             List<Instruction> instructions, String jsMethodName) {
         if (!isStraightLineEligible(method, instructions)) {
             return false;
         }
-        StringBuilder setup = new StringBuilder();
-        StringBuilder instructionBody = new StringBuilder();
-        StringBuilder body = new StringBuilder();
-        StraightLineContext ctx = new StraightLineContext(method.getMaxLocals(), method.getMaxStack());
-        if (isWrappedStaticMethod(method)) {
-            ctx.initializedClasses.add(cls.getClsName());
-        }
-        if (!method.isStatic()) {
-            setup.append("  let l0 = __cn1ThisObject;\n");
-            ctx.localsInitialized[0] = true;
-            ctx.localsUsed[0] = true;
-        }
-        List<ByteCodeMethodArg> arguments = method.getArguments();
-        int localIndex = method.isStatic() ? 0 : 1;
-        for (int i = 0; i < arguments.size(); i++) {
-            setup.append("  let l").append(localIndex).append(" = __cn1Arg").append(i + 1).append(";\n");
-            ctx.localsInitialized[localIndex] = true;
-            ctx.localsUsed[localIndex] = true;
-            localIndex++;
-            if (arguments.get(i).isDoubleOrLong()) {
-                localIndex++;
+        try {
+            StringBuilder setup = new StringBuilder();
+            StringBuilder instructionBody = new StringBuilder();
+            StringBuilder body = new StringBuilder();
+            StraightLineContext ctx = new StraightLineContext(method.getMaxLocals(), method.getMaxStack());
+            if (isWrappedStaticMethod(method)) {
+                ctx.initializedClasses.add(cls.getClsName());
             }
-        }
-        for (int i = 0; i < instructions.size(); i++) {
-            Instruction instruction = instructions.get(i);
-            if (!appendStraightLineInstruction(instructionBody, method, instruction, ctx)) {
+            if (!method.isStatic()) {
+                setup.append("  let l0 = __cn1ThisObject;\n");
+                ctx.localsInitialized[0] = true;
+                ctx.localsUsed[0] = true;
+            }
+            List<ByteCodeMethodArg> arguments = method.getArguments();
+            int localIndex = method.isStatic() ? 0 : 1;
+            for (int i = 0; i < arguments.size(); i++) {
+                setup.append("  let l").append(localIndex).append(" = __cn1Arg").append(i + 1).append(";\n");
+                ctx.localsInitialized[localIndex] = true;
+                ctx.localsUsed[localIndex] = true;
+                localIndex++;
+                if (arguments.get(i).isDoubleOrLong()) {
+                    localIndex++;
+                }
+            }
+            for (int i = 0; i < instructions.size(); i++) {
+                Instruction instruction = instructions.get(i);
+                if (!appendStraightLineInstruction(instructionBody, method, instruction, ctx)) {
+                    return false;
+                }
+            }
+            body.append(setup);
+            for (int i = 0; i < method.getMaxLocals(); i++) {
+                if (!ctx.localsInitialized[i] && ctx.localsUsed[i]) {
+                    body.append("  let l").append(i).append(" = null;\n");
+                }
+            }
+            for (int i = 0; i < ctx.getMaxObservedStack(); i++) {
+                body.append("  let s").append(i).append(" = null;\n");
+            }
+            if (method.isSynchronizedMethod()) {
+                body.append("  const __cn1Monitor = ").append(method.isStatic() ? "jvm.getClassObject(\"" + cls.getClsName() + "\")" : "__cn1ThisObject").append(";\n");
+                body.append("  jvm.monitorEnter(jvm.currentThread, __cn1Monitor);\n");
+                body.append("  try {\n");
+            }
+            body.append(instructionBody);
+            if (method.isSynchronizedMethod()) {
+                body.append("  } finally {\n");
+                body.append("    jvm.monitorExit(jvm.currentThread, __cn1Monitor);\n");
+                body.append("  }\n");
+            }
+            out.append(body);
+            out.append("}\n");
+            if ("__CLINIT__".equals(method.getMethodName())) {
+                out.append("jvm.classes[\"").append(cls.getClsName()).append("\"].clinit = ").append(jsMethodName).append(";\n");
+            }
+            if (!method.isStatic() && !method.isConstructor()) {
+                out.append("jvm.addVirtualMethod(\"").append(cls.getClsName()).append("\", \"")
+                        .append(jsMethodName).append("\", ").append(jsMethodName).append(");\n");
+            }
+            return true;
+        } catch (IllegalStateException ex) {
+            if (ex.getMessage() != null && ex.getMessage().startsWith("Straight-line JS lowering")) {
                 return false;
             }
+            throw ex;
         }
-        body.append(setup);
-        for (int i = 0; i < method.getMaxLocals(); i++) {
-            if (!ctx.localsInitialized[i] && ctx.localsUsed[i]) {
-                body.append("  let l").append(i).append(" = null;\n");
-            }
-        }
-        for (int i = 0; i < ctx.getMaxObservedStack(); i++) {
-            body.append("  let s").append(i).append(" = null;\n");
-        }
-        if (method.isSynchronizedMethod()) {
-            body.append("  const __cn1Monitor = ").append(method.isStatic() ? "jvm.getClassObject(\"" + cls.getClsName() + "\")" : "__cn1ThisObject").append(";\n");
-            body.append("  jvm.monitorEnter(jvm.currentThread, __cn1Monitor);\n");
-            body.append("  try {\n");
-        }
-        body.append(instructionBody);
-        if (method.isSynchronizedMethod()) {
-            body.append("  } finally {\n");
-            body.append("    jvm.monitorExit(jvm.currentThread, __cn1Monitor);\n");
-            body.append("  }\n");
-        }
-        out.append(body);
-        out.append("}\n");
-        if ("__CLINIT__".equals(method.getMethodName())) {
-            out.append("jvm.classes[\"").append(cls.getClsName()).append("\"].clinit = ").append(jsMethodName).append(";\n");
-        }
-        if (!method.isStatic() && !method.isConstructor()) {
-            out.append("jvm.addVirtualMethod(\"").append(cls.getClsName()).append("\", \"")
-                    .append(jsMethodName).append("\", ").append(jsMethodName).append(");\n");
-        }
-        return true;
     }
 
     private static boolean isStraightLineEligible(BytecodeMethod method, List<Instruction> instructions) {
@@ -551,6 +627,22 @@ final class JavascriptMethodGenerator {
             case Opcodes.SIPUSH:
                 out.append("  ").append(ctx.push(Integer.toString(instruction.getValue()))).append(";\n");
                 return true;
+            case Opcodes.ILOAD:
+            case Opcodes.LLOAD:
+            case Opcodes.FLOAD:
+            case Opcodes.DLOAD:
+            case Opcodes.ALOAD:
+                ctx.localsUsed[instruction.getValue()] = true;
+                out.append("  ").append(ctx.push("l" + instruction.getValue())).append(";\n");
+                return true;
+            case Opcodes.ISTORE:
+            case Opcodes.LSTORE:
+            case Opcodes.FSTORE:
+            case Opcodes.DSTORE:
+            case Opcodes.ASTORE:
+                ctx.localsUsed[instruction.getValue()] = true;
+                out.append("  l").append(instruction.getValue()).append(" = ").append(ctx.pop()).append(";\n");
+                return true;
             case Opcodes.POP:
                 ctx.pop();
                 return true;
@@ -560,45 +652,67 @@ final class JavascriptMethodGenerator {
                 return true;
             case Opcodes.DUP: {
                 String value = ctx.peek(0);
-                out.append("  ").append(ctx.push(value)).append(";\n");
+                String temp = ctx.nextTemp("__dup");
+                out.append("  const ").append(temp).append(" = ").append(value).append(";\n");
+                out.append("  ").append(ctx.push(temp)).append(";\n");
                 return true;
             }
             case Opcodes.DUP_X1: {
                 String v1 = ctx.pop();
                 String v2 = ctx.pop();
-                out.append("  ").append(ctx.push(v1)).append(";\n");
-                out.append("  ").append(ctx.push(v2)).append(";\n");
-                out.append("  ").append(ctx.push(v1)).append(";\n");
+                String t1 = ctx.nextTemp("__dup");
+                String t2 = ctx.nextTemp("__dup");
+                out.append("  const ").append(t1).append(" = ").append(v1).append(";\n");
+                out.append("  const ").append(t2).append(" = ").append(v2).append(";\n");
+                out.append("  ").append(ctx.push(t1)).append(";\n");
+                out.append("  ").append(ctx.push(t2)).append(";\n");
+                out.append("  ").append(ctx.push(t1)).append(";\n");
                 return true;
             }
             case Opcodes.DUP_X2: {
                 String v1 = ctx.pop();
                 String v2 = ctx.pop();
                 String v3 = ctx.pop();
-                out.append("  ").append(ctx.push(v1)).append(";\n");
-                out.append("  ").append(ctx.push(v3)).append(";\n");
-                out.append("  ").append(ctx.push(v2)).append(";\n");
-                out.append("  ").append(ctx.push(v1)).append(";\n");
+                String t1 = ctx.nextTemp("__dup");
+                String t2 = ctx.nextTemp("__dup");
+                String t3 = ctx.nextTemp("__dup");
+                out.append("  const ").append(t1).append(" = ").append(v1).append(";\n");
+                out.append("  const ").append(t2).append(" = ").append(v2).append(";\n");
+                out.append("  const ").append(t3).append(" = ").append(v3).append(";\n");
+                out.append("  ").append(ctx.push(t1)).append(";\n");
+                out.append("  ").append(ctx.push(t3)).append(";\n");
+                out.append("  ").append(ctx.push(t2)).append(";\n");
+                out.append("  ").append(ctx.push(t1)).append(";\n");
                 return true;
             }
             case Opcodes.DUP2: {
                 String v1 = ctx.pop();
                 String v2 = ctx.pop();
-                out.append("  ").append(ctx.push(v2)).append(";\n");
-                out.append("  ").append(ctx.push(v1)).append(";\n");
-                out.append("  ").append(ctx.push(v2)).append(";\n");
-                out.append("  ").append(ctx.push(v1)).append(";\n");
+                String t1 = ctx.nextTemp("__dup");
+                String t2 = ctx.nextTemp("__dup");
+                out.append("  const ").append(t1).append(" = ").append(v1).append(";\n");
+                out.append("  const ").append(t2).append(" = ").append(v2).append(";\n");
+                out.append("  ").append(ctx.push(t2)).append(";\n");
+                out.append("  ").append(ctx.push(t1)).append(";\n");
+                out.append("  ").append(ctx.push(t2)).append(";\n");
+                out.append("  ").append(ctx.push(t1)).append(";\n");
                 return true;
             }
             case Opcodes.DUP2_X1: {
                 String v1 = ctx.pop();
                 String v2 = ctx.pop();
                 String v3 = ctx.pop();
-                out.append("  ").append(ctx.push(v2)).append(";\n");
-                out.append("  ").append(ctx.push(v1)).append(";\n");
-                out.append("  ").append(ctx.push(v3)).append(";\n");
-                out.append("  ").append(ctx.push(v2)).append(";\n");
-                out.append("  ").append(ctx.push(v1)).append(";\n");
+                String t1 = ctx.nextTemp("__dup");
+                String t2 = ctx.nextTemp("__dup");
+                String t3 = ctx.nextTemp("__dup");
+                out.append("  const ").append(t1).append(" = ").append(v1).append(";\n");
+                out.append("  const ").append(t2).append(" = ").append(v2).append(";\n");
+                out.append("  const ").append(t3).append(" = ").append(v3).append(";\n");
+                out.append("  ").append(ctx.push(t2)).append(";\n");
+                out.append("  ").append(ctx.push(t1)).append(";\n");
+                out.append("  ").append(ctx.push(t3)).append(";\n");
+                out.append("  ").append(ctx.push(t2)).append(";\n");
+                out.append("  ").append(ctx.push(t1)).append(";\n");
                 return true;
             }
             case Opcodes.DUP2_X2: {
@@ -606,12 +720,20 @@ final class JavascriptMethodGenerator {
                 String v2 = ctx.pop();
                 String v3 = ctx.pop();
                 String v4 = ctx.pop();
-                out.append("  ").append(ctx.push(v2)).append(";\n");
-                out.append("  ").append(ctx.push(v1)).append(";\n");
-                out.append("  ").append(ctx.push(v4)).append(";\n");
-                out.append("  ").append(ctx.push(v3)).append(";\n");
-                out.append("  ").append(ctx.push(v2)).append(";\n");
-                out.append("  ").append(ctx.push(v1)).append(";\n");
+                String t1 = ctx.nextTemp("__dup");
+                String t2 = ctx.nextTemp("__dup");
+                String t3 = ctx.nextTemp("__dup");
+                String t4 = ctx.nextTemp("__dup");
+                out.append("  const ").append(t1).append(" = ").append(v1).append(";\n");
+                out.append("  const ").append(t2).append(" = ").append(v2).append(";\n");
+                out.append("  const ").append(t3).append(" = ").append(v3).append(";\n");
+                out.append("  const ").append(t4).append(" = ").append(v4).append(";\n");
+                out.append("  ").append(ctx.push(t2)).append(";\n");
+                out.append("  ").append(ctx.push(t1)).append(";\n");
+                out.append("  ").append(ctx.push(t4)).append(";\n");
+                out.append("  ").append(ctx.push(t3)).append(";\n");
+                out.append("  ").append(ctx.push(t2)).append(";\n");
+                out.append("  ").append(ctx.push(t1)).append(";\n");
                 return true;
             }
             case Opcodes.SWAP: {
@@ -738,7 +860,8 @@ final class JavascriptMethodGenerator {
                 String indexTemp = ctx.nextTemp("__idx");
                 out.append("  { const ").append(arrayTemp).append(" = ").append(arr)
                         .append("; const ").append(indexTemp).append(" = ").append(idx)
-                        .append("; if (!").append(arrayTemp).append(".__array) throw new Error(\"Array expected\"); if (")
+                        .append("; if (!").append(arrayTemp).append(" || !").append(arrayTemp).append(".__array) throw new Error(\"Array expected: \" + (")
+                        .append(arrayTemp).append(" == null ? \"null\" : (").append(arrayTemp).append(".__class || typeof ").append(arrayTemp).append("))); if (")
                         .append(indexTemp).append(" < 0 || ").append(indexTemp).append(" >= ").append(arrayTemp)
                         .append(".length) throw new Error(\"ArrayIndexOutOfBoundsException\"); ")
                         .append(ctx.push(arrayTemp + "[" + indexTemp + "]")).append("; }\n");
@@ -759,7 +882,8 @@ final class JavascriptMethodGenerator {
                 String indexTemp = ctx.nextTemp("__idx");
                 out.append("  { const ").append(arrayTemp).append(" = ").append(arr)
                         .append("; const ").append(indexTemp).append(" = ").append(idx)
-                        .append("; if (!").append(arrayTemp).append(".__array) throw new Error(\"Array expected\"); if (")
+                        .append("; if (!").append(arrayTemp).append(" || !").append(arrayTemp).append(".__array) throw new Error(\"Array expected: \" + (")
+                        .append(arrayTemp).append(" == null ? \"null\" : (").append(arrayTemp).append(".__class || typeof ").append(arrayTemp).append("))); if (")
                         .append(indexTemp).append(" < 0 || ").append(indexTemp).append(" >= ").append(arrayTemp)
                         .append(".length) throw new Error(\"ArrayIndexOutOfBoundsException\"); ")
                         .append(arrayTemp).append("[").append(indexTemp).append("] = ").append(value).append("; }\n");
@@ -908,9 +1032,14 @@ final class JavascriptMethodGenerator {
     }
 
     private static boolean appendStraightLineInvokeInstruction(StringBuilder out, Invoke invoke, StraightLineContext ctx) {
-        String owner = JavascriptNameUtil.sanitizeClassName(invoke.getOwner());
-        String methodId = JavascriptNameUtil.methodIdentifier(invoke.getOwner(), invoke.getName(), invoke.getDesc());
-        String methodBodyId = jsStaticMethodBodyIdentifier(invoke.getOwner(), invoke.getName(), invoke.getDesc());
+        String declaredOwner = invoke.getOwner();
+        String directOwner = resolveDirectInvokeOwner(invoke);
+        String owner = JavascriptNameUtil.sanitizeClassName(directOwner);
+        String methodOwner = (invoke.getOpcode() == Opcodes.INVOKEVIRTUAL || invoke.getOpcode() == Opcodes.INVOKEINTERFACE)
+                ? declaredOwner
+                : directOwner;
+        String methodId = JavascriptNameUtil.methodIdentifier(methodOwner, invoke.getName(), invoke.getDesc());
+        String methodBodyId = jsStaticMethodBodyIdentifier(methodOwner, invoke.getName(), invoke.getDesc());
         List<String> args = JavascriptNameUtil.argumentTypes(invoke.getDesc());
         boolean hasReturn = invoke.getDesc().charAt(invoke.getDesc().length() - 1) != 'V';
         String[] argValues = new String[args.size()];
@@ -1075,21 +1204,80 @@ final class JavascriptMethodGenerator {
         return JavascriptNameUtil.methodIdentifier(owner, name, desc) + "__impl";
     }
 
-    private static void appendNativeStubIfNeeded(StringBuilder out, ByteCodeClass cls, BytecodeMethod method) {
+private static void appendNativeStubIfNeeded(StringBuilder out, ByteCodeClass cls, BytecodeMethod method) {
         String jsMethodName = jsMethodIdentifier(cls, method);
-        JavascriptNativeRegistry.NativeCategory category = JavascriptNativeRegistry.categoryFor(jsMethodName);
-        if (category == JavascriptNativeRegistry.NativeCategory.RUNTIME_IMPLEMENTED) {
-            return;
+        if (method.isJsBodyMethod()) {
+            appendJsBodyMethod(out, cls, method, jsMethodName);
+        } else {
+            JavascriptNativeRegistry.NativeCategory category = JavascriptNativeRegistry.categoryFor(jsMethodName);
+            if (category == JavascriptNativeRegistry.NativeCategory.RUNTIME_IMPLEMENTED) {
+                return;
+            }
+            String reason = JavascriptNativeRegistry.unsupportedReason(jsMethodName);
+            out.append("if (typeof ").append(jsMethodName).append(" === \"undefined\") {\n");
+            out.append("  ").append(jsMethodName).append(" = function*(");
+            boolean first = true;
+            if (!method.isStatic()) {
+                out.append("__cn1ThisObject");
+                first = false;
+            }
+            List<ByteCodeMethodArg> arguments = method.getArguments();
+            for (int i = 0; i < arguments.size(); i++) {
+                if (!first) {
+                    out.append(", ");
+                }
+                first = false;
+                out.append("__cn1Arg").append(i + 1);
+            }
+            out.append(") { ");
+            if (category == JavascriptNativeRegistry.NativeCategory.HOST_HOOK) {
+                out.append("return yield jvm.invokeHostNative(\"").append(jsMethodName).append("\", [");
+                boolean firstArg = true;
+                if (!method.isStatic()) {
+                    out.append("__cn1ThisObject");
+                    firstArg = false;
+                }
+                for (int i = 0; i < arguments.size(); i++) {
+                    if (!firstArg) {
+                        out.append(", ");
+                    }
+                    firstArg = false;
+                    out.append("__cn1Arg").append(i + 1);
+                }
+                out.append("]);");
+            } else {
+                out.append("throw new Error(\"");
+                if (reason == null) {
+                    out.append("Missing javascript native method ").append(jsMethodName);
+                } else {
+                    out.append(JavascriptNameUtil.escapeJs(reason));
+                }
+                out.append("\");");
+            }
+            out.append(" };\n");
+            out.append("}\n");
         }
-        String reason = JavascriptNativeRegistry.unsupportedReason(jsMethodName);
+    }
+
+private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, BytecodeMethod method, String jsMethodName) {
+        String script = method.getJsBodyScript();
+        String[] params = method.getJsBodyParams();
+        ByteCodeMethodArg returnType = method.getReturnType();
+        boolean isVoid = returnType == null || returnType.isVoid();
+        
         out.append("if (typeof ").append(jsMethodName).append(" === \"undefined\") {\n");
         out.append("  ").append(jsMethodName).append(" = function*(");
+        
+        java.util.List<ByteCodeMethodArg> arguments = method.getArguments();
+        int paramOffset = 0;
         boolean first = true;
+        
         if (!method.isStatic()) {
             out.append("__cn1ThisObject");
             first = false;
+            paramOffset = 1;
         }
-        List<ByteCodeMethodArg> arguments = method.getArguments();
+        
         for (int i = 0; i < arguments.size(); i++) {
             if (!first) {
                 out.append(", ");
@@ -1097,32 +1285,58 @@ final class JavascriptMethodGenerator {
             first = false;
             out.append("__cn1Arg").append(i + 1);
         }
-        out.append(") { ");
-        if (category == JavascriptNativeRegistry.NativeCategory.HOST_HOOK) {
-            out.append("return yield jvm.invokeHostNative(\"").append(jsMethodName).append("\", [");
-            boolean firstArg = true;
-            if (!method.isStatic()) {
-                out.append("__cn1ThisObject");
-                firstArg = false;
-            }
-            for (int i = 0; i < arguments.size(); i++) {
-                if (!firstArg) {
-                    out.append(", ");
+        out.append(") {\n");
+        
+        out.append("    ");
+        
+        if (params != null && params.length > 0) {
+            for (int i = 0; i < params.length; i++) {
+                String paramName = params[i];
+                int argIndex = paramOffset + i;
+                ByteCodeMethodArg argType = i < arguments.size() ? arguments.get(i) : null;
+                if (argType != null && argType.isObject()) {
+                    out.append("let ").append(paramName).append(" = jvm.unwrapJsValue(__cn1Arg").append(argIndex + 1).append("); ");
+                } else {
+                    out.append("let ").append(paramName).append(" = __cn1Arg").append(argIndex + 1).append("; ");
                 }
-                firstArg = false;
-                out.append("__cn1Arg").append(i + 1);
             }
-            out.append("]);");
-        } else {
-            out.append("throw new Error(\"");
-            if (reason == null) {
-                out.append("Missing javascript native method ").append(jsMethodName);
-            } else {
-                out.append(JavascriptNameUtil.escapeJs(reason));
-            }
-            out.append("\");");
+            out.append("\n    ");
         }
-        out.append(" };\n");
+        
+        if (!isVoid) {
+            out.append("const __jsBodyResult = (function() { ").append(script).append(" }).call(this);\n");
+            String returnTypeName = returnType.getTypeName();
+            String jsReturnType;
+            if (returnTypeName != null) {
+                jsReturnType = JavascriptNameUtil.sanitizeClassName(returnTypeName);
+            } else {
+                Class primitiveType = returnType.getPrimitiveType();
+                if (primitiveType == Integer.TYPE) {
+                    jsReturnType = "int";
+                } else if (primitiveType == Long.TYPE) {
+                    jsReturnType = "long";
+                } else if (primitiveType == Double.TYPE) {
+                    jsReturnType = "double";
+                } else if (primitiveType == Float.TYPE) {
+                    jsReturnType = "float";
+                } else if (primitiveType == Boolean.TYPE) {
+                    jsReturnType = "boolean";
+                } else if (primitiveType == Byte.TYPE) {
+                    jsReturnType = "byte";
+                } else if (primitiveType == Short.TYPE) {
+                    jsReturnType = "short";
+                } else if (primitiveType == Character.TYPE) {
+                    jsReturnType = "char";
+                } else {
+                    jsReturnType = "java_lang_Object";
+                }
+            }
+            out.append("    return jvm.wrapJsResult(__jsBodyResult, \"").append(jsReturnType).append("\");\n");
+        } else {
+            out.append(script).append("\n");
+        }
+        
+        out.append("  }\n");
         out.append("}\n");
     }
 
@@ -1308,6 +1522,20 @@ final class JavascriptMethodGenerator {
             case Opcodes.BIPUSH:
             case Opcodes.SIPUSH:
                 out.append("        stack.push(").append(instruction.getValue()).append("); pc = ").append(index + 1).append("; break;\n");
+                return;
+            case Opcodes.ILOAD:
+            case Opcodes.LLOAD:
+            case Opcodes.FLOAD:
+            case Opcodes.DLOAD:
+            case Opcodes.ALOAD:
+                out.append("        stack.push(locals[").append(instruction.getValue()).append("]); pc = ").append(index + 1).append("; break;\n");
+                return;
+            case Opcodes.ISTORE:
+            case Opcodes.LSTORE:
+            case Opcodes.FSTORE:
+            case Opcodes.DSTORE:
+            case Opcodes.ASTORE:
+                out.append("        locals[").append(instruction.getValue()).append("] = stack.pop(); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.POP:
                 out.append("        stack.pop(); pc = ").append(index + 1).append("; break;\n");
@@ -1502,7 +1730,7 @@ final class JavascriptMethodGenerator {
             case Opcodes.BALOAD:
             case Opcodes.CALOAD:
             case Opcodes.SALOAD:
-                out.append("        { const idx = stack.pop(); const arr = stack.pop(); if (!arr.__array) throw new Error(\"Array expected\"); if (idx < 0 || idx >= arr.length) throw new Error(\"ArrayIndexOutOfBoundsException\"); stack.push(arr[idx]); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { const idx = stack.pop(); const arr = stack.pop(); if (!arr || !arr.__array) throw new Error(\"Array expected: \" + (arr == null ? \"null\" : (arr.__class || typeof arr))); if (idx < 0 || idx >= arr.length) throw new Error(\"ArrayIndexOutOfBoundsException\"); stack.push(arr[idx]); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.AASTORE:
             case Opcodes.IASTORE:
@@ -1512,7 +1740,7 @@ final class JavascriptMethodGenerator {
             case Opcodes.BASTORE:
             case Opcodes.CASTORE:
             case Opcodes.SASTORE:
-                out.append("        { const value = stack.pop(); const idx = stack.pop(); const arr = stack.pop(); if (!arr.__array) throw new Error(\"Array expected\"); if (idx < 0 || idx >= arr.length) throw new Error(\"ArrayIndexOutOfBoundsException\"); arr[idx] = value; pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { const value = stack.pop(); const idx = stack.pop(); const arr = stack.pop(); if (!arr || !arr.__array) throw new Error(\"Array expected: \" + (arr == null ? \"null\" : (arr.__class || typeof arr))); if (idx < 0 || idx >= arr.length) throw new Error(\"ArrayIndexOutOfBoundsException\"); arr[idx] = value; pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.MONITORENTER:
                 out.append("        jvm.monitorEnter(jvm.currentThread, stack.pop()); pc = ").append(index + 1).append("; break;\n");
@@ -1629,7 +1857,15 @@ final class JavascriptMethodGenerator {
         out.append(indent).append("if (").append(valueExpression).append(" != null) { const __classDef = ").append(valueExpression)
                 .append(".__classDef; if (").append(valueExpression).append(".__class !== \"").append(typeName)
                 .append("\" && !(__classDef && __classDef.assignableTo && __classDef.assignableTo[\"").append(typeName)
-                .append("\"])) ").append(failureStatement).append("; }\n");
+                .append("\"])) {")
+                .append(" if (").append(valueExpression).append(".__jsValue !== undefined) {")
+                .append(" jvm.enhanceJsWrapper(").append(valueExpression).append(", \"").append(typeName).append("\");")
+                .append(" const __enhancedClassDef = ").append(valueExpression).append(".__classDef;")
+                .append(" if (").append(valueExpression).append(".__class !== \"").append(typeName)
+                .append("\" && !(__enhancedClassDef && __enhancedClassDef.assignableTo && __enhancedClassDef.assignableTo[\"").append(typeName)
+                .append("\"])) ").append(failureStatement).append(";")
+                .append(" } else ").append(failureStatement).append(";")
+                .append(" } }\n");
     }
 
     private static String directInstanceOfExpression(String valueExpression, String typeName) {
@@ -1766,9 +2002,14 @@ final class JavascriptMethodGenerator {
 
     private static void appendInvokeInstruction(StringBuilder out, Invoke invoke, int index, boolean usesClassInitCache,
             boolean usesVirtualDispatchCache) {
-        String owner = JavascriptNameUtil.sanitizeClassName(invoke.getOwner());
-        String methodId = JavascriptNameUtil.methodIdentifier(invoke.getOwner(), invoke.getName(), invoke.getDesc());
-        String methodBodyId = jsStaticMethodBodyIdentifier(invoke.getOwner(), invoke.getName(), invoke.getDesc());
+        String declaredOwner = invoke.getOwner();
+        String directOwner = resolveDirectInvokeOwner(invoke);
+        String owner = JavascriptNameUtil.sanitizeClassName(directOwner);
+        String methodOwner = (invoke.getOpcode() == Opcodes.INVOKEVIRTUAL || invoke.getOpcode() == Opcodes.INVOKEINTERFACE)
+                ? declaredOwner
+                : directOwner;
+        String methodId = JavascriptNameUtil.methodIdentifier(methodOwner, invoke.getName(), invoke.getDesc());
+        String methodBodyId = jsStaticMethodBodyIdentifier(methodOwner, invoke.getName(), invoke.getDesc());
         List<String> args = JavascriptNameUtil.argumentTypes(invoke.getDesc());
         boolean hasReturn = invoke.getDesc().charAt(invoke.getDesc().length() - 1) != 'V';
         int argCount = args.size();
@@ -1864,5 +2105,41 @@ final class JavascriptMethodGenerator {
 
     private static String staticInvocationTargetExpression(String methodId, String methodBodyId) {
         return "typeof " + methodBodyId + " === \"function\" ? " + methodBodyId + " : " + methodId;
+    }
+
+    private static String resolveDirectInvokeOwner(Invoke invoke) {
+        String owner = invoke.getOwner();
+        if (owner == null) {
+            return null;
+        }
+        if (invoke.getOpcode() == Opcodes.INVOKESTATIC) {
+            ByteCodeClass ownerClass = Parser.getClassObject(owner.replace('/', '_').replace('$', '_'));
+            String resolvedOwner = findActualStaticOwner(ownerClass, invoke.getName(), invoke.getDesc());
+            return resolvedOwner != null ? resolvedOwner : owner;
+        }
+        if (invoke.getOpcode() == Opcodes.INVOKESPECIAL
+                && !"<init>".equals(invoke.getName())
+                && !"<clinit>".equals(invoke.getName())) {
+            String resolvedOwner = Util.resolveInvokeSpecialOwner(owner, invoke.getName(), invoke.getDesc());
+            return resolvedOwner != null ? resolvedOwner : owner;
+        }
+        return owner;
+    }
+
+    private static String findActualStaticOwner(ByteCodeClass ownerClass, String name, String desc) {
+        if (ownerClass == null) {
+            return null;
+        }
+        List<BytecodeMethod> methods = ownerClass.getMethods();
+        if (methods != null) {
+            for (BytecodeMethod method : methods) {
+                if (method.isStatic()
+                        && method.getMethodName().equals(name)
+                        && desc.equals(method.getSignature())) {
+                    return ownerClass.getOriginalClassName();
+                }
+            }
+        }
+        return findActualStaticOwner(ownerClass.getBaseClassObject(), name, desc);
     }
 }

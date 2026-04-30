@@ -866,7 +866,7 @@ public final class GeneratedAccess_com_codename1_facebook {
         if ("getAlbumPhotos".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.list.DefaultListModel.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.ui.events.ActionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.list.DefaultListModel.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.ui.events.ActionListener.class}, false);
-                typedTarget.getAlbumPhotos((java.lang.String) adaptedArgs[0], (com.codename1.ui.list.DefaultListModel) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue(), (com.codename1.ui.events.ActionListener) adaptedArgs[4]); return null;
+                typedTarget.getAlbumPhotos((java.lang.String) adaptedArgs[0], (com.codename1.ui.list.DefaultListModel) adaptedArgs[1], toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3]), (com.codename1.ui.events.ActionListener) adaptedArgs[4]); return null;
             }
         }
         if ("getFaceBookObject".equals(name)) {
@@ -898,7 +898,7 @@ public final class GeneratedAccess_com_codename1_facebook {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.list.DefaultListModel.class, java.lang.Integer.class, com.codename1.ui.events.ActionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.list.DefaultListModel.class, java.lang.Integer.class, com.codename1.ui.events.ActionListener.class}, false);
-                typedTarget.getNewsFeed((java.lang.String) adaptedArgs[0], (com.codename1.ui.list.DefaultListModel) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue(), (com.codename1.ui.events.ActionListener) adaptedArgs[3]); return null;
+                typedTarget.getNewsFeed((java.lang.String) adaptedArgs[0], (com.codename1.ui.list.DefaultListModel) adaptedArgs[1], toIntValue(adaptedArgs[2]), (com.codename1.ui.events.ActionListener) adaptedArgs[3]); return null;
             }
         }
         if ("getPage".equals(name)) {
@@ -938,7 +938,7 @@ public final class GeneratedAccess_com_codename1_facebook {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.Component.class, java.lang.Integer.class, java.lang.String.class, com.codename1.ui.geom.Dimension.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.Component.class, java.lang.Integer.class, java.lang.String.class, com.codename1.ui.geom.Dimension.class, java.lang.Boolean.class}, false);
-                typedTarget.getPicture((java.lang.String) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue(), (java.lang.String) adaptedArgs[3], (com.codename1.ui.geom.Dimension) adaptedArgs[4], ((Boolean) adaptedArgs[5]).booleanValue()); return null;
+                typedTarget.getPicture((java.lang.String) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1], toIntValue(adaptedArgs[2]), (java.lang.String) adaptedArgs[3], (com.codename1.ui.geom.Dimension) adaptedArgs[4], ((Boolean) adaptedArgs[5]).booleanValue()); return null;
             }
         }
         if ("getPictureAndWait".equals(name)) {
@@ -994,7 +994,7 @@ public final class GeneratedAccess_com_codename1_facebook {
         if ("getUserInboxThreads".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.list.DefaultListModel.class, java.lang.Integer.class, com.codename1.ui.events.ActionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.list.DefaultListModel.class, java.lang.Integer.class, com.codename1.ui.events.ActionListener.class}, false);
-                typedTarget.getUserInboxThreads((java.lang.String) adaptedArgs[0], (com.codename1.ui.list.DefaultListModel) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue(), (com.codename1.ui.events.ActionListener) adaptedArgs[3]); return null;
+                typedTarget.getUserInboxThreads((java.lang.String) adaptedArgs[0], (com.codename1.ui.list.DefaultListModel) adaptedArgs[1], toIntValue(adaptedArgs[2]), (com.codename1.ui.events.ActionListener) adaptedArgs[3]); return null;
             }
         }
         if ("getUserNotifications".equals(name)) {
@@ -1016,7 +1016,7 @@ public final class GeneratedAccess_com_codename1_facebook {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.list.DefaultListModel.class, java.lang.Integer.class, com.codename1.ui.events.ActionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.list.DefaultListModel.class, java.lang.Integer.class, com.codename1.ui.events.ActionListener.class}, false);
-                typedTarget.getWallFeed((java.lang.String) adaptedArgs[0], (com.codename1.ui.list.DefaultListModel) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue(), (com.codename1.ui.events.ActionListener) adaptedArgs[3]); return null;
+                typedTarget.getWallFeed((java.lang.String) adaptedArgs[0], (com.codename1.ui.list.DefaultListModel) adaptedArgs[1], toIntValue(adaptedArgs[2]), (com.codename1.ui.events.ActionListener) adaptedArgs[3]); return null;
             }
         }
         if ("getWallPosts".equals(name)) {
@@ -1026,7 +1026,7 @@ public final class GeneratedAccess_com_codename1_facebook {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.list.DefaultListModel.class, java.lang.Integer.class, com.codename1.ui.events.ActionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.list.DefaultListModel.class, java.lang.Integer.class, com.codename1.ui.events.ActionListener.class}, false);
-                typedTarget.getWallPosts((java.lang.String) adaptedArgs[0], (com.codename1.ui.list.DefaultListModel) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue(), (com.codename1.ui.events.ActionListener) adaptedArgs[3]); return null;
+                typedTarget.getWallPosts((java.lang.String) adaptedArgs[0], (com.codename1.ui.list.DefaultListModel) adaptedArgs[1], toIntValue(adaptedArgs[2]), (com.codename1.ui.events.ActionListener) adaptedArgs[3]); return null;
             }
         }
         if ("isAuthenticated".equals(name)) {
@@ -1255,7 +1255,19 @@ public final class GeneratedAccess_com_codename1_facebook {
         if (!(value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue)) {
             return value;
         }
+        // Direct fit when LambdaValue already implements the target SAM
+        // (Runnable, Function, Comparator, ...).
+        if (type.isInstance(value)) {
+            return value;
+        }
         return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
+    }
+
+    private static int toIntValue(Object value) {
+        if (value instanceof Number) return ((Number) value).intValue();
+        if (value instanceof Character) return (int) ((Character) value).charValue();
+        throw new ClassCastException("Cannot coerce "
+            + (value == null ? "null" : value.getClass().getName()) + " to int");
     }
 
     private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
@@ -1310,10 +1322,15 @@ public final class GeneratedAccess_com_codename1_facebook {
         if ("byte".equals(type.getName()) || type == Byte.class || "short".equals(type.getName()) || type == Short.class
                 || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
                 || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
-            return value instanceof Number;
+            // Java widens char to int implicitly, so accept Character
+            // for any int-or-larger numeric slot.
+            return value instanceof Number || value instanceof Character;
         }
         if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
-            return isSamInterface(type);
+            // LambdaValue implements common SAMs directly (Runnable,
+            // Function, Predicate, Comparator, ...). Also accept any
+            // CN1 SAM the listener-bridge knows how to wrap.
+            return type.isInstance(value) || isSamInterface(type);
         }
         return type.isInstance(value);
     }

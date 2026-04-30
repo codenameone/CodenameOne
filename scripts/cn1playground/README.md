@@ -187,6 +187,22 @@ The playground includes an **Inspector** tab that displays the component hierarc
 
 Changes made in the property editor are immediately reflected in the preview. The component tree updates automatically when your script re-runs.
 
+## JavaScript Port Tracking
+
+The current `javascript` module still represents the legacy JavaScript build
+path. While the new ParparVM-backed JavaScript port is being integrated, you
+can compare bundle size against a ParparVM artifact with:
+
+```bash
+PLAYGROUND_PARPARVM_BUNDLE=/path/to/parparvm/dist ./build.sh javascript_compare
+```
+
+This uses
+[`compare-javascript-bundles.sh`](/Users/shai/dev/cn1/scripts/cn1playground/tools/compare-javascript-bundles.sh)
+to report total and JavaScript payload sizes. The long-term goal is to replace
+the legacy `javascript` module build itself with the ParparVM-backed port once
+the runtime and browser harness are complete.
+
 ## BeanShell Interpreter Tradeoffs
 
 The playground uses a customized version of [BeanShell](https://github.com/beanshell/beanshell) with several Codename One-specific adaptations.
@@ -202,69 +218,146 @@ The playground uses a customized version of [BeanShell](https://github.com/beans
 - **Variable capture**: Lambdas capture variables from enclosing scopes
 - **Nested lambdas**: Inner lambdas are rewritten before outer lambdas execute
 
-### Limitations
+### Class, Interface, Enum, and Record Support
 
-#### Class Declarations Have Limited Support
+The playground includes a CN1-safe scripted-class runtime so user-declared
+types work without runtime bytecode generation or reflection. The
+`PlaygroundSyntaxMatrixHarness` (in `common/src/test/java/...`) is a
+table-driven matrix that pins exactly what is supported — every entry
+either reaches `SUCCESS` or documents a known gap with its diagnostic.
 
-BeanShell's class generation is disabled in this playground, but single top-level classes are automatically unwrapped:
+What works:
 
-```java
-// This works - playground unwraps the class:
-public class DemoApp {
-    private Label status;  // Becomes script variable: status = null;
-    
-    public void start() {
-        status = new Label("Ready");
-        // ...
-    }
-}
-```
+- **Classes** with fields, constructors (overloaded), methods (overloaded),
+  generic type parameters (`class Pair<T>`), inheritance with method
+  overrides, and `super.method()` / `super(args)` dispatch.
+- **Static nested classes** (`Outer.Inner`) with `Outer.Inner.staticField` /
+  `new Outer.Inner()` access.
+- **Interfaces** with static methods, default methods, and anonymous
+  implementations (`new Greeter() { public String greet() { ... } }`).
+- **Enums** with simple constants, constants taking constructor args,
+  per-constant method bodies, and built-in `name()` / `ordinal()` /
+  `values()` / `valueOf()`.
+- **Records** (`record Point(int x, int y) {}`) with auto-generated
+  accessors, an optional body block, and the compact-constructor form
+  (`Range { if (lo > hi) { ... } }`) which runs validation/normalisation
+  before the implicit field assignments.
+- **Sealed / non-sealed / permits** with runtime-enforced permit lists:
+  declaring a subclass that isn't named in the parent's `permits` clause
+  fails at evaluation time with a clear diagnostic.
+- **Pattern-matching switch statements** with type bindings:
+  `switch (o) { case Integer i -> useInt(i); case String s -> useStr(s); default -> ...; }`.
+- **Non-static inner classes** — `class Outer { class Inner { ... } }`
+  works, with Inner's methods reading/writing Outer's instance fields
+  through the namespace chain. Construction via
+  `new Outer().new Inner()` is supported; `new Inner()` inside an
+  Outer method also works (the enclosing `this` is auto-resolved).
+- **Interface method enforcement at declaration time** — a concrete
+  class that says `implements Iface` must provide every abstract
+  method Iface declares. Fires for both Java interfaces (signatures
+  pulled from the CN1 registry) and scripted interfaces (abstract
+  methods read from the interface's own `ScriptedClass`). A bare
+  `class Other implements ActionListener {}` now fails with
+  `class 'Other' is not abstract and does not implement all methods
+  from com.codename1.ui.events.ActionListener. Missing:
+  actionPerformed.`
+- **Diagnostic suggestions** — missing static fields, static methods,
+  and instance methods on scripted classes all produce a "Did you
+  mean: X?" hint drawn from the relevant name table. Helps spot
+  typos like `Display.PICKER_TYP_DATE` or `myObj.sayz()`.
 
-**What doesn't work**:
-- Nested classes
-- Multiple top-level classes
-- Interfaces or enums
-- Static fields or methods that reference instance fields
+What still doesn't work:
 
-For complex state management, consider using loose methods with script-level variables instead of class fields.
+- Reflection APIs (`java.lang.reflect.*`, `Class.forName`) — forbidden in
+  CN1 and out of scope.
+- Cross-snippet sealed hierarchies — sealed enforcement operates on a
+  single snippet because the Interpreter is per-run.
+- JDK surface that isn't in CN1's runtime (`Optional`, `List.of`,
+  `Map.of`, `Set.of`, `Stream.of`, `IntStream.range`, extended
+  Collectors, etc.). The playground mirrors CN1's actual API surface
+  rather than full JDK parity — scripts that compile here also run
+  on device.
 
-#### Instance Field Access in Lambdas
+### Streams
 
-Variables from enclosing scopes work in lambdas, but instance field references without `this` may not resolve correctly:
+`Collection.stream()` is wired through a minimal in-process shim
+(`bsh.cn1.CN1StreamBridge`) because CN1's collection backport doesn't
+expose `stream()` natively. Supported intermediate ops: `filter`,
+`map`, `flatMap`, `peek`, `sorted` / `sorted(Comparator)`, `distinct`,
+`limit`, `skip`. Supported terminal ops: `forEach`, `count`, `collect`
+(returns a `List`, ignores the collector argument), `toList`,
+`toArray`, `iterator`, `anyMatch` / `allMatch` / `noneMatch`,
+`findFirst` / `findAny`, `min` / `max`, `reduce(BinaryOperator)`,
+`reduce(identity, BinaryOperator)`. Methods that ordinarily return
+`Optional` return the value directly, or `null` when the stream is
+empty — CN1's runtime omits `java.util.Optional`. `reduce` keys off
+`BinaryOperator` rather than `BiFunction` for the same reason.
 
-```java
-// Works:
-String prefix = "Hello ";
-button.addActionListener(e -> status.setText(prefix + "World"));
+### Lambdas and Method References
 
-// May not work as expected if 'status' is an instance field:
-// Use 'this.status' or move the field to script scope
-```
+- Lambdas in any context: assignment (`Runnable r = () -> {};`), return
+  expressions, method-call arguments, and as fields.
+- Lambdas implement common SAM types directly: `Runnable`, `Supplier`,
+  `Consumer`, `BiConsumer`, `Function`, `Predicate`, `Comparator`. Other
+  CN1-specific listener interfaces are wrapped via `PlaygroundListenerBridge`.
+- Method references for static (`System.out::println`), bound-instance
+  (`prefix::concat`), unbound-instance (`String::length` →
+  `(s) -> s.length()`), and constructor (`ArrayList::new`) forms.
 
-#### Generic Type Parameters Are Erased
+### Switch and Pattern Matching
 
-Generic type parameters are erased at runtime. Methods that rely on specific generic types may require casting:
+- Classic switch statements (int, String, fall-through with explicit break).
+- Switch expression arrow form: `String s = switch (x) { case 1 -> "one"; default -> "?"; };`.
+- Switch expression yield form: `case 1: yield "one"; default: yield "?";`.
+- Arrow-form switch statements (no result value).
+- Pattern matching for instanceof: `if (o instanceof String s) { use(s); }`.
+
+### Try-with-resources, Multi-catch, var
+
+- `try (Reader r = ...)` with single, multiple, and trailing-semicolon
+  resource lists.
+- Multi-catch `catch (E1 | E2 e)`.
+- Local variable type inference with `var` (BSH already treats `var` as a
+  loose type).
+
+### Generic Type Parameters Are Erased
+
+Generic type parameters are not enforced at runtime. Methods that rely on
+specific generic types may require casting:
 
 ```java
 // Generic types are erased, so explicit casting may be needed:
 List<String> items = (List<String>) someMethod();
 ```
 
-#### Some Java Syntax Is Unsupported
+### Error Diagnostics
 
-- **Enhanced for-each with arrays**: BeanShell's for-each works for `Collection` types but not for arrays when using the generated access registry. Use traditional `for (int i = 0; i < arr.length; i++)` loops for arrays, or convert to a List first:
-  ```java
-  // Doesn't work with arrays:
-  String[] arr = {"a", "b", "c"};
-  for (String s : arr) { }  // May fail
-  
-  // Workaround:
-  for (int i = 0; i < arr.length; i++) { String s = arr[i]; }
-  // Or convert to List:
-  for (String s : java.util.Arrays.asList(arr)) { }
-  ```
-- **Method references**: `Object::toString` syntax is not supported; use lambdas instead
-- **Try-with-resources**: Use try/finally blocks manually
+When a static field, static method, or instance method on a scripted
+class misses, the playground searches the relevant name table (CN1
+registry for Java types, the scripted class's own method list for
+user types) for the closest match by case-insensitive prefix or
+short Levenshtein distance and appends up to three suggestions.
+Typos like `Display.PICKER_TYP_DATE` surface as `... (did you mean:
+PICKER_TYPE_DATE, PICKER_TYPE_DATE_AND_TIME?)`, and
+`myThing.sayz()` surfaces as `No instance method Thing.sayz/0. Did
+you mean: say?`.
+
+Interface-method enforcement fires at class-declaration time, so
+`class X implements ActionListener {}` fails immediately with
+`Missing: actionPerformed.` rather than deferring to the first
+invocation site.
+
+### Cold-start Performance
+
+`PlaygroundColdStartHarness` in the test sources prints baseline
+timings for the cold-start phases (registry first use, first
+package-helper load, first FIELD_INDEX lookup, CN1 `Display.init`,
+first full `PlaygroundRunner.run`). Run it against a fresh JVM via
+`java -cp ...` to catch regressions. Typical median on a dev
+laptop: first registry hit ~27 ms, first `PlaygroundRunner.run`
+~60 ms, CN1's own `Display.init` ~800 ms. Only the
+playground-controlled phases are actionable; the rest is CN1
+runtime wiring.
 
 ## JavaScript Port Considerations
 
@@ -347,8 +440,36 @@ mvn clean install
 
 ```bash
 cd scripts/cn1playground
-./scripts/run-tests.sh
+bash tools/run-playground-smoke-tests.sh
 ```
+
+This smoke command currently runs:
+
+1. CN1 access registry generation (`tools/generate-cn1-access-registry.sh`).
+2. Registry sanity checks (expected/forbidden class entries).
+3. `PlaygroundSmokeHarness` end-to-end behavior checks.
+4. `PlaygroundSyntaxMatrixHarness` syntax regression checks.
+
+## Language Feature Rollout Process
+
+Use this process when adding or fixing Java syntax support in Playground:
+
+1. **Add/adjust matrix coverage first**  
+   Update `common/src/test/java/com/codenameone/playground/PlaygroundSyntaxMatrixHarness.java` with a focused snippet for the target syntax.
+   - For currently unsupported syntax, add as `ExpectedOutcome.FAILURE`.
+   - When support lands, flip that case to `ExpectedOutcome.SUCCESS`.
+
+2. **Implement parser/runtime change in small steps**  
+   Prefer one syntax feature per PR (e.g. method references only) to keep regressions easy to isolate.
+
+3. **Run smoke + syntax matrix locally**  
+   Run `bash tools/run-playground-smoke-tests.sh` from `scripts/cn1playground`.
+
+4. **Require CI green before merge**  
+   The `CN1 Playground Language Tests` workflow runs the same smoke command under CI (`xvfb-run`) and should pass before merging syntax updates.
+
+5. **Document behavior changes**  
+   Update this README's known issues/limitations when syntax support changes so users know what is now supported.
 
 ## Known Issues
 

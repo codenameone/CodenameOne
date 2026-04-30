@@ -971,13 +971,21 @@ public class Parser extends ClassVisitor {
                 // ... assign fields ...
                 // RETURN
 
-                ctor.addInstruction(Opcodes.ALOAD); // 25
+                // NOTE: do NOT also emit `addInstruction(Opcodes.ALOAD)` here.
+                // `addVariableOperation(Opcodes.ALOAD, 0)` is the canonical aload_0.
+                // Emitting both produces a BasicInstruction with opcode=ALOAD and value=0
+                // that the C backend (iOS) silently ignores but the JavaScript backend
+                // translates as a real `push locals[0]`. The extra push corrupts the
+                // operand stack simulation: invokespecial/putfield/invokevirtual then
+                // pop from the wrong positions, producing method calls with the wrong
+                // target and shifted arguments (e.g. lambda `run()` ending up invoking
+                // its captured method on the captured Form rather than on the
+                // enclosing `this`, surfacing as VIRTUAL_FAIL missing_interface_default_method).
                 ctor.addVariableOperation(Opcodes.ALOAD, 0);
                 ctor.addInvoke(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
 
                 int varIndex = 1;
                 for (int i = 0; i < capturedArgs.length; i++) {
-                    ctor.addInstruction(Opcodes.ALOAD);
                     ctor.addVariableOperation(Opcodes.ALOAD, 0); // this
 
                     Type t = capturedArgs[i];
@@ -1016,8 +1024,8 @@ public class Parser extends ClassVisitor {
                 }
 
                 // Load captured args
+                // Same caveat as the constructor: do not also emit addInstruction(Opcodes.ALOAD).
                 for (int i = 0; i < capturedArgs.length; i++) {
-                    interfaceMethod.addInstruction(Opcodes.ALOAD);
                     interfaceMethod.addVariableOperation(Opcodes.ALOAD, 0);
                     String fieldName = "arg$" + (i + 1);
                     interfaceMethod.addField(lambdaClass, Opcodes.GETFIELD, lambdaClassName, fieldName, capturedArgs[i].getDescriptor());
@@ -1212,13 +1220,16 @@ public class Parser extends ClassVisitor {
 
         @Override
         public AnnotationVisitor visitAnnotation(String desc, boolean visible) {
+            if ("Lcom/codename1/html5/js/JSBody;".equals(desc) || "Lorg/teavm/jso/JSBody;".equals(desc)) {
+                return new JSBodyAnnotationVisitor(mtd);
+            }
             if (DISABLE_DEBUG_INFO_ANNOTATION.equals(desc)) {
                 mtd.setDisableDebugInfo(true);
             } else if (DISABLE_NULL_AND_ARRAY_BOUNDS_CHECKS_ANNOTATION.equals(desc)) {
                 mtd.setDisableNullAndArrayBoundsChecks(true);
             }
             if (mv == null) return null;
-            return new AnnotationVisitorWrapper(super.visitAnnotation(desc, visible)); 
+            return new AnnotationVisitorWrapper(super.visitAnnotation(desc, visible));
         }
 
         @Override
@@ -1298,5 +1309,46 @@ public class Parser extends ClassVisitor {
         
         
     
+    }
+
+    static class JSBodyAnnotationVisitor extends AnnotationVisitor {
+        private final BytecodeMethod method;
+        private String script;
+        private java.util.List<String> params = new java.util.ArrayList<>();
+
+        public JSBodyAnnotationVisitor(BytecodeMethod method) {
+            super(Opcodes.ASM9);
+            this.method = method;
+        }
+
+        @Override
+        public void visit(String name, Object value) {
+            if ("script".equals(name)) {
+                script = (String) value;
+            }
+            super.visit(name, value);
+        }
+
+        @Override
+        public AnnotationVisitor visitArray(String name) {
+            if ("params".equals(name)) {
+                return new AnnotationVisitor(Opcodes.ASM9) {
+                    @Override
+                    public void visit(String name, Object value) {
+                        params.add((String) value);
+                    }
+                };
+            }
+            return super.visitArray(name);
+        }
+
+        @Override
+        public void visitEnd() {
+            if (script != null) {
+                method.setJsBodyScript(script);
+                method.setJsBodyParams(params.toArray(new String[0]));
+            }
+            super.visitEnd();
+        }
     }
 }

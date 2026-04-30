@@ -422,7 +422,7 @@ class IndexedImage extends Image {
     @Override
     int[] getRGBImpl() {
         int rlen = width * height;
-        int[] rgb = new int[rlen];
+        int[] rgb = Image.allocateRgbArray(rlen);
 
         for (int iter = 0; iter < rlen; iter++) {
             int i = imageDataByte[iter] & 0xff;

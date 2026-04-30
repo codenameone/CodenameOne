@@ -67,6 +67,7 @@ node_modules
 **/genfiles.properties
 **/private/private.properties
 .idea/
+.claude/
 target
 pom.xml.versionsBackup
 pom.xml.releaseBackup
@@ -96,3 +97,6 @@ dependency-reduced-pom.xml
 /docs/website/.venv-video-refresh/
 /docs/website/.youtube-oauth-token.json
 /docs/website/client_secret.json
+/.playwright-cli
+package-lock.json
+package.json

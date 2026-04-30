@@ -19,23 +19,55 @@ final class PlaygroundExamples {
             import com.codename1.components.*;
             import com.codename1.ui.plaf.*;
 
-            Container root = new Container(BoxLayout.y());
-            root.setScrollableY(true);
-            root.getAllStyles().setPaddingUnit(Style.UNIT_TYPE_DIPS);
-            root.getAllStyles().setPadding(3, 3, 3, 3);
+            Form form = new Form("Welcome", BoxLayout.y());
 
-            SpanLabel title = new SpanLabel("Codename One Playground");
-            title.getAllStyles().setFgColor(0x1f3a5f);
-            root.add(title);
+            form.add(new SpanLabel(
+                "Codename One Playground - tap the device toggle above to flip between iOS and Android themes."));
 
-            Button button = new Button("Tap me");
-            button.setText("Interactive controls can be added next");
-            root.add(button);
+            Button btn = new Button("Default Button");
+            form.add(btn);
 
-            Label info = new Label("Rendered inside the preview panel");
-            root.add(info);
+            Button raised = new Button("Raised Button");
+            raised.setUIID("RaisedButton");
+            form.add(raised);
+
+            Switch wifi = new Switch();
+            wifi.setValue(true);
+            form.add(BoxLayout.encloseX(new Label("Wi-Fi"), new Label(" "), wifi));
+
+            CheckBox subscribe = new CheckBox("Subscribe");
+            subscribe.setSelected(true);
+            form.add(subscribe);
+
+            form.add(new TextField("", "Type something"));
+
+            FloatingActionButton fab = FloatingActionButton.createFAB(FontImage.MATERIAL_ADD);
+            fab.bindFabToContainer(form.getContentPane());
+            fab.addActionListener(e -> Dialog.show("FAB", "Tapped!", "OK", null));
 
             ctx.log("Preview built successfully");
+            form;
+            """;
+
+    static final String HELLO_WORLD_SCRIPT = """
+            import com.codename1.ui.*;
+            import com.codename1.ui.layouts.*;
+
+            Container root = new Container(BoxLayout.y());
+            root.add(new Label("Hello, World!"));
+            root;
+            """;
+
+    static final String DATE_PICKER_SCRIPT = """
+            import com.codename1.ui.*;
+            import com.codename1.ui.layouts.*;
+            import com.codename1.ui.spinner.*;
+
+            Container root = new Container(BoxLayout.y());
+            Picker datePicker = new Picker();
+            datePicker.setType(Display.PICKER_TYPE_DATE);
+            root.add(new Label("Pick a date:"));
+            root.add(datePicker);
             root;
             """;
 
@@ -82,14 +114,31 @@ final class PlaygroundExamples {
             import com.codename1.ui.layouts.*;
             import com.codename1.components.*;
 
-            Container root = new Container(BoxLayout.y());
-            root.setScrollableY(true);
-            root.add(new Label("Profile Card"));
-            root.add(new SpanLabel("Use the side menu to load more samples or restore history."));
-            root.add(new TextField("Ada Lovelace", "Name"));
-            root.add(new TextField("Mathematician", "Title"));
-            root.add(new Button("Save"));
-            root;
+            Form form = new Form("Profile", BoxLayout.y());
+
+            form.add(new SpanLabel(
+                "Modern theme inputs adapt automatically to the active device skin."));
+
+            form.add(new TextField("Ada Lovelace", "Name"));
+            form.add(new TextField("Mathematician", "Title"));
+            form.add(new TextField("ada@analytical.engine", "Email"));
+            form.add(new TextArea("First programmer; collaborator on Babbage's Analytical Engine.", 3, 30));
+
+            CheckBox notify = new CheckBox("Email me about updates");
+            notify.setSelected(true);
+            form.add(notify);
+
+            Button save = new Button("Save");
+            save.setUIID("RaisedButton");
+            FontImage.setMaterialIcon(save, FontImage.MATERIAL_SAVE);
+            save.addActionListener(e -> Dialog.show("Saved", "Profile updated.", "OK", null));
+            form.add(save);
+
+            Button cancel = new Button("Cancel");
+            FontImage.setMaterialIcon(cancel, FontImage.MATERIAL_CLOSE);
+            form.add(cancel);
+
+            form;
             """;
 
     static final String LIST_SCRIPT = """
@@ -97,36 +146,102 @@ final class PlaygroundExamples {
             import com.codename1.ui.layouts.*;
             import com.codename1.components.*;
 
-            Container root = new Container(BoxLayout.y());
-            root.setScrollableY(true);
-            for (int i = 1; i <= 8; i++) {
-                MultiButton row = new MultiButton("Menu Item " + i);
-                row.addActionListener(e -> Dialog.show("Clicked", "Clicked item " + i, "OK", null));
-                row.setTextLine2("Secondary line for item " + i);
-                root.add(row);
+            String[] titles = {"Inbox", "Starred", "Archive", "Snoozed", "Folders", "Settings"};
+            String[] subtitles = {
+                "12 unread", "Starred messages", "Older threads",
+                "Snoozed for later", "Shared with the team", "Account & preferences"
+            };
+            char[] icons = {
+                FontImage.MATERIAL_INBOX, FontImage.MATERIAL_STAR, FontImage.MATERIAL_ARCHIVE,
+                FontImage.MATERIAL_SNOOZE, FontImage.MATERIAL_FOLDER, FontImage.MATERIAL_SETTINGS
+            };
+
+            Form form = new Form("Menu", BoxLayout.y());
+            for (int i = 0; i < titles.length; i++) {
+                int idx = i;
+                MultiButton row = new MultiButton(titles[i]);
+                row.setTextLine2(subtitles[i]);
+                row.setMaterialIcon(icons[i], 5);
+                row.addActionListener(e -> Dialog.show(titles[idx], subtitles[idx], "OK", null));
+                form.add(row);
             }
             ctx.log("List sample loaded");
-            root;
+            form;
+            """;
+
+    static final String UI_SHOWCASE_SCRIPT = """
+            import com.codename1.ui.*;
+            import com.codename1.ui.layouts.*;
+            import com.codename1.components.*;
+            import com.codename1.ui.spinner.*;
+
+            Form form = new Form("UI Showcase", BoxLayout.y());
+
+            form.add(new Label("Buttons"));
+            Button flat = new Button("Flat");
+            Button raised = new Button("Raised");
+            raised.setUIID("RaisedButton");
+            Button disabled = new Button("Disabled");
+            disabled.setEnabled(false);
+            form.add(BoxLayout.encloseX(flat, raised, disabled));
+
+            form.add(new Label("Toggles"));
+            CheckBox check = new CheckBox("Notifications");
+            check.setSelected(true);
+            RadioButton radioA = new RadioButton("Light");
+            RadioButton radioB = new RadioButton("Dark");
+            radioB.setSelected(true);
+            ButtonGroup g = new ButtonGroup(radioA, radioB);
+            Switch sw = new Switch();
+            sw.setValue(true);
+            form.add(check);
+            form.add(BoxLayout.encloseX(radioA, radioB));
+            form.add(BoxLayout.encloseX(new Label("Dark mode"), sw));
+
+            form.add(new Label("Inputs"));
+            form.add(new TextField("ada@analytical.engine", "Email"));
+            form.add(new TextArea("First programmer.", 2, 28));
+
+            Picker date = new Picker();
+            date.setType(Display.PICKER_TYPE_DATE);
+            form.add(BoxLayout.encloseX(new Label("Birthday"), date));
+
+            FloatingActionButton fab = FloatingActionButton.createFAB(FontImage.MATERIAL_EDIT);
+            fab.bindFabToContainer(form.getContentPane());
+            fab.addActionListener(e -> Dialog.show("Edit", "FAB tapped.", "OK", null));
+
+            form;
             """;
 
     static final String TABS_SCRIPT = """
             import com.codename1.ui.*;
             import com.codename1.ui.layouts.*;
+            import com.codename1.components.*;
 
+            // Tabs render with each platform's native placement: iOS Modern
+            // floats a pill bar at the bottom, Material 3 stays on top with
+            // an underline indicator. The theme decides; we just add tabs.
+            Form form = new Form("Tabs", new BorderLayout());
             Tabs tabs = new Tabs();
-            tabs.setTabPlacement(Component.TOP);
-            tabs.addTab("News", BoxLayout.encloseY(new Label("Latest updates"), new Label("Deployment is green")));
-            tabs.addTab("Stats", BoxLayout.encloseY(new Label("Users: 42"), new Label("Build time: 3m")));
-            tabs.addTab("Notes", BoxLayout.encloseY(new Label("Dark mode follows the website theme")));
-            tabs.getTabsContainer().getAllStyles().setBgTransparency(255);
-            tabs.getTabsContainer().getAllStyles().setBgColor(0xe2e8f0);
-            for (int i = 0; i < tabs.getTabCount(); i++) {
-                Component tab = tabs.getTabsContainer().getComponentAt(i);
-                tab.getAllStyles().setBgTransparency(255);
-                tab.getAllStyles().setBgColor(0xe2e8f0);
-                tab.getAllStyles().setFgColor(0x0f172a);
-            }
-            tabs;
+            tabs.addTab("Home",
+                FontImage.createMaterial(FontImage.MATERIAL_HOME, "Tab", 4),
+                BoxLayout.encloseY(
+                    new SpanLabel("Latest activity"),
+                    new Label("3 new notifications"),
+                    new Button("Open inbox")));
+            tabs.addTab("Search",
+                FontImage.createMaterial(FontImage.MATERIAL_SEARCH, "Tab", 4),
+                BoxLayout.encloseY(
+                    new TextField("", "Search anything"),
+                    new SpanLabel("Results appear here")));
+            tabs.addTab("Profile",
+                FontImage.createMaterial(FontImage.MATERIAL_PERSON, "Tab", 4),
+                BoxLayout.encloseY(
+                    new Label("Ada Lovelace"),
+                    new Label("ada@analytical.engine"),
+                    new Button("Sign out")));
+            form.add(BorderLayout.CENTER, tabs);
+            form;
             """;
 
     static final String BROWSER_SCRIPT = """
@@ -154,6 +269,7 @@ final class PlaygroundExamples {
             root.setScrollableY(true);
             SpanLabel output = new SpanLabel("Tap fetch to load https://www.codenameone.com/feed.xml");
             Button fetch = new Button("Fetch Feed XML");
+            FontImage.setMaterialIcon(fetch, FontImage.MATERIAL_CLOUD_DOWNLOAD);
             fetch.addActionListener(new ActionListener() {
                 public void actionPerformed(ActionEvent evt) {
                     ConnectionRequest req = new ConnectionRequest();
@@ -188,6 +304,7 @@ final class PlaygroundExamples {
             root.setScrollableY(true);
             SpanLabel output = new SpanLabel("Tap load to fetch XML as text via RequestBuilder.");
             Button load = new Button("Load codenameone.com");
+            FontImage.setMaterialIcon(load, FontImage.MATERIAL_CLOUD_DOWNLOAD);
             load.addActionListener(() -> {
                 RequestBuilder builder = Rest.get("https://www.codenameone.com/feed.xml");
                 builder.fetchAsString(response -> {
@@ -212,6 +329,7 @@ final class PlaygroundExamples {
             Label status = new Label("Ready to use camera features");
             root.add(new SpanLabel("Use this sample on device or simulator targets that support capture."));
             Button photo = new Button("Capture Photo");
+            FontImage.setMaterialIcon(photo, FontImage.MATERIAL_PHOTO_CAMERA);
             photo.addActionListener(new ActionListener() {
                 public void actionPerformed(ActionEvent evt) {
                     String path = Capture.capturePhoto();
@@ -221,6 +339,7 @@ final class PlaygroundExamples {
                 }
             });
             Button audio = new Button("Record Audio");
+            FontImage.setMaterialIcon(audio, FontImage.MATERIAL_MIC);
             audio.addActionListener(new ActionListener() {
                 public void actionPerformed(ActionEvent evt) {
                     String path = Capture.captureAudio();
@@ -234,10 +353,12 @@ final class PlaygroundExamples {
 
     static final Sample[] SAMPLES = new Sample[]{
             new Sample("Welcome", DEFAULT_SCRIPT),
-            new Sample("build(ctx)", BUILD_METHOD_SCRIPT),
+            new Sample("UI Showcase", UI_SHOWCASE_SCRIPT),
+            new Sample("Hello World", HELLO_WORLD_SCRIPT),
             new Sample("Lifecycle Demo", LIFECYCLE_SCRIPT),
-            new Sample("Profile Form", FORM_SCRIPT),
+            new Sample("Date Picker", DATE_PICKER_SCRIPT),
             new Sample("Menu List", LIST_SCRIPT),
+            new Sample("Profile Form", FORM_SCRIPT),
             new Sample("Tabs", TABS_SCRIPT),
             new Sample("BrowserComponent", BROWSER_SCRIPT),
             new Sample("Network Fetch", NETWORK_SCRIPT),

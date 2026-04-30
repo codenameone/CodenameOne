@@ -77,7 +77,43 @@ class BSHAllocationExpression extends SimpleNode
         if ( args == null)
             throw new EvalError( "Null args in new.", this, callstack );
 
-        // Lookup class
+        // Lookup class. Try a regular variable lookup first so that names
+        // bound to a ScriptedClass (declared earlier in the same script)
+        // resolve before we force a Java class lookup.
+        Object scripted = lookupScriptedClass(nameNode.text, callstack);
+        if (scripted != null) {
+            ScriptedClass sc = (ScriptedClass) scripted;
+            // Anonymous-class style: `new Iface() { method bodies }` —
+            // synthesise a one-off subclass whose instance methods come from
+            // the body, then construct it. Works for both interfaces and
+            // regular classes.
+            boolean hasBody = jjtGetNumChildren() > 2;
+            if (hasBody) {
+                BSHBlock body = (BSHBlock) jjtGetChild(2);
+                ScriptedClass anonClass = ScriptedClass.build(
+                        sc.getName() + "$anon", callstack.top(), body, sc,
+                        callstack, interpreter);
+                return anonClass.newInstance(args, callstack, interpreter);
+            }
+            if (sc.isInterface()) {
+                throw new EvalError("Cannot instantiate scripted interface "
+                        + sc.getName() + " directly; use a class that implements it.",
+                        this, callstack);
+            }
+            // Non-static inner class — walk callstack for an enclosing
+            // `this` whose ScriptedClass matches the required outer.
+            ScriptedInstance enclosing = null;
+            if (sc.getEnclosingClass() != null) {
+                enclosing = findEnclosingInstance(sc.getEnclosingClass(), callstack);
+                if (enclosing == null) {
+                    throw new EvalError("Cannot construct non-static inner class "
+                            + sc.getName() + " without an enclosing instance of "
+                            + sc.getEnclosingClass().getName() + " in scope.",
+                            this, callstack);
+                }
+            }
+            return sc.newInstance(args, enclosing, callstack, interpreter);
+        }
         Object obj = nameNode.toObject(
             callstack, interpreter, true /*force class*/ );
 
@@ -112,11 +148,144 @@ class BSHAllocationExpression extends SimpleNode
             return constructObject( type, args, callstack, interpreter );
     }
 
+    /** Walk the callstack looking for a `this` binding whose
+     * ScriptedInstance is an instance of {@code outer} (or of any
+     * nested non-static class whose enclosing chain reaches
+     * {@code outer}). Used when constructing a non-static inner
+     * class. */
+    private static ScriptedInstance findEnclosingInstance(ScriptedClass outer, CallStack callstack) {
+        for (int i = 0; i < callstack.depth(); i++) {
+            NameSpace ns = callstack.get(i);
+            while (ns != null) {
+                try {
+                    Object thisObj = ns.getVariable("this");
+                    if (thisObj instanceof ScriptedInstance) {
+                        ScriptedInstance si = (ScriptedInstance) thisObj;
+                        ScriptedInstance walk = si;
+                        while (walk != null) {
+                            if (walk.getScriptedClass() == outer) return walk;
+                            walk = walk.getEnclosingInstance();
+                        }
+                    }
+                    if (thisObj instanceof This) {
+                        Object inner = ((This) thisObj).namespace.getVariable("this");
+                        if (inner instanceof ScriptedInstance) {
+                            ScriptedInstance walk = (ScriptedInstance) inner;
+                            while (walk != null) {
+                                if (walk.getScriptedClass() == outer) return walk;
+                                walk = walk.getEnclosingInstance();
+                            }
+                        }
+                    }
+                } catch (UtilEvalError ignore) {
+                    // no `this` in this namespace — keep walking
+                }
+                ns = ns.getParent();
+            }
+        }
+        return null;
+    }
+
+    private static Object lookupScriptedClass(String rawName, CallStack callstack) {
+        if (rawName == null || rawName.length() == 0) return null;
+        if (callstack == null) return null;
+        // Strip a generic suffix like "Pair<String>" — type arguments are
+        // erased at runtime in our scripted-class model.
+        String simpleName = rawName;
+        int lt = simpleName.indexOf('<');
+        if (lt >= 0) simpleName = simpleName.substring(0, lt);
+        // Dotted names like "Outer.Inner": resolve the head as a
+        // ScriptedClass and walk through nested classes via the static
+        // namespace of each enclosing class. We split manually because
+        // String.split(regex) is not available on CN1's restricted String.
+        java.util.List<String> partsList = new java.util.ArrayList<String>();
+        int from = 0;
+        for (int j = 0; j < simpleName.length(); j++) {
+            if (simpleName.charAt(j) == '.') {
+                partsList.add(simpleName.substring(from, j));
+                from = j + 1;
+            }
+        }
+        partsList.add(simpleName.substring(from));
+        String[] parts = partsList.toArray(new String[partsList.size()]);
+        if (parts.length == 0) return null;
+        ScriptedClass current;
+        try {
+            Object v = callstack.top().getVariable(parts[0]);
+            if (!(v instanceof ScriptedClass)) return null;
+            current = (ScriptedClass) v;
+        } catch (UtilEvalError ex) {
+            return null;
+        }
+        for (int i = 1; i < parts.length; i++) {
+            try {
+                Object next = current.getStaticNameSpace().getVariable(parts[i]);
+                if (!(next instanceof ScriptedClass)) return null;
+                current = (ScriptedClass) next;
+            } catch (UtilEvalError ex) {
+                return null;
+            }
+        }
+        return current;
+    }
+
     Object constructFromEnclosingInstance(Object obj, CallStack callstack,
             Interpreter interpreter ) throws EvalError {
-        throw new EvalError(
-                "Inner class allocation from an enclosing instance is not supported in the Codename One BeanShell runtime.",
-                this, callstack);
+        // The outer instance `obj` must be a ScriptedInstance for the
+        // `outer.new Inner(args)` form to resolve — Java inner classes
+        // still aren't constructable without reflection.
+        if (!(obj instanceof ScriptedInstance)) {
+            throw new EvalError(
+                    "Inner class allocation from a Java enclosing instance is not supported"
+                            + " in the Codename One BeanShell runtime.",
+                    this, callstack);
+        }
+        ScriptedInstance outerInstance = (ScriptedInstance) obj;
+        ScriptedClass outerClass = outerInstance.getScriptedClass();
+
+        Node typeNode = jjtGetChild(0);
+        Node argsNode = jjtGetChild(1);
+        if (!(typeNode instanceof BSHAmbiguousName) || !(argsNode instanceof BSHArguments)) {
+            throw new EvalError(
+                    "Unsupported inner-class allocation shape",
+                    this, callstack);
+        }
+        String innerName = ((BSHAmbiguousName) typeNode).text;
+        Object[] args = ((BSHArguments) argsNode).getArguments(callstack, interpreter);
+
+        ScriptedClass inner;
+        try {
+            Object v = outerClass.getStaticNameSpace().getVariable(innerName);
+            if (!(v instanceof ScriptedClass)) {
+                throw new EvalError("No nested class '" + innerName + "' on "
+                        + outerClass.getName(), this, callstack);
+            }
+            inner = (ScriptedClass) v;
+        } catch (UtilEvalError ex) {
+            throw ex.toEvalError(this, callstack);
+        }
+        if (inner.getEnclosingClass() == null) {
+            throw new EvalError("Nested class '" + outerClass.getName() + "." + innerName
+                    + "' is static — use new " + outerClass.getName() + "." + innerName
+                    + "(...) instead.",
+                    this, callstack);
+        }
+        // Ensure the supplied outer is an instance of the inner's
+        // enclosing class (or a subclass thereof via the extends chain).
+        ScriptedClass requiredOuter = inner.getEnclosingClass();
+        ScriptedClass walkCls = outerClass;
+        boolean ok = false;
+        while (walkCls != null) {
+            if (walkCls == requiredOuter) { ok = true; break; }
+            walkCls = walkCls.getParent();
+        }
+        if (!ok) {
+            throw new EvalError("Outer instance of type " + outerClass.getName()
+                    + " cannot construct " + inner.getName()
+                    + " — expected enclosing type " + requiredOuter.getName() + ".",
+                    this, callstack);
+        }
+        return inner.newInstance(args, outerInstance, callstack, interpreter);
     }
 
     private Object constructObject(Class<?> type, Object[] args,
@@ -136,6 +305,7 @@ class BSHAllocationExpression extends SimpleNode
                 // clean up, prevent memory leak
                 This.registerConstructorContext(null, null);
         }
+        com.codenameone.playground.PlaygroundContext.notifyConstructed(obj);
         String className = type.getName();
         // Is it an inner class?
         if ( className.indexOf("$") == -1 )

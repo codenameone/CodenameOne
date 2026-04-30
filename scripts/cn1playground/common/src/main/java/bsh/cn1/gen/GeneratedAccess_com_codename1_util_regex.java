@@ -70,7 +70,7 @@ public final class GeneratedAccess_com_codename1_util_regex {
         if (type == com.codename1.util.regex.CharacterArrayCharacterIterator.class) {
             if (matches(safeArgs, new Class<?>[]{char[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{char[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return new com.codename1.util.regex.CharacterArrayCharacterIterator((char[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
+                return new com.codename1.util.regex.CharacterArrayCharacterIterator((char[]) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]));
             }
         }
         if (type == com.codename1.util.regex.RE.class) {
@@ -88,11 +88,11 @@ public final class GeneratedAccess_com_codename1_util_regex {
             }
             if (matches(safeArgs, new Class<?>[]{com.codename1.util.regex.REProgram.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.util.regex.REProgram.class, java.lang.Integer.class}, false);
-                return new com.codename1.util.regex.RE((com.codename1.util.regex.REProgram) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
+                return new com.codename1.util.regex.RE((com.codename1.util.regex.REProgram) adaptedArgs[0], toIntValue(adaptedArgs[1]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
-                return new com.codename1.util.regex.RE((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
+                return new com.codename1.util.regex.RE((java.lang.String) adaptedArgs[0], toIntValue(adaptedArgs[1]));
             }
         }
         if (type == com.codename1.util.regex.RECompiler.class) {
@@ -108,11 +108,11 @@ public final class GeneratedAccess_com_codename1_util_regex {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, char[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, char[].class}, false);
-                return new com.codename1.util.regex.REProgram(((Number) adaptedArgs[0]).intValue(), (char[]) adaptedArgs[1]);
+                return new com.codename1.util.regex.REProgram(toIntValue(adaptedArgs[0]), (char[]) adaptedArgs[1]);
             }
             if (matches(safeArgs, new Class<?>[]{char[].class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{char[].class, java.lang.Integer.class}, false);
-                return new com.codename1.util.regex.REProgram((char[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
+                return new com.codename1.util.regex.REProgram((char[]) adaptedArgs[0], toIntValue(adaptedArgs[1]));
             }
         }
         if (type == com.codename1.util.regex.RESyntaxException.class) {
@@ -226,7 +226,7 @@ public final class GeneratedAccess_com_codename1_util_regex {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
-                return com.codename1.util.regex.REUtil.createRE((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
+                return com.codename1.util.regex.REUtil.createRE((java.lang.String) adaptedArgs[0], toIntValue(adaptedArgs[1]));
             }
         }
         throw unsupportedStatic(com.codename1.util.regex.REUtil.class, name, safeArgs);
@@ -330,23 +330,23 @@ public final class GeneratedAccess_com_codename1_util_regex {
         if ("charAt".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.charAt(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.charAt(toIntValue(adaptedArgs[0]));
             }
         }
         if ("isEnd".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.isEnd(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.isEnd(toIntValue(adaptedArgs[0]));
             }
         }
         if ("substring".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.substring(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.substring(toIntValue(adaptedArgs[0]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.substring(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.substring(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -361,7 +361,7 @@ public final class GeneratedAccess_com_codename1_util_regex {
         if ("getParen".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getParen(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.getParen(toIntValue(adaptedArgs[0]));
             }
         }
         if ("getParenCount".equals(name)) {
@@ -372,19 +372,19 @@ public final class GeneratedAccess_com_codename1_util_regex {
         if ("getParenEnd".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getParenEnd(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.getParenEnd(toIntValue(adaptedArgs[0]));
             }
         }
         if ("getParenLength".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getParenLength(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.getParenLength(toIntValue(adaptedArgs[0]));
             }
         }
         if ("getParenStart".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getParenStart(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.getParenStart(toIntValue(adaptedArgs[0]));
             }
         }
         if ("getProgram".equals(name)) {
@@ -405,17 +405,17 @@ public final class GeneratedAccess_com_codename1_util_regex {
             }
             if (matches(safeArgs, new Class<?>[]{com.codename1.util.regex.CharacterIterator.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.util.regex.CharacterIterator.class, java.lang.Integer.class}, false);
-                return typedTarget.match((com.codename1.util.regex.CharacterIterator) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.match((com.codename1.util.regex.CharacterIterator) adaptedArgs[0], toIntValue(adaptedArgs[1]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
-                return typedTarget.match((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.match((java.lang.String) adaptedArgs[0], toIntValue(adaptedArgs[1]));
             }
         }
         if ("setMatchFlags".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setMatchFlags(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setMatchFlags(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setProgram".equals(name)) {
@@ -437,7 +437,7 @@ public final class GeneratedAccess_com_codename1_util_regex {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.Integer.class}, false);
-                return typedTarget.subst((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue());
+                return typedTarget.subst((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], toIntValue(adaptedArgs[2]));
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -467,7 +467,7 @@ public final class GeneratedAccess_com_codename1_util_regex {
         if ("setInstructions".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{char[].class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{char[].class, java.lang.Integer.class}, false);
-                typedTarget.setInstructions((char[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.setInstructions((char[]) adaptedArgs[0], toIntValue(adaptedArgs[1])); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -477,23 +477,23 @@ public final class GeneratedAccess_com_codename1_util_regex {
         if ("charAt".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.charAt(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.charAt(toIntValue(adaptedArgs[0]));
             }
         }
         if ("isEnd".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.isEnd(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.isEnd(toIntValue(adaptedArgs[0]));
             }
         }
         if ("substring".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.substring(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.substring(toIntValue(adaptedArgs[0]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.substring(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.substring(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -503,23 +503,23 @@ public final class GeneratedAccess_com_codename1_util_regex {
         if ("charAt".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.charAt(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.charAt(toIntValue(adaptedArgs[0]));
             }
         }
         if ("isEnd".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.isEnd(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.isEnd(toIntValue(adaptedArgs[0]));
             }
         }
         if ("substring".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.substring(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.substring(toIntValue(adaptedArgs[0]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.substring(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.substring(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -529,23 +529,23 @@ public final class GeneratedAccess_com_codename1_util_regex {
         if ("charAt".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.charAt(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.charAt(toIntValue(adaptedArgs[0]));
             }
         }
         if ("isEnd".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.isEnd(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.isEnd(toIntValue(adaptedArgs[0]));
             }
         }
         if ("substring".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.substring(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.substring(toIntValue(adaptedArgs[0]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.substring(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.substring(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -560,7 +560,7 @@ public final class GeneratedAccess_com_codename1_util_regex {
         if ("mark".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.mark(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.mark(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("markSupported".equals(name)) {
@@ -578,7 +578,7 @@ public final class GeneratedAccess_com_codename1_util_regex {
             }
             if (matches(safeArgs, new Class<?>[]{char[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{char[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.read((char[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
+                return typedTarget.read((char[]) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]));
             }
         }
         if ("readLine".equals(name)) {
@@ -609,69 +609,75 @@ public final class GeneratedAccess_com_codename1_util_regex {
         if ("charAt".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.charAt(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.charAt(toIntValue(adaptedArgs[0]));
             }
         }
         if ("isEnd".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.isEnd(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.isEnd(toIntValue(adaptedArgs[0]));
             }
         }
         if ("substring".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.substring(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.substring(toIntValue(adaptedArgs[0]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.substring(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.substring(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == com.codename1.util.regex.RE.class) {
-            if ("MATCH_CASEINDEPENDENT".equals(name)) return com.codename1.util.regex.RE.MATCH_CASEINDEPENDENT;
-            if ("MATCH_MULTILINE".equals(name)) return com.codename1.util.regex.RE.MATCH_MULTILINE;
-            if ("MATCH_NORMAL".equals(name)) return com.codename1.util.regex.RE.MATCH_NORMAL;
-            if ("MATCH_SINGLELINE".equals(name)) return com.codename1.util.regex.RE.MATCH_SINGLELINE;
-            if ("REPLACE_ALL".equals(name)) return com.codename1.util.regex.RE.REPLACE_ALL;
-            if ("REPLACE_BACKREFERENCES".equals(name)) return com.codename1.util.regex.RE.REPLACE_BACKREFERENCES;
-            if ("REPLACE_FIRSTONLY".equals(name)) return com.codename1.util.regex.RE.REPLACE_FIRSTONLY;
-        }
-        if (type == com.codename1.util.regex.RECharacter.class) {
-            if ("COMBINING_SPACING_MARK".equals(name)) return com.codename1.util.regex.RECharacter.COMBINING_SPACING_MARK;
-            if ("CONNECTOR_PUNCTUATION".equals(name)) return com.codename1.util.regex.RECharacter.CONNECTOR_PUNCTUATION;
-            if ("CONTROL".equals(name)) return com.codename1.util.regex.RECharacter.CONTROL;
-            if ("CURRENCY_SYMBOL".equals(name)) return com.codename1.util.regex.RECharacter.CURRENCY_SYMBOL;
-            if ("DASH_PUNCTUATION".equals(name)) return com.codename1.util.regex.RECharacter.DASH_PUNCTUATION;
-            if ("DECIMAL_DIGIT_NUMBER".equals(name)) return com.codename1.util.regex.RECharacter.DECIMAL_DIGIT_NUMBER;
-            if ("ENCLOSING_MARK".equals(name)) return com.codename1.util.regex.RECharacter.ENCLOSING_MARK;
-            if ("END_PUNCTUATION".equals(name)) return com.codename1.util.regex.RECharacter.END_PUNCTUATION;
-            if ("FORMAT".equals(name)) return com.codename1.util.regex.RECharacter.FORMAT;
-            if ("LETTER_NUMBER".equals(name)) return com.codename1.util.regex.RECharacter.LETTER_NUMBER;
-            if ("LINE_SEPARATOR".equals(name)) return com.codename1.util.regex.RECharacter.LINE_SEPARATOR;
-            if ("LOWERCASE_LETTER".equals(name)) return com.codename1.util.regex.RECharacter.LOWERCASE_LETTER;
-            if ("MATH_SYMBOL".equals(name)) return com.codename1.util.regex.RECharacter.MATH_SYMBOL;
-            if ("MODIFIER_LETTER".equals(name)) return com.codename1.util.regex.RECharacter.MODIFIER_LETTER;
-            if ("MODIFIER_SYMBOL".equals(name)) return com.codename1.util.regex.RECharacter.MODIFIER_SYMBOL;
-            if ("NON_SPACING_MARK".equals(name)) return com.codename1.util.regex.RECharacter.NON_SPACING_MARK;
-            if ("OTHER_LETTER".equals(name)) return com.codename1.util.regex.RECharacter.OTHER_LETTER;
-            if ("OTHER_NUMBER".equals(name)) return com.codename1.util.regex.RECharacter.OTHER_NUMBER;
-            if ("OTHER_PUNCTUATION".equals(name)) return com.codename1.util.regex.RECharacter.OTHER_PUNCTUATION;
-            if ("OTHER_SYMBOL".equals(name)) return com.codename1.util.regex.RECharacter.OTHER_SYMBOL;
-            if ("PARAGRAPH_SEPARATOR".equals(name)) return com.codename1.util.regex.RECharacter.PARAGRAPH_SEPARATOR;
-            if ("PRIVATE_USE".equals(name)) return com.codename1.util.regex.RECharacter.PRIVATE_USE;
-            if ("SPACE_SEPARATOR".equals(name)) return com.codename1.util.regex.RECharacter.SPACE_SEPARATOR;
-            if ("START_PUNCTUATION".equals(name)) return com.codename1.util.regex.RECharacter.START_PUNCTUATION;
-            if ("SURROGATE".equals(name)) return com.codename1.util.regex.RECharacter.SURROGATE;
-            if ("TITLECASE_LETTER".equals(name)) return com.codename1.util.regex.RECharacter.TITLECASE_LETTER;
-            if ("UNASSIGNED".equals(name)) return com.codename1.util.regex.RECharacter.UNASSIGNED;
-            if ("UPPERCASE_LETTER".equals(name)) return com.codename1.util.regex.RECharacter.UPPERCASE_LETTER;
-        }
+        if (type == com.codename1.util.regex.RE.class) return getStaticField0(name);
+        if (type == com.codename1.util.regex.RECharacter.class) return getStaticField1(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("MATCH_CASEINDEPENDENT".equals(name)) return com.codename1.util.regex.RE.MATCH_CASEINDEPENDENT;
+        if ("MATCH_MULTILINE".equals(name)) return com.codename1.util.regex.RE.MATCH_MULTILINE;
+        if ("MATCH_NORMAL".equals(name)) return com.codename1.util.regex.RE.MATCH_NORMAL;
+        if ("MATCH_SINGLELINE".equals(name)) return com.codename1.util.regex.RE.MATCH_SINGLELINE;
+        if ("REPLACE_ALL".equals(name)) return com.codename1.util.regex.RE.REPLACE_ALL;
+        if ("REPLACE_BACKREFERENCES".equals(name)) return com.codename1.util.regex.RE.REPLACE_BACKREFERENCES;
+        if ("REPLACE_FIRSTONLY".equals(name)) return com.codename1.util.regex.RE.REPLACE_FIRSTONLY;
+        throw unsupportedStaticField(com.codename1.util.regex.RE.class, name);
+    }
+
+    private static Object getStaticField1(String name) throws Exception {
+        if ("COMBINING_SPACING_MARK".equals(name)) return com.codename1.util.regex.RECharacter.COMBINING_SPACING_MARK;
+        if ("CONNECTOR_PUNCTUATION".equals(name)) return com.codename1.util.regex.RECharacter.CONNECTOR_PUNCTUATION;
+        if ("CONTROL".equals(name)) return com.codename1.util.regex.RECharacter.CONTROL;
+        if ("CURRENCY_SYMBOL".equals(name)) return com.codename1.util.regex.RECharacter.CURRENCY_SYMBOL;
+        if ("DASH_PUNCTUATION".equals(name)) return com.codename1.util.regex.RECharacter.DASH_PUNCTUATION;
+        if ("DECIMAL_DIGIT_NUMBER".equals(name)) return com.codename1.util.regex.RECharacter.DECIMAL_DIGIT_NUMBER;
+        if ("ENCLOSING_MARK".equals(name)) return com.codename1.util.regex.RECharacter.ENCLOSING_MARK;
+        if ("END_PUNCTUATION".equals(name)) return com.codename1.util.regex.RECharacter.END_PUNCTUATION;
+        if ("FORMAT".equals(name)) return com.codename1.util.regex.RECharacter.FORMAT;
+        if ("LETTER_NUMBER".equals(name)) return com.codename1.util.regex.RECharacter.LETTER_NUMBER;
+        if ("LINE_SEPARATOR".equals(name)) return com.codename1.util.regex.RECharacter.LINE_SEPARATOR;
+        if ("LOWERCASE_LETTER".equals(name)) return com.codename1.util.regex.RECharacter.LOWERCASE_LETTER;
+        if ("MATH_SYMBOL".equals(name)) return com.codename1.util.regex.RECharacter.MATH_SYMBOL;
+        if ("MODIFIER_LETTER".equals(name)) return com.codename1.util.regex.RECharacter.MODIFIER_LETTER;
+        if ("MODIFIER_SYMBOL".equals(name)) return com.codename1.util.regex.RECharacter.MODIFIER_SYMBOL;
+        if ("NON_SPACING_MARK".equals(name)) return com.codename1.util.regex.RECharacter.NON_SPACING_MARK;
+        if ("OTHER_LETTER".equals(name)) return com.codename1.util.regex.RECharacter.OTHER_LETTER;
+        if ("OTHER_NUMBER".equals(name)) return com.codename1.util.regex.RECharacter.OTHER_NUMBER;
+        if ("OTHER_PUNCTUATION".equals(name)) return com.codename1.util.regex.RECharacter.OTHER_PUNCTUATION;
+        if ("OTHER_SYMBOL".equals(name)) return com.codename1.util.regex.RECharacter.OTHER_SYMBOL;
+        if ("PARAGRAPH_SEPARATOR".equals(name)) return com.codename1.util.regex.RECharacter.PARAGRAPH_SEPARATOR;
+        if ("PRIVATE_USE".equals(name)) return com.codename1.util.regex.RECharacter.PRIVATE_USE;
+        if ("SPACE_SEPARATOR".equals(name)) return com.codename1.util.regex.RECharacter.SPACE_SEPARATOR;
+        if ("START_PUNCTUATION".equals(name)) return com.codename1.util.regex.RECharacter.START_PUNCTUATION;
+        if ("SURROGATE".equals(name)) return com.codename1.util.regex.RECharacter.SURROGATE;
+        if ("TITLECASE_LETTER".equals(name)) return com.codename1.util.regex.RECharacter.TITLECASE_LETTER;
+        if ("UNASSIGNED".equals(name)) return com.codename1.util.regex.RECharacter.UNASSIGNED;
+        if ("UPPERCASE_LETTER".equals(name)) return com.codename1.util.regex.RECharacter.UPPERCASE_LETTER;
+        throw unsupportedStaticField(com.codename1.util.regex.RECharacter.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {
@@ -825,7 +831,19 @@ public final class GeneratedAccess_com_codename1_util_regex {
         if (!(value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue)) {
             return value;
         }
+        // Direct fit when LambdaValue already implements the target SAM
+        // (Runnable, Function, Comparator, ...).
+        if (type.isInstance(value)) {
+            return value;
+        }
         return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
+    }
+
+    private static int toIntValue(Object value) {
+        if (value instanceof Number) return ((Number) value).intValue();
+        if (value instanceof Character) return (int) ((Character) value).charValue();
+        throw new ClassCastException("Cannot coerce "
+            + (value == null ? "null" : value.getClass().getName()) + " to int");
     }
 
     private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
@@ -880,10 +898,15 @@ public final class GeneratedAccess_com_codename1_util_regex {
         if ("byte".equals(type.getName()) || type == Byte.class || "short".equals(type.getName()) || type == Short.class
                 || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
                 || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
-            return value instanceof Number;
+            // Java widens char to int implicitly, so accept Character
+            // for any int-or-larger numeric slot.
+            return value instanceof Number || value instanceof Character;
         }
         if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
-            return isSamInterface(type);
+            // LambdaValue implements common SAMs directly (Runnable,
+            // Function, Predicate, Comparator, ...). Also accept any
+            // CN1 SAM the listener-bridge knows how to wrap.
+            return type.isInstance(value) || isSamInterface(type);
         }
         return type.isInstance(value);
     }

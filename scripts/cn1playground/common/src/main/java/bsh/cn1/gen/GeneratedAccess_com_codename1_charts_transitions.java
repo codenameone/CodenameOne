@@ -149,13 +149,13 @@ public final class GeneratedAccess_com_codename1_charts_transitions {
         if ("setDuration".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setDuration(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setDuration(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setEasing".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setEasing(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setEasing(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("updateChart".equals(name)) {
@@ -222,13 +222,13 @@ public final class GeneratedAccess_com_codename1_charts_transitions {
         if ("setDuration".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setDuration(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setDuration(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setEasing".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setEasing(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setEasing(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("updateChart".equals(name)) {
@@ -295,13 +295,13 @@ public final class GeneratedAccess_com_codename1_charts_transitions {
         if ("setDuration".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setDuration(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setDuration(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setEasing".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setEasing(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setEasing(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("updateChart".equals(name)) {
@@ -353,13 +353,13 @@ public final class GeneratedAccess_com_codename1_charts_transitions {
         if ("setDuration".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setDuration(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setDuration(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setEasing".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setEasing(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setEasing(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("updateChart".equals(name)) {
@@ -371,13 +371,43 @@ public final class GeneratedAccess_com_codename1_charts_transitions {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == com.codename1.charts.transitions.SeriesTransition.class) {
-            if ("EASING_IN".equals(name)) return com.codename1.charts.transitions.SeriesTransition.EASING_IN;
-            if ("EASING_IN_OUT".equals(name)) return com.codename1.charts.transitions.SeriesTransition.EASING_IN_OUT;
-            if ("EASING_LINEAR".equals(name)) return com.codename1.charts.transitions.SeriesTransition.EASING_LINEAR;
-            if ("EASING_OUT".equals(name)) return com.codename1.charts.transitions.SeriesTransition.EASING_OUT;
-        }
+        if (type == com.codename1.charts.transitions.SeriesTransition.class) return getStaticField0(name);
+        if (type == com.codename1.charts.transitions.XYMultiSeriesTransition.class) return getStaticField1(name);
+        if (type == com.codename1.charts.transitions.XYSeriesTransition.class) return getStaticField2(name);
+        if (type == com.codename1.charts.transitions.XYValueSeriesTransition.class) return getStaticField3(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("EASING_IN".equals(name)) return com.codename1.charts.transitions.SeriesTransition.EASING_IN;
+        if ("EASING_IN_OUT".equals(name)) return com.codename1.charts.transitions.SeriesTransition.EASING_IN_OUT;
+        if ("EASING_LINEAR".equals(name)) return com.codename1.charts.transitions.SeriesTransition.EASING_LINEAR;
+        if ("EASING_OUT".equals(name)) return com.codename1.charts.transitions.SeriesTransition.EASING_OUT;
+        throw unsupportedStaticField(com.codename1.charts.transitions.SeriesTransition.class, name);
+    }
+
+    private static Object getStaticField1(String name) throws Exception {
+        if ("EASING_IN".equals(name)) return com.codename1.charts.transitions.XYMultiSeriesTransition.EASING_IN;
+        if ("EASING_IN_OUT".equals(name)) return com.codename1.charts.transitions.XYMultiSeriesTransition.EASING_IN_OUT;
+        if ("EASING_LINEAR".equals(name)) return com.codename1.charts.transitions.XYMultiSeriesTransition.EASING_LINEAR;
+        if ("EASING_OUT".equals(name)) return com.codename1.charts.transitions.XYMultiSeriesTransition.EASING_OUT;
+        throw unsupportedStaticField(com.codename1.charts.transitions.XYMultiSeriesTransition.class, name);
+    }
+
+    private static Object getStaticField2(String name) throws Exception {
+        if ("EASING_IN".equals(name)) return com.codename1.charts.transitions.XYSeriesTransition.EASING_IN;
+        if ("EASING_IN_OUT".equals(name)) return com.codename1.charts.transitions.XYSeriesTransition.EASING_IN_OUT;
+        if ("EASING_LINEAR".equals(name)) return com.codename1.charts.transitions.XYSeriesTransition.EASING_LINEAR;
+        if ("EASING_OUT".equals(name)) return com.codename1.charts.transitions.XYSeriesTransition.EASING_OUT;
+        throw unsupportedStaticField(com.codename1.charts.transitions.XYSeriesTransition.class, name);
+    }
+
+    private static Object getStaticField3(String name) throws Exception {
+        if ("EASING_IN".equals(name)) return com.codename1.charts.transitions.XYValueSeriesTransition.EASING_IN;
+        if ("EASING_IN_OUT".equals(name)) return com.codename1.charts.transitions.XYValueSeriesTransition.EASING_IN_OUT;
+        if ("EASING_LINEAR".equals(name)) return com.codename1.charts.transitions.XYValueSeriesTransition.EASING_LINEAR;
+        if ("EASING_OUT".equals(name)) return com.codename1.charts.transitions.XYValueSeriesTransition.EASING_OUT;
+        throw unsupportedStaticField(com.codename1.charts.transitions.XYValueSeriesTransition.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {
@@ -531,7 +561,19 @@ public final class GeneratedAccess_com_codename1_charts_transitions {
         if (!(value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue)) {
             return value;
         }
+        // Direct fit when LambdaValue already implements the target SAM
+        // (Runnable, Function, Comparator, ...).
+        if (type.isInstance(value)) {
+            return value;
+        }
         return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
+    }
+
+    private static int toIntValue(Object value) {
+        if (value instanceof Number) return ((Number) value).intValue();
+        if (value instanceof Character) return (int) ((Character) value).charValue();
+        throw new ClassCastException("Cannot coerce "
+            + (value == null ? "null" : value.getClass().getName()) + " to int");
     }
 
     private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
@@ -586,10 +628,15 @@ public final class GeneratedAccess_com_codename1_charts_transitions {
         if ("byte".equals(type.getName()) || type == Byte.class || "short".equals(type.getName()) || type == Short.class
                 || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
                 || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
-            return value instanceof Number;
+            // Java widens char to int implicitly, so accept Character
+            // for any int-or-larger numeric slot.
+            return value instanceof Number || value instanceof Character;
         }
         if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
-            return isSamInterface(type);
+            // LambdaValue implements common SAMs directly (Runnable,
+            // Function, Predicate, Comparator, ...). Also accept any
+            // CN1 SAM the listener-bridge knows how to wrap.
+            return type.isInstance(value) || isSamInterface(type);
         }
         return type.isInstance(value);
     }

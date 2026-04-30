@@ -1,0 +1,137 @@
+name: Test JavaScript screenshot scripts
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/scripts-javascript.yml'
+      - 'scripts/run-javascript-browser-tests.sh'
+      - 'scripts/run-javascript-screenshot-tests.sh'
+      - 'scripts/run-javascript-headless-browser.mjs'
+      - 'scripts/build-javascript-port-hellocodenameone.sh'
+      - 'scripts/javascript_browser_harness.py'
+      - 'scripts/javascript/screenshots/**'
+      - 'scripts/lib/cn1ss.sh'
+      - 'scripts/common/java/**'
+      - 'scripts/hellocodenameone/**'
+      - 'Ports/JavaScriptPort/**'
+      - 'vm/**'
+      - 'maven/**'
+      - '!maven/core-unittests/**'
+      - '!docs/**'
+  push:
+    branches: [ master ]
+    paths:
+      - '.github/workflows/scripts-javascript.yml'
+      - 'scripts/run-javascript-browser-tests.sh'
+      - 'scripts/run-javascript-screenshot-tests.sh'
+      - 'scripts/run-javascript-headless-browser.mjs'
+      - 'scripts/build-javascript-port-hellocodenameone.sh'
+      - 'scripts/javascript_browser_harness.py'
+      - 'scripts/javascript/screenshots/**'
+      - 'scripts/lib/cn1ss.sh'
+      - 'scripts/common/java/**'
+      - 'scripts/hellocodenameone/**'
+      - 'Ports/JavaScriptPort/**'
+      - 'vm/**'
+      - 'maven/**'
+      - '!maven/core-unittests/**'
+      - '!docs/**'
+
+jobs:
+  javascript-screenshots:
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+      GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+      ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/javascript-ui-tests
+      CN1_JS_TIMEOUT_SECONDS: "180"
+      CN1_JS_BROWSER_LIFETIME_SECONDS: "150"
+      CN1SS_SKIP_COVERAGE: "1"
+      CN1SS_FAIL_ON_MISMATCH: "1"
+      BROWSER_CMD: "node \"$GITHUB_WORKSPACE/scripts/run-javascript-headless-browser.mjs\""
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java 8 for ParparVM
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '8'
+          cache: 'maven'
+
+      - name: Prepare Codename One binaries for Maven plugin
+        run: |
+          mkdir -p ~/.codenameone
+          cp maven/UpdateCodenameOne.jar ~/.codenameone/
+
+      - name: Build ParparVM compiler bundle
+        run: mvn -B -f maven/pom.xml -pl parparvm -am -DskipTests -Dmaven.javadoc.skip=true package
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+          cache: 'maven'
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Playwright Chromium
+        run: |
+          cd scripts
+          npm init -y 2>/dev/null || true
+          npm install playwright
+          npx playwright install --with-deps chromium
+
+      - name: Install Xvfb for headless Java AWT
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
+      - name: Setup workspace
+        run: xvfb-run ./scripts/setup-workspace.sh -q -DskipTests
+
+      - name: Build HelloCodenameOne JavaScript port bundle
+        run: |
+          # Use JAVA_HOME set by actions/setup-java for Java 17
+          # (JAVA_HOME_17_X64 is always available after setup-java@v4)
+          export JAVA_HOME="${JAVA_HOME_17_X64}"
+          export PATH="$JAVA_HOME/bin:$PATH"
+          echo "Using JAVA_HOME=$JAVA_HOME"
+          java -version
+
+          # xvfb-run is required for CSS compilation which uses java.awt
+          SKIP_PARPARVM_BUILD=1 xvfb-run ./scripts/build-javascript-port-hellocodenameone.sh "${GITHUB_WORKSPACE}/artifacts/javascript-ui-tests/hellocodenameone-javascript-port.zip"
+
+      - name: Locate JavaScript bundle
+        id: locate_bundle
+        run: |
+          set -euo pipefail
+          bundle="$(ls -1 \
+            artifacts/javascript-ui-tests/hellocodenameone-javascript-port.zip \
+            scripts/hellocodenameone/parparvm/target/hellocodenameone-javascript-port.zip \
+            2>/dev/null | head -n1 || true)"
+          if [ -z "$bundle" ]; then
+            echo "Unable to locate HelloCodenameOne JavaScript-port bundle" >&2
+            exit 1
+          fi
+          echo "bundle=$bundle" >> "$GITHUB_OUTPUT"
+
+      - name: Run JavaScript screenshot browser tests
+        run: |
+          mkdir -p "${ARTIFACTS_DIR}"
+          ./scripts/run-javascript-browser-tests.sh "${{ steps.locate_bundle.outputs.bundle }}" "${GITHUB_WORKSPACE}/scripts/javascript/screenshots"
+
+      - name: Upload JavaScript screenshot artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: javascript-ui-tests
+          path: artifacts/javascript-ui-tests
+          if-no-files-found: warn
+          retention-days: 14

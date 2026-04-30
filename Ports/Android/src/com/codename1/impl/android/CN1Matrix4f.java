@@ -149,11 +149,17 @@ public final class CN1Matrix4f {
         }
     }
 
-    public boolean equals(CN1Matrix4f matrix){
-        if ( matrix == null ){
+    @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof CN1Matrix4f)) {
             return false;
         }
-        return Arrays.equals(data, matrix.data);
+        return Arrays.equals(data, ((CN1Matrix4f) o).data);
+    }
+
+    @Override
+    public int hashCode() {
+        return Arrays.hashCode(data);
     }
     
     public static CN1Matrix4f make(float[] data) {

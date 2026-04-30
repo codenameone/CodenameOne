@@ -13,6 +13,7 @@ public class CSSDarkModeMediaQueryTest {
 
     public static void main(String[] args) throws Exception {
         testDarkMediaCompilesToDarkUiids();
+        testAtMediaInsideHeaderCommentIsIgnored();
     }
 
     private static void testDarkMediaCompilesToDarkUiids() throws Exception {
@@ -36,6 +37,39 @@ public class CSSDarkModeMediaQueryTest {
             assertEquals("000000", themeProps.get("$DarkButton.bgColor"), "Dark style bgColor");
             assertEquals("255", themeProps.get("$DarkButton.transparency"), "Dark style transparency");
             assertEquals("ff0000", themeProps.get("$DarkButton.sel#fgColor"), "Dark selected fgColor");
+        } finally {
+            deleteIfExists(cssFile);
+            deleteIfExists(resFile);
+        }
+    }
+
+    /**
+     * Regression: the dark-mode rewriter must not trigger on the literal
+     * "@media (prefers-color-scheme:" string sitting inside a header
+     * comment. Before the fix it swallowed everything up to the next {,
+     * treated the subsequent block's properties as dark selectors, and
+     * ran the tokenizer off EOF later on.
+     */
+    private static void testAtMediaInsideHeaderCommentIsIgnored() throws Exception {
+        Path cssFile = Files.createTempFile("cn1-dark-comment", ".css");
+        Path resFile = Files.createTempFile("cn1-dark-comment", ".res");
+        try {
+            String css = "/* header doc mentions @media (prefers-color-scheme: dark) for reference */\n"
+                    + "#Constants { tabsGridBool: true; }\n"
+                    + "Button { color: #111111; }\n"
+                    + "@media (prefers-color-scheme: dark) {\n"
+                    + "  Button { color: #eeeeee; }\n"
+                    + "}\n";
+            Files.write(cssFile, css.getBytes(StandardCharsets.UTF_8));
+
+            CSSTheme theme = CSSTheme.load(cssFile.toUri().toURL());
+            theme.resourceFile = resFile.toFile();
+            theme.updateResources();
+
+            Hashtable themeProps = theme.res.getTheme("Theme");
+            assertEquals("111111", themeProps.get("Button.fgColor"), "Light Button fgColor survives comment");
+            assertEquals("eeeeee", themeProps.get("$DarkButton.fgColor"), "Real dark block still compiles");
+            assertEquals("true", themeProps.get("@tabsGridBool"), "#Constants block isn't mangled");
         } finally {
             deleteIfExists(cssFile);
             deleteIfExists(resFile);

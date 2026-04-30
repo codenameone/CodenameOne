@@ -56,7 +56,7 @@ public class AndroidNativeUtil {
      * Binds a callback to lifecycle events
      * @param l listener
      */
-    public static void addLifecycleListener(LifecycleListener l) {
+    public static synchronized void addLifecycleListener(LifecycleListener l) {
         if(listeners == null) {
             listeners = new ArrayList<LifecycleListener>();
         }
@@ -188,7 +188,7 @@ public class AndroidNativeUtil {
         return nativeBuffer;
     }
     
-    public static void registerViewRenderer(Class viewClass, BitmapViewRenderer b) {
+    public static synchronized void registerViewRenderer(Class viewClass, BitmapViewRenderer b) {
         if(viewRendererMap == null) {
             viewRendererMap = new HashMap<Class, BitmapViewRenderer>();
         }

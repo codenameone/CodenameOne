@@ -83,23 +83,23 @@ public final class GeneratedAccess_com_codename1_io_gzip {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return new com.codename1.io.gzip.Deflater(((Number) adaptedArgs[0]).intValue());
+                return new com.codename1.io.gzip.Deflater(toIntValue(adaptedArgs[0]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false);
-                return new com.codename1.io.gzip.Deflater(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue());
+                return new com.codename1.io.gzip.Deflater(toIntValue(adaptedArgs[0]), ((Boolean) adaptedArgs[1]).booleanValue());
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return new com.codename1.io.gzip.Deflater(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return new com.codename1.io.gzip.Deflater(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false);
-                return new com.codename1.io.gzip.Deflater(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Boolean) adaptedArgs[2]).booleanValue());
+                return new com.codename1.io.gzip.Deflater(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), ((Boolean) adaptedArgs[2]).booleanValue());
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return new com.codename1.io.gzip.Deflater(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
+                return new com.codename1.io.gzip.Deflater(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]));
             }
         }
         if (type == com.codename1.io.gzip.GZIPException.class) {
@@ -123,11 +123,11 @@ public final class GeneratedAccess_com_codename1_io_gzip {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return new com.codename1.io.gzip.Inflater(((Number) adaptedArgs[0]).intValue());
+                return new com.codename1.io.gzip.Inflater(toIntValue(adaptedArgs[0]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false);
-                return new com.codename1.io.gzip.Inflater(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue());
+                return new com.codename1.io.gzip.Inflater(toIntValue(adaptedArgs[0]), ((Boolean) adaptedArgs[1]).booleanValue());
             }
         }
         if (type == com.codename1.io.gzip.ZStream.class) {
@@ -354,7 +354,7 @@ public final class GeneratedAccess_com_codename1_io_gzip {
         if ("mark".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.mark(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.mark(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("markSupported".equals(name)) {
@@ -372,7 +372,7 @@ public final class GeneratedAccess_com_codename1_io_gzip {
             }
             if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.read((byte[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
+                return typedTarget.read((byte[]) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]));
             }
         }
         if ("readHeader".equals(name)) {
@@ -456,7 +456,7 @@ public final class GeneratedAccess_com_codename1_io_gzip {
         if ("setOS".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setOS(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setOS(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setSyncFlush".equals(name)) {
@@ -468,7 +468,7 @@ public final class GeneratedAccess_com_codename1_io_gzip {
         if ("write".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.write(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.write(toIntValue(adaptedArgs[0])); return null;
             }
             if (matches(safeArgs, new Class<?>[]{byte[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class}, false);
@@ -476,7 +476,7 @@ public final class GeneratedAccess_com_codename1_io_gzip {
             }
             if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.write((byte[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue()); return null;
+                typedTarget.write((byte[]) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2])); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -492,7 +492,7 @@ public final class GeneratedAccess_com_codename1_io_gzip {
         if ("deflate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.deflate(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.deflate(toIntValue(adaptedArgs[0]));
             }
         }
         if ("deflateEnd".equals(name)) {
@@ -503,35 +503,35 @@ public final class GeneratedAccess_com_codename1_io_gzip {
         if ("deflateInit".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.deflateInit(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.deflateInit(toIntValue(adaptedArgs[0]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false);
-                return typedTarget.deflateInit(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue());
+                return typedTarget.deflateInit(toIntValue(adaptedArgs[0]), ((Boolean) adaptedArgs[1]).booleanValue());
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.deflateInit(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.deflateInit(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false);
-                return typedTarget.deflateInit(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Boolean) adaptedArgs[2]).booleanValue());
+                return typedTarget.deflateInit(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), ((Boolean) adaptedArgs[2]).booleanValue());
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.deflateInit(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
+                return typedTarget.deflateInit(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]));
             }
         }
         if ("deflateParams".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.deflateParams(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.deflateParams(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
         if ("deflateSetDictionary".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class}, false);
-                return typedTarget.deflateSetDictionary((byte[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.deflateSetDictionary((byte[]) adaptedArgs[0], toIntValue(adaptedArgs[1]));
             }
         }
         if ("end".equals(name)) {
@@ -602,7 +602,7 @@ public final class GeneratedAccess_com_codename1_io_gzip {
         if ("inflate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.inflate(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.inflate(toIntValue(adaptedArgs[0]));
             }
         }
         if ("inflateEnd".equals(name)) {
@@ -625,17 +625,17 @@ public final class GeneratedAccess_com_codename1_io_gzip {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.inflateInit(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.inflateInit(toIntValue(adaptedArgs[0]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false);
-                return typedTarget.inflateInit(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue());
+                return typedTarget.inflateInit(toIntValue(adaptedArgs[0]), ((Boolean) adaptedArgs[1]).booleanValue());
             }
         }
         if ("inflateSetDictionary".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class}, false);
-                return typedTarget.inflateSetDictionary((byte[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.inflateSetDictionary((byte[]) adaptedArgs[0], toIntValue(adaptedArgs[1]));
             }
         }
         if ("inflateSync".equals(name)) {
@@ -651,47 +651,47 @@ public final class GeneratedAccess_com_codename1_io_gzip {
         if ("init".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.init(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.init(toIntValue(adaptedArgs[0]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false);
-                return typedTarget.init(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue());
+                return typedTarget.init(toIntValue(adaptedArgs[0]), ((Boolean) adaptedArgs[1]).booleanValue());
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.init(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.init(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false);
-                return typedTarget.init(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Boolean) adaptedArgs[2]).booleanValue());
+                return typedTarget.init(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), ((Boolean) adaptedArgs[2]).booleanValue());
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.init(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
+                return typedTarget.init(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]));
             }
         }
         if ("params".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.params(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.params(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
         if ("setAvailIn".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setAvailIn(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setAvailIn(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setAvailOut".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setAvailOut(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setAvailOut(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setDictionary".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class}, false);
-                return typedTarget.setDictionary((byte[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.setDictionary((byte[]) adaptedArgs[0], toIntValue(adaptedArgs[1]));
             }
         }
         if ("setInput".equals(name)) {
@@ -705,7 +705,7 @@ public final class GeneratedAccess_com_codename1_io_gzip {
             }
             if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false);
-                typedTarget.setInput((byte[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Boolean) adaptedArgs[3]).booleanValue()); return null;
+                typedTarget.setInput((byte[]) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), ((Boolean) adaptedArgs[3]).booleanValue()); return null;
             }
         }
         if ("setNextIn".equals(name)) {
@@ -717,7 +717,7 @@ public final class GeneratedAccess_com_codename1_io_gzip {
         if ("setNextInIndex".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setNextInIndex(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setNextInIndex(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setNextOut".equals(name)) {
@@ -729,7 +729,7 @@ public final class GeneratedAccess_com_codename1_io_gzip {
         if ("setNextOutIndex".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setNextOutIndex(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setNextOutIndex(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setOutput".equals(name)) {
@@ -739,7 +739,7 @@ public final class GeneratedAccess_com_codename1_io_gzip {
             }
             if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.setOutput((byte[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue()); return null;
+                typedTarget.setOutput((byte[]) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2])); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -790,7 +790,7 @@ public final class GeneratedAccess_com_codename1_io_gzip {
         if ("write".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.write(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.write(toIntValue(adaptedArgs[0])); return null;
             }
             if (matches(safeArgs, new Class<?>[]{byte[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class}, false);
@@ -798,7 +798,7 @@ public final class GeneratedAccess_com_codename1_io_gzip {
             }
             if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.write((byte[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue()); return null;
+                typedTarget.write((byte[]) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2])); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -808,7 +808,7 @@ public final class GeneratedAccess_com_codename1_io_gzip {
         if ("deflate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.deflate(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.deflate(toIntValue(adaptedArgs[0]));
             }
         }
         if ("deflateEnd".equals(name)) {
@@ -819,35 +819,35 @@ public final class GeneratedAccess_com_codename1_io_gzip {
         if ("deflateInit".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.deflateInit(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.deflateInit(toIntValue(adaptedArgs[0]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false);
-                return typedTarget.deflateInit(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue());
+                return typedTarget.deflateInit(toIntValue(adaptedArgs[0]), ((Boolean) adaptedArgs[1]).booleanValue());
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.deflateInit(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.deflateInit(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false);
-                return typedTarget.deflateInit(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Boolean) adaptedArgs[2]).booleanValue());
+                return typedTarget.deflateInit(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), ((Boolean) adaptedArgs[2]).booleanValue());
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.deflateInit(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
+                return typedTarget.deflateInit(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]));
             }
         }
         if ("deflateParams".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.deflateParams(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.deflateParams(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
         if ("deflateSetDictionary".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class}, false);
-                return typedTarget.deflateSetDictionary((byte[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.deflateSetDictionary((byte[]) adaptedArgs[0], toIntValue(adaptedArgs[1]));
             }
         }
         if ("end".equals(name)) {
@@ -918,7 +918,7 @@ public final class GeneratedAccess_com_codename1_io_gzip {
         if ("inflate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.inflate(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.inflate(toIntValue(adaptedArgs[0]));
             }
         }
         if ("inflateEnd".equals(name)) {
@@ -941,17 +941,17 @@ public final class GeneratedAccess_com_codename1_io_gzip {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.inflateInit(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.inflateInit(toIntValue(adaptedArgs[0]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false);
-                return typedTarget.inflateInit(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue());
+                return typedTarget.inflateInit(toIntValue(adaptedArgs[0]), ((Boolean) adaptedArgs[1]).booleanValue());
             }
         }
         if ("inflateSetDictionary".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class}, false);
-                return typedTarget.inflateSetDictionary((byte[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.inflateSetDictionary((byte[]) adaptedArgs[0], toIntValue(adaptedArgs[1]));
             }
         }
         if ("inflateSync".equals(name)) {
@@ -974,29 +974,29 @@ public final class GeneratedAccess_com_codename1_io_gzip {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.init(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.init(toIntValue(adaptedArgs[0]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false);
-                return typedTarget.init(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue());
+                return typedTarget.init(toIntValue(adaptedArgs[0]), ((Boolean) adaptedArgs[1]).booleanValue());
             }
         }
         if ("setAvailIn".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setAvailIn(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setAvailIn(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setAvailOut".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setAvailOut(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setAvailOut(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setDictionary".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class}, false);
-                return typedTarget.setDictionary((byte[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.setDictionary((byte[]) adaptedArgs[0], toIntValue(adaptedArgs[1]));
             }
         }
         if ("setInput".equals(name)) {
@@ -1010,7 +1010,7 @@ public final class GeneratedAccess_com_codename1_io_gzip {
             }
             if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false);
-                typedTarget.setInput((byte[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Boolean) adaptedArgs[3]).booleanValue()); return null;
+                typedTarget.setInput((byte[]) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), ((Boolean) adaptedArgs[3]).booleanValue()); return null;
             }
         }
         if ("setNextIn".equals(name)) {
@@ -1022,7 +1022,7 @@ public final class GeneratedAccess_com_codename1_io_gzip {
         if ("setNextInIndex".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setNextInIndex(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setNextInIndex(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setNextOut".equals(name)) {
@@ -1034,7 +1034,7 @@ public final class GeneratedAccess_com_codename1_io_gzip {
         if ("setNextOutIndex".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setNextOutIndex(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setNextOutIndex(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setOutput".equals(name)) {
@@ -1044,7 +1044,7 @@ public final class GeneratedAccess_com_codename1_io_gzip {
             }
             if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.setOutput((byte[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue()); return null;
+                typedTarget.setOutput((byte[]) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2])); return null;
             }
         }
         if ("sync".equals(name)) {
@@ -1094,7 +1094,7 @@ public final class GeneratedAccess_com_codename1_io_gzip {
         if ("mark".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.mark(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.mark(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("markSupported".equals(name)) {
@@ -1112,7 +1112,7 @@ public final class GeneratedAccess_com_codename1_io_gzip {
             }
             if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.read((byte[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
+                return typedTarget.read((byte[]) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]));
             }
         }
         if ("readHeader".equals(name)) {
@@ -1157,7 +1157,7 @@ public final class GeneratedAccess_com_codename1_io_gzip {
         if ("update".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.update((byte[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue()); return null;
+                typedTarget.update((byte[]) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2])); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -1186,7 +1186,7 @@ public final class GeneratedAccess_com_codename1_io_gzip {
         if ("update".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.update((byte[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue()); return null;
+                typedTarget.update((byte[]) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2])); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -1206,7 +1206,7 @@ public final class GeneratedAccess_com_codename1_io_gzip {
         if ("mark".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.mark(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.mark(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("markSupported".equals(name)) {
@@ -1224,7 +1224,7 @@ public final class GeneratedAccess_com_codename1_io_gzip {
             }
             if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.read((byte[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
+                return typedTarget.read((byte[]) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]));
             }
         }
         if ("reset".equals(name)) {
@@ -1255,7 +1255,7 @@ public final class GeneratedAccess_com_codename1_io_gzip {
         if ("write".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.write(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.write(toIntValue(adaptedArgs[0])); return null;
             }
             if (matches(safeArgs, new Class<?>[]{byte[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class}, false);
@@ -1263,7 +1263,7 @@ public final class GeneratedAccess_com_codename1_io_gzip {
             }
             if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.write((byte[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue()); return null;
+                typedTarget.write((byte[]) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2])); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -1529,7 +1529,7 @@ public final class GeneratedAccess_com_codename1_io_gzip {
         if ("ioStreamUpdate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class}, false);
-                typedTarget.ioStreamUpdate((java.lang.Object) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.ioStreamUpdate((java.lang.Object) adaptedArgs[0], toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("isCheckSSLCertificates".equals(name)) {
@@ -1662,7 +1662,7 @@ public final class GeneratedAccess_com_codename1_io_gzip {
         if ("setChunkedStreamingMode".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setChunkedStreamingMode(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setChunkedStreamingMode(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setContentType".equals(name)) {
@@ -1734,7 +1734,7 @@ public final class GeneratedAccess_com_codename1_io_gzip {
         if ("setPriority".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Byte.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Byte.class}, false);
-                typedTarget.setPriority(((Number) adaptedArgs[0]).byteValue()); return null;
+                typedTarget.setPriority((byte) toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setReadRequest".equals(name)) {
@@ -1752,7 +1752,7 @@ public final class GeneratedAccess_com_codename1_io_gzip {
         if ("setReadTimeout".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setReadTimeout(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setReadTimeout(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setRequestBody".equals(name)) {
@@ -1774,13 +1774,13 @@ public final class GeneratedAccess_com_codename1_io_gzip {
         if ("setSilentRetryCount".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setSilentRetryCount(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setSilentRetryCount(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setTimeout".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setTimeout(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setTimeout(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setUrl".equals(name)) {
@@ -1914,7 +1914,7 @@ public final class GeneratedAccess_com_codename1_io_gzip {
         if ("setOS".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setOS(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setOS(toIntValue(adaptedArgs[0])); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -1924,7 +1924,7 @@ public final class GeneratedAccess_com_codename1_io_gzip {
         if ("deflate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.deflate(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.deflate(toIntValue(adaptedArgs[0]));
             }
         }
         if ("deflateEnd".equals(name)) {
@@ -1935,35 +1935,35 @@ public final class GeneratedAccess_com_codename1_io_gzip {
         if ("deflateInit".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.deflateInit(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.deflateInit(toIntValue(adaptedArgs[0]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false);
-                return typedTarget.deflateInit(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue());
+                return typedTarget.deflateInit(toIntValue(adaptedArgs[0]), ((Boolean) adaptedArgs[1]).booleanValue());
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.deflateInit(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.deflateInit(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false);
-                return typedTarget.deflateInit(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Boolean) adaptedArgs[2]).booleanValue());
+                return typedTarget.deflateInit(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), ((Boolean) adaptedArgs[2]).booleanValue());
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.deflateInit(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
+                return typedTarget.deflateInit(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]));
             }
         }
         if ("deflateParams".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.deflateParams(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.deflateParams(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
         if ("deflateSetDictionary".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class}, false);
-                return typedTarget.deflateSetDictionary((byte[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.deflateSetDictionary((byte[]) adaptedArgs[0], toIntValue(adaptedArgs[1]));
             }
         }
         if ("end".equals(name)) {
@@ -2034,7 +2034,7 @@ public final class GeneratedAccess_com_codename1_io_gzip {
         if ("inflate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.inflate(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.inflate(toIntValue(adaptedArgs[0]));
             }
         }
         if ("inflateEnd".equals(name)) {
@@ -2057,17 +2057,17 @@ public final class GeneratedAccess_com_codename1_io_gzip {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.inflateInit(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.inflateInit(toIntValue(adaptedArgs[0]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false);
-                return typedTarget.inflateInit(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue());
+                return typedTarget.inflateInit(toIntValue(adaptedArgs[0]), ((Boolean) adaptedArgs[1]).booleanValue());
             }
         }
         if ("inflateSetDictionary".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class}, false);
-                return typedTarget.inflateSetDictionary((byte[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.inflateSetDictionary((byte[]) adaptedArgs[0], toIntValue(adaptedArgs[1]));
             }
         }
         if ("inflateSync".equals(name)) {
@@ -2083,13 +2083,13 @@ public final class GeneratedAccess_com_codename1_io_gzip {
         if ("setAvailIn".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setAvailIn(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setAvailIn(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setAvailOut".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setAvailOut(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setAvailOut(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setInput".equals(name)) {
@@ -2103,7 +2103,7 @@ public final class GeneratedAccess_com_codename1_io_gzip {
             }
             if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false);
-                typedTarget.setInput((byte[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Boolean) adaptedArgs[3]).booleanValue()); return null;
+                typedTarget.setInput((byte[]) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), ((Boolean) adaptedArgs[3]).booleanValue()); return null;
             }
         }
         if ("setNextIn".equals(name)) {
@@ -2115,7 +2115,7 @@ public final class GeneratedAccess_com_codename1_io_gzip {
         if ("setNextInIndex".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setNextInIndex(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setNextInIndex(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setNextOut".equals(name)) {
@@ -2127,7 +2127,7 @@ public final class GeneratedAccess_com_codename1_io_gzip {
         if ("setNextOutIndex".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setNextOutIndex(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setNextOutIndex(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setOutput".equals(name)) {
@@ -2137,59 +2137,75 @@ public final class GeneratedAccess_com_codename1_io_gzip {
             }
             if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.setOutput((byte[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue()); return null;
+                typedTarget.setOutput((byte[]) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2])); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == com.codename1.io.gzip.GZIPHeader.class) {
-            if ("OS_AMIGA".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_AMIGA;
-            if ("OS_ATARI".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_ATARI;
-            if ("OS_CPM".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_CPM;
-            if ("OS_MACOS".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_MACOS;
-            if ("OS_MSDOS".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_MSDOS;
-            if ("OS_OS2".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_OS2;
-            if ("OS_QDOS".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_QDOS;
-            if ("OS_RISCOS".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_RISCOS;
-            if ("OS_TOPS20".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_TOPS20;
-            if ("OS_UNIX".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_UNIX;
-            if ("OS_UNKNOWN".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_UNKNOWN;
-            if ("OS_VMCMS".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_VMCMS;
-            if ("OS_VMS".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_VMS;
-            if ("OS_WIN32".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_WIN32;
-            if ("OS_ZSYSTEM".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_ZSYSTEM;
-        }
-        if (type == com.codename1.io.gzip.JZlib.class) {
-            if ("DEF_WBITS".equals(name)) return com.codename1.io.gzip.JZlib.DEF_WBITS;
-            if ("MAX_WBITS".equals(name)) return com.codename1.io.gzip.JZlib.MAX_WBITS;
-            if ("Z_ASCII".equals(name)) return com.codename1.io.gzip.JZlib.Z_ASCII;
-            if ("Z_BEST_COMPRESSION".equals(name)) return com.codename1.io.gzip.JZlib.Z_BEST_COMPRESSION;
-            if ("Z_BEST_SPEED".equals(name)) return com.codename1.io.gzip.JZlib.Z_BEST_SPEED;
-            if ("Z_BINARY".equals(name)) return com.codename1.io.gzip.JZlib.Z_BINARY;
-            if ("Z_BUF_ERROR".equals(name)) return com.codename1.io.gzip.JZlib.Z_BUF_ERROR;
-            if ("Z_DATA_ERROR".equals(name)) return com.codename1.io.gzip.JZlib.Z_DATA_ERROR;
-            if ("Z_DEFAULT_COMPRESSION".equals(name)) return com.codename1.io.gzip.JZlib.Z_DEFAULT_COMPRESSION;
-            if ("Z_DEFAULT_STRATEGY".equals(name)) return com.codename1.io.gzip.JZlib.Z_DEFAULT_STRATEGY;
-            if ("Z_ERRNO".equals(name)) return com.codename1.io.gzip.JZlib.Z_ERRNO;
-            if ("Z_FILTERED".equals(name)) return com.codename1.io.gzip.JZlib.Z_FILTERED;
-            if ("Z_FINISH".equals(name)) return com.codename1.io.gzip.JZlib.Z_FINISH;
-            if ("Z_FULL_FLUSH".equals(name)) return com.codename1.io.gzip.JZlib.Z_FULL_FLUSH;
-            if ("Z_HUFFMAN_ONLY".equals(name)) return com.codename1.io.gzip.JZlib.Z_HUFFMAN_ONLY;
-            if ("Z_MEM_ERROR".equals(name)) return com.codename1.io.gzip.JZlib.Z_MEM_ERROR;
-            if ("Z_NEED_DICT".equals(name)) return com.codename1.io.gzip.JZlib.Z_NEED_DICT;
-            if ("Z_NO_COMPRESSION".equals(name)) return com.codename1.io.gzip.JZlib.Z_NO_COMPRESSION;
-            if ("Z_NO_FLUSH".equals(name)) return com.codename1.io.gzip.JZlib.Z_NO_FLUSH;
-            if ("Z_OK".equals(name)) return com.codename1.io.gzip.JZlib.Z_OK;
-            if ("Z_PARTIAL_FLUSH".equals(name)) return com.codename1.io.gzip.JZlib.Z_PARTIAL_FLUSH;
-            if ("Z_STREAM_END".equals(name)) return com.codename1.io.gzip.JZlib.Z_STREAM_END;
-            if ("Z_STREAM_ERROR".equals(name)) return com.codename1.io.gzip.JZlib.Z_STREAM_ERROR;
-            if ("Z_SYNC_FLUSH".equals(name)) return com.codename1.io.gzip.JZlib.Z_SYNC_FLUSH;
-            if ("Z_UNKNOWN".equals(name)) return com.codename1.io.gzip.JZlib.Z_UNKNOWN;
-            if ("Z_VERSION_ERROR".equals(name)) return com.codename1.io.gzip.JZlib.Z_VERSION_ERROR;
-        }
+        if (type == com.codename1.io.gzip.GZConnectionRequest.class) return getStaticField0(name);
+        if (type == com.codename1.io.gzip.GZIPHeader.class) return getStaticField1(name);
+        if (type == com.codename1.io.gzip.JZlib.class) return getStaticField2(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("PRIORITY_CRITICAL".equals(name)) return com.codename1.io.gzip.GZConnectionRequest.PRIORITY_CRITICAL;
+        if ("PRIORITY_HIGH".equals(name)) return com.codename1.io.gzip.GZConnectionRequest.PRIORITY_HIGH;
+        if ("PRIORITY_LOW".equals(name)) return com.codename1.io.gzip.GZConnectionRequest.PRIORITY_LOW;
+        if ("PRIORITY_NORMAL".equals(name)) return com.codename1.io.gzip.GZConnectionRequest.PRIORITY_NORMAL;
+        if ("PRIORITY_REDUNDANT".equals(name)) return com.codename1.io.gzip.GZConnectionRequest.PRIORITY_REDUNDANT;
+        throw unsupportedStaticField(com.codename1.io.gzip.GZConnectionRequest.class, name);
+    }
+
+    private static Object getStaticField1(String name) throws Exception {
+        if ("OS_AMIGA".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_AMIGA;
+        if ("OS_ATARI".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_ATARI;
+        if ("OS_CPM".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_CPM;
+        if ("OS_MACOS".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_MACOS;
+        if ("OS_MSDOS".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_MSDOS;
+        if ("OS_OS2".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_OS2;
+        if ("OS_QDOS".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_QDOS;
+        if ("OS_RISCOS".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_RISCOS;
+        if ("OS_TOPS20".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_TOPS20;
+        if ("OS_UNIX".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_UNIX;
+        if ("OS_UNKNOWN".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_UNKNOWN;
+        if ("OS_VMCMS".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_VMCMS;
+        if ("OS_VMS".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_VMS;
+        if ("OS_WIN32".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_WIN32;
+        if ("OS_ZSYSTEM".equals(name)) return com.codename1.io.gzip.GZIPHeader.OS_ZSYSTEM;
+        throw unsupportedStaticField(com.codename1.io.gzip.GZIPHeader.class, name);
+    }
+
+    private static Object getStaticField2(String name) throws Exception {
+        if ("DEF_WBITS".equals(name)) return com.codename1.io.gzip.JZlib.DEF_WBITS;
+        if ("MAX_WBITS".equals(name)) return com.codename1.io.gzip.JZlib.MAX_WBITS;
+        if ("Z_ASCII".equals(name)) return com.codename1.io.gzip.JZlib.Z_ASCII;
+        if ("Z_BEST_COMPRESSION".equals(name)) return com.codename1.io.gzip.JZlib.Z_BEST_COMPRESSION;
+        if ("Z_BEST_SPEED".equals(name)) return com.codename1.io.gzip.JZlib.Z_BEST_SPEED;
+        if ("Z_BINARY".equals(name)) return com.codename1.io.gzip.JZlib.Z_BINARY;
+        if ("Z_BUF_ERROR".equals(name)) return com.codename1.io.gzip.JZlib.Z_BUF_ERROR;
+        if ("Z_DATA_ERROR".equals(name)) return com.codename1.io.gzip.JZlib.Z_DATA_ERROR;
+        if ("Z_DEFAULT_COMPRESSION".equals(name)) return com.codename1.io.gzip.JZlib.Z_DEFAULT_COMPRESSION;
+        if ("Z_DEFAULT_STRATEGY".equals(name)) return com.codename1.io.gzip.JZlib.Z_DEFAULT_STRATEGY;
+        if ("Z_ERRNO".equals(name)) return com.codename1.io.gzip.JZlib.Z_ERRNO;
+        if ("Z_FILTERED".equals(name)) return com.codename1.io.gzip.JZlib.Z_FILTERED;
+        if ("Z_FINISH".equals(name)) return com.codename1.io.gzip.JZlib.Z_FINISH;
+        if ("Z_FULL_FLUSH".equals(name)) return com.codename1.io.gzip.JZlib.Z_FULL_FLUSH;
+        if ("Z_HUFFMAN_ONLY".equals(name)) return com.codename1.io.gzip.JZlib.Z_HUFFMAN_ONLY;
+        if ("Z_MEM_ERROR".equals(name)) return com.codename1.io.gzip.JZlib.Z_MEM_ERROR;
+        if ("Z_NEED_DICT".equals(name)) return com.codename1.io.gzip.JZlib.Z_NEED_DICT;
+        if ("Z_NO_COMPRESSION".equals(name)) return com.codename1.io.gzip.JZlib.Z_NO_COMPRESSION;
+        if ("Z_NO_FLUSH".equals(name)) return com.codename1.io.gzip.JZlib.Z_NO_FLUSH;
+        if ("Z_OK".equals(name)) return com.codename1.io.gzip.JZlib.Z_OK;
+        if ("Z_PARTIAL_FLUSH".equals(name)) return com.codename1.io.gzip.JZlib.Z_PARTIAL_FLUSH;
+        if ("Z_STREAM_END".equals(name)) return com.codename1.io.gzip.JZlib.Z_STREAM_END;
+        if ("Z_STREAM_ERROR".equals(name)) return com.codename1.io.gzip.JZlib.Z_STREAM_ERROR;
+        if ("Z_SYNC_FLUSH".equals(name)) return com.codename1.io.gzip.JZlib.Z_SYNC_FLUSH;
+        if ("Z_UNKNOWN".equals(name)) return com.codename1.io.gzip.JZlib.Z_UNKNOWN;
+        if ("Z_VERSION_ERROR".equals(name)) return com.codename1.io.gzip.JZlib.Z_VERSION_ERROR;
+        throw unsupportedStaticField(com.codename1.io.gzip.JZlib.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {
@@ -2240,11 +2256,11 @@ public final class GeneratedAccess_com_codename1_io_gzip {
         if (target instanceof com.codename1.io.gzip.Deflater) {
             com.codename1.io.gzip.Deflater typedTarget = (com.codename1.io.gzip.Deflater) target;
             if ("availIn".equals(name)) {
-                typedTarget.availIn = ((Number) value).intValue();
+                typedTarget.availIn = toIntValue(value);
                 return;
             }
             if ("availOut".equals(name)) {
-                typedTarget.availOut = ((Number) value).intValue();
+                typedTarget.availOut = toIntValue(value);
                 return;
             }
             if ("msg".equals(name)) {
@@ -2256,7 +2272,7 @@ public final class GeneratedAccess_com_codename1_io_gzip {
                 return;
             }
             if ("nextInIndex".equals(name)) {
-                typedTarget.nextInIndex = ((Number) value).intValue();
+                typedTarget.nextInIndex = toIntValue(value);
                 return;
             }
             if ("nextOut".equals(name)) {
@@ -2264,7 +2280,7 @@ public final class GeneratedAccess_com_codename1_io_gzip {
                 return;
             }
             if ("nextOutIndex".equals(name)) {
-                typedTarget.nextOutIndex = ((Number) value).intValue();
+                typedTarget.nextOutIndex = toIntValue(value);
                 return;
             }
             if ("totalIn".equals(name)) {
@@ -2279,11 +2295,11 @@ public final class GeneratedAccess_com_codename1_io_gzip {
         if (target instanceof com.codename1.io.gzip.Inflater) {
             com.codename1.io.gzip.Inflater typedTarget = (com.codename1.io.gzip.Inflater) target;
             if ("availIn".equals(name)) {
-                typedTarget.availIn = ((Number) value).intValue();
+                typedTarget.availIn = toIntValue(value);
                 return;
             }
             if ("availOut".equals(name)) {
-                typedTarget.availOut = ((Number) value).intValue();
+                typedTarget.availOut = toIntValue(value);
                 return;
             }
             if ("msg".equals(name)) {
@@ -2295,7 +2311,7 @@ public final class GeneratedAccess_com_codename1_io_gzip {
                 return;
             }
             if ("nextInIndex".equals(name)) {
-                typedTarget.nextInIndex = ((Number) value).intValue();
+                typedTarget.nextInIndex = toIntValue(value);
                 return;
             }
             if ("nextOut".equals(name)) {
@@ -2303,7 +2319,7 @@ public final class GeneratedAccess_com_codename1_io_gzip {
                 return;
             }
             if ("nextOutIndex".equals(name)) {
-                typedTarget.nextOutIndex = ((Number) value).intValue();
+                typedTarget.nextOutIndex = toIntValue(value);
                 return;
             }
             if ("totalIn".equals(name)) {
@@ -2318,11 +2334,11 @@ public final class GeneratedAccess_com_codename1_io_gzip {
         if (target instanceof com.codename1.io.gzip.ZStream) {
             com.codename1.io.gzip.ZStream typedTarget = (com.codename1.io.gzip.ZStream) target;
             if ("availIn".equals(name)) {
-                typedTarget.availIn = ((Number) value).intValue();
+                typedTarget.availIn = toIntValue(value);
                 return;
             }
             if ("availOut".equals(name)) {
-                typedTarget.availOut = ((Number) value).intValue();
+                typedTarget.availOut = toIntValue(value);
                 return;
             }
             if ("msg".equals(name)) {
@@ -2334,7 +2350,7 @@ public final class GeneratedAccess_com_codename1_io_gzip {
                 return;
             }
             if ("nextInIndex".equals(name)) {
-                typedTarget.nextInIndex = ((Number) value).intValue();
+                typedTarget.nextInIndex = toIntValue(value);
                 return;
             }
             if ("nextOut".equals(name)) {
@@ -2342,7 +2358,7 @@ public final class GeneratedAccess_com_codename1_io_gzip {
                 return;
             }
             if ("nextOutIndex".equals(name)) {
-                typedTarget.nextOutIndex = ((Number) value).intValue();
+                typedTarget.nextOutIndex = toIntValue(value);
                 return;
             }
             if ("totalIn".equals(name)) {
@@ -2496,7 +2512,19 @@ public final class GeneratedAccess_com_codename1_io_gzip {
         if (!(value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue)) {
             return value;
         }
+        // Direct fit when LambdaValue already implements the target SAM
+        // (Runnable, Function, Comparator, ...).
+        if (type.isInstance(value)) {
+            return value;
+        }
         return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
+    }
+
+    private static int toIntValue(Object value) {
+        if (value instanceof Number) return ((Number) value).intValue();
+        if (value instanceof Character) return (int) ((Character) value).charValue();
+        throw new ClassCastException("Cannot coerce "
+            + (value == null ? "null" : value.getClass().getName()) + " to int");
     }
 
     private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
@@ -2551,10 +2579,15 @@ public final class GeneratedAccess_com_codename1_io_gzip {
         if ("byte".equals(type.getName()) || type == Byte.class || "short".equals(type.getName()) || type == Short.class
                 || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
                 || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
-            return value instanceof Number;
+            // Java widens char to int implicitly, so accept Character
+            // for any int-or-larger numeric slot.
+            return value instanceof Number || value instanceof Character;
         }
         if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
-            return isSamInterface(type);
+            // LambdaValue implements common SAMs directly (Runnable,
+            // Function, Predicate, Comparator, ...). Also accept any
+            // CN1 SAM the listener-bridge knows how to wrap.
+            return type.isInstance(value) || isSamInterface(type);
         }
         return type.isInstance(value);
     }

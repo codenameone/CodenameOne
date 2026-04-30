@@ -46,7 +46,7 @@ public final class GeneratedAccess_java_text {
         if (type == java.text.ParseException.class) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
-                return new java.text.ParseException((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
+                return new java.text.ParseException((java.lang.String) adaptedArgs[0], toIntValue(adaptedArgs[1]));
             }
         }
         if (type == java.text.SimpleDateFormat.class) {
@@ -75,13 +75,13 @@ public final class GeneratedAccess_java_text {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return java.text.DateFormat.getDateInstance(((Number) adaptedArgs[0]).intValue());
+                return java.text.DateFormat.getDateInstance(toIntValue(adaptedArgs[0]));
             }
         }
         if ("getDateTimeInstance".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return java.text.DateFormat.getDateTimeInstance(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return java.text.DateFormat.getDateTimeInstance(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
         if ("getInstance".equals(name)) {
@@ -95,7 +95,7 @@ public final class GeneratedAccess_java_text {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return java.text.DateFormat.getTimeInstance(((Number) adaptedArgs[0]).intValue());
+                return java.text.DateFormat.getTimeInstance(toIntValue(adaptedArgs[0]));
             }
         }
         throw unsupportedStatic(java.text.DateFormat.class, name, safeArgs);
@@ -340,14 +340,27 @@ public final class GeneratedAccess_java_text {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == java.text.DateFormat.class) {
-            if ("DEFAULT".equals(name)) return java.text.DateFormat.DEFAULT;
-            if ("FULL".equals(name)) return java.text.DateFormat.FULL;
-            if ("LONG".equals(name)) return java.text.DateFormat.LONG;
-            if ("MEDIUM".equals(name)) return java.text.DateFormat.MEDIUM;
-            if ("SHORT".equals(name)) return java.text.DateFormat.SHORT;
-        }
+        if (type == java.text.DateFormat.class) return getStaticField0(name);
+        if (type == java.text.SimpleDateFormat.class) return getStaticField1(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("DEFAULT".equals(name)) return java.text.DateFormat.DEFAULT;
+        if ("FULL".equals(name)) return java.text.DateFormat.FULL;
+        if ("LONG".equals(name)) return java.text.DateFormat.LONG;
+        if ("MEDIUM".equals(name)) return java.text.DateFormat.MEDIUM;
+        if ("SHORT".equals(name)) return java.text.DateFormat.SHORT;
+        throw unsupportedStaticField(java.text.DateFormat.class, name);
+    }
+
+    private static Object getStaticField1(String name) throws Exception {
+        if ("DEFAULT".equals(name)) return java.text.SimpleDateFormat.DEFAULT;
+        if ("FULL".equals(name)) return java.text.SimpleDateFormat.FULL;
+        if ("LONG".equals(name)) return java.text.SimpleDateFormat.LONG;
+        if ("MEDIUM".equals(name)) return java.text.SimpleDateFormat.MEDIUM;
+        if ("SHORT".equals(name)) return java.text.SimpleDateFormat.SHORT;
+        throw unsupportedStaticField(java.text.SimpleDateFormat.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {
@@ -501,7 +514,19 @@ public final class GeneratedAccess_java_text {
         if (!(value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue)) {
             return value;
         }
+        // Direct fit when LambdaValue already implements the target SAM
+        // (Runnable, Function, Comparator, ...).
+        if (type.isInstance(value)) {
+            return value;
+        }
         return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
+    }
+
+    private static int toIntValue(Object value) {
+        if (value instanceof Number) return ((Number) value).intValue();
+        if (value instanceof Character) return (int) ((Character) value).charValue();
+        throw new ClassCastException("Cannot coerce "
+            + (value == null ? "null" : value.getClass().getName()) + " to int");
     }
 
     private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
@@ -556,10 +581,15 @@ public final class GeneratedAccess_java_text {
         if ("byte".equals(type.getName()) || type == Byte.class || "short".equals(type.getName()) || type == Short.class
                 || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
                 || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
-            return value instanceof Number;
+            // Java widens char to int implicitly, so accept Character
+            // for any int-or-larger numeric slot.
+            return value instanceof Number || value instanceof Character;
         }
         if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
-            return isSamInterface(type);
+            // LambdaValue implements common SAMs directly (Runnable,
+            // Function, Predicate, Comparator, ...). Also accept any
+            // CN1 SAM the listener-bridge knows how to wrap.
+            return type.isInstance(value) || isSamInterface(type);
         }
         return type.isInstance(value);
     }

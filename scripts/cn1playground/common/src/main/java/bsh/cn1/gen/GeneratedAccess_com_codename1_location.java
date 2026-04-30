@@ -33,6 +33,9 @@ public final class GeneratedAccess_com_codename1_location {
         if ("GeofenceManager".equals(simpleName)) {
             return com.codename1.location.GeofenceManager.class;
         }
+        if ("Listener".equals(simpleName)) {
+            return com.codename1.location.GeofenceManager.Listener.class;
+        }
         if ("Location".equals(simpleName)) {
             return com.codename1.location.Location.class;
         }
@@ -52,7 +55,7 @@ public final class GeneratedAccess_com_codename1_location {
         if (type == com.codename1.location.Geofence.class) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.location.Location.class, java.lang.Integer.class, java.lang.Long.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.location.Location.class, java.lang.Integer.class, java.lang.Long.class}, false);
-                return new com.codename1.location.Geofence((java.lang.String) adaptedArgs[0], (com.codename1.location.Location) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).longValue());
+                return new com.codename1.location.Geofence((java.lang.String) adaptedArgs[0], (com.codename1.location.Location) adaptedArgs[1], toIntValue(adaptedArgs[2]), ((Number) adaptedArgs[3]).longValue());
             }
         }
         if (type == com.codename1.location.Location.class) {
@@ -76,7 +79,7 @@ public final class GeneratedAccess_com_codename1_location {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Long.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Long.class}, false);
-                return new com.codename1.location.LocationRequest(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).longValue());
+                return new com.codename1.location.LocationRequest(toIntValue(adaptedArgs[0]), ((Number) adaptedArgs[1]).longValue());
             }
         }
         throw unsupportedConstruct(type, safeArgs);
@@ -139,37 +142,44 @@ public final class GeneratedAccess_com_codename1_location {
                 unsupported = ex;
             }
         }
+        if (target instanceof com.codename1.location.GeofenceManager.Listener) {
+            try {
+                return invoke2((com.codename1.location.GeofenceManager.Listener) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
         if (target instanceof com.codename1.location.Location) {
             try {
-                return invoke2((com.codename1.location.Location) target, name, safeArgs);
+                return invoke3((com.codename1.location.Location) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.location.LocationManager) {
             try {
-                return invoke3((com.codename1.location.LocationManager) target, name, safeArgs);
+                return invoke4((com.codename1.location.LocationManager) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.location.LocationRequest) {
             try {
-                return invoke4((com.codename1.location.LocationRequest) target, name, safeArgs);
+                return invoke5((com.codename1.location.LocationRequest) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.location.GeofenceListener) {
             try {
-                return invoke5((com.codename1.location.GeofenceListener) target, name, safeArgs);
+                return invoke6((com.codename1.location.GeofenceListener) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.location.LocationListener) {
             try {
-                return invoke6((com.codename1.location.LocationListener) target, name, safeArgs);
+                return invoke7((com.codename1.location.LocationListener) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
@@ -316,7 +326,7 @@ public final class GeneratedAccess_com_codename1_location {
         if ("setBubbleRadius".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setBubbleRadius(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setBubbleRadius(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setListenerClass".equals(name)) {
@@ -333,17 +343,45 @@ public final class GeneratedAccess_com_codename1_location {
         if ("update".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.update(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.update(toIntValue(adaptedArgs[0])); return null;
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false);
-                typedTarget.update(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
+                typedTarget.update(toIntValue(adaptedArgs[0]), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke2(com.codename1.location.Location typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke2(com.codename1.location.GeofenceManager.Listener typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("locationUpdated".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.location.Location.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.location.Location.class}, false);
+                typedTarget.locationUpdated((com.codename1.location.Location) adaptedArgs[0]); return null;
+            }
+        }
+        if ("onEntered".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.onEntered((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("onExit".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.onExit((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("providerStateChanged".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.providerStateChanged(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke3(com.codename1.location.Location typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("createDistanceCompartor".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.createDistanceCompartor();
@@ -439,7 +477,7 @@ public final class GeneratedAccess_com_codename1_location {
         if ("setStatus".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setStatus(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setStatus(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setTimeStamp".equals(name)) {
@@ -462,7 +500,7 @@ public final class GeneratedAccess_com_codename1_location {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke3(com.codename1.location.LocationManager typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke4(com.codename1.location.LocationManager typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addGeoFencing".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Class.class, com.codename1.location.Geofence.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Class.class, com.codename1.location.Geofence.class}, false);
@@ -538,7 +576,7 @@ public final class GeneratedAccess_com_codename1_location {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke4(com.codename1.location.LocationRequest typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke5(com.codename1.location.LocationRequest typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getInterval".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getInterval();
@@ -552,7 +590,7 @@ public final class GeneratedAccess_com_codename1_location {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke5(com.codename1.location.GeofenceListener typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke6(com.codename1.location.GeofenceListener typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("onEntered".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -568,7 +606,7 @@ public final class GeneratedAccess_com_codename1_location {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke6(com.codename1.location.LocationListener typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke7(com.codename1.location.LocationListener typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("locationUpdated".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.location.Location.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.location.Location.class}, false);
@@ -578,24 +616,30 @@ public final class GeneratedAccess_com_codename1_location {
         if ("providerStateChanged".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.providerStateChanged(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.providerStateChanged(toIntValue(adaptedArgs[0])); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == com.codename1.location.LocationManager.class) {
-            if ("AVAILABLE".equals(name)) return com.codename1.location.LocationManager.AVAILABLE;
-            if ("OUT_OF_SERVICE".equals(name)) return com.codename1.location.LocationManager.OUT_OF_SERVICE;
-            if ("TEMPORARILY_UNAVAILABLE".equals(name)) return com.codename1.location.LocationManager.TEMPORARILY_UNAVAILABLE;
-        }
-        if (type == com.codename1.location.LocationRequest.class) {
-            if ("PRIORITY_HIGH_ACCUARCY".equals(name)) return com.codename1.location.LocationRequest.PRIORITY_HIGH_ACCUARCY;
-            if ("PRIORITY_LOW_ACCUARCY".equals(name)) return com.codename1.location.LocationRequest.PRIORITY_LOW_ACCUARCY;
-            if ("PRIORITY_MEDIUM_ACCUARCY".equals(name)) return com.codename1.location.LocationRequest.PRIORITY_MEDIUM_ACCUARCY;
-        }
+        if (type == com.codename1.location.LocationManager.class) return getStaticField0(name);
+        if (type == com.codename1.location.LocationRequest.class) return getStaticField1(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("AVAILABLE".equals(name)) return com.codename1.location.LocationManager.AVAILABLE;
+        if ("OUT_OF_SERVICE".equals(name)) return com.codename1.location.LocationManager.OUT_OF_SERVICE;
+        if ("TEMPORARILY_UNAVAILABLE".equals(name)) return com.codename1.location.LocationManager.TEMPORARILY_UNAVAILABLE;
+        throw unsupportedStaticField(com.codename1.location.LocationManager.class, name);
+    }
+
+    private static Object getStaticField1(String name) throws Exception {
+        if ("PRIORITY_HIGH_ACCUARCY".equals(name)) return com.codename1.location.LocationRequest.PRIORITY_HIGH_ACCUARCY;
+        if ("PRIORITY_LOW_ACCUARCY".equals(name)) return com.codename1.location.LocationRequest.PRIORITY_LOW_ACCUARCY;
+        if ("PRIORITY_MEDIUM_ACCUARCY".equals(name)) return com.codename1.location.LocationRequest.PRIORITY_MEDIUM_ACCUARCY;
+        throw unsupportedStaticField(com.codename1.location.LocationRequest.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {
@@ -749,7 +793,19 @@ public final class GeneratedAccess_com_codename1_location {
         if (!(value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue)) {
             return value;
         }
+        // Direct fit when LambdaValue already implements the target SAM
+        // (Runnable, Function, Comparator, ...).
+        if (type.isInstance(value)) {
+            return value;
+        }
         return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
+    }
+
+    private static int toIntValue(Object value) {
+        if (value instanceof Number) return ((Number) value).intValue();
+        if (value instanceof Character) return (int) ((Character) value).charValue();
+        throw new ClassCastException("Cannot coerce "
+            + (value == null ? "null" : value.getClass().getName()) + " to int");
     }
 
     private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
@@ -804,10 +860,15 @@ public final class GeneratedAccess_com_codename1_location {
         if ("byte".equals(type.getName()) || type == Byte.class || "short".equals(type.getName()) || type == Short.class
                 || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
                 || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
-            return value instanceof Number;
+            // Java widens char to int implicitly, so accept Character
+            // for any int-or-larger numeric slot.
+            return value instanceof Number || value instanceof Character;
         }
         if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
-            return isSamInterface(type);
+            // LambdaValue implements common SAMs directly (Runnable,
+            // Function, Predicate, Comparator, ...). Also accept any
+            // CN1 SAM the listener-bridge knows how to wrap.
+            return type.isInstance(value) || isSamInterface(type);
         }
         return type.isInstance(value);
     }

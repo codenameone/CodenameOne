@@ -1,0 +1,47 @@
+name: CN1 Playground Language Tests
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'scripts/cn1playground/**'
+      - '.github/workflows/cn1playground-language.yml'
+  push:
+    branches: [main, master]
+    paths:
+      - 'scripts/cn1playground/**'
+      - '.github/workflows/cn1playground-language.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  language-smoke:
+    name: Playground language smoke
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Ensure Xvfb is available
+        run: |
+          set -euo pipefail
+          if ! command -v xvfb-run >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y xvfb
+          fi
+
+      - name: Run playground language smoke tests
+        run: |
+          set -euo pipefail
+          cd scripts/cn1playground
+          xvfb-run -a bash tools/run-playground-smoke-tests.sh

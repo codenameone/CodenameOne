@@ -36,7 +36,11 @@ final class PlaygroundStateStore {
     private static final String CURRENT_CSS_KEY = "cn1playground.currentCss";
     private static final String CURRENT_OUTPUT_KEY = "cn1playground.currentOutput";
     private static final String HISTORY_KEY = "cn1playground.history";
-    private static final int MAX_HISTORY = 10;
+    private static final String MODE_KEY = "cn1playground.mode";
+    private static final String DEVICE_KEY = "cn1playground.device";
+    private static final String ORIENTATION_KEY = "cn1playground.orientation";
+    private static final String PANEL_KEY = "cn1playground.panel";
+    private static final int MAX_HISTORY = 50;
 
     private PlaygroundStateStore() {
     }
@@ -62,6 +66,42 @@ final class PlaygroundStateStore {
         Storage.getInstance().writeObject(CURRENT_SCRIPT_KEY, script == null ? "" : script);
         Storage.getInstance().writeObject(CURRENT_CSS_KEY, css == null ? "" : css);
         Storage.getInstance().writeObject(CURRENT_OUTPUT_KEY, output == null ? "" : output);
+    }
+
+    static String loadMode(String defaultMode) {
+        Object value = Storage.getInstance().readObject(MODE_KEY);
+        return value instanceof String && ((String) value).length() > 0 ? (String) value : defaultMode;
+    }
+
+    static void saveMode(String mode) {
+        Storage.getInstance().writeObject(MODE_KEY, mode == null ? "" : mode);
+    }
+
+    static String loadDevice(String defaultDevice) {
+        Object value = Storage.getInstance().readObject(DEVICE_KEY);
+        return value instanceof String && ((String) value).length() > 0 ? (String) value : defaultDevice;
+    }
+
+    static void saveDevice(String device) {
+        Storage.getInstance().writeObject(DEVICE_KEY, device == null ? "" : device);
+    }
+
+    static String loadOrientation(String defaultOrientation) {
+        Object value = Storage.getInstance().readObject(ORIENTATION_KEY);
+        return value instanceof String && ((String) value).length() > 0 ? (String) value : defaultOrientation;
+    }
+
+    static void saveOrientation(String orientation) {
+        Storage.getInstance().writeObject(ORIENTATION_KEY, orientation == null ? "" : orientation);
+    }
+
+    static String loadPanel(String defaultPanel) {
+        Object value = Storage.getInstance().readObject(PANEL_KEY);
+        return value instanceof String ? (String) value : defaultPanel;
+    }
+
+    static void savePanel(String panel) {
+        Storage.getInstance().writeObject(PANEL_KEY, panel == null ? "" : panel);
     }
 
     static List<HistoryEntry> loadHistory() {

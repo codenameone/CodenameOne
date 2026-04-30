@@ -27,7 +27,7 @@ Theme layering helps in two common cases:
 - A platform needs a slightly different theme.
 - A specific use case needs theme customization. For example, a user might select larger fonts.
 
-Theme layering is straightforward and doesn't require rebuilding the entire theme. A theme can be applied on top of another theme, similar to CSS cascading. To create a layer, add a new theme with the #Add Theme# button.
+Theme layering is straightforward and doesn't require rebuilding the entire theme. A theme can be applied on top of another theme, like CSS cascading. To create a layer, add a new theme with the #Add Theme# button.
 
 IMPORTANT: Remove the `includeNativeBool` constant from the new theme.
 
@@ -47,7 +47,7 @@ Update it to look like this:
 include::../demos/common/src/main/java/com/codenameone/developerguide/advancedtheming/AdvancedThemingSnippets.java[tag=initNamedTheme,indent=0]
 ----
 
-NOTE: This example assumes that the main theme is named "Theme", not the layer theme that was added.
+NOTE: This example assumes that the main theme is named `Theme`, not the layer theme that was added.
 
 The original code relies on the theme being at position 0 in the theme name array. That might not always be true.
 
@@ -60,11 +60,11 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/advancedth
 
 The `addThemeProps` call places the secondary theme on top of the primary "Theme" and keeps the original UIIDs in "Theme" intact.
 
-To apply theme changes to a running application, call `Form`'s `refreshTheme()`. This updates the UI immediately and provides visual feedback for the theme changes.
+To apply theme changes to a running application, call `Form`'s `refreshTheme()`. This updates the UI and provides visual feedback for the theme changes.
 
 === Override resources in platform
 
-When you adapt an application to different OS conventions, one common requirement is to use different icons. Sometimes you also need to change behavior based on device type, for example to use a different UI structure for a tablet.
+When you adapt an application to different OS conventions, one common need is to use different icons. Sometimes you also need to change behavior based on device type, for example to use a different UI structure for a tablet.
 
 Codename One lets you override a resource for a specific platform. You can redefine a resource for that platform and add platform-specific resources.
 
@@ -118,7 +118,7 @@ Internally, Codename One has many built-in constants, and the list keeps growing
 |`true` to activate the caps text mode in the buttons. When activated `setText` on `Button` and all the constructors will invoke `upcase()` on all the strings effectively making the application buttons use uppercase exclusively. This is `false` by default except for Android where it defaults to `true`. it's equivalent to `Button.setCapsTextDefault(boolean)` and can be tuned to an individual `Component` via `Component.setRippleEffect(boolean)`
 
 |capsButtonUiids
-|A list of the UIID's that should be capitalized by default (in supported platforms) other than the `Button` and `RaisedButton` which are already capitalized. This list can be separated by spaces or commas e.g. `capsButtonUiids=UpcaseButton,OtherCustomButton`
+|A list of the UIID's that should be capitalized by default (in supported platforms) other than the `Button` and `RaisedButton` which are already capitalized. This list can be separated by spaces or commas for example, `capsButtonUiids=UpcaseButton,OtherCustomButton`
 
 |defaultCommandImage
 |Image to give a command with no icon
@@ -130,13 +130,13 @@ Internally, Codename One has many built-in constants, and the list keeps growing
 |Sets the default Gaussian blur radius for the background of the dialogs. The default value is -1 indicating no blur
 
 |dialogPosition
-|Place the dialog in an arbitrary border layout position (e.g. North, South, Center, etc.)
+|Place the dialog in an arbitrary border layout position (for example, North, South, Center, etc.)
 
 |centeredPopupBool
 |Popup of the combo box will appear in the center of the screen
 
 |changeTabOnFocusBool
-|Useful for feature phones, allows changing the tab when the focus changes immediately, without pressing a key
+|Useful for feature phones, allows changing the tab when the focus changes, without pressing a key
 
 |checkBoxCheckDisImage
 |CheckBox image to use instead of Codename One drawing it on its own
@@ -184,6 +184,9 @@ SoftKey, Touch, Bar, Title, Right, Native
 |iconUiid
 |Allows theming the icon component used by `SpanLabel`, `SpanButton`, `MultiButton`, and `SpanMultiButton` when they fetch icon styling via theme constants.
 
+|iosScrollMotionBool
+|Enables iOS-style scroll physics (nonlinear rubber-band during drag and critically damped tensile snap-back). When unset it defaults to `true` on the iOS platform and `false` elsewhere. Set explicitly to override the platform default. See <<scroll-motion-tuning-section>>
+
 |imageviewerNavigationArrowsBool
 |Enables side navigation arrows by default for `ImageViewer` instances using the `ImageViewer` UIID (or a lowercased custom UIID prefix).
 
@@ -202,6 +205,9 @@ SoftKey, Touch, Bar, Title, Right, Native
 |dialogTransitionOutImage
 |Default transition https://www.codenameone.com/javadoc/com/codename1/ui/Image.html[Image] for dialog, causes a https://www.codenameone.com/javadoc/com/codename1/ui/animations/Timeline.html[Timeline] transition effect
 
+|DecayMotionScaleFactorInt
+|Velocity-to-distance multiplier for the exponential-decay scroll motion (see <<scroll-motion-tuning-section>>). Default is `950`. Larger values make flicks travel farther for the same release velocity
+
 |disabledColor
 |Color to use when disabling entries by default
 
@@ -209,6 +215,7 @@ SoftKey, Touch, Bar, Title, Right, Native
 |The UIID used for dialog button commands
 
 |dlgCommandButtonSizeInt
+// vale-skip: write-good.TooWordy — 'Minimum' is the precise term for a numeric lower bound; 'least' would imply a comparison rather than a constraint.
 |Minimum size to give to command buttons in the dialog
 
 |dlgCommandGridBool
@@ -233,10 +240,11 @@ SoftKey, Touch, Bar, Title, Right, Native
 |Boolean indicating if the scrollbar should fade when there is inactivity
 
 |setFadeScrollBarSpeed(int) _(API)_
+// vale-skip: Microsoft.ComplexWords — 'Approximate' is the correct technical term for an estimated duration; 'about' would lose precision in a numeric formula context.
 |Sets the per-frame opacity decrement for scrollbar fading (not milliseconds). Approximate fade duration is `durationMs ~= (255 / speed) * (1000 / frameRate)`. At 60 FPS: speed `5` ~= `850ms`, `3` ~= `1400ms`, `2` ~= `2100ms`, `1` ~= `4250ms`
 
 |fadeScrollEdgeBool
-|Places a fade effect at the edges of the screen to indicate that it's possible to scroll until we reach the edge (common on Android)
+|Places a fade effect at the edges of the screen to show that it's possible to scroll until you reach the edge (common on Android)
 
 |fadeScrollEdgeInt
 |Amount of pixels to fade out at the edge
@@ -266,7 +274,7 @@ SoftKey, Touch, Bar, Title, Right, Native
 |Indicates that the Toolbar API should be on/off by default for all forms
 
 |hasRaisedButtonBool
-|Is true in platforms where the theme has the `RaisedButton` UIID defined. This is currently only true in the native Android theme to allow some material design guidelines
+|Is true in platforms where the theme has the `RaisedButton` UIID defined. This is only true in the native Android theme to allow some material design guidelines
 
 |hideBackCommandBool
 |Hides the back command from the side menu when possible
@@ -344,7 +352,7 @@ SoftKey, Touch, Bar, Title, Right, Native
 |Allows positioning and sizing the menu
 
 |menuImage
-|The three dot menu image used in Android and the https://www.codenameone.com/javadoc/com/codename1/ui/Toolbar.html[Toolbar] to show additional command entries
+|The three dot menu image used in Android and the https://www.codenameone.com/javadoc/com/codename1/ui/Toolbar.html[Toolbar] to show more command entries
 
 |menuImageSize
 |The size in millimeters (floating point value) of the generated side menu image, this is only used if you don't supply a custom image. The default value is 4.5.
@@ -472,11 +480,20 @@ SoftKey, Touch, Bar, Title, Right, Native
 |rightSideMenuPressImage
 |Same as sideMenuPressImage only for the right side, optional and defaults to sideMenuPressImage
 
+|rubberBandCoefficientInt
+|Resistance coefficient for the iOS-style rubber-band compression used while the finger drags past a scroll edge. Value is interpreted as hundredths, so `55` means `0.55` (the iOS reference value). Larger values let the content be pulled farther for the same finger travel; smaller values make the content feel stiffer. Only active when `iosScrollMotionBool` is `true`. See <<scroll-motion-tuning-section>>
+
+|ScrollMotion
+|Selects the post-release flick model. `DECAY` (default) uses exponential velocity decay controlled by `ScrollMotionTimeConstantInt` and `DecayMotionScaleFactorInt`. Any other value (for example, `FRICTION`) falls back to the linear-friction model. See <<scroll-motion-tuning-section>>
+
+|ScrollMotionTimeConstantInt
+|Time constant in milliseconds for the exponential-decay flick model (active when `ScrollMotion=DECAY`). Default is `500`. Smaller values stop the flick sooner
+
 |scrollVisibleBool
 |`true`/`false` default is platform dependent. Toggles whether the scroll bar is visible
 
 |showBackCommandOnTitleBool
-|Used by the https://www.codenameone.com/javadoc/com/codename1/ui/Toolbar.html[Toolbar] API to indicate whether the back button should appear on the title
+|Used by the https://www.codenameone.com/javadoc/com/codename1/ui/Toolbar.html[Toolbar] API to show whether the back button should appear on the title
 
 |shrinkPopupTitleBool
 |Indicates the title of the popup should be set to 0 if it's missing
@@ -575,7 +592,7 @@ SoftKey, Touch, Bar, Title, Right, Native
 |The placement of the tabs in the https://www.codenameone.com/javadoc/com/codename1/ui/Tabs.html[Tabs] component: TOP = 0, LEFT = 1, BOTTOM = 2, RIGHT = 3
 
 |tabsSlideSpeedInt
-|The time of the animation that occurs (in milliseconds) between  between releasing a swiped tab and reaching the next tab.  Currently defaults to 200
+|The time of the animation that occurs (in milliseconds) between releasing a swiped tab and reaching the next tab. Defaults to 200
 
 |tabsFillRowsBool
 |Indicates if the tabs should fill the row using flow layout
@@ -593,13 +610,13 @@ SoftKey, Touch, Bar, Title, Right, Native
 |A hex RGB color which defaults to null in which case this has no effect. When defined this will change the color of the border and label to the given color to match the material design styling. This implements the red border underline in cases of error and the label text color change
 
 |textComponentOnTopBool
-|Toggles the on top mode which makes things look like they do on Android. This defaults to true on Android and false on other OS's. This can also be manipulated via the `onTopMode(boolean)` method in `InputComponent` however the layout will only use the theme constant
+|Toggles the on top mode which makes things look like they do on Android. This defaults to true on Android and false on other OS's. This can also be manipulated via the `onTopMode(boolean)` method in `InputComponent`, but the layout will only use the theme constant
 
 |textComponentAnimBool
 |toggles the animation mode which again can be manipulated by a method in `InputComponent`. If you want to keep the UI static without the floating hint effect set this to false. Notice this defaults to true only on Android
 
 |textComponentFieldUIID
-|sets the UIID of the text field to something other than `TextField` this is useful for platforms such as iOS where the look of the text field is different within the text component. This allows us to make the background of the text field transparent when it's within the `TextComponent` and make it different from the regular text field
+|sets the UIID of the text field to something other than `TextField` this is useful for platforms such as iOS where the look of the text field is different within the text component. This allows you to make the background of the text field transparent when it's within the `TextComponent` and make it different from the regular text field
 
 |textFieldCursorColorInt
 |The color of the cursor as an integer (not hex)
@@ -641,23 +658,47 @@ SoftKey, Touch, Bar, Title, Right, Native
 |Picture of a file node for the `Tree` class
 
 |tensileDragBool
-|Indicates that tensile drag should be enabled/disabled. This is usually set by platform themes
+|Indicates that tensile drag should be enabled/disabled. This is set by platform themes
+
+|tensileSnapMinDurationInt
+// vale-skip: write-good.TooWordy — 'Minimum' is the precise term for the numeric lower bound on duration.
+|Minimum duration in milliseconds for the tensile snap-back animation when the finger is released past a scroll edge. Defaults to `400` when `iosScrollMotionBool` is `true` and `300` otherwise. The actual duration scales with the distance being snapped; this is only a floor
+
+|tensileSnapMotion
+|Motion curve used for the tensile snap-back. `SPRING` (the default when `iosScrollMotionBool` is `true`) applies a critically damped spring envelope that settles softly. `DECELERATION` (the default elsewhere) applies the legacy quadratic ease-out. See <<scroll-motion-tuning-section>>
 |===
+
+[[scroll-motion-tuning-section]]
+==== Scroll motion tuning
+
+Scroll feel is controlled by three stages, each tunable via theme constants:
+
+. *While the finger is dragging past an edge*--when `iosScrollMotionBool` is `true`, the over-edge distance is compressed by the iOS UIScrollView rubber-band function `c * d * dim / (c * d + dim)`, where `d` is the raw finger displacement past the edge, `dim` is the viewport dimension, and `c` is `rubberBandCoefficientInt / 100` (default `0.55`). The result is that the content feels heavier the farther you pull it, asymptotically approaching `dim`. When `iosScrollMotionBool` is `false`, the legacy behavior is used: a linear 1:1 follow clamped to `tensileLength`.
+. *After the finger is lifted, while there is still velocity*--the `ScrollMotion` constant selects the model. `DECAY` (default) uses exponential velocity decay with a time constant of `ScrollMotionTimeConstantInt` milliseconds and a distance scale of `DecayMotionScaleFactorInt`. Any other value (for example, `FRICTION`) falls back to linear friction.
+. *When the scroll comes to rest past an edge*--a tensile snap-back animates the content back to the edge. `tensileSnapMotion` picks the curve: `SPRING` is a critically damped envelope (iOS-like soft settle) and `DECELERATION` is the legacy quadratic ease-out. The duration scales with distance but never falls below `tensileSnapMinDurationInt` milliseconds.
++
+`iosScrollMotionBool` is the single switch that flips stage 1 and the default of stage 3 to the iOS-matching behavior. It defaults to `true` on the iOS platform only. Every individual constant can still be overridden regardless of this switch, so you can, for example, enable the nonlinear rubber-band globally (`iosScrollMotionBool=true`) while keeping the legacy quadratic snap-back (`tensileSnapMotion=DECELERATION`).
+
+.Tuning suggestions
+* To make scrolling feel stiffer on iOS (less pull), reduce `rubberBandCoefficientInt` from `55` toward `35`.
+* To make flicks stop sooner, reduce `ScrollMotionTimeConstantInt` (default `500`) or `DecayMotionScaleFactorInt` (default `950`).
+* To enable iOS-style physics on Android or desktop for consistency, set `iosScrollMotionBool=true` explicitly.
+* To disable iOS physics on the simulator while debugging, set `iosScrollMotionBool=false` in your development theme.
 
 .Dynamic Theme Swapping & Theme Constants
 ****
 Once a theme constant is set by a theme, it isn't removed on a refresh when replacing the theme.
 
-E.g. if one would set the `comboImage` constant to a specific value in theme A and then switch to theme B, that doesn't define the `comboImage`, the original theme A `comboImage` might remain!
+For example, if one would set the `comboImage` constant to a specific value in theme A and then switch to theme B, that doesn't define the `comboImage`, the original theme A `comboImage` might remain!
 
 The reason for this is simple: when extracting the constant values, components keep the values in cache locally and just don't track the change in value. Furthermore, since the components allow manually setting values, it's impractical for them to track whether a value was set by a constant or explicitly by the user.
 
-The solution for this is to either manually reset undesired values before replacing a theme (e.g. for the case, above by calling the default look and feel method for setting the combo image with a null value), or defining a constant value to replace the existing value.
+The solution for this is to either manually reset undesired values before replacing a theme (for example, for the case, above by calling the default look and feel method for setting the combo image with a null value), or defining a constant value to replace the existing value.
 ****
 
-=== Native Theming
+=== Native theming
 
-Codename One uses a theme constant called `includeNativeBool`, when that constant is set to `true` Codename One starts by loading the native theme first and then applying all the theme settings. This means your theme "derives" the style of the native theme first, similar to the cascading effect of CSS. Internally this is exactly what the <<theme-layering-section,theme layering>> section covered.
+Codename One uses a theme constant called `includeNativeBool`, when that constant is set to `true` Codename One starts by loading the native theme first and then applying all the theme settings. This means your theme "derives" the style of the native theme first, like the cascading effect of CSS. Internally this is what the <<theme-layering-section,theme layering>> section covered.
 
 By avoiding this flag you can create themes that look _EXACTLY_ the same on all platforms.
 
@@ -671,7 +712,7 @@ image::img/designer-native-theme-menu.png[The native theme menu option,scaledwid
 
 Developers can pick the platform of their liking and see how the theme will appear in that particular platform by selecting it and having the preview update on the fly.
 
-=== Under the Hood of the Theme Engine
+=== Under the hood of the theme engine
 
 To truly understand a theme you need to understand what it's. Internally a theme is a `Hashtable` key/value pair between UIID based keys and their respective values. For example: the key:
 
@@ -710,11 +751,11 @@ The type is omitted for the default unselected type, and may be one of _sel_ (se
 *	`backgroundType` - a `Byte` object containing one of the constants for the background type defined in https://www.codenameone.com/javadoc/com/codename1/ui/plaf/Style.html[Style] under BACKGROUND_*.
 *	`backgroundGradient` - contains an `Object` array containing 2 integers for the colors of the gradient. If the gradient is radial it contains 3 floating points defining the x, y & size of the gradient.
 
-So to set the foreground color of a selected button to red, a theme will define a property like:
+to set the foreground color of a selected button to red, a theme will define a property like:
 
 `Button.sel#fgColor=ff0000`
 
-This information is mostly useful for understanding how things work within Codename One, but it can also be useful in runtime.
+This information is useful for understanding how things work within Codename One, but it can also be useful in runtime.
 
 For example: to increase the size of all fonts in the application, you can do something like:
 
@@ -724,7 +765,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/advancedth
 ----
 
 [[understanding-images-and-multi-images]]
-=== Understanding Images and Multi-Images
+=== Understanding images and Multi-Images
 
 // HTML_ONLY_START
 NOTE: This section provides a high-level overview of images. You dive deeper into the various types of images in the https://www.codenameone.com/manual/graphics.html#deep-into-images-section[graphics section].
@@ -736,27 +777,27 @@ NOTE: This section provides a high-level overview of images. You dive deeper int
 
 When working with a theme, you often use images for borders or backgrounds. You also use images within the GUI for various purposes and most such images will be extracted from the resource file.
 
-Adding a standard JPEG/PNG image to the resource file is straight forward, and the resulting image can be viewed within the images section. For example, due to the wide difference between device types, an image that would be appropriate in size for an iPhone 3gs would not be appropriate in size for a Nexus device or an iPhone 4 (but perhaps, surprisingly, it will be right for iPad 1 and iPad 2).
+Adding a standard JPEG/PNG image to the resource file is straight forward, and the resulting image can be viewed within the images section. For example, due to the wide difference between device types, an image that would be appropriate in size for an iPhone 3gs would not be appropriate in size for a Nexus device or an iPhone 4 (but perhaps, it will be right for iPad 1 and iPad 2).
 
-The density of the devices varies significantly and Codename One tries to simplify the process by unifying everything into one set of values to indicate density. For simplicity's sake, density is sometimes expressed in terms of pixels, however it's mapped internally to actual screen measurements where possible.
+The density of the devices varies and Codename One tries to simplify the process by unifying everything into one set of values to show density. For simplicity's sake, density is sometimes expressed in pixels, but it's mapped internally to actual screen measurements where possible.
 
 A multi-image is an image that has many varieties for different densities, and thus looks sharp in all the
 densities. Since scaling on the device can’t interpolate the data (due to performance considerations), significant scaling on the device becomes impractical. For example, a multi-image will provide the "right" resolution image for the given device type.
 
-From the programming perspective this is mostly seamless, a developer accesses one image and has no ability to access the images in the different resolutions. Within the designer, however, you can explicitly define images for many resolutions and perform high quality scaling so the "right" image is available.
+From the programming perspective this is seamless, a developer accesses one image and has no ability to access the images in the different resolutions. Within the designer, but, you can explicitly define images for many resolutions and perform high quality scaling so the "right" image is available.
 
 You can use two basic methods to add a multi-image: quick add and standard add.
 
 Both methods rely on understanding the source resolution of the image, for example: if you've an icon that you expect to be
-128x128 pixels on iPhone 4, 102x102 on nexus one and 64x64 on iPhone 3gs. You can provide the source image
+128×128 pixels on iPhone 4, 102×102 on nexus one and 64×64 on iPhone 3gs. You can provide the source image
 as the 128 pixel image and perform a quick add option while picking the # High# density option.
 
-This will indicate to the algorithm that your source image is designed for the " high" density and it will scale for
+This will show to the algorithm that your source image is designed for the " high" density and it will scale for
 the rest of the densities accordingly.
 
 TIP: This relies on the common use case of asking your designer to design for one high end device (for example: iPhone X) then you can take the resources and add them as "HD" resources. They will automatically adapt to the lower resolutions
 
-Alternatively, you can use the standard add multi-image dialog and set it like this:
+Or, you can use the standard add multi-image dialog and set it like this:
 
 image::img/select-image-resolutions.png[Multi-image resolution dialog,scaledwidth=50%]
 
@@ -766,9 +807,10 @@ on the closest alternative.
 
 The percentage value will change the entire column, and it means the percentage of the screen. For example: You know
 the icon is 128 for the high resolution, you can move the percentage until you reach something close to
-128 in the " High" row and the other rows will represent a size that should be pretty close in terms of physical
+128 in the " High" row and the other rows will represent a size that should be pretty close in physical
 size to the 128 figure.
 
+// vale-skip: Microsoft.ComplexWords — 'approximate' is correct here (an estimate of pixel density); 'about pixel density' would be wrong English.
 At runtime, you can always find the host device's approximate pixel density using the `Display.getDeviceDensity()`
 method. This will return one of:
 
@@ -786,17 +828,18 @@ method. This will return one of:
 | `Density.DENSITY_4K` | ~ 1250ppi |
 |=====
 
-=== Use Millimeters for Padding/Margin and Font Sizes
+=== Use millimeters for Padding/Margin and font sizes
 
-When configuring your styles, you should almost never use "Pixels" as the unit for padding, margins, font size,
+// vale-skip: write-good.TooWordy — 'rarely' is the natural word here; 'seldom' (vale's preferred substitute) reads as archaic in modern technical writing.
+When configuring your styles, you should rarely use "Pixels" as the unit for padding, margins, font size,
 and border thickness because the results will be inconsistent on different densities. Instead, you should use
 millimeters for all non-zero units of measurement.
 
 As you now understand the <<DPI-explanation-sidebar,complexities of DPI>> it should be clear why this is important.
 
-==== Fractions of Millimeters
+==== Fractions of millimeters
 
-Sometimes millimeters don't give you enough precision for what you want to do. Currently the designer allows you to specify integer values for most units. For example, you can achieve more precise results when working directly in Java. The `Display.convertToPixels()` method will allow you to convert millimeters (or DIPS) to pixels. It also takes an integer input, but you can use it to obtain a multiplier that you can then use to convert any millimeter value you want into pixels.
+Sometimes millimeters don't give you enough precision for what you want to do. The designer allows you to specify integer values for most units. For example, you can achieve more precise results when working directly in Java. The `Display.convertToPixels()` method will allow you to convert millimeters (or DIPS) to pixels. It also takes an integer input, but you can use it to get a multiplier that you can then use to convert any millimeter value you want into pixels.
 
 For example:
 
@@ -812,7 +855,7 @@ And now you can set the padding on an element to 1.5mm. For example:
 include::../demos/common/src/main/java/com/codenameone/developerguide/advancedtheming/AdvancedThemingSnippets.java[tag=paddingFromMM,indent=0]
 ----
 
-=== Creating a Great Looking Side Menu
+=== Creating a great looking side menu
 
 .Side Menu final result
 image::img/styled-sidemenu-result.png[Side Menu final result,scaledwidth=50%]
@@ -829,7 +872,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/advancedth
 ----
 
 
-<1> This is the icon which was used in lieu of a logo it appears in the top right of the side menu
+<1> This is the icon which was used instead of a logo it appears in the top right of the side menu
 <2> This is the top bar containing the tagline and the icon it's styled as if it's a command but you can put anything here for example: an image etc.
 <3> The commands are added as usual to the side menu with no styling or functionality, the entire look is determined by the theme
 
@@ -865,7 +908,7 @@ The iOS version of the side command inherits a border style so you must "remove"
 .Border must be defined as Empty
 image::img/styled-sidemenu-6.png[Border must be defined as Empty,scaledwidth=40%]
 
-Next you need to pick a good looking font and make sure it's large enough. You use millimeters size it correctly for all OS’s and override the derived text decoration which has a value in the iOS native theme so it can impact the final look.
+Next you need to pick a good looking font and make sure it's large enough. You use millimeters size it for all OS’s and override the derived text decoration which has a value in the iOS native theme so it can impact the final look.
 
 .Pick a good looking font for the side command
 image::img/styled-sidemenu-7.png[Pick a good looking font for the side command,scaledwidth=40%]
@@ -893,13 +936,13 @@ The last change for the theme is for the #StatusBarSideMenu# UIID which is a spa
 .StatusBarSideMenu padding for the top of the side menu
 image::img/styled-sidemenu-11.png[StatusBarSideMenu padding for the top of the side menu,scaledwidth=40%]
 
-Finally, you will add the icon image (or a logo if you've it) into the theme as a multi image so you can use it within the side menu as a good looking logo. A relatively large icon image works as a 2HD multi-image but you can use many strategies to get a fitting image for this spot.
+Finally, you will add the icon image (or a logo if you've it) into the theme as a multi image so you can use it within the side menu as a good looking logo. A large icon image works as a 2HD multi-image but you can use many strategies to get a fitting image for this spot.
 
 TIP: Rounded images work well here, you can round images dynamically using masking
 
 These steps produce the UI above as a side menu, they might seem like a long set of steps but each step is pretty simple as you walk thru each one. This does show off the versatility and power of Codename One as a change to one step can create a radically different UI design.
 
-=== Converting a PSD To A Theme
+=== Converting a PSD to a theme
 
 Codename One provides extensive support for designing beautiful user interfaces, but it isn't necessarily obvious to new developers how to achieve their desired results. A common workflow for app design includes a PSD file with mock-ups of the UI, created by a professional designer.
 
@@ -930,7 +973,7 @@ Here is a screenshot of the resulting component running inside the Codename One 
 .Resulting app in the Codename One simulator
 image::img/psd2app-image3.png[Resulting app in the Codename One simulator,scaledwidth=25%]
 
-==== Breaking Down the PSD
+==== Breaking down the PSD
 
 Open the PSD you're interested in using Photoshop.
 
@@ -940,7 +983,7 @@ In this PSD you want one of the screen designs so initially you want to remove e
 
 - Select the drag tool (the top left tool)
 - In the toolbar for the tool (top bar area) check the #Auto Select# mode
-- Select the #Layer Mode# for auto selection (in some cases group would actually be better so feel free to experiment)
+- Select the #Layer Mode# for auto selection (sometimes group would actually be better so feel free to experiment)
 - Click on the portion in the PSD that you're interested in
 
 You should end up with something like this where a layer is selected in the layers window:
@@ -965,11 +1008,11 @@ Once the layer hierarchy is a smart object you can double click it which will op
 .Double clicking the smart object allows you to edit the form you need
 image::img/psd2app-image7.png[Double clicking the smart object allows you to edit the form you need,scaledwidth=40%]
 
-===== Removing the Noise
+===== Removing the noise
 
-The first thing you need to do is remove from the image all of the things that you don't need. The status bar area on the top is redundant as if is a part of the phones UI. You can select it using the select tool and click the eye icon next to the layer to hide it.
+The first thing you need to do is remove from the image all the things that you don't need. The status bar area on the top is redundant as if is a part of the phones UI. You can select it using the select tool and click the eye icon next to the layer to hide it.
 
-Normally you'd want to have the back arrow but thanks to the material design icons that are a part of Codename One you don't need that icon so you can hide that too.
+You'd want to have the back arrow but thanks to the material design icons that are a part of Codename One you don't need that icon so you can hide that too.
 
 You don't need the "Sign Up" or "Done" strings in the title either but before removing them you'd like to know the font that's used.
 
@@ -992,17 +1035,17 @@ image::img/psd2app-image10.png[The color dialog lists the hex color at the botto
 
 You can now hide both text layers so they won't pose a problem later.
 
-===== The Camera Button
+===== The camera Button
 
-The camera button includes an icon and the button background itself. You can use that as a single image and be done with it, but for the purpose of this tutorial I will take the harder route of separating this into a button background and a foreground image.
+The camera button includes an icon and the button background itself. You can use that as a single image and be done with it, but for this tutorial I will take the harder route of separating this into a button background and a foreground image.
 
 When you click on the camera icon you will notice that the camera icon is comprised of two separate layers: the camera and the "x" symbol above it. You can select both layers using #ctrl-click# (command click on the Mac) and convert both to a smart object together using the same method as before:
 
 .The camera smart object
 image::img/psd2app-image11.png[The camera smart object]
 
-Since the image is used as an icon you want it to be completely square which isn't the situation here! +
-This is important as a non-square image can trigger misalignment when dealing with icons and the background. So you need to use the #Image# -> #Canvas Size# menu and set the values to be the same (the higher value of the two).
+Since the image is used as an icon you want it to be square which isn't the situation here! +
+This is important as a non-square image can trigger misalignment when dealing with icons and the background. you need to use the #Image# -> #Canvas Size# menu and set the values to be the same (the higher value of the two).
 
 .The canvas size dialog for the camera.png file
 image::img/psd-image-size.png[The canvas size dialog for the camera.png file,scaledwidth=40%]
@@ -1025,7 +1068,7 @@ image::img/camera-button.png[The camera button image set to a gray background so
 
 Now you can hide both of these elements and proceed to get the background image for the title.
 
-Here the "smart object trick" won't work... There is an effects layer in place and the smart object will provide you with the real underlying image instead of the look you actually want. For example, solving this is trivial now that you hid all of the elements on top of the image!
+Here the "smart object trick" won't work... There is an effects layer in place and the smart object will provide you with the real underlying image instead of the look you actually want. For example, solving this is trivial now that you hid all the elements on top of the image!
 
 You need to switch to the rectangular select tool:
 
@@ -1034,7 +1077,7 @@ image::img/psd2app-image12.png[The select tool and the clean image you want to s
 
 Now drag the select tool to select the image don't cross into the white pixels below the image. You can use the zoom value and set it to a high value to get the selection right.
 
-When the selection is right click #Edit# -> #Copy Merged#. Normally #Copy# would copy a specific layer but in this case you want to copy what you see on the screen!
+When the selection is right click #Edit# -> #Copy Merged#. #Copy# would copy a specific layer but in this case you want to copy what you see on the screen!
 
 Now click #File# -> #New# it should have the #Presets# set to #Clipboard# which means the newly created image is based on what you copied (that's seriously great UX). Just accept that dialog and paste (#Ctrl-V# or #Command-V#).
 
@@ -1050,9 +1093,9 @@ image::img/psd2app-image13.png[The eye drop tool can be pointed at an area of th
 
 ==== The Code
 
-While that was verbose it was relatively simple. You will create a simple barebones manual application with the native theme.
+While that was verbose it was simple. You will create a simple barebones manual application with the native theme.
 
-NOTE: The reason for this is to avoid "noise", if you use a more elaborate theme it would have some existing settings. This can make the tutorial harder to follow
+NOTE: The reason for this is to avoid "noise," if you use a more elaborate theme it would have some existing settings. This can make the tutorial harder to follow
 
 .Simple bare bones app settings
 image::img/psd2app-image14.png[Simple bare bones app settings]
@@ -1061,7 +1104,7 @@ Once the project is created double click the `theme.res` file and within the des
 
 Then save the resource file so you can use these images from code.
 
-Here is the source code you used to work with the UI above there are comments within the code explaining some of the logic:
+Here is the source code you used to work with the UI above there are comments within the code explaining some logic:
 
 [source,java]
 ----
@@ -1073,17 +1116,17 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/advancedth
 include::../demos/common/src/main/java/com/codenameone/developerguide/advancedtheming/PsdTutorialDemo.java[tag=psdStart,indent=0]
 ----
 
-==== Styling The UI
+==== Styling the UI
 
-So the code above is most of the work but you still need to put everything together using the theme. This is what you've so far:
+the code above is most of the work but you still need to put everything together using the theme. This is what you've so far:
 
 .Before applying the changes to the theme this is what you've
 image::img/psd2app-image15.png[Before applying the changes to the theme this is what you've,scaledwidth=20%]
 
-.This is what you're aiming at with no additional code changes
-image::img/psd2app-image16.png[This is what you're aiming at with no additional code changes,scaledwidth=20%]
+.This is what you're aiming at with no more code changes
+image::img/psd2app-image16.png[This is what you're aiming at with no more code changes,scaledwidth=20%]
 
-This looks like a major set of changes but it requires exactly 10 UIID definitions to get to this look!
+This looks like a major set of changes but it requires 10 UIID definitions to get to this look!
 
 Open the designer and select the theme. Press the #Add# button and type in #TitleContainer#. Uncheck derive for the background and select #IMAGE_SCALED_FILL# for the #Type# and the #background.jpg# image.
 
@@ -1106,7 +1149,7 @@ Press #OK# to save the changes.
 
 Copy the `Title` UIID and paste it, change the name to "TitleCommand" and press #OK# to save the changes.
 
-Copy the `Title` UIID again and paste it, change the name to "RedCommand". In the #Color# tab set the foreground color to `f73267`. In the #Font# tab set the #True Type# to #native:MainLight# and set the size to 3. Press #OK# to save the changes.
+Copy the `Title` UIID again and paste it, change the name to `RedCommand`. In the #Color# tab set the foreground color to `f73267`. In the #Font# tab set the #True Type# to #native:MainLight# and set the size to 3. Press #OK# to save the changes.
 
 Add the "TitleArea" UIID. In the #Color# tab define transparency as `0` (fully transparent so you will see the `TitleContainer`). Define padding and margin as 0 on all sides. +
 In the #Border# tab press the #...# button and select #[Empty]#.
@@ -1116,7 +1159,7 @@ Add the "TextField" UIID. In the #Color# tab define transparency as `255` (fully
 In the #Border# tab press the #...# button and select #[Empty]#.
 In the #Font# tab set the #True Type# to #native:MainLight# and set the size to 2. Press #OK# to save the changes.
 
-Copy the `TextField` UIID again and paste it, change the name to "TextHint". In the #Color# tab set the foreground color to `4d606f`. Press #OK# to save the changes.
+Copy the `TextField` UIID again and paste it, change the name to `TextHint`. In the #Color# tab set the foreground color to `4d606f`. Press #OK# to save the changes.
 
 Add the "SouthButton" UIID. In the #Color# tab define transparency as `255` (fully opaque) and the background as `f73267` (red) and the foreground as `ffffff` (white). Define #Alignment# as #Center#. +
 
@@ -1145,8 +1188,8 @@ Press #OK# to save the changes.
 
 You can now save the theme and the app should look like the final result!
 
-===== Not Quite There Yet
+===== Not quite there yet
 
-There is one last piece that you would notice if you actually try to run this code. When pressing the buttons/text fields you would see their look change completely due to the different styles for focus/press behavior.
+There is one last piece that you would notice if you actually try to run this code. When pressing the buttons/text fields you would see their look change due to the different styles for focus/press behavior.
 
 You can derive the regular styles from the selected/pressed styles but one of the simplest ways is to copy & paste the styles to the pressed/selected tabs. You can copy `CameraButton`, `RedCommand`, `SouthButton` & `TextField` to the selected state. Then copy `CameraButton`, `RedCommand` & `SouthButton` to the pressed state to get the complete app running!

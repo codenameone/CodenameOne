@@ -35,6 +35,7 @@ import com.codename1.ui.plaf.Accessor;
 import com.codename1.ui.plaf.Border;
 import com.codename1.tools.resourcebuilder.ThemeTaskConstants;
 import com.codename1.ui.util.EditableResources;
+import com.codename1.ui.util.EditableResourcesEditor;
 import com.codename1.ui.Font;
 import com.codename1.ui.animations.AnimationAccessor;
 import com.codename1.ui.animations.Timeline;
@@ -152,7 +153,7 @@ public class ResourceEditorView extends FrameView {
     private HelpAction helpAction = new HelpAction();
     private static final String IMAGE_DIR = "/com/codename1/designer/resources/";
 
-    private static EditableResources loadedResources = new EditableResources();
+    private static EditableResources loadedResources = new EditableResourcesEditor();
     private Properties projectGeneratorSettings;
     private static String manualIDESettings;
     private List<String> recentFiles = new ArrayList<String>();
@@ -509,7 +510,7 @@ public class ResourceEditorView extends FrameView {
                 }
                 File f = getPlatformOverrideFile();
                 if(f != null) {
-                    EditableResources platformOverrideResource = new EditableResources();
+                    EditableResources platformOverrideResource = new EditableResourcesEditor();
                     if(f.exists()) {
                         try {
                             platformOverrideResource.openFile(new FileInputStream(f));
@@ -657,7 +658,7 @@ public class ResourceEditorView extends FrameView {
             // tree tries to restore selection sometimes with a non-existing resource:
             for(String s : loadedResources.getResourceNames()) {
                 if(s.equals(selectedResource)) {
-                    BaseForm b = (BaseForm)loadedResources.getResourceEditor(selectedResource, ResourceEditorView.this);
+                    BaseForm b = (BaseForm)((EditableResourcesEditor)loadedResources).getResourceEditor(selectedResource, ResourceEditorView.this);
                     if(loadedResources.isOverrideMode() && !loadedResources.isOverridenResource(selectedResource)) {
                         b.setOverrideMode(true, mainPanel);
                     }
@@ -2052,7 +2053,7 @@ private static void checkDuplicateResources(EditableResources r, String[] loaded
 }
 
     public void importResourceStream(InputStream is) throws IOException {
-        EditableResources r = new EditableResources();
+        EditableResources r = new EditableResourcesEditor();
         r.openFile(is);
         checkDuplicateResourcesLoop(r, loadedResources.getThemeResourceNames(),
                 r.getThemeResourceNames(), "Rename Theme", "Theme ");
@@ -2826,7 +2827,7 @@ private void duplicateItemActionPerformed(java.awt.event.ActionEvent evt) {//GEN
                     loadedResources.setModified();
                 }
                 bo.close();
-                EditableResources r = new EditableResources();
+                EditableResources r = new EditableResourcesEditor();
                 r.openFile(new ByteArrayInputStream(bo.toByteArray()));
                 loadedResources.addResourceObjectDuplicate(selectedResource, val, r.getResourceObject(selectedResource));
                 setSelectedResource(val);
@@ -3292,7 +3293,7 @@ private void imageBorderWizardMenuItemActionPerformed(java.awt.event.ActionEvent
             } else {
                 i = new FileInputStream(file);
             }
-            EditableResources er = new EditableResources();
+            EditableResources er = new EditableResourcesEditor();
             er.openFile(i);
             JavaSEPortWithSVGSupport.setNativeTheme(er);
             JavaSEPortWithSVGSupport.setShowEDTWarnings(false);

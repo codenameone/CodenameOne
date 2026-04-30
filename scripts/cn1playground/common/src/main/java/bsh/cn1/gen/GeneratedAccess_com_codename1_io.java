@@ -45,6 +45,12 @@ public final class GeneratedAccess_com_codename1_io {
         if ("ConnectionRequest".equals(simpleName)) {
             return com.codename1.io.ConnectionRequest.class;
         }
+        if ("CachingMode".equals(simpleName)) {
+            return com.codename1.io.ConnectionRequest.CachingMode.class;
+        }
+        if ("SSLCertificate".equals(simpleName)) {
+            return com.codename1.io.ConnectionRequest.SSLCertificate.class;
+        }
         if ("Cookie".equals(simpleName)) {
             return com.codename1.io.Cookie.class;
         }
@@ -56,6 +62,12 @@ public final class GeneratedAccess_com_codename1_io {
         }
         if ("File".equals(simpleName)) {
             return com.codename1.io.File.class;
+        }
+        if ("FileFilter".equals(simpleName)) {
+            return com.codename1.io.File.FileFilter.class;
+        }
+        if ("FilenameFilter".equals(simpleName)) {
+            return com.codename1.io.File.FilenameFilter.class;
         }
         if ("FileSystemStorage".equals(simpleName)) {
             return com.codename1.io.FileSystemStorage.class;
@@ -87,6 +99,9 @@ public final class GeneratedAccess_com_codename1_io {
         if ("Oauth2".equals(simpleName)) {
             return com.codename1.io.Oauth2.class;
         }
+        if ("RefreshTokenRequest".equals(simpleName)) {
+            return com.codename1.io.Oauth2.RefreshTokenRequest.class;
+        }
         if ("PreferenceListener".equals(simpleName)) {
             return com.codename1.io.PreferenceListener.class;
         }
@@ -98,6 +113,9 @@ public final class GeneratedAccess_com_codename1_io {
         }
         if ("Socket".equals(simpleName)) {
             return com.codename1.io.Socket.class;
+        }
+        if ("StopListening".equals(simpleName)) {
+            return com.codename1.io.Socket.StopListening.class;
         }
         if ("SocketConnection".equals(simpleName)) {
             return com.codename1.io.SocketConnection.class;
@@ -113,6 +131,9 @@ public final class GeneratedAccess_com_codename1_io {
         }
         if ("WebServiceProxyCall".equals(simpleName)) {
             return com.codename1.io.WebServiceProxyCall.class;
+        }
+        if ("WSDefinition".equals(simpleName)) {
+            return com.codename1.io.WebServiceProxyCall.WSDefinition.class;
         }
         return null;
     }
@@ -163,7 +184,7 @@ public final class GeneratedAccess_com_codename1_io {
             }
             if (matches(safeArgs, new Class<?>[]{char[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{char[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return new com.codename1.io.CharArrayReader((char[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
+                return new com.codename1.io.CharArrayReader((char[]) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]));
             }
         }
         if (type == com.codename1.io.ConnectionRequest.class) {
@@ -211,13 +232,13 @@ public final class GeneratedAccess_com_codename1_io {
             }
         }
         if (type == com.codename1.io.NetworkEvent.class) {
-            if (matches(safeArgs, new Class<?>[]{com.codename1.io.ConnectionRequest.class, java.lang.Integer.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.io.ConnectionRequest.class, java.lang.Integer.class}, false);
-                return new com.codename1.io.NetworkEvent((com.codename1.io.ConnectionRequest) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
-            }
             if (matches(safeArgs, new Class<?>[]{com.codename1.io.ConnectionRequest.class, java.lang.Exception.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.io.ConnectionRequest.class, java.lang.Exception.class}, false);
                 return new com.codename1.io.NetworkEvent((com.codename1.io.ConnectionRequest) adaptedArgs[0], (java.lang.Exception) adaptedArgs[1]);
+            }
+            if (matches(safeArgs, new Class<?>[]{com.codename1.io.ConnectionRequest.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.io.ConnectionRequest.class, java.lang.Integer.class}, false);
+                return new com.codename1.io.NetworkEvent((com.codename1.io.ConnectionRequest) adaptedArgs[0], toIntValue(adaptedArgs[1]));
             }
             if (matches(safeArgs, new Class<?>[]{com.codename1.io.ConnectionRequest.class, java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.io.ConnectionRequest.class, java.lang.Object.class}, false);
@@ -225,7 +246,7 @@ public final class GeneratedAccess_com_codename1_io {
             }
             if (matches(safeArgs, new Class<?>[]{com.codename1.io.ConnectionRequest.class, java.lang.Integer.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.io.ConnectionRequest.class, java.lang.Integer.class, java.lang.String.class}, false);
-                return new com.codename1.io.NetworkEvent((com.codename1.io.ConnectionRequest) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), (java.lang.String) adaptedArgs[2]);
+                return new com.codename1.io.NetworkEvent((com.codename1.io.ConnectionRequest) adaptedArgs[0], toIntValue(adaptedArgs[1]), (java.lang.String) adaptedArgs[2]);
             }
         }
         if (type == com.codename1.io.Oauth2.class) {
@@ -306,7 +327,7 @@ public final class GeneratedAccess_com_codename1_io {
         if ("setDefaultBufferSize".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                com.codename1.io.BufferedInputStream.setDefaultBufferSize(((Number) adaptedArgs[0]).intValue()); return null;
+                com.codename1.io.BufferedInputStream.setDefaultBufferSize(toIntValue(adaptedArgs[0])); return null;
             }
         }
         throw unsupportedStatic(com.codename1.io.BufferedInputStream.class, name, safeArgs);
@@ -321,7 +342,7 @@ public final class GeneratedAccess_com_codename1_io {
         if ("setDefaultBufferSize".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                com.codename1.io.BufferedOutputStream.setDefaultBufferSize(((Number) adaptedArgs[0]).intValue()); return null;
+                com.codename1.io.BufferedOutputStream.setDefaultBufferSize(toIntValue(adaptedArgs[0])); return null;
             }
         }
         throw unsupportedStatic(com.codename1.io.BufferedOutputStream.class, name, safeArgs);
@@ -594,7 +615,7 @@ public final class GeneratedAccess_com_codename1_io {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
-                com.codename1.io.Log.p((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
+                com.codename1.io.Log.p((java.lang.String) adaptedArgs[0], toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("sendLog".equals(name)) {
@@ -610,13 +631,13 @@ public final class GeneratedAccess_com_codename1_io {
         if ("setLevel".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                com.codename1.io.Log.setLevel(((Number) adaptedArgs[0]).intValue()); return null;
+                com.codename1.io.Log.setLevel(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setReportingLevel".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                com.codename1.io.Log.setReportingLevel(((Number) adaptedArgs[0]).intValue()); return null;
+                com.codename1.io.Log.setReportingLevel(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("showLog".equals(name)) {
@@ -724,7 +745,7 @@ public final class GeneratedAccess_com_codename1_io {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
-                return com.codename1.io.Preferences.get((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
+                return com.codename1.io.Preferences.get((java.lang.String) adaptedArgs[0], toIntValue(adaptedArgs[1]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Long.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Long.class}, false);
@@ -750,7 +771,7 @@ public final class GeneratedAccess_com_codename1_io {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
-                return com.codename1.io.Preferences.getAndSet((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
+                return com.codename1.io.Preferences.getAndSet((java.lang.String) adaptedArgs[0], toIntValue(adaptedArgs[1]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Long.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Long.class}, false);
@@ -791,7 +812,7 @@ public final class GeneratedAccess_com_codename1_io {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
-                com.codename1.io.Preferences.set((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
+                com.codename1.io.Preferences.set((java.lang.String) adaptedArgs[0], toIntValue(adaptedArgs[1])); return null;
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Long.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Long.class}, false);
@@ -823,7 +844,7 @@ public final class GeneratedAccess_com_codename1_io {
         if ("connect".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class, com.codename1.io.SocketConnection.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class, com.codename1.io.SocketConnection.class}, false);
-                com.codename1.io.Socket.connect((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), (com.codename1.io.SocketConnection) adaptedArgs[2]); return null;
+                com.codename1.io.Socket.connect((java.lang.String) adaptedArgs[0], toIntValue(adaptedArgs[1]), (com.codename1.io.SocketConnection) adaptedArgs[2]); return null;
             }
         }
         if ("getHostOrIP".equals(name)) {
@@ -844,7 +865,7 @@ public final class GeneratedAccess_com_codename1_io {
         if ("listen".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Class.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Class.class}, false);
-                return com.codename1.io.Socket.listen(((Number) adaptedArgs[0]).intValue(), (java.lang.Class) adaptedArgs[1]);
+                return com.codename1.io.Socket.listen(toIntValue(adaptedArgs[0]), (java.lang.Class) adaptedArgs[1]);
             }
         }
         throw unsupportedStatic(com.codename1.io.Socket.class, name, safeArgs);
@@ -1058,7 +1079,7 @@ public final class GeneratedAccess_com_codename1_io {
         if ("insertObjectAtOffset".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object[].class, java.lang.Object[].class, java.lang.Integer.class, java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object[].class, java.lang.Object[].class, java.lang.Integer.class, java.lang.Object.class}, false);
-                com.codename1.io.Util.insertObjectAtOffset((java.lang.Object[]) adaptedArgs[0], (java.lang.Object[]) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue(), (java.lang.Object) adaptedArgs[3]); return null;
+                com.codename1.io.Util.insertObjectAtOffset((java.lang.Object[]) adaptedArgs[0], (java.lang.Object[]) adaptedArgs[1], toIntValue(adaptedArgs[2]), (java.lang.Object) adaptedArgs[3]); return null;
             }
         }
         if ("instanceofByteArray".equals(name)) {
@@ -1138,7 +1159,7 @@ public final class GeneratedAccess_com_codename1_io {
         if ("removeObjectAtOffset".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object[].class, java.lang.Object[].class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object[].class, java.lang.Object[].class, java.lang.Integer.class}, false);
-                com.codename1.io.Util.removeObjectAtOffset((java.lang.Object[]) adaptedArgs[0], (java.lang.Object[]) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue()); return null;
+                com.codename1.io.Util.removeObjectAtOffset((java.lang.Object[]) adaptedArgs[0], (java.lang.Object[]) adaptedArgs[1], toIntValue(adaptedArgs[2])); return null;
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Object[].class, java.lang.Object[].class, java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object[].class, java.lang.Object[].class, java.lang.Object.class}, false);
@@ -1160,7 +1181,7 @@ public final class GeneratedAccess_com_codename1_io {
         if ("sleep".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                com.codename1.io.Util.sleep(((Number) adaptedArgs[0]).intValue()); return null;
+                com.codename1.io.Util.sleep(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("split".equals(name)) {
@@ -1242,9 +1263,9 @@ public final class GeneratedAccess_com_codename1_io {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.Integer.class, int[].class}, true);
                 int[] varArgs = new int[adaptedArgs.length - 3];
                 for (int i = 3; i < adaptedArgs.length; i++) {
-                    varArgs[i - 3] = ((Number) adaptedArgs[i]).intValue();
+                    varArgs[i - 3] = toIntValue(adaptedArgs[i]);
                 }
-                return com.codename1.io.WebServiceProxyCall.defineWebService((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue(), varArgs);
+                return com.codename1.io.WebServiceProxyCall.defineWebService((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], toIntValue(adaptedArgs[2]), varArgs);
             }
         }
         if ("invokeWebserviceASync".equals(name)) {
@@ -1330,128 +1351,163 @@ public final class GeneratedAccess_com_codename1_io {
                 unsupported = ex;
             }
         }
+        if (target instanceof com.codename1.io.ConnectionRequest.SSLCertificate) {
+            try {
+                return invoke7((com.codename1.io.ConnectionRequest.SSLCertificate) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
         if (target instanceof com.codename1.io.Cookie) {
             try {
-                return invoke7((com.codename1.io.Cookie) target, name, safeArgs);
+                return invoke8((com.codename1.io.Cookie) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.io.File) {
             try {
-                return invoke8((com.codename1.io.File) target, name, safeArgs);
+                return invoke9((com.codename1.io.File) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.io.FileSystemStorage) {
             try {
-                return invoke9((com.codename1.io.FileSystemStorage) target, name, safeArgs);
+                return invoke10((com.codename1.io.FileSystemStorage) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.io.JSONParser) {
             try {
-                return invoke10((com.codename1.io.JSONParser) target, name, safeArgs);
+                return invoke11((com.codename1.io.JSONParser) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.io.Log) {
             try {
-                return invoke11((com.codename1.io.Log) target, name, safeArgs);
+                return invoke12((com.codename1.io.Log) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.io.MalformedURLException) {
             try {
-                return invoke12((com.codename1.io.MalformedURLException) target, name, safeArgs);
+                return invoke13((com.codename1.io.MalformedURLException) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.io.NetworkEvent) {
             try {
-                return invoke13((com.codename1.io.NetworkEvent) target, name, safeArgs);
+                return invoke14((com.codename1.io.NetworkEvent) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.io.NetworkManager) {
             try {
-                return invoke14((com.codename1.io.NetworkManager) target, name, safeArgs);
+                return invoke15((com.codename1.io.NetworkManager) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.io.Oauth2) {
             try {
-                return invoke15((com.codename1.io.Oauth2) target, name, safeArgs);
+                return invoke16((com.codename1.io.Oauth2) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.io.Oauth2.RefreshTokenRequest) {
+            try {
+                return invoke17((com.codename1.io.Oauth2.RefreshTokenRequest) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.io.Properties) {
             try {
-                return invoke16((com.codename1.io.Properties) target, name, safeArgs);
+                return invoke18((com.codename1.io.Properties) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.io.SocketConnection) {
             try {
-                return invoke17((com.codename1.io.SocketConnection) target, name, safeArgs);
+                return invoke19((com.codename1.io.SocketConnection) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.io.Storage) {
             try {
-                return invoke18((com.codename1.io.Storage) target, name, safeArgs);
+                return invoke20((com.codename1.io.Storage) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.io.URL) {
             try {
-                return invoke19((com.codename1.io.URL) target, name, safeArgs);
+                return invoke21((com.codename1.io.URL) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.io.Data) {
             try {
-                return invoke20((com.codename1.io.Data) target, name, safeArgs);
+                return invoke22((com.codename1.io.Data) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.io.Externalizable) {
             try {
-                return invoke21((com.codename1.io.Externalizable) target, name, safeArgs);
+                return invoke23((com.codename1.io.Externalizable) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.io.File.FileFilter) {
+            try {
+                return invoke24((com.codename1.io.File.FileFilter) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.io.File.FilenameFilter) {
+            try {
+                return invoke25((com.codename1.io.File.FilenameFilter) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.io.IOProgressListener) {
             try {
-                return invoke22((com.codename1.io.IOProgressListener) target, name, safeArgs);
+                return invoke26((com.codename1.io.IOProgressListener) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.io.JSONParseCallback) {
             try {
-                return invoke23((com.codename1.io.JSONParseCallback) target, name, safeArgs);
+                return invoke27((com.codename1.io.JSONParseCallback) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.io.PreferenceListener) {
             try {
-                return invoke24((com.codename1.io.PreferenceListener) target, name, safeArgs);
+                return invoke28((com.codename1.io.PreferenceListener) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.io.Socket.StopListening) {
+            try {
+                return invoke29((com.codename1.io.Socket.StopListening) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
@@ -1737,7 +1793,7 @@ public final class GeneratedAccess_com_codename1_io {
         if ("ioStreamUpdate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class}, false);
-                typedTarget.ioStreamUpdate((java.lang.Object) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.ioStreamUpdate((java.lang.Object) adaptedArgs[0], toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("isBase64Binaries".equals(name)) {
@@ -1892,7 +1948,7 @@ public final class GeneratedAccess_com_codename1_io {
         if ("setChunkedStreamingMode".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setChunkedStreamingMode(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setChunkedStreamingMode(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setContentType".equals(name)) {
@@ -1976,7 +2032,7 @@ public final class GeneratedAccess_com_codename1_io {
         if ("setPriority".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Byte.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Byte.class}, false);
-                typedTarget.setPriority(((Number) adaptedArgs[0]).byteValue()); return null;
+                typedTarget.setPriority((byte) toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setReadRequest".equals(name)) {
@@ -1994,7 +2050,7 @@ public final class GeneratedAccess_com_codename1_io {
         if ("setReadTimeout".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setReadTimeout(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setReadTimeout(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setRequestBody".equals(name)) {
@@ -2016,13 +2072,13 @@ public final class GeneratedAccess_com_codename1_io {
         if ("setSilentRetryCount".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setSilentRetryCount(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setSilentRetryCount(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setTimeout".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setTimeout(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setTimeout(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setUrl".equals(name)) {
@@ -2173,7 +2229,7 @@ public final class GeneratedAccess_com_codename1_io {
         if ("mark".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.mark(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.mark(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("markSupported".equals(name)) {
@@ -2191,7 +2247,7 @@ public final class GeneratedAccess_com_codename1_io {
             }
             if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.read((byte[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
+                return typedTarget.read((byte[]) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]));
             }
         }
         if ("reset".equals(name)) {
@@ -2226,7 +2282,7 @@ public final class GeneratedAccess_com_codename1_io {
         if ("setYield".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setYield(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setYield(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("skip".equals(name)) {
@@ -2294,7 +2350,7 @@ public final class GeneratedAccess_com_codename1_io {
         if ("write".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.write(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.write(toIntValue(adaptedArgs[0])); return null;
             }
             if (matches(safeArgs, new Class<?>[]{byte[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class}, false);
@@ -2302,7 +2358,7 @@ public final class GeneratedAccess_com_codename1_io {
             }
             if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.write((byte[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue()); return null;
+                typedTarget.write((byte[]) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2])); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -2382,13 +2438,13 @@ public final class GeneratedAccess_com_codename1_io {
         if ("setCacheSize".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setCacheSize(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setCacheSize(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setStorageCacheSize".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setStorageCacheSize(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setStorageCacheSize(toIntValue(adaptedArgs[0])); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -2403,7 +2459,7 @@ public final class GeneratedAccess_com_codename1_io {
         if ("mark".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.mark(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.mark(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("markSupported".equals(name)) {
@@ -2421,7 +2477,7 @@ public final class GeneratedAccess_com_codename1_io {
             }
             if (matches(safeArgs, new Class<?>[]{char[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{char[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.read((char[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
+                return typedTarget.read((char[]) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]));
             }
         }
         if ("ready".equals(name)) {
@@ -2703,7 +2759,7 @@ public final class GeneratedAccess_com_codename1_io {
         if ("ioStreamUpdate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class}, false);
-                typedTarget.ioStreamUpdate((java.lang.Object) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.ioStreamUpdate((java.lang.Object) adaptedArgs[0], toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("isCheckSSLCertificates".equals(name)) {
@@ -2836,7 +2892,7 @@ public final class GeneratedAccess_com_codename1_io {
         if ("setChunkedStreamingMode".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setChunkedStreamingMode(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setChunkedStreamingMode(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setContentType".equals(name)) {
@@ -2908,7 +2964,7 @@ public final class GeneratedAccess_com_codename1_io {
         if ("setPriority".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Byte.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Byte.class}, false);
-                typedTarget.setPriority(((Number) adaptedArgs[0]).byteValue()); return null;
+                typedTarget.setPriority((byte) toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setReadRequest".equals(name)) {
@@ -2926,7 +2982,7 @@ public final class GeneratedAccess_com_codename1_io {
         if ("setReadTimeout".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setReadTimeout(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setReadTimeout(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setRequestBody".equals(name)) {
@@ -2948,13 +3004,13 @@ public final class GeneratedAccess_com_codename1_io {
         if ("setSilentRetryCount".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setSilentRetryCount(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setSilentRetryCount(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setTimeout".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setTimeout(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setTimeout(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setUrl".equals(name)) {
@@ -2978,7 +3034,21 @@ public final class GeneratedAccess_com_codename1_io {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke7(com.codename1.io.Cookie typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke7(com.codename1.io.ConnectionRequest.SSLCertificate typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("getCertificteAlgorithm".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getCertificteAlgorithm();
+            }
+        }
+        if ("getCertificteUniqueKey".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getCertificteUniqueKey();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke8(com.codename1.io.Cookie typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getDomain".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getDomain();
@@ -3074,7 +3144,7 @@ public final class GeneratedAccess_com_codename1_io {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke8(com.codename1.io.File typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke9(com.codename1.io.File typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("canExecute".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.canExecute();
@@ -3232,7 +3302,7 @@ public final class GeneratedAccess_com_codename1_io {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke9(com.codename1.io.FileSystemStorage typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke10(com.codename1.io.FileSystemStorage typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("delete".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -3242,7 +3312,7 @@ public final class GeneratedAccess_com_codename1_io {
         if ("deleteRetry".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
-                typedTarget.deleteRetry((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.deleteRetry((java.lang.String) adaptedArgs[0], toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("exists".equals(name)) {
@@ -3351,7 +3421,7 @@ public final class GeneratedAccess_com_codename1_io {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke10(com.codename1.io.JSONParser typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke11(com.codename1.io.JSONParser typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("booleanToken".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
@@ -3458,7 +3528,7 @@ public final class GeneratedAccess_com_codename1_io {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke11(com.codename1.io.Log typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke12(com.codename1.io.Log typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getFileURL".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getFileURL();
@@ -3489,7 +3559,7 @@ public final class GeneratedAccess_com_codename1_io {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke12(com.codename1.io.MalformedURLException typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke13(com.codename1.io.MalformedURLException typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addSuppressed".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false);
@@ -3546,7 +3616,7 @@ public final class GeneratedAccess_com_codename1_io {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke13(com.codename1.io.NetworkEvent typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke14(com.codename1.io.NetworkEvent typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("consume".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.consume(); return null;
@@ -3682,7 +3752,7 @@ public final class GeneratedAccess_com_codename1_io {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke14(com.codename1.io.NetworkManager typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke15(com.codename1.io.NetworkManager typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addDefaultHeader".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
@@ -3722,7 +3792,7 @@ public final class GeneratedAccess_com_codename1_io {
         if ("assignToThread".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Class.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Class.class, java.lang.Integer.class}, false);
-                typedTarget.assignToThread((java.lang.Class) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.assignToThread((java.lang.Class) adaptedArgs[0], toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("enumurateQueue".equals(name)) {
@@ -3809,13 +3879,13 @@ public final class GeneratedAccess_com_codename1_io {
         if ("setThreadCount".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setThreadCount(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setThreadCount(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setTimeout".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setTimeout(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setTimeout(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("shutdown".equals(name)) {
@@ -3836,13 +3906,13 @@ public final class GeneratedAccess_com_codename1_io {
         if ("updateThreadCount".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.updateThreadCount(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.updateThreadCount(toIntValue(adaptedArgs[0])); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke15(com.codename1.io.Oauth2 typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke16(com.codename1.io.Oauth2 typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("authenticate".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.authenticate();
@@ -3891,7 +3961,130 @@ public final class GeneratedAccess_com_codename1_io {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke16(com.codename1.io.Properties typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke17(com.codename1.io.Oauth2.RefreshTokenRequest typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("addListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.util.AsyncResource.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.util.AsyncResource.class}, false);
+                typedTarget.addListener((com.codename1.util.AsyncResource) adaptedArgs[0]); return null;
+            }
+        }
+        if ("addObserver".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.util.Observer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Observer.class}, false);
+                typedTarget.addObserver((java.util.Observer) adaptedArgs[0]); return null;
+            }
+        }
+        if ("asPromise".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.asPromise();
+            }
+        }
+        if ("await".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.await(); return null;
+            }
+        }
+        if ("cancel".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                return typedTarget.cancel(((Boolean) adaptedArgs[0]).booleanValue());
+            }
+        }
+        if ("countObservers".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.countObservers();
+            }
+        }
+        if ("deleteObserver".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.util.Observer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Observer.class}, false);
+                typedTarget.deleteObserver((java.util.Observer) adaptedArgs[0]); return null;
+            }
+        }
+        if ("deleteObservers".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.deleteObservers(); return null;
+            }
+        }
+        if ("error".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false);
+                typedTarget.error((java.lang.Throwable) adaptedArgs[0]); return null;
+            }
+        }
+        if ("except".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.util.SuccessCallback.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.util.SuccessCallback.class}, false);
+                return typedTarget.except((com.codename1.util.SuccessCallback) adaptedArgs[0]);
+            }
+            if (matches(safeArgs, new Class<?>[]{com.codename1.util.SuccessCallback.class, com.codename1.util.EasyThread.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.util.SuccessCallback.class, com.codename1.util.EasyThread.class}, false);
+                return typedTarget.except((com.codename1.util.SuccessCallback) adaptedArgs[0], (com.codename1.util.EasyThread) adaptedArgs[1]);
+            }
+        }
+        if ("get".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.get();
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.get(toIntValue(adaptedArgs[0]));
+            }
+        }
+        if ("hasChanged".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.hasChanged();
+            }
+        }
+        if ("isCancelled".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isCancelled();
+            }
+        }
+        if ("isDone".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isDone();
+            }
+        }
+        if ("isReady".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isReady();
+            }
+        }
+        if ("notifyObservers".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.notifyObservers(); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                typedTarget.notifyObservers((java.lang.Object) adaptedArgs[0]); return null;
+            }
+        }
+        if ("onResult".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.util.AsyncResult.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.util.AsyncResult.class}, false);
+                typedTarget.onResult((com.codename1.util.AsyncResult) adaptedArgs[0]); return null;
+            }
+        }
+        if ("ready".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.util.SuccessCallback.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.util.SuccessCallback.class}, false);
+                return typedTarget.ready((com.codename1.util.SuccessCallback) adaptedArgs[0]);
+            }
+            if (matches(safeArgs, new Class<?>[]{com.codename1.util.SuccessCallback.class, com.codename1.util.EasyThread.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.util.SuccessCallback.class, com.codename1.util.EasyThread.class}, false);
+                return typedTarget.ready((com.codename1.util.SuccessCallback) adaptedArgs[0], (com.codename1.util.EasyThread) adaptedArgs[1]);
+            }
+        }
+        if ("waitFor".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.waitFor(); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke18(com.codename1.io.Properties typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("clear".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.clear(); return null;
@@ -3997,11 +4190,11 @@ public final class GeneratedAccess_com_codename1_io {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke17(com.codename1.io.SocketConnection typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke19(com.codename1.io.SocketConnection typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("connectionError".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class}, false);
-                typedTarget.connectionError(((Number) adaptedArgs[0]).intValue(), (java.lang.String) adaptedArgs[1]); return null;
+                typedTarget.connectionError(toIntValue(adaptedArgs[0]), (java.lang.String) adaptedArgs[1]); return null;
             }
         }
         if ("getConnectTimeout".equals(name)) {
@@ -4017,13 +4210,13 @@ public final class GeneratedAccess_com_codename1_io {
         if ("setConnectTimeout".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setConnectTimeout(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setConnectTimeout(toIntValue(adaptedArgs[0])); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke18(com.codename1.io.Storage typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke20(com.codename1.io.Storage typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("clearCache".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.clearCache(); return null;
@@ -4080,7 +4273,7 @@ public final class GeneratedAccess_com_codename1_io {
         if ("setHardCacheSize".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setHardCacheSize(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setHardCacheSize(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setNormalizeNames".equals(name)) {
@@ -4102,7 +4295,7 @@ public final class GeneratedAccess_com_codename1_io {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke19(com.codename1.io.URL typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke21(com.codename1.io.URL typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("equals".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
@@ -4183,7 +4376,7 @@ public final class GeneratedAccess_com_codename1_io {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke20(com.codename1.io.Data typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke22(com.codename1.io.Data typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getSize".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getSize();
@@ -4192,7 +4385,7 @@ public final class GeneratedAccess_com_codename1_io {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke21(com.codename1.io.Externalizable typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke23(com.codename1.io.Externalizable typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getObjectId".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getObjectId();
@@ -4206,17 +4399,37 @@ public final class GeneratedAccess_com_codename1_io {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke22(com.codename1.io.IOProgressListener typedTarget, String name, Object[] safeArgs) throws Exception {
-        if ("ioStreamUpdate".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class}, false);
-                typedTarget.ioStreamUpdate((java.lang.Object) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
+    private static Object invoke24(com.codename1.io.File.FileFilter typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("accept".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.io.File.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.io.File.class}, false);
+                return typedTarget.accept((com.codename1.io.File) adaptedArgs[0]);
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke23(com.codename1.io.JSONParseCallback typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke25(com.codename1.io.File.FilenameFilter typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("accept".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.io.File.class, java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.io.File.class, java.lang.String.class}, false);
+                return typedTarget.accept((com.codename1.io.File) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke26(com.codename1.io.IOProgressListener typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("ioStreamUpdate".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class}, false);
+                typedTarget.ioStreamUpdate((java.lang.Object) adaptedArgs[0], toIntValue(adaptedArgs[1])); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke27(com.codename1.io.JSONParseCallback typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("booleanToken".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
@@ -4279,7 +4492,7 @@ public final class GeneratedAccess_com_codename1_io {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke24(com.codename1.io.PreferenceListener typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke28(com.codename1.io.PreferenceListener typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("preferenceChanged".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object.class, java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object.class, java.lang.Object.class}, false);
@@ -4289,83 +4502,139 @@ public final class GeneratedAccess_com_codename1_io {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
+    private static Object invoke29(com.codename1.io.Socket.StopListening typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("stop".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.stop(); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == com.codename1.io.ConnectionRequest.class) {
-            if ("PRIORITY_CRITICAL".equals(name)) return com.codename1.io.ConnectionRequest.PRIORITY_CRITICAL;
-            if ("PRIORITY_HIGH".equals(name)) return com.codename1.io.ConnectionRequest.PRIORITY_HIGH;
-            if ("PRIORITY_LOW".equals(name)) return com.codename1.io.ConnectionRequest.PRIORITY_LOW;
-            if ("PRIORITY_NORMAL".equals(name)) return com.codename1.io.ConnectionRequest.PRIORITY_NORMAL;
-            if ("PRIORITY_REDUNDANT".equals(name)) return com.codename1.io.ConnectionRequest.PRIORITY_REDUNDANT;
-        }
-        if (type == com.codename1.io.Cookie.class) {
-            if ("STORAGE_NAME".equals(name)) return com.codename1.io.Cookie.STORAGE_NAME;
-        }
-        if (type == com.codename1.io.File.class) {
-            if ("separator".equals(name)) return com.codename1.io.File.separator;
-            if ("separatorChar".equals(name)) return com.codename1.io.File.separatorChar;
-        }
-        if (type == com.codename1.io.FileSystemStorage.class) {
-            if ("ROOT_TYPE_MAINSTORAGE".equals(name)) return com.codename1.io.FileSystemStorage.ROOT_TYPE_MAINSTORAGE;
-            if ("ROOT_TYPE_SDCARD".equals(name)) return com.codename1.io.FileSystemStorage.ROOT_TYPE_SDCARD;
-            if ("ROOT_TYPE_UNKNOWN".equals(name)) return com.codename1.io.FileSystemStorage.ROOT_TYPE_UNKNOWN;
-        }
-        if (type == com.codename1.io.Log.class) {
-            if ("DEBUG".equals(name)) return com.codename1.io.Log.DEBUG;
-            if ("ERROR".equals(name)) return com.codename1.io.Log.ERROR;
-            if ("INFO".equals(name)) return com.codename1.io.Log.INFO;
-            if ("REPORTING_DEBUG".equals(name)) return com.codename1.io.Log.REPORTING_DEBUG;
-            if ("REPORTING_NONE".equals(name)) return com.codename1.io.Log.REPORTING_NONE;
-            if ("REPORTING_PRODUCTION".equals(name)) return com.codename1.io.Log.REPORTING_PRODUCTION;
-            if ("WARNING".equals(name)) return com.codename1.io.Log.WARNING;
-        }
-        if (type == com.codename1.io.NetworkEvent.class) {
-            if ("PROGRESS_TYPE_COMPLETED".equals(name)) return com.codename1.io.NetworkEvent.PROGRESS_TYPE_COMPLETED;
-            if ("PROGRESS_TYPE_INITIALIZING".equals(name)) return com.codename1.io.NetworkEvent.PROGRESS_TYPE_INITIALIZING;
-            if ("PROGRESS_TYPE_INPUT".equals(name)) return com.codename1.io.NetworkEvent.PROGRESS_TYPE_INPUT;
-            if ("PROGRESS_TYPE_OUTPUT".equals(name)) return com.codename1.io.NetworkEvent.PROGRESS_TYPE_OUTPUT;
-        }
-        if (type == com.codename1.io.NetworkManager.class) {
-            if ("ACCESS_POINT_TYPE_CABLE".equals(name)) return com.codename1.io.NetworkManager.ACCESS_POINT_TYPE_CABLE;
-            if ("ACCESS_POINT_TYPE_CORPORATE".equals(name)) return com.codename1.io.NetworkManager.ACCESS_POINT_TYPE_CORPORATE;
-            if ("ACCESS_POINT_TYPE_NETWORK2G".equals(name)) return com.codename1.io.NetworkManager.ACCESS_POINT_TYPE_NETWORK2G;
-            if ("ACCESS_POINT_TYPE_NETWORK3G".equals(name)) return com.codename1.io.NetworkManager.ACCESS_POINT_TYPE_NETWORK3G;
-            if ("ACCESS_POINT_TYPE_UNKNOWN".equals(name)) return com.codename1.io.NetworkManager.ACCESS_POINT_TYPE_UNKNOWN;
-            if ("ACCESS_POINT_TYPE_WLAN".equals(name)) return com.codename1.io.NetworkManager.ACCESS_POINT_TYPE_WLAN;
-        }
-        if (type == com.codename1.io.Oauth2.class) {
-            if ("TOKEN".equals(name)) return com.codename1.io.Oauth2.TOKEN;
-        }
-        if (type == com.codename1.io.WebServiceProxyCall.class) {
-            if ("TYPE_BOOLEAN".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_BOOLEAN;
-            if ("TYPE_BOOLEAN_ARRAY".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_BOOLEAN_ARRAY;
-            if ("TYPE_BOOLEAN_OBJECT".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_BOOLEAN_OBJECT;
-            if ("TYPE_BYTE".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_BYTE;
-            if ("TYPE_BYTE_ARRAY".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_BYTE_ARRAY;
-            if ("TYPE_BYTE_OBJECT".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_BYTE_OBJECT;
-            if ("TYPE_CHAR".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_CHAR;
-            if ("TYPE_CHARACTER_OBJECT".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_CHARACTER_OBJECT;
-            if ("TYPE_CHAR_ARRAY".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_CHAR_ARRAY;
-            if ("TYPE_DOUBLE".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_DOUBLE;
-            if ("TYPE_DOUBLE_ARRAY".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_DOUBLE_ARRAY;
-            if ("TYPE_DOUBLE_OBJECT".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_DOUBLE_OBJECT;
-            if ("TYPE_EXTERNALIABLE".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_EXTERNALIABLE;
-            if ("TYPE_FLOAT".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_FLOAT;
-            if ("TYPE_FLOAT_ARRAY".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_FLOAT_ARRAY;
-            if ("TYPE_FLOAT_OBJECT".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_FLOAT_OBJECT;
-            if ("TYPE_INT".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_INT;
-            if ("TYPE_INTEGER_OBJECT".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_INTEGER_OBJECT;
-            if ("TYPE_INT_ARRAY".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_INT_ARRAY;
-            if ("TYPE_LONG".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_LONG;
-            if ("TYPE_LONG_ARRAY".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_LONG_ARRAY;
-            if ("TYPE_LONG_OBJECT".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_LONG_OBJECT;
-            if ("TYPE_SHORT".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_SHORT;
-            if ("TYPE_SHORT_ARRAY".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_SHORT_ARRAY;
-            if ("TYPE_SHORT_OBJECT".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_SHORT_OBJECT;
-            if ("TYPE_STRING".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_STRING;
-            if ("TYPE_STRING_ARRAY".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_STRING_ARRAY;
-            if ("TYPE_VOID".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_VOID;
-        }
+        if (type == com.codename1.io.ConnectionRequest.class) return getStaticField0(name);
+        if (type == com.codename1.io.ConnectionRequest.CachingMode.class) return getStaticField1(name);
+        if (type == com.codename1.io.Cookie.class) return getStaticField2(name);
+        if (type == com.codename1.io.File.class) return getStaticField3(name);
+        if (type == com.codename1.io.FileSystemStorage.class) return getStaticField4(name);
+        if (type == com.codename1.io.Log.class) return getStaticField5(name);
+        if (type == com.codename1.io.MultipartRequest.class) return getStaticField6(name);
+        if (type == com.codename1.io.NetworkEvent.class) return getStaticField7(name);
+        if (type == com.codename1.io.NetworkManager.class) return getStaticField8(name);
+        if (type == com.codename1.io.Oauth2.class) return getStaticField9(name);
+        if (type == com.codename1.io.WebServiceProxyCall.class) return getStaticField10(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("PRIORITY_CRITICAL".equals(name)) return com.codename1.io.ConnectionRequest.PRIORITY_CRITICAL;
+        if ("PRIORITY_HIGH".equals(name)) return com.codename1.io.ConnectionRequest.PRIORITY_HIGH;
+        if ("PRIORITY_LOW".equals(name)) return com.codename1.io.ConnectionRequest.PRIORITY_LOW;
+        if ("PRIORITY_NORMAL".equals(name)) return com.codename1.io.ConnectionRequest.PRIORITY_NORMAL;
+        if ("PRIORITY_REDUNDANT".equals(name)) return com.codename1.io.ConnectionRequest.PRIORITY_REDUNDANT;
+        throw unsupportedStaticField(com.codename1.io.ConnectionRequest.class, name);
+    }
+
+    private static Object getStaticField1(String name) throws Exception {
+        if ("MANUAL".equals(name)) return com.codename1.io.ConnectionRequest.CachingMode.MANUAL;
+        if ("OFF".equals(name)) return com.codename1.io.ConnectionRequest.CachingMode.OFF;
+        if ("OFFLINE".equals(name)) return com.codename1.io.ConnectionRequest.CachingMode.OFFLINE;
+        if ("OFFLINE_FIRST".equals(name)) return com.codename1.io.ConnectionRequest.CachingMode.OFFLINE_FIRST;
+        if ("SMART".equals(name)) return com.codename1.io.ConnectionRequest.CachingMode.SMART;
+        throw unsupportedStaticField(com.codename1.io.ConnectionRequest.CachingMode.class, name);
+    }
+
+    private static Object getStaticField2(String name) throws Exception {
+        if ("STORAGE_NAME".equals(name)) return com.codename1.io.Cookie.STORAGE_NAME;
+        throw unsupportedStaticField(com.codename1.io.Cookie.class, name);
+    }
+
+    private static Object getStaticField3(String name) throws Exception {
+        if ("separator".equals(name)) return com.codename1.io.File.separator;
+        if ("separatorChar".equals(name)) return com.codename1.io.File.separatorChar;
+        throw unsupportedStaticField(com.codename1.io.File.class, name);
+    }
+
+    private static Object getStaticField4(String name) throws Exception {
+        if ("ROOT_TYPE_MAINSTORAGE".equals(name)) return com.codename1.io.FileSystemStorage.ROOT_TYPE_MAINSTORAGE;
+        if ("ROOT_TYPE_SDCARD".equals(name)) return com.codename1.io.FileSystemStorage.ROOT_TYPE_SDCARD;
+        if ("ROOT_TYPE_UNKNOWN".equals(name)) return com.codename1.io.FileSystemStorage.ROOT_TYPE_UNKNOWN;
+        throw unsupportedStaticField(com.codename1.io.FileSystemStorage.class, name);
+    }
+
+    private static Object getStaticField5(String name) throws Exception {
+        if ("DEBUG".equals(name)) return com.codename1.io.Log.DEBUG;
+        if ("ERROR".equals(name)) return com.codename1.io.Log.ERROR;
+        if ("INFO".equals(name)) return com.codename1.io.Log.INFO;
+        if ("REPORTING_DEBUG".equals(name)) return com.codename1.io.Log.REPORTING_DEBUG;
+        if ("REPORTING_NONE".equals(name)) return com.codename1.io.Log.REPORTING_NONE;
+        if ("REPORTING_PRODUCTION".equals(name)) return com.codename1.io.Log.REPORTING_PRODUCTION;
+        if ("WARNING".equals(name)) return com.codename1.io.Log.WARNING;
+        throw unsupportedStaticField(com.codename1.io.Log.class, name);
+    }
+
+    private static Object getStaticField6(String name) throws Exception {
+        if ("PRIORITY_CRITICAL".equals(name)) return com.codename1.io.MultipartRequest.PRIORITY_CRITICAL;
+        if ("PRIORITY_HIGH".equals(name)) return com.codename1.io.MultipartRequest.PRIORITY_HIGH;
+        if ("PRIORITY_LOW".equals(name)) return com.codename1.io.MultipartRequest.PRIORITY_LOW;
+        if ("PRIORITY_NORMAL".equals(name)) return com.codename1.io.MultipartRequest.PRIORITY_NORMAL;
+        if ("PRIORITY_REDUNDANT".equals(name)) return com.codename1.io.MultipartRequest.PRIORITY_REDUNDANT;
+        throw unsupportedStaticField(com.codename1.io.MultipartRequest.class, name);
+    }
+
+    private static Object getStaticField7(String name) throws Exception {
+        if ("PROGRESS_TYPE_COMPLETED".equals(name)) return com.codename1.io.NetworkEvent.PROGRESS_TYPE_COMPLETED;
+        if ("PROGRESS_TYPE_INITIALIZING".equals(name)) return com.codename1.io.NetworkEvent.PROGRESS_TYPE_INITIALIZING;
+        if ("PROGRESS_TYPE_INPUT".equals(name)) return com.codename1.io.NetworkEvent.PROGRESS_TYPE_INPUT;
+        if ("PROGRESS_TYPE_OUTPUT".equals(name)) return com.codename1.io.NetworkEvent.PROGRESS_TYPE_OUTPUT;
+        throw unsupportedStaticField(com.codename1.io.NetworkEvent.class, name);
+    }
+
+    private static Object getStaticField8(String name) throws Exception {
+        if ("ACCESS_POINT_TYPE_CABLE".equals(name)) return com.codename1.io.NetworkManager.ACCESS_POINT_TYPE_CABLE;
+        if ("ACCESS_POINT_TYPE_CORPORATE".equals(name)) return com.codename1.io.NetworkManager.ACCESS_POINT_TYPE_CORPORATE;
+        if ("ACCESS_POINT_TYPE_NETWORK2G".equals(name)) return com.codename1.io.NetworkManager.ACCESS_POINT_TYPE_NETWORK2G;
+        if ("ACCESS_POINT_TYPE_NETWORK3G".equals(name)) return com.codename1.io.NetworkManager.ACCESS_POINT_TYPE_NETWORK3G;
+        if ("ACCESS_POINT_TYPE_UNKNOWN".equals(name)) return com.codename1.io.NetworkManager.ACCESS_POINT_TYPE_UNKNOWN;
+        if ("ACCESS_POINT_TYPE_WLAN".equals(name)) return com.codename1.io.NetworkManager.ACCESS_POINT_TYPE_WLAN;
+        throw unsupportedStaticField(com.codename1.io.NetworkManager.class, name);
+    }
+
+    private static Object getStaticField9(String name) throws Exception {
+        if ("TOKEN".equals(name)) return com.codename1.io.Oauth2.TOKEN;
+        throw unsupportedStaticField(com.codename1.io.Oauth2.class, name);
+    }
+
+    private static Object getStaticField10(String name) throws Exception {
+        if ("TYPE_BOOLEAN".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_BOOLEAN;
+        if ("TYPE_BOOLEAN_ARRAY".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_BOOLEAN_ARRAY;
+        if ("TYPE_BOOLEAN_OBJECT".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_BOOLEAN_OBJECT;
+        if ("TYPE_BYTE".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_BYTE;
+        if ("TYPE_BYTE_ARRAY".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_BYTE_ARRAY;
+        if ("TYPE_BYTE_OBJECT".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_BYTE_OBJECT;
+        if ("TYPE_CHAR".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_CHAR;
+        if ("TYPE_CHARACTER_OBJECT".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_CHARACTER_OBJECT;
+        if ("TYPE_CHAR_ARRAY".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_CHAR_ARRAY;
+        if ("TYPE_DOUBLE".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_DOUBLE;
+        if ("TYPE_DOUBLE_ARRAY".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_DOUBLE_ARRAY;
+        if ("TYPE_DOUBLE_OBJECT".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_DOUBLE_OBJECT;
+        if ("TYPE_EXTERNALIABLE".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_EXTERNALIABLE;
+        if ("TYPE_FLOAT".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_FLOAT;
+        if ("TYPE_FLOAT_ARRAY".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_FLOAT_ARRAY;
+        if ("TYPE_FLOAT_OBJECT".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_FLOAT_OBJECT;
+        if ("TYPE_INT".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_INT;
+        if ("TYPE_INTEGER_OBJECT".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_INTEGER_OBJECT;
+        if ("TYPE_INT_ARRAY".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_INT_ARRAY;
+        if ("TYPE_LONG".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_LONG;
+        if ("TYPE_LONG_ARRAY".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_LONG_ARRAY;
+        if ("TYPE_LONG_OBJECT".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_LONG_OBJECT;
+        if ("TYPE_SHORT".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_SHORT;
+        if ("TYPE_SHORT_ARRAY".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_SHORT_ARRAY;
+        if ("TYPE_SHORT_OBJECT".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_SHORT_OBJECT;
+        if ("TYPE_STRING".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_STRING;
+        if ("TYPE_STRING_ARRAY".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_STRING_ARRAY;
+        if ("TYPE_VOID".equals(name)) return com.codename1.io.WebServiceProxyCall.TYPE_VOID;
+        throw unsupportedStaticField(com.codename1.io.WebServiceProxyCall.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {
@@ -4519,7 +4788,19 @@ public final class GeneratedAccess_com_codename1_io {
         if (!(value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue)) {
             return value;
         }
+        // Direct fit when LambdaValue already implements the target SAM
+        // (Runnable, Function, Comparator, ...).
+        if (type.isInstance(value)) {
+            return value;
+        }
         return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
+    }
+
+    private static int toIntValue(Object value) {
+        if (value instanceof Number) return ((Number) value).intValue();
+        if (value instanceof Character) return (int) ((Character) value).charValue();
+        throw new ClassCastException("Cannot coerce "
+            + (value == null ? "null" : value.getClass().getName()) + " to int");
     }
 
     private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
@@ -4574,10 +4855,15 @@ public final class GeneratedAccess_com_codename1_io {
         if ("byte".equals(type.getName()) || type == Byte.class || "short".equals(type.getName()) || type == Short.class
                 || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
                 || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
-            return value instanceof Number;
+            // Java widens char to int implicitly, so accept Character
+            // for any int-or-larger numeric slot.
+            return value instanceof Number || value instanceof Character;
         }
         if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
-            return isSamInterface(type);
+            // LambdaValue implements common SAMs directly (Runnable,
+            // Function, Predicate, Comparator, ...). Also accept any
+            // CN1 SAM the listener-bridge knows how to wrap.
+            return type.isInstance(value) || isSamInterface(type);
         }
         return type.isInstance(value);
     }

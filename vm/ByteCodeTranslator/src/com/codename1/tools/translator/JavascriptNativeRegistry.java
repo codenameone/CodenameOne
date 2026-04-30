@@ -15,11 +15,9 @@ final class JavascriptNativeRegistry {
     private static final Set<String> RUNTIME_IMPLEMENTED = new HashSet<String>(Arrays.asList(
             "cn1_java_io_InputStreamReader_bytesToChars_byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY",
             "cn1_java_io_NSLogOutputStream_write_byte_1ARRAY_int_int",
-            "cn1_java_lang_Class_getNameImpl_R_java_lang_String",
-            "cn1_java_lang_Character_toLowerCase_char_R_char",
-            "cn1_java_lang_Character_toLowerCase_int_R_int",
             "cn1_java_lang_Class_forNameImpl_java_lang_String_R_java_lang_Class",
             "cn1_java_lang_Class_getComponentType_R_java_lang_Class",
+            "cn1_java_lang_Class_getNameImpl_R_java_lang_String",
             "cn1_java_lang_Class_getName_R_java_lang_String",
             "cn1_java_lang_Class_hashCode_R_int",
             "cn1_java_lang_Class_isAnnotation_R_boolean",
@@ -32,6 +30,8 @@ final class JavascriptNativeRegistry {
             "cn1_java_lang_Class_isPrimitive_R_boolean",
             "cn1_java_lang_Class_isSynthetic_R_boolean",
             "cn1_java_lang_Class_newInstanceImpl_R_java_lang_Object",
+            "cn1_java_lang_Character_toLowerCase_char_R_char",
+            "cn1_java_lang_Character_toLowerCase_int_R_int",
             "cn1_java_lang_Double_doubleToLongBits_double_R_long",
             "cn1_java_lang_Double_longBitsToDouble_long_R_double",
             "cn1_java_lang_Double_toStringImpl_double_boolean_R_java_lang_String",
@@ -75,6 +75,7 @@ final class JavascriptNativeRegistry {
             "cn1_java_lang_StringBuilder_append_java_lang_String_R_java_lang_StringBuilder",
             "cn1_java_lang_StringBuilder_charAt_int_R_char",
             "cn1_java_lang_StringBuilder_getChars_int_int_char_1ARRAY_int",
+            "cn1_java_lang_StringToReal_parseDblImpl_java_lang_String_int_R_double",
             "cn1_java_lang_String_bytesToChars_byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY",
             "cn1_java_lang_String_charAt_int_R_char",
             "cn1_java_lang_String_charsToBytes_char_1ARRAY_char_1ARRAY_R_byte_1ARRAY",
@@ -88,7 +89,6 @@ final class JavascriptNativeRegistry {
             "cn1_java_lang_String_toLowerCase_R_java_lang_String",
             "cn1_java_lang_String_toString_R_java_lang_String",
             "cn1_java_lang_String_toUpperCase_R_java_lang_String",
-            "cn1_java_lang_StringToReal_parseDblImpl_java_lang_String_int_R_double",
             "cn1_java_lang_System_arraycopy_java_lang_Object_int_java_lang_Object_int_int",
             "cn1_java_lang_System_currentTimeMillis_R_long",
             "cn1_java_lang_System_exit_int",
@@ -110,6 +110,7 @@ final class JavascriptNativeRegistry {
             "cn1_java_text_DateFormat_format_java_util_Date_java_lang_StringBuffer_R_java_lang_String",
             "cn1_java_util_HashMap_areEqualKeys_java_lang_Object_java_lang_Object_R_boolean",
             "cn1_java_util_HashMap_findNonNullKeyEntry_java_lang_Object_int_int_R_java_util_HashMap_Entry",
+            "cn1_java_util_LinkedHashMap_findNonNullKeyEntry_java_lang_Object_int_int_R_java_util_HashMap_Entry",
             "cn1_java_util_Locale_getOSLanguage_R_java_lang_String",
             "cn1_java_util_TimeZone_getTimezoneId_R_java_lang_String",
             "cn1_java_util_TimeZone_getTimezoneOffset_java_lang_String_int_int_int_int_R_int",
@@ -120,14 +121,14 @@ final class JavascriptNativeRegistry {
     ));
 
     private static final Set<String> HOST_HOOK_PREFIXES = new HashSet<String>(Arrays.asList(
-            "cn1_com_codename1_impl_platform_js_VMHost_"
+            "cn1_com_codename1_impl_platform_js_"
     ));
 
     private JavascriptNativeRegistry() {
     }
 
     static boolean hasRuntimeImplementation(String symbol) {
-        return RUNTIME_IMPLEMENTED.contains(symbol);
+        return RUNTIME_IMPLEMENTED.contains(symbol) || RUNTIME_IMPLEMENTED.contains(normalizeTripleUnderscores(symbol));
     }
 
     static boolean isHostHook(String symbol) {
@@ -157,5 +158,9 @@ final class JavascriptNativeRegistry {
             return "java.io.File native filesystem access is not supported in javascript backend";
         }
         return null;
+    }
+
+    private static String normalizeTripleUnderscores(String symbol) {
+        return symbol.replace("___", "_");
     }
 }

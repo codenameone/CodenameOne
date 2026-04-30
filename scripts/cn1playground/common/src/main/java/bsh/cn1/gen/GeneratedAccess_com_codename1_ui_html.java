@@ -137,7 +137,7 @@ public final class GeneratedAccess_com_codename1_ui_html {
         if ("addSpecialKey".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
-                com.codename1.ui.html.HTMLComponent.addSpecialKey((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
+                com.codename1.ui.html.HTMLComponent.addSpecialKey((java.lang.String) adaptedArgs[0], toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("setCSSSupportedMediaTypes".equals(name)) {
@@ -149,7 +149,7 @@ public final class GeneratedAccess_com_codename1_ui_html {
         if ("setMaxThreads".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                com.codename1.ui.html.HTMLComponent.setMaxThreads(((Number) adaptedArgs[0]).intValue()); return null;
+                com.codename1.ui.html.HTMLComponent.setMaxThreads(toIntValue(adaptedArgs[0])); return null;
             }
         }
         throw unsupportedStatic(com.codename1.ui.html.HTMLComponent.class, name, safeArgs);
@@ -319,13 +319,13 @@ public final class GeneratedAccess_com_codename1_ui_html {
         if ("dataChanged".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, com.codename1.ui.html.HTMLComponent.class, com.codename1.ui.TextField.class, com.codename1.ui.html.HTMLElement.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, com.codename1.ui.html.HTMLComponent.class, com.codename1.ui.TextField.class, com.codename1.ui.html.HTMLElement.class}, false);
-                typedTarget.dataChanged(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), (com.codename1.ui.html.HTMLComponent) adaptedArgs[2], (com.codename1.ui.TextField) adaptedArgs[3], (com.codename1.ui.html.HTMLElement) adaptedArgs[4]); return null;
+                typedTarget.dataChanged(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), (com.codename1.ui.html.HTMLComponent) adaptedArgs[2], (com.codename1.ui.TextField) adaptedArgs[3], (com.codename1.ui.html.HTMLElement) adaptedArgs[4]); return null;
             }
         }
         if ("fieldSubmitted".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.html.HTMLComponent.class, com.codename1.ui.TextArea.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.Integer.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.html.HTMLComponent.class, com.codename1.ui.TextArea.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.Integer.class, java.lang.String.class}, false);
-                return typedTarget.fieldSubmitted((com.codename1.ui.html.HTMLComponent) adaptedArgs[0], (com.codename1.ui.TextArea) adaptedArgs[1], (java.lang.String) adaptedArgs[2], (java.lang.String) adaptedArgs[3], (java.lang.String) adaptedArgs[4], ((Number) adaptedArgs[5]).intValue(), (java.lang.String) adaptedArgs[6]);
+                return typedTarget.fieldSubmitted((com.codename1.ui.html.HTMLComponent) adaptedArgs[0], (com.codename1.ui.TextArea) adaptedArgs[1], (java.lang.String) adaptedArgs[2], (java.lang.String) adaptedArgs[3], (java.lang.String) adaptedArgs[4], toIntValue(adaptedArgs[5]), (java.lang.String) adaptedArgs[6]);
             }
         }
         if ("focusGained".equals(name)) {
@@ -361,19 +361,19 @@ public final class GeneratedAccess_com_codename1_ui_html {
         if ("pageStatusChanged".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.html.HTMLComponent.class, java.lang.Integer.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.html.HTMLComponent.class, java.lang.Integer.class, java.lang.String.class}, false);
-                typedTarget.pageStatusChanged((com.codename1.ui.html.HTMLComponent) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), (java.lang.String) adaptedArgs[2]); return null;
+                typedTarget.pageStatusChanged((com.codename1.ui.html.HTMLComponent) adaptedArgs[0], toIntValue(adaptedArgs[1]), (java.lang.String) adaptedArgs[2]); return null;
             }
         }
         if ("parsingError".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class}, false);
-                return typedTarget.parsingError(((Number) adaptedArgs[0]).intValue(), (java.lang.String) adaptedArgs[1], (java.lang.String) adaptedArgs[2], (java.lang.String) adaptedArgs[3], (java.lang.String) adaptedArgs[4]);
+                return typedTarget.parsingError(toIntValue(adaptedArgs[0]), (java.lang.String) adaptedArgs[1], (java.lang.String) adaptedArgs[2], (java.lang.String) adaptedArgs[3], (java.lang.String) adaptedArgs[4]);
             }
         }
         if ("selectionChanged".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, com.codename1.ui.html.HTMLComponent.class, com.codename1.ui.List.class, com.codename1.ui.html.HTMLElement.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, com.codename1.ui.html.HTMLComponent.class, com.codename1.ui.List.class, com.codename1.ui.html.HTMLElement.class}, false);
-                typedTarget.selectionChanged(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), (com.codename1.ui.html.HTMLComponent) adaptedArgs[2], (com.codename1.ui.List) adaptedArgs[3], (com.codename1.ui.html.HTMLElement) adaptedArgs[4]); return null;
+                typedTarget.selectionChanged(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), (com.codename1.ui.html.HTMLComponent) adaptedArgs[2], (com.codename1.ui.List) adaptedArgs[3], (com.codename1.ui.html.HTMLElement) adaptedArgs[4]); return null;
             }
         }
         if ("titleUpdated".equals(name)) {
@@ -436,7 +436,7 @@ public final class GeneratedAccess_com_codename1_ui_html {
         if ("setExpectedContentType".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setExpectedContentType(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setExpectedContentType(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setParams".equals(name)) {
@@ -506,13 +506,13 @@ public final class GeneratedAccess_com_codename1_ui_html {
         if ("addCharEntitiesRange".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String[].class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String[].class, java.lang.Integer.class}, false);
-                typedTarget.addCharEntitiesRange((java.lang.String[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.addCharEntitiesRange((java.lang.String[]) adaptedArgs[0], toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("addCharEntity".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
-                typedTarget.addCharEntity((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.addCharEntity((java.lang.String) adaptedArgs[0], toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("addComponent".equals(name)) {
@@ -522,11 +522,11 @@ public final class GeneratedAccess_com_codename1_ui_html {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, com.codename1.ui.Component.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, com.codename1.ui.Component.class}, false);
-                typedTarget.addComponent(((Number) adaptedArgs[0]).intValue(), (com.codename1.ui.Component) adaptedArgs[1]); return null;
+                typedTarget.addComponent(toIntValue(adaptedArgs[0]), (com.codename1.ui.Component) adaptedArgs[1]); return null;
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Object.class, com.codename1.ui.Component.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Object.class, com.codename1.ui.Component.class}, false);
-                typedTarget.addComponent(((Number) adaptedArgs[0]).intValue(), (java.lang.Object) adaptedArgs[1], (com.codename1.ui.Component) adaptedArgs[2]); return null;
+                typedTarget.addComponent(toIntValue(adaptedArgs[0]), (java.lang.Object) adaptedArgs[1], (com.codename1.ui.Component) adaptedArgs[2]); return null;
             }
         }
         if ("addDragFinishedListener".equals(name)) {
@@ -603,61 +603,61 @@ public final class GeneratedAccess_com_codename1_ui_html {
         if ("animateHierarchy".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.animateHierarchy(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.animateHierarchy(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("animateHierarchyAndWait".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.animateHierarchyAndWait(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.animateHierarchyAndWait(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("animateHierarchyFade".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.animateHierarchyFade(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.animateHierarchyFade(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("animateHierarchyFadeAndWait".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.animateHierarchyFadeAndWait(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.animateHierarchyFadeAndWait(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("animateLayout".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.animateLayout(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.animateLayout(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("animateLayoutAndWait".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.animateLayoutAndWait(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.animateLayoutAndWait(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("animateLayoutFade".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.animateLayoutFade(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.animateLayoutFade(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("animateLayoutFadeAndWait".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.animateLayoutFadeAndWait(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.animateLayoutFadeAndWait(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("animateUnlayout".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Runnable.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Runnable.class}, false);
-                typedTarget.animateUnlayout(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), (java.lang.Runnable) adaptedArgs[2]); return null;
+                typedTarget.animateUnlayout(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), (java.lang.Runnable) adaptedArgs[2]); return null;
             }
         }
         if ("animateUnlayoutAndWait".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.animateUnlayoutAndWait(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.animateUnlayoutAndWait(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("announceForAccessibility".equals(name)) {
@@ -700,49 +700,49 @@ public final class GeneratedAccess_com_codename1_ui_html {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.contains(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.contains(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
         if ("containsOrOwns".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.containsOrOwns(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.containsOrOwns(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
         if ("createAnimateHierarchy".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.createAnimateHierarchy(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.createAnimateHierarchy(toIntValue(adaptedArgs[0]));
             }
         }
         if ("createAnimateHierarchyFade".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.createAnimateHierarchyFade(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.createAnimateHierarchyFade(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
         if ("createAnimateLayout".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.createAnimateLayout(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.createAnimateLayout(toIntValue(adaptedArgs[0]));
             }
         }
         if ("createAnimateLayoutFade".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.createAnimateLayoutFade(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.createAnimateLayoutFade(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
         if ("createAnimateLayoutFadeAndWait".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.createAnimateLayoutFadeAndWait(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.createAnimateLayoutFadeAndWait(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
         if ("createAnimateUnlayout".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Runnable.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Runnable.class}, false);
-                return typedTarget.createAnimateUnlayout(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), (java.lang.Runnable) adaptedArgs[2]);
+                return typedTarget.createAnimateUnlayout(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), (java.lang.Runnable) adaptedArgs[2]);
             }
         }
         if ("createReplaceTransition".equals(name)) {
@@ -754,19 +754,19 @@ public final class GeneratedAccess_com_codename1_ui_html {
         if ("createStyleAnimation".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
-                return typedTarget.createStyleAnimation((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.createStyleAnimation((java.lang.String) adaptedArgs[0], toIntValue(adaptedArgs[1]));
             }
         }
         if ("drop".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.drop((com.codename1.ui.Component) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue()); return null;
+                typedTarget.drop((com.codename1.ui.Component) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2])); return null;
             }
         }
         if ("findDropTargetAt".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.findDropTargetAt(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.findDropTargetAt(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
         if ("findFirstFocusable".equals(name)) {
@@ -812,7 +812,7 @@ public final class GeneratedAccess_com_codename1_ui_html {
         if ("getBaseline".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.getBaseline(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.getBaseline(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
         if ("getBaselineResizeBehavior".equals(name)) {
@@ -862,7 +862,7 @@ public final class GeneratedAccess_com_codename1_ui_html {
         if ("getClosestComponentTo".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.getClosestComponentTo(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.getClosestComponentTo(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
         if ("getCloudBoundProperty".equals(name)) {
@@ -878,11 +878,11 @@ public final class GeneratedAccess_com_codename1_ui_html {
         if ("getComponentAt".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getComponentAt(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.getComponentAt(toIntValue(adaptedArgs[0]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.getComponentAt(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.getComponentAt(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
         if ("getComponentCount".equals(name)) {
@@ -1190,7 +1190,7 @@ public final class GeneratedAccess_com_codename1_ui_html {
         if ("getResponderAt".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.getResponderAt(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.getResponderAt(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
         if ("getSafeAreaRoot".equals(name)) {
@@ -1337,7 +1337,7 @@ public final class GeneratedAccess_com_codename1_ui_html {
         if ("growShrink".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.growShrink(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.growShrink(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("handlesInput".equals(name)) {
@@ -1553,19 +1553,19 @@ public final class GeneratedAccess_com_codename1_ui_html {
         if ("keyPressed".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.keyPressed(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.keyPressed(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("keyReleased".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.keyReleased(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.keyReleased(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("keyRepeated".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.keyRepeated(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.keyRepeated(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("layoutContainer".equals(name)) {
@@ -1576,19 +1576,19 @@ public final class GeneratedAccess_com_codename1_ui_html {
         if ("longPointerPress".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.longPointerPress(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.longPointerPress(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("morph".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class, java.lang.Integer.class, java.lang.Runnable.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class, java.lang.Integer.class, java.lang.Runnable.class}, false);
-                typedTarget.morph((com.codename1.ui.Component) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue(), (java.lang.Runnable) adaptedArgs[3]); return null;
+                typedTarget.morph((com.codename1.ui.Component) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1], toIntValue(adaptedArgs[2]), (java.lang.Runnable) adaptedArgs[3]); return null;
             }
         }
         if ("morphAndWait".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class, java.lang.Integer.class}, false);
-                typedTarget.morphAndWait((com.codename1.ui.Component) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue()); return null;
+                typedTarget.morphAndWait((com.codename1.ui.Component) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1], toIntValue(adaptedArgs[2])); return null;
             }
         }
         if ("paint".equals(name)) {
@@ -1639,19 +1639,19 @@ public final class GeneratedAccess_com_codename1_ui_html {
         if ("paintRippleOverlay".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.paintRippleOverlay((com.codename1.ui.Graphics) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue()); return null;
+                typedTarget.paintRippleOverlay((com.codename1.ui.Graphics) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3])); return null;
             }
         }
         if ("paintShadows".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.paintShadows((com.codename1.ui.Graphics) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue()); return null;
+                typedTarget.paintShadows((com.codename1.ui.Graphics) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2])); return null;
             }
         }
         if ("pointerDragged".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.pointerDragged(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.pointerDragged(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1])); return null;
             }
             if (matches(safeArgs, new Class<?>[]{int[].class, int[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class, int[].class}, false);
@@ -1679,7 +1679,7 @@ public final class GeneratedAccess_com_codename1_ui_html {
         if ("pointerPressed".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.pointerPressed(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.pointerPressed(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1])); return null;
             }
             if (matches(safeArgs, new Class<?>[]{int[].class, int[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class, int[].class}, false);
@@ -1689,7 +1689,7 @@ public final class GeneratedAccess_com_codename1_ui_html {
         if ("pointerReleased".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.pointerReleased(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.pointerReleased(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1])); return null;
             }
             if (matches(safeArgs, new Class<?>[]{int[].class, int[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class, int[].class}, false);
@@ -1798,7 +1798,7 @@ public final class GeneratedAccess_com_codename1_ui_html {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
-                typedTarget.repaint(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue()); return null;
+                typedTarget.repaint(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3])); return null;
             }
         }
         if ("replace".equals(name)) {
@@ -1808,7 +1808,7 @@ public final class GeneratedAccess_com_codename1_ui_html {
             }
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class, com.codename1.ui.animations.Transition.class, java.lang.Runnable.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class, com.codename1.ui.animations.Transition.class, java.lang.Runnable.class, java.lang.Integer.class}, false);
-                typedTarget.replace((com.codename1.ui.Component) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1], (com.codename1.ui.animations.Transition) adaptedArgs[2], (java.lang.Runnable) adaptedArgs[3], ((Number) adaptedArgs[4]).intValue()); return null;
+                typedTarget.replace((com.codename1.ui.Component) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1], (com.codename1.ui.animations.Transition) adaptedArgs[2], (java.lang.Runnable) adaptedArgs[3], toIntValue(adaptedArgs[4])); return null;
             }
         }
         if ("replaceAndWait".equals(name)) {
@@ -1816,13 +1816,13 @@ public final class GeneratedAccess_com_codename1_ui_html {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class, com.codename1.ui.animations.Transition.class}, false);
                 typedTarget.replaceAndWait((com.codename1.ui.Component) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1], (com.codename1.ui.animations.Transition) adaptedArgs[2]); return null;
             }
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class, com.codename1.ui.animations.Transition.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class, com.codename1.ui.animations.Transition.class, java.lang.Integer.class}, false);
+                typedTarget.replaceAndWait((com.codename1.ui.Component) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1], (com.codename1.ui.animations.Transition) adaptedArgs[2], toIntValue(adaptedArgs[3])); return null;
+            }
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class, com.codename1.ui.animations.Transition.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class, com.codename1.ui.animations.Transition.class, java.lang.Boolean.class}, false);
                 typedTarget.replaceAndWait((com.codename1.ui.Component) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1], (com.codename1.ui.animations.Transition) adaptedArgs[2], ((Boolean) adaptedArgs[3]).booleanValue()); return null;
-            }
-            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class, com.codename1.ui.animations.Transition.class, java.lang.Integer.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class, com.codename1.ui.animations.Transition.class, java.lang.Integer.class}, false);
-                typedTarget.replaceAndWait((com.codename1.ui.Component) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1], (com.codename1.ui.animations.Transition) adaptedArgs[2], ((Number) adaptedArgs[3]).intValue()); return null;
             }
         }
         if ("requestFocus".equals(name)) {
@@ -1859,19 +1859,19 @@ public final class GeneratedAccess_com_codename1_ui_html {
         if ("scrollPages".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false);
-                typedTarget.scrollPages(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
+                typedTarget.scrollPages(toIntValue(adaptedArgs[0]), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
             }
         }
         if ("scrollPixels".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false);
-                typedTarget.scrollPixels(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
+                typedTarget.scrollPixels(toIntValue(adaptedArgs[0]), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
             }
         }
         if ("scrollRectToVisible".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.ui.Component.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.ui.Component.class}, false);
-                typedTarget.scrollRectToVisible(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue(), (com.codename1.ui.Component) adaptedArgs[4]); return null;
+                typedTarget.scrollRectToVisible(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3]), (com.codename1.ui.Component) adaptedArgs[4]); return null;
             }
         }
         if ("scrollToElement".equals(name)) {
@@ -1947,7 +1947,7 @@ public final class GeneratedAccess_com_codename1_ui_html {
         if ("setCursor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setCursor(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setCursor(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setDOM".equals(name)) {
@@ -1981,7 +1981,7 @@ public final class GeneratedAccess_com_codename1_ui_html {
         if ("setDragTransparency".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Byte.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Byte.class}, false);
-                typedTarget.setDragTransparency(((Number) adaptedArgs[0]).byteValue()); return null;
+                typedTarget.setDragTransparency((byte) toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setDraggable".equals(name)) {
@@ -2059,7 +2059,7 @@ public final class GeneratedAccess_com_codename1_ui_html {
         if ("setHeight".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setHeight(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setHeight(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setHidden".equals(name)) {
@@ -2231,7 +2231,7 @@ public final class GeneratedAccess_com_codename1_ui_html {
         if ("setPreferredH".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setPreferredH(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setPreferredH(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setPreferredSize".equals(name)) {
@@ -2249,13 +2249,13 @@ public final class GeneratedAccess_com_codename1_ui_html {
         if ("setPreferredTabIndex".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setPreferredTabIndex(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setPreferredTabIndex(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setPreferredW".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setPreferredW(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setPreferredW(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setPressedStyle".equals(name)) {
@@ -2303,19 +2303,19 @@ public final class GeneratedAccess_com_codename1_ui_html {
         if ("setScrollAnimationSpeed".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setScrollAnimationSpeed(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setScrollAnimationSpeed(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setScrollIncrement".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setScrollIncrement(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setScrollIncrement(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setScrollOpacityChangeSpeed".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setScrollOpacityChangeSpeed(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setScrollOpacityChangeSpeed(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setScrollSize".equals(name)) {
@@ -2399,7 +2399,7 @@ public final class GeneratedAccess_com_codename1_ui_html {
         if ("setTabIndex".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setTabIndex(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setTabIndex(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setTactileTouch".equals(name)) {
@@ -2417,7 +2417,7 @@ public final class GeneratedAccess_com_codename1_ui_html {
         if ("setTensileLength".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setTensileLength(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setTensileLength(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setTooltip".equals(name)) {
@@ -2463,19 +2463,19 @@ public final class GeneratedAccess_com_codename1_ui_html {
         if ("setWidth".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setWidth(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setWidth(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setX".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setX(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setX(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setY".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setY(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.setY(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("startEditingAsync".equals(name)) {
@@ -2519,13 +2519,13 @@ public final class GeneratedAccess_com_codename1_ui_html {
         if ("updateTabIndices".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.updateTabIndices(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.updateTabIndices(toIntValue(adaptedArgs[0]));
             }
         }
         if ("visibleBoundsContains".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.visibleBoundsContains(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.visibleBoundsContains(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -2553,19 +2553,19 @@ public final class GeneratedAccess_com_codename1_ui_html {
         if ("getAttributeAsInt".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
-                return typedTarget.getAttributeAsInt((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.getAttributeAsInt((java.lang.String) adaptedArgs[0], toIntValue(adaptedArgs[1]));
             }
         }
         if ("getAttributeById".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getAttributeById(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.getAttributeById(toIntValue(adaptedArgs[0]));
             }
         }
         if ("getAttributeName".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getAttributeName(Integer.valueOf(((Number) adaptedArgs[0]).intValue()));
+                return typedTarget.getAttributeName(Integer.valueOf(toIntValue(adaptedArgs[0])));
             }
         }
         if ("getAttributes".equals(name)) {
@@ -2576,7 +2576,7 @@ public final class GeneratedAccess_com_codename1_ui_html {
         if ("getChildAt".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getChildAt(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.getChildAt(toIntValue(adaptedArgs[0]));
             }
         }
         if ("getChildIndex".equals(name)) {
@@ -2594,11 +2594,11 @@ public final class GeneratedAccess_com_codename1_ui_html {
         if ("getDescendantsByTagId".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getDescendantsByTagId(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.getDescendantsByTagId(toIntValue(adaptedArgs[0]));
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
-                return typedTarget.getDescendantsByTagId(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.getDescendantsByTagId(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
         if ("getDescendantsByTagName".equals(name)) {
@@ -2608,13 +2608,13 @@ public final class GeneratedAccess_com_codename1_ui_html {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
-                return typedTarget.getDescendantsByTagName((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
+                return typedTarget.getDescendantsByTagName((java.lang.String) adaptedArgs[0], toIntValue(adaptedArgs[1]));
             }
         }
         if ("getDescendantsByTagNameAndAttribute".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.Integer.class}, false);
-                return typedTarget.getDescendantsByTagNameAndAttribute((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue());
+                return typedTarget.getDescendantsByTagNameAndAttribute((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], toIntValue(adaptedArgs[2]));
             }
         }
         if ("getElementById".equals(name)) {
@@ -2626,7 +2626,7 @@ public final class GeneratedAccess_com_codename1_ui_html {
         if ("getFirstChildByTagId".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getFirstChildByTagId(((Number) adaptedArgs[0]).intValue());
+                return typedTarget.getFirstChildByTagId(toIntValue(adaptedArgs[0]));
             }
         }
         if ("getFirstChildByTagName".equals(name)) {
@@ -2678,7 +2678,7 @@ public final class GeneratedAccess_com_codename1_ui_html {
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class, java.lang.Integer.class}, false);
-                return typedTarget.getTextDescendants((java.lang.String) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue(), ((Number) adaptedArgs[2]).intValue());
+                return typedTarget.getTextDescendants((java.lang.String) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue(), toIntValue(adaptedArgs[2]));
             }
         }
         if ("hasTextChild".equals(name)) {
@@ -2689,7 +2689,7 @@ public final class GeneratedAccess_com_codename1_ui_html {
         if ("insertChildAt".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.xml.Element.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.xml.Element.class, java.lang.Integer.class}, false);
-                typedTarget.insertChildAt((com.codename1.xml.Element) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.insertChildAt((com.codename1.xml.Element) adaptedArgs[0], toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("isEmpty".equals(name)) {
@@ -2716,13 +2716,13 @@ public final class GeneratedAccess_com_codename1_ui_html {
         if ("removeAttributeById".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.removeAttributeById(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.removeAttributeById(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("removeChildAt".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.removeChildAt(((Number) adaptedArgs[0]).intValue()); return null;
+                typedTarget.removeChildAt(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("replaceChild".equals(name)) {
@@ -2740,7 +2740,7 @@ public final class GeneratedAccess_com_codename1_ui_html {
         if ("setAttributeById".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class}, false);
-                typedTarget.setAttributeById(((Number) adaptedArgs[0]).intValue(), (java.lang.String) adaptedArgs[1]); return null;
+                typedTarget.setAttributeById(toIntValue(adaptedArgs[0]), (java.lang.String) adaptedArgs[1]); return null;
             }
         }
         if ("setText".equals(name)) {
@@ -2765,13 +2765,13 @@ public final class GeneratedAccess_com_codename1_ui_html {
         if ("addCharEntitiesRange".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String[].class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String[].class, java.lang.Integer.class}, false);
-                typedTarget.addCharEntitiesRange((java.lang.String[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.addCharEntitiesRange((java.lang.String[]) adaptedArgs[0], toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("addCharEntity".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
-                typedTarget.addCharEntity((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
+                typedTarget.addCharEntity((java.lang.String) adaptedArgs[0], toIntValue(adaptedArgs[1])); return null;
             }
         }
         if ("isCaseSensitive".equals(name)) {
@@ -2820,13 +2820,13 @@ public final class GeneratedAccess_com_codename1_ui_html {
         if ("dataChanged".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, com.codename1.ui.html.HTMLComponent.class, com.codename1.ui.TextField.class, com.codename1.ui.html.HTMLElement.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, com.codename1.ui.html.HTMLComponent.class, com.codename1.ui.TextField.class, com.codename1.ui.html.HTMLElement.class}, false);
-                typedTarget.dataChanged(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), (com.codename1.ui.html.HTMLComponent) adaptedArgs[2], (com.codename1.ui.TextField) adaptedArgs[3], (com.codename1.ui.html.HTMLElement) adaptedArgs[4]); return null;
+                typedTarget.dataChanged(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), (com.codename1.ui.html.HTMLComponent) adaptedArgs[2], (com.codename1.ui.TextField) adaptedArgs[3], (com.codename1.ui.html.HTMLElement) adaptedArgs[4]); return null;
             }
         }
         if ("fieldSubmitted".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.html.HTMLComponent.class, com.codename1.ui.TextArea.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.Integer.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.html.HTMLComponent.class, com.codename1.ui.TextArea.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.Integer.class, java.lang.String.class}, false);
-                return typedTarget.fieldSubmitted((com.codename1.ui.html.HTMLComponent) adaptedArgs[0], (com.codename1.ui.TextArea) adaptedArgs[1], (java.lang.String) adaptedArgs[2], (java.lang.String) adaptedArgs[3], (java.lang.String) adaptedArgs[4], ((Number) adaptedArgs[5]).intValue(), (java.lang.String) adaptedArgs[6]);
+                return typedTarget.fieldSubmitted((com.codename1.ui.html.HTMLComponent) adaptedArgs[0], (com.codename1.ui.TextArea) adaptedArgs[1], (java.lang.String) adaptedArgs[2], (java.lang.String) adaptedArgs[3], (java.lang.String) adaptedArgs[4], toIntValue(adaptedArgs[5]), (java.lang.String) adaptedArgs[6]);
             }
         }
         if ("focusGained".equals(name)) {
@@ -2862,19 +2862,19 @@ public final class GeneratedAccess_com_codename1_ui_html {
         if ("pageStatusChanged".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.html.HTMLComponent.class, java.lang.Integer.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.html.HTMLComponent.class, java.lang.Integer.class, java.lang.String.class}, false);
-                typedTarget.pageStatusChanged((com.codename1.ui.html.HTMLComponent) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), (java.lang.String) adaptedArgs[2]); return null;
+                typedTarget.pageStatusChanged((com.codename1.ui.html.HTMLComponent) adaptedArgs[0], toIntValue(adaptedArgs[1]), (java.lang.String) adaptedArgs[2]); return null;
             }
         }
         if ("parsingError".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class}, false);
-                return typedTarget.parsingError(((Number) adaptedArgs[0]).intValue(), (java.lang.String) adaptedArgs[1], (java.lang.String) adaptedArgs[2], (java.lang.String) adaptedArgs[3], (java.lang.String) adaptedArgs[4]);
+                return typedTarget.parsingError(toIntValue(adaptedArgs[0]), (java.lang.String) adaptedArgs[1], (java.lang.String) adaptedArgs[2], (java.lang.String) adaptedArgs[3], (java.lang.String) adaptedArgs[4]);
             }
         }
         if ("selectionChanged".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, com.codename1.ui.html.HTMLComponent.class, com.codename1.ui.List.class, com.codename1.ui.html.HTMLElement.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, com.codename1.ui.html.HTMLComponent.class, com.codename1.ui.List.class, com.codename1.ui.html.HTMLElement.class}, false);
-                typedTarget.selectionChanged(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), (com.codename1.ui.html.HTMLComponent) adaptedArgs[2], (com.codename1.ui.List) adaptedArgs[3], (com.codename1.ui.html.HTMLElement) adaptedArgs[4]); return null;
+                typedTarget.selectionChanged(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), (com.codename1.ui.html.HTMLComponent) adaptedArgs[2], (com.codename1.ui.List) adaptedArgs[3], (com.codename1.ui.html.HTMLElement) adaptedArgs[4]); return null;
             }
         }
         if ("titleUpdated".equals(name)) {
@@ -2887,214 +2887,307 @@ public final class GeneratedAccess_com_codename1_ui_html {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == com.codename1.ui.html.DocumentInfo.class) {
-            if ("ENCODING_ISO".equals(name)) return com.codename1.ui.html.DocumentInfo.ENCODING_ISO;
-            if ("ENCODING_UTF8".equals(name)) return com.codename1.ui.html.DocumentInfo.ENCODING_UTF8;
-            if ("TYPE_CSS".equals(name)) return com.codename1.ui.html.DocumentInfo.TYPE_CSS;
-            if ("TYPE_HTML".equals(name)) return com.codename1.ui.html.DocumentInfo.TYPE_HTML;
-            if ("TYPE_IMAGE".equals(name)) return com.codename1.ui.html.DocumentInfo.TYPE_IMAGE;
-        }
-        if (type == com.codename1.ui.html.HTMLCallback.class) {
-            if ("ERROR_CONNECTING".equals(name)) return com.codename1.ui.html.HTMLCallback.ERROR_CONNECTING;
-            if ("ERROR_IMAGE_BAD_FORMAT".equals(name)) return com.codename1.ui.html.HTMLCallback.ERROR_IMAGE_BAD_FORMAT;
-            if ("ERROR_IMAGE_NOT_FOUND".equals(name)) return com.codename1.ui.html.HTMLCallback.ERROR_IMAGE_NOT_FOUND;
-            if ("ERROR_INVALID_TAG_HIERARCHY".equals(name)) return com.codename1.ui.html.HTMLCallback.ERROR_INVALID_TAG_HIERARCHY;
-            if ("ERROR_NO_BASE_URL".equals(name)) return com.codename1.ui.html.HTMLCallback.ERROR_NO_BASE_URL;
-            if ("FIELD_PASSWORD".equals(name)) return com.codename1.ui.html.HTMLCallback.FIELD_PASSWORD;
-            if ("FIELD_TEXT".equals(name)) return com.codename1.ui.html.HTMLCallback.FIELD_TEXT;
-            if ("LINK_FORBIDDEN".equals(name)) return com.codename1.ui.html.HTMLCallback.LINK_FORBIDDEN;
-            if ("LINK_REGULAR".equals(name)) return com.codename1.ui.html.HTMLCallback.LINK_REGULAR;
-            if ("LINK_VISTED".equals(name)) return com.codename1.ui.html.HTMLCallback.LINK_VISTED;
-            if ("STATUS_CANCELLED".equals(name)) return com.codename1.ui.html.HTMLCallback.STATUS_CANCELLED;
-            if ("STATUS_COMPLETED".equals(name)) return com.codename1.ui.html.HTMLCallback.STATUS_COMPLETED;
-            if ("STATUS_CONNECTED".equals(name)) return com.codename1.ui.html.HTMLCallback.STATUS_CONNECTED;
-            if ("STATUS_DISPLAYED".equals(name)) return com.codename1.ui.html.HTMLCallback.STATUS_DISPLAYED;
-            if ("STATUS_ERROR".equals(name)) return com.codename1.ui.html.HTMLCallback.STATUS_ERROR;
-            if ("STATUS_NONE".equals(name)) return com.codename1.ui.html.HTMLCallback.STATUS_NONE;
-            if ("STATUS_PARSED".equals(name)) return com.codename1.ui.html.HTMLCallback.STATUS_PARSED;
-            if ("STATUS_REDIRECTED".equals(name)) return com.codename1.ui.html.HTMLCallback.STATUS_REDIRECTED;
-            if ("STATUS_REQUESTED".equals(name)) return com.codename1.ui.html.HTMLCallback.STATUS_REQUESTED;
-        }
-        if (type == com.codename1.ui.html.HTMLElement.class) {
-            if ("ATTR_ABBR".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_ABBR;
-            if ("ATTR_ACCESSKEY".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_ACCESSKEY;
-            if ("ATTR_ACTION".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_ACTION;
-            if ("ATTR_ALIGN".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_ALIGN;
-            if ("ATTR_ALT".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_ALT;
-            if ("ATTR_AXIS".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_AXIS;
-            if ("ATTR_BGCOLOR".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_BGCOLOR;
-            if ("ATTR_BORDER".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_BORDER;
-            if ("ATTR_CELLPADDING".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_CELLPADDING;
-            if ("ATTR_CELLSPACING".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_CELLSPACING;
-            if ("ATTR_CHARSET".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_CHARSET;
-            if ("ATTR_CHECKED".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_CHECKED;
-            if ("ATTR_CITE".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_CITE;
-            if ("ATTR_CLASS".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_CLASS;
-            if ("ATTR_COLOR".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_COLOR;
-            if ("ATTR_COLS".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_COLS;
-            if ("ATTR_COLSPAN".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_COLSPAN;
-            if ("ATTR_CONTENT".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_CONTENT;
-            if ("ATTR_COORDS".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_COORDS;
-            if ("ATTR_DIR".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_DIR;
-            if ("ATTR_DISABLED".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_DISABLED;
-            if ("ATTR_EMPTYOK".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_EMPTYOK;
-            if ("ATTR_ENCTYPE".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_ENCTYPE;
-            if ("ATTR_FACE".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_FACE;
-            if ("ATTR_FOR".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_FOR;
-            if ("ATTR_FORMAT".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_FORMAT;
-            if ("ATTR_FRAME".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_FRAME;
-            if ("ATTR_HEADERS".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_HEADERS;
-            if ("ATTR_HEIGHT".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_HEIGHT;
-            if ("ATTR_HREF".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_HREF;
-            if ("ATTR_HREFLANG".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_HREFLANG;
-            if ("ATTR_HSPACE".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_HSPACE;
-            if ("ATTR_HTTPEQUIV".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_HTTPEQUIV;
-            if ("ATTR_ID".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_ID;
-            if ("ATTR_ISMAP".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_ISMAP;
-            if ("ATTR_ISTYLE".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_ISTYLE;
-            if ("ATTR_LABEL".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_LABEL;
-            if ("ATTR_LANG".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_LANG;
-            if ("ATTR_LINK".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_LINK;
-            if ("ATTR_LOCALSRC".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_LOCALSRC;
-            if ("ATTR_LONGDESC".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_LONGDESC;
-            if ("ATTR_MAXLENGTH".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_MAXLENGTH;
-            if ("ATTR_MEDIA".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_MEDIA;
-            if ("ATTR_METHOD".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_METHOD;
-            if ("ATTR_MULTIPLE".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_MULTIPLE;
-            if ("ATTR_NAME".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_NAME;
-            if ("ATTR_READONLY".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_READONLY;
-            if ("ATTR_REL".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_REL;
-            if ("ATTR_REV".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_REV;
-            if ("ATTR_ROWS".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_ROWS;
-            if ("ATTR_ROWSPAN".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_ROWSPAN;
-            if ("ATTR_RULES".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_RULES;
-            if ("ATTR_SCHEME".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_SCHEME;
-            if ("ATTR_SCOPE".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_SCOPE;
-            if ("ATTR_SELECTED".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_SELECTED;
-            if ("ATTR_SHAPE".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_SHAPE;
-            if ("ATTR_SIZE".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_SIZE;
-            if ("ATTR_SRC".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_SRC;
-            if ("ATTR_START".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_START;
-            if ("ATTR_STYLE".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_STYLE;
-            if ("ATTR_SUMMARY".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_SUMMARY;
-            if ("ATTR_TABINDEX".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_TABINDEX;
-            if ("ATTR_TEXT".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_TEXT;
-            if ("ATTR_TITLE".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_TITLE;
-            if ("ATTR_TYPE".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_TYPE;
-            if ("ATTR_USEMAP".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_USEMAP;
-            if ("ATTR_VALIGN".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_VALIGN;
-            if ("ATTR_VALUE".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_VALUE;
-            if ("ATTR_VERSION".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_VERSION;
-            if ("ATTR_VSPACE".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_VSPACE;
-            if ("ATTR_WIDTH".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_WIDTH;
-            if ("ATTR_XMLLANG".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_XMLLANG;
-            if ("ATTR_XMLNS".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_XMLNS;
-            if ("ATTR_XMLSPACE".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_XMLSPACE;
-            if ("COLOR_AQUA".equals(name)) return com.codename1.ui.html.HTMLElement.COLOR_AQUA;
-            if ("COLOR_BLACK".equals(name)) return com.codename1.ui.html.HTMLElement.COLOR_BLACK;
-            if ("COLOR_BLUE".equals(name)) return com.codename1.ui.html.HTMLElement.COLOR_BLUE;
-            if ("COLOR_FUCHSIA".equals(name)) return com.codename1.ui.html.HTMLElement.COLOR_FUCHSIA;
-            if ("COLOR_GRAY".equals(name)) return com.codename1.ui.html.HTMLElement.COLOR_GRAY;
-            if ("COLOR_GREEN".equals(name)) return com.codename1.ui.html.HTMLElement.COLOR_GREEN;
-            if ("COLOR_LIME".equals(name)) return com.codename1.ui.html.HTMLElement.COLOR_LIME;
-            if ("COLOR_MAROON".equals(name)) return com.codename1.ui.html.HTMLElement.COLOR_MAROON;
-            if ("COLOR_NAVY".equals(name)) return com.codename1.ui.html.HTMLElement.COLOR_NAVY;
-            if ("COLOR_OLIVE".equals(name)) return com.codename1.ui.html.HTMLElement.COLOR_OLIVE;
-            if ("COLOR_ORANGE".equals(name)) return com.codename1.ui.html.HTMLElement.COLOR_ORANGE;
-            if ("COLOR_PURPLE".equals(name)) return com.codename1.ui.html.HTMLElement.COLOR_PURPLE;
-            if ("COLOR_RED".equals(name)) return com.codename1.ui.html.HTMLElement.COLOR_RED;
-            if ("COLOR_SILVER".equals(name)) return com.codename1.ui.html.HTMLElement.COLOR_SILVER;
-            if ("COLOR_TEAL".equals(name)) return com.codename1.ui.html.HTMLElement.COLOR_TEAL;
-            if ("COLOR_WHITE".equals(name)) return com.codename1.ui.html.HTMLElement.COLOR_WHITE;
-            if ("COLOR_YELLOW".equals(name)) return com.codename1.ui.html.HTMLElement.COLOR_YELLOW;
-            if ("TAG_A".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_A;
-            if ("TAG_ABBR".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_ABBR;
-            if ("TAG_ACRONYM".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_ACRONYM;
-            if ("TAG_ADDRESS".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_ADDRESS;
-            if ("TAG_AREA".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_AREA;
-            if ("TAG_B".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_B;
-            if ("TAG_BASE".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_BASE;
-            if ("TAG_BASEFONT".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_BASEFONT;
-            if ("TAG_BIG".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_BIG;
-            if ("TAG_BLOCKQUOTE".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_BLOCKQUOTE;
-            if ("TAG_BODY".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_BODY;
-            if ("TAG_BR".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_BR;
-            if ("TAG_BUTTON".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_BUTTON;
-            if ("TAG_CAPTION".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_CAPTION;
-            if ("TAG_CENTER".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_CENTER;
-            if ("TAG_CITE".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_CITE;
-            if ("TAG_CODE".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_CODE;
-            if ("TAG_CSS_ILLEGAL_SELECTOR".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_CSS_ILLEGAL_SELECTOR;
-            if ("TAG_CSS_SELECTOR".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_CSS_SELECTOR;
-            if ("TAG_DD".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_DD;
-            if ("TAG_DEL".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_DEL;
-            if ("TAG_DFN".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_DFN;
-            if ("TAG_DIR".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_DIR;
-            if ("TAG_DIV".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_DIV;
-            if ("TAG_DL".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_DL;
-            if ("TAG_DT".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_DT;
-            if ("TAG_EM".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_EM;
-            if ("TAG_FIELDSET".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_FIELDSET;
-            if ("TAG_FONT".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_FONT;
-            if ("TAG_FORM".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_FORM;
-            if ("TAG_H1".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_H1;
-            if ("TAG_H2".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_H2;
-            if ("TAG_H3".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_H3;
-            if ("TAG_H4".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_H4;
-            if ("TAG_H5".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_H5;
-            if ("TAG_H6".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_H6;
-            if ("TAG_HEAD".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_HEAD;
-            if ("TAG_HR".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_HR;
-            if ("TAG_HTML".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_HTML;
-            if ("TAG_I".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_I;
-            if ("TAG_IMG".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_IMG;
-            if ("TAG_INPUT".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_INPUT;
-            if ("TAG_INS".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_INS;
-            if ("TAG_KBD".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_KBD;
-            if ("TAG_LABEL".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_LABEL;
-            if ("TAG_LEGEND".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_LEGEND;
-            if ("TAG_LI".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_LI;
-            if ("TAG_LINK".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_LINK;
-            if ("TAG_MAP".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_MAP;
-            if ("TAG_MENU".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_MENU;
-            if ("TAG_META".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_META;
-            if ("TAG_NOFRAMES".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_NOFRAMES;
-            if ("TAG_NOSCRIPT".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_NOSCRIPT;
-            if ("TAG_OBJECT".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_OBJECT;
-            if ("TAG_OL".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_OL;
-            if ("TAG_OPTGROUP".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_OPTGROUP;
-            if ("TAG_OPTION".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_OPTION;
-            if ("TAG_P".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_P;
-            if ("TAG_PARAM".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_PARAM;
-            if ("TAG_PRE".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_PRE;
-            if ("TAG_Q".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_Q;
-            if ("TAG_S".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_S;
-            if ("TAG_SAMP".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_SAMP;
-            if ("TAG_SELECT".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_SELECT;
-            if ("TAG_SMALL".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_SMALL;
-            if ("TAG_SPAN".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_SPAN;
-            if ("TAG_STRIKE".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_STRIKE;
-            if ("TAG_STRONG".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_STRONG;
-            if ("TAG_STYLE".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_STYLE;
-            if ("TAG_SUB".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_SUB;
-            if ("TAG_SUP".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_SUP;
-            if ("TAG_TABLE".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_TABLE;
-            if ("TAG_TBODY".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_TBODY;
-            if ("TAG_TD".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_TD;
-            if ("TAG_TEXT".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_TEXT;
-            if ("TAG_TEXTAREA".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_TEXTAREA;
-            if ("TAG_TFOOT".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_TFOOT;
-            if ("TAG_TH".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_TH;
-            if ("TAG_THEAD".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_THEAD;
-            if ("TAG_TITLE".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_TITLE;
-            if ("TAG_TR".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_TR;
-            if ("TAG_TT".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_TT;
-            if ("TAG_U".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_U;
-            if ("TAG_UL".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_UL;
-            if ("TAG_UNSUPPORTED".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_UNSUPPORTED;
-            if ("TAG_VAR".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_VAR;
-        }
+        if (type == com.codename1.ui.html.DefaultHTMLCallback.class) return getStaticField0(name);
+        if (type == com.codename1.ui.html.DocumentInfo.class) return getStaticField1(name);
+        if (type == com.codename1.ui.html.HTMLCallback.class) return getStaticField2(name);
+        if (type == com.codename1.ui.html.HTMLComponent.class) return getStaticField3(name);
+        if (type == com.codename1.ui.html.HTMLElement.class) return getStaticField4(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("ERROR_ATTIBUTE_VALUE_INVALID".equals(name)) return com.codename1.ui.html.DefaultHTMLCallback.ERROR_ATTIBUTE_VALUE_INVALID;
+        if ("ERROR_ATTRIBUTE_NOT_SUPPORTED".equals(name)) return com.codename1.ui.html.DefaultHTMLCallback.ERROR_ATTRIBUTE_NOT_SUPPORTED;
+        if ("ERROR_CONNECTING".equals(name)) return com.codename1.ui.html.DefaultHTMLCallback.ERROR_CONNECTING;
+        if ("ERROR_ENCODING".equals(name)) return com.codename1.ui.html.DefaultHTMLCallback.ERROR_ENCODING;
+        if ("ERROR_IMAGE_BAD_FORMAT".equals(name)) return com.codename1.ui.html.DefaultHTMLCallback.ERROR_IMAGE_BAD_FORMAT;
+        if ("ERROR_IMAGE_NOT_FOUND".equals(name)) return com.codename1.ui.html.DefaultHTMLCallback.ERROR_IMAGE_NOT_FOUND;
+        if ("ERROR_INVALID_TAG_HIERARCHY".equals(name)) return com.codename1.ui.html.DefaultHTMLCallback.ERROR_INVALID_TAG_HIERARCHY;
+        if ("ERROR_MULTIPLE_ROOTS".equals(name)) return com.codename1.ui.html.DefaultHTMLCallback.ERROR_MULTIPLE_ROOTS;
+        if ("ERROR_NO_BASE_URL".equals(name)) return com.codename1.ui.html.DefaultHTMLCallback.ERROR_NO_BASE_URL;
+        if ("ERROR_NO_CLOSE_TAG".equals(name)) return com.codename1.ui.html.DefaultHTMLCallback.ERROR_NO_CLOSE_TAG;
+        if ("ERROR_NO_ROOTS".equals(name)) return com.codename1.ui.html.DefaultHTMLCallback.ERROR_NO_ROOTS;
+        if ("ERROR_TAG_NOT_SUPPORTED".equals(name)) return com.codename1.ui.html.DefaultHTMLCallback.ERROR_TAG_NOT_SUPPORTED;
+        if ("ERROR_UNEXPECTED_CHARACTER".equals(name)) return com.codename1.ui.html.DefaultHTMLCallback.ERROR_UNEXPECTED_CHARACTER;
+        if ("ERROR_UNEXPECTED_TAG_CLOSING".equals(name)) return com.codename1.ui.html.DefaultHTMLCallback.ERROR_UNEXPECTED_TAG_CLOSING;
+        if ("ERROR_UNRECOGNIZED_CHAR_ENTITY".equals(name)) return com.codename1.ui.html.DefaultHTMLCallback.ERROR_UNRECOGNIZED_CHAR_ENTITY;
+        if ("FIELD_PASSWORD".equals(name)) return com.codename1.ui.html.DefaultHTMLCallback.FIELD_PASSWORD;
+        if ("FIELD_TEXT".equals(name)) return com.codename1.ui.html.DefaultHTMLCallback.FIELD_TEXT;
+        if ("LINK_FORBIDDEN".equals(name)) return com.codename1.ui.html.DefaultHTMLCallback.LINK_FORBIDDEN;
+        if ("LINK_REGULAR".equals(name)) return com.codename1.ui.html.DefaultHTMLCallback.LINK_REGULAR;
+        if ("LINK_VISTED".equals(name)) return com.codename1.ui.html.DefaultHTMLCallback.LINK_VISTED;
+        if ("STATUS_CANCELLED".equals(name)) return com.codename1.ui.html.DefaultHTMLCallback.STATUS_CANCELLED;
+        if ("STATUS_COMPLETED".equals(name)) return com.codename1.ui.html.DefaultHTMLCallback.STATUS_COMPLETED;
+        if ("STATUS_CONNECTED".equals(name)) return com.codename1.ui.html.DefaultHTMLCallback.STATUS_CONNECTED;
+        if ("STATUS_DISPLAYED".equals(name)) return com.codename1.ui.html.DefaultHTMLCallback.STATUS_DISPLAYED;
+        if ("STATUS_ERROR".equals(name)) return com.codename1.ui.html.DefaultHTMLCallback.STATUS_ERROR;
+        if ("STATUS_NONE".equals(name)) return com.codename1.ui.html.DefaultHTMLCallback.STATUS_NONE;
+        if ("STATUS_PARSED".equals(name)) return com.codename1.ui.html.DefaultHTMLCallback.STATUS_PARSED;
+        if ("STATUS_REDIRECTED".equals(name)) return com.codename1.ui.html.DefaultHTMLCallback.STATUS_REDIRECTED;
+        if ("STATUS_REQUESTED".equals(name)) return com.codename1.ui.html.DefaultHTMLCallback.STATUS_REQUESTED;
+        throw unsupportedStaticField(com.codename1.ui.html.DefaultHTMLCallback.class, name);
+    }
+
+    private static Object getStaticField1(String name) throws Exception {
+        if ("ENCODING_ISO".equals(name)) return com.codename1.ui.html.DocumentInfo.ENCODING_ISO;
+        if ("ENCODING_UTF8".equals(name)) return com.codename1.ui.html.DocumentInfo.ENCODING_UTF8;
+        if ("TYPE_CSS".equals(name)) return com.codename1.ui.html.DocumentInfo.TYPE_CSS;
+        if ("TYPE_HTML".equals(name)) return com.codename1.ui.html.DocumentInfo.TYPE_HTML;
+        if ("TYPE_IMAGE".equals(name)) return com.codename1.ui.html.DocumentInfo.TYPE_IMAGE;
+        throw unsupportedStaticField(com.codename1.ui.html.DocumentInfo.class, name);
+    }
+
+    private static Object getStaticField2(String name) throws Exception {
+        if ("ERROR_ATTIBUTE_VALUE_INVALID".equals(name)) return com.codename1.ui.html.HTMLCallback.ERROR_ATTIBUTE_VALUE_INVALID;
+        if ("ERROR_ATTRIBUTE_NOT_SUPPORTED".equals(name)) return com.codename1.ui.html.HTMLCallback.ERROR_ATTRIBUTE_NOT_SUPPORTED;
+        if ("ERROR_CONNECTING".equals(name)) return com.codename1.ui.html.HTMLCallback.ERROR_CONNECTING;
+        if ("ERROR_ENCODING".equals(name)) return com.codename1.ui.html.HTMLCallback.ERROR_ENCODING;
+        if ("ERROR_IMAGE_BAD_FORMAT".equals(name)) return com.codename1.ui.html.HTMLCallback.ERROR_IMAGE_BAD_FORMAT;
+        if ("ERROR_IMAGE_NOT_FOUND".equals(name)) return com.codename1.ui.html.HTMLCallback.ERROR_IMAGE_NOT_FOUND;
+        if ("ERROR_INVALID_TAG_HIERARCHY".equals(name)) return com.codename1.ui.html.HTMLCallback.ERROR_INVALID_TAG_HIERARCHY;
+        if ("ERROR_MULTIPLE_ROOTS".equals(name)) return com.codename1.ui.html.HTMLCallback.ERROR_MULTIPLE_ROOTS;
+        if ("ERROR_NO_BASE_URL".equals(name)) return com.codename1.ui.html.HTMLCallback.ERROR_NO_BASE_URL;
+        if ("ERROR_NO_CLOSE_TAG".equals(name)) return com.codename1.ui.html.HTMLCallback.ERROR_NO_CLOSE_TAG;
+        if ("ERROR_NO_ROOTS".equals(name)) return com.codename1.ui.html.HTMLCallback.ERROR_NO_ROOTS;
+        if ("ERROR_TAG_NOT_SUPPORTED".equals(name)) return com.codename1.ui.html.HTMLCallback.ERROR_TAG_NOT_SUPPORTED;
+        if ("ERROR_UNEXPECTED_CHARACTER".equals(name)) return com.codename1.ui.html.HTMLCallback.ERROR_UNEXPECTED_CHARACTER;
+        if ("ERROR_UNEXPECTED_TAG_CLOSING".equals(name)) return com.codename1.ui.html.HTMLCallback.ERROR_UNEXPECTED_TAG_CLOSING;
+        if ("ERROR_UNRECOGNIZED_CHAR_ENTITY".equals(name)) return com.codename1.ui.html.HTMLCallback.ERROR_UNRECOGNIZED_CHAR_ENTITY;
+        if ("FIELD_PASSWORD".equals(name)) return com.codename1.ui.html.HTMLCallback.FIELD_PASSWORD;
+        if ("FIELD_TEXT".equals(name)) return com.codename1.ui.html.HTMLCallback.FIELD_TEXT;
+        if ("LINK_FORBIDDEN".equals(name)) return com.codename1.ui.html.HTMLCallback.LINK_FORBIDDEN;
+        if ("LINK_REGULAR".equals(name)) return com.codename1.ui.html.HTMLCallback.LINK_REGULAR;
+        if ("LINK_VISTED".equals(name)) return com.codename1.ui.html.HTMLCallback.LINK_VISTED;
+        if ("STATUS_CANCELLED".equals(name)) return com.codename1.ui.html.HTMLCallback.STATUS_CANCELLED;
+        if ("STATUS_COMPLETED".equals(name)) return com.codename1.ui.html.HTMLCallback.STATUS_COMPLETED;
+        if ("STATUS_CONNECTED".equals(name)) return com.codename1.ui.html.HTMLCallback.STATUS_CONNECTED;
+        if ("STATUS_DISPLAYED".equals(name)) return com.codename1.ui.html.HTMLCallback.STATUS_DISPLAYED;
+        if ("STATUS_ERROR".equals(name)) return com.codename1.ui.html.HTMLCallback.STATUS_ERROR;
+        if ("STATUS_NONE".equals(name)) return com.codename1.ui.html.HTMLCallback.STATUS_NONE;
+        if ("STATUS_PARSED".equals(name)) return com.codename1.ui.html.HTMLCallback.STATUS_PARSED;
+        if ("STATUS_REDIRECTED".equals(name)) return com.codename1.ui.html.HTMLCallback.STATUS_REDIRECTED;
+        if ("STATUS_REQUESTED".equals(name)) return com.codename1.ui.html.HTMLCallback.STATUS_REQUESTED;
+        throw unsupportedStaticField(com.codename1.ui.html.HTMLCallback.class, name);
+    }
+
+    private static Object getStaticField3(String name) throws Exception {
+        if ("BASELINE".equals(name)) return com.codename1.ui.html.HTMLComponent.BASELINE;
+        if ("BOTTOM".equals(name)) return com.codename1.ui.html.HTMLComponent.BOTTOM;
+        if ("BRB_CENTER_OFFSET".equals(name)) return com.codename1.ui.html.HTMLComponent.BRB_CENTER_OFFSET;
+        if ("BRB_CONSTANT_ASCENT".equals(name)) return com.codename1.ui.html.HTMLComponent.BRB_CONSTANT_ASCENT;
+        if ("BRB_CONSTANT_DESCENT".equals(name)) return com.codename1.ui.html.HTMLComponent.BRB_CONSTANT_DESCENT;
+        if ("BRB_OTHER".equals(name)) return com.codename1.ui.html.HTMLComponent.BRB_OTHER;
+        if ("CENTER".equals(name)) return com.codename1.ui.html.HTMLComponent.CENTER;
+        if ("CROSSHAIR_CURSOR".equals(name)) return com.codename1.ui.html.HTMLComponent.CROSSHAIR_CURSOR;
+        if ("DEFAULT_CURSOR".equals(name)) return com.codename1.ui.html.HTMLComponent.DEFAULT_CURSOR;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_X".equals(name)) return com.codename1.ui.html.HTMLComponent.DRAG_REGION_IMMEDIATELY_DRAG_X;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_XY".equals(name)) return com.codename1.ui.html.HTMLComponent.DRAG_REGION_IMMEDIATELY_DRAG_XY;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_Y".equals(name)) return com.codename1.ui.html.HTMLComponent.DRAG_REGION_IMMEDIATELY_DRAG_Y;
+        if ("DRAG_REGION_LIKELY_DRAG_X".equals(name)) return com.codename1.ui.html.HTMLComponent.DRAG_REGION_LIKELY_DRAG_X;
+        if ("DRAG_REGION_LIKELY_DRAG_XY".equals(name)) return com.codename1.ui.html.HTMLComponent.DRAG_REGION_LIKELY_DRAG_XY;
+        if ("DRAG_REGION_LIKELY_DRAG_Y".equals(name)) return com.codename1.ui.html.HTMLComponent.DRAG_REGION_LIKELY_DRAG_Y;
+        if ("DRAG_REGION_NOT_DRAGGABLE".equals(name)) return com.codename1.ui.html.HTMLComponent.DRAG_REGION_NOT_DRAGGABLE;
+        if ("DRAG_REGION_POSSIBLE_DRAG_X".equals(name)) return com.codename1.ui.html.HTMLComponent.DRAG_REGION_POSSIBLE_DRAG_X;
+        if ("DRAG_REGION_POSSIBLE_DRAG_XY".equals(name)) return com.codename1.ui.html.HTMLComponent.DRAG_REGION_POSSIBLE_DRAG_XY;
+        if ("DRAG_REGION_POSSIBLE_DRAG_Y".equals(name)) return com.codename1.ui.html.HTMLComponent.DRAG_REGION_POSSIBLE_DRAG_Y;
+        if ("E_RESIZE_CURSOR".equals(name)) return com.codename1.ui.html.HTMLComponent.E_RESIZE_CURSOR;
+        if ("HAND_CURSOR".equals(name)) return com.codename1.ui.html.HTMLComponent.HAND_CURSOR;
+        if ("LEFT".equals(name)) return com.codename1.ui.html.HTMLComponent.LEFT;
+        if ("MOVE_CURSOR".equals(name)) return com.codename1.ui.html.HTMLComponent.MOVE_CURSOR;
+        if ("NE_RESIZE_CURSOR".equals(name)) return com.codename1.ui.html.HTMLComponent.NE_RESIZE_CURSOR;
+        if ("NW_RESIZE_CURSOR".equals(name)) return com.codename1.ui.html.HTMLComponent.NW_RESIZE_CURSOR;
+        if ("N_RESIZE_CURSOR".equals(name)) return com.codename1.ui.html.HTMLComponent.N_RESIZE_CURSOR;
+        if ("RIGHT".equals(name)) return com.codename1.ui.html.HTMLComponent.RIGHT;
+        if ("SE_RESIZE_CURSOR".equals(name)) return com.codename1.ui.html.HTMLComponent.SE_RESIZE_CURSOR;
+        if ("SW_RESIZE_CURSOR".equals(name)) return com.codename1.ui.html.HTMLComponent.SW_RESIZE_CURSOR;
+        if ("S_RESIZE_CURSOR".equals(name)) return com.codename1.ui.html.HTMLComponent.S_RESIZE_CURSOR;
+        if ("TEXT_CURSOR".equals(name)) return com.codename1.ui.html.HTMLComponent.TEXT_CURSOR;
+        if ("TOP".equals(name)) return com.codename1.ui.html.HTMLComponent.TOP;
+        if ("WAIT_CURSOR".equals(name)) return com.codename1.ui.html.HTMLComponent.WAIT_CURSOR;
+        if ("W_RESIZE_CURSOR".equals(name)) return com.codename1.ui.html.HTMLComponent.W_RESIZE_CURSOR;
+        throw unsupportedStaticField(com.codename1.ui.html.HTMLComponent.class, name);
+    }
+
+    private static Object getStaticField4(String name) throws Exception {
+        if ("ATTR_ABBR".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_ABBR;
+        if ("ATTR_ACCESSKEY".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_ACCESSKEY;
+        if ("ATTR_ACTION".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_ACTION;
+        if ("ATTR_ALIGN".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_ALIGN;
+        if ("ATTR_ALT".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_ALT;
+        if ("ATTR_AXIS".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_AXIS;
+        if ("ATTR_BGCOLOR".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_BGCOLOR;
+        if ("ATTR_BORDER".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_BORDER;
+        if ("ATTR_CELLPADDING".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_CELLPADDING;
+        if ("ATTR_CELLSPACING".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_CELLSPACING;
+        if ("ATTR_CHARSET".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_CHARSET;
+        if ("ATTR_CHECKED".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_CHECKED;
+        if ("ATTR_CITE".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_CITE;
+        if ("ATTR_CLASS".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_CLASS;
+        if ("ATTR_COLOR".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_COLOR;
+        if ("ATTR_COLS".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_COLS;
+        if ("ATTR_COLSPAN".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_COLSPAN;
+        if ("ATTR_CONTENT".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_CONTENT;
+        if ("ATTR_COORDS".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_COORDS;
+        if ("ATTR_DIR".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_DIR;
+        if ("ATTR_DISABLED".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_DISABLED;
+        if ("ATTR_EMPTYOK".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_EMPTYOK;
+        if ("ATTR_ENCTYPE".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_ENCTYPE;
+        if ("ATTR_FACE".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_FACE;
+        if ("ATTR_FOR".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_FOR;
+        if ("ATTR_FORMAT".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_FORMAT;
+        if ("ATTR_FRAME".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_FRAME;
+        if ("ATTR_HEADERS".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_HEADERS;
+        if ("ATTR_HEIGHT".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_HEIGHT;
+        if ("ATTR_HREF".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_HREF;
+        if ("ATTR_HREFLANG".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_HREFLANG;
+        if ("ATTR_HSPACE".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_HSPACE;
+        if ("ATTR_HTTPEQUIV".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_HTTPEQUIV;
+        if ("ATTR_ID".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_ID;
+        if ("ATTR_ISMAP".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_ISMAP;
+        if ("ATTR_ISTYLE".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_ISTYLE;
+        if ("ATTR_LABEL".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_LABEL;
+        if ("ATTR_LANG".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_LANG;
+        if ("ATTR_LINK".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_LINK;
+        if ("ATTR_LOCALSRC".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_LOCALSRC;
+        if ("ATTR_LONGDESC".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_LONGDESC;
+        if ("ATTR_MAXLENGTH".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_MAXLENGTH;
+        if ("ATTR_MEDIA".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_MEDIA;
+        if ("ATTR_METHOD".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_METHOD;
+        if ("ATTR_MULTIPLE".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_MULTIPLE;
+        if ("ATTR_NAME".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_NAME;
+        if ("ATTR_READONLY".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_READONLY;
+        if ("ATTR_REL".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_REL;
+        if ("ATTR_REV".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_REV;
+        if ("ATTR_ROWS".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_ROWS;
+        if ("ATTR_ROWSPAN".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_ROWSPAN;
+        if ("ATTR_RULES".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_RULES;
+        if ("ATTR_SCHEME".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_SCHEME;
+        if ("ATTR_SCOPE".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_SCOPE;
+        if ("ATTR_SELECTED".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_SELECTED;
+        if ("ATTR_SHAPE".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_SHAPE;
+        if ("ATTR_SIZE".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_SIZE;
+        if ("ATTR_SRC".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_SRC;
+        if ("ATTR_START".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_START;
+        if ("ATTR_STYLE".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_STYLE;
+        if ("ATTR_SUMMARY".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_SUMMARY;
+        if ("ATTR_TABINDEX".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_TABINDEX;
+        if ("ATTR_TEXT".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_TEXT;
+        if ("ATTR_TITLE".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_TITLE;
+        if ("ATTR_TYPE".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_TYPE;
+        if ("ATTR_USEMAP".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_USEMAP;
+        if ("ATTR_VALIGN".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_VALIGN;
+        if ("ATTR_VALUE".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_VALUE;
+        if ("ATTR_VERSION".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_VERSION;
+        if ("ATTR_VSPACE".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_VSPACE;
+        if ("ATTR_WIDTH".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_WIDTH;
+        if ("ATTR_XMLLANG".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_XMLLANG;
+        if ("ATTR_XMLNS".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_XMLNS;
+        if ("ATTR_XMLSPACE".equals(name)) return com.codename1.ui.html.HTMLElement.ATTR_XMLSPACE;
+        if ("COLOR_AQUA".equals(name)) return com.codename1.ui.html.HTMLElement.COLOR_AQUA;
+        if ("COLOR_BLACK".equals(name)) return com.codename1.ui.html.HTMLElement.COLOR_BLACK;
+        if ("COLOR_BLUE".equals(name)) return com.codename1.ui.html.HTMLElement.COLOR_BLUE;
+        if ("COLOR_FUCHSIA".equals(name)) return com.codename1.ui.html.HTMLElement.COLOR_FUCHSIA;
+        if ("COLOR_GRAY".equals(name)) return com.codename1.ui.html.HTMLElement.COLOR_GRAY;
+        if ("COLOR_GREEN".equals(name)) return com.codename1.ui.html.HTMLElement.COLOR_GREEN;
+        if ("COLOR_LIME".equals(name)) return com.codename1.ui.html.HTMLElement.COLOR_LIME;
+        if ("COLOR_MAROON".equals(name)) return com.codename1.ui.html.HTMLElement.COLOR_MAROON;
+        if ("COLOR_NAVY".equals(name)) return com.codename1.ui.html.HTMLElement.COLOR_NAVY;
+        if ("COLOR_OLIVE".equals(name)) return com.codename1.ui.html.HTMLElement.COLOR_OLIVE;
+        if ("COLOR_ORANGE".equals(name)) return com.codename1.ui.html.HTMLElement.COLOR_ORANGE;
+        if ("COLOR_PURPLE".equals(name)) return com.codename1.ui.html.HTMLElement.COLOR_PURPLE;
+        if ("COLOR_RED".equals(name)) return com.codename1.ui.html.HTMLElement.COLOR_RED;
+        if ("COLOR_SILVER".equals(name)) return com.codename1.ui.html.HTMLElement.COLOR_SILVER;
+        if ("COLOR_TEAL".equals(name)) return com.codename1.ui.html.HTMLElement.COLOR_TEAL;
+        if ("COLOR_WHITE".equals(name)) return com.codename1.ui.html.HTMLElement.COLOR_WHITE;
+        if ("COLOR_YELLOW".equals(name)) return com.codename1.ui.html.HTMLElement.COLOR_YELLOW;
+        if ("DEPTH_INFINITE".equals(name)) return com.codename1.ui.html.HTMLElement.DEPTH_INFINITE;
+        if ("TAG_A".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_A;
+        if ("TAG_ABBR".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_ABBR;
+        if ("TAG_ACRONYM".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_ACRONYM;
+        if ("TAG_ADDRESS".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_ADDRESS;
+        if ("TAG_AREA".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_AREA;
+        if ("TAG_B".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_B;
+        if ("TAG_BASE".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_BASE;
+        if ("TAG_BASEFONT".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_BASEFONT;
+        if ("TAG_BIG".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_BIG;
+        if ("TAG_BLOCKQUOTE".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_BLOCKQUOTE;
+        if ("TAG_BODY".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_BODY;
+        if ("TAG_BR".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_BR;
+        if ("TAG_BUTTON".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_BUTTON;
+        if ("TAG_CAPTION".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_CAPTION;
+        if ("TAG_CENTER".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_CENTER;
+        if ("TAG_CITE".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_CITE;
+        if ("TAG_CODE".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_CODE;
+        if ("TAG_CSS_ILLEGAL_SELECTOR".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_CSS_ILLEGAL_SELECTOR;
+        if ("TAG_CSS_SELECTOR".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_CSS_SELECTOR;
+        if ("TAG_DD".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_DD;
+        if ("TAG_DEL".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_DEL;
+        if ("TAG_DFN".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_DFN;
+        if ("TAG_DIR".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_DIR;
+        if ("TAG_DIV".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_DIV;
+        if ("TAG_DL".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_DL;
+        if ("TAG_DT".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_DT;
+        if ("TAG_EM".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_EM;
+        if ("TAG_FIELDSET".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_FIELDSET;
+        if ("TAG_FONT".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_FONT;
+        if ("TAG_FORM".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_FORM;
+        if ("TAG_H1".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_H1;
+        if ("TAG_H2".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_H2;
+        if ("TAG_H3".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_H3;
+        if ("TAG_H4".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_H4;
+        if ("TAG_H5".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_H5;
+        if ("TAG_H6".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_H6;
+        if ("TAG_HEAD".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_HEAD;
+        if ("TAG_HR".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_HR;
+        if ("TAG_HTML".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_HTML;
+        if ("TAG_I".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_I;
+        if ("TAG_IMG".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_IMG;
+        if ("TAG_INPUT".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_INPUT;
+        if ("TAG_INS".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_INS;
+        if ("TAG_KBD".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_KBD;
+        if ("TAG_LABEL".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_LABEL;
+        if ("TAG_LEGEND".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_LEGEND;
+        if ("TAG_LI".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_LI;
+        if ("TAG_LINK".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_LINK;
+        if ("TAG_MAP".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_MAP;
+        if ("TAG_MENU".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_MENU;
+        if ("TAG_META".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_META;
+        if ("TAG_NOFRAMES".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_NOFRAMES;
+        if ("TAG_NOSCRIPT".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_NOSCRIPT;
+        if ("TAG_OBJECT".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_OBJECT;
+        if ("TAG_OL".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_OL;
+        if ("TAG_OPTGROUP".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_OPTGROUP;
+        if ("TAG_OPTION".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_OPTION;
+        if ("TAG_P".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_P;
+        if ("TAG_PARAM".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_PARAM;
+        if ("TAG_PRE".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_PRE;
+        if ("TAG_Q".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_Q;
+        if ("TAG_S".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_S;
+        if ("TAG_SAMP".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_SAMP;
+        if ("TAG_SELECT".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_SELECT;
+        if ("TAG_SMALL".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_SMALL;
+        if ("TAG_SPAN".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_SPAN;
+        if ("TAG_STRIKE".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_STRIKE;
+        if ("TAG_STRONG".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_STRONG;
+        if ("TAG_STYLE".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_STYLE;
+        if ("TAG_SUB".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_SUB;
+        if ("TAG_SUP".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_SUP;
+        if ("TAG_TABLE".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_TABLE;
+        if ("TAG_TBODY".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_TBODY;
+        if ("TAG_TD".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_TD;
+        if ("TAG_TEXT".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_TEXT;
+        if ("TAG_TEXTAREA".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_TEXTAREA;
+        if ("TAG_TFOOT".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_TFOOT;
+        if ("TAG_TH".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_TH;
+        if ("TAG_THEAD".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_THEAD;
+        if ("TAG_TITLE".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_TITLE;
+        if ("TAG_TR".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_TR;
+        if ("TAG_TT".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_TT;
+        if ("TAG_U".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_U;
+        if ("TAG_UL".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_UL;
+        if ("TAG_UNSUPPORTED".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_UNSUPPORTED;
+        if ("TAG_VAR".equals(name)) return com.codename1.ui.html.HTMLElement.TAG_VAR;
+        throw unsupportedStaticField(com.codename1.ui.html.HTMLElement.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {
@@ -3248,7 +3341,19 @@ public final class GeneratedAccess_com_codename1_ui_html {
         if (!(value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue)) {
             return value;
         }
+        // Direct fit when LambdaValue already implements the target SAM
+        // (Runnable, Function, Comparator, ...).
+        if (type.isInstance(value)) {
+            return value;
+        }
         return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
+    }
+
+    private static int toIntValue(Object value) {
+        if (value instanceof Number) return ((Number) value).intValue();
+        if (value instanceof Character) return (int) ((Character) value).charValue();
+        throw new ClassCastException("Cannot coerce "
+            + (value == null ? "null" : value.getClass().getName()) + " to int");
     }
 
     private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
@@ -3303,10 +3408,15 @@ public final class GeneratedAccess_com_codename1_ui_html {
         if ("byte".equals(type.getName()) || type == Byte.class || "short".equals(type.getName()) || type == Short.class
                 || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
                 || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
-            return value instanceof Number;
+            // Java widens char to int implicitly, so accept Character
+            // for any int-or-larger numeric slot.
+            return value instanceof Number || value instanceof Character;
         }
         if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
-            return isSamInterface(type);
+            // LambdaValue implements common SAMs directly (Runnable,
+            // Function, Predicate, Comparator, ...). Also accept any
+            // CN1 SAM the listener-bridge knows how to wrap.
+            return type.isInstance(value) || isSamInterface(type);
         }
         return type.isInstance(value);
     }
