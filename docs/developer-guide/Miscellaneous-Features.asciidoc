@@ -473,8 +473,8 @@ No code changes are required — Android's resource framework switches icons whe
 
 iOS does not localize launcher icons natively, so Codename One wires up https://developer.apple.com/documentation/uikit/uiapplication/2806818-setalternateiconname[alternate app icons] for you:
 
-* For each detected locale the build generates `AppIcon_<lang>_<COUNTRY>@2x.png` (120×120), `@3x.png` (180×180), `@2x~ipad.png` (152×152) and `83.5x83.5@2x~ipad.png` (167×167 for iPad Pro) in the app bundle root.
-* A `CFBundleIcons` (and `CFBundleIcons~ipad`) entry is injected into `Info.plist` containing a `CFBundleAlternateIcons` dictionary with one entry per locale. `CFBundlePrimaryIcon` continues to reference the default `iPhone7App`/`iPadApp7` image families.
+* For each detected locale the build generates an `AppIcon_<lang>_<COUNTRY>.appiconset` inside `Images.xcassets` containing the 120×120, 180×180, 152×152 and 167×167 (iPad Pro) PNGs along with a matching `Contents.json`.
+* The build adds the matching `ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES` Xcode build setting so `actool` emits a coherent partial `Info.plist` covering both `CFBundlePrimaryIcon` and `CFBundleAlternateIcons`. The user's `Info.plist` is left untouched; injecting `CFBundleIcons` manually would be dropped during the actool merge and is therefore avoided.
 * The `CodenameOne_GLAppDelegate` is patched to call `-[UIApplication setAlternateIconName:completionHandler:]` at launch. The delegate reads `[NSLocale preferredLanguages]`, tries the full `<lang>_<COUNTRY>` key first, then falls back to the language-only key, and clears the alternate icon (reverting to the default) if no variant matches.
 * The injection is idempotent and runs before the `ios.afterFinishLaunching` hook, so any custom code you supply via that build hint is unaffected.
 
