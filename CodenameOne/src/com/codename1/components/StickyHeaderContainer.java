@@ -152,8 +152,8 @@ public class StickyHeaderContainer extends Container {
     /// order they were added.
     public List<Component> getStickyHeaders() {
         List<Component> out = new ArrayList<Component>(sections.size());
-        for (int i = 0; i < sections.size(); i++) {
-            out.add(sections.get(i).header);
+        for (Section s : sections) {
+            out.add(s.header);
         }
         return Collections.unmodifiableList(out);
     }
@@ -209,8 +209,8 @@ public class StickyHeaderContainer extends Container {
         int nextRelTop = Integer.MAX_VALUE;
         for (int i = 0; i < sections.size(); i++) {
             Section s = sections.get(i);
-            Component anchor = s.placeholder.getParent() == scroller ? s.placeholder : s.header;
-            if (anchor.getParent() != scroller) {
+            Component anchor = s.placeholder.getParent() == scroller ? s.placeholder : s.header; //NOPMD CompareObjectsWithEquals
+            if (anchor.getParent() != scroller) { //NOPMD CompareObjectsWithEquals
                 continue;
             }
             int aH = anchor.getHeight();
@@ -319,8 +319,12 @@ public class StickyHeaderContainer extends Container {
             int y = ps.getPaddingTop();
             int innerW = parent.getLayoutWidth() - parent.getSideGap() - ps.getHorizontalPadding();
             int innerH = parent.getLayoutHeight() - parent.getBottomGap() - ps.getVerticalPadding();
-            if (innerW < 0) innerW = 0;
-            if (innerH < 0) innerH = 0;
+            if (innerW < 0) {
+                innerW = 0;
+            }
+            if (innerH < 0) {
+                innerH = 0;
+            }
 
             scroller.setX(x);
             scroller.setY(y);

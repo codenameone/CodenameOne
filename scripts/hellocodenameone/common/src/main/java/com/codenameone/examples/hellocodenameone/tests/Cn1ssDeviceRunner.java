@@ -281,6 +281,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 || "ToastBarTopPositionScreenshotTest".equals(testName)
                 || "ValidatorLightweightPickerScreenshotTest".equals(testName)
                 || "LightweightPickerButtonsScreenshotTest".equals(testName)
+                || "StickyHeaderScreenshotTest".equals(testName)
                 // graphics tests
                 || "AffineScale".equals(testName)
                 || "Clip".equals(testName)
