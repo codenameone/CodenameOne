@@ -3,6 +3,7 @@ name: ParparVM Java Tests
 on:
   pull_request:
     paths:
+      - '.github/workflows/parparvm-tests.yml'
       - 'vm/**'
       - 'Ports/JavaScriptPort/**'
       - '!vm/**/README.md'
@@ -11,6 +12,7 @@ on:
   push:
     branches: [ master, main ]
     paths:
+      - '.github/workflows/parparvm-tests.yml'
       - 'vm/**'
       - 'Ports/JavaScriptPort/**'
       - '!vm/**/README.md'
