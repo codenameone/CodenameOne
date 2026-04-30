@@ -253,29 +253,10 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     }
 
     private static boolean isJsSkippedAnimationTest(String testName) {
-        // Animation grid tests render six full-form frames each. They exceed
-        // the JS port's 150s browser-lifetime budget and the value is already
-        // covered on iOS/Android/JavaSE.
-        return "SlideHorizontalTransitionTest".equals(testName)
-                || "SlideHorizontalBackTransitionTest".equals(testName)
-                || "SlideVerticalTransitionTest".equals(testName)
-                || "SlideFadeTitleTransitionTest".equals(testName)
-                || "CoverHorizontalTransitionTest".equals(testName)
-                || "UncoverHorizontalTransitionTest".equals(testName)
-                || "FadeTransitionTest".equals(testName)
-                || "FlipTransitionTest".equals(testName)
-                || "AnimateLayoutScreenshotTest".equals(testName)
-                || "AnimateHierarchyScreenshotTest".equals(testName)
-                || "AnimateUnlayoutScreenshotTest".equals(testName)
-                || "SmoothScrollScreenshotTest".equals(testName)
-                || "StickyHeaderScreenshotTest".equals(testName)
-                || "StickyHeaderSlideTransitionScreenshotTest".equals(testName)
-                || "StickyHeaderFadeTransitionScreenshotTest".equals(testName)
-                || "TensileBounceScreenshotTest".equals(testName)
-                || "ComponentReplaceFadeScreenshotTest".equals(testName)
-                || "ComponentReplaceSlideScreenshotTest".equals(testName)
-                || "ComponentReplaceFlipScreenshotTest".equals(testName)
-                || "MotionShowcaseScreenshotTest".equals(testName);
+        // Diagnostic: animation tests temporarily enabled on JS port to
+        // surface internal port issues (the failures may correlate with
+        // the dialog/Form pipeline bugs on the new JS port).
+        return false;
     }
 
     private static boolean isJsSkippedScreenshotTest(String testName) {

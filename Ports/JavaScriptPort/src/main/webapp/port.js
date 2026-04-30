@@ -3032,26 +3032,9 @@ const cn1ssForcedTimeoutTestClasses = Object.freeze({
   "com_codenameone_examples_hellocodenameone_tests_SpanLabelThemeScreenshotTest": "themeScreenshot",
   "com_codenameone_examples_hellocodenameone_tests_DarkLightShowcaseThemeScreenshotTest": "themeScreenshot",
   "com_codenameone_examples_hellocodenameone_tests_PaletteOverrideThemeScreenshotTest": "themeScreenshot",
-  // Animation/transition grid tests render six full-form frames; each runs
-  // ~1-2s on the JS port and the chunk emission overflows the 150s browser
-  // lifetime budget. iOS/Android cover this content already.
-  "com_codenameone_examples_hellocodenameone_tests_SlideHorizontalTransitionTest": "animationGrid",
-  "com_codenameone_examples_hellocodenameone_tests_SlideHorizontalBackTransitionTest": "animationGrid",
-  "com_codenameone_examples_hellocodenameone_tests_SlideVerticalTransitionTest": "animationGrid",
-  "com_codenameone_examples_hellocodenameone_tests_SlideFadeTitleTransitionTest": "animationGrid",
-  "com_codenameone_examples_hellocodenameone_tests_CoverHorizontalTransitionTest": "animationGrid",
-  "com_codenameone_examples_hellocodenameone_tests_UncoverHorizontalTransitionTest": "animationGrid",
-  "com_codenameone_examples_hellocodenameone_tests_FadeTransitionTest": "animationGrid",
-  "com_codenameone_examples_hellocodenameone_tests_FlipTransitionTest": "animationGrid",
-  "com_codenameone_examples_hellocodenameone_tests_AnimateLayoutScreenshotTest": "animationGrid",
-  "com_codenameone_examples_hellocodenameone_tests_AnimateHierarchyScreenshotTest": "animationGrid",
-  "com_codenameone_examples_hellocodenameone_tests_AnimateUnlayoutScreenshotTest": "animationGrid",
-  "com_codenameone_examples_hellocodenameone_tests_SmoothScrollScreenshotTest": "animationGrid",
-  "com_codenameone_examples_hellocodenameone_tests_TensileBounceScreenshotTest": "animationGrid",
-  "com_codenameone_examples_hellocodenameone_tests_ComponentReplaceFadeScreenshotTest": "animationGrid",
-  "com_codenameone_examples_hellocodenameone_tests_ComponentReplaceSlideScreenshotTest": "animationGrid",
-  "com_codenameone_examples_hellocodenameone_tests_ComponentReplaceFlipScreenshotTest": "animationGrid",
-  "com_codenameone_examples_hellocodenameone_tests_MotionShowcaseScreenshotTest": "animationGrid",
+  // Animation/transition grid skip removed — tests are temporarily enabled
+  // on JS port to surface internal port issues that may correlate with
+  // the dialog/Form pipeline bugs being investigated.
   // Screenshot-emitting tests whose chunk streams the JS port truncates
   // under console.log line drops. Cn1ssChunkTools's gap detection (added
   // in 963dd5af) correctly fails the resulting partial PNGs; force-finalise
@@ -3115,26 +3098,9 @@ const cn1ssForcedTimeoutTestNames = Object.freeze({
   "SpanLabelThemeScreenshotTest": "themeScreenshot",
   "DarkLightShowcaseThemeScreenshotTest": "themeScreenshot",
   "PaletteOverrideThemeScreenshotTest": "themeScreenshot",
-  // Animation/transition grid tests render six full-form frames; each runs
-  // ~1-2s on the JS port and the chunk emission overflows the 150s browser
-  // lifetime budget. iOS/Android cover this content already.
-  "SlideHorizontalTransitionTest": "animationGrid",
-  "SlideHorizontalBackTransitionTest": "animationGrid",
-  "SlideVerticalTransitionTest": "animationGrid",
-  "SlideFadeTitleTransitionTest": "animationGrid",
-  "CoverHorizontalTransitionTest": "animationGrid",
-  "UncoverHorizontalTransitionTest": "animationGrid",
-  "FadeTransitionTest": "animationGrid",
-  "FlipTransitionTest": "animationGrid",
-  "AnimateLayoutScreenshotTest": "animationGrid",
-  "AnimateHierarchyScreenshotTest": "animationGrid",
-  "AnimateUnlayoutScreenshotTest": "animationGrid",
-  "SmoothScrollScreenshotTest": "animationGrid",
-  "TensileBounceScreenshotTest": "animationGrid",
-  "ComponentReplaceFadeScreenshotTest": "animationGrid",
-  "ComponentReplaceSlideScreenshotTest": "animationGrid",
-  "ComponentReplaceFlipScreenshotTest": "animationGrid",
-  "MotionShowcaseScreenshotTest": "animationGrid",
+  // Animation/transition grid skip removed — tests are temporarily enabled
+  // on JS port to surface internal port issues that may correlate with
+  // the dialog/Form pipeline bugs being investigated.
   // Screenshot-emitting tests whose chunk streams the JS port truncates
   // under console.log line drops. Cn1ssChunkTools's gap detection (added
   // in 963dd5af) correctly fails the resulting partial PNGs; force-finalise
