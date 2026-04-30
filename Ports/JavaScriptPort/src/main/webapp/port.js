@@ -2994,6 +2994,22 @@ const cn1ssRunnerAwaitTestCompletionMethodId = "cn1_com_codenameone_examples_hel
 const cn1ssTestTimeoutMs = 10000;
 const cn1ssRunnerFinalizeTestMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_finalizeTest_int_com_codenameone_examples_hellocodenameone_tests_BaseTest_java_lang_String_boolean";
 const cn1ssRunnerFinishSuiteMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_finishSuite";
+// The translator numbers lambdas in their declaration order within the class.
+// Earlier revs hardcoded `_4_` / `_3_` based on what Cn1ssDeviceRunner emitted
+// at that snapshot, but adding new methods to the runner (e.g. PR #4821, which
+// added animation-suite plumbing) shifts the indices — `awaitTestCompletion_3`
+// became `awaitTestCompletion_0`, and the lambda2RunBridge poll loop died with
+// `missingDispatch=1` after the first tick because the hardcoded ID no longer
+// existed. Build the candidate-id list from a fixed range so the lookup keeps
+// working across translator renumberings.
+function cn1ssRunnerLambdaIdsByName(methodName, paramSig) {
+  const ids = [];
+  for (let i = 0; i < 16; i++) {
+    ids.push("cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_"
+      + methodName + "_" + i + "_" + paramSig);
+  }
+  return ids;
+}
 const cn1ssRunnerFinalizeLambda4MethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_finalizeTest_4_java_lang_String_int";
 const cn1ssRunnerAwaitLambda3MethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_awaitTestCompletion_3_int_com_codenameone_examples_hellocodenameone_tests_BaseTest_java_lang_String_long";
 const cn1ssRunnerLambda1RunMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_lambda_1_run";
@@ -3143,11 +3159,17 @@ const cn1ssForcedTimeoutTestNames = Object.freeze({
 
 if (jvm && typeof jvm.addVirtualMethod === "function" && jvm.classes && jvm.classes["java_lang_String"]) {
   const stringMethods = jvm.classes["java_lang_String"].methods || {};
-  if (typeof stringMethods[cn1ssRunnerFinalizeLambda4MethodId] !== "function") {
-    jvm.addVirtualMethod("java_lang_String", cn1ssRunnerFinalizeLambda4MethodId, function*() {
-      emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssFinalizeLambda4:stringReceiverBypass=1");
-      return null;
-    });
+  // Cover whichever index the current bundle uses for the finalizeTest lambda
+  // (see cn1ssRunnerLambdaIdsByName for why the index drifts).
+  const finalizeLambdaIds = cn1ssRunnerLambdaIdsByName("finalizeTest", "java_lang_String_int");
+  for (let i = 0; i < finalizeLambdaIds.length; i++) {
+    const finalizeLambdaId = finalizeLambdaIds[i];
+    if (typeof stringMethods[finalizeLambdaId] !== "function") {
+      jvm.addVirtualMethod("java_lang_String", finalizeLambdaId, function*() {
+        emitDiagLine("PARPAR:DIAG:FALLBACK:cn1ssFinalizeLambda:stringReceiverBypass=1");
+        return null;
+      });
+    }
   }
 }
 
@@ -3580,7 +3602,10 @@ bindCiFallback("Cn1ssDeviceRunner.lambda2RunBridge", [
   const testName = getCn1ssLambdaCaptureValue(__cn1ThisObject, 4);
   const deadline = getCn1ssLambdaCaptureValue(__cn1ThisObject, 5);
   const awaitLambdaMethod = resolveCn1ssRunnerTranslatedMethod(
-    [cn1ssRunnerAwaitLambda3MethodId],
+    cn1ssRunnerLambdaIdsByName(
+      "awaitTestCompletion",
+      "int_com_codenameone_examples_hellocodenameone_tests_BaseTest_java_lang_String_long"
+    ),
     "Cn1ssDeviceRunner.lambda2RunBridge"
   );
   if (!runner || runner.__class !== cn1ssRunnerClassId || typeof awaitLambdaMethod !== "function") {
