@@ -188,6 +188,33 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     final Object editingLock=new Object();
 
+    // Coordinates the order in which pointer-press and pointer-release events
+    // reach Display.inputEventStack. ParparVM compiles every Java method to a
+    // JS generator; JSO calls inside ``onMouseDown`` / ``onMouseUp`` (e.g.
+    // ``getClientX``, ``focusInputElement``) suspend the generator while the
+    // host bridge round-trips. While ``onMouseDown`` is suspended on a yield,
+    // the worker can dequeue and start running ``onMouseUp`` for the SAME
+    // click. If onMouseUp finishes first (it has slightly fewer yields), its
+    // ``nativeCallSerially(pointerReleased)`` schedules the release on
+    // ``nativeEdt`` BEFORE onMouseDown's matching press. The EDT then sees
+    // POINTER_RELEASED before POINTER_PRESSED, drops the release because
+    // ``eventForm == null`` (Display.java POINTER_RELEASED handler), and the
+    // matching Button.released never fires -- so a Hello-button click never
+    // shows its Dialog.
+    //
+    // Fix: deferred-release pattern. onMouseDown sets ``pressInFlight=true``
+    // synchronously at handler entry (before any JSO yield) and clears it
+    // after ``Display.pointerPressed`` returns. onMouseUp checks the flag at
+    // dispatch time: if a press is still in flight, it stashes the release
+    // in ``deferredRelease`` and returns immediately; the press's completion
+    // hook then runs the deferred release. We avoid ``Object.wait()`` on
+    // purpose -- blocking a worker-side event-listener thread while the EDT
+    // is inside ``invokeAndBlock`` (e.g. Dialog modal) starves subsequent
+    // pointerdown listener invocations and stalls the entire UI.
+    private final Object pointerEventOrderLock = new Object();
+    private boolean pressInFlight = false;
+    private Runnable deferredRelease;
+
     private Form _getCurrent() {
         return getCurrentForm();
     }
@@ -1332,10 +1359,45 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
             @Override
             public void handleEvent(Event evt) {
+                // Set ``mouseDown=true`` IMMEDIATELY, before any JSO call
+                // that can yield. ParparVM compiles every Java method to a
+                // JS generator, and JSO calls (``evt.getType()``,
+                // ``getClientX(me)``, ``focusInputElement()``,
+                // ``evt.preventDefault()``) all suspend the generator while
+                // they round-trip through the host bridge. While onMouseDown
+                // is suspended, the worker can dequeue and start running
+                // onMouseUp for the SAME click — which then reads
+                // ``mouseDown==false`` (we haven't set it yet), early-returns
+                // via ``if (!isMouseDown()) return``, and the press's
+                // matching release is silently dropped. By the time
+                // onMouseDown resumes and sets ``mouseDown=true``, it's too
+                // late: the next click's onMouseDown sees ``mouseDown==true``
+                // (still — never cleared by the swallowed mouseup),
+                // shouldIgnoreMousePress returns true, and the next click
+                // gets the opposite asymmetry (release-only).
+                //
+                // Root cause of the PR #4795 dialog freeze: a Dialog's OK
+                // click landed on this every-other-half drop, Button.released
+                // never fired, dispose never happened, ``invokeAndBlock``
+                // blocked the EDT forever. Setting the flag synchronously at
+                // listener entry closes the window.
+                if (!pointerState.isMouseDown()) {
+                    pointerState.setMouseDown(true);
+                }
+                // Mark a press as in-flight SYNCHRONOUSLY (before any JSO
+                // yield) and clear any stale deferredRelease left over from a
+                // previous click. The matching nativeCallSerially below
+                // clears the flag after Display.pointerPressed returns, then
+                // runs any release that onMouseUp deferred while waiting.
+                synchronized (pointerEventOrderLock) {
+                    pressInFlight = true;
+                    deferredRelease = null;
+                }
                 if (nativeEventListener != null) {
                     CancelableEvent cevt = (CancelableEvent)evt;
                     nativeEventListener.handleEvent(evt);
                     if (cevt.isDefaultPrevented()) {
+                        completePressInFlight();
                         return;
                     }
                 }
@@ -1351,18 +1413,29 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     evt.preventDefault();
                     evt.stopPropagation();
                 }
-                if (JavaScriptInputCoordinator.shouldIgnoreMousePress(pointerState.isTouchDown(), pointerState.isMouseDown(), evt.getTarget() == textField || evt.getTarget() == textArea)) {
+                // Re-check ignore conditions with the now-already-set flag.
+                // ``shouldIgnoreMousePress`` reads mouseDown=true here for
+                // every press, so the only way it stays meaningful is via
+                // touchDown / textInputTarget. That's intentional — the old
+                // mouseDown-based dedup was for the duplicate listener
+                // registration we removed in JavaScriptEventWiring.
+                boolean ignore = pointerState.isTouchDown()
+                        || (evt.getTarget() == textField || evt.getTarget() == textArea);
+                if (ignore) {
                     debugLog("[mouseDown] touchIsDown");
                     if (pointerState.isTouchDown()) {
                         pointerState.setMouseDown(false);
                     }
+                    completePressInFlight();
                     return;
                 }
                 onMouseMoveHandle = EventUtil.addEventListener(peersContainer, "mousemove", onMouseMove, true);
                 onPointerMoveHandle = EventUtil.addEventListener(peersContainer, "pointermove", onMouseMove, true);
-                
+
                 pointerState.setLastMousePosition(x, y);
-                pointerState.setMouseDown(true);
+                // ``mouseDown=true`` already set at handler entry — see comment
+                // at top. Don't unset/re-set here; doing so opens the same
+                // every-other-half-drop race we just closed.
                 callSerially(new Runnable() {
                     public void run() {
                         
@@ -1375,7 +1448,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 installBacksideHooksInUserInteraction();
                 nativeCallSerially(new Runnable() {
                     public void run() {
-                        HTML5Implementation.this.pointerPressed(new int[]{x}, new int[]{y});
+                        try {
+                            HTML5Implementation.this.pointerPressed(new int[]{x}, new int[]{y});
+                        } finally {
+                            completePressInFlight();
+                        }
                     }
                 });
                 if (contextListenerActive && me.getButton() == 2) {
@@ -1409,7 +1486,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     evt.stopPropagation();
                 }
                 pointerState.setGrabbedDrag(false);
-                
+
                 // Prevent conflicts with touch events
                 // Guard against mouseUp if the mouse isn't already dwon
                 if (pointerState.isTouchDown()) {
@@ -1417,32 +1494,54 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     pointerState.setMouseDown(false);
                     return;
                 }
-                
+
                 if (!pointerState.isMouseDown()) {
                     return;
                 }
                 pointerState.setMouseDown(false);
-                
-                
-                
+
                 EventUtil.removeEventListener(peersContainer, "mousemove", onMouseMoveHandle, true);
                 EventUtil.removeEventListener(peersContainer, "pointermove", onPointerMoveHandle, true);
-                
+
                 pointerState.setLastTouchUpPosition(x, y);
                 installBacksideHooksInUserInteraction();
-                nativeCallSerially(new Runnable() {
+
+                final Runnable releaseDispatch = new Runnable() {
                     public void run() {
-                        HTML5Implementation.this.pointerReleased(new int[]{x}, new int[]{y});
+                        nativeCallSerially(new Runnable() {
+                            public void run() {
+                                HTML5Implementation.this.pointerReleased(new int[]{x}, new int[]{y});
+                            }
+                        });
+                        callSerially(new Runnable() {
+                            public void run() {
+                                for (ActionListener l : mouseUpListeners) {
+                                    l.actionPerformed(null);
+                                }
+                            }
+                        });
                     }
-                });
-                callSerially(new Runnable() {
-                    public void run() {
-                        for (ActionListener l : mouseUpListeners) {
-                            l.actionPerformed(null);
-                        }
+                };
+
+                // If the matching onMouseDown is still suspended on a JSO
+                // yield (so its press hasn't reached Display.inputEventStack
+                // yet), stash the release and let the press's completion hook
+                // run it. Otherwise queue the release immediately. Avoids
+                // blocking the worker's listener thread, which would starve
+                // subsequent pointerdown invocations during a Dialog modal.
+                boolean runNow;
+                synchronized (pointerEventOrderLock) {
+                    if (pressInFlight) {
+                        deferredRelease = releaseDispatch;
+                        runNow = false;
+                    } else {
+                        runNow = true;
                     }
-                });
-                
+                }
+                if (runNow) {
+                    releaseDispatch.run();
+                }
+
             }
         };
         
@@ -2320,6 +2419,18 @@ public class HTML5Implementation extends CodenameOneImplementation {
             }).start();
         } else {
             new Thread(r).start();
+        }
+    }
+
+    private void completePressInFlight() {
+        Runnable pending;
+        synchronized (pointerEventOrderLock) {
+            pressInFlight = false;
+            pending = deferredRelease;
+            deferredRelease = null;
+        }
+        if (pending != null) {
+            pending.run();
         }
     }
     
