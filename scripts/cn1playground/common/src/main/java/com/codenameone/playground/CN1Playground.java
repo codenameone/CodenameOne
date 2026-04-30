@@ -11,6 +11,7 @@ import com.codename1.ui.Button;
 import com.codename1.ui.CN;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
+import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
@@ -120,6 +121,14 @@ public class CN1Playground extends Lifecycle {
     @Override
     public void runApp() {
         CN.setProperty("platformHint.javascript.beforeUnloadMessage", null);
+        // Force every Dialog into InteractionDialog mode. A regular modal Dialog
+        // replaces the current Form, which in the playground means the editor
+        // chrome itself gets swapped out when user code calls Dialog.show(...).
+        // InteractionDialog renders into the layered pane so the editor stays
+        // intact. Pinning the static flag here also locks out the
+        // `defaultInteractionDialogModeBool` theme constant from later flipping
+        // the default back when the iOS / Android native theme overlays load.
+        Dialog.setDefaultInteractionDialogMode(true);
         theme = Resources.getGlobalResources();
         currentScript = resolveInitialScript();
         currentCss = resolveInitialCss();
@@ -977,6 +986,14 @@ public class CN1Playground extends Lifecycle {
             // means "don't render a bezel", not "don't theme the content".
             layerIosTheme();
         }
+        // Re-pin InteractionDialog mode after every theme reload. The static
+        // flag is sticky once `setDefaultInteractionDialogMode` has been
+        // called, but the native iOS / Android overlays we just layered carry
+        // their own `defaultInteractionDialogModeBool` theme constants and a
+        // future CN1 framework revision could legitimately re-read them on
+        // theme reload. A modal Dialog in the preview would replace the
+        // editor chrome itself, so we keep the default explicitly true.
+        Dialog.setDefaultInteractionDialogMode(true);
     }
 
     private void applyDeviceTheme(String device) {
