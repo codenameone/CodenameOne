@@ -247,16 +247,18 @@ public class Sheet extends Container {
                     break;
             }
             long now = System.currentTimeMillis();
-            long elapsed = now - lastDragTime;
-            if (elapsed > 0) {
-                int dragDelta;
-                if (positionInt == E || positionInt == W) {
-                    dragDelta = x - lastDragPointerX;
-                } else {
-                    dragDelta = y - lastDragPointerY;
-                }
-                dragVelocity = dragDelta * 1000f / elapsed;
+            // Treat sub-millisecond gaps as 1ms so a fast successive drag
+            // event still produces a finite velocity reading rather than
+            // silently keeping the previous value (which would be zero on
+            // the first sample).
+            long elapsed = Math.max(1, now - lastDragTime);
+            int dragDelta;
+            if (positionInt == E || positionInt == W) {
+                dragDelta = x - lastDragPointerX;
+            } else {
+                dragDelta = y - lastDragPointerY;
             }
+            dragVelocity = dragDelta * 1000f / elapsed;
             lastDragPointerX = x;
             lastDragPointerY = y;
             lastDragTime = now;

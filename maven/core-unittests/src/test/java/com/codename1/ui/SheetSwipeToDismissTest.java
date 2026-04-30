@@ -67,9 +67,12 @@ class SheetSwipeToDismissTest extends UITestBase {
         implementation.dispatchPointerPress(x, startY);
         implementation.setHasDragStarted(true);
         flushSerialCalls();
-        // Single very fast drag to maximise velocity at release time. No sleep,
-        // so dragVelocity comes out enormous and clears the flick threshold
-        // even though the absolute distance is below 1/3 of the sheet height.
+        // Sleep ensures elapsed > 0 for the velocity calc; the drag still
+        // produces a velocity well above the (low) test-implementation flick
+        // threshold (convertToPixels returns dipCount-as-pixels in tests),
+        // so dismiss should fire via the velocity path despite the sub-
+        // threshold absolute distance.
+        sleepQuietly(20);
         implementation.dispatchPointerDrag(x, finalY);
         implementation.dispatchPointerRelease(x, finalY);
         flushSerialCalls();
