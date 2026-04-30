@@ -128,7 +128,7 @@ self.__cn1InstallHooks = function() {
     const wrapped = function*(...args) {
       if (preFn) preFn(args);
       const r = yield* orig.apply(this, args);
-      if (postFn) postFn(args);
+      if (postFn) postFn(args, r);
       return r;
     };
     wrapped.__cn1WrappedLabel = label;
@@ -210,6 +210,24 @@ self.__cn1InstallHooks = function() {
   );` : ''}
   ${sym.formPointerPressed ? `wrapGen(${JSON.stringify(sym.formPointerPressed)}, 'Form.pointerPressed',
     args => __push({ k: 'enter:Form.pointerPressed', form: __idOf(args[0]), x: args[1], y: args[2] })
+  );` : ''}
+  // Capture return value of Form.getResponderAt and Container.getComponentAt
+  // (the spatial walk used by Form.pointerPressed). Uses postFn(args, r)
+  // signature so we can see what component the walk landed on.
+  ${sym.formGetComponentAt ? `wrapGen(${JSON.stringify(sym.formGetComponentAt)}, 'Form.getResponderAt',
+    null,
+    (args, r) => __push({ k: 'leave:Form.getResponderAt', form: __idOf(args[0]), x: args[1], y: args[2], result: __idOf(r) })
+  );` : ''}
+  ${sym.containerGetComponentAt ? `wrapGen(${JSON.stringify(sym.containerGetComponentAt)}, 'Container.getComponentAt',
+    null,
+    (args, r) => {
+      // First 30 entries only (recursive walks blow this up otherwise)
+      if ((self.__cn1Trace.counts['leave:Container.getComponentAt'] || 0) <= 30) {
+        __push({ k: 'leave:Container.getComponentAt',
+                 recv: __idOf(args[0]), x: args[1], y: args[2],
+                 result: __idOf(r), recursing_self: r === args[0] });
+      }
+    }
   );` : ''}
   ${sym.formPointerReleased ? `wrapGen(${JSON.stringify(sym.formPointerReleased)}, 'Form.pointerReleased',
     args => __push({ k: 'enter:Form.pointerReleased', form: __idOf(args[0]), x: args[1], y: args[2] })
@@ -334,6 +352,23 @@ const failures = [];
 function expect(cond, label) {
   if (!cond) failures.push(label);
 }
+
+// Log every DOM-level mousedown/mouseup at window level to verify the
+// physical event chain. If mouseup events never fire here, the page
+// itself is dropping them. If they DO fire here but not in the JS port's
+// peersContainer listener, the wiring is the issue.
+await page.addInitScript(() => {
+  let domEvtCount = 0;
+  const log = (e) => {
+    domEvtCount++;
+    if (domEvtCount <= 100) {
+      console.log(`[dom] ${e.type} target=${e.target && e.target.tagName}#${e.target && e.target.id || ''} client=${e.clientX || 'na'},${e.clientY || 'na'}`);
+    }
+  };
+  for (const t of ['mousedown', 'mouseup', 'click', 'mouseout', 'pointerout', 'mouseleave', 'pointermove', 'pointerdown', 'pointerup']) {
+    window.addEventListener(t, log, true);
+  }
+});
 
 await page.goto(`http://localhost:${PORT}/`);
 await page.waitForFunction(() => window.cn1Started === true, { timeout: 30000 }).catch(() => {});
