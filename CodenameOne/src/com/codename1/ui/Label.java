@@ -29,6 +29,7 @@ import com.codename1.ui.TextSelection.Char;
 import com.codename1.ui.TextSelection.Span;
 import com.codename1.ui.TextSelection.Spans;
 import com.codename1.ui.TextSelection.TextSelectionSupport;
+import com.codename1.ui.animations.AnimationTime;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
@@ -1089,7 +1090,7 @@ public class Label extends Component implements IconHolder, TextHolder {
                 parent.registerAnimatedInternal(this);
             }
         }
-        tickerStartTime = System.currentTimeMillis();
+        tickerStartTime = AnimationTime.now();
         tickerDelay = delay;
         tickerRunning = true;
         this.rightToLeft = rightToLeft;
@@ -1169,8 +1170,8 @@ public class Label extends Component implements IconHolder, TextHolder {
             return false;
         }
         boolean animateTicker = false;
-        if (tickerRunning && tickerStartTime + tickerDelay < System.currentTimeMillis()) {
-            tickerStartTime = System.currentTimeMillis();
+        if (tickerRunning && tickerStartTime + tickerDelay < AnimationTime.now()) {
+            tickerStartTime = AnimationTime.now();
             if (rightToLeft) {
                 shiftText -= Display.getInstance().convertToPixels(shiftMillimeters);
                 if (shiftText + getStringWidth(getStyle().getFont()) < 0) {

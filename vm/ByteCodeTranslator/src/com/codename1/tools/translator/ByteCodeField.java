@@ -141,7 +141,10 @@ public class ByteCodeField {
     
     @Override
     public boolean equals(Object o) {
-        return fieldName.equals(((ByteCodeField)o).fieldName);
+        if (!(o instanceof ByteCodeField)) {
+            return false;
+        }
+        return fieldName.equals(((ByteCodeField) o).fieldName);
     }
     
     @Override

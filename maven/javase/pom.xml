@@ -142,6 +142,24 @@
                                     <property name="cn1.path" location="${project.basedir}/../.."/>
                                 </ant>
                                 <copy file="${project.build.directory}/skins/codenameone-skins/OTA/iPhoneX.skin" todir="${project.build.outputDirectory}"/>
+                                <!-- Bundle every shipped native theme into the
+                                     simulator fat jar so JavaSEPort.loadSkinFile can
+                                     load the right .res based on the current skin's
+                                     platformName (or the Simulator "Native Theme"
+                                     menu override). failonerror=false lets the
+                                     simulator still build if
+                                     scripts/build-native-themes.sh hasn't produced
+                                     the modern .res files yet. -->
+                                <copy todir="${project.build.outputDirectory}" failonerror="false">
+                                    <fileset dir="${project.basedir}/../../Themes">
+                                        <include name="iOSModernTheme.res"/>
+                                        <include name="AndroidMaterialTheme.res"/>
+                                        <include name="iPhoneTheme.res"/>
+                                        <include name="iOS7Theme.res"/>
+                                        <include name="androidTheme.res"/>
+                                        <include name="android_holo_light.res"/>
+                                    </fileset>
+                                </copy>
                             </target>
                         </configuration>
                         <goals>

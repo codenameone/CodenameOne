@@ -50,7 +50,16 @@ public final class GenerateCN1AccessRegistry {
     private static final Map<String, Boolean> RUNTIME_PUBLIC_TYPE_CACHE = new HashMap<String, Boolean>();
     private static final Set<String> INTERNAL_CN1_TYPES = new HashSet<String>(Arrays.asList(
             "com.codename1.ui.Accessor",
-            "com.codename1.io.IOAccessor"
+            "com.codename1.io.IOAccessor",
+            // Simd's allocaByte/allocaInt/allocaFloat (+ the *Zeroed/*Filled
+            // variants) return method-local scratch arrays that the ParparVM
+            // lowering may place on the C stack. CN1's compliance check
+            // forbids letting such an array escape the method that allocated
+            // it, and the generated reflection bridge inherently does escape
+            // it by returning it from invokeN. Exclude the whole class from
+            // the bean-shell registry - Simd is a low-level SIMD primitives
+            // API that playground scripts are extremely unlikely to need.
+            "com.codename1.util.Simd"
     ));
 
     private static final String[] INDEX_PACKAGE_PREFIXES = new String[]{
@@ -1002,7 +1011,9 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
     }
 
     private static ApiMethod parseMethod(SourceClass sourceClass, MethodTree methodTree, Resolver resolver, boolean enclosingInterface) {
-        if (!isPublicMethod(methodTree, enclosingInterface) || isBlacklistedMethod(methodTree.getName().toString())) {
+        String methodName = methodTree.getName().toString();
+        if (!isPublicMethod(methodTree, enclosingInterface) || isBlacklistedMethod(methodName)
+                || isBlacklistedQualifiedMethod(sourceClass.qualifiedName, methodName)) {
             return null;
         }
         // Push method-level type parameter bounds into the resolver
@@ -1786,8 +1797,44 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
         return new ArrayList<String>(names);
     }
 
+    /** Render a method signature for the registry's editor index in the
+     * form {@code name(type1, type2)} using simple type names. The
+     * runtime "did you mean" diagnostic mines this string to surface
+     * concrete overload signatures (e.g.
+     * {@code MultiButton.setMaterialIcon(char, float)}); collapsing all
+     * non-empty parameter lists to {@code (...)} loses that information.
+     * Keep the format whitespace-free so prefix-name extraction (split
+     * on '(') stays trivial for existing consumers. */
     private static String editorMethodSignature(ApiMethod method) {
-        return method.paramTypes.isEmpty() && !method.varArgs ? method.name + "()" : method.name + "(...)";
+        if (method.paramTypes.isEmpty() && !method.varArgs) {
+            return method.name + "()";
+        }
+        StringBuilder out = new StringBuilder();
+        out.append(method.name).append('(');
+        for (int i = 0; i < method.paramTypes.size(); i++) {
+            if (i > 0) {
+                out.append(", ");
+            }
+            ApiType type = method.paramTypes.get(i);
+            String base = simpleTypeName(type.baseName);
+            out.append(base);
+            for (int d = 0; d < type.arrayDepth; d++) {
+                out.append("[]");
+            }
+            if (i == method.paramTypes.size() - 1 && method.varArgs) {
+                out.append("...");
+            }
+        }
+        out.append(')');
+        return out.toString();
+    }
+
+    private static String simpleTypeName(String qualified) {
+        if (qualified == null || qualified.isEmpty()) return qualified;
+        int lt = qualified.indexOf('<');
+        String head = lt > 0 ? qualified.substring(0, lt) : qualified;
+        int dot = head.lastIndexOf('.');
+        return dot >= 0 ? head.substring(dot + 1) : head;
     }
 
     private static String joinMembers(List<String> members) {
@@ -2592,6 +2639,21 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
                 || "getClass".equals(name)
                 || "clone".equals(name)
                 || "finalize".equals(name);
+    }
+
+    /// Qualified-name method exclusions. Reserved for APIs that are present
+    /// in the pinned registry version but still don't work on one of the
+    /// runtime ports the playground deploys to. Version-skew between the
+    /// release channel and the JS cloud build is handled structurally by
+    /// the cn1.registry.version pin in the POM, so this set should stay
+    /// empty unless a port-specific regression needs a surgical workaround.
+    private static final Set<String> BLACKLISTED_QUALIFIED_METHODS = new HashSet<String>();
+
+    private static boolean isBlacklistedQualifiedMethod(String qualifiedClassName, String methodName) {
+        if (qualifiedClassName == null) {
+            return false;
+        }
+        return BLACKLISTED_QUALIFIED_METHODS.contains(qualifiedClassName + "." + methodName);
     }
 
     private static void collectJavaFiles(File root, List<File> out) {

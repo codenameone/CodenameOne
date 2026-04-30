@@ -1320,7 +1320,17 @@ public class UIManager {
             themeProps.put("CommandList.sel#border", Border.createLineBorder(1));
         }
 
-        if (installedTheme == null || !installedTheme.containsKey("Toolbar.derive")) {
+        // The default Toolbar.derive=TitleArea was historically added so
+        // legacy themes that styled TitleArea got the same look on Toolbar
+        // for free. The modern themes (and any user theme that wires
+        // TitleArea.derive=Toolbar) flips the relationship the other way -
+        // setting both directions creates a cycle that infinite-loops
+        // createStyle when the resolver follows derive recursively. Skip
+        // the legacy default in that case.
+        boolean userDeclaredTitleAreaDerivesToolbar = installedTheme != null
+                && "Toolbar".equals(installedTheme.get("TitleArea.derive"));
+        if (!userDeclaredTitleAreaDerivesToolbar
+                && (installedTheme == null || !installedTheme.containsKey("Toolbar.derive"))) {
             themeProps.put("Toolbar.derive", "TitleArea");
         }
         if (installedTheme == null || !installedTheme.containsKey("FloatingActionButton.derive")) {
@@ -1498,6 +1508,124 @@ public class UIManager {
         }
     }
 
+    /// Scales the font sizes of the current theme by the given factor, e.g.
+    /// a factor of 1.2 increases all font sizes by 20% and a factor of 0.8
+    /// decreases them by 20%. Only fonts that support scaling (TTF or native:
+    /// fonts, see [Font#isTTFNativeFont()]) are affected; system fonts are
+    /// skipped since their size is fixed by the underlying platform.
+    ///
+    /// The zoom is applied relative to the current state of the theme, so
+    /// calling this method repeatedly compounds the effect. To undo a zoom,
+    /// either reapply the theme or call this method with the reciprocal
+    /// factor.
+    ///
+    /// **Note:** this updates the theme definitions and clears the cached
+    /// styles, but components already shown on a form continue to render
+    /// with the Font instances they captured before the call. To apply the
+    /// new sizes to a live form, invoke `refreshTheme()` on it (typically
+    /// `Form.getCurrentForm().refreshTheme()`) after calling this method.
+    ///
+    /// #### Parameters
+    ///
+    /// - `factor`: the multiplier applied to every scalable font size. Must
+    ///   be greater than zero.
+    public void zoomFonts(float factor) {
+        if (factor <= 0f) {
+            throw new IllegalArgumentException("Zoom factor must be greater than zero");
+        }
+        if (factor == 1f) {
+            return;
+        }
+        for (Map.Entry<String, Object> entry : themeProps.entrySet()) {
+            if (!entry.getKey().endsWith(Style.FONT)) {
+                continue;
+            }
+            Object value = entry.getValue();
+            Font font = null;
+            if (value instanceof Font) {
+                font = (Font) value;
+            } else if (value instanceof String) {
+                Font parsed = parseFont((String) value);
+                if (parsed != null && parsed.isTTFNativeFont()) {
+                    font = parsed;
+                }
+            }
+            if (font == null || !font.isTTFNativeFont()) {
+                continue;
+            }
+            Font scaled = scaleFontByFactor(font, factor);
+            if (scaled != null && scaled != font) { //NOPMD CompareObjectsWithEquals
+                entry.setValue(scaled);
+            }
+        }
+        Font defFont = defaultStyle.getFont();
+        if (defFont != null && defFont.isTTFNativeFont()) {
+            Font scaled = scaleFontByFactor(defFont, factor);
+            if (scaled != null && scaled != defFont) { //NOPMD CompareObjectsWithEquals
+                defaultStyle.setFont(scaled);
+            }
+        }
+        Font defSelFont = defaultSelectedStyle.getFont();
+        if (defSelFont != null && defSelFont.isTTFNativeFont()) {
+            Font scaled = scaleFontByFactor(defSelFont, factor);
+            if (scaled != null && scaled != defSelFont) { //NOPMD CompareObjectsWithEquals
+                defaultSelectedStyle.setFont(scaled);
+            }
+        }
+        styles.clear();
+        selectedStyles.clear();
+        imageCache.clear();
+        current.refreshTheme(false);
+    }
+
+    private Font scaleFontByFactor(Font font, float factor) {
+        if (font == null || !font.isTTFNativeFont()) {
+            return font;
+        }
+        float baseSize = font.getPixelSize();
+        if (baseSize <= 0) {
+            baseSize = font.getHeight();
+        }
+        if (baseSize <= 0) {
+            return font;
+        }
+        try {
+            return font.derive(baseSize * factor, font.getStyle());
+        } catch (Exception ex) {
+            Log.e(ex);
+            return font;
+        }
+    }
+
+    /// Invalidates the cached Style instances and re-runs the theme build pass
+    /// against the currently installed theme properties. Callers use this after
+    /// state changes that affect style resolution (notably `Display.setDarkMode`,
+    /// which makes `$Dark<UIID>` entries eligible) without reloading the theme
+    /// from a resource file. Components styled after this call resolve against
+    /// the refreshed theme; already-resolved Style references on existing
+    /// components keep their old values until those components re-fetch their
+    /// styles.
+    public void refreshTheme() {
+        if (!accessible || themeProps == null) {
+            return;
+        }
+        Hashtable props = new Hashtable();
+        for (Map.Entry<String, Object> e : themeProps.entrySet()) {
+            props.put(e.getKey(), e.getValue());
+        }
+        // buildTheme strips `@`-prefixed constants into themeConstants and
+        // drops them from the main themeProps map. Round-tripping through
+        // setThemePropsImpl would therefore lose every constant - so
+        // re-add them from themeConstants with the `@` restored, matching
+        // the shape buildTheme expects on input.
+        if (themeConstants != null) {
+            for (Map.Entry<String, Object> e : themeConstants.entrySet()) {
+                props.put("@" + e.getKey(), e.getValue());
+            }
+        }
+        setThemePropsImpl(props);
+    }
+
     /// Returns a theme constant defined in the resource editor
     ///
     /// #### Parameters
@@ -1625,7 +1753,33 @@ public class UIManager {
             themelisteners.fireActionEvent(new ActionEvent(themeProps, ActionEvent.Type.Theme));
         }
         buildTheme(themeProps);
+        breakTitleAreaToolbarDeriveCycle();
         current.refreshTheme(true);
+    }
+
+    /// resetThemeProps decides whether to install the legacy
+    /// `Toolbar.derive=TitleArea` default by inspecting only the *immediate*
+    /// installedTheme it was handed. When a user theme has
+    /// `@includeNativeBool: true`, buildTheme later layers in a native theme
+    /// (e.g. iOS Modern's `TitleArea.derive=Toolbar`) and the user theme on
+    /// top - and those layers can flip the derive direction without the
+    /// outer reset noticing. Once both `Toolbar.derive=TitleArea` and
+    /// `TitleArea.derive=Toolbar` exist in the merged themeProps,
+    /// `createStyle` recurses indefinitely and Logs `Error creating style
+    /// TitleArea` (the catch returns a default style, but the cycle leaves
+    /// the chrome unstyled and the app effectively stuck). Drop the legacy
+    /// default once we can see the merged state.
+    private void breakTitleAreaToolbarDeriveCycle() {
+        if (themeProps == null) {
+            return;
+        }
+        Object titleAreaDerive = themeProps.get("TitleArea.derive");
+        if ("Toolbar".equals(titleAreaDerive)) {
+            Object toolbarDerive = themeProps.get("Toolbar.derive");
+            if ("TitleArea".equals(toolbarDerive)) {
+                themeProps.remove("Toolbar.derive");
+            }
+        }
     }
 
     private void buildTheme(Hashtable themeProps) {

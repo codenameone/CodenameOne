@@ -615,14 +615,22 @@ public class CN1CSSCLI {
             System.out.println(" -l, -localization  Directory containing Java resource bundle .properties files to include.");
             System.out.println(" -w, -watch         Run in watch mode.");
             System.out.println("                    Watches input files for changes and automatically recompiles.");
+            System.out.println(" -no-cef            Disallow any CSS feature that would trigger CEF-backed image");
+            System.out.println("                    rasterization (9-piece borders, complex gradients, shadows, filters).");
+            System.out.println("                    The compile fails listing offending rules instead of falling back.");
+            System.out.println("                    Used by the framework native-themes build.");
             System.out.println("\nSystem Properties:");
             System.out.println(" cef.dir            The path to the CEF directory.");
             System.out.println("                    Required for generation of image borders.");
             System.out.println(" parent.port        The port number to connect to the parent process for watch mode so that it knows ");
             System.out.println("                    to exit if the parent process ends.");
             return;
-            
-            
+
+
+        }
+        if (getArgByName(args, "no-cef") != null) {
+            CSSTheme.strictNoCef = true;
+            System.out.println("CSS compiler running in no-cef mode: any rule requiring CEF rasterization will fail the build.");
         }
         statelessMode = getArgByName(args, "i", "input") != null;
         String localizationPath = getArgByName(args, "l", "localization");

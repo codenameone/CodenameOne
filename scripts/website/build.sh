@@ -35,6 +35,15 @@ if [ "${WEBSITE_INCLUDE_INITIALIZR}" = "auto" ]; then
   fi
 fi
 
+ensure_native_themes() {
+  if [ -f "${REPO_ROOT}/Themes/iOSModernTheme.res" ] \
+      && [ -f "${REPO_ROOT}/Themes/AndroidMaterialTheme.res" ]; then
+    return
+  fi
+  echo "Generating native theme .res files via build-native-themes.sh..." >&2
+  bash "${REPO_ROOT}/scripts/build-native-themes.sh"
+}
+
 bootstrap_local_cn1_snapshots() {
   if [ "${WEBSITE_BOOTSTRAP_CN1_SNAPSHOTS}" != "true" ]; then
     return
@@ -343,6 +352,9 @@ build_developer_guide_for_site() {
   rm -f "${WEBSITE_DIR}/static/developer-guide.html"
   mkdir -p "${html_out}" "${guide_dir}" "${generated_dir}"
 
+  local build_date
+  build_date="$(date +%Y-%m-%d)"
+
   (
     cd "${REPO_ROOT}"
     asciidoctor \
@@ -350,6 +362,7 @@ build_developer_guide_for_site() {
       -a linkcss \
       -a copycss \
       -a rouge-css=style \
+      -a revdate="${build_date}" \
       -D "${html_out}" \
       -o developer-guide-full.html \
       docs/developer-guide/developer-guide.asciidoc
@@ -553,6 +566,12 @@ build_initializr_for_site() {
     return
   fi
 
+  # The initializr's live preview overlays the iOS Modern theme, which is
+  # bundled from the gitignored Themes/iOSModernTheme.res. Generate it now
+  # so the antrun copy in scripts/initializr/common/pom.xml has something
+  # to pick up.
+  ensure_native_themes
+
   echo "Building Initializr JavaScript bundle for website..." >&2
   (
     cd "${REPO_ROOT}/scripts/initializr"
@@ -613,6 +632,12 @@ build_playground_for_site() {
   fi
 
   bootstrap_local_cn1_snapshots
+
+  # The playground's live preview switches between iOS Modern and Android
+  # Material via Resources.openLayered. Both .res files are gitignored
+  # build artifacts; generate them now so the antrun copy in
+  # scripts/cn1playground/common/pom.xml has something to pick up.
+  ensure_native_themes
 
   echo "Building Playground JavaScript bundle for website..." >&2
   (

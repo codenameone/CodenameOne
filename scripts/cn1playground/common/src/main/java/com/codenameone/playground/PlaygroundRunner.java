@@ -86,6 +86,10 @@ final class PlaygroundRunner {
         try {
             Interpreter interpreter = new Interpreter();
             bindGlobals(interpreter, context);
+            if (context != null) {
+                context.clearCreatedComponents();
+                context.clearShownForm();
+            }
             PlaygroundContext.pushCurrent(context);
             CN1LambdaSupport.pushInterpreter(interpreter);
             try {
@@ -94,7 +98,7 @@ final class PlaygroundRunner {
                     interpreter.eval(plan.typeDeclarations.get(i));
                 }
                 Object result = interpreter.eval(plan.executableScript);
-                Component component = resolveComponent(interpreter, result, context);
+                Component component = resolveComponent(interpreter, result, context, plan.wrappedAsBuild);
                 inlineMessages.add(new InlineMessage(0, "Preview updated.", "success"));
                 return new RunResult(component, Collections.<Diagnostic>emptyList(), inlineMessages);
             } finally {
@@ -158,7 +162,9 @@ final class PlaygroundRunner {
         List<TypeDeclarationBlock> declarations = findTopLevelTypeDeclarations(normalized, importEnd);
         if (declarations.isEmpty()) {
             String wrapped = wrapLooseScript(normalized);
-            return new ScriptPlan(Collections.<String>emptyList(), wrapped == null ? normalized : wrapped);
+            return new ScriptPlan(Collections.<String>emptyList(),
+                    wrapped == null ? normalized : wrapped,
+                    wrapped != null);
         }
 
         String importSection = normalized.substring(packageEnd, importEnd);
@@ -179,7 +185,9 @@ final class PlaygroundRunner {
 
         String rewritten = normalized.substring(0, importEnd) + remainingBody.toString();
         String wrapped = wrapLooseScript(rewritten);
-        return new ScriptPlan(declarationScripts, wrapped == null ? rewritten : wrapped);
+        return new ScriptPlan(declarationScripts,
+                wrapped == null ? rewritten : wrapped,
+                wrapped != null);
     }
 
     private String rewriteClassModel(String script) {
@@ -1989,8 +1997,15 @@ final class PlaygroundRunner {
         String prefix = script.substring(0, bodyStart);
         String body = script.substring(bodyStart);
         String rewrittenBody = rewriteLooseScriptBody(body);
+        // Returning Object (rather than Component) lets the trailing
+        // expression be anything — a Form value, a void method call like
+        // `f.show();`, a primitive — without bsh complaining about the
+        // wrapper's declared return type. Whether the resulting value is
+        // actually previewable is decided in resolveComponent, which can
+        // also fall back to shownForm or constructed components when the
+        // trailing expression is non-component.
         return prefix
-                + "Component build(PlaygroundContext ctx) {\n"
+                + "Object build(PlaygroundContext ctx) {\n"
                 + rewrittenBody
                 + "\n}\n"
                 + "build(ctx);";
@@ -2057,7 +2072,10 @@ final class PlaygroundRunner {
             if (looksLikeReturnStatement(trimmed)) {
                 return body;
             }
-            return "return " + trimmed + ";";
+            if (looksLikeBareReference(trimmed)) {
+                return "return " + trimmed + ";";
+            }
+            return body + "\nreturn null;";
         }
         int statementStart = findStatementStart(body, lastSemi);
         String leading = body.substring(0, statementStart);
@@ -2069,7 +2087,13 @@ final class PlaygroundRunner {
         if (looksLikeReturnStatement(statement)) {
             return body;
         }
-        if (looksLikeReturnableExpression(statement)) {
+        // Only the trailing-bare-identifier convention (`myCmp;`) gets
+        // promoted to a return. Other trailing expressions — method
+        // calls like `f.show();`, arithmetic like `1 + 2;`, etc. — are
+        // left alone so the value-resolution fallback chain can kick in
+        // (shownForm, first constructed Form/Component) without bsh's
+        // method-body type check rejecting a void or primitive return.
+        if (looksLikeBareReference(statement)) {
             return leading + "return " + statement + ";" + trailing;
         }
         return body + "\nreturn null;";
@@ -2135,52 +2159,65 @@ final class PlaygroundRunner {
         return startsWithWord(statement, skipWhitespace(statement, 0), "return");
     }
 
-    private boolean looksLikeReturnableExpression(String statement) {
-        int start = skipWhitespace(statement, 0);
-        if (start >= statement.length()) {
+    /** True when the statement is a bare reference to a Component-like
+     * value: a plain identifier (`form`), a dotted access chain
+     * (`obj.field.value`), or an indexed access (`arr[0]`,
+     * `widgets["main"].child`). Method invocations like `f.show()` or
+     * arithmetic like `1 + 2` deliberately return false — those are
+     * left as plain statements so the value-fallback chain in
+     * resolveComponent can supply the preview component instead of
+     * forcing the build wrapper to return a void or primitive value. */
+    private boolean looksLikeBareReference(String statement) {
+        int len = statement.length();
+        int i = skipWhitespace(statement, 0);
+        if (i >= len) return false;
+        if (!isIdentifierStart(statement.charAt(i))) {
             return false;
         }
-        if (startsWithAnyWord(statement, start, "if", "for", "while", "switch", "try", "catch", "finally",
-                "do", "class", "interface", "enum", "throw", "break", "continue", "public", "private",
-                "protected", "static", "final", "abstract", "synchronized")) {
+        boolean expectIdentifier = true;
+        while (i < len) {
+            char ch = statement.charAt(i);
+            if (ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r') {
+                i++;
+                continue;
+            }
+            if (expectIdentifier) {
+                if (!isIdentifierStart(ch)) return false;
+                while (i < len && isIdentifierPart(statement.charAt(i))) i++;
+                expectIdentifier = false;
+                continue;
+            }
+            if (ch == '.') {
+                i++;
+                expectIdentifier = true;
+                continue;
+            }
+            if (ch == '[') {
+                int close = findMatchingBracket(statement, i);
+                if (close < 0) return false;
+                i = close + 1;
+                continue;
+            }
             return false;
         }
-        return !containsTopLevelAssignment(statement);
+        return !expectIdentifier;
     }
 
-    private boolean containsTopLevelAssignment(String text) {
+    private int findMatchingBracket(String text, int openIndex) {
         int depth = 0;
-        for (int i = 0; i < text.length(); i++) {
+        for (int i = openIndex; i < text.length(); i++) {
             char ch = text.charAt(i);
             if (ch == '"' || ch == '\'') {
                 i = skipQuoted(text, i);
                 continue;
             }
-            if (startsLineComment(text, i)) {
-                i = skipLineComment(text, i);
-                continue;
-            }
-            if (startsBlockComment(text, i)) {
-                i = skipBlockComment(text, i);
-                continue;
-            }
-            if (ch == '(' || ch == '[' || ch == '{') {
-                depth++;
-                continue;
-            }
-            if (ch == ')' || ch == ']' || ch == '}') {
+            if (ch == '[') depth++;
+            else if (ch == ']') {
                 depth--;
-                continue;
-            }
-            if (depth == 0 && ch == '=') {
-                char before = i > 0 ? text.charAt(i - 1) : 0;
-                char after = i + 1 < text.length() ? text.charAt(i + 1) : 0;
-                if (before != '=' && before != '!' && before != '<' && before != '>' && after != '=') {
-                    return true;
-                }
+                if (depth == 0) return i;
             }
         }
-        return false;
+        return -1;
     }
 
     private boolean startsWithAnyWord(String text, int index, String... words) {
@@ -2891,26 +2928,72 @@ final class PlaygroundRunner {
         }
     }
 
-    private Component resolveComponent(Interpreter interpreter, Object value, PlaygroundContext context) throws EvalError {
-        if (context != null && context.getShownForm() != null) {
-            return context.getShownForm();
-        }
-        if (value != null && value != Primitive.VOID && value != Primitive.NULL) {
-            return coerceToComponent(value, context);
+    private Component resolveComponent(Interpreter interpreter, Object value, PlaygroundContext context,
+            boolean wrappedAsBuild) throws EvalError {
+        NameSpace namespace = interpreter.getNameSpace();
+
+        // Lifecycle scripts (init/start) keep their existing flow — they
+        // own the show()/return contract through runLifecycle().
+        if (hasLifecycleMethods(namespace, context)) {
+            return runLifecycle(namespace, interpreter, context);
         }
 
-        NameSpace namespace = interpreter.getNameSpace();
-        if (hasBuildMethod(namespace, context)) {
+        // Honour an explicit build(ctx) the user wrote. We skip this when
+        // we wrapped the loose script ourselves, since the wrapper has
+        // already executed build(ctx) once — calling it again would replay
+        // the whole body and double up its side effects.
+        if (!wrappedAsBuild && hasBuildMethod(namespace, context)) {
             return coerceToComponent(namespace.invokeMethod("build", new Object[]{context}, interpreter), context);
         }
 
-        if (hasLifecycleMethods(namespace, context)) {
-            return runLifecycle(namespace, interpreter, context);
+        // Simplified syntax fallback chain:
+        //   1. Trailing component identifier on the last line (the value
+        //      returned by the implicit build wrapper).
+        //   2. Form passed to Form.show() during execution.
+        //   3. First Form constructed with `new` during execution.
+        //   4. First Component constructed with `new` during execution.
+        Component fromValue = componentFromValue(value);
+        if (fromValue != null) {
+            return fromValue;
+        }
+        if (context != null && context.getShownForm() != null) {
+            return context.getShownForm();
+        }
+        Component fromCreated = firstCreatedComponent(context);
+        if (fromCreated != null) {
+            return fromCreated;
+        }
+        if (value != null && value != Primitive.VOID && value != Primitive.NULL) {
+            // Trailing expression evaluated to something that wasn't a
+            // Component (e.g. `42;`). Surface the existing diagnostic so
+            // the type mismatch is obvious.
+            return coerceToComponent(value, context);
         }
 
         throw new EvalError(
                 "Script must return a com.codename1.ui.Component, define build(ctx), or define lifecycle methods such as init(Object) and start().",
                 null, null);
+    }
+
+    private Component componentFromValue(Object value) {
+        if (value == null || value == Primitive.VOID || value == Primitive.NULL) {
+            return null;
+        }
+        if (value instanceof Component) {
+            return (Component) value;
+        }
+        return null;
+    }
+
+    private Component firstCreatedComponent(PlaygroundContext context) {
+        if (context == null) {
+            return null;
+        }
+        Form form = context.getFirstCreatedForm();
+        if (form != null) {
+            return form;
+        }
+        return context.getFirstCreatedComponent();
     }
 
     private boolean hasLifecycleMethods(NameSpace namespace, PlaygroundContext context) {
@@ -3000,7 +3083,9 @@ final class PlaygroundRunner {
             String candidate = current.getMessage();
             if (candidate != null && candidate.length() > 0) {
                 candidate = simplifyMessage(candidate);
-                if (candidate.indexOf("Generated ") >= 0
+                if (candidate.indexOf("No matching instance method") >= 0
+                        || candidate.indexOf("did you mean:") >= 0
+                        || candidate.indexOf("Generated ") >= 0
                         || candidate.indexOf("not implemented") >= 0
                         || candidate.indexOf("Class or variable not found:") >= 0
                         || candidate.indexOf("Script must return") >= 0
@@ -3021,16 +3106,37 @@ final class PlaygroundRunner {
         return throwable.getClass().getSimpleName();
     }
 
+    /** Trims bsh's verbose "Sourced file: inline evaluation of: ... '' : "
+     * prefix and " : at Line: N : in file: ... '' : <text>" /
+     * "\nCalled from method: ..." suffix from an EvalError message
+     * once we've located our actionable marker. The marker text itself
+     * (e.g. "No matching instance method ...") carries everything the
+     * user needs; the bsh trace just makes the error look like an
+     * internal stack dump. The line + source-text are still available
+     * via Diagnostic.line, which the editor uses to highlight the call. */
     private String simplifyMessage(String message) {
-        int generated = message.indexOf("Generated ");
-        if (generated >= 0) {
-            return message.substring(generated);
+        int found = -1;
+        String[] markers = {
+                "No matching instance method ",
+                "Generated ",
+                "Class or variable not found:"
+        };
+        for (int i = 0; i < markers.length; i++) {
+            int idx = message.indexOf(markers[i]);
+            if (idx >= 0 && (found < 0 || idx < found)) {
+                found = idx;
+            }
         }
-        int classMissing = message.indexOf("Class or variable not found:");
-        if (classMissing >= 0) {
-            return message.substring(classMissing);
+        String core = found >= 0 ? message.substring(found) : message;
+        int trace = core.indexOf(" : at Line: ");
+        if (trace > 0) {
+            core = core.substring(0, trace);
         }
-        return message;
+        int callFrom = core.indexOf("\nCalled from method");
+        if (callFrom > 0) {
+            core = core.substring(0, callFrom);
+        }
+        return core;
     }
 
     private String formatParseMessage(ParseException ex) {
@@ -3269,10 +3375,12 @@ final class PlaygroundRunner {
     private static final class ScriptPlan {
         final List<String> typeDeclarations;
         final String executableScript;
+        final boolean wrappedAsBuild;
 
-        ScriptPlan(List<String> typeDeclarations, String executableScript) {
+        ScriptPlan(List<String> typeDeclarations, String executableScript, boolean wrappedAsBuild) {
             this.typeDeclarations = typeDeclarations;
             this.executableScript = executableScript;
+            this.wrappedAsBuild = wrappedAsBuild;
         }
     }
 }

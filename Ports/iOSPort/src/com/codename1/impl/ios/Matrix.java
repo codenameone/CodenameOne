@@ -76,7 +76,7 @@ public final class Matrix {
         private float[] sTemp = new float[32];
         private static Factory defaultFactory = null;
 
-        public static Factory getDefault() {
+        public static synchronized Factory getDefault() {
             if (defaultFactory == null) {
                 defaultFactory = new Factory();
 
@@ -255,17 +255,27 @@ public final class Matrix {
     }
 
     
-    public boolean equals(Matrix m2){
-        if ( m2 == null ){
+    @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof Matrix)) {
             return false;
         }
-        for ( int i=0; i<16; i++){
-            if ( Math.abs(this.data[i]-m2.data[i]) > 0.0001 ){
+        Matrix m2 = (Matrix) o;
+        for (int i = 0; i < 16; i++) {
+            if (Math.abs(this.data[i] - m2.data[i]) > 0.0001) {
                 return false;
             }
         }
         return true;
-        
+    }
+
+    @Override
+    public int hashCode() {
+        int h = 0;
+        for (int i = 0; i < 16; i++) {
+            h = 31 * h + Float.floatToIntBits(this.data[i]);
+        }
+        return h;
     }
     
     public boolean isIdentity() {

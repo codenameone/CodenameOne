@@ -1,0 +1,494 @@
+/*
+ * Android Material 3 native theme.
+ *
+ * CEF-free subset of the Codename One CSS compiler: solid fills, native
+ * rounded/pill borders, state selectors via .pressed / .selected /
+ * .disabled. Light and dark palettes live at the bottom of this file
+ * in a prefers-color-scheme block the compiler rewrites into $DarkUIID
+ * entries. Colors are inlined (not CSS variables) because the rewriter
+ * operates at string level and doesn't re-scope :root declarations.
+ *
+ * Material 3 baseline palette reference:
+ *   primary               #6750a4 dark #d0bcff
+ *   on-primary            #ffffff dark #381e72
+ *   primary-container     #eaddff dark #4f378b
+ *   on-primary-container  #21005d dark #eaddff
+ *   surface               #fef7ff dark #141218
+ *   on-surface            #1d1b20 dark #e6e0e9
+ *   surface-variant       #e7e0ec dark #49454f
+ *   on-surface-variant    #49454f dark #cac4d0
+ *   surface-container     #f3edf7 dark #211f26
+ *   outline               #79747e dark #938f99
+ *   outline-variant       #cac4d0 dark #49454f
+ *   state-pressed         #d0bcff dark #4f378b
+ *   state-disabled        #e0dce4 dark #2b2930
+ *   on-disabled           #a5a0ab dark #5c5967
+ *
+ * Overridable palette: user apps layer their own theme.css or runtime
+ * UIManager.addThemeProps on top of this theme - see
+ * PaletteOverrideThemeScreenshotTest for a working example.
+ */
+
+#Constants {
+    includeNativeBool: false;
+    darkModeBool: true;
+    commandBehavior: Native;
+    paintsTitleBarBool: false;
+    /* Material 3 Tabs stay at the top, edge-to-edge. The Material 3
+       bottom-nav-rail is a separate component (NavigationBar) and
+       is not what Codename One's Tabs widget represents.
+       tabPlacementInt is set explicitly so flipping the playground
+       device toggle from iOS Modern (which sets it to BOTTOM=2)
+       back to Android resets it to TOP=0; without an explicit value
+       the iOS constant would leak across themes after a reload.
+       tabsSafeAreaBool is the framework default (true) - Material
+       tab strip is full-width and reserves the indicator space
+       internally, no host wrapper needed. */
+    tabPlacementInt: 0;
+    tabsSafeAreaBool: true;
+    tabsFillRowsBool: true;
+    tabsGridBool: true;
+    switchThumbPaddingInt: 2;
+    switchThumbScaleY: "1.5";
+    switchTrackScaleY: "0.9";
+    switchTrackScaleX: "3";
+    switchTrackOffOutlineWidthMM: "0";
+    switchTrackOnOutlineWidthMM: "0";
+    switchTrackOffOutlineColor: "79747e";
+    switchThumbInsetMM: "0";
+    /* Dialog sizing/layout constants - see iOS Modern theme for the
+       rationale. Without these the framework falls back to a wider
+       default Dialog layout that ballooned Dialog.show() to near-full
+       screen with the body floating in empty space. */
+    hideEmptyTitleBool: true;
+    shrinkPopupTitleBool: true;
+    dialogButtonCommandsBool: true;
+    dlgCommandGridBool: true;
+}
+
+Component {
+    color: #1d1b20;
+    background-color: #fef7ff;
+    padding: 0;
+    margin: 0;
+}
+
+Form { background-color: #fef7ff; padding: 0; margin: 0; }
+ContentPane { background-color: #fef7ff; padding: 0; margin: 0; }
+/* Container is layout-only by default - transparent so wrappers
+   like SpanLabel (which uses UIID="Container") inside a coloured
+   parent (Dialog, Tab pill) let that parent's surface show
+   through instead of painting an opaque block over it. */
+Container { background-color: transparent; padding: 0; margin: 0; }
+
+/* Label transparent so it sits cleanly over its parent's surface.
+   SpanLabel's internal TextArea uses UIID="Label" so this also
+   fixes the visible block behind dialog body text. */
+Label {
+    color: #1d1b20;
+    background-color: transparent;
+    padding: 0.5mm 1.5mm 0.5mm 1.5mm;
+    margin: 0;
+    font-family: "native:MainRegular";
+    font-size: 3.5mm;
+}
+
+SecondaryLabel { cn1-derive: Label; color: #49454f; }
+TertiaryLabel { cn1-derive: Label; color: #79747e; }
+/* SpanLabel + SpanLabelText transparent so they sit cleanly over a
+   translucent / coloured parent (Dialog, PopupContent) without
+   painting their own surface fill. */
+SpanLabel { cn1-derive: Label; background-color: transparent; }
+SpanLabelText { cn1-derive: Label; background-color: transparent; }
+
+/* Material 3 button: fully-rounded "pill" shape via cn1-pill-border
+   (RoundBorder, CEF-free). border-radius (RoundRectBorder) was leaving
+   visible artefacts when the button height didn't divide cleanly - the
+   pill border paints a single rounded fill that scales correctly.
+   Generous horizontal padding so short labels still get clear pill
+   ends. cn1-derive doesn't carry cn1-background-type forward, so the
+   derived UIIDs (RaisedButton, FlatButton) re-declare it explicitly. */
+/* Re-declare every state-affecting property (padding, margin, font,
+   text-align) on `.pressed` and `.disabled` so the compiled $press#
+   / $dis# style entries keep IDENTICAL geometry to the base. Without
+   the re-declaration the framework's per-state Style merge introduces
+   a subtle vertical drift while a button is held - text "jumps" by
+   a pixel or two between unselected and pressed. cn1-derive on a
+   state selector wouldn't help here (the compiler's getThemeDerive
+   only honours base-level cn1-derive), so explicit values are the
+   reliable fix. */
+Button {
+    color: #ffffff;
+    background-color: #6750a4;
+    padding: 1.5mm 4mm 1.5mm 4mm;
+    margin: 0.8mm;
+    font-family: "native:MainRegular";
+    font-size: 3.5mm;
+    cn1-background-type: cn1-pill-border;
+    text-align: center;
+}
+Button.pressed {
+    color: #21005d;
+    background-color: #d0bcff;
+    padding: 1.5mm 4mm 1.5mm 4mm;
+    margin: 0.8mm;
+    font-family: "native:MainRegular";
+    font-size: 3.5mm;
+    cn1-background-type: cn1-pill-border;
+    text-align: center;
+}
+Button.disabled {
+    color: #a5a0ab;
+    background-color: #e0dce4;
+    padding: 1.5mm 4mm 1.5mm 4mm;
+    margin: 0.8mm;
+    font-family: "native:MainRegular";
+    font-size: 3.5mm;
+    cn1-background-type: cn1-pill-border;
+    text-align: center;
+}
+
+/* RaisedButton: bumped surface (M3 "elevated" tone) to keep it
+   visibly distinct from the default filled Button, including in
+   dark mode where Button's own container color otherwise matches. */
+RaisedButton {
+    cn1-derive: Button;
+    color: #21005d;
+    background-color: #eaddff;
+    padding: 1.5mm 4mm 1.5mm 4mm;
+    margin: 0.8mm;
+    font-family: "native:MainRegular";
+    font-size: 3.5mm;
+    cn1-background-type: cn1-pill-border;
+    text-align: center;
+}
+RaisedButton.pressed {
+    color: #21005d;
+    background-color: #d0bcff;
+    padding: 1.5mm 4mm 1.5mm 4mm;
+    margin: 0.8mm;
+    font-family: "native:MainRegular";
+    font-size: 3.5mm;
+    cn1-background-type: cn1-pill-border;
+    text-align: center;
+}
+RaisedButton.disabled {
+    color: #a5a0ab;
+    background-color: #e0dce4;
+    padding: 1.5mm 4mm 1.5mm 4mm;
+    margin: 0.8mm;
+    font-family: "native:MainRegular";
+    font-size: 3.5mm;
+    cn1-background-type: cn1-pill-border;
+    text-align: center;
+}
+
+FlatButton {
+    cn1-derive: Button;
+    background-color: transparent;
+    color: #6750a4;
+    cn1-background-type: cn1-pill-border;
+    text-align: center;
+}
+FlatButton.pressed { background-color: #eaddff; color: #21005d; cn1-background-type: cn1-pill-border; }
+
+TextField {
+    color: #1d1b20;
+    background-color: #f3edf7;
+    padding: 1.5mm 2.5mm 1.5mm 2.5mm;
+    margin: 0.8mm 1.5mm 0.8mm 1.5mm;
+    font-family: "native:MainRegular";
+    font-size: 3.5mm;
+    border-radius: 1mm;
+}
+TextField.pressed { background-color: #e7e0ec; }
+TextField.disabled { color: #a5a0ab; background-color: #e0dce4; }
+
+TextArea {
+    color: #1d1b20;
+    background-color: #f3edf7;
+    padding: 1.5mm 2.5mm 1.5mm 2.5mm;
+    margin: 0.8mm 1.5mm 0.8mm 1.5mm;
+    font-family: "native:MainRegular";
+    font-size: 3.5mm;
+    border-radius: 1mm;
+}
+TextArea.pressed { background-color: #e7e0ec; }
+TextArea.disabled { color: #a5a0ab; background-color: #e0dce4; }
+
+TextHint {
+    color: #79747e;
+    padding: 2mm 3mm 2mm 3mm;
+    font-family: "native:MainRegular";
+}
+
+CheckBox {
+    color: #1d1b20;
+    background-color: transparent;
+    padding: 0.5mm 1.5mm 0.5mm 1.5mm;
+    margin: 0;
+    font-family: "native:MainRegular";
+    font-size: 3.5mm;
+    icon-gap: 2mm;
+}
+CheckBox.selected { color: #6750a4; }
+CheckBox.disabled { color: #a5a0ab; background-color: #e0dce4; }
+
+RadioButton {
+    color: #1d1b20;
+    background-color: transparent;
+    padding: 0.5mm 1.5mm 0.5mm 1.5mm;
+    margin: 0;
+    font-family: "native:MainRegular";
+    font-size: 3.5mm;
+    icon-gap: 2mm;
+}
+RadioButton.selected { color: #6750a4; }
+RadioButton.disabled { color: #a5a0ab; background-color: #e0dce4; }
+
+/* Switch's track left-edge aligns with Label's text left-edge
+   above (margin-left + padding-left = label padding-left). */
+Switch {
+    color: #79747e;
+    background-color: #e7e0ec;
+    padding: 0;
+    margin: 1mm 1.5mm 1mm 1.5mm;
+    text-align: left;
+}
+Switch.selected { color: #ffffff; background-color: #6750a4; }
+Switch.disabled { color: #a5a0ab; background-color: #e0dce4; }
+
+OnOffSwitch {
+    cn1-derive: Label;
+    color: #ffffff;
+    background-color: #e7e0ec;
+    padding: 1mm 2mm 1mm 2mm;
+    cn1-background-type: cn1-pill-border;
+}
+OnOffSwitch.selected { background-color: #6750a4; color: #ffffff; }
+
+Toolbar {
+    background-color: #fef7ff;
+    color: #1d1b20;
+    padding: 1mm;
+    margin: 0;
+}
+/* TitleArea inlined rather than cn1-derive'd to Toolbar - see the iOS
+   modern theme for the resolver-hang note. The two UIIDs serve
+   different purposes and keeping inheritance simple is safer. */
+TitleArea {
+    background-color: #fef7ff;
+    color: #1d1b20;
+    padding: 1mm 2mm 1mm 2mm;
+    margin: 0;
+}
+
+Title {
+    color: #1d1b20;
+    background-color: #fef7ff;
+    padding: 0.8mm 2mm 0.8mm 2mm;
+    font-family: "native:MainBold";
+    font-size: 4mm;
+}
+MainTitle { cn1-derive: Title; }
+
+BackCommand { cn1-derive: Button; background-color: transparent; color: #6750a4; padding: 1mm 2mm 1mm 2mm; }
+TitleCommand { cn1-derive: Button; background-color: transparent; color: #6750a4; padding: 1mm 2mm 1mm 2mm; }
+
+/* Material 3 top tabs: flat surface with selected tab underlined by
+   color rather than a pill fill. No border-radius here -
+   combining it with a visible border would drop into the 9-piece
+   rasterization path. */
+Tabs { background-color: #fef7ff; padding: 0; margin: 0; }
+TabsContainer { background-color: #fef7ff; color: #1d1b20; padding: 0; margin: 0; }
+
+Tab {
+    color: #49454f;
+    background-color: #fef7ff;
+    padding: 1.5mm 2mm 1.5mm 2mm;
+    margin: 0;
+    font-family: "native:MainRegular";
+    font-size: 3.5mm;
+    text-align: center;
+}
+Tab.selected { color: #6750a4; background-color: #fef7ff; }
+Tab.pressed { color: #21005d; background-color: #eaddff; }
+
+SelectedTab { cn1-derive: Tab; color: #6750a4; }
+UnselectedTab { cn1-derive: Tab; color: #49454f; }
+
+SideNavigationPanel { background-color: #fef7ff; padding: 0; margin: 0; }
+
+SideCommand {
+    cn1-derive: Button;
+    background-color: transparent;
+    color: #1d1b20;
+    padding: 2mm 3mm 2mm 3mm;
+    margin: 0;
+}
+SideCommand.pressed { background-color: #eaddff; }
+
+List { background-color: #fef7ff; padding: 0; margin: 0; }
+
+ListRenderer { cn1-derive: Label; padding: 1.5mm 2mm 1.5mm 2mm; }
+
+/* MultiButton is a list-row component with multi-line content, NOT a
+   bordered pill. Don't cn1-derive from Button - that pulls in
+   cn1-pill-border which then renders as an outline only on certain
+   surfaces (visible in dark mode against the panel surface, invisible
+   in light mode against white). Inline a clean rectangular row look
+   instead. */
+MultiButton {
+    background-color: #fef7ff;
+    color: #1d1b20;
+    padding: 2mm 3mm 2mm 3mm;
+    margin: 0;
+    font-family: "native:MainRegular";
+    font-size: 3.5mm;
+}
+MultiButton.pressed { background-color: #eaddff; }
+MultiButton.disabled { color: #a5a0ab; background-color: #e0dce4; }
+
+MultiLine1 { cn1-derive: Label; color: #1d1b20; font-family: "native:MainBold"; }
+MultiLine2 { cn1-derive: Label; color: #49454f; }
+MultiLine3 { cn1-derive: Label; color: #79747e; }
+MultiLine4 { cn1-derive: Label; color: #79747e; }
+
+/* Material 3 dialogs use surface-container-highest (#e6e0e9) so the
+   dialog sits visibly above the surface background (#fef7ff). All
+   Dialog sub-UIIDs (Body / Title / ContentPane / CommandArea) are
+   transparent so the Dialog's surface paints once - otherwise each
+   sub-region's bgColor draws over Dialog's and reads as a
+   visibly different shade in the rounded corners. */
+/* margin: 0 - see iOS Modern Dialog rule for the rationale. A non-zero
+   margin here forced Dialog.show() to grow the dialog to screen size
+   with the body floating in mostly empty space. */
+Dialog {
+    background-color: #e6e0e9;
+    color: #1d1b20;
+    padding: 2mm;
+    margin: 0;
+    border-radius: 6mm;
+}
+DialogBody {
+    background-color: transparent;
+    color: #1d1b20;
+    padding: 1.5mm;
+    margin: 0;
+}
+DialogTitle {
+    color: #1d1b20;
+    background-color: transparent;
+    padding: 1.5mm 2mm 1.5mm 2mm;
+    font-family: "native:MainBold";
+    font-size: 4mm;
+}
+DialogContentPane { background-color: transparent; padding: 2mm; margin: 0; }
+DialogCommandArea { background-color: transparent; padding: 1mm; }
+
+FloatingActionButton {
+    color: #21005d;
+    background-color: #eaddff;
+    padding: 3mm;
+    margin: 3mm;
+    font-family: "native:MainBold";
+    cn1-background-type: cn1-pill-border;
+}
+FloatingActionButton.pressed { background-color: #d0bcff; }
+
+Separator { background-color: #cac4d0; padding: 0; margin: 0; }
+PopupContent {
+    background-color: #e6e0e9;
+    color: #1d1b20;
+    padding: 2mm;
+    margin: 0;
+    border-radius: 7mm;
+}
+
+@media (prefers-color-scheme: dark) {
+    Component { color: #e6e0e9; background-color: #141218; }
+    Form { background-color: #141218; padding: 0; margin: 0; }
+    ContentPane { background-color: #141218; padding: 0; margin: 0; }
+
+    Label { color: #e6e0e9; background-color: transparent; }
+    SecondaryLabel { color: #cac4d0; background-color: transparent; }
+    TertiaryLabel { color: #938f99; background-color: transparent; }
+    SpanLabel { color: #e6e0e9; background-color: transparent; }
+    SpanLabelText { color: #e6e0e9; background-color: transparent; }
+
+    /* Re-declare cn1-background-type on each dark Button override -
+       the compiler doesn't carry the light declaration's pill border
+       forward into the $Dark<UIID> entries. */
+    Button { color: #381e72; background-color: #d0bcff; cn1-background-type: cn1-pill-border; }
+    Button.pressed { background-color: #4f378b; color: #eaddff; cn1-background-type: cn1-pill-border; }
+    Button.disabled { color: #5c5967; background-color: #2b2930; cn1-background-type: cn1-pill-border; }
+
+    RaisedButton { color: #eaddff; background-color: #4f378b; cn1-background-type: cn1-pill-border; }
+    RaisedButton.pressed { color: #eaddff; background-color: #6750a4; cn1-background-type: cn1-pill-border; }
+    RaisedButton.disabled { background-color: #2b2930; color: #5c5967; cn1-background-type: cn1-pill-border; }
+
+    FlatButton { color: #d0bcff; background-color: transparent; cn1-background-type: cn1-pill-border; }
+    FlatButton.pressed { background-color: #4f378b; color: #eaddff; cn1-background-type: cn1-pill-border; }
+
+    TextField { color: #e6e0e9; background-color: #211f26; }
+    TextField.pressed { background-color: #49454f; }
+    TextField.disabled { color: #5c5967; background-color: #2b2930; }
+    TextArea { color: #e6e0e9; background-color: #211f26; }
+    TextArea.pressed { background-color: #49454f; }
+    TextArea.disabled { color: #5c5967; background-color: #2b2930; }
+    TextHint { color: #938f99; }
+
+    CheckBox { color: #e6e0e9; background-color: transparent; }
+    CheckBox.selected { color: #d0bcff; }
+    CheckBox.disabled { color: #5c5967; background-color: #2b2930; }
+    RadioButton { color: #e6e0e9; background-color: transparent; }
+    RadioButton.selected { color: #d0bcff; }
+    RadioButton.disabled { color: #5c5967; background-color: #2b2930; }
+
+    Switch { color: #938f99; background-color: #49454f; }
+    Switch.selected { color: #381e72; background-color: #d0bcff; }
+    Switch.disabled { color: #5c5967; background-color: #2b2930; }
+
+    OnOffSwitch { color: #381e72; background-color: #49454f; }
+    OnOffSwitch.selected { background-color: #d0bcff; color: #381e72; }
+
+    Toolbar { background-color: #141218; color: #e6e0e9; }
+    TitleArea { background-color: #141218; color: #e6e0e9; }
+    Title { color: #e6e0e9; background-color: #141218; }
+    MainTitle { color: #e6e0e9; background-color: #141218; }
+    BackCommand { color: #d0bcff; background-color: transparent; }
+    TitleCommand { color: #d0bcff; background-color: transparent; }
+
+    Tabs { background-color: #141218; }
+    TabsContainer { background-color: #141218; color: #e6e0e9; }
+    Tab { color: #cac4d0; background-color: #141218; }
+    Tab.selected { color: #d0bcff; background-color: #141218; }
+    Tab.pressed { color: #eaddff; background-color: #4f378b; }
+    SelectedTab { color: #d0bcff; }
+    UnselectedTab { color: #cac4d0; }
+
+    SideNavigationPanel { background-color: #141218; }
+    SideCommand { color: #e6e0e9; background-color: transparent; }
+    SideCommand.pressed { background-color: #4f378b; }
+
+    List { background-color: #141218; }
+    ListRenderer { color: #e6e0e9; background-color: transparent; }
+    MultiButton { background-color: #141218; color: #e6e0e9; }
+    MultiButton.pressed { background-color: #4f378b; }
+    MultiLine1 { color: #e6e0e9; }
+    MultiLine2 { color: #cac4d0; }
+    MultiLine3 { color: #938f99; }
+    MultiLine4 { color: #938f99; }
+
+    Dialog { background-color: #211f26; color: #e6e0e9; }
+    DialogBody { background-color: #211f26; color: #e6e0e9; }
+    DialogTitle { color: #e6e0e9; background-color: #211f26; }
+    DialogContentPane { background-color: #211f26; }
+    DialogCommandArea { background-color: #211f26; }
+    PopupContent { background-color: #211f26; color: #e6e0e9; }
+
+    FloatingActionButton { color: #eaddff; background-color: #4f378b; }
+    FloatingActionButton.pressed { background-color: #d0bcff; }
+
+    Separator { background-color: #49454f; }
+}

@@ -17,13 +17,13 @@ Codename One is much more than an API library. It provides a full tool-chain and
 No reflection::
 Codename One apps don't support reflection because reflection makes it impossible to keep app-size down.
 
-=== Kotlin API Support
+=== Kotlin API support
 
-Codename One apps support the https://kotlinlang.org/api/latest/jvm/stdlib/[Kotlin Standard Library]. Kotlin support is still relatively new, so are still discovering which libraries are compatible. APIs that rely on reflection won't be supported, but most other libraries should work.
+Codename One apps support the https://kotlinlang.org/api/latest/jvm/stdlib/[Kotlin Standard Library]. Kotlin support is still new, so are still discovering which libraries are compatible. APIs that rely on reflection won't be supported, but most other libraries should work.
 
-=== Add-on Libraries
+=== Add-on libraries
 
-Add-on libraries can be added to your library in the common/pom.xml file, however, if you use APIs that aren't supported by Codename One (e.g. which use reflection), then your app will fail to build.
+Add-on libraries can be added to your library in the common/pom.xml file, but, if you use APIs that aren't supported by Codename One (for example, which use reflection), then your app will fail to build.
 
 Codename One supports its own library format (cn1lib) which sort of "certifies" that it's compatible with Codename One. You can browse the growing catalog of available cn1libs inside <<settings,Codename One Settings>>.
 

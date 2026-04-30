@@ -49,6 +49,7 @@ public class FacebookImpl extends FacebookConnect {
     }
 
     @Override
+    @SuppressWarnings("deprecation")
     public void login() {
         loginCompleted = false;
         loginCancelled = false;

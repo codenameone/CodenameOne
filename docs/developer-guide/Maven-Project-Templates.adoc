@@ -1,11 +1,11 @@
 [#creating-project-templates]
-== Creating Project Templates
+== Creating project templates
 
 A project template is a Codename One application project that can be used as a starting point for building a Codename One application. https://start.codenameone.com[Codename One initializr] uses project templates to generate starter projects for Codename One applications. You can also use the <<generate-app-project>> goal to generate starter projects from templates directly in Maven.
 
 Any Codename One project can be converted into a project template.
 
-=== Converting a Codename One Application Project into a Project template
+=== Converting a Codename One application project into a project template
 
 If you've an existing maven Codename One application project, you can convert it into a project template by adding a file named `generate-app-project.rpf` in the root directory of the project.
 
@@ -43,11 +43,11 @@ Paste any maven dependencies that the parent project requires into this section.
 
 See <<sample-generate-app-project-file>> for a more concrete example of the `generate-app-project.rpf`.
 
-=== Test your Project Template
+=== Test your project template
 
 You can test your project template by using it as the `sourceProject` parameter for the `generate-app-project` goal. See <<generate-app-project>>.
 
-=== Add Your Template to Codename One Intializr
+=== Add your template to Codename One intializr
 
 If you've a project template that you want to share with the community, please file an issue in the https://github.com/codenameone/CodenameOne/issues[Codename One issue tracker] with a link to a Github Repository of your project template, and request to have it added https://start.codenameone.com[Codename One initializr].
 

@@ -36,6 +36,8 @@ import java.util.Properties;
  * @author shai
  */
 public class SortedProperties extends Properties {
+    private static final long serialVersionUID = 1L;
+
     /**
      * Stores properties to the specified {@code OutputStream}, using ISO-8859-1.
      * See "<a href="#character_encoding">Character Encoding</a>".

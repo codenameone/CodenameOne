@@ -305,6 +305,7 @@ class BSHAllocationExpression extends SimpleNode
                 // clean up, prevent memory leak
                 This.registerConstructorContext(null, null);
         }
+        com.codenameone.playground.PlaygroundContext.notifyConstructed(obj);
         String className = type.getName();
         // Is it an inner class?
         if ( className.indexOf("$") == -1 )

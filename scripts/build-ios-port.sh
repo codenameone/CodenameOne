@@ -37,4 +37,13 @@ if [ ! -f "$BUILD_CLIENT" ]; then
   fi
 fi
 
+# Compile native CSS themes (iOSModernTheme.res) and copy into the iOS port's
+# native sources so the Maven iOS build packages them into nativeios.jar. The
+# iOS runtime falls back to iOS7Theme.res when iOSModernTheme.res is missing,
+# which loses all $DarkUIID entries (dark mode appears broken) and the liquid-
+# glass styling — so make sure this runs before the port is built.
+./scripts/build-native-themes.sh
+mkdir -p Ports/iOSPort/nativeSources
+cp Themes/iOSModernTheme.res Ports/iOSPort/nativeSources/iOSModernTheme.res
+
 "$MAVEN_HOME/bin/mvn" -q -f maven/pom.xml -pl ios -am -Djava.awt.headless=true clean install "$@"

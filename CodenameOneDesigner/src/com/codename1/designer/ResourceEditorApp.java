@@ -37,6 +37,7 @@ import com.codename1.impl.javase.CN1Bootstrap;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.resource.util.QuitAction;
 import com.codename1.ui.util.EditableResources;
+import com.codename1.ui.util.EditableResourcesEditor;
 import com.codename1.ui.util.Resources;
 import com.codename1.ui.util.UIBuilderOverride;
 import java.awt.BorderLayout;
@@ -298,7 +299,7 @@ public class ResourceEditorApp extends SingleFrameApplication {
                                 
                 boolean isXMLEnabled = Preferences.userNodeForPackage(ResourceEditorView.class).getBoolean("XMLFileMode", true);
                 EditableResources.setXMLEnabled(isXMLEnabled);
-                EditableResources res = new EditableResources();
+                EditableResources res = new EditableResourcesEditor();
                 File resourceFile = new File(args[1]);
                 res.openFileWithXMLSupport(resourceFile);
                 
@@ -424,7 +425,7 @@ public class ResourceEditorApp extends SingleFrameApplication {
                 
                 boolean isXMLEnabled = Preferences.userNodeForPackage(ResourceEditorView.class).getBoolean("XMLFileMode", true);
                 EditableResources.setXMLEnabled(isXMLEnabled);
-                EditableResources res = new EditableResources();
+                EditableResources res = new EditableResourcesEditor();
                 
                 res.openFileWithXMLSupport(resourceFile);
                 res.setImage(imageName, img);
@@ -499,7 +500,7 @@ public class ResourceEditorApp extends SingleFrameApplication {
                 
                 boolean isXMLEnabled = Preferences.userNodeForPackage(ResourceEditorView.class).getBoolean("XMLFileMode", true);
                 EditableResources.setXMLEnabled(isXMLEnabled);
-                EditableResources res = new EditableResources();
+                EditableResources res = new EditableResourcesEditor();
                 
                 res.openFileWithXMLSupport(resourceFile);
                 AddAndScaleMultiImage.generateImpl(new File[] {imageFile}, 
@@ -524,7 +525,7 @@ public class ResourceEditorApp extends SingleFrameApplication {
                 com.codename1.ui.Display.init(cnt);
                 File projectDir = new File(args[1]);
                 EditableResources.setXMLEnabled(true);
-                EditableResources res = new EditableResources();
+                EditableResources res = new EditableResourcesEditor();
                 res.openFileWithXMLSupport(new File(args[2]));
                 migrateGuiBuilder(projectDir, res, args[3]);
                 System.exit(0);
@@ -535,7 +536,7 @@ public class ResourceEditorApp extends SingleFrameApplication {
                 com.codename1.ui.Display.init(cnt);
                 File output = new File(args[1]);
                 EditableResources.setXMLEnabled(true);
-                EditableResources res = new EditableResources();
+                EditableResources res = new EditableResourcesEditor();
                 res.openFileWithXMLSupport(output);
                 FileOutputStream fos = new FileOutputStream(output);
                 res.save(fos);
@@ -550,7 +551,7 @@ public class ResourceEditorApp extends SingleFrameApplication {
                     com.codename1.ui.Display.init(cnt);
                     File output = new File(args[1]);
                     EditableResources.setXMLEnabled(true);
-                    EditableResources res = new EditableResources();
+                    EditableResources res = new EditableResourcesEditor();
                     res.openFileWithXMLSupport(output);
                     FileOutputStream fos = new FileOutputStream(output);
                     res.save(fos);
@@ -579,7 +580,7 @@ public class ResourceEditorApp extends SingleFrameApplication {
     
     private static void generateResourceFile(File f, String themeName, String ui) throws Exception {        
         System.out.println("Generating resource file " + f + " theme " + themeName + " template " + ui);
-        EditableResources res = new EditableResources();
+        EditableResources res = new EditableResourcesEditor();
         
         //"native", "leather", "tzone", "tipster", "blank"
         String template = "Native_Theme";
@@ -1232,7 +1233,7 @@ public class ResourceEditorApp extends SingleFrameApplication {
         Hashtable theme = new Hashtable();
         if(is != null) {
             try {
-                EditableResources r = new EditableResources();
+                EditableResources r = new EditableResourcesEditor();
                 r.openFile(is);
                 is.close();
                 if(r.getThemeResourceNames().length > 0) {

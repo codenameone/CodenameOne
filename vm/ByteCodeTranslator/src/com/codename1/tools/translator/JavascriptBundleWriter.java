@@ -169,12 +169,18 @@ final class JavascriptBundleWriter {
             Files.createDirectories(target);
             try (DirectoryStream<Path> stream = Files.newDirectoryStream(source)) {
                 for (Path child : stream) {
-                    copyPathIfPresent(child, target.resolve(child.getFileName().toString()));
+                    Path childName = child.getFileName();
+                    if (childName != null) {
+                        copyPathIfPresent(child, target.resolve(childName.toString()));
+                    }
                 }
             }
             return;
         }
-        Files.createDirectories(target.getParent());
+        Path parent = target.getParent();
+        if (parent != null) {
+            Files.createDirectories(parent);
+        }
         Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
     }
 

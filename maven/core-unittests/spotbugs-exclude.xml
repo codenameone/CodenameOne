@@ -282,6 +282,17 @@
         <Bug pattern="EQ_COMPARETO_USE_OBJECT_EQUALS" />
     </Match>
 
+    <!--
+    MutableResource.saveL10N iterates the L10N Hashtable via keys() to produce the
+    serialized output. The surrounding format relies on that key-ordered loop; the
+    map is small and this is not a hot path.
+    -->
+    <Match>
+        <Class name="com.codename1.ui.util.MutableResource" />
+        <Method name="saveL10N" />
+        <Bug pattern="WMI_WRONG_MAP_ITERATOR" />
+    </Match>
+
     <!-- Excluded classes... -->
 
     <!-- Badly written 3rd party class -->

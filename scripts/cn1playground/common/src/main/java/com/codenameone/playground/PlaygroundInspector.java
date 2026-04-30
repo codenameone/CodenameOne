@@ -1,41 +1,49 @@
 package com.codenameone.playground;
 
+import com.codename1.components.SplitPane;
 import com.codename1.ui.Button;
 import com.codename1.ui.CheckBox;
-import com.codename1.ui.ComboBox;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
+import com.codename1.ui.Display;
+import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
-import com.codename1.ui.List;
 import com.codename1.ui.Painter;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
-import com.codename1.ui.events.ActionEvent;
-import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.plaf.Style;
-import com.codename1.ui.table.TableLayout;
-import com.codename1.ui.tree.Tree;
-import com.codename1.ui.tree.TreeModel;
 import com.codename1.ui.util.UITimer;
 
-import java.util.Vector;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Consumer;
 
+/// Component inspector panel.
+///
+/// Laid out per the redesign spec: tree at the top with chevrons + outlined
+/// type icons indented by nesting depth, then a single-column form split
+/// into IDENTITY / CONTENT / APPEARANCE / LAYOUT sections. Each section opens
+/// with an uppercase divider label; fields are label-on-left (22 mm fixed
+/// width) + input-on-right. Multi-value numeric fields (bounds / padding /
+/// margin) render as 4 sub-inputs plus a micro-label row directly beneath.
+/// Units pick from a horizontal segmented control. Colour fields pair a hex
+/// input with a live 9 mm swatch.
 final class PlaygroundInspector {
     interface Listener {
         void onComponentPropertyChanged(Component component, String property, Object value);
     }
 
     private static final String EMPTY_TREE_LABEL = "Run code to see component tree";
-    private static final String[] UNIT_NAMES = {"Pixels", "Dips", "% Screen", "VW", "VH"};
-    private static final byte[] UNIT_VALUES = {Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_SCREEN_PERCENTAGE, Style.UNIT_TYPE_VW, Style.UNIT_TYPE_VH};
+    private static final String[] UNIT_NAMES = {"Dips", "Pixels"};
+    private static final byte[] UNIT_VALUES = {Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_PIXELS};
 
     private final Container component;
-    private final Tree tree;
+    private final Container treeContainer;
     private final Container propertiesContainer;
     private final Listener listener;
     private Component selectedComponent;
@@ -44,14 +52,39 @@ final class PlaygroundInspector {
     private Painter originalGlassPane;
     private boolean darkMode;
     private UITimer highlightTimer;
+    private final java.util.Set<Component> expanded = new java.util.HashSet<Component>();
 
     PlaygroundInspector(boolean darkMode, Listener listener) {
         this.darkMode = darkMode;
         this.listener = listener;
-        tree = createTree();
-        propertiesContainer = createPropertiesContainer();
-        component = createLayout();
+
+        treeContainer = new Container(BoxLayout.y());
+        treeContainer.setScrollableY(true);
+
+        // propertiesContainer is the non-scrollable inner content we mutate on
+        // selection. A dedicated scroll wrapper sits between it and the SplitPane
+        // bottom pane so the scroll state is never recreated when content changes.
+        // BoxLayout.y on the wrapper (not BorderLayout.NORTH) so overflow extends
+        // downward and scrollableY actually engages.
+        propertiesContainer = new Container(BoxLayout.y());
+        Container propertiesScroll = new Container(BoxLayout.y());
+        propertiesScroll.setScrollableY(true);
+        propertiesScroll.add(propertiesContainer);
+
+        SplitPane.Settings settings = new SplitPane.Settings(
+                SplitPane.VERTICAL_SPLIT, "30%", "50%", "70%")
+                .showExpandCollapseButtons(false)
+                .showDragHandle(false)
+                .dividerThicknessMM(0.8f)
+                .dividerUIID("PlaygroundSplitDivider");
+        SplitPane split = new SplitPane(settings, treeContainer, propertiesScroll);
+
+        component = new Container(new BorderLayout());
+        component.setUIID(darkMode ? "PlaygroundInspectorRootDark" : "PlaygroundInspectorRoot");
+        component.add(BorderLayout.CENTER, split);
+
         applyTheme(darkMode);
+        rebuildTree();
         updatePropertyPanel(null);
     }
 
@@ -66,127 +99,142 @@ final class PlaygroundInspector {
 
     void applyTheme(boolean darkMode) {
         this.darkMode = darkMode;
-        applyThemeToInspectorComponent(component, darkMode);
+        component.setUIID(darkMode ? "PlaygroundInspectorRootDark" : "PlaygroundInspectorRoot");
+        int panelBg = darkMode ? 0x0A1D3A : 0xFFFFFF;
+        treeContainer.getAllStyles().setBgColor(panelBg);
+        treeContainer.getAllStyles().setBgTransparency(255);
+        propertiesContainer.getAllStyles().setBgColor(panelBg);
+        propertiesContainer.getAllStyles().setBgTransparency(255);
+
+        // Inline breathing-room padding - the root UIID is padding-less so the
+        // SplitPane divider can span the full panel width.
+        treeContainer.getAllStyles().setPaddingUnit(Style.UNIT_TYPE_DIPS);
+        treeContainer.getAllStyles().setPadding(1, 1, 2, 2);
+        propertiesContainer.getAllStyles().setPaddingUnit(Style.UNIT_TYPE_DIPS);
+        propertiesContainer.getAllStyles().setPadding(1, 2, 2, 2);
+
         rebuildTree();
         updatePropertyPanel(selectedComponent);
     }
 
-    private void applyThemeToInspectorComponent(Component cmp, boolean dark) {
-        if (cmp == null) {
-            return;
-        }
-
-        String uiid = cmp.getUIID();
-        if (uiid != null && supportsDarkVariant(uiid)) {
-            if (dark && !uiid.endsWith("Dark")) {
-                cmp.setUIID(uiid + "Dark");
-            } else if (!dark && uiid.endsWith("Dark")) {
-                cmp.setUIID(uiid.substring(0, uiid.length() - 4));
-            }
-        }
-
-        if (cmp instanceof Container) {
-            Container cnt = (Container) cmp;
-            for (int i = 0; i < cnt.getComponentCount(); i++) {
-                applyThemeToInspectorComponent(cnt.getComponentAt(i), dark);
-            }
-        }
+    private String uiidDark(String base) {
+        return darkMode ? base + "Dark" : base;
     }
 
-    private boolean supportsDarkVariant(String uiid) {
-        switch (uiid) {
-            case "PlaygroundInspectorRoot":
-            case "PlaygroundInspectorTree":
-            case "PlaygroundInspectorProps":
-            case "PlaygroundPropName":
-            case "PlaygroundPropValue":
-            case "PlaygroundPropSmall":
-            case "PlaygroundPropUnit":
-            case "PlaygroundPropEmpty":
-            case "PlaygroundColorPreview":
-                return true;
-            default:
-                return false;
-        }
-    }
-
-    private Tree createTree() {
-        Tree t = new Tree(new EmptyTreeModel()) {
-            @Override
-            protected String childToDisplayLabel(Object child) {
-                if (child instanceof ComponentWrapper) {
-                    return ((ComponentWrapper) child).getDisplayText();
-                }
-                return String.valueOf(child);
-            }
-
-            @Override
-            protected Component createNode(Object node, int depth) {
-                Component c = super.createNode(node, depth);
-                if (c != null) {
-                    Style s = c.getAllStyles();
-                    s.setPaddingTop(0);
-                    s.setPaddingBottom(0);
-                    s.setPaddingLeft(depth * 4);
-                    s.setPaddingRight(2);
-                    s.setMarginTop(0);
-                    s.setMarginBottom(0);
-
-                    if (c instanceof Button) {
-                        c.setUIID(darkMode ? "PlaygroundInspectorTreeNodeDark" : "PlaygroundInspectorTreeNode");
-                        final Object nodeObj = node;
-                        ((Button) c).addActionListener(e -> {
-                            if (nodeObj instanceof ComponentWrapper) {
-                                handleComponentSelected(((ComponentWrapper) nodeObj).component);
-                            }
-                        });
-                    } else {
-                        c.setUIID(darkMode ? "PlaygroundInspectorTreeNodeDark" : "PlaygroundInspectorTreeNode");
-                    }
-                }
-                return c;
-            }
-        };
-        t.setUIID("PlaygroundInspectorTree");
-        return t;
-    }
-
-    private Container createPropertiesContainer() {
-        Container c = new Container(new TableLayout(0, 4));
-        c.setScrollableY(true);
-        c.setUIID("PlaygroundInspectorProps");
-        return c;
-    }
-
-    private Container createLayout() {
-        Container root = new Container(new GridLayout(2, 1));
-        root.setUIID("PlaygroundInspectorRoot");
-        root.addAll(tree, propertiesContainer);
-        return root;
-    }
+    // ============================================================
+    // Tree
+    // ============================================================
 
     private void rebuildTree() {
+        treeContainer.removeAll();
         if (previewRoot == null) {
-            tree.setModel(new EmptyTreeModel());
-            selectedComponent = null;
-            updatePropertyPanel(null);
+            Label empty = new Label(EMPTY_TREE_LABEL);
+            empty.setUIID(uiidDark("PlaygroundPropEmpty"));
+            treeContainer.add(empty);
+            if (treeContainer.getComponentForm() != null) {
+                treeContainer.revalidate();
+            }
             return;
         }
-        tree.setModel(new ComponentTreeModel(previewRoot));
+        buildTreeRows(previewRoot, 0);
+        if (treeContainer.getComponentForm() != null) {
+            treeContainer.revalidate();
+        }
     }
 
-    private void handleComponentSelected(Component component) {
-        selectedComponent = component;
-        highlightComponent(component);
-        updatePropertyPanel(component);
+    private void buildTreeRows(Component c, int depth) {
+        if (c == null) {
+            return;
+        }
+        treeContainer.add(createTreeRow(c, depth));
+        if (c instanceof Container && isExpanded(c)) {
+            Container cnt = (Container) c;
+            for (int i = 0; i < cnt.getComponentCount(); i++) {
+                buildTreeRows(cnt.getComponentAt(i), depth + 1);
+            }
+        }
     }
 
-    private void highlightComponent(Component component) {
-        if (component == null) {
+    private boolean isExpanded(Component c) {
+        // Default: root is expanded, everything else collapsed.
+        return expanded.contains(c) || c == previewRoot;
+    }
+
+    private Container createTreeRow(Component c, int depth) {
+        boolean isContainer = c instanceof Container;
+        boolean selected = c == selectedComponent;
+        String rowUiid = uiidDark(selected ? "PlaygroundTreeRowActive" : "PlaygroundTreeRow");
+
+        Container row = new Container(new BorderLayout());
+        row.setUIID(rowUiid);
+
+        Button chevron = new Button();
+        chevron.setUIID(uiidDark("PlaygroundTreeChevron"));
+        if (isContainer) {
+            char arrow = isExpanded(c) ? FontImage.MATERIAL_EXPAND_MORE : FontImage.MATERIAL_CHEVRON_RIGHT;
+            FontImage.setMaterialIcon(chevron, arrow, 2.6f);
+            chevron.addActionListener(e -> {
+                if (isExpanded(c) && c != previewRoot) {
+                    expanded.remove(c);
+                } else {
+                    expanded.add(c);
+                }
+                rebuildTree();
+            });
+        } else {
+            chevron.setVisible(false);
+            chevron.setHidden(true);
+        }
+
+        // Button-in-CENTER: works reliably inside a scrollable container where
+        // a Container pointer-listener does not (the outer scroll swallows the
+        // drag gestures). The Button stretches to fill CENTER, giving the full
+        // row width as a click target.
+        String text = c.getClass().getSimpleName() + extractBracket(c);
+        Button body = new Button(text);
+        body.setUIID(uiidDark(selected ? "PlaygroundTreeTypeActive" : "PlaygroundTreeType"));
+        char typeChar = isContainer ? FontImage.MATERIAL_FOLDER_OPEN : FontImage.MATERIAL_ARTICLE;
+        FontImage.setMaterialIcon(body, typeChar, 3f);
+        body.setTextPosition(Component.RIGHT);
+        body.setGap(Display.getInstance().convertToPixels(1f));
+        body.setAlignment(Component.LEFT);
+        body.addActionListener(e -> handleComponentSelected(c));
+
+        float indentMm = 2f + depth * 3.8f;
+        row.getAllStyles().setPaddingUnit(Style.UNIT_TYPE_DIPS);
+        row.getAllStyles().setPaddingLeft((int) indentMm);
+        row.getAllStyles().setPaddingRight(1);
+        row.getAllStyles().setPaddingTop(0);
+        row.getAllStyles().setPaddingBottom(0);
+        int rowH = Display.getInstance().convertToPixels(6f);
+        row.setPreferredH(rowH);
+
+        row.add(BorderLayout.WEST, chevron);
+        row.add(BorderLayout.CENTER, body);
+        return row;
+    }
+
+    private static String extractBracket(Component c) {
+        String uiid = c.getUIID();
+        String typeName = c.getClass().getSimpleName();
+        if (uiid != null && uiid.length() > 0 && !uiid.equals(typeName)) {
+            return " [" + uiid + "]";
+        }
+        return "";
+    }
+
+    private void handleComponentSelected(Component c) {
+        selectedComponent = c;
+        highlightComponent(c);
+        updatePropertyPanel(c);
+    }
+
+    private void highlightComponent(Component c) {
+        if (c == null) {
             clearHighlight();
             return;
         }
-        Form form = component.getComponentForm();
+        Form form = c.getComponentForm();
         if (form == null) {
             clearHighlight();
             return;
@@ -194,9 +242,10 @@ final class PlaygroundInspector {
         clearHighlight();
         glassPaneForm = form;
         originalGlassPane = form.getGlassPane();
-        form.setGlassPane(new HighlightPainter(component, darkMode));
-        form.repaint();
-        
+        form.setGlassPane(new HighlightPainter(c, darkMode));
+        // No explicit form.repaint() - CN1 paints the new glass pane on the
+        // next natural frame. An explicit repaint here was fighting the Button
+        // press animation and the pending inspector revalidate.
         if (highlightTimer != null) {
             highlightTimer.cancel();
         }
@@ -209,48 +258,57 @@ final class PlaygroundInspector {
     private void clearHighlight() {
         if (glassPaneForm != null) {
             glassPaneForm.setGlassPane(originalGlassPane);
-            glassPaneForm.repaint();
             glassPaneForm = null;
         }
         originalGlassPane = null;
     }
+
+    // ============================================================
+    // Property panel
+    // ============================================================
 
     private void updatePropertyPanel(Component comp) {
         propertiesContainer.removeAll();
 
         if (comp == null) {
             Label empty = new Label("Select a component");
-            empty.setUIID("PlaygroundPropEmpty");
+            empty.setUIID(uiidDark("PlaygroundPropEmpty"));
             propertiesContainer.add(empty);
             propertiesContainer.revalidate();
             return;
         }
 
-        addRow("Type", comp.getClass().getSimpleName(), false, null);
-        addRow("UIID", comp.getUIID(), true, v -> {
+        addSectionHeader("IDENTITY");
+        addTextRow("Type", comp.getClass().getSimpleName(), false, null);
+        addTextRow("UIID", comp.getUIID(), true, v -> {
             comp.setUIID(v);
             notifyChange(comp, "uiid");
         });
+        addTextRow("Name", comp.getName() == null ? "" : comp.getName(), true, v -> {
+            comp.setName(v);
+            notifyChange(comp, "name");
+        });
 
+        // CONTENT only appears when the selected component actually has editable
+        // text, so we never render an empty "Text: -" placeholder.
+        String textValue = null;
+        Consumer<String> textSetter = null;
         if (comp instanceof Label) {
-            addRow("Text", ((Label) comp).getText(), true, v -> {
-                ((Label) comp).setText(v);
-                notifyChange(comp, "text");
-            });
+            textValue = ((Label) comp).getText();
+            textSetter = v -> { ((Label) comp).setText(v); notifyChange(comp, "text"); };
         } else if (comp instanceof TextField) {
-            addRow("Text", ((TextField) comp).getText(), true, v -> {
-                ((TextField) comp).setText(v);
-                notifyChange(comp, "text");
-            });
+            textValue = ((TextField) comp).getText();
+            textSetter = v -> { ((TextField) comp).setText(v); notifyChange(comp, "text"); };
         } else if (comp instanceof TextArea) {
-            addRow("Text", ((TextArea) comp).getText(), true, v -> {
-                ((TextArea) comp).setText(v);
-                notifyChange(comp, "text");
-            });
+            textValue = ((TextArea) comp).getText();
+            textSetter = v -> { ((TextArea) comp).setText(v); notifyChange(comp, "text"); };
+        }
+        if (textSetter != null) {
+            addSectionHeader("CONTENT");
+            addTextRow("Text", textValue == null ? "" : textValue, true, textSetter);
         }
 
-        addBoundsRow(comp);
-
+        addSectionHeader("APPEARANCE");
         Style s = comp.getUnselectedStyle();
         addColorRow("Background", s.getBgColor(), s.getBgTransparency(), (color, alpha) -> {
             Style a = comp.getAllStyles();
@@ -263,138 +321,226 @@ final class PlaygroundInspector {
             notifyChange(comp, "fg");
         });
 
-        String layoutName = "-";
-        if (comp instanceof Container cnt) {
-            if (cnt.getLayout() != null) {
-                layoutName = cnt.getLayout().getClass().getSimpleName();
-            }
-        }
-        addRow("Layout", layoutName, false, null);
-
-        addPaddingMarginRow("Padding", s, true);
-        addPaddingMarginRow("Margin", s, false);
-
-        if (comp.getParent() != null) {
-            Container parent = comp.getParent();
-            if (parent.getLayout() instanceof BorderLayout) {
-                Object constraint = comp.getClientProperty("layoutConstraint");
-                String constraintStr = constraint == null ? "Center" : constraint.toString();
-                addRow("Constraint", constraintStr, true, v -> {
-                    comp.putClientProperty("layoutConstraint", v);
-                    parent.revalidate();
-                    notifyChange(comp, "constraint");
+        addSectionHeader("LAYOUT");
+        addMultiValueRow("Bounds",
+                new int[]{comp.getX(), comp.getY(), comp.getWidth(), comp.getHeight()},
+                new String[]{"X", "Y", "Width", "Height"},
+                vals -> {
+                    comp.setX(vals[0]);
+                    comp.setY(vals[1]);
+                    comp.setWidth(vals[2]);
+                    comp.setHeight(vals[3]);
+                    notifyChange(comp, "bounds");
                 });
-            }
-        }
-
+        addPaddingMarginRow("Padding", s, true);
+        addUnitSegmented("Padding units", getUnit(s.getPaddingUnit()), unit -> {
+            s.setPaddingUnit(unit);
+            notifyChange(comp, "padding");
+        });
+        addPaddingMarginRow("Margin", s, false);
+        addUnitSegmented("Margin units", getUnit(s.getMarginUnit()), unit -> {
+            s.setMarginUnit(unit);
+            notifyChange(comp, "margin");
+        });
         addBooleanRow("Visible", comp.isVisible(), v -> {
             comp.setVisible(v);
             notifyChange(comp, "visible");
         });
 
-        applyThemeToInspectorComponent(propertiesContainer, darkMode);
+        // propertiesContainer is now a non-scrollable inner content Container
+        // wrapped inside propertiesScroll. Mutating propertiesContainer never
+        // disturbs the scroll wrapper's layout state, so a plain revalidate
+        // re-lays out the new children reliably.
         propertiesContainer.revalidate();
     }
 
-    private void addRow(String name, String value, boolean editable, java.util.function.Consumer<String> callback) {
-        Label nameLabel = new Label(name);
-        nameLabel.setUIID("PlaygroundPropName");
-        addProperty(nameLabel);
+    // ============================================================
+    // Field builders
+    // ============================================================
 
+    private int mm(float v) {
+        return Display.getInstance().convertToPixels(v);
+    }
+
+    private void addSectionHeader(String title) {
+        Label header = new Label(title);
+        header.setUIID(uiidDark("PlaygroundInspectorSection"));
+        propertiesContainer.add(header);
+    }
+
+    private Container baseFieldRow(String labelText) {
+        Container row = new Container(new BorderLayout());
+        row.setUIID(uiidDark("PlaygroundFieldRow"));
+        row.getAllStyles().setMarginUnit(Style.UNIT_TYPE_DIPS);
+        row.getAllStyles().setMargin(1, 0, 0, 0);
+
+        Label label = new Label(labelText);
+        label.setUIID(uiidDark("PlaygroundFieldLabel"));
+        // Spec's 22 mm label-column rendered as CSS-px-sized 12 mm -- spec values
+        // were in design-doc mm which at CN1's physical-mm are roughly 2x too big.
+        label.setPreferredW(mm(12));
+
+        row.add(BorderLayout.WEST, label);
+        return row;
+    }
+
+    private void addTextRow(String label, String value, boolean editable, Consumer<String> callback) {
+        Container row = baseFieldRow(label);
         if (editable && callback != null) {
             TextField field = new TextField(value == null ? "" : value);
-            field.setUIID("PlaygroundPropValue");
+            field.setUIID(uiidDark("PlaygroundFieldInput"));
             field.setSingleLineTextArea(true);
-            field.addDataChangedListener((type, index) -> callback.accept(field.getText()));
-            addProperty(field);
+            field.addDataChangedListener((t, i) -> callback.accept(field.getText()));
+            row.add(BorderLayout.CENTER, field);
         } else {
-            Label valueLabel = new Label(value == null ? "" : value);
-            valueLabel.setUIID("PlaygroundPropValue");
-            addProperty(valueLabel);
+            Label v = new Label(value == null ? "" : value);
+            v.setUIID(uiidDark("PlaygroundFieldReadOnly"));
+            row.add(BorderLayout.CENTER, v);
         }
+        propertiesContainer.add(row);
     }
 
-    private void addBoundsRow(Component comp) {
-        Label nameLabel = new Label("Bounds");
-        nameLabel.setUIID("PlaygroundPropName");
-        addProperty(nameLabel);
+    private void addColorRow(String labelText, int color, int alpha, ColorCallback callback) {
+        int safeAlpha = clampAlpha(alpha);
+        Container row = baseFieldRow(labelText);
 
-        Container fields = new Container(new GridLayout(1, 4));
-        fields.setUIID("PlaygroundPropGroup");
-
-        TextField xField = addSmallField(fields, String.valueOf(comp.getX()), true);
-        TextField yField = addSmallField(fields, String.valueOf(comp.getY()), true);
-        TextField wField = addSmallField(fields, String.valueOf(comp.getWidth()), true);
-        TextField hField = addSmallField(fields, String.valueOf(comp.getHeight()), true);
-
-        xField.addDataChangedListener((t, i) -> {
-            comp.setX(parseInt(xField.getText(), comp.getX()));
-            notifyChange(comp, "bounds");
-        });
-        yField.addDataChangedListener((t, i) -> {
-            comp.setY(parseInt(yField.getText(), comp.getY()));
-            notifyChange(comp, "bounds");
-        });
-        wField.addDataChangedListener((t, i) -> {
-            comp.setWidth(parseInt(wField.getText(), comp.getWidth()));
-            notifyChange(comp, "bounds");
-        });
-        hField.addDataChangedListener((t, i) -> {
-            comp.setHeight(parseInt(hField.getText(), comp.getHeight()));
-            notifyChange(comp, "bounds");
-        });
-
-        addProperty(fields);
-    }
-
-    private TextField addSmallField(Container parent, String value, boolean editable) {
-        TextField field = new TextField(value);
-        field.setUIID("PlaygroundPropSmall");
-        field.setSingleLineTextArea(true);
-        field.setEditable(editable);
-        parent.add(field);
-        return field;
-    }
-
-    private void addProperty(Component cmp) {
-        propertiesContainer.add(((TableLayout)propertiesContainer.getLayout()).createConstraint().wp(25), cmp);
-    }
-
-    private void addColorRow(String name, int color, int alpha, ColorCallback callback) {
-        int safeAlpha = Math.max(0, Math.min(255, alpha));
-
-        Label nameLabel = new Label(name);
-        nameLabel.setUIID("PlaygroundPropName");
-        addProperty(nameLabel);
-
-        TextField hexField = new TextField(formatColor(color), "Color", 1, 8);
-        hexField.setUIID("PlaygroundPropSmall");
+        TextField hexField = new TextField(formatColor(color));
+        hexField.setUIID(uiidDark("PlaygroundFieldInput"));
         hexField.setSingleLineTextArea(true);
 
-        TextField alphaField = new TextField(String.valueOf(safeAlpha), "Alpha", 1, 3);
-        alphaField.setUIID("PlaygroundPropSmall");
-        alphaField.setSingleLineTextArea(true);
-
-        Label preview = new Label("  ");
-        preview.setUIID("PlaygroundColorPreview");
-        updateColorPreview(preview, color, safeAlpha);
+        Label swatch = new Label(" ");
+        swatch.setUIID(uiidDark("PlaygroundInspectorSwatch"));
+        int swatchSize = mm(5);
+        swatch.setPreferredW(swatchSize);
+        swatch.setPreferredH(swatchSize);
+        updateColorPreview(swatch, color, safeAlpha);
 
         Runnable updater = () -> {
             Integer c = parseColor(hexField.getText());
-            int a = clampAlpha(parseInt(alphaField.getText(), safeAlpha));
             if (c != null) {
-                callback.update(c, a);
-                updateColorPreview(preview, c, a);
+                callback.update(c, safeAlpha);
+                updateColorPreview(swatch, c, safeAlpha);
             }
         };
-
         hexField.addDataChangedListener((t, i) -> updater.run());
-        alphaField.addDataChangedListener((t, i) -> updater.run());
 
-        Container row = BoxLayout.encloseX(hexField, alphaField, preview);
-        row.setUIID("PlaygroundPropGroup");
-        addProperty(row);
+        Container rightWrap = new Container(new BorderLayout());
+        rightWrap.getAllStyles().setBgTransparency(0);
+        rightWrap.getAllStyles().setMarginUnit(Style.UNIT_TYPE_DIPS);
+        rightWrap.getAllStyles().setMargin(0, 0, 0, 2);
+        rightWrap.add(BorderLayout.CENTER, hexField);
+        rightWrap.add(BorderLayout.EAST, swatch);
+        row.add(BorderLayout.CENTER, rightWrap);
+        propertiesContainer.add(row);
     }
+
+    private void addMultiValueRow(String labelText, int[] values, String[] tooltips,
+                                  Consumer<int[]> commit) {
+        Container row = baseFieldRow(labelText);
+
+        Container fields = new Container(new GridLayout(1, 4));
+        fields.getAllStyles().setBgTransparency(0);
+
+        // Spec's micro labels (X Y W H / T R B L) are represented as tooltips so
+        // the row stays compact while each input is still discoverable.
+        TextField[] tfs = new TextField[4];
+        for (int i = 0; i < 4; i++) {
+            TextField f = new TextField(String.valueOf(values[i]));
+            f.setUIID(uiidDark("PlaygroundFieldInput"));
+            f.setSingleLineTextArea(true);
+            f.getAllStyles().setMarginUnit(Style.UNIT_TYPE_DIPS);
+            // Left margin on every cell except the first so cells never touch.
+            // Equal internal gap between adjacent cells; the first cell's
+            // outer-left edge aligns with the field-row's CENTER edge.
+            f.getAllStyles().setMargin(0, 0, i == 0 ? 0 : 1, 0);
+            if (tooltips != null && i < tooltips.length && tooltips[i] != null) {
+                f.setTooltip(tooltips[i]);
+            }
+            tfs[i] = f;
+            fields.add(f);
+        }
+        Runnable commitRunner = () -> {
+            int[] v = new int[4];
+            for (int i = 0; i < 4; i++) {
+                v[i] = parseInt(tfs[i].getText(), values[i]);
+            }
+            commit.accept(v);
+        };
+        for (TextField f : tfs) {
+            f.addDataChangedListener((t, i) -> commitRunner.run());
+        }
+
+        row.add(BorderLayout.CENTER, fields);
+        propertiesContainer.add(row);
+    }
+
+    private void addPaddingMarginRow(String labelText, Style s, boolean isPadding) {
+        int[] v = new int[4];
+        if (isPadding) {
+            v[0] = s.getPaddingTop();
+            v[1] = s.getPaddingRight(false);
+            v[2] = s.getPaddingBottom();
+            v[3] = s.getPaddingLeft(false);
+        } else {
+            v[0] = s.getMarginTop();
+            v[1] = s.getMarginRight(false);
+            v[2] = s.getMarginBottom();
+            v[3] = s.getMarginLeft(false);
+        }
+        addMultiValueRow(labelText, v, new String[]{"Top", "Right", "Bottom", "Left"}, vals -> {
+            if (isPadding) {
+                s.setPadding(vals[0], vals[2], vals[3], vals[1]);
+            } else {
+                s.setMargin(vals[0], vals[2], vals[3], vals[1]);
+            }
+            notifyChange(selectedComponent, isPadding ? "padding" : "margin");
+        });
+    }
+
+    private void addUnitSegmented(String labelText, int activeIndex, Consumer<Byte> onChange) {
+        Container row = baseFieldRow(labelText);
+
+        Container seg = new Container(new GridLayout(1, UNIT_NAMES.length));
+        seg.setUIID(uiidDark("PlaygroundInspectorSegment"));
+
+        Button[] buttons = new Button[UNIT_NAMES.length];
+        for (int i = 0; i < UNIT_NAMES.length; i++) {
+            final int idx = i;
+            Button b = new Button(UNIT_NAMES[i]);
+            b.setUIID(uiidDark(idx == activeIndex
+                    ? "PlaygroundInspectorSegmentActive"
+                    : "PlaygroundInspectorSegmentInactive"));
+            b.addActionListener(e -> {
+                for (int j = 0; j < buttons.length; j++) {
+                    buttons[j].setUIID(uiidDark(j == idx
+                            ? "PlaygroundInspectorSegmentActive"
+                            : "PlaygroundInspectorSegmentInactive"));
+                }
+                onChange.accept(UNIT_VALUES[idx]);
+            });
+            buttons[i] = b;
+            seg.add(b);
+        }
+        row.add(BorderLayout.CENTER, seg);
+        propertiesContainer.add(row);
+    }
+
+    private void addBooleanRow(String labelText, boolean value, Consumer<Boolean> callback) {
+        Container row = baseFieldRow(labelText);
+        CheckBox cb = new CheckBox();
+        cb.setSelected(value);
+        cb.setUIID(uiidDark("PlaygroundInspectorCheckbox"));
+        cb.addActionListener(e -> callback.accept(cb.isSelected()));
+        Container wrap = new Container(new FlowLayout(Component.LEFT, Component.CENTER));
+        wrap.getAllStyles().setBgTransparency(0);
+        wrap.add(cb);
+        row.add(BorderLayout.CENTER, wrap);
+        propertiesContainer.add(row);
+    }
+
+    // ============================================================
+    // Helpers
+    // ============================================================
 
     private void updateColorPreview(Label preview, int color, int alpha) {
         preview.getAllStyles().setBgTransparency(alpha);
@@ -405,101 +551,14 @@ final class PlaygroundInspector {
         return Math.max(0, Math.min(255, value));
     }
 
-    private void addPaddingMarginRow(String name, Style s, boolean isPadding) {
-        int t, b, l, r;
-        byte unit;
-
-        if (isPadding) {
-            t = s.getPaddingTop();
-            b = s.getPaddingBottom();
-            l = s.getPaddingLeft(false);
-            r = s.getPaddingRight(false);
-            byte[] units = s.getPaddingUnit();
-            unit = units != null && units.length > 0 ? units[0] : Style.UNIT_TYPE_PIXELS;
-        } else {
-            t = s.getMarginTop();
-            b = s.getMarginBottom();
-            l = s.getMarginLeft(false);
-            r = s.getMarginRight(false);
-            byte[] units = s.getMarginUnit();
-            unit = units != null && units.length > 0 ? units[0] : Style.UNIT_TYPE_PIXELS;
-        }
-
-        Label nameLabel = new Label(name);
-        nameLabel.setUIID("PlaygroundPropName");
-        addProperty(nameLabel);
-
-        Container fields = new Container(new GridLayout(1, 4));
-        TextField topF = addSmallField(fields, String.valueOf(t), true);
-        TextField botF = addSmallField(fields, String.valueOf(b), true);
-        TextField leftF = addSmallField(fields, String.valueOf(l), true);
-        TextField rightF = addSmallField(fields, String.valueOf(r), true);
-        addProperty(fields);
-
-        Label unitNameLabel = new Label(name + " unit");
-        unitNameLabel.setUIID("PlaygroundPropName");
-        addProperty(unitNameLabel);
-
-        ComboBox<String> unitBox = new ComboBox<>(UNIT_NAMES);
-        unitBox.setSelectedItem(unitToName(unit));
-        unitBox.setUIID("PlaygroundPropUnit");
-        addProperty(unitBox);
-
-        Runnable updater = () -> {
-            byte currentUnit = nameToUnit((String) unitBox.getSelectedItem());
-            applyPaddingMargin(
-                    s,
-                    isPadding,
-                    parseInt(topF.getText(), t),
-                    parseInt(botF.getText(), b),
-                    parseInt(leftF.getText(), l),
-                    parseInt(rightF.getText(), r),
-                    currentUnit
-            );
-            notifyChange(selectedComponent, isPadding ? "padding" : "margin");
-        };
-
-        unitBox.addActionListener(e -> updater.run());
-        topF.addDataChangedListener((t1, i) -> updater.run());
-        botF.addDataChangedListener((t1, i) -> updater.run());
-        leftF.addDataChangedListener((t1, i) -> updater.run());
-        rightF.addDataChangedListener((t1, i) -> updater.run());
-    }
-
-    private void applyPaddingMargin(Style s, boolean isPadding, int t, int b, int l, int r, byte unit) {
-        if (isPadding) {
-            s.setPaddingUnit(unit);
-            s.setPadding(t, b, l, r);
-        } else {
-            s.setMarginUnit(unit);
-            s.setMargin(t, b, l, r);
-        }
-    }
-
-    private String unitToName(byte unit) {
+    private int getUnit(byte[] units) {
+        byte unit = units != null && units.length > 0 ? units[0] : Style.UNIT_TYPE_DIPS;
         for (int i = 0; i < UNIT_VALUES.length; i++) {
-            if (UNIT_VALUES[i] == unit) return UNIT_NAMES[i];
+            if (UNIT_VALUES[i] == unit) {
+                return i;
+            }
         }
-        return UNIT_NAMES[1];
-    }
-
-    private byte nameToUnit(String name) {
-        for (int i = 0; i < UNIT_NAMES.length; i++) {
-            if (UNIT_NAMES[i].equals(name)) return UNIT_VALUES[i];
-        }
-        return Style.UNIT_TYPE_DIPS;
-    }
-
-    private void addBooleanRow(String name, boolean value, java.util.function.Consumer<Boolean> callback) {
-        Label nameLabel = new Label(name);
-        nameLabel.setUIID("PlaygroundPropName");
-        addProperty(nameLabel);
-
-        CheckBox cb = new CheckBox();
-        cb.setSelected(value);
-        cb.setUIID("PlaygroundPropCheckbox");
-        cb.addActionListener(e -> callback.accept(cb.isSelected()));
-        addProperty(FlowLayout.encloseCenter(cb));
+        return 0;
     }
 
     private void notifyChange(Component comp, String property) {
@@ -518,7 +577,7 @@ final class PlaygroundInspector {
         int c = color & 0xFFFFFF;
         String hex = Integer.toHexString(c);
         while (hex.length() < 6) hex = "0" + hex;
-        return "0x" + hex.toUpperCase();
+        return "#" + hex.toUpperCase();
     }
 
     private Integer parseColor(String value) {
@@ -545,85 +604,6 @@ final class PlaygroundInspector {
 
     private interface ColorCallback {
         void update(int color, int alpha);
-    }
-
-    private static final class ComponentWrapper {
-        final Component component;
-
-        ComponentWrapper(Component component) {
-            this.component = component;
-        }
-
-        String getDisplayText() {
-            String name = component.getClass().getSimpleName();
-            String uiid = component.getUIID();
-            if (uiid != null && uiid.length() > 0 && !uiid.equals(name)) {
-                name = name + " [" + uiid + "]";
-            }
-            if (component instanceof Label) {
-                String text = ((Label) component).getText();
-                if (text != null && text.length() > 0) {
-                    String display = text.length() > 15 ? text.substring(0, 12) + "..." : text;
-                    name = name + ": " + display;
-                }
-            }
-            return name;
-        }
-    }
-
-    private static final class EmptyTreeModel implements TreeModel {
-        @Override
-        public Vector getChildren(Object parent) {
-            Vector v = new Vector();
-            if (parent == null) {
-                v.addElement(EMPTY_TREE_LABEL);
-            }
-            return v;
-        }
-
-        @Override
-        public boolean isLeaf(Object node) {
-            return true;
-        }
-    }
-
-    private static final class ComponentTreeModel implements TreeModel {
-        private final Component root;
-
-        ComponentTreeModel(Component root) {
-            this.root = root;
-        }
-
-        @Override
-        public Vector getChildren(Object parent) {
-            Vector v = new Vector();
-            if (parent == null) {
-                v.addElement(new ComponentWrapper(root));
-                return v;
-            }
-            if (parent instanceof ComponentWrapper) {
-                Component comp = ((ComponentWrapper) parent).component;
-                if (comp instanceof Container) {
-                    Container container = (Container) comp;
-                    for (int i = 0; i < container.getComponentCount(); i++) {
-                        v.addElement(new ComponentWrapper(container.getComponentAt(i)));
-                    }
-                }
-            }
-            return v;
-        }
-
-        @Override
-        public boolean isLeaf(Object node) {
-            if (node instanceof ComponentWrapper) {
-                Component comp = ((ComponentWrapper) node).component;
-                if (comp instanceof Container) {
-                    return ((Container) comp).getComponentCount() == 0;
-                }
-                return true;
-            }
-            return true;
-        }
     }
 
     private static final class HighlightPainter implements Painter {

@@ -25,6 +25,7 @@ public final class PlaygroundSmokeHarness {
         smokeStringMethods();
         smokeComponentTypeResolvesWithoutExplicitImport();
         smokeUIManagerClassImportDoesNotCollideWithGlobals();
+        smokeInstanceDispatchSuggestsStaticUtility();
         System.out.println("Playground smoke tests passed.");
         // Codename One/JavaSE initialization may leave non-daemon threads running.
         // Force a clean exit so CI jobs don't hang after successful completion.
@@ -250,6 +251,64 @@ public final class PlaygroundSmokeHarness {
         require(result.getComponent() instanceof Container,
                 "UIManager import snippet should produce a Container: " + summarizeMessages(result));
     }
+
+    /** Regression: calling {@code row.setMaterialIcon(FontImage.MATERIAL_X)}
+     * on a MultiButton fails because the only instance overload is
+     * {@code (char, float)} — the user forgot the size. It used to surface
+     * "Generated instance dispatch not implemented", which read like an
+     * internal bug. The runner should now produce a hint that names
+     * the same-class overload first ("MultiButton.setMaterialIcon(...)
+     * with different parameters") and the static utility helpers second
+     * ("FontImage.setMaterialIcon(...)") — same-class is a stronger
+     * signal because the user is already on the right type. */
+    private static void smokeInstanceDispatchSuggestsStaticUtility() {
+        Display.init(null);
+
+        Form host = new Form("Host", new BorderLayout());
+        Container preview = new Container(new BorderLayout());
+        host.add(BorderLayout.CENTER, preview);
+        host.show();
+
+        PlaygroundContext context = new PlaygroundContext(host, preview, null,
+                new PlaygroundContext.Logger() {
+                    public void log(String message) {
+                    }
+                });
+
+        PlaygroundRunner runner = new PlaygroundRunner();
+        PlaygroundRunner.RunResult result = runner.run(
+                "import com.codename1.ui.*;\n"
+                        + "import com.codename1.components.*;\n"
+                        + "MultiButton row = new MultiButton(\"Inbox\");\n"
+                        + "row.setMaterialIcon(FontImage.MATERIAL_ADD_CIRCLE);\n"
+                        + "row;\n",
+                context);
+
+        require(result.getComponent() == null,
+                "Instance dispatch of a static utility should fail to produce a component");
+        String summary = summarizeMessages(result);
+        require(summary.indexOf("No matching instance method") >= 0,
+                "Error message should name the missing instance method, got: " + summary);
+        require(summary.indexOf("did you mean:") >= 0,
+                "Error message should include 'did you mean:', got: " + summary);
+        int sameClassIdx = summary.indexOf("MultiButton.setMaterialIcon(char, float)");
+        require(sameClassIdx >= 0,
+                "Error message should suggest MultiButton.setMaterialIcon(char, float), got: " + summary);
+        int staticIdx = summary.indexOf("FontImage.setMaterialIcon(MultiButton");
+        require(staticIdx >= 0,
+                "Error message should suggest FontImage.setMaterialIcon(MultiButton, ...), got: " + summary);
+        require(sameClassIdx < staticIdx,
+                "Same-class hint must come before static utility hint, got: " + summary);
+        require(summary.indexOf("FontImage.setMaterialIcon(Label") < 0
+                        && summary.indexOf("FontImage.setMaterialIcon(SpanLabel") < 0,
+                "Static suggestions must be filtered to overloads applicable to the target, got: " + summary);
+        require(summary.indexOf("Sourced file:") < 0
+                        && summary.indexOf(" : at Line: ") < 0,
+                "Bsh trace chrome should be stripped, got: " + summary);
+        require(summary.indexOf("Generated instance dispatch not implemented") < 0,
+                "Raw 'Generated instance dispatch' message should be replaced, got: " + summary);
+    }
+
     private static void require(boolean condition, String message) {
         if (!condition) {
             throw new IllegalStateException(message);

@@ -356,7 +356,20 @@ public class IPhoneBuilder extends Executor {
         }
 
         debug("Xcode version is "+xcodeVersion);
-        String iosMode = request.getArg("ios.themeMode", "auto");
+        // ios.themeMode stays the platform-specific knob; cn1.nativeTheme is
+        // the cross-platform meta hint. modern / legacy on the meta hint
+        // translate to the equivalent iOS values when ios.themeMode is unset.
+        String iosMode = request.getArg("ios.themeMode", null);
+        if (iosMode == null) {
+            String sharedMode = request.getArg("cn1.nativeTheme", null);
+            if ("legacy".equalsIgnoreCase(sharedMode)) {
+                iosMode = "ios7";
+            } else if ("modern".equalsIgnoreCase(sharedMode)) {
+                iosMode = "modern";
+            } else {
+                iosMode = "auto";
+            }
+        }
         
         tmpFile = getBuildDirectory();
         if (tmpFile == null) {
@@ -2251,6 +2264,8 @@ public class IPhoneBuilder extends Executor {
 
                 injectToPlist(tmpFile, resDir, request);
 
+                addLocalizedIconsBuildSetting(pbxprojFile);
+
             } catch (Exception ex) {
                 throw new BuildException("Failed to inject into plist");
             }
@@ -2784,9 +2799,13 @@ public class IPhoneBuilder extends Executor {
         if(inject.indexOf("CFBundleShortVersionString") < 0) {
             inject += "\n<key>CFBundleShortVersionString</key> 	<string>" + buildVersion +"</string>";
         }
-        if (!localizedIcons.isEmpty() && !inject.contains("CFBundleAlternateIcons")) {
-            inject += buildLocalizedIconsPlistFragment();
-        }
+        // Localized icons are emitted by actool through the asset catalog
+        // (Images.xcassets/AppIcon_<locale>.appiconset) and the
+        // ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES build setting; the
+        // resulting partial Info.plist already contains the correct
+        // CFBundleIcons entries, so we deliberately do not inject any
+        // CFBundleAlternateIcons fragment here. Doing so would conflict with
+        // actool's output during the Info.plist merge.
         String locationUsageDescription = null;
         if (xcodeVersion >= 9) {
             if ( (locationUsageDescription = request.getArg("ios.locationUsageDescription", null)) != null ){
@@ -3145,54 +3164,6 @@ public class IPhoneBuilder extends Executor {
         copy(new File(srcDir, name), new File(destDir, name));
     }
 
-    private String buildLocalizedIconsPlistFragment() {
-        StringBuilder alternateIcons = new StringBuilder();
-        for (Map.Entry<String, String> entry : localizedIcons.entrySet()) {
-            String iconName = entry.getKey();
-            alternateIcons.append("        <key>").append(iconName).append("</key>\n");
-            alternateIcons.append("        <dict>\n");
-            alternateIcons.append("            <key>CFBundleIconFiles</key>\n");
-            alternateIcons.append("            <array>\n");
-            alternateIcons.append("                <string>").append(iconName).append("</string>\n");
-            alternateIcons.append("            </array>\n");
-            alternateIcons.append("            <key>UIPrerenderedIcon</key>\n");
-            alternateIcons.append("            <false/>\n");
-            alternateIcons.append("        </dict>\n");
-        }
-        StringBuilder out = new StringBuilder();
-        out.append("\n<key>CFBundleIcons</key>\n");
-        out.append("<dict>\n");
-        out.append("    <key>CFBundlePrimaryIcon</key>\n");
-        out.append("    <dict>\n");
-        out.append("        <key>CFBundleIconFiles</key>\n");
-        out.append("        <array>\n");
-        out.append("            <string>iPhone7App</string>\n");
-        out.append("            <string>iPhoneApp</string>\n");
-        out.append("        </array>\n");
-        out.append("    </dict>\n");
-        out.append("    <key>CFBundleAlternateIcons</key>\n");
-        out.append("    <dict>\n");
-        out.append(alternateIcons);
-        out.append("    </dict>\n");
-        out.append("</dict>\n");
-        out.append("<key>CFBundleIcons~ipad</key>\n");
-        out.append("<dict>\n");
-        out.append("    <key>CFBundlePrimaryIcon</key>\n");
-        out.append("    <dict>\n");
-        out.append("        <key>CFBundleIconFiles</key>\n");
-        out.append("        <array>\n");
-        out.append("            <string>iPadApp7</string>\n");
-        out.append("            <string>iPhone7App</string>\n");
-        out.append("        </array>\n");
-        out.append("    </dict>\n");
-        out.append("    <key>CFBundleAlternateIcons</key>\n");
-        out.append("    <dict>\n");
-        out.append(alternateIcons);
-        out.append("    </dict>\n");
-        out.append("</dict>\n");
-        return out.toString();
-    }
-
     private String buildLocalizedIconSelectorObjC() {
         StringBuilder mapping = new StringBuilder();
         mapping.append("        @{ ");
@@ -3306,19 +3277,24 @@ public class IPhoneBuilder extends Executor {
                 "iPadPro@2x.png",
                 "AppStore.png");
 
-        processLocalizedIcons(resDir);
+        processLocalizedIcons(resDir, request);
 
         return true;
     }
 
     /**
      * Scans the resources directory for files named cn1_icon_LANG[_COUNTRY].png
-     * and registers them as iOS alternate app icons so the bundle will contain
-     * per-locale launcher icons in addition to the default icon. Runtime icon
-     * selection is wired up in the GL app delegate and the Info.plist
-     * CFBundleIcons entry is populated in {@link #injectToPlist}.
+     * and registers them as iOS alternate app icons. Each detected locale is
+     * written as its own AppIcon_LOC.appiconset inside Images.xcassets so that
+     * actool produces a coherent CFBundleIcons / CFBundleAlternateIcons
+     * partial Info.plist; mixing manual CFBundleIcons entries in the user
+     * Info.plist with an asset-catalog-managed primary icon is unsafe because
+     * actool's partial plist replaces ours during the merge. The matching
+     * ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES build setting is added in
+     * {@link #addLocalizedIconsBuildSetting}; runtime icon selection is wired
+     * up in the GL app delegate.
      */
-    private void processLocalizedIcons(File resDir) throws IOException {
+    private void processLocalizedIcons(File resDir, BuildRequest request) throws IOException {
         File[] candidates = resDir.listFiles(new FilenameFilter() {
             @Override
             public boolean accept(File dir, String name) {
@@ -3329,6 +3305,8 @@ public class IPhoneBuilder extends Executor {
         if (candidates == null || candidates.length == 0) {
             return;
         }
+        File assetCatalogDir = new File(tmpFile, "dist/" + request.getMainClass()
+                + "-src/Images.xcassets");
         for (File candidate : candidates) {
             String base = candidate.getName();
             // strip prefix/suffix
@@ -3357,14 +3335,92 @@ public class IPhoneBuilder extends Executor {
                 candidate.delete();
                 continue;
             }
-            createIconFile(new File(resDir, iconName + "60x60@2x.png"), img, 120, 120);
-            createIconFile(new File(resDir, iconName + "60x60@3x.png"), img, 180, 180);
-            createIconFile(new File(resDir, iconName + "76x76@2x~ipad.png"), img, 152, 152);
+
+            File alternateIconset = new File(assetCatalogDir, iconName + ".appiconset");
+            if (!alternateIconset.exists() && !alternateIconset.mkdirs()) {
+                log("Failed to create alternate icon set directory: "
+                        + alternateIconset.getAbsolutePath());
+                candidate.delete();
+                continue;
+            }
+            String iphone2x = iconName + "60x60@2x.png";
+            String iphone3x = iconName + "60x60@3x.png";
+            String ipad2x = iconName + "76x76@2x~ipad.png";
+            String ipadPro2x = iconName + "83.5x83.5@2x~ipad.png";
+            createIconFile(new File(alternateIconset, iphone2x), img, 120, 120);
+            createIconFile(new File(alternateIconset, iphone3x), img, 180, 180);
+            createIconFile(new File(alternateIconset, ipad2x), img, 152, 152);
+            createIconFile(new File(alternateIconset, ipadPro2x), img, 167, 167);
+            writeAlternateAppIconContentsJson(new File(alternateIconset, "Contents.json"),
+                    iphone2x, iphone3x, ipad2x, ipadPro2x);
             localizedIcons.put(iconName, localeKey);
             // Remove the original so it isn't bundled as a stray resource.
             candidate.delete();
             log("Registered localized app icon '" + iconName + "' for locale " + localeKey);
         }
+    }
+
+    private void writeAlternateAppIconContentsJson(File contentsJson,
+            String iphone2x, String iphone3x, String ipad2x, String ipadPro2x) throws IOException {
+        String json = "{\n"
+                + "  \"images\" : [\n"
+                + "    {\n"
+                + "      \"size\" : \"60x60\",\n"
+                + "      \"idiom\" : \"iphone\",\n"
+                + "      \"filename\" : \"" + iphone2x + "\",\n"
+                + "      \"scale\" : \"2x\"\n"
+                + "    },\n"
+                + "    {\n"
+                + "      \"size\" : \"60x60\",\n"
+                + "      \"idiom\" : \"iphone\",\n"
+                + "      \"filename\" : \"" + iphone3x + "\",\n"
+                + "      \"scale\" : \"3x\"\n"
+                + "    },\n"
+                + "    {\n"
+                + "      \"size\" : \"76x76\",\n"
+                + "      \"idiom\" : \"ipad\",\n"
+                + "      \"filename\" : \"" + ipad2x + "\",\n"
+                + "      \"scale\" : \"2x\"\n"
+                + "    },\n"
+                + "    {\n"
+                + "      \"size\" : \"83.5x83.5\",\n"
+                + "      \"idiom\" : \"ipad\",\n"
+                + "      \"filename\" : \"" + ipadPro2x + "\",\n"
+                + "      \"scale\" : \"2x\"\n"
+                + "    }\n"
+                + "  ],\n"
+                + "  \"info\" : {\n"
+                + "    \"version\" : 1,\n"
+                + "    \"author\" : \"xcode\"\n"
+                + "  }\n"
+                + "}\n";
+        try (Writer w = new OutputStreamWriter(Files.newOutputStream(contentsJson.toPath()),
+                StandardCharsets.UTF_8)) {
+            w.write(json);
+        }
+    }
+
+    private void addLocalizedIconsBuildSetting(File pbx) throws IOException {
+        if (localizedIcons.isEmpty()) {
+            return;
+        }
+        StringBuilder names = new StringBuilder();
+        boolean first = true;
+        for (String iconName : localizedIcons.keySet()) {
+            if (!first) {
+                names.append(' ');
+            }
+            first = false;
+            names.append(iconName);
+        }
+        // actool reads ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES and emits a
+        // partial Info.plist with both CFBundlePrimaryIcon and CFBundleAlternateIcons,
+        // which is what we need for setAlternateIconName: to resolve at runtime.
+        replaceAllInFile(pbx,
+                "ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;",
+                "ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;\n"
+                        + "\t\t\t\tASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = \""
+                        + names + "\";");
     }
 
     

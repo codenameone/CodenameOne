@@ -213,7 +213,7 @@ public final class Util {
         }
     }
 
-    /// Closes the object (connection, stream etc.) without throwing any exception, even if the
+/// Closes the object (connection, stream etc.) without throwing any exception, even if the
     /// object is null
     ///
     /// #### Parameters

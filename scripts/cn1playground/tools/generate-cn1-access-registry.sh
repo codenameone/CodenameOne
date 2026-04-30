@@ -14,6 +14,19 @@ read_cn1_version() {
   perl -0777 -ne 'if (m|<properties>.*?<cn1\.version>([^<]+)</cn1\.version>|s) { print $1; exit 0 }' "$POM"
 }
 
+# Registry version is intentionally pinned one release behind <cn1.version>.
+# The playground-common module compiles against the current cn1.version, but
+# the bean-shell access registry is consumed by the deployed JavaScript
+# cloud build, which lags the release channel. Generating the registry off
+# the bleeding-edge release makes new APIs (zoomFonts, isSimdOptimizationsEnabled,
+# etc.) resolve at shell-eval time to methods that don't exist on the JS
+# port yet, failing the whole playground session with a NoSuchMethod error.
+# Prefer an explicit <cn1.registry.version> in the POM if present so the
+# pin can be bumped deliberately as the JS port catches up.
+read_cn1_registry_version() {
+  perl -0777 -ne 'if (m|<properties>.*?<cn1\.registry\.version>([^<]+)</cn1\.registry\.version>|s) { print $1; exit 0 }' "$POM"
+}
+
 USE_LOCAL_SOURCES="${CN1_ACCESS_USE_LOCAL_SOURCES:-false}"
 
 CN1_SOURCE_ROOTS_VALUE=""
@@ -46,9 +59,12 @@ if [ "$USE_LOCAL_SOURCES" = "true" ]; then
     echo "Warning: local $LOCAL_VERSION jars not found in $LOCAL_M2 — runtime validation will be skipped." >&2
   fi
 else
-  CN1_VERSION="${CN1_VERSION:-$(read_cn1_version)}"
+  CN1_VERSION="${CN1_VERSION:-$(read_cn1_registry_version)}"
   if [ -z "$CN1_VERSION" ]; then
-    echo "Unable to determine cn1.version from $POM" >&2
+    CN1_VERSION="$(read_cn1_version)"
+  fi
+  if [ -z "$CN1_VERSION" ]; then
+    echo "Unable to determine cn1.version or cn1.registry.version from $POM" >&2
     exit 1
   fi
   echo "Using release source jars for Codename One version: $CN1_VERSION" >&2

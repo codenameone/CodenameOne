@@ -495,4 +495,46 @@ public class PickerCoverageTest extends UITestBase {
         Assertions.assertNotNull(findButtonWithText(dlg, "Top"), "Top custom button should be rendered");
         Assertions.assertNotNull(findButtonWithText(dlg, "Bottom"), "Bottom custom button should be rendered");
     }
+
+    @FormTest
+    public void testLightweightPopupCustomButtonAlignments() {
+        cleanup();
+        Form form = new Form("Custom Alignment", new BoxLayout(BoxLayout.Y_AXIS));
+        Picker picker = new Picker();
+        picker.setType(Display.PICKER_TYPE_DATE);
+        picker.setUseLightweightPopup(true);
+        picker.addLightweightPopupButton("LeftBtn", new Runnable() {
+            @Override
+            public void run() {}
+        }, Picker.LightweightPopupButtonPlacement.BELOW_SPINNER, Component.LEFT);
+        picker.addLightweightPopupButton("CenterBtn", new Runnable() {
+            @Override
+            public void run() {}
+        }, Picker.LightweightPopupButtonPlacement.BELOW_SPINNER, Component.CENTER);
+        picker.addLightweightPopupButton("RightBtn", new Runnable() {
+            @Override
+            public void run() {}
+        }, Picker.LightweightPopupButtonPlacement.BELOW_SPINNER, Component.RIGHT);
+        form.add(picker);
+        form.show();
+        waitForForm(form);
+
+        picker.pressed();
+        picker.released();
+        DisplayTest.flushEdt();
+        runAnimations(form);
+
+        InteractionDialog dlg = findInteractionDialog(form);
+        Assertions.assertNotNull(dlg, "Dialog should be open");
+        Button leftBtn = findButtonWithText(dlg, "LeftBtn");
+        Button centerBtn = findButtonWithText(dlg, "CenterBtn");
+        Button rightBtn = findButtonWithText(dlg, "RightBtn");
+        Assertions.assertNotNull(leftBtn, "Left-aligned button should be rendered");
+        Assertions.assertNotNull(centerBtn, "Center-aligned button should be rendered");
+        Assertions.assertNotNull(rightBtn, "Right-aligned button should be rendered");
+        Assertions.assertTrue(leftBtn.getAbsoluteX() < centerBtn.getAbsoluteX(),
+                "Left-aligned button should be to the left of the center-aligned button");
+        Assertions.assertTrue(centerBtn.getAbsoluteX() < rightBtn.getAbsoluteX(),
+                "Center-aligned button should be to the left of the right-aligned button");
+    }
 }

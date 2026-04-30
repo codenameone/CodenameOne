@@ -1729,16 +1729,14 @@ public class AndroidGradleBuilder extends Executor {
         }
 
         //String sdkVersion = request.getArg("android.targetSDKVersion", defaultVersion);
-        if (targetNumber != null) {
-            if (Integer.parseInt(targetNumber) >= 17) {
-                try {
-                    File androidBrowserComponentCallback = new File(srcDir, "com" + File.separator + "codename1" + File.separator + "impl" + File.separator + "android" + File.separator + "AndroidBrowserComponentCallback.java");
-                    replaceInFile(androidBrowserComponentCallback, "//import android.webkit.JavascriptInterface;", "import android.webkit.JavascriptInterface;");
-                    replaceInFile(androidBrowserComponentCallback, "//@JavascriptInterface", "@JavascriptInterface");
-                } catch (Exception e) {
-                    // Swallow this and continue.
-                    log("Non-fatal exception encountered when processing AndroidBrowserComponentCallback.java: " + e);
-                }
+        if (Integer.parseInt(targetNumber) >= 17) {
+            try {
+                File androidBrowserComponentCallback = new File(srcDir, "com" + File.separator + "codename1" + File.separator + "impl" + File.separator + "android" + File.separator + "AndroidBrowserComponentCallback.java");
+                replaceInFile(androidBrowserComponentCallback, "//import android.webkit.JavascriptInterface;", "import android.webkit.JavascriptInterface;");
+                replaceInFile(androidBrowserComponentCallback, "//@JavascriptInterface", "@JavascriptInterface");
+            } catch (Exception e) {
+                // Swallow this and continue.
+                log("Non-fatal exception encountered when processing AndroidBrowserComponentCallback.java: " + e);
             }
         }
 
@@ -4499,7 +4497,15 @@ public class AndroidGradleBuilder extends Executor {
     }
 
     private File makeLocalizedDir(File resDir, String baseDirName, String qualifier, String childFileName) {
-        File dir = new File(resDir, baseDirName + qualifier);
+        // Android requires resource qualifiers in a fixed order: locale must come
+        // before density. Insert the locale qualifier right after the base name so
+        // "drawable-xhdpi" becomes "drawable-<locale>-xhdpi" rather than the
+        // invalid "drawable-xhdpi-<locale>".
+        int dash = baseDirName.indexOf('-');
+        String dirName = dash < 0
+                ? baseDirName + qualifier
+                : baseDirName.substring(0, dash) + qualifier + baseDirName.substring(dash);
+        File dir = new File(resDir, dirName);
         dir.mkdirs();
         return new File(dir, childFileName);
     }
