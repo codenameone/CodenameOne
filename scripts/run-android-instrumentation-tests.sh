@@ -280,6 +280,118 @@ for test in "${TEST_NAMES[@]}"; do
   fi
 done
 
+# ---- Retry decode-only failures via adb relaunch -------------------------
+# Logcat occasionally drops a single chunk line on the JDK 8 Android image
+# (typically once per run, on a different test each time). When that happens
+# the test's PNG can't be reassembled even though the CN1SS_SUITE actually
+# completed successfully on-device. Rather than fail the build for what is a
+# transport-layer flake, restart the already-installed APK via `adb shell am
+# start` (no Gradle, no recompile, no reinstall) and re-decode just the
+# tests that previously failed. The on-device suite re-emits every test;
+# we only redo the work for the ones that need recovery.
+if [ "${#FAILED_TESTS[@]}" -gt 0 ] && [ -n "${PACKAGE_NAME:-}" ]; then
+  ra_log "STAGE:RETRY -> Attempting decode recovery for: ${FAILED_TESTS[*]}"
+
+  # Resolve the package's launcher activity component so `am start` can
+  # invoke it directly. Falls back to the package name's main activity
+  # convention if cmd-package fails.
+  LAUNCH_COMPONENT=""
+  if RESOLVE_OUT="$("$ADB_BIN" shell cmd package resolve-activity --brief "$PACKAGE_NAME" 2>/dev/null | tr -d '\r' | tail -n1)"; then
+    LAUNCH_COMPONENT="${RESOLVE_OUT//[$'\t']/}"
+  fi
+  case "$LAUNCH_COMPONENT" in
+    "$PACKAGE_NAME"/*) ;;
+    *) LAUNCH_COMPONENT="" ;;
+  esac
+
+  # Stop the original logcat tail so the new capture starts cleanly. The
+  # cleanup trap watches LOGCAT_PID, so reassign it to the retry tail
+  # below and the trap will still kill the right process on exit.
+  if [ "${LOGCAT_PID:-0}" -ne 0 ]; then
+    kill "$LOGCAT_PID" >/dev/null 2>&1 || true
+    wait "$LOGCAT_PID" 2>/dev/null || true
+    LOGCAT_PID=0
+  fi
+  "$ADB_BIN" shell am force-stop "$PACKAGE_NAME" >/dev/null 2>&1 || true
+  sleep 1
+  "$ADB_BIN" logcat -c >/dev/null 2>&1 || true
+
+  RETRY_LOG="$ARTIFACTS_DIR/connectedAndroidTest-retry.log"
+  ra_log "Capturing retry logcat to $RETRY_LOG"
+  "$ADB_BIN" logcat -v threadtime > "$RETRY_LOG" 2>&1 &
+  RETRY_LOGCAT_PID=$!
+  LOGCAT_PID="$RETRY_LOGCAT_PID"
+  sleep 2
+
+  if [ -n "$LAUNCH_COMPONENT" ]; then
+    ra_log "Relaunching $LAUNCH_COMPONENT via adb am start"
+    "$ADB_BIN" shell am start -n "$LAUNCH_COMPONENT" >/dev/null 2>&1 || true
+  else
+    ra_log "Relaunching package $PACKAGE_NAME via monkey (launcher component unresolved)"
+    "$ADB_BIN" shell monkey -p "$PACKAGE_NAME" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1 || true
+  fi
+
+  RETRY_TIMEOUT=600
+  RETRY_START="$(date +%s)"
+  ra_log "Waiting up to ${RETRY_TIMEOUT}s for retry — will short-circuit as soon as every previously-failed test re-emits its CN1SS:END marker"
+  while true; do
+    have_all_ends=1
+    for failed_test in "${FAILED_TESTS[@]}"; do
+      if ! grep -q "CN1SS:END:${failed_test}" "$RETRY_LOG" 2>/dev/null; then
+        have_all_ends=0
+        break
+      fi
+    done
+    if [ "$have_all_ends" = "1" ]; then
+      ra_log "All previously-failed tests re-emitted CN1SS:END on retry; stopping early"
+      break
+    fi
+    if grep -q "$END_MARKER" "$RETRY_LOG" 2>/dev/null; then
+      ra_log "Detected DeviceRunner completion marker on retry"
+      break
+    fi
+    NOW="$(date +%s)"
+    if [ $(( NOW - RETRY_START )) -ge $RETRY_TIMEOUT ]; then
+      ra_log "STAGE:RETRY_TIMEOUT -> retry did not emit completion marker within ${RETRY_TIMEOUT}s"
+      break
+    fi
+    sleep 3
+  done
+
+  sleep 3
+  if [ "${RETRY_LOGCAT_PID:-0}" -ne 0 ]; then
+    kill "$RETRY_LOGCAT_PID" >/dev/null 2>&1 || true
+    wait "$RETRY_LOGCAT_PID" 2>/dev/null || true
+    RETRY_LOGCAT_PID=0
+  fi
+
+  declare -a STILL_FAILED=()
+  for test in "${FAILED_TESTS[@]}"; do
+    dest="$SCREENSHOT_TMP_DIR/${test}.png"
+    if source_label="$(cn1ss_decode_test_png "$test" "$dest" "LOGCAT:$RETRY_LOG")"; then
+      TEST_OUTPUTS["$test"]="$dest"
+      TEST_SOURCES["$test"]="$source_label"
+      ra_log "Retry decoded screenshot for '$test' (source=${source_label}, size: $(cn1ss_file_size "$dest") bytes)"
+      preview_dest="$SCREENSHOT_PREVIEW_DIR/${test}.jpg"
+      if preview_source="$(cn1ss_decode_test_preview "$test" "$preview_dest" "LOGCAT:$RETRY_LOG")"; then
+        PREVIEW_OUTPUTS["$test"]="$preview_dest"
+        ra_log "Retry decoded preview for '$test' (size: $(cn1ss_file_size "$preview_dest") bytes)"
+      else
+        rm -f "$preview_dest" 2>/dev/null || true
+      fi
+    else
+      ra_log "Retry still failed to decode '$test'"
+      STILL_FAILED+=("$test")
+    fi
+  done
+  FAILED_TESTS=("${STILL_FAILED[@]}")
+  if [ "${#FAILED_TESTS[@]}" -eq 0 ]; then
+    ra_log "All decode-only failures recovered on retry"
+  else
+    ra_log "Tests still failing after retry: ${FAILED_TESTS[*]}"
+  fi
+fi
+
 # ---- Compare against stored references ------------------------------------
 
 COMPARE_ENTRIES=()
