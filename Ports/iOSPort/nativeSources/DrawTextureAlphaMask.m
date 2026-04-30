@@ -301,6 +301,26 @@ static DrawTextureAlphaMaskOGLProgram* getOGLProgram() {
     // IOSNative.m's nativePathRendererCreateTexture under Metal. Just bridge
     // back to the Obj-C handle (no transfer of ownership) and dispatch.
     id<MTLTexture> tex = (__bridge id<MTLTexture>)(void *)(uintptr_t)textureName;
+    // If a RadialGradientPaint is currently set, route through the radial
+    // pipeline so fillShape() inherits the gradient colour exactly like the
+    // GL path's getOGLProgram() switch above. This is what was missing on
+    // graphics-draw-gradient TL/TR (top half: radial gradients all rendered
+    // as solid black on Metal).
+    //
+    // Screen (Global) path queues a RadialGradientPaint op that sets
+    // PaintOp.current via execute; mutable path's applyPaint() pushes the
+    // paint into PaintOp.currentMutable directly (see
+    // applyRadialGradientPaintMutable in IOSNative.m). Pick the right one
+    // based on whether this op is targeting a mutable image.
+    PaintOp *paint = (target != nil) ? [PaintOp getCurrentMutable] : [PaintOp getCurrent];
+    if (paint != NULL && [paint isKindOfClass:[RadialGradientPaint class]]) {
+        RadialGradientPaint *g = (RadialGradientPaint *)paint;
+        CN1MetalDrawAlphaMaskRadial(tex, x, y, w, h,
+                                    g.startColor, g.endColor,
+                                    (float)g.x, (float)g.y,
+                                    (float)g.width, (float)g.height);
+        return;
+    }
     CN1MetalDrawAlphaMask(tex, color, alpha, x, y, w, h);
     return;
 #endif
