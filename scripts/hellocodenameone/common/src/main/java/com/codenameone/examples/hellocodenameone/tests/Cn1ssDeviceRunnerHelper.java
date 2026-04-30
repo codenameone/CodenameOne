@@ -20,9 +20,14 @@ interface Cn1ssDeviceRunnerHelper {
     // tests added each emitting ~150KB PNGs (~400 chunks each), the JDK 21
     // Android job started flaking with one random "PNG chunk truncated before
     // CRC" per run on different tests across runs (SlideHorizontalTransitionTest
-    // on one CI run, MultiButtonTheme_dark on the next). Bumping to 30ms gives
-    // logcat extra drain time without doubling overall emission cost.
-    int DELAY_ANDROID = 30;
+    // on one CI run, MultiButtonTheme_dark on the next). Bumping to 30ms gave
+    // logcat extra drain time. With three more screenshot tests added by
+    // the sticky-headers PR (#4829) the JDK 21 entry started flaking again
+    // (one random theme stream truncated per run). Bumping to 50ms; the
+    // Cn1ssDeviceRunner per-test deadline is now 30s on native platforms so
+    // the slower emission still completes inside the budget for a dual
+    // appearance test (~14s for two captures).
+    int DELAY_ANDROID = 50;
     int MAX_PREVIEW_BYTES = 20 * 1024;
     String PREVIEW_CHANNEL = "PREVIEW";
     int[] PREVIEW_QUALITIES = new int[] {60, 50, 40, 35, 30, 25, 20, 18, 16, 14, 12, 10, 8, 6, 5, 4, 3, 2, 1};
