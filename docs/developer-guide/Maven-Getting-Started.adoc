@@ -1,5 +1,24 @@
 == Getting started
 
+[#prerequisites]
+=== Prerequisites
+
+Codename One supports JDK 11 through 25 for running the simulator and the
+"Run as desktop app" target. https://adoptium.net[Eclipse Temurin] is the
+easiest source of a supported JDK on macOS, Windows, and Linux.
+
+After installing the JDK, point `JAVA_HOME` at it and confirm with:
+
+[source,bash]
+----
+java -version
+mvn -v
+----
+
+Both should report Java 11 or newer. The Codename One Maven plugin checks the
+runtime JDK version before launching the simulator or the desktop wrapper, and
+fails fast with a friendly message if it is older than 11.
+
 [#creating-app-project]
 === Creating a new project
 

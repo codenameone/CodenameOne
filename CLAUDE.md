@@ -20,7 +20,8 @@ The project is transitioning from Ant to Maven. **Maven is the preferred build s
 ### Building from Source
 
 **Requirements:**
-- JDK 8 (required for core build)
+- JDK 8 (required for the core framework build)
+- JDK 11 through 25 (required at *runtime* for the simulator and "Run as desktop app")
 - JDK 17 (required for Android port)
 - Apache Maven 3.6+
 - macOS with Xcode (for iOS port only)
@@ -166,7 +167,8 @@ To use locally-built version, edit the generated `pom.xml`:
 - **Tooling/Plugins**: Can use Java 8+
 - **Tests**: Can use Java 11+
 - **Android build**: Requires JDK 17 in JAVA17_HOME
-- **Main JAVA_HOME**: Must be JDK 8
+- **Main JAVA_HOME (for building the framework)**: Must be JDK 8
+- **Runtime JDK for simulator / desktop run**: JDK 11 through 25 is supported. The Codename One Maven plugin checks this on entry to `prepare-simulator-classpath` and `generate-desktop-app-wrapper` and aborts with a friendly error when an older JDK is in use.
 
 ### Working with Native Code
 
@@ -251,7 +253,8 @@ The JavaSE port serves as the simulator with:
 
 ### Common Issues
 
-- **JDK version mismatch**: Ensure JAVA_HOME is JDK 8, JAVA17_HOME is JDK 17
+- **JDK version mismatch**: Ensure JAVA_HOME is JDK 8 for building the framework, JAVA17_HOME is JDK 17 for the Android port
+- **`Unrecognized option: --add-exports=...`** when running the simulator or desktop app: the project is being executed on a JDK older than 11. Switch to JDK 11 through 25 (Eclipse Temurin from <https://adoptium.net>) and re-run. The Codename One Maven plugin now detects this and prints a friendly error before the JVM is forked.
 - **Missing cn1-binaries**: Run `setup-workspace.sh` or manually clone to `../cn1-binaries`
 - **Build client missing**: Copy `maven/CodeNameOneBuildClient.jar` to `~/.codenameone/`
 - **macOS ARM JDK8**: Setup script downloads x64 version (works via Rosetta)

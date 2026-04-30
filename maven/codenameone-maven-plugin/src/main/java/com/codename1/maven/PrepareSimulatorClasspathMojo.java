@@ -70,6 +70,8 @@ public class PrepareSimulatorClasspathMojo extends AbstractCN1Mojo {
 
     @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
+        JavaVersionUtil.requireRuntimeJavaVersion(JavaVersionUtil.MIN_RUNTIME_JAVA_VERSION,
+                "run the Codename One simulator");
         getLog().info("Preparing Simulator Classpath");
         Properties props = project.getModel().getProperties();
         if (props == null) {
