@@ -47,6 +47,58 @@ interface Cn1ssDeviceRunnerHelper {
         emitCurrentFormScreenshot(testName, null);
     }
 
+    /// Emits an off-screen Image PNG directly through System.out without
+    /// going through [emitChannel]. The JS port has a fallback bound to
+    /// emitChannel's method ID that hijacks the primary screenshot channel
+    /// and replaces the payload with a host capture of the visible browser
+    /// canvas (workaround for OffscreenCanvas staleness in
+    /// Display.screenshot()). For tests that already constructed the
+    /// ground-truth Image themselves (animation/transition grids,
+    /// AbstractComponentReplaceScreenshotTest), the hijack throws away the
+    /// correct bytes and substitutes a stale visible canvas. Use this entry
+    /// point so the Java-rendered PNG reaches the chunk stream verbatim.
+    static void emitImageDirect(Image image, String testName, Runnable onComplete) {
+        String safeName = sanitizeTestName(testName);
+        if (image == null) {
+            println("CN1SS:ERR:test=" + safeName + " message=Image is null");
+            emitPlaceholderScreenshot(safeName);
+            complete(onComplete);
+            return;
+        }
+        try {
+            ImageIO io = ImageIO.getImageIO();
+            if (io == null || !io.isFormatSupported(ImageIO.FORMAT_PNG)) {
+                println("CN1SS:ERR:test=" + safeName + " message=PNG encoding unavailable");
+                emitPlaceholderScreenshot(safeName);
+                return;
+            }
+            int width = Math.max(1, image.getWidth());
+            int height = Math.max(1, image.getHeight());
+            if (Display.getInstance().isSimulator()) {
+                io.save(image, Storage.getInstance().createOutputStream(safeName + ".png"), ImageIO.FORMAT_PNG, 1);
+            }
+            ByteArrayOutputStream pngOut = new ByteArrayOutputStream(Math.max(1024, width * height / 2));
+            io.save(image, pngOut, ImageIO.FORMAT_PNG, 1f);
+            byte[] pngBytes = pngOut.toByteArray();
+            println("CN1SS:INFO:test=" + safeName + " png_bytes=" + pngBytes.length);
+            emitChannelDirect(pngBytes, safeName, "");
+
+            byte[] preview = encodePreview(io, image, safeName);
+            if (preview != null && preview.length > 0) {
+                emitChannelDirect(preview, safeName, PREVIEW_CHANNEL);
+            } else {
+                println("CN1SS:INFO:test=" + safeName + " preview_jpeg_bytes=0 preview_quality=0");
+            }
+        } catch (IOException ex) {
+            println("CN1SS:ERR:test=" + safeName + " message=" + ex);
+            Log.e(ex);
+            emitPlaceholderScreenshot(safeName);
+        } finally {
+            image.dispose();
+            complete(onComplete);
+        }
+    }
+
     static void emitImage(Image image, String testName, Runnable onComplete) {
         String safeName = sanitizeTestName(testName);
         if (image == null) {
@@ -168,6 +220,40 @@ interface Cn1ssDeviceRunnerHelper {
             }
         }
         return chosenPreview;
+    }
+
+    /// Same body as [emitChannel] but with a different method ID so the JS
+    /// port's `emitChannelFastJs` fallback (in port.js) does not bind to
+    /// it. Used by [emitImageDirect] so off-screen Image PNG bytes reach
+    /// the chunk stream verbatim instead of being replaced with a host
+    /// capture of the (potentially stale) visible browser canvas.
+    static void emitChannelDirect(byte[] bytes, String safeName, String channel) {
+        String prefix = channel != null && channel.length() > 0 ? "CN1SS" + channel : "CN1SS";
+        if (bytes == null || bytes.length == 0) {
+            println(prefix + ":END:" + safeName);
+            System.out.flush();
+            return;
+        }
+        String base64 = Base64.encodeNoNewline(bytes);
+        int count = 0;
+        boolean isAndroid = "and".equals(Display.getInstance().getPlatformName());
+        int chunkSize = isAndroid ? CHUNK_SIZE_ANDROID : CHUNK_SIZE_DEFAULT;
+        int delay = isAndroid ? DELAY_ANDROID : 0;
+        for (int pos = 0; pos < base64.length(); pos += chunkSize) {
+            int end = Math.min(pos + chunkSize, base64.length());
+            String chunk = base64.substring(pos, end);
+            println(prefix + ":" + safeName + ":" + zeroPad(pos, 6) + ":" + chunk);
+            count++;
+            if (delay > 0) {
+                Util.sleep(delay);
+            }
+        }
+        println("CN1SS:INFO:test=" + safeName + " chunks=" + count + " total_b64_len=" + base64.length());
+        if (delay > 0) {
+            Util.sleep(50);
+        }
+        println(prefix + ":END:" + safeName);
+        System.out.flush();
     }
 
     static void emitChannel(byte[] bytes, String safeName, String channel) {

@@ -62,7 +62,14 @@ public abstract class AbstractAnimationScreenshotTest extends BaseTest {
         } finally {
             AnimationTime.reset();
         }
-        Cn1ssDeviceRunnerHelper.emitImage(grid, getImageName(), this::done);
+        // Use emitImageDirect (not emitImage) so the off-screen grid PNG
+        // bytes reach the chunk stream verbatim. emitImage routes through
+        // emitChannel, which the JS port hijacks with a host capture of
+        // the visible browser canvas - that's correct for tests that go
+        // through Display.screenshot() (worker OffscreenCanvas may be
+        // stale), but for animation/transition tests the off-screen
+        // buildScreenshot Image already IS the ground truth.
+        Cn1ssDeviceRunnerHelper.emitImageDirect(grid, getImageName(), this::done);
     }
 
     /// Build the final screenshot Image. The default implementation runs the
