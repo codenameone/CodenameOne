@@ -6128,10 +6128,74 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createImageFile___long_boolean_int_in
 #ifndef CN1_USE_ARC
     [(BRIDGE_CAST GLUIImage*)((void *)imagePeer) retain];
 #endif
+#ifdef CN1_USE_METAL
+    // Phase 3 v2: PNG/JPEG encoding sources from [GLUIImage getImage] which
+    // is the original UIImage backing — initial-fill colour for any mutable
+    // that's been drawn into via Metal. Drain the op queue first so the
+    // mutable's MTLTexture has the latest pixels, then read those pixels
+    // into a fresh UIImage and encode that. flushBuffer already dispatches
+    // sync to the main thread and runs drawFrame; doing it OUTSIDE the
+    // dispatch_sync block below avoids the nested-dispatch_sync deadlock
+    // that would otherwise occur (we'd be waiting on main to run drawFrame
+    // while main is waiting on us to free the dispatch_sync slot).
+    {
+        GLUIImage *glllOuter = (BRIDGE_CAST GLUIImage*)((void *)imagePeer);
+        if ([glllOuter mtlMutableTexture] != nil) {
+            BOOL stillDrawing = (((BRIDGE_CAST void*)[CodenameOne_GLViewController instance].currentMutableImage) == ((void *)imagePeer));
+            if (stillDrawing) {
+                Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl();
+            }
+            int dw = Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl();
+            int dh = Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl();
+            [[CodenameOne_GLViewController instance] flushBuffer:nil x:0 y:0 width:dw height:dh];
+            if (stillDrawing) {
+                int restoreW = [glllOuter mtlMutableWidth];
+                int restoreH = [glllOuter mtlMutableHeight];
+                Java_com_codename1_impl_ios_IOSImplementation_startDrawingOnImageImpl(restoreW, restoreH, (void *)imagePeer);
+            }
+        }
+    }
+#endif
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         GLUIImage* glll = (BRIDGE_CAST GLUIImage*)((void *)imagePeer);
-        UIImage* i = [glll getImage];
+        UIImage* i = nil;
+#ifdef CN1_USE_METAL
+        // If the image has live Metal pixels, blit-and-read into a fresh
+        // UIImage so PNG/JPEG encoding sees post-draw content rather than
+        // the stale UIImage initial-fill backing.
+        if ([glll mtlMutableTexture] != nil) {
+            int srcW = [glll mtlMutableWidth];
+            int srcH = [glll mtlMutableHeight];
+            if (srcW > 0 && srcH > 0) {
+                int *pixels = (int *)malloc((size_t)srcW * (size_t)srcH * sizeof(int));
+                if (pixels != NULL) {
+                    if (CN1MetalReadMutableImagePixels(glll, pixels, 0, 0, srcW, srcH, srcW, srcH)) {
+                        // CN1MetalReadMutableImagePixels writes ARGB ints; wrap as a
+                        // CGImage with RGBA byte order (the alpha-first/last and
+                        // R/B swap matches what UIKit expects for iOS little-endian).
+                        CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
+                        CGContextRef ctx = CGBitmapContextCreate(pixels, (size_t)srcW, (size_t)srcH, 8,
+                                                                  (size_t)srcW * 4, cs,
+                                                                  kCGBitmapByteOrder32Little | kCGImageAlphaPremultipliedFirst);
+                        CGColorSpaceRelease(cs);
+                        if (ctx != NULL) {
+                            CGImageRef cgImg = CGBitmapContextCreateImage(ctx);
+                            CGContextRelease(ctx);
+                            if (cgImg != NULL) {
+                                i = [UIImage imageWithCGImage:cgImg scale:1.0 orientation:UIImageOrientationUp];
+                                CGImageRelease(cgImg);
+                            }
+                        }
+                    }
+                    free(pixels);
+                }
+            }
+        }
+#endif
+        if (i == nil) {
+            i = [glll getImage];
+        }
         if(width == -1) {
             float aspect = height / i.size.height;
             blockWidth = (int)(i.size.width * aspect);
@@ -6148,7 +6212,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createImageFile___long_boolean_int_in
         } else {
             data = UIImagePNGRepresentation(i);
         }
-        
+
 #ifndef CN1_USE_ARC
         [data retain];
 #endif
