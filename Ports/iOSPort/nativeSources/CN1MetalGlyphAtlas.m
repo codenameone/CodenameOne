@@ -85,7 +85,15 @@ static int                     atlasCacheCount = 0;
     if (device == nil) return nil;
 
     _fontKey = [key copy];
-    _ctFont = CTFontCreateWithName((__bridge CFStringRef)uifont.fontName, uifont.pointSize, NULL);
+    // Build the CTFont from UIFont's descriptor, NOT from .fontName.
+    // iOS system fonts have private names like ".SFUI-Regular" and
+    // CTFontCreateWithName silently falls back to Times for those —
+    // text on the screen path then renders as a serif Times Roman
+    // instead of the requested system font. UIFontDescriptor and
+    // CTFontDescriptor are toll-free bridged, so casting through
+    // .fontDescriptor preserves the actual font identity.
+    CTFontDescriptorRef ctDesc = (__bridge CTFontDescriptorRef)uifont.fontDescriptor;
+    _ctFont = CTFontCreateWithFontDescriptor(ctDesc, uifont.pointSize, NULL);
     if (_ctFont == NULL) return nil;
 
     _textureWidth = CN1_METAL_ATLAS_INITIAL_W;
