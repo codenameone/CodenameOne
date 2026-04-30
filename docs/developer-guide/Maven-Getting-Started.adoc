@@ -16,8 +16,9 @@ mvn -v
 ----
 
 Both should report Java 11 or newer. The Codename One Maven plugin checks the
-runtime JDK version before launching the simulator or the desktop wrapper, and
-fails fast with a friendly message if it is older than 11.
+runtime JDK version when you invoke `mvn cn1:run` or `mvn cn1:debug` and fails
+fast with a friendly message if it is older than 11. Build-only goals (such as
+`-Pexecutable-jar`) still work on older JDKs.
 
 [#creating-app-project]
 === Creating a new project

@@ -24,6 +24,9 @@ public class CN1DebugMojo extends AbstractCN1Mojo {
             return;
         }
 
+        JavaVersionUtil.requireRuntimeJavaVersion(JavaVersionUtil.MIN_RUNTIME_JAVA_VERSION,
+                "debug the Codename One simulator");
+
 
 
         InvocationRequest request = new DefaultInvocationRequest();

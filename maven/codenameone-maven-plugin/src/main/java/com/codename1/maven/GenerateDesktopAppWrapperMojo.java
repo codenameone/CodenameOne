@@ -22,8 +22,6 @@ import static com.codename1.maven.PathUtil.path;
 public class GenerateDesktopAppWrapperMojo extends AbstractCN1Mojo {
     @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
-        JavaVersionUtil.requireRuntimeJavaVersion(JavaVersionUtil.MIN_RUNTIME_JAVA_VERSION,
-                "run or build the JavaSE desktop app");
         String iconPath = properties.getProperty("codename1.icon");
         File iconFile = new File(iconPath);
         if (!iconFile.isAbsolute()) {

@@ -168,7 +168,7 @@ To use locally-built version, edit the generated `pom.xml`:
 - **Tests**: Can use Java 11+
 - **Android build**: Requires JDK 17 in JAVA17_HOME
 - **Main JAVA_HOME (for building the framework)**: Must be JDK 8
-- **Runtime JDK for simulator / desktop run**: JDK 11 through 25 is supported. The Codename One Maven plugin checks this on entry to `prepare-simulator-classpath` and `generate-desktop-app-wrapper` and aborts with a friendly error when an older JDK is in use.
+- **Runtime JDK for simulator / desktop run**: JDK 11 through 25 is supported. The Codename One Maven plugin checks this on entry to `cn1:run` and `cn1:debug` and aborts with a friendly error when an older JDK is in use. The build-time goals (`generate-desktop-app-wrapper`, `prepare-simulator-classpath`, the `executable-jar` profile) are not gated -- they still work on JDK 8 because they only generate icons / classpath metadata.
 
 ### Working with Native Code
 
