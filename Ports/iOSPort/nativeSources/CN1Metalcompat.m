@@ -555,6 +555,20 @@ static void drawStringWholeStringFallback(NSString *str, UIFont *font, int color
 void CN1MetalDrawString(NSString *str, UIFont *font, int color, int alpha, int x, int y) {
     if (str == nil || font == nil || str.length == 0) return;
 
+    // CN1SS_DSD_DIAG: instrument the per-call font/size/position so we can
+    // explain why graphics-draw-string-decorated TL panel renders larger
+    // than TR. Logs the first few characters of the string + the UIFont
+    // identity and metrics. Remove once root cause is fixed.
+    static int diagCount = 0;
+    if (diagCount < 80) {
+        NSLog(@"CN1SS_DSD_DIAG idx=%d str=\"%@\" font=%@ name=%@ ptSize=%g lineHeight=%g ascender=%g x=%d y=%d",
+              diagCount,
+              ([str length] > 25 ? [str substringToIndex:25] : str),
+              font, font.fontName, (double)font.pointSize, (double)font.lineHeight, (double)font.ascender,
+              x, y);
+        diagCount++;
+    }
+
     // Phase 4: shape the string with CTLine and emit one alpha-mask quad
     // per glyph against a per-(font, point-size) R8 atlas. Falls back to
     // the whole-string LRU path if the atlas can't be created (no
