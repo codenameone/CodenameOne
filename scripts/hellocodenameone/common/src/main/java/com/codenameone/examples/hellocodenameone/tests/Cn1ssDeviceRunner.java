@@ -36,16 +36,26 @@ import com.codenameone.examples.hellocodenameone.tests.accessibility.Accessibili
 
 
 public final class Cn1ssDeviceRunner extends DeviceRunner {
-    // Previously 30_000. In the JavaScript port each test's onShowCompleted -> UITimer
-    // -> emitCurrentFormScreenshot -> done() chain typically completes in ~1500ms
-    // (see BaseTest.registerReadyCallback). Tests that never reach done() shouldn't
-    // block the whole suite for 30s each — the overall CI browser lifetime is only
-    // ~150s, so even three stuck tests used to consume the entire budget and prevent
-    // later tests from ever running. 10s is still 6× the normal budget which is plenty
-    // of margin for the rare genuinely slow form; iOS/Android are unaffected (they use
-    // their own deadline logic in their respective runners).
-    private static final int TEST_TIMEOUT_MS = 10000;
+    // Per-test deadline cap. On the JavaScript port the overall CI browser
+    // lifetime is only ~150s, so a stuck test mustn't eat the whole budget;
+    // the tight 10s cap kept the suite from being blocked by the rare hung
+    // form (e.g. KotlinUiTest's missing cn1lib). iOS / Android / JavaSE
+    // run with much longer wall budgets so a per-test cap of 30s is safe -
+    // it only matters for genuinely stuck tests, and 30s leaves headroom
+    // for theme captures whose chunked-log emission is rate-limited (Android
+    // throttles 500-byte chunks at 30ms each to keep logcat from dropping
+    // lines, so a 60KB PNG plus its preview takes ~6s per appearance, and
+    // a dual-appearance test like SpanLabelTheme legitimately needs ~12s
+    // even on a healthy device).
+    private static final int TEST_TIMEOUT_MS_HTML5 = 10000;
+    private static final int TEST_TIMEOUT_MS_NATIVE = 30000;
     private static final int TEST_POLL_INTERVAL_MS = 50;
+
+    private static int testTimeoutMs() {
+        return "HTML5".equals(Display.getInstance().getPlatformName())
+                ? TEST_TIMEOUT_MS_HTML5
+                : TEST_TIMEOUT_MS_NATIVE;
+    }
 
     // Calling Display.getInstance() at static-init time was tripping the iOS
     // class loader (Cn1ssDeviceRunner failed to load before runSuite could
@@ -70,6 +80,9 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new AnimateHierarchyScreenshotTest(),
             new AnimateUnlayoutScreenshotTest(),
             new SmoothScrollScreenshotTest(),
+            new StickyHeaderScreenshotTest(),
+            new StickyHeaderSlideTransitionScreenshotTest(),
+            new StickyHeaderFadeTransitionScreenshotTest(),
             new TensileBounceScreenshotTest(),
             new ComponentReplaceFadeScreenshotTest(),
             new ComponentReplaceSlideScreenshotTest(),
@@ -182,7 +195,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 logThrowable("runTest:" + testName, t);
                 testClass.fail(String.valueOf(t));
             }
-            awaitTestCompletion(index, testClass, testName, System.currentTimeMillis() + TEST_TIMEOUT_MS);
+            awaitTestCompletion(index, testClass, testName, System.currentTimeMillis() + testTimeoutMs());
         });
     }
 
@@ -255,6 +268,9 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 || "AnimateHierarchyScreenshotTest".equals(testName)
                 || "AnimateUnlayoutScreenshotTest".equals(testName)
                 || "SmoothScrollScreenshotTest".equals(testName)
+                || "StickyHeaderScreenshotTest".equals(testName)
+                || "StickyHeaderSlideTransitionScreenshotTest".equals(testName)
+                || "StickyHeaderFadeTransitionScreenshotTest".equals(testName)
                 || "TensileBounceScreenshotTest".equals(testName)
                 || "ComponentReplaceFadeScreenshotTest".equals(testName)
                 || "ComponentReplaceSlideScreenshotTest".equals(testName)
@@ -279,6 +295,9 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 || "ToastBarTopPositionScreenshotTest".equals(testName)
                 || "ValidatorLightweightPickerScreenshotTest".equals(testName)
                 || "LightweightPickerButtonsScreenshotTest".equals(testName)
+                || "StickyHeaderScreenshotTest".equals(testName)
+                || "StickyHeaderSlideTransitionScreenshotTest".equals(testName)
+                || "StickyHeaderFadeTransitionScreenshotTest".equals(testName)
                 // graphics tests
                 || "AffineScale".equals(testName)
                 || "Clip".equals(testName)
