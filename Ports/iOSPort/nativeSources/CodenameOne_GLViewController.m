@@ -1974,12 +1974,45 @@ void* Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl() {
 void Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayImpl
 (void* peer, int* arr, int x, int y, int width, int height, int imgWidth, int imgHeight) {
 #ifdef CN1_USE_METAL
-    // Phase 3 v2 step-6 readback (flushBuffer + Metal blit + getBytes) was
-    // observed to deadlock the suite at DrawImage in CI run 24973232138.
-    // Disabled while we investigate; falls through to the legacy CG-from-
-    // UIImage read which returns stale pixels for mutable images on
-    // Metal but doesn't hang. Tracked: reinstate after the underlying
-    // deadlock is understood.
+    {
+        // Phase 3 v2 readback. Was disabled in 9b2aaf11d on suspicion of a
+        // DrawImage-test hang (GPU memory pressure → nextDrawable wedge),
+        // but the legacy CG-from-UIImage fallback returns the stale
+        // initial-fill pixels for any mutable that's been drawn into via
+        // Metal — animation/transition tests added in master #4821 then
+        // emit empty grids and downstream EDT scheduling stalls trying
+        // to advance to the next test.
+        //
+        // The original GPU-pressure concern is mitigated by the resource-
+        // leak fix in commit e548d1afb (each transient GLUIImage no longer
+        // pins +1 retains on its mtlMutableTexture / command buffer / read
+        // textures). Reinstate the path so getRGB sees real Metal pixels.
+        //
+        // If we're still inside a draw-on-image session we must close it
+        // first so the queued ops are visible to the drain (mirrors the
+        // legacy path's finishDrawingOnImageImpl call below).
+        GLUIImage *gl = (BRIDGE_CAST GLUIImage*)peer;
+        if ([gl mtlMutableTexture] != nil) {
+            BOOL stillDrawing = (((BRIDGE_CAST void*)[CodenameOne_GLViewController instance].currentMutableImage) == peer);
+            BOOL savedTransformSet = currentMutableTransformSet;
+            if (stillDrawing) {
+                Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl();
+            }
+            // flushBuffer dispatches synchronously to main and runs
+            // drawFrame, which drains queued ExecutableOps -- including
+            // any with target=this image -- through Begin/End mutable
+            // encoders so the texture is up-to-date. The bounding rect
+            // doesn't matter for the queue drain (drawFrame uses it only
+            // for ClipRect.setDrawRect on screen ops).
+            [[CodenameOne_GLViewController instance] flushBuffer:nil x:0 y:0 width:displayWidth height:displayHeight];
+            CN1MetalReadMutableImagePixels(gl, arr, x, y, width, height, imgWidth, imgHeight);
+            if (stillDrawing) {
+                Java_com_codename1_impl_ios_IOSImplementation_startDrawingOnImageImpl(imgWidth, imgHeight, peer);
+                currentMutableTransformSet = savedTransformSet;
+            }
+            return;
+        }
+    }
 #endif
     BOOL currentlyDrawing = NO;
     BOOL oldCurrentMutableTransformSet = currentMutableTransformSet;
