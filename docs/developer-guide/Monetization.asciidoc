@@ -295,7 +295,7 @@ NOTE: The receipt store is intended to interface with a server so that the subsc
 
 
 .The Receipt store is a layer between your server and Codename One
-image::img/in-app purchase-receipt-store-diagram.png[The Receipt store is a layer between your server and Codename One]
+image::img/in-app-purchase-receipt-store-diagram.png[The Receipt store is a layer between your server and Codename One]
 
 
 A basic receipt store needs to implement just two methods:
@@ -592,16 +592,16 @@ Notice that, in `itemPurchased()` you don't need to explicitly create any receip
 ==== Screenshots
 
 .Main form
-image::img/in-app purchase-subscription-main-form.png[Main form,scaledwidth=25%]
+image::img/in-app-purchase-subscription-main-form.png[Main form,scaledwidth=25%]
 
 .Dialog shown when subscribing to a product
-image::img/in-app purchase-subscription-dialog.png[Dialog shown when subscribing to a product,scaledwidth=25%]
+image::img/in-app-purchase-subscription-dialog.png[Dialog shown when subscribing to a product,scaledwidth=25%]
 
 .Simulator confirm dialog when purchasing a subscription
-image::img/in-app purchase-subscription-confirm.png[Simulator confirm dialog when purchasing a subscription,scaledwidth=40%]
+image::img/in-app-purchase-subscription-confirm.png[Simulator confirm dialog when purchasing a subscription,scaledwidth=40%]
 
 .Upon successful buy, the toastbar message is shown
-image::img/in-app purchase-subscription-toastbar-success.png[Upon successful buy, the toastbar message is shown,scaledwidth=20%]
+image::img/in-app-purchase-subscription-toastbar-success.png[Upon successful buy, the toastbar message is shown,scaledwidth=20%]
 
 ==== Summary
 
@@ -714,12 +714,12 @@ image::img/iap3-subscriptions-form.png[Subscriptions form,scaledwidth=20%]
 Click on the "Subscribe 1 Month No Ads" button. You will be prompted to accept the purchase:
 
 .Approve buy dialog
-image::img/iap3-approve-buy.png[Approve buy dialog,scaledwidth=40%]
+image::img/iap3-approve-purchase.png[Approve buy dialog,scaledwidth=40%]
 
 Upon completion, the app will submit the purchase to your server, and if all went well, it will retrieve the updated list of receipts from your server also, and update the label on this form to say "No Ads. Expires <some date>":
 
 .After successful buy
-image::img/iap3-successful-buy.png[After successful buy,scaledwidth=20%]
+image::img/iap3-successful-purchase.png[After successful buy,scaledwidth=20%]
 
 NOTE: This project is set up to use an expedited expiry date schedule for purchases from the simulator.  1 month = 5 minutes.  3 months = 15 minutes. This helps for testing. That's why your expiry date may be different than expected.
 

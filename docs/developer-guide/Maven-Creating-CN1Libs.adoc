@@ -206,7 +206,7 @@ In this screenshot I have expanded "Source Packages" and "Other Sources/css" to 
 
 The project inspector hides a few important files, but, so here is a screenshot of the File inspector for the common project:
 
-image::img/netbeans-your-first-library-file-inspector-common.png[]
+image::img/netbeans-my-first-library-file-inspector-common.png[]
 
 ===== Eclipse IDE IDE
 

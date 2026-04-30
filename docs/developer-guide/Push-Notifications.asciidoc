@@ -594,7 +594,7 @@ You can read more about the certificate wizard in the <<signing-section-top-head
 
 The Codename One UWP target was discontinued in release 7.0.229. Older references to WNS setup, Package SID values, and client secrets are preserved in archived material for teams maintaining legacy code outside the current supported build flow.
 
-[[push-bureaucracy-JavaScript-section]]
+[[push-bureaucracy-javascript-section]]
 ==== The push bureaucracy - JavaScript
 
 Codename One apps support push in browsers that implement the Web Push API. At time of writing, this list includes:

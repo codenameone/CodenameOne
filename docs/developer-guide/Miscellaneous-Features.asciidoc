@@ -1404,7 +1404,7 @@ image::img/google-sign-in-google-cloud-platform-credentials.png[Credentials,scal
 +
 image::img/google-sign-in-oauth-setup-redirect-url.png[Redirect URL,scaledwidth=30%]
 
-[[JavaScript-setup]]
+[[javascript-setup]]
 ==== Javascript setup instructions
 
 The Javascript port can use the same OAuth2.0 credentials as the simulator does. It doesn't require your Client Secret or redirect URL. It requires your Client ID, which you can specify using the `GoogleConnect.setClientID()` method.

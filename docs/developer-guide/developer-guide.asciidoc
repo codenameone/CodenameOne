@@ -36,7 +36,7 @@ ifdef::env-CN1_PLUGIN_RELEASE_VERSION[:cn1-plugin-release-version: {env:CN1_PLUG
 
 :cn1-snapshot-version: {cn1-release-version}-SNAPSHOT
 
-= {Doctitle}
+= {doctitle}
 {author}
 
 toc::[]

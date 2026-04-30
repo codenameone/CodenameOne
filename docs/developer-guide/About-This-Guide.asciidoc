@@ -38,7 +38,7 @@ If you print or reproduce sections and make changes, state that the result is a 
 
 This guide uses several notations for tips and further guidance.
 
-When more information breaks from the current tutorial flow, use a sidebar like this:
+When additional information breaks from the current tutorial flow, use a sidebar like this:
 
 .Sidebar
 ****

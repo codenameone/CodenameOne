@@ -81,7 +81,7 @@ The *Javascript* build target will result in up to three different bundles being
 2. YourApp-1.0.zip
 3. YourApp-1.0-Preview.html
 
-**YourApp-1.0.war** is a self contained application bundle that can be installed in any JavaEE servlet container. If you haven't customized any <<JavaScript-proxy-settings,proxy settings>>, then the application will be configured to use a proxy servlet that's embedded into the.war file.
+**YourApp-1.0.war** is a self contained application bundle that can be installed in any JavaEE servlet container. If you haven't customized any <<javascript-proxy-settings,proxy settings>>, then the application will be configured to use a proxy servlet that's embedded into the.war file.
 
 As an example, the PropertyCross.war file contains the following files:
 
@@ -165,7 +165,7 @@ You'll notice that it has many of the same files as the.war distribution. it's m
 
 **YourApp-1.0-Preview.html** is a single-page HTML file with all the application's resources embedded into a single page. This is generated for convenience so that you can preview your application on the build server directly. While you could use this file in production, you're probably better to use the ZIP or WAR distribution instead as some mobile devices have file size limitations that may cause problems for the "one large single file" approach. If you do decide to use this file for your production app (that is, copy the file to your own web server), you will need to change the proxy settings, as it's configured to use the proxy on the Codename One build server - which won't be available when the app is hosted on a different server.
 
-[[JavaScript-proxy-settings]]
+[[javascript-proxy-settings]]
 === Setting up a proxy for network requests
 
 The Codename One API includes a network layer (the https://www.codenameone.com/javadoc/com/codename1/io/NetworkManager.html[NetworkManager] and https://www.codenameone.com/javadoc/com/codename1/io/ConnectionRequest.html[ConnectionRequest] classes) that allows you to make HTTP requests to arbitrary destinations. When an application is running inside a browser as a Javascript app, it's constrained by the same origin policy. You can make network requests to the same host that served the app originally.
@@ -328,7 +328,9 @@ TIP: A project may contain more than one manifest file. This allows you to inclu
 
 ===== How to NOT generate the `script` tag
 
-Sometimes you may want a Javascript file to be treated as a library (that is, packaged in the `includes` directory) but not automatically included in the `index.html` page. Rather than specifying the name of the file in the `libs` list, you can provide a structure with multiple options about the file. For example, ----
+Sometimes you may want a Javascript file to be treated as a library (that is, packaged in the `includes` directory) but not automatically included in the `index.html` page. Rather than specifying the name of the file in the `libs` list, you can provide a structure with multiple options about the file. For example,
+
+----
 {
     "JavaScript" : {
         "libs" : [
@@ -350,7 +352,9 @@ You can also specify directories in the manifest file. In this case, the entire 
 
 WARNING: If you're including Javascript files in your app that are contained inside a directory hierarchy, you should specify the root directory of the hierarchy in your manifest file and use the sub "includes" property of the directory entry to specify which files should be included with `<script>` tags. Specifying the file directly inside the "libs" list will result in the file being packed directly in the your app's `includes` directory. This may or may not be what you want.
 
-For example, ----
+For example,
+
+----
 {
     "javascript" : {
         "libs" : [
@@ -407,7 +411,9 @@ NOTE: This example uses the "//" prefix for the URL instead of specifying the pr
 
 ===== Including CSS files
 
-CSS files can be included using the same mechanism as is used for Javascript files. If the file name ends with `.css`, then it will be treated as a CSS file (and included with a `<link>` tag instead of a `<script>` tag. For example, ----
+CSS files can be included using the same mechanism as is used for Javascript files. If the file name ends with `.css`, then it will be treated as a CSS file (and included with a `<link>` tag instead of a `<script>` tag. For example,
+
+----
 {
     "JavaScript" : {
         "libs" : [
