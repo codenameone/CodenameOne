@@ -53,7 +53,7 @@ jobs:
         java-version: [8, 17, 21]
 
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v4
       - name: Validate Java 25 markdown docs style (CodenameOne + CLDC11)
         run: ./.github/scripts/validate-java25-markdown-docs.sh
       - name: Set up Java

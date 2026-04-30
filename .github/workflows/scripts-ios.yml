@@ -76,6 +76,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Cache CocoaPods and user gems
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gem
+            ~/Library/Caches/CocoaPods
+            ~/.cocoapods/repos
+          key: ${{ runner.os }}-pods-v1-${{ hashFiles('scripts/setup-workspace.sh') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-v1-
 
       - name: Ensure CocoaPods tooling
         run: |
@@ -87,7 +97,9 @@ jobs:
           fi
           GEM_USER_DIR="$(ruby -e 'print Gem.user_dir')"
           export PATH="$GEM_USER_DIR/bin:$PATH"
-          gem install cocoapods xcodeproj --no-document --user-install
+          if ! command -v pod >/dev/null 2>&1; then
+            gem install cocoapods xcodeproj --no-document --user-install
+          fi
           pod --version
 
       - name: Compute setup-workspace hash
@@ -106,6 +118,14 @@ jobs:
           key: ${{ runner.os }}-cn1-tools-${{ steps.setup_hash.outputs.hash }}
           restore-keys: |
             ${{ runner.os }}-cn1-tools-
+
+      - name: Cache Maven repository
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-
 
       - name: Restore cn1-binaries cache
         uses: actions/cache@v4
