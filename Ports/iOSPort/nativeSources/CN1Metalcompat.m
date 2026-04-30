@@ -507,6 +507,14 @@ static CN1MetalTextCacheEntry *findOrBuildTextTexture(NSString *str, UIFont *fon
     } else {
         slot = textCacheNextEvict;
         textCacheNextEvict = (textCacheNextEvict + 1) % CN1_METAL_TEXT_CACHE_MAX;
+        // Release the +1 retains held by the slot before overwriting:
+        // key was [key copy] (+1) and texture was newTextureWithDescriptor
+        // (+1). Skipping these turns every eviction into a leak of one
+        // string + one MTLTexture under MRR.
+#ifndef CN1_USE_ARC
+        [textCache[slot].key release];
+        [textCache[slot].texture release];
+#endif
         textCache[slot].key = nil;
         textCache[slot].texture = nil;
     }
@@ -800,6 +808,11 @@ static CN1MetalGradCacheEntry *findOrBuildGradTexture(int type, int startColor, 
     } else {
         slot = gradCacheNextEvict;
         gradCacheNextEvict = (gradCacheNextEvict + 1) % CN1_METAL_GRAD_CACHE_MAX;
+        // Release evicted texture's +1 retain (newTextureWithDescriptor)
+        // before overwriting; same MRR leak fix as the text cache above.
+#ifndef CN1_USE_ARC
+        [gradCache[slot].texture release];
+#endif
         gradCache[slot].texture = nil;
     }
     gradCache[slot].type = type;
@@ -1046,6 +1059,12 @@ void CN1MetalEnsureMutableTexture(GLUIImage *image, int width, int height) {
         [clearCb commit];
     }
     [image setMtlMutableTexture:tex width:width height:height];
+    // setMtlMutableTexture retains; balance the +1 from
+    // newTextureWithDescriptor: so the GLUIImage owns the only retain.
+    // Without this the texture leaks even with the dealloc release.
+#ifndef CN1_USE_ARC
+    [tex release];
+#endif
 }
 
 BOOL CN1MetalBeginMutableImageDraw(GLUIImage *image) {
@@ -1191,6 +1210,12 @@ BOOL CN1MetalReadMutableImagePixels(GLUIImage *image, int *outARGB,
         }
     }
     free(bytes);
+#ifndef CN1_USE_ARC
+    // shared is +1 from newTextureWithDescriptor: release it now that the
+    // CPU-visible bytes are copied out. Without this every Image.getRGB
+    // round-trip leaks a full-resolution staging texture.
+    [shared release];
+#endif
     return YES;
 }
 

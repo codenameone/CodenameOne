@@ -137,8 +137,10 @@ extern int nextPowerOf2(int val);
 #endif
 #ifdef CN1_USE_METAL
     // Invalidate the cached MTLTexture — it was built from the previous
-    // UIImage's pixels. ARC handles release; under MRC the texture is
-    // owned by the device and freed when references drop.
+    // UIImage's pixels. The CN1MetalTextureFromUIImage assignment
+    // transferred a +1 retain; release it explicitly so swapping the
+    // backing UIImage doesn't leak the old GPU texture.
+    [mtlTexture release];
     mtlTexture = nil;
 #endif
     if(textureName != 0) {
@@ -179,24 +181,43 @@ extern int nextPowerOf2(int val);
 
 -(id<MTLTexture>)mtlMutableTexture { return mtlMutableTexture; }
 -(void)setMtlMutableTexture:(id<MTLTexture>)t width:(int)w height:(int)h {
+    // Retain new, release old. Under MRR direct ivar assignment doesn't
+    // auto-retain; without this the new texture would be autoreleased
+    // out from under us when the next pool drains. Same fix pattern as
+    // CN1MetalGlyphAtlas (commit b9c5add52). Setting the same texture
+    // again is rare in practice but the retain-then-release order is
+    // safe regardless.
+    [t retain];
+    [mtlMutableTexture release];
     mtlMutableTexture = t;
     mtlMutableWidth = w;
     mtlMutableHeight = h;
     // Stale cached read-only texture: future getMTLTexture should sample
-    // mtlMutableTexture instead of the UIImage-derived one.
+    // mtlMutableTexture instead of the UIImage-derived one. Release the
+    // +1 retain transferred in by getMTLTexture's CN1MetalTextureFromUIImage
+    // assignment; without this the read-only texture leaks.
+    [mtlTexture release];
     mtlTexture = nil;
 }
 -(int)mtlMutableWidth { return mtlMutableWidth; }
 -(int)mtlMutableHeight { return mtlMutableHeight; }
 -(id<MTLCommandBuffer>)mtlMutableCommandBuffer { return mtlMutableCommandBuffer; }
--(void)setMtlMutableCommandBuffer:(id<MTLCommandBuffer>)cb { mtlMutableCommandBuffer = cb; }
+-(void)setMtlMutableCommandBuffer:(id<MTLCommandBuffer>)cb {
+    // [queue commandBuffer] returns an autoreleased object; without
+    // retaining it here, the cb dangles after the next pool drain and
+    // [cb commit] / [cb waitUntilCompleted] crash later. Same MRR
+    // discipline as setMtlMutableTexture above.
+    [cb retain];
+    [mtlMutableCommandBuffer release];
+    mtlMutableCommandBuffer = cb;
+}
 -(int)mtlMutableInitialARGB { return mtlMutableInitialARGB; }
 -(void)setMtlMutableInitialARGB:(int)argb { mtlMutableInitialARGB = argb; }
 #endif
 
 -(void)dealloc {
     if(name != nil) {
-        //CN1Log(@"Deleting image name %@", name); 
+        //CN1Log(@"Deleting image name %@", name);
 #ifndef CN1_USE_ARC
         [name release];
 #endif
@@ -212,10 +233,23 @@ extern int nextPowerOf2(int val);
                 //int fm = [ExecutableOp get_free_memory];
                 glDeleteTextures(1, &tname);
                 GLErrorLog;
-                //CN1Log(@"Texture deletion freed up: %i", [ExecutableOp get_free_memory] - fm); 
+                //CN1Log(@"Texture deletion freed up: %i", [ExecutableOp get_free_memory] - fm);
             });
         }
     }
+#ifdef CN1_USE_METAL
+    // Both ivars hold a +1 MTLTexture retain (newTextureWithDescriptor /
+    // CN1MetalTextureFromUIImage both return owned references). Without
+    // these explicit releases under MRR every transient Metal-backed image
+    // leaks a GPU texture: the animation/transition test suite creates
+    // 7 mutable images per test × ~17 tests, and the simulator runs out
+    // of Metal device memory mid-suite, hanging the next test.
+    [mtlTexture release];               mtlTexture = nil;
+    [mtlMutableTexture release];        mtlMutableTexture = nil;
+    // Same +1 retain ownership rule for the cached command buffer (the
+    // setter retains; dealloc must release).
+    [mtlMutableCommandBuffer release];  mtlMutableCommandBuffer = nil;
+#endif
 #ifndef CN1_USE_ARC
     [img release];
     [super dealloc];
