@@ -1,4 +1,4 @@
-== Native Modern Themes
+== Native modern themes
 
 Codename One ships an iOS Modern (liquid-glass) theme and an Android
 Material 3 theme that you can opt your app into with a single build
@@ -271,7 +271,7 @@ iOS-only behaviour:
 
 * `Toolbar`, `TitleArea`, `Title` paint over the status-bar area.
   iOS reserves room above for the notch / status bar; in your
-  capture this reads as a coloured strip at the very top of the
+  capture this reads as a coloured strip at the top of the
   Form. In production the device fills it with system content
   (signal, battery, time).
 * `MultiButton` is styled as an iOS Settings row (multi-line text
@@ -280,7 +280,7 @@ iOS-only behaviour:
 
 Android-only behaviour:
 
-* `Toolbar` does not paint over the system status bar; the native
+* `Toolbar` doesn't paint over the system status bar; the native
   Android status bar handles that.
 * `Tabs` use Material 3 top tabs (flat, underline-by-color). iOS
   modern renders Tabs as a bottom-anchored pill group via the
@@ -300,7 +300,7 @@ constants (Material codepoints):
 
 |`@checkBoxCheckedIconInt`
 |`MATERIAL_CHECK_BOX` (`E834`)
-|Override to e.g. `MATERIAL_CHECK_CIRCLE` (`E86C` / `59500`) for an
+|Override to for example, `MATERIAL_CHECK_CIRCLE` (`E86C` / `59500`) for an
 iOS-style filled circle. The iOS modern theme does this.
 
 |`@checkBoxUncheckedIconInt`
@@ -400,7 +400,7 @@ DangerButton.pressed {
 ----
 
 `cn1-derive` works best when the relationship is *child refines
-parent*. Avoid deriving across unrelated UIIDs (e.g. a TitleArea
+parent*. Avoid deriving across unrelated UIIDs (for example, a TitleArea
 that derives from Toolbar) - inline the properties instead.
 
 === Translucency, glass effects, and the test harness

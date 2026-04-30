@@ -4,7 +4,7 @@
 
 Resources packaged within the "JAR" don't belong in this section of the developer guide, but they are often confused with `Storage` and `FileSystemStorage`, so this is a good place to clarify them.
 
-You can place arbitrary files within the `src` directory of a Codename One project. The file is packaged into the final distribution. In standard Java SE you can usually do something like:
+You can place arbitrary files within the `src` directory of a Codename One project. The file is packaged into the final distribution. In standard Java SE you can do something like:
 
 [source,java]
 ----
@@ -34,7 +34,7 @@ InputStream i = Display.getInstance().getResourceAsStream(getClass(), "myFile");
 
 Those limitations exist for portability. iOS and Android handle resources differently, so supporting the full Java SE semantics is unrealistic.
 
-WARNING: This is even worse in some cases. Because of the way iOS works with resources, some file names can fail. For example, names with the `@` character or more than one `.` can cause problems (for example, `file.ext.act`).
+WARNING: This is even worse sometimes. Because of the way iOS works with resources, some file names can fail. For example, names with the `@` character or more than one `.` can cause problems (for example, `file.ext.act`).
 
 Just like in Java SE, the entries within the "JAR" are read and can't be modified. You can access the stream, but not the actual file.
 
@@ -44,7 +44,7 @@ https://www.codenameone.com/javadoc/com/codename1/io/Storage.html[Storage] is ac
 
 The `Storage` API also provides convenient methods to write objects to `Storage` and read them back with `readObject` and `writeObject`.
 
-TIP: Objects in `Storage` are usually deleted when an app is uninstalled, but they are retained between application updates. A notable exception is Android, which on some devices keeps objects in `Storage` after uninstalling an app. To force Android to remove them on uninstall, use the build hint `android.allowBackup=false`.
+TIP: Objects in `Storage` are deleted when an app is uninstalled, but they are retained between application updates. A notable exception is Android, which on some devices keeps objects in `Storage` after uninstalling an app. To force Android to remove them on uninstall, use the build hint `android.allowBackup=false`.
 
 The sample code below demonstrates listing storage content, adding and viewing entries, and deleting entries:
 
@@ -128,31 +128,31 @@ The backing store filename defaults to `"codenameone.properties"`, but you can o
 
 When you've a batch of updates, prefer the `Preferences.set(Map<String,Object>)` overload so that all values are persisted with a single disk write.
 
-Preferences can also notify interested code when a key changes. Register a `PreferenceListener` with `addPreferenceListener()` to react to updates made in other parts of your code or triggered remotely through `Codename One Push`.
+Preferences can also tell interested code when a key changes. Register a `PreferenceListener` with `addPreferenceListener()` to react to updates made in other parts of your code or triggered remotely through `Codename One Push`.
 Remember to remove listeners you no longer need to avoid leaks.
 
 WARNING: This gets somewhat confusing with primitive numbers for example: if you use `Preferences.set("primitiveLongValue", myLongNumber)` then invoke `Preferences.get("primitiveLongValue", 0)` you might get an exception! +
 This would happen because the value is physically a `Long` object but you're trying to get an `Integer`. The workaround is to remain consistent and use code like this `Preferences.get("primitiveLongValue", (long)0)`.
 
-=== File System
+=== File system
 
 https://www.codenameone.com/javadoc/com/codename1/io/FileSystemStorage.html[FileSystemStorage] provides file system access. It maps to the underlying OS’s file system API providing most of the common operations expected from a file API somewhat in the vain of `java.io.File` & `java.io.FileInputStream` for example: opening, renaming, deleting etc.
 
 Notice that the file system API is somewhat platform specific in its behavior. All paths used the API should be absolute otherwise they aren't guaranteed to work.
 
-The main reason `java.io.File` & `java.io.FileInputStream` were not supported directly has a lot to do with the richness of those two API's. They effectively allow saving a file anywhere, however mobile devices are far more restrictive and don't allow apps to see/modify files that are owned by other apps.
+The main reason `java.io.File` & `java.io.FileInputStream` weren't supported directly has a lot to do with the richness of those two API's. They effectively allow saving a file anywhere, but mobile devices are far more restrictive and don't allow apps to see/change files that are owned by other apps.
 
-==== File Paths & App Home
+==== File paths & app home
 
-All paths in `FileSystemStorage` are absolute, this simplifies the issue of portability significantly since the concept of relativity and current working directory aren't portable.
+All paths in `FileSystemStorage` are absolute, this simplifies the issue of portability since the concept of relativity and current working directory aren't portable.
 
 All URL's use the `/` as their path separator you try to enforce this behavior even in Windows.
 
-Directories end with the `/` character and thus can be easily distinguished by their name.
+Directories end with the `/` character and thus can be distinguished by their name.
 
 The `FileSystemStorage` API provides a `getRoots()` call to list the root directories of the file system (you can then "dig in" through the `listFiles` API). For example, this is confusing and unintuitive for developers.
 
-To simplify the process of creating/reading files you added the `getAppHomePath()` method. This method allows you to obtain the path to a directory where files can be stored/read.
+To simplify the process of creating/reading files Codename One provides the `getAppHomePath()` method. This method allows you to get the path to a directory where files can be stored/read.
 
 // HTML_ONLY_START
 You can use this directory to place an image to share as you did in the https://www.codenameone.com/manual/components.html#sharebutton-section[share sample].
@@ -216,7 +216,7 @@ hi.show();
 .Simple sample of a tree for the FileSystemStorage API
 image::img/filesystem-tree.png[Simple sample of a tree for the FileSystemStorage API,scaledwidth=20%]
 
-==== Storage vs. File System
+==== Storage vs. file system
 
 The question of storage vs. file system is often confusing for novice mobile developers. This embeds two separate questions:
 
@@ -227,9 +227,9 @@ The main reasons for the 2 API's are technical. Many OS's provide 2 ways of acce
 
 The secondary reason for the two API's is conceptual. `FileSystemStorage` is more powerful and in a sense provides more ways to fail, this is compounded by the complex on-device behavior of the API. `Storage` is designed to be friendlier to the uninitiated and more portable.
 
-You should pick `Storage` unless you've a specific requirement that prevents it. Some API's such as `Capture` expect a `FileSystemStorage` URI so in those cases this would also be a requirement.
+You should pick `Storage` unless you've a specific need that prevents it. Some API's such as `Capture` expect a `FileSystemStorage` URI so in those cases this would also be a need.
 
-Another case where `FileSystemStorage` is beneficial is the case of hierarchy or native API usage. If you need a a directory structure or need to communicate with a native API the `FileSystemStorage` approach is usually easier.
+Another case where `FileSystemStorage` is beneficial is the case of hierarchy or native API usage. If you need a directory structure or need to communicate with a native API the `FileSystemStorage` approach is easier.
 
 IMPORTANT: In some OS's the `FileSystemStorage` API can find the content of the `Storage` API. As one is implemented on top of the other. This is undocumented behavior that can change at any moment!
 
@@ -255,12 +255,12 @@ In general SQL seems overly complex for most embedded device programming tasks.
 .Portability Of SQLite
 ****
 SQLite is supported on iOS, Android, JavaScript, and Desktop/Simulator
-builds.  The JavaScript port relies on the browser's WebSQL implementation, so
+builds. The JavaScript port relies on the browser's WebSQL implementation, so
 it may be unavailable in environments that have already removed that feature.
 
-The biggest issue with SQLite portability is in iOS. The SQLite version for most platforms is threadsafe and as a result very stable. However, the iOS version isn't!
+The biggest issue with SQLite portability is in iOS. The SQLite version for most platforms is threadsafe and as a result stable. But, the iOS version isn't!
 
-This might not seem like a big deal normally, however if you forget to close a connection the GC might close it for you thus producing a crash. This is such a common occurrence that Codename One logs a warning when the GC collects a database resource on the simulator.
+This might not seem like a big deal, but if you forget to close a connection the GC might close it for you thus producing a crash. This is such a common occurrence that Codename One logs a warning when the GC collects a database resource on the simulator.
 ****
 
 
@@ -359,11 +359,11 @@ image::img/sql-table.png[Querying the temp demo generated by the SQLDemo applica
 image::img/sql-entry.png[Issuing a query,scaledwidth=20%]
 
 
-=== Network Manager & Connection Request
+=== Network manager & connection request
 
 One of the more common problems in Network programming is spawning a new thread to handle the network operations. In Codename One this is done seamlessly and becomes unessential thanks to the http://www.codenameone.com/javadoc/com/codename1/io/NetworkManager.html[NetworkManager].
 
-`NetworkManager` effectively alleviates the need for managing network threads by managing the complexity of network threading. The connection request class can be used to facilitate web service requests when coupled with the JSON/XML parsing capabilities.
+`NetworkManager` effectively alleviates the need for managing network threads by managing the complexity of network threading. The connection request class can be used to ease web service requests when coupled with the JSON/XML parsing capabilities.
 
 To open a connection one needs to use a http://www.codenameone.com/javadoc/com/codename1/io/ConnectionRequest.html[ConnectionRequest]
 object, which has some similarities to the networking mechanism in JavaScript but is obviously somewhat more elaborate.
@@ -420,20 +420,20 @@ byte[] resultOfRequest = request.getData();
 Notice that in this case the `addToQueueAndWait` method returned after the connection completed. Also notice that this was totally legal to do on the EDT!
 
 
-==== Timeouts & Retries
+==== Timeouts & retries
 
 Each request can override the global timeout using `setTimeout(int)`, which
-expects a duration in milliseconds. This is especially useful when you're
+expects a duration in milliseconds. This is useful when you're
 talking to endpoints that occasionally need a longer window than the default
 NetworkManager setting. You can also configure how many times Codename One
-should retry a failing call silently by using `setSilentRetryCount(int)`. When
+should retry a failing call by using `setSilentRetryCount(int)`. When
 the silent retry limit is reached the standard error handling kicks in (for example:
 listeners fire, fail dialogs show, etc.).
 
 
 ==== Threading
 
-By default the `NetworkManager` launches with a single network thread. This is sufficient for simple applications that don't do too much networking but if you need to fetch many images concurrently and perform web services in parallel this might be an issue.
+By default the `NetworkManager` launches with a single network thread. This is enough for simple applications that don't do too much networking but if you need to fetch many images concurrently and perform web services in parallel this might be an issue.
 
 WARNING: Once you increase the thread count there is no guarantee of order for your requests. Requests might not execute in the order with which you added them to the queue!
 
@@ -450,7 +450,7 @@ There is one exception to this rule which is the `postResponse()` method designe
 
 IMPORTANT: Never change the UI from a `ConnectionRequest` callback. You can either use a listener on the `ConnectionRequest`, use `postResponse()` (which is the exception to this rule) or wrap your UI code with `callSerially`.
 
-==== VPN Detection (Best Effort)
+==== VPN detection (best effort)
 
 `NetworkManager` includes two APIs for querying VPN state:
 
@@ -475,17 +475,17 @@ Use this API for UX or diagnostics (for example: warnings, telemetry, or logging
 not for access control or fraud prevention by itself.
 
 
-==== Arguments, Headers & Methods
+==== Arguments, headers & methods
 
 HTTP/S is a complex protocol that expects complex encoded data for its requests. Codename One tries to simplify and abstract most of these complexities behind common sense API's while still providing the full low-level access you would expect from such an API.
 
 ===== Arguments
 
-HTTP supports many "request methods", most commonly `GET` & `POST` but also a few others such as `HEAD`, `PUT`, `DELETE` etc.
+HTTP supports many "request methods," most commonly `GET` & `POST` but also a few others such as `HEAD`, `PUT`, `DELETE` etc.
 
 Arguments in HTTP are passed differently between `GET` and `POST` methods. that's what the `setPost` method in Codename One determines, whether arguments added to the request should be placed using the `GET` semantics or the `POST` semantics.
 
-So if you continue your example from above you can do something like this:
+if you continue your example from above you can do something like this:
 
 [source,java]
 ----
@@ -521,9 +521,9 @@ request.setHttpMethod("HEAD");
 
 ===== Headers
 
-When communicating with HTTP servers you often pass data within headers mostly for authentication/authorization but also to convey various properties.
+When communicating with HTTP servers you often pass data within headers for authentication/authorization but also to convey various properties.
 
-Some headers are built-in as direct API's for example: content type is directly exposed within the API since it's a pretty common use case. You can set the content type of a post request using:
+Some headers are built-in as direct API's for example: content type is directly exposed within the API since it's a pretty common use case. You can set the content kind of a post request using:
 
 [source,java]
 ----
@@ -549,7 +549,7 @@ String authHeader = "Basic " + Base64.encode(authCode.getBytes());
 NetworkManager.getInstance().addDefaultHeader("Authorization", authHeader);
 ----
 
-===== Server Headers
+===== Server headers
 
 Server returned headers are a bit trickier to read. You need to subclass the connection request and override the `readHeaders` method for example:
 
@@ -572,11 +572,11 @@ NetworkManager.getInstance().addToQueue(request);
 
 Here you can extract the headers one by one to handle complex headers such as cookies, authentication etc.
 
-===== Error Handling
+===== Error handling
 
-As you noticed above practically all of the methods in the `ConectionRequest` throw `IOException`. This allows you to avoid the `try`/`catch` semantics and let the error propagate up the chain so it can be handled uniformly by the application.
+As you noticed above practically all the methods in the `ConectionRequest` throw `IOException`. This allows you to avoid the `try`/`catch` semantics and let the error propagate up the chain so it can be handled uniformly by the application.
 
-There are two distinct placed where you can handle a networking error:
+two distinct placed where you can handle a networking error:
 
 - The `ConnectionRequest` - by overriding callback methods
 - The `NetworkManager` error handler
@@ -593,7 +593,7 @@ NetworkManager.getInstance().addErrorListener((e) -> e.consume());
 
 The error listener is invoked first with the https://www.codenameone.com/javadoc/com/codename1/io/NetworkEvent.html[NetworkEvent] matching the error. Consuming the event prevents it from propagating further down the chain into the `ConnectionRequest` callbacks.
 
-You can also override the error callbacks of the various types in the request for example: in the case of a server error code you can do:
+You can also override the error callbacks of the various types in the request for example: for a server error code you can do:
 
 [source,java]
 ----
@@ -610,7 +610,7 @@ ConnectionRequest request = new ConnectionRequest(url, false) {
 NetworkManager.getInstance().addToQueue(request);
 ----
 
-IMPORTANT: The error callback callback is triggered in the network thread! +
+IMPORTANT: The error callback is triggered in the network thread! +
 As a result it can't access the UI to show a `Dialog` or anything like that.
 
 Another approach is to use the `setFailSilently(true)` method on the `ConnectionRequest`. This will prevent the `ConnectionRequest` from displaying any errors to the user. it's a powerful strategy if you use the synchronous version of the API's for example:
@@ -627,11 +627,11 @@ if(request.getResponseCode() != 200) {
 
 TIP: This code will work with the synchronous "AndWait" version of the method since the response code will take a while to return for the non-wait version.
 
-===== Error Stream
+===== Error stream
 
 When you get an error code that isn't 200/300 you ignore the result. This is problematic as the result might contain information you need. For example: many webservices provide further XML/JSON based details describing the reason for the error code.
 
-Calling `setReadResponseForErrors(true)` will trigger a mode where even errors will receive the `readResponse` callback with the error stream. This also means that API's like `getData` and the listener API's will also work correctly in case of error.
+Calling `setReadResponseForErrors(true)` will trigger a mode where even errors will receive the `readResponse` callback with the error stream. This also means that API's like `getData` and the listener API's will also work in case of error.
 
 ==== GZIP
 
@@ -639,7 +639,7 @@ Gzip is a common compression format based on the lz algorithm, it’s used by we
 
 Codename One supports https://www.codenameone.com/javadoc/com/codename1/io/gzip/GZIPInputStream.html[GZipInputStream] and https://www.codenameone.com/javadoc/com/codename1/io/gzip/GZIPOutputStream.html[GZipOutputStream], which allow you to compress data seamlessly into a stream and extract compressed data from a stream. This is useful and can be applied to every arbitrary stream.
 
-Codename One also features a https://www.codenameone.com/javadoc/com/codename1/io/gzip/GZConnectionRequest.html[GZConnectionRequest], which will automatically unzip an HTTP response if it's indeed gzipped. Notice that some devices (iOS) always request gzip’ed data and always decompress it for you, however in the case of iOS it doesn't remove the gziped header. The `GZConnectionRequest` is aware of such behaviors so it's better to use that when connecting to the network (if applicable).
+Codename One also features a https://www.codenameone.com/javadoc/com/codename1/io/gzip/GZConnectionRequest.html[GZConnectionRequest], which will automatically unzip an HTTP response if it's indeed gzipped. Notice that some devices (iOS) always request gzip’ed data and always decompress it for you, but for iOS it doesn't remove the gziped header. The `GZConnectionRequest` is aware of such behaviors so it's better to use that when connecting to the network (if applicable).
 
 By default `GZConnectionRequest` doesn't request gzipped data ( unzips it when its received) but its pretty easy to do so add the HTTP header `Accept-Encoding: gzip` for example:
 
@@ -651,11 +651,11 @@ con.addRequestHeader("Accept-Encoding", "gzip");
 
 Do the rest as usual and you should have smaller responses from the servers.
 
-==== File Upload
+==== File upload
 
 https://www.codenameone.com/javadoc/com/codename1/io/MultipartRequest.html[MultipartRequest] tries to simplify the process of uploading a file from the local device to a remote server.
 
-You can always submit data in the `buildRequestBody` but this is flaky and has some limitations in terms of devices/size allowed. HTTP standardized file upload capabilities thru the multipart request protocol, this is implemented by countless servers and is well documented. Codename One supports this out of the box:
+You can always submit data in the `buildRequestBody` but this is flaky and has some limitations in devices/size allowed. HTTP standardized file upload capabilities thru the multipart request protocol, this is implemented by countless servers and is well documented. Codename One supports this out of the box:
 
 [source,java]
 ----
@@ -694,11 +694,11 @@ public class UploadServlet extends HttpServlet {
 
 Codename One has many built in parsers for JSON, XML, CSV & Properties formats. You can use those parsers to read data from the Internet or data that's shipping with your product. For example: use the CSV data to setup default values for your application.
 
-All your parsers are designed with simplicity and small distribution size; they don't validate and will fail in odd ways when faced with broken data. The main logic behind this is that validation takes up CPU time on the device where CPU is a precious resource.
+All your parsers are designed with simplicity and small distribution size; they don't check and will fail in odd ways when faced with broken data. The main logic behind this is that validation takes up CPU time on the device where CPU is a precious resource.
 
 ===== Parsing CSV
 
-CSV is probably the easiest to use, the "Comma Separated Values" format is a list of values separated by commas (or some other character) with new lines to indicate another row in the table. These usually map well to an Excel spreadsheet or database table and are supported by default in all spreadsheets.
+CSV is probably the easiest to use, the "Comma Separated Values" format is a list of values separated by commas (or some other character) with new lines to show another row in the table. These map well to an Excel spreadsheet or database table and are supported by default in all spreadsheets.
 
 To parse a CSV use the https://www.codenameone.com/javadoc/com/codename1/io/CSVParser.html[CSVParser] class as such:
 
@@ -720,12 +720,12 @@ try(Reader r = new CharArrayReader("1997,Ford,E350,\"Super, \"\"luxurious\"\" tr
 hi.show();
 ----
 
-.CSV parsing results, notice the properly escaped parentheses and comma
-image::img/csv-parsing.png[CSV parsing results notice the properly escaped parentheses and comma,scaledwidth=30%]
+.CSV parsing results, notice the escaped parentheses and comma
+image::img/csv-parsing.png[CSV parsing results notice the escaped parentheses and comma,scaledwidth=30%]
 
 The data contains a two dimensional array of the CSV content. You can change the delimiter character by using the `CSVParser` constructor that accepts a character.
 
-IMPORTANT: Notice that you used `CharArrayReader` from the `com.codename1.io` package for this sample. Normally you would want to use `java.util.InputStreamReader` for real world data.
+IMPORTANT: Notice that you used `CharArrayReader` from the `com.codename1.io` package for this sample. You would want to use `java.util.InputStreamReader` for real world data.
 
 ===== JSON
 
@@ -741,7 +741,7 @@ The response is a `Map` containing a nested hierarchy of `Collection` (`java.uti
 
 The sample below uses results from https://anapioficeandfire.com/[an API of ice and fire] that queries structured data about the "Song Of Ice & Fire" book series. Here is a sample result returned from the API for the query http://www.anapioficeandfire.com/api/characters?page=5&pageSize=3 :
 
-[source,javascript]
+[source,JavaScript]
 ----
 [
   {
@@ -854,7 +854,7 @@ try(Reader r = new InputStreamReader(Display.getInstance().getResourceAsStream(g
 hi.show();
 ----
 
-<1> The `JSONParser` returns a `Map` which is great if the root object is a `Map` but in some cases its a list of elements (as is the case above). In this case a special case "root" element is created to contain the actual list of elements.
+<1> The `JSONParser` returns a `Map` which is great if the root object is a `Map` but sometimes its a list of elements (as is the case above). In this case a special case "root" element is created to contain the actual list of elements.
 
 <2> You rely that the entries are all maps, this might not be the case for every API type.
 
@@ -870,11 +870,11 @@ An alternative approach is to use the static data parse() method of the `JSONPar
 
 `JSONParser.parse(reader, callback);`
 
-Notice that a static version of the method is used! The callback object is an instance of the `JSONParseCallback` interface, which includes many methods. These methods are invoked by the parser to indicate internal parser states, this is similar to the way traditional XML SAX event parsers work.
+Notice that a static version of the method is used! The callback object is an instance of the `JSONParseCallback` interface, which includes many methods. These methods are invoked by the parser to show internal parser states, this is like the way traditional XML SAX event parsers work.
 
-===== XML Parsing
+===== XML parsing
 
-The https://www.codenameone.com/javadoc/com/codename1/xml/XMLParser.html[XMLParser] started its life as an HTML parser built for displaying mobile HTML. That usage has since been deprecated but the parser can still parse many HTML pages and is "loose" in terms of verification. This is both good and bad as the parser will work with invalid data without complaining.
+The https://www.codenameone.com/javadoc/com/codename1/xml/XMLParser.html[XMLParser] started its life as an HTML parser built for displaying mobile HTML. That usage has since been deprecated but the parser can still parse many HTML pages and is "loose" in verification. This is both good and bad as the parser will work with invalid data without complaining.
 
 The simplest usage of `XMLParser` looks a bit like this:
 
@@ -895,9 +895,9 @@ https://www.codenameone.com/manual/components.html#tree-section[Tree Section] of
 You've had a great sample of working with `XMLParser` in the <<tree-section,Tree Section>> of this guide.
 ////
 
-`XMLParser` has the complimentary https://www.codenameone.com/javadoc/com/codename1/xml/XMLWriter.html[XMLWriter] class which can generate XML from the `Element` hierarchy. This allows a developers to mutate (modify) the elements and save them to a writer stream.
+`XMLParser` has the complimentary https://www.codenameone.com/javadoc/com/codename1/xml/XMLWriter.html[XMLWriter] class which can generate XML from the `Element` hierarchy. This allows a developers to mutate (change) the elements and save them to a writer stream.
 
-===== XPath Processing
+===== XPath processing
 
 The https://www.codenameone.com/javadoc/com/codename1/processing/Result.html[Result] class provides a subset of
 https://www.w3schools.com/xml/xpath_intro.asp[XPath], but it isn't limited to XML documents, it can also work with JSON documents, and even with raw `Map` objects.
@@ -934,7 +934,7 @@ https://developers.google.com/maps/documentation/geocoding/[Google Reverse Geoco
 </GeocodeResponse>
 ----
 
-You want to extract some of the data above into simpler string results. You can do this using:
+You want to extract some data above into simpler string results. You can do this using:
 
 [source,java]
 ----
@@ -944,7 +944,7 @@ String region = result.getAsString("/result/address_component[type='administrati
 String city = result.getAsString("/result/address_component[type='locality']/long_name");
 ----
 
-If you're at all familiar with processing responses from webservices, you will notice that what would normally require many lines of code of selecting and testing nodes in regular java can now be done in a single line using the new path expressions.
+If you're at all familiar with processing responses from webservices, you will notice that what would require many lines of code of selecting and testing nodes in regular java can now be done in a single line using the new path expressions.
 
 In the code above, input can be any of:
 
@@ -1000,7 +1000,7 @@ hi.show();
 
 The returned JSON looks something like this (notice it's snipped because the data is too long):
 
-[source,javascript]
+[source,JavaScript]
 ----
 {
   "status": "OK",
@@ -1107,7 +1107,7 @@ The returned JSON looks something like this (notice it's snipped because the dat
 image::img/processing-package.png[Running the geocode sample above in the simulator,scaledwidth=20%]
 
 
-The XML processor currently handles global selections by using a double slash anywhere within the expression, for example:
+The XML processor handles global selections by using a double slash anywhere within the expression, for example:
 
 [source,java]
 ----
@@ -1119,9 +1119,9 @@ String array[] = result.getAsStringArray("/result[1]//type");
 ----
 
 
-NOTE: Notice that Google’s JSON webservice uses plural form for each of the node names in that API (ie. results, address_components, and types) where they don’t in the XML services (ie result, address_component etc.)
+NOTE: Notice that Google’s JSON webservice uses plural form for each of the node names in that API (ie. results, address_components, and types) where they don’t in the XML services (that's result, address_component etc.)
 
-====== Second Example
+====== Second example
 
 It also possible to do some more complex expressions. You’ll use the following XML fragment for the next batch of examples:
 
@@ -1166,7 +1166,7 @@ Above, if you want to select the IDs of all players that are ranked in the top 2
 int top2[] = result.getAsIntegerArray("//player[@rank < 3]/@id");
 ----
 
-TIP: Notice above that the expression is using an attribute for selecting both rank and id. In JSON documents, if you attempt to select an attribute, it will look for a child node under the attribute name you ask for)
+TIP: Notice above that the expression is using an attribute for selecting both rank and id. In JSON documents, if you try to select an attribute, it will look for a child node under the attribute name you ask for)
 
 If a document is ordered, you might want to select nodes by their position, for example:
 
@@ -1185,7 +1185,7 @@ it's also possible to select parent nodes, by using the ‘..’ expression. For
 int id = result.getAsInteger("//lastname[text()='Hewitt']/../@id");
 ----
 
-Above, you globally find a lastname element with a value of ‘Hewitt’, then grab the parent node of lastname which happens to be the player node, then grab the id attribute from the player node. Alternatively, you could get the same result from the following simpler statement:
+Above, you globally find a lastname element with a value of ‘Hewitt’, then grab the parent node of lastname which happens to be the player node, then grab the id attribute from the player node. Or, you could get the same result from the following simpler statement:
 
 [source,java]
 ----
@@ -1216,7 +1216,7 @@ Above, you selected the IDs of all ranked players. Conversely, you can select th
 int id[] = result.getAsIntegerArray("//player[@rank=null]/@id");
 ----
 
-NOTE: Logical not (!) operators currently aren't implemented)
+NOTE: Logical not (!) operators aren't implemented)
 
 You can also select by the existence of a child node
 
@@ -1229,26 +1229,26 @@ int id[] = result.getAsIntegerArray("//player[middlename]/@id");
 Above, you selected all players that have a middle name.<br/>
 Keep in mind that the Codename One path expression language isn't a full implementation of XPath 1.0, but does already handle many of the most useful features of the specification.
 
-===== Properties Files
+===== Properties files
 
 https://www.codenameone.com/javadoc/com/codename1/io/Properties.html[Properties] files are standard key/value pairs encoded into a text file. This file format is familiar to Java developers and the Codename One specific version tries to be as close as possible to the original Java implementation.
 
-Notice that properties file both in Java proper and in Codename One don't support non-ascii characters. In order to encode unicode values into the properties file format you should use the `native2ascii` tool that ships with the JDK.
+Notice that properties file both in Java proper and in Codename One don't support non-ascii characters. To encode unicode values into the properties file format you should use the `native2ascii` tool that ships with the JDK.
 
 One major difference between standard Java properties and the ones in Codename One is that Codename One sorts properties alphabetically when saving. Java uses random order based on the `Hashtable` natural ordering.
 
 This was done to provide consistency for saved files.
 
-=== Debugging Network Connections
+=== Debugging network connections
 
 .Debugging Network Connections
 image::img/network-monitor.png[Debugging Network Connections,scaledwidth=20%]
 
-Codename One includes a Network Monitor tool which you can access through the simulator menu option. This tool reflects all the requests made through the connection requests and displays them in the left pane. This allows you to track issues in your code/web service and see everything the is "going through the wire".
+Codename One includes a Network Monitor tool which you can access through the simulator menu option. This tool reflects all the requests made through the connection requests and displays them in the left pane. This allows you to track issues in your code/web service and see everything the is "going through the wire."
 
-This is a remarkably useful tool for optimizing and for figuring out what exactly is happening with your server connection logic.
+This is a useful tool for optimizing and for figuring out what is happening with your server connection logic.
 
-==== Simpler Downloads
+==== Simpler downloads
 
 A common task is file download to storage or filesystem.
 
@@ -1263,7 +1263,7 @@ These all delegate to a feature in https://www.codenameone.com/javadoc/com/coden
 
 Both of which simplify the whole process of downloading a file.
 
-===== Downloading Images
+===== Downloading images
 
 Codename One has many ways to download an image and the general recommendation is the https://www.codenameone.com/javadoc/com/codename1/ui/URLImage.html[URLImage].
 For example, the `URLImage` assumes that you know the size of the image in advance or that you're willing to resize it. In that regard it works great for some use cases but not so much for others.
@@ -1287,7 +1287,7 @@ request.downloadImageToStorage(url, (img) -> theImageIsHereDoSomethingWithIt(img
 
 This effectively maps the `ConnectionRequest` directly to a https://www.codenameone.com/javadoc/com/codename1/util/SuccessCallback.html[SuccessCallback] for further processing.
 
-====== URLImage Caching
+====== URLImage caching
 
 `URLImage` is great. It changed the way you do some things in Codename One.
 
@@ -1295,14 +1295,14 @@ For example, when you introduced it you didn't have support for the cache filesy
 
 JavaScript already knows how to download and cache images from the web. `URLImage` is actually a step back from the things a good browser can do so why not use the native abilities of the browser when you're running there and fallback to using the cache filesystem if it's available and as a last resort go to storage...
 
-that's exactly what the new method of `URLImage` does:
+that's what the new method of `URLImage` does:
 
 [source,java]
 ----
 public static Image createCachedImage(String imageName, String url, Image placeholder, int resizeRule);
 ----
 
-There are a few important things you need to notice about this method:
+a few important things you need to notice about this method:
 
 - It returns *Image* and not *URLImage*. This is crucial. Down casting to `URLImage* will work on the simulator but might fail in some platforms (for example: JavaScript) so don't do that! +
 Since this is implemented natively in JavaScript you need a different abstraction for that platform.
@@ -1313,7 +1313,7 @@ If you do use this approach it would be far more efficient when running in the J
 
 === Rest API
 
-The `Rest` API makes it easy to invoke a restfull webservice without many of the nuances of `ConnectionRequest`. You can use it to define the HTTP method and start building based on that. So if I want to get a parsed JSON result from a URL you could do:
+The `Rest` API makes it easy to invoke a restfull webservice without many of the nuances of `ConnectionRequest`. You can use it to define the HTTP method and start building based on that. if I want to get a parsed JSON result from a URL you could do:
 
 [source,java]
 ----
@@ -1344,15 +1344,15 @@ Some highlights that are easy to miss:
  request when you need stateless behavior.
 * `.useBoolean(boolean)` and `.useLongs(boolean)` toggle how the JSON parser
  materializes number and boolean types inside the resulting `Map`, which is
- handy when your backend is strict about data types.
+ handy when your back end is strict about data types.
 * `.cacheMode(...)` and `.postParameters(...)` expose the same knobs as
  `ConnectionRequest`, keeping you in the fluent API even for advanced tweaks.
 
 I changed the code in the kitchen sink webservice sample to use this API. I was able to make it shorter and more readable without sacrificing anything.
 
-==== Rest in Practice - Twilio
+==== Rest in practice - twilio
 
-The best way to explain the usage of this API is through a concrete "real world" example. Twilio provides many great telephony oriented webservices to developers. One of those is an SMS sending webservice which can be useful for things such as "device activation".
+The best way to explain the usage of this API is through a concrete "real world" example. Twilio provides many great telephony oriented webservices to developers. One of those is an SMS sending webservice which can be useful for things such as "device activation."
 
 To get started you would need to signup to http://twillo.com/[Twilio] and have the following 3 variable values:
 
@@ -1363,7 +1363,7 @@ String authToken = "---------------";
 String fromPhone = "your Twilio phone number here";
 ----
 
-TIP: You can open a trial Twilio account and it tags all of your SMS's. Notice you would need to use a US based number if you don't want to pay
+TIP: You can open a trial Twilio account and it tags all your SMS's. Notice you would need to use a You based number if you don't want to pay
 
 You can now send hello world as an SMS to the end user. Once this is in place sending an SMS through REST is a matter of using the `Rest` API:
 
@@ -1389,11 +1389,11 @@ curl 'https://api.twilio.com/2010-04-01/Accounts/[accountSID]/Messages.json' -X 
 
 that's pretty cool as the curl command maps almost directly to the `Rest` API call!
 
-What you do here is actually pretty trivial, you open a connection the the api messages URL. You add arguments to the body of the post request and define the basic authentication data.
+What you do here is actually pretty trivial, you open a connection the api messages URL. You add arguments to the body of the post request and define the basic authentication data.
 
-The result is in JSON form you mostly ignore it since it isn't that important but it might be useful for error handling. This is a sample response (redacted keys):
+The result is in JSON form you ignore it since it isn't that important but it might be useful for error handling. This is a sample response (redacted keys):
 
-[source,javascript]
+[source,JavaScript]
 ----
 {
     "sid": "[sid value]",
@@ -1438,7 +1438,7 @@ if(result.getResponseData() != null) {
 ----
 
 
-=== Webservice Wizard
+=== Webservice wizard
 
 The Webservice Wizard can be invoked directly from the plugin. It generates stubs for the client side that allow performing simple method invocations on the server. It also generates a servlet that can be installed on any servlet container to intercept client side calls.
 
@@ -1450,7 +1450,7 @@ image::img/webservice-wizard-step1-create-webapp.png[The first step in creating 
 .Any name will do
 image::img/webservice-wizard-step2-any-name-will-do.png[Any name will do,scaledwidth=40%]
 
-Normally you should have a server setup locally. I use Tomcat since it's trivial and I don't need much but there are many great Java webservers out there and this should work with all of them!
+You should have a server setup locally. I use Tomcat since it's trivial and I don't need much but there are many great Java webservers out there and this should work with all them!
 
 .Setup your webserver in the IDE
 image::img/webservice-wizard-step3-setup-your-webserver.png[Setup your webserver in the IDE,scaledwidth=40%]
@@ -1464,10 +1464,10 @@ image::img/webservice-wizard-step5-main-project-rightclick-select-webservice-wiz
 .Set the package and class name for the webservice abstraction (notice this isn't your main class name) and then add the methods you want in the webservice
 image::img/webservice-wizard-step6-set-package-and-class-names-add-methods.png[Set the package and class name for the webservice abstraction (notice this isn't your main class name) and then add the methods you want in the webservice,scaledwidth=40%]
 
-.Add the methods and their arguments/return types. Once you finished adding all of those press the "Generate" button
-image::img/webservice-wizard-step7-add-methods.png[Add the methods and their arguments/return types. Once you finished adding all of those press the "Generate" button,scaledwidth=40%]
+.Add the methods and their arguments/return types. Once you finished adding all those press the "Generate" button
+image::img/webservice-wizard-step7-add-methods.png[Add the methods and their arguments/return types. Once you finished adding all those press the "Generate" button,scaledwidth=40%]
 
-TIP: The types of arguments are pretty limited however you can pass an arbitrary `Externalizable` object which can be "anything"
+TIP: The types of arguments are pretty limited but you can pass an arbitrary `Externalizable` object which can be "anything"
 
 .Pick the directory in the server project to which the source files will be generated by default this is the src/java directory under the project you created in the first step
 image::img/webservice-wizard-step8-pick-the-server-source-directory.png[Pick the directory in the server project to which the source files will be generated by default this is the src/java directory under the project you created in the first step,scaledwidth=40%]
@@ -1523,22 +1523,22 @@ public class GameOfThronesService {
 }
 ----
 
-The destination URL needs to point at the actual server which you will recall from the new project creation should include "HelloWebServiceWizard". So you can fix the URL to:
+The destination URL needs to point at the actual server which you will recall from the new project creation should include `HelloWebServiceWizard`. you can fix the URL to:
 
 [source,java]
 ----
 private static final String DESTINATION_URL = "http://localhost:8080/HelloWebServiceWizard/cn1proxy";
 ----
 
-You would naturally need to update the host name of the server for running on a device otherwise the device would need to reside within your internal network and point to your IP address.
+You would need to update the host name of the server for running on a device otherwise the device would need to live within your internal network and point to your IP address.
 
-it's now time to write the actual client code that calls this. Every method you defined above is now defined as a static method within the `GameOfThronesService` class with two permutations. One is a synchronous permutation that behaves exactly as expected. It blocks the calling thread while calling the server and might throw an `IOException` if something failed.
+it's now time to write the actual client code that calls this. Every method you defined above is now defined as a static method within the `GameOfThronesService` class with two permutations. One is a synchronous permutation that behaves as expected. It blocks the calling thread while calling the server and might throw an `IOException` if something failed.
 
-This type of method (synchronous method) is easy to work with since it's completely legal to call it from the event dispatch thread and it's easy to map it to application logic flow.
+This kind of method (synchronous method) is easy to work with since it's legal to call it from the event dispatch thread and it's easy to map it to application logic flow.
 
-The second type of method uses the async JavaScript style callbacks and accepts the callback interface. It returns immediately and doesn't throw any exception. It will call onSuccess/onError based on the server result.
+The second kind of method uses the async JavaScript style callbacks and accepts the callback interface. It returns and doesn't throw any exception. It will call onSuccess/onError based on the server result.
 
-You can pick either one of these approaches based on your personal preferences. Here you demonstrate both uses with the server API:
+You can pick either one of these approaches based on your personal preferences. Here you show both uses with the server API:
 
 [source,java]
 ----
@@ -1582,13 +1582,13 @@ getNamesASync.addActionListener((e) -> {
 .The final result of the WebService Wizard code
 image::img/webservice-wizard-result.png[The final result of the WebService Wizard code,scaledwidth=20%]
 
-=== Connection Request Caching
+=== Connection request caching
 
-Caching server data locally is a huge part of the advantage a native app has over a web app. Normally this is
-non-trivial as it requires a delicate balance especially if you want to test the server resource for changes.
+Caching server data locally is a huge part of the advantage a native app has over a web app. This is
+non-trivial as it requires a delicate balance if you want to test the server resource for changes.
 
 HTTP provides two ways to do that the https://en.wikipedia.org/wiki/HTTP_ETag[ETag] and
-https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Last-Modified[Last-Modified]. While both are
+https://developer.mozilla.org/en-You/docs/Web/HTTP/Headers/Last-Modified[Last-Modified]. While both are
 great they are non-trivial to use and by no definition seamless.
 
 You added an experimental feature to connection request that allows you to set the caching mode to one of
@@ -1596,7 +1596,7 @@ You added an experimental feature to connection request that allows you to set t
 
 - *OFF* is the default meaning no caching.
 - *SMART* means all get requests are cached intelligently and caching is "mostly" seamless
-- *MANUAL* means that the developer is responsible for the actual caching but the system won't do a request on a resource that's already "fresh"
+- *MANUAL* means that the developer handles the actual caching but the system won't do a request on a resource that's already "fresh"
 - *OFFLINE* will fetch data from the cache and wont try to go to the server. It will generate a 404 error if data isn't available
 
 You can toggle these in the specific request by using `setCacheMode(CachingMode)` and set the global
@@ -1604,7 +1604,7 @@ default using `setDefaultCacheMode(CachingMode)`.
 
 NOTE: Caching applies to `GET` operations, it won't work for `POST` or other methods
 
-There are many methods of interest to keep an eye for:
+many methods of interest to keep an eye for:
 
 [source,java]
 ----
@@ -1619,31 +1619,31 @@ public static void purgeCacheDirectory() throws IOException;
 This returns the cached data. This is invoked to implement `readResponse(InputStream)` when running offline
 or when you detect that the local cache isn't stale.
 
-The smart mode implements this properly and will fetch the right data. For example, the manual mode doesn't
+The smart mode implements this and will fetch the right data. For example, the manual mode doesn't
 store the data and relies on you to do so. In that case you need to return the data you stored at this point and must
 implement this method for manual mode.
 
-==== cacheUnmodified()
+==== Cacheunmodified()
 
-This is a callback that's invoked to indicate a cache hit, meaning that you already have the data.
+This is a callback that's invoked to show a cache hit, meaning that you already have the data.
 
 The default implementation still tries to call all the pieces for compatibility (for example: `readResponse`).
 For example, if this is unnecessary you can override that method with a custom implementation or even a blank
 implementation to block such a case.
 
-==== purgeCache & purgeCacheDirectory
+==== Purgecache & purgeCacheDirectory
 
 These methods are pretty self-explanatory. Notice one caveat though...
 
 When you download a file or a storage element you don't cache them and rely on the file/storage element to
-be present and serve as "cache". When purging you won't delete a file or storage element you downloaded and
+be present and serve as "cache." When purging you won't delete a file or storage element you downloaded and
 thus these might remain.
 
 For example, you do remove the `ETag` and `Last-Modified` data so the files might get refreshed the next time around.
 
-=== Cached Data Service
+=== Cached data service
 
-The https://www.codenameone.com/javadoc/com/codename1/io/services/CachedDataService.html[CachedDataService] allows caching data and updating it if the data changed on the server. Normally the download API's won't check for update if there is a local cache of the data (for example: `URLImage` always uses the local copy). This isn't a bad thing, it's pretty efficient.
+The https://www.codenameone.com/javadoc/com/codename1/io/services/CachedDataService.html[CachedDataService] allows caching data and updating it if the data changed on the server. The download API's won't check for update if there is a local cache of the data (for example: `URLImage` always uses the local copy). This isn't a bad thing, it's pretty efficient.
 
 For example, it might be important to update the image if it changed but you still want caching.
 
@@ -1668,9 +1668,9 @@ CachedDataService.updateData(d, new ActionListener() {
 ----
 
 
-=== Externalizable Objects
+=== Externalizable objects
 
-Codename One provides the https://www.codenameone.com/javadoc/com/codename1/io/Externalizable.html[Externalizable] interface, which is similar to the Java SE `Externalizable` interface.
+Codename One provides the https://www.codenameone.com/javadoc/com/codename1/io/Externalizable.html[Externalizable] interface, which is like the Java SE `Externalizable` interface.
 This interface allows an object to declare itself as `Externalizable` for serialization (so an object can be stored in a
 file/storage or sent over the network). For example, due to the lack of reflection and use of obfuscation these objects
 must be registered with the https://www.codenameone.com/javadoc/com/codename1/io/Util.html[Util] class.
@@ -1716,7 +1716,7 @@ public String getObjectId();
 ----
 
 The `getVersion()` method returns the current version of the object allowing the stored data to change its structure in the future (the version is then passed when internalizing the object). The object id is a `String` uniquely representing the object;
-it usually corresponds to the class name (in the example above the Unique Name should be `MyClass`).
+it corresponds to the class name (in the example above the Unique Name should be `MyClass`).
 
 WARNING: it's a common mistake to use `getClass().getName()` to implement `getObjectId()` and it would *seem to work* in the simulator. This isn't the case though! +
 Since devices obfuscate the class names this becomes a problem as data is stored in a random name that changes with every release.
@@ -1754,7 +1754,7 @@ public void internalize(int version, DataInputStream in) throws IOException {
 }
 ----
 
-Since strings might be null sometimes you also included convenience methods to implement such externalization. This effectively writes a boolean before writing the UTF to indicate whether the string is null:
+Since strings might be null sometimes you also included convenience methods to implement such externalization. This effectively writes a boolean before writing the UTF to show whether the string is null:
 
 [source,java]
 ----
@@ -1825,9 +1825,9 @@ public class MyClass implements Externalizable {
 
 Notice that you need to check for compatibility during the reading process as the writing process always writes the latest version of the data.
 
-=== UI Bindings & Utilities
+=== UI bindings & utilities
 
-Codename One provides many tools to simplify the path between networking/IO & GUI. A common task of showing a wait dialog or progress indication while fetching network data can be simplified by using the https://www.codenameone.com/javadoc/com/codename1/components/InfiniteProgress.html[InfiniteProgress] class for example:
+Codename One provides many tools to simplify the path between networking/IO & GUI. A common task of showing a wait dialog or progress sign while fetching network data can be simplified by using the https://www.codenameone.com/javadoc/com/codename1/components/InfiniteProgress.html[InfiniteProgress] class for example:
 
 [source,java]
 ----
@@ -1840,7 +1840,7 @@ The process of showing a progress bar for a long IO operation such as downloadin
 
 TIP: You can simulate network delays and disconnected network in the #Simulator# menu
 
-The `SliderBridge` class can bind a `ConnectionRequest` to a `Slider` and effectively indicate the progress of the download. For example:
+The `SliderBridge` class can bind a `ConnectionRequest` to a `Slider` and effectively show the progress of the download. For example:
 
 [source,java]
 ----
@@ -1863,11 +1863,11 @@ hi.show();
 .SliderBridge progress for downloading the image in the slow network mode
 image::img/network-sliderbridge.png[SliderBridge progress for downloading the image in the slow network mode,scaledwidth=20%]
 
-=== Logging & Crash Protection
+=== Logging & crash protection
 
 Codename One includes a https://www.codenameone.com/javadoc/com/codename1/io/Log.html[Log] API that allows developers to invoke `Log.p(String)` or `Log.e(Throwable)` to log information to storage.
 
-As part of the premium cloud features it's possible to invoke Log.sendLog() in order to email a log directly to the developer account. Codename One can do that seamlessly based on changes printed into the log or based on exceptions that are uncaught or logged for example:
+As part of the premium cloud features it's possible to invoke Log.sendLog() to email a log directly to the developer account. Codename One can do that seamlessly based on changes printed into the log or based on exceptions that are uncaught or logged for example:
 
 [source,java]
 ----
@@ -2008,7 +2008,7 @@ public class MyApplication {
 
 === Properties
 
-In standard Java you usually have a POJO (Plain Old Java Object) which has getters/setters for example: you can have a
+In standard Java you have a POJO (Plain Old Java Object) which has getters/setters for example: you can have a
 simple `Meeting` class like this:
 
 [source,java]
@@ -2055,7 +2055,7 @@ that are crucial:
 
 These features are crucial since properties allow you all kinds of magic for example: hibernate/ORM uses properties to bind
 Java objects to a database representation, jaxb does it to parse XML directly into Java objects and GUI builders
-use them to let you customize UI's visually.
+use them to let's customize UI's visually.
 
 POJO's don't support most of that so pretty much all Java based tools use a lot of reflection & bytecode manipulation. This works but has a lot of downsides for example: say I want to map an object both to the Database and to XML/JSON.
 
@@ -2067,7 +2067,7 @@ And how do I write custom generic code that uses such abilities? Do I need to ma
 
 ==== Properties in Java
 
-These are all abstract ideas, lets look at how you think properties should look in Java and how you can benefit from this moving forward.
+These are all abstract ideas, lets look at how you think properties should look in Java and how you can gain from this moving forward.
 
 
 This is the same class as the one above written with properties:
@@ -2109,7 +2109,7 @@ Log.p(meet.subject.get());
 
 ===== Encapsulation
 
-At first glance it looks like you created public fields (which you did) but if you will look closely at the declaration
+At first glance it looks like you created public fields (which you did) but if you will look at the declaration
 you will notice the `final` keyword:
 
 [source,java]
@@ -2124,7 +2124,7 @@ This means that this code won't compile:
 meet.subject = otherValue;
 ----
 
-So all setting/getting must happen thru the set/get methods and they can be replaced. For example: this is valid syntax
+all setting/getting must happen thru the set/get methods and they can be replaced. For example: this is valid syntax
 that prevents setting the property to null and defaults it to an empty string:
 
 [source,java]
@@ -2141,7 +2141,7 @@ public final Property<String,Meeting> subject = new Property<>("subject", "") {
 
 NOTE: You will discuss the reason for returning the `Meeting` instance below
 
-===== Introspection & Observability
+===== Introspection & observability
 
 Since `Property` is a common class it's pretty easy for introspective code to manipulate properties. For example,
 it can't detect properties in an object without reflection.
@@ -2159,7 +2159,7 @@ out any change made to the property:
 meet.subject.addChangeListener((p) -> Log.p("New property value is: " + p.get()));
 ----
 
-==== The Cool Stuff
+==== The cool stuff
 
 that's the simple stuff that can be done with properties, but they can do **much** more!
 
@@ -2212,14 +2212,14 @@ String jsonString = meet.toJSON();
 ----
 
 You also have a simple ORM solution that maps values to table columns and can create tables. it's no hibernate
-but sqlite isn't exactly big iron so it might be good enough.
+but sqlite isn't big iron so it might be good enough.
 
 ===== Constructors
 
 One of the problematic issues with constructors is that any change starts propagating everywhere. If I have
 fields in the constructor and I add a new field later I need to keep the old constructor for compatibility.
 
-So you added a new syntax:
+you added a new syntax:
 
 [source,java]
 ----
@@ -2245,7 +2245,7 @@ meet.when.set(new Date());
 
 
 
-===== Seamless Serialization
+===== Seamless serialization
 
 Lets assume I have an object called `Contacts` which includes contact information of contact for example:
 
@@ -2286,7 +2286,7 @@ For example: you can do something like this in your `init(Object)` method:
 new Contact().getPropertyIndex().registerExternalizable();
 ----
 
-After you do that once you can write/read contacts from storage if you so desire:
+After you do that once you can write/read contacts from storage if you so want:
 
 [source,java]
 ----
@@ -2297,7 +2297,7 @@ Contact readContact = (Contact)Storage.getInstance().readObject("MyContact");
 
 This will obviously also work for things like `List<Contact>` etc...
 
-===== Seamless SQL Storage
+===== Seamless SQL storage
 
 Writing SQL code can be tedious. Which is why `SQLMap` is such an important API for some of you. `SQLMap` allows CRUD (Create, Read, Update, Delete) operations on the built-in SQLite database using property objects.
 
@@ -2331,7 +2331,7 @@ In the above code you do the following:
 <3> Define the primary key for contact as `id` and set it to `auto increment` which will give it a unique value from the database
 <4> Call SQL's createTable if the table doesn't exist yet!
 
-TIP: Notice that at this time altering a created table isn't possible so if you add a new property you might need to detect that and do an `alter` call manually
+TIP: Notice that now altering a created table isn't possible so if you add a new property you might need to detect that and do an `alter` call manually
 
 You can then add entries to the contact table using:
 
@@ -2375,35 +2375,35 @@ The arguments for the `select` method are:
 - Number of elements to fetch
 - Page to start with - in this case if you've more than 1000 elements you can fetch the next page using `sm.select(c, c.name, true, 1000, 1)`
 
-There are many additional configurations where you can fine tune how a specific property maps to a column etc.
+many more configurations where you can fine tune how a specific property maps to a column etc.
 
-====== What's Still Missing
+====== What's still missing
 
-The `SQLMap` API is simplistic and doesn't try to be Hibernate/JPA for mobile. So basic things aren't available at this time and won't work. This isn't necessarily a problem as mobile databases don't need to be as powerful as server databases.
+The `SQLMap` API is simplistic and doesn't try to be Hibernate/JPA for mobile. basic things aren't available now and won't work. This isn't necessarily a problem as mobile databases don't need to be as powerful as server databases.
 
 ====== Relational Mappings/JOIN
 
-Right now you can't map an object to another object in the database with the typical one-many, one-one etc. relationships that would could do with JPA. The `SQLMap` API is simplistic and isn't suited for that level of mapping at this time.
+Right now you can't map an object to another object in the database with the typical one-many, one-one etc. relationships that would could do with JPA. The `SQLMap` API is simplistic and isn't suited for that level of mapping now.
 
 If there is demand for this it's something you might add moving forward but your goal isn't to re-invent hibernate.
 
 ====== Threading
 
-SQLite is sensitive to threading issues especially on iOS. You mostly ignored the issue of threading and issue all calls in process. This can be a problem for larger data sets as the calls would usually go on the EDT.
+SQLite is sensitive to threading issues on iOS. You ignored the issue of threading and issue all calls in process. This can be a problem for larger data sets as the calls would go on the EDT.
 
 This is something you might want to fix for the generic SQLite API so low-level SQL queries will work with your mapping in a sensible way.
 
 ====== Alter
 
-Right now you don't support table altering to support updated schemas. This is doable and shouldn't be too hard to implement correctly so if there is demand for doing it you will probably add support for this.
+Right now you don't support table altering to support updated schemas. This is doable and shouldn't be too hard to implement so if there is demand for doing it you will probably add support for this.
 
 ====== Complex SQL/Transactions
 
 You ignored functions, joins, transactions and a lot of other SQL capabilities.
 
-You can use SQL directly to use all of these capabilities for example: if you begin a transaction before inserting/updating or deleting this will work as advertised however if a rollback occurs your mapping will be unaware of that so you will need to re-fetch the data.
+You can use SQL directly to use all these capabilities for example: if you begin a transaction before inserting/updating or deleting this will work as advertised but if a rollback occurs your mapping will be unaware of that so you will need to re-fetch the data.
 
-You will notice you mapped auto-increment so you will generally try to map things that make sense for various use cases, if you've such a use case you'd appreciate pull requests and feedback on the implementation.
+You will notice you mapped auto-increment so you will try to map things that make sense for various use cases, if you've such a use case you'd appreciate pull requests and feedback on the implementation.
 
 ====== Caching/Collision
 
@@ -2411,7 +2411,7 @@ As mentioned above, you don't cache anything and there might be a collision if y
 
 That means you need to pay attention to the way you cache objects to avoid a case of a modified version of an object kept with an older version.
 
-===== Preferences Binding
+===== Preferences binding
 
 Some objects make sense as global objects, you can use the `Preferences` API to store that data directly but then you don't have the type safety that property objects bring to the table. that's where the binding of property objects to preferences makes sense. For example: say you've a global `Settings` property object you can bind it to preferences using:
 
@@ -2420,7 +2420,7 @@ Some objects make sense as global objects, you can use the `Preferences` API to 
 PreferencesObject.create(settingsInstance).bind();
 ----
 
-So if settings has a property called `companyName` it would bind into `Preferences` under the `Settings.companyName` entry.
+if settings has a property called `companyName` it would bind into `Preferences` under the `Settings.companyName` entry.
 
 You can do some more elaborate bindings such as:
 
@@ -2434,7 +2434,7 @@ PreferencesObject.create(settingsInstance).
 
 This would customize all entry keys to start with `MySettings-` instead of `Settings.`. This would also set the company name entry to `company` so in this case instead of `Settings.companyName` you'd have `MySettings-company`.
 
-===== UI Binding
+===== UI binding
 
 One of the bigger features of properties are their ability to bind UI to a property. For example: if you continue the sample above with the `Contact` class let's say you've a text field on the form and you want the property (which you mapped to the database) to have the value of the text field. You could do something like this:
 
@@ -2444,9 +2444,9 @@ myNameTextField.setText(myNameTextField.getText());
 myNameTextField.addActionListener(e -> myContact.name.set(myNameTextField.getText()));
 ----
 
-That would work nicely but what if you changed the property value, that wouldn't be reflected back into the text field?
+That would work but what if you changed the property value, that wouldn't be reflected back into the text field?
 
-Also that works nicely for text field but what about other types for example: numbers, check boxes, pickers etc. this becomes a bit more tedious with those.
+Also that works for text field but what about other types for example: numbers, check boxes, pickers etc. this becomes a bit more tedious with those.
 
 Binding makes this all seamless. For example: the code above can be written as:
 
@@ -2463,9 +2463,9 @@ The cool thing is that this works with many component types and property types a
 uib.bind(myRankTextField, myContact.rank);
 ----
 
-Seems similar to the one above but it takes a String that's returned by the text field and seamlessly converts it to the integer needed by rank. This also works in the other direction...
+Seems like the one above but it takes a String that's returned by the text field and seamlessly converts it to the integer needed by rank. This also works in the other direction...
 
-You can easily build a UI that would allow you to edit the `Contact` property in memory:
+You can build a UI that would allow you to edit the `Contact` property in memory:
 
 [source,java]
 ----
@@ -2518,8 +2518,9 @@ resp.add(c.rank.getLabel()).
 .Properties form for the contact
 image::img/properties-demo-binding.png[Properties form for the contact,scaledwidth=20%]
 
-====== Binding Object & Auto Commit
+====== Binding object & auto commit
 
+// vale-skip: Microsoft.ComplexWords/TooWordy — 'an additional version' reads correctly; 'an more version' is ungrammatical.
 You skipped a couple of fact about the `bind()` method. It has an additional version that accepts a `ComponentAdapter` which allows you to adapt the binding to any custom 3rd party component. that's a bit advanced for now but I might discuss this later.
 
 For example, the big thing I "skipped" was the return value... `bind` returns a `UiBinding.Binding` object when performing the bind. This object allows you to manipulate aspects of the binding specifically unbind a component and also manipulate auto commit for a specific binding.
@@ -2532,7 +2533,7 @@ Binding also includes the ability to "unbind" this is important if you've a glob
 
 By using the `disconnect()` method in `Binding` you can separate the UI from the object and allow the GC to cleanup.
 
-===== UI Generation
+===== UI generation
 
 Up until now this was pretty cool but if you looked at the UI construction code above you would see that it's pretty full of boilerplate code. The thing about boilerplate is that it shows where automation can be applied, that's the exact idea behind the magical "InstantUI" class. This means that the UI above can be generated using this code:
 
@@ -2567,7 +2568,7 @@ You might be surprised to know that this will still work seamlessly without doin
 
 The picker component implicitly works for date type properties, numeric constraints and numbers are implicitly used for number properties and check boxes are used for booleans.
 
-But how do you know to use an email constraint for the email property?
+However, how do you know to use an email constraint for the email property?
 
 you've some special case defaults for some common property names, so if your property is named email it will use an email constraint by default. If it's named url or password etc. it will do the "right thing" unless you explicitly state otherwise. You can customize the constraint for a specific property using something like:
 
@@ -2576,4 +2577,4 @@ you've some special case defaults for some common property names, so if your pro
 iui.setTextFieldConstraint(contact.email, TextArea.ANY);
 ----
 
-This will override the defaults you've in place. The goal of this tool is to have sensible "magical" defaults that "work".
+This will override the defaults you've in place. The goal of this tool is to have sensible "magical" defaults that "work."

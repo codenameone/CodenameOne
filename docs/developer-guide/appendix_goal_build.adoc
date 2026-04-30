@@ -1,8 +1,8 @@
-=== Codename One Build (`build`)
+=== Codename One build (`build`)
 
 The `build` goal is used to send builds to the Codename One build server. It also supports a few local build targets, such as `ios-source`, which generates an Xcode project, and `android-source` which generates an Android Gradle project.
 
-This goal is bound to the `package` phase of the <<cn1app-archetype>>, so you generally don't need to run this directly.
+This goal is bound to the `package` phase of the <<cn1app-archetype>>, so you don't need to run this directly.
 
 ==== Example
 
@@ -15,7 +15,7 @@ mvn cn1:build -Dcodename1.platform=javase -Dcodename1.buildTarget=mac-os-x-deskt
 ==== Properties
 
 codename1.platform::
-Specifies the platform to build for. Values include Java SE, android, ios, javascript, and win.
+Specifies the platform to build for. Values include Java SE, android, ios, JavaScript, and win.
 
 codename1.buildTarget::
 The build target. Different platforms support different build sets of build targets.
@@ -29,11 +29,11 @@ The build target. Different platforms support different build sets of build targ
 | android-source | android | Generates an Android Gradle project locally that can be opened and built in Android Studio.
 | ios-device | ios | Sends an iOS build to the Codename One build server.
 | ios-source | ios | Generates an iOS Xcode project locally that can be opened and built in Xcode.
-| javascript | javascript | Sends a Javascript build to the Codename One build server.
+| JavaScript | JavaScript | Sends a Javascript build to the Codename One build server.
 |====
 
 automated::
-Set to `true` to submit build as an automated build. When using this flag, the goal will wait for the build server to complete the build, then download it and save it in the target directory (of the associated module) using standard maven artifact file naming conventions. This allows you to set up automated CI workflows more easily.
+Set to `true` to submit build as an automated build. When using this flag, the goal will wait for the build server to complete the build, then download it and save it in the target directory (of the associated module) using standard maven artifact file naming conventions. This allows you to set up automated CI workflows more.
 +
 Default value is `false`.
 +

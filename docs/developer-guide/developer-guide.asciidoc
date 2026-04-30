@@ -102,7 +102,7 @@ include::Maven-Appendix-Control-Center.adoc[]
 
 include::Maven-Appendix-Rich-Properties.adoc[]
 
-= Historical Reference
+= Historical reference
 
 include::Working-with-UWP.asciidoc[]
 

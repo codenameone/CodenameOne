@@ -1,12 +1,12 @@
-=== Install Legacy Cn1lib (`install-cn1lib`)
+=== Install legacy Cn1lib (`install-cn1lib`)
 
 Installs a legacy cn1lib file as a dependency in this application project.
 
 See <<project-dependencies>> for more complete coverage of project dependencies.
 
-NOTE: Generally using this goal explicitly is a last resort. The best solution for installing add-ons into your project is <<managing-addons-in-control-center>>.
+NOTE: Using this goal explicitly is a last resort. The best solution for installing add-ons into your project is <<managing-addons-in-control-center>>.
 
-==== Usage Example
+==== Usage example
 
 [source,bash]
 ----
@@ -15,13 +15,13 @@ mvn cn1:install-cn1lib -Dfile=/path/to/MyLegacyLib.cn1lib
 
 This will generate a Maven pom project for this lib inside the "cn1libs" directory, and it will add a dependency inside the common/pom.xml file.
 
-NOTE: The generated project isn't a <<cn1lib-archetype, cn1lib-archetype>> project, and it isn't meant to modify. it's merely a Maven wrapper around the cn1lib file that provides compatibility with Maven's dependency mechanism.
+NOTE: The generated project isn't a <<cn1lib-archetype, cn1lib-archetype>> project, and it isn't meant to change. it's merely a Maven wrapper around the cn1lib file that provides compatibility with Maven's dependency mechanism.
 
-==== Removing the Cn1lib Later
+==== Removing the Cn1lib later
 
-If you need to remove the cn1lib later (i.e. revert an installation), you can simply remove the `<dependency>` tag that was added to the common/pom.xml file for the cn1lib.
+If you need to remove the cn1lib later (that is, revert an installation), you can remove the `<dependency>` tag that was added to the common/pom.xml file for the cn1lib.
 
-You can also remove the directory that was created inside the cn1libs folder for this cn1lib - but this step isn't strictly necessary.
+You can also remove the directory that was created inside the cn1libs folder for this cn1lib - but this step isn't necessary.
 
 ==== Parameters
 
