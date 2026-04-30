@@ -555,19 +555,6 @@ static void drawStringWholeStringFallback(NSString *str, UIFont *font, int color
 void CN1MetalDrawString(NSString *str, UIFont *font, int color, int alpha, int x, int y) {
     if (str == nil || font == nil || str.length == 0) return;
 
-    // CN1SS_DSD_DIAG: only log decorated-test strings so we can see what
-    // UIFont each panel actually receives. Filtering by string keeps the
-    // log size manageable and avoids flooding from KotlinUiTest's many
-    // labels.
-    if ([str hasPrefix:@"No Decoration"] || [str hasPrefix:@"3D "] ||
-        [str hasPrefix:@"Overline"] || [str hasPrefix:@"Strikethru"] ||
-        [str hasPrefix:@"Underline"] || [str hasPrefix:@"Default Font"] ||
-        [str hasPrefix:@"Small Bold Monospace"] || [str hasPrefix:@"native:"]) {
-        NSLog(@"CN1SS_DSD_DIAG str=\"%@\" name=%@ ptSize=%g lineHeight=%g ascender=%g x=%d y=%d",
-              str, font.fontName, (double)font.pointSize, (double)font.lineHeight, (double)font.ascender,
-              x, y);
-    }
-
     // Phase 4: shape the string with CTLine and emit one alpha-mask quad
     // per glyph against a per-(font, point-size) R8 atlas. Falls back to
     // the whole-string LRU path if the atlas can't be created (no
