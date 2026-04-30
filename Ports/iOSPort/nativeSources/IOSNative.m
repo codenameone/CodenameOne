@@ -1032,45 +1032,26 @@ void com_codename1_impl_ios_IOSNative_nativeDrawShadowMutable___long_int_int_int
 
 extern CGContextRef Java_com_codename1_impl_ios_IOSImplementation_drawPath(CN1_THREAD_STATE_MULTI_ARG JAVA_INT commandsLen, JAVA_OBJECT commandsArr, JAVA_INT pointsLen, JAVA_OBJECT pointsArr);
 
-#ifdef CN1_USE_METAL
-// Phase 3 v2 mutable shape helpers — implemented in CodenameOne_GLViewController.m
-// where DrawImage/GLUIImage are already in scope. See note there for why
-// the implementation lives in that translation unit rather than this one.
-extern void cn1MetalQueueShapeFillOnMutable(CN1_THREAD_STATE_MULTI_ARG int color, int alpha, JAVA_INT commandsLen, JAVA_OBJECT commandsArr, JAVA_INT pointsLen, JAVA_OBJECT pointsArr);
-extern void cn1MetalQueueShapeStrokeOnMutable(CN1_THREAD_STATE_MULTI_ARG int color, int alpha, JAVA_INT commandsLen, JAVA_OBJECT commandsArr, JAVA_INT pointsLen, JAVA_OBJECT pointsArr, float lineWidth, int capStyle, int joinStyle, float mitreLimit);
-#endif
-
 static CGContextRef drawPath(CN1_THREAD_STATE_MULTI_ARG JAVA_INT commandsLen, JAVA_OBJECT commandsArr, JAVA_INT pointsLen, JAVA_OBJECT pointsArr) {
 
     return Java_com_codename1_impl_ios_IOSImplementation_drawPath(CN1_THREAD_STATE_PASS_ARG commandsLen, commandsArr, pointsLen, pointsArr);
-
-
+    
+   
 
 }
 
 
 //native void nativeFillShapeMutable(int color, int alpha, int commandsLen, byte[] commandsArr, int pointsLen, float[] pointsArr);
 void com_codename1_impl_ios_IOSNative_nativeFillShapeMutable___int_int_int_byte_1ARRAY_int_float_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT color, JAVA_INT alpha, JAVA_INT commandsLen, JAVA_OBJECT commandsArr, JAVA_INT pointsLen, JAVA_OBJECT pointsArr) {
-#ifdef CN1_USE_METAL
-    // The CG drawPath path below relies on UIGraphicsGetCurrentContext()
-    // — nil under the v2 mutable encoder. Route through the queueing
-    // helper instead.
-    cn1MetalQueueShapeFillOnMutable(CN1_THREAD_STATE_PASS_ARG color, alpha, commandsLen, commandsArr, pointsLen, pointsArr);
-    return;
-#endif
     POOL_BEGIN();
     [UIColorFromRGB(color, alpha) set];
     CGContextRef context = drawPath(CN1_THREAD_STATE_PASS_ARG commandsLen, commandsArr, pointsLen, pointsArr);
     CGContextFillPath(context);
     POOL_END();
-
+    
 }
 
 void com_codename1_impl_ios_IOSNative_nativeDrawShapeMutable___int_int_int_byte_1ARRAY_int_float_1ARRAY_float_int_int_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT color, JAVA_INT alpha, JAVA_INT commandsLen, JAVA_OBJECT commandsArr, JAVA_INT pointsLen, JAVA_OBJECT pointsArr, JAVA_FLOAT lineWidth, JAVA_INT capStyle, JAVA_INT joinStyle, JAVA_FLOAT mitreLimit) {
-#ifdef CN1_USE_METAL
-    cn1MetalQueueShapeStrokeOnMutable(CN1_THREAD_STATE_PASS_ARG color, alpha, commandsLen, commandsArr, pointsLen, pointsArr, lineWidth, capStyle, joinStyle, mitreLimit);
-    return;
-#endif
     POOL_BEGIN();
     if ([CodenameOne_GLViewController isCurrentMutableTransformSet]) {
         CGContextSaveGState(UIGraphicsGetCurrentContext());
