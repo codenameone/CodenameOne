@@ -1,0 +1,80 @@
+name: Skin Designer Device DB Update
+
+on:
+  schedule:
+    # Monthly on the 1st at 06:30 UTC. The scrape walks ~18 brands × ~10
+    # listing pages × phones per page; with a 1.5 s polite delay it tends
+    # to finish in 30-60 minutes.
+    - cron: '30 6 1 * *'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/skin-designer-devices-update.yml'
+      - 'scripts/skindesigner/tools/devicedb/build_devices_json.py'
+
+permissions:
+  actions: write
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-device-db:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Restore HTML scrape cache
+        uses: actions/cache@v4
+        with:
+          path: scripts/skindesigner/tools/devicedb/cache
+          key: skin-designer-devicedb-cache-${{ github.run_id }}
+          restore-keys: |
+            skin-designer-devicedb-cache-
+
+      - name: Scrape GSMArena → devices.json
+        # --delay 1.5 keeps us at <1 req/sec averaged with jitter, which
+        # is well under GSMArena's per-IP rate limit. The cache directory
+        # is restored from the previous run so unchanged phone pages
+        # don't get re-fetched.
+        run: |
+          python3 scripts/skindesigner/tools/devicedb/build_devices_json.py \
+            --delay 1.5 --max-pages 12
+
+      - name: Show diff (PR mode)
+        if: github.event_name == 'pull_request'
+        run: |
+          if git diff --quiet -- scripts/skindesigner/common/src/main/resources/devices.json; then
+            echo "Device DB is already up to date."
+          else
+            git --no-pager diff --stat -- scripts/skindesigner/common/src/main/resources/devices.json
+          fi
+
+      - name: Create pull request
+        if: github.event_name != 'pull_request'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          commit-message: "Refresh Skin Designer device database"
+          title: "Refresh Skin Designer device database"
+          body: |
+            ## Summary
+            - Regenerates `scripts/skindesigner/common/src/main/resources/devices.json`
+              by scraping GSMArena directly. The script merges fresh records
+              into the existing catalog so historical entries survive partial
+              scrapes.
+
+            This PR is created automatically by the monthly device DB update
+            workflow. Skip the merge if the diff is empty or only churn.
+          base: master
+          branch: automation/skin-designer-device-db
+          delete-branch: true
+          labels: |
+            dependencies
+            automation

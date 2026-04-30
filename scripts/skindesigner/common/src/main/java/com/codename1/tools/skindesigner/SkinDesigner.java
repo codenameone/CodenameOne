@@ -1,275 +1,1431 @@
 package com.codename1.tools.skindesigner;
 
-import com.codename1.system.Lifecycle;
 import com.codename1.components.OnOffSwitch;
-import com.codename1.components.ScaleImageLabel;
-import com.codename1.components.SplitPane;
 import com.codename1.components.ToastBar;
 import com.codename1.io.FileSystemStorage;
-import com.codename1.ui.Display;
-import com.codename1.ui.CN;
-import com.codename1.ui.Form;
-import com.codename1.ui.Label;
 import com.codename1.io.Log;
 import com.codename1.io.Preferences;
 import com.codename1.io.Properties;
 import com.codename1.io.Storage;
 import com.codename1.io.Util;
-import com.codename1.ui.BrowserComponent;
+import com.codename1.system.Lifecycle;
 import com.codename1.ui.Button;
+import com.codename1.ui.CN;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
+import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
+import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
-import com.codename1.ui.Tabs;
-import com.codename1.ui.TextArea;
+import com.codename1.ui.Label;
 import com.codename1.ui.TextField;
-import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.GridLayout;
-import com.codename1.ui.spinner.Picker;
+import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.util.ImageIO;
 import com.codename1.ui.util.UITimer;
-import com.codename1.ui.validation.NumericConstraint;
-import com.codename1.ui.validation.Validator;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import net.sf.zipme.ZipEntry;
 import net.sf.zipme.ZipOutputStream;
 
+/**
+ * Wizard-style skin designer.
+ *
+ * Step 0 — pick a device from {@link DeviceDatabase}.
+ * Step 1 — pick a starting source (shape preset, uploaded image, or blank).
+ * Step 2 — editor with live preview and a sidebar (Shape / Cutouts / Info).
+ * Step 3 — done summary; the .skin file is written and a JS-port download
+ *           dialog is triggered.
+ */
 public class SkinDesigner extends Lifecycle {
-    private static final String[] NATIVE_THEMES = {"iOS", "Android", "Windows"};
-    private static final String[] NATIVE_THEME_FILES = {"iOS7Theme.res", "android_holo_light.res", "winTheme.res"};
+    private static final String PREF_STEP = "wiz.step";
+    private static final String PREF_DEVICE = "wiz.deviceId";
+    private static final String PREF_SOURCE = "wiz.source";
+    private static final String PREF_HAS_IMAGE = "wiz.hasImage";
+    private static final String IMAGE_STORAGE = "wiz.image.png";
+
+    private static final int STEP_DEVICE = 0;
+    private static final int STEP_SOURCE = 1;
+    private static final int STEP_EDIT = 2;
+    private static final int STEP_DONE = 3;
+
     private boolean websiteDarkMode;
+    private Form form;
+    private int step;
+    private DeviceDatabase.Device device;
+    private String source;
+    private SkinModel skin = new SkinModel();
+    private Image bodyImage;
+    private Container bodyHolder;
+    private Container header;
+    private Container statusbar;
+    private Label statusName;
+    private Label statusSpec;
+    private Container stepperRow;
+    private Container wizardNav;
 
     @Override
     public void runApp() {
         CN.setProperty("platformHint.javascript.beforeUnloadMessage", null);
-        Form skinDesignerForm = new Form("Skin Designer", new BorderLayout());
-        skinDesignerForm.setTitle("");
-        skinDesignerForm.setUIID("SkinDesignerForm");
-        Validator vl = new Validator();
-        final Tabs details = new Tabs();
-        details.getTabsContainer().setUIID("SkinDesignerTabsContainer");
-        details.getTabsContainer().setScrollableX(false);
-        final ImageSettings[] imPortraitRef = new ImageSettings[1];
-        final ImageSettings[] imLandscapeRef = new ImageSettings[1];
-
-        skinDesignerForm.add(BorderLayout.CENTER, details);
-
-        Picker nativeTheme = new Picker();
-        nativeTheme.setUIID("SkinDesignerField");
-        nativeTheme.setStrings(NATIVE_THEMES);
-        nativeTheme.setSelectedString(NATIVE_THEMES[0]);
-        nativeTheme.setRenderingPrototype("XXXXXXXXXXXXXXXXXXX");
-        autoSave(nativeTheme, "nativeTheme");
-
-        Picker platformName = new Picker();
-        platformName.setUIID("SkinDesignerField");
-        platformName.setStrings("ios", "and", "win","rim", "se");
-        platformName.setSelectedString("ios");
-        platformName.setRenderingPrototype("XXXX");
-        autoSave(platformName, "platformName");
-
-        OnOffSwitch tablet = new OnOffSwitch();
-        tablet.setUIID("SkinDesignerField");
-        tablet.setValue(false);
-        autoSave(tablet, "tablet");
-
-        TextField systemFontFamily = new TextField("Helvetica", "System Font Family", 20, TextField.ANY);
-        TextField proportionalFontFamily = new TextField("Helvetica", "Proportional Font Family", 20, TextField.ANY);
-        TextField monospaceFontFamily = new TextField("Courier", "Monospace Font Family", 20, TextField.ANY);
-        styleFields(systemFontFamily, proportionalFontFamily, monospaceFontFamily);
-        autoSave(systemFontFamily, "systemFontFamily");
-        autoSave(proportionalFontFamily, "proportionalFontFamily");
-        autoSave(monospaceFontFamily, "monospaceFontFamily");
-
-        TextField smallFontSize = new TextField("11", "Small Font Size", 20, TextField.NUMERIC);
-        TextField mediumFontSize = new TextField("14", "Medium Font Size", 20, TextField.NUMERIC);
-        TextField largeFontSize = new TextField("20", "Large Font Size", 20, TextField.NUMERIC);
-        styleFields(smallFontSize, mediumFontSize, largeFontSize);
-        autoSave(smallFontSize, "smallFontSize");
-        autoSave(mediumFontSize, "mediumFontSize");
-        autoSave(largeFontSize, "largeFontSize");
-
-        TextField pixelRatio = new TextField("6.4173236936575", "Pixel Ratio - pixels per millimeter", 20, TextField.DECIMAL);
-        pixelRatio.setUIID("SkinDesignerField");
-        autoSave(pixelRatio, "pixelRatio");
-
-        Picker overrideNamePrimary = new Picker();
-        overrideNamePrimary.setUIID("SkinDesignerField");
-        overrideNamePrimary.setStrings("phone", "tablet", "desktop");
-        overrideNamePrimary.setSelectedString("phone");
-        overrideNamePrimary.setRenderingPrototype("XXXXXXXX");
-        autoSave(overrideNamePrimary, "overrideNamePrimary");
-
-        Picker overrideNameSecondary = new Picker();
-        overrideNameSecondary.setUIID("SkinDesignerField");
-        overrideNameSecondary.setStrings("ios", "android", "windows");
-        overrideNameSecondary.setSelectedString("ios");
-        overrideNameSecondary.setRenderingPrototype("XXXXXXXX");
-        autoSave(overrideNameSecondary, "overrideNameSecondary");
-
-        Picker overrideNameLast = new Picker();
-        overrideNameLast.setUIID("SkinDesignerField");
-        overrideNameLast.setStrings("iphone", "ipad", "android-phone", "android-tablet", "desktop");
-        overrideNameLast.setSelectedString("iphone");
-        overrideNameLast.setRenderingPrototype("XXXXXXXX");
-        autoSave(overrideNameLast, "overrideNameLast");
-
-        Container settingsContainer = BoxLayout.encloseY(
-                labeledFieldTitle("Native Theme"),
-                nativeTheme,
-                labeledFieldTitle("Platform Name"),
-                platformName,
-                BorderLayout.center(labeledFieldTitle("Tablet")).add(BorderLayout.EAST, tablet),
-                labeledFieldTitle(systemFontFamily.getHint()),
-                systemFontFamily,
-                labeledFieldTitle(proportionalFontFamily.getHint()),
-                proportionalFontFamily,
-                labeledFieldTitle(monospaceFontFamily.getHint()),
-                monospaceFontFamily,
-                labeledFieldTitle(smallFontSize.getHint()),
-                smallFontSize,
-                labeledFieldTitle(mediumFontSize.getHint()),
-                mediumFontSize,
-                labeledFieldTitle(largeFontSize.getHint()),
-                largeFontSize,
-                labeledFieldTitle(pixelRatio.getHint()),
-                pixelRatio,
-                labeledFieldTitle("Platform Overrides"),
-                BoxLayout.encloseX(overrideNamePrimary, overrideNameSecondary, overrideNameLast)
-        );
-        settingsContainer.setUIID("SkinDesignerCard");
-        settingsContainer.setScrollableY(true);
-
-        vl.addConstraint(smallFontSize, new NumericConstraint(false, 5, 400, "Font size must be a valid integer in the 5-400 range")).
-                addConstraint(mediumFontSize, new NumericConstraint(false, 5, 400, "Font size must be a valid integer in the 5-400 range")).
-                addConstraint(largeFontSize, new NumericConstraint(false, 5, 400, "Font size must be a valid integer in the 5-400 range")).
-                addConstraint(pixelRatio, new NumericConstraint(true, 0.1, 60, "PixelRatio is a positive decimal size in the range of 0.1 to 60")).
-                setShowErrorMessageForFocusedComponent(true);
-
-        Runnable saveAction = () -> {
-            byte[] data = createSkinFile(imPortraitRef[0], imLandscapeRef[0], nativeTheme, platformName, tablet, systemFontFamily,
-                    proportionalFontFamily, monospaceFontFamily, smallFontSize, mediumFontSize, largeFontSize,
-                    pixelRatio, overrideNamePrimary, overrideNameSecondary, overrideNameLast);
-            if(data != null) {
-                FileSystemStorage fs = FileSystemStorage.getInstance();
-                try(OutputStream os = fs.openOutputStream(fs.getAppHomePath() + "skin-file.skin")) {
-                    os.write(data);
-                } catch(IOException err) {
-                    Log.e(err);
-                    ToastBar.showErrorMessage("Error wring skin file " + err);
-                }
-                // in the JavaScript port this will trigger the download dialog
-                Display.getInstance().execute(fs.getAppHomePath() + "skin-file.skin");
-            }
-        };
-
-        imPortraitRef[0] = createImageSettings("/skin.png", "port", vl, () -> showHelpForm(skinDesignerForm), saveAction);
-        imLandscapeRef[0] = createImageSettings("/skin_l.png", "lan", vl, () -> showHelpForm(skinDesignerForm), saveAction);
-        ImageSettings imPortrait = imPortraitRef[0];
-        ImageSettings imLandscape = imLandscapeRef[0];
-        details.addTab("Portrait", FontImage.MATERIAL_STAY_CURRENT_PORTRAIT, 4.5f, imPortrait.getContainer());
-        details.addTab("Landscape", FontImage.MATERIAL_STAY_CURRENT_LANDSCAPE, 4.5f, imLandscape.getContainer());
-        details.addTab("Settings", FontImage.MATERIAL_SETTINGS, 3.5f, settingsContainer);
-
-        skinDesignerForm.show();
-        initThemeFromUrl(skinDesignerForm, details);
-    }
-
-    private Label labeledFieldTitle(String text) {
-        Label label = new Label(text);
-        label.setUIID("SkinDesignerFieldLabel");
-        return label;
-    }
-
-    private void styleFields(TextField... fields) {
-        for (TextField field : fields) {
-            field.setUIID("SkinDesignerField");
-        }
-    }
-
-    private void styleActionButton(Button button, char materialIcon) {
-        button.setUIID("SkinDesignerActionButton");
-        FontImage.setMaterialIcon(button, materialIcon);
-        button.getAllStyles().setAlignment(Component.CENTER);
-        button.setGap(CN.convertToPixels(0.7f));
-    }
-
-    private void styleIconActionButton(Button button, char materialIcon) {
-        styleActionButton(button, materialIcon);
-        button.setText("");
-        button.setGap(0);
-    }
-
-    private void initThemeFromUrl(Form form, Tabs details) {
         websiteDarkMode = readThemeFromUrl();
         Display.getInstance().setDarkMode(websiteDarkMode);
-        applyWebsiteTheme(form, websiteDarkMode);
-        applyTabsTheme(details, websiteDarkMode);
-        form.refreshTheme();
+
+        form = new Form("Skin Designer", new BorderLayout());
+        form.setUIID("SkinDesignerForm");
+        form.setTitle("");
+
+        loadState();
+
+        header = buildHeader();
+        bodyHolder = new Container(new BorderLayout());
+        bodyHolder.setUIID("SkinDesignerBody");
+        statusbar = buildStatusbar();
+
+        form.add(BorderLayout.NORTH, header);
+        form.add(BorderLayout.CENTER, bodyHolder);
+        form.add(BorderLayout.SOUTH, statusbar);
+
+        renderStep();
+        form.show();
+
         UITimer.timer(900, true, form, () -> {
             boolean dark = readThemeFromUrl();
             if (dark != websiteDarkMode) {
                 websiteDarkMode = dark;
                 Display.getInstance().setDarkMode(dark);
-                applyWebsiteTheme(form, dark);
-                applyTabsTheme(details, dark);
+                applyDarkRecursive(form);
                 form.refreshTheme();
             }
         });
     }
 
-    private void applyTabsTheme(Tabs tabs, boolean dark) {
-        if (tabs == null) {
+    // ====================================================================
+    //  State persistence
+    // ====================================================================
+
+    private void loadState() {
+        step = Preferences.get(PREF_STEP, STEP_DEVICE);
+        String id = Preferences.get(PREF_DEVICE, null);
+        device = DeviceDatabase.findById(id);
+        source = Preferences.get(PREF_SOURCE, null);
+        skin.load();
+        if (device != null && skin.name == null) {
+            skin.resetForDevice(device);
+        }
+        if (Preferences.get(PREF_HAS_IMAGE, false) && Storage.getInstance().exists(IMAGE_STORAGE)) {
+            try (InputStream is = Storage.getInstance().createInputStream(IMAGE_STORAGE)) {
+                bodyImage = Image.createImage(is);
+            } catch (IOException err) {
+                Log.e(err);
+            }
+        }
+        if (step >= STEP_SOURCE && device == null) {
+            step = STEP_DEVICE;
+        }
+        if (step >= STEP_EDIT && source == null) {
+            step = STEP_SOURCE;
+        }
+    }
+
+    private void saveState() {
+        Preferences.set(PREF_STEP, step);
+        Preferences.set(PREF_DEVICE, device == null ? null : device.id);
+        Preferences.set(PREF_SOURCE, source);
+        Preferences.set(PREF_HAS_IMAGE, bodyImage != null);
+        skin.save();
+    }
+
+    private void restart() {
+        step = STEP_DEVICE;
+        device = null;
+        source = null;
+        skin = new SkinModel();
+        bodyImage = null;
+        Storage.getInstance().deleteStorageFile(IMAGE_STORAGE);
+        Preferences.delete(PREF_STEP);
+        Preferences.delete(PREF_DEVICE);
+        Preferences.delete(PREF_SOURCE);
+        Preferences.delete(PREF_HAS_IMAGE);
+        SkinModel.clearPersisted();
+        renderStep();
+    }
+
+    // ====================================================================
+    //  Header / statusbar
+    // ====================================================================
+
+    private Container buildHeader() {
+        Label logo = new Label("CN1");
+        logo.setUIID("SkinDesignerBrandLogo");
+        Label title = new Label("Skin Designer");
+        title.setUIID("SkinDesignerBrandTitle");
+        Container brand = BoxLayout.encloseX(logo, title);
+        brand.setUIID("SkinDesignerBrand");
+
+        stepperRow = new Container(new BoxLayout(BoxLayout.X_AXIS));
+        stepperRow.setUIID("SkinDesignerStepper");
+        rebuildStepper();
+
+        wizardNav = new Container(new FlowLayout(Component.RIGHT));
+        wizardNav.setUIID("SkinDesignerWizardNav");
+
+        Container topbar = new Container(new BorderLayout());
+        topbar.setUIID("SkinDesignerTopbar");
+        topbar.add(BorderLayout.WEST, brand);
+        topbar.add(BorderLayout.CENTER, FlowLayout.encloseCenter(stepperRow));
+        topbar.add(BorderLayout.EAST, wizardNav);
+        return topbar;
+    }
+
+    private void rebuildStepper() {
+        if (stepperRow == null) {
             return;
         }
-        String tabsUiid = dark ? "SkinDesignerTabsContainerDark" : "SkinDesignerTabsContainer";
-        String tabUiid = dark ? "TabDark" : "Tab";
-        tabs.setUIID(tabsUiid);
-        tabs.setTabUIID(tabUiid);
-        Container tabsContainer = tabs.getTabsContainer();
-        for (int i = 0; i < tabsContainer.getComponentCount(); i++) {
-            tabsContainer.getComponentAt(i).setUIID(tabUiid);
+        stepperRow.removeAll();
+        String[] labels = { "Device", "Start from", "Editor", "Save" };
+        for (int i = 0; i < labels.length; i++) {
+            if (i > 0) {
+                Label sep = new Label(" ");
+                sep.setUIID("SkinDesignerStepperSep");
+                stepperRow.add(sep);
+            }
+            String state = i == step ? "Active" : (i < step ? "Done" : "Pending");
+            Label num = new Label(i < step ? "" : String.valueOf(i + 1));
+            num.setUIID("SkinDesignerStepperNum" + state);
+            if (i < step) {
+                FontImage.setMaterialIcon(num, FontImage.MATERIAL_CHECK);
+            }
+            Label text = new Label(labels[i]);
+            text.setUIID("SkinDesignerStepperLabel" + state);
+            Container item = BoxLayout.encloseX(num, text);
+            item.setUIID("SkinDesignerStepperItem" + state);
+            stepperRow.add(item);
         }
-        tabs.refreshTheme();
-        tabs.revalidate();
+        stepperRow.revalidate();
     }
+
+    private void rebuildWizardNav() {
+        if (wizardNav == null) {
+            return;
+        }
+        wizardNav.removeAll();
+        if (step > STEP_DEVICE && step < STEP_DONE) {
+            Button reset = new Button("Start over");
+            reset.setUIID("SkinDesignerGhostButton");
+            reset.addActionListener(e -> restart());
+            wizardNav.add(reset);
+        }
+        wizardNav.revalidate();
+    }
+
+    private Container buildStatusbar() {
+        statusName = new Label("Ready");
+        statusName.setUIID("SkinDesignerStatusName");
+        statusSpec = new Label("");
+        statusSpec.setUIID("SkinDesignerStatusSpec");
+        Container bar = new Container(new BorderLayout());
+        bar.setUIID("SkinDesignerStatusbar");
+        bar.add(BorderLayout.WEST, statusName);
+        bar.add(BorderLayout.EAST, statusSpec);
+        return bar;
+    }
+
+    private void updateStatusbar() {
+        if (device == null) {
+            statusName.setText("Ready");
+            statusSpec.setText("");
+        } else {
+            statusName.setText(skin.name + ".skin");
+            statusSpec.setText(device.resolutionW + " × " + device.resolutionH
+                    + " · " + device.ppi + " ppi · Saved locally");
+        }
+        statusName.getParent().revalidate();
+    }
+
+    // ====================================================================
+    //  Step rendering
+    // ====================================================================
+
+    private void renderStep() {
+        if (skin == null) {
+            skin = new SkinModel();
+        }
+        if (device != null && (skin.name == null || skin.name.isEmpty())) {
+            skin.resetForDevice(device);
+        }
+        bodyHolder.removeAll();
+        switch (step) {
+            case STEP_DEVICE:
+                bodyHolder.add(BorderLayout.CENTER, buildDeviceStep());
+                break;
+            case STEP_SOURCE:
+                bodyHolder.add(BorderLayout.CENTER, buildSourceStep());
+                break;
+            case STEP_EDIT:
+                bodyHolder.add(BorderLayout.CENTER, buildEditorStep());
+                break;
+            case STEP_DONE:
+                bodyHolder.add(BorderLayout.CENTER, buildDoneStep());
+                break;
+        }
+        rebuildStepper();
+        rebuildWizardNav();
+        updateStatusbar();
+        applyDarkRecursive(form);
+        bodyHolder.revalidate();
+        saveState();
+    }
+
+    private void goToStep(int s) {
+        step = Math.max(STEP_DEVICE, Math.min(STEP_DONE, s));
+        renderStep();
+    }
+
+    // ====================================================================
+    //  Step 0 — pick device
+    // ====================================================================
+
+    private Container buildDeviceStep() {
+        Container root = new Container(new BorderLayout());
+        root.setUIID("SkinDesignerStepRoot");
+
+        Container heading = new Container(new BoxLayout(BoxLayout.Y_AXIS));
+        heading.setUIID("SkinDesignerStepHead");
+        Label h1 = new Label("Which device is this skin for?");
+        h1.setUIID("SkinDesignerH1");
+        Label sub = new Label("Pick your device. We'll prefill resolution, PPI, safe-area insets, and fonts.");
+        sub.setUIID("SkinDesignerSub");
+        heading.add(h1);
+        heading.add(sub);
+
+        TextField search = new TextField("", "Search devices…", 24, TextField.ANY);
+        search.setUIID("SkinDesignerSearchField");
+
+        String[] filterIds = { "all", "phone", "tablet", "fold" };
+        String[] filterLabels = { "All", "Phones", "Tablets", "Foldables" };
+        final String[] activeFilter = { "all" };
+        Button[] filters = new Button[filterIds.length];
+        Container filterRow = new Container(new FlowLayout(Component.CENTER));
+        filterRow.setUIID("SkinDesignerFilterRow");
+
+        Container grid = new Container(new BoxLayout(BoxLayout.Y_AXIS));
+        grid.setUIID("SkinDesignerDeviceGrid");
+        grid.setScrollableY(true);
+
+        Runnable refresh = () -> rebuildDeviceGrid(grid, search.getText(), activeFilter[0]);
+
+        for (int i = 0; i < filterIds.length; i++) {
+            final String id = filterIds[i];
+            Button b = new Button(filterLabels[i]);
+            b.setUIID("all".equals(id) ? "SkinDesignerFilterTagActive" : "SkinDesignerFilterTag");
+            b.addActionListener(e -> {
+                activeFilter[0] = id;
+                for (int j = 0; j < filters.length; j++) {
+                    filters[j].setUIID(filterIds[j].equals(id) ? "SkinDesignerFilterTagActive" : "SkinDesignerFilterTag");
+                }
+                refresh.run();
+            });
+            filters[i] = b;
+            filterRow.add(b);
+        }
+
+        search.addActionListener(e -> refresh.run());
+        search.addDataChangedListener((type, index) -> refresh.run());
+
+        Container topInner = BoxLayout.encloseY(heading, FlowLayout.encloseCenter(search), filterRow);
+        topInner.setUIID("SkinDesignerStepHeadInner");
+
+        // Footer with Continue button
+        Button cont = new Button("Continue");
+        cont.setUIID("SkinDesignerPrimaryButton");
+        FontImage.setMaterialIcon(cont, FontImage.MATERIAL_CHEVRON_RIGHT);
+        cont.setTextPosition(Component.LEFT);
+        cont.setEnabled(device != null);
+        cont.addActionListener(e -> {
+            if (device != null) {
+                goToStep(STEP_SOURCE);
+            }
+        });
+        Container footer = FlowLayout.encloseRight(cont);
+        footer.setUIID("SkinDesignerFooter");
+
+        rebuildDeviceGrid(grid, "", "all");
+
+        Container scroll = new Container(new BorderLayout());
+        scroll.setUIID("SkinDesignerStepScroll");
+        scroll.add(BorderLayout.NORTH, topInner);
+        scroll.add(BorderLayout.CENTER, grid);
+
+        // Keep a handle to refresh footer enabled state as devices are selected
+        bodyHolder.putClientProperty("deviceContinue", cont);
+
+        root.add(BorderLayout.CENTER, scroll);
+        root.add(BorderLayout.SOUTH, footer);
+        return root;
+    }
+
+    private void rebuildDeviceGrid(Container grid, String query, String filter) {
+        grid.removeAll();
+        Map<String, List<DeviceDatabase.Device>> grouped = new LinkedHashMap<>();
+        for (DeviceDatabase.Device d : DeviceDatabase.all()) {
+            if (!d.matchesFormFilter(filter)) continue;
+            if (!d.matchesQuery(query)) continue;
+            List<DeviceDatabase.Device> bucket = grouped.get(d.brand);
+            if (bucket == null) {
+                bucket = new ArrayList<>();
+                grouped.put(d.brand, bucket);
+            }
+            bucket.add(d);
+        }
+        if (grouped.isEmpty()) {
+            Label none = new Label("No devices match");
+            none.setUIID("SkinDesignerEmptyHint");
+            grid.add(none);
+            grid.revalidate();
+            return;
+        }
+        for (Map.Entry<String, List<DeviceDatabase.Device>> entry : grouped.entrySet()) {
+            Label brand = new Label(entry.getKey() + " · " + entry.getValue().size());
+            brand.setUIID("SkinDesignerGroupLabel");
+            grid.add(brand);
+            Container row = new Container(new GridLayout(1, Math.max(1, gridColumns())));
+            row.setUIID("SkinDesignerCardRow");
+            int col = 0;
+            int columns = Math.max(1, gridColumns());
+            for (DeviceDatabase.Device d : entry.getValue()) {
+                if (col >= columns) {
+                    grid.add(row);
+                    row = new Container(new GridLayout(1, columns));
+                    row.setUIID("SkinDesignerCardRow");
+                    col = 0;
+                }
+                row.add(buildDeviceCard(d));
+                col++;
+            }
+            // pad row so last items align left
+            while (col < columns) {
+                row.add(new Label(" "));
+                col++;
+            }
+            grid.add(row);
+        }
+        grid.revalidate();
+    }
+
+    private int gridColumns() {
+        int w = Display.getInstance().getDisplayWidth();
+        int cardW = CN.convertToPixels(50);
+        return Math.max(1, w / cardW);
+    }
+
+    private Container buildDeviceCard(DeviceDatabase.Device d) {
+        Container card = new Container(new BoxLayout(BoxLayout.Y_AXIS));
+        boolean selected = device != null && device.id.equals(d.id);
+        card.setUIID(selected ? "SkinDesignerDeviceCardSelected" : "SkinDesignerDeviceCard");
+
+        Label osMark = new Label();
+        osMark.setUIID("SkinDesignerOsMark");
+        FontImage.setMaterialIcon(osMark, "ios".equals(d.platformName)
+                ? FontImage.MATERIAL_PHONE_IPHONE
+                : FontImage.MATERIAL_PHONE_ANDROID);
+        Label name = new Label(d.name);
+        name.setUIID("SkinDesignerDeviceName");
+        Container top = new Container(new BorderLayout());
+        top.add(BorderLayout.WEST, osMark);
+        top.add(BorderLayout.CENTER, name);
+        if (selected) {
+            Label check = new Label();
+            check.setUIID("SkinDesignerDeviceCheck");
+            FontImage.setMaterialIcon(check, FontImage.MATERIAL_CHECK);
+            top.add(BorderLayout.EAST, check);
+        }
+        card.add(top);
+
+        Label spec = new Label(d.resolutionW + "×" + d.resolutionH
+                + "  ·  " + d.ppi + "ppi  ·  " + d.screenSize + "\"");
+        spec.setUIID("SkinDesignerDeviceSpec");
+        card.add(spec);
+
+        card.setLeadComponent(name);
+        card.addPointerReleasedListener(e -> {
+            device = d;
+            skin.resetForDevice(d);
+            Button cont = (Button) bodyHolder.getClientProperty("deviceContinue");
+            if (cont != null) {
+                cont.setEnabled(true);
+            }
+            renderStep();
+        });
+        return card;
+    }
+
+    // ====================================================================
+    //  Step 1 — pick source
+    // ====================================================================
+
+    private Container buildSourceStep() {
+        Container root = new Container(new BorderLayout());
+        root.setUIID("SkinDesignerStepRoot");
+
+        Label h1 = new Label("How would you like to start?");
+        h1.setUIID("SkinDesignerH1");
+        Label sub = new Label("Build a skin for " + device.name + ".");
+        sub.setUIID("SkinDesignerSub");
+        Container heading = BoxLayout.encloseY(h1, sub);
+        heading.setUIID("SkinDesignerStepHead");
+
+        Container cards = new Container(new GridLayout(1, 3));
+        cards.setUIID("SkinDesignerSourceRow");
+        cards.add(buildSourceCard("Pick a shape",
+                "Start from a common phone silhouette and tweak dimensions and cutouts.",
+                FontImage.MATERIAL_PHONE_IPHONE,
+                SkinModel.SOURCE_SHAPE));
+        cards.add(buildSourceCard("Upload an image",
+                "Use a render or photo of the device. Position the screen rectangle and mark cutouts on top.",
+                FontImage.MATERIAL_IMAGE,
+                SkinModel.SOURCE_IMAGE));
+        cards.add(buildSourceCard("Blank rectangle",
+                "Plain outline with the screen filling the whole skin. Useful when you don't need any cutouts.",
+                FontImage.MATERIAL_CROP_DIN,
+                SkinModel.SOURCE_BLANK));
+
+        Container body = BoxLayout.encloseY(heading, cards);
+        body.setScrollableY(true);
+        body.setUIID("SkinDesignerStepBody");
+
+        Button back = new Button("Back");
+        back.setUIID("SkinDesignerSecondaryButton");
+        FontImage.setMaterialIcon(back, FontImage.MATERIAL_CHEVRON_LEFT);
+        back.addActionListener(e -> goToStep(STEP_DEVICE));
+        Container footer = FlowLayout.encloseIn(back);
+        footer.setUIID("SkinDesignerFooter");
+
+        root.add(BorderLayout.CENTER, body);
+        root.add(BorderLayout.SOUTH, footer);
+        return root;
+    }
+
+    private Container buildSourceCard(String title, String desc, char icon, String sourceId) {
+        Container card = new Container(new BoxLayout(BoxLayout.Y_AXIS));
+        card.setUIID("SkinDesignerSourceCard");
+
+        Label illustration = new Label();
+        illustration.setUIID("SkinDesignerSourceIll");
+        FontImage.setMaterialIcon(illustration, icon, 8.0f);
+        card.add(illustration);
+
+        Label h3 = new Label(title);
+        h3.setUIID("SkinDesignerH3");
+        card.add(h3);
+
+        Label p = new Label(desc);
+        p.setUIID("SkinDesignerSourceP");
+        card.add(p);
+
+        card.setLeadComponent(h3);
+        card.addPointerReleasedListener(e -> {
+            source = sourceId;
+            if (SkinModel.SOURCE_BLANK.equals(sourceId)) {
+                skin.cutouts.clear();
+                skin.bezel = 0;
+                skin.cornerR = 4;
+                skin.homeIndicator = false;
+            } else if (SkinModel.SOURCE_IMAGE.equals(sourceId)) {
+                if (bodyImage == null) {
+                    pickImage(() -> goToStep(STEP_EDIT));
+                    return;
+                }
+            }
+            goToStep(STEP_EDIT);
+        });
+        return card;
+    }
+
+    // ====================================================================
+    //  Step 2 — editor
+    // ====================================================================
+
+    private DevicePreview livePreview;
+    private Container cutoutListHolder;
+    private int selectedCutout = -1;
+
+    private Container buildEditorStep() {
+        Container root = new Container(new BorderLayout());
+        root.setUIID("SkinDesignerStepRoot");
+
+        livePreview = new DevicePreview(false);
+        livePreview.setSkin(skin);
+        if (SkinModel.SOURCE_IMAGE.equals(source) && bodyImage != null) {
+            livePreview.setBodyImage(bodyImage);
+        }
+
+        Container stage = new Container(new LayeredLayout());
+        stage.setUIID("SkinDesignerStage");
+        Container previewWrap = new Container(new FlowLayout(Component.CENTER, Component.CENTER));
+        previewWrap.add(livePreview);
+        stage.add(previewWrap);
+
+        Container chips = new Container(new BoxLayout(BoxLayout.X_AXIS));
+        chips.setUIID("SkinDesignerStageChips");
+        chips.add(infoChip("Screen", device.resolutionW + "×" + device.resolutionH));
+        chips.add(infoChip("Cutouts", String.valueOf(skin.cutouts.size())));
+        Container chipsLayer = new Container(new FlowLayout(Component.LEFT, Component.TOP));
+        chipsLayer.add(chips);
+        stage.add(chipsLayer);
+
+        Container sidebar = buildSidebar();
+
+        // Use a 65/35 split via a container with computed widths
+        Container split = new Container(new BorderLayout());
+        split.add(BorderLayout.CENTER, stage);
+        split.add(BorderLayout.EAST, sidebar);
+        sidebar.setPreferredW(CN.convertToPixels(60));
+
+        root.add(BorderLayout.CENTER, split);
+        return root;
+    }
+
+    private Container infoChip(String label, String value) {
+        Label k = new Label(label);
+        k.setUIID("SkinDesignerChipKey");
+        Label v = new Label(value);
+        v.setUIID("SkinDesignerChipValue");
+        Container chip = BoxLayout.encloseX(k, v);
+        chip.setUIID("SkinDesignerInfoChip");
+        return chip;
+    }
+
+    private final String[] sidebarTabIds = { "shape", "cutouts", "info" };
+    private String activeSidebarTab = "shape";
+    private Container sidebarBody;
+
+    private Container buildSidebar() {
+        Container sidebar = new Container(new BorderLayout());
+        sidebar.setUIID("SkinDesignerSidebar");
+
+        Container tabs = new Container(new GridLayout(1, sidebarTabIds.length));
+        tabs.setUIID("SkinDesignerSidebarTabs");
+        Button[] tabBtns = new Button[sidebarTabIds.length];
+        String[] tabLabels = { "Shape", "Cutouts", "Info" };
+        for (int i = 0; i < sidebarTabIds.length; i++) {
+            final String id = sidebarTabIds[i];
+            Button t = new Button(tabLabels[i]);
+            t.setUIID(id.equals(activeSidebarTab) ? "SkinDesignerSidebarTabActive" : "SkinDesignerSidebarTab");
+            t.addActionListener(e -> {
+                activeSidebarTab = id;
+                for (int j = 0; j < tabBtns.length; j++) {
+                    tabBtns[j].setUIID(sidebarTabIds[j].equals(id)
+                            ? "SkinDesignerSidebarTabActive"
+                            : "SkinDesignerSidebarTab");
+                }
+                rebuildSidebarBody();
+            });
+            tabBtns[i] = t;
+            tabs.add(t);
+        }
+
+        sidebarBody = new Container(new BoxLayout(BoxLayout.Y_AXIS));
+        sidebarBody.setUIID("SkinDesignerSidebarBody");
+        sidebarBody.setScrollableY(true);
+        rebuildSidebarBody();
+
+        Button back = new Button("Back");
+        back.setUIID("SkinDesignerSecondaryButton");
+        FontImage.setMaterialIcon(back, FontImage.MATERIAL_CHEVRON_LEFT);
+        back.addActionListener(e -> goToStep(STEP_SOURCE));
+
+        Button finish = new Button("Finish");
+        finish.setUIID("SkinDesignerPrimaryButton");
+        FontImage.setMaterialIcon(finish, FontImage.MATERIAL_CHEVRON_RIGHT);
+        finish.setTextPosition(Component.LEFT);
+        finish.addActionListener(e -> goToStep(STEP_DONE));
+
+        Container foot = new Container(new BorderLayout());
+        foot.setUIID("SkinDesignerSidebarFoot");
+        foot.add(BorderLayout.WEST, back);
+        foot.add(BorderLayout.EAST, finish);
+
+        sidebar.add(BorderLayout.NORTH, tabs);
+        sidebar.add(BorderLayout.CENTER, sidebarBody);
+        sidebar.add(BorderLayout.SOUTH, foot);
+        return sidebar;
+    }
+
+    private void rebuildSidebarBody() {
+        sidebarBody.removeAll();
+        if ("shape".equals(activeSidebarTab)) {
+            buildShapeTab(sidebarBody);
+        } else if ("cutouts".equals(activeSidebarTab)) {
+            buildCutoutsTab(sidebarBody);
+        } else {
+            buildInfoTab(sidebarBody);
+        }
+        sidebarBody.revalidate();
+        applyDarkRecursive(sidebarBody);
+    }
+
+    private void buildShapeTab(Container parent) {
+        if (SkinModel.SOURCE_SHAPE.equals(source)) {
+            parent.add(sectionLabel("PRESET"));
+            parent.add(buildPresetGrid());
+        } else if (SkinModel.SOURCE_IMAGE.equals(source)) {
+            Label help = new Label("Upload a device image. The screen rectangle and cutouts will be positioned on top.");
+            help.setUIID("SkinDesignerHelpBlock");
+            parent.add(help);
+            Button upload = new Button(bodyImage != null ? "Replace image" : "Upload image");
+            upload.setUIID("SkinDesignerSecondaryButton");
+            FontImage.setMaterialIcon(upload, FontImage.MATERIAL_FILE_UPLOAD);
+            upload.addActionListener(e -> pickImage(() -> {
+                livePreview.setBodyImage(bodyImage);
+                rebuildSidebarBody();
+            }));
+            parent.add(upload);
+        }
+
+        parent.add(sectionLabel("DIMENSIONS"));
+        parent.add(numericPair("Corner radius", "px", skin.cornerR, v -> {
+            skin.cornerR = Math.max(0, v);
+            livePreview.repaint();
+            saveState();
+        }, "Bezel", "px", skin.bezel, v -> {
+            skin.bezel = Math.max(0, v);
+            livePreview.repaint();
+            saveState();
+        }));
+
+        parent.add(boolPair("Home indicator", skin.homeIndicator, v -> {
+            skin.homeIndicator = v;
+            livePreview.repaint();
+            saveState();
+        }));
+    }
+
+    private Container buildPresetGrid() {
+        // Mirrors SHAPE_PRESETS in Editor.jsx
+        String[][] presets = {
+                { "rr", "Rounded rect" },
+                { "notch", "Notch" },
+                { "island", "Dynamic Island" },
+                { "hole", "Punch-hole" },
+                { "holeCorner", "Corner hole" },
+                { "classic", "Classic (home)" },
+        };
+        Container row = new Container(new GridLayout(2, 3));
+        row.setUIID("SkinDesignerPresetGrid");
+        for (String[] preset : presets) {
+            row.add(buildPresetTile(preset[0], preset[1]));
+        }
+        return row;
+    }
+
+    private Container buildPresetTile(String id, String label) {
+        Container tile = new Container(new BoxLayout(BoxLayout.Y_AXIS));
+        tile.setUIID(id.equals(skin.presetId) ? "SkinDesignerPresetSelected" : "SkinDesignerPreset");
+        PresetIcon icon = new PresetIcon(id);
+        icon.setUIID("SkinDesignerPresetIcon");
+        tile.add(icon);
+        Label lbl = new Label(label);
+        lbl.setUIID("SkinDesignerPresetLabel");
+        tile.add(lbl);
+        tile.setLeadComponent(lbl);
+        tile.addPointerReleasedListener(e -> {
+            applyPreset(id);
+            rebuildSidebarBody();
+            livePreview.setSkin(skin);
+            livePreview.repaint();
+            saveState();
+        });
+        return tile;
+    }
+
+    private void applyPreset(String id) {
+        skin.presetId = id;
+        skin.cutouts = new ArrayList<>();
+        switch (id) {
+            case "rr":
+                skin.cornerR = 40; skin.bezel = 40; skin.homeIndicator = true;
+                break;
+            case "notch":
+                skin.cornerR = 44; skin.bezel = 28; skin.homeIndicator = true;
+                skin.cutouts.add(new SkinModel.Cutout(SkinModel.CUTOUT_NOTCH, 180, 30, 0, 0, "Notch"));
+                break;
+            case "island":
+                skin.cornerR = 48; skin.bezel = 22; skin.homeIndicator = true;
+                skin.cutouts.add(new SkinModel.Cutout(SkinModel.CUTOUT_ISLAND, 120, 35, 0, 14, "Dynamic Island"));
+                break;
+            case "hole":
+                skin.cornerR = 36; skin.bezel = 24; skin.homeIndicator = true;
+                skin.cutouts.add(new SkinModel.Cutout(SkinModel.CUTOUT_HOLE, 28, 28, 0, 20, "Camera"));
+                break;
+            case "holeCorner":
+                skin.cornerR = 32; skin.bezel = 22; skin.homeIndicator = true;
+                skin.cutouts.add(new SkinModel.Cutout(SkinModel.CUTOUT_HOLE, 26, 26, -100, 18, "Camera"));
+                break;
+            case "classic":
+                skin.cornerR = 20; skin.bezel = 64; skin.homeIndicator = false;
+                break;
+        }
+    }
+
+    private void buildCutoutsTab(Container parent) {
+        Label help = new Label("Cutouts (notch, island, camera hole) hide rendering and ignore touch input. Positions are relative to the top-center of the screen.");
+        help.setUIID("SkinDesignerHelpBlock");
+        parent.add(help);
+
+        parent.add(sectionLabel("CUTOUTS (" + skin.cutouts.size() + ")"));
+        cutoutListHolder = new Container(new BoxLayout(BoxLayout.Y_AXIS));
+        rebuildCutoutList();
+        parent.add(cutoutListHolder);
+
+        Container addRow = new Container(new GridLayout(1, 3));
+        addRow.add(addCutoutBtn("Notch", SkinModel.CUTOUT_NOTCH));
+        addRow.add(addCutoutBtn("Island", SkinModel.CUTOUT_ISLAND));
+        addRow.add(addCutoutBtn("Hole", SkinModel.CUTOUT_HOLE));
+        parent.add(addRow);
+    }
+
+    private void rebuildCutoutList() {
+        cutoutListHolder.removeAll();
+        if (skin.cutouts.isEmpty()) {
+            Label none = new Label("None. Add one below.");
+            none.setUIID("SkinDesignerEmptyHint");
+            cutoutListHolder.add(none);
+        }
+        for (int i = 0; i < skin.cutouts.size(); i++) {
+            cutoutListHolder.add(buildCutoutRow(i));
+        }
+        if (selectedCutout >= 0 && selectedCutout < skin.cutouts.size()) {
+            cutoutListHolder.add(buildCutoutEditor(selectedCutout));
+        }
+        cutoutListHolder.revalidate();
+        applyDarkRecursive(cutoutListHolder);
+    }
+
+    private Container buildCutoutRow(int idx) {
+        SkinModel.Cutout c = skin.cutouts.get(idx);
+        boolean sel = idx == selectedCutout;
+        Container row = new Container(new BorderLayout());
+        row.setUIID(sel ? "SkinDesignerCutoutRowSelected" : "SkinDesignerCutoutRow");
+        Label sw = new Label(" ");
+        sw.setUIID("SkinDesignerCutoutSwatch");
+        Label name = new Label(c.name);
+        name.setUIID("SkinDesignerCutoutName");
+        Label type = new Label(c.type);
+        type.setUIID("SkinDesignerCutoutType");
+        Button rm = new Button();
+        rm.setUIID("SkinDesignerIconButton");
+        FontImage.setMaterialIcon(rm, FontImage.MATERIAL_CLOSE);
+        rm.addActionListener(e -> {
+            skin.cutouts.remove(idx);
+            if (selectedCutout == idx) selectedCutout = -1;
+            else if (selectedCutout > idx) selectedCutout--;
+            saveState();
+            rebuildSidebarBody();
+            livePreview.repaint();
+        });
+        Container left = BoxLayout.encloseX(sw, name);
+        Container right = BoxLayout.encloseX(type, rm);
+        row.add(BorderLayout.WEST, left);
+        row.add(BorderLayout.EAST, right);
+        row.setLeadComponent(name);
+        row.addPointerReleasedListener(e -> {
+            selectedCutout = (selectedCutout == idx) ? -1 : idx;
+            rebuildCutoutList();
+        });
+        return row;
+    }
+
+    private Container buildCutoutEditor(int idx) {
+        SkinModel.Cutout c = skin.cutouts.get(idx);
+        Container editor = new Container(new BoxLayout(BoxLayout.Y_AXIS));
+        editor.setUIID("SkinDesignerCutoutEditor");
+        editor.add(numericPair("Width", "px", c.w, v -> { c.w = Math.max(1, v); livePreview.repaint(); saveState(); },
+                                "Height", "px", c.h, v -> { c.h = Math.max(1, v); livePreview.repaint(); saveState(); }));
+        editor.add(numericPair("Offset X", "px", c.x, v -> { c.x = v; livePreview.repaint(); saveState(); },
+                                "Offset Y", "px", c.y, v -> { c.y = v; livePreview.repaint(); saveState(); }));
+        return editor;
+    }
+
+    private Button addCutoutBtn(String label, String type) {
+        Button b = new Button(label);
+        b.setUIID("SkinDesignerSecondaryButton");
+        FontImage.setMaterialIcon(b, FontImage.MATERIAL_ADD);
+        b.addActionListener(e -> {
+            SkinModel.Cutout nc;
+            switch (type) {
+                case SkinModel.CUTOUT_NOTCH:
+                    nc = new SkinModel.Cutout(type, 180, 30, 0, 0, "Notch"); break;
+                case SkinModel.CUTOUT_ISLAND:
+                    nc = new SkinModel.Cutout(type, 120, 35, 0, 14, "Dynamic Island"); break;
+                default:
+                    nc = new SkinModel.Cutout(SkinModel.CUTOUT_HOLE, 28, 28, 0, 20, "Camera"); break;
+            }
+            skin.cutouts.add(nc);
+            selectedCutout = skin.cutouts.size() - 1;
+            saveState();
+            rebuildSidebarBody();
+            livePreview.repaint();
+        });
+        return b;
+    }
+
+    private void buildInfoTab(Container parent) {
+        parent.add(sectionLabel("SKIN"));
+        TextField nameField = new TextField(skin.name, "Name", 32, TextField.ANY);
+        nameField.setUIID("SkinDesignerField");
+        nameField.addDataChangedListener((type, idx) -> {
+            skin.name = nameField.getText();
+            updateStatusbar();
+            saveState();
+        });
+        parent.add(fieldRow("Name", nameField));
+
+        parent.add(sectionLabel("DEVICE (from library)"));
+        parent.add(numericPair("Width", "px", device.resolutionW, null,
+                "Height", "px", device.resolutionH, null));
+        // CN1 wants pixel ratio as pixels per millimeter — derive from PPI.
+        int ppmm100 = (int) Math.round((device.ppi / 25.4) * 100);
+        parent.add(numericPair("PPI", "", device.ppi, null,
+                "Px/mm × 100", "", ppmm100, null));
+
+        parent.add(sectionLabel("SAFE AREA"));
+        parent.add(numericPair("Top", "px", skin.safeTop, v -> { skin.safeTop = Math.max(0, v); saveState(); },
+                "Bottom", "px", skin.safeBottom, v -> { skin.safeBottom = Math.max(0, v); saveState(); }));
+    }
+
+    private Label sectionLabel(String text) {
+        Label lbl = new Label(text);
+        lbl.setUIID("SkinDesignerSectionLabel");
+        return lbl;
+    }
+
+    private Container fieldRow(String labelText, Component field) {
+        Label l = new Label(labelText);
+        l.setUIID("SkinDesignerFieldLabel");
+        Container c = BoxLayout.encloseY(l, field);
+        c.setUIID("SkinDesignerFieldRow");
+        return c;
+    }
+
+    private Container boolPair(String label, boolean value, BooleanSetter setter) {
+        Label l = new Label(label);
+        l.setUIID("SkinDesignerFieldLabel");
+        OnOffSwitch sw = new OnOffSwitch();
+        sw.setUIID("SkinDesignerField");
+        sw.setValue(value);
+        if (setter != null) {
+            sw.addActionListener(e -> setter.set(sw.isValue()));
+        }
+        Container c = new Container(new BorderLayout());
+        c.setUIID("SkinDesignerFieldRow");
+        c.add(BorderLayout.CENTER, l);
+        c.add(BorderLayout.EAST, sw);
+        return c;
+    }
+
+    private Container numericPair(String label1, String unit1, int value1, IntSetter setter1,
+                                  String label2, String unit2, int value2, IntSetter setter2) {
+        Container row = new Container(new GridLayout(1, 2));
+        row.setUIID("SkinDesignerFieldGrid");
+        row.add(numericField(label1, unit1, value1, setter1));
+        row.add(numericField(label2, unit2, value2, setter2));
+        return row;
+    }
+
+    private Container numericField(String label, String unit, int value, IntSetter setter) {
+        Label l = new Label(unit == null || unit.isEmpty() ? label : label + " (" + unit + ")");
+        l.setUIID("SkinDesignerFieldLabel");
+        TextField tf = new TextField(String.valueOf(value), label, 6, TextField.NUMERIC);
+        tf.setUIID(setter == null ? "SkinDesignerFieldReadonly" : "SkinDesignerField");
+        tf.setEditable(setter != null);
+        if (setter != null) {
+            tf.addDataChangedListener((type, idx) -> {
+                String t = tf.getText();
+                int v;
+                try {
+                    v = Integer.parseInt(t.length() == 0 ? "0" : t);
+                } catch (NumberFormatException nfe) {
+                    return;
+                }
+                setter.set(v);
+            });
+        }
+        Container c = BoxLayout.encloseY(l, tf);
+        c.setUIID("SkinDesignerFieldRow");
+        return c;
+    }
+
+    interface IntSetter { void set(int v); }
+    interface BooleanSetter { void set(boolean v); }
+
+    // ====================================================================
+    //  Step 3 — done summary + save
+    // ====================================================================
+
+    private Container buildDoneStep() {
+        // Build the .skin file once when arriving at this step
+        byte[] data = createSkinBytes();
+        boolean savedOk = false;
+        if (data != null) {
+            FileSystemStorage fs = FileSystemStorage.getInstance();
+            String outPath = fs.getAppHomePath() + sanitize(skin.name) + ".skin";
+            try (OutputStream os = fs.openOutputStream(outPath)) {
+                os.write(data);
+                savedOk = true;
+                // In the JS port this triggers the download dialog
+                Display.getInstance().execute(outPath);
+            } catch (IOException err) {
+                Log.e(err);
+                ToastBar.showErrorMessage("Error saving skin: " + err);
+            }
+        }
+
+        Container root = new Container(new BoxLayout(BoxLayout.Y_AXIS));
+        root.setUIID("SkinDesignerDoneRoot");
+
+        Label check = new Label();
+        check.setUIID("SkinDesignerDoneCheck");
+        FontImage.setMaterialIcon(check, FontImage.MATERIAL_CHECK, 8.0f);
+        Container checkWrap = FlowLayout.encloseCenter(check);
+        root.add(checkWrap);
+
+        Label h1 = new Label(savedOk ? "Skin saved" : "Skin ready");
+        h1.setUIID("SkinDesignerH1");
+        root.add(FlowLayout.encloseCenter(h1));
+
+        Label msg = new Label(savedOk
+                ? "Your skin has been saved locally. You can go back and tweak it, or start a new one."
+                : "Your skin is ready. Use the buttons below to adjust or start a new one.");
+        msg.setUIID("SkinDesignerSub");
+        root.add(FlowLayout.encloseCenter(msg));
+
+        Container summary = new Container(new BoxLayout(BoxLayout.Y_AXIS));
+        summary.setUIID("SkinDesignerSummary");
+        summary.add(summaryRow("Name", skin.name));
+        summary.add(summaryRow("Device", device.name));
+        summary.add(summaryRow("Resolution", device.resolutionW + " × " + device.resolutionH));
+        summary.add(summaryRow("Cutouts", String.valueOf(skin.cutouts.size())));
+        summary.add(summaryRow("Source", source));
+        root.add(FlowLayout.encloseCenter(summary));
+
+        Button back = new Button("Back to editor");
+        back.setUIID("SkinDesignerSecondaryButton");
+        FontImage.setMaterialIcon(back, FontImage.MATERIAL_CHEVRON_LEFT);
+        back.addActionListener(e -> goToStep(STEP_EDIT));
+
+        Button restart = new Button("New skin");
+        restart.setUIID("SkinDesignerPrimaryButton");
+        restart.addActionListener(e -> restart());
+
+        Container actions = new Container(new FlowLayout(Component.CENTER));
+        actions.add(back);
+        actions.add(restart);
+        root.add(actions);
+
+        Container scroll = new Container(new BorderLayout());
+        scroll.setScrollableY(true);
+        scroll.add(BorderLayout.CENTER, root);
+        return scroll;
+    }
+
+    private Container summaryRow(String k, String v) {
+        Label kl = new Label(k);
+        kl.setUIID("SkinDesignerSummaryKey");
+        Label vl = new Label(v);
+        vl.setUIID("SkinDesignerSummaryValue");
+        Container row = new Container(new BorderLayout());
+        row.setUIID("SkinDesignerSummaryRow");
+        row.add(BorderLayout.WEST, kl);
+        row.add(BorderLayout.EAST, vl);
+        return row;
+    }
+
+    // ====================================================================
+    //  Image upload
+    // ====================================================================
+
+    private void pickImage(Runnable onDone) {
+        Display.getInstance().openGallery((ee) -> {
+            if (ee != null && ee.getSource() != null) {
+                try {
+                    String fileName = (String) ee.getSource();
+                    bodyImage = Image.createImage(fileName);
+                    Util.copy(FileSystemStorage.getInstance().openInputStream(fileName),
+                            Storage.getInstance().createOutputStream(IMAGE_STORAGE));
+                    saveState();
+                } catch (IOException err) {
+                    Log.e(err);
+                    ToastBar.showErrorMessage("Error loading image: " + err);
+                }
+            }
+            if (onDone != null) onDone.run();
+        }, Display.GALLERY_IMAGE);
+    }
+
+    // ====================================================================
+    //  Skin file generation
+    // ====================================================================
+
+    private byte[] createSkinBytes() {
+        try {
+            Image portrait = generatePortraitImage();
+            Image landscape = rotate90(portrait);
+            Image overlayPortrait = generateOverlay(portrait.getWidth(), portrait.getHeight(),
+                    skinBezelInPx(portrait.getWidth(), portrait.getHeight()));
+            Image overlayLandscape = rotate90(overlayPortrait);
+
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            try (ZipOutputStream zos = new ZipOutputStream(bos)) {
+                writeEntry(zos, "skin.png", imageBytes(portrait));
+                writeEntry(zos, "skin_l.png", imageBytes(landscape));
+                writeEntry(zos, "skin_map.png", imageBytes(overlayPortrait));
+                writeEntry(zos, "skin_map_l.png", imageBytes(overlayLandscape));
+
+                String themeFile = pickNativeThemeFile(device);
+                InputStream is = Display.getInstance().getResourceAsStream(getClass(), "/" + themeFile);
+                if (is != null) {
+                    zos.putNextEntry(new ZipEntry(themeFile));
+                    Util.copyNoClose(is, zos, 8192);
+                }
+
+                Properties props = buildProperties(portrait.getWidth(), portrait.getHeight());
+                zos.putNextEntry(new ZipEntry("skin.properties"));
+                props.store(zos, "Created by the Codename One skin designer");
+            }
+            return bos.toByteArray();
+        } catch (IOException err) {
+            Log.e(err);
+            ToastBar.showErrorMessage("Error generating skin: " + err);
+            return null;
+        }
+    }
+
+    private void writeEntry(ZipOutputStream zos, String name, byte[] data) throws IOException {
+        zos.putNextEntry(new ZipEntry(name));
+        zos.write(data);
+    }
+
+    private byte[] imageBytes(Image img) throws IOException {
+        ByteArrayOutputStream bo = new ByteArrayOutputStream();
+        ImageIO.getImageIO().save(img, bo, ImageIO.FORMAT_PNG, 1);
+        return bo.toByteArray();
+    }
+
+    private int skinBezelInPx(int totalW, int totalH) {
+        // Bezel is stored relative to the design's 320×620 viewbox; scale up to
+        // device pixels so screen position lands at (bezel, bezel) within the
+        // generated image.
+        return Math.round(((float) skin.bezel / DevicePreview.VB_W) * totalW);
+    }
+
+    private int skinCornerInPx(int totalW) {
+        return Math.round(((float) skin.cornerR / DevicePreview.VB_W) * totalW);
+    }
+
+    /**
+     * Produces a portrait skin image whose dimensions are
+     * {@code device.resolution + 2 * bezelPx}. The screen rectangle (an area
+     * with alpha=0) starts at (bezelPx, bezelPx) and spans the full device
+     * resolution.
+     */
+    private Image generatePortraitImage() {
+        if (SkinModel.SOURCE_IMAGE.equals(source) && bodyImage != null) {
+            return generateImageBased();
+        }
+        // Resolve bezel/corner from the design viewbox into device-pixel space.
+        // Use a sensible fixed bezel (in device px) so that on large devices the
+        // frame stays modest. The user-facing bezel value (in viewbox px) is
+        // remapped onto a per-device device-pixel value.
+        float framePxScale = ((float) device.resolutionW) / DevicePreview.VB_W;
+        int bezelPx = Math.round(skin.bezel * framePxScale);
+        int cornerPx = Math.round(skin.cornerR * framePxScale);
+        int totalW = device.resolutionW + bezelPx * 2;
+        int totalH = device.resolutionH + bezelPx * 2;
+
+        // Start with a solid dark frame
+        Image base = Image.createImage(totalW, totalH, 0xff121822);
+        Graphics g = base.getGraphics();
+        g.setAntiAliased(true);
+
+        // Inner highlight to fake a gradient edge
+        g.setColor(0x2a2f3a);
+        int inset = Math.max(1, totalW / 200);
+        g.fillRoundRect(inset, inset, totalW - inset * 2, totalH - inset * 2,
+                Math.max(0, (cornerPx - inset) * 2), Math.max(0, (cornerPx - inset) * 2));
+
+        // Carve the rounded shape: paint outside the round-rect transparent
+        int[] data = base.getRGB();
+        applyRoundRectAlphaMask(data, totalW, totalH, 0, 0, totalW, totalH, cornerPx);
+
+        // Carve the screen (alpha=0 inside)
+        carveScreenRect(data, totalW, totalH, bezelPx, bezelPx,
+                device.resolutionW, device.resolutionH);
+
+        // Carve cutouts (still alpha=0)
+        applyCutouts(data, totalW, totalH, bezelPx, bezelPx,
+                device.resolutionW, device.resolutionH, framePxScale);
+
+        return Image.createImage(data, totalW, totalH);
+    }
+
+    private Image generateImageBased() {
+        // Fit the uploaded image into a (device.resolutionW + 2*bezelPx) canvas
+        float framePxScale = ((float) device.resolutionW) / DevicePreview.VB_W;
+        int bezelPx = Math.round(skin.bezel * framePxScale);
+        int cornerPx = Math.round(skin.cornerR * framePxScale);
+        int totalW = device.resolutionW + bezelPx * 2;
+        int totalH = device.resolutionH + bezelPx * 2;
+
+        Image canvas = Image.createImage(totalW, totalH, 0);
+        Graphics g = canvas.getGraphics();
+        g.setAntiAliased(true);
+        Image scaled = bodyImage.scaledLargerRatio(totalW, totalH);
+        int dx = (totalW - scaled.getWidth()) / 2;
+        int dy = (totalH - scaled.getHeight()) / 2;
+        g.drawImage(scaled, dx, dy);
+
+        int[] data = canvas.getRGB();
+        applyRoundRectAlphaMask(data, totalW, totalH, 0, 0, totalW, totalH, cornerPx);
+        carveScreenRect(data, totalW, totalH, bezelPx, bezelPx,
+                device.resolutionW, device.resolutionH);
+        applyCutouts(data, totalW, totalH, bezelPx, bezelPx,
+                device.resolutionW, device.resolutionH, framePxScale);
+        return Image.createImage(data, totalW, totalH);
+    }
+
+    private Image generateOverlay(int totalW, int totalH, int bezelPx) {
+        Image overlay = Image.createImage(totalW, totalH, 0);
+        Graphics g = overlay.getGraphics();
+        g.setColor(0x000000);
+        g.fillRect(bezelPx, bezelPx, device.resolutionW, device.resolutionH);
+        return overlay;
+    }
+
+    private void carveScreenRect(int[] data, int w, int h, int x, int y, int rw, int rh) {
+        int x2 = Math.min(w, x + rw);
+        int y2 = Math.min(h, y + rh);
+        for (int yy = Math.max(0, y); yy < y2; yy++) {
+            int row = yy * w;
+            for (int xx = Math.max(0, x); xx < x2; xx++) {
+                data[row + xx] = 0;
+            }
+        }
+    }
+
+    private void applyRoundRectAlphaMask(int[] data, int w, int h,
+                                         int x, int y, int rw, int rh, int radius) {
+        if (radius <= 0) return;
+        int r = Math.min(radius, Math.min(rw, rh) / 2);
+        int r2 = r * r;
+        int[][] corners = {
+                { x + r, y + r, -1, -1 },
+                { x + rw - r - 1, y + r, +1, -1 },
+                { x + r, y + rh - r - 1, -1, +1 },
+                { x + rw - r - 1, y + rh - r - 1, +1, +1 },
+        };
+        for (int[] c : corners) {
+            int cx = c[0], cy = c[1], dx = c[2], dy = c[3];
+            for (int yy = 0; yy < r; yy++) {
+                for (int xx = 0; xx < r; xx++) {
+                    int px = cx + dx * xx;
+                    int py = cy + dy * yy;
+                    if (px < 0 || py < 0 || px >= w || py >= h) continue;
+                    int distSq = xx * xx + yy * yy;
+                    if (distSq > r2) {
+                        data[py * w + px] = 0;
+                    }
+                }
+            }
+        }
+    }
+
+    private void applyCutouts(int[] data, int w, int h,
+                              int screenX, int screenY, int sw, int sh, float scale) {
+        int cx = screenX + sw / 2;
+        for (SkinModel.Cutout c : skin.cutouts) {
+            int cw = Math.round(c.w * scale);
+            int ch = Math.round(c.h * scale);
+            int ox = cx + Math.round(c.x * scale);
+            int oy = screenY + Math.round(c.y * scale);
+            if (SkinModel.CUTOUT_NOTCH.equals(c.type)) {
+                int x0 = ox - cw / 2;
+                fillRect(data, w, h, x0, screenY, cw, ch);
+            } else if (SkinModel.CUTOUT_ISLAND.equals(c.type)) {
+                int x0 = ox - cw / 2;
+                fillRoundedRect(data, w, h, x0, oy, cw, ch, ch / 2);
+            } else if (SkinModel.CUTOUT_HOLE.equals(c.type)) {
+                int r = cw / 2;
+                fillCircle(data, w, h, ox, oy + ch / 2, r);
+            }
+        }
+    }
+
+    private void fillRect(int[] data, int w, int h, int x, int y, int rw, int rh) {
+        int x2 = Math.min(w, x + rw);
+        int y2 = Math.min(h, y + rh);
+        for (int yy = Math.max(0, y); yy < y2; yy++) {
+            for (int xx = Math.max(0, x); xx < x2; xx++) {
+                data[yy * w + xx] = 0xff000000;
+            }
+        }
+    }
+
+    private void fillCircle(int[] data, int w, int h, int cx, int cy, int r) {
+        int r2 = r * r;
+        for (int yy = Math.max(0, cy - r); yy < Math.min(h, cy + r + 1); yy++) {
+            int dy = yy - cy;
+            for (int xx = Math.max(0, cx - r); xx < Math.min(w, cx + r + 1); xx++) {
+                int dx = xx - cx;
+                if (dx * dx + dy * dy <= r2) {
+                    data[yy * w + xx] = 0xff000000;
+                }
+            }
+        }
+    }
+
+    private void fillRoundedRect(int[] data, int w, int h, int x, int y, int rw, int rh, int r) {
+        int x2 = Math.min(w, x + rw);
+        int y2 = Math.min(h, y + rh);
+        for (int yy = Math.max(0, y); yy < y2; yy++) {
+            for (int xx = Math.max(0, x); xx < x2; xx++) {
+                int dx = xx - x;
+                int dy = yy - y;
+                int rrw = rw - 1;
+                int rrh = rh - 1;
+                int cdx, cdy;
+                if (dx < r && dy < r) { cdx = r - dx; cdy = r - dy; }
+                else if (dx > rrw - r && dy < r) { cdx = dx - (rrw - r); cdy = r - dy; }
+                else if (dx < r && dy > rrh - r) { cdx = r - dx; cdy = dy - (rrh - r); }
+                else if (dx > rrw - r && dy > rrh - r) { cdx = dx - (rrw - r); cdy = dy - (rrh - r); }
+                else { data[yy * w + xx] = 0xff000000; continue; }
+                if (cdx * cdx + cdy * cdy <= r * r) {
+                    data[yy * w + xx] = 0xff000000;
+                }
+            }
+        }
+    }
+
+    private Image rotate90(Image src) {
+        return src.rotate90Degrees(true);
+    }
+
+    private Properties buildProperties(int totalW, int totalH) {
+        Properties p = new Properties();
+        p.put("touch", "true");
+        p.put("platformName", device.platformName);
+        p.put("tablet", String.valueOf(device.tablet));
+        p.put("systemFontFamily", device.systemFont);
+        p.put("proportionalFontFamily", device.proportionalFont);
+        p.put("monospaceFontFamily", device.monoFont);
+        p.put("smallFontSize", String.valueOf(device.fontSmall));
+        p.put("mediumFontSize", String.valueOf(device.fontMedium));
+        p.put("largeFontSize", String.valueOf(device.fontLarge));
+        // CN1's pixelRatio is *pixels per millimeter*; convert from PPI.
+        double ppmm = device.ppi / 25.4;
+        p.put("pixelRatio", String.valueOf(ppmm));
+        p.put("overrideNames", overrideNames(device));
+
+        int bezelPx = skinBezelInPx(totalW, totalH);
+        int safeTopPx = Math.round(skin.safeTop * ((float) device.resolutionW / DevicePreview.VB_W));
+        int safeBottomPx = Math.round(skin.safeBottom * ((float) device.resolutionW / DevicePreview.VB_W));
+        int safeX = bezelPx;
+        int safeY = bezelPx + safeTopPx;
+        int safeW = device.resolutionW;
+        int safeH = Math.max(1, device.resolutionH - safeTopPx - safeBottomPx);
+
+        p.put("safePortraitX", String.valueOf(safeX));
+        p.put("safePortraitY", String.valueOf(safeY));
+        p.put("safePortraitWidth", String.valueOf(safeW));
+        p.put("safePortraitHeight", String.valueOf(safeH));
+        // Landscape is portrait rotated 90° clockwise — swap accordingly
+        int landTotalW = totalH;
+        int landTotalH = totalW;
+        int landSafeX = bezelPx + safeBottomPx; // bottom edge becomes left
+        int landSafeY = bezelPx;
+        int landSafeW = Math.max(1, device.resolutionH - safeTopPx - safeBottomPx);
+        int landSafeH = device.resolutionW;
+        // Suppress unused-var warnings on totals
+        if (landTotalW + landTotalH == 0) {} // no-op
+        p.put("safeLandscapeX", String.valueOf(landSafeX));
+        p.put("safeLandscapeY", String.valueOf(landSafeY));
+        p.put("safeLandscapeWidth", String.valueOf(landSafeW));
+        p.put("safeLandscapeHeight", String.valueOf(landSafeH));
+        return p;
+    }
+
+    private String overrideNames(DeviceDatabase.Device d) {
+        String form = d.tablet ? "tablet" : "phone";
+        String os;
+        String last;
+        if ("ios".equals(d.platformName)) {
+            os = "ios";
+            last = d.tablet ? "ipad" : "iphone";
+        } else if ("and".equals(d.platformName)) {
+            os = "android";
+            last = d.tablet ? "android-tablet" : "android-phone";
+        } else {
+            os = "windows";
+            last = "desktop";
+        }
+        return form + "," + os + "," + last;
+    }
+
+    private String pickNativeThemeFile(DeviceDatabase.Device d) {
+        if ("ios".equals(d.platformName)) return "iOS7Theme.res";
+        if ("and".equals(d.platformName)) return "android_holo_light.res";
+        return "winTheme.res";
+    }
+
+    private static String sanitize(String name) {
+        if (name == null || name.isEmpty()) return "skin";
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < name.length(); i++) {
+            char c = name.charAt(i);
+            if (isAsciiAlphanumeric(c) || c == '-' || c == '_') {
+                sb.append(c);
+            } else if (c == ' ') {
+                sb.append('-');
+            }
+        }
+        if (sb.length() == 0) sb.append("skin");
+        return sb.toString();
+    }
+
+    private static boolean isAsciiAlphanumeric(char c) {
+        return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+    }
+
+    // ====================================================================
+    //  Theming helpers (light/dark via URL ?theme=)
+    // ====================================================================
 
     private boolean readThemeFromUrl() {
         String href = CN.getProperty("browser.window.location.href", "");
         String theme = queryParam(href, "theme");
-        if ("dark".equalsIgnoreCase(theme)) {
-            return true;
-        }
-        if ("light".equalsIgnoreCase(theme)) {
-            return false;
-        }
+        if ("dark".equalsIgnoreCase(theme)) return true;
+        if ("light".equalsIgnoreCase(theme)) return false;
         return Display.getInstance().isDarkMode();
     }
 
     private String queryParam(String href, String name) {
-        if (href == null || href.length() == 0) {
-            return null;
-        }
-        int queryStart = href.indexOf('?');
-        if (queryStart < 0 || queryStart == href.length() - 1) {
-            return null;
-        }
-        String query = href.substring(queryStart + 1);
+        if (href == null || href.length() == 0) return null;
+        int q = href.indexOf('?');
+        if (q < 0 || q == href.length() - 1) return null;
+        String query = href.substring(q + 1);
         int hash = query.indexOf('#');
-        if (hash >= 0) {
-            query = query.substring(0, hash);
-        }
+        if (hash >= 0) query = query.substring(0, hash);
         String prefix = name + "=";
-        String[] pairs = Util.split(query, "&");
-        for (String pair : pairs) {
+        for (String pair : Util.split(query, "&")) {
             if (pair.startsWith(prefix) && pair.length() > prefix.length()) {
                 return pair.substring(prefix.length());
             }
@@ -277,1250 +1433,84 @@ public class SkinDesigner extends Lifecycle {
         return null;
     }
 
-    private void applyWebsiteTheme(Container component, boolean dark) {
-        for (int i = 0; i < component.getComponentCount(); i++) {
-            Component child = component.getComponentAt(i);
-            String uiid = child.getUIID();
-            String themed = themedUiid(uiid, dark);
-            if (uiid != null && !uiid.equals(themed)) {
-                child.setUIID(themed);
-            }
-            if (child instanceof Container) {
-                applyWebsiteTheme((Container) child, dark);
+    private void applyDarkRecursive(Component c) {
+        String uiid = c.getUIID();
+        if (uiid != null) {
+            String themed = themedUiid(uiid, websiteDarkMode);
+            if (!uiid.equals(themed)) {
+                c.setUIID(themed);
             }
         }
-        String containerUiid = component.getUIID();
-        String themedContainer = themedUiid(containerUiid, dark);
-        if (containerUiid != null && !containerUiid.equals(themedContainer)) {
-            component.setUIID(themedContainer);
+        if (c instanceof Container) {
+            Container container = (Container) c;
+            for (int i = 0; i < container.getComponentCount(); i++) {
+                applyDarkRecursive(container.getComponentAt(i));
+            }
         }
     }
 
     private String themedUiid(String uiid, boolean dark) {
-        if (uiid == null || uiid.length() == 0) {
-            return uiid;
-        }
+        if (uiid == null || uiid.isEmpty()) return uiid;
+        if (!uiid.startsWith("SkinDesigner")) return uiid;
         if (dark) {
-            if (uiid.endsWith("Dark")) {
-                return uiid;
-            }
-            switch (uiid) {
-                case "SkinDesignerForm":
-                case "SkinDesignerTabsContainer":
-                case "SkinDesignerCard":
-                case "SkinDesignerField":
-                case "SkinDesignerFieldLabel":
-                case "SkinDesignerTabBar":
-                case "SkinDesignerTabButton":
-                case "SkinDesignerTabButtonSelected":
-                case "Toolbar":
-                case "Title":
-                case "Command":
-                case "Tab":
-                case "TabSelected":
-                case "TabsContainer":
-                    return uiid + "Dark";
-                default:
-                    return uiid;
-            }
+            return uiid.endsWith("Dark") ? uiid : uiid + "Dark";
         }
-        if (!uiid.endsWith("Dark")) {
-            return uiid;
-        }
-        String base = uiid.substring(0, uiid.length() - "Dark".length());
-        switch (base) {
-            case "SkinDesignerForm":
-            case "SkinDesignerTabsContainer":
-            case "SkinDesignerCard":
-            case "SkinDesignerField":
-            case "SkinDesignerFieldLabel":
-            case "SkinDesignerTabBar":
-            case "SkinDesignerTabButton":
-            case "SkinDesignerTabButtonSelected":
-            case "Toolbar":
-            case "Title":
-            case "Command":
-            case "Tab":
-            case "TabSelected":
-            case "TabsContainer":
-                return base;
-            default:
-                return uiid;
-        }
+        return uiid.endsWith("Dark") ? uiid.substring(0, uiid.length() - 4) : uiid;
     }
 
-    interface ImageSettings {
-        Container getContainer();
-        Image createSkinOverlay();
-        Image getSkinImage();
-        int getScreenX();
-        int getScreenY();
-        int getScreenWidth();
-        int getScreenHeight();
-        int getSafeX();
-        int getSafeY();
-        int getSafeWidth();
-        int getSafeHeight();
-    }
+    // ====================================================================
+    //  Preset icons
+    // ====================================================================
 
-    private void autoSave(TextArea ta, String preferencesKey) {
-        String val = Preferences.get(preferencesKey, null);
-        if(val != null) {
-            ta.setText(val);
-        }
-        ta.addActionListener(e -> {
-            Preferences.set(preferencesKey, ta.getText());
-        });
-    }
-
-    private void autoSave(OnOffSwitch o, String preferencesKey) {
-        boolean val = Preferences.get(preferencesKey, o.isValue());
-        if(val != o.isValue()) {
-            o.setValue(val);
-        }
-        o.addActionListener(e -> {
-            Preferences.set(preferencesKey, o.isValue());
-        });
-    }
-
-    private void autoSave(Picker p, String preferencesKey) {
-        String val = Preferences.get(preferencesKey, null);
-        if(val != null) {
-            p.setSelectedString(val);
-        }
-        p.addActionListener(e -> {
-            Preferences.set(preferencesKey, p.getSelectedString());
-        });
-    }
-
-    private ImageSettings createImageSettings(String imageFile, String prefix, Validator vl, Runnable helpCallback, Runnable saveCallback) {
-        Image img = null;
-        try {
-            img = Image.createImage(Display.getInstance().getResourceAsStream(getClass(), imageFile));
-        } catch(IOException err) {
-            Log.e(err);
-        }
-        ScaleImageLabel sl = new ScaleImageLabel(img);
-        Button imagePicker = new Button("Select Image");
-        imagePicker.setUIID("SkinDesignerActionButton");
-        imagePicker.setTooltip("Choose a skin image from your gallery");
-        imagePicker.addActionListener((e) -> {
-            Display.getInstance().openGallery((ee) -> {
-                if(ee != null && ee.getSource() != null) {
-                    try {
-                        String fileName = (String)ee.getSource();
-                        sl.setIcon(Image.createImage(fileName));
-                        sl.getParent().revalidate();
-                        Util.copy(FileSystemStorage.getInstance().openInputStream(fileName),
-                                Storage.getInstance().createOutputStream(prefix + ".png"));
-                    } catch(IOException err) {
-                        ToastBar.showErrorMessage("Error Loading Image: " + err);
-                    }
-                }
-            }, Display.GALLERY_IMAGE);
-        });
-        if(Storage.getInstance().exists(prefix + ".png")) {
-            try(InputStream is = Storage.getInstance().createInputStream(prefix + ".png")) {
-                sl.setIcon(Image.createImage(is));
-            } catch(IOException err) {
-                Log.e(err);
-            }
-        }
-
-        final TextField screenWidthPixels = new TextField("320", "Width", 8, TextField.NUMERIC);
-        final TextField screenHeightPixels = new TextField("480", "Height", 8, TextField.NUMERIC);
-        final TextField screenPositionX = new TextField("40", "X", 8, TextField.NUMERIC);
-        final TextField screenPositionY = new TextField("40", "Y", 8, TextField.NUMERIC);
-        final TextField safeX = new TextField("40", "Safe X", 8, TextField.NUMERIC);
-        final TextField safeY = new TextField("40", "Safe Y", 8, TextField.NUMERIC);
-        final TextField safeWidth = new TextField("320", "Safe Width", 8, TextField.NUMERIC);
-        final TextField safeHeight = new TextField("480", "Safe Height", 8, TextField.NUMERIC);
-        final TextField floodTolerance = new TextField("24", "Color Tol (0-441)", 4, TextField.NUMERIC);
-        if("lan".equals(prefix) && Preferences.get("lanX", null) == null) {
-            String portraitX = Preferences.get("portX", null);
-            String portraitY = Preferences.get("portY", null);
-            String portraitWidth = Preferences.get("portWidth", null);
-            String portraitHeight = Preferences.get("portHeight", null);
-            if(portraitX != null && portraitY != null && portraitWidth != null && portraitHeight != null) {
-                screenPositionX.setText(portraitY);
-                screenPositionY.setText(portraitX);
-                screenWidthPixels.setText(portraitHeight);
-                screenHeightPixels.setText(portraitWidth);
-                safeX.setText(portraitY);
-                safeY.setText(portraitX);
-                safeWidth.setText(portraitHeight);
-                safeHeight.setText(portraitWidth);
-            }
-        }
-        styleFields(screenWidthPixels, screenHeightPixels, screenPositionX, screenPositionY);
-        styleFields(safeX, safeY, safeWidth, safeHeight, floodTolerance);
-        autoSave(screenWidthPixels, prefix + "Width");
-        autoSave(screenHeightPixels, prefix + "Height");
-        autoSave(screenPositionX, prefix + "X");
-        autoSave(screenPositionY, prefix + "Y");
-        autoSave(safeX, prefix + "SafeX");
-        autoSave(safeY, prefix + "SafeY");
-        autoSave(safeWidth, prefix + "SafeWidth");
-        autoSave(safeHeight, prefix + "SafeHeight");
-        autoSave(floodTolerance, prefix + "FloodTolerance");
-        vl.addConstraint(screenWidthPixels, new NumericConstraint(false, 20, 5000, "Screen size must be a valid integer in the 20-5000 range")).
-                addConstraint(screenHeightPixels, new NumericConstraint(false, 20, 5000, "Screen size must be a valid integer in the 20-5000 range")).
-                addConstraint(screenPositionX, new NumericConstraint(false, 0, 5000, "Screen position must be a valid integer in the 0-5000 range")).
-                addConstraint(screenPositionY, new NumericConstraint(false, 0, 5000, "Screen position must be a valid integer in the 0-5000 range")).
-                addConstraint(safeX, new NumericConstraint(false, 0, 5000, "Safe area X must be a valid integer in the 0-5000 range")).
-                addConstraint(safeY, new NumericConstraint(false, 0, 5000, "Safe area Y must be a valid integer in the 0-5000 range")).
-                addConstraint(safeWidth, new NumericConstraint(false, 1, 5000, "Safe area width must be a valid integer in the 1-5000 range")).
-                addConstraint(safeHeight, new NumericConstraint(false, 1, 5000, "Safe area height must be a valid integer in the 1-5000 range")).
-                addConstraint(floodTolerance, new NumericConstraint(false, 0, 441, "Tolerance must be 0-441"));
-        if("lan".equals(prefix)) {
-            String portraitX = Preferences.get("portX", null);
-            String portraitY = Preferences.get("portY", null);
-            String portraitWidth = Preferences.get("portWidth", null);
-            String portraitHeight = Preferences.get("portHeight", null);
-            if(portraitX != null && portraitY != null && portraitWidth != null && portraitHeight != null &&
-                    portraitX.equals(screenPositionX.getText()) && portraitY.equals(screenPositionY.getText()) &&
-                    portraitWidth.equals(screenWidthPixels.getText()) && portraitHeight.equals(screenHeightPixels.getText())) {
-                screenPositionX.setText(portraitY);
-                screenPositionY.setText(portraitX);
-                screenWidthPixels.setText(portraitHeight);
-                screenHeightPixels.setText(portraitWidth);
-                safeX.setText(portraitY);
-                safeY.setText(portraitX);
-                safeWidth.setText(portraitHeight);
-                safeHeight.setText(portraitWidth);
-            }
-        }
-
-        final OnOffSwitch useSafeArea = new OnOffSwitch();
-        useSafeArea.setUIID("SkinDesignerField");
-        useSafeArea.setValue(false);
-        useSafeArea.setTooltip("Enable a separate safe area inside the screen");
-        autoSave(useSafeArea, prefix + "UseSafeArea");
-        Runnable applySafeEnabled = () -> {
-            boolean enabled = useSafeArea.isValue();
-            safeX.setEnabled(enabled);
-            safeY.setEnabled(enabled);
-            safeWidth.setEnabled(enabled);
-            safeHeight.setEnabled(enabled);
-        };
-        applySafeEnabled.run();
-        useSafeArea.addActionListener(e -> {
-            boolean enabled = useSafeArea.isValue();
-            if (enabled) {
-                int sx = screenPositionX.getAsInt(0);
-                int sy = screenPositionY.getAsInt(0);
-                int sw = screenWidthPixels.getAsInt(0);
-                int sh = screenHeightPixels.getAsInt(0);
-                int curX = safeX.getAsInt(sx);
-                int curY = safeY.getAsInt(sy);
-                int curW = safeWidth.getAsInt(sw);
-                int curH = safeHeight.getAsInt(sh);
-                if (curW < 1 || curW > sw) { curW = sw; }
-                if (curH < 1 || curH > sh) { curH = sh; }
-                if (curX < sx) { curX = sx; }
-                if (curY < sy) { curY = sy; }
-                if (curX + curW > sx + sw) { curX = sx + sw - curW; }
-                if (curY + curH > sy + sh) { curY = sy + sh - curH; }
-                safeX.setText("" + curX);
-                safeY.setText("" + curY);
-                safeWidth.setText("" + curW);
-                safeHeight.setText("" + curH);
-            }
-            applySafeEnabled.run();
-        });
-
-        Button aim = new Button();
-        styleIconActionButton(aim, FontImage.MATERIAL_PAN_TOOL);
-        aim.setTooltip("Visually position the screen and safe area");
-
-        aim.addActionListener(e ->
-                aimPosition(sl.getIcon(),
-                        screenPositionX,
-                        screenPositionY,
-                        screenWidthPixels,
-                        screenHeightPixels,
-                        safeX,
-                        safeY,
-                        safeWidth,
-                        safeHeight,
-                        useSafeArea));
-
-        Button helpButton = new Button();
-        styleIconActionButton(helpButton, FontImage.MATERIAL_HELP);
-        helpButton.setTooltip("Open help");
-        helpButton.addActionListener(e -> helpCallback.run());
-
-        Button saveButton = new Button();
-        styleIconActionButton(saveButton, FontImage.MATERIAL_SAVE);
-        saveButton.setTooltip("Save the skin file");
-        saveButton.addActionListener(e -> saveCallback.run());
-
-        ScaleImageLabel maskLabel = new ScaleImageLabel();
-        OnOffSwitch useMask = new OnOffSwitch();
-        useMask.setValue(false);
-        useMask.setUIID("SkinDesignerField");
-        useMask.setTooltip("Use the detected mask instead of a simple rectangle");
-        autoSave(useMask, prefix + "UseMask");
-        Button detectScreenButton = new Button("Detect Screen by Color");
-        detectScreenButton.setUIID("SkinDesignerActionButton");
-        detectScreenButton.setTooltip("Auto-detect the screen area via flood-fill from the center pixel");
-        detectScreenButton.addActionListener(e -> {
-            Image source = sl.getIcon();
-            if(source == null) {
-                ToastBar.showErrorMessage("Please select a skin image first");
-                return;
-            }
-            int seedX = screenPositionX.getAsInt(0) + (screenWidthPixels.getAsInt(0) / 2);
-            int seedY = screenPositionY.getAsInt(0) + (screenHeightPixels.getAsInt(0) / 2);
-            Image generatedMask = createFloodFillMask(source,
-                    seedX,
-                    seedY,
-                    floodTolerance.getAsInt(24));
-            if(generatedMask != null) {
-                maskLabel.setIcon(generatedMask);
-                useMask.setValue(true);
-                maskLabel.getParent().revalidate();
-                try(OutputStream os = Storage.getInstance().createOutputStream(prefix + ".mask.png")) {
-                    ImageIO.getImageIO().save(generatedMask, os, ImageIO.FORMAT_PNG, 1);
-                } catch(IOException err) {
-                    Log.e(err);
-                    ToastBar.showErrorMessage("Error saving generated mask: " + err.getMessage());
-                }
-            }
-        });
-
-        if(Storage.getInstance().exists(prefix + ".mask.png")) {
-            try(InputStream is = Storage.getInstance().createInputStream(prefix + ".mask.png")) {
-                maskLabel.setIcon(Image.createImage(is));
-            } catch(IOException err) {
-                Log.e(err);
-            }
-        }
-
-        Container actionButtons = FlowLayout.encloseCenter(aim, helpButton, saveButton);
-        Container detectionButtons = FlowLayout.encloseCenter(detectScreenButton, floodTolerance, useMask);
-        Container safeAreaHeader = BorderLayout.center(labeledFieldTitle("Safe Area (X/Y/Width/Height)"))
-                .add(BorderLayout.EAST, useSafeArea);
-        Container controls = BoxLayout.encloseY(
-                imagePicker,
-                labeledFieldTitle("Screen Position (X/Y/Width/Height)"),
-                GridLayout.encloseIn(4, screenPositionX, screenPositionY, screenWidthPixels, screenHeightPixels),
-                safeAreaHeader,
-                GridLayout.encloseIn(4, safeX, safeY, safeWidth, safeHeight),
-                labeledFieldTitle("Screen Mask Detection"),
-                detectionButtons,
-                actionButtons
-        );
-        controls.setUIID("SkinDesignerCard");
-        controls.setScrollableY(true);
-        Container preview = BoxLayout.encloseY(sl);
-        preview.setUIID("SkinDesignerCard");
-        preview.setScrollableY(true);
-
-        int splitType = "lan".equals(prefix) ? SplitPane.VERTICAL_SPLIT : SplitPane.HORIZONTAL_SPLIT;
-        Component split = new SplitPane(splitType, controls, preview, "35%", "45%", "55%");
-        final Container cnt = BorderLayout.center(split);
-        cnt.setUIID("SkinDesignerCard");
-        return new ImageSettings() {
-            @Override
-            public Container getContainer() {
-                return cnt;
-            }
-
-            @Override
-            public Image getSkinImage() {
-                Image img = sl.getIcon();
-                int[] data = img.getRGB();
-                int width = img.getWidth();
-                int height = img.getHeight();
-                Image mask = maskLabel.getIcon();
-                if(useMask.isValue() && mask != null && mask.getWidth() == width && mask.getHeight() == height) {
-                    int[] maskRgb = mask.getRGB();
-                    for(int i = 0 ; i < maskRgb.length ; i++) {
-                        if(maskRgb[i] != 0xff000000) {
-                            data[i] = 0;
-                        }
-                    }
-                } else {
-                    Rectangle screen = new Rectangle(screenPositionX.getAsInt(0), screenPositionY.getAsInt(0),
-                            screenWidthPixels.getAsInt(50), screenHeightPixels.getAsInt(50));
-                    for(int x = 0 ; x < width ; x++) {
-                        for(int y = 0 ; y < height ; y++) {
-                            if(screen.contains(x, y, 1, 1)) {
-                                data[y * width + x] = 0;
-                            }
-                        }
-                    }
-                }
-
-                return Image.createImage(data, width, height);
-            }
-
-            @Override
-            public Image createSkinOverlay() {
-                Image skinImage = getSkinImage();
-                if(skinImage == null) {
-                    return null;
-                }
-                Image m = Image.createImage(skinImage.getWidth(), skinImage.getHeight(), 0);
-                Graphics g = m.getGraphics();
-                g.setColor(0);
-                Image mask = maskLabel.getIcon();
-                if(useMask.isValue() && mask != null && mask.getWidth() == skinImage.getWidth() && mask.getHeight() == skinImage.getHeight()) {
-                    int[] maskRgb = mask.getRGB();
-                    int w = mask.getWidth();
-                    int h = mask.getHeight();
-                    for(int x = 0; x < w; x++) {
-                        for(int y = 0; y < h; y++) {
-                            if(maskRgb[y * w + x] == 0xff000000) {
-                                g.drawLine(x, y, x, y);
-                            }
-                        }
-                    }
-                } else {
-                    g.fillRect(screenPositionX.getAsInt(0), screenPositionY.getAsInt(0),
-                            screenWidthPixels.getAsInt(50), screenHeightPixels.getAsInt(50));
-                }
-                return m;
-            }
-
-            @Override
-            public int getScreenX() {
-                return screenPositionX.getAsInt(0);
-            }
-
-            @Override
-            public int getScreenY() {
-                return screenPositionY.getAsInt(0);
-            }
-
-            @Override
-            public int getScreenWidth() {
-                return screenWidthPixels.getAsInt(50);
-            }
-
-            @Override
-            public int getScreenHeight() {
-                return screenHeightPixels.getAsInt(50);
-            }
-
-            @Override
-            public int getSafeX() {
-                return useSafeArea.isValue() ? safeX.getAsInt(getScreenX()) : getScreenX();
-            }
-
-            @Override
-            public int getSafeY() {
-                return useSafeArea.isValue() ? safeY.getAsInt(getScreenY()) : getScreenY();
-            }
-
-            @Override
-            public int getSafeWidth() {
-                return useSafeArea.isValue() ? safeWidth.getAsInt(getScreenWidth()) : getScreenWidth();
-            }
-
-            @Override
-            public int getSafeHeight() {
-                return useSafeArea.isValue() ? safeHeight.getAsInt(getScreenHeight()) : getScreenHeight();
-            }
-        };
-    }
-
-    private Image createFloodFillMask(Image source, int seedX, int seedY, int tolerance) {
-        int width = source.getWidth();
-        int height = source.getHeight();
-        if(seedX < 0 || seedY < 0 || seedX >= width || seedY >= height) {
-            ToastBar.showErrorMessage("Seed point is outside image bounds");
-            return null;
-        }
-        int[] src = source.getRGB();
-        int[] mask = new int[src.length];
-        for(int i = 0; i < mask.length; i++) {
-            mask[i] = 0xffffffff;
-        }
-        boolean[] visited = new boolean[src.length];
-        int[] queue = new int[src.length];
-        int head = 0;
-        int tail = 0;
-        int seedIdx = seedY * width + seedX;
-        int seedColor = src[seedIdx];
-        queue[tail++] = seedIdx;
-        visited[seedIdx] = true;
-        while(head < tail) {
-            int idx = queue[head++];
-            int px = idx % width;
-            int py = idx / width;
-            if(colorMatch(src[idx], seedColor, tolerance)) {
-                mask[idx] = 0xff000000;
-                if(px > 0) {
-                    int n = idx - 1;
-                    if(!visited[n]) {
-                        visited[n] = true;
-                        queue[tail++] = n;
-                    }
-                }
-                if(px < width - 1) {
-                    int n = idx + 1;
-                    if(!visited[n]) {
-                        visited[n] = true;
-                        queue[tail++] = n;
-                    }
-                }
-                if(py > 0) {
-                    int n = idx - width;
-                    if(!visited[n]) {
-                        visited[n] = true;
-                        queue[tail++] = n;
-                    }
-                }
-                if(py < height - 1) {
-                    int n = idx + width;
-                    if(!visited[n]) {
-                        visited[n] = true;
-                        queue[tail++] = n;
-                    }
-                }
-            }
-        }
-        return Image.createImage(mask, width, height);
-    }
-
-    private boolean colorMatch(int c1, int c2, int tolerance) {
-        int a1 = (c1 >>> 24) & 0xff;
-        int a2 = (c2 >>> 24) & 0xff;
-        if(a2 < 16) {
-            return a1 < 16;
-        }
-        int r1 = (c1 >> 16) & 0xff;
-        int g1 = (c1 >> 8) & 0xff;
-        int b1 = c1 & 0xff;
-        int r2 = (c2 >> 16) & 0xff;
-        int g2 = (c2 >> 8) & 0xff;
-        int b2 = c2 & 0xff;
-        return Math.abs(a1 - a2) <= tolerance &&
-                Math.abs(r1 - r2) <= tolerance &&
-                Math.abs(g1 - g2) <= tolerance &&
-                Math.abs(b1 - b2) <= tolerance;
-    }
-
-    private void showHelpForm(Form backForm) {
-        BrowserComponent help = new BrowserComponent();
-        help.setURL("jar:///help.html?theme=" + (websiteDarkMode ? "dark" : "light"));
-        Form helpForm = new Form("Help", new BorderLayout());
-        helpForm.setUIID("SkinDesignerForm");
-        helpForm.add(BorderLayout.CENTER, help);
-        Button back = new Button();
-        styleIconActionButton(back, FontImage.MATERIAL_ARROW_BACK);
-        back.addActionListener(ee -> backForm.showBack());
-        Container helpActions = FlowLayout.encloseRight(back);
-        helpActions.setUIID("SkinDesignerTabBar");
-        helpForm.add(BorderLayout.NORTH, helpActions);
-        applyWebsiteTheme(helpForm, websiteDarkMode);
-        helpForm.show();
-    }
-
-    static final int AIM_MODE_SCREEN = 0;
-    static final int AIM_MODE_SAFE = 1;
-
-    static final int DRAG_NONE = 0;
-    static final int DRAG_MOVE = 1;
-    static final int DRAG_N = 1 << 1;
-    static final int DRAG_S = 1 << 2;
-    static final int DRAG_W = 1 << 3;
-    static final int DRAG_E = 1 << 4;
-    static final int MIN_SAFE_SIZE = 10;
-
-    final class AimView extends Component {
-        private final Image img;
-        private final int imgW;
-        private final int imgH;
-        private final TextField xField;
-        private final TextField yField;
-        private final TextField screenWField;
-        private final TextField screenHField;
-        private final TextField safeXField;
-        private final TextField safeYField;
-        private final TextField safeWField;
-        private final TextField safeHField;
-        private final OnOffSwitch useSafeArea;
-        private Runnable onChange;
-        private int mode = AIM_MODE_SCREEN;
-        private float zoomMul = 1f;
-        private float panNX = 0.5f;
-        private float panNY = 0.5f;
-        private int lastPX = -1;
-        private int lastPY = -1;
-        private int dragOp = DRAG_NONE;
-
-        AimView(Image img, TextField xField, TextField yField,
-                TextField screenWField, TextField screenHField,
-                TextField safeXField, TextField safeYField,
-                TextField safeWField, TextField safeHField,
-                OnOffSwitch useSafeArea) {
-            this.img = img;
-            this.imgW = img.getWidth();
-            this.imgH = img.getHeight();
-            this.xField = xField;
-            this.yField = yField;
-            this.screenWField = screenWField;
-            this.screenHField = screenHField;
-            this.safeXField = safeXField;
-            this.safeYField = safeYField;
-            this.safeWField = safeWField;
-            this.safeHField = safeHField;
-            this.useSafeArea = useSafeArea;
-            setUIID("SkinDesignerCard");
-            setFocusable(true);
-        }
-
-        void setOnChange(Runnable onChange) {
-            this.onChange = onChange;
-        }
-
-        private void notifyChanged() {
-            if (onChange != null) {
-                onChange.run();
-            }
-        }
-
-        int screenW() {
-            return Math.max(1, screenWField.getAsInt(1));
-        }
-
-        int screenH() {
-            return Math.max(1, screenHField.getAsInt(1));
-        }
-
-        boolean isSafeAreaEnabled() {
-            return useSafeArea != null && useSafeArea.isValue();
-        }
-
-        void setMode(int mode) {
-            this.mode = mode;
-        }
-
-        int getMode() {
-            return mode;
-        }
-
-        void zoomIn() {
-            float nz = Math.min(8f, zoomMul * 1.5f);
-            if (nz != zoomMul) {
-                zoomMul = nz;
-                centerOnActiveRect();
-                repaint();
-            }
-        }
-
-        void zoomOut() {
-            float nz = Math.max(1f, zoomMul / 1.5f);
-            if (nz != zoomMul) {
-                zoomMul = nz;
-                if (zoomMul <= 1f) {
-                    panNX = 0.5f;
-                    panNY = 0.5f;
-                } else {
-                    centerOnActiveRect();
-                }
-                repaint();
-            }
-        }
-
-        private void centerOnActiveRect() {
-            int cx, cy;
-            if (mode == AIM_MODE_SAFE && isSafeAreaEnabled()) {
-                cx = safeXField.getAsInt(0) + safeWField.getAsInt(screenW()) / 2;
-                cy = safeYField.getAsInt(0) + safeHField.getAsInt(screenH()) / 2;
-            } else {
-                cx = xField.getAsInt(0) + screenW() / 2;
-                cy = yField.getAsInt(0) + screenH() / 2;
-            }
-            if (imgW > 0) {
-                panNX = Math.max(0f, Math.min(1f, ((float) cx) / imgW));
-            }
-            if (imgH > 0) {
-                panNY = Math.max(0f, Math.min(1f, ((float) cy) / imgH));
-            }
-        }
-
-        void nudge(int dx, int dy) {
-            int savedOp = dragOp;
-            dragOp = DRAG_MOVE;
-            applyDelta(dx, dy);
-            dragOp = savedOp;
-            repaint();
-        }
-
-        private float currentScale() {
-            int vw = getWidth();
-            int vh = getHeight();
-            if (vw <= 0 || vh <= 0 || imgW <= 0 || imgH <= 0) {
-                return 0f;
-            }
-            float fit = Math.min(((float) vw) / imgW, ((float) vh) / imgH);
-            return fit * zoomMul;
-        }
-
-        private int drawOriginX(float scale) {
-            int vw = getWidth();
-            int drawW = Math.max(1, Math.round(imgW * scale));
-            if (drawW <= vw) {
-                return getX() + (vw - drawW) / 2;
-            }
-            int raw = getX() + vw / 2 - Math.round(panNX * drawW);
-            int min = getX() + vw - drawW;
-            int max = getX();
-            return Math.max(min, Math.min(max, raw));
-        }
-
-        private int drawOriginY(float scale) {
-            int vh = getHeight();
-            int drawH = Math.max(1, Math.round(imgH * scale));
-            if (drawH <= vh) {
-                return getY() + (vh - drawH) / 2;
-            }
-            int raw = getY() + vh / 2 - Math.round(panNY * drawH);
-            int min = getY() + vh - drawH;
-            int max = getY();
-            return Math.max(min, Math.min(max, raw));
-        }
-
-        private int clamp(int v, int lo, int hi) {
-            if (hi < lo) {
-                hi = lo;
-            }
-            return Math.max(lo, Math.min(hi, v));
-        }
-
-        private void applyDelta(int dImgX, int dImgY) {
-            if (dImgX == 0 && dImgY == 0 || dragOp == DRAG_NONE) {
-                return;
-            }
-            int sW = screenW();
-            int sH = screenH();
-            if (mode == AIM_MODE_SAFE) {
-                if (!isSafeAreaEnabled()) {
-                    return;
-                }
-                int boundsX = xField.getAsInt(0);
-                int boundsY = yField.getAsInt(0);
-                int boundsW = sW;
-                int boundsH = sH;
-                int curX = safeXField.getAsInt(boundsX);
-                int curY = safeYField.getAsInt(boundsY);
-                int curW = Math.min(safeWField.getAsInt(boundsW), boundsW);
-                int curH = Math.min(safeHField.getAsInt(boundsH), boundsH);
-                int[] rect = applyResize(curX, curY, curW, curH, dImgX, dImgY,
-                        boundsX, boundsY, boundsW, boundsH);
-                boolean changed = false;
-                if (rect[0] != curX) { safeXField.setText("" + rect[0]); changed = true; }
-                if (rect[1] != curY) { safeYField.setText("" + rect[1]); changed = true; }
-                if (rect[2] != curW) { safeWField.setText("" + rect[2]); changed = true; }
-                if (rect[3] != curH) { safeHField.setText("" + rect[3]); changed = true; }
-                if (changed) { notifyChanged(); }
-                return;
-            }
-            int curX = xField.getAsInt(0);
-            int curY = yField.getAsInt(0);
-            int newX = clamp(curX + dImgX, 0, imgW - sW);
-            int newY = clamp(curY + dImgY, 0, imgH - sH);
-            int actualDx = newX - curX;
-            int actualDy = newY - curY;
-            boolean changed = false;
-            if (actualDx != 0) { xField.setText("" + newX); changed = true; }
-            if (actualDy != 0) { yField.setText("" + newY); changed = true; }
-            if ((actualDx != 0 || actualDy != 0) && isSafeAreaEnabled()) {
-                int saw = Math.min(safeWField.getAsInt(sW), sW);
-                int sah = Math.min(safeHField.getAsInt(sH), sH);
-                int curSafeX = safeXField.getAsInt(curX);
-                int curSafeY = safeYField.getAsInt(curY);
-                int newSafeX = clamp(curSafeX + actualDx, newX, newX + sW - saw);
-                int newSafeY = clamp(curSafeY + actualDy, newY, newY + sH - sah);
-                if (newSafeX != curSafeX) { safeXField.setText("" + newSafeX); changed = true; }
-                if (newSafeY != curSafeY) { safeYField.setText("" + newSafeY); changed = true; }
-            }
-            if (changed) { notifyChanged(); }
-        }
-
-        private int[] applyResize(int curX, int curY, int curW, int curH, int dx, int dy,
-                                  int boundsX, int boundsY, int boundsW, int boundsH) {
-            boolean moveLeft = (dragOp & DRAG_W) != 0 || dragOp == DRAG_MOVE;
-            boolean moveRight = (dragOp & DRAG_E) != 0 || dragOp == DRAG_MOVE;
-            boolean moveTop = (dragOp & DRAG_N) != 0 || dragOp == DRAG_MOVE;
-            boolean moveBottom = (dragOp & DRAG_S) != 0 || dragOp == DRAG_MOVE;
-            int left = curX;
-            int right = curX + curW;
-            int top = curY;
-            int bottom = curY + curH;
-            if (moveLeft) { left += dx; }
-            if (moveRight) { right += dx; }
-            if (moveTop) { top += dy; }
-            if (moveBottom) { bottom += dy; }
-            int minX = boundsX;
-            int minY = boundsY;
-            int maxX = boundsX + boundsW;
-            int maxY = boundsY + boundsH;
-            if (left < minX) { left = minX; if (moveLeft && !moveRight && right < left + MIN_SAFE_SIZE) right = left + MIN_SAFE_SIZE; }
-            if (right > maxX) { right = maxX; if (moveRight && !moveLeft && left > right - MIN_SAFE_SIZE) left = right - MIN_SAFE_SIZE; }
-            if (top < minY) { top = minY; if (moveTop && !moveBottom && bottom < top + MIN_SAFE_SIZE) bottom = top + MIN_SAFE_SIZE; }
-            if (bottom > maxY) { bottom = maxY; if (moveBottom && !moveTop && top > bottom - MIN_SAFE_SIZE) top = bottom - MIN_SAFE_SIZE; }
-            if (right - left < MIN_SAFE_SIZE) {
-                if (moveLeft && !moveRight) { left = right - MIN_SAFE_SIZE; }
-                else if (moveRight && !moveLeft) { right = left + MIN_SAFE_SIZE; }
-            }
-            if (bottom - top < MIN_SAFE_SIZE) {
-                if (moveTop && !moveBottom) { top = bottom - MIN_SAFE_SIZE; }
-                else if (moveBottom && !moveTop) { bottom = top + MIN_SAFE_SIZE; }
-            }
-            if (dragOp == DRAG_MOVE) {
-                int w = right - left;
-                int h = bottom - top;
-                left = clamp(left, minX, maxX - w);
-                top = clamp(top, minY, maxY - h);
-                right = left + w;
-                bottom = top + h;
-            }
-            return new int[] { left, top, right - left, bottom - top };
-        }
-
+    /** Tiny inline icon for the shape-preset tiles. */
+    static final class PresetIcon extends Component {
+        private final String id;
+        PresetIcon(String id) { this.id = id; }
         @Override
-        public void pointerPressed(int x, int y) {
-            lastPX = x;
-            lastPY = y;
-            dragOp = hitTestDragOp(x, y);
+        protected com.codename1.ui.geom.Dimension calcPreferredSize() {
+            int s = CN.convertToPixels(8);
+            return new com.codename1.ui.geom.Dimension(s, (int) (s * 1.5f));
         }
-
-        @Override
-        public void pointerReleased(int x, int y) {
-            lastPX = -1;
-            lastPY = -1;
-            dragOp = DRAG_NONE;
-        }
-
-        private int hitTestDragOp(int px, int py) {
-            if (mode == AIM_MODE_SAFE && isSafeAreaEnabled()) {
-                float scale = currentScale();
-                if (scale <= 0f) { return DRAG_MOVE; }
-                int drawX = drawOriginX(scale);
-                int drawY = drawOriginY(scale);
-                int sX = drawX + Math.round(safeXField.getAsInt(0) * scale);
-                int sY = drawY + Math.round(safeYField.getAsInt(0) * scale);
-                int sW = Math.max(1, Math.round(safeWField.getAsInt(screenW()) * scale));
-                int sH = Math.max(1, Math.round(safeHField.getAsInt(screenH()) * scale));
-                int zone = Math.max(8, Display.getInstance().convertToPixels(2.5f));
-                boolean nearLeft = px >= sX - zone && px <= sX + zone;
-                boolean nearRight = px >= sX + sW - zone && px <= sX + sW + zone;
-                boolean nearTop = py >= sY - zone && py <= sY + zone;
-                boolean nearBottom = py >= sY + sH - zone && py <= sY + sH + zone;
-                int op = 0;
-                if (nearLeft) { op |= DRAG_W; }
-                if (nearRight) { op |= DRAG_E; }
-                if (nearTop) { op |= DRAG_N; }
-                if (nearBottom) { op |= DRAG_S; }
-                if (op != 0) { return op; }
-            }
-            return DRAG_MOVE;
-        }
-
-        @Override
-        public void pointerDragged(int x, int y) {
-            if (lastPX < 0 || lastPY < 0) {
-                lastPX = x;
-                lastPY = y;
-                return;
-            }
-            int dpx = x - lastPX;
-            int dpy = y - lastPY;
-            float scale = currentScale();
-            if (scale <= 0f) {
-                lastPX = x;
-                lastPY = y;
-                return;
-            }
-            int dImgX = Math.round(dpx / scale);
-            int dImgY = Math.round(dpy / scale);
-            if (dImgX == 0 && dImgY == 0) {
-                return;
-            }
-            applyDelta(dImgX, dImgY);
-            lastPX = x;
-            lastPY = y;
-            repaint();
-        }
-
         @Override
         public void paint(Graphics g) {
-            super.paint(g);
-            float scale = currentScale();
-            if (scale <= 0f) {
-                return;
-            }
-            int drawW = Math.max(1, Math.round(imgW * scale));
-            int drawH = Math.max(1, Math.round(imgH * scale));
-            int drawX = drawOriginX(scale);
-            int drawY = drawOriginY(scale);
-
-            int[] clip = g.getClip();
-            g.pushClip();
-            g.clipRect(getX(), getY(), getWidth(), getHeight());
-
-            g.drawImage(img, drawX, drawY, drawW, drawH);
-
-            int sW = screenW();
-            int sH = screenH();
-            int screenImgX = xField.getAsInt(0);
-            int screenImgY = yField.getAsInt(0);
-            boolean safeOn = isSafeAreaEnabled();
-            int safeImgX = safeOn ? safeXField.getAsInt(screenImgX) : screenImgX;
-            int safeImgY = safeOn ? safeYField.getAsInt(screenImgY) : screenImgY;
-            int safeImgW = safeOn ? safeWField.getAsInt(sW) : sW;
-            int safeImgH = safeOn ? safeHField.getAsInt(sH) : sH;
-
-            int sx = drawX + Math.round(screenImgX * scale);
-            int sy = drawY + Math.round(screenImgY * scale);
-            int sw = Math.max(1, Math.round(sW * scale));
-            int sh = Math.max(1, Math.round(sH * scale));
-            int fx = drawX + Math.round(safeImgX * scale);
-            int fy = drawY + Math.round(safeImgY * scale);
-            int fw = Math.max(1, Math.round(safeImgW * scale));
-            int fh = Math.max(1, Math.round(safeImgH * scale));
-
-            int oldAlpha = g.getAlpha();
-            int oldColor = g.getColor();
-
-            g.setAlpha(150);
-            g.setColor(0);
-            g.fillRect(sx, sy, sw, sh);
-
-            g.setAlpha(80);
-            int checker = Math.max(4, Math.round(12f * scale));
-            for (int yy = sy; yy < sy + sh; yy += checker) {
-                for (int xx = sx; xx < sx + sw; xx += checker) {
-                    boolean dark = (((xx - sx) / checker) + ((yy - sy) / checker)) % 2 == 0;
-                    g.setColor(dark ? 0x999999 : 0xcccccc);
-                    int cw = Math.min(checker, sx + sw - xx);
-                    int ch = Math.min(checker, sy + sh - yy);
-                    g.fillRect(xx, yy, cw, ch);
-                }
-            }
-
-            if (safeOn) {
-                g.setAlpha(150);
-                g.setColor(0xff0000);
-                int safeRight = fx + fw;
-                int safeBottom = fy + fh;
-                int screenRight = sx + sw;
-                int screenBottom = sy + sh;
-                if (fy > sy) {
-                    g.fillRect(sx, sy, sw, Math.max(0, fy - sy));
-                }
-                if (fx > sx) {
-                    g.fillRect(sx, fy, Math.max(0, fx - sx), Math.max(0, fh));
-                }
-                if (safeRight < screenRight) {
-                    g.fillRect(safeRight, fy, Math.max(0, screenRight - safeRight), Math.max(0, fh));
-                }
-                if (safeBottom < screenBottom) {
-                    g.fillRect(sx, safeBottom, sw, Math.max(0, screenBottom - safeBottom));
-                }
-            }
-
-            g.setAlpha(255);
-            g.setColor(mode == AIM_MODE_SCREEN ? 0x2f6bff : 0x00ffff);
-            g.drawRect(sx, sy, sw, sh);
-            if (safeOn) {
-                g.setColor(mode == AIM_MODE_SAFE ? 0xffaa00 : 0xff0000);
-                g.drawRect(fx, fy, fw, fh);
-                if (mode == AIM_MODE_SAFE) {
-                    int handle = Math.max(6, Display.getInstance().convertToPixels(2f));
-                    int half = handle / 2;
-                    g.fillRect(fx - half, fy - half, handle, handle);
-                    g.fillRect(fx + fw - half, fy - half, handle, handle);
-                    g.fillRect(fx - half, fy + fh - half, handle, handle);
-                    g.fillRect(fx + fw - half, fy + fh - half, handle, handle);
-                    g.fillRect(fx + fw / 2 - half, fy - half, handle, handle);
-                    g.fillRect(fx + fw / 2 - half, fy + fh - half, handle, handle);
-                    g.fillRect(fx - half, fy + fh / 2 - half, handle, handle);
-                    g.fillRect(fx + fw - half, fy + fh / 2 - half, handle, handle);
-                }
-            }
-
-            g.setAlpha(oldAlpha);
-            g.setColor(oldColor);
-            g.popClip();
-            g.setClip(clip);
-        }
-    }
-
-    void aimPosition(final Image img,
-                    final TextField screenX, final TextField screenY,
-                    final TextField screenW, final TextField screenH,
-                    final TextField safeX, final TextField safeY,
-                    final TextField safeW, final TextField safeH,
-                    final OnOffSwitch useSafeArea) {
-        if(img == null) {
-            ToastBar.showErrorMessage("You need to pick a skin image first");
-            return;
-        }
-        final Form previousForm = Display.getInstance().getCurrent();
-        final boolean safeEnabled = useSafeArea != null && useSafeArea.isValue();
-        final Form editPosition = new Form("Positioning", new BorderLayout());
-        editPosition.setUIID("SkinDesignerForm");
-
-        final AimView view = new AimView(img, screenX, screenY, screenW, screenH,
-                safeX, safeY, safeW, safeH, useSafeArea);
-
-        final TextField aimScreenX = numericMirror(screenX);
-        final TextField aimScreenY = numericMirror(screenY);
-        final TextField aimScreenW = numericMirror(screenW);
-        final TextField aimScreenH = numericMirror(screenH);
-        final TextField aimSafeX = numericMirror(safeX);
-        final TextField aimSafeY = numericMirror(safeY);
-        final TextField aimSafeW = numericMirror(safeW);
-        final TextField aimSafeH = numericMirror(safeH);
-        if (!safeEnabled) {
-            aimSafeX.setEnabled(false);
-            aimSafeY.setEnabled(false);
-            aimSafeW.setEnabled(false);
-            aimSafeH.setEnabled(false);
-        }
-        Runnable refreshAimFields = () -> {
-            syncMirror(aimScreenX, screenX);
-            syncMirror(aimScreenY, screenY);
-            syncMirror(aimScreenW, screenW);
-            syncMirror(aimScreenH, screenH);
-            syncMirror(aimSafeX, safeX);
-            syncMirror(aimSafeY, safeY);
-            syncMirror(aimSafeW, safeW);
-            syncMirror(aimSafeH, safeH);
-        };
-        view.setOnChange(refreshAimFields);
-        bindAimToMain(aimScreenX, screenX, view);
-        bindAimToMain(aimScreenY, screenY, view);
-        bindAimToMain(aimScreenW, screenW, view);
-        bindAimToMain(aimScreenH, screenH, view);
-        bindAimToMain(aimSafeX, safeX, view);
-        bindAimToMain(aimSafeY, safeY, view);
-        bindAimToMain(aimSafeW, safeW, view);
-        bindAimToMain(aimSafeH, safeH, view);
-
-        final String originalScreenX = screenX.getText();
-        final String originalScreenY = screenY.getText();
-        final String originalScreenW = screenW.getText();
-        final String originalScreenH = screenH.getText();
-        final String originalSafeX = safeX.getText();
-        final String originalSafeY = safeY.getText();
-        final String originalSafeW = safeW.getText();
-        final String originalSafeH = safeH.getText();
-
-        Button done = new Button("Done");
-        styleActionButton(done, FontImage.MATERIAL_CHECK);
-        done.setTooltip("Keep changes and return");
-        done.addActionListener(e -> previousForm.showBack());
-        Button cancel = new Button("Cancel");
-        styleActionButton(cancel, FontImage.MATERIAL_CANCEL);
-        cancel.setTooltip("Discard changes and return");
-        Runnable cancelAction = () -> {
-            screenX.setText(originalScreenX);
-            screenY.setText(originalScreenY);
-            screenW.setText(originalScreenW);
-            screenH.setText(originalScreenH);
-            safeX.setText(originalSafeX);
-            safeY.setText(originalSafeY);
-            safeW.setText(originalSafeW);
-            safeH.setText(originalSafeH);
-            previousForm.showBack();
-        };
-        cancel.addActionListener(e -> cancelAction.run());
-        editPosition.setBackCommand(new com.codename1.ui.Command("Cancel") {
-            @Override
-            public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
-                cancelAction.run();
-            }
-        });
-
-        Container topActions = GridLayout.encloseIn(2, cancel, done);
-        topActions.setUIID("SkinDesignerTabBar");
-        editPosition.add(BorderLayout.NORTH, topActions);
-
-        Container south = new Container(new BoxLayout(BoxLayout.Y_AXIS));
-        if (safeEnabled) {
-            Button modeScreen = new Button("Screen");
-            Button modeSafe = new Button("Safe");
-            modeScreen.setTooltip("Drag to reposition the screen area");
-            modeSafe.setTooltip("Drag inside to move the safe area; drag its edges or corners to resize");
-            final Button[] modeButtons = { modeScreen, modeSafe };
-            final int[] modeValues = { AIM_MODE_SCREEN, AIM_MODE_SAFE };
-            updateModeButtons(modeButtons, view.getMode());
-            for (int i = 0; i < modeButtons.length; i++) {
-                final int target = modeValues[i];
-                modeButtons[i].addActionListener(e -> {
-                    view.setMode(target);
-                    updateModeButtons(modeButtons, target);
-                    view.repaint();
-                });
-            }
-            Container modeBar = GridLayout.encloseIn(2, modeScreen, modeSafe);
-            modeBar.setUIID("SkinDesignerTabBar");
-            south.add(modeBar);
-        }
-
-        south.add(labeledFieldTitle("Screen (X / Y / W / H)"));
-        south.add(GridLayout.encloseIn(4, aimScreenX, aimScreenY, aimScreenW, aimScreenH));
-        if (safeEnabled) {
-            south.add(labeledFieldTitle("Safe (X / Y / W / H)"));
-            south.add(GridLayout.encloseIn(4, aimSafeX, aimSafeY, aimSafeW, aimSafeH));
-        }
-
-        Button zoomIn = new Button();
-        Button zoomOut = new Button();
-        Button leftBtn = new Button();
-        Button rightBtn = new Button();
-        Button upBtn = new Button();
-        Button downBtn = new Button();
-        styleIconActionButton(zoomIn, FontImage.MATERIAL_ZOOM_IN);
-        styleIconActionButton(zoomOut, FontImage.MATERIAL_ZOOM_OUT);
-        styleIconActionButton(leftBtn, FontImage.MATERIAL_KEYBOARD_ARROW_LEFT);
-        styleIconActionButton(rightBtn, FontImage.MATERIAL_KEYBOARD_ARROW_RIGHT);
-        styleIconActionButton(upBtn, FontImage.MATERIAL_KEYBOARD_ARROW_UP);
-        styleIconActionButton(downBtn, FontImage.MATERIAL_KEYBOARD_ARROW_DOWN);
-        zoomIn.setTooltip("Zoom in (centers on the active rectangle)");
-        zoomOut.setTooltip("Zoom out");
-        leftBtn.setTooltip("Nudge the active rectangle 1 px left");
-        rightBtn.setTooltip("Nudge the active rectangle 1 px right");
-        upBtn.setTooltip("Nudge the active rectangle 1 px up");
-        downBtn.setTooltip("Nudge the active rectangle 1 px down");
-
-        zoomIn.addActionListener(e -> view.zoomIn());
-        zoomOut.addActionListener(e -> view.zoomOut());
-        leftBtn.addActionListener(e -> { view.nudge(-1, 0); refreshAimFields.run(); });
-        rightBtn.addActionListener(e -> { view.nudge(1, 0); refreshAimFields.run(); });
-        upBtn.addActionListener(e -> { view.nudge(0, -1); refreshAimFields.run(); });
-        downBtn.addActionListener(e -> { view.nudge(0, 1); refreshAimFields.run(); });
-
-        Container navBar = GridLayout.encloseIn(6, zoomOut, zoomIn, leftBtn, rightBtn, upBtn, downBtn);
-        south.add(navBar);
-
-        editPosition.add(BorderLayout.CENTER, view);
-        editPosition.add(BorderLayout.SOUTH, south);
-        applyWebsiteTheme(editPosition, websiteDarkMode);
-        editPosition.show();
-
-        String intro = safeEnabled
-                ? "Drag the screen or safe rectangle to move it. Drag safe-area edges or corners to resize. Use the fields below for exact values."
-                : "Drag the screen rectangle to move it. Use the X / Y / W / H fields below for exact values.";
-        ToastBar.showMessage(intro, FontImage.MATERIAL_INFO, 6000);
-    }
-
-    private TextField numericMirror(TextField source) {
-        TextField t = new TextField(source.getText(), source.getHint(), 6, TextField.NUMERIC);
-        t.setUIID("SkinDesignerField");
-        return t;
-    }
-
-    private void syncMirror(TextField mirror, TextField source) {
-        if (!source.getText().equals(mirror.getText())) {
-            mirror.setText(source.getText());
-        }
-    }
-
-    private void bindAimToMain(final TextField mirror, final TextField main, final AimView view) {
-        mirror.addActionListener(e -> {
-            String text = mirror.getText();
-            if (!main.getText().equals(text)) {
-                main.setText(text);
-            }
-            view.repaint();
-        });
-    }
-
-    private void updateModeButtons(Button[] buttons, int selectedMode) {
-        for (int i = 0; i < buttons.length; i++) {
-            boolean selected = i == selectedMode;
-            String base = selected ? "SkinDesignerTabButtonSelected" : "SkinDesignerTabButton";
-            buttons[i].setUIID(websiteDarkMode ? base + "Dark" : base);
-        }
-    }
-
-    private byte[] imageToByteArray(Image img) throws IOException {
-        ByteArrayOutputStream bo  = new ByteArrayOutputStream();
-        ImageIO.getImageIO().save(img, bo, ImageIO.FORMAT_PNG, 1);
-        bo.close();
-        return bo.toByteArray();
-    }
-
-    byte[] createSkinFile(ImageSettings imPortrait, ImageSettings imLandscape, Picker nativeTheme, Picker platformName, OnOffSwitch tablet, TextField systemFontFamily, TextField proportionalFontFamily, TextField monospaceFontFamily, TextField smallFontSize, TextField mediumFontSize, TextField largeFontSize, TextField pixelRatio, Picker overrideNamePrimary, Picker overrideNameSecondary, Picker overrideNameLast) {
-        Image portrait = imPortrait.getSkinImage();
-        Image landscape = imLandscape.getSkinImage();
-        if (portrait == null) {
-            ToastBar.showErrorMessage("Missing portrait skin image");
-            return null;
-        }
-        if (landscape == null) {
-            ToastBar.showErrorMessage("Missing landscape skin image");
-            return null;
-        }
-        Image overlayPortrait = imPortrait.createSkinOverlay();
-        Image overlayLandscape = imLandscape.createSkinOverlay();
-        ByteArrayOutputStream bos = new ByteArrayOutputStream();
-        try(ZipOutputStream zos = new ZipOutputStream(bos)) {
-            ZipEntry ze = new ZipEntry("skin.png");
-            zos.putNextEntry(ze);
-            zos.write(imageToByteArray(portrait));
-
-            ze = new ZipEntry("skin_l.png");
-            zos.putNextEntry(ze);
-            zos.write(imageToByteArray(landscape));
-
-            ze = new ZipEntry("skin_map.png");
-            zos.putNextEntry(ze);
-            zos.write(imageToByteArray(overlayPortrait));
-
-            ze = new ZipEntry("skin_map_l.png");
-            zos.putNextEntry(ze);
-            zos.write(imageToByteArray(overlayLandscape));
-
-            String theme = nativeTheme.getSelectedString();
-            for(int iter = 0 ; iter < NATIVE_THEMES.length ; iter++) {
-                if(NATIVE_THEMES[iter].equals(theme)) {
-                    ze = new ZipEntry(NATIVE_THEME_FILES[iter]);
-                    zos.putNextEntry(ze);
-                    InputStream is = Display.getInstance().getResourceAsStream(getClass(), "/" + NATIVE_THEME_FILES[iter]);
-                    Util.copyNoClose(is, zos, 8192);
+            int w = getWidth(), h = getHeight();
+            int pad = Math.max(1, w / 12);
+            g.setColor(0x7F8AA3);
+            int rx = getX() + pad, ry = getY() + pad;
+            int rw = w - pad * 2, rh = h - pad * 2;
+            int corner = "classic".equals(id) ? rw / 8 : rw / 4;
+            g.drawRoundRect(rx, ry, rw, rh, corner * 2, corner * 2);
+            g.setColor(0x112247);
+            switch (id) {
+                case "notch": {
+                    int nw = rw / 3, nh = rh / 14;
+                    g.fillRoundRect(rx + (rw - nw) / 2, ry + 2, nw, nh, nh, nh);
                     break;
                 }
+                case "island": {
+                    int iw = rw / 3, ih = rh / 18;
+                    g.fillRoundRect(rx + (rw - iw) / 2, ry + ih, iw, ih, ih, ih);
+                    break;
+                }
+                case "hole": {
+                    int r = rw / 12;
+                    g.fillArc(rx + rw / 2 - r, ry + r * 2, r * 2, r * 2, 0, 360);
+                    break;
+                }
+                case "holeCorner": {
+                    int r = rw / 14;
+                    g.fillArc(rx + r * 2, ry + r * 2, r * 2, r * 2, 0, 360);
+                    break;
+                }
+                case "classic": {
+                    int r = rw / 18;
+                    g.drawArc(rx + rw / 2 - r, ry + rh - r * 3, r * 2, r * 2, 0, 360);
+                    break;
+                }
+                default:
+                    break;
             }
-
-            Properties props = new Properties();
-            props.put("touch", "true");
-            props.put("platformName", platformName.getSelectedString());
-            props.put("tablet", "" + tablet.isValue());
-            props.put("systemFontFamily", systemFontFamily.getText());
-            props.put("proportionalFontFamily", proportionalFontFamily.getText());
-            props.put("monospaceFontFamily", monospaceFontFamily.getText());
-            props.put("smallFontSize", smallFontSize.getText());
-            props.put("mediumFontSize", mediumFontSize.getText());
-            props.put("largeFontSize", largeFontSize.getText());
-            props.put("pixelRatio", pixelRatio.getText());
-            props.put("overrideNames", overrideNamePrimary.getSelectedString() + "," +
-                    overrideNameSecondary.getSelectedString() + "," +
-                    overrideNameLast.getSelectedString());
-            props.put("safePortraitX", "" + imPortrait.getSafeX());
-            props.put("safePortraitY", "" + imPortrait.getSafeY());
-            props.put("safePortraitWidth", "" + imPortrait.getSafeWidth());
-            props.put("safePortraitHeight", "" + imPortrait.getSafeHeight());
-            props.put("safeLandscapeX", "" + imLandscape.getSafeX());
-            props.put("safeLandscapeY", "" + imLandscape.getSafeY());
-            props.put("safeLandscapeWidth", "" + imLandscape.getSafeWidth());
-            props.put("safeLandscapeHeight", "" + imLandscape.getSafeHeight());
-
-            ze = new ZipEntry("skin.properties");
-            zos.putNextEntry(ze);
-            props.store(zos, "Created by the Codename One skin designer see https://www.codenameone.com/");
-        } catch(IOException err) {
-            Log.e(err);
-            ToastBar.showErrorMessage("Error while saving file: " + err);
         }
-        return bos.toByteArray();
     }
+
 }
