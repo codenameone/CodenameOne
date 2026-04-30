@@ -119,39 +119,3 @@ fragment float4 cn1_fs_clear(
 {
     return float4(0.0, 0.0, 0.0, 0.0);
 }
-
-// --------- AlphaMaskRadial pipeline (Phase 5+) ---------
-// Same vertex stage as AlphaMask (cn1_vs_textured); the fragment computes a
-// radial gradient analytically and multiplies by the alpha mask sampled from
-// texture(0). Mirrors the GL DrawTextureAlphaMask radial-gradient shader at
-// DrawTextureAlphaMask.m:181-360 — gradient colours interpolate from
-// `startColor` at the centre to `endColor` at radius 1, computed in
-// texcoord-space using elliptical normalisation (radiusX, radiusY can differ
-// to support gradients with non-square bounds).
-//
-// Buffer layout for this pipeline:
-//   buffer(0): float4 startColor — colour at gradient centre
-//   buffer(1): float4 endColor   — colour at gradient edge
-//   buffer(2): float4 params     — (centerX, centerY, radiusX, radiusY) all in
-//                                  texcoord-space (0..1)
-
-fragment float4 cn1_fs_alpha_mask_radial(
-    VertexOutTextured in [[stage_in]],
-    constant float4 &startColor [[buffer(0)]],
-    constant float4 &endColor   [[buffer(1)]],
-    constant float4 &params     [[buffer(2)]],
-    texture2d<float> tex [[texture(0)]])
-{
-    constexpr sampler s(mag_filter::linear, min_filter::linear, address::clamp_to_edge);
-    float a = tex.sample(s, in.texcoord).r;
-    float2 center = params.xy;
-    float2 radii  = params.zw;
-    // Elliptical distance: scale (texcoord - centre) by radii so that t=1
-    // sits on the ellipse boundary. clamp(0,1) keeps colours in range when
-    // the gradient bbox doesn't cover the whole alpha mask.
-    float2 d = (in.texcoord - center) / max(radii, float2(1e-6, 1e-6));
-    float t = clamp(length(d), 0.0, 1.0);
-    float4 grad = mix(startColor, endColor, t);
-    // Premultiplied output: rgb already includes alpha, multiply by mask.
-    return float4(grad.rgb * a, grad.a * a);
-}

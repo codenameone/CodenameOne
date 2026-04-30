@@ -68,11 +68,6 @@ static void configureBlendDisabled(MTLRenderPipelineColorAttachmentDescriptor *a
             desc.fragmentFunction = [library newFunctionWithName:@"cn1_fs_clear"];
             configureBlendDisabled(desc.colorAttachments[0]);
             break;
-        case CN1MetalPipelineAlphaMaskRadial:
-            desc.vertexFunction = [library newFunctionWithName:@"cn1_vs_textured"];
-            desc.fragmentFunction = [library newFunctionWithName:@"cn1_fs_alpha_mask_radial"];
-            configureBlendPremultiplied(desc.colorAttachments[0]);
-            break;
         default:
             return nil;
     }

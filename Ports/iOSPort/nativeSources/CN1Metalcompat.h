@@ -57,7 +57,6 @@ typedef NS_ENUM(NSInteger, CN1MetalPipeline) {
     CN1MetalPipelineClearPunch,        // ClearRect: write zeros, no blend
     CN1MetalPipelineLinearGradient,    // Phase 2
     CN1MetalPipelineRadialGradient,    // Phase 2
-    CN1MetalPipelineAlphaMaskRadial,   // DrawTextureAlphaMask + RadialGradientPaint
     CN1MetalPipelineCount
 };
 
@@ -175,16 +174,6 @@ id<MTLTexture> CN1MetalCreateAlphaMaskTexture(const uint8_t *bytes, int width, i
 // fillShape / drawShape after Renderer.c rasterises the path.
 void CN1MetalDrawAlphaMask(id<MTLTexture> texture, int color, int alpha,
                            int x, int y, int width, int height);
-
-// Same as CN1MetalDrawAlphaMask but uses the AlphaMaskRadial pipeline to
-// fill the masked region with a radial gradient. (gx, gy, gw, gh) describes
-// the gradient bbox in screen-space; the shader maps this into texcoord
-// space relative to the alpha-mask quad. Mirrors the GL radial-gradient
-// shader path in DrawTextureAlphaMask.m:340-395.
-void CN1MetalDrawAlphaMaskRadial(id<MTLTexture> texture,
-                                 int x, int y, int width, int height,
-                                 int startColor, int endColor,
-                                 float gx, float gy, float gw, float gh);
 
 // Draw a linear or radial gradient filling (x,y,w,h). type is one of
 // GRADIENT_TYPE_HORIZONTAL / GRADIENT_TYPE_VERTICAL / GRADIENT_TYPE_RADIAL

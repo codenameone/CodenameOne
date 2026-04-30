@@ -901,55 +901,6 @@ void CN1MetalDrawAlphaMask(id<MTLTexture> texture, int color, int alpha,
     drawQuad(CN1MetalPipelineAlphaMask, vertices, texcoords, colorV, texture);
 }
 
-// Draw an alpha-mask quad with a radial gradient as colour source. Mirrors
-// the GL radial-gradient program in DrawTextureAlphaMask.m:340-395 — the
-// gradient is parameterised in texcoord-space (0..1) so the shader can
-// compute it without knowing screen coordinates. Caller passes the
-// gradient's screen-space bbox (gx, gy, gw, gh) and we convert to
-// texcoord-space relative to the alpha-mask quad (x, y, width, height).
-void CN1MetalDrawAlphaMaskRadial(id<MTLTexture> texture,
-                                 int x, int y, int width, int height,
-                                 int startColor, int endColor,
-                                 float gx, float gy, float gw, float gh) {
-    if (texture == nil || width <= 0 || height <= 0) return;
-    if (activeEncoder == nil || pipelineCache == nil) return;
-    id<MTLRenderPipelineState> state = [pipelineCache pipelineFor:CN1MetalPipelineAlphaMaskRadial];
-    if (state == nil) return;
-    [activeEncoder setRenderPipelineState:state];
-
-    float vertices[8] = {
-        (float)x,           (float)y,
-        (float)(x + width), (float)y,
-        (float)x,           (float)(y + height),
-        (float)(x + width), (float)(y + height)
-    };
-    static const float texcoords[8] = {
-        0.0f, 0.0f,
-        1.0f, 0.0f,
-        0.0f, 1.0f,
-        1.0f, 1.0f
-    };
-    [activeEncoder setVertexBytes:vertices length:sizeof(float) * 8 atIndex:0];
-    CN1MetalMatrices matrices = currentMatrices();
-    [activeEncoder setVertexBytes:&matrices length:sizeof(matrices) atIndex:1];
-    [activeEncoder setVertexBytes:texcoords length:sizeof(float) * 8 atIndex:2];
-
-    // Premultiplied colours so blending produces the right output.
-    simd_float4 startV = premultipliedColor(startColor, 0xff);
-    simd_float4 endV   = premultipliedColor(endColor,   0xff);
-    // Centre and radii in texcoord space.
-    float cx = (gx + gw / 2.0f - (float)x) / (float)width;
-    float cy = (gy + gh / 2.0f - (float)y) / (float)height;
-    float rx = (gw / 2.0f) / (float)width;
-    float ry = (gh / 2.0f) / (float)height;
-    simd_float4 params = (simd_float4){ cx, cy, rx, ry };
-    [activeEncoder setFragmentBytes:&startV length:sizeof(startV) atIndex:0];
-    [activeEncoder setFragmentBytes:&endV   length:sizeof(endV)   atIndex:1];
-    [activeEncoder setFragmentBytes:&params length:sizeof(params) atIndex:2];
-    [activeEncoder setFragmentTexture:texture atIndex:0];
-    [activeEncoder drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0 vertexCount:4];
-}
-
 // --------------- Texture helpers ---------------
 
 id<MTLTexture> CN1MetalTextureFromUIImage(UIImage *image) {
