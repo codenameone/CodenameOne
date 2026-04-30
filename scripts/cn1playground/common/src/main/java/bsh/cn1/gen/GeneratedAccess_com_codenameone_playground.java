@@ -79,6 +79,12 @@ public final class GeneratedAccess_com_codenameone_playground {
                 return com.codenameone.playground.PlaygroundContext.interceptMethodInvocation((java.lang.Object) adaptedArgs[0], (java.lang.String) adaptedArgs[1], (java.lang.Object[]) adaptedArgs[2]);
             }
         }
+        if ("notifyConstructed".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                com.codenameone.playground.PlaygroundContext.notifyConstructed((java.lang.Object) adaptedArgs[0]); return null;
+            }
+        }
         throw unsupportedStatic(com.codenameone.playground.PlaygroundContext.class, name, safeArgs);
     }
 
@@ -175,6 +181,11 @@ public final class GeneratedAccess_com_codenameone_playground {
                 typedTarget.captureShownForm((com.codename1.ui.Form) adaptedArgs[0]); return null;
             }
         }
+        if ("clearCreatedComponents".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.clearCreatedComponents(); return null;
+            }
+        }
         if ("clearPreview".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.clearPreview(); return null;
@@ -183,6 +194,21 @@ public final class GeneratedAccess_com_codenameone_playground {
         if ("clearShownForm".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.clearShownForm(); return null;
+            }
+        }
+        if ("getCreatedComponents".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getCreatedComponents();
+            }
+        }
+        if ("getFirstCreatedComponent".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getFirstCreatedComponent();
+            }
+        }
+        if ("getFirstCreatedForm".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getFirstCreatedForm();
             }
         }
         if ("getHostForm".equals(name)) {
@@ -209,6 +235,12 @@ public final class GeneratedAccess_com_codenameone_playground {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 typedTarget.log((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("recordCreatedComponent".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
+                typedTarget.recordCreatedComponent((com.codename1.ui.Component) adaptedArgs[0]); return null;
             }
         }
         if ("refreshPreview".equals(name)) {

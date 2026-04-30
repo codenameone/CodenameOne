@@ -1599,7 +1599,7 @@ public final class GeneratedCN1Access implements CN1Access {
         index.put("com.codename1.xml.XMLParser", splitMembers(""));
         index.put("com.codename1.xml.XMLWriter", splitMembers(""));
         index.put("com.codenameone.playground.CN1Playground", splitMembers("destroy()getTheme()init(Object)runApp()start()stop()"));
-        index.put("com.codenameone.playground.PlaygroundContext", splitMembers("captureShownForm(Form)clearPreview()clearShownForm()getHostForm()getPreviewRoot()getShownForm()getTheme()log(String)refreshPreview()setTitle(String)debug(String)getCurrent()interceptMethodInvocation(Object, String, Object[])"));
+        index.put("com.codenameone.playground.PlaygroundContext", splitMembers("captureShownForm(Form)clearCreatedComponents()clearPreview()clearShownForm()getCreatedComponents()getFirstCreatedComponent()getFirstCreatedForm()getHostForm()getPreviewRoot()getShownForm()getTheme()log(String)recordCreatedComponent(Component)refreshPreview()setTitle(String)debug(String)getCurrent()interceptMethodInvocation(Object, String, Object[])notifyConstructed(Object)"));
         index.put("com.codenameone.playground.PlaygroundContext.Logger", splitMembers("log(String)"));
         index.put("com.codenameone.playground.PlaygroundLambdaBridge", splitMembers("lambda(Object[], String)lambda(String[], String)"));
         index.put("com.codenameone.playground.PlaygroundListenerBridge", splitMembers("actionListener(Object)networkListener(Object)onComplete(Object)runnable(Object)"));
