@@ -27,19 +27,31 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up JDK 8
-        uses: actions/setup-java@v1
+        uses: actions/setup-java@v4
         with:
-          java-version: 1.8
-          java-package: jdk
+          java-version: '8'
+          distribution: 'temurin'
+          cache: 'maven'
 
       - name: Install build dependencies
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends xvfb unzip
 
+      - name: Cache cn1-binaries
+        uses: actions/cache@v4
+        with:
+          path: ../cn1-binaries
+          key: cn1-binaries-${{ runner.os }}-designer
+          restore-keys: |
+            cn1-binaries-${{ runner.os }}-
+
       - name: Fetch cn1 binaries
         run: |
-          wget https://github.com/codenameone/cn1-binaries/archive/refs/heads/master.zip
-          unzip master.zip -d ..
-          mv ../cn1-binaries-master ../cn1-binaries
+          if [ ! -d ../cn1-binaries ] || [ -z "$(ls -A ../cn1-binaries 2>/dev/null)" ]; then
+            wget -q https://github.com/codenameone/cn1-binaries/archive/refs/heads/master.zip
+            unzip -q master.zip -d ..
+            rm -rf ../cn1-binaries
+            mv ../cn1-binaries-master ../cn1-binaries
+          fi
           mkdir -p maven/target
           rm -rf maven/target/cn1-binaries
           cp -R ../cn1-binaries maven/target/cn1-binaries
