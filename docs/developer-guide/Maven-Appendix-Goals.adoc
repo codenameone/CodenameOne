@@ -1,9 +1,9 @@
 [appendix]
-== Maven Goals
+== Maven goals
 
 include::appendix_goal_build.adoc[]
 
-include::appendix_goal-cn1lib.adoc[]
+include::appendix_objective-cn1lib.adoc[]
 
 include::appendix_goal_compliance_check.adoc[]
 

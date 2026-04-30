@@ -1,17 +1,18 @@
-== Video Capture Constraints API
+== Video capture constraints API
 
 The new video capture constraints API allows you to specify "constraints" when capturing videos. Constraints include:
 
 1. Video Quality (High or Low)
+// vale-skip: write-good.TooWordy — 'Maximum duration' is a precise upper-bound label.
 2. Maximum duration
-3. Maximum file size
-4. Video Resolution (i.e. width and height).
+3. Most file size
+4. Video Resolution (that is, width and height).
 
-Support for these constraints vary by platform and device, but the API allows you to check if your constraints are supported at runtime. Essentially, you set your "preferred" constraints, and the API will give you its best attempt at meeting those constraints. This is similar to setting a visual Component's preferred width and height. The layout manager takes these preferred dimensions under advisement, but ultimately sets the size on its own.
+Support for these constraints vary by platform and device, but the API allows you to check if your constraints are supported at runtime. Essentially, you set your "preferred" constraints, and the API will give you its best try at meeting those constraints. This is like setting a visual Component's preferred width and height. The layout manager takes these preferred dimensions under advisement, but sets the size on its own.
 
-=== Example 1: Capturing a Low-Quality 5-Second Clip
+=== Example 1: capturing a Low-Quality 5-Second clip
 
-Suppose we want to allow the user to capture a short (5 second) clip, in a low resolution, appropriate for sharing on a social media platform. We create our `VideoCaptureConstraints` object as follows:
+Suppose you want to allow the user to capture a short (5 second) clip, in a low resolution, appropriate for sharing on a social media platform. You create your `VideoCaptureConstraints` object as follows:
 
 [source,java]
 ----
@@ -20,7 +21,7 @@ VideoCaptureConstraints cnst = new VideoCaptureConstraint()
     .preferredMaxLength(5);
 ----
 
-This constraint can then be passed to `Capture.captureVideo()` to obtain the captured file.
+This constraint can then be passed to `Capture.captureVideo()` to get the captured file.
 
 [source,java]
 ----
@@ -29,11 +30,9 @@ String videoPath = Capture.captureVideo(cnst);
 
 === Not all platforms support all constraints
 
-So how do we know if our constraints will be obeyed? If the platform doesn't support the max length, constraint, we may want to do something different. You can find out if a constraint is supported by simply asking out constraint object.
+how do you know if your constraints will be obeyed? If the platform doesn't support the max length, constraint, you may want to do something different. You can find out if a constraint is supported by asking out constraint object.
 
-E.g.
-
-[source,java]
+For example, [source,java]
 ----
 if (cnst.isMaxLengthSupported()) {
     // The max length constraint that we specified is supported on this platform.
@@ -60,9 +59,9 @@ You can probe a constraint to see whether the entire constraint is supported (i.
 * `isMaxFileSizeSupported()` - True if the max file size setting is supported.
 * `isSizeSupported()` - True if the specified preferred width and height constraints are supported.
 
-=== Example 2: Specifying Explicit Width and Height
+=== Example 2: specifying explicit width and height
 
-Suppose we want to capture a video with resolution 320x240. We would begin with this constraint:
+Suppose you want to capture a video with resolution 320×240. You would begin with this constraint:
 
 [source,java]
 ----
@@ -71,15 +70,15 @@ VideoCaptureConstraints cnst = new VideoCaptureConstraints()
     .preferredHeight(240);
 ----
 
-Explicit width and height constraints currently aren't well supported across platforms. Android doesn't support them at all. iOS supports 3 specific sizes. Javascript supports it when running on a desktop browser or on Android - but not on iOS. Etc..
+Explicit width and height constraints aren't well supported across platforms. Android doesn't support them at all. iOS supports 3 specific sizes. Javascript supports it when running on a desktop browser or on Android - but not on iOS. Etc..
 
-So let's find out if this constraint will be obeyed.
+let's find out if this constraint will be obeyed.
 
 [source,java]
 ----
 if (cnst.isSizeSupported()) {
    // Yay! This platform supports our constraint, so the captured video will
-   // be exactly 320x240.
+   // be exactly 320×240.
 } else {
    // Not supported... let's see if the platform will at least try to accommodate us
    int effectiveWidth = cnst.getWidth();
@@ -90,17 +89,17 @@ if (cnst.isSizeSupported()) {
        // In many cases it will try to at least set the quality approximate
        if (quality != 0) {
           //  The platform set the quality for us to try to comply.
-          // Since 320x240 is pretty small, the quality would probably
+          // Since 320×240 is pretty small, the quality would probably
           // be set to QUALITY_LOW
        }
    } else {
-       // The platform couldn't capture at 320x240, but it has provided an
+       // The platform couldn't capture at 320×240, but it has provided an
        // alternate size that is as close to that as possible.
    }
 }
 ----
 
-=== Constraint Support By Platform
+=== Constraint support by platform
 
 
 [width="100%",options="header,footer"]
@@ -113,5 +112,5 @@ if (cnst.isSizeSupported()) {
 | Javascript (Android) | Yes | Yes | Yes | No
 | Javascript (iOS) | Yes | Yes | Yes | No
 |====================
-`*` If size is specified, the platform will attempt to translate to the appropriate quality constraint.
+`*` If size is specified, the platform will try to translate to the appropriate quality constraint.
 

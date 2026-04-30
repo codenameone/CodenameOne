@@ -2,17 +2,17 @@
 
 Welcome to the Codename One Developer Guide. This manual brings together tutorials, patterns, and reference material to help you design, build, and ship cross-platform apps with Codename One. Use the table of contents to explore the topics most relevant to your project, or follow the guide sequentially for a comprehensive tour of the toolkit.
 
-== Guide at a Glance
+== Guide at a glance
 
-* *Getting Started* – Installation, project creation, and first-run walkthroughs that help you configure your environment and build your first Codename One app.
-* *UI & UX* – Layout managers, themes, components, and best practices for crafting responsive user interfaces across platforms.
-* *Application Services* – Covers data storage, networking, push notifications, native interfaces, and other platform services you can integrate.
-* *Deployment & Distribution* – Instructions for packaging, signing, and publishing to the major app stores alongside troubleshooting tips.
-* *Appendices & Reference* – Supplemental material including glossary entries, configuration tables, and advanced topics for power users.
+* *Getting Started:* Installation, project creation, and first-run walkthroughs that help you configure your environment and build your first Codename One app.
+* *UI & UX:* Layout managers, themes, components, and best practices for crafting responsive user interfaces across platforms.
+* *Application Services:* Covers data storage, networking, push notifications, native interfaces, and other platform services you can integrate.
+* *Deployment & Distribution:* Instructions for packaging, signing, and publishing to the major app stores alongside troubleshooting tips.
+* *Appendices & Reference:* Supplemental material including glossary entries, configuration tables, and advanced topics for power users.
 
-Each section is organized to surface conceptual explanations first, followed by practical examples and deeper dives. Cross references within the guide link related topics so you can quickly pivot between beginner-friendly introductions and advanced techniques.
+Each section is organized to surface conceptual explanations first, followed by practical examples and deeper dives. Cross references within the guide link related topics so you can pivot between beginner-friendly introductions and advanced techniques.
 
-== Recommended Resources
+== Recommended resources
 
 These resources complement the manual and are maintained by the Codename One team:
 

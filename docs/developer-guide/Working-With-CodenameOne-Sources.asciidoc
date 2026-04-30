@@ -1,4 +1,4 @@
-== Working with Codename One Sources
+== Working with Codename One sources
 
 The Codename One SDK is published as a Maven multi-module project. Building the
 aggregator in the `/maven` directory compiles every module, installs the
@@ -32,7 +32,7 @@ $ mvn install
 The default build runs every module and its unit tests. Append `-DskipTests`
 if you want to skip the test phases to speed up local builds.
 
-The version printed by Maven will usually end with `-SNAPSHOT` when you build
+The version printed by Maven will end with `-SNAPSHOT` when you build
 from the `master` branch. Release builds from Maven Central omit the suffix.
 
 === Installing the Maven archetypes
@@ -67,7 +67,7 @@ $ mvn -pl core-unittests test
 $ mvn -pl tests -am verify
 ----
 
-Refer to the READMEs in `maven/core-unittests` and `maven/tests` for additional
+Refer to the READMEs in `maven/core-unittests` and `maven/tests` for more
 configuration flags, platform requirements, and environment variables.
 
 === Using your local build in application projects
@@ -89,12 +89,12 @@ project), adjust the `pom.xml` properties to reference your snapshot version:
 Open the project in your IDE and build or run it. Maven will resolve the local
 snapshot instead of downloading the latest release from Maven Central.
 
-=== Why build from source?
+=== Why build from source
 
 Building the SDK yourself gives you:
 
 * Immediate access to fixes and features before they reach Maven Central.
-* The ability to inspect, debug, and modify the framework when you need custom
+* The ability to inspect, debug, and change the framework when you need custom
  behavior.
 * A path to contribute improvements back to the Codename One core.
 

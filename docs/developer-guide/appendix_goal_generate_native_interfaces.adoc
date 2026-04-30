@@ -1,4 +1,4 @@
-=== Generate Native Interfaces (`generate-native-interfaces`)
+=== Generate native interfaces (`generate-native-interfaces`)
 
 Generates stub implementations for all native interfaces defined in the project. This won't overwrite any existing implemetations that may exist.
 
@@ -6,11 +6,11 @@ You should run this goal explicitly after you create a native interface in your 
 
 See the Codename One Developer guide section on https://www.codenameone.com/developer-guide.html#_native_interfaces[native interfaces] for more information on creating native interfaces.
 
-==== Usage Example
+==== Usage example
 
 Suppose you've created a native interface as the Java interface `com.mycompany.myapp.MyNative`, as described in the example in https://www.codenameone.com/developer-guide.html#_native_interfaces[native interfaces].
 
-After creating this (and possibly other) native interfaces in our project, run the `generate-native-interfaces` Maven goal as follows:
+After creating this (and possibly other) native interfaces in your project, run the `generate-native-interfaces` Maven goal as follows:
 
 [source, bash]
 ----
@@ -37,8 +37,8 @@ android::
 `android/src/main/java/com/mycompany/myapp/MyNativeImpl.java`
 android (optional Kotlin)::
 `android/src/main/java/com/mycompany/myapp/MyNativeImpl.kt`
-javascript::
-`javascript/src/main/javascript/com_mycompany_myapp_MyNativeImpl.js`
+JavaScript::
+`JavaScript/src/main/JavaScript/com_mycompany_myapp_MyNativeImpl.js`
 ios (optional Swift)::
 `ios/src/main/objectivec/com_mycompany_myapp_MyNativeImpl.swift`
 

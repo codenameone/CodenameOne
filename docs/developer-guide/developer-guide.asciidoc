@@ -36,7 +36,7 @@ ifdef::env-CN1_PLUGIN_RELEASE_VERSION[:cn1-plugin-release-version: {env:CN1_PLUG
 
 :cn1-snapshot-version: {cn1-release-version}-SNAPSHOT
 
-= {doctitle}
+= {Doctitle}
 {author}
 
 toc::[]
@@ -102,7 +102,7 @@ include::Maven-Appendix-Control-Center.adoc[]
 
 include::Maven-Appendix-Rich-Properties.adoc[]
 
-= Historical Reference
+= Historical reference
 
 include::Working-with-UWP.asciidoc[]
 

@@ -1,8 +1,8 @@
-== Miscellaneous Features
+== Miscellaneous features
 
-=== Phone Functions
+=== Phone functions
 
-Most of the low-level phone functionality is accessible in the https://www.codenameone.com/javadoc/com/codename1/ui/Display.html[Display] class. Think of it as a global class that covers access to the "system".
+Most of the low-level phone functionality is accessible in the https://www.codenameone.com/javadoc/com/codename1/ui/Display.html[Display] class. Think of it as a global class that covers access to the "system."
 
 ==== SMS
 
@@ -21,7 +21,7 @@ try {
 
 Android supports sending SMS messages in the background without any UI. iOS doesn't provide that ability, so the best it can offer is to launch the native SMS app with your message composed for the user to send. Android supports that interactive flow as well (launching the OS native SMS app).
 
-The default `sendSMS` API ignores that difference and simply works interactively on iOS while sending
+The default `sendSMS` API ignores that difference and works interactively on iOS while sending
 in the background for Android when the platform allows it.
 
 The `getSMSSupport` API returns one of the following options:
@@ -29,7 +29,7 @@ The `getSMSSupport` API returns one of the following options:
 - SMS_NOT_SUPPORTED - for desktop, tablet etc.
 - SMS_SEAMLESS - `sendSMS` won't show a UI and will send in the background
 - SMS_INTERACTIVE - `sendSMS` will show an SMS sending UI
-- SMS_BOTH - `sendSMS` can support both seamless and interactive mode, this currently works on Android
+- SMS_BOTH - `sendSMS` can support both seamless and interactive mode, this works on Android
 
 The `sendSMS` can accept an interactive argument: `sendSMS(String phoneNumber, String message, boolean interactive)`
 
@@ -70,7 +70,7 @@ You can dial the phone by using:
 Display.getInstance().dial("+999999999");
 ----
 
-==== Call Detection
+==== Call detection
 
 Codename One includes a generic call detection API through `Display.isCallDetectionSupported()` and `Display.isInCall()`.
 
@@ -80,7 +80,7 @@ On iOS, `isInCall()` is inferred from app interruption lifecycle events, which m
 
 Because iOS toggles this flag during app lifecycle transitions, polling it with a `UITimer` can miss the interruption window entirely (timers are paused while the app is inactive, and the flag is reset when the app becomes active again). If you need to react, check it from lifecycle callbacks such as your app's `stop()`/`start()` flow instead of periodic polling.
 
-On Android, call detection is currently unsupported because robust detection would require invasive telephony permissions that are intentionally avoided.
+On Android, call detection is unsupported because robust detection would require invasive telephony permissions that are intentionally avoided.
 
 [source,java]
 ----
@@ -114,9 +114,9 @@ m.getAttachments().put(imageAttachmentUri, "image/png");
 Display.getInstance().sendMessage(new String[] {"someone@gmail.com"}, "Subject of message", m);
 ----
 
-NOTE: Some features such as attachments etc. don't work correctly in the simulator but should work on iOS/Android
+NOTE: Some features such as attachments etc. don't work in the simulator but should work on iOS/Android
 
-=== Larger Text Accessibility
+=== Larger text accessibility
 
 Codename One can adapt to the operating system’s larger text accessibility setting. The https://www.codenameone.com/javadoc/com/codename1/ui/Display.html[Display] APIs expose two signals: `isLargerTextEnabled()` indicates whether the user has enabled larger text, and `getLargerTextScale()` returns the scale factor that should be applied to fonts.
 
@@ -144,10 +144,10 @@ if (display.isLargerTextEnabled()) {
 
 ==== How the scale is computed per platform
 
-* *iOS* — the scale is the ratio between the body text size at the user's current Dynamic Type setting and the iOS standard 17pt body size, i.e. `[UIFont preferredFontForTextStyle:UIFontTextStyleBody].pointSize / [UIFont systemFontSize]`. Scales for the standard slider stops range from `0.82×` (Extra Small) through `1.00×` (Large, default) up to `1.35×` (Extra Extra Extra Large). When the user enables _Larger Accessibility Sizes_ in Settings → Accessibility → Display & Text Size → Larger Text, the slider extends with five additional stops whose scales reach as high as `3.12×`. These values match what every native iOS app sees from `UIFontMetrics`.
-* *Android* — the scale is `Configuration.fontScale`, which is bucketed by Android (typically `0.85`, `1.0`, `1.15`, `1.30`).
+* *iOS:* the scale is the ratio between the body text size at the user's current Dynamic Type setting and the iOS standard 17pt body size, that is, `[UIFont preferredFontForTextStyle:UIFontTextStyleBody].pointSize / [UIFont systemFontSize]`. Scales for the standard slider stops range from `0.82×` (Extra Small) through `1.00×` (Large, default) up to `1.35×` (Extra Extra Large). When the user enables _Larger Accessibility Sizes_ in Settings → Accessibility → Display & Text Size → Larger Text, the slider extends with five more stops whose scales reach as high as `3.12×`. These values match what every native iOS app sees from `UIFontMetrics`.
+* *Android:* the scale is `Configuration.fontScale`, which is bucketed by Android (typically `0.85`, `1.0`, `1.15`, `1.30`).
 
-NOTE: Because the scale is multiplicative, a base font size that is already larger than the platform default will compound. For example, a `defaultFontSizeInt: 18` in your CSS is roughly 6% larger than iOS's 17pt body, so at iOS Dynamic Type _Extra Extra Extra Large_ (`1.35×`) your text will render at roughly `24.3pt` versus a native iOS app's `23pt`. If you intentionally use a base size larger than the platform default and you also enable `useLargerTextScaleBool`, expect the absolute size at high accessibility settings to be visibly larger than typical native apps. Many native iOS apps cap Dynamic Type via `UIFontMetrics maximumPointSize:` for non-text-heavy UIs to avoid layout breakage.
+NOTE: Because the scale is multiplicative, a base font size that's already larger than the platform default will compound. For example, a `defaultFontSizeInt: 18` in your CSS is 6% larger than iOS's 17pt body, so at iOS Dynamic Type _Extra Extra Large_ (`1.35×`) your text will render at `24.3pt` versus a native iOS app's `23pt`. If you intentionally use a base size larger than the platform default and you also enable `useLargerTextScaleBool`, expect the absolute size at high accessibility settings to be visibly larger than typical native apps. Many native iOS apps cap Dynamic Type via `UIFontMetrics maximumPointSize:` for non-text-heavy UIs to avoid layout breakage.
 
 ==== Previewing in the simulator
 
@@ -162,7 +162,7 @@ The contacts API provides you with the means to query the phone’s address book
 
 Notice that on some platforms this will prompt the user for permissions and the user might choose not to grant that permission. To detect whether this is the case you can invoke `isContactsPermissionGranted()` after invoking `getAllContacts()`. This can help you adapt your error message to the user.
 
-Once you've a https://www.codenameone.com/javadoc/com/codename1/contacts/Contact.html[Contact] you can use the `getContactById` method, however the default method is a bit slow if you want to pull a large batch of contacts. The solution for this is to extract the data that you need through
+Once you've a https://www.codenameone.com/javadoc/com/codename1/contacts/Contact.html[Contact] you can use the `getContactById` method, but the default method is a bit slow if you want to pull a large batch of contacts. The solution for this is to extract the data that you need through
 
 [source,java]
 ----
@@ -173,9 +173,9 @@ getContactById(String id, boolean includesFullName,
 
 Here you can specify true for the attributes that actually matter to you.
 
-Another capability of the contacts API is the ability to extract all of the contacts quickly. This isn't supported on all platforms but platforms such as Android can get a boost from this API as extracting the contacts one by one is remarkably slow on Android.
+Another capability of the contacts API is the ability to extract all the contacts. This isn't supported on all platforms but platforms such as Android can get a boost from this API as extracting the contacts one by one is slow on Android.
 
-You can check if a platform supports the extraction of all the contacts quickly thru `ContactsManager.isAllContactsFast()`.
+You can check if a platform supports the extraction of all the contacts thru `ContactsManager.isAllContactsFast()`.
 
 IMPORTANT: When retrieving all the contacts, notice that you should probably not retrieve all the data and should set some fields to false to perform a more efficient query
 
@@ -206,7 +206,7 @@ image::img/contacts-list.png[List of contacts,scaledwidth=20%]
 
 Notice that you didn't fetch the image of the contact as the performance of loading these images might be prohibitive. You can enhance the code above to include images by using slightly more complex code such as this:
 
-TIP: The `scheduleBackgroundTask` method is similar to `new Thread()` in some regards. It places elements in a queue instead of opening too many threads so it can be good for non-urgent tasks
+TIP: The `scheduleBackgroundTask` method is like `new Thread()` in some regards. It places elements in a queue instead of opening too many threads so it can be good for non-urgent tasks
 
 [source,java]
 ----
@@ -249,7 +249,7 @@ TIP: Notice that the code above uses `callSerially` & `scheduleBackgroundTask` i
 You can use `createContact(String firstName, String familyName, String officePhone, String homePhone, String cellPhone, String email)` to add a new contact and deleteContact(String id) to delete a contact.
 
 
-=== Localization & Internationalization (L10N & I18N)
+=== Localization & internationalization (L10N & I18N)
 
 Localization (l10n) means adapting to a locale which is more than translating to a specific language but also to a specific language within environment for example: `en_US!= en_UK`.
 Internationalization (i18n) is the process of creating one application that adapts to all locales and regional requirements.
@@ -292,7 +292,7 @@ Enumeration locales = res.listL10NLocales( "l10n" );
 
 An exception for localization is the `TextField`/`TextArea` components both of which contain user data, in those cases the text won't be localized to avoid accidental localization of user input.
 
-TIP: You can export and import resource bundles as standard Java properties files, CSV and XML. The formats are pretty standard for most localization shops, the XML format Codename One supports is the one used by Android’s string bundles which means most localization specialists should easily localize it
+TIP: You can export and import resource bundles as standard Java properties files, CSV and XML. The formats are pretty standard for most localization shops, the XML format Codename One supports is the one used by Android’s string bundles which means most localization specialists should localize it
 
 The resource bundle is a map between keys and values for example: the code below displays `"This Label is localized"` on the `Label` with the hardcoded resource bundle. It would work the same with a resource bundle loaded from a resource file:
 
@@ -309,7 +309,7 @@ hi.show();
 .Localized label
 image::img/l10n-basic.png[Localized label,scaledwidth=30%]
 
-==== Localization Manager
+==== Localization manager
 
 The https://www.codenameone.com/javadoc/com/codename1/l10n/L10NManager.html[L10NManager] class includes a multitude of features useful for common localization tasks.
 
@@ -345,7 +345,7 @@ image::img/l10n-manager.png[Localization formatting/parsing and information,scal
 
 RTL stands for right to left, in the world of internationalization it refers to languages that are written from right to left (Arabic, Hebrew, Syriac, Thaana).
 
-Most western languages are written from left to right (LTR), however some languages are written from right to left (RTL) speakers of these languages expect the UI to flow in the opposite direction otherwise it seems weird like reading this word would be to most English speakers: "drieW".
+Most western languages are written from left to right (LTR), but some languages are written from right to left (RTL) speakers of these languages expect the UI to flow in the opposite direction otherwise it seems weird like reading this word would be to most English speakers: "drieW."
 
 The problem posed by RTL languages is known as BiDi (Bi-directional) and not as RTL since the "true" problem isn't the reversal of the writing/UI but rather the mixing of RTL and LTR together. For example: numbers are always written from left to right ( like in English) so in an RTL language the direction is from right to left and once you reach a number or English text embedded in the middle of the sentence (such as a name) the direction switches for a duration and is later restored.
 
@@ -372,18 +372,18 @@ Most of Codename One's RTL support is under the hood, the https://www.codenameon
 
 Once RTL is activated all positions in Codename One become reversed and the UI becomes a mirror of itself. For example: Adding a `Toolbar` command to the left will actually make it appear on the right. Padding on the left becomes padding on the right. The scroll moves to the left etc.
 
-This applies to the layout managers (except for group layout) and most components. Bidi is mostly seamless in Codename One but a developer still needs to be aware that his UI might be mirrored for these cases.
+This applies to the layout managers (except for group layout) and most components. Bidi is seamless in Codename One but a developer still needs to be aware that his UI might be mirrored for these cases.
 
 
-==== Localizing Native iOS Strings
+==== Localizing native iOS strings
 
 Some strings in iOS need to be localized using iOS's native mechanisms - namely providing _*.lproj_ directories with _.strings_ files. For example, if you want the app to have a different bundle display name for each language, or you want to translate the "UsageDescription" strings of your Info.plist into many languages, you would need to use iOS' https://developer.apple.com/localization/[native localization facilities].
 
-===== Example: Localizing the App Name
+===== Example: localizing the app name
 
-The app name, as it's displayed to the user, is defined in using the _CFBundleDisplayName_ key of the app's Info.plist file. Normally, this will be automatically set to your app's display name, as defined in your _codenameone_settings.properties_ file. This works fine if your app will have the same name in every locale, but suppose you want your app to take on a different name in French than in English. For example: You want your app to be called "Hello App" for English-speaking users, and "Bonjour App" for French-speaking users.
+The app name, as it's displayed to the user, is defined in using the _CFBundleDisplayName_ key of the app's Info.plist file., this will be automatically set to your app's display name, as defined in your _codenameone_settings.properties_ file. This works fine if your app will have the same name in every locale, but suppose you want your app to take on a different name in French than in English. For example: You want your app to be called "Hello App" for English-speaking users, and "Bonjour App" for French-speaking users.
 
-In this case, you need to add iOS localization bundles "en.lproj" and "fr.lproj", each with a file named "InfoPlist.strings". If you're using Maven, then you can add these directly inside the _ios/src/main/strings_ directory of your project.
+In this case, you need to add iOS localization bundles "en.lproj" and `fr.lproj`, each with a file named `InfoPlist.strings`. If you're using Maven, then you can add these directly inside the _ios/src/main/strings_ directory of your project.
 
 TIP: You will need to create the _strings_ directory manually, if it doesn't exist yet.
 
@@ -406,28 +406,28 @@ image::img/ios_strings_directory_screenshot.png[]
 
 [NOTE]
 ====
-The _strings_ format is similar to the _properties_ file format, except that both the "key" and the "value" must be wrapped in quotes. And if there are many strings, then they must be delimited by a semi-colon `;`.
+The _strings_ format is like the _properties_ file format, except that both the "key" and the "value" must be wrapped in quotes. And if there are many strings, then they must be delimited by a semi-colon `;`.
 ====
 
 .Legacy Ant Projects
 ****
-Legacy Ant projects have a different directory structure. They have no equivalent location to the Maven _ios/src/main/strings_ directory, but the legacy `ios/src/main/resources` content can be replicated under _native/ios_. To include native iOS localizations in those projects, place zipped versions of your .lproj directories inside the `native/ios` directory.  E.g. _en.lproj.zip_, _fr.lproj.zip_, etc.
+Legacy Ant projects have a different directory structure. They have no equivalent location to the Maven _ios/src/main/strings_ directory, but the legacy `ios/src/main/resources` content can be replicated under _native/ios_. To include native iOS localizations in those projects, place zipped versions of your .lproj directories inside the `native/ios` directory.  For example, _en.lproj.zip_, _fr.lproj.zip_, etc.
 
 TIP: Whenever possible, migrate legacy builds to Maven to take advantage of the modern workflow. See <<maven-project-workflow>> for automated migration options.
 ****
 
-===== Example: Localization App Usage Description Strings
+===== Example: localization app usage description strings
 
-iOS requires you to supply usage descriptions for many features that will be displayed to the user when the app requests permission to use the feature. For example, the https://developer.apple.com/documentation/bundleresources/information_property_list/nscamerausagedescription?language=objc[NSCameraUsageDescription] string must be provided if your app needs to use the camera. You can specify these values as build hints using the pattern `ios.NSXXXUsageDescription=This feature is needed blah blah blah`. In the `NSCameraUsageDescription` case, you might include the build hint:
+iOS requires you to supply usage descriptions for many features that will be displayed to the user when the app requests permission to use the feature. For example, the https://developer.apple.com/documentation/bundleresources/information_property_list/nscamerausagedescription?language=objc[NSCameraUsageDescription] string must be provided if your app needs to use the camera. You can specify these values as build hints using the pattern `ios.NSXXXUsageDescription=This feature is needed blah blah`. In the `NSCameraUsageDescription` case, you might include the build hint:
 
 [source,properties]
 ----
 ios.NSCameraUsageDescription=This app needs to use your camera to scan bar codes
 ----
 
-Ultimately these descriptions are embedded in your app's Info.plist file, so they can be localized the same way you localize other Info.plist values - in the localized _InfoPlist.strings_ file.
+These descriptions are embedded in your app's Info.plist file, so they can be localized the same way you localize other Info.plist values - in the localized _InfoPlist.strings_ file.
 
-See <<_example_localizing_the_app_name, the above example>> for instructions on localizing values in the Info.plist file. Then simply add translations to the _InfoPlist.strings_ file for your usage descriptions.
+See <<_example_localizing_the_app_name, the above example>> for instructions on localizing values in the Info.plist file. Then add translations to the _InfoPlist.strings_ file for your usage descriptions.
 
 .ios/src/main/strings/en.lproj/InfoPlist.strings
 [source,strings]
@@ -443,9 +443,9 @@ See <<_example_localizing_the_app_name, the above example>> for instructions on 
 "NSCameraUsageDescription"="Cette application doit utiliser votre appareil photo pour scanner les codes à barres";
 ----
 
-==== Localizing the App Icon
+==== Localizing the app icon
 
-Codename One can ship a different launcher icon per locale on iOS and Android by detecting specially-named PNG files during the build. Drop your per-locale artwork into `common/src/main/resources` using the convention:
+Codename One can ship a different launcher icon per locale on iOS and Android by detecting specially named PNG files during the build. Drop your per-locale artwork into `common/src/main/resources` using the convention:
 
 [source,text]
 ----
@@ -454,38 +454,38 @@ cn1_icon_<lang>[_<country>].png
 
 `<lang>` is a two-letter ISO 639-1 language code and the optional `<country>` is a two-letter ISO 3166-1 country code. Language is treated as case-insensitive; the country component is normalized to uppercase. A few valid examples:
 
-* `cn1_icon_fr.png` — French (any region)
-* `cn1_icon_en_GB.png` — British English
-* `cn1_icon_es_MX.png` — Mexican Spanish
+* `cn1_icon_fr.png`: French (any region)
+* `cn1_icon_en_GB.png`: British English
+* `cn1_icon_es_MX.png`: Mexican Spanish
 
 Supply a square source image at least 432×432 pixels (the largest size emitted for Android adaptive icons); the build resizes it to every target density. The default app icon continues to be controlled by your `codenameone_settings.properties` file and is used whenever the device locale doesn't match any of the localized variants. At runtime the builders look for a `<lang>_<COUNTRY>` match first, then fall back to a bare `<lang>` match. Providing both (for example `cn1_icon_en.png` plus `cn1_icon_en_GB.png`) lets you give British users a country-specific icon while every other English locale still receives the generic English icon.
 
-===== Android Behaviour
+===== Android behaviour
 
 On Android the build generates locale-qualified drawable resources at every density so the platform picks the right icon automatically based on the device's current locale:
 
 * `drawable-<lang>[-r<COUNTRY>][-<dpi>]/icon.png` at 36, 48, 72, 96, 128, 144 and 192 pixels for legacy launchers.
 * When `android.enableAdaptiveIcons=true` the same variants are also written as `mipmap-<lang>[-r<COUNTRY>]-<dpi>/ic_launcher.png` and `ic_launcher_foreground.png`. The default adaptive background and the `mipmap-anydpi-v26/ic_launcher.xml` definition are reused as-is.
 
-No code changes are required — Android's resource framework switches icons when the locale changes.
+No code changes are required—Android's resource framework switches icons when the locale changes.
 
-===== iOS Behaviour
+===== iOS behaviour
 
-iOS does not localize launcher icons natively, so Codename One wires up https://developer.apple.com/documentation/uikit/uiapplication/2806818-setalternateiconname[alternate app icons] for you:
+iOS doesn't localize launcher icons natively, so Codename One wires up https://developer.apple.com/documentation/uikit/uiapplication/2806818-setalternateiconname[alternate app icons] for you:
 
 * For each detected locale the build generates `AppIcon_<lang>_<COUNTRY>@2x.png` (120×120), `@3x.png` (180×180), `@2x~ipad.png` (152×152) and `83.5x83.5@2x~ipad.png` (167×167 for iPad Pro) in the app bundle root.
 * A `CFBundleIcons` (and `CFBundleIcons~ipad`) entry is injected into `Info.plist` containing a `CFBundleAlternateIcons` dictionary with one entry per locale. `CFBundlePrimaryIcon` continues to reference the default `iPhone7App`/`iPadApp7` image families.
 * The `CodenameOne_GLAppDelegate` is patched to call `-[UIApplication setAlternateIconName:completionHandler:]` at launch. The delegate reads `[NSLocale preferredLanguages]`, tries the full `<lang>_<COUNTRY>` key first, then falls back to the language-only key, and clears the alternate icon (reverting to the default) if no variant matches.
 * The injection is idempotent and runs before the `ios.afterFinishLaunching` hook, so any custom code you supply via that build hint is unaffected.
 
-NOTE: iOS briefly displays a system alert the first time an app switches to an alternate icon. This is platform-standard behaviour — Codename One cannot suppress it.
+NOTE: iOS displays a system alert the first time an app switches to an alternate icon. This is platform-standard behaviour—Codename One can't suppress it.
 
-===== Tips and Troubleshooting
+===== Tips and troubleshooting
 
 * File names are matched case-insensitively. `cn1_icon_EN_uk.png` is treated the same as `cn1_icon_en_UK.png`.
 * Names that don't fit the `<2-letter lang>[_<2-letter country>]` pattern are logged and skipped; the rest of the build continues.
 * The original `cn1_icon_*.png` files are removed after processing so they aren't shipped as stray bundle resources.
-* To override the default (non-localized) icon, keep using the `Icon` setting in `codenameone_settings.properties` or the `icon` image in `CN1Resource.res` — this feature only adds *alternate* icons for specific locales.
+* To override the default (non-localized) icon, keep using the `Icon` setting in `codenameone_settings.properties` or the `icon` image in `CN1Resource.res`. This feature only adds *alternate* icons for specific locales.
 
 === Location - GPS
 
@@ -504,7 +504,7 @@ IMPORTANT: In order for location to work on iOS you *MUST* define the build hint
 
 The `getCurrentLocationSync()` method is good for cases where you need to fetch a current location once and not repeatedly query location. It activates the GPS then turns it off to avoid excessive battery usage. For example, if an application needs to track motion or position over time it should use the location listener API to track location as such:
 
-TIP: Notice that there is a method called `getCurrentLocation()` which will return the current state immediately and might not be accurate for some cases.
+TIP: Notice that there is a method called `getCurrentLocation()` which will return the current state and might not be right for some cases.
 
 [source,java]
 ----
@@ -522,24 +522,24 @@ LocationManager.getLocationManager().setLocationListener(new MyListener());
 
 IMPORTANT: On Android location maps to low-level API's if you disable the usage of Google Play Services. By default location should perform well if you leave the Google Play Services on
 
-==== Location In The Background - Geofencing
+==== Location in the background - geofencing
 
-Polling location is generally expensive and requires a special permission on iOS. Its also implemented rather differently both in iOS and Android. Both platforms place restrictions on the location API usage in the background.
+Polling location is expensive and requires a special permission on iOS. Its also implemented rather differently both in iOS and Android. Both platforms place restrictions on the location API usage in the background.
 
 Because of the nature of background location the API is non-trivial. It starts with the venerable `LocationManager` but instead of using the standard API you need to use `setBackgroundLocationListener`.
 
 Instead of passing a `LocationListener` instance you need to pass a `Class` object instance. This is important because background location might be invoked when the app isn't running and an object would need to be allocated.
 
-Notice that you should *NOT* perform long operations in the background listener callback. IOS wake-up time is limited to approximately 10 seconds and the app could get killed if it exceeds that time slice.
+Notice that you should *NOT* perform long operations in the background listener callback. IOS wake-up time is limited to about 10 seconds and the app could get killed if it exceeds that time slice.
 
-Notice that the listener can also send events when the app is in the foreground, therefore it's recommended to check the app state before deciding how to process this event. You can use `Display.isMinimized()` to determine if the app is currently running or in the background.
+Notice that the listener can also send events when the app is in the foreground, so it's recommended to check the app state before deciding how to process this event. You can use `Display.isMinimized()` to determine if the app is running or in the background.
 
 When implementing this make sure that:
 
 - The class passed to the API is a public class in the global scope. Not an inner class or anything like that!
 - The class has a public no-argument constructor
 - You need to pass it as a class literal for example: `MyClassName.class`. don't use `Class.forName("my.package.MyClassName")`! +
-Class names are problematic since device builds are obfuscated, you should use literals which the obfuscator detects and handles correctly.
+Class names are problematic since device builds are obfuscated, you should use literals which the obfuscator detects and handles.
 
 The following code demonstrates usage of the GeoFence API:
 
@@ -552,11 +552,11 @@ LocationManager.getLocationManager()
         .addGeoFencing(GeofenceListenerImpl.class, gf);
 ----
 
-===== Android Background Location Permissions (API 30+)
+===== Android background location permissions (API 30+)
 
-On Android 11 (API level 30) and higher, requesting background location permission requires a two-step process. First, foreground location permissions must be granted. Then, the app must request background location access, which will direct the user to the system settings to select "Allow all the time". Codename One handles this flow automatically when you use `LocationManager`.
+On Android 11 (API level 30) and higher, requesting background location permission requires a two-step process. First, foreground location permissions must be granted. Then, the app must request background location access, which will direct the user to the system settings to select `Allow all the time`. Codename One handles this flow automatically when you use `LocationManager`.
 
-For Android 11+ (API 30+), Codename One detects if background location is needed and presents a dialog explaining the requirement before redirecting the user to the app settings. You can customize the permission prompt message using the localization key `android.permission.ACCESS_BACKGROUND_LOCATION`.
+For Android 11+ (API 30+), Codename One detects if background location is needed and presents a dialog explaining the need before redirecting the user to the app settings. You can customize the permission prompt message using the localization key `android.permission.ACCESS_BACKGROUND_LOCATION`.
 
 [source,java]
 ----
@@ -581,7 +581,7 @@ public class GeofenceListenerImpl implements GeofenceListener {
 }
 ----
 
-=== Background Music Playback
+=== Background music playback
 
 Codename One supports playing music in the background (for example: when the app is minimized) which is useful for developers building a music player style application.
 
@@ -593,7 +593,7 @@ For iOS you will need to use a special build hint: `ios.background_modes=music`.
 
 Which should allow background playback of music on iOS and would work with the `createBackgroundMedia()` method.
 
-=== Capture - Photos, Video, Audio
+=== Capture - photos, video, audio
 
 The capture API allows you to use the camera to capture photographs or the microphone to capture audio. It even includes an API for video capture. +
 The API itself couldn’t be simpler:
@@ -658,11 +658,11 @@ hi.show();
 image::img/capture-photo.png[Captured photos previewed in the ImageViewer,scaledwidth=20%]
 
 // HTML_ONLY_START
-You demonstrate video capture in the https://www.codenameone.com/manual/components.html#mediamanager-section[MediaManager section].
+You show video capture in the https://www.codenameone.com/manual/components.html#mediamanager-section[MediaManager section].
 // HTML_ONLY_END
 ////
 //PDF_ONLY
-You demonstrate video capture in the <<mediamanager-section,MediaManager section>>.
+You show video capture in the <<mediamanager-section,MediaManager section>>.
 ////
 
 The sample below captures audio recordings (using the 'Capture' API) and copies them locally under unique names. It also demonstrates the storage and organization of captured audio:
@@ -724,7 +724,7 @@ hi.show();
 .Captured recordings in the demo
 image::img/capture-audio.png[Captured recordings in the demo,scaledwidth=20%]
 
-Alternatively, you can use the `Media`, `MediaManager` and `MediaRecorderBuilder` APIs to capture audio, as a more customizable approach than using the Capture API:
+Or, you can use the `Media`, `MediaManager` and `MediaRecorderBuilder` APIs to capture audio, as a more customizable approach than using the Capture API:
 
 [source,java]
 ----
@@ -930,7 +930,7 @@ Alternatively, you can use the `Media`, `MediaManager` and `MediaRecorderBuilder
 
 image::img/media-audio-recording-example.png[Example of recording and playback audio using Media API]
 
-==== Capture Asynchronous API
+==== Capture asynchronous API
 
 The `Capture` API also includes a callback based API that uses the `ActionListener` interface to implement capture. For example: you can adapt the previous sample to use this API as such:
 
@@ -1004,9 +1004,9 @@ TIP: There is no need for a screenshot as it will look identical to the capture 
 The last value is the type of content picked which can be one of:
 `Display.GALLERY_ALL`, `Display.GALLERY_VIDEO` or `Display.GALLERY_IMAGE`.
 
-=== Analytics Integration
+=== Analytics integration
 
-One of the features in Codename One is built-in support for analytic instrumentation. Currently Codename One has built-in support for https://www.google.com/analytics/[Google Analytics], which provides reasonable enough statistics of application usage.
+One of the features in Codename One is built-in support for analytic instrumentation. Codename One has built-in support for https://www.google.com/analytics/[Google Analytics], which provides reasonable enough statistics of application usage.
 
 Analytics is pretty seamless for the old GUI builder since navigation occurs through the Codename One API and can be logged without developer interaction. For example, to begin the instrumentation one needs to add the line:
 
@@ -1018,17 +1018,17 @@ AnalyticsService.init(agent, domain);
 
 To get the value for the agent value create a Google Analytics account and add a domain, then copy and paste the string that looks something like UA-99999999-8 from the console to the agent string. Once this is in place you should start receiving statistic events for the application.
 
-If your application isn't a GUI builder application or you would like to send more detailed data you can use the `Analytics.visit()` method to indicate that you're entering a specific page.
+If your application isn't a GUI builder application or you would like to send more detailed data you can use the `Analytics.visit()` method to show that you're entering a specific page.
 
-==== Application Level Analytics
+==== Application level analytics
 
 In 2013 Google introduced an improved application level analytics API that's specifically built for mobile apps. For example, it requires a slightly different API usage. You can activate this specific mode by invoking `setAppsMode(true)`.
 
 When using this mode you can also report errors and crashes to the Google analytics server using the `sendCrashReport(Throwable, String message, boolean fatal)` method.
 
-You generally recommend using this mode and setting up an apps analytics account as the results are more refined.
+You recommend using this mode and setting up an apps analytics account as the results are more refined.
 
-==== Overriding The Analytics Implementation
+==== Overriding the analytics implementation
 
 The Analytics API can also be enhanced to support any other form of analytics solution of your own choosing by deriving the `AnalyticsService` class.
 
@@ -1041,7 +1041,7 @@ AnalyticsService.init(new MyAnalyticsServiceSubclass());
 
 Notice that this removes the need to invoke the other `init` method or `setAppsMode(boolean)`.
 
-=== Native Facebook Support
+=== Native Facebook support
 
 // HTML_ONLY_START
 TIP: Check out the https://www.codenameone.com/manual/components.html#sharebutton-section[ShareButton section] it might be enough for most of your needs.
@@ -1053,7 +1053,7 @@ TIP: Check out the <<sharebutton-section,ShareButton section>> it might be enoug
 
 Codename One supports Facebooks https://www.codenameone.com/javadoc/com/codename1/io/Oauth2.html[Oauth2] login and Facebooks single sign on for iOS and Android.
 
-==== Getting Started - Web Setup
+==== Getting started - web setup
 
 To get started first you will need to create a facebook app on the Facebook developer portal
 at https://developers.facebook.com/apps/
@@ -1094,7 +1094,7 @@ IMPORTANT: The activity name should match the main class name followed by the wo
 .Android Activity definition
 image::img/chat-app-tutorial-facebook-login-7.png[Details,scaledwidth=50%]
 
-To build the native Android app you must make sure that you setup the keystore correctly for your application. If you don't have
+To build the native Android app you must make sure that you setup the keystore for your application. If you don't have
 an Android certificate you can use the visual wizard (in the Android section in the project preferences the button labeled #Generate#) or use the command line:
 
 [source,bash]
@@ -1127,9 +1127,9 @@ Lastly you need to publish the Facebook app by flipping the switch in the apps "
 .Without flipping the switch the app won't "appear"
 image::img/chat-app-tutorial-facebook-login-9.png[Enable The App,scaledwidth=50%]
 
-==== IDE Setup
+==== IDE setup
 
-You now need to set some important build hints in the project so it will work correctly. To set the build hints right click the project select project properties and in the Codename One section pick the second tab. Add this entry into the table:
+You now need to set some important build hints in the project so it will work. To set the build hints right click the project select project properties and in the Codename One section pick the second tab. Add this entry into the table:
 
 [source,bash]
 ----
@@ -1169,14 +1169,14 @@ if(!fb.isUserLoggedIn()){
 }
 ----
 
-IMPORTANT: All of these values are from the web version of the app! +
+IMPORTANT: All these values are from the web version of the app! +
 They are used in the simulator and on "unsupported"
 platforms as a fallback. Android and iOS will use the
 native login
 
-==== Facebook Publish Permissions
+==== Facebook publish permissions
 
-In order to post something to Facebook you need to request a write permission, you can do write operations
+To post something to Facebook you need to request a write permission, you can do write operations
 within the callback which is invoked when the user approves the permission.
 
 You can prompt the user for publish permissions by using this code on a logged in https://www.codenameone.com/javadoc/com/codename1/social/FacebookConnect.html[FacebookConnect]:
@@ -1198,7 +1198,7 @@ TIP: Notice that this won't always prompt the user, but its required to verify t
 [[google-login-section]]
 === Google Sign-In
 
-Google Login is a bit of a moving target, as they are regularly creating new APIs and deprecating old ones. Codename One 3.7 and earlier used the Google+ API for sign-in, which is now deprecated. While this API still works, it's no longer useful on iOS as it redirects to Safari to perform login, and Apple no longer allows this practice.
+Google Login is a bit of a moving target, as they are creating new APIs and deprecating old ones. Codename One 3.7 and earlier used the Google+ API for sign-in, which is now deprecated. While this API still works, it's no longer useful on iOS as it redirects to Safari to perform login, and Apple no longer allows this practice.
 
 The new, approved API is called Google Sign-In. Rather than using Safari to handle login (on iOS), it uses an embedded web view, which *is* permitted by Apple.
 
@@ -1213,7 +1213,7 @@ The process involves four parts:
 
 
 [[ios-setup]]
-==== iOS Setup Instructions
+==== iOS setup instructions
 
 **Short Version**
 
@@ -1251,7 +1251,7 @@ You'll be presented with the following screen
 .Choose and Configure Services form
 image::img/google-signin-ios-choose-and-configure-services-form.png[Choose and Configure Services form,scaledwidth=50%]
 
-Click on "Google Sign-In".
+Click on `Google Sign-In`.
 
 Then press the "Enable Google Sign-In" button that appears.
 
@@ -1263,7 +1263,7 @@ You should then be presented with another button to "Generate Configuration File
 .Generate Configuration Files
 image::img/google-signin-ios-generate-configuration-files-button.png[Generate Configuration Files,scaledwidth=20%]
 
-Finally you will be presented with a button to "Download GoogleServices-Info.plist".
+You will be presented with a button to `Download GoogleServices-Info.plist`.
 
 .Download GoogleService-Info.plist file
 image::img/google-signin-ios-download-googleservice-infoplist-btn.png[Download GoogleService-Info plist file,scaledwidth=20%]
@@ -1276,7 +1276,7 @@ image::img/google-signin-ios-google-service-info-plist-file-structure.png[Projec
 At this point, your app should be able to use Google Sign-In. Notice that you don't require any build hints. Only that the GoogleService-Info.plist file is added to the project's native/ios directory.
 
 [[android-setup]]
-==== Android Setup Instructions
+==== Android setup instructions
 
 **Short Version**
 
@@ -1321,7 +1321,7 @@ The value that you enter here should be obtained from the certificate that you'r
 $ keytool -exportcert -alias myAlias -keystore /path/to/my-keystore.keystore -list -v
 ----
 
-The snippet above assumes that your keystore is located at `/path/to/my-keystore.keystore`, and the certificate alias is "myAlias". You'll be prompted to enter the password for your keystore, then the output will look something like:
+The snippet above assumes that your keystore is located at `/path/to/my-keystore.keystore`, and the certificate alias is "myAlias." You'll be prompted to enter the password for your keystore, then the output will look something like:
 
 ----
 Alias name: myAlias
@@ -1369,7 +1369,7 @@ Press this button and you'll be presented with another button to "Generate Confi
 .Generate Configuration Files
 image::img/google-signin-ios-generate-configuration-files-button.png[Generate Configuration Files,scaledwidth=20%]
 
-Finally you will be presented with a button to "Download google-services.json".
+You will be presented with a button to `Download google-services.json`.
 
 .Download google-services.json file
 image::img/google-signin-android-download-googleservices-json-btn.png[Download google-services json file,scaledwidth=20%]
@@ -1381,16 +1381,16 @@ image::img/google-signin-android-google-services-json-file-structure.png[Project
 
 At this point, your app should be able to use Google Sign-In. Notice that you don't require any build hints. Only that the google-services.json file is added to the project's native/android directory.
 
-IMPORTANT: If you want to access additional information about the logged in user using Google's REST APIs, you will require an OAuth2.0 client ID of type Web Application for this project as well. See <<oauth-setup>> for details.
+IMPORTANT: If you want to access more information about the logged in user using Google's REST APIs, you will require an OAuth2.0 client ID of type Web Application for this project as well. See <<oauth-setup>> for details.
 
 [[oauth-setup]]
-==== OAuth Setup (Simulator and REST API Access)
+==== OAuth setup (simulator and REST API access)
 
-Getting Google Sign-In to work in the Codename One simulator requires an additional step after you've set up iOS and/or Android apps. The Simulator can't use the native Google Sign-In APIs, so it uses the standard Web Application OAuth2.0 API. In addition, the Android App requires a Web Application OAuth2.0 client ID to access additional Google REST APIs.
+Getting Google Sign-In to work in the Codename One simulator requires an extra step after you've set up iOS and/or Android apps. The Simulator can't use the native Google Sign-In APIs, so it uses the standard Web Application OAuth2.0 API. Also, the Android App requires a Web Application OAuth2.0 client ID to access more Google REST APIs.
 
-If you've set up the Google Sign-In API for either Android or iOS, then Google will have already automatically generated a Web Application OAuth2.0 client ID for you. You need to provide the ClientID and ClientSecret to the `GoogleConnect` instance (in your java code).
+If you've set up the Google Sign-In API for either Android or iOS, then Google will have already automatically generated a Web Application OAuth2.0 client ID for you. You need to provide the ClientID and ClientSecret to the `GoogleConnect` instance (in your Java code).
 
-===== Client ID, Client Secret and Redirect URL
+===== Client ID, client secret and redirect URL
 
 . Log into https://console.cloud.google.com/apis[the Google Cloud Platform API console].
 . Select your app from the drop-down-menu in the top bar
@@ -1400,12 +1400,12 @@ image::img/google-sign-in-google-cloud-platform-credentials.png[Credentials,scal
 . Under the "OAuth2.0 Client IDs", find the row with "Web application" listed in the type column
 . Click the "Edit icon for that row.
 . Make note of the "Client ID" and "Client Secret" on this page, as you'll need to add them to your Java source in the next step.
-. In the "Authorized redirect URIs" section, you will need to enter the URL to the page that the user will be sent to after a successful login. This page will appear in the simulator for a split second, as Codename One's BrowserComponent will intercept this request to obtain the access token upon successful login. You can use any URL you like here, but it must match the value you give to `GoogleConnect.setRedirectURL()` in <<the-code>>.
+. In the "Authorized redirect URIs" section, you will need to enter the URL to the page that the user will be sent to after a successful login. This page will appear in the simulator for a split second, as Codename One's BrowserComponent will intercept this request to get the access token upon successful login. You can use any URL you like here, but it must match the value you give to `GoogleConnect.setRedirectURL()` in <<the-code>>.
 +
 image::img/google-sign-in-oauth-setup-redirect-url.png[Redirect URL,scaledwidth=30%]
 
-[[javascript-setup]]
-==== Javascript Setup Instructions
+[[JavaScript-setup]]
+==== Javascript setup instructions
 
 The Javascript port can use the same OAuth2.0 credentials as the simulator does. It doesn't require your Client Secret or redirect URL. It requires your Client ID, which you can specify using the `GoogleConnect.setClientID()` method.
 
@@ -1441,7 +1441,7 @@ if(!gc.isUserLoggedIn()){
 
 NOTE: The client ID and client secret values here are the ones from your <<oauth-setup, OAuth2.0 Web Application>>.
 
-IMPORTANT: The *Client ID* and *Client Secret* values are used on both the Simulator and on Android. On simulator these values are required for login to work at all. On Android these values are required to obtain an access token to query the Google API further using its various REST APIs. If you don't include these values on Android, login will still work, but `gc.getAccessToken().getToken()` will return `null`.
+IMPORTANT: The *Client ID* and *Client Secret* values are used on both the Simulator and on Android. On simulator these values are required for login to work at all. On Android these values are required to get an access token to query the Google API further using its various REST APIs. If you don't include these values on Android, login will still work, but `gc.getAccessToken().getToken()` will return `null`.
 
 
 [[lead-component-section]]
@@ -1451,14 +1451,14 @@ Codename One has two basic ways to create new components:
 
 1. Subclass a `Component` override `paint`, implement event callbacks etc.
 
-2. Compose many components into a new component, usually by subclassing a `Container`.
+2. Compose many components into a new component, by subclassing a `Container`.
 
 Components such as https://www.codenameone.com/javadoc/com/codename1/ui/Tabs.html[Tabs] subclass `Container` which make a lot of sense for that component since it's physically a `Container`.
 
 For example,
 components like https://www.codenameone.com/javadoc/com/codename1/components/MultiButton.html[MultiButton], https://www.codenameone.com/javadoc/com/codename1/components/SpanButton.html[SpanButton] & https://www.codenameone.com/javadoc/com/codename1/components/SpanLabel.html[SpanLabel] don't necessarily seem like the right candidate for compositing but they are all `Container` subclasses.
 
-Using a `Container` provides you a lot of flexibility in terms of layout & functionality for a specific component. `MultiButton`
+Using a `Container` provides you a lot of flexibility in layout & functionality for a specific component. `MultiButton`
 is a great example of that. it's a `Container` internally that's composed of 5 labels and a `Button`.
 
 Codename One makes the `MultiButton` "feel" like a single button thru the use of `setLeadComponent(Component)` which
@@ -1466,7 +1466,7 @@ turns the button into the "leader" of the component.
 
 When a `Container` hierarchy is placed under a leader all events within the hierarchy are sent to the leader, so if a label within the lead component receives a pointer pressed event this event will be sent to the leader.
 
-For example: in the case of the `MultiButton` the internal button will receive that event and send the action performed event, change the state etc.
+For example: for the `MultiButton` the internal button will receive that event and send the action performed event, change the state etc.
 
 This creates some potential issues for instance in `MultiButton`:
 
@@ -1482,13 +1482,13 @@ myMultiButton.addActionListener((e) -> {
 });
 ----
 
-The leader also determines the style state, so all the elements being lead are in the same state. For example: if the the button is pressed all elements will display their pressed states, notice that they will do so with their own styles but
+The leader also determines the style state, so all the elements being lead are in the same state. For example: if the button is pressed all elements will display their pressed states, notice that they will do so with their own styles but
 they will each pick the pressed version of that style so a `Label` UIID within a lead component in the pressed state
 would return the Pressed state for a `Label` not for the `Button`.
 
 This is convenient when you need to construct more elaborate UI's and the cool thing about it's that you can do this entirely in the designer which allows assembling containers and defining the lead component inside the hierarchy.
 
-For example: the `SpanButton` class is similar to this code:
+For example: the `SpanButton` class is like this code:
 
 [source,java]
 ----
@@ -1537,7 +1537,7 @@ public class SpanButton extends Container {
 }
 ----
 
-==== Blocking Lead Behavior
+==== Blocking lead behavior
 
 The `Component` class has two methods that allow you to exclude a component from lead behavior: `setBlockLead(boolean)` & `isBlockLead()`.
 
@@ -1575,12 +1575,12 @@ void addEntry(Accordion accr) {
 }
 ----
 
-This allows you to add/edit entries but it also allows the delete button above to actually work separately. Without a call to `setBlockLead(true)` the delete button would cat as the rest of the accordion title.
+This allows you to add/edit entries but it also allows the delete button above to actually work. Without a call to `setBlockLead(true)` the delete button would cat as the rest of the accordion title.
 
 .Accordion with delete button entries that work despite the surrounding lead
 image::img/lead-component-blocking.png[Accordion with delete button entries that work despite the surrounding lead,scaledwidth=20%]
 
-=== Pull To Refresh
+=== Pull to refresh
 
 Pull to refresh is the common UI paradigm that Twitter popularized where the user can pull down the form/container to receive an update. Adding this to Codename One couldn’t be simpler!
 
@@ -1600,7 +1600,7 @@ hi.show();
 .Pull to refresh demo
 image::img/pull-to-refresh.png[Simple pull to refresh demo,scaledwidth=20%]
 
-=== Running 3rd Party Apps Using Display's execute
+=== Running 3rd party apps using display's execute
 
 The https://www.codenameone.com/javadoc/com/codename1/ui/Display.html[Display] class's `execute` method allows you to invoke a URL which is bound to a particular application.
 
@@ -1618,7 +1618,7 @@ allows you to support 3 result states:
 
 . `null` - you've no idea whether the URL will work on this platform.
 
-The sample below launches a "godfather" search on IMDB when this is sure to work ( on iOS currently). You can actually try to search in the case of null as well but this sample plays it safe by using the http link which is sure to work:
+The sample below launches a "godfather" search on IMDB when this is sure to work ( on iOS currently). You can actually try to search for null as well but this sample plays it safe by using the http link which is sure to work:
 
 [source,java]
 ----
@@ -1630,11 +1630,11 @@ if(can != null && can) {
 }
 ----
 
-=== Automatic Build Hint Configuration
+=== Automatic build hint configuration
 
-You try to make Codename One "seamless", this expresses itself in small details such as the automatic detection of permissions on Android etc. The build servers go a long way in setting up the environment as intuitive. But it isn't enough, build hints are often confusing and obscure. it's hard to abstract the mess that's native mobile OS's and the odd policies from Apple/Google...
+You try to make Codename One "seamless," this expresses itself in small details such as the automatic detection of permissions on Android etc. The build servers go a long way in setting up the environment as intuitive. However, it isn't enough, build hints are often confusing and obscure. it's hard to abstract the mess that's native mobile OS's and the odd policies from Apple/Google...
 
-A good example for a common problem developers face is location code that doesn't work in iOS. This is due to the `ios.locationUsageDescription` build hint that's required. The reason that build hint was added is a requirement by Apple to provide a description for every app that uses the location service.
+A good example for a common problem developers face is location code that doesn't work in iOS. This is due to the `ios.locationUsageDescription` build hint that's required. The reason that build hint was added is a need by Apple to provide a description for every app that uses the location service.
 
 To solve this sort of used case you've two API's in `Display`:
 
@@ -1659,20 +1659,20 @@ public void setProjectBuildHint(String key, String value) {}
 
 Both of these allow you to detect if a build hint is set and if not (or if it's set incorrectly) set its value...
 
-So if you will use the location API from the simulator and you didn't define `ios.locationUsageDescription` Codename One will implicitly define a string there. The cool thing is that you will now see that string in your settings and you would be able to customize it easily.
+if you will use the location API from the simulator and you didn't define `ios.locationUsageDescription` Codename One will implicitly define a string there. The cool thing is that you will now see that string in your settings and you would be able to customize it.
 
 For example, this gets way better than that trivial example!
 
-The real value is for 3rd party cn1lib authors. For example: Google Maps or Parse. They can inspect the build hints in the simulator and show an error in case of a misconfiguration. They can even show a setup UI. Demos that need special keys in place can force the developer to set them up properly before continuing.
+The real value is for 3rd party cn1lib authors. For example: Google Maps or Parse. They can inspect the build hints in the simulator and show an error in case of a misconfiguration. They can even show a setup UI. Demos that need special keys in place can force the developer to set them up before continuing.
 
 
-=== Easy Thread
+=== Easy thread
 
-Working with threads is usually ranked as one of the least intuitive and painful tasks in programming. This is such an error prone task that some platforms/languages took the route of avoiding threads entirely. I needed to convert some code to work on a separate thread but I still wanted the ability to communicate and transfer data from that thread.
+Working with threads is ranked as one of the least intuitive and painful tasks in programming. This is such an error prone task that some platforms/languages took the route of avoiding threads entirely. I needed to convert some code to work on a separate thread but I still wanted the ability to communicate and transfer data from that thread.
 
-This is possible in Java but non-trivial, the thing is that this is relatively easy to do in Codename One with tools such as `callSerially` I can let arbitrary code run on the EDT. Why not offer that to any random thread?
+This is possible in Java but non-trivial, the thing is that this is easy to do in Codename One with tools such as `callSerially` I can let arbitrary code run on the EDT. Why not offer that to any random thread?
 
-that's why I created `EasyThread` which takes some of the concepts of Codeame One's threading and makes them more accessible to an arbitrary thread. This way you can move things like resource loading into a separate thread and easily synchronize the data back into the EDT as needed...
+that's why I created `EasyThread` which takes some concepts of Codeame One's threading and makes them more accessible to an arbitrary thread. This way you can move things like resource loading into a separate thread and synchronize the data back into the EDT as needed...
 
 Easy thread can be created like this:
 
@@ -1688,14 +1688,14 @@ You can send a task to the thread using:
 e.run(() -> doThisOnTheThread());
 ----
 
-But it gets better, say you want to return a value:
+However, it gets better, say you want to return a value:
 
 [source,java]
 ----
 e.run((success) -> success.onSuccess(doThisOnTheThread()), (myResult) -> onEDTGotResult(myRsult));
 ----
 
-Lets break that down... You ran the thread with the success callback on the new thread then the callback got invoked on the EDT as a result. So this code `(success) -> success.onSuccess(doThisOnTheThread())` ran off the EDT in the thread and when you invoked the `onSuccess` callback it sent it asynchronously to the EDT here: `(myResult) -> onEDTGotResult(myRsult)`.
+Lets break that down... You ran the thread with the success callback on the new thread then the callback got invoked on the EDT as a result. this code `(success) -> success.onSuccess(doThisOnTheThread())` ran off the EDT in the thread and when you invoked the `onSuccess` callback it sent it asynchronously to the EDT here: `(myResult) -> onEDTGotResult(myRsult)`.
 
 These asynchronous calls make things a bit painful to wade thru so instead I chose to wrap them in a simplified synchronous version:
 
@@ -1708,11 +1708,11 @@ int result = e.run(() -> {
 });
 ----
 
-There are a few other variants like `runAndWait` and there is a `kill()` method which stops a thread and releases its resources.
+a few other variants like `runAndWait` and there is a `kill()` method which stops a thread and releases its resources.
 
-=== Mouse Cursor
+=== Mouse cursor
 
-Codename one can change the mouse cursor when hovering over specific areas to indicate resizability, movability etc. For obvious reasons this feature is available in the desktop and JavaScript ports as the other ports rely mostly on touch interaction. The feature is off by default and needs to be enabled on a `Form` by using `Form.setEnableCursors(true);`. If you're writing a custom component that can use cursors such as `SplitPane` you can use:
+Codename one can change the mouse cursor when hovering over specific areas to show resizability, movability etc. For obvious reasons this feature is available in the desktop and JavaScript ports as the other ports rely on touch interaction. The feature is off by default and needs to be enabled on a `Form` by using `Form.setEnableCursors(true);`. If you're writing a custom component that can use cursors such as `SplitPane` you can use:
 
 [source,java]
 ----
@@ -1726,11 +1726,11 @@ protected void initComponent() {
 Once this is enabled you can set the cursor over a specific region using `cmp.setCursor()` which accepts one of the cursor constants defined in `Component`.
 
 
-=== Working With GIT
+=== Working with GIT
 
-Working with GIT for storing Codename One projects isn't exactly a feature but since it's so ubiquitous you think it's important to have a common guideline.
+Working with GIT for storing Codename One projects isn't a feature but since it's so ubiquitous you think it's important to have a common guideline.
 
-When you first started committing to git you used something like this for netbeans projects:
+When you first started committing to git you used something like this for NetBeans projects:
 
 ----
 
@@ -1745,9 +1745,9 @@ Removing the jars, build, private folder etc. makes a lot of sense but there are
 
 ==== cn1lib's
 
-You will notice you excluded the jars which are stored under lib and you exclude the Codename One source zip. But I didn't exclude cn1libs... That was an omission since the original project you committed didn't have cn1libs. But should you commit a binary file to git?
+You will notice you excluded the jars which are stored under lib and you exclude the Codename One source zip. However, I didn't exclude cn1libs... That was an omission since the original project you committed didn't have cn1libs. However, should you commit a binary file to git?
 
-I don't know. Generally git isn't good with binaries but cn1libs make sense. In another project that did have a cn1lib I did this:
+I don't know. Git isn't good with binaries but cn1libs make sense. In another project that did have a cn1lib I did this:
 
 ----
 
@@ -1762,22 +1762,22 @@ native/internal_tmp/
 
 The important lines are `lib/impl/` and `native/internal_tmp/`. Technically cn1libs are zips. When you do a refresh libs they unzip into the right directories under `lib/impl` and `native/internal_tmp`. By excluding these directories you can remove duplicates that can result in conflicts.
 
-==== Resource Files
+==== Resource files
 
 Committing the res file is a matter of personal choice. it's committed in the git ignore files above but you can remove it. The res file is at risk of corruption and in that case having a history you can refer to, matters a lot.
 
-But the resource file is a bit of a problematic file. As a binary file if you've a team working with it the conflicts can be a major blocker. This was far worse with the old GUI builder, that was one of the big motivations of moving into the new GUI builder which works better for teams.
+However, the resource file is a bit of a problematic file. As a binary file if you've a team working with it the conflicts can be a major blocker. This was far worse with the old GUI builder, that was one of the big motivations of moving into the new GUI builder which works better for teams.
 
 Still, if you want to keep an eye of every change in the resource file you can switch on the #File# -> #XML Team Mode# which should be on by default. This mode creates a file hierarchy under the `res` directory to match the res file you opened. For example: if you've a file named `src/theme.res` it will create a matching `res/theme.xml` and also nest all the images and resources you use in the res directory.
 
 that's useful as you can edit the files directly and keep track of every file in git. For example, this has two big drawbacks:
 
 - it's flaky - while this mode works it never reached the stability of the regular res file mode
-- It conflicts - the simulator/device are oblivious to this mode. So if you fetch an update you also need to update the res file and you might still have conflicts related to that file
+- It conflicts - the simulator/device are oblivious to this mode. if you fetch an update you also need to update the res file and you might still have conflicts related to that file
 
-Ultimately both of these issues shouldn't be a deal breaker. Even though this mode is a bit flaky it's better than the alternative as you can literally "see" the content of the resource file. You can easily revert and reapply your changes to the res file when merging from git, it's tedious but again not a deal breaker.
+Both of these issues shouldn't be a deal breaker. Even though this mode is a bit flaky it's better than the alternative as you can "see" the content of the resource file. You can revert and reapply your changes to the res file when merging from git, it's tedious but again not a deal breaker.
 
-==== Eclipse Version
+==== Eclipse version
 
 Building on the gitignore you've for NetBeans the eclipse version should look like this:
 
