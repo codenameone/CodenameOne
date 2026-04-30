@@ -481,6 +481,12 @@ Currently only supported for App Store builds.  See https://www.codenameone.com/
 |win.vm32bit
 |true/false (defaults to false). Forces windows desktop builds to use the Win32 JVM instead of the 64 bit VM making them compatible with older Windows Machines. This is off by default at the moment because of a bug in JDK 8 update 112 that might cause this to fail for some cases
 
+|win.installDirName
+|Windows desktop builds only. Overrides the default installation folder name suggested by the installer (under `Program Files`). Defaults to the application's main class name for backward compatibility. Use this build hint to set a user-friendly installation folder name (e.g. `win.installDirName=My Application`). The application id used by Windows for upgrade detection is unaffected, so existing installs continue to upgrade correctly.
+
+|win.shortcutName
+|Windows desktop builds only. Overrides the name used for the Start Menu shortcut, the Desktop shortcut and (when `win.launchOnStart=true`) the autostart shortcut. Defaults to the application's main class name for backward compatibility. Use this build hint to set a user-friendly shortcut label (e.g. `win.shortcutName=My Application`).
+
 |noExtraResources
 |true/false (defaults to false). Blocks codename one from injecting its own resources when set to true, the only effect this has is in slightly reducing archive size. This might have adverse effects on some features of Codename One so it isn't recommended.
 
