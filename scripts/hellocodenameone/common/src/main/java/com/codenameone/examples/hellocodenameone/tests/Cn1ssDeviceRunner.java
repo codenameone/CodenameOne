@@ -70,6 +70,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new AnimateHierarchyScreenshotTest(),
             new AnimateUnlayoutScreenshotTest(),
             new SmoothScrollScreenshotTest(),
+            new StickyHeaderScreenshotTest(),
             new TensileBounceScreenshotTest(),
             new ComponentReplaceFadeScreenshotTest(),
             new ComponentReplaceSlideScreenshotTest(),
@@ -255,6 +256,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 || "AnimateHierarchyScreenshotTest".equals(testName)
                 || "AnimateUnlayoutScreenshotTest".equals(testName)
                 || "SmoothScrollScreenshotTest".equals(testName)
+                || "StickyHeaderScreenshotTest".equals(testName)
                 || "TensileBounceScreenshotTest".equals(testName)
                 || "ComponentReplaceFadeScreenshotTest".equals(testName)
                 || "ComponentReplaceSlideScreenshotTest".equals(testName)
