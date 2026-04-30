@@ -2,7 +2,6 @@ name: Build Developer Guide Docs
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - 'docs/developer-guide/**'
       - 'docs/demos/**'

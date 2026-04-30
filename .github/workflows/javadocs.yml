@@ -2,6 +2,12 @@ name: Build JavaDocs
 
 on:
   pull_request:
+    paths:
+      - 'CodenameOne/src/**/*.java'
+      - 'Ports/**/src/**/*.java'
+      - 'maven/**/src/main/java/**/*.java'
+      - '.github/scripts/build_javadocs.sh'
+      - '.github/workflows/javadocs.yml'
   push:
     branches:
       - master
