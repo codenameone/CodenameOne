@@ -307,19 +307,32 @@ void CN1MetalFillPolygon(const float *xCoords, const float *yCoords, int num,
     simd_float4 colorV = premultipliedColor(color, alpha);
     // Triangulate as a fan from vertex 0: (0,1,2), (0,2,3), (0,3,4), ...
     // Works for convex polygons only, matching the GL path's assumption.
-    int triCount = num - 2;
-    int vertCount = triCount * 3;
-    // Cap at setVertexBytes's 4KB limit (512 float2 vertices). Convex
-    // polygons from CN1 are typically <100 vertices; this should not clip.
-    if (vertCount > 512) vertCount = 512;
-    float stackBuf[1024]; // 512 vertices * 2 floats = 1024 floats
-    int out = 0;
-    for (int i = 1; i + 1 < num && out + 6 <= (int)(sizeof(stackBuf) / sizeof(float)); i++) {
-        stackBuf[out++] = xCoords[0];   stackBuf[out++] = yCoords[0];
-        stackBuf[out++] = xCoords[i];   stackBuf[out++] = yCoords[i];
-        stackBuf[out++] = xCoords[i+1]; stackBuf[out++] = yCoords[i+1];
+    //
+    // setVertexBytes has a 4KB hard limit (= 512 float2 vertices = ~170
+    // triangles per draw call). Polygons with more triangles must be
+    // submitted in chunks. The previous implementation silently truncated
+    // at 170 triangles, leaving half a 360-point circle unfilled in
+    // graphics-fill-polygon. Fix: emit batches of up to BATCH_TRIS
+    // triangles, each starting from vertex 0 (so the fan still meets
+    // contiguously). Adjacent chunks share the seam vertex (i, i+1) so
+    // the visual surface stays gap-free.
+    enum { BATCH_TRIS = 168, BATCH_FLOATS = BATCH_TRIS * 6 };
+    float stackBuf[BATCH_FLOATS];
+    int triRemaining = num - 2;
+    int firstTri = 0;
+    while (triRemaining > 0) {
+        int batch = (triRemaining > BATCH_TRIS) ? BATCH_TRIS : triRemaining;
+        int out = 0;
+        for (int t = 0; t < batch; t++) {
+            int i = 1 + firstTri + t;            // 1, 2, 3, ...
+            stackBuf[out++] = xCoords[0];        stackBuf[out++] = yCoords[0];
+            stackBuf[out++] = xCoords[i];        stackBuf[out++] = yCoords[i];
+            stackBuf[out++] = xCoords[i + 1];    stackBuf[out++] = yCoords[i + 1];
+        }
+        drawSolidPrimitive(MTLPrimitiveTypeTriangle, stackBuf, out / 2, colorV);
+        firstTri += batch;
+        triRemaining -= batch;
     }
-    drawSolidPrimitive(MTLPrimitiveTypeTriangle, stackBuf, out / 2, colorV);
 }
 
 void CN1MetalClearRect(int x, int y, int width, int height) {
