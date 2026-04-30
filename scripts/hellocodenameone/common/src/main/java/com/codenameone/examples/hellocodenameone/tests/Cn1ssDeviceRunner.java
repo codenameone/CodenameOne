@@ -71,6 +71,8 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new AnimateUnlayoutScreenshotTest(),
             new SmoothScrollScreenshotTest(),
             new StickyHeaderScreenshotTest(),
+            new StickyHeaderSlideTransitionScreenshotTest(),
+            new StickyHeaderFadeTransitionScreenshotTest(),
             new TensileBounceScreenshotTest(),
             new ComponentReplaceFadeScreenshotTest(),
             new ComponentReplaceSlideScreenshotTest(),
@@ -257,6 +259,8 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 || "AnimateUnlayoutScreenshotTest".equals(testName)
                 || "SmoothScrollScreenshotTest".equals(testName)
                 || "StickyHeaderScreenshotTest".equals(testName)
+                || "StickyHeaderSlideTransitionScreenshotTest".equals(testName)
+                || "StickyHeaderFadeTransitionScreenshotTest".equals(testName)
                 || "TensileBounceScreenshotTest".equals(testName)
                 || "ComponentReplaceFadeScreenshotTest".equals(testName)
                 || "ComponentReplaceSlideScreenshotTest".equals(testName)
@@ -282,6 +286,8 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 || "ValidatorLightweightPickerScreenshotTest".equals(testName)
                 || "LightweightPickerButtonsScreenshotTest".equals(testName)
                 || "StickyHeaderScreenshotTest".equals(testName)
+                || "StickyHeaderSlideTransitionScreenshotTest".equals(testName)
+                || "StickyHeaderFadeTransitionScreenshotTest".equals(testName)
                 // graphics tests
                 || "AffineScale".equals(testName)
                 || "Clip".equals(testName)
