@@ -391,14 +391,14 @@ public class Log {
                 // TEMPORARY DIAGNOSTIC INSTRUMENTATION (PR #4795): the ParparVM
                 // JS port currently surfaces every original EDT exception as a
                 // bare ``Exception: <class>`` line because *this* listener
-                // throws an NPE while trying to format the report — the
+                // throws an NPE while trying to format the report -- the
                 // formatting NPE is the one that ends up logged, the original
                 // is silently swallowed. Wrap each step so we can identify
                 // which sub-call fails AND so the caught ``evt.getSource()``
                 // throwable still reaches ``Log.e`` even when a preceding
                 // line dies. Use ``Log.p(s, 1)`` (level=INFO) for the
                 // markers so they survive the JS port's
-                // ``console.error``-only echo path — the worker-side
+                // ``console.error``-only echo path -- the worker-side
                 // ``System.out.println`` route is gated behind the
                 // ``?parparDiag=1`` flag and gets dropped on the live
                 // preview. Remove this granular wrapping once the JS-port
@@ -412,37 +412,52 @@ public class Log {
                     p("[edtErr] getSource threw: " + t, 1);
                 }
                 if (consumeError) {
-                    try { evt.consume(); }
-                    catch (Throwable t) { p("[edtErr] consume threw: " + t, 1); }
+                    try {
+                        evt.consume();
+                    } catch (Throwable t) {
+                        p("[edtErr] consume threw: " + t, 1);
+                    }
                 }
                 try {
                     p("Exception in " + Display.getInstance().getProperty("AppName", "app") + " version " + Display.getInstance().getProperty("AppVersion", "Unknown"));
-                } catch (Throwable t) { p("[edtErr] appName/version threw: " + t, 1); }
+                } catch (Throwable t) {
+                    p("[edtErr] appName/version threw: " + t, 1);
+                }
                 try {
                     p("OS " + Display.getInstance().getPlatformName());
-                } catch (Throwable t) { p("[edtErr] platformName threw: " + t, 1); }
+                } catch (Throwable t) {
+                    p("[edtErr] platformName threw: " + t, 1);
+                }
                 try {
                     p("Error " + source);
-                } catch (Throwable t) { p("[edtErr] sourceLog threw: " + t, 1); }
+                } catch (Throwable t) {
+                    p("[edtErr] sourceLog threw: " + t, 1);
+                }
                 try {
                     if (Display.getInstance().getCurrent() != null) {
                         p("Current Form " + Display.getInstance().getCurrent().getName());
                     } else {
                         p("Before the first form!");
                     }
-                } catch (Throwable t) { p("[edtErr] currentForm threw: " + t, 1); }
+                } catch (Throwable t) {
+                    p("[edtErr] currentForm threw: " + t, 1);
+                }
                 try {
                     if (source instanceof Throwable) {
                         e((Throwable) source);
                     } else {
                         p("[edtErr] source not Throwable, skipping Log.e", 1);
                     }
-                } catch (Throwable t) { p("[edtErr] Log.e threw: " + t, 1); }
+                } catch (Throwable t) {
+                    p("[edtErr] Log.e threw: " + t, 1);
+                }
                 try {
                     if (getUniqueDeviceKey() != null) {
                         sendLog();
                     }
-                } catch (Throwable t) { p("[edtErr] sendLog threw: " + t, 1); }
+                } catch (Throwable t) {
+                    p("[edtErr] sendLog threw: " + t, 1);
+                }
                 p("[edtErr] exit listener", 1);
             }
         });
