@@ -56,6 +56,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set TMPDIR
+        run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
+
+      - name: Cache codenameone-tools
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/codenameone-tools
+          key: ${{ runner.os }}-cn1-tools-${{ hashFiles('scripts/setup-workspace.sh') }}
+          restore-keys: |
+            ${{ runner.os }}-cn1-tools-
+
       - name: Set up Java 8 for ParparVM
         uses: actions/setup-java@v4
         with:
@@ -83,12 +94,33 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Cache npm modules for scripts/
+        uses: actions/cache@v4
+        with:
+          path: scripts/node_modules
+          key: ${{ runner.os }}-scripts-npm-playwright-v1
+          restore-keys: |
+            ${{ runner.os }}-scripts-npm-
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-v1
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
       - name: Install Playwright Chromium
         run: |
           cd scripts
           npm init -y 2>/dev/null || true
           npm install playwright
-          npx playwright install --with-deps chromium
+          if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
+            npx playwright install-deps chromium
+          else
+            npx playwright install --with-deps chromium
+          fi
 
       - name: Install Xvfb for headless Java AWT
         run: sudo apt-get update && sudo apt-get install -y xvfb
