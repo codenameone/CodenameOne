@@ -565,7 +565,16 @@ void CN1MetalDrawString(NSString *str, UIFont *font, int color, int alpha, int x
         return;
     }
 
-    NSDictionary *attrs = @{ (__bridge NSString *)kCTFontAttributeName: (__bridge id)atlas.ctFont };
+    // Pass the UIFont directly as the kCTFontAttributeName value. CoreText
+    // accepts UIFont here and uses it to drive glyph mapping and positions
+    // — keeping the CTLine completely consistent with how UIKit's
+    // drawAtPoint:withAttributes: would shape the same string in the
+    // whole-string fallback path. Bridging through atlas.ctFont (built via
+    // CTFontCreateWithFontDescriptor) was producing slightly different
+    // metrics for the first DrawString call after a fresh form, which
+    // surfaced as the TL panel of graphics-draw-string-decorated rendering
+    // larger/wider glyphs than TR/BL/BR despite identical Java state.
+    NSDictionary *attrs = @{ (__bridge NSString *)kCTFontAttributeName: font };
     CFAttributedStringRef attrStr = CFAttributedStringCreate(NULL,
                                                              (__bridge CFStringRef)str,
                                                              (__bridge CFDictionaryRef)attrs);
