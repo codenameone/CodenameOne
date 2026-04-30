@@ -15,7 +15,14 @@ import java.io.IOException;
 interface Cn1ssDeviceRunnerHelper {
     int CHUNK_SIZE_ANDROID = 500;
     int CHUNK_SIZE_DEFAULT = 900;
-    int DELAY_ANDROID = 20;
+    // Throttle introduced in 763bd6676 (#4253). The 20ms value was tuned
+    // against the original ~10-test screenshot suite; with 17 animation grid
+    // tests added each emitting ~150KB PNGs (~400 chunks each), the JDK 21
+    // Android job started flaking with one random "PNG chunk truncated before
+    // CRC" per run on different tests across runs (SlideHorizontalTransitionTest
+    // on one CI run, MultiButtonTheme_dark on the next). Bumping to 30ms gives
+    // logcat extra drain time without doubling overall emission cost.
+    int DELAY_ANDROID = 30;
     int MAX_PREVIEW_BYTES = 20 * 1024;
     String PREVIEW_CHANNEL = "PREVIEW";
     int[] PREVIEW_QUALITIES = new int[] {60, 50, 40, 35, 30, 25, 20, 18, 16, 14, 12, 10, 8, 6, 5, 4, 3, 2, 1};
@@ -33,6 +40,48 @@ interface Cn1ssDeviceRunnerHelper {
 
     static void emitCurrentFormScreenshot(String testName) {
         emitCurrentFormScreenshot(testName, null);
+    }
+
+    static void emitImage(Image image, String testName, Runnable onComplete) {
+        String safeName = sanitizeTestName(testName);
+        if (image == null) {
+            println("CN1SS:ERR:test=" + safeName + " message=Image is null");
+            emitPlaceholderScreenshot(safeName);
+            complete(onComplete);
+            return;
+        }
+        try {
+            ImageIO io = ImageIO.getImageIO();
+            if (io == null || !io.isFormatSupported(ImageIO.FORMAT_PNG)) {
+                println("CN1SS:ERR:test=" + safeName + " message=PNG encoding unavailable");
+                emitPlaceholderScreenshot(safeName);
+                return;
+            }
+            int width = Math.max(1, image.getWidth());
+            int height = Math.max(1, image.getHeight());
+            if (Display.getInstance().isSimulator()) {
+                io.save(image, Storage.getInstance().createOutputStream(safeName + ".png"), ImageIO.FORMAT_PNG, 1);
+            }
+            ByteArrayOutputStream pngOut = new ByteArrayOutputStream(Math.max(1024, width * height / 2));
+            io.save(image, pngOut, ImageIO.FORMAT_PNG, 1f);
+            byte[] pngBytes = pngOut.toByteArray();
+            println("CN1SS:INFO:test=" + safeName + " png_bytes=" + pngBytes.length);
+            emitChannel(pngBytes, safeName, "");
+
+            byte[] preview = encodePreview(io, image, safeName);
+            if (preview != null && preview.length > 0) {
+                emitChannel(preview, safeName, PREVIEW_CHANNEL);
+            } else {
+                println("CN1SS:INFO:test=" + safeName + " preview_jpeg_bytes=0 preview_quality=0");
+            }
+        } catch (IOException ex) {
+            println("CN1SS:ERR:test=" + safeName + " message=" + ex);
+            Log.e(ex);
+            emitPlaceholderScreenshot(safeName);
+        } finally {
+            image.dispose();
+            complete(onComplete);
+        }
     }
 
     static void emitCurrentFormScreenshot(String testName, Runnable onComplete) {

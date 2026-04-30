@@ -198,7 +198,14 @@ cn1ss_print_log() {
 cn1ss_verify_png() {
   local file="$1"
   [ -s "$file" ] || return 1
-  head -c 8 "$file" | od -An -t x1 | tr -d ' \n' | grep -qi '^89504e470d0a1a0a$'
+  # Leading PNG signature: 89 50 4E 47 0D 0A 1A 0A
+  head -c 8 "$file" | od -An -t x1 | tr -d ' \n' | grep -qi '^89504e470d0a1a0a$' || return 1
+  # Trailing IEND chunk: ascii "IEND" (49 45 4E 44) + CRC of "IEND" (AE 42 60 82).
+  # A truncated PNG (e.g. caused by a dropped chunk in the reassembly pipeline)
+  # would still match the leading signature, so the trailer check is what
+  # catches "PNG chunk truncated before CRC" before the file reaches the
+  # comparator.
+  tail -c 8 "$file" | od -An -t x1 | tr -d ' \n' | grep -qi '^49454e44ae426082$'
 }
 
 cn1ss_verify_jpeg() {
@@ -215,7 +222,7 @@ cn1ss_decode_test_asset() {
   local dest="$1"; shift
   local channel="$1"; shift
   local verifier="$1"; shift
-  local entry source_type source_path count
+  local entry source_type source_path count err_log
 
   rm -f "$dest" 2>/dev/null || true
   for entry in "$@"; do
@@ -226,12 +233,29 @@ cn1ss_decode_test_asset() {
     count="${count//[^0-9]/}"; : "${count:=0}"
     [ "$count" -gt 0 ] || continue
     cn1ss_log "Reassembling test '$test' from ${source_type} source: $source_path (chunks=$count)"
-    if cn1ss_decode_binary "$source_path" "$test" "$channel" > "$dest" 2>/dev/null; then
-      if [ -z "$verifier" ] || "$verifier" "$dest"; then
-        echo "${source_type}:$(basename "$source_path")"
-        return 0
-      fi
+    err_log="$(mktemp -t cn1ss-decode-err.XXXXXX 2>/dev/null || mktemp 2>/dev/null || echo "")"
+    if [ -n "$err_log" ]; then
+      cn1ss_decode_binary "$source_path" "$test" "$channel" > "$dest" 2>"$err_log"
+    else
+      cn1ss_decode_binary "$source_path" "$test" "$channel" > "$dest" 2>/dev/null
     fi
+    local rc=$?
+    if [ "$rc" -eq 0 ] && { [ -z "$verifier" ] || "$verifier" "$dest"; }; then
+      [ -n "$err_log" ] && rm -f "$err_log" 2>/dev/null || true
+      echo "${source_type}:$(basename "$source_path")"
+      return 0
+    fi
+    if [ "$rc" -ne 0 ]; then
+      cn1ss_log "Reassembly failed for test '$test' from ${source_type} source: $source_path (exit=$rc)"
+    else
+      cn1ss_log "Reassembled file for test '$test' failed verification (${source_type} source: $source_path)"
+    fi
+    if [ -n "$err_log" ] && [ -s "$err_log" ]; then
+      while IFS= read -r line; do
+        cn1ss_log "  $line"
+      done < "$err_log"
+    fi
+    [ -n "$err_log" ] && rm -f "$err_log" 2>/dev/null || true
   done
   rm -f "$dest" 2>/dev/null || true
   return 1

@@ -125,6 +125,46 @@ public class Cn1ssChunkTools {
             chunks.add(chunk);
         }
         Collections.sort(chunks);
+
+        // Each chunk's index is its byte offset within the emitted base64 stream
+        // (Cn1ssDeviceRunnerHelper.emitChannel and the iOS Swift equivalent). A
+        // valid stream covers offsets [0, totalLength) with no gaps. If a log line
+        // gets dropped (logcat buffer overflow, line truncation, etc.) we'd
+        // silently concatenate the surviving chunks and produce a short binary
+        // that passes the magic-byte verifier but fails downstream parsers with
+        // "PNG chunk truncated before CRC". Detect the gap here and refuse to
+        // emit a partial stream.
+        long expectedTotal = readTotalBase64Length(path, targetTest, channel);
+        List<String> issues = new ArrayList<>();
+        int expected = 0;
+        for (Chunk chunk : chunks) {
+            if (chunk.index != expected) {
+                issues.add(chunk.index > expected
+                        ? "missing " + (chunk.index - expected) + " base64 chars at offset "
+                                + expected + " (next chunk starts at " + chunk.index + ")"
+                        : "overlap of " + (expected - chunk.index) + " base64 chars at offset "
+                                + chunk.index);
+            }
+            expected = chunk.index + chunk.payload.length();
+        }
+        if (expectedTotal >= 0 && expected != expectedTotal) {
+            issues.add("reassembled length " + expected
+                    + " does not match emitted total_b64_len=" + expectedTotal);
+        }
+        if (!issues.isEmpty()) {
+            String channelLabel = channel == null || channel.isEmpty() ? "" : " (channel '" + channel + "')";
+            System.err.println("ERROR: incomplete chunk stream for test '" + targetTest + "'"
+                    + channelLabel + " in " + path + ":");
+            for (String issue : issues) {
+                System.err.println("  - " + issue);
+            }
+            System.err.println("  Got " + chunks.size() + " chunks covering "
+                    + expected + " base64 chars"
+                    + (expectedTotal >= 0 ? " of " + expectedTotal + " expected" : "")
+                    + ". Refusing to emit a partial stream.");
+            System.exit(1);
+        }
+
         StringBuilder payload = new StringBuilder();
         for (Chunk chunk : chunks) {
             payload.append(chunk.payload);
@@ -140,6 +180,43 @@ public class Cn1ssChunkTools {
         } else {
             System.out.print(payload.toString());
         }
+    }
+
+    /**
+     * Returns the total base64 length advertised by the emitter for the given
+     * test/channel, or -1 if no matching INFO line was found. The emitter logs
+     * `CN1SS:INFO:test=<name> chunks=<n> total_b64_len=<len>` once it has
+     * finished writing all chunks; matching against this gives us a definitive
+     * "did we receive everything" check independent of chunk-index continuity.
+     */
+    private static long readTotalBase64Length(Path path, String testName, String channel) throws IOException {
+        // The INFO line is always emitted on the default channel regardless of
+        // whether the chunks themselves go to a side channel like PREVIEW, so
+        // we only filter by test name here.
+        String text = Files.readString(path, StandardCharsets.UTF_8);
+        Pattern info = Pattern.compile(
+                "CN1SS:INFO:test=" + Pattern.quote(testName)
+                        + "\\b[^\\n]*?\\btotal_b64_len=(\\d+)");
+        Matcher m = info.matcher(text);
+        long latest = -1;
+        // The same test may emit multiple channels (PNG + PREVIEW). Without a
+        // channel marker on the INFO line we can't disambiguate, so we only
+        // trust the value when there is exactly one. If channel is non-empty
+        // (PREVIEW) we conservatively skip the length check rather than risk
+        // a false positive against the PNG total.
+        if (channel != null && !channel.isEmpty()) {
+            return -1;
+        }
+        int count = 0;
+        while (m.find()) {
+            count++;
+            try {
+                latest = Long.parseLong(m.group(1));
+            } catch (NumberFormatException ignored) {
+                return -1;
+            }
+        }
+        return count == 1 ? latest : -1;
     }
 
     private static void runTests(String[] args) throws IOException {
