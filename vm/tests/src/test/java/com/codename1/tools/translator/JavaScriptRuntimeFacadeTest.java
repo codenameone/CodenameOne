@@ -216,8 +216,12 @@ class JavaScriptRuntimeFacadeTest {
                 "ClipShape should delegate path traversal to the shared shape path adapter");
         assertTrue(html5Source.contains("JavaScriptImageDataAdapter.readRgbaToArgb("),
                 "HTML5Implementation should delegate image-data readback packing to the image data adapter");
-        assertTrue(html5Source.contains("JavaScriptImageDataAdapter.writeArgbToRgba("),
-                "HTML5Implementation should delegate image-data writes to the image data adapter");
+        assertTrue(html5Source.contains(".writeArgbBuffer("),
+                "HTML5Implementation should delegate image-data writes through ImageData.writeArgbBuffer "
+                + "(host-side prototype extension in browser_bridge.js) — the worker-side "
+                + "JavaScriptImageDataAdapter.writeArgbToRgba round-trip lost every byte to the "
+                + "Uint8ClampedArray clone optimization in hostResult, see commit 6c6c48330 for the "
+                + "rationale and the diagnosis chain");
         assertTrue(html5Source.contains("JavaScriptNativeImageAdapter.resolveWidth("),
                 "HTML5Implementation.NativeImage should delegate width resolution to the native image adapter");
         assertTrue(html5Source.contains("JavaScriptNativeImageAdapter.resolveHeight("),
