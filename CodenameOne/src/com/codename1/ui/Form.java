@@ -2669,6 +2669,22 @@ public class Form extends Container {
 
         initComponentImpl();
         Display.getInstance().setCurrent(this, reverse);
+        // Defensive: on the ParparVM JavaScript port, Display.setCurrent
+        // queues a transition (Dialog defaults to Fade) and defers the
+        // final ``impl.setCurrentForm(dialog)`` call until the animation
+        // finishes — but the JS port's animation completion path doesn't
+        // always feed back to ``setCurrentForm`` before pointer events
+        // start arriving for the dialog. ``impl.currentForm`` stays
+        // pointing at the previous form, so taps on the dialog's OK /
+        // Cancel buttons get routed to the background form, the dialog
+        // never disposes, and the modal ``invokeAndBlock`` below blocks
+        // the EDT forever (the user sees a frozen UI). Force-set the
+        // dialog as the current form here. On every other port this is
+        // a no-op (setCurrent already did it synchronously) and only the
+        // assignment matters anyway.
+        if (modal && Display.impl != null) {
+            Display.impl.setCurrentForm(this);
+        }
         onShow();
 
         if (modal) {
