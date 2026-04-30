@@ -4972,17 +4972,16 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
     
     Object createImageData(int[] rgb, int offset, int width, int height) {
-        final Uint8ClampedArray arr = Uint8ClampedArray.create(width*height*4);
-        JavaScriptImageDataAdapter.writeArgbToRgba(rgb, offset, width, height, new JavaScriptImageDataAdapter.PixelWriter() {
-            @Override
-            public void set(int index, int value) {
-                arr.set(index, value);
-            }
-        });
         ImageData d = graphics.getContext().createImageData(width, height);
-        ((Uint8ClampedArraySetter)d.getData()).set(arr);
+        // Single round-trip: send the ARGB int[] to host, where the
+        // ``writeArgbBuffer`` prototype extension unpacks it directly into
+        // ``this.data``. The earlier
+        // ``((Uint8ClampedArraySetter)d.getData()).set(arr)`` path lost every
+        // byte to the worker-side clone of ``imageData.data`` — see
+        // ``ImageData.writeArgbBuffer`` for the full rationale.
+        d.writeArgbBuffer(rgb, offset, width, height);
         return d;
-        
+
     }
 
     private int isTablet = -1;

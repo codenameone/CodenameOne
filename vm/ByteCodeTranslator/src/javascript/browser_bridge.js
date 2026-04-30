@@ -567,6 +567,49 @@
     return null;
   });
 
+  // Install a `writeBuffer(arr)` method on `ImageData.prototype` so the
+  // worker can copy bytes into the live host-side `imageData.data` buffer in
+  // one shot. The worker can't write to `imageData.data` from its side
+  // because `hostResult` clones any returned `Uint8ClampedArray` to a fresh
+  // worker-local view (read perf optimization, see line ~485) — so a worker
+  // call like `((Uint8ClampedArraySetter)d.getData()).set(arr)` writes into
+  // the clone, not the original. `putImageData(d)` then sees zeros. This
+  // helper sidesteps the clone: the bridge call lands on `ImageData` itself
+  // (resolved via host-ref), and `this.data.set(host_arr)` runs entirely on
+  // the host where `this.data` is the live buffer.
+  if (typeof ImageData !== 'undefined' && ImageData.prototype && !ImageData.prototype.writeArgbBuffer) {
+    var __waFn = function(argb, offset, width, height) {
+      // ``argb`` is a Java int[] cloned via postMessage. It survives as an
+      // array-like with ``.length`` and integer-indexed entries. Unpack each
+      // 32-bit ARGB word into RGBA bytes directly into ``this.data`` — that
+      // buffer is live on host, so ``putImageData`` will see what we wrote.
+      var data = this.data;
+      var off = offset | 0;
+      var w = width | 0;
+      var h = height | 0;
+      var pixelCount = w * h;
+      var dstLen = data.length;
+      var maxPixels = (dstLen / 4) | 0;
+      if (pixelCount > maxPixels) pixelCount = maxPixels;
+      for (var i = 0; i < pixelCount; i++) {
+        var argbWord = argb[off + i] | 0;
+        var di = i * 4;
+        data[di] = (argbWord >>> 16) & 0xFF;
+        data[di + 1] = (argbWord >>> 8) & 0xFF;
+        data[di + 2] = argbWord & 0xFF;
+        data[di + 3] = (argbWord >>> 24) & 0xFF;
+      }
+    };
+    try {
+      Object.defineProperty(ImageData.prototype, 'writeArgbBuffer', {
+        value: __waFn,
+        writable: true, configurable: true, enumerable: false
+      });
+    } catch (_e) {
+      try { ImageData.prototype.writeArgbBuffer = __waFn; } catch (_e2) {}
+    }
+  }
+
   hostBridge.register('__cn1_jso_bridge__', function(request) {
     var payload = request || {};
     var receiver = resolveHostRef(payload.receiver);
