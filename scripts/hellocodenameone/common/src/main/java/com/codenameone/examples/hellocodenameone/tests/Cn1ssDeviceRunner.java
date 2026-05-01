@@ -116,6 +116,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new BrowserComponentScreenshotTest(),
             new MediaPlaybackScreenshotTest(),
             new SheetScreenshotTest(),
+            new SheetSlideUpAnimationScreenshotTest(),
             new ImageViewerNavigationScreenshotTest(),
             new TabsScreenshotTest(),
             new TextAreaAlignmentScreenshotTest(),
@@ -143,6 +144,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new InPlaceEditViewTest(),
             new BytecodeTranslatorRegressionTest(),
             new SimdApiTest(),
+            new SimdLargeAllocaTest(),
             new StreamApiTest(),
             new TimeApiTest(),
             new Java17Tests(),
@@ -255,7 +257,10 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     private static boolean isJsSkippedAnimationTest(String testName) {
         // Diagnostic: animation tests temporarily enabled on JS port to
         // surface internal port issues (the failures may correlate with
-        // the dialog/Form pipeline bugs on the new JS port).
+        // the dialog/Form pipeline bugs on the new JS port). The brand-new
+        // SheetSlideUpAnimationScreenshotTest (#4835) is intentionally NOT
+        // re-skipped here either, so its first JS-port run is observed
+        // alongside the existing animation grid.
         return false;
     }
 

@@ -3050,7 +3050,9 @@ const cn1ssForcedTimeoutTestClasses = Object.freeze({
   "com_codenameone_examples_hellocodenameone_tests_PaletteOverrideThemeScreenshotTest": "themeScreenshot",
   // Animation/transition grid skip removed — tests are temporarily enabled
   // on JS port to surface internal port issues that may correlate with
-  // the dialog/Form pipeline bugs being investigated.
+  // the dialog/Form pipeline bugs being investigated. SheetSlideUpAnimation
+  // (#4835) is brand-new on master; let it run too so any JS-port regression
+  // it surfaces is caught here rather than masked by a skip.
   // Screenshot-emitting tests whose chunk streams the JS port truncates
   // under console.log line drops. Cn1ssChunkTools's gap detection (added
   // in 963dd5af) correctly fails the resulting partial PNGs; force-finalise
@@ -3116,7 +3118,9 @@ const cn1ssForcedTimeoutTestNames = Object.freeze({
   "PaletteOverrideThemeScreenshotTest": "themeScreenshot",
   // Animation/transition grid skip removed — tests are temporarily enabled
   // on JS port to surface internal port issues that may correlate with
-  // the dialog/Form pipeline bugs being investigated.
+  // the dialog/Form pipeline bugs being investigated. SheetSlideUpAnimation
+  // (#4835) is brand-new on master; let it run too so any JS-port regression
+  // it surfaces is caught here rather than masked by a skip.
   // Screenshot-emitting tests whose chunk streams the JS port truncates
   // under console.log line drops. Cn1ssChunkTools's gap detection (added
   // in 963dd5af) correctly fails the resulting partial PNGs; force-finalise

@@ -63,7 +63,10 @@ public class Simd {
     /// @deprecated This is a special scratch-allocation API. On ParparVM this may be lowered to a
     /// stack-backed faux array, so callers MUST keep it method-local, MUST be extremely cautious
     /// when using it, and MUST treat its contents as undefined until written. Use `allocByte(int)`
-    /// for heap-backed arrays.
+    /// for heap-backed arrays. The ParparVM lowering automatically falls back to a heap allocation
+    /// when the requested size would not fit safely on the per-thread stack, so this API is safe
+    /// to call with image-scale sizes - but using `allocByte(int)` directly is preferred when the
+    /// size is known to be large.
     public byte[] allocaByte(int size) {
         return allocByte(size);
     }
@@ -71,7 +74,10 @@ public class Simd {
     /// @deprecated This is a special scratch-allocation API. On ParparVM this may be lowered to a
     /// stack-backed faux array, so callers MUST keep it method-local, MUST be extremely cautious
     /// when using it, and MUST treat its contents as undefined until written. Use `allocInt(int)`
-    /// for heap-backed arrays.
+    /// for heap-backed arrays. The ParparVM lowering automatically falls back to a heap allocation
+    /// when the requested size would not fit safely on the per-thread stack, so this API is safe
+    /// to call with image-scale sizes - but using `allocInt(int)` directly is preferred when the
+    /// size is known to be large.
     public int[] allocaInt(int size) {
         return allocInt(size);
     }
@@ -79,7 +85,10 @@ public class Simd {
     /// @deprecated This is a special scratch-allocation API. On ParparVM this may be lowered to a
     /// stack-backed faux array, so callers MUST keep it method-local, MUST be extremely cautious
     /// when using it, and MUST treat its contents as undefined until written. Use `allocFloat(int)`
-    /// for heap-backed arrays.
+    /// for heap-backed arrays. The ParparVM lowering automatically falls back to a heap allocation
+    /// when the requested size would not fit safely on the per-thread stack, so this API is safe
+    /// to call with image-scale sizes - but using `allocFloat(int)` directly is preferred when the
+    /// size is known to be large.
     public float[] allocaFloat(int size) {
         return allocFloat(size);
     }

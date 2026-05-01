@@ -1089,25 +1089,44 @@ extern JAVA_OBJECT allocArray(CODENAME_ONE_THREAD_STATE, int length, struct claz
 extern JAVA_OBJECT allocArrayAligned(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type, int primitiveSize, int dim, int alignment);
 extern JAVA_OBJECT allocMultiArray(int* lengths, struct clazz* type, int primitiveSize, int dim);
 #define CN1_SIMD_ALIGNMENT 16
+/* Maximum payload size we are willing to alloca() on the per-thread stack
+ * before falling back to a regular GC-tracked heap allocation. iOS secondary
+ * threads default to a 512 KB stack, so any allocation that scales with image
+ * dimensions (e.g. createMask / applyMask) can blow the stack at modest sizes
+ * (a 410x410 ARGB image needs ~656 KB of int scratch). The cap is intentionally
+ * conservative: the fallback path costs a normal heap allocation (cheap
+ * relative to the SIMD work that follows it), while a stack overflow is fatal
+ * with no chance to recover. */
+#define CN1_SIMD_STACK_HEAP_THRESHOLD (32 * 1024)
 #define CN1_SIMD_STACK_PRIMITIVE_ARRAY(length, arrayClass, primitiveSize) \
     __extension__ ({ \
         int __cn1StackLength = (length); \
         const int __cn1Alignment = CN1_SIMD_ALIGNMENT; \
         int __cn1ActualSize = __cn1StackLength * (primitiveSize); \
-        /* header + embedded data pointer slot + payload + alignment slack for the payload start */ \
-        char* __cn1StackMem = (char*)__builtin_alloca(sizeof(struct JavaArrayPrototype) + sizeof(void*) + __cn1ActualSize + __cn1Alignment - 1); \
-        JAVA_ARRAY __cn1StackArray = (JAVA_ARRAY)__cn1StackMem; \
-        *__cn1StackArray = (struct JavaArrayPrototype){DEBUG_GC_INIT (arrayClass), 0, 0, 0, 0, 0, __cn1StackLength, 1, (primitiveSize), 0}; \
-        if (__cn1ActualSize > 0) { \
-            char* __cn1Data = (char*)(&(__cn1StackArray->data)); \
-            __cn1Data += sizeof(void*); \
-            /* round the payload start up by adding alignment-1 then masking off the low bits */ \
-            uintptr_t __cn1Aligned = (((uintptr_t)__cn1Data) + ((uintptr_t)__cn1Alignment - 1)) & ~((uintptr_t)__cn1Alignment - 1); \
-            __cn1StackArray->data = (void*)__cn1Aligned; \
+        JAVA_OBJECT __cn1Result; \
+        if (__cn1StackLength < 0 || __cn1ActualSize > CN1_SIMD_STACK_HEAP_THRESHOLD) { \
+            /* Too large to safely place on the stack - fall back to a regular */ \
+            /* aligned heap allocation. The returned array still satisfies the */ \
+            /* SIMD alignment contract; only the lifetime widens (GC-managed */ \
+            /* instead of method-local), which is harmless for callers. */ \
+            __cn1Result = allocArrayAligned(threadStateData, __cn1StackLength, (arrayClass), (primitiveSize), 1, __cn1Alignment); \
         } else { \
-            __cn1StackArray->data = 0; \
+            /* header + embedded data pointer slot + payload + alignment slack for the payload start */ \
+            char* __cn1StackMem = (char*)__builtin_alloca(sizeof(struct JavaArrayPrototype) + sizeof(void*) + __cn1ActualSize + __cn1Alignment - 1); \
+            JAVA_ARRAY __cn1StackArray = (JAVA_ARRAY)__cn1StackMem; \
+            *__cn1StackArray = (struct JavaArrayPrototype){DEBUG_GC_INIT (arrayClass), 0, 0, 0, 0, 0, __cn1StackLength, 1, (primitiveSize), 0}; \
+            if (__cn1ActualSize > 0) { \
+                char* __cn1Data = (char*)(&(__cn1StackArray->data)); \
+                __cn1Data += sizeof(void*); \
+                /* round the payload start up by adding alignment-1 then masking off the low bits */ \
+                uintptr_t __cn1Aligned = (((uintptr_t)__cn1Data) + ((uintptr_t)__cn1Alignment - 1)) & ~((uintptr_t)__cn1Alignment - 1); \
+                __cn1StackArray->data = (void*)__cn1Aligned; \
+            } else { \
+                __cn1StackArray->data = 0; \
+            } \
+            __cn1Result = (JAVA_OBJECT)__cn1StackArray; \
         } \
-        (JAVA_OBJECT)__cn1StackArray; \
+        __cn1Result; \
     })
 #define CN1_SIMD_ALLOCA_BYTE(length) CN1_SIMD_STACK_PRIMITIVE_ARRAY((length), &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE))
 #define CN1_SIMD_ALLOCA_INT(length) CN1_SIMD_STACK_PRIMITIVE_ARRAY((length), &class_array1__JAVA_INT, sizeof(JAVA_ARRAY_INT))
