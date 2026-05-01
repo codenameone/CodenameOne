@@ -129,7 +129,7 @@ public class CodenameOneActivity extends Activity {
             for (android.content.pm.Signature signature : packageInfo.signatures) {
                 java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA");
                 md.update(signature.toByteArray());
-                String currentSignature = android.util.Base64.encodeToString(md.digest(), android.util.Base64.DEFAULT);
+                String currentSignature = android.util.Base64.encodeToString(md.digest(), android.util.Base64.NO_WRAP);
                 if (!splitString.contains(currentSignature)) {
                     throw new RuntimeException("App integrity check failed for: " + currentSignature);
                 }
