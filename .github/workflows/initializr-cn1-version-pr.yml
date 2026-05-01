@@ -28,6 +28,13 @@ jobs:
       - name: Create pull request
         uses: peter-evans/create-pull-request@v6
         with:
+          # PRs created with the default GITHUB_TOKEN do not trigger pull_request
+          # workflows (GitHub's anti-recursion rule), so the bump PR ships with no
+          # CI coverage. Authenticate as a real user so workflows like
+          # cn1playground-language and website-docs run as they would on a manual PR.
+          # CN1SS_GH_TOKEN is the same fine-grained PAT used by the screenshot
+          # workflows (see scripts-android.yml header for rotation instructions).
+          token: ${{ secrets.CN1SS_GH_TOKEN }}
           base: ${{ github.event.repository.default_branch }}
           commit-message: "scripts/website: bump Codename One versions to ${{ github.event.release.tag_name || github.ref_name }}"
           title: "scripts/website: bump Codename One versions to ${{ github.event.release.tag_name || github.ref_name }}"
