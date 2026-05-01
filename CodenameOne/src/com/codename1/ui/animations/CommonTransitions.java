@@ -868,7 +868,7 @@ public final class CommonTransitions extends Transition {
                     // form fully. The form's normal paint clears the title
                     // area properly, which matters on persistent-backing
                     // renderers (iOS Metal MTLLoadActionLoad) that faithfully
-                    // preserve every previous-frame pixel — without this
+                    // preserve every previous-frame pixel -- without this
                     // cleanup, the cross-fade's accumulated alpha-blended
                     // title pixels remain in the screenTexture and the next
                     // captured frame shows two titles overlapping. iOS GL ES2
