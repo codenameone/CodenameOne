@@ -1085,11 +1085,13 @@ public class Image implements ActionSource {
         if (isSimdOptimizationsEnabled() && rlen >= 16) {
             Simd simd = Simd.get();
             mask = simd.allocByte(rlen);
-            // Single-pass: copy rgb into a registered scratch once and pack the
-            // whole array in one native call to amortize dispatch/validation cost.
-            int[] scratch = simd.allocaInt(rlen);
-            System.arraycopy(rgb, 0, scratch, 0, rlen);
-            simd.packIntToByteTruncate(scratch, 0, mask, 0, rlen);
+            // `rgb` came from getRGBCached() / allocateRgbArray() and is therefore
+            // a Simd-registered buffer for sizes >= 16, so we can pack straight
+            // from it without an intermediate scratch. The previous scratch was
+            // allocated via `allocaInt(rlen)`, which on ParparVM lowers to a
+            // stack alloca - for image-scale rlen this overflows the per-thread
+            // stack on iOS (e.g. a 410x410 image needs ~656 KB).
+            simd.packIntToByteTruncate(rgb, 0, mask, 0, rlen);
         } else {
             mask = new byte[rlen];
             for (int iter = 0; iter < rlen; iter++) {
@@ -1201,7 +1203,11 @@ public class Image implements ActionSource {
             // `rgb` came from getRGB() / allocateRgbArray() and is therefore a
             // Simd-registered array, so we can operate on it in place. Mask data
             // may have been produced outside of createMask (e.g. deserialized
-            // IndexedImage), so copy it once into a registered scratch.
+            // IndexedImage), so copy it once into a registered scratch. The
+            // alloca path keeps small masks on the stack; the ParparVM macro
+            // transparently falls back to a heap allocation past
+            // CN1_SIMD_STACK_HEAP_THRESHOLD so image-scale masks (a 410x410
+            // alpha mask is ~168 KB) stay safe on iOS.
             byte[] maskBuf = simd.allocaByte(total);
             System.arraycopy(maskData, 0, maskBuf, 0, total);
             // rgb[i] = (rgb[i] & 0x00ffffff) | ((maskBuf[i] & 0xff) << 24)

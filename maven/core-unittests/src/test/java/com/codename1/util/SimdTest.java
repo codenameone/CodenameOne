@@ -112,6 +112,40 @@ class SimdTest extends UITestBase {
         assertEquals(11, simd.allocaByteFilled(16, (byte)11)[4]);
     }
 
+    /// The alloca-style APIs must remain safe at image-scale buffer sizes. On
+    /// ParparVM these calls were lowering to `__builtin_alloca` and overflowing
+    /// the per-thread stack on iOS for ARGB scratch the size of a 410x410
+    /// image (~656 KB). The contract is now: any allocation past a safe stack
+    /// threshold transparently falls back to a heap-allocated, GC-tracked
+    /// array. This test exercises the contract through the active platform
+    /// implementation and via the pure-Java fallback.
+    @FormTest
+    void testAllocaHandlesImageScaleSizes() {
+        int len = 410 * 410;
+
+        Simd fallback = new Simd();
+        assertEquals(len, fallback.allocaInt(len).length);
+        assertEquals(len, fallback.allocaByte(len).length);
+        assertEquals(len, fallback.allocaIntZeroed(len).length);
+        assertEquals(len, fallback.allocaByteZeroed(len).length);
+
+        Simd simd = Simd.get();
+        int[] scratchInt = simd.allocaInt(len);
+        assertEquals(len, scratchInt.length);
+        // Touch the endpoints to verify the buffer is fully addressable.
+        scratchInt[0] = 1;
+        scratchInt[len - 1] = 2;
+        assertEquals(1, scratchInt[0]);
+        assertEquals(2, scratchInt[len - 1]);
+
+        byte[] scratchByte = simd.allocaByte(len);
+        assertEquals(len, scratchByte.length);
+        scratchByte[0] = 3;
+        scratchByte[len - 1] = 4;
+        assertEquals(3, scratchByte[0]);
+        assertEquals(4, scratchByte[len - 1]);
+    }
+
     @FormTest
     void genericBitwiseShiftCompareSelectOpsWork() {
         Simd simd = new Simd();
