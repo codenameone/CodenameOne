@@ -1056,6 +1056,17 @@ void CN1MetalEnsureMutableTexture(GLUIImage *image, int width, int height) {
     double r = ((argb >> 16) & 0xff) / 255.0;
     double g = ((argb >> 8)  & 0xff) / 255.0;
     double b = ( argb        & 0xff) / 255.0;
+    // Store premultiplied so subsequent ops (which run through the
+    // pipeline cache's premultiplied blend: src=One, dst=OneMinusSrcAlpha)
+    // composite correctly when this texture is later sampled. Without this,
+    // a half-transparent green fill (Image.createImage(w,h, 0x2000ff00))
+    // sampled at full green=1.0 + alpha=0.125 gets blended as green*1.0 +
+    // dst*(1-0.125) instead of green*0.125 + dst*(1-0.125), producing a
+    // saturated cyan when composed over a blue background instead of the
+    // intended faintly-green tint. (Compare graphics-draw-image-rect's
+    // blue arcs visible through the green mutableWithAlpha box: GL renders
+    // them blue with a faint green wash; pre-fix Metal rendered them
+    // turquoise.)
     id<MTLCommandQueue> queue = CN1MetalCommandQueue();
     if (queue != nil) {
         id<MTLCommandBuffer> clearCb = [queue commandBuffer];
@@ -1063,7 +1074,7 @@ void CN1MetalEnsureMutableTexture(GLUIImage *image, int width, int height) {
         clearPass.colorAttachments[0].texture = tex;
         clearPass.colorAttachments[0].loadAction = MTLLoadActionClear;
         clearPass.colorAttachments[0].storeAction = MTLStoreActionStore;
-        clearPass.colorAttachments[0].clearColor = MTLClearColorMake(r, g, b, a);
+        clearPass.colorAttachments[0].clearColor = MTLClearColorMake(r * a, g * a, b * a, a);
         [[clearCb renderCommandEncoderWithDescriptor:clearPass] endEncoding];
         [clearCb commit];
     }
