@@ -862,6 +862,25 @@ public final class CommonTransitions extends Transition {
                     paintInterformContainers(g);
                     return;
                 case TYPE_SLIDE_AND_FADE: {
+                    // Final transition frame: instead of repeating the cross-
+                    // fade (which intentionally leaves both source + dest
+                    // titles visible at varying alpha), paint the destination
+                    // form fully. The form's normal paint clears the title
+                    // area properly, which matters on persistent-backing
+                    // renderers (iOS Metal MTLLoadActionLoad) that faithfully
+                    // preserve every previous-frame pixel — without this
+                    // cleanup, the cross-fade's accumulated alpha-blended
+                    // title pixels remain in the screenTexture and the next
+                    // captured frame shows two titles overlapping. iOS GL ES2
+                    // happens to mask this because CAEAGLLayer.retainBacking
+                    // is permissively lossy about partial-alpha pixels.
+                    if (firstFinished) {
+                        Form finalForm = (Form) getDestination();
+                        if (finalForm != null) {
+                            paint(g, finalForm, 0, 0, true);
+                        }
+                        return;
+                    }
 
                     Form sourceForm = (Form) getSource();
                     Form destForm = (Form) getDestination();
@@ -914,36 +933,6 @@ public final class CommonTransitions extends Transition {
                     paintInterformContainers(g);
 
 
-                    // Each transition frame paints the cross-fading source +
-                    // destination titles on top of whatever is in the title-
-                    // bar area. titleArea.paintComponentBackground is a no-op
-                    // when the title bar is non-opaque (the iOS-style theme
-                    // default), so on persistent-backing renderers (iOS Metal,
-                    // anywhere CAEAGLLayer.retainBacking actually holds its
-                    // contents) the title pixels from previous frames remain
-                    // and the cross-fade alpha-blends ON TOP of them — the
-                    // captured screenshot then shows two titles at slightly
-                    // different positions / alphas. iOS GL ES2 only "happens
-                    // to" not show this because retainBacking on CAEAGLLayer
-                    // is permissively lossy. Fix the framework correctness
-                    // hole by repainting the destination form's titleArea
-                    // bounds with the destination form's background colour
-                    // first (matching what would have been visible behind a
-                    // truly transparent titleArea), giving the cross-fade
-                    // below a clean canvas regardless of the underlying
-                    // persistent-backing semantics. Then call the original
-                    // paintComponentBackground so any non-default titleArea
-                    // styling (gradient, image, etc.) still draws on top.
-                    int saveAlpha = g.getAlpha();
-                    int saveColor = g.getColor();
-                    g.setAlpha(255);
-                    g.setColor(destForm.getStyle().getBgColor());
-                    g.fillRect(destTitleArea.getAbsoluteX(),
-                            destTitleArea.getAbsoluteY(),
-                            destTitleArea.getWidth(),
-                            destTitleArea.getHeight());
-                    g.setColor(saveColor);
-                    g.setAlpha(saveAlpha);
                     titleArea.paintComponentBackground(g);
                     paintShiftFadeHierarchy(titleArea, 255 - alpha, g, false);
                     paintShiftFadeHierarchy(destTitleArea, alpha, g, true);
