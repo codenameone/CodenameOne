@@ -287,8 +287,31 @@ static DrawTextureAlphaMaskOGLProgram* getOGLProgram() {
     y = pY;
     w = pW;
     h = pH;
+#ifdef CN1_USE_METAL
+    // The handle is a CFBridgingRetain'd id<MTLTexture> owned by the Java
+    // TextureAlphaMask object (which the textureCache holds only as a
+    // SoftWeak ref). With the concurrent GC, finalize() can run between
+    // op queueing and drawFrame draining; finalize -> dispose ->
+    // nativeDeleteTexture -> CFBridgingRelease drops the +1, and we'd
+    // sample a freed texture at execute time. Take an additional retain
+    // here so the texture survives until this op deallocs after drain.
+    if (textureName != 0) {
+        CFRetain((CFTypeRef)(void *)(uintptr_t)textureName);
+    }
+#endif
     return self;
 }
+
+#ifdef CN1_USE_METAL
+-(void)dealloc {
+    if (textureName != 0) {
+        CFRelease((CFTypeRef)(void *)(uintptr_t)textureName);
+    }
+#ifndef CN1_USE_ARC
+    [super dealloc];
+#endif
+}
+#endif
 #ifdef USE_ES2
 -(void)execute
 {
