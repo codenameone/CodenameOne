@@ -719,47 +719,35 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         }
         re.getParentFile().mkdirs();
 
-        InputStream bundled = AbstractCN1Mojo.class.getResourceAsStream(UPDATE_CODENAMEONE_JAR_RESOURCE);
-        if (bundled != null) {
-            getLog().info("Installing Codename One Updater from bundled plugin resource");
-            try {
+        try (InputStream bundled = AbstractCN1Mojo.class.getResourceAsStream(UPDATE_CODENAMEONE_JAR_RESOURCE)) {
+            if (bundled != null) {
+                getLog().info("Installing Codename One Updater from bundled plugin resource");
                 copyToFile(bundled, re);
                 return;
-            } finally {
-                try { bundled.close(); } catch (IOException ignore) {}
             }
         }
 
         IOException lastFailure = null;
         for (String url : new String[] { UPDATE_CODENAMEONE_JAR_URL, UPDATE_CODENAMEONE_JAR_FALLBACK_URL }) {
             getLog().info("Installing Codename One Updater from " + url);
-            InputStream is = null;
-            try {
-                is = new URL(url).openStream();
+            try (InputStream is = new URL(url).openStream()) {
                 copyToFile(is, re);
                 return;
             } catch (IOException ex) {
                 lastFailure = ex;
                 getLog().warn("Failed to download Codename One Updater from " + url + ": " + ex.getMessage());
-            } finally {
-                if (is != null) {
-                    try { is.close(); } catch (IOException ignore) {}
-                }
             }
         }
         throw lastFailure != null ? lastFailure : new IOException("Failed to install Codename One updater");
     }
 
     private static void copyToFile(InputStream is, File dest) throws IOException {
-        FileOutputStream os = new FileOutputStream(dest);
-        try {
+        try (FileOutputStream os = new FileOutputStream(dest)) {
             byte[] buf = new byte[65536];
             int len;
             while ((len = is.read(buf)) > -1) {
                 os.write(buf, 0, len);
             }
-        } finally {
-            os.close();
         }
     }
     
