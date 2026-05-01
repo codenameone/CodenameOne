@@ -21,11 +21,12 @@ public class FillRoundRect extends AbstractGraphicsScreenshotTest {
     // the slide-in transition has begun but before the screen is fully
     // settled, so the 1500ms default in BaseTest captures the title still
     // mid-transition (previous form's title still partially visible).
-    // Bumping to 3000ms gives the slide animation enough headroom on slower
-    // CI runners.
+    // 3s wasn't enough on the GH Actions iOS simulator either; 5s gives
+    // the slide animation + the ~1200 round-rect bitmap rasterisations
+    // enough headroom that the screen has fully settled before capture.
     @Override
     protected void registerReadyCallback(Form parent, Runnable run) {
-        UITimer.timer(3000, false, parent, run);
+        UITimer.timer(5000, false, parent, run);
     }
 
     @Override

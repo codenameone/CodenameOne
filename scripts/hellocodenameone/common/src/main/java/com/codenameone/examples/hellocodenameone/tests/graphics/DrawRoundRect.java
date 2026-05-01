@@ -21,7 +21,7 @@ public class DrawRoundRect extends AbstractGraphicsScreenshotTest {
     // capture the screen mid-transition. See FillRoundRect.
     @Override
     protected void registerReadyCallback(Form parent, Runnable run) {
-        UITimer.timer(3000, false, parent, run);
+        UITimer.timer(5000, false, parent, run);
     }
 
     @Override
