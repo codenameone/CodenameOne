@@ -192,12 +192,13 @@ public abstract class RECharacter {
 //#                 return CHAR_CLASSES[i][c - spaceIndex];
 //#             }
 //#         }
+//#         return UNASSIGNED;
 //#else
         if (c < 128) {
             return CHAR_CLASSES[c];
         }
+        return (byte) Character.getType(c);
 //#endif
-        return UNASSIGNED;
     }
 //#endif
 
