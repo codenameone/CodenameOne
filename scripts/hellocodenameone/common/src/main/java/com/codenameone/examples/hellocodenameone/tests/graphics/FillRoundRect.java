@@ -1,9 +1,7 @@
 package com.codenameone.examples.hellocodenameone.tests.graphics;
 
-import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.geom.Rectangle;
-import com.codename1.ui.util.UITimer;
 import com.codenameone.examples.hellocodenameone.tests.AbstractGraphicsScreenshotTest;
 
 public class FillRoundRect extends AbstractGraphicsScreenshotTest {
@@ -14,19 +12,6 @@ public class FillRoundRect extends AbstractGraphicsScreenshotTest {
             nextColor(g);
             g.fillRoundRect(bounds.getX() + iter, bounds.getY() + iter, bounds.getX() + bounds.getWidth() - iter, bounds.getY() + bounds.getHeight() + iter, iter % 20, iter % 20);
         }
-    }
-
-    // Round-rect rendering rasterises ~1200 CG bitmaps in this test (4 panels
-    // x ~300 iterations). On the iOS Metal port the rendering completes after
-    // the slide-in transition has begun but before the screen is fully
-    // settled, so the 1500ms default in BaseTest captures the title still
-    // mid-transition (previous form's title still partially visible).
-    // 3s wasn't enough on the GH Actions iOS simulator either; 5s gives
-    // the slide animation + the ~1200 round-rect bitmap rasterisations
-    // enough headroom that the screen has fully settled before capture.
-    @Override
-    protected void registerReadyCallback(Form parent, Runnable run) {
-        UITimer.timer(5000, false, parent, run);
     }
 
     @Override
