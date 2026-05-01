@@ -126,7 +126,16 @@ public abstract class AbstractGraphicsScreenshotTest extends BaseTest {
             }
         });
 
+        configureForm(form);
         form.show();
         return true;
+    }
+
+    /// Hook for subclasses to tweak the form before show(). Heavy rendering
+    /// tests (e.g. FillRoundRect / DrawRoundRect on the Metal port) override
+    /// this to disable the slide-and-fade transition, which on Metal can leave
+    /// residual title pixels in the persistent screenTexture under heavy paint
+    /// load.
+    protected void configureForm(com.codename1.ui.Form form) {
     }
 }

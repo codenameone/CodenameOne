@@ -1,10 +1,21 @@
 package com.codenameone.examples.hellocodenameone.tests.graphics;
 
+import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
+import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.geom.Rectangle;
 import com.codenameone.examples.hellocodenameone.tests.AbstractGraphicsScreenshotTest;
 
 public class DrawRoundRect extends AbstractGraphicsScreenshotTest {
+
+    // Same rationale as FillRoundRect — skip the slide-and-fade transition
+    // to avoid Metal's "doubled title" artefact under heavy CG-rasterised
+    // round-rect rendering. See FillRoundRect.configureForm.
+    @Override
+    protected void configureForm(Form form) {
+        form.setTransitionInAnimator(CommonTransitions.createEmpty());
+    }
+
     @Override
     protected void drawContent(Graphics g, Rectangle bounds) {
         g.setColor(0xffffff);
