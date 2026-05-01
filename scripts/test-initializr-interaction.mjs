@@ -493,6 +493,32 @@ expect(okToBefore < dialogToOk,
 // canvas (not just 5px nudges), keyboard input on focused fields, and
 // rapid-fire clicks designed to overlap with the EDT paint cadence.
 console.log('\n=== Test 2: Repeated interactions (black-square detection) ===');
+
+// Liveness probe: if Test 1 left the worker in a stuck state (Hello
+// dialog modal blocks subsequent input), Test 2's interactions all
+// silently no-op and the blackFrac/transparentFrac deltas stay 0,
+// passing vacuously. Confirm the canvas is responsive to a known-good
+// action before running the stress loop -- otherwise tag the run as
+// stuck up front instead of pretending the stress passed clean.
+const sigBeforeTest2Probe = await canvasSignature();
+await page.mouse.click(593, 905); // IDE expander row -- toggles visible
+let test2Live = false;
+for (let i = 0; i < 8; i++) {
+  await new Promise(r => setTimeout(r, 250));
+  const sigNow = await canvasSignature();
+  if (sigBeforeTest2Probe && sigHamming(sigBeforeTest2Probe, sigNow) > 1) {
+    test2Live = true;
+    break;
+  }
+}
+console.log(`Test 2 liveness probe: canvas responsive=${test2Live}`);
+if (!test2Live) {
+  // Snap a screenshot for the artifact bundle so a CI failure has
+  // something visible to point at.
+  await snapshotCanvas('test2-stuck-canvas');
+}
+expect(test2Live, `Test 2 precondition: worker is stuck (canvas unresponsive 2s after a known-good click) — likely Test 1 left an open Dialog whose modal starves subsequent input`);
+
 const baseSig = sigBefore;
 let darkenedFrames = 0;
 let maxDelta = 0;
@@ -619,6 +645,156 @@ addInteraction('quick-clicks-on-preview', async () => {
   }
 });
 
+// ----------------------------------------------------------------------
+// Stress interactions designed to trigger sticking / paint artifacts.
+// Each one tries a different way of overlapping press/release with
+// transitions, paints, or focus changes -- exactly the seams where the
+// PR #4795 dropped-release race lived.
+// ----------------------------------------------------------------------
+
+// Rapid alternating presses across distant widgets. Stresses the
+// generator-yield interleaving between simultaneously-running onMouseDown
+// invocations -- the same race that dropped Hello's pointerReleased before
+// the deferredRelease fix.
+addInteraction('alternating-cross-form-clicks', async () => {
+  const pts = [[180, 525], [936, 141], [180, 580], [936, 250], [640, 870]];
+  for (let i = 0; i < 12; i++) {
+    const [x, y] = pts[i % pts.length];
+    await page.mouse.click(x, y, { delay: 5 });
+    await new Promise(r => setTimeout(r, 25));
+  }
+});
+
+// Triple-tap rapid burst on a single element. Each tap is a full
+// down-up cycle with no inter-event delay -- the browser fires
+// pointerdown/up back-to-back, exercising the onMouseDown JSO yield
+// window onMouseUp can interleave on.
+addInteraction('triple-tap-burst', async () => {
+  for (let i = 0; i < 3; i++) {
+    await page.mouse.click(348, 690, { delay: 0 });
+  }
+});
+
+// Long-press: hold down for 1.5s with no movement. Browsers fire
+// pointerdown immediately and pointerup only on the eventual release;
+// in the meantime the worker should stay responsive (animation frames,
+// other clicks). Stuck-state check below verifies that.
+addInteraction('long-press-hold', async () => {
+  await page.mouse.move(348, 690);
+  await page.mouse.down();
+  await new Promise(r => setTimeout(r, 1500));
+  await page.mouse.up();
+});
+
+// Press at A, drag to B, release at B (different visual element). On
+// the JS port the press's pointerPressed targets the form at (A); the
+// release lands on the form at (B). Mismatched press/release form
+// matching is a known dropped-release case and surfaced the deferred-
+// release fix.
+addInteraction('drag-with-distant-release', async () => {
+  await page.mouse.move(180, 525);
+  await page.mouse.down();
+  for (let t = 0; t <= 10; t++) {
+    await page.mouse.move(180 + t * 50, 525 + t * 30, { steps: 1 });
+    await new Promise(r => setTimeout(r, 12));
+  }
+  await page.mouse.up();
+});
+
+// Clicks during in-flight Form transition: trigger the IDE expander
+// (which runs a transition-style relayout) and immediately click again
+// before the relayout settles. If the worker drops events while paint
+// frames stack up, the second click goes nowhere.
+addInteraction('click-during-relayout', async () => {
+  await page.mouse.click(640, 870); // "Generate Project" wide bar
+  // Don't await the layout settle -- click again immediately
+  await page.mouse.click(180, 525, { delay: 0 });
+  await page.mouse.click(348, 690, { delay: 0 });
+  await new Promise(r => setTimeout(r, 400));
+});
+
+// Type-then-burst-backspace: rapid edits on a focused field. Stresses
+// the keydown/keypress/keyup pipeline and any pending-text-changes
+// flush the JS port does on each event.
+addInteraction('type-burst-then-backspace-burst', async () => {
+  await page.mouse.click(300, 300);
+  await new Promise(r => setTimeout(r, 200));
+  await page.keyboard.type('abcdefghij', { delay: 5 });
+  for (let i = 0; i < 10; i++) {
+    await page.keyboard.press('Backspace', { delay: 5 });
+  }
+});
+
+// Tab navigation: keyboard-only walk through the form. Hits any
+// focus-change paint paths that mouse interaction skips.
+addInteraction('keyboard-tab-walk', async () => {
+  for (let i = 0; i < 8; i++) {
+    await page.keyboard.press('Tab');
+    await new Promise(r => setTimeout(r, 50));
+  }
+});
+
+// Rapid wheel scrolling in alternating directions: stresses the
+// drag-event/wheel-event cooperative cadence.
+addInteraction('wheel-jitter', async () => {
+  await page.mouse.move(640, 500);
+  for (let i = 0; i < 20; i++) {
+    await page.mouse.wheel(0, i % 2 === 0 ? 80 : -80);
+    await new Promise(r => setTimeout(r, 15));
+  }
+});
+
+// Click outside the canvas (in the surrounding page chrome). Should be
+// a complete no-op for the worker -- but the host's window-level
+// listener still serialises and posts. If the worker treats out-of-
+// bounds events differently, the resulting bookkeeping mismatch could
+// stick mouseDown.
+addInteraction('click-outside-canvas', async () => {
+  await page.mouse.click(10, 10);
+  await new Promise(r => setTimeout(r, 50));
+  await page.mouse.click(1270, 10);
+  await new Promise(r => setTimeout(r, 50));
+  await page.mouse.click(640, 890);
+});
+
+// Right-click (button=2) on the preview canvas. The JS port has a
+// dedicated context-menu hook (``contextListener.handleEvent`` in
+// onMouseDown when ``me.getButton() == 2``); a stuck pointer state in
+// that path would block subsequent left clicks.
+addInteraction('right-click-then-left-click', async () => {
+  await page.mouse.click(936, 250, { button: 'right' });
+  await new Promise(r => setTimeout(r, 100));
+  // dismiss any context menu, then hit a normal target
+  await page.keyboard.press('Escape');
+  await new Promise(r => setTimeout(r, 100));
+  await page.mouse.click(180, 525);
+});
+
+// Tiny drag (under drag-threshold). The user-perceived event is a
+// click, but the JS port emits pointerdown/move/up with nontrivial
+// movement deltas. Easy to mis-classify and drop.
+addInteraction('sub-threshold-jitter-click', async () => {
+  await page.mouse.move(348, 690);
+  await page.mouse.down();
+  await page.mouse.move(350, 691);
+  await page.mouse.move(348, 690);
+  await page.mouse.up();
+});
+
+// Resize-during-drag: viewport changes while a drag is held. The
+// canvas re-allocates; if the in-flight pointer state isn't reset,
+// the next click lands in stale coords.
+addInteraction('resize-during-drag', async () => {
+  await page.mouse.move(640, 400);
+  await page.mouse.down();
+  await page.setViewportSize({ width: 1100, height: 800 });
+  await new Promise(r => setTimeout(r, 300));
+  await page.mouse.move(500, 350);
+  await page.mouse.up();
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await new Promise(r => setTimeout(r, 300));
+});
+
 const blackFractions = [];
 let transparentFrames = 0;
 let maxTransparentDelta = 0;
@@ -648,6 +824,48 @@ expect(darkenedFrames < 2, `Test 2: ${darkenedFrames}/${interactions.length} int
 expect(transparentFrames < 2, `Test 2: ${transparentFrames}/${interactions.length} interactions left transparent holes — canvas-cleared-but-not-repainted regression`);
 
 await snapshotCanvas('after-many-interactions');
+
+// === Test 3: Liveness after stress ===
+// After all the rapid clicks/drags/keys above, verify the worker is
+// still responsive. The check: pick a known-actionable target (the
+// Generate Project banner toggles a download URL but visibly highlights
+// on press); click it and confirm the canvas changes within a generous
+// timeout. If the canvas freezes here, some interaction above wedged
+// the EDT or worker-listener path.
+console.log('\n=== Test 3: Liveness after Test 2 stress ===');
+const sigBeforeLiveness = await canvasSignature();
+await page.mouse.click(640, 870); // Generate Project button
+let sigChanged = false;
+let livenessIters = 0;
+for (let i = 0; i < 20; i++) {
+  await new Promise(r => setTimeout(r, 250));
+  const sigNow = await canvasSignature();
+  livenessIters = i + 1;
+  if (sigBeforeLiveness && sigHamming(sigBeforeLiveness, sigNow) > 1) {
+    sigChanged = true;
+    break;
+  }
+}
+console.log(`liveness: canvas changed=${sigChanged} after ${livenessIters * 250}ms`);
+expect(sigChanged, `Test 3: UI appears stuck — canvas unchanged 5s after Generate-Project click (worker likely starved)`);
+
+// === Test 4: Rapid open/close cycles on collapsible sections ===
+// The form has IDE / Theme Customization / Localization / Java Version /
+// Current Settings sections that expand on click. Rapidly expand and
+// collapse one to stress the layout/animation pipeline. After the
+// burst, the canvas signature should have stabilized (no transparent
+// pixels left over from a half-finished animation frame).
+console.log('\n=== Test 4: Rapid expand/collapse on collapsible section ===');
+for (let i = 0; i < 6; i++) {
+  await page.mouse.click(593, 905); // IDE expander row
+  await new Promise(r => setTimeout(r, 80));
+}
+await new Promise(r => setTimeout(r, 800));
+const sigAfterCollapseStress = await canvasSignature();
+const transparentDelta4 = sigAfterCollapseStress.transparentFrac - baseSig.transparentFrac;
+console.log(`collapse-stress final transparentFrac=${sigAfterCollapseStress.transparentFrac.toFixed(3)} (delta=${transparentDelta4 >= 0 ? '+' : ''}${transparentDelta4.toFixed(3)})`);
+expect(transparentDelta4 < 0.02, `Test 4: rapid expand/collapse left ${(transparentDelta4*100).toFixed(1)}% transparent pixels — canvas-cleared-but-not-repainted`);
+await snapshotCanvas('after-collapse-stress');
 
 // === Diagnostic: dump the worker-side trace events ===
 const trace = await page.evaluate(() => {
