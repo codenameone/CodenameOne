@@ -2818,6 +2818,7 @@ const cn1ssForcedTimeoutTestClasses = Object.freeze({
   "com_codenameone_examples_hellocodenameone_tests_ComponentReplaceSlideScreenshotTest": "animationGrid",
   "com_codenameone_examples_hellocodenameone_tests_ComponentReplaceFlipScreenshotTest": "animationGrid",
   "com_codenameone_examples_hellocodenameone_tests_MotionShowcaseScreenshotTest": "animationGrid",
+  "com_codenameone_examples_hellocodenameone_tests_SheetSlideUpAnimationScreenshotTest": "animationGrid",
   // Screenshot-emitting tests whose chunk streams the JS port truncates
   // under console.log line drops. Cn1ssChunkTools's gap detection (added
   // in 963dd5af) correctly fails the resulting partial PNGs; force-finalise
@@ -2900,6 +2901,7 @@ const cn1ssForcedTimeoutTestNames = Object.freeze({
   "ComponentReplaceSlideScreenshotTest": "animationGrid",
   "ComponentReplaceFlipScreenshotTest": "animationGrid",
   "MotionShowcaseScreenshotTest": "animationGrid",
+  "SheetSlideUpAnimationScreenshotTest": "animationGrid",
   // Screenshot-emitting tests whose chunk streams the JS port truncates
   // under console.log line drops. Cn1ssChunkTools's gap detection (added
   // in 963dd5af) correctly fails the resulting partial PNGs; force-finalise
