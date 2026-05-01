@@ -312,16 +312,18 @@ jobs:
       - name: Restore built CN1 + iOS port artifacts
         # build-port (the reusable workflow at .github/workflows/_build-ios-port.yml)
         # populates this cache with the iOS port artifact + native themes + cn1
-        # Maven artifacts. Keyed on the CN1 source hash so the same SHA hits the
-        # same cache entry across the GL and Metal jobs in this workflow and
-        # across the iOS native and packaging workflows.
+        # Use the exact key the build-port job saved against. Recomputing
+        # the hash on this runner has been observed to produce a different
+        # value than build-port on the same SHA (suspected: find traversal
+        # picks up runner-specific filesystem metadata), causing a spurious
+        # cache miss. Reusing the published key sidesteps that.
         uses: actions/cache/restore@v4
         with:
           path: |
             ~/.m2/repository/com/codenameone
             Themes
             Ports/iOSPort/nativeSources
-          key: cn1-built-${{ runner.os }}-${{ steps.src_hash.outputs.hash }}
+          key: ${{ needs.build-port.outputs.cn1_built_cache_key }}
           fail-on-cache-miss: true
 
       - name: Install Metal Toolchain

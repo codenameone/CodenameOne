@@ -15,11 +15,17 @@ name: _Build iOS port (reusable)
 
 on:
   workflow_call:
+    outputs:
+      cn1_built_cache_key:
+        description: "Cache key the build job used for the cn1-built artifact bundle. Dependent jobs should reuse this exact key to avoid recomputing the hash and getting a spurious cache miss."
+        value: ${{ jobs.build.outputs.cn1_built_cache_key }}
 
 jobs:
   build:
     runs-on: macos-15
     timeout-minutes: 60
+    outputs:
+      cn1_built_cache_key: ${{ steps.cn1_built_key.outputs.key }}
     concurrency:
       group: mac-ios-port-${{ github.workflow }}-${{ github.ref_name }}
       cancel-in-progress: true
@@ -105,6 +111,18 @@ jobs:
       # Built CN1 + iOS port artifacts. Restored after the m2 cache so it
       # overwrites any stale com/codenameone subtree pulled in by the broader
       # m2 cache (whose key is keyed on POMs, not source).
+      - name: Compute cn1-built cache key
+        id: cn1_built_key
+        # Single source of truth for the cache key, exposed as a job output
+        # so dependent jobs (build-ios, build-ios-metal in scripts-ios.yml,
+        # the iOS-native and packaging workflows) restore the EXACT key this
+        # job saved against. Computing the same hash again on each consumer
+        # job has been observed to produce a different value on some runners
+        # (suspected: the find -type f traversal picks up runner-specific
+        # filesystem metadata that survives between jobs). Sharing the key
+        # via an output sidesteps that.
+        run: echo "key=cn1-built-${{ runner.os }}-${{ steps.src_hash.outputs.hash }}" >> "$GITHUB_OUTPUT"
+
       - name: Cache built CN1 + iOS port artifacts
         id: cn1_built
         uses: actions/cache@v4
@@ -113,7 +131,7 @@ jobs:
             ~/.m2/repository/com/codenameone
             Themes
             Ports/iOSPort/nativeSources
-          key: cn1-built-${{ runner.os }}-${{ steps.src_hash.outputs.hash }}
+          key: ${{ steps.cn1_built_key.outputs.key }}
 
       - name: Setup workspace
         if: steps.cn1_built.outputs.cache-hit != 'true'
