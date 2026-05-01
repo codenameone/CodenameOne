@@ -214,7 +214,7 @@ This means that in runtime a user might revoke a permission. A good example for 
 
 === Installing Codename One
 
-IMPORTANT: Codename One requires either JDK 11 or JDK 8. Other JDK versions aren't supported now.
+IMPORTANT: Codename One supports JDK 11 through 25 for running the simulator and the desktop ("Run as desktop app") target. Eclipse Temurin (https://adoptium.net) is the easiest way to install a supported JDK.
 
 Codename One projects are built with Maven. Typical Maven targets such as `package`, `clean` and `install` work out of the box, but the Codename One integrations that ship with each IDE provide dedicated Run and Build actions for a smoother workflow.
 

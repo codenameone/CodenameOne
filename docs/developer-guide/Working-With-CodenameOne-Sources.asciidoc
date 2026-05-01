@@ -11,7 +11,9 @@ Codename One uses multiple JDKs and Maven profiles during the build. Make sure
 your development machine includes the following tooling (see
 `BUILDING.md` for platform-specific installation tips):
 
-* JDK 8 (required for the core build and Maven invocations)
+* JDK 8 (required for the core build of the framework itself)
+* JDK 11 through 25 (required at *runtime* to launch the simulator or
+  "Run as desktop app" target)
 * JDK 17 (required when compiling the Android port)
 * Apache Maven 3.6 or newer
 * macOS with Xcode (if you plan to build or test the iOS port)

@@ -177,7 +177,9 @@ The setup is covered in depth in [this article and video](https://www.codenameon
 " img width="80%"> </a>
 </div>
 
-**IMPORTANT:** Building Codename One requires **JDK 8**, currently. You cannot use JDK 11 as some sub-modules must use `-source 1.5` and `-target 1.5` to maintain backward compatibility with parts of the toolchain.
+**IMPORTANT:** *Building* the Codename One framework from source requires **JDK 8** -- some sub-modules must use `-source 1.5` and `-target 1.5` to maintain backward compatibility with parts of the toolchain, and newer JDKs cannot emit those targets.
+
+*Running* a Codename One application (the simulator or the "Run as desktop app" target) supports **JDK 11 through 25** (Eclipse Temurin: <https://adoptium.net>).
 
 
 ### Quick Start with Maven

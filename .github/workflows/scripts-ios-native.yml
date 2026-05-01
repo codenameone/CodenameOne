@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/scripts-ios-native.yml'
+      - '.github/workflows/_build-ios-port.yml'
       - 'scripts/setup-workspace.sh'
       - 'scripts/build-ios-port.sh'
       - 'scripts/build-ios-app.sh'
@@ -30,6 +31,7 @@ on:
     branches: [ master ]
     paths:
       - '.github/workflows/scripts-ios-native.yml'
+      - '.github/workflows/_build-ios-port.yml'
       - 'scripts/setup-workspace.sh'
       - 'scripts/build-ios-port.sh'
       - 'scripts/build-ios-app.sh'
@@ -54,17 +56,32 @@ on:
       - '!maven/core-unittests/**'
 
 jobs:
+  build-port:
+    uses: ./.github/workflows/_build-ios-port.yml
+
   native-ios:
+    needs: build-port
     permissions:
       contents: read
     runs-on: macos-15
-    timeout-minutes: 65
+    timeout-minutes: 45
     concurrency:
       group: mac-ci-${{ github.workflow }}-${{ github.ref_name }}
       cancel-in-progress: true
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Cache CocoaPods and user gems
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gem
+            ~/Library/Caches/CocoaPods
+            ~/.cocoapods/repos
+          key: ${{ runner.os }}-pods-v1-${{ hashFiles('scripts/setup-workspace.sh') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-v1-
 
       - name: Ensure CocoaPods tooling
         run: |
@@ -76,7 +93,9 @@ jobs:
           fi
           GEM_USER_DIR="$(ruby -e 'print Gem.user_dir')"
           export PATH="$GEM_USER_DIR/bin:$PATH"
-          gem install cocoapods xcodeproj --no-document --user-install
+          if ! command -v pod >/dev/null 2>&1; then
+            gem install cocoapods xcodeproj --no-document --user-install
+          fi
           pod --version
 
       - name: Compute setup-workspace hash
@@ -84,6 +103,23 @@ jobs:
         run: |
           set -euo pipefail
           echo "hash=$(shasum -a 256 scripts/setup-workspace.sh | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Compute CN1 source hash
+        id: src_hash
+        run: |
+          set -euo pipefail
+          SRC_HASH=$(find CodenameOne/src Ports/iOSPort vm/JavaAPI vm/ByteCodeTranslator Themes \
+              -type f \( -name '*.java' -o -name '*.m' -o -name '*.h' -o -name '*.xml' -o -name '*.properties' -o -name '*.css' \) 2>/dev/null \
+              | sort | xargs shasum -a 256 | shasum -a 256 | awk '{print $1}')
+          POM_HASH=$(find . -name 'pom.xml' -not -path './scripts/*' 2>/dev/null \
+              | sort | xargs shasum -a 256 | shasum -a 256 | awk '{print $1}')
+          SCRIPT_HASH=$(shasum -a 256 \
+              scripts/setup-workspace.sh \
+              scripts/build-ios-port.sh \
+              scripts/build-native-themes.sh \
+              .github/workflows/_build-ios-port.yml \
+              | shasum -a 256 | awk '{print $1}')
+          echo "hash=${SRC_HASH:0:16}-${POM_HASH:0:16}-${SCRIPT_HASH:0:16}" >> "$GITHUB_OUTPUT"
 
       - name: Set TMPDIR
         run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
@@ -96,6 +132,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cn1-tools-
 
+      - name: Cache Maven repository
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-
+
       - name: Restore cn1-binaries cache
         uses: actions/cache@v4
         with:
@@ -104,13 +148,15 @@ jobs:
           restore-keys: |
             cn1-binaries-${{ runner.os }}-
 
-      - name: Setup workspace
-        run: ./scripts/setup-workspace.sh -q -DskipTests
-        timeout-minutes: 40
-
-      - name: Build iOS port
-        run: ./scripts/build-ios-port.sh -q -DskipTests
-        timeout-minutes: 40
+      - name: Restore built CN1 + iOS port artifacts
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.m2/repository/com/codenameone
+            Themes
+            Ports/iOSPort/nativeSources
+          key: cn1-built-${{ runner.os }}-${{ steps.src_hash.outputs.hash }}
+          fail-on-cache-miss: true
 
       - name: Build sample iOS app
         id: build_ios_app

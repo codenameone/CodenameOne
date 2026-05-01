@@ -121,6 +121,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new BrowserComponentScreenshotTest(),
             new MediaPlaybackScreenshotTest(),
             new SheetScreenshotTest(),
+            new SheetSlideUpAnimationScreenshotTest(),
             new ImageViewerNavigationScreenshotTest(),
             new TabsScreenshotTest(),
             new TextAreaAlignmentScreenshotTest(),
@@ -280,7 +281,8 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 || "ComponentReplaceFadeScreenshotTest".equals(testName)
                 || "ComponentReplaceSlideScreenshotTest".equals(testName)
                 || "ComponentReplaceFlipScreenshotTest".equals(testName)
-                || "MotionShowcaseScreenshotTest".equals(testName);
+                || "MotionShowcaseScreenshotTest".equals(testName)
+                || "SheetSlideUpAnimationScreenshotTest".equals(testName);
     }
 
     private static boolean isJsSkippedScreenshotTest(String testName) {

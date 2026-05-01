@@ -4,7 +4,8 @@ This guide explains how to build Codename One from source using Maven. It provid
 
 ## Prerequisites
 
-- **JDK 8**
+- **JDK 8** for compiling the core framework (the core modules use `-source 1.5 -target 1.5` for backward compatibility)
+- **JDK 11 through 25** for *running* the simulator and the "Run as desktop app" target
 - **JDK 17** for building the Android port
 - **Apache Maven 3.6+**
 - macOS with Xcode (required only for the iOS port)

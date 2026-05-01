@@ -1,54 +1,28 @@
-name: Test iOS packaging
+name: _Build iOS port (reusable)
+
+# Reusable workflow that runs scripts/setup-workspace.sh + scripts/build-ios-port.sh
+# once per workflow run, populating shared caches that downstream test jobs (in
+# scripts-ios.yml, scripts-ios-native.yml, ios-packaging.yml) restore via the
+# same cache keys.
+#
+# A separate "cn1-built" cache is keyed on the CN1 source hash with no restore-
+# keys (exact match only). On hit, the entire setup-workspace + build-ios-port
+# sequence is skipped — the iOS port artifact in ~/.m2/repository/com/codenameone
+# is already correct for the current source state.
+#
+# This cache is shared across all three iOS workflows on the same branch, so
+# whichever workflow runs first populates it and the others skip the rebuild.
 
 on:
-  pull_request:
-    paths:
-      - '.github/workflows/ios-packaging.yml'
-      - '.github/workflows/_build-ios-port.yml'
-      - 'maven/codenameone-maven-plugin/**'
-      - 'vm/ByteCodeTranslator/**'
-      - 'Ports/iOSPort/**'
-      - 'scripts/build-ios-app.sh'
-      - 'scripts/run-ios-ui-tests.sh'
-      - 'scripts/run-ios-native-tests.sh'
-      - 'scripts/ios/**'
-      - 'scripts/hellocodenameone/**'
-      - '!docs/**'
-  push:
-    branches: [ master ]
-    paths:
-      - '.github/workflows/ios-packaging.yml'
-      - '.github/workflows/_build-ios-port.yml'
-      - 'maven/codenameone-maven-plugin/**'
-      - 'vm/ByteCodeTranslator/**'
-      - 'Ports/iOSPort/**'
-      - 'scripts/build-ios-app.sh'
-      - 'scripts/run-ios-ui-tests.sh'
-      - 'scripts/run-ios-native-tests.sh'
-      - 'scripts/ios/**'
-      - 'scripts/hellocodenameone/**'
-      - '!docs/**'
+  workflow_call:
 
 jobs:
-  build-port:
-    uses: ./.github/workflows/_build-ios-port.yml
-
-  packaging:
-    needs: build-port
-    permissions:
-      contents: read
+  build:
     runs-on: macos-15
-    timeout-minutes: 45
-    # Exercises both CocoaPods and SPM in a single Xcode project. Catches
-    # regressions in either dependency manager (each pathway runs end to end)
-    # and additionally validates that they coexist correctly.
-    env:
-      IOS_DEPENDENCY_ARGS: >-
-        -Dcodename1.arg.ios.dependencyManager=both
-        -Dcodename1.arg.ios.pods=AFNetworking
-        -Dcodename1.arg.ios.spm.packages=swift-collections|https://github.com/apple/swift-collections.git|from:1.1.0
-        -Dcodename1.arg.ios.spm.products.swift-collections=Collections
-
+    timeout-minutes: 60
+    concurrency:
+      group: mac-ios-port-${{ github.workflow }}-${{ github.ref_name }}
+      cancel-in-progress: true
     steps:
       - uses: actions/checkout@v4
 
@@ -68,6 +42,9 @@ jobs:
           mkdir -p ~/.codenameone
           cp maven/UpdateCodenameOne.jar ~/.codenameone/
           set -euo pipefail
+          if ! command -v ruby >/dev/null; then
+            echo "ruby not found"; exit 1
+          fi
           GEM_USER_DIR="$(ruby -e 'print Gem.user_dir')"
           export PATH="$GEM_USER_DIR/bin:$PATH"
           if ! command -v pod >/dev/null 2>&1; then
@@ -125,49 +102,33 @@ jobs:
           restore-keys: |
             cn1-binaries-${{ runner.os }}-
 
-      - name: Restore built CN1 + iOS port artifacts
-        uses: actions/cache/restore@v4
+      # Built CN1 + iOS port artifacts. Restored after the m2 cache so it
+      # overwrites any stale com/codenameone subtree pulled in by the broader
+      # m2 cache (whose key is keyed on POMs, not source).
+      - name: Cache built CN1 + iOS port artifacts
+        id: cn1_built
+        uses: actions/cache@v4
         with:
           path: |
             ~/.m2/repository/com/codenameone
             Themes
             Ports/iOSPort/nativeSources
           key: cn1-built-${{ runner.os }}-${{ steps.src_hash.outputs.hash }}
-          fail-on-cache-miss: true
 
-      - name: Build sample iOS app
-        id: build_ios_app
-        run: ./scripts/build-ios-app.sh -q -DskipTests
-        timeout-minutes: 30
+      - name: Setup workspace
+        if: steps.cn1_built.outputs.cache-hit != 'true'
+        run: ./scripts/setup-workspace.sh -q -DskipTests
+        timeout-minutes: 40
 
-      - name: Run iOS UI smoke
-        env:
-          ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/ios-packaging
+      - name: Build iOS port
+        if: steps.cn1_built.outputs.cache-hit != 'true'
+        run: ./scripts/build-ios-port.sh -q -DskipTests
+        timeout-minutes: 40
+
+      - name: Report cache outcome
         run: |
-          set -euo pipefail
-          mkdir -p "${ARTIFACTS_DIR}"
-          ./scripts/run-ios-ui-tests.sh \
-            "${{ steps.build_ios_app.outputs.workspace }}" \
-            "" \
-            "${{ steps.build_ios_app.outputs.scheme }}"
-        timeout-minutes: 30
-
-      - name: Run native iOS notification tests
-        env:
-          ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/ios-packaging-native
-        run: |
-          set -euo pipefail
-          mkdir -p "${ARTIFACTS_DIR}"
-          ./scripts/run-ios-native-tests.sh \
-            "${{ steps.build_ios_app.outputs.workspace }}" \
-            "${{ steps.build_ios_app.outputs.scheme }}"
-        timeout-minutes: 20
-
-      - name: Upload packaging artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ios-packaging
-          path: artifacts
-          if-no-files-found: warn
-          retention-days: 14
+          if [ "${{ steps.cn1_built.outputs.cache-hit }}" = "true" ]; then
+            echo "cn1-built cache HIT for key cn1-built-${{ runner.os }}-${{ steps.src_hash.outputs.hash }} — setup-workspace and build-ios-port were skipped."
+          else
+            echo "cn1-built cache MISS for key cn1-built-${{ runner.os }}-${{ steps.src_hash.outputs.hash }} — built fresh."
+          fi

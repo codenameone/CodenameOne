@@ -126,6 +126,24 @@ jobs:
           key: ${{ runner.os }}-cn1-tools-${{ hashFiles('scripts/setup-workspace.sh') }}
           restore-keys: |
             ${{ runner.os }}-cn1-tools-
+      - name: Cache Maven repository
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-m2-android-${{ matrix.id }}-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-android-${{ matrix.id }}-
+            ${{ runner.os }}-m2-
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ matrix.id }}-${{ hashFiles('scripts/hellocodenameone/**/build.gradle*', 'scripts/hellocodenameone/**/gradle-wrapper.properties', 'Ports/Android/build.gradle*') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-${{ matrix.id }}-
+            ${{ runner.os }}-gradle-
       - name: Setup workspace
         run: ./scripts/setup-workspace.sh -q -DskipTests
       - name: Build Android port
