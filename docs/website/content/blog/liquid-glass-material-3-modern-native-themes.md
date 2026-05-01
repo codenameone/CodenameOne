@@ -73,7 +73,7 @@ The full screen source is [DarkLightShowcaseThemeScreenshotTest.java](https://gi
 
 ![Android Material 3 theme — light and dark](/blog/liquid-glass-material-3-modern-native-themes/showcase-android.png)
 
-Same `ShowcaseTheme` source on Android. The Material 3 baseline palette gives `Default` the primary container colour and `Raised` the elevated-surface tone, with the dark variant flipping the relationship correctly via the dark colour-role mapping. Padding and font sizing follow Material density, which you can see in how compact the same Form lays out compared to iOS.
+Same `ShowcaseTheme` source on Android. The Material 3 baseline palette gives `Default` the primary container color and `Raised` the elevated-surface tone, with the dark variant flipping the relationship correctly via the dark color-role mapping. Padding and font sizing follow Material density, which you can see in how compact the same Form lays out compared to iOS.
 
 ### Translucent surfaces
 
@@ -89,7 +89,7 @@ The native theme is meant to be a starting point — you can layer your own pale
 
 ### The palette you can customize
 
-The thing you actually want to override on a real app is the colour palette — the brand accent, the disabled tone, surface tiers, separators. The native themes use a documented set of palette roles, each role mapped to a specific colour in light mode and a different colour in dark mode. To customize, you add a `theme.css` to your project that re-declares the UIIDs you care about with your own colours; that CSS is layered on top of the native theme and wins. Dark variants are written using the standard `@media (prefers-color-scheme: dark)` block.
+The thing you actually want to override on a real app is the color palette — the brand accent, the disabled tone, surface tiers, separators. The native themes use a documented set of palette roles, each role mapped to a specific color in light mode and a different color in dark mode. To customize, you add a `theme.css` to your project that re-declares the UIIDs you care about with your own colors; that CSS is layered on top of the native theme and wins. Dark variants are written using the standard `@media (prefers-color-scheme: dark)` block.
 
 For example, to swap the iOS accent from system blue to a brand magenta you write your own `RaisedButton` rule in `theme.css`:
 
@@ -119,7 +119,7 @@ The same pattern works for any UIID — `Button`, `FlatButton`, `Toolbar`, `Form
 
 | Role | Where it shows up | Light | Dark |
 | --- | --- | --- | --- |
-| accent | `RaisedButton`, `FlatButton`, FAB, switch on-track, link colour | `#007aff` | `#0a84ff` |
+| accent | `RaisedButton`, `FlatButton`, FAB, switch on-track, link color | `#007aff` | `#0a84ff` |
 | accent pressed | accent UIIDs in `.pressed` state | `#0064d1` | `#64b1ff` |
 | accent disabled | accent UIIDs in `.disabled` state | `#b3d4ff` | `#004a99` |
 | text primary | `Label`, `Button` text, body | `#000000` | `#ffffff` |
@@ -163,7 +163,7 @@ By default an iOS skin maps to the iOS Modern theme, an Android skin maps to And
 
 ## On devices
 
-The opt-in is the same on iOS and Android. Set `ios.themeMode=modern` (other accepted values: `liquid`, `auto`, `ios7`, `flat`) and `cn1.androidTheme=material` (`material`, `hololight`, `legacy`) in your project's `codenameone_settings.properties`, or as Build Hints in the simulator UI. There is a single cross-platform shortcut, `cn1.nativeTheme=modern`, which the iOS builder consults when `ios.themeMode` is unset and which the Android port reads at runtime as a default for `cn1.androidTheme`. Existing `and.hololight=true` projects keep their Holo Light look — that hint is still honoured for back-compat.
+The opt-in is the same on iOS and Android. Set `ios.themeMode=modern` (other accepted values: `liquid`, `auto`, `ios7`, `flat`) and `cn1.androidTheme=material` (`material`, `hololight`, `legacy`) in your project's `codenameone_settings.properties`, or as Build Hints in the simulator UI. There is a single cross-platform shortcut, `cn1.nativeTheme=modern`, which the iOS builder consults when `ios.themeMode` is unset and which the Android port reads at runtime as a default for `cn1.androidTheme`. Existing `and.hololight=true` projects keep their Holo Light look — that hint is still honored for back-compat.
 
 The default for an existing app stays on legacy on every platform. We do not flip a 15-year-old app's look without an opt-in. New apps generated from the initializr ship with `ios.themeMode=modern`, `cn1.androidTheme=material`, and `cn1.nativeTheme=modern` already set in `codenameone_settings.properties`, so a brand new project starts with the modern themes preselected. The Playground does the same.
 
@@ -175,7 +175,7 @@ The other piece of look-and-feel that we want to highlight is `StickyHeaderConta
 
 ![Sticky header sectioned scroll](/blog/liquid-glass-material-3-modern-native-themes/sticky-header-slide.gif)
 
-Above is a six-frame sweep from the screenshot test — the user scrolls through sections A, B, C, D, E and the pinned header recolours to whichever section is currently active at the top of the viewport.
+Above is a six-frame sweep from the screenshot test — the user scrolls through sections A, B, C, D, E and the pinned header recolors to whichever section is currently active at the top of the viewport.
 
 The API is small. Build the container, register sections with `addSection(header, content)`, configure the transition style and duration, and add it to a Form:
 
