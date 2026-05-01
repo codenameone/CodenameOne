@@ -14,6 +14,10 @@ public class DrawRoundRect extends AbstractGraphicsScreenshotTest {
     @Override
     protected void configureForm(Form form) {
         form.setTransitionInAnimator(CommonTransitions.createEmpty());
+        com.codename1.ui.Form prev = com.codename1.ui.Display.getInstance().getCurrent();
+        if (prev != null) {
+            prev.setTransitionOutAnimator(CommonTransitions.createEmpty());
+        }
     }
 
     @Override
