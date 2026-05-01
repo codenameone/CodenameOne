@@ -390,6 +390,44 @@ class ImageTest extends UITestBase {
         assertEquals(supported, Image.isSimdOptimizationsEnabled());
     }
 
+    /// Regression for the alloca-overflow on iOS reported on StackOverflow:
+    /// `createMask()` on a 410x410 mutable round-rect image was lowering to
+    /// `__builtin_alloca` of ~656 KB which blew the per-thread stack. Both
+    /// `createMask()` and `applyMask()` must succeed at image-scale buffers and
+    /// the SIMD and scalar paths must agree.
+    @FormTest
+    void testCreateAndApplyMaskOnLargeRoundedImage() {
+        int width = 410;
+        int height = 410;
+        Image roundMask = Image.createImage(width, height, 0xff000000);
+        Graphics g = roundMask.getGraphics();
+        g.setColor(0xffffff);
+        g.fillRoundRect(0, 0, width, height, 60, 60);
+
+        try {
+            Image.setSimdOptimizationsEnabled(false);
+            Object scalarMask = roundMask.createMask();
+            Image scalarApplied = roundMask.applyMask(scalarMask);
+
+            Image.setSimdOptimizationsEnabled(true);
+            Object simdMask = roundMask.createMask();
+            Image simdApplied = roundMask.applyMask(simdMask);
+
+            assertNotNull(scalarMask);
+            assertNotNull(simdMask);
+            assertArrayEquals(
+                    ((IndexedImage) scalarMask).getImageDataByte(),
+                    ((IndexedImage) simdMask).getImageDataByte(),
+                    "SIMD and scalar createMask must agree at image scale");
+            assertArrayEquals(scalarApplied.getRGB(), simdApplied.getRGB(),
+                    "SIMD and scalar applyMask must agree at image scale");
+            assertEquals(width, simdApplied.getWidth());
+            assertEquals(height, simdApplied.getHeight());
+        } finally {
+            Image.resetSimdOptimizationsEnabled();
+        }
+    }
+
     @FormTest
     void testImageSimdAndScalarPathsMatch() {
         int[] rgb = new int[]{

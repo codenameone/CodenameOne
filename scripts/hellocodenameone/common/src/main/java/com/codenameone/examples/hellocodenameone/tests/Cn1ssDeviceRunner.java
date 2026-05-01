@@ -144,6 +144,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new InPlaceEditViewTest(),
             new BytecodeTranslatorRegressionTest(),
             new SimdApiTest(),
+            new SimdLargeAllocaTest(),
             new StreamApiTest(),
             new TimeApiTest(),
             new Java17Tests(),
