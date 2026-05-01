@@ -197,7 +197,24 @@ public abstract class RECharacter {
         if (c < 128) {
             return CHAR_CLASSES[c];
         }
-        return (byte) Character.getType(c);
+        // The framework is compiled against the CLDC11 stub, which does not
+        // expose Character.getType or isLetter. Compose what we need from the
+        // available primitives. Letters that are neither cased nor digits
+        // (modifier letters, OTHER_LETTER such as CJK ideographs) still fall
+        // through to UNASSIGNED.
+        if (Character.isLowerCase(c)) {
+            return LOWERCASE_LETTER;
+        }
+        if (Character.isUpperCase(c)) {
+            return UPPERCASE_LETTER;
+        }
+        if (Character.isDigit(c)) {
+            return DECIMAL_DIGIT_NUMBER;
+        }
+        if (Character.isSpaceChar(c)) {
+            return SPACE_SEPARATOR;
+        }
+        return UNASSIGNED;
 //#endif
     }
 //#endif
