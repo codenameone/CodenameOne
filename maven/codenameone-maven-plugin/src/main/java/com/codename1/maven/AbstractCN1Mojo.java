@@ -706,42 +706,47 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
     }
     
     public static final String UPDATE_CODENAMEONE_JAR_URL = "https://www.codenameone.com/files/updates/UpdateCodenameOne.jar";
+    public static final String UPDATE_CODENAMEONE_JAR_FALLBACK_URL = "https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/UpdateCodenameOne.jar";
+    public static final String UPDATE_CODENAMEONE_JAR_RESOURCE = "/com/codename1/maven/UpdateCodenameOne.jar";
     public static final String JPDATE_CODENAMEONE_JAR_PATH = System.getProperty("user.home") + File.separator + ".codenameone" + File.separator + "UpdateCodenameOne.jar";
 
-    
-    protected void installUpdater() throws IOException {
-        String destinationPath = JPDATE_CODENAMEONE_JAR_PATH;
-        FileOutputStream os = null;
-        InputStream is = null;
-        try {
-            File re = new File(destinationPath);
 
-            if (!re.exists()) {
-                getLog().info("Installing Codename One Updater from "+UPDATE_CODENAMEONE_JAR_URL);
-                is = new URL(UPDATE_CODENAMEONE_JAR_URL).openStream();
-                os = new FileOutputStream(re);
-                byte[] buf = new byte[65536];
-                int len = 0;
-                while ((len = is.read(buf)) > -1) {
-                    os.write(buf, 0, len);
-                }
-            } else {
-                getLog().debug("Designer is up to date");
+    protected void installUpdater() throws IOException {
+        File re = new File(JPDATE_CODENAMEONE_JAR_PATH);
+        if (re.exists()) {
+            getLog().debug("Designer is up to date");
+            return;
+        }
+        re.getParentFile().mkdirs();
+
+        try (InputStream bundled = AbstractCN1Mojo.class.getResourceAsStream(UPDATE_CODENAMEONE_JAR_RESOURCE)) {
+            if (bundled != null) {
+                getLog().info("Installing Codename One Updater from bundled plugin resource");
+                copyToFile(bundled, re);
+                return;
             }
-        } finally {
-            if (os != null) {
-                try {
-                    os.close();
-                } catch (IOException ex) {
-                    getLog().error("Error closing output stream", ex);
-                }
+        }
+
+        IOException lastFailure = null;
+        for (String url : new String[] { UPDATE_CODENAMEONE_JAR_URL, UPDATE_CODENAMEONE_JAR_FALLBACK_URL }) {
+            getLog().info("Installing Codename One Updater from " + url);
+            try (InputStream is = new URL(url).openStream()) {
+                copyToFile(is, re);
+                return;
+            } catch (IOException ex) {
+                lastFailure = ex;
+                getLog().warn("Failed to download Codename One Updater from " + url + ": " + ex.getMessage());
             }
-            if (is != null) {
-                try {
-                    is.close();
-                } catch (IOException ex) {
-                    getLog().error("Error closing input stream", ex);
-                }
+        }
+        throw lastFailure != null ? lastFailure : new IOException("Failed to install Codename One updater");
+    }
+
+    private static void copyToFile(InputStream is, File dest) throws IOException {
+        try (FileOutputStream os = new FileOutputStream(dest)) {
+            byte[] buf = new byte[65536];
+            int len;
+            while ((len = is.read(buf)) > -1) {
+                os.write(buf, 0, len);
             }
         }
     }
