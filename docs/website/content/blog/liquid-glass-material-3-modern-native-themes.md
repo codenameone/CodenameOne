@@ -89,43 +89,67 @@ The native theme is meant to be a starting point — you can layer your own pale
 
 ### The palette you can customize
 
-The thing you actually want to override on a real app is the colour palette — the brand accent, the disabled tone, surface tiers, separators. Layer your own theme.css (or a runtime `UIManager.addThemeProps` call as in the magenta example above) on top of the native theme and these are the values you change.
+The thing you actually want to override on a real app is the colour palette — the brand accent, the disabled tone, surface tiers, separators. The native themes use a documented set of palette roles, each role mapped to a specific colour in light mode and a different colour in dark mode. To customize, you add a `theme.css` to your project that re-declares the UIIDs you care about with your own colours; that CSS is layered on top of the native theme and wins. Dark variants are written using the standard `@media (prefers-color-scheme: dark)` block.
 
-**iOS Modern**
+For example, to swap the iOS accent from system blue to a brand magenta you write your own `RaisedButton` rule in `theme.css`:
 
-| Role | Light | Dark |
-| --- | --- | --- |
-| accent | `#007aff` | `#0a84ff` |
-| accent pressed | `#0064d1` | `#64b1ff` |
-| accent disabled | `#b3d4ff` | `#004a99` |
-| text primary | `#000000` | `#ffffff` |
-| text secondary | `#3c3c43` | `#ebebf5` |
-| text tertiary | `#8e8e93` | `#8e8e93` |
-| text disabled | `#c7c7cc` | `#48484a` |
-| surface | `#ffffff` | `#000000` |
-| surface grouped | `#f2f2f7` | `#1c1c1e` |
-| surface tertiary | `#e5e5ea` | `#2c2c2e` |
-| separator | `#c6c6c8` | `#38383a` |
-| success | `#34c759` | `#30d158` |
+```css
+RaisedButton {
+    background-color: #d63aff;
+    color: #ffffff;
+}
+RaisedButton.pressed {
+    background-color: #b322d6;
+}
+RaisedButton.disabled {
+    background-color: #f3c8ff;
+    color: #ffffff;
+}
 
-**Android Material 3 (baseline)**
+@media (prefers-color-scheme: dark) {
+    RaisedButton          { background-color: #ff66ff; color: #1a001a; }
+    RaisedButton.pressed  { background-color: #ff8aff; }
+    RaisedButton.disabled { background-color: #4a004a; color: #b380b3; }
+}
+```
 
-| Role | Light | Dark |
-| --- | --- | --- |
-| primary | `#6750a4` | `#d0bcff` |
-| on-primary | `#ffffff` | `#381e72` |
-| primary container | `#eaddff` | `#4f378b` |
-| on primary container | `#21005d` | `#eaddff` |
-| surface | `#fef7ff` | `#141218` |
-| on-surface | `#1d1b20` | `#e6e0e9` |
-| surface variant | `#e7e0ec` | `#49454f` |
-| on surface variant | `#49454f` | `#cac4d0` |
-| surface container | `#f3edf7` | `#211f26` |
-| outline | `#79747e` | `#938f99` |
-| outline variant | `#cac4d0` | `#49454f` |
-| state pressed | `#d0bcff` | `#4f378b` |
-| state disabled | `#e0dce4` | `#2b2930` |
-| on disabled | `#a5a0ab` | `#5c5967` |
+The same pattern works for any UIID — `Button`, `FlatButton`, `Toolbar`, `Form`, `Dialog`, `TabsContainer`, etc. The reference values below are the roles each native theme uses internally so you know what you are overriding and what a sensible "pressed" or "disabled" pair looks like in each appearance.
+
+**iOS Modern palette reference**
+
+| Role | Where it shows up | Light | Dark |
+| --- | --- | --- | --- |
+| accent | `RaisedButton`, `FlatButton`, FAB, switch on-track, link colour | `#007aff` | `#0a84ff` |
+| accent pressed | accent UIIDs in `.pressed` state | `#0064d1` | `#64b1ff` |
+| accent disabled | accent UIIDs in `.disabled` state | `#b3d4ff` | `#004a99` |
+| text primary | `Label`, `Button` text, body | `#000000` | `#ffffff` |
+| text secondary | `SecondaryLabel`, sub-headlines | `#3c3c43` | `#ebebf5` |
+| text tertiary | `TertiaryLabel`, hints | `#8e8e93` | `#8e8e93` |
+| text disabled | disabled label / button text | `#c7c7cc` | `#48484a` |
+| surface | `Dialog`, `Sheet`, popup background | `#ffffff` | `#000000` |
+| surface grouped | `Form`, `ContentPane` | `#f2f2f7` | `#1c1c1e` |
+| surface tertiary | `TextField`, `MultiButton` rows | `#e5e5ea` | `#2c2c2e` |
+| separator | borders, list dividers | `#c6c6c8` | `#38383a` |
+| success | confirm / success states | `#34c759` | `#30d158` |
+
+**Android Material 3 baseline palette reference**
+
+| Role | Where it shows up | Light | Dark |
+| --- | --- | --- | --- |
+| primary | `RaisedButton`, switch on-track, FAB | `#6750a4` | `#d0bcff` |
+| on-primary | text/icons on top of primary | `#ffffff` | `#381e72` |
+| primary container | `Button` (filled-tonal), elevated chips | `#eaddff` | `#4f378b` |
+| on primary container | text on top of primary container | `#21005d` | `#eaddff` |
+| surface | `Form`, `ContentPane` | `#fef7ff` | `#141218` |
+| on-surface | body text, primary glyphs | `#1d1b20` | `#e6e0e9` |
+| surface variant | `TextField`, `MultiButton` rows | `#e7e0ec` | `#49454f` |
+| on surface variant | secondary text, hints | `#49454f` | `#cac4d0` |
+| surface container | `Dialog`, `Sheet`, elevated surfaces | `#f3edf7` | `#211f26` |
+| outline | borders, dividers | `#79747e` | `#938f99` |
+| outline variant | subtle dividers | `#cac4d0` | `#49454f` |
+| state pressed | primary UIIDs in `.pressed` state | `#d0bcff` | `#4f378b` |
+| state disabled | primary UIIDs in `.disabled` state | `#e0dce4` | `#2b2930` |
+| on disabled | text on top of disabled surface | `#a5a0ab` | `#5c5967` |
 
 ## In the simulator
 
@@ -190,10 +214,10 @@ If you want to read the source, the suite lives at [scripts/hellocodenameone/com
 
 The theme work was the loudest thing this week, but plenty of other commits landed alongside it:
 
-- **SIMD alloca regression fix.** The `cn1.SIMD` path on iOS regressed; the bytecode compliance checker around alloca-tainted values is unforgiving about how those values flow into `fail()` strings and similar. The fix restructures the alloca-direct test phase to use only constant fail messages and pure-control-flow boolean checks, keeping `array.length` and `array[i]` expressions on Simd alloca arrays out of any path that might emit `invokedynamic` or `Integer.valueOf` calls.
+- **SIMD large-allocation fallback.** The SIMD path on iOS allocates its working buffers on the stack via `alloca` for speed. Past a certain buffer size the stack allocation simply fails — there is not enough stack to give, and the request crashes the process. The fix detects that case and falls back to a regular heap allocation when the request is too large to live on the stack. Small SIMD ops keep the fast `alloca` path; large ones no longer crash.
 - **Pluggable AnimationTime clock.** `Motion`, `Timeline`, `MorphAnimation`, `Image.animate`, and `Label` tickers now all route through a new `AnimationTime` class that defaults to `System.currentTimeMillis()` but can be overridden. Tests can drive animations deterministically frame by frame; demos can run in slow motion or fast forward; `Motion.slowMotion` is no longer the only lever.
-- **POSIX character classes for non-ASCII letters.** `RECharacter.getType()` returned `UNASSIGNED` for any char `>= 128`, so `[[:alpha:]]`, `[[:alnum:]]`, `[[:lower:]]`, and `[[:upper:]]` silently failed to match Greek, Cyrillic, CJK ideographs, vulgar fractions, currency symbols, or anything with a cedilla. The fix delegates to `java.lang.Character.getType(c)` for `c >= 128`. Five regression tests added, including the exact failing case from the issue.
-- **Fail-fast on JDK < 11.** The simulator and "Run as desktop app" goals fork the JVM with `--add-exports=java.desktop/com.apple.eawt=ALL-UNNAMED`, which JDK 8 rejects with the unhelpful "Could not create the Java Virtual Machine". Now the Maven plugin checks the runtime JDK version on entry to `cn1:run` and `cn1:debug` and aborts with a friendly message naming the detected version, `JAVA_HOME`, and a pointer to Adoptium. JDK 11 through 25 is the supported runtime range, JDK 8 stays the build-time requirement for the core framework.
+- **POSIX character classes for non-ASCII letters.** `[[:alpha:]]`, `[[:alnum:]]`, `[[:lower:]]`, and `[[:upper:]]` silently failed to match anything outside the basic ASCII range — Greek, Cyrillic, CJK ideographs, accented letters, vulgar fractions, currency symbols. They now match the way you would expect, with five regression tests covering the failing cases from the issue.
+- **Fail-fast on JDK < 11.** The simulator and "Run as desktop app" goals fork the JVM with `--add-exports=java.desktop/com.apple.eawt=ALL-UNNAMED`, which JDK 8 rejects with the unhelpful "Could not create the Java Virtual Machine". Now the Maven plugin checks the runtime JDK version on entry to `cn1:run` and `cn1:debug` and aborts with a friendly message naming the detected version, `JAVA_HOME`, and a pointer to Adoptium. JDK 11 through 25 is the supported runtime range for the simulator, JDK 8 stays the build-time requirement for the core framework, and JDK 8 is still fully supported at runtime for shipped desktop apps — only the simulator / "Run as desktop app" Maven goals require JDK 11+.
 - **Sheet scrolling swipe and animation.** `Sheet` finally drags from the bottom with a real animation instead of snapping in. Issue [#4825](https://github.com/codenameone/CodenameOne/issues/4825).
 - **Picker positioning.** `Picker` got additional button-positioning options and a small batch of coverage tests.
 - **Playground polish.** The Playground moved every `Dialog.show(...)` to `InteractionDialog` mode so user code calling `Dialog.show` does not blow away the editor chrome — it renders into the layered pane instead. Error messages got a substantial overhaul. The preview-resolution syntax expanded so the Playground can pick previews from a much wider set of expressions, with a new harness keeping it honest in CI.
@@ -208,8 +232,6 @@ Neither half is finished. They are both ongoing, and they both depend on communi
 We are sitting at **496 open issues** as of this post. That is slow but steady progress — the number is moving in the right direction week over week, and the issues that close tend to ship as features or fixes you can see, not as silent triage. If you have a problem, [file it](https://github.com/codenameone/CodenameOne/issues). If you have an RFE, file that too. The themes you saw above started as an RFE.
 
 You can try the new themes today by opening the [Playground](/playground), by setting `ios.themeMode=modern` and `cn1.androidTheme=material` in your project's `codenameone_settings.properties`, or by picking them from the simulator's new Native Theme menu. New projects from the initializr already have them on. The shipping resources are bundled in the iOS and Android ports as of this week.
-
-That is a lot of plumbing for "your app looks better now". It usually is.
 
 ---
 
