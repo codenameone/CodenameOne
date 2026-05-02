@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class JavaScriptRuntimeFacadeTest {
@@ -548,10 +549,21 @@ class JavaScriptRuntimeFacadeTest {
         });
         wiringClass.getMethod("registerPeerPointerEvents", elementRegistrarClass, boolean.class, boolean.class, boolean.class, boolean.class, boolean.class, String.class, Object.class, Object.class, Object.class, Object.class, Object.class, Object.class)
                 .invoke(null, elementRegistrar, true, true, true, true, true, "wheel", new Object(), new Object(), new Object(), new Object(), new Object(), new Object());
-        assertTrue(peerEvents.contains("mousedown:true"));
+        // The peer-pointer wiring intentionally drops legacy ``mousedown`` /
+        // ``mouseup`` registrations: every supported browser ships pointer
+        // events, and registering both fired listeners twice per real click,
+        // causing a stateful dedup race that dropped Dialog OK releases.
+        // See JavaScriptEventWiring.registerPeerPointerEvents and the
+        // bafab5308 fix commentary.
         assertTrue(peerEvents.contains("pointerdown:true"));
+        assertTrue(peerEvents.contains("pointerup:true"));
+        assertTrue(peerEvents.contains("pointercancel:true"));
         assertTrue(peerEvents.contains("hittest:true"));
         assertTrue(peerEvents.contains("wheel:true"));
+        assertFalse(peerEvents.contains("mousedown:true"),
+                "mousedown registration was removed -- pointerdown covers it without the dedup race");
+        assertFalse(peerEvents.contains("mouseup:true"),
+                "mouseup registration was removed -- pointerup covers it without the dedup race");
     }
 
     @Test
