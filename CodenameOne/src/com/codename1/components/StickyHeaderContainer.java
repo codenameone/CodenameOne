@@ -24,10 +24,6 @@ package com.codename1.components;
 
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
-import com.codename1.ui.Form;
-import com.codename1.ui.Graphics;
-import com.codename1.ui.Image;
-import com.codename1.ui.animations.AnimationTime;
 import com.codename1.ui.events.ScrollListener;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
@@ -41,12 +37,15 @@ import java.util.List;
 
 /// A scrollable container that pins the most recently scrolled-past section
 /// header to the top of its viewport, in the style of the iOS contacts list
-/// or sectioned material lists. As the user scrolls past a section boundary
-/// the previous header is replaced by the next one through a configurable
-/// staged transition: a directional slide (slides up on forward scroll, down
-/// on reverse scroll) or a cross-fade. Transitions are time-driven so a slow
-/// scroll surfaces every animation frame at full duration while a fast
-/// scroll lets the latest swap supersede earlier in-flight ones.
+/// or sectioned material lists. As the next section's header rises into the
+/// pinned slot the previous header is replaced through a configurable
+/// scroll-driven transition: a directional slide where the rising header
+/// pushes the pinned one up and out, an instant cover where the rising
+/// header simply slides over the pinned one, or a fade where the pinned
+/// header fades to transparency as the next section closes the gap.
+/// Transitions are driven by scroll position so the visual stays in sync
+/// with the user's gesture and there is no time-based animation that lags
+/// behind a slow drag or skips ahead on a fling.
 ///
 /// Sections are added with `addSection(header, content)`. The header is a
 /// real component that participates in the scroll: when it is the active
@@ -59,7 +58,6 @@ import java.util.List;
 /// ```java
 /// StickyHeaderContainer sticky = new StickyHeaderContainer();
 /// sticky.setTransitionStyle(StickyHeaderContainer.TRANSITION_SLIDE);
-/// sticky.setTransitionDurationMillis(250);
 /// for (char c = 'A'; c <= 'Z'; c++) {
 ///     Label header = new Label("" + c, "StickyHeader");
 ///     Container items = new Container(BoxLayout.y());
@@ -73,16 +71,20 @@ import java.util.List;
 ///
 /// @author Shai Almog
 public class StickyHeaderContainer extends Container {
-    /// Replace the pinned header without animation.
+    /// Replace the pinned header without a fade or shift. As the next
+    /// section's header rises into the pinned slot from below it slides
+    /// over the pinned header (which is hidden during the overlap) and
+    /// then takes its place once it reaches the top.
     public static final int TRANSITION_NONE = 0;
-    /// Slide the outgoing header out of the slot while the incoming header
-    /// slides in. Forward scroll slides upward, reverse scroll slides
-    /// downward.
+    /// As the next section's header rises into the pinned slot from below
+    /// it pushes the pinned header up and out of the slot in sync with
+    /// the scroll, replacing it once the rising header reaches the top.
     public static final int TRANSITION_SLIDE = 1;
-    /// Fade the outgoing header to transparency on top of the incoming one.
+    /// As the next section's header rises into the pinned slot from below
+    /// the pinned header fades to transparency, revealing the rising
+    /// header behind it. The swap happens once the rising header reaches
+    /// the top and the pinned header has fully faded.
     public static final int TRANSITION_FADE = 2;
-
-    private static final int DEFAULT_TRANSITION_DURATION_MS = 250;
 
     private final ScrollContainer scroller;
     private final Container stickyHost;
@@ -91,12 +93,13 @@ public class StickyHeaderContainer extends Container {
     private int activeIndex = -1;
 
     private int transitionStyle = TRANSITION_SLIDE;
-    private int transitionDurationMillis = DEFAULT_TRANSITION_DURATION_MS;
+    private int transitionDurationMillis;
 
-    private Image transitionOutgoing;
-    private long transitionStartMs;
-    private boolean transitionForward;
-    private int transitionSlotHeight;
+    /// Pixels of overlap between the pinned header's slot and the next
+    /// section's header. `0` means the next section is still fully below
+    /// the slot; equal to the pinned header's height means the swap is
+    /// imminent.
+    private int pushOffset;
     private int stickyHostBaseY;
 
     private static class Section {
@@ -192,23 +195,30 @@ public class StickyHeaderContainer extends Container {
         return activeIndex;
     }
 
-    /// Selects how the pinned header is replaced when the active section
-    /// changes. One of [#TRANSITION_NONE], [#TRANSITION_SLIDE] (default) or
-    /// [#TRANSITION_FADE].
+    /// Selects how the pinned header is replaced when the next section
+    /// rises into the slot. One of [#TRANSITION_NONE], [#TRANSITION_SLIDE]
+    /// (default) or [#TRANSITION_FADE].
     public void setTransitionStyle(int style) {
         if (style != TRANSITION_NONE && style != TRANSITION_SLIDE && style != TRANSITION_FADE) {
             throw new IllegalArgumentException("Unknown transition style: " + style);
         }
+        if (this.transitionStyle == style) {
+            return;
+        }
         this.transitionStyle = style;
+        applyPushVisuals();
+        if (isInitialized()) {
+            repaint();
+        }
     }
 
     public int getTransitionStyle() {
         return transitionStyle;
     }
 
-    /// Sets the duration of the header replacement animation in
-    /// milliseconds. A value of `0` makes transitions instantaneous
-    /// regardless of [#getTransitionStyle()].
+    /// Retained for API compatibility. Transitions are now scroll-driven so
+    /// the per-frame duration no longer affects visuals; the value is
+    /// validated and stored but otherwise unused.
     public void setTransitionDurationMillis(int millis) {
         if (millis < 0) {
             throw new IllegalArgumentException("duration cannot be negative");
@@ -220,28 +230,28 @@ public class StickyHeaderContainer extends Container {
         return transitionDurationMillis;
     }
 
-    /// Returns true while a header replacement animation is in progress.
+    /// Returns true while the next section's header is overlapping the
+    /// pinned slot, i.e. the scroll-driven transition is mid-flight.
     public boolean isTransitionInProgress() {
-        if (transitionOutgoing == null) {
-            return false;
-        }
-        return AnimationTime.now() - transitionStartMs < transitionDurationMillis;
+        return pushOffset > 0;
     }
 
     /// Returns the progress of the in-flight transition as a fraction in
-    /// `[0, 1]`. Returns `1` when no transition is running.
+    /// `[0, 1]`: `0` when the next section is just touching the slot from
+    /// below and `1` when it has fully displaced the pinned header.
+    /// Returns `0` when no transition is in progress.
     public float getTransitionProgress() {
-        if (transitionOutgoing == null || transitionDurationMillis <= 0) {
-            return 1f;
-        }
-        long elapsed = AnimationTime.now() - transitionStartMs;
-        if (elapsed <= 0) {
+        if (activeIndex < 0 || pushOffset <= 0) {
             return 0f;
         }
-        if (elapsed >= transitionDurationMillis) {
+        int activeH = activeHeightFor(activeIndex);
+        if (activeH <= 0) {
+            return 0f;
+        }
+        if (pushOffset >= activeH) {
             return 1f;
         }
-        return (float) elapsed / (float) transitionDurationMillis;
+        return (float) pushOffset / (float) activeH;
     }
 
     /// Sets the scroll position of the inner scroll container. The value is
@@ -262,10 +272,10 @@ public class StickyHeaderContainer extends Container {
         sections.clear();
     }
 
-    /// Recomputes which section header should be pinned and updates the
-    /// overlay accordingly. The container calls this internally on scroll;
-    /// call it explicitly when section content has been mutated outside of
-    /// a normal layout cycle.
+    /// Recomputes which section header should be pinned and how far the
+    /// next section has displaced it. Called internally on every scroll
+    /// event; call it explicitly when section content has been mutated
+    /// outside of a normal layout cycle.
     public void updateSticky() {
         if (sections.isEmpty()) {
             deactivate();
@@ -295,11 +305,22 @@ public class StickyHeaderContainer extends Container {
             }
         }
 
-        if (newActive == activeIndex) {
-            return;
+        boolean activationChanged = (newActive != activeIndex);
+        if (activationChanged) {
+            applyActivation(newActive);
+            sy = scroller.getScrollY();
         }
 
-        applyActivation(newActive);
+        int newPush = computePushOffset(sy);
+        boolean pushChanged = (newPush != pushOffset);
+        pushOffset = newPush;
+
+        if (activationChanged || pushChanged) {
+            applyPushVisuals();
+            if (isInitialized()) {
+                repaint();
+            }
+        }
     }
 
     private int activeHeightFor(int index) {
@@ -314,32 +335,42 @@ public class StickyHeaderContainer extends Container {
         return h;
     }
 
+    private int computePushOffset(int sy) {
+        if (activeIndex < 0) {
+            return 0;
+        }
+        int activeH = activeHeightFor(activeIndex);
+        if (activeH <= 0) {
+            return 0;
+        }
+        int nextIdx = activeIndex + 1;
+        if (nextIdx >= sections.size()) {
+            return 0;
+        }
+        Section next = sections.get(nextIdx);
+        Component anchor = next.placeholder.getParent() == scroller ? next.placeholder : next.header; //NOPMD CompareObjectsWithEquals
+        if (anchor.getParent() != scroller) { //NOPMD CompareObjectsWithEquals
+            return 0;
+        }
+        int aH = anchor.getHeight();
+        if (aH <= 0) {
+            aH = anchor.getPreferredH();
+        }
+        if (aH <= 0) {
+            return 0;
+        }
+        int relY = anchor.getY() - sy;
+        if (relY >= activeH) {
+            return 0;
+        }
+        if (relY <= 0) {
+            return activeH;
+        }
+        return activeH - relY;
+    }
+
     private void applyActivation(int newActive) {
-        Image outgoingSnapshot = null;
-        int outgoingHeight = 0;
-        boolean wasActive = activeIndex >= 0;
-        boolean willBeActive = newActive >= 0;
-
-        if (wasActive && willBeActive
-                && transitionStyle != TRANSITION_NONE
-                && transitionDurationMillis > 0) {
-            Component oldHeader = sections.get(activeIndex).header;
-            outgoingHeight = oldHeader.getHeight();
-            if (oldHeader.getWidth() > 0 && outgoingHeight > 0) {
-                outgoingSnapshot = oldHeader.toImage();
-            }
-        }
-
-        boolean forward;
-        if (!wasActive) {
-            forward = true;
-        } else if (!willBeActive) {
-            forward = false;
-        } else {
-            forward = newActive > activeIndex;
-        }
-
-        if (wasActive) {
+        if (activeIndex >= 0) {
             Section prev = sections.get(activeIndex);
             stickyHost.removeAll();
             int idx = scroller.getComponentIndex(prev.placeholder);
@@ -349,7 +380,7 @@ public class StickyHeaderContainer extends Container {
             }
         }
 
-        if (willBeActive) {
+        if (newActive >= 0) {
             Section next = sections.get(newActive);
             int idx = scroller.getComponentIndex(next.header);
             int h = next.header.getHeight();
@@ -370,24 +401,14 @@ public class StickyHeaderContainer extends Container {
         }
 
         activeIndex = newActive;
-
-        if (outgoingSnapshot != null && willBeActive) {
-            transitionOutgoing = outgoingSnapshot;
-            transitionStartMs = AnimationTime.now();
-            transitionForward = forward;
-            transitionSlotHeight = outgoingHeight > 0 ? outgoingHeight
-                    : activeHeightFor(activeIndex);
-            registerForAnimation();
-        } else {
-            stopTransition();
-        }
+        // The newly active section starts fresh: no overlap with the
+        // section after it until further scrolling brings it into the
+        // push window.
+        pushOffset = 0;
 
         scroller.layoutContainer();
         stickyHost.layoutContainer();
         layoutContainer();
-        if (isInitialized()) {
-            repaint();
-        }
     }
 
     private void deactivate() {
@@ -395,112 +416,53 @@ public class StickyHeaderContainer extends Container {
             return;
         }
         applyActivation(-1);
-    }
-
-    private void registerForAnimation() {
-        Form f = getComponentForm();
-        if (f != null) {
-            f.registerAnimated(this);
+        applyPushVisuals();
+        if (isInitialized()) {
+            repaint();
         }
     }
 
-    private void stopTransition() {
-        transitionOutgoing = null;
-        stickyHost.setY(stickyHostBaseY);
-        stickyHost.getAllStyles().setOpacity(255);
-        Form f = getComponentForm();
-        if (f != null) {
-            f.deregisterAnimated(this);
-        }
-    }
-
-    private void applyTransitionStateToIncoming() {
-        if (transitionOutgoing == null) {
+    private void applyPushVisuals() {
+        if (activeIndex < 0 || pushOffset <= 0) {
             stickyHost.setY(stickyHostBaseY);
             stickyHost.getAllStyles().setOpacity(255);
+            stickyHost.setVisible(true);
             return;
         }
-        long elapsed = AnimationTime.now() - transitionStartMs;
-        if (elapsed >= transitionDurationMillis) {
-            stickyHost.setY(stickyHostBaseY);
-            stickyHost.getAllStyles().setOpacity(255);
-            return;
-        }
-        if (elapsed < 0) {
-            elapsed = 0;
-        }
-        float progress = (float) elapsed / (float) transitionDurationMillis;
-
-        if (transitionStyle == TRANSITION_SLIDE && transitionSlotHeight > 0) {
-            int direction = transitionForward ? 1 : -1;
-            int yOffset = (int) (direction * (1f - progress) * transitionSlotHeight);
-            stickyHost.setY(stickyHostBaseY + yOffset);
-            stickyHost.getAllStyles().setOpacity(255);
-        } else if (transitionStyle == TRANSITION_FADE) {
-            int alpha = (int) (255 * progress);
-            stickyHost.getAllStyles().setOpacity(alpha);
-            stickyHost.setY(stickyHostBaseY);
-        }
-    }
-
-    @Override
-    public boolean animate() {
-        if (transitionOutgoing == null) {
-            return false;
-        }
-        long elapsed = AnimationTime.now() - transitionStartMs;
-        if (elapsed >= transitionDurationMillis) {
-            stopTransition();
-            return true;
-        }
-        applyTransitionStateToIncoming();
-        return true;
-    }
-
-    @Override
-    public void paint(Graphics g) {
-        applyTransitionStateToIncoming();
-        super.paint(g);
-    }
-
-    @Override
-    protected void paintGlass(Graphics g) {
-        super.paintGlass(g);
-        if (transitionOutgoing == null) {
-            return;
-        }
-        long elapsed = AnimationTime.now() - transitionStartMs;
-        if (elapsed < 0) {
-            elapsed = 0;
-        }
-        if (elapsed >= transitionDurationMillis) {
-            return;
-        }
-        float progress = (float) elapsed / (float) transitionDurationMillis;
-
-        Style ps = getStyle();
-        int slotAbsX = getAbsoluteX() + ps.getPaddingLeft(isRTL());
-        int slotAbsY = getAbsoluteY() + ps.getPaddingTop();
-
-        if (transitionStyle == TRANSITION_FADE) {
-            int alpha = (int) (255 * (1f - progress));
-            int saved = g.getAlpha();
-            g.setAlpha(alpha);
-            g.drawImage(transitionOutgoing, slotAbsX, slotAbsY);
-            g.setAlpha(saved);
-        } else if (transitionStyle == TRANSITION_SLIDE && transitionSlotHeight > 0) {
-            int direction = transitionForward ? -1 : 1;
-            int yOffset = (int) (direction * progress * transitionSlotHeight);
-            g.drawImage(transitionOutgoing, slotAbsX, slotAbsY + yOffset);
-        }
-    }
-
-    @Override
-    protected void deinitialize() {
-        super.deinitialize();
-        Form f = getComponentForm();
-        if (f != null) {
-            f.deregisterAnimated(this);
+        int activeH = activeHeightFor(activeIndex);
+        switch (transitionStyle) {
+            case TRANSITION_SLIDE: {
+                stickyHost.setY(stickyHostBaseY - pushOffset);
+                stickyHost.getAllStyles().setOpacity(255);
+                stickyHost.setVisible(true);
+                break;
+            }
+            case TRANSITION_NONE: {
+                // Hide the pinned header so the next section, which is
+                // already rising into this slot through the scroller, is
+                // visible underneath. The swap restores visibility.
+                stickyHost.setY(stickyHostBaseY);
+                stickyHost.getAllStyles().setOpacity(255);
+                stickyHost.setVisible(false);
+                break;
+            }
+            case TRANSITION_FADE: {
+                int alpha = 255;
+                if (activeH > 0) {
+                    alpha = 255 - (pushOffset * 255) / activeH;
+                    if (alpha < 0) {
+                        alpha = 0;
+                    } else if (alpha > 255) {
+                        alpha = 255;
+                    }
+                }
+                stickyHost.setY(stickyHostBaseY);
+                stickyHost.getAllStyles().setOpacity(alpha);
+                stickyHost.setVisible(true);
+                break;
+            }
+            default:
+                break;
         }
     }
 
@@ -527,9 +489,11 @@ public class StickyHeaderContainer extends Container {
             int headerH = activeIndex >= 0 ? activeHeightFor(activeIndex) : 0;
             stickyHostBaseY = y;
             stickyHost.setX(x);
-            stickyHost.setY(y);
             stickyHost.setWidth(innerW);
             stickyHost.setHeight(headerH);
+            // Re-apply any in-flight push so the host's Y matches the
+            // current push offset relative to the freshly computed base.
+            applyPushVisuals();
         }
 
         @Override
