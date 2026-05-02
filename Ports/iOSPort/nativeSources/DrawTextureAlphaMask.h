@@ -41,6 +41,22 @@
     int y;
     int w;
     int h;
+#ifdef CN1_USE_METAL
+    // Snapshot of any RadialGradientPaint that was active when this op was
+    // queued. The mutable-graphics path's applyRadialGradientPaintMutable
+    // sets PaintOp.currentMutable synchronously and unapplyPaint clears it
+    // synchronously -- both before drainOps runs -- so reading the global
+    // paint state at execute time misses the gradient. Capturing here lets
+    // the op render the gradient correctly even after the global has been
+    // cleared.
+    BOOL hasRadialPaint;
+    int radialStartColor;
+    int radialEndColor;
+    int radialX;
+    int radialY;
+    int radialWidth;
+    int radialHeight;
+#endif
 }
 
 -(id)initWithArgs:(JAVA_LONG)pTextName color:(int)pColor alpha:(int)pAlpha x:(int)pX y:(int)pY w:(int)pW h:(int)pH;

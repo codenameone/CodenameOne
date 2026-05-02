@@ -298,6 +298,23 @@ static DrawTextureAlphaMaskOGLProgram* getOGLProgram() {
     if (textureName != 0) {
         CFRetain((CFTypeRef)(void *)(uintptr_t)textureName);
     }
+    // Snapshot the active RadialGradientPaint at queue time so the op
+    // renders the gradient even after the mutable-side unapplyPaint clears
+    // PaintOp.currentMutable. Read from currentMutable -- the screen path
+    // already queues a RadialGradientPaint op that runs in-order with
+    // execute, so its mutation happens between this op's queue and execute.
+    hasRadialPaint = NO;
+    PaintOp *snapshot = [PaintOp getCurrentMutable];
+    if (snapshot != NULL && [snapshot isKindOfClass:[RadialGradientPaint class]]) {
+        RadialGradientPaint *g = (RadialGradientPaint *)snapshot;
+        hasRadialPaint = YES;
+        radialStartColor = g.startColor;
+        radialEndColor = g.endColor;
+        radialX = g.x;
+        radialY = g.y;
+        radialWidth = g.width;
+        radialHeight = g.height;
+    }
 #endif
     return self;
 }
@@ -324,25 +341,37 @@ static DrawTextureAlphaMaskOGLProgram* getOGLProgram() {
     // IOSNative.m's nativePathRendererCreateTexture under Metal. Just bridge
     // back to the Obj-C handle (no transfer of ownership) and dispatch.
     id<MTLTexture> tex = (__bridge id<MTLTexture>)(void *)(uintptr_t)textureName;
-    // If a RadialGradientPaint is currently set, route through the radial
-    // pipeline so fillShape() inherits the gradient colour exactly like the
-    // GL path's getOGLProgram() switch above. This is what was missing on
-    // graphics-draw-gradient TL/TR (top half: radial gradients all rendered
-    // as solid black on Metal).
+    // Resolve the radial-gradient paint differently per target:
     //
-    // Screen (Global) path queues a RadialGradientPaint op that sets
-    // PaintOp.current via execute; mutable path's applyPaint() pushes the
-    // paint into PaintOp.currentMutable directly (see
-    // applyRadialGradientPaintMutable in IOSNative.m). Pick the right one
-    // based on whether this op is targeting a mutable image.
-    PaintOp *paint = (target != nil) ? [PaintOp getCurrentMutable] : [PaintOp getCurrent];
-    if (paint != NULL && [paint isKindOfClass:[RadialGradientPaint class]]) {
-        RadialGradientPaint *g = (RadialGradientPaint *)paint;
+    //   Mutable (target != nil): the Java-side applyPaint() and
+    //     unapplyPaint() invoke applyRadialGradientPaintMutable /
+    //     clearRadialGradientPaintMutable as direct C calls -- they set and
+    //     clear PaintOp.currentMutable synchronously around the queue call,
+    //     before drainOps runs. Reading PaintOp.currentMutable at execute
+    //     time is too late; use the snapshot captured at init.
+    //
+    //   Screen (target == nil): the Java-side applyPaint() invokes
+    //     applyRadialGradientPaintGlobal which queues a RadialGradientPaint
+    //     op into the same queue as this DrawTextureAlphaMask op. Its
+    //     execute sets PaintOp.current just before our execute runs, so
+    //     reading it here is correct.
+    if (target != nil && hasRadialPaint) {
         CN1MetalDrawAlphaMaskRadial(tex, x, y, w, h,
-                                    g.startColor, g.endColor,
-                                    (float)g.x, (float)g.y,
-                                    (float)g.width, (float)g.height);
+                                    radialStartColor, radialEndColor,
+                                    (float)radialX, (float)radialY,
+                                    (float)radialWidth, (float)radialHeight);
         return;
+    }
+    if (target == nil) {
+        PaintOp *paint = [PaintOp getCurrent];
+        if (paint != NULL && [paint isKindOfClass:[RadialGradientPaint class]]) {
+            RadialGradientPaint *g = (RadialGradientPaint *)paint;
+            CN1MetalDrawAlphaMaskRadial(tex, x, y, w, h,
+                                        g.startColor, g.endColor,
+                                        (float)g.x, (float)g.y,
+                                        (float)g.width, (float)g.height);
+            return;
+        }
     }
     CN1MetalDrawAlphaMask(tex, color, alpha, x, y, w, h);
     return;
