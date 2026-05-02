@@ -194,7 +194,17 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertMainSourceFile(entries, template, packageName, mainClassName, false);
         assertThemeDefaults(entries, template);
         assertLocalizationBundles(entries, template, false);
+        assertAutoLocalizationBundleStub(entries);
         assertNoTemplatePlaceholders(entries, template);
+    }
+
+    private void assertAutoLocalizationBundleStub(Map<String, byte[]> entries) {
+        // Workaround stub for the simulator AutoLocalizationBundle @im fabrication crash
+        // in shipped CN1 <= 7.0.236. Must be present on every generated project (with or
+        // without localization bundles) because enableAutoLocalizationBundle auto-creates
+        // src/main/l10n in the CSS compiler subprocess and hits the crash regardless.
+        String stub = getText(entries, "common/src/main/l10n/Bundle.properties");
+        assertContains(stub, "@im=", "Generated project must ship Bundle.properties with @im= to suppress simulator wormhole crash");
     }
 
     private void assertThemeDefaults(Map<String, byte[]> entries, Template template) {
