@@ -409,183 +409,48 @@ void CN1MetalTileImage(id<MTLTexture> texture, int alpha,
     }
 }
 
-// --------------- Text rendering (parity level) ---------------
-
-// LRU cache mapping "str|font|color" -> {MTLTexture, stringWidth, stringHeight,
-// p2w, p2h}. Capped so long-running apps don't leak memory. Phase 4 will
-// replace this with a CoreText glyph atlas; this whole-string cache is a
-// direct port of what DrawStringTextureCache does on the GL path.
-#define CN1_METAL_TEXT_CACHE_MAX 128
-typedef struct {
-    NSString *key;
-    id<MTLTexture> texture;
-    int strWidth;
-    int strHeight;
-    int p2w;
-    int p2h;
-} CN1MetalTextCacheEntry;
-static CN1MetalTextCacheEntry textCache[CN1_METAL_TEXT_CACHE_MAX];
-static int textCacheCount = 0;
-static int textCacheNextEvict = 0;
-
-static int nextPowerOf2ForText(int v) {
-    int p = 1;
-    while (p < v) p <<= 1;
-    return p;
-}
-
-static CN1MetalTextCacheEntry *findOrBuildTextTexture(NSString *str, UIFont *font, int color) {
-    NSString *key = [NSString stringWithFormat:@"%@|%p|%08x", str, font, color];
-    for (int i = 0; i < textCacheCount; i++) {
-        if ([textCache[i].key isEqualToString:key]) {
-            return &textCache[i];
-        }
-    }
-    // Not cached — rasterise. Measure via sizeWithAttributes (sizeWithFont:
-    // was deprecated long ago; the GL path still uses it, but UIKit prints
-    // a warning on newer SDKs. Keep the same measurement for consistency).
-    NSDictionary *attrs = @{ NSFontAttributeName: font };
-    CGSize sz = [str sizeWithAttributes:attrs];
-    int w = (int)ceilf((float)sz.width);
-    int h = (int)ceilf((float)font.lineHeight + 1.0f);
-    if (w <= 0 || h <= 0) return NULL;
-    int p2w = nextPowerOf2ForText(w);
-    int p2h = nextPowerOf2ForText(h);
-
-    // Rasterise into an RGBA bitmap with the colour baked in (same scheme
-    // as DrawString.m's GL branch -- fragment shader just modulates alpha).
-    CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
-    size_t bytesPerRow = 4 * (size_t)p2w;
-    void *bitmap = calloc((size_t)p2h * bytesPerRow, 1);
-    CGContextRef ctx = CGBitmapContextCreate(bitmap, p2w, p2h, 8, bytesPerRow, cs,
-        kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big);
-    CGColorSpaceRelease(cs);
-
-    // UIGraphicsPushContext only sets the current context; it does NOT flip
-    // the CTM. Without a flip, UIKit's drawAtPoint: targets CG (0,0) which
-    // is the bottom of the bitmap, and characters render upside-down in
-    // buffer memory. The GL path tolerates that because its texcoords use
-    // V=1 at the top vertex and sample bottom-to-top; Metal's V=0-at-top
-    // convention doesn't compensate. Apply a y-axis flip so text ends up
-    // at the TOP-LEFT of the buffer, right-side-up, matching the texcoords
-    // I use in CN1MetalDrawString below.
-    CGContextTranslateCTM(ctx, 0, p2h);
-    CGContextScaleCTM(ctx, 1, -1);
-    UIGraphicsPushContext(ctx);
-    UIColor *uiColor = [UIColor colorWithRed:((color >> 16) & 0xff)/255.0f
-                                       green:((color >> 8)  & 0xff)/255.0f
-                                        blue:((color)       & 0xff)/255.0f
-                                       alpha:1.0f];
-    [uiColor set];
-    [str drawAtPoint:CGPointZero withAttributes:@{ NSFontAttributeName: font,
-                                                   NSForegroundColorAttributeName: uiColor }];
-    UIGraphicsPopContext();
-
-    id<MTLDevice> device = CN1MetalDevice();
-    if (device == nil) {
-        CGContextRelease(ctx);
-        free(bitmap);
-        return NULL;
-    }
-    MTLTextureDescriptor *desc = [MTLTextureDescriptor
-        texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm
-        width:p2w height:p2h mipmapped:NO];
-    desc.usage = MTLTextureUsageShaderRead;
-    id<MTLTexture> tex = [device newTextureWithDescriptor:desc];
-    [tex replaceRegion:MTLRegionMake2D(0, 0, p2w, p2h)
-           mipmapLevel:0
-             withBytes:bitmap
-           bytesPerRow:bytesPerRow];
-
-    CGContextRelease(ctx);
-    free(bitmap);
-
-    // Cache with simple round-robin eviction.
-    int slot;
-    if (textCacheCount < CN1_METAL_TEXT_CACHE_MAX) {
-        slot = textCacheCount++;
-    } else {
-        slot = textCacheNextEvict;
-        textCacheNextEvict = (textCacheNextEvict + 1) % CN1_METAL_TEXT_CACHE_MAX;
-        // Release the +1 retains held by the slot before overwriting:
-        // key was [key copy] (+1) and texture was newTextureWithDescriptor
-        // (+1). Skipping these turns every eviction into a leak of one
-        // string + one MTLTexture under MRR.
-#ifndef CN1_USE_ARC
-        [textCache[slot].key release];
-        [textCache[slot].texture release];
-#endif
-        textCache[slot].key = nil;
-        textCache[slot].texture = nil;
-    }
-    textCache[slot].key = [key copy];
-    textCache[slot].texture = tex;
-    textCache[slot].strWidth = w;
-    textCache[slot].strHeight = h;
-    textCache[slot].p2w = p2w;
-    textCache[slot].p2h = p2h;
-    return &textCache[slot];
-}
-
-// Phase-2 fallback: same whole-string LRU rendering kept for the case where
-// the Phase-4 glyph atlas can't be created (no MTLDevice etc.) so text
-// always shows up even if the atlas path is unavailable.
-static void drawStringWholeStringFallback(NSString *str, UIFont *font, int color, int alpha, int x, int y) {
-    CN1MetalTextCacheEntry *entry = findOrBuildTextTexture(str, font, color);
-    if (entry == NULL || entry->texture == nil) return;
-    float a = alpha / 255.0f;
-    simd_float4 tint = (simd_float4){ a, a, a, a };
-    float vertices[8] = {
-        (float)x,                      (float)y,
-        (float)(x + entry->strWidth),  (float)y,
-        (float)x,                      (float)(y + entry->strHeight),
-        (float)(x + entry->strWidth),  (float)(y + entry->strHeight)
-    };
-    float uMax = (float)entry->strWidth / (float)entry->p2w;
-    float vMax = (float)entry->strHeight / (float)entry->p2h;
-    float texcoords[8] = {
-        0.0f, 0.0f,
-        uMax, 0.0f,
-        0.0f, vMax,
-        uMax, vMax
-    };
-    drawQuad(CN1MetalPipelineTexturedRGBA, vertices, texcoords, tint, entry->texture);
-}
+// --------------- Text rendering (CoreText glyph atlas) ---------------
+//
+// Per the Metal-port plan's Phase 4: shape the string via CoreText and
+// emit one alpha-mask quad per glyph against the per-(font, pointSize)
+// R8 atlas owned by CN1MetalGlyphAtlas. There is no whole-string CG-
+// rasterise fallback -- the plan was explicit ("Delete DrawStringTextureCache
+// usage on the Metal path -- no more whole-string LRU"). If the atlas
+// or CTLine cannot be built we log and skip the string; that exposes
+// the failure rather than papering over it with a different pipeline
+// that would silently mask the bug.
 
 void CN1MetalDrawString(NSString *str, UIFont *font, int color, int alpha, int x, int y) {
     if (str == nil || font == nil || str.length == 0) return;
 
-    // Phase 4: shape the string with CTLine and emit one alpha-mask quad
-    // per glyph against a per-(font, point-size) R8 atlas. Falls back to
-    // the whole-string LRU path if the atlas can't be created (no
-    // MTLDevice, CTFont creation failed, etc.) so text always renders.
     CN1MetalGlyphAtlas *atlas = [CN1MetalGlyphAtlas atlasForFont:font];
     if (atlas == nil) {
-        drawStringWholeStringFallback(str, font, color, alpha, x, y);
+        NSLog(@"CN1MetalDrawString: no atlas available for font %@ pt=%g; string skipped",
+              font.fontName, (double)font.pointSize);
         return;
     }
 
     // Pass the UIFont directly as the kCTFontAttributeName value. CoreText
     // accepts UIFont here and uses it to drive glyph mapping and positions
-    // — keeping the CTLine completely consistent with how UIKit's
-    // drawAtPoint:withAttributes: would shape the same string in the
-    // whole-string fallback path. Bridging through atlas.ctFont (built via
-    // CTFontCreateWithFontDescriptor) was producing slightly different
-    // metrics for the first DrawString call after a fresh form, which
-    // surfaced as the TL panel of graphics-draw-string-decorated rendering
-    // larger/wider glyphs than TR/BL/BR despite identical Java state.
+    // -- keeping the CTLine completely consistent with how UIKit's
+    // drawAtPoint:withAttributes: shapes the same string. Bridging through
+    // atlas.ctFont (built via CTFontCreateWithFontDescriptor) was producing
+    // slightly different metrics for the first DrawString call after a
+    // fresh form, which surfaced as the TL panel of graphics-draw-string-
+    // decorated rendering larger/wider glyphs than TR/BL/BR despite
+    // identical Java state.
     NSDictionary *attrs = @{ (__bridge NSString *)kCTFontAttributeName: font };
     CFAttributedStringRef attrStr = CFAttributedStringCreate(NULL,
                                                              (__bridge CFStringRef)str,
                                                              (__bridge CFDictionaryRef)attrs);
     if (attrStr == NULL) {
-        drawStringWholeStringFallback(str, font, color, alpha, x, y);
+        NSLog(@"CN1MetalDrawString: CFAttributedStringCreate failed for \"%@\"; string skipped", str);
         return;
     }
     CTLineRef line = CTLineCreateWithAttributedString(attrStr);
     CFRelease(attrStr);
     if (line == NULL) {
-        drawStringWholeStringFallback(str, font, color, alpha, x, y);
+        NSLog(@"CN1MetalDrawString: CTLineCreateWithAttributedString failed for \"%@\"; string skipped", str);
         return;
     }
 
@@ -1251,14 +1116,17 @@ BOOL CN1MetalReadMutableImagePixels(GLUIImage *image, int *outARGB,
 extern void CN1MetalGlyphAtlasReleaseAll(void);
 
 void CN1MetalReleaseCaches(void) {
-    for (int i = 0; i < textCacheCount; i++) {
-        textCache[i].key = nil;
-        textCache[i].texture = nil;
-    }
-    textCacheCount = 0;
-    textCacheNextEvict = 0;
-
+    // Whole-string text cache no longer exists -- text rendering goes
+    // exclusively through the CN1MetalGlyphAtlas (Phase 4). Drop the
+    // gradient cache (the retains it holds were +1 from
+    // newTextureWithDescriptor in findOrBuildGradTexture; release them
+    // properly here so memory-warning recovery actually frees the
+    // bitmap-backed gradient textures rather than just dropping the
+    // pointer).
     for (int i = 0; i < gradCacheCount; i++) {
+#ifndef CN1_USE_ARC
+        [gradCache[i].texture release];
+#endif
         gradCache[i].texture = nil;
     }
     gradCacheCount = 0;
