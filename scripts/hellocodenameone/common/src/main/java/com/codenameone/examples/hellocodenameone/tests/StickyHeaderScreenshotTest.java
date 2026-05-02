@@ -6,9 +6,9 @@ import com.codename1.ui.animations.Motion;
 
 /// Fast-scroll demo: drives the container's scroll position across the full
 /// content range over the capture duration so each frame samples a different
-/// scroll offset. With a long transition duration relative to the per-frame
-/// scroll delta the slide animations are still in flight when each frame is
-/// captured, surfacing the staged header replacement.
+/// scroll offset. With scroll-driven transitions, frames whose scroll lands
+/// inside a section's push window will surface the partial overlap between
+/// the outgoing pinned header and the incoming one.
 public class StickyHeaderScreenshotTest extends AbstractStickyHeaderScreenshotTest {
     private Motion scrollMotion;
 
@@ -20,11 +20,6 @@ public class StickyHeaderScreenshotTest extends AbstractStickyHeaderScreenshotTe
     @Override
     protected void configureTransition(StickyHeaderContainer sticky) {
         sticky.setTransitionStyle(StickyHeaderContainer.TRANSITION_SLIDE);
-        // Pick a duration shorter than the per-frame scroll delta
-        // (900ms / 5 ≈ 180ms) so most frames capture the post-transition
-        // settled state, with the occasional in-flight overlap when scroll
-        // crosses a section boundary mid-frame.
-        sticky.setTransitionDurationMillis(150);
     }
 
     @Override

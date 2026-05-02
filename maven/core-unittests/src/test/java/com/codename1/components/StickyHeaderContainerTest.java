@@ -4,12 +4,11 @@ import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
-import com.codename1.ui.animations.AnimationTime;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.Style;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -21,11 +20,6 @@ class StickyHeaderContainerTest extends UITestBase {
     private static final int HEADER_HEIGHT = 50;
     private static final int CONTENT_HEIGHT = 200;
     private static final int SECTION_STRIDE = HEADER_HEIGHT + CONTENT_HEIGHT;
-
-    @org.junit.jupiter.api.AfterEach
-    void resetAnimationTime() {
-        AnimationTime.reset();
-    }
 
     @FormTest
     void addSectionRejectsNullHeader() {
@@ -149,49 +143,118 @@ class StickyHeaderContainerTest extends UITestBase {
     }
 
     @FormTest
-    void slideTransitionStartsOnActiveChange() {
+    void pushProgressTracksScrollPositionWithinWindow() {
         StickyHeaderContainer sticky = build(3);
-        sticky.setTransitionDurationMillis(200);
 
-        AnimationTime.setTime(1000L);
-        sticky.setScrollPosition(10);
+        // Pin section 0 well clear of the next boundary: no overlap yet.
+        sticky.setScrollPosition(100);
         sticky.updateSticky();
-        // First activation has no outgoing snapshot so no transition runs.
-        assertTrue(sticky.getTransitionProgress() == 1f);
-
-        sticky.setScrollPosition(SECTION_STRIDE + 10);
-        sticky.updateSticky();
-        // Second activation starts a transition because there is an outgoing
-        // header to swap.
-        assertTrue(sticky.isTransitionInProgress(), "expected transition after section swap");
+        assertEquals(0, sticky.getActiveSectionIndex());
+        assertFalse(sticky.isTransitionInProgress(),
+                "no overlap when next header is far below the slot");
         assertEquals(0f, sticky.getTransitionProgress(), 0.001f);
 
-        AnimationTime.setTime(1100L);
-        assertEquals(0.5f, sticky.getTransitionProgress(), 0.05f);
+        // Section 1's header sits at Y = SECTION_STRIDE (250). It enters
+        // the push window when scrollY > SECTION_STRIDE - HEADER_HEIGHT
+        // (i.e. the header's top is within the slot height).
+        sticky.setScrollPosition(SECTION_STRIDE - HEADER_HEIGHT + 10);
+        sticky.updateSticky();
+        assertEquals(0, sticky.getActiveSectionIndex(),
+                "the swap shouldn't happen until next.relY <= 0");
+        assertTrue(sticky.isTransitionInProgress(),
+                "expected push to be in flight inside the window");
+        assertEquals(10f / HEADER_HEIGHT, sticky.getTransitionProgress(), 0.001f);
 
-        AnimationTime.setTime(1300L);
-        assertTrue(sticky.getTransitionProgress() >= 1f);
+        sticky.setScrollPosition(SECTION_STRIDE - HEADER_HEIGHT + 25);
+        sticky.updateSticky();
+        assertEquals(25f / HEADER_HEIGHT, sticky.getTransitionProgress(), 0.001f);
+
+        sticky.setScrollPosition(SECTION_STRIDE - HEADER_HEIGHT + 40);
+        sticky.updateSticky();
+        assertEquals(40f / HEADER_HEIGHT, sticky.getTransitionProgress(), 0.001f);
+
+        // Cross the boundary and section 1 takes over; no new overlap with
+        // section 2 yet, so the push offset resets to 0.
+        sticky.setScrollPosition(SECTION_STRIDE + 10);
+        sticky.updateSticky();
+        assertEquals(1, sticky.getActiveSectionIndex());
+        assertFalse(sticky.isTransitionInProgress());
+        assertEquals(0f, sticky.getTransitionProgress(), 0.001f);
     }
 
     @FormTest
-    void noneStyleSkipsTransitionAnimation() {
+    void slidePushShiftsStickyHostUp() {
+        StickyHeaderContainer sticky = build(3);
+        sticky.setTransitionStyle(StickyHeaderContainer.TRANSITION_SLIDE);
+
+        sticky.setScrollPosition(100);
+        sticky.updateSticky();
+        int baseY = sticky.getStickyHost().getY();
+
+        sticky.setScrollPosition(SECTION_STRIDE - HEADER_HEIGHT + 30);
+        sticky.updateSticky();
+        // pushOffset = 30 → host shifts up by 30.
+        assertEquals(baseY - 30, sticky.getStickyHost().getY(),
+                "slide style must shift the host up by the push offset");
+        assertEquals(255, sticky.getStickyHost().getStyle().getOpacity(),
+                "slide style keeps the host fully opaque");
+        assertTrue(sticky.getStickyHost().isVisible(),
+                "slide style keeps the host visible during the push");
+    }
+
+    @FormTest
+    void noneStyleHidesStickyHostDuringOverlap() {
         StickyHeaderContainer sticky = build(3);
         sticky.setTransitionStyle(StickyHeaderContainer.TRANSITION_NONE);
 
-        sticky.setScrollPosition(10);
+        sticky.setScrollPosition(100);
         sticky.updateSticky();
+        assertTrue(sticky.getStickyHost().isVisible(),
+                "host stays visible when there is no overlap");
+
+        // Inside the push window: NONE hides the host so the rising
+        // section header in the scroller is what the user sees.
+        sticky.setScrollPosition(SECTION_STRIDE - HEADER_HEIGHT + 20);
+        sticky.updateSticky();
+        assertFalse(sticky.getStickyHost().isVisible(),
+                "NONE must hide the host so the rising header covers the slot");
+
+        // Past the boundary: new section is pinned, host shows again.
         sticky.setScrollPosition(SECTION_STRIDE + 10);
         sticky.updateSticky();
-
         assertEquals(1, sticky.getActiveSectionIndex());
-        assertTrue(sticky.getTransitionProgress() == 1f,
-                "TRANSITION_NONE must not start an animation");
+        assertTrue(sticky.getStickyHost().isVisible(),
+                "after the swap the host is visible with the new header");
+    }
+
+    @FormTest
+    void fadeStyleReducesStickyHostOpacityWithPush() {
+        StickyHeaderContainer sticky = build(3);
+        sticky.setTransitionStyle(StickyHeaderContainer.TRANSITION_FADE);
+
+        sticky.setScrollPosition(100);
+        sticky.updateSticky();
+        assertEquals(255, sticky.getStickyHost().getStyle().getOpacity(),
+                "fully opaque outside the push window");
+
+        sticky.setScrollPosition(SECTION_STRIDE - HEADER_HEIGHT + 25);
+        sticky.updateSticky();
+        // pushOffset = 25 of 50 → alpha = 255 - 25*255/50 = 127 (or 128 by rounding)
+        int alpha = sticky.getStickyHost().getStyle().getOpacity();
+        assertTrue(alpha > 100 && alpha < 160,
+                "fade alpha should be roughly half-way through, was " + alpha);
+        assertTrue(sticky.getStickyHost().isVisible());
+
+        // After the swap: full opacity again on the new header.
+        sticky.setScrollPosition(SECTION_STRIDE + 10);
+        sticky.updateSticky();
+        assertEquals(1, sticky.getActiveSectionIndex());
+        assertEquals(255, sticky.getStickyHost().getStyle().getOpacity());
     }
 
     @FormTest
     void scrollingPastSeveralBoundariesSettlesOnLast() {
         StickyHeaderContainer sticky = build(4);
-        sticky.setTransitionDurationMillis(0);
 
         sticky.setScrollPosition(SECTION_STRIDE * 3 + 10);
         sticky.updateSticky();
