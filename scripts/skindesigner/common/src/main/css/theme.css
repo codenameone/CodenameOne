@@ -719,9 +719,23 @@ SkinDesignerDeviceCard {
     padding: 2.4mm 2.6mm;
     margin: 1mm;
 }
+SkinDesignerDeviceCardHover {
+    cn1-round-border: 2mm;
+    background: #f3f7ff;
+    border: 1px solid #2f6bff;
+    padding: 2.4mm 2.6mm;
+    margin: 1mm;
+}
 SkinDesignerDeviceCardDark {
     cn1-round-border: 2mm;
     background: #102b66;
+    padding: 2.4mm 2.6mm;
+    margin: 1mm;
+}
+SkinDesignerDeviceCardHoverDark {
+    cn1-round-border: 2mm;
+    background: #163575;
+    border: 1px solid #4d86ff;
     padding: 2.4mm 2.6mm;
     margin: 1mm;
 }
@@ -731,9 +745,23 @@ SkinDesignerDeviceCardSelected {
     padding: 2.4mm 2.6mm;
     margin: 1mm;
 }
+SkinDesignerDeviceCardSelectedHover {
+    cn1-round-border: 2mm;
+    background: #d8e6ff;
+    border: 1px solid #2f6bff;
+    padding: 2.4mm 2.6mm;
+    margin: 1mm;
+}
 SkinDesignerDeviceCardSelectedDark {
     cn1-round-border: 2mm;
     background: #1c3a7a;
+    padding: 2.4mm 2.6mm;
+    margin: 1mm;
+}
+SkinDesignerDeviceCardSelectedHoverDark {
+    cn1-round-border: 2mm;
+    background: #244790;
+    border: 1px solid #4d86ff;
     padding: 2.4mm 2.6mm;
     margin: 1mm;
 }
@@ -802,18 +830,25 @@ SkinDesignerSourceRow {
 }
 SkinDesignerSourceRowDark { background: transparent; padding: 4mm 6mm; }
 
-/* Source cards — rounded body, blue ring on press (we don't have a true
- * hover state in the CN1 CSS subset, so .pressed is the closest visual
- * cue; on desktop the click-and-hold still highlights). */
+/* Source cards — rounded body. SkinDesigner.java's pointerHover override
+ * swaps the wrapper's UIID to *Hover variants on cursor enter so we get a
+ * true hover effect (CN1's CSS subset has no :hover state). */
 SkinDesignerSourceCard {
     cn1-round-border: 3mm;
     background: #ffffff;
     padding: 6mm 4mm;
     margin: 2mm;
 }
-SkinDesignerSourceCard.pressed {
+SkinDesignerSourceCardHover {
     cn1-round-border: 3mm;
     background: #f3f7ff;
+    border: 2px solid #2f6bff;
+    padding: 6mm 4mm;
+    margin: 2mm;
+}
+SkinDesignerSourceCard.pressed {
+    cn1-round-border: 3mm;
+    background: #e8f0ff;
     padding: 6mm 4mm;
     margin: 2mm;
 }
@@ -823,9 +858,16 @@ SkinDesignerSourceCardDark {
     padding: 6mm 4mm;
     margin: 2mm;
 }
-SkinDesignerSourceCardDark.pressed {
+SkinDesignerSourceCardHoverDark {
     cn1-round-border: 3mm;
     background: #163575;
+    border: 2px solid #4d86ff;
+    padding: 6mm 4mm;
+    margin: 2mm;
+}
+SkinDesignerSourceCardDark.pressed {
+    cn1-round-border: 3mm;
+    background: #1c3a7a;
     padding: 6mm 4mm;
     margin: 2mm;
 }

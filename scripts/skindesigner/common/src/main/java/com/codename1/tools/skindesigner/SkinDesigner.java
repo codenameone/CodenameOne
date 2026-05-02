@@ -75,13 +75,32 @@ public class SkinDesigner extends Lifecycle {
     private Container stepperRow;
     private Container wizardNav;
 
+    /** Containers that should swap their UIID to {@code <uiid>Hover} while
+     *  the cursor is over them. Empty on touch-only platforms (no hover). */
+    private final List<Container> hoverCards = new ArrayList<>();
+    private Container hoveredCard;
+
     @Override
     public void runApp() {
         CN.setProperty("platformHint.javascript.beforeUnloadMessage", null);
         websiteDarkMode = readThemeFromUrl();
         Display.getInstance().setDarkMode(websiteDarkMode);
 
-        form = new Form("Skin Designer", new BorderLayout());
+        // Subclass so we can intercept hover events at the form level. CN1
+        // doesn't have a CSS :hover state, and overriding pointerHover on a
+        // child is unreliable when an overlay Button sits on top (the
+        // overlay swallows the hover dispatch). Walking a registry on each
+        // hover event lets us toggle the wrapper's UIID precisely once when
+        // crossing card boundaries.
+        form = new Form("Skin Designer", new BorderLayout()) {
+            @Override
+            public void pointerHover(int[] x, int[] y) {
+                super.pointerHover(x, y);
+                if (x != null && x.length > 0 && y != null && y.length > 0) {
+                    updateHoverState(x[0], y[0]);
+                }
+            }
+        };
         form.setUIID("SkinDesignerForm");
         form.setTitle("");
         // The Form's default Toolbar otherwise sits above our custom topbar
@@ -156,6 +175,8 @@ public class SkinDesigner extends Lifecycle {
         source = null;
         skin = new SkinModel();
         bodyImage = null;
+        lastSkinBytes = null;
+        lastSkinFile = null;
         Storage.getInstance().deleteStorageFile(IMAGE_STORAGE);
         Preferences.delete(PREF_STEP);
         Preferences.delete(PREF_DEVICE);
@@ -284,6 +305,7 @@ public class SkinDesigner extends Lifecycle {
         if (device != null && (skin.name == null || skin.name.isEmpty())) {
             skin.resetForDevice(device);
         }
+        clearHoverState();
         bodyHolder.removeAll();
         switch (step) {
             case STEP_DEVICE:
@@ -544,6 +566,7 @@ public class SkinDesigner extends Lifecycle {
         wrapper.putClientProperty("deviceId", d.id);
         wrapper.putClientProperty("card", card);
         wrapper.putClientProperty("check", check);
+        registerHover(wrapper);
         return wrapper;
     }
 
@@ -573,11 +596,16 @@ public class SkinDesigner extends Lifecycle {
             Component c = container.getComponentAt(i);
             Object id = c.getClientProperty("deviceId");
             if (id instanceof String) {
-                Container card = (Container) c.getClientProperty("card");
                 Component check = (Component) c.getClientProperty("check");
                 boolean sel = id.equals(selectedId);
-                if (card != null) {
-                    card.setUIID(sel ? "SkinDesignerDeviceCardSelected" : "SkinDesignerDeviceCard");
+                // makeClickable moved the visible UIID to the wrapper (`c`),
+                // so toggle there. Update baseUIID too so hover swaps onto
+                // the right variant.
+                String base = sel ? "SkinDesignerDeviceCardSelected" : "SkinDesignerDeviceCard";
+                c.putClientProperty("baseUIID", base);
+                String visible = (c == hoveredCard) ? base + "Hover" : base;
+                if (!visible.equals(c.getUIID())) {
+                    c.setUIID(visible);
                 }
                 if (check != null) {
                     check.setVisible(sel);
@@ -614,6 +642,61 @@ public class SkinDesigner extends Lifecycle {
         overlay.addActionListener(listener);
         layered.add(overlay);
         return layered;
+    }
+
+    /**
+     * Registers a clickable card so the form's pointerHover override toggles
+     * its UIID to {@code <uiid>Hover} while the cursor is over it. Stores the
+     * base UIID on the component itself so we can restore it cleanly even if
+     * a later state change rewrites it.
+     */
+    private void registerHover(Container card) {
+        card.putClientProperty("baseUIID", card.getUIID());
+        hoverCards.add(card);
+    }
+
+    /**
+     * Called from the subclassed Form's pointerHover. Walks {@link #hoverCards}
+     * once per hover event, swaps UIIDs on whichever card the cursor entered
+     * or left.
+     */
+    private void updateHoverState(int x, int y) {
+        if (hoverCards.isEmpty()) {
+            return;
+        }
+        Container target = null;
+        for (int i = 0; i < hoverCards.size(); i++) {
+            Container c = hoverCards.get(i);
+            if (c.getParent() != null && c.contains(x, y)) {
+                target = c;
+                break;
+            }
+        }
+        if (target == hoveredCard) {
+            return;
+        }
+        if (hoveredCard != null) {
+            String base = (String) hoveredCard.getClientProperty("baseUIID");
+            if (base != null) {
+                hoveredCard.setUIID(base);
+                hoveredCard.repaint();
+            }
+        }
+        hoveredCard = target;
+        if (hoveredCard != null) {
+            String base = (String) hoveredCard.getClientProperty("baseUIID");
+            if (base != null) {
+                hoveredCard.setUIID(base + "Hover");
+                hoveredCard.repaint();
+            }
+        }
+    }
+
+    /** Drop hover registrations whenever we rebuild a step so we don't leak
+     *  stale references to detached containers. */
+    private void clearHoverState() {
+        hoverCards.clear();
+        hoveredCard = null;
     }
 
     // ====================================================================
@@ -694,7 +777,7 @@ public class SkinDesigner extends Lifecycle {
         p.setRows(3);
         card.add(p);
 
-        return makeClickable(card, e -> {
+        Container wrapper = makeClickable(card, e -> {
             source = sourceId;
             if (SkinModel.SOURCE_BLANK.equals(sourceId)) {
                 skin.cutouts.clear();
@@ -709,6 +792,8 @@ public class SkinDesigner extends Lifecycle {
             }
             goToStep(STEP_EDIT);
         });
+        registerHover(wrapper);
+        return wrapper;
     }
 
     // ====================================================================
@@ -808,7 +893,15 @@ public class SkinDesigner extends Lifecycle {
         finish.setUIID("SkinDesignerPrimaryButton");
         FontImage.setMaterialIcon(finish, FontImage.MATERIAL_CHEVRON_RIGHT);
         finish.setTextPosition(Component.LEFT);
-        finish.addActionListener(e -> goToStep(STEP_DONE));
+        finish.addActionListener(e -> {
+            // Build + save + trigger the download from this direct click
+            // handler so the browser sees a user-gesture chain. If we wait
+            // for buildDoneStep() to do it, the browser may have lost the
+            // gesture context by the time Display.execute fires (especially
+            // after the heavy skin-image generation).
+            saveSkinFromUserGesture();
+            goToStep(STEP_DONE);
+        });
 
         Container foot = new Container(new BorderLayout());
         foot.setUIID("SkinDesignerSidebarFoot");
@@ -1142,28 +1235,39 @@ public class SkinDesigner extends Lifecycle {
     private byte[] lastSkinBytes;
     private String lastSkinFile;
 
-    private Container buildDoneStep() {
-        // Build the .skin file once when arriving at this step. We keep it on
-        // disk so reloading the page doesn't lose it; we also keep the bytes
-        // in memory so the user can click Save again to re-download.
+    /**
+     * Generates the .skin bytes, persists them to FileSystemStorage and
+     * triggers {@link Display#execute(String)} to open the browser's
+     * download dialog. MUST be called from a direct user-gesture (e.g. a
+     * Button action listener); browsers block downloads triggered from
+     * deferred / async code.
+     */
+    private void saveSkinFromUserGesture() {
         byte[] data = createSkinBytes();
-        boolean savedOk = false;
-        String outPath = null;
-        if (data != null) {
-            FileSystemStorage fs = FileSystemStorage.getInstance();
-            outPath = fs.getAppHomePath() + sanitize(skin.name) + ".skin";
-            try (OutputStream os = fs.openOutputStream(outPath)) {
-                os.write(data);
-                savedOk = true;
-                lastSkinBytes = data;
-                lastSkinFile = outPath;
-                // JS port: triggers the browser's download dialog.
-                Display.getInstance().execute(outPath);
-            } catch (IOException err) {
-                Log.e(err);
-                ToastBar.showErrorMessage("Error saving skin: " + err);
-            }
+        if (data == null) {
+            // ToastBar already shown by createSkinBytes() on failure.
+            return;
         }
+        FileSystemStorage fs = FileSystemStorage.getInstance();
+        String outPath = fs.getAppHomePath() + sanitize(skin.name) + ".skin";
+        try (OutputStream os = fs.openOutputStream(outPath)) {
+            os.write(data);
+            lastSkinBytes = data;
+            lastSkinFile = outPath;
+            // Calling execute() here, synchronously inside the Finish click
+            // handler, keeps us inside the browser's user-gesture window so
+            // the download dialog actually fires. (The earlier auto-save in
+            // buildDoneStep() ran one event-loop tick later — long enough
+            // for the gesture context to expire — and the popup was blocked.)
+            Display.getInstance().execute(outPath);
+        } catch (IOException err) {
+            Log.e(err);
+            ToastBar.showErrorMessage("Error saving skin: " + err);
+        }
+    }
+
+    private Container buildDoneStep() {
+        boolean savedOk = lastSkinBytes != null && lastSkinFile != null;
 
         Container root = new Container(new BoxLayout(BoxLayout.Y_AXIS));
         root.setUIID("SkinDesignerDoneRoot");
@@ -1180,11 +1284,16 @@ public class SkinDesigner extends Lifecycle {
         h1.setUIID("SkinDesignerH1");
         root.add(FlowLayout.encloseCenter(h1));
 
-        Label msg = new Label(savedOk
-                ? "Your skin has been saved locally. You can go back and tweak it, or start a new one."
-                : "Your skin is ready. Use the buttons below to adjust or start a new one.");
+        TextArea msg = new TextArea(savedOk
+                ? "Your skin file has been generated. If your browser blocked "
+                        + "the download, click \"Download skin\" below to save it again."
+                : "Click \"Download skin\" to generate and save your .skin file.");
         msg.setUIID("SkinDesignerSub");
-        root.add(FlowLayout.encloseCenter(msg));
+        msg.setEditable(false);
+        msg.setFocusable(false);
+        msg.setGrowByContent(true);
+        msg.setRows(2);
+        root.add(msg);
 
         Container summary = new Container(new BoxLayout(BoxLayout.Y_AXIS));
         summary.setUIID("SkinDesignerSummary");
@@ -1195,25 +1304,28 @@ public class SkinDesigner extends Lifecycle {
         summary.add(summaryRow("Source", source));
         root.add(FlowLayout.encloseCenter(summary));
 
+        // Big primary "Download skin" button — the only reliably user-gesture
+        // path on browsers that blocked the auto-trigger from Finish.
+        Button download = new Button("Download skin");
+        download.setUIID("SkinDesignerPrimaryButton");
+        FontImage.setMaterialIcon(download, FontImage.MATERIAL_FILE_DOWNLOAD);
+        download.addActionListener(e -> {
+            // If we already have generated bytes, just re-fire the download
+            // (also from a direct gesture). Otherwise generate now.
+            if (lastSkinFile != null) {
+                Display.getInstance().execute(lastSkinFile);
+            } else {
+                saveSkinFromUserGesture();
+            }
+        });
+
         Button back = new Button("Back to editor");
         back.setUIID("SkinDesignerSecondaryButton");
         FontImage.setMaterialIcon(back, FontImage.MATERIAL_CHEVRON_LEFT);
         back.addActionListener(e -> goToStep(STEP_EDIT));
 
-        // Re-trigger the download dialog. Useful when the browser blocked
-        // the original auto-download or when the user wants to save again.
-        Button download = new Button(savedOk ? "Save again" : "Try saving");
-        download.setUIID("SkinDesignerSecondaryButton");
-        FontImage.setMaterialIcon(download, FontImage.MATERIAL_FILE_DOWNLOAD);
-        download.setEnabled(lastSkinBytes != null && lastSkinFile != null);
-        download.addActionListener(e -> {
-            if (lastSkinFile != null) {
-                Display.getInstance().execute(lastSkinFile);
-            }
-        });
-
         Button restartBtn = new Button("Make another skin");
-        restartBtn.setUIID("SkinDesignerPrimaryButton");
+        restartBtn.setUIID("SkinDesignerSecondaryButton");
         FontImage.setMaterialIcon(restartBtn, FontImage.MATERIAL_REFRESH);
         restartBtn.addActionListener(e -> restart());
 
