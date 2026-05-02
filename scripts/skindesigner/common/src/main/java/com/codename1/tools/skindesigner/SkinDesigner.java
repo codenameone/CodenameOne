@@ -83,6 +83,10 @@ public class SkinDesigner extends Lifecycle {
         form = new Form("Skin Designer", new BorderLayout());
         form.setUIID("SkinDesignerForm");
         form.setTitle("");
+        // The Form's default Toolbar otherwise sits above our custom topbar
+        // showing an empty title strip — hide it so the topbar is the only
+        // header.
+        form.getToolbar().setHidden(true);
 
         loadState();
 
@@ -165,8 +169,9 @@ public class SkinDesigner extends Lifecycle {
     // ====================================================================
 
     private Container buildHeader() {
-        Label logo = new Label("CN1");
+        Label logo = new Label();
         logo.setUIID("SkinDesignerBrandLogo");
+        FontImage.setMaterialIcon(logo, FontImage.MATERIAL_PHONE_IPHONE);
         Label title = new Label("Skin Designer");
         title.setUIID("SkinDesignerBrandTitle");
         Container brand = BoxLayout.encloseX(logo, title);
@@ -195,23 +200,33 @@ public class SkinDesigner extends Lifecycle {
         String[] labels = { "Device", "Start from", "Editor", "Save" };
         for (int i = 0; i < labels.length; i++) {
             if (i > 0) {
-                Label sep = new Label(" ");
-                sep.setUIID("SkinDesignerStepperSep");
-                stepperRow.add(sep);
+                stepperRow.add(buildStepperSep());
             }
-            String state = i == step ? "Active" : (i < step ? "Done" : "Pending");
-            Label num = new Label(i < step ? "" : String.valueOf(i + 1));
-            num.setUIID("SkinDesignerStepperNum" + state);
-            if (i < step) {
-                FontImage.setMaterialIcon(num, FontImage.MATERIAL_CHECK);
-            }
+            int state = (i == step) ? CircleBadge.STATE_ACTIVE
+                    : (i < step ? CircleBadge.STATE_DONE : CircleBadge.STATE_PENDING);
+            CircleBadge badge = new CircleBadge(i + 1, state, websiteDarkMode);
+            String labelUiid = (i == step) ? "SkinDesignerStepperLabelActive"
+                    : (i < step ? "SkinDesignerStepperLabelDone" : "SkinDesignerStepperLabelPending");
             Label text = new Label(labels[i]);
-            text.setUIID("SkinDesignerStepperLabel" + state);
-            Container item = BoxLayout.encloseX(num, text);
-            item.setUIID("SkinDesignerStepperItem" + state);
+            text.setUIID(labelUiid);
+            Container item = BoxLayout.encloseX(badge, text);
+            String itemUiid = (i == step) ? "SkinDesignerStepperItemActive"
+                    : (i < step ? "SkinDesignerStepperItemDone" : "SkinDesignerStepperItemPending");
+            item.setUIID(itemUiid);
             stepperRow.add(item);
         }
         stepperRow.revalidate();
+    }
+
+    /** A wide, short horizontal line between stepper items. The component is
+     *  a colored block (no custom paint), sized via UIID, so BoxLayout always
+     *  draws a horizontal bar regardless of how it tries to stretch us. */
+    private Component buildStepperSep() {
+        Label sep = new Label(" ");
+        sep.setUIID("SkinDesignerStepperSep");
+        sep.setPreferredW(CN.convertToPixels(6));
+        sep.setPreferredH(CN.convertToPixels(0.5f));
+        return sep;
     }
 
     private void rebuildWizardNav() {
@@ -295,6 +310,15 @@ public class SkinDesigner extends Lifecycle {
     //  Step 0 — pick device
     // ====================================================================
 
+    /** Cap on cards rendered at once. The full DB has 5000+ entries; rendering
+     *  them all on the EDT freezes the UI for several seconds. Users narrow
+     *  via search/filter to find what's missing. Kept low so even slow
+     *  platforms stay responsive on a filter switch. */
+    private static final int DEVICE_GRID_LIMIT = 60;
+
+    private Label deviceCountLabel;
+    private UITimer searchDebounce;
+
     private Container buildDeviceStep() {
         Container root = new Container(new BorderLayout());
         root.setUIID("SkinDesignerStepRoot");
@@ -322,7 +346,18 @@ public class SkinDesigner extends Lifecycle {
         grid.setUIID("SkinDesignerDeviceGrid");
         grid.setScrollableY(true);
 
+        deviceCountLabel = new Label("");
+        deviceCountLabel.setUIID("SkinDesignerEmptyHint");
+
         Runnable refresh = () -> rebuildDeviceGrid(grid, search.getText(), activeFilter[0]);
+
+        // Debounce search keystrokes so we don't rebuild 5k cards on each char.
+        Runnable debouncedRefresh = () -> {
+            if (searchDebounce != null) {
+                searchDebounce.cancel();
+            }
+            searchDebounce = UITimer.timer(180, false, form, refresh);
+        };
 
         for (int i = 0; i < filterIds.length; i++) {
             final String id = filterIds[i];
@@ -333,16 +368,21 @@ public class SkinDesigner extends Lifecycle {
                 for (int j = 0; j < filters.length; j++) {
                     filters[j].setUIID(filterIds[j].equals(id) ? "SkinDesignerFilterTagActive" : "SkinDesignerFilterTag");
                 }
-                refresh.run();
+                // Repaint the chip change immediately, then defer the (slow)
+                // grid rebuild to the next event-loop tick so the press
+                // visual lands first.
+                filterRow.revalidate();
+                CN.callSerially(refresh);
             });
             filters[i] = b;
             filterRow.add(b);
         }
 
         search.addActionListener(e -> refresh.run());
-        search.addDataChangedListener((type, index) -> refresh.run());
+        search.addDataChangedListener((type, index) -> debouncedRefresh.run());
 
-        Container topInner = BoxLayout.encloseY(heading, FlowLayout.encloseCenter(search), filterRow);
+        Container topInner = BoxLayout.encloseY(heading, FlowLayout.encloseCenter(search), filterRow,
+                FlowLayout.encloseCenter(deviceCountLabel));
         topInner.setUIID("SkinDesignerStepHeadInner");
 
         // Footer with Continue button
@@ -376,10 +416,38 @@ public class SkinDesigner extends Lifecycle {
 
     private void rebuildDeviceGrid(Container grid, String query, String filter) {
         grid.removeAll();
-        Map<String, List<DeviceDatabase.Device>> grouped = new LinkedHashMap<>();
+
+        // First pass: collect matching devices (DB is already sorted year-desc).
+        List<DeviceDatabase.Device> matched = new ArrayList<>();
+        int totalMatched = 0;
         for (DeviceDatabase.Device d : DeviceDatabase.all()) {
             if (!d.matchesFormFilter(filter)) continue;
             if (!d.matchesQuery(query)) continue;
+            totalMatched++;
+            if (matched.size() < DEVICE_GRID_LIMIT) {
+                matched.add(d);
+            }
+        }
+
+        if (deviceCountLabel != null) {
+            if (totalMatched == 0) {
+                deviceCountLabel.setText("No devices match");
+            } else if (totalMatched <= matched.size()) {
+                deviceCountLabel.setText(totalMatched + " device" + (totalMatched == 1 ? "" : "s"));
+            } else {
+                deviceCountLabel.setText("Showing " + matched.size() + " of " + totalMatched
+                        + " — type to narrow");
+            }
+        }
+
+        if (matched.isEmpty()) {
+            grid.revalidate();
+            return;
+        }
+
+        // Group by brand, preserving order (already year-desc within DB).
+        Map<String, List<DeviceDatabase.Device>> grouped = new LinkedHashMap<>();
+        for (DeviceDatabase.Device d : matched) {
             List<DeviceDatabase.Device> bucket = grouped.get(d.brand);
             if (bucket == null) {
                 bucket = new ArrayList<>();
@@ -387,21 +455,15 @@ public class SkinDesigner extends Lifecycle {
             }
             bucket.add(d);
         }
-        if (grouped.isEmpty()) {
-            Label none = new Label("No devices match");
-            none.setUIID("SkinDesignerEmptyHint");
-            grid.add(none);
-            grid.revalidate();
-            return;
-        }
+
+        int columns = Math.max(1, gridColumns());
         for (Map.Entry<String, List<DeviceDatabase.Device>> entry : grouped.entrySet()) {
             Label brand = new Label(entry.getKey() + " · " + entry.getValue().size());
             brand.setUIID("SkinDesignerGroupLabel");
             grid.add(brand);
-            Container row = new Container(new GridLayout(1, Math.max(1, gridColumns())));
+            Container row = new Container(new GridLayout(1, columns));
             row.setUIID("SkinDesignerCardRow");
             int col = 0;
-            int columns = Math.max(1, gridColumns());
             for (DeviceDatabase.Device d : entry.getValue()) {
                 if (col >= columns) {
                     grid.add(row);
@@ -412,7 +474,6 @@ public class SkinDesigner extends Lifecycle {
                 row.add(buildDeviceCard(d));
                 col++;
             }
-            // pad row so last items align left
             while (col < columns) {
                 row.add(new Label(" "));
                 col++;
@@ -456,8 +517,7 @@ public class SkinDesigner extends Lifecycle {
         spec.setUIID("SkinDesignerDeviceSpec");
         card.add(spec);
 
-        card.setLeadComponent(name);
-        card.addPointerReleasedListener(e -> {
+        return makeClickable(card, e -> {
             device = d;
             skin.resetForDevice(d);
             Button cont = (Button) bodyHolder.getClientProperty("deviceContinue");
@@ -466,7 +526,33 @@ public class SkinDesigner extends Lifecycle {
             }
             renderStep();
         });
-        return card;
+    }
+
+    /**
+     * Wraps a card's content in a {@link LayeredLayout} container with a
+     * transparent {@link Button} overlay on top. The overlay is a real
+     * Button so it participates in CN1's scroll-vs-tap detection inside
+     * scrollable parents, where {@code addPointerReleasedListener} on a
+     * plain Container was getting swallowed by the scroll layer.
+     *
+     * The overlay also picks up Button's standard pressed/disabled visual
+     * states for free.
+     */
+    private static Container makeClickable(Container content, com.codename1.ui.events.ActionListener listener) {
+        // Preserve the content's UIID so the wrapper looks like the card.
+        String uiid = content.getUIID();
+        Container layered = new Container(new LayeredLayout());
+        layered.setUIID(uiid);
+        // Reset content's UIID so its background/border don't double up on
+        // top of the wrapper.
+        content.setUIID("Container");
+        layered.add(content);
+
+        Button overlay = new Button("");
+        overlay.setUIID("SkinDesignerCardOverlay");
+        overlay.addActionListener(listener);
+        layered.add(overlay);
+        return layered;
     }
 
     // ====================================================================
@@ -532,8 +618,7 @@ public class SkinDesigner extends Lifecycle {
         p.setUIID("SkinDesignerSourceP");
         card.add(p);
 
-        card.setLeadComponent(h3);
-        card.addPointerReleasedListener(e -> {
+        return makeClickable(card, e -> {
             source = sourceId;
             if (SkinModel.SOURCE_BLANK.equals(sourceId)) {
                 skin.cutouts.clear();
@@ -548,7 +633,6 @@ public class SkinDesigner extends Lifecycle {
             }
             goToStep(STEP_EDIT);
         });
-        return card;
     }
 
     // ====================================================================
@@ -737,15 +821,13 @@ public class SkinDesigner extends Lifecycle {
         Label lbl = new Label(label);
         lbl.setUIID("SkinDesignerPresetLabel");
         tile.add(lbl);
-        tile.setLeadComponent(lbl);
-        tile.addPointerReleasedListener(e -> {
+        return makeClickable(tile, e -> {
             applyPreset(id);
             rebuildSidebarBody();
             livePreview.setSkin(skin);
             livePreview.repaint();
             saveState();
         });
-        return tile;
     }
 
     private void applyPreset(String id) {
@@ -816,12 +898,25 @@ public class SkinDesigner extends Lifecycle {
         boolean sel = idx == selectedCutout;
         Container row = new Container(new BorderLayout());
         row.setUIID(sel ? "SkinDesignerCutoutRowSelected" : "SkinDesignerCutoutRow");
+
         Label sw = new Label(" ");
         sw.setUIID("SkinDesignerCutoutSwatch");
         Label name = new Label(c.name);
         name.setUIID("SkinDesignerCutoutName");
         Label type = new Label(c.type);
         type.setUIID("SkinDesignerCutoutType");
+
+        // Selectable left half (swatch + name + type chip) — clickable as one unit
+        Container selectArea = new Container(new BorderLayout());
+        selectArea.setUIID("Container");
+        selectArea.add(BorderLayout.WEST, BoxLayout.encloseX(sw, name));
+        selectArea.add(BorderLayout.EAST, type);
+        makeClickable(selectArea, e -> {
+            selectedCutout = (selectedCutout == idx) ? -1 : idx;
+            rebuildCutoutList();
+        });
+
+        // The X button stays an independent Button so it can fire on its own
         Button rm = new Button();
         rm.setUIID("SkinDesignerIconButton");
         FontImage.setMaterialIcon(rm, FontImage.MATERIAL_CLOSE);
@@ -833,15 +928,9 @@ public class SkinDesigner extends Lifecycle {
             rebuildSidebarBody();
             livePreview.repaint();
         });
-        Container left = BoxLayout.encloseX(sw, name);
-        Container right = BoxLayout.encloseX(type, rm);
-        row.add(BorderLayout.WEST, left);
-        row.add(BorderLayout.EAST, right);
-        row.setLeadComponent(name);
-        row.addPointerReleasedListener(e -> {
-            selectedCutout = (selectedCutout == idx) ? -1 : idx;
-            rebuildCutoutList();
-        });
+
+        row.add(BorderLayout.CENTER, selectArea);
+        row.add(BorderLayout.EAST, rm);
         return row;
     }
 
@@ -1456,6 +1545,106 @@ public class SkinDesigner extends Lifecycle {
             return uiid.endsWith("Dark") ? uiid : uiid + "Dark";
         }
         return uiid.endsWith("Dark") ? uiid.substring(0, uiid.length() - 4) : uiid;
+    }
+
+    // ====================================================================
+    //  Stepper badge — guaranteed circle with centered digit / check
+    // ====================================================================
+
+    /**
+     * A real circle (filled disc) with the step number or a check mark drawn
+     * in the middle. Avoids relying on cn1-pill-border + Label sizing, which
+     * was producing oversized horizontal pills with the digit cropped or
+     * floating off-center.
+     */
+    static final class CircleBadge extends Component {
+        static final int STATE_PENDING = 0;
+        static final int STATE_ACTIVE = 1;
+        static final int STATE_DONE = 2;
+
+        private final int number;
+        private final int state;
+        private final boolean dark;
+
+        CircleBadge(int number, int state, boolean dark) {
+            this.number = number;
+            this.state = state;
+            this.dark = dark;
+            setUIID("Container");
+            setFocusable(false);
+        }
+
+        @Override
+        protected com.codename1.ui.geom.Dimension calcPreferredSize() {
+            int diameter = CN.convertToPixels(4.6f);
+            return new com.codename1.ui.geom.Dimension(diameter, diameter);
+        }
+
+        @Override
+        public void paint(Graphics g) {
+            int diameter = Math.min(getWidth(), getHeight());
+            int cx = getX() + (getWidth() - diameter) / 2;
+            int cy = getY() + (getHeight() - diameter) / 2;
+
+            int fill, fg;
+            switch (state) {
+                case STATE_ACTIVE:
+                    fill = dark ? 0x4d86ff : 0x2f6bff;
+                    fg = 0xffffff;
+                    break;
+                case STATE_DONE:
+                    fill = 0xb8d532;
+                    fg = dark ? 0x0a2460 : 0x112247;
+                    break;
+                case STATE_PENDING:
+                default:
+                    fill = dark ? 0x4c6ea8 : 0xd9dee8;
+                    fg = dark ? 0x102b66 : 0xffffff;
+                    break;
+            }
+
+            int oldColor = g.getColor();
+            int oldAlpha = g.getAlpha();
+            boolean oldAA = g.isAntiAliased();
+            g.setAntiAliased(true);
+            g.setColor(fill);
+            g.fillArc(cx, cy, diameter, diameter, 0, 360);
+
+            g.setColor(fg);
+            if (state == STATE_DONE) {
+                int pad = diameter / 4;
+                int x0 = cx + pad;
+                int y0 = cy + diameter / 2;
+                int xm = cx + diameter * 7 / 16;
+                int ym = cy + diameter - pad - 1;
+                int x1 = cx + diameter - pad;
+                int y1 = cy + pad + 1;
+                int stroke = Math.max(1, diameter / 9);
+                drawThickLine(g, x0, y0, xm, ym, stroke);
+                drawThickLine(g, xm, ym, x1, y1, stroke);
+            } else {
+                String text = String.valueOf(number);
+                com.codename1.ui.Font f = g.getFont();
+                if (f != null) {
+                    int tw = f.stringWidth(text);
+                    int th = f.getHeight();
+                    int tx = cx + (diameter - tw) / 2;
+                    int ty = cy + (diameter - th) / 2;
+                    g.drawString(text, tx, ty);
+                }
+            }
+            g.setAntiAliased(oldAA);
+            g.setAlpha(oldAlpha);
+            g.setColor(oldColor);
+        }
+
+        private static void drawThickLine(Graphics g, int x0, int y0, int x1, int y1, int thick) {
+            for (int dx = -thick / 2; dx <= thick / 2; dx++) {
+                for (int dy = -thick / 2; dy <= thick / 2; dy++) {
+                    g.drawLine(x0 + dx, y0 + dy, x1 + dx, y1 + dy);
+                }
+            }
+        }
     }
 
     // ====================================================================
