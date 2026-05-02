@@ -19,6 +19,7 @@ import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
+import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
@@ -202,17 +203,22 @@ public class SkinDesigner extends Lifecycle {
             if (i > 0) {
                 stepperRow.add(buildStepperSep());
             }
-            int state = (i == step) ? CircleBadge.STATE_ACTIVE
-                    : (i < step ? CircleBadge.STATE_DONE : CircleBadge.STATE_PENDING);
-            CircleBadge badge = new CircleBadge(i + 1, state, websiteDarkMode);
-            String labelUiid = (i == step) ? "SkinDesignerStepperLabelActive"
-                    : (i < step ? "SkinDesignerStepperLabelDone" : "SkinDesignerStepperLabelPending");
+            String suffix = (i == step) ? "Active" : (i < step ? "Done" : "Pending");
+            // Force a square size so cn1-pill-border draws the badge as a true
+            // circle, with the digit centered by the Label's own alignment.
+            Label badge = new Label(String.valueOf(i + 1));
+            badge.setUIID("SkinDesignerStepperNum" + suffix);
+            int diameter = CN.convertToPixels(4.6f);
+            badge.setPreferredSize(new com.codename1.ui.geom.Dimension(diameter, diameter));
+            if (i < step) {
+                badge.setText("");
+                FontImage.setMaterialIcon(badge, FontImage.MATERIAL_CHECK,
+                        2.6f);
+            }
             Label text = new Label(labels[i]);
-            text.setUIID(labelUiid);
+            text.setUIID("SkinDesignerStepperLabel" + suffix);
             Container item = BoxLayout.encloseX(badge, text);
-            String itemUiid = (i == step) ? "SkinDesignerStepperItemActive"
-                    : (i < step ? "SkinDesignerStepperItemDone" : "SkinDesignerStepperItemPending");
-            item.setUIID(itemUiid);
+            item.setUIID("SkinDesignerStepperItem" + suffix);
             stepperRow.add(item);
         }
         stepperRow.revalidate();
@@ -327,13 +333,22 @@ public class SkinDesigner extends Lifecycle {
         heading.setUIID("SkinDesignerStepHead");
         Label h1 = new Label("Which device is this skin for?");
         h1.setUIID("SkinDesignerH1");
-        Label sub = new Label("Pick your device. We'll prefill resolution, PPI, safe-area insets, and fonts.");
+        TextArea sub = new TextArea(
+                "Pick your device. We'll prefill resolution, PPI, safe-area insets, "
+                        + "and fonts so you can focus on the skin shape.");
         sub.setUIID("SkinDesignerSub");
+        sub.setEditable(false);
+        sub.setFocusable(false);
+        sub.setGrowByContent(true);
+        sub.setRows(2);
         heading.add(h1);
         heading.add(sub);
 
         TextField search = new TextField("", "Search devices…", 24, TextField.ANY);
         search.setUIID("SkinDesignerSearchField");
+        // Magnifier glass material icon as the hint icon, matching the design.
+        search.setHintIcon(FontImage.createMaterial(
+                FontImage.MATERIAL_SEARCH, search.getStyle(), 3.4f));
 
         String[] filterIds = { "all", "phone", "tablet", "fold" };
         String[] filterLabels = { "All", "Phones", "Tablets", "Foldables" };
@@ -406,8 +421,11 @@ public class SkinDesigner extends Lifecycle {
         scroll.add(BorderLayout.NORTH, topInner);
         scroll.add(BorderLayout.CENTER, grid);
 
-        // Keep a handle to refresh footer enabled state as devices are selected
+        // Handles used by selectDevice() to re-style cards in place and to
+        // toggle Continue without doing a full step rebuild (which would
+        // jump the scroll position).
         bodyHolder.putClientProperty("deviceContinue", cont);
+        bodyHolder.putClientProperty("deviceGrid", grid);
 
         root.add(BorderLayout.CENTER, scroll);
         root.add(BorderLayout.SOUTH, footer);
@@ -496,20 +514,23 @@ public class SkinDesigner extends Lifecycle {
 
         Label osMark = new Label();
         osMark.setUIID("SkinDesignerOsMark");
+        // Use the brand glyphs (apple/android) rather than the silhouette
+        // phone icons, which read as identical at this size.
         FontImage.setMaterialIcon(osMark, "ios".equals(d.platformName)
-                ? FontImage.MATERIAL_PHONE_IPHONE
-                : FontImage.MATERIAL_PHONE_ANDROID);
+                ? FontImage.MATERIAL_APPLE
+                : FontImage.MATERIAL_ANDROID);
         Label name = new Label(d.name);
         name.setUIID("SkinDesignerDeviceName");
         Container top = new Container(new BorderLayout());
         top.add(BorderLayout.WEST, osMark);
         top.add(BorderLayout.CENTER, name);
-        if (selected) {
-            Label check = new Label();
-            check.setUIID("SkinDesignerDeviceCheck");
-            FontImage.setMaterialIcon(check, FontImage.MATERIAL_CHECK);
-            top.add(BorderLayout.EAST, check);
-        }
+        Label check = new Label();
+        check.setUIID("SkinDesignerDeviceCheck");
+        FontImage.setMaterialIcon(check, FontImage.MATERIAL_CHECK);
+        // Always add the slot — toggle visibility on selection — so the layout
+        // doesn't shift between selected/unselected states.
+        check.setVisible(selected);
+        top.add(BorderLayout.EAST, check);
         card.add(top);
 
         Label spec = new Label(d.resolutionW + "×" + d.resolutionH
@@ -517,15 +538,55 @@ public class SkinDesigner extends Lifecycle {
         spec.setUIID("SkinDesignerDeviceSpec");
         card.add(spec);
 
-        return makeClickable(card, e -> {
-            device = d;
-            skin.resetForDevice(d);
-            Button cont = (Button) bodyHolder.getClientProperty("deviceContinue");
-            if (cont != null) {
-                cont.setEnabled(true);
+        Container wrapper = makeClickable(card, e -> selectDevice(d));
+        // Keep a back-pointer so we can re-style without rebuilding the grid
+        // (which would lose the user's scroll position).
+        wrapper.putClientProperty("deviceId", d.id);
+        wrapper.putClientProperty("card", card);
+        wrapper.putClientProperty("check", check);
+        return wrapper;
+    }
+
+    /**
+     * Selecting a device used to call {@link #renderStep()}, which rebuilt the
+     * entire body and lost the user's scroll position — that produced the
+     * "jumping" the user reported. Now we just toggle the previously- and
+     * newly-selected cards' UIIDs in place and refresh the Continue button.
+     */
+    private void selectDevice(DeviceDatabase.Device d) {
+        device = d;
+        skin.resetForDevice(d);
+        Button cont = (Button) bodyHolder.getClientProperty("deviceContinue");
+        if (cont != null) {
+            cont.setEnabled(true);
+        }
+        Container grid = (Container) bodyHolder.getClientProperty("deviceGrid");
+        if (grid != null) {
+            applySelectionToGrid(grid, d.id);
+        }
+        updateStatusbar();
+        saveState();
+    }
+
+    private void applySelectionToGrid(Container container, String selectedId) {
+        for (int i = 0; i < container.getComponentCount(); i++) {
+            Component c = container.getComponentAt(i);
+            Object id = c.getClientProperty("deviceId");
+            if (id instanceof String) {
+                Container card = (Container) c.getClientProperty("card");
+                Component check = (Component) c.getClientProperty("check");
+                boolean sel = id.equals(selectedId);
+                if (card != null) {
+                    card.setUIID(sel ? "SkinDesignerDeviceCardSelected" : "SkinDesignerDeviceCard");
+                }
+                if (check != null) {
+                    check.setVisible(sel);
+                }
+            } else if (c instanceof Container) {
+                applySelectionToGrid((Container) c, selectedId);
             }
-            renderStep();
-        });
+        }
+        container.repaint();
     }
 
     /**
@@ -565,15 +626,24 @@ public class SkinDesigner extends Lifecycle {
 
         Label h1 = new Label("How would you like to start?");
         h1.setUIID("SkinDesignerH1");
-        Label sub = new Label("Build a skin for " + device.name + ".");
-        sub.setUIID("SkinDesignerSub");
-        Container heading = BoxLayout.encloseY(h1, sub);
+        // Render "Build a skin for <bold device name>." with the device name bold.
+        Label subPrefix = new Label("Build a skin for ");
+        subPrefix.setUIID("SkinDesignerSub");
+        Label subDevice = new Label(device.name);
+        subDevice.setUIID("SkinDesignerSubBold");
+        Label subSuffix = new Label(".");
+        subSuffix.setUIID("SkinDesignerSub");
+        Container subRow = new Container(new FlowLayout(Component.CENTER));
+        subRow.add(subPrefix);
+        subRow.add(subDevice);
+        subRow.add(subSuffix);
+        Container heading = BoxLayout.encloseY(h1, subRow);
         heading.setUIID("SkinDesignerStepHead");
 
         Container cards = new Container(new GridLayout(1, 3));
         cards.setUIID("SkinDesignerSourceRow");
         cards.add(buildSourceCard("Pick a shape",
-                "Start from a common phone silhouette and tweak dimensions and cutouts.",
+                "Start from a common phone silhouette and tweak dimensions and cutouts from there.",
                 FontImage.MATERIAL_PHONE_IPHONE,
                 SkinModel.SOURCE_SHAPE));
         cards.add(buildSourceCard("Upload an image",
@@ -614,8 +684,14 @@ public class SkinDesigner extends Lifecycle {
         h3.setUIID("SkinDesignerH3");
         card.add(h3);
 
-        Label p = new Label(desc);
+        // Multi-line description — Label wraps poorly, so use a non-editable
+        // TextArea that grows to fit the wrapped text.
+        TextArea p = new TextArea(desc);
         p.setUIID("SkinDesignerSourceP");
+        p.setEditable(false);
+        p.setFocusable(false);
+        p.setGrowByContent(true);
+        p.setRows(3);
         card.add(p);
 
         return makeClickable(card, e -> {
@@ -1061,17 +1137,27 @@ public class SkinDesigner extends Lifecycle {
     //  Step 3 — done summary + save
     // ====================================================================
 
+    /** Holds the most-recently-generated .skin bytes + filename so the
+     *  Save button on the done step can re-trigger the download. */
+    private byte[] lastSkinBytes;
+    private String lastSkinFile;
+
     private Container buildDoneStep() {
-        // Build the .skin file once when arriving at this step
+        // Build the .skin file once when arriving at this step. We keep it on
+        // disk so reloading the page doesn't lose it; we also keep the bytes
+        // in memory so the user can click Save again to re-download.
         byte[] data = createSkinBytes();
         boolean savedOk = false;
+        String outPath = null;
         if (data != null) {
             FileSystemStorage fs = FileSystemStorage.getInstance();
-            String outPath = fs.getAppHomePath() + sanitize(skin.name) + ".skin";
+            outPath = fs.getAppHomePath() + sanitize(skin.name) + ".skin";
             try (OutputStream os = fs.openOutputStream(outPath)) {
                 os.write(data);
                 savedOk = true;
-                // In the JS port this triggers the download dialog
+                lastSkinBytes = data;
+                lastSkinFile = outPath;
+                // JS port: triggers the browser's download dialog.
                 Display.getInstance().execute(outPath);
             } catch (IOException err) {
                 Log.e(err);
@@ -1082,9 +1168,11 @@ public class SkinDesigner extends Lifecycle {
         Container root = new Container(new BoxLayout(BoxLayout.Y_AXIS));
         root.setUIID("SkinDesignerDoneRoot");
 
+        // A subtler check: smaller, finer-stroked icon. The lime ring around
+        // it lives on the SkinDesignerDoneCheck UIID's background.
         Label check = new Label();
         check.setUIID("SkinDesignerDoneCheck");
-        FontImage.setMaterialIcon(check, FontImage.MATERIAL_CHECK, 8.0f);
+        FontImage.setMaterialIcon(check, FontImage.MATERIAL_CHECK, 5.0f);
         Container checkWrap = FlowLayout.encloseCenter(check);
         root.add(checkWrap);
 
@@ -1112,13 +1200,27 @@ public class SkinDesigner extends Lifecycle {
         FontImage.setMaterialIcon(back, FontImage.MATERIAL_CHEVRON_LEFT);
         back.addActionListener(e -> goToStep(STEP_EDIT));
 
-        Button restart = new Button("New skin");
-        restart.setUIID("SkinDesignerPrimaryButton");
-        restart.addActionListener(e -> restart());
+        // Re-trigger the download dialog. Useful when the browser blocked
+        // the original auto-download or when the user wants to save again.
+        Button download = new Button(savedOk ? "Save again" : "Try saving");
+        download.setUIID("SkinDesignerSecondaryButton");
+        FontImage.setMaterialIcon(download, FontImage.MATERIAL_FILE_DOWNLOAD);
+        download.setEnabled(lastSkinBytes != null && lastSkinFile != null);
+        download.addActionListener(e -> {
+            if (lastSkinFile != null) {
+                Display.getInstance().execute(lastSkinFile);
+            }
+        });
+
+        Button restartBtn = new Button("Make another skin");
+        restartBtn.setUIID("SkinDesignerPrimaryButton");
+        FontImage.setMaterialIcon(restartBtn, FontImage.MATERIAL_REFRESH);
+        restartBtn.addActionListener(e -> restart());
 
         Container actions = new Container(new FlowLayout(Component.CENTER));
         actions.add(back);
-        actions.add(restart);
+        actions.add(download);
+        actions.add(restartBtn);
         root.add(actions);
 
         Container scroll = new Container(new BorderLayout());
@@ -1545,106 +1647,6 @@ public class SkinDesigner extends Lifecycle {
             return uiid.endsWith("Dark") ? uiid : uiid + "Dark";
         }
         return uiid.endsWith("Dark") ? uiid.substring(0, uiid.length() - 4) : uiid;
-    }
-
-    // ====================================================================
-    //  Stepper badge — guaranteed circle with centered digit / check
-    // ====================================================================
-
-    /**
-     * A real circle (filled disc) with the step number or a check mark drawn
-     * in the middle. Avoids relying on cn1-pill-border + Label sizing, which
-     * was producing oversized horizontal pills with the digit cropped or
-     * floating off-center.
-     */
-    static final class CircleBadge extends Component {
-        static final int STATE_PENDING = 0;
-        static final int STATE_ACTIVE = 1;
-        static final int STATE_DONE = 2;
-
-        private final int number;
-        private final int state;
-        private final boolean dark;
-
-        CircleBadge(int number, int state, boolean dark) {
-            this.number = number;
-            this.state = state;
-            this.dark = dark;
-            setUIID("Container");
-            setFocusable(false);
-        }
-
-        @Override
-        protected com.codename1.ui.geom.Dimension calcPreferredSize() {
-            int diameter = CN.convertToPixels(4.6f);
-            return new com.codename1.ui.geom.Dimension(diameter, diameter);
-        }
-
-        @Override
-        public void paint(Graphics g) {
-            int diameter = Math.min(getWidth(), getHeight());
-            int cx = getX() + (getWidth() - diameter) / 2;
-            int cy = getY() + (getHeight() - diameter) / 2;
-
-            int fill, fg;
-            switch (state) {
-                case STATE_ACTIVE:
-                    fill = dark ? 0x4d86ff : 0x2f6bff;
-                    fg = 0xffffff;
-                    break;
-                case STATE_DONE:
-                    fill = 0xb8d532;
-                    fg = dark ? 0x0a2460 : 0x112247;
-                    break;
-                case STATE_PENDING:
-                default:
-                    fill = dark ? 0x4c6ea8 : 0xd9dee8;
-                    fg = dark ? 0x102b66 : 0xffffff;
-                    break;
-            }
-
-            int oldColor = g.getColor();
-            int oldAlpha = g.getAlpha();
-            boolean oldAA = g.isAntiAliased();
-            g.setAntiAliased(true);
-            g.setColor(fill);
-            g.fillArc(cx, cy, diameter, diameter, 0, 360);
-
-            g.setColor(fg);
-            if (state == STATE_DONE) {
-                int pad = diameter / 4;
-                int x0 = cx + pad;
-                int y0 = cy + diameter / 2;
-                int xm = cx + diameter * 7 / 16;
-                int ym = cy + diameter - pad - 1;
-                int x1 = cx + diameter - pad;
-                int y1 = cy + pad + 1;
-                int stroke = Math.max(1, diameter / 9);
-                drawThickLine(g, x0, y0, xm, ym, stroke);
-                drawThickLine(g, xm, ym, x1, y1, stroke);
-            } else {
-                String text = String.valueOf(number);
-                com.codename1.ui.Font f = g.getFont();
-                if (f != null) {
-                    int tw = f.stringWidth(text);
-                    int th = f.getHeight();
-                    int tx = cx + (diameter - tw) / 2;
-                    int ty = cy + (diameter - th) / 2;
-                    g.drawString(text, tx, ty);
-                }
-            }
-            g.setAntiAliased(oldAA);
-            g.setAlpha(oldAlpha);
-            g.setColor(oldColor);
-        }
-
-        private static void drawThickLine(Graphics g, int x0, int y0, int x1, int y1, int thick) {
-            for (int dx = -thick / 2; dx <= thick / 2; dx++) {
-                for (int dy = -thick / 2; dy <= thick / 2; dy++) {
-                    g.drawLine(x0 + dx, y0 + dy, x1 + dx, y1 + dy);
-                }
-            }
-        }
     }
 
     // ====================================================================

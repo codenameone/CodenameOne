@@ -91,77 +91,148 @@ SkinDesignerStepper {
 }
 SkinDesignerStepperDark { background: transparent; padding: 0; }
 
-/* Step item — number-badge + label side-by-side. The badge is painted by
- * the CircleBadge custom component (always a true circle), so the item
- * itself just needs a transparent background and a little breathing room. */
-SkinDesignerStepperItemActive,
+/* Step item — number-badge + label side-by-side. The active step gets a
+ * translucent blue pill behind it so the user sees where they are in the
+ * wizard at a glance. */
+SkinDesignerStepperItemActive {
+    cn1-pill-border: 1;
+    background: #e8f0ff;
+    padding: 0.8mm 2.4mm;
+    margin: 0 0.6mm;
+}
+SkinDesignerStepperItemActiveDark {
+    cn1-pill-border: 1;
+    background: #1c3a7a;
+    padding: 0.8mm 2.4mm;
+    margin: 0 0.6mm;
+}
 SkinDesignerStepperItemDone,
 SkinDesignerStepperItemPending {
     background: transparent;
-    padding: 1mm 2.4mm;
+    padding: 0.8mm 2.4mm;
     margin: 0 0.6mm;
 }
-SkinDesignerStepperItemActiveDark,
 SkinDesignerStepperItemDoneDark,
 SkinDesignerStepperItemPendingDark {
     background: transparent;
-    padding: 1mm 2.4mm;
+    padding: 0.8mm 2.4mm;
     margin: 0 0.6mm;
+}
+
+/* Number badges — Label sized to a square in code, cn1-pill-border draws a
+ * true circle, padding kept symmetric so the digit lands centered. */
+SkinDesignerStepperNumActive {
+    cn1-pill-border: 1;
+    background: #2f6bff;
+    color: #ffffff;
+    padding: 0;
+    margin: 0 1.2mm 0 0;
+    font-size: 2.6mm;
+    font-family: "native:MainBold";
+    text-align: center;
+}
+SkinDesignerStepperNumActiveDark {
+    cn1-pill-border: 1;
+    background: #4d86ff;
+    color: #ffffff;
+    padding: 0;
+    margin: 0 1.2mm 0 0;
+    font-size: 2.6mm;
+    font-family: "native:MainBold";
+    text-align: center;
+}
+SkinDesignerStepperNumDone {
+    cn1-pill-border: 1;
+    background: #b8d532;
+    color: #112247;
+    padding: 0;
+    margin: 0 1.2mm 0 0;
+    font-size: 2.4mm;
+    font-family: "native:MainBold";
+    text-align: center;
+}
+SkinDesignerStepperNumDoneDark {
+    cn1-pill-border: 1;
+    background: #b8d532;
+    color: #0a2460;
+    padding: 0;
+    margin: 0 1.2mm 0 0;
+    font-size: 2.4mm;
+    font-family: "native:MainBold";
+    text-align: center;
+}
+SkinDesignerStepperNumPending {
+    cn1-pill-border: 1;
+    background: #d9dee8;
+    color: #ffffff;
+    padding: 0;
+    margin: 0 1.2mm 0 0;
+    font-size: 2.6mm;
+    font-family: "native:MainBold";
+    text-align: center;
+}
+SkinDesignerStepperNumPendingDark {
+    cn1-pill-border: 1;
+    background: #4c6ea8;
+    color: #102b66;
+    padding: 0;
+    margin: 0 1.2mm 0 0;
+    font-size: 2.6mm;
+    font-family: "native:MainBold";
+    text-align: center;
 }
 
 SkinDesignerStepperLabelActive {
     color: #2f6bff;
     font-size: 2.8mm;
-    font-family: "native:MainBold";
-    padding: 0.4mm 0 0.4mm 1.2mm;
+    font-family: "native:MainMedium";
+    padding: 0;
 }
 SkinDesignerStepperLabelActiveDark {
     color: #4d86ff;
     font-size: 2.8mm;
-    font-family: "native:MainBold";
-    padding: 0.4mm 0 0.4mm 1.2mm;
+    font-family: "native:MainMedium";
+    padding: 0;
 }
 SkinDesignerStepperLabelDone {
     color: #112247;
     font-size: 2.8mm;
     font-family: "native:MainLight";
-    padding: 0.4mm 0 0.4mm 1.2mm;
+    padding: 0;
 }
 SkinDesignerStepperLabelDoneDark {
     color: #f5f8ff;
     font-size: 2.8mm;
     font-family: "native:MainLight";
-    padding: 0.4mm 0 0.4mm 1.2mm;
+    padding: 0;
 }
 SkinDesignerStepperLabelPending {
     color: #7f8aa3;
     font-size: 2.8mm;
     font-family: "native:MainLight";
-    padding: 0.4mm 0 0.4mm 1.2mm;
+    padding: 0;
 }
 SkinDesignerStepperLabelPendingDark {
     color: #a8b8da;
     font-size: 2.8mm;
     font-family: "native:MainLight";
-    padding: 0.4mm 0 0.4mm 1.2mm;
+    padding: 0;
 }
 
-/* Horizontal line between stepper items. Solid background + tiny preferred
- * height in code (set in buildStepperSep) so BoxLayout always lays it out
- * as a thin horizontal bar. */
+/* Horizontal line between stepper items. */
 SkinDesignerStepperSep {
     background: #d9dee8;
     color: transparent;
     font-size: 0.5mm;
     padding: 0;
-    margin: 1.2mm 0.4mm;
+    margin: 1.4mm 0.4mm;
 }
 SkinDesignerStepperSepDark {
     background: #4c6ea8;
     color: transparent;
     font-size: 0.5mm;
     padding: 0;
-    margin: 1.2mm 0.4mm;
+    margin: 1.4mm 0.4mm;
 }
 
 SkinDesignerWizardNav { background: transparent; padding: 0; }
@@ -205,12 +276,12 @@ SkinDesignerStepRootDark { background: #071b4d; padding: 0; }
 
 SkinDesignerStepHead {
     background: transparent;
-    padding: 8mm 4mm 3mm 4mm;
+    padding: 2mm 4mm 1mm 4mm;
 }
-SkinDesignerStepHeadDark { background: transparent; padding: 8mm 4mm 3mm 4mm; }
+SkinDesignerStepHeadDark { background: transparent; padding: 2mm 4mm 1mm 4mm; }
 
-SkinDesignerStepHeadInner { background: transparent; padding: 0 0 4mm 0; }
-SkinDesignerStepHeadInnerDark { background: transparent; padding: 0 0 4mm 0; }
+SkinDesignerStepHeadInner { background: transparent; padding: 0 0 0.6mm 0; }
+SkinDesignerStepHeadInnerDark { background: transparent; padding: 0 0 0.6mm 0; }
 
 SkinDesignerStepBody {
     background: transparent;
@@ -226,43 +297,75 @@ SkinDesignerStepScrollDark { background: transparent; padding: 0; }
 
 SkinDesignerH1 {
     color: #112247;
-    font-size: 5.6mm;
-    font-family: "native:MainBold";
-    padding: 0.6mm 0;
+    font-size: 5.0mm;
+    font-family: "native:MainMedium";
+    padding: 0.4mm 0;
+    margin: 0;
+    background: transparent;
     text-align: center;
 }
 SkinDesignerH1Dark {
     color: #f5f8ff;
-    font-size: 5.6mm;
-    font-family: "native:MainBold";
-    padding: 0.6mm 0;
+    font-size: 5.0mm;
+    font-family: "native:MainMedium";
+    padding: 0.4mm 0;
+    margin: 0;
+    background: transparent;
     text-align: center;
 }
 SkinDesignerH3 {
     color: #112247;
-    font-size: 3.6mm;
-    font-family: "native:MainBold";
+    font-size: 3.4mm;
+    font-family: "native:MainMedium";
     padding: 0.4mm 0;
+    margin: 0;
+    background: transparent;
 }
 SkinDesignerH3Dark {
     color: #f5f8ff;
-    font-size: 3.6mm;
-    font-family: "native:MainBold";
+    font-size: 3.4mm;
+    font-family: "native:MainMedium";
     padding: 0.4mm 0;
+    margin: 0;
+    background: transparent;
 }
 SkinDesignerSub {
-    color: #7f8aa3;
+    color: #4a5775;
+    background: transparent;
+    border: none;
     font-size: 2.8mm;
     font-family: "native:MainLight";
-    padding: 0.4mm 0 1mm 0;
+    padding: 0;
+    margin: 0;
     text-align: center;
 }
 SkinDesignerSubDark {
-    color: #a8b8da;
+    color: #c8d4ee;
+    background: transparent;
+    border: none;
     font-size: 2.8mm;
     font-family: "native:MainLight";
-    padding: 0.4mm 0 1mm 0;
+    padding: 0;
+    margin: 0;
     text-align: center;
+}
+SkinDesignerSubBold {
+    color: #112247;
+    background: transparent;
+    border: none;
+    font-size: 2.8mm;
+    font-family: "native:MainBold";
+    padding: 0;
+    margin: 0;
+}
+SkinDesignerSubBoldDark {
+    color: #f5f8ff;
+    background: transparent;
+    border: none;
+    font-size: 2.8mm;
+    font-family: "native:MainBold";
+    padding: 0;
+    margin: 0;
 }
 
 /* --- Buttons --------------------------------------------------------- */
@@ -486,21 +589,19 @@ SkinDesignerFooterDark {
 /* --- Search / filter chips ------------------------------------------ */
 
 SkinDesignerSearchField {
+    cn1-round-border: 1.4mm;
     color: #112247;
     background: #ffffff;
-    border: 1px solid #d9dee8;
-    border-radius: 1.4mm;
-    padding: 1.2mm;
+    padding: 1.6mm 2.4mm;
     margin: 0.6mm;
     font-family: "native:MainLight";
     font-size: 3mm;
 }
 SkinDesignerSearchFieldDark {
+    cn1-round-border: 1.4mm;
     color: #f5f8ff;
     background: #0e2a61;
-    border: 1px solid #4c6ea8;
-    border-radius: 1.4mm;
-    padding: 1.2mm;
+    padding: 1.6mm 2.4mm;
     margin: 0.6mm;
     font-family: "native:MainLight";
     font-size: 3mm;
@@ -518,8 +619,8 @@ SkinDesignerFilterTag {
     cn1-pill-border: 1;
     color: #7f8aa3;
     background: #ffffff;
-    padding: 1.2mm 3.2mm;
-    margin: 0.6mm;
+    padding: 0.8mm 2.4mm;
+    margin: 0.4mm;
     font-family: "native:MainLight";
     font-size: 2.6mm;
 }
@@ -527,8 +628,8 @@ SkinDesignerFilterTag.pressed {
     cn1-pill-border: 1;
     color: #112247;
     background: #e8eef9;
-    padding: 1.2mm 3.2mm;
-    margin: 0.6mm;
+    padding: 0.8mm 2.4mm;
+    margin: 0.4mm;
     font-family: "native:MainLight";
     font-size: 2.6mm;
 }
@@ -536,8 +637,8 @@ SkinDesignerFilterTagDark {
     cn1-pill-border: 1;
     color: #a8b8da;
     background: #102b66;
-    padding: 1.2mm 3.2mm;
-    margin: 0.6mm;
+    padding: 0.8mm 2.4mm;
+    margin: 0.4mm;
     font-family: "native:MainLight";
     font-size: 2.6mm;
 }
@@ -545,8 +646,8 @@ SkinDesignerFilterTagDark.pressed {
     cn1-pill-border: 1;
     color: #f5f8ff;
     background: #163575;
-    padding: 1.2mm 3.2mm;
-    margin: 0.6mm;
+    padding: 0.8mm 2.4mm;
+    margin: 0.4mm;
     font-family: "native:MainLight";
     font-size: 2.6mm;
 }
@@ -554,8 +655,8 @@ SkinDesignerFilterTagActive {
     cn1-pill-border: 1;
     color: #ffffff;
     background: #2f6bff;
-    padding: 1.2mm 3.2mm;
-    margin: 0.6mm;
+    padding: 0.8mm 2.4mm;
+    margin: 0.4mm;
     font-family: "native:MainBold";
     font-size: 2.6mm;
 }
@@ -563,8 +664,8 @@ SkinDesignerFilterTagActive.pressed {
     cn1-pill-border: 1;
     color: #ffffff;
     background: #1f4ec9;
-    padding: 1.2mm 3.2mm;
-    margin: 0.6mm;
+    padding: 0.8mm 2.4mm;
+    margin: 0.4mm;
     font-family: "native:MainBold";
     font-size: 2.6mm;
 }
@@ -572,8 +673,8 @@ SkinDesignerFilterTagActiveDark {
     cn1-pill-border: 1;
     color: #ffffff;
     background: #4d86ff;
-    padding: 1.2mm 3.2mm;
-    margin: 0.6mm;
+    padding: 0.8mm 2.4mm;
+    margin: 0.4mm;
     font-family: "native:MainBold";
     font-size: 2.6mm;
 }
@@ -581,8 +682,8 @@ SkinDesignerFilterTagActiveDark.pressed {
     cn1-pill-border: 1;
     color: #ffffff;
     background: #2f6bff;
-    padding: 1.2mm 3.2mm;
-    margin: 0.6mm;
+    padding: 0.8mm 2.4mm;
+    margin: 0.4mm;
     font-family: "native:MainBold";
     font-size: 2.6mm;
 }
@@ -613,46 +714,46 @@ SkinDesignerDeviceGrid {
 SkinDesignerDeviceGridDark { background: transparent; padding: 0 4mm 4mm 4mm; }
 
 SkinDesignerDeviceCard {
+    cn1-round-border: 2mm;
     background: #ffffff;
-    border: 1px solid #d9dee8;
-    padding: 4mm 4mm 4mm 4mm;
-    margin: 1.6mm;
+    padding: 2.4mm 2.6mm;
+    margin: 1mm;
 }
 SkinDesignerDeviceCardDark {
+    cn1-round-border: 2mm;
     background: #102b66;
-    border: 1px solid #4c6ea8;
-    padding: 4mm 4mm 4mm 4mm;
-    margin: 1.6mm;
+    padding: 2.4mm 2.6mm;
+    margin: 1mm;
 }
 SkinDesignerDeviceCardSelected {
-    background: #ffffff;
-    border: 2px solid #2f6bff;
-    padding: 4mm 4mm 4mm 4mm;
-    margin: 1.6mm;
+    cn1-round-border: 2mm;
+    background: #e8f0ff;
+    padding: 2.4mm 2.6mm;
+    margin: 1mm;
 }
 SkinDesignerDeviceCardSelectedDark {
-    background: #102b66;
-    border: 2px solid #4d86ff;
-    padding: 4mm 4mm 4mm 4mm;
-    margin: 1.6mm;
+    cn1-round-border: 2mm;
+    background: #1c3a7a;
+    padding: 2.4mm 2.6mm;
+    margin: 1mm;
 }
 
 SkinDesignerOsMark {
+    cn1-round-border: 1mm;
     color: #112247;
     background: #f7f8fb;
-    border-radius: 1.4mm;
-    padding: 0.6mm;
-    margin: 0 0.6mm 0 0;
-    font-size: 2.6mm;
+    padding: 0.8mm;
+    margin: 0 1mm 0 0;
+    font-size: 3.2mm;
     text-align: center;
 }
 SkinDesignerOsMarkDark {
+    cn1-round-border: 1mm;
     color: #f5f8ff;
     background: #163575;
-    border-radius: 1.4mm;
-    padding: 0.6mm;
-    margin: 0 0.6mm 0 0;
-    font-size: 2.6mm;
+    padding: 0.8mm;
+    margin: 0 1mm 0 0;
+    font-size: 3.2mm;
     text-align: center;
 }
 
@@ -701,48 +802,69 @@ SkinDesignerSourceRow {
 }
 SkinDesignerSourceRowDark { background: transparent; padding: 4mm 6mm; }
 
+/* Source cards — rounded body, blue ring on press (we don't have a true
+ * hover state in the CN1 CSS subset, so .pressed is the closest visual
+ * cue; on desktop the click-and-hold still highlights). */
 SkinDesignerSourceCard {
+    cn1-round-border: 3mm;
     background: #ffffff;
-    border: 1px solid #d9dee8;
-    padding: 8mm 6mm;
-    margin: 3mm;
+    padding: 6mm 4mm;
+    margin: 2mm;
+}
+SkinDesignerSourceCard.pressed {
+    cn1-round-border: 3mm;
+    background: #f3f7ff;
+    padding: 6mm 4mm;
+    margin: 2mm;
 }
 SkinDesignerSourceCardDark {
+    cn1-round-border: 3mm;
     background: #102b66;
-    border: 1px solid #4c6ea8;
-    padding: 8mm 6mm;
-    margin: 3mm;
+    padding: 6mm 4mm;
+    margin: 2mm;
+}
+SkinDesignerSourceCardDark.pressed {
+    cn1-round-border: 3mm;
+    background: #163575;
+    padding: 6mm 4mm;
+    margin: 2mm;
 }
 
 SkinDesignerSourceIll {
+    cn1-round-border: 2mm;
     background: #f7f8fb;
     color: #7f8aa3;
-    padding: 6mm;
+    padding: 5mm;
     margin: 0 0 2mm 0;
-    border-radius: 2mm;
     text-align: center;
     font-size: 8mm;
 }
 SkinDesignerSourceIllDark {
+    cn1-round-border: 2mm;
     background: #163575;
     color: #a8b8da;
-    padding: 6mm;
+    padding: 5mm;
     margin: 0 0 2mm 0;
-    border-radius: 2mm;
     text-align: center;
     font-size: 8mm;
 }
 SkinDesignerSourceP {
-    color: #7f8aa3;
+    background: transparent;
+    border: none;
+    color: #4a5775;
     font-size: 2.6mm;
     font-family: "native:MainLight";
-    padding: 0.4mm;
+    padding: 0.4mm 0;
+    margin: 0.6mm 0 0 0;
 }
 SkinDesignerSourcePDark {
-    color: #a8b8da;
+    background: transparent;
+    border: none;
+    color: #c8d4ee;
     font-size: 2.6mm;
     font-family: "native:MainLight";
-    padding: 0.4mm;
+    padding: 0.4mm 0;
+    margin: 0.6mm 0 0 0;
 }
 
 /* --- Editor / stage / sidebar --------------------------------------- */
@@ -1119,22 +1241,24 @@ SkinDesignerDoneRootDark {
     background: #071b4d;
     padding: 8mm 4mm;
 }
+/* Subtler success badge: smaller diameter, lighter green ring, finer
+ * check icon (sized in code via FontImage.setMaterialIcon). */
 SkinDesignerDoneCheck {
-    background: #b8d532;
-    color: #112247;
-    border-radius: 12mm;
-    padding: 4mm;
+    cn1-pill-border: 1;
+    background: #e8f3c8;
+    color: #6e8a1a;
+    padding: 2.4mm;
     margin: 1mm;
-    font-size: 8mm;
+    font-size: 5mm;
     text-align: center;
 }
 SkinDesignerDoneCheckDark {
-    background: #b8d532;
-    color: #0a2460;
-    border-radius: 12mm;
-    padding: 4mm;
+    cn1-pill-border: 1;
+    background: #2c4216;
+    color: #b8d532;
+    padding: 2.4mm;
     margin: 1mm;
-    font-size: 8mm;
+    font-size: 5mm;
     text-align: center;
 }
 
