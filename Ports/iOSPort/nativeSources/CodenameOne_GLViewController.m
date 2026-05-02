@@ -853,12 +853,29 @@ CGContextRef roundRect(CGContextRef context, int color, int alpha, int x, int y,
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRoundRectMutableImpl
 (int color, int alpha, int x, int y, int width, int height, int arcWidth, int arcHeight) {
 #ifdef CN1_USE_METAL
-    // Dead under Metal -- MutableGraphics builds a round-rect GeneralPath
-    // and routes it through the alpha-mask Metal pipeline (Renderer.c ->
-    // R8 MTLTexture -> DrawTextureAlphaMask op tagged with the mutable
-    // target). The Java side gates with `metalRendering` before calling
-    // this JNI; the GL body below is GL-only.
-    return;
+    {
+        GLUIImage *target = [CodenameOne_GLViewController instance].currentMutableImage;
+        if (target == nil) return;
+        // Rasterise the round-rect stroke via CG into a temp UIImage on EDT,
+        // wrap in a GLUIImage, then queue a DrawImage tagged with the
+        // current mutable target so the drain loop blits the temp image
+        // onto the mutable's MTLTexture. Mirrors the Global counterpart's
+        // pattern; the only difference is the queued op carries a target.
+        UIGraphicsBeginImageContextWithOptions(CGSizeMake(width, height), NO, 1.0);
+        CGContextRef ctx = UIGraphicsGetCurrentContext();
+        CGContextStrokePath(roundRect(ctx, color, alpha, 0, 0, width, height, arcWidth, arcHeight));
+        UIImage* img = UIGraphicsGetImageFromCurrentImageContext();
+        UIGraphicsEndImageContext();
+        GLUIImage* glu = [[GLUIImage alloc] initWithImage:img];
+        DrawImage *f = [[DrawImage alloc] initWithArgs:255 xpos:x ypos:y i:glu w:width h:height];
+        [f setTarget:target];
+        [CodenameOne_GLViewController upcoming:f];
+#ifndef CN1_USE_ARC
+        [glu release];
+        [f release];
+#endif
+        return;
+    }
 #endif
     CGContextRef context = UIGraphicsGetCurrentContext();
     if (currentMutableTransformSet) {
@@ -870,6 +887,132 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRoundRectMutableImp
         CGContextRestoreGState(context);
     }
 }
+
+#ifdef CN1_USE_METAL
+// Phase 3 v2 mutable-shape rendering. The pre-Metal nativeFillShapeMutable /
+// nativeDrawShapeMutable in IOSNative.m drew into UIGraphicsGetCurrentContext()
+// — which is nil under the v2 mutable encoder, so graphics-fill-shape's
+// bottom panels were blank. These helpers live here (rather than in
+// IOSNative.m) because that translation unit can't see the @interface
+// for DrawImage even with `#import "DrawImage.h"` — the symbol resolves
+// fine in CodenameOne_GLViewController.m where DrawImage.h is already in
+// scope and used elsewhere (e.g. nativeDrawRoundRectMutableImpl above).
+//
+// Strategy: drawPath() expects a UIGraphics context to build the path
+// into, so we push a placeholder 1×1 image context, run drawPath() to
+// have it CGContextMoveToPoint/AddLineTo/etc into the placeholder ctx,
+// copy the path out via CGContextCopyPath, pop the placeholder, then
+// rasterise the copied path into a bbox-sized bitmap context. The
+// resulting UIImage is wrapped as a GLUIImage and queued as a DrawImage
+// op with `setTarget:` pointing at the current mutable image; the drain
+// loop (Phase 3 v2 step 4) then composites it onto the mutable's
+// MTLTexture using the standard Metal path.
+
+extern CGContextRef Java_com_codename1_impl_ios_IOSImplementation_drawPath(CN1_THREAD_STATE_MULTI_ARG JAVA_INT commandsLen, JAVA_OBJECT commandsArr, JAVA_INT pointsLen, JAVA_OBJECT pointsArr);
+
+static CGPathRef cn1MetalCopyPathFromCommands(CN1_THREAD_STATE_MULTI_ARG JAVA_INT commandsLen, JAVA_OBJECT commandsArr, JAVA_INT pointsLen, JAVA_OBJECT pointsArr) {
+    UIGraphicsBeginImageContextWithOptions(CGSizeMake(1, 1), NO, 1.0);
+    CGContextRef pathCtx = Java_com_codename1_impl_ios_IOSImplementation_drawPath(CN1_THREAD_STATE_PASS_ARG commandsLen, commandsArr, pointsLen, pointsArr);
+    CGPathRef cgPath = pathCtx ? CGContextCopyPath(pathCtx) : NULL;
+    UIGraphicsEndImageContext();
+    return cgPath;
+}
+
+void cn1MetalQueueShapeFillOnMutable(CN1_THREAD_STATE_MULTI_ARG int color, int alpha, JAVA_INT commandsLen, JAVA_OBJECT commandsArr, JAVA_INT pointsLen, JAVA_OBJECT pointsArr) {
+    GLUIImage *target = [CodenameOne_GLViewController instance].currentMutableImage;
+    if (target == nil) return;
+    CGPathRef cgPath = cn1MetalCopyPathFromCommands(CN1_THREAD_STATE_PASS_ARG commandsLen, commandsArr, pointsLen, pointsArr);
+    if (cgPath == NULL) return;
+    CGRect bbox = CGPathGetPathBoundingBox(cgPath);
+    if (CGRectIsEmpty(bbox) || bbox.size.width <= 0 || bbox.size.height <= 0) {
+        CGPathRelease(cgPath);
+        return;
+    }
+    int bw = (int)ceilf((float)bbox.size.width)  + 2;
+    int bh = (int)ceilf((float)bbox.size.height) + 2;
+    UIGraphicsBeginImageContextWithOptions(CGSizeMake(bw, bh), NO, 1.0);
+    CGContextRef ctx = UIGraphicsGetCurrentContext();
+    // Translate so bbox top-left lands at (1,1) — 1px padding on every
+    // side absorbs AA bleed.
+    CGContextTranslateCTM(ctx, 1 - bbox.origin.x, 1 - bbox.origin.y);
+    [UIColorFromRGB(color, alpha) set];
+    CGContextAddPath(ctx, cgPath);
+    CGContextFillPath(ctx);
+    CGPathRelease(cgPath);
+    UIImage *img = UIGraphicsGetImageFromCurrentImageContext();
+    UIGraphicsEndImageContext();
+
+    GLUIImage *glu = [[GLUIImage alloc] initWithImage:img];
+    DrawImage *f = [[DrawImage alloc] initWithArgs:255
+                                              xpos:(int)bbox.origin.x - 1
+                                              ypos:(int)bbox.origin.y - 1
+                                                 i:glu
+                                                 w:bw
+                                                 h:bh];
+    [f setTarget:target];
+    [CodenameOne_GLViewController upcoming:f];
+#ifndef CN1_USE_ARC
+    [glu release];
+    [f release];
+#endif
+}
+
+void cn1MetalQueueShapeStrokeOnMutable(CN1_THREAD_STATE_MULTI_ARG int color, int alpha, JAVA_INT commandsLen, JAVA_OBJECT commandsArr, JAVA_INT pointsLen, JAVA_OBJECT pointsArr, float lineWidth, int capStyle, int joinStyle, float mitreLimit) {
+    GLUIImage *target = [CodenameOne_GLViewController instance].currentMutableImage;
+    if (target == nil) return;
+    CGPathRef cgPath = cn1MetalCopyPathFromCommands(CN1_THREAD_STATE_PASS_ARG commandsLen, commandsArr, pointsLen, pointsArr);
+    if (cgPath == NULL) return;
+    CGRect bbox = CGPathGetPathBoundingBox(cgPath);
+    if (CGRectIsEmpty(bbox) || bbox.size.width <= 0 || bbox.size.height <= 0) {
+        CGPathRelease(cgPath);
+        return;
+    }
+    // Stroke extends lineWidth/2 past path on every side; pad by
+    // lineWidth+2 to absorb caps/joins that can extend further.
+    int pad = (int)ceilf(lineWidth) + 2;
+    int bw = (int)ceilf((float)bbox.size.width)  + 2 * pad;
+    int bh = (int)ceilf((float)bbox.size.height) + 2 * pad;
+    UIGraphicsBeginImageContextWithOptions(CGSizeMake(bw, bh), NO, 1.0);
+    CGContextRef ctx = UIGraphicsGetCurrentContext();
+    CGContextTranslateCTM(ctx, pad - bbox.origin.x, pad - bbox.origin.y);
+    [UIColorFromRGB(color, alpha) set];
+    CGContextAddPath(ctx, cgPath);
+    CGPathRelease(cgPath);
+    CGContextSetLineWidth(ctx, lineWidth);
+    CGLineCap cap = kCGLineCapButt;
+    switch (capStyle) {
+        case CN1_CAP_BUTT:   cap = kCGLineCapButt;   break;
+        case CN1_CAP_ROUND:  cap = kCGLineCapRound;  break;
+        case CN1_CAP_SQUARE: cap = kCGLineCapSquare; break;
+    }
+    CGContextSetLineCap(ctx, cap);
+    CGLineJoin join = kCGLineJoinMiter;
+    switch (joinStyle) {
+        case CN1_JOIN_MITER: join = kCGLineJoinMiter; break;
+        case CN1_JOIN_ROUND: join = kCGLineJoinRound; break;
+        case CN1_JOIN_BEVEL: join = kCGLineJoinBevel; break;
+    }
+    CGContextSetLineJoin(ctx, join);
+    CGContextSetMiterLimit(ctx, mitreLimit);
+    CGContextStrokePath(ctx);
+    UIImage *img = UIGraphicsGetImageFromCurrentImageContext();
+    UIGraphicsEndImageContext();
+
+    GLUIImage *glu = [[GLUIImage alloc] initWithImage:img];
+    DrawImage *f = [[DrawImage alloc] initWithArgs:255
+                                              xpos:(int)bbox.origin.x - pad
+                                              ypos:(int)bbox.origin.y - pad
+                                                 i:glu
+                                                 w:bw
+                                                 h:bh];
+    [f setTarget:target];
+    [CodenameOne_GLViewController upcoming:f];
+#ifndef CN1_USE_ARC
+    [glu release];
+    [f release];
+#endif
+}
+#endif
 
 void Java_com_codename1_impl_ios_IOSImplementation_setAntiAliasedMutableImpl
 (JAVA_BOOLEAN antialiased) {
@@ -907,18 +1050,13 @@ extern void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalI
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRoundRectGlobalImpl
 (int color, int alpha, int x, int y, int width, int height, int arcWidth, int arcHeight) {
-#ifdef CN1_USE_METAL
-    // Dead under Metal -- GlobalGraphics builds a round-rect GeneralPath
-    // and routes it through nativeDrawShape (alpha-mask Metal pipeline).
-    return;
-#endif
     UIGraphicsBeginImageContextWithOptions(CGSizeMake(width, height), NO, 1.0);
     CGContextRef context = UIGraphicsGetCurrentContext();
     CGContextStrokePath(roundRect(context, color, alpha, 0, 0, width, height, arcWidth, arcHeight));
     UIImage* img = UIGraphicsGetImageFromCurrentImageContext();
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl %i", ((int)img));
     UIGraphicsEndImageContext();
-
+    
     GLUIImage* glu = [[GLUIImage alloc] initWithImage:img];
     Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalImpl((BRIDGE_CAST void*) glu, 255, x, y, width, height, 0);
 #ifndef CN1_USE_ARC
@@ -930,10 +1068,24 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRoundRectGlobalImpl
 void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRoundRectMutableImpl
 (int color, int alpha, int x, int y, int width, int height, int arcWidth, int arcHeight) {
 #ifdef CN1_USE_METAL
-    // Dead under Metal -- MutableGraphics goes through the alpha-mask
-    // Metal pipeline (build path, Renderer.c -> R8 MTLTexture ->
-    // DrawTextureAlphaMask op tagged with currentMutableImage).
-    return;
+    {
+        GLUIImage *target = [CodenameOne_GLViewController instance].currentMutableImage;
+        if (target == nil) return;
+        UIGraphicsBeginImageContextWithOptions(CGSizeMake(width, height), NO, 1.0);
+        CGContextRef ctx = UIGraphicsGetCurrentContext();
+        CGContextFillPath(roundRect(ctx, color, alpha, 0, 0, width, height, arcWidth, arcHeight));
+        UIImage* img = UIGraphicsGetImageFromCurrentImageContext();
+        UIGraphicsEndImageContext();
+        GLUIImage* glu = [[GLUIImage alloc] initWithImage:img];
+        DrawImage *f = [[DrawImage alloc] initWithArgs:255 xpos:x ypos:y i:glu w:width h:height];
+        [f setTarget:target];
+        [CodenameOne_GLViewController upcoming:f];
+#ifndef CN1_USE_ARC
+        [glu release];
+        [f release];
+#endif
+        return;
+    }
 #endif
     CGContextRef context = UIGraphicsGetCurrentContext();
     if (currentMutableTransformSet) {
@@ -948,18 +1100,13 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRoundRectMutableImp
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRoundRectGlobalImpl
 (int color, int alpha, int x, int y, int width, int height, int arcWidth, int arcHeight) {
-#ifdef CN1_USE_METAL
-    // Dead under Metal -- GlobalGraphics routes through the alpha-mask
-    // Metal pipeline.
-    return;
-#endif
     UIGraphicsBeginImageContextWithOptions(CGSizeMake(width, height), NO, 1.0);
     CGContextRef context = UIGraphicsGetCurrentContext();
     CGContextFillPath(roundRect(context, color, alpha, 0, 0, width, height, arcWidth, arcHeight));
     UIImage* img = UIGraphicsGetImageFromCurrentImageContext();
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl %i", ((int)img));
     UIGraphicsEndImageContext();
-
+    
     GLUIImage* glu = [[GLUIImage alloc] initWithImage:img];
     Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalImpl((BRIDGE_CAST void*)glu, 255, x, y, width, height, 0);
 #ifndef CN1_USE_ARC
@@ -1016,10 +1163,24 @@ CGContextRef drawArc(CGContextRef context, int color, int alpha, int x, int y, i
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawArcMutableImpl
 (int color, int alpha, int x, int y, int width, int height, int startAngle, int angle) {
 #ifdef CN1_USE_METAL
-    // Dead under Metal -- MutableGraphics builds a GeneralPath via
-    // drawingArcPath.arc(...) and routes through nativeDrawShape (alpha-mask
-    // Metal pipeline tagged with currentMutableImage).
-    return;
+    {
+        GLUIImage *target = [CodenameOne_GLViewController instance].currentMutableImage;
+        if (target == nil) return;
+        UIGraphicsBeginImageContextWithOptions(CGSizeMake(width, height), NO, 1.0);
+        CGContextRef ctx = UIGraphicsGetCurrentContext();
+        CGContextStrokePath(drawArc(ctx, color, alpha, 0, 0, width, height, startAngle, angle, NO));
+        UIImage* img = UIGraphicsGetImageFromCurrentImageContext();
+        UIGraphicsEndImageContext();
+        GLUIImage* glu = [[GLUIImage alloc] initWithImage:img];
+        DrawImage *f = [[DrawImage alloc] initWithArgs:255 xpos:x ypos:y i:glu w:width h:height];
+        [f setTarget:target];
+        [CodenameOne_GLViewController upcoming:f];
+#ifndef CN1_USE_ARC
+        [glu release];
+        [f release];
+#endif
+        return;
+    }
 #endif
     CGContextRef context = UIGraphicsGetCurrentContext();
     if (currentMutableTransformSet) {
@@ -1064,13 +1225,61 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRadialGradientMutab
 void Java_com_codename1_impl_ios_IOSImplementation_nativeFillArcMutableImpl
 (int color, int alpha, int x, int y, int width, int height, int startAngle, int angle) {
 #ifdef CN1_USE_METAL
-    // Dead under Metal -- MutableGraphics builds drawingArcPath via
-    // GeneralPath.arc(...) and routes through nativeFillShape (alpha-mask
-    // Metal pipeline tagged with currentMutableImage). RadialGradientPaint
-    // composes through the AlphaMaskRadial pipeline at draw time
-    // (DrawTextureAlphaMask.execute checks PaintOp and routes to
-    // CN1MetalDrawAlphaMaskRadial).
-    return;
+    {
+        GLUIImage *target = [CodenameOne_GLViewController instance].currentMutableImage;
+        if (target == nil) return;
+        UIGraphicsBeginImageContextWithOptions(CGSizeMake(width, height), NO, 1.0);
+        CGContextRef ctx = UIGraphicsGetCurrentContext();
+        PaintOp *paint = [PaintOp getCurrentMutable];
+        if (paint != NULL && [paint isKindOfClass:[RadialGradientPaint class]]) {
+            // Mirror Java_com_codename1_impl_ios_IOSImplementation_nativeFillRadialGradientMutableImpl
+            // (which the GL mutable path consults via PaintOp on line 1255):
+            // clip to the arc, then draw the radial gradient inside that
+            // clip. The temp bitmap is bbox-sized so we draw at (0,0)
+            // origin and let the queued DrawImage place it back at (x,y).
+            RadialGradientPaint *g = (RadialGradientPaint *)paint;
+            int scolor = g.startColor;
+            int ecolor = g.endColor;
+            CGFloat components[8] = {
+                ((float)((scolor >> 16) & 0xff))/255.0,
+                ((float)((scolor >> 8)  & 0xff))/255.0,
+                ((float) (scolor        & 0xff))/255.0, 1.0,
+                ((float)((ecolor >> 16) & 0xff))/255.0,
+                ((float)((ecolor >> 8)  & 0xff))/255.0,
+                ((float) (ecolor        & 0xff))/255.0, 1.0
+            };
+            CGFloat locations[2] = { 0.0, 1.0 };
+            CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
+            CGGradientRef grad = CGGradientCreateWithColorComponents(cs, components, locations, 2);
+            CGColorSpaceRelease(cs);
+            CGContextSaveGState(ctx);
+            // drawArc paints into context using local coords (0,0..w,h); we
+            // only need its path so use the arc as a clip, then fill the
+            // radial gradient inside.
+            drawArc(ctx, g.startColor, 1.0, 0, 0, width, height, startAngle, angle, YES);
+            CGContextClip(ctx);
+            // Gradient origin is the centre of the gradient bbox; translate
+            // from screen-space (g.x, g.y) into the temp bitmap which lives
+            // at (x, y). centre = (g.x + g.width/2 - x, g.y + g.height/2 - y).
+            CGPoint centre = CGPointMake(g.x + g.width/2.0f - x, g.y + g.height/2.0f - y);
+            CGContextDrawRadialGradient(ctx, grad, centre, 0, centre, g.width/2.0f, 0);
+            CGGradientRelease(grad);
+            CGContextRestoreGState(ctx);
+        } else {
+            CGContextFillPath(drawArc(ctx, color, alpha, 0, 0, width, height, startAngle, angle, YES));
+        }
+        UIImage* img = UIGraphicsGetImageFromCurrentImageContext();
+        UIGraphicsEndImageContext();
+        GLUIImage* glu = [[GLUIImage alloc] initWithImage:img];
+        DrawImage *f = [[DrawImage alloc] initWithArgs:255 xpos:x ypos:y i:glu w:width h:height];
+        [f setTarget:target];
+        [CodenameOne_GLViewController upcoming:f];
+#ifndef CN1_USE_ARC
+        [glu release];
+        [f release];
+#endif
+        return;
+    }
 #endif
     CGContextRef context = UIGraphicsGetCurrentContext();
     if (currentMutableTransformSet) {
