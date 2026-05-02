@@ -38,10 +38,26 @@ import static com.codename1.maven.PathUtil.path;
  *
  * @author shannah
  */
-@Mojo(name = "css", defaultPhase = LifecyclePhase.PROCESS_RESOURCES, 
+@Mojo(name = "css", defaultPhase = LifecyclePhase.PROCESS_RESOURCES,
         requiresDependencyResolution = ResolutionScope.COMPILE_PLUS_RUNTIME,
         requiresDependencyCollection = ResolutionScope.COMPILE_PLUS_RUNTIME)
 public class CompileCSSMojo extends AbstractCN1Mojo {
+
+    /**
+     * Override the default DEBUG log level so the forked CSS compiler's stdout
+     * is visible in normal mvn output. When the CSS subprocess throws (e.g.
+     * StringIndexOutOfBoundsException in CN1CSSCLI), users currently only see
+     * the wrapper "An error occurred while compiling the CSS files" message
+     * with no usable detail unless they re-run with -X.
+     *
+     * Routed through createJava() (not the call site) so subclasses that
+     * override createJava() in tests still get to substitute their recording
+     * Java task without having to know about the log level.
+     */
+    @Override
+    public org.apache.tools.ant.taskdefs.Java createJava() {
+        return createJava(org.apache.maven.doxia.logging.Log.LEVEL_INFO);
+    }
 
 
     @Override
@@ -232,16 +248,15 @@ public class CompileCSSMojo extends AbstractCN1Mojo {
 
 
 
-        // Run the CSS compiler which is contained inside the codenameone-designer jar
+        // Run the CSS compiler which is contained inside the codenameone-designer jar.
         // NOTE: The codenameone-designer.jar is a dependency of the codenameone-maven-plugin as
         // zip file (which is the designer jar with all dependencies).  We use this jar
         // rather than the central designer_1.jar located in the user's home directory to make it
         // easier to pin to a particular version.
-        // Use INFO log level (rather than the default DEBUG) so that stack traces from the
-        // forked CSS compiler are visible without re-running with -X. When the subprocess
-        // throws (e.g. StringIndexOutOfBoundsException in CN1CSSCLI), users currently only see
-        // the wrapper "An error occurred while compiling the CSS files" with no useful detail.
-        Java java = createJava(org.apache.maven.doxia.logging.Log.LEVEL_INFO);
+        // The Java task is created via createJava() (overridden in this class to use INFO log
+        // level) so subprocess output -- including stack traces from CN1CSSCLI failures --
+        // shows up in normal mvn output instead of being hidden at DEBUG.
+        Java java = createJava();
         java.setDir(getCN1ProjectDir());
         java.setJar(getDesignerJar());
         java.setFork(true);
