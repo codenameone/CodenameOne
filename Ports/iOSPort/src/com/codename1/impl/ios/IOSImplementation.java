@@ -140,8 +140,18 @@ public class IOSImplementation extends CodenameOneImplementation {
     /// True when iOS was built with -Dios.metal=true. Phase 3 v2 mutable-
     /// image rendering paths (tileImage etc.) need to know this to choose
     /// between queueing an op and falling through to the CG-loop super
-    /// implementation. Initialised in postInit() via nativeInstance.isMetalRendering().
-    private boolean metalRendering;
+    /// implementation.
+    ///
+    /// Static rather than instance: the gate is read from inner classes
+    /// (NativeGraphics / GlobalGraphics / NativeImage), and the synthetic
+    /// outer-instance field accessor that javac generates for non-static
+    /// inner classes was returning false on the iOS Metal port even though
+    /// `nativeInstance.isMetalRendering()` returned true at postInit. CI bisect
+    /// (run 25259320137) traced 'mutable shape ops render via the CG fallback
+    /// instead of the alpha-mask Metal pipeline' to that gate not firing.
+    /// Making it static + populating eagerly in init() side-steps the
+    /// inner-class accessor entirely.
+    static boolean metalRendering;
     static IOSImplementation instance;
     private TextArea currentEditing;
     private static boolean initialized;
@@ -204,7 +214,6 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     public void postInit() {
         nativeInstance.initVM();
-        metalRendering = nativeInstance.isMetalRendering();
         super.postInit();
     }
     
@@ -219,6 +228,12 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     public void init(Object m) {
         instance = this;
+        // Set the metalRendering static gate as early as possible -- before any
+        // NativeImage / NativeGraphics is constructed, so mutable-image
+        // rendering routes through the alpha-mask Metal pipeline from the
+        // very first paint instead of falling through to the CG-rasterise
+        // helpers in IOSNative.m.
+        metalRendering = nativeInstance.isMetalRendering();
         setUseNativeCookieStore(false);
         Display.getInstance().setTransitionYield(10);
         Display.getInstance().setDefaultVirtualKeyboard(new IOSVirtualKeyboard(this));
