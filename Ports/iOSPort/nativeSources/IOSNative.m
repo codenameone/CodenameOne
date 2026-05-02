@@ -8644,7 +8644,18 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathRendererCreateTexture___lon
         id<MTLTexture> tex = CN1MetalCreateAlphaMaskTexture((const uint8_t *)maskArray, width, height);
         free(maskArray);
         if (tex == nil) return 0;
-        return (JAVA_LONG)(uintptr_t)CFBridgingRetain(tex);
+        // Under MRR, CFBridgingRetain calls CFRetain (no ownership transfer
+        // like ARC's __bridge_retained). CN1MetalCreateAlphaMaskTexture
+        // returns a +1 (newTextureWithDescriptor), and CFBridgingRetain adds
+        // a second +1, for a net +2. Java's nativeDeleteTexture only
+        // CFBridgingReleases once on dispose, so we'd leak one full alpha-
+        // mask MTLTexture per drawShape call. Release the local tex once
+        // CF holds its retain via CFBridgingRetain.
+        JAVA_LONG handle = (JAVA_LONG)(uintptr_t)CFBridgingRetain(tex);
+#ifndef CN1_USE_ARC
+        [tex release];
+#endif
+        return handle;
     }
 #endif
 #ifdef USE_ES2

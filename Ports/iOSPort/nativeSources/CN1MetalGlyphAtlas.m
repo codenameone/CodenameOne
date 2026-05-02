@@ -169,6 +169,12 @@ static int                     atlasCacheCount = 0;
     _shelfY = CN1_METAL_ATLAS_PADDING;
     _shelfHeight = 0;
     _cursorX = CN1_METAL_ATLAS_PADDING;
+#ifndef CN1_USE_ARC
+    // Release the previous _texture's +1 retain (held since alloc-init or
+    // the previous tryGrowAtlas) before overwriting the ivar with newTex's
+    // +1; otherwise every grow leaks the previous atlas texture.
+    [_texture release];
+#endif
     _texture = newTex;
     _textureWidth = newW;
     _textureHeight = newH;

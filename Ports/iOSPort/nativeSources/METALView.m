@@ -156,7 +156,14 @@ extern BOOL isRetinaBug();
         // pipeline non-blocking under pressure.
         metalLayer.maximumDrawableCount = 3;
         // `makeCommandQueue` is the Swift name; Objective-C uses `newCommandQueue`.
-        self.commandQueue = [metalLayer.device newCommandQueue];
+        // newCommandQueue returns +1 (NARC family); release the local after
+        // the synthesized retain setter takes its own retain so we end up at
+        // +1 owned by the property, not +2.
+        id<MTLCommandQueue> newQueue = [metalLayer.device newCommandQueue];
+        self.commandQueue = newQueue;
+#ifndef CN1_USE_ARC
+        [newQueue release];
+#endif
         CGSize sz = self.bounds.size;
         CGFloat s = self.contentScaleFactor;
         [self updateFrameBufferSize:(int)(sz.width * s) h:(int)(sz.height * s)];
@@ -250,7 +257,16 @@ extern BOOL isRetinaBug();
         width:pw height:ph mipmapped:NO];
     desc.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
     desc.storageMode = MTLStorageModePrivate;
-    self.screenTexture = [layer.device newTextureWithDescriptor:desc];
+    // newTextureWithDescriptor returns +1 (NARC family); the synthesized
+    // retain setter adds another +1 for a net +2 under MRR. Release the
+    // local once the property holds its own retain so we don't leak the
+    // previous screenTexture every time the framebuffer is resized
+    // (rotation, window resize, etc.).
+    id<MTLTexture> newScreen = [layer.device newTextureWithDescriptor:desc];
+    self.screenTexture = newScreen;
+#ifndef CN1_USE_ARC
+    [newScreen release];
+#endif
 
     // Prime the texture to opaque black: private-storage textures come back
     // uninitialised, so the first frame (which uses MTLLoadActionLoad) would
