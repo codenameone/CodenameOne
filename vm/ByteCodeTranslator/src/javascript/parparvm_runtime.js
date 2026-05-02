@@ -1973,24 +1973,19 @@ const jvm = {
           this.scheduleDrain();
           break;
         }
-        let thread;
-        if (this.atomicThread) {
-          // ``flushGraphics`` (or any other atomic section) marks itself.
-          // While set, only that thread is dispatched; any other runnable
-          // waits. If the atomic thread isn't currently runnable (it's
-          // parked on a JSO host-call awaiting HOST_CALLBACK) we break
-          // out so the JS event loop can deliver the callback -- but we
-          // MUST NOT run other threads, because that's exactly the
-          // interleaving that lets concurrent paints flood the
-          // host->worker message queue and starve self.onmessage.
-          const atomicIdx = this.runnable.indexOf(this.atomicThread);
-          if (atomicIdx < 0) {
-            break;
-          }
-          thread = this.runnable.splice(atomicIdx, 1)[0];
-        } else {
-          thread = this.runnable.shift();
-        }
+        // Atomic-thread mode (set by flushGraphics' begin/endGraphicsAtomic
+        // pair) used to suppress dispatch of every other green thread.
+        // That created a deadlock window with cooperative monitor parking:
+        // if the atomic thread blocks on a monitor held by some other
+        // green thread, drain refuses to run the holder, the holder
+        // never releases, the atomic thread never unparks. Cooperative
+        // monitor semantics already prevent the recursive-paint flood
+        // the atomic flag was guarding against -- a thread that re-enters
+        // synchronized(pendingDisplay) inside flushGraphics naturally
+        // queues behind the active flush. Trusting the locks instead of
+        // the atomic flag avoids the deadlock without re-introducing
+        // the flood.
+        const thread = this.runnable.shift();
         if (thread.done) {
           continue;
         }
