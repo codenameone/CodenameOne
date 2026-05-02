@@ -1098,6 +1098,41 @@ const jvm = {
               ? self.toHostTransferArg(arg)
               : arg;
         }
+        // Fire-and-forget for void-return JSO methods (and JSO property
+        // setters, which are inherently void). The vast majority of canvas
+        // ops the renderer issues -- ``ctx.save()``, ``ctx.fillStyle = X``,
+        // ``ctx.fillRect(...)``, ``ctx.beginPath()``, ``ctx.fill()``,
+        // ``ctx.restore()`` -- all return void. The original code yielded
+        // the green thread waiting for a HOST_CALLBACK on every single one
+        // of them, multiplying a 100-op frame into 100 host-callback
+        // messages on the worker's inbox. With the worker stuck draining
+        // its own callback chain it never had room for incoming pointer
+        // events, which is what made the OK button on a Dialog modal
+        // unreachable. Send the host-call but don't wait: the host
+        // processes ops in postMessage FIFO order, so a subsequent
+        // value-returning call (``getImageData``, ``measureText``) still
+        // sees the right state. Embeds a ``__cn1_no_response`` flag the
+        // host bridge honours by skipping ``postHostCallback``.
+        const isVoid = bridge.returnClass === "void"
+                || bridge.returnClass === "v"
+                || bridge.returnClass == null;
+        const isFireAndForget = (bridge.kind === "setter") || (bridge.kind === "method" && isVoid);
+        if (isFireAndForget) {
+          emitVmMessage({
+            type: self.protocol.messages.HOST_CALL,
+            id: self.nextHostCallId++,
+            symbol: "__cn1_jso_bridge__",
+            args: self.toHostTransferArg([{
+              receiver: receiver,
+              receiverClass: (receiver && receiver.__cn1HostClass) ? receiver.__cn1HostClass : className,
+              kind: bridge.kind,
+              member: bridge.member,
+              args: transferableArgs,
+              __cn1_no_response: true
+            }])
+          });
+          return null;
+        }
         const hostResult = yield self.invokeHostNative("__cn1_jso_bridge__", [{
           receiver: receiver,
           receiverClass: (receiver && receiver.__cn1HostClass) ? receiver.__cn1HostClass : className,

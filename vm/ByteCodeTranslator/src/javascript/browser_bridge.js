@@ -131,17 +131,34 @@
     },
     invoke: function(symbol, args, target, id) {
       var handler = this.handlers[symbol];
+      // Fire-and-forget request: the worker passed ``__cn1_no_response``
+      // because the Java caller is a void method whose green thread
+      // shouldn't block on a HOST_CALLBACK round-trip. Run the handler
+      // and don't post a callback. (For JSO bridge requests the flag
+      // lives on ``args[0].__cn1_no_response``; ``__cn1_jso_bridge__``
+      // is the only handler that uses it, and the per-canvas-op flood
+      // it eliminates was what starved ``self.onmessage`` for incoming
+      // pointer events during a Dialog modal.)
+      var noResponse = !!(args && args[0] && args[0].__cn1_no_response);
       if (!handler) {
         diag('FIRST_FAILURE', 'category', 'host_call_unhandled');
         diag('FIRST_FAILURE', 'symbol', symbol);
-        postHostCallback(target, id, null, 'Unhandled host call ' + symbol);
+        if (!noResponse) {
+          postHostCallback(target, id, null, 'Unhandled host call ' + symbol);
+        }
         return;
       }
       try {
         normalizeHostResult(handler.apply(null, args || []), function(value, err) {
+          if (noResponse && err == null) {
+            return;
+          }
           postHostCallback(target, id, value, err);
         });
       } catch (err) {
+        // Errors must surface even for fire-and-forget, otherwise a bad
+        // op silently corrupts the canvas state with no signal to the
+        // worker that the chain went off the rails.
         postHostCallback(target, id, null, err);
       }
     }
