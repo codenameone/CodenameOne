@@ -14295,6 +14295,15 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (key instanceof String) {
                 String strKey = (String) key;
                 if (value == null) {
+                    // Don't auto-fabricate values for meta-keys like @rtl, @im, @im-<name>.
+                    // These are configuration entries that callers (e.g. UIManager.setBundle)
+                    // distinguish from "missing" by checking for null. If we echo the key back
+                    // as the value, setBundle will treat "@im" as a real input-mode descriptor,
+                    // tokenize it, and crash inside parseTextFieldInputMode when the resulting
+                    // token has no '='.
+                    if (strKey.startsWith("@")) {
+                        return null;
+                    }
                     String autoValue = strKey;
                     putInternal(strKey, autoValue);
                     storeEntry(strKey, autoValue, true);
