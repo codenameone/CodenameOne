@@ -59,11 +59,15 @@ class JavascriptRuntimeSemanticsTest {
     }
 
     /**
-     * Pins ``synchronized`` block mutual exclusion. Two green-threaded
-     * workers loop hammering the same lock; if at any point both are
-     * inside the block (lock was "stolen" rather than parked-and-yielded),
-     * the high-water-mark check trips and result is 0 instead of 511.
-     * See JsMonitorMutexApp javadoc for the historical regression this
+     * Pins ``synchronized`` block mutual exclusion. Two Java green
+     * threads (called ``Contender`` in the fixture to avoid confusion
+     * with the host Web Worker -- the JS port has exactly one OS
+     * thread, the Web Worker, and all "threads" in the fixture are
+     * cooperatively scheduled green threads inside it) loop hammering
+     * the same lock; if at any point both are inside the block (lock
+     * was "stolen" rather than parked-and-yielded), the high-water-
+     * mark check trips and result is 0 instead of 511. See
+     * JsMonitorMutexApp javadoc for the historical regression this
      * is guarding against.
      */
     @ParameterizedTest
@@ -78,9 +82,10 @@ class JavascriptRuntimeSemanticsTest {
     }
 
     /**
-     * Pins FIFO ordering of contended monitor entrants. Three workers
-     * each block on a lock held by the main thread; when main releases,
-     * the first worker to have parked must run first.
+     * Pins FIFO ordering of contended monitor entrants. Three Java
+     * green threads (``Entrant``) each block on a lock held by the
+     * main thread; when main releases, the first to have parked must
+     * run first, the second second, the third third.
      */
     @ParameterizedTest
     @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
@@ -110,9 +115,9 @@ class JavascriptRuntimeSemanticsTest {
     }
 
     /**
-     * Pins ``Object.wait()`` releasing the monitor. While the waiting
-     * thread is parked, another thread must be able to acquire the
-     * SAME synchronized block; the waiter re-acquires before
+     * Pins ``Object.wait()`` releasing the monitor. While a waiting
+     * green thread is parked, the main thread must be able to acquire
+     * the SAME synchronized block; the waiter re-acquires before
      * resuming. If wait didn't release, this fixture would deadlock
      * the worker harness.
      */
@@ -129,14 +134,15 @@ class JavascriptRuntimeSemanticsTest {
 
     /**
      * End-to-end scheduler test that mirrors the Display.invokeAndBlock +
-     * Dialog body-thread polling pattern -- main thread loops on
-     * ``synchronized(L) { wait(N); }`` waiting for a condition; a worker
-     * thread eventually acquires the same lock, sets the condition,
-     * notifies. This is the cooperative-scheduling shape that the JS
-     * port relies on for every modal dialog. It implicitly chains all
-     * four primitives: monitor mutual exclusion, wait release-and-
-     * reacquire, monitor entrant promotion on monitorExit, and
-     * notifyAll waking parked waiters.
+     * Dialog body-thread polling pattern -- main thread (the
+     * "blocker") loops on ``synchronized(L) { wait(N); }`` waiting
+     * for a condition; a "notifier" green thread eventually acquires
+     * the same lock, sets the condition, notifies. This is the
+     * cooperative-scheduling shape that the JS port relies on for
+     * every modal dialog. It implicitly chains all four primitives:
+     * monitor mutual exclusion, wait release-and-reacquire, monitor
+     * entrant promotion on monitorExit, and notifyAll waking parked
+     * waiters.
      */
     @ParameterizedTest
     @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")

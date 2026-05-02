@@ -1,14 +1,20 @@
 /**
  * Verifies that contended monitor entrants are admitted in FIFO order
- * (the order they parked). Workers W1, W2, W3 each park on the same
- * lock (held by main); when main releases, W1 should run first, then
- * W2, then W3.
+ * (the order they parked). Three Java green threads (``Entrant``)
+ * each park on the same lock held by main; when main releases,
+ * entrant 1 should run first, then 2, then 3.
+ *
+ * Architecture note: only one OS thread (the Web Worker) is in play.
+ * "Three entrants" here means three Java green threads parked on
+ * the monitor's entrants queue inside that single Worker -- the
+ * FIFO property is enforced by the cooperative scheduler, not by
+ * any OS scheduling fairness.
  *
  * If the runtime correctly preserves entrant order, the captured
- * sequence is [1,2,3] and the test reports ``result = 511``. Out-of-order
- * promotion -- which the old lock-stealing path could exhibit if a
- * later-arriving thread "stole" before earlier entrants drained --
- * would record a different sequence and report 0.
+ * sequence is [1,2,3] and the test reports ``result = 511``.
+ * Out-of-order promotion -- which the old lock-stealing path could
+ * exhibit if a later-arriving thread "stole" before earlier entrants
+ * drained -- would record a different sequence and report 0.
  */
 public class JsMonitorFifoApp {
     static final Object LOCK = new Object();
@@ -21,9 +27,9 @@ public class JsMonitorFifoApp {
         final int id;
         Entrant(int id) { this.id = id; }
         public void run() {
-            // Bump the barrier so main knows this worker is about to
+            // Bump the barrier so main knows this entrant is about to
             // hit the lock. Spin briefly (yielding) until the previous
-            // worker has parked, so the parking order is deterministic.
+            // entrant has parked, so the parking order is deterministic.
             synchronized (LOCK) {  // contended -- main holds it
                 int slot = orderIdx++;
                 if (slot >= 0 && slot < order.length) {
@@ -39,11 +45,11 @@ public class JsMonitorFifoApp {
         Entrant w3 = new Entrant(3);
 
         synchronized (LOCK) {
-            // Hold the lock and start workers. Each will park on the
+            // Hold the lock and start entrants. Each will park on the
             // monitor's entrants queue in the order they reach the
             // synchronized block. ``Thread.sleep(0)`` between starts
-            // yields so each worker has a turn to actually run up to
-            // the lock acquisition before the next worker is started.
+            // yields so each entrant has a turn to actually run up to
+            // the lock acquisition before the next is started.
             w1.start();
             Thread.sleep(0);
             w2.start();
