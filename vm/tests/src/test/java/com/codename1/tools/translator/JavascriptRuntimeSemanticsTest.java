@@ -127,6 +127,28 @@ class JavascriptRuntimeSemanticsTest {
         assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
     }
 
+    /**
+     * End-to-end scheduler test that mirrors the Display.invokeAndBlock +
+     * Dialog body-thread polling pattern -- main thread loops on
+     * ``synchronized(L) { wait(N); }`` waiting for a condition; a worker
+     * thread eventually acquires the same lock, sets the condition,
+     * notifies. This is the cooperative-scheduling shape that the JS
+     * port relies on for every modal dialog. It implicitly chains all
+     * four primitives: monitor mutual exclusion, wait release-and-
+     * reacquire, monitor entrant promotion on monitorExit, and
+     * notifyAll waking parked waiters.
+     */
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void cooperativeWaitNotifyMatchesInvokeAndBlockPattern(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsInvokeAndBlockApp.java", "JsInvokeAndBlockApp");
+
+        assertEquals(511, result.result,
+                "main wait-loop + worker notify must complete cooperatively without deadlock. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
     @ParameterizedTest
     @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
     void executesBroaderJavaApiCoverageInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
