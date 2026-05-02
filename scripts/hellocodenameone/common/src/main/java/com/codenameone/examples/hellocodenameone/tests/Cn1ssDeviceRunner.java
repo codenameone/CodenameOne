@@ -157,7 +157,8 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new CallDetectionAPITest(),
             new LocalNotificationOverrideTest(),
             new Base64NativePerformanceTest(),
-            new AccessibilityTest()
+            new AccessibilityTest(),
+            new MutableImageReadbackTest()
     };
 
     private static BaseTest prependedTest;
