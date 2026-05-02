@@ -1987,6 +1987,25 @@ public class IOSImplementation extends CodenameOneImplementation {
         nativeInstance.nativeDrawStringGlobal(color, alpha, fontPeer, str, x, y);
     }
 
+    @Override
+    public void drawString(Object graphics, Object nativeFont, String str, int x, int y, int textDecoration) {
+        // Re-sync ng.font with the Java-side current font before drawing.
+        // Display.impl.drawLabelComponent calls setNativeFont(ng, labelStyleFont)
+        // directly to push the label's style font into NativeGraphics for fast
+        // native rendering, but does NOT update Graphics.current. After the
+        // title bar (or any Label) renders, ng.font holds the label's font
+        // while Graphics.current holds the Java-side font from before the
+        // label's draw. The user's next g.drawString() on the same Graphics
+        // expects to use Graphics.current; the iOS 4-arg drawString below
+        // reads ng.font instead, so they diverge. Graphics.drawString already
+        // passes Graphics.current as the nativeFont parameter -- pin ng.font
+        // to it here so the 4-arg drawString picks up the correct font.
+        if (nativeFont != null && graphics instanceof NativeGraphics) {
+            ((NativeGraphics) graphics).font = (NativeFont) nativeFont;
+        }
+        super.drawString(graphics, nativeFont, str, x, y, textDecoration);
+    }
+
     public void drawString(Object graphics, String str, int x, int y) {
         NativeGraphics ng = (NativeGraphics)graphics;
         ng.checkControl();

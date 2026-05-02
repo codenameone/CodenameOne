@@ -47,19 +47,6 @@ public abstract class AbstractGraphicsScreenshotTest extends BaseTest {
             int alpha = g.getAlpha();
             int color = g.getColor();
             Font font = g.getFont();
-            // Re-sync the native graphics' font with the Java-side current
-            // font: Label.paint -> Display.impl.drawLabelComponent calls
-            // setNativeFont() to push the label's style font into the
-            // platform NativeGraphics, but does NOT update Graphics.current.
-            // The next g.drawString() call therefore picks up the LABEL's
-            // leftover font (e.g. the form's title font on iOS, where
-            // impl.drawString reads ng.getFont() instead of the
-            // Java-current-derived nativeFont parameter). Without this
-            // re-sync the first test panel renders strings in the title
-            // font while subsequent panels (after this paint's restoring
-            // g.setFont(font) tail) come out correctly. See the iOS Metal
-            // port investigation around CN1MetalDrawString.
-            g.setFont(font);
             g.pushClip();
             cleanPaint(g);
             g.popClip();
