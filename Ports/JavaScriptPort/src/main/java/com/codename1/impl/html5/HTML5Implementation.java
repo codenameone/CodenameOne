@@ -4860,6 +4860,34 @@ public class HTML5Implementation extends CodenameOneImplementation {
      */
     boolean graphicsLocked;
     
+    /**
+     * Mark the calling green thread as the only one ``drain`` will dispatch
+     * until the matching ``endGraphicsAtomic()``. While set, ALL other Java
+     * green threads on the worker stay parked even when their wait timeouts
+     * expire; the runtime's drain loop sees the atomic-thread flag and
+     * picks only this thread.
+     *
+     * Why: ``flushGraphics`` issues a JSO call per canvas op (``ctx.save``,
+     * ``ctx.fillStyle``, ``ctx.fillRect``, ...). Each JSO call yields the
+     * green thread waiting for HOST_CALLBACK. Without this marker the
+     * runtime would interleave OTHER green threads during those yields --
+     * those other threads can call repaint(), Component invalidations,
+     * Form transitions, requestAnimationFrame -- each of which queues
+     * MORE canvas ops. The recursive flood of host->worker host-callback
+     * messages then crowded out ``self.onmessage`` for incoming pointer
+     * events (the OK click on a Dialog modal stopped reaching the worker).
+     *
+     * Holding the atomic marker for the duration of the per-frame batch
+     * mirrors how other Codename One ports run paint on a single thread
+     * with no input interleaving, and keeps the host->worker message
+     * queue fair-shareable for incoming DOM events between frames.
+     */
+    @JSBody(params={}, script="if (typeof jvm !== 'undefined') jvm.atomicThread = jvm.currentThread;")
+    private static native void beginGraphicsAtomic();
+
+    @JSBody(params={}, script="if (typeof jvm !== 'undefined') jvm.atomicThread = null;")
+    private static native void endGraphicsAtomic();
+
     @Override
     public void flushGraphics(int x, int y, int width, int height) {
         JavaScriptRenderQueueCoordinator.waitUntilFlushable(new JavaScriptRenderQueueCoordinator.FlushBarrier() {
@@ -4873,16 +4901,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 Thread.sleep(millis);
             }
         }, pendingDisplay);
-        
+
         List<ExecutableOp> flushedOps;
         synchronized(pendingDisplay){
-            /*
-            CanvasRenderingContext2D context = (CanvasRenderingContext2D)outputCanvas.getContext("2d");
-            List<ExecutableOp> ops = graphics.flush(x, y, width, height);
-            for (ExecutableOp op : ops){
-                op.execute(context);
-            }
-            */
             flushedOps = graphics.flush(x, y, width, height);
             JavaScriptRenderQueueCoordinator.queueFlush(new JavaScriptRenderQueueCoordinator.GraphicsLock() {
                 @Override
@@ -4891,15 +4912,20 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 }
             }, pendingDisplay, flushedOps, x, y, width, height);
         }
-        drainPendingDisplayFrame();
+        beginGraphicsAtomic();
+        try {
+            drainPendingDisplayFrame();
+        } finally {
+            endGraphicsAtomic();
+        }
         if (isEditing) {
             resizeNativeEditor();
         }
         if (activePicker != null) {
             activePicker.resizeNativeElement();
         }
-    	
-       
+
+
     }
 
     @Override

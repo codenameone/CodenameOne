@@ -427,6 +427,22 @@ const jvm = {
   currentThread: null,
   runnable: [],
   threads: [],
+  // Single-timer cooperative scheduler. ``timedWakeups`` holds entries for
+  // sleep / Object.wait(timeout); one global ``_wakeupTimer`` fires for the
+  // soonest pending deadline. Replaces the per-yield ``setTimeout`` chain
+  // that piled up dozens of pending browser timers (every Display
+  // invokeAndBlock iteration creates lock.wait(10)) and crowded out
+  // self.onmessage from receiving incoming pointer events. See
+  // ``_scheduleTimedWakeup`` / ``_processExpiredTimedWakeups``.
+  timedWakeups: [],
+  _wakeupTimer: null,
+  _wakeupAt: Infinity,
+  // When a green thread enters an "atomic section" (flushGraphics today),
+  // ``drain`` only dispatches that thread until the section ends. Other
+  // runnables wait. Prevents repaint() / requestAnimationFrame /
+  // Form-transition logic from interleaving with a frame's canvas-op
+  // chain and recursively producing more canvas ops.
+  atomicThread: null,
   pendingHostCalls: Object.create(null),
   eventQueue: [],
   mainClass: null,
@@ -1922,7 +1938,24 @@ const jvm = {
           this.scheduleDrain();
           break;
         }
-        const thread = this.runnable.shift();
+        let thread;
+        if (this.atomicThread) {
+          // ``flushGraphics`` (or any other atomic section) marks itself.
+          // While set, only that thread is dispatched; any other runnable
+          // waits. If the atomic thread isn't currently runnable (it's
+          // parked on a JSO host-call awaiting HOST_CALLBACK) we break
+          // out so the JS event loop can deliver the callback -- but we
+          // MUST NOT run other threads, because that's exactly the
+          // interleaving that lets concurrent paints flood the
+          // host->worker message queue and starve self.onmessage.
+          const atomicIdx = this.runnable.indexOf(this.atomicThread);
+          if (atomicIdx < 0) {
+            break;
+          }
+          thread = this.runnable.splice(atomicIdx, 1)[0];
+        } else {
+          thread = this.runnable.shift();
+        }
         if (thread.done) {
           continue;
         }
@@ -1973,6 +2006,73 @@ const jvm = {
       this.draining = false;
     }
   },
+  // Cooperative scheduler bookkeeping: see field comments above.
+  _scheduleTimedWakeup(entry) {
+    this.timedWakeups.push(entry);
+    this._refreshTimedWakeupTimer();
+  },
+  _removeTimedWakeup(entry) {
+    if (!entry || entry.cancelled) return;
+    entry.cancelled = true;
+    const idx = this.timedWakeups.indexOf(entry);
+    if (idx >= 0) this.timedWakeups.splice(idx, 1);
+    this._refreshTimedWakeupTimer();
+  },
+  _refreshTimedWakeupTimer() {
+    let earliest = Infinity;
+    for (let i = 0; i < this.timedWakeups.length; i++) {
+      const w = this.timedWakeups[i];
+      if (!w.cancelled && w.wakeAt < earliest) earliest = w.wakeAt;
+    }
+    if (earliest === Infinity) {
+      if (this._wakeupTimer != null) {
+        clearTimeout(this._wakeupTimer);
+        this._wakeupTimer = null;
+        this._wakeupAt = Infinity;
+      }
+      return;
+    }
+    if (this._wakeupTimer != null && this._wakeupAt <= earliest) {
+      // Existing timer fires sooner or at the same moment; keep it.
+      return;
+    }
+    if (this._wakeupTimer != null) clearTimeout(this._wakeupTimer);
+    const delay = Math.max(0, earliest - this.schedulerNow());
+    this._wakeupAt = earliest;
+    const self = this;
+    this._wakeupTimer = setTimeout(function() {
+      self._wakeupTimer = null;
+      self._wakeupAt = Infinity;
+      self._processExpiredTimedWakeups();
+    }, delay);
+  },
+  _processExpiredTimedWakeups() {
+    const now = this.schedulerNow();
+    const expired = [];
+    for (let i = this.timedWakeups.length - 1; i >= 0; i--) {
+      const w = this.timedWakeups[i];
+      if (w.cancelled) {
+        this.timedWakeups.splice(i, 1);
+        continue;
+      }
+      // 1ms tolerance: setTimeout firing slightly early under browser
+      // clamping shouldn't keep the entry around for another full cycle.
+      if (w.wakeAt <= now + 1) {
+        expired.push(w);
+        this.timedWakeups.splice(i, 1);
+      }
+    }
+    expired.reverse();  // restore registration order for FIFO fairness
+    for (let i = 0; i < expired.length; i++) {
+      const w = expired[i];
+      if (w.kind === "sleep") {
+        this.enqueue(w.thread);
+      } else if (w.kind === "wait") {
+        this.resumeWaiter(w.waiter);
+      }
+    }
+    this._refreshTimedWakeupTimer();
+  },
   handleYield(thread, yielded) {
     if (shouldTraceThread(thread)) {
       vmTrace("runtime.handleYield.thread-" + thread.id + ":" +
@@ -1984,15 +2084,25 @@ const jvm = {
       return;
     }
     if (yielded.op === "sleep") {
-      const timer = setTimeout(() => this.enqueue(thread), Math.max(0, yielded.millis | 0));
-      thread.waiting = { op: "sleep", timer: timer };
+      const millis = Math.max(0, yielded.millis | 0);
+      if (millis === 0) {
+        // Thread.yield / Thread.sleep(0) is just a co-operative hand-off
+        // to the next runnable green thread; no real-time delay needed.
+        this.enqueue(thread);
+        return;
+      }
+      const entry = { kind: "sleep", thread: thread, wakeAt: this.schedulerNow() + millis, cancelled: false };
+      thread.waiting = { op: "sleep", entry: entry };
+      this._scheduleTimedWakeup(entry);
       return;
     }
     if (yielded.op === "wait") {
       const waiter = { thread: thread, monitor: yielded.monitor, reentryCount: yielded.reentryCount };
       yielded.monitor.__monitor.waiters.push(waiter);
       if (yielded.timeout > 0) {
-        waiter.timer = setTimeout(() => this.resumeWaiter(waiter), yielded.timeout);
+        const entry = { kind: "wait", waiter: waiter, wakeAt: this.schedulerNow() + yielded.timeout, cancelled: false };
+        waiter.timedEntry = entry;
+        this._scheduleTimedWakeup(entry);
       }
       thread.waiting = { op: "wait", waiter: waiter };
       return;
@@ -2093,8 +2203,9 @@ const jvm = {
     if (!waiter) {
       return;
     }
-    if (waiter.timer) {
-      clearTimeout(waiter.timer);
+    if (waiter.timedEntry) {
+      this._removeTimedWakeup(waiter.timedEntry);
+      waiter.timedEntry = null;
     }
     this.resumeWaiter(waiter);
   },
@@ -2102,8 +2213,9 @@ const jvm = {
     const monitor = obj.__monitor || (obj.__monitor = this.createMonitor());
     const waiters = monitor.waiters.splice(0, monitor.waiters.length);
     for (const waiter of waiters) {
-      if (waiter.timer) {
-        clearTimeout(waiter.timer);
+      if (waiter.timedEntry) {
+        this._removeTimedWakeup(waiter.timedEntry);
+        waiter.timedEntry = null;
       }
       this.resumeWaiter(waiter);
     }
@@ -2126,14 +2238,17 @@ const jvm = {
       return;
     }
     if (thread.waiting.op === "sleep") {
-      clearTimeout(thread.waiting.timer);
+      if (thread.waiting.entry) {
+        this._removeTimedWakeup(thread.waiting.entry);
+      }
       this.enqueue(thread, { interrupted: true });
       return;
     }
     if (thread.waiting.op === "wait") {
       const waiter = thread.waiting.waiter;
-      if (waiter.timer) {
-        clearTimeout(waiter.timer);
+      if (waiter.timedEntry) {
+        this._removeTimedWakeup(waiter.timedEntry);
+        waiter.timedEntry = null;
       }
       const monitor = waiter.monitor.__monitor || (waiter.monitor.__monitor = this.createMonitor());
       const index = monitor.waiters.indexOf(waiter);
