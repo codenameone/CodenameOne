@@ -403,6 +403,138 @@ function threadDebugLabel(threadObject) {
   const targetClass = target && target.__class ? target.__class : "null";
   return "thread:" + (name || "null") + ":target:" + targetClass;
 }
+
+// ============================================================================
+// Cooperative Scheduler -- map of thread behavior in the JS port runtime
+// ============================================================================
+//
+// The JS port runs the entire VM in a single Web Worker (one OS thread). All
+// "Java threads" the application sees are green threads multiplexed
+// cooperatively on that single OS thread. This block documents the
+// scheduler's data structures, lifecycle, and yield protocol so anyone
+// touching ``drain`` / ``handleYield`` / monitor ops has a precise mental
+// model.
+//
+// State (on the ``jvm`` object below):
+//   threads[]          -- every Thread struct ever spawned (housekeeping).
+//   runnable[]         -- FIFO queue of threads ready to run. Drained head-
+//                         first; thread.start, sleep(0), monitor-promotion,
+//                         and notifyAll-of-an-unowned-monitor all push here.
+//   currentThread      -- thread being dispatched right now (only valid
+//                         inside ``drain``).
+//   draining           -- re-entrancy guard. ``enqueue`` may be called from
+//                         inside ``drain``; the recursive ``drain()`` call
+//                         short-circuits on this flag.
+//   drainScheduled     -- a setTimeout(drain, 0) is already pending.
+//   timedWakeups[]     -- entries for sleep(N>0) and wait(N>0). One global
+//                         ``_wakeupTimer`` fires for the soonest deadline
+//                         (browser/Node setTimeout); see _refreshTimed-
+//                         WakeupTimer.
+//
+// Per-thread state (Thread struct):
+//   id                 -- monotonically assigned at spawn; used as
+//                         monitor.owner.
+//   object             -- the java.lang.Thread receiver, if any.
+//   generator          -- the JS generator implementing the thread's
+//                         translated body. ``drain`` calls
+//                         ``generator.next(resumeValue)`` to advance one
+//                         "step" (i.e. up to the next yield).
+//   waiting            -- non-null when parked: { op: "sleep" | "wait" |
+//                         "monitor_enter" | "HOST_CALL", ... }. Cleared by
+//                         ``enqueue``.
+//   resumeValue        -- value handed to generator.next on next resume
+//                         (e.g. notifyAll passes null; interrupt passes
+//                         { interrupted: true }).
+//   resumeError        -- when set, drain calls generator.throw instead of
+//                         next (interrupt-during-wait, host-callback error).
+//   done               -- generator finished. drain skips done threads;
+//                         on completion drain also flips
+//                         object.alive=0 and notifyAll(object) so any
+//                         join() waiters wake up.
+//
+// Per-monitor state (obj.__monitor, lazily attached):
+//   owner              -- thread.id holding the monitor, or null.
+//   count              -- reentry count. monitorEnter on owner.id increments;
+//                         monitorExit decrements. count==0 releases
+//                         ownership and promotes the head entrant.
+//   entrants[]         -- threads parked on monitorEnter contention.
+//                         FIFO: monitorExit shifts the head, sets that
+//                         thread as the new owner, restores its reentry
+//                         count, and enqueues it. Order is preserved so
+//                         there is no later-arrival "stealing".
+//   waiters[]          -- threads parked on Object.wait(). notify pulls
+//                         from the head; notifyAll splices all. Each waiter
+//                         carries its saved reentryCount so it re-acquires
+//                         at the right depth.
+//
+// Yield protocol (handleYield):
+//   { op: "sleep", millis: 0 }      -> enqueue(thread). Pure cooperative
+//                                       hand-off, no real-time delay.
+//   { op: "sleep", millis: N>0 }    -> _scheduleTimedWakeup with kind=sleep;
+//                                       waking enqueues the thread.
+//   { op: "wait", monitor, timeout, reentryCount }
+//                                    -> push onto monitor.waiters; if
+//                                       timeout>0 also _scheduleTimedWakeup
+//                                       with kind=wait; on wake/notify call
+//                                       resumeWaiter (which either takes
+//                                       ownership or re-parks on entrants).
+//   { op: "monitor_enter", monitor, entrant }
+//                                    -> entrant has already been pushed
+//                                       onto monitor.entrants by
+//                                       monitorEnter; handleYield only
+//                                       records thread.waiting. monitorExit
+//                                       wakes it on release.
+//   { op: HOST_CALL, id, symbol, args }
+//                                    -> outbound RPC to the main thread;
+//                                       resumed when host posts a
+//                                       host-callback message back.
+//
+// Acquire/release lifecycle for synchronized:
+//   monitorEnter(thread, obj):
+//     uncontended (owner null or self): set owner=thread.id; count++; return
+//                                        null (no yield).
+//     contended:                         push entrant; return {op:
+//                                        "monitor_enter"} for the caller
+//                                        to ``yield``. The translator emits
+//                                        ``yield* _me(obj)`` -- the yield*
+//                                        is critical, plain ``_me(obj)``
+//                                        starts an iterator that nobody
+//                                        consumes and silently never
+//                                        acquires the monitor.
+//   monitorExit(thread, obj):
+//     count-- ; if count<=0: clear owner; if entrants non-empty, shift the
+//     head, assign owner+count from it, enqueue its thread. The entrant's
+//     resumeValue is null so its paused ``yield`` returns null and execution
+//     continues into the synchronized body with the lock now held.
+//   waitOn(thread, obj, timeout):
+//     save reentryCount; clear owner+count; return {op:"wait", reentryCount}.
+//     The lock is fully released until resumeWaiter restores ownership.
+//   resumeWaiter(waiter):
+//     if monitor unowned (or self-owned): take ownership at saved depth,
+//     enqueue waiter.thread. Otherwise re-park on monitor.entrants -- the
+//     waiter has to compete for re-entry like any other contender.
+//
+// Drain budget:
+//   drain bails after 2048 steps OR 8ms wall-clock (real
+//   performance.now()), whichever comes first; scheduleDrain posts a
+//   setTimeout(drain, 0) so the host event loop can process pointer
+//   events / network callbacks between drain bursts. The bail-out keeps a
+//   compute-heavy green thread from monopolising the worker.
+//
+// Common pitfalls when editing:
+//   * Translator MUST emit ``yield* _me(...)`` for monitorenter and
+//     synchronized-method entry. Plain ``_me(...)`` returns an unawaited
+//     iterator: monitorEnter never runs, monitorExit later sees an
+//     unowned monitor and throws IllegalMonitorStateException.
+//   * monitorExit must promote at most one entrant. Promoting more would
+//     break mutual exclusion (multiple owners simultaneously).
+//   * Adding new yield ops requires both a handler in handleYield AND an
+//     unpark path that calls enqueue / resumeWaiter -- otherwise the
+//     thread stays parked forever.
+//   * The installed ByteCodeTranslator jar bundles parparvm_runtime.js;
+//     edits to the source file require ``mvn install`` on
+//     vm/ByteCodeTranslator before downstream tests pick them up.
+// ============================================================================
 const jvm = {
   classes: {},
   nativeMethods: Object.create(null),
