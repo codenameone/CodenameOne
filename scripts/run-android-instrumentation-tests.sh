@@ -298,6 +298,17 @@ done
 #   launch — we can drive it directly from adb.
 #
 # RIGHT FIX, KEEP IT THAT WAY:
+#   * Re-install the main APK before relaunching. The Gradle
+#     `connectedAndroidTest` task uninstalls BOTH the .test APK and the
+#     app-under-test APK at teardown (look for two "DeviceConnector ...
+#     uninstalling <pkg>" lines in the gradle log to confirm). So by the
+#     time this retry block runs, the package is gone — `am start` then
+#     fails with "Activity not started, unable to resolve Intent ... pkg=
+#     <package>" no matter how cleanly we launch it. We sidestep that by
+#     running `pm list packages` to check installation state and `adb
+#     install -r $MAIN_APK` to put the APK back when missing. We don't
+#     need the .test APK for the retry — the main APK contains
+#     Cn1ssDeviceRunner and re-runs the entire suite when launched.
 #   * Use `am start -W -a MAIN -c LAUNCHER -p $PACKAGE_NAME` to launch by
 #     intent filter rather than resolving the launcher activity component
 #     name. Older (`cmd package resolve-activity --brief`) returned just the
@@ -335,6 +346,34 @@ if [ "${#FAILED_TESTS[@]}" -gt 0 ] && [ -n "${PACKAGE_NAME:-}" ]; then
   RETRY_LOGCAT_PID=$!
   LOGCAT_PID="$RETRY_LOGCAT_PID"
   sleep 2
+
+  # Re-install the main APK if Gradle has already uninstalled it (it
+  # uninstalls both APKs at teardown — see the comment block above for the
+  # diagnostic that surfaced this). Match the package name with `grep -x`
+  # rather than relying on `pm list packages`'s substring filter so we
+  # don't get a false positive from `<pkg>.test` or any other prefixed
+  # package that happens to be present.
+  if "$ADB_BIN" shell pm list packages "$PACKAGE_NAME" 2>/dev/null \
+      | tr -d '\r' | grep -qx "package:$PACKAGE_NAME"; then
+    ra_log "$PACKAGE_NAME already installed; skipping reinstall"
+  else
+    MAIN_APK="$GRADLE_PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk"
+    if [ -f "$MAIN_APK" ]; then
+      ra_log "$PACKAGE_NAME not installed; reinstalling from $MAIN_APK"
+      if INSTALL_OUT="$("$ADB_BIN" install -r "$MAIN_APK" 2>&1 | tr -d '\r')"; then
+        INSTALL_RC=0
+      else
+        INSTALL_RC=$?
+      fi
+      ra_log "adb install exit=${INSTALL_RC}, output:"
+      printf '%s\n' "$INSTALL_OUT" | sed 's/^/[run-android-instrumentation-tests]   /'
+      if [ "$INSTALL_RC" -ne 0 ]; then
+        ra_log "WARN: adb install reported failure; the am start below will likely fail too"
+      fi
+    else
+      ra_log "ERROR: cannot reinstall — APK not found at $MAIN_APK"
+    fi
+  fi
 
   # Launch by intent filter (action=MAIN, category=LAUNCHER, filtered to
   # our package). This avoids the launcher-component-resolution dance and
