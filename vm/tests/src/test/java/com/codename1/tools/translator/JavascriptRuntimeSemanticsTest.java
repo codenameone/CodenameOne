@@ -58,6 +58,75 @@ class JavascriptRuntimeSemanticsTest {
         assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
     }
 
+    /**
+     * Pins ``synchronized`` block mutual exclusion. Two green-threaded
+     * workers loop hammering the same lock; if at any point both are
+     * inside the block (lock was "stolen" rather than parked-and-yielded),
+     * the high-water-mark check trips and result is 0 instead of 511.
+     * See JsMonitorMutexApp javadoc for the historical regression this
+     * is guarding against.
+     */
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void synchronizedBlocksEnforceMutualExclusion(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsMonitorMutexApp.java", "JsMonitorMutexApp");
+
+        assertEquals(511, result.result,
+                "synchronized blocks must serialise green threads -- only one may be inside at a time. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    /**
+     * Pins FIFO ordering of contended monitor entrants. Three workers
+     * each block on a lock held by the main thread; when main releases,
+     * the first worker to have parked must run first.
+     */
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void synchronizedBlocksAdmitContendedEntrantsInFifoOrder(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsMonitorFifoApp.java", "JsMonitorFifoApp");
+
+        assertEquals(511, result.result,
+                "Contended monitor entrants must drain in registration order. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    /**
+     * Pins synchronized re-entrancy. A thread that already owns a
+     * monitor must take the fast ``count++`` path on a nested entry
+     * (otherwise it would park itself on its own monitor and deadlock).
+     */
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void synchronizedReentryByOwningThreadDoesNotBlock(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsMonitorReentrantApp.java", "JsMonitorReentrantApp");
+
+        assertEquals(511, result.result,
+                "synchronized re-entry by the owning thread must not block. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    /**
+     * Pins ``Object.wait()`` releasing the monitor. While the waiting
+     * thread is parked, another thread must be able to acquire the
+     * SAME synchronized block; the waiter re-acquires before
+     * resuming. If wait didn't release, this fixture would deadlock
+     * the worker harness.
+     */
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void objectWaitReleasesAndReacquiresMonitor(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsMonitorWaitReleaseApp.java", "JsMonitorWaitReleaseApp");
+
+        assertEquals(511, result.result,
+                "Object.wait must release the monitor and re-acquire on resume. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
     @ParameterizedTest
     @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
     void executesBroaderJavaApiCoverageInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
