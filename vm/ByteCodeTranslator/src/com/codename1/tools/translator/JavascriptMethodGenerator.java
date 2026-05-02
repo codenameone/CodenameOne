@@ -1250,11 +1250,7 @@ final class JavascriptMethodGenerator {
         }
         if (method.isSynchronizedMethod()) {
             out.append("  let __cn1Monitor = ").append(method.isStatic() ? "jvm.getClassObject(\"" + cls.getClsName() + "\")" : "__cn1ThisObject").append(";\n");
-            // ``yield* _me(...)`` lets the calling green thread park if
-            // the monitor is contended; the non-contended case is a
-            // fast no-yield. See parparvm_runtime.js ``_me`` /
-            // ``monitorEnter``.
-            out.append("  yield* _me(__cn1Monitor);\n");
+            out.append("  _me(__cn1Monitor);\n");
             out.append("  try {\n");
         }
         out.append("  while (true) {\n");
@@ -1858,7 +1854,7 @@ final class JavascriptMethodGenerator {
             }
             if (method.isSynchronizedMethod()) {
                 body.append("  let __cn1Monitor = ").append(method.isStatic() ? "jvm.getClassObject(\"" + cls.getClsName() + "\")" : "__cn1ThisObject").append(";\n");
-                body.append("  yield* _me(__cn1Monitor);\n");
+                body.append("  _me(__cn1Monitor);\n");
                 body.append("  try {\n");
             }
             body.append(instructionBody);
@@ -3497,7 +3493,7 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                 out.append("        { let value = stack.q(); let idx = stack.q(); let arr = stack.q(); _T(arr, idx, value); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.MONITORENTER:
-                out.append("        yield* _me(stack.q()); pc = ").append(index + 1).append("; break;\n");
+                out.append("        _me(stack.q()); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.MONITOREXIT:
                 out.append("        _mx(stack.q()); pc = ").append(index + 1).append("; break;\n");

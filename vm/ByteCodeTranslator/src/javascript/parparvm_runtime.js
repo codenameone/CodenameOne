@@ -2153,13 +2153,6 @@ const jvm = {
       emitVmMessage({ type: this.protocol.messages.HOST_CALL, id: yielded.id, symbol: yielded.symbol, args: safeArgs });
       return;
     }
-    if (yielded.op === "monitor_enter") {
-      // Thread is parked on monitor.entrants until ``monitorExit``
-      // promotes it. No timer, no setTimeout -- waking is purely
-      // event-driven on the holder's release.
-      thread.waiting = { op: "monitor_enter", entrant: yielded.entrant };
-      return;
-    }
     throw new Error("Unsupported yield op " + yielded.op);
   },
   resumeWaiter(waiter) {
@@ -2182,29 +2175,24 @@ const jvm = {
     if (monitor.owner == null || monitor.owner === thread.id) {
       monitor.owner = thread.id;
       monitor.count++;
-      return null;
+      return;
     }
-    // Contention. Park the current green thread on the monitor's
-    // ``entrants`` queue and signal a yield op to the caller. ``_me``
-    // (the translator-emitted ``yield* _me(obj)`` helper) sees the op
-    // and yields it; ``handleYield`` parks the thread; ``drain`` moves
-    // on to the next runnable thread. When the holder eventually calls
-    // ``monitorExit`` and ``count`` drops to 0, the next entrant is
-    // promoted to owner and re-enqueued.
-    //
-    // Older revisions of this method ``stole`` the lock from the
-    // current holder (pushed its (owner, count) onto a stack and took
-    // over), then unwound the stack on the entrant's matching exit.
-    // That made every contended synchronized block effectively
-    // non-mutexing: BOTH green threads could be inside the same
-    // block simultaneously, mutating shared state with the locking
-    // protocol promising they couldn't. Display.lock contention from
-    // Display.invokeAndBlock interleaved with the Dialog body thread
-    // was the most-felt manifestation. Yielding-and-queueing matches
-    // real Java monitor semantics on a cooperatively-scheduled worker.
-    const entrant = { thread: thread, reentryCount: 1, resumeValue: null };
-    monitor.entrants.push(entrant);
-    return { op: "monitor_enter", monitor: obj, entrant: entrant };
+    // Contention. The whole JS backend runs on one real thread, so the
+    // current owner is another simulated Java thread that yielded while
+    // still inside a synchronized block (e.g. Display.callSerially's
+    // internal lock held across a thread hand-off during Form.show's
+    // focus bring-up path). That thread can't make progress until we
+    // yield back to the scheduler, so stealing the lock here is safe:
+    // we push its (owner, count) pair onto a stack, take over, and pop
+    // on our way out. When the original owner eventually resumes and
+    // calls monitorExit, its (owner, count) match again. Nested steals
+    // cascade through the stack. This avoids needing generator-based
+    // yielding semantics in the emitted code (jvm.monitorEnter is a
+    // plain synchronous call in JavascriptMethodGenerator).
+    const stolen = monitor.__stolen || (monitor.__stolen = []);
+    stolen.push({ owner: monitor.owner, count: monitor.count });
+    monitor.owner = thread.id;
+    monitor.count = 1;
   },
   monitorExit(thread, obj) {
     const monitor = obj.__monitor || (obj.__monitor = this.createMonitor());
@@ -2215,7 +2203,18 @@ const jvm = {
     if (monitor.count <= 0) {
       monitor.count = 0;
       monitor.owner = null;
-      if (monitor.entrants.length) {
+      // Unwind the most recent steal before handing the lock to a
+      // properly-queued entrant. The stolen-from thread will expect its
+      // own (owner, count) to still be in place when its monitorExit
+      // runs eventually.
+      if (monitor.__stolen && monitor.__stolen.length) {
+        const prev = monitor.__stolen.pop();
+        if (!monitor.__stolen.length) {
+          monitor.__stolen = null;
+        }
+        monitor.owner = prev.owner;
+        monitor.count = prev.count;
+      } else if (monitor.entrants.length) {
         const next = monitor.entrants.shift();
         monitor.owner = next.thread.id;
         monitor.count = next.reentryCount;
@@ -2563,21 +2562,7 @@ global._j = (c,t,l) => jvm.newArray(c,t,l);    // jvm.newArray(count,type,dims)
 // declared (it's ``null`` at load time), so we need a getter-style
 // function rather than a captured alias.
 global._g = () => jvm.currentThread;
-// ``_me`` is a generator so a translator-emitted ``yield* _me(obj)`` can
-// suspend the calling green thread when the monitor is contended.
-// Non-contended path returns null and the generator finishes immediately
-// with no yield -- effectively a synchronous fast path for the common
-// case (drain doesn't context-switch and the caller continues without
-// observable overhead beyond a generator object allocation).
-// Contended path returns a {op:"monitor_enter"} value, which we yield
-// to handleYield. handleYield parks the thread on monitor.entrants;
-// monitorExit promotes the head entrant when the holder releases.
-global._me = function*(m) {
-  const yielded = jvm.monitorEnter(jvm.currentThread, m);
-  if (yielded && yielded.op) {
-    yield yielded;
-  }
-};
+global._me = (m) => jvm.monitorEnter(jvm.currentThread, m);
 global._mx = (m) => jvm.monitorExit(jvm.currentThread, m);
 // Hook into ``defineClass`` to populate ``_S`` alongside the normal
 // ``jvm.classes`` registration. Done via a wrapping re-assignment so
