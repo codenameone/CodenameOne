@@ -47,7 +47,10 @@ public final class SkinModel {
 
     public void resetForDevice(DeviceDatabase.Device d) {
         presetId = "rr";
-        name = d == null ? "My skin" : d.name + " skin";
+        // Drop the trailing " skin" from the generated name — sanitize() then
+        // appends ".skin" as the file extension, so without this the file
+        // came out as "Apple-iPad-Air-13-2024-skin.skin".
+        name = d == null ? "My skin" : d.name;
         cornerR = 40;
         bezel = 40;
         homeIndicator = d == null || d.hasHomeIndicator;

@@ -1,6 +1,7 @@
 package com.codename1.tools.skindesigner;
 
 import com.codename1.components.OnOffSwitch;
+import com.codename1.components.SpanLabel;
 import com.codename1.components.ToastBar;
 import com.codename1.io.FileSystemStorage;
 import com.codename1.io.Log;
@@ -19,7 +20,6 @@ import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
-import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
@@ -355,14 +355,13 @@ public class SkinDesigner extends Lifecycle {
         heading.setUIID("SkinDesignerStepHead");
         Label h1 = new Label("Which device is this skin for?");
         h1.setUIID("SkinDesignerH1");
-        TextArea sub = new TextArea(
+        // SpanLabel wraps cleanly without inheriting TextArea's default
+        // underline/border styling (which was reading as a thick divider).
+        SpanLabel sub = new SpanLabel(
                 "Pick your device. We'll prefill resolution, PPI, safe-area insets, "
                         + "and fonts so you can focus on the skin shape.");
-        sub.setUIID("SkinDesignerSub");
-        sub.setEditable(false);
-        sub.setFocusable(false);
-        sub.setGrowByContent(true);
-        sub.setRows(2);
+        sub.setUIID("SkinDesignerSubBlock");
+        sub.setTextUIID("SkinDesignerSub");
         heading.add(h1);
         heading.add(sub);
 
@@ -767,14 +766,9 @@ public class SkinDesigner extends Lifecycle {
         h3.setUIID("SkinDesignerH3");
         card.add(h3);
 
-        // Multi-line description — Label wraps poorly, so use a non-editable
-        // TextArea that grows to fit the wrapped text.
-        TextArea p = new TextArea(desc);
-        p.setUIID("SkinDesignerSourceP");
-        p.setEditable(false);
-        p.setFocusable(false);
-        p.setGrowByContent(true);
-        p.setRows(3);
+        SpanLabel p = new SpanLabel(desc);
+        p.setUIID("SkinDesignerSourcePBlock");
+        p.setTextUIID("SkinDesignerSourceP");
         card.add(p);
 
         Container wrapper = makeClickable(card, e -> {
@@ -1080,7 +1074,12 @@ public class SkinDesigner extends Lifecycle {
         selectArea.setUIID("Container");
         selectArea.add(BorderLayout.WEST, BoxLayout.encloseX(sw, name));
         selectArea.add(BorderLayout.EAST, type);
-        makeClickable(selectArea, e -> {
+        // makeClickable returns a LayeredLayout WRAPPER that contains
+        // selectArea + an overlay Button. We must add THAT wrapper to the
+        // row, not selectArea itself — re-parenting selectArea would orphan
+        // the overlay and the row would no longer respond to taps. (This
+        // was the source of the exception the user saw on the Cutouts tab.)
+        Container clickable = makeClickable(selectArea, e -> {
             selectedCutout = (selectedCutout == idx) ? -1 : idx;
             rebuildCutoutList();
         });
@@ -1098,7 +1097,7 @@ public class SkinDesigner extends Lifecycle {
             livePreview.repaint();
         });
 
-        row.add(BorderLayout.CENTER, selectArea);
+        row.add(BorderLayout.CENTER, clickable);
         row.add(BorderLayout.EAST, rm);
         return row;
     }
@@ -1236,11 +1235,14 @@ public class SkinDesigner extends Lifecycle {
     private String lastSkinFile;
 
     /**
-     * Generates the .skin bytes, persists them to FileSystemStorage and
-     * triggers {@link Display#execute(String)} to open the browser's
-     * download dialog. MUST be called from a direct user-gesture (e.g. a
-     * Button action listener); browsers block downloads triggered from
-     * deferred / async code.
+     * Generates the .skin bytes and persists them to FileSystemStorage so
+     * the done step's Download button can fire {@link Display#execute(String)}
+     * on the cached file instantly (no slow regeneration inside the click
+     * handler). Does NOT itself call execute() — the Finish click handler
+     * runs createSkinBytes() which can take seconds, and by the time we'd
+     * call execute() the browser's user-gesture window is gone and the
+     * download is silently blocked. The done step's primary "Download skin"
+     * Button is the reliable trigger.
      */
     private void saveSkinFromUserGesture() {
         byte[] data = createSkinBytes();
@@ -1254,12 +1256,6 @@ public class SkinDesigner extends Lifecycle {
             os.write(data);
             lastSkinBytes = data;
             lastSkinFile = outPath;
-            // Calling execute() here, synchronously inside the Finish click
-            // handler, keeps us inside the browser's user-gesture window so
-            // the download dialog actually fires. (The earlier auto-save in
-            // buildDoneStep() ran one event-loop tick later — long enough
-            // for the gesture context to expire — and the popup was blocked.)
-            Display.getInstance().execute(outPath);
         } catch (IOException err) {
             Log.e(err);
             ToastBar.showErrorMessage("Error saving skin: " + err);
@@ -1284,15 +1280,13 @@ public class SkinDesigner extends Lifecycle {
         h1.setUIID("SkinDesignerH1");
         root.add(FlowLayout.encloseCenter(h1));
 
-        TextArea msg = new TextArea(savedOk
-                ? "Your skin file has been generated. If your browser blocked "
-                        + "the download, click \"Download skin\" below to save it again."
+        SpanLabel msg = new SpanLabel(savedOk
+                ? "Your skin file has been generated. Click \"Download skin\" "
+                        + "below to save it (your browser may have blocked the "
+                        + "auto-download)."
                 : "Click \"Download skin\" to generate and save your .skin file.");
-        msg.setUIID("SkinDesignerSub");
-        msg.setEditable(false);
-        msg.setFocusable(false);
-        msg.setGrowByContent(true);
-        msg.setRows(2);
+        msg.setUIID("SkinDesignerSubBlock");
+        msg.setTextUIID("SkinDesignerSub");
         root.add(msg);
 
         Container summary = new Container(new BoxLayout(BoxLayout.Y_AXIS));
@@ -1639,8 +1633,28 @@ public class SkinDesigner extends Lifecycle {
         p.put("overrideNames", overrideNames(device));
 
         int bezelPx = skinBezelInPx(totalW, totalH);
-        int safeTopPx = Math.round(skin.safeTop * ((float) device.resolutionW / DevicePreview.VB_W));
-        int safeBottomPx = Math.round(skin.safeBottom * ((float) device.resolutionW / DevicePreview.VB_W));
+        // Effective safe-top must cover any cutouts the user added (notch,
+        // island, hole) that intrude into the screen, otherwise content
+        // would render under them. Use the deepest cutout extent in the
+        // viewbox space, then take max with the user-set skin.safeTop.
+        int cutoutSafeTopVB = 0;
+        for (SkinModel.Cutout c : skin.cutouts) {
+            int extent;
+            if (SkinModel.CUTOUT_NOTCH.equals(c.type)) {
+                // Notches start at y=0 and protrude h px down.
+                extent = c.h;
+            } else {
+                // Island / hole y is from screen top; bottom edge is y + h.
+                extent = c.y + c.h;
+            }
+            if (extent > cutoutSafeTopVB) {
+                cutoutSafeTopVB = extent;
+            }
+        }
+        int effectiveSafeTopVB = Math.max(skin.safeTop, cutoutSafeTopVB);
+        float vbToPx = (float) device.resolutionW / DevicePreview.VB_W;
+        int safeTopPx = Math.round(effectiveSafeTopVB * vbToPx);
+        int safeBottomPx = Math.round(skin.safeBottom * vbToPx);
         int safeX = bezelPx;
         int safeY = bezelPx + safeTopPx;
         int safeW = device.resolutionW;
