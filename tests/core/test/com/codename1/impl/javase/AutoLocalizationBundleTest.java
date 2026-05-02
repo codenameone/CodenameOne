@@ -62,6 +62,21 @@ public class AutoLocalizationBundleTest extends AbstractTest {
             Map<String, String> bundleReloadedMap = (Map<String, String>) bundleReloaded;
             assertEqual("missingKey", bundleReloadedMap.get("missingKey"), "Existing persisted values should be loaded");
 
+            // Regression: meta-keys (anything starting with `@`) must NOT be auto-fabricated.
+            // The auto-fabrication was breaking UIManager.setBundle, which queries `@im` /
+            // `@rtl` on every install and uses null-vs-non-null to mean "feature disabled".
+            // When the bundle echoed "@im" -> "@im", setBundle tokenized it, queried
+            // "@im-@im", got "@im-@im" back, and parseTextFieldInputMode crashed on
+            // substring(0, indexOf('=')) for a token with no '=' (issue #4850).
+            assertNull(bundleReloadedMap.get("@im"), "@-prefixed meta-keys must not be auto-fabricated");
+            assertNull(bundleReloadedMap.get("@rtl"), "@-prefixed meta-keys must not be auto-fabricated");
+            assertNull(bundleReloadedMap.get("@im-FOO"), "@-prefixed meta-keys must not be auto-fabricated");
+
+            // But real meta-key values that exist in the underlying file are still returned.
+            // Stage one by writing it through the explicit put path (which persists to disk).
+            bundleReloadedMap.put("@rtl", "true");
+            assertEqual("true", bundleReloadedMap.get("@rtl"), "Existing meta-key values should still be returned");
+
             return true;
         } finally {
             deleteRecursive(tempDir);

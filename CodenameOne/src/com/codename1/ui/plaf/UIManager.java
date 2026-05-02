@@ -2431,20 +2431,9 @@ public class UIManager {
         for (int iter = 0; iter < count; iter++) {
             String t = (String) tokens.elementAt(iter);
             int pos = t.indexOf('=');
-            // A malformed bundle (e.g. simulator AutoLocalizationBundle echoing the @im key
-            // back as its value) can produce tokens with no '='. Skip them rather than
-            // crashing on substring(0, -1).
-            if (pos < 0) {
-                continue;
-            }
             String key = t.substring(0, pos);
             String val = t.substring(pos + 1);
-            try {
-                response.put(Integer.valueOf(key), val);
-            } catch (NumberFormatException nfe) {
-                // Same defense: a non-numeric key means the entry isn't a real input-mode
-                // descriptor, so just skip it rather than failing the entire bundle install.
-            }
+            response.put(Integer.valueOf(key), val);
         }
         return response;
     }
