@@ -6,7 +6,9 @@
 package com.codename1.impl.javase.util;
 
 import com.codename1.io.Log;
+import com.codename1.ui.Display;
 import java.io.File;
+import java.net.URL;
 
 /**
  *
@@ -63,6 +65,49 @@ public class MavenUtils {
         return null;
     }
     
+    /**
+     * Locate the codenameone-designer:jar-with-dependencies jar inside the local
+     * Maven (~/.m2) repository, using the version of the codenameone-core jar that
+     * is currently loaded into this JVM. Returns null if the running framework is
+     * not loaded from m2 (e.g. running from a build directory) or if the matching
+     * designer jar has not been resolved yet.
+     *
+     * <p>The Maven plugin declares codenameone-designer as a plugin dependency, so
+     * any plugin invocation (cn1:run, mvn compile when bound to the css goal, etc.)
+     * implicitly fetches the matching designer jar into m2. This lookup lets the
+     * simulator runtime use that exact version even when codename1.designer.jar
+     * isn't passed as a system property -- avoiding a stale ~/.codenameone/designer_1.jar
+     * fallback.
+     */
+    public static File findDesignerJarInM2() {
+        try {
+            URL location = Display.class.getProtectionDomain().getCodeSource().getLocation();
+            if (location == null) {
+                return null;
+            }
+            File coreJar = new File(location.toURI());
+            // Expected layout: <repo>/com/codenameone/codenameone-core/<version>/codenameone-core-<version>.jar
+            File versionDir = coreJar.getParentFile();
+            if (versionDir == null) return null;
+            File coreDir = versionDir.getParentFile();
+            if (coreDir == null) return null;
+            File codenameoneGroupDir = coreDir.getParentFile();
+            if (codenameoneGroupDir == null) return null;
+            if (!"codenameone-core".equals(coreDir.getName())) {
+                return null;
+            }
+            String version = versionDir.getName();
+            File designerVersionDir = new File(codenameoneGroupDir, "codenameone-designer" + File.separator + version);
+            File designer = new File(designerVersionDir, "codenameone-designer-" + version + "-jar-with-dependencies.jar");
+            if (designer.isFile()) {
+                return designer;
+            }
+        } catch (Throwable t) {
+            // Best-effort lookup. Any unexpected layout means we can't resolve via m2.
+        }
+        return null;
+    }
+
     public static boolean isRunningInJDK() {
         if (!isRunningInJDKChecked) {
             isRunningInJDKChecked = true;

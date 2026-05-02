@@ -237,7 +237,11 @@ public class CompileCSSMojo extends AbstractCN1Mojo {
         // zip file (which is the designer jar with all dependencies).  We use this jar
         // rather than the central designer_1.jar located in the user's home directory to make it
         // easier to pin to a particular version.
-        Java java = createJava();
+        // Use INFO log level (rather than the default DEBUG) so that stack traces from the
+        // forked CSS compiler are visible without re-running with -X. When the subprocess
+        // throws (e.g. StringIndexOutOfBoundsException in CN1CSSCLI), users currently only see
+        // the wrapper "An error occurred while compiling the CSS files" with no useful detail.
+        Java java = createJava(org.apache.maven.doxia.logging.Log.LEVEL_INFO);
         java.setDir(getCN1ProjectDir());
         java.setJar(getDesignerJar());
         java.setFork(true);

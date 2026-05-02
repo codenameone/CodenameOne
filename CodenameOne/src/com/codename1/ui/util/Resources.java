@@ -929,7 +929,11 @@ public class Resources {
     ///
     /// Hashtable containing key value pairs for localized data
     public Hashtable<String, String> getL10N(String id, String locale) {
-        return (Hashtable<String, String>) ((Hashtable) resources.get(id)).get(locale);
+        Hashtable bundles = (Hashtable) resources.get(id);
+        if (bundles == null) {
+            return null;
+        }
+        return (Hashtable<String, String>) bundles.get(locale);
     }
 
     /// Returns an enumration of the locales supported by this resource id
@@ -942,7 +946,11 @@ public class Resources {
     ///
     /// enumeration of strings containing bundle names
     public Enumeration listL10NLocales(String id) {
-        return ((Hashtable) resources.get(id)).keys();
+        Hashtable bundles = (Hashtable) resources.get(id);
+        if (bundles == null) {
+            return null;
+        }
+        return bundles.keys();
     }
 
     /// Returns a collection of the l10 locale names
@@ -955,7 +963,11 @@ public class Resources {
     ///
     /// collection of strings containing bundle names
     public Collection<String> l10NLocaleSet(String id) {
-        return ((Hashtable<String, String>) resources.get(id)).keySet();
+        Hashtable<String, String> bundles = (Hashtable<String, String>) resources.get(id);
+        if (bundles == null) {
+            return null;
+        }
+        return bundles.keySet();
     }
 
     /// Returns the font resource from the file

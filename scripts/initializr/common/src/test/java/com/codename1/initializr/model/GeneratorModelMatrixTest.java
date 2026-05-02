@@ -345,18 +345,27 @@ public class GeneratorModelMatrixTest extends AbstractTest {
 
 
     private void assertLocalizationBundles(Map<String, byte[]> entries, Template template, boolean expectLocalizationBundles) {
+        // Bundles MUST live under common/src/main/l10n -- that's where the CN1 maven plugin's
+        // CSS compiler scans for properties files to bake into theme.res. Placing them under
+        // src/main/resources causes Resources.getGlobalResources().getL10N("messages", lang)
+        // to return null at runtime (see CompileCSSMojo.findLocalizationDirectory).
         if (template == Template.BAREBONES || template == Template.KOTLIN) {
             if (expectLocalizationBundles) {
-                assertNotNull(entries.get("common/src/main/resources/messages.properties"), "Barebones templates should include default localization bundle");
-                assertNotNull(entries.get("common/src/main/resources/messages_ar.properties"), "Barebones templates should include Arabic localization bundle");
-                assertNotNull(entries.get("common/src/main/resources/messages_he.properties"), "Barebones templates should include Hebrew localization bundle");
+                assertNotNull(entries.get("common/src/main/l10n/messages.properties"), "Barebones templates should include default localization bundle under l10n");
+                assertNotNull(entries.get("common/src/main/l10n/messages_ar.properties"), "Barebones templates should include Arabic localization bundle under l10n");
+                assertNotNull(entries.get("common/src/main/l10n/messages_he.properties"), "Barebones templates should include Hebrew localization bundle under l10n");
+                assertNull(entries.get("common/src/main/resources/messages.properties"), "Bundles must not be written to src/main/resources -- the CN1 plugin will not bake them into theme.res");
+                assertNull(entries.get("common/src/main/resources/messages_ar.properties"), "Bundles must not be written to src/main/resources -- the CN1 plugin will not bake them into theme.res");
+                assertNull(entries.get("common/src/main/resources/messages_he.properties"), "Bundles must not be written to src/main/resources -- the CN1 plugin will not bake them into theme.res");
             } else {
+                assertNull(entries.get("common/src/main/l10n/messages.properties"), "Barebones templates should not include localization bundles by default");
+                assertNull(entries.get("common/src/main/l10n/messages_ar.properties"), "Barebones templates should not include Arabic localization bundle by default");
+                assertNull(entries.get("common/src/main/l10n/messages_he.properties"), "Barebones templates should not include Hebrew localization bundle by default");
                 assertNull(entries.get("common/src/main/resources/messages.properties"), "Barebones templates should not include localization bundles by default");
-                assertNull(entries.get("common/src/main/resources/messages_ar.properties"), "Barebones templates should not include Arabic localization bundle by default");
-                assertNull(entries.get("common/src/main/resources/messages_he.properties"), "Barebones templates should not include Hebrew localization bundle by default");
             }
             return;
         }
+        assertNull(entries.get("common/src/main/l10n/messages.properties"), "Non-bare templates should not receive default localization bundle");
         assertNull(entries.get("common/src/main/resources/messages.properties"), "Non-bare templates should not receive default localization bundle");
     }
 
