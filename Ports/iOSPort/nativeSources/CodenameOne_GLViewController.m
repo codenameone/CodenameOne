@@ -1350,6 +1350,19 @@ void Java_com_codename1_impl_ios_IOSImplementation_drawTextureAlphaMaskImpl(JAVA
 {
 
     DrawTextureAlphaMask *f = [[DrawTextureAlphaMask alloc] initWithArgs:textureName color:color alpha:alpha x:x y:y w:w h:h];
+#ifdef CN1_USE_METAL
+    // If a mutable image is the current draw target (the Java side called
+    // startDrawingOnImage(...) to begin painting INTO an Image), tag the op
+    // so drawFrame's drain (Phase 3 v2) routes it to that image's encoder
+    // instead of the screen encoder. This is what unifies mutable-image
+    // shape rendering with the screen pipeline -- the same alpha-mask
+    // texture goes to the same Metal alpha-mask shader, just bound to a
+    // different render target.
+    GLUIImage *mutableTarget = [CodenameOne_GLViewController instance].currentMutableImage;
+    if (mutableTarget != nil) {
+        [f setTarget:mutableTarget];
+    }
+#endif
     [CodenameOne_GLViewController upcoming:f];
 #ifndef CN1_USE_ARC
     [f release];

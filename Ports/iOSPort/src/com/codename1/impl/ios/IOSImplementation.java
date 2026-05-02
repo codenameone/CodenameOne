@@ -4895,19 +4895,84 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
 
         void nativeDrawRoundRect(int color, int alpha, int x, int y, int width, int height, int arcWidth, int arcHeight) {
+            if (metalRendering) {
+                // Build a round-rect GeneralPath and route through nativeDrawShape
+                // so the alpha-mask Metal pipeline renders it. No CG bitmap.
+                GeneralPath p = roundRectPath(x, y, width, height, arcWidth, arcHeight);
+                if (tmpStroke1px == null) tmpStroke1px = new Stroke(1, Stroke.CAP_BUTT, Stroke.JOIN_ROUND, 1f);
+                nativeDrawShape(p, tmpStroke1px);
+                return;
+            }
             nativeDrawRoundRectMutable(color, alpha, x, y, width, height, arcWidth, arcHeight);
         }
 
         void nativeFillRoundRect(int color, int alpha, int x, int y, int width, int height, int arcWidth, int arcHeight) {
+            if (metalRendering) {
+                GeneralPath p = roundRectPath(x, y, width, height, arcWidth, arcHeight);
+                nativeFillShape(p);
+                return;
+            }
             nativeFillRoundRectMutable(color, alpha, x, y, width, height, arcWidth, arcHeight);
         }
 
         void nativeDrawArc(int color, int alpha, int x, int y, int width, int height, int startAngle, int arcAngle) {
+            if (metalRendering) {
+                // Same approach GlobalGraphics uses (drawingArcPath + nativeDrawShape).
+                if (drawingArcPath == null) drawingArcPath = new GeneralPath();
+                if (tmpStroke1px == null) tmpStroke1px = new Stroke(1, Stroke.CAP_BUTT, Stroke.JOIN_ROUND, 1f);
+                drawingArcPath.reset();
+                drawingArcPath.arc(x, y, width, height, startAngle * Math.PI / 180, arcAngle * Math.PI / 180, false);
+                nativeDrawShape(drawingArcPath, tmpStroke1px);
+                return;
+            }
             nativeDrawArcMutable(color, alpha, x, y, width, height, startAngle, arcAngle);
         }
 
         void nativeFillArc(int color, int alpha, int x, int y, int width, int height, int startAngle, int arcAngle) {
+            if (metalRendering) {
+                if (drawingArcPath == null) drawingArcPath = new GeneralPath();
+                drawingArcPath.reset();
+                drawingArcPath.moveTo(x + width / 2, y + height / 2);
+                drawingArcPath.arc(x, y, width, height, startAngle * Math.PI / 180, arcAngle * Math.PI / 180, true);
+                drawingArcPath.closePath();
+                nativeFillShape(drawingArcPath);
+                return;
+            }
             nativeFillArcMutable(color, alpha, x, y, width, height, startAngle, arcAngle);
+        }
+
+        private Stroke tmpStroke1px;
+        private GeneralPath drawingArcPath;
+
+        // Build a round-rect path from the parametric (x,y,w,h,arcW,arcH) form
+        // so the alpha-mask pipeline can rasterise it. arcW/arcH are full
+        // ellipse-axis lengths (matching the Java2D / cn1 roundRect contract);
+        // half each gives the corner radii.
+        private GeneralPath roundRectPath(int x, int y, int width, int height, int arcWidth, int arcHeight) {
+            GeneralPath p = new GeneralPath();
+            float rx = Math.min(arcWidth / 2f, width / 2f);
+            float ry = Math.min(arcHeight / 2f, height / 2f);
+            if (rx <= 0 || ry <= 0) {
+                // Degenerate: just emit a rectangle outline.
+                p.moveTo(x, y);
+                p.lineTo(x + width, y);
+                p.lineTo(x + width, y + height);
+                p.lineTo(x, y + height);
+                p.closePath();
+                return p;
+            }
+            // Top edge + four ellipse-quarter corners.
+            p.moveTo(x + rx, y);
+            p.lineTo(x + width - rx, y);
+            p.arc(x + width - 2*rx, y,             2*rx, 2*ry, -Math.PI / 2,  Math.PI / 2, false);
+            p.lineTo(x + width,     y + height - ry);
+            p.arc(x + width - 2*rx, y + height - 2*ry, 2*rx, 2*ry, 0,           Math.PI / 2, false);
+            p.lineTo(x + rx,        y + height);
+            p.arc(x,                y + height - 2*ry, 2*rx, 2*ry, Math.PI / 2, Math.PI / 2, false);
+            p.lineTo(x,             y + ry);
+            p.arc(x,                y,             2*rx, 2*ry, Math.PI,     Math.PI / 2, false);
+            p.closePath();
+            return p;
         }
 
         void nativeDrawString(int color, int alpha, long fontPeer, String str, int x, int y) {
@@ -4934,7 +4999,14 @@ public class IOSImplementation extends CodenameOneImplementation {
         // BEGIN DRAW SHAPE METHODS
         
         void nativeDrawAlphaMask(TextureAlphaMask mask){
-            
+            // Mirror GlobalGraphics: hand the alpha-mask MTLTexture handle
+            // off to drawTextureAlphaMask. The JNI side picks up
+            // currentMutableImage and tags the queued op so drawFrame's
+            // drain (Phase 3 v2) routes it to the mutable's encoder.
+            if (mask != null && mask.getTextureName() != 0) {
+                Rectangle r = mask.getBounds();
+                nativeInstance.drawTextureAlphaMask(mask.getTextureName(), this.color, this.alpha, r.getX(), r.getY(), r.getWidth(), r.getHeight());
+            }
         }
         
         
@@ -4980,44 +5052,116 @@ public class IOSImplementation extends CodenameOneImplementation {
          * @param shape
          * @param stroke
          */
-        void nativeDrawShape(Shape shape, Stroke stroke){//float lineWidth, int capStyle, int miterStyle, float miterLimit){
-            if (shape.getClass() == GeneralPath.class) {
-                // GeneralPath gives us some easy access to the points
-                GeneralPath p = (GeneralPath)shape;
-                int commandsLen = p.getTypesSize();
-                int pointsLen = p.getPointsSize();
-                byte[] commandsArr = getTmpNativeDrawShape_commands(commandsLen);
-                float[] pointsArr = getTmpNativeDrawShape_coords(pointsLen);
-                p.getTypes(commandsArr);
-                p.getPoints(pointsArr);
-                
-                nativeInstance.nativeDrawShapeMutable(color, alpha, commandsLen, commandsArr, pointsLen, pointsArr, stroke.getLineWidth(), stroke.getCapStyle(), stroke.getJoinStyle(), stroke.getMiterLimit());
+        void nativeDrawShape(Shape shape, Stroke stroke){
+            if (!metalRendering) {
+                // GL keeps the original CG-backed path (nativeDrawShapeMutable
+                // JNI) so its goldens stay valid.
+                if (shape.getClass() == GeneralPath.class) {
+                    GeneralPath p = (GeneralPath)shape;
+                    int commandsLen = p.getTypesSize();
+                    int pointsLen = p.getPointsSize();
+                    byte[] commandsArr = getTmpNativeDrawShape_commands(commandsLen);
+                    float[] pointsArr = getTmpNativeDrawShape_coords(pointsLen);
+                    p.getTypes(commandsArr);
+                    p.getPoints(pointsArr);
+                    nativeInstance.nativeDrawShapeMutable(color, alpha, commandsLen, commandsArr, pointsLen, pointsArr, stroke.getLineWidth(), stroke.getCapStyle(), stroke.getJoinStyle(), stroke.getMiterLimit());
+                } else {
+                    Log.p("Drawing shapes that are not GeneralPath objects is not yet supported on mutable images.");
+                }
+                return;
+            }
+            // Metal: route through the Renderer.c-driven alpha-mask path. On
+            // the iOS Metal port that path emits an R8 MTLTexture and a
+            // DrawTextureAlphaMask op; the JNI side (drawTextureAlphaMaskImpl)
+            // tags the op with currentMutableImage so the drain loop binds
+            // the mutable's offscreen MTLTexture as the render target -- same
+            // Metal alpha-mask shader, just a different attachment. No more
+            // CGContextStrokePath, no more separate nativeDrawShapeMutable JNI.
+            if (shape instanceof GeneralPath) {
+                if (transform == null || transform.isIdentity()) {
+                    TextureAlphaMask mask = textureCache.get(shape, stroke);
+                    if (mask == null) {
+                        mask = createAlphaMask(shape, stroke);
+                        textureCache.add(shape, stroke, mask);
+                    }
+                    if (mask == null) return;
+                    nativeDrawAlphaMask(mask);
+                } else {
+                    // Non-identity transform path: bake the transform into
+                    // a copy of the shape, then alpha-mask + draw. Mirrors
+                    // GlobalGraphics.nativeDrawShape exactly.
+                    if (tmpDrawShape == null) tmpDrawShape = new GeneralPath();
+                    if (tmpTransform == null) tmpTransform = Transform.makeIdentity();
+                    if (tmpDrawStroke == null) tmpDrawStroke = new Stroke();
+                    GeneralPath p = (GeneralPath) shape;
+                    if (tmpRect2 == null) tmpRect2 = new Rectangle();
+                    Rectangle origBounds = reusableRect;
+                    Rectangle transformedBounds = tmpRect2;
+                    p.getBounds(origBounds);
+                    tmpDrawShape.setShape(shape, transform);
+                    tmpDrawShape.getBounds(transformedBounds);
+                    double h1 = Math.sqrt(origBounds.getWidth()*origBounds.getWidth() + origBounds.getHeight()*origBounds.getHeight());
+                    double h2 = Math.sqrt(transformedBounds.getWidth()*transformedBounds.getWidth() + transformedBounds.getHeight()*transformedBounds.getHeight());
+                    if (h2 < 1) h2 = 1;
+                    if (h1 < 1) h1 = 1;
+                    float scale = (float)(h2 / h1);
+                    tmpTransform.setScale(scale, scale);
+                    tmpDrawShape.setShape(shape, tmpTransform);
+                    if (stroke != null) {
+                        tmpDrawStroke.setStroke(stroke);
+                        tmpDrawStroke.setLineWidth(tmpDrawStroke.getLineWidth() * scale);
+                    }
+                    TextureAlphaMask mask = textureCache.get(tmpDrawShape, stroke == null ? null : tmpDrawStroke);
+                    if (mask == null) {
+                        mask = createAlphaMask(tmpDrawShape, stroke == null ? null : tmpDrawStroke);
+                        textureCache.add(tmpDrawShape, stroke == null ? null : tmpDrawStroke, mask);
+                    }
+                    if (mask == null) return;
+                    Transform saved = transform;
+                    Transform inv = Transform.makeIdentity();
+                    inv.setTransform(transform);
+                    inv.scale(1f / scale, 1f / scale);
+                    setTransform(inv);
+                    try {
+                        nativeDrawAlphaMask(mask);
+                    } finally {
+                        setTransform(saved);
+                    }
+                }
             } else {
                 Log.p("Drawing shapes that are not GeneralPath objects is not yet supported on mutable images.");
             }
-            
-            
         }
-        
+
+        private GeneralPath tmpDrawShape;
+        private Transform tmpTransform;
+        private Stroke tmpDrawStroke;
+        private Rectangle tmpRect2;
+
         /**
          * Fills a shape in the graphics context.
          * @param shape
          */
         void nativeFillShape(Shape shape) {
-            if (shape.getClass() == GeneralPath.class) {
-                // GeneralPath gives us some easy access to the points
-                GeneralPath p = (GeneralPath)shape;
-                int commandsLen = p.getTypesSize();
-                int pointsLen = p.getPointsSize();
-                byte[] commandsArr = getTmpNativeDrawShape_commands(commandsLen);
-                float[] pointsArr = getTmpNativeDrawShape_coords(pointsLen);
-                p.getTypes(commandsArr);
-                p.getPoints(pointsArr);
-                
-                nativeInstance.nativeFillShapeMutable(color, alpha, commandsLen, commandsArr, pointsLen, pointsArr);
-            } else {
-                Log.p("Drawing shapes that are not GeneralPath objects is not yet supported on mutable images.");
+            if (!metalRendering) {
+                if (shape.getClass() == GeneralPath.class) {
+                    GeneralPath p = (GeneralPath)shape;
+                    int commandsLen = p.getTypesSize();
+                    int pointsLen = p.getPointsSize();
+                    byte[] commandsArr = getTmpNativeDrawShape_commands(commandsLen);
+                    float[] pointsArr = getTmpNativeDrawShape_coords(pointsLen);
+                    p.getTypes(commandsArr);
+                    p.getPoints(pointsArr);
+                    nativeInstance.nativeFillShapeMutable(color, alpha, commandsLen, commandsArr, pointsLen, pointsArr);
+                } else {
+                    Log.p("Drawing shapes that are not GeneralPath objects is not yet supported on mutable images.");
+                }
+                return;
             }
+            // Same architectural shift as nativeDrawShape -- alpha-mask path
+            // on Metal, no CGContextFillPath. fillShape passes a null stroke
+            // to flag fill-rather-than-stroke through the Renderer.c side.
+            nativeDrawShape(shape, null);
         }
 
         boolean isDrawShadowSupported() {
@@ -5041,7 +5185,12 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         
         boolean isAlphaMaskSupported(){
-            return false;
+            // On Metal, nativeDrawShape/nativeFillShape route through the
+            // Renderer.c-driven alpha-mask pipeline (same as GlobalGraphics).
+            // Letting the framework know unblocks code paths that prefer
+            // alpha-mask rendering for mutable targets. On GL we keep the
+            // legacy CG path -- same as before.
+            return metalRendering;
         }
 
         // END DRAW SHAPE METHODS
@@ -5351,11 +5500,54 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
 
         void nativeDrawRoundRect(int color, int alpha, int x, int y, int width, int height, int arcWidth, int arcHeight) {
+            if (metalRendering) {
+                // Route through the alpha-mask Metal pipeline (build a path,
+                // then nativeDrawShape uses Renderer.c -> R8 MTLTexture ->
+                // DrawTextureAlphaMask op). No more CGContextStrokePath.
+                GeneralPath p = roundRectPath(x, y, width, height, arcWidth, arcHeight);
+                if (tmpStroke1px == null) tmpStroke1px = new Stroke(1, Stroke.CAP_BUTT, Stroke.JOIN_ROUND, 1f);
+                nativeDrawShape(p, tmpStroke1px);
+                return;
+            }
             nativeDrawRoundRectGlobal(color, alpha, x, y, width, height, arcWidth, arcHeight);
         }
 
         void nativeFillRoundRect(int color, int alpha, int x, int y, int width, int height, int arcWidth, int arcHeight) {
+            if (metalRendering) {
+                GeneralPath p = roundRectPath(x, y, width, height, arcWidth, arcHeight);
+                nativeFillShape(p);
+                return;
+            }
             nativeFillRoundRectGlobal(color, alpha, x, y, width, height, arcWidth, arcHeight);
+        }
+
+        // Build a round-rect path from the parametric (x,y,w,h,arcW,arcH) form
+        // so the alpha-mask Metal pipeline can rasterise it. arcW/arcH are
+        // full ellipse-axis lengths (cn1 / Java2D contract); half each gives
+        // the corner radii. Mirrors MutableGraphics.roundRectPath.
+        private GeneralPath roundRectPath(int x, int y, int width, int height, int arcWidth, int arcHeight) {
+            GeneralPath p = new GeneralPath();
+            float rx = Math.min(arcWidth / 2f, width / 2f);
+            float ry = Math.min(arcHeight / 2f, height / 2f);
+            if (rx <= 0 || ry <= 0) {
+                p.moveTo(x, y);
+                p.lineTo(x + width, y);
+                p.lineTo(x + width, y + height);
+                p.lineTo(x, y + height);
+                p.closePath();
+                return p;
+            }
+            p.moveTo(x + rx, y);
+            p.lineTo(x + width - rx, y);
+            p.arc(x + width - 2*rx, y,             2*rx, 2*ry, -Math.PI / 2,  Math.PI / 2, false);
+            p.lineTo(x + width,     y + height - ry);
+            p.arc(x + width - 2*rx, y + height - 2*ry, 2*rx, 2*ry, 0,           Math.PI / 2, false);
+            p.lineTo(x + rx,        y + height);
+            p.arc(x,                y + height - 2*ry, 2*rx, 2*ry, Math.PI / 2, Math.PI / 2, false);
+            p.lineTo(x,             y + ry);
+            p.arc(x,                y,             2*rx, 2*ry, Math.PI,     Math.PI / 2, false);
+            p.closePath();
+            return p;
         }
 
         private Stroke tmpStroke1px;
