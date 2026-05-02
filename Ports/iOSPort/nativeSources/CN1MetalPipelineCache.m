@@ -73,6 +73,22 @@ static void configureBlendDisabled(MTLRenderPipelineColorAttachmentDescriptor *a
             desc.fragmentFunction = [library newFunctionWithName:@"cn1_fs_alpha_mask_radial"];
             configureBlendPremultiplied(desc.colorAttachments[0]);
             break;
+        case CN1MetalPipelineLinearGradient:
+            // Pure GPU linear gradient -- vertex stage feeds per-corner 0..1
+            // texcoords; fragment lerps startColor->endColor along whichever
+            // axis the caller picks. Replaces the CG-rasterise + upload
+            // path the iOS Metal port had carried over from Phase 2.
+            desc.vertexFunction = [library newFunctionWithName:@"cn1_vs_textured"];
+            desc.fragmentFunction = [library newFunctionWithName:@"cn1_fs_linear_gradient"];
+            configureBlendPremultiplied(desc.colorAttachments[0]);
+            break;
+        case CN1MetalPipelineRadialGradient:
+            // Pure GPU radial gradient -- same vertex stage as the linear
+            // variant. Replaces CGContextDrawRadialGradient + bitmap upload.
+            desc.vertexFunction = [library newFunctionWithName:@"cn1_vs_textured"];
+            desc.fragmentFunction = [library newFunctionWithName:@"cn1_fs_radial_gradient"];
+            configureBlendPremultiplied(desc.colorAttachments[0]);
+            break;
         default:
             return nil;
     }

@@ -542,191 +542,110 @@ void CN1MetalDrawString(NSString *str, UIFont *font, int color, int alpha, int x
 }
 
 // --------------- Gradient rendering ---------------
+// Per the Metal-port plan's Phase 1 pipeline list (linear-gradient,
+// radial-gradient): pure-GPU MSL shaders, no CGBitmap rasterise, no
+// LRU cache. The shaders interpolate startColor->endColor across the
+// quad in 0..1 texcoord space; see cn1_fs_linear_gradient and
+// cn1_fs_radial_gradient in CN1MetalShaders.metal.
 
-// Direct port of DrawGradient.m's GL path: rasterise the gradient via
-// CGContextDrawLinearGradient / CGContextDrawRadialGradient into a
-// CGBitmapContext, upload as MTLTexture, render as a textured quad.
-// A small round-robin cache avoids re-rasterising the same gradient
-// every frame (the same pattern as the text cache above).
-//
-// Cache size limit chosen to match the GL DrawGradientTextureCache's
-// effective per-frame footprint without growing unbounded. A typical
-// CN1 form has 2-5 distinct gradient backgrounds; 32 covers transitions.
-#define CN1_METAL_GRAD_CACHE_MAX 32
-typedef struct {
-    int type;
-    int startColor;
-    int endColor;
-    int width;
-    int height;
-    float relativeX;
-    float relativeY;
-    float relativeSize;
-    int p2w;
-    int p2h;
-    id<MTLTexture> texture;
-} CN1MetalGradCacheEntry;
-static CN1MetalGradCacheEntry gradCache[CN1_METAL_GRAD_CACHE_MAX];
-static int gradCacheCount = 0;
-static int gradCacheNextEvict = 0;
-
-static int nextPowerOf2ForGrad(int v) {
-    int p = 1;
-    while (p < v) p <<= 1;
-    return p;
+// Convert a 0xAARRGGBB int (alpha=0 implies opaque, matching Java's
+// historical createImage/setColor convention) to a premultiplied
+// simd_float4. Used by the gradient shaders, which expect premultiplied
+// inputs because the pipeline blend factors are (One, OneMinusSrcAlpha).
+static simd_float4 premultipliedFromARGB(int argb) {
+    float a = ((argb >> 24) & 0xff) / 255.0f;
+    if (((argb >> 24) & 0xff) == 0) {
+        a = 1.0f; // alpha=0 in legacy paint state means "opaque" (see GL gradient impl)
+    }
+    float r = ((argb >> 16) & 0xff) / 255.0f;
+    float g = ((argb >> 8)  & 0xff) / 255.0f;
+    float b = ( argb        & 0xff) / 255.0f;
+    return (simd_float4){ r * a, g * a, b * a, a };
 }
 
-static CN1MetalGradCacheEntry *findOrBuildGradTexture(int type, int startColor, int endColor,
-                                                     int width, int height,
-                                                     float relativeX, float relativeY, float relativeSize) {
-    for (int i = 0; i < gradCacheCount; i++) {
-        CN1MetalGradCacheEntry *e = &gradCache[i];
-        if (e->type == type && e->startColor == startColor && e->endColor == endColor
-            && e->width == width && e->height == height
-            && e->relativeX == relativeX && e->relativeY == relativeY && e->relativeSize == relativeSize) {
-            return e;
-        }
-    }
-
-    if (width <= 0 || height <= 0) return NULL;
-    id<MTLDevice> device = CN1MetalDevice();
-    if (device == nil) return NULL;
-
-    int p2w = nextPowerOf2ForGrad(width);
-    int p2h = nextPowerOf2ForGrad(height);
-
-    CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
-    size_t bytesPerRow = 4 * (size_t)p2w;
-    void *bitmap = calloc((size_t)p2h * bytesPerRow, 1);
-    CGContextRef ctx = CGBitmapContextCreate(bitmap, p2w, p2h, 8, bytesPerRow, colorSpace,
-        kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big);
-    // Y-flip the CTM so display-row-0 lands at memory-row-0 (matches the
-    // texture-from-UIImage path; with non-inverted texcoords on the draw
-    // call, the gradient renders right-side-up).
-    CGContextTranslateCTM(ctx, 0, p2h);
-    CGContextScaleCTM(ctx, 1, -1);
-
-    UIGraphicsPushContext(ctx);
-
-    float alpha1 = 1.0f;
-    if (((startColor >> 24) & 0xff) != 0) {
-        alpha1 = ((float)((startColor >> 24) & 0xff)) / 255.0f;
-    }
-    float alpha2 = 1.0f;
-    if (((endColor >> 24) & 0xff) != 0) {
-        alpha2 = ((float)((endColor >> 24) & 0xff)) / 255.0f;
-    }
-    CGFloat components[8] = {
-        ((float)((startColor >> 16) & 0xff)) / 255.0f,
-        ((float)((startColor >> 8)  & 0xff)) / 255.0f,
-        ((float)(startColor & 0xff)) / 255.0f,
-        alpha1,
-        ((float)((endColor >> 16) & 0xff)) / 255.0f,
-        ((float)((endColor >> 8)  & 0xff)) / 255.0f,
-        ((float)(endColor & 0xff)) / 255.0f,
-        alpha2
-    };
-    CGFloat locations[2] = { 0.0, 1.0 };
-    CGGradientRef grad = CGGradientCreateWithColorComponents(colorSpace, components, locations, 2);
-
-    // Constants from DrawGradient.h — duplicated here so this file doesn't
-    // need to import every op header. Keep in sync with DrawGradient.h.
-    enum { GRAD_TYPE_RADIAL = 1, GRAD_TYPE_HORIZONTAL = 2, GRAD_TYPE_VERTICAL = 3 };
-
-    switch (type) {
-        case GRAD_TYPE_RADIAL: {
-            UIColor *endC = [UIColor colorWithRed:((endColor >> 16) & 0xff) / 255.0f
-                                            green:((endColor >> 8)  & 0xff) / 255.0f
-                                             blue:((endColor)       & 0xff) / 255.0f
-                                            alpha:alpha2];
-            [endC set];
-            CGContextFillRect(ctx, CGRectMake(0, 0, width, height));
-            CGPoint centre = CGPointMake(relativeX * width, relativeY * height);
-            float radius = MIN(width, height) * relativeSize;
-            CGContextDrawRadialGradient(ctx, grad, centre, 0, centre, radius,
-                                         kCGGradientDrawsAfterEndLocation);
-            break;
-        }
-        case GRAD_TYPE_HORIZONTAL:
-            CGContextDrawLinearGradient(ctx, grad,
-                CGPointMake(0, 0), CGPointMake(width, 0),
-                kCGGradientDrawsBeforeStartLocation | kCGGradientDrawsAfterEndLocation);
-            break;
-        case GRAD_TYPE_VERTICAL:
-            CGContextDrawLinearGradient(ctx, grad,
-                CGPointMake(0, 0), CGPointMake(0, height),
-                kCGGradientDrawsBeforeStartLocation | kCGGradientDrawsAfterEndLocation);
-            break;
-    }
-
-    UIGraphicsPopContext();
-    CGGradientRelease(grad);
-    CGColorSpaceRelease(colorSpace);
-
-    MTLTextureDescriptor *desc = [MTLTextureDescriptor
-        texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm
-        width:p2w height:p2h mipmapped:NO];
-    desc.usage = MTLTextureUsageShaderRead;
-    id<MTLTexture> tex = [device newTextureWithDescriptor:desc];
-    [tex replaceRegion:MTLRegionMake2D(0, 0, p2w, p2h)
-           mipmapLevel:0
-             withBytes:bitmap
-           bytesPerRow:bytesPerRow];
-
-    CGContextRelease(ctx);
-    free(bitmap);
-
-    int slot;
-    if (gradCacheCount < CN1_METAL_GRAD_CACHE_MAX) {
-        slot = gradCacheCount++;
-    } else {
-        slot = gradCacheNextEvict;
-        gradCacheNextEvict = (gradCacheNextEvict + 1) % CN1_METAL_GRAD_CACHE_MAX;
-        // Release evicted texture's +1 retain (newTextureWithDescriptor)
-        // before overwriting; same MRR leak fix as the text cache above.
-#ifndef CN1_USE_ARC
-        [gradCache[slot].texture release];
-#endif
-        gradCache[slot].texture = nil;
-    }
-    gradCache[slot].type = type;
-    gradCache[slot].startColor = startColor;
-    gradCache[slot].endColor = endColor;
-    gradCache[slot].width = width;
-    gradCache[slot].height = height;
-    gradCache[slot].relativeX = relativeX;
-    gradCache[slot].relativeY = relativeY;
-    gradCache[slot].relativeSize = relativeSize;
-    gradCache[slot].p2w = p2w;
-    gradCache[slot].p2h = p2h;
-    gradCache[slot].texture = tex;
-    return &gradCache[slot];
+// Quad-with-three-uniforms helper. The gradient and alpha-mask-radial
+// pipelines all need (startColor, endColor, params) as fragment buffers
+// 0/1/2 plus a 0..1 texcoord at vertex buffer 2. drawQuad above only
+// supports a single fragment uniform so we have a separate helper
+// instead of overloading it.
+static void drawGradientQuad(CN1MetalPipeline pipeline,
+                             const float vertices[8],
+                             const float texcoords[8],
+                             simd_float4 startColor,
+                             simd_float4 endColor,
+                             simd_float4 params) {
+    if (activeEncoder == nil || pipelineCache == nil) return;
+    id<MTLRenderPipelineState> state = [pipelineCache pipelineFor:pipeline];
+    if (state == nil) return;
+    [activeEncoder setRenderPipelineState:state];
+    [activeEncoder setVertexBytes:vertices  length:sizeof(float) * 8 atIndex:0];
+    CN1MetalMatrices matrices = currentMatrices();
+    [activeEncoder setVertexBytes:&matrices  length:sizeof(matrices)  atIndex:1];
+    [activeEncoder setVertexBytes:texcoords length:sizeof(float) * 8 atIndex:2];
+    [activeEncoder setFragmentBytes:&startColor length:sizeof(startColor) atIndex:0];
+    [activeEncoder setFragmentBytes:&endColor   length:sizeof(endColor)   atIndex:1];
+    [activeEncoder setFragmentBytes:&params     length:sizeof(params)     atIndex:2];
+    [activeEncoder drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0 vertexCount:4];
 }
 
 void CN1MetalDrawGradient(int type, int startColor, int endColor,
                           int x, int y, int width, int height,
                           float relativeX, float relativeY, float relativeSize) {
-    CN1MetalGradCacheEntry *e = findOrBuildGradTexture(type, startColor, endColor,
-                                                       width, height,
-                                                       relativeX, relativeY, relativeSize);
-    if (e == NULL || e->texture == nil) return;
+    if (width <= 0 || height <= 0) return;
 
-    simd_float4 tint = (simd_float4){ 1.0f, 1.0f, 1.0f, 1.0f };
+    // Per the plan's Phase 1: gradients render through pure-GPU MSL
+    // fragment shaders -- no CGContextDrawLinearGradient / CGContextDrawRadialGradient,
+    // no offscreen bitmap upload, no LRU cache. The shader interpolates
+    // start->end across the quad in 0..1 texcoord space.
+    simd_float4 sc = premultipliedFromARGB(startColor);
+    simd_float4 ec = premultipliedFromARGB(endColor);
+
     float vertices[8] = {
         (float)x,           (float)y,
         (float)(x + width), (float)y,
         (float)x,           (float)(y + height),
         (float)(x + width), (float)(y + height)
     };
-    float uMax = (float)width / (float)e->p2w;
-    float vMax = (float)height / (float)e->p2h;
-    float texcoords[8] = {
+    static const float texcoords[8] = {
         0.0f, 0.0f,
-        uMax, 0.0f,
-        0.0f, vMax,
-        uMax, vMax
+        1.0f, 0.0f,
+        0.0f, 1.0f,
+        1.0f, 1.0f
     };
-    drawQuad(CN1MetalPipelineTexturedRGBA, vertices, texcoords, tint, e->texture);
+
+    // Constants must match DrawGradient.h.
+    enum { GRAD_TYPE_RADIAL = 1, GRAD_TYPE_HORIZONTAL = 2, GRAD_TYPE_VERTICAL = 3 };
+
+    switch (type) {
+        case GRAD_TYPE_HORIZONTAL: {
+            // axis.x == 1 picks texcoord.x as the gradient parameter t.
+            simd_float4 axis = (simd_float4){ 1.0f, 0.0f, 0.0f, 0.0f };
+            drawGradientQuad(CN1MetalPipelineLinearGradient, vertices, texcoords, sc, ec, axis);
+            break;
+        }
+        case GRAD_TYPE_VERTICAL: {
+            // axis.x == 0 picks texcoord.y.
+            simd_float4 axis = (simd_float4){ 0.0f, 0.0f, 0.0f, 0.0f };
+            drawGradientQuad(CN1MetalPipelineLinearGradient, vertices, texcoords, sc, ec, axis);
+            break;
+        }
+        case GRAD_TYPE_RADIAL: {
+            // Mirror the GL/CG semantics: centre at (relativeX, relativeY)
+            // in 0..1 fractions of (width, height); radius_px = relativeSize
+            // * MIN(width, height); convert that radius into 0..1 texcoord
+            // space along each axis (different along each axis whenever
+            // width != height -- the resulting elliptical iso-curves match
+            // CGContextDrawRadialGradient's circular iso-curves at the
+            // smaller-dim boundary).
+            float minDim = (float)((width < height) ? width : height);
+            float radiusPx = relativeSize * minDim;
+            float rxTex = radiusPx / (float)width;
+            float ryTex = radiusPx / (float)height;
+            simd_float4 params = (simd_float4){ relativeX, relativeY, rxTex, ryTex };
+            drawGradientQuad(CN1MetalPipelineRadialGradient, vertices, texcoords, sc, ec, params);
+            break;
+        }
+    }
 }
 
 // --------------- Alpha mask rendering (path-based shapes) ---------------
@@ -1117,21 +1036,11 @@ extern void CN1MetalGlyphAtlasReleaseAll(void);
 
 void CN1MetalReleaseCaches(void) {
     // Whole-string text cache no longer exists -- text rendering goes
-    // exclusively through the CN1MetalGlyphAtlas (Phase 4). Drop the
-    // gradient cache (the retains it holds were +1 from
-    // newTextureWithDescriptor in findOrBuildGradTexture; release them
-    // properly here so memory-warning recovery actually frees the
-    // bitmap-backed gradient textures rather than just dropping the
-    // pointer).
-    for (int i = 0; i < gradCacheCount; i++) {
-#ifndef CN1_USE_ARC
-        [gradCache[i].texture release];
-#endif
-        gradCache[i].texture = nil;
-    }
-    gradCacheCount = 0;
-    gradCacheNextEvict = 0;
-
+    // exclusively through the CN1MetalGlyphAtlas (Phase 4 mandate).
+    // Gradient cache no longer exists either -- gradients render through
+    // pure-GPU MSL fragment shaders (Phase 1 pipeline list:
+    // linear-gradient / radial-gradient), no offscreen bitmap to cache.
+    // Only the glyph atlases need releasing under memory pressure.
     CN1MetalGlyphAtlasReleaseAll();
 }
 

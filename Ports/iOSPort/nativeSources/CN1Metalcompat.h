@@ -55,8 +55,8 @@ typedef NS_ENUM(NSInteger, CN1MetalPipeline) {
     CN1MetalPipelineTexturedRGBA,      // DrawImage, TileImage
     CN1MetalPipelineAlphaMask,         // DrawString glyph, DrawTextureAlphaMask
     CN1MetalPipelineClearPunch,        // ClearRect: write zeros, no blend
-    CN1MetalPipelineLinearGradient,    // Phase 2
-    CN1MetalPipelineRadialGradient,    // Phase 2
+    CN1MetalPipelineLinearGradient,    // FillLinearGradient (pure GPU, no CG bitmap)
+    CN1MetalPipelineRadialGradient,    // FillRadialGradient (pure GPU, no CG bitmap)
     CN1MetalPipelineAlphaMaskRadial,   // DrawTextureAlphaMask + RadialGradientPaint
     CN1MetalPipelineCount
 };

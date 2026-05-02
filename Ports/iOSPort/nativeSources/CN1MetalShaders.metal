@@ -155,3 +155,50 @@ fragment float4 cn1_fs_alpha_mask_radial(
     // Premultiplied output: rgb already includes alpha, multiply by mask.
     return float4(grad.rgb * a, grad.a * a);
 }
+
+// --------- LinearGradient pipeline ---------
+// Pure GPU horizontal/vertical gradient -- no CGContextDrawLinearGradient,
+// no offscreen bitmap upload. The vertex stage feeds the quad's per-corner
+// 0..1 texcoord into the fragment, and the fragment lerps between
+// startColor and endColor along whichever axis params.x picks.
+//
+// Buffer layout:
+//   buffer(0): float4 startColor       (premultiplied, alpha in .a)
+//   buffer(1): float4 endColor         (premultiplied)
+//   buffer(2): float4 axis             (axis.x = 1.0 horizontal, 0.0 vertical;
+//                                       remaining components reserved)
+
+fragment float4 cn1_fs_linear_gradient(
+    VertexOutTextured in [[stage_in]],
+    constant float4 &startColor [[buffer(0)]],
+    constant float4 &endColor   [[buffer(1)]],
+    constant float4 &axis       [[buffer(2)]])
+{
+    float t = clamp(mix(in.texcoord.y, in.texcoord.x, axis.x), 0.0, 1.0);
+    float4 grad = mix(startColor, endColor, t);
+    return grad;
+}
+
+// --------- RadialGradient pipeline ---------
+// Pure GPU radial gradient -- no CGContextDrawRadialGradient, no offscreen
+// bitmap. Texcoord 0..1 across the quad; params carries the centre and
+// radius (also in 0..1 texcoord space) so the same shader handles whatever
+// rectangular bounds the caller specifies.
+//
+// Buffer layout:
+//   buffer(0): float4 startColor       (premultiplied, alpha in .a)
+//   buffer(1): float4 endColor         (premultiplied)
+//   buffer(2): float4 params           (.xy = centre in 0..1 texcoord-space,
+//                                       .zw = radii (rx, ry) in 0..1 texcoord-space)
+
+fragment float4 cn1_fs_radial_gradient(
+    VertexOutTextured in [[stage_in]],
+    constant float4 &startColor [[buffer(0)]],
+    constant float4 &endColor   [[buffer(1)]],
+    constant float4 &params     [[buffer(2)]])
+{
+    float2 center = params.xy;
+    float2 radii  = max(params.zw, float2(1e-6, 1e-6));
+    float t = clamp(length((in.texcoord - center) / radii), 0.0, 1.0);
+    return mix(startColor, endColor, t);
+}
