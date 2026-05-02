@@ -90,6 +90,7 @@ public class GeneratorModel {
         copyZipEntriesToMap(template.CSS, mergedEntries, ZipEntryType.TEMPLATE_CSS);
         copyZipEntriesToMap(template.SOURCE_ZIP, mergedEntries, ZipEntryType.TEMPLATE_SOURCE);
         addLocalizationEntries(mergedEntries);
+        addAutoLocalizationBundleStub(mergedEntries);
 
         try (ZipOutputStream zos = new ZipOutputStream(outputStream)) {
             for (Map.Entry<String, byte[]> fileEntry : mergedEntries.entrySet()) {
@@ -102,12 +103,53 @@ public class GeneratorModel {
     }
 
 
+    /**
+     * Workaround for a bug in shipped Codename One versions (<= 7.0.236) where the
+     * simulator's AutoLocalizationBundle echoes any missing key back as its own value.
+     * UIManager.setBundle queries `@im` on every bundle install, gets `"@im"` back from
+     * the wormhole, tokenizes it, queries `"@im-@im"`, gets `"@im-@im"` back, then
+     * crashes inside parseTextFieldInputMode on substring(0, indexOf('=')) for a token
+     * with no `=`. The CSS compiler subprocess (CN1CSSCLI -> Display.init -> JavaSEPort.init
+     * -> enableAutoLocalizationBundle) hits this on every initializr-generated project.
+     *
+     * The proper fix lives in JavaSEPort.AutoLocalizationBundle (don't fabricate values
+     * for `@`-prefixed meta-keys), but that requires a new framework release. As a
+     * workaround we ship an empty `Bundle.properties` with `@im=`, which:
+     *   1. Is preferred by JavaSEPort.findDefaultLocalizationBundleFile over any other
+     *      bundle file in src/main/l10n, so the AutoLocalizationBundle loads it as base.
+     *   2. Pre-populates `@im=""` in the bundle's underlying Hashtable, so
+     *      AutoLocalizationBundle.get("@im") returns "" (not the fabricated "@im"),
+     *      which has length 0, so setBundle skips the input-mode block entirely.
+     *
+     * This is unconditional (added to every generated project) because
+     * enableAutoLocalizationBundle auto-creates `src/main/l10n` even when the user
+     * didn't ask for localization bundles, so the crash hits projects without any
+     * localization too. Remove this stub once the framework fix has shipped and
+     * cn1.plugin.version is bumped past it.
+     */
+    private void addAutoLocalizationBundleStub(Map<String, byte[]> mergedEntries) throws IOException {
+        String stub = "# Workaround for the simulator AutoLocalizationBundle @im fabrication crash\n"
+                + "# in Codename One <= 7.0.236. Once the framework fix ships, this file can be removed.\n"
+                + "# See GeneratorModel.addAutoLocalizationBundleStub for the full story.\n"
+                + "@im=\n";
+        copySingleTextEntryToMap(
+                "common/src/main/l10n/Bundle.properties",
+                stub,
+                mergedEntries,
+                ZipEntryType.COMMON
+        );
+    }
+
     private void addLocalizationEntries(Map<String, byte[]> mergedEntries) throws IOException {
         if (!isBareTemplate() || !options.includeLocalizationBundles) {
             return;
         }
+        // The Codename One Maven plugin's CSS compiler scans src/main/l10n (or src/main/i18n)
+        // for *.properties bundles and bakes them into theme.res. If the bundles are placed
+        // anywhere else (e.g. src/main/resources) they are NOT baked into the resource file
+        // and Resources.getGlobalResources().getL10N("messages", lang) returns null at runtime.
         copySingleTextEntryToMap(
-                "common/src/main/resources/messages.properties",
+                "common/src/main/l10n/messages.properties",
                 readResourceToString("/messages.properties"),
                 mergedEntries,
                 ZipEntryType.COMMON
@@ -117,7 +159,7 @@ public class GeneratorModel {
                 continue;
             }
             copySingleTextEntryToMap(
-                    "common/src/main/resources/messages_" + language.bundleSuffix + ".properties",
+                    "common/src/main/l10n/messages_" + language.bundleSuffix + ".properties",
                     readResourceToString("/messages_" + language.bundleSuffix + ".properties"),
                     mergedEntries,
                     ZipEntryType.COMMON
@@ -356,8 +398,14 @@ public class GeneratorModel {
                 + "    public void init(Object context) {\n"
                 + "        super.init(context);\n"
                 + "        String language = L10NManager.getInstance().getLanguage();\n"
-                + "        Hashtable<String, String> bundle = Resources.getGlobalResources().getL10N(\"messages\", language);\n"
-                + "        UIManager.getInstance().setBundle(bundle);\n"
+                + "        Resources global = Resources.getGlobalResources();\n"
+                + "        Hashtable<String, String> bundle = global == null ? null : global.getL10N(\"messages\", language);\n"
+                + "        if (bundle == null && global != null) {\n"
+                + "            bundle = global.getL10N(\"messages\", \"\");\n"
+                + "        }\n"
+                + "        if (bundle != null) {\n"
+                + "            UIManager.getInstance().setBundle(bundle);\n"
+                + "        }\n"
                 + "    }\n\n";
         int firstBrace = content.indexOf('{');
         if (firstBrace > -1) {
@@ -374,8 +422,14 @@ public class GeneratorModel {
         String method = "\n    override fun init(context: Any?) {\n"
                 + "        super.init(context)\n"
                 + "        val language = L10NManager.getInstance().language\n"
-                + "        val bundle: Hashtable<String, String>? = Resources.getGlobalResources().getL10N(\"messages\", language)\n"
-                + "        UIManager.getInstance().setBundle(bundle)\n"
+                + "        val global = Resources.getGlobalResources()\n"
+                + "        var bundle: Hashtable<String, String>? = global?.getL10N(\"messages\", language)\n"
+                + "        if (bundle == null) {\n"
+                + "            bundle = global?.getL10N(\"messages\", \"\")\n"
+                + "        }\n"
+                + "        if (bundle != null) {\n"
+                + "            UIManager.getInstance().setBundle(bundle)\n"
+                + "        }\n"
                 + "    }\n\n";
         int firstBrace = content.indexOf('{');
         if (firstBrace > -1) {

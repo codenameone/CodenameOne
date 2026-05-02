@@ -2,12 +2,14 @@ package com.codename1.initializr.model;
 
 import com.codename1.io.Util;
 import com.codename1.testing.AbstractTest;
+import com.codename1.ui.util.Resources;
 import net.sf.zipme.ZipEntry;
 import net.sf.zipme.ZipInputStream;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -15,6 +17,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Hashtable;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -65,6 +68,38 @@ public class GeneratorModelIntegrationBuildTest extends AbstractTest {
 
         int exitCode = runMavenCompile(projectDir, homeDir, javaHome);
         assertTrue(exitCode == 0, "Generated project should compile with selected JDK. Version=" + version.label + " | exitCode=" + exitCode);
+
+        // Localization bundles were requested -- they must end up baked into theme.res so
+        // that Resources.getGlobalResources().getL10N("messages", lang) resolves at runtime.
+        // This is the regression test for the NPE in MyAppName.init() reported when bundles
+        // were generated under common/src/main/resources instead of common/src/main/l10n.
+        assertLocalizationBakedIntoThemeRes(projectDir, version);
+    }
+
+    private void assertLocalizationBakedIntoThemeRes(Path projectDir, ProjectOptions.JavaVersion version) throws Exception {
+        Path themeRes = projectDir.resolve("common/target/classes/theme.res");
+        assertTrue(Files.isRegularFile(themeRes),
+                "theme.res should exist after compile. Version=" + version.label + " | path=" + themeRes);
+
+        Resources res;
+        try (FileInputStream in = new FileInputStream(themeRes.toFile())) {
+            res = Resources.open(in);
+        }
+
+        Hashtable<String, String> defaultBundle = res.getL10N("messages", "");
+        assertNotNull(defaultBundle,
+                "theme.res should contain a 'messages' L10N bundle for the default locale (\"\"). "
+                        + "If null, bundles were not picked up by the CN1 css compiler -- check that "
+                        + "they are placed under common/src/main/l10n. Version=" + version.label);
+        assertTrue(defaultBundle.size() > 0,
+                "Default 'messages' bundle should not be empty. Version=" + version.label);
+
+        Hashtable<String, String> hebrew = res.getL10N("messages", "he");
+        assertNotNull(hebrew,
+                "theme.res should contain a Hebrew 'messages' bundle when localization bundles are requested. "
+                        + "Version=" + version.label);
+        assertTrue(hebrew.size() > 0,
+                "Hebrew 'messages' bundle should not be empty. Version=" + version.label);
     }
 
     private byte[] createProjectZip(ProjectOptions options, String appName, String packageName) throws IOException {
