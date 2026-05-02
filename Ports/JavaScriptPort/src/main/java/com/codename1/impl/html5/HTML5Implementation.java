@@ -2257,14 +2257,28 @@ public class HTML5Implementation extends CodenameOneImplementation {
     public void handleAnimationFrame(double time) {
 
         if (graphicsLocked){
-            // If the graphics is locked, we don't do anything
+            // Paint queue is mid-mutation. Re-arm rAF so we retry the
+            // drain once the writer releases the lock; otherwise pending
+            // ops would never paint.
             scheduleAnimationFrame();
             return;
 
         }
 
         drainPendingDisplayFrame();
-        scheduleAnimationFrame();
+        // Re-arm rAF only if there's still work to flush. The original
+        // unconditional re-arm produced a 60 Hz worker-callback flood
+        // (host->worker postMessage of the rAF firing) even when the UI
+        // was completely idle. During Display.invokeAndBlock that flood
+        // crowded out self.onmessage for incoming pointer events:
+        // the OK button on a Dialog modal stopped reaching the worker.
+        // ``flushGraphics`` paints synchronously and calls
+        // ``scheduleAnimationFrame()`` itself when it leaves work behind,
+        // so dropping the unconditional re-arm here is safe -- the next
+        // user-driven paint or queue write restarts the loop.
+        if (pendingDisplay.hasPendingOps()) {
+            scheduleAnimationFrame();
+        }
 
     }
 
@@ -4917,6 +4931,15 @@ public class HTML5Implementation extends CodenameOneImplementation {
             drainPendingDisplayFrame();
         } finally {
             endGraphicsAtomic();
+        }
+        // If anything got queued mid-flush (e.g. a re-entrant flushGraphics
+        // call ran while we held the atomic flag and its ops landed after
+        // our snapshot), make sure the rAF chain runs at least one more
+        // tick to catch them. ``handleAnimationFrame`` no longer re-arms
+        // unconditionally, so without this poke the queued ops would sit
+        // forever.
+        if (pendingDisplay.hasPendingOps()) {
+            scheduleAnimationFrame();
         }
         if (isEditing) {
             resizeNativeEditor();
