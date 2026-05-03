@@ -7,6 +7,7 @@ import com.codename1.ui.CN;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Image;
+import com.codename1.ui.Toolbar;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.ImageIO;
 
@@ -71,10 +72,14 @@ public class ScreenshotApp {
 
         // Lifecycle.start() normally pulls in the bundled theme.res via
         // UIManager.initFirstTheme. We bypass Lifecycle entirely (no
-        // simulator), so do the same load by hand — without the theme,
-        // Form.getToolbar() returns null because globalToobarBool isn't
-        // set, and SkinDesigner.runApp NPEs on its first toolbar tweak.
+        // simulator), so do the same load by hand.
         UIManager.initFirstTheme("/theme");
+
+        // SkinDesigner.runApp expects a global Toolbar (it calls
+        // form.getToolbar().setHidden(true) without nullguarding). The
+        // simulator turns this on for us; in headless mode we have to
+        // flip it ourselves before any Form is constructed.
+        Toolbar.setGlobalToolbar(true);
 
         for (String[] s : SCENARIOS) {
             renderAndSave(s, outDir);
