@@ -72,14 +72,14 @@ SkinDesignerBrandLogoDark {
 
 SkinDesignerBrandTitle {
     color: #112247;
-    font-size: 3.6mm;
-    font-family: "native:MainBold";
+    font-size: 3.4mm;
+    font-family: "native:MainMedium";
     padding: 0.6mm 0.4mm;
 }
 SkinDesignerBrandTitleDark {
     color: #f5f8ff;
-    font-size: 3.6mm;
-    font-family: "native:MainBold";
+    font-size: 3.4mm;
+    font-family: "native:MainMedium";
     padding: 0.6mm 0.4mm;
 }
 
@@ -219,20 +219,23 @@ SkinDesignerStepperLabelPendingDark {
     padding: 0;
 }
 
-/* Horizontal line between stepper items. */
+/* Em-dash separator between stepper items. Single character, transparent
+ * background — keeps BoxLayout from over-stretching it into a thick bar. */
 SkinDesignerStepperSep {
-    background: #d9dee8;
-    color: transparent;
-    font-size: 0.5mm;
+    background: transparent;
+    color: #b8c1d4;
+    font-family: "native:MainLight";
+    font-size: 3mm;
     padding: 0;
-    margin: 1.4mm 0.4mm;
+    margin: 0 0.4mm;
 }
 SkinDesignerStepperSepDark {
-    background: #4c6ea8;
-    color: transparent;
-    font-size: 0.5mm;
+    background: transparent;
+    color: #4c6ea8;
+    font-family: "native:MainLight";
+    font-size: 3mm;
     padding: 0;
-    margin: 1.4mm 0.4mm;
+    margin: 0 0.4mm;
 }
 
 SkinDesignerWizardNav { background: transparent; padding: 0; }

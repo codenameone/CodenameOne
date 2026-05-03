@@ -26,6 +26,7 @@ import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.layouts.LayeredLayout;
+import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.ImageIO;
 import com.codename1.ui.util.UITimer;
 import java.io.ByteArrayOutputStream;
@@ -193,7 +194,7 @@ public class SkinDesigner extends Lifecycle {
     private Container buildHeader() {
         Label logo = new Label();
         logo.setUIID("SkinDesignerBrandLogo");
-        FontImage.setMaterialIcon(logo, FontImage.MATERIAL_PHONE_IPHONE);
+        applyMaterialIcon(logo, FontImage.MATERIAL_PHONE_IPHONE);
         Label title = new Label("Skin Designer");
         title.setUIID("SkinDesignerBrandTitle");
         Container brand = BoxLayout.encloseX(logo, title);
@@ -233,7 +234,7 @@ public class SkinDesigner extends Lifecycle {
             badge.setPreferredSize(new com.codename1.ui.geom.Dimension(diameter, diameter));
             if (i < step) {
                 badge.setText("");
-                FontImage.setMaterialIcon(badge, FontImage.MATERIAL_CHECK,
+                applyMaterialIcon(badge, FontImage.MATERIAL_CHECK,
                         2.6f);
             }
             Label text = new Label(labels[i]);
@@ -245,14 +246,12 @@ public class SkinDesigner extends Lifecycle {
         stepperRow.revalidate();
     }
 
-    /** A wide, short horizontal line between stepper items. The component is
-     *  a colored block (no custom paint), sized via UIID, so BoxLayout always
-     *  draws a horizontal bar regardless of how it tries to stretch us. */
+    /** Em-dash between stepper items - far simpler than a colored block,
+     *  and BoxLayout can't grow a single character into a thick bar.
+     *  Uses a unicode escape because Java sources are ASCII-only. */
     private Component buildStepperSep() {
-        Label sep = new Label(" ");
+        Label sep = new Label("\u2014");
         sep.setUIID("SkinDesignerStepperSep");
-        sep.setPreferredW(CN.convertToPixels(6));
-        sep.setPreferredH(CN.convertToPixels(0.5f));
         return sep;
     }
 
@@ -424,7 +423,7 @@ public class SkinDesigner extends Lifecycle {
         // Footer with Continue button
         Button cont = new Button("Continue");
         cont.setUIID("SkinDesignerPrimaryButton");
-        FontImage.setMaterialIcon(cont, FontImage.MATERIAL_CHEVRON_RIGHT);
+        applyMaterialIcon(cont, FontImage.MATERIAL_CHEVRON_RIGHT);
         cont.setTextPosition(Component.LEFT);
         cont.setEnabled(device != null);
         cont.addActionListener(e -> {
@@ -537,7 +536,7 @@ public class SkinDesigner extends Lifecycle {
         osMark.setUIID("SkinDesignerOsMark");
         // Use the brand glyphs (apple/android) rather than the silhouette
         // phone icons, which read as identical at this size.
-        FontImage.setMaterialIcon(osMark, "ios".equals(d.platformName)
+        applyMaterialIcon(osMark, "ios".equals(d.platformName)
                 ? FontImage.MATERIAL_APPLE
                 : FontImage.MATERIAL_ANDROID);
         Label name = new Label(d.name);
@@ -547,7 +546,7 @@ public class SkinDesigner extends Lifecycle {
         top.add(BorderLayout.CENTER, name);
         Label check = new Label();
         check.setUIID("SkinDesignerDeviceCheck");
-        FontImage.setMaterialIcon(check, FontImage.MATERIAL_CHECK);
+        applyMaterialIcon(check, FontImage.MATERIAL_CHECK);
         // Always add the slot — toggle visibility on selection — so the layout
         // doesn't shift between selected/unselected states.
         check.setVisible(selected);
@@ -598,11 +597,12 @@ public class SkinDesigner extends Lifecycle {
                 Component check = (Component) c.getClientProperty("check");
                 boolean sel = id.equals(selectedId);
                 // makeClickable moved the visible UIID to the wrapper (`c`),
-                // so toggle there. Update baseUIID too so hover swaps onto
-                // the right variant.
-                String base = sel ? "SkinDesignerDeviceCardSelected" : "SkinDesignerDeviceCard";
+                // so toggle there. Compose the dark suffix when needed and
+                // update baseUIID so hover swaps onto the correct variant.
+                String baseLight = sel ? "SkinDesignerDeviceCardSelected" : "SkinDesignerDeviceCard";
+                String base = websiteDarkMode ? baseLight + "Dark" : baseLight;
                 c.putClientProperty("baseUIID", base);
-                String visible = (c == hoveredCard) ? base + "Hover" : base;
+                String visible = (c == hoveredCard) ? hoverVariantOf(base) : base;
                 if (!visible.equals(c.getUIID())) {
                     c.setUIID(visible);
                 }
@@ -645,12 +645,12 @@ public class SkinDesigner extends Lifecycle {
 
     /**
      * Registers a clickable card so the form's pointerHover override toggles
-     * its UIID to {@code <uiid>Hover} while the cursor is over it. Stores the
-     * base UIID on the component itself so we can restore it cleanly even if
-     * a later state change rewrites it.
+     * its UIID to its hover variant while the cursor is over it. We resolve
+     * the base UIID lazily on first hover so we capture the
+     * already-dark-mode-applied UIID rather than the build-time light one
+     * (registerHover runs before applyDarkRecursive).
      */
     private void registerHover(Container card) {
-        card.putClientProperty("baseUIID", card.getUIID());
         hoverCards.add(card);
     }
 
@@ -683,12 +683,29 @@ public class SkinDesigner extends Lifecycle {
         }
         hoveredCard = target;
         if (hoveredCard != null) {
+            // Capture base lazily — whatever UIID the card has right now is
+            // already dark-mode-adjusted by applyDarkRecursive.
             String base = (String) hoveredCard.getClientProperty("baseUIID");
-            if (base != null) {
-                hoveredCard.setUIID(base + "Hover");
-                hoveredCard.repaint();
+            if (base == null) {
+                base = hoveredCard.getUIID();
+                hoveredCard.putClientProperty("baseUIID", base);
             }
+            hoveredCard.setUIID(hoverVariantOf(base));
+            hoveredCard.repaint();
         }
+    }
+
+    /**
+     * Light:  SkinDesignerSourceCard      -> SkinDesignerSourceCardHover
+     * Dark:   SkinDesignerSourceCardDark  -> SkinDesignerSourceCardHoverDark
+     * Selected light: ...CardSelected     -> ...CardSelectedHover
+     * Selected dark:  ...CardSelectedDark -> ...CardSelectedHoverDark
+     */
+    private static String hoverVariantOf(String base) {
+        if (base.endsWith("Dark")) {
+            return base.substring(0, base.length() - 4) + "HoverDark";
+        }
+        return base + "Hover";
     }
 
     /** Drop hover registrations whenever we rebuild a step so we don't leak
@@ -743,7 +760,7 @@ public class SkinDesigner extends Lifecycle {
 
         Button back = new Button("Back");
         back.setUIID("SkinDesignerSecondaryButton");
-        FontImage.setMaterialIcon(back, FontImage.MATERIAL_CHEVRON_LEFT);
+        applyMaterialIcon(back, FontImage.MATERIAL_CHEVRON_LEFT);
         back.addActionListener(e -> goToStep(STEP_DEVICE));
         Container footer = FlowLayout.encloseIn(back);
         footer.setUIID("SkinDesignerFooter");
@@ -759,7 +776,7 @@ public class SkinDesigner extends Lifecycle {
 
         Label illustration = new Label();
         illustration.setUIID("SkinDesignerSourceIll");
-        FontImage.setMaterialIcon(illustration, icon, 8.0f);
+        applyMaterialIcon(illustration, icon, 8.0f);
         card.add(illustration);
 
         Label h3 = new Label(title);
@@ -880,12 +897,12 @@ public class SkinDesigner extends Lifecycle {
 
         Button back = new Button("Back");
         back.setUIID("SkinDesignerSecondaryButton");
-        FontImage.setMaterialIcon(back, FontImage.MATERIAL_CHEVRON_LEFT);
+        applyMaterialIcon(back, FontImage.MATERIAL_CHEVRON_LEFT);
         back.addActionListener(e -> goToStep(STEP_SOURCE));
 
         Button finish = new Button("Finish");
         finish.setUIID("SkinDesignerPrimaryButton");
-        FontImage.setMaterialIcon(finish, FontImage.MATERIAL_CHEVRON_RIGHT);
+        applyMaterialIcon(finish, FontImage.MATERIAL_CHEVRON_RIGHT);
         finish.setTextPosition(Component.LEFT);
         finish.addActionListener(e -> {
             // Build + save + trigger the download from this direct click
@@ -931,7 +948,7 @@ public class SkinDesigner extends Lifecycle {
             parent.add(help);
             Button upload = new Button(bodyImage != null ? "Replace image" : "Upload image");
             upload.setUIID("SkinDesignerSecondaryButton");
-            FontImage.setMaterialIcon(upload, FontImage.MATERIAL_FILE_UPLOAD);
+            applyMaterialIcon(upload, FontImage.MATERIAL_FILE_UPLOAD);
             upload.addActionListener(e -> pickImage(() -> {
                 livePreview.setBodyImage(bodyImage);
                 rebuildSidebarBody();
@@ -1087,7 +1104,7 @@ public class SkinDesigner extends Lifecycle {
         // The X button stays an independent Button so it can fire on its own
         Button rm = new Button();
         rm.setUIID("SkinDesignerIconButton");
-        FontImage.setMaterialIcon(rm, FontImage.MATERIAL_CLOSE);
+        applyMaterialIcon(rm, FontImage.MATERIAL_CLOSE);
         rm.addActionListener(e -> {
             skin.cutouts.remove(idx);
             if (selectedCutout == idx) selectedCutout = -1;
@@ -1116,7 +1133,7 @@ public class SkinDesigner extends Lifecycle {
     private Button addCutoutBtn(String label, String type) {
         Button b = new Button(label);
         b.setUIID("SkinDesignerSecondaryButton");
-        FontImage.setMaterialIcon(b, FontImage.MATERIAL_ADD);
+        applyMaterialIcon(b, FontImage.MATERIAL_ADD);
         b.addActionListener(e -> {
             SkinModel.Cutout nc;
             switch (type) {
@@ -1272,7 +1289,7 @@ public class SkinDesigner extends Lifecycle {
         // it lives on the SkinDesignerDoneCheck UIID's background.
         Label check = new Label();
         check.setUIID("SkinDesignerDoneCheck");
-        FontImage.setMaterialIcon(check, FontImage.MATERIAL_CHECK, 5.0f);
+        applyMaterialIcon(check, FontImage.MATERIAL_CHECK, 5.0f);
         Container checkWrap = FlowLayout.encloseCenter(check);
         root.add(checkWrap);
 
@@ -1302,7 +1319,7 @@ public class SkinDesigner extends Lifecycle {
         // path on browsers that blocked the auto-trigger from Finish.
         Button download = new Button("Download skin");
         download.setUIID("SkinDesignerPrimaryButton");
-        FontImage.setMaterialIcon(download, FontImage.MATERIAL_FILE_DOWNLOAD);
+        applyMaterialIcon(download, FontImage.MATERIAL_FILE_DOWNLOAD);
         download.addActionListener(e -> {
             // If we already have generated bytes, just re-fire the download
             // (also from a direct gesture). Otherwise generate now.
@@ -1315,12 +1332,12 @@ public class SkinDesigner extends Lifecycle {
 
         Button back = new Button("Back to editor");
         back.setUIID("SkinDesignerSecondaryButton");
-        FontImage.setMaterialIcon(back, FontImage.MATERIAL_CHEVRON_LEFT);
+        applyMaterialIcon(back, FontImage.MATERIAL_CHEVRON_LEFT);
         back.addActionListener(e -> goToStep(STEP_EDIT));
 
         Button restartBtn = new Button("Make another skin");
         restartBtn.setUIID("SkinDesignerSecondaryButton");
-        FontImage.setMaterialIcon(restartBtn, FontImage.MATERIAL_REFRESH);
+        applyMaterialIcon(restartBtn, FontImage.MATERIAL_REFRESH);
         restartBtn.addActionListener(e -> restart());
 
         Container actions = new Container(new FlowLayout(Component.CENTER));
@@ -1758,12 +1775,53 @@ public class SkinDesigner extends Lifecycle {
                 c.setUIID(themed);
             }
         }
+        // Hover-card baseUIID may have been captured under the previous
+        // theme; recompute against the now-current theme so the hover
+        // swap restores to the right variant.
+        Object base = c.getClientProperty("baseUIID");
+        if (base instanceof String) {
+            String rebased = themedUiid((String) base, websiteDarkMode);
+            if (!rebased.equals(base)) {
+                c.putClientProperty("baseUIID", rebased);
+            }
+        }
+        // Material icons bake the host's bg color into the image. After we
+        // swap UIID light->dark, the icon's background is still the old
+        // theme's. Re-bake against the now-current style so the icon's
+        // transparent area matches the surrounding button.
+        Object iconChar = c.getClientProperty("materialIcon");
+        if (iconChar instanceof Character && c instanceof Label) {
+            applyMaterialIcon((Label) c, (Character) iconChar);
+        }
         if (c instanceof Container) {
             Container container = (Container) c;
             for (int i = 0; i < container.getComponentCount(); i++) {
                 applyDarkRecursive(container.getComponentAt(i));
             }
         }
+    }
+
+    /**
+     * Sets a material icon on the label and remembers the char so
+     * {@link #applyDarkRecursive(Component)} can re-bake it after a theme
+     * switch. Forces a transparent style background so the icon image
+     * never carries a solid colored block (which produced a "white square
+     * behind the arrow" in dark mode where the button was light at the
+     * time of icon creation).
+     */
+    private static void applyMaterialIcon(Label l, char icon) {
+        l.putClientProperty("materialIcon", icon);
+        Style s = new Style(l.getUnselectedStyle());
+        s.setBgTransparency(0);
+        l.setIcon(FontImage.createMaterial(icon, s, 4f));
+    }
+
+    /** Variant with explicit size in mm. */
+    private static void applyMaterialIcon(Label l, char icon, float sizeMM) {
+        l.putClientProperty("materialIcon", icon);
+        Style s = new Style(l.getUnselectedStyle());
+        s.setBgTransparency(0);
+        l.setIcon(FontImage.createMaterial(icon, s, sizeMM));
     }
 
     private String themedUiid(String uiid, boolean dark) {
