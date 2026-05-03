@@ -884,7 +884,13 @@ void CN1MetalEnsureMutableTexture(GLUIImage *image, int width, int height) {
     // textured pipeline samples through a sampler so the format
     // conversion lands the right channels in the right slots.
     UIImage *existingUI = [image getImage];
-    if (existingUI != nil && queue != nil && pipelineCache != nil) {
+    if (existingUI != nil && queue != nil) {
+        // pipelineCache may not have been initialised yet if no screen
+        // frame has begun -- the very first mutable image touched in a
+        // run typically pre-dates BeginFrame. Force-init here so the
+        // seed render pass below has a CN1MetalPipelineTexturedRGBA
+        // pipeline available.
+        ensurePipelineCache();
         id<MTLTexture> srcTex = CN1MetalTextureFromUIImage(existingUI);
         if (srcTex != nil) {
             id<MTLRenderPipelineState> seedState = [pipelineCache pipelineFor:CN1MetalPipelineTexturedRGBA];
@@ -916,11 +922,20 @@ void CN1MetalEnsureMutableTexture(GLUIImage *image, int width, int height) {
                     0.0f,           (float)height,
                     (float)width,   (float)height
                 };
+                // V flipped: CN1MetalTextureFromUIImage stores the source
+                // with memory_row_0 = visual BOTTOM (CG default no-flip
+                // CTM), so reading V=0 gets the source's bottom. The
+                // mutable target uses memory_row_0 = visual top (matches
+                // user-y=0 at top), so we want visual-top of source to
+                // land at top of dest -- read V=1 at the top vertex.
+                // Without this the seeded shadow halo lands flipped and
+                // ends up below the thumb, leaving the thumb composited
+                // over a hard ring rather than a soft halo.
                 float seedTexcoords[8] = {
-                    0.0f, 0.0f,
-                    1.0f, 0.0f,
                     0.0f, 1.0f,
-                    1.0f, 1.0f
+                    1.0f, 1.0f,
+                    0.0f, 0.0f,
+                    1.0f, 0.0f
                 };
                 simd_float4 seedTint = (simd_float4){ 1.0f, 1.0f, 1.0f, 1.0f };
                 [seedEnc setVertexBytes:seedVerts length:sizeof(seedVerts) atIndex:0];
