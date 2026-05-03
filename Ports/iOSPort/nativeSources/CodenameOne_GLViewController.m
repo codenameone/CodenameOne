@@ -167,6 +167,33 @@ static void updateDisplayMetricsFromView(UIView *view) {
     displayWidth = (int)(view.bounds.size.width * scaleValue);
     displayHeight = (int)(view.bounds.size.height * scaleValue);
 }
+
+// On iPad with UIScene, view.bounds (and even window.bounds) can transiently
+// be in the snapshot orientation between sceneDidEnterBackground and the
+// first post-foreground layout pass. Cross-check against the windowScene's
+// interfaceOrientation -- which reflects what the user actually sees -- and
+// swap the dimensions if they contradict it. Without this, sampling bounds
+// during the foreground transition publishes a swapped-dimension
+// screenSizeChanged event between stop and start (issue #4767).
+static CGSize cn1OrientationCorrectSize(UIView *view) {
+    CGSize size = view.bounds.size;
+#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 130000
+    if (@available(iOS 13.0, *)) {
+        UIWindowScene *scene = view.window.windowScene;
+        if (scene != nil) {
+            UIInterfaceOrientation o = scene.interfaceOrientation;
+            if (o != UIInterfaceOrientationUnknown) {
+                BOOL shouldBePortrait = UIInterfaceOrientationIsPortrait(o);
+                BOOL isPortrait = size.height >= size.width;
+                if (shouldBePortrait != isPortrait) {
+                    return CGSizeMake(size.height, size.width);
+                }
+            }
+        }
+    }
+#endif
+    return size;
+}
 BOOL forceSlideUpField;
 static UIScrollView *cn1StatusBarTapProxy = nil;
 
@@ -2020,22 +2047,22 @@ bool lockDrawing;
     if(touchesArray != nil) {
         [touchesArray removeAllObjects];
     }
-    int currentWidth = (int)self.view.bounds.size.width * scaleValue;
+    CGSize size = cn1OrientationCorrectSize(self.view);
     //if(currentWidth != displayWidth) {
     // Note:  While it may be tempting to only update the frame buffer if the size has changed,
-    // doing that causes a bug whereby the app may paint with the wrong dimensions 
+    // doing that causes a bug whereby the app may paint with the wrong dimensions
     // when opening from the background on iPad with multitasking enabled.
     // https://github.com/codenameone/CodenameOne/issues/2819
     // This may be caused by the fact the getDisplayWidthImpl() and getDisplayHeightImpl() update
     // the display width/height each time to match the view, without performing other resizing
     // details, so it is possible that the size change event still needs to be sent
     // even if the display width already matches the value we're given here.
-    [[self eaglView] updateFrameBufferSize:(int)self.view.bounds.size.width h:(int)self.view.bounds.size.height];
-    updateDisplayMetricsFromView(self.view);
-    displayWidth = currentWidth;
+    [[self eaglView] updateFrameBufferSize:(int)size.width h:(int)size.height];
+    displayWidth = (int)size.width * scaleValue;
+    displayHeight = (int)size.height * scaleValue;
     screenSizeChanged(displayWidth, displayHeight);
     //}
-    
+
 }
 
 - (BOOL)canBecomeFirstResponder {
