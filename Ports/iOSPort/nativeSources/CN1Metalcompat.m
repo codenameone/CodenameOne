@@ -1023,6 +1023,77 @@ BOOL CN1MetalReadMutableImagePixels(GLUIImage *image, int *outARGB,
     return YES;
 }
 
+UIImage *CN1MetalReadMutableImageAsUIImage(GLUIImage *image) {
+    if (image == nil) return nil;
+    id<MTLTexture> tex = [image mtlMutableTexture];
+    if (tex == nil) return nil;
+
+    CN1MetalFlushMutableImageSync(image);
+
+    int texW = (int)tex.width;
+    int texH = (int)tex.height;
+    if (texW <= 0 || texH <= 0) return nil;
+
+    id<MTLDevice> device = CN1MetalDevice();
+    id<MTLCommandQueue> queue = CN1MetalCommandQueue();
+    if (device == nil || queue == nil) return nil;
+
+    // Same blit-to-shared dance as CN1MetalReadMutableImagePixels: private
+    // textures aren't getBytes'able directly. Build the UIImage from the
+    // shared scratch's bytes.
+    MTLTextureDescriptor *desc = [MTLTextureDescriptor
+        texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm
+        width:(NSUInteger)texW height:(NSUInteger)texH mipmapped:NO];
+    desc.usage = MTLTextureUsageShaderRead;
+    desc.storageMode = MTLStorageModeShared;
+    id<MTLTexture> shared = [device newTextureWithDescriptor:desc];
+    if (shared == nil) return nil;
+
+    id<MTLCommandBuffer> blitCb = [queue commandBuffer];
+    id<MTLBlitCommandEncoder> blit = [blitCb blitCommandEncoder];
+    [blit copyFromTexture:tex sourceSlice:0 sourceLevel:0
+              sourceOrigin:MTLOriginMake(0, 0, 0)
+                sourceSize:MTLSizeMake((NSUInteger)texW, (NSUInteger)texH, 1)
+                 toTexture:shared destinationSlice:0 destinationLevel:0
+         destinationOrigin:MTLOriginMake(0, 0, 0)];
+    [blit endEncoding];
+    [blitCb commit];
+    [blitCb waitUntilCompleted];
+
+    NSUInteger rowBytes = (NSUInteger)(texW * 4);
+    NSUInteger byteCount = rowBytes * (NSUInteger)texH;
+    uint8_t *bytes = (uint8_t *)malloc(byteCount);
+    if (bytes == NULL) {
+#ifndef CN1_USE_ARC
+        [shared release];
+#endif
+        return nil;
+    }
+    [shared getBytes:bytes bytesPerRow:rowBytes
+          fromRegion:MTLRegionMake2D(0, 0, (NSUInteger)texW, (NSUInteger)texH)
+         mipmapLevel:0];
+#ifndef CN1_USE_ARC
+    [shared release];
+#endif
+
+    // Wrap the BGRA buffer as a CGImage / UIImage. The provider takes
+    // ownership of the malloc'd bytes via the freeData callback.
+    CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
+    CGDataProviderRef provider = CGDataProviderCreateWithData(NULL, bytes, byteCount,
+        ^(void * __unused info, const void *data, size_t __unused size) {
+            free((void *)data);
+        });
+    CGImageRef cgImg = CGImageCreate((size_t)texW, (size_t)texH, 8, 32, rowBytes, cs,
+        (CGBitmapInfo)(kCGBitmapByteOrder32Little | kCGImageAlphaPremultipliedFirst),
+        provider, NULL, NO, kCGRenderingIntentDefault);
+    CGDataProviderRelease(provider);
+    CGColorSpaceRelease(cs);
+    if (cgImg == NULL) return nil;
+    UIImage *out = [UIImage imageWithCGImage:cgImg];
+    CGImageRelease(cgImg);
+    return out;
+}
+
 // --------------- Memory-pressure cache release ---------------
 //
 // METALView observes UIApplicationDidReceiveMemoryWarning and calls

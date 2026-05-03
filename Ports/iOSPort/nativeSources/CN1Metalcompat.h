@@ -270,5 +270,12 @@ BOOL CN1MetalReadMutableImagePixels(GLUIImage *image, int *outARGB,
                                      int x, int y, int w, int h,
                                      int imgWidth, int imgHeight);
 
+// Read the mutable image's MTLTexture pixels and wrap them as a UIImage.
+// Forces a flush + waitUntilCompleted on the image's command buffer first
+// so the GPU work is finalised. Returns nil if there's no mutable texture
+// or read fails. Used by gausianBlurImage / toBase64* / etc. that consume
+// the mutable's pixels through CG / CIImage on Metal builds.
+UIImage * _Nullable CN1MetalReadMutableImageAsUIImage(GLUIImage *image);
+
 #endif /* CN1_USE_METAL */
 #endif /* CN1Metalcompat_h */

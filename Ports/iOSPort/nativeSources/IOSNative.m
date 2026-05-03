@@ -792,8 +792,26 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_gausianBlurImage___long_float(CN1_THR
         Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl();
     }
 
-    UIImage* original = [glu getImage];
-    
+    UIImage* original = nil;
+#ifdef CN1_USE_METAL
+    // On Metal the mutable's pixels live in mtlMutableTexture, not in
+    // [glu getImage]; the latter returns the original (likely empty)
+    // UIImage that was used to construct the GLUIImage. Read the GPU
+    // texture back to a UIImage so CIGaussianBlur sees actual pixels.
+    // Switch's createRoundThumbImage depends on this -- without it the
+    // blur runs on transparent input, returns empty, and the pre-blur
+    // shadow rings end up showing through as visible artefacts on the
+    // final thumb composite.
+    if ([glu mtlMutableTexture] != nil) {
+        original = CN1MetalReadMutableImageAsUIImage(glu);
+    }
+    if (original == nil) {
+        original = [glu getImage];
+    }
+#else
+    original = [glu getImage];
+#endif
+
     // taken from: http://stackoverflow.com/a/19433086/756809
     CIFilter *gaussianBlurFilter = [CIFilter filterWithName:@"CIGaussianBlur"];
     [gaussianBlurFilter setDefaults];
@@ -801,14 +819,14 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_gausianBlurImage___long_float(CN1_THR
     [gaussianBlurFilter setValue:inputImage forKey:kCIInputImageKey];
     NSNumber *radiusNumber = [NSNumber numberWithFloat:radius];
     [gaussianBlurFilter setValue:radiusNumber forKey:kCIInputRadiusKey];
-    
+
     CIImage *outputImage = [gaussianBlurFilter outputImage];
     CIContext *context   = [CIContext contextWithOptions:nil];
     CGImageRef cgimg     = [context createCGImage:outputImage fromRect:[inputImage extent]];
     UIImage *image       = [UIImage imageWithCGImage:cgimg];
     CGImageRelease(cgimg);
     GLUIImage* gl = [[GLUIImage alloc] initWithImage:image];
-    
+
     POOL_END();
     return (BRIDGE_CAST void*)gl;
 }
