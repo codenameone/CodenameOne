@@ -53,11 +53,11 @@ public class ScreenshotApp {
             "wiz.step", "wiz.deviceId", "wiz.source", "wiz.hasImage",
     };
 
-    /** Render dimensions. iPhone 16 Pro point size — wide enough that the
-     *  wizard's two-column editor layout matches what a user sees on a
-     *  phone-class viewport. */
-    private static final int WIDTH = 390;
-    private static final int HEIGHT = 844;
+    /** Render dimensions. Desktop-class viewport so the editor's
+     *  two-column layout (preview + sidebar) renders at full width,
+     *  matching what a website visitor sees on the hosted tool. */
+    private static final int WIDTH = 1280;
+    private static final int HEIGHT = 800;
 
     public static void main(String[] args) throws Exception {
         File outDir = resolveOutDir(args);
