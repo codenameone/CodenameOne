@@ -25,14 +25,26 @@ extern id<MTLDevice> CN1MetalDevice(void);
 // Simple fixed-size array cache (linear scan). Replaced an
 // NSMutableDictionary that was hanging on CI's iPhone 17 Pro sim during
 // the second lookup of the same key — issue reproduced with diagnostic
-// logging in commit 330fcdc10. Linear scan over <=16 entries is fine.
-#define CN1_METAL_ATLAS_CACHE_MAX 16
+// logging in commit 330fcdc10. Linear scan over <=64 entries is fine.
+//
+// `lastUsedTick` is bumped to a monotonic counter on every cache hit and
+// at insertion, so the LRU eviction below picks the entry that was
+// touched longest ago. Without this the cache used to flat-out reject
+// new fonts once full, and any text rendered after the 16th unique
+// (font, pointSize) request silently dropped on the Metal path -- the
+// bug that made ToolbarTheme / TextFieldTheme / etc. render blank
+// because by the time those tests ran (positions 58-67 in the suite),
+// the cache had already been filled by earlier graphics tests and all
+// further atlasForFont:: calls returned nil.
+#define CN1_METAL_ATLAS_CACHE_MAX 64
 typedef struct {
     NSString             *key;
     CN1MetalGlyphAtlas   *atlas;
+    uint64_t              lastUsedTick;
 } CN1MetalAtlasCacheEntry;
 static CN1MetalAtlasCacheEntry atlasCacheEntries[CN1_METAL_ATLAS_CACHE_MAX];
 static int                     atlasCacheCount = 0;
+static uint64_t                atlasCacheTick = 0;
 
 @implementation CN1MetalGlyphSlot
 @end
@@ -55,12 +67,13 @@ static int                     atlasCacheCount = 0;
 
 + (nullable instancetype)atlasForFont:(nonnull UIFont *)font {
     NSString *key = [NSString stringWithFormat:@"%@|%g", font.fontName, (double)font.pointSize];
+    atlasCacheTick++;
     for (int i = 0; i < atlasCacheCount; i++) {
         if ([atlasCacheEntries[i].key isEqualToString:key]) {
+            atlasCacheEntries[i].lastUsedTick = atlasCacheTick;
             return atlasCacheEntries[i].atlas;
         }
     }
-    if (atlasCacheCount >= CN1_METAL_ATLAS_CACHE_MAX) return nil;
     CN1MetalGlyphAtlas *fresh = [[CN1MetalGlyphAtlas alloc] initWithFont:font key:key];
     if (fresh == nil) return nil;
     // Note: this file builds without ARC (cn1's iOS port keeps
@@ -72,9 +85,35 @@ static int                     atlasCacheCount = 0;
     // hung on its second lookup because the dictionary itself, created
     // via [NSMutableDictionary dictionary] (autoreleased), was
     // deallocated when the autorelease pool drained between frames.
-    atlasCacheEntries[atlasCacheCount].key = [key copy];
-    atlasCacheEntries[atlasCacheCount].atlas = fresh;
-    atlasCacheCount++;
+    int slot;
+    if (atlasCacheCount < CN1_METAL_ATLAS_CACHE_MAX) {
+        slot = atlasCacheCount++;
+    } else {
+        // LRU eviction: pick the entry with the smallest lastUsedTick.
+        // Skipping this turned every overflow request into a nil return
+        // and the calling CN1MetalDrawString silently dropped the string.
+        slot = 0;
+        uint64_t oldest = atlasCacheEntries[0].lastUsedTick;
+        for (int i = 1; i < CN1_METAL_ATLAS_CACHE_MAX; i++) {
+            if (atlasCacheEntries[i].lastUsedTick < oldest) {
+                oldest = atlasCacheEntries[i].lastUsedTick;
+                slot = i;
+            }
+        }
+        // Drop the +1 retains held by the slot before overwriting:
+        // key was [key copy] (+1) and atlas was alloc/init (+1). Without
+        // releasing them the cache leaks one NSString and one MTLTexture-
+        // backed atlas per eviction under MRR.
+#ifndef CN1_USE_ARC
+        [atlasCacheEntries[slot].key release];
+        [atlasCacheEntries[slot].atlas release];
+#endif
+        atlasCacheEntries[slot].key = nil;
+        atlasCacheEntries[slot].atlas = nil;
+    }
+    atlasCacheEntries[slot].key = [key copy];
+    atlasCacheEntries[slot].atlas = fresh;
+    atlasCacheEntries[slot].lastUsedTick = atlasCacheTick;
     return fresh;
 }
 
