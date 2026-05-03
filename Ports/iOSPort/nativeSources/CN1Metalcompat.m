@@ -875,27 +875,67 @@ void CN1MetalEnsureMutableTexture(GLUIImage *image, int width, int height) {
     // subsequent thumb fillArc triggered EnsureMutableTexture the halo
     // was lost and the composited switch showed a sharp ring artefact
     // instead of a soft blur.
+    //
+    // Use a render pass + cn1_vs_textured / cn1_fs_textured to copy the
+    // source onto the destination -- a plain blitEncoder copy would
+    // swap R and B because CN1MetalTextureFromUIImage allocates the
+    // source as RGBA8Unorm (matching the screen-side cn1_fs_textured
+    // sampler convention) while the mutable target is BGRA8Unorm. The
+    // textured pipeline samples through a sampler so the format
+    // conversion lands the right channels in the right slots.
     UIImage *existingUI = [image getImage];
-    if (existingUI != nil && queue != nil) {
+    if (existingUI != nil && queue != nil && pipelineCache != nil) {
         id<MTLTexture> srcTex = CN1MetalTextureFromUIImage(existingUI);
         if (srcTex != nil) {
-            int copyW = MIN(width,  (int)srcTex.width);
-            int copyH = MIN(height, (int)srcTex.height);
-            if (copyW > 0 && copyH > 0) {
-                id<MTLCommandBuffer> copyCb = [queue commandBuffer];
-                id<MTLBlitCommandEncoder> blit = [copyCb blitCommandEncoder];
-                [blit copyFromTexture:srcTex sourceSlice:0 sourceLevel:0
-                          sourceOrigin:MTLOriginMake(0, 0, 0)
-                            sourceSize:MTLSizeMake((NSUInteger)copyW, (NSUInteger)copyH, 1)
-                             toTexture:tex destinationSlice:0 destinationLevel:0
-                     destinationOrigin:MTLOriginMake(0, 0, 0)];
-                [blit endEncoding];
-                [copyCb commit];
+            id<MTLRenderPipelineState> seedState = [pipelineCache pipelineFor:CN1MetalPipelineTexturedRGBA];
+            if (seedState != nil) {
+                id<MTLCommandBuffer> seedCb = [queue commandBuffer];
+                MTLRenderPassDescriptor *seedPass = [MTLRenderPassDescriptor renderPassDescriptor];
+                seedPass.colorAttachments[0].texture = tex;
+                // loadAction=Load preserves the just-cleared bg fill the
+                // earlier pass put in -- so when the source has alpha<1
+                // pixels (gausianBlurImage's halo edges) they composite
+                // over the bg colour the user picked at createImage time.
+                seedPass.colorAttachments[0].loadAction = MTLLoadActionLoad;
+                seedPass.colorAttachments[0].storeAction = MTLStoreActionStore;
+                id<MTLRenderCommandEncoder> seedEnc = [seedCb renderCommandEncoderWithDescriptor:seedPass];
+                [seedEnc setViewport:(MTLViewport){0.0, 0.0, (double)width, (double)height, 0.0, 1.0}];
+                [seedEnc setRenderPipelineState:seedState];
+
+                // Build an ortho projection that maps (0,0)->(width, height) onto NDC,
+                // matching mutableProjection so cn1_vs_textured's matrix multiplication
+                // produces the correct fullscreen quad.
+                CN1MetalMatrices seedMatrices;
+                seedMatrices.projection = mutableProjection(width, height);
+                seedMatrices.modelView = identityMatrix();
+                seedMatrices.transform = identityMatrix();
+
+                float seedVerts[8] = {
+                    0.0f,           0.0f,
+                    (float)width,   0.0f,
+                    0.0f,           (float)height,
+                    (float)width,   (float)height
+                };
+                float seedTexcoords[8] = {
+                    0.0f, 0.0f,
+                    1.0f, 0.0f,
+                    0.0f, 1.0f,
+                    1.0f, 1.0f
+                };
+                simd_float4 seedTint = (simd_float4){ 1.0f, 1.0f, 1.0f, 1.0f };
+                [seedEnc setVertexBytes:seedVerts length:sizeof(seedVerts) atIndex:0];
+                [seedEnc setVertexBytes:&seedMatrices length:sizeof(seedMatrices) atIndex:1];
+                [seedEnc setVertexBytes:seedTexcoords length:sizeof(seedTexcoords) atIndex:2];
+                [seedEnc setFragmentBytes:&seedTint length:sizeof(seedTint) atIndex:0];
+                [seedEnc setFragmentTexture:srcTex atIndex:0];
+                [seedEnc drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0 vertexCount:4];
+                [seedEnc endEncoding];
+                [seedCb commit];
             }
 #ifndef CN1_USE_ARC
             // CN1MetalTextureFromUIImage returns a +1 retain (newTextureWithDescriptor).
-            // Drop it now that the blit's queued; Metal retains the texture
-            // internally for the duration of the encoded work.
+            // Drop it now that the render pass is queued; Metal keeps the
+            // texture alive internally for the duration of the encoded work.
             [srcTex release];
 #endif
         }
