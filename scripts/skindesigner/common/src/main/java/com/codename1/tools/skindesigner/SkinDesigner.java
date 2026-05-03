@@ -123,7 +123,12 @@ public class SkinDesigner extends Lifecycle {
         renderStep();
         form.show();
 
-        UITimer.timer(900, true, form, () -> {
+        // Theme drift poll. Was 900ms, but each tick crosses the JS-port
+        // bridge to read window.location.href; over an idle session it
+        // accumulated enough JS-side work to lock the browser tab. 5 s
+        // gives the user a near-immediate response without polling on
+        // every animation frame.
+        UITimer.timer(5000, true, form, () -> {
             boolean dark = readThemeFromUrl();
             if (dark != websiteDarkMode) {
                 websiteDarkMode = dark;
@@ -366,9 +371,13 @@ public class SkinDesigner extends Lifecycle {
 
         TextField search = new TextField("", "Search devices…", 24, TextField.ANY);
         search.setUIID("SkinDesignerSearchField");
-        // Magnifier glass material icon as the hint icon, matching the design.
+        // Magnifier glass material icon as the hint icon. Force the icon
+        // style's bg transparent so the baked image doesn't carry the
+        // search field's solid white block (visible after dark-mode swap).
+        Style searchIconStyle = new Style(search.getStyle());
+        searchIconStyle.setBgTransparency(0);
         search.setHintIcon(FontImage.createMaterial(
-                FontImage.MATERIAL_SEARCH, search.getStyle(), 3.4f));
+                FontImage.MATERIAL_SEARCH, searchIconStyle, 3.4f));
 
         String[] filterIds = { "all", "phone", "tablet", "fold" };
         String[] filterLabels = { "All", "Phones", "Tablets", "Foldables" };
@@ -518,6 +527,10 @@ public class SkinDesigner extends Lifecycle {
             }
             grid.add(row);
         }
+        // Filter rebuilds happen outside renderStep, so applyDarkRecursive
+        // wasn't running on the freshly-built cards — leaving them in
+        // light-mode UIIDs even when the rest of the form was dark.
+        applyDarkRecursive(grid);
         grid.revalidate();
     }
 
