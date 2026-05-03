@@ -2605,6 +2605,10 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createBrowserComponent___java_lang_Ob
         com_codename1_impl_ios_IOSNative_createBrowserComponent.backgroundColor = [UIColor clearColor];
         com_codename1_impl_ios_IOSNative_createBrowserComponent.opaque = NO;
         com_codename1_impl_ios_IOSNative_createBrowserComponent.autoresizesSubviews = YES;
+        // Disable scrollsToTop on the embedded scroll view so it doesn't compete
+        // with the CN1 status-bar tap proxy. iOS only delivers the tap when
+        // exactly one scroll view on screen has scrollsToTop=YES.
+        com_codename1_impl_ios_IOSNative_createBrowserComponent.scrollView.scrollsToTop = NO;
         UIWebViewEventDelegate *del = [[UIWebViewEventDelegate alloc] initWithCallback:obj];
         com_codename1_impl_ios_IOSNative_createBrowserComponent.delegate = del;
         com_codename1_impl_ios_IOSNative_createBrowserComponent.autoresizingMask=(UIViewAutoresizingFlexibleHeight | UIViewAutoresizingFlexibleWidth);
@@ -2653,6 +2657,10 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createWKBrowserComponent___java_lang_
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent.backgroundColor = [UIColor clearColor];
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent.opaque = NO;
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent.autoresizesSubviews = YES;
+            // Disable scrollsToTop on the embedded scroll view so it doesn't compete
+            // with the CN1 status-bar tap proxy. iOS only delivers the tap when
+            // exactly one scroll view on screen has scrollsToTop=YES.
+            com_codename1_impl_ios_IOSNative_createWKBrowserComponent.scrollView.scrollsToTop = NO;
             cn1_setBrowserFollowTargetBlank(com_codename1_impl_ios_IOSNative_createWKBrowserComponent, YES);
 
             if (getBooleanClientProperty(CN1_THREAD_GET_STATE_PASS_ARG obj, @"BrowserComponent.ios.debug")) {
