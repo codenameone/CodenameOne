@@ -862,6 +862,44 @@ void CN1MetalEnsureMutableTexture(GLUIImage *image, int width, int height) {
         [[clearCb renderCommandEncoderWithDescriptor:clearPass] endEncoding];
         [clearCb commit];
     }
+    // If the GLUIImage already has a UIImage (e.g. it was returned by
+    // gausianBlurImage / FontImage / etc. that built the image via CG and
+    // assigned it via initWithImage), seed the freshly-cleared mutable
+    // texture with those pixels so subsequent draws layer on top of the
+    // existing content. The GL path's startDrawingOnImageImpl does this
+    // implicitly by drawing the existing UIImage into the CG context
+    // (CodenameOne_GLViewController.m:2110-2114); the Metal path was
+    // skipping it and discarding the prior pixels. Switch's
+    // createRoundThumbImage broke here: gausianBlurImage produced an
+    // image whose UIImage held the blurred shadow halo, but when the
+    // subsequent thumb fillArc triggered EnsureMutableTexture the halo
+    // was lost and the composited switch showed a sharp ring artefact
+    // instead of a soft blur.
+    UIImage *existingUI = [image getImage];
+    if (existingUI != nil && queue != nil) {
+        id<MTLTexture> srcTex = CN1MetalTextureFromUIImage(existingUI);
+        if (srcTex != nil) {
+            int copyW = MIN(width,  (int)srcTex.width);
+            int copyH = MIN(height, (int)srcTex.height);
+            if (copyW > 0 && copyH > 0) {
+                id<MTLCommandBuffer> copyCb = [queue commandBuffer];
+                id<MTLBlitCommandEncoder> blit = [copyCb blitCommandEncoder];
+                [blit copyFromTexture:srcTex sourceSlice:0 sourceLevel:0
+                          sourceOrigin:MTLOriginMake(0, 0, 0)
+                            sourceSize:MTLSizeMake((NSUInteger)copyW, (NSUInteger)copyH, 1)
+                             toTexture:tex destinationSlice:0 destinationLevel:0
+                     destinationOrigin:MTLOriginMake(0, 0, 0)];
+                [blit endEncoding];
+                [copyCb commit];
+            }
+#ifndef CN1_USE_ARC
+            // CN1MetalTextureFromUIImage returns a +1 retain (newTextureWithDescriptor).
+            // Drop it now that the blit's queued; Metal retains the texture
+            // internally for the duration of the encoded work.
+            [srcTex release];
+#endif
+        }
+    }
     [image setMtlMutableTexture:tex width:width height:height];
     // setMtlMutableTexture retains; balance the +1 from
     // newTextureWithDescriptor: so the GLUIImage owns the only retain.
