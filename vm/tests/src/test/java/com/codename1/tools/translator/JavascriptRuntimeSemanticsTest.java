@@ -144,6 +144,27 @@ class JavascriptRuntimeSemanticsTest {
     }
 
     /**
+     * Pins ``Object.wait()`` releasing the monitor *and* promoting
+     * the head entrant. Regression: lifecycle.start() in the JS port
+     * hung when the EDT held Display.lock, the main thread parked on
+     * its entrants queue (from invokeAndBlock's first synchronized
+     * block), and the EDT then called wait() -- waitOn used to clear
+     * owner/count without draining entrants, so main stayed parked
+     * forever on a monitor with owner=null. The fix promotes the
+     * head entrant inside waitOn, just like monitorExit does.
+     */
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void waitReleasePromotesQueuedMonitorEntrant(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsMonitorWaitPromotesEntrantApp.java", "JsMonitorWaitPromotesEntrantApp");
+
+        assertEquals(511, result.result,
+                "wait() must drain the head of the entrants queue when releasing the monitor. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    /**
      * End-to-end scheduler test that mirrors the Display.invokeAndBlock +
      * Dialog body-thread polling pattern -- a "blocker" thread loops
      * on ``synchronized(L) { wait(N); }`` waiting for a condition; a

@@ -507,8 +507,12 @@ function threadDebugLabel(threadObject) {
 //     resumeValue is null so its paused ``yield`` returns null and execution
 //     continues into the synchronized body with the lock now held.
 //   waitOn(thread, obj, timeout):
-//     save reentryCount; clear owner+count; return {op:"wait", reentryCount}.
-//     The lock is fully released until resumeWaiter restores ownership.
+//     save reentryCount; clear owner+count; **drain the head of the
+//     entrants queue exactly like monitorExit does** (otherwise an
+//     entrant that was already queued when the holder called wait
+//     stays parked forever on an unowned monitor); return
+//     {op:"wait", reentryCount}. The lock is fully released until
+//     resumeWaiter restores ownership.
 //   resumeWaiter(waiter):
 //     if monitor unowned (or self-owned): take ownership at saved depth,
 //     enqueue waiter.thread. Otherwise re-park on monitor.entrants -- the
@@ -2358,6 +2362,22 @@ const jvm = {
     const reentryCount = monitor.count;
     monitor.owner = null;
     monitor.count = 0;
+    // Releasing the monitor for ``wait`` must also drain the head of
+    // the entrants queue, identical to ``monitorExit``. Otherwise any
+    // thread parked on this monitor stays stuck forever even after
+    // the holder calls wait() and (eventually) gets notified --
+    // ownership goes back to the waker, never to the queued entrant.
+    // This is the asymmetry that hung lifecycle.start: EDT acquired
+    // Display.lock, called wait, didn't promote the main thread (
+    // queued on entrants from invokeAndBlock's first synchronized
+    // block), and the runtime sat with owner=null + entrants=1
+    // forever.
+    if (monitor.entrants.length) {
+      const next = monitor.entrants.shift();
+      monitor.owner = next.thread.id;
+      monitor.count = next.reentryCount;
+      this.enqueue(next.thread, next.resumeValue);
+    }
     return { op: "wait", monitor: obj, timeout: timeout | 0, reentryCount: reentryCount };
   },
   notifyOne(obj) {
