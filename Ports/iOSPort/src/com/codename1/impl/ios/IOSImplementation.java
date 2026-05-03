@@ -4988,16 +4988,24 @@ public class IOSImplementation extends CodenameOneImplementation {
                 p.closePath();
                 return p;
             }
-            // Top edge + four ellipse-quarter corners.
+            // joinPath=true on each arc so the corners connect to the
+            // adjacent line segments via lineTo instead of starting a new
+            // sub-path. With joinPath=false (the prior code) each arc was
+            // an independent moveTo'd sub-path, and Renderer.c rendered the
+            // whole thing as 4 disconnected pacman pieces. For pills
+            // (arcWidth == arcHeight == box height, so rx = ry = h/2 and the
+            // straight edges between corners collapse to zero length) this
+            // showed as the Switch track rendering as two separate semicircle
+            // wedges facing inward instead of one solid pill.
             p.moveTo(x + rx, y);
             p.lineTo(x + width - rx, y);
-            p.arc(x + width - 2*rx, y,             2*rx, 2*ry, -Math.PI / 2,  Math.PI / 2, false);
+            p.arc(x + width - 2*rx, y,             2*rx, 2*ry, -Math.PI / 2,  Math.PI / 2, true);
             p.lineTo(x + width,     y + height - ry);
-            p.arc(x + width - 2*rx, y + height - 2*ry, 2*rx, 2*ry, 0,           Math.PI / 2, false);
+            p.arc(x + width - 2*rx, y + height - 2*ry, 2*rx, 2*ry, 0,           Math.PI / 2, true);
             p.lineTo(x + rx,        y + height);
-            p.arc(x,                y + height - 2*ry, 2*rx, 2*ry, Math.PI / 2, Math.PI / 2, false);
+            p.arc(x,                y + height - 2*ry, 2*rx, 2*ry, Math.PI / 2, Math.PI / 2, true);
             p.lineTo(x,             y + ry);
-            p.arc(x,                y,             2*rx, 2*ry, Math.PI,     Math.PI / 2, false);
+            p.arc(x,                y,             2*rx, 2*ry, Math.PI,     Math.PI / 2, true);
             p.closePath();
             return p;
         }
@@ -5564,15 +5572,19 @@ public class IOSImplementation extends CodenameOneImplementation {
                 p.closePath();
                 return p;
             }
+            // joinPath=true on each arc so corners connect to adjacent line
+            // segments via lineTo (single sub-path) instead of starting a
+            // new sub-path each. See MutableGraphics.roundRectPath for the
+            // pill-rendering bug this avoids.
             p.moveTo(x + rx, y);
             p.lineTo(x + width - rx, y);
-            p.arc(x + width - 2*rx, y,             2*rx, 2*ry, -Math.PI / 2,  Math.PI / 2, false);
+            p.arc(x + width - 2*rx, y,             2*rx, 2*ry, -Math.PI / 2,  Math.PI / 2, true);
             p.lineTo(x + width,     y + height - ry);
-            p.arc(x + width - 2*rx, y + height - 2*ry, 2*rx, 2*ry, 0,           Math.PI / 2, false);
+            p.arc(x + width - 2*rx, y + height - 2*ry, 2*rx, 2*ry, 0,           Math.PI / 2, true);
             p.lineTo(x + rx,        y + height);
-            p.arc(x,                y + height - 2*ry, 2*rx, 2*ry, Math.PI / 2, Math.PI / 2, false);
+            p.arc(x,                y + height - 2*ry, 2*rx, 2*ry, Math.PI / 2, Math.PI / 2, true);
             p.lineTo(x,             y + ry);
-            p.arc(x,                y,             2*rx, 2*ry, Math.PI,     Math.PI / 2, false);
+            p.arc(x,                y,             2*rx, 2*ry, Math.PI,     Math.PI / 2, true);
             p.closePath();
             return p;
         }
