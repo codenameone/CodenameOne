@@ -12,9 +12,15 @@ package com.codename1.impl.javase;
 
 /**
  * Registers schema metadata for the native-theme build hints
- * (ios.themeMode, cn1.androidTheme, cn1.nativeTheme) so that the
+ * (ios.themeMode, and.themeMode, nativeTheme) so that the
  * Build Hints UI inside the Codename One Simulator can show them as
  * labelled Select dropdowns instead of opaque key/value entries.
+ *
+ * <p>The deprecated keys {@code cn1.nativeTheme} and
+ * {@code cn1.androidTheme} are still honored at runtime but are no
+ * longer surfaced in the schema - new projects should use
+ * {@code nativeTheme} / {@code and.themeMode} (matching the
+ * {@code ios.themeMode} pattern).
  *
  * <p><b>Why this class exists:</b> {@link com.codename1.impl.javase.BuildHintEditor}
  * is the dialog that lets developers set build hints from the
@@ -57,14 +63,15 @@ final class BuildHintSchemaDefaults {
                 + "legacy themes remain selectable via the values below.");
 
         // Cross-platform meta hint.
-        set("{{#nativeTheme#cn1.nativeTheme}}.label", "Shared override");
-        set("{{#nativeTheme#cn1.nativeTheme}}.type", "Select");
-        set("{{#nativeTheme#cn1.nativeTheme}}.values", "modern,legacy,custom");
-        set("{{#nativeTheme#cn1.nativeTheme}}.description",
+        set("{{#nativeTheme#nativeTheme}}.label", "Shared override");
+        set("{{#nativeTheme#nativeTheme}}.type", "Select");
+        set("{{#nativeTheme#nativeTheme}}.values", "modern,legacy,custom");
+        set("{{#nativeTheme#nativeTheme}}.description",
                 "Overrides both iOS and Android native theme selection. "
                 + "\"modern\" = liquid glass / Material 3. \"legacy\" = iOS 7 "
                 + "flat / Android Holo Light. \"custom\" disables the framework "
-                + "default and expects the app to install its own.");
+                + "default and expects the app to install its own. "
+                + "(Deprecated alias: cn1.nativeTheme.)");
 
         // iOS.
         set("{{#nativeTheme#ios.themeMode}}.label", "iOS theme");
@@ -76,13 +83,14 @@ final class BuildHintSchemaDefaults {
                 + "legacy / iphone = pre-iOS7 theme.");
 
         // Android.
-        set("{{#nativeTheme#cn1.androidTheme}}.label", "Android theme");
-        set("{{#nativeTheme#cn1.androidTheme}}.type", "Select");
-        set("{{#nativeTheme#cn1.androidTheme}}.values", "material,hololight,legacy");
-        set("{{#nativeTheme#cn1.androidTheme}}.description",
-                "material = Material 3 (default). hololight = Android Holo "
-                + "Light (API 14+). legacy = pre-Holo Android theme. "
-                + "and.hololight=true is accepted for back-compat.");
+        set("{{#nativeTheme#and.themeMode}}.label", "Android theme");
+        set("{{#nativeTheme#and.themeMode}}.type", "Select");
+        set("{{#nativeTheme#and.themeMode}}.values", "auto,modern,hololight,legacy");
+        set("{{#nativeTheme#and.themeMode}}.description",
+                "auto = modern (default). modern / material = Material 3. "
+                + "hololight = Android Holo Light (API 14+). legacy = pre-Holo "
+                + "Android theme. (Deprecated alias: cn1.androidTheme; "
+                + "and.hololight=true is also accepted for back-compat.)");
     }
 
     /** Idempotent setter: does not overwrite user / project-level hint metadata. */

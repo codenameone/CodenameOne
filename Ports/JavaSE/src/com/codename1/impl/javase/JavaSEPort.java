@@ -1232,6 +1232,126 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     /**
+     * Resolves the override theme for the "auto" Native Theme menu choice.
+     * Reads ios.themeMode / and.themeMode / nativeTheme from the project's
+     * build hints (loaded into system properties as
+     * codename1.arg.&lt;hint&gt;), falling back to the deprecated
+     * cn1.androidTheme / cn1.nativeTheme aliases. When no hint is set, the
+     * platformName drives the choice and "ios" / "and" map to the modern
+     * themes that initializr / Playground now default to. Returns the
+     * theme resource basename (without ".res") or {@code null} to fall back
+     * to the skin's embedded theme.
+     */
+    private static String resolveAutoNativeTheme(String platformName) {
+        if ("ios".equals(platformName)) {
+            String iosMode = buildHint("ios.themeMode");
+            if (iosMode != null) {
+                if ("modern".equalsIgnoreCase(iosMode) || "liquid".equalsIgnoreCase(iosMode)) {
+                    return "iOSModernTheme";
+                }
+                if ("ios7".equalsIgnoreCase(iosMode) || "flat".equalsIgnoreCase(iosMode)) {
+                    return "iOS7Theme";
+                }
+                if ("legacy".equalsIgnoreCase(iosMode) || "iphone".equalsIgnoreCase(iosMode)) {
+                    return "iPhoneTheme";
+                }
+            }
+            String shared = sharedNativeThemeHint();
+            if ("legacy".equalsIgnoreCase(shared)) {
+                return "iOS7Theme";
+            }
+            if ("custom".equalsIgnoreCase(shared)) {
+                return null;
+            }
+            // Default for an iOS skin is the modern theme.
+            return "iOSModernTheme";
+        }
+        if ("and".equals(platformName)) {
+            String andMode = buildHint("and.themeMode");
+            if (andMode == null) {
+                andMode = buildHint("cn1.androidTheme");
+            }
+            if (andMode != null) {
+                if ("modern".equalsIgnoreCase(andMode) || "material".equalsIgnoreCase(andMode)) {
+                    return "AndroidMaterialTheme";
+                }
+                if ("hololight".equalsIgnoreCase(andMode) || "holo".equalsIgnoreCase(andMode)) {
+                    return "android_holo_light";
+                }
+                if ("legacy".equalsIgnoreCase(andMode)) {
+                    return "androidTheme";
+                }
+            }
+            String shared = sharedNativeThemeHint();
+            if ("legacy".equalsIgnoreCase(shared)) {
+                return "android_holo_light";
+            }
+            if ("custom".equalsIgnoreCase(shared)) {
+                return null;
+            }
+            // Default for an Android skin is Material 3.
+            return "AndroidMaterialTheme";
+        }
+        return null;
+    }
+
+    private static String sharedNativeThemeHint() {
+        String v = buildHint("nativeTheme");
+        if (v == null) {
+            v = buildHint("cn1.nativeTheme");
+        }
+        return v;
+    }
+
+    /**
+     * Reads a build hint from the runtime - first the
+     * codename1.arg.&lt;name&gt; system property (set by the
+     * Maven plugin / Simulator), then the loaded
+     * codenameone_settings.properties on disk so unit-test invocations
+     * without the simulator wrapper still see the value.
+     */
+    private static String buildHint(String name) {
+        String v = System.getProperty("codename1.arg." + name);
+        if (v != null && !v.isEmpty()) {
+            return v;
+        }
+        Properties cnop = loadCodenameOneSettings();
+        if (cnop != null) {
+            v = cnop.getProperty("codename1.arg." + name);
+            if (v != null && !v.isEmpty()) {
+                return v;
+            }
+        }
+        return null;
+    }
+
+    private static Properties cachedCnopProperties;
+    private static long cachedCnopMtime = -1L;
+
+    private static Properties loadCodenameOneSettings() {
+        File f = new File(getCWD(), "codenameone_settings.properties");
+        if (!f.exists()) {
+            f = new File(getCWD(), "common" + File.separator + "codenameone_settings.properties");
+        }
+        if (!f.exists()) {
+            return null;
+        }
+        long mtime = f.lastModified();
+        if (cachedCnopProperties != null && cachedCnopMtime == mtime) {
+            return cachedCnopProperties;
+        }
+        Properties p = new Properties();
+        try (FileInputStream in = new FileInputStream(f)) {
+            p.load(in);
+        } catch (IOException ex) {
+            return cachedCnopProperties;
+        }
+        cachedCnopProperties = p;
+        cachedCnopMtime = mtime;
+        return p;
+    }
+
+    /**
      * @return the useNativeInput
      */
     public static boolean isUseNativeInput() {
@@ -2775,20 +2895,21 @@ public class JavaSEPort extends CodenameOneImplementation {
             // plus the legacy ones). The user can override via the
             // Simulator's "Native Theme" submenu (stored in the
             // simulatorNativeTheme Preference) or the cn1.forceSimulatorTheme
-            // system property. If neither is set, platformName maps ios ->
-            // iOSModernTheme and and -> AndroidMaterialTheme. Anything else
-            // keeps whatever the skin archive embedded.
+            // system property. When "auto" is selected we consult the
+            // project's build hints (ios.themeMode / and.themeMode /
+            // nativeTheme, plus the deprecated cn1.androidTheme /
+            // cn1.nativeTheme aliases) so a project that opted in to
+            // ios.themeMode=modern actually previews with the modern
+            // theme instead of an unrelated default. If no hint is set we
+            // keep mapping platformName ios -> iOSModernTheme and
+            // and -> AndroidMaterialTheme - the new defaults shipped by
+            // the initializr / Playground - so a brand new simulator run
+            // matches what the device build will look like.
             String overrideTheme = System.getProperty("cn1.forceSimulatorTheme",
                     Preferences.userNodeForPackage(JavaSEPort.class)
                             .get("simulatorNativeTheme", null));
             if (overrideTheme == null || overrideTheme.isEmpty() || "auto".equalsIgnoreCase(overrideTheme)) {
-                if ("ios".equals(platformName)) {
-                    overrideTheme = "iOSModernTheme";
-                } else if ("and".equals(platformName)) {
-                    overrideTheme = "AndroidMaterialTheme";
-                } else {
-                    overrideTheme = null;
-                }
+                overrideTheme = resolveAutoNativeTheme(platformName);
             } else if ("embedded".equalsIgnoreCase(overrideTheme)) {
                 // Explicit "keep the skin's embedded theme".
                 overrideTheme = null;
@@ -3666,6 +3787,41 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         });
         simulatorMenu.add(autoLocalizationMenu);
+
+        // Rotate menu item: only added when app-frame mode is off. The
+        // app-frame toolbar already exposes Portrait / Landscape RotateAction
+        // buttons, so duplicating them in the menu would be confusing. When
+        // the user has Single Window mode disabled there is no toolbar, so
+        // the only way to rotate is via this menu item - it was lost when
+        // the toolbar buttons were introduced and the menu entry was
+        // removed wholesale instead of gated behind appFrame == null.
+        final JMenuItem rotateMenu = new JMenuItem("Rotate");
+        rotateMenu.setEnabled(!desktopSkin);
+        rotateMenu.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                setPortrait(!portrait);
+                Container parent = canvas.getParent();
+                parent.remove(canvas);
+                canvas.setForcedSize(new java.awt.Dimension(
+                        (int) (getSkin().getWidth() * zoomLevel),
+                        (int) (getSkin().getHeight() * zoomLevel)));
+                if (window != null) {
+                    window.setSize(new java.awt.Dimension(
+                            (int) (getSkin().getWidth() * zoomLevel),
+                            (int) (getSkin().getHeight() * zoomLevel)));
+                }
+                java.awt.Container top = ((JComponent) parent).getTopLevelAncestor();
+                top.revalidate();
+                top.repaint();
+                parent.add(BorderLayout.CENTER, canvas);
+                if (window != null) {
+                    window.pack();
+                }
+                JavaSEPort.this.sizeChanged(getScreenCoordinates().width, getScreenCoordinates().height);
+            }
+        });
+        if (appFrame == null) simulatorMenu.add(rotateMenu);
 
         final JCheckBoxMenuItem zoomMenu = new JCheckBoxMenuItem("Zoom", scrollableSkin);
         if (appFrame == null) simulatorMenu.add(zoomMenu);
@@ -4671,7 +4827,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             bar.add(simulateMenu);
             bar.add(toolsMenu);
             bar.add(skinMenu);
-            bar.add(createNativeThemeMenu());
+            bar.add(createNativeThemeMenu(frm));
             bar.add(helpMenu);
         }
 
@@ -4780,18 +4936,21 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
     
     /**
-     * Build the Native Theme override menu. By default the simulator picks a
-     * theme from the current skin's platformName ("ios" -&gt; iOSModernTheme,
-     * "and" -&gt; AndroidMaterialTheme); this menu lets the user force one
-     * of the shipped themes or "Use skin's embedded theme" to bypass the
-     * heuristic entirely. Selection is written to the simulatorNativeTheme
-     * Preference and the simulator is reloaded.
+     * Build the Native Theme override menu. "Auto" defers to the project's
+     * build hints (ios.themeMode / and.themeMode / nativeTheme) so a project
+     * that opted in via codenameone_settings.properties previews with the
+     * theme it would ship with; the explicit choices below force a
+     * specific theme regardless of build hints. Selection is written to
+     * the simulatorNativeTheme Preference and the simulator is reloaded
+     * via {@code reload.simulator} - the same mechanism the skin menu
+     * uses, so disposing the JFrame is what actually triggers the
+     * Simulator polling thread to pick up the new theme.
      */
-    private JMenu createNativeThemeMenu() {
+    private JMenu createNativeThemeMenu(final JFrame frm) {
         JMenu m = new JMenu("Native Theme");
         m.setDoubleBuffered(true);
         String[][] items = {
-            {"auto", "Auto (based on skin)"},
+            {"auto", "Auto (from build hints)"},
             {"iOSModernTheme", "iOS Modern (Liquid Glass)"},
             {"iOS7Theme", "iOS 7 (Flat)"},
             {"iPhoneTheme", "iPhone (Pre-Flat)"},
@@ -4810,10 +4969,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                 public void actionPerformed(ActionEvent e) {
                     Preferences.userNodeForPackage(JavaSEPort.class)
                             .put("simulatorNativeTheme", entry[0]);
+                    deinitializeSync();
+                    frm.dispose();
                     System.setProperty("reload.simulator", "true");
-                    if (window != null) {
-                        window.dispose();
-                    }
                 }
             });
             group.add(mi);

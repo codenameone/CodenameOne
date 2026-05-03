@@ -2051,6 +2051,35 @@ public class AndroidGradleBuilder extends Executor {
             storeIds = "";
         }
 
+        // Native modern theme hints - propagated to Display.getProperty so
+        // AndroidImplementation.installNativeTheme() can pick the
+        // material / hololight / legacy variant. and.themeMode is the
+        // current platform-specific knob (cn1.androidTheme is honored as a
+        // deprecated alias). nativeTheme is the cross-platform shortcut
+        // (cn1.nativeTheme is its deprecated alias).
+        String andThemeHint = request.getArg("and.themeMode", null);
+        String androidThemeHint = request.getArg("cn1.androidTheme", null);
+        String nativeThemeHintNew = request.getArg("nativeTheme", null);
+        String nativeThemeHint = request.getArg("cn1.nativeTheme", null);
+        StringBuilder nativeThemeProps = new StringBuilder();
+        if (andThemeHint != null) {
+            nativeThemeProps.append("        Display.getInstance().setProperty(\"and.themeMode\", \"")
+                    .append(andThemeHint).append("\");\n");
+        }
+        if (androidThemeHint != null) {
+            nativeThemeProps.append("        Display.getInstance().setProperty(\"cn1.androidTheme\", \"")
+                    .append(androidThemeHint).append("\");\n");
+        }
+        if (nativeThemeHintNew != null) {
+            nativeThemeProps.append("        Display.getInstance().setProperty(\"nativeTheme\", \"")
+                    .append(nativeThemeHintNew).append("\");\n");
+        }
+        if (nativeThemeHint != null) {
+            nativeThemeProps.append("        Display.getInstance().setProperty(\"cn1.nativeTheme\", \"")
+                    .append(nativeThemeHint).append("\");\n");
+        }
+        String nativeThemeStubProps = nativeThemeProps.toString();
+
         String gcmSenderId = request.getArg("gcm.sender_id", null);
         if (gcmSenderId != null) {
             gcmSenderId = "        Display.getInstance().setProperty(\"gcm.sender_id\", \"" + gcmSenderId + "\");\n";
@@ -2770,6 +2799,7 @@ public class AndroidGradleBuilder extends Executor {
                     + reinitCode0
                     + storeIds
                     + gcmSenderId
+                    + nativeThemeStubProps
                     + "        Display.getInstance().setProperty(\"build_key\", d(BUILD_KEY));\n"
                     + "        Display.getInstance().setProperty(\"package_name\", PACKAGE_NAME);\n"
                     + "        Display.getInstance().setProperty(\"built_by_user\", d(BUILT_BY_USER));\n"

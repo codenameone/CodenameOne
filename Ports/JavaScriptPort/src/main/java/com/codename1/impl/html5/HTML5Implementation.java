@@ -2658,29 +2658,53 @@ public class HTML5Implementation extends CodenameOneImplementation {
     public void installNativeTheme(){
     	try {
             // Prefer the modern native theme when explicitly requested via
-            // ios.themeMode / cn1.androidTheme / javascript.native.theme. If
-            // the hint isn't set we keep the pre-existing JS-port default
-            // (iOS 7 / Holo Light) since the JS bundle may not include the
-            // modern .res files (scripts/build-native-themes.sh has to have
-            // mirrored them before the JS bundle was produced).
+            // ios.themeMode / and.themeMode (legacy alias: cn1.androidTheme)
+            // / nativeTheme (legacy alias: cn1.nativeTheme) /
+            // javascript.native.theme. If no hint is set we keep the
+            // pre-existing JS-port default (iOS 7 / Holo Light) since the JS
+            // bundle may not include the modern .res files
+            // (scripts/build-native-themes.sh has to have mirrored them
+            // before the JS bundle was produced).
             String defaultTheme = isAndroid_() ? "/android_holo_light.res" : "/iOS7Theme.res";
-            String iosMode = Display.getInstance().getProperty("ios.themeMode", null);
-            String androidMode = Display.getInstance().getProperty("cn1.androidTheme", null);
-            if (isAndroid_() && androidMode != null) {
-                androidMode = androidMode.toLowerCase();
-                if ("material".equals(androidMode) || "modern".equals(androidMode)) {
-                    defaultTheme = "/AndroidMaterialTheme.res";
-                } else if ("legacy".equals(androidMode)) {
-                    defaultTheme = "/androidTheme.res";
-                } else if ("hololight".equals(androidMode) || "holo".equals(androidMode)) {
-                    defaultTheme = "/android_holo_light.res";
+            Display d = Display.getInstance();
+            String iosMode = d.getProperty("ios.themeMode", null);
+            String androidMode = d.getProperty("and.themeMode",
+                    d.getProperty("cn1.androidTheme", null));
+            String shared = d.getProperty("nativeTheme",
+                    d.getProperty("cn1.nativeTheme", null));
+            if (isAndroid_()) {
+                if (androidMode == null && shared != null) {
+                    if ("modern".equalsIgnoreCase(shared)) {
+                        androidMode = "material";
+                    } else if ("legacy".equalsIgnoreCase(shared)) {
+                        androidMode = "hololight";
+                    }
                 }
-            } else if (!isAndroid_() && iosMode != null) {
-                iosMode = iosMode.toLowerCase();
-                if ("modern".equals(iosMode) || "liquid".equals(iosMode) || "auto".equals(iosMode)) {
-                    defaultTheme = "/iOSModernTheme.res";
-                } else if ("legacy".equals(iosMode) || "iphone".equals(iosMode)) {
-                    defaultTheme = "/iPhoneTheme.res";
+                if (androidMode != null) {
+                    androidMode = androidMode.toLowerCase();
+                    if ("material".equals(androidMode) || "modern".equals(androidMode) || "auto".equals(androidMode)) {
+                        defaultTheme = "/AndroidMaterialTheme.res";
+                    } else if ("legacy".equals(androidMode)) {
+                        defaultTheme = "/androidTheme.res";
+                    } else if ("hololight".equals(androidMode) || "holo".equals(androidMode)) {
+                        defaultTheme = "/android_holo_light.res";
+                    }
+                }
+            } else {
+                if (iosMode == null && shared != null) {
+                    if ("modern".equalsIgnoreCase(shared)) {
+                        iosMode = "modern";
+                    } else if ("legacy".equalsIgnoreCase(shared)) {
+                        iosMode = "ios7";
+                    }
+                }
+                if (iosMode != null) {
+                    iosMode = iosMode.toLowerCase();
+                    if ("modern".equals(iosMode) || "liquid".equals(iosMode) || "auto".equals(iosMode)) {
+                        defaultTheme = "/iOSModernTheme.res";
+                    } else if ("legacy".equals(iosMode) || "iphone".equals(iosMode)) {
+                        defaultTheme = "/iPhoneTheme.res";
+                    }
                 }
             }
             String nativeTheme = Display.getInstance().getProperty("javascript.native.theme", defaultTheme);

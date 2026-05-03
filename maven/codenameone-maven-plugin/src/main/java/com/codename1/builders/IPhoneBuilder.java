@@ -356,12 +356,14 @@ public class IPhoneBuilder extends Executor {
         }
 
         debug("Xcode version is "+xcodeVersion);
-        // ios.themeMode stays the platform-specific knob; cn1.nativeTheme is
+        // ios.themeMode stays the platform-specific knob; nativeTheme is
         // the cross-platform meta hint. modern / legacy on the meta hint
         // translate to the equivalent iOS values when ios.themeMode is unset.
+        // cn1.nativeTheme is honored as a deprecated alias for nativeTheme.
         String iosMode = request.getArg("ios.themeMode", null);
         if (iosMode == null) {
-            String sharedMode = request.getArg("cn1.nativeTheme", null);
+            String sharedMode = request.getArg("nativeTheme",
+                    request.getArg("cn1.nativeTheme", null));
             if ("legacy".equalsIgnoreCase(sharedMode)) {
                 iosMode = "ios7";
             } else if ("modern".equalsIgnoreCase(sharedMode)) {
