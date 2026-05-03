@@ -52,7 +52,16 @@ if [ -f "$SKIN_DESIGNER_DIR/cn1libs/ZipSupport.cn1lib" ] && [ ! -f "$ZIP_LIB_DIR
 fi
 
 log "Building Skin Designer (mvn -DskipTests install)"
-(cd "$SKIN_DESIGNER_DIR" && mvn -B -ntp -DskipTests install)
+# The CN1 plugin's css goal instantiates the designer (JavaSEPort) to
+# compile theme.css; that path queries getDefaultScreenDevice() and
+# throws HeadlessException on a CI runner without a display. Wrap mvn
+# in xvfb-run when available (Linux) so the install step can complete.
+if command -v xvfb-run >/dev/null 2>&1; then
+    (cd "$SKIN_DESIGNER_DIR" && xvfb-run -a -s "-screen 0 1600x1100x24" \
+        mvn -B -ntp -DskipTests install)
+else
+    (cd "$SKIN_DESIGNER_DIR" && mvn -B -ntp -DskipTests install)
+fi
 
 # The CN1 Maven plugin composes codename1.mainClass from the package +
 # mainName at startup. We override codename1.mainClass directly here so
