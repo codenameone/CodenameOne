@@ -1477,24 +1477,23 @@ public class SkinDesigner extends Lifecycle {
      */
     /**
      * How tall the top frame extension needs to be (in physical pixels) to
-     * fit any cutouts the user added above the screen rect. Matches the
-     * builtin iPhone X / 11 / 12 / 13 skin convention where the notch sits
-     * in the device frame above the screen, leaving a gap.
+     * fit notch cutouts above the screen rect. Notches are physical
+     * hardware cutouts (iPhone X / 11 / 12 / 13 style) and live in the
+     * device frame.
+     *
+     * Islands and punch-holes are NOT counted here — they're software/in-
+     * display features (iPhone 14 Pro+ Dynamic Island, Android camera
+     * holes), so they're drawn floating inside the screen rect with the
+     * iOS status bar / safe area pushing content below them.
      */
     private int computeTopCutoutPx(float scale) {
         int maxExtentVB = 0;
         for (SkinModel.Cutout c : skin.cutouts) {
-            int extentVB;
-            if (SkinModel.CUTOUT_NOTCH.equals(c.type)) {
-                // Notch is anchored at the top of the frame and protrudes down c.h vb px.
-                extentVB = c.h;
-            } else {
-                // Island / hole: c.y is the gap between cutout bottom and screen top
-                // (in viewbox space). Extent above screen = c.y + c.h.
-                extentVB = c.y + c.h;
+            if (!SkinModel.CUTOUT_NOTCH.equals(c.type)) {
+                continue;
             }
-            if (extentVB > maxExtentVB) {
-                maxExtentVB = extentVB;
+            if (c.h > maxExtentVB) {
+                maxExtentVB = c.h;
             }
         }
         return Math.round(maxExtentVB * scale);
@@ -1529,9 +1528,14 @@ public class SkinDesigner extends Lifecycle {
         carveRoundedScreenRect(data, totalW, totalH, bezelPx, screenY,
                 device.resolutionW, device.resolutionH, screenCornerPx);
 
-        // Cutouts hang from the bottom of the top frame extension into the
-        // gap above the screen, never inside the screen rect.
+        // Notches hang from the top frame extension into the gap above the
+        // screen rect (physical hardware cutout, iPhone X / 11 / 12 / 13).
         applyTopFrameCutouts(data, totalW, totalH, bezelPx, screenY,
+                device.resolutionW, framePxScale);
+        // Islands and punch-holes float inside the screen rect — Dynamic
+        // Island and Android camera holes are software-reserved space the
+        // OS status bar paints around, not physical cutouts.
+        applyInScreenCutouts(data, totalW, totalH, bezelPx, screenY,
                 device.resolutionW, framePxScale);
 
         return Image.createImage(data, totalW, totalH);
@@ -1560,6 +1564,8 @@ public class SkinDesigner extends Lifecycle {
         carveRoundedScreenRect(data, totalW, totalH, bezelPx, screenY,
                 device.resolutionW, device.resolutionH, screenCornerPx);
         applyTopFrameCutouts(data, totalW, totalH, bezelPx, screenY,
+                device.resolutionW, framePxScale);
+        applyInScreenCutouts(data, totalW, totalH, bezelPx, screenY,
                 device.resolutionW, framePxScale);
         return Image.createImage(data, totalW, totalH);
     }
@@ -1634,23 +1640,45 @@ public class SkinDesigner extends Lifecycle {
     }
 
     /**
-     * Renders cutouts in the frame extension above the screen, never inside
-     * the screen rect. The cutout's bottom edge sits {@code c.y * scale} px
-     * above the screen top; for notch (c.y=0) the bottom touches the screen.
+     * Renders notch cutouts (physical hardware cutouts) hanging from the
+     * top frame extension down to the screen top. Used for iPhone X / 11 /
+     * 12 / 13 style devices where the notch occupies a U-shaped chunk of
+     * the device frame above the display.
      */
     private void applyTopFrameCutouts(int[] data, int w, int h,
                                       int bezelPx, int screenY, int sw, float scale) {
         int cx = bezelPx + sw / 2;
         for (SkinModel.Cutout c : skin.cutouts) {
+            if (!SkinModel.CUTOUT_NOTCH.equals(c.type)) {
+                continue;
+            }
             int cw = Math.round(c.w * scale);
             int ch = Math.round(c.h * scale);
             int ox = cx + Math.round(c.x * scale);
-            int yOffset = Math.round(c.y * scale);
-            int oy = screenY - yOffset - ch;
+            int oy = screenY - ch;
+            int x0 = ox - cw / 2;
+            fillRect(data, w, h, x0, oy, cw, ch);
+        }
+    }
+
+    /**
+     * Renders software cutouts (Dynamic Island, punch-hole cameras) as
+     * opaque pills/circles floating *inside* the screen rect. The iOS
+     * theme reserves the safe-area top for the status bar, and these
+     * shapes appear painted on top of that area in the skin overlay.
+     */
+    private void applyInScreenCutouts(int[] data, int w, int h,
+                                      int bezelPx, int screenY, int sw, float scale) {
+        int cx = bezelPx + sw / 2;
+        for (SkinModel.Cutout c : skin.cutouts) {
             if (SkinModel.CUTOUT_NOTCH.equals(c.type)) {
-                int x0 = ox - cw / 2;
-                fillRect(data, w, h, x0, oy, cw, ch);
-            } else if (SkinModel.CUTOUT_ISLAND.equals(c.type)) {
+                continue;
+            }
+            int cw = Math.round(c.w * scale);
+            int ch = Math.round(c.h * scale);
+            int ox = cx + Math.round(c.x * scale);
+            int oy = screenY + Math.round(c.y * scale);
+            if (SkinModel.CUTOUT_ISLAND.equals(c.type)) {
                 int x0 = ox - cw / 2;
                 fillRoundedRect(data, w, h, x0, oy, cw, ch, ch / 2);
             } else if (SkinModel.CUTOUT_HOLE.equals(c.type)) {
@@ -1764,12 +1792,24 @@ public class SkinDesigner extends Lifecycle {
         p.put("overrideNames", overrideNames(device));
 
         int bezelPx = skinBezelInPx(totalW, totalH);
-        // Cutouts now live in the top frame extension (above the screen
-        // rect), so they no longer eat into the screen area and we don't
-        // need to extend safeTop to cover them. Just translate the
-        // user-configured safeTop / safeBottom into device pixels.
+        // Notch cutouts live in the top frame extension above the screen,
+        // so they don't eat into safeTop. But islands and punch-holes are
+        // drawn floating *inside* the screen and the iOS status bar
+        // reserves space for them — extend safeTop to cover their bottom
+        // edge so app content lands below.
+        int inScreenCutoutBottomVB = 0;
+        for (SkinModel.Cutout c : skin.cutouts) {
+            if (SkinModel.CUTOUT_NOTCH.equals(c.type)) {
+                continue;
+            }
+            int extentVB = c.y + c.h;
+            if (extentVB > inScreenCutoutBottomVB) {
+                inScreenCutoutBottomVB = extentVB;
+            }
+        }
+        int effectiveSafeTopVB = Math.max(skin.safeTop, inScreenCutoutBottomVB);
         float vbToPx = (float) device.resolutionW / DevicePreview.VB_W;
-        int safeTopPx = Math.round(skin.safeTop * vbToPx);
+        int safeTopPx = Math.round(effectiveSafeTopVB * vbToPx);
         int safeBottomPx = Math.round(skin.safeBottom * vbToPx);
 
         // Safe area is consumed by Container.snapToSafeAreaInternal, which
