@@ -857,9 +857,8 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRoundRectMutableImp
     // and routes it through the alpha-mask Metal pipeline (Renderer.c ->
     // R8 MTLTexture -> DrawTextureAlphaMask op tagged with the mutable
     // target). The Java side gates with `metalRendering` before calling
-    // this JNI; the GL body below is GL-only.
-    return;
-#endif
+    // this JNI.
+#else
     CGContextRef context = UIGraphicsGetCurrentContext();
     if (currentMutableTransformSet) {
         CGContextSaveGState(context);
@@ -869,20 +868,20 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRoundRectMutableImp
     if (currentMutableTransformSet) {
         CGContextRestoreGState(context);
     }
+#endif
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_setAntiAliasedMutableImpl
 (JAVA_BOOLEAN antialiased) {
 #ifdef CN1_USE_METAL
     // Metal pipelines are antialiased by default; CG's runtime AA toggle
-    // has no direct equivalent. The CG-rasterised shim path used by some
-    // mutable ops creates fresh contexts that default to AA on, so the
-    // visible behaviour matches "antialiased=YES" everywhere on Metal.
+    // has no direct equivalent. The visible behaviour matches
+    // "antialiased=YES" everywhere on Metal.
     (void)antialiased;
-    return;
-#endif
+#else
     CGContextRef context = UIGraphicsGetCurrentContext();
     CGContextSetAllowsAntialiasing(context, antialiased);
+#endif
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_resetAffineGlobal() {
@@ -910,19 +909,18 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRoundRectGlobalImpl
 #ifdef CN1_USE_METAL
     // Dead under Metal -- GlobalGraphics builds a round-rect GeneralPath
     // and routes it through nativeDrawShape (alpha-mask Metal pipeline).
-    return;
-#endif
+#else
     UIGraphicsBeginImageContextWithOptions(CGSizeMake(width, height), NO, 1.0);
     CGContextRef context = UIGraphicsGetCurrentContext();
     CGContextStrokePath(roundRect(context, color, alpha, 0, 0, width, height, arcWidth, arcHeight));
     UIImage* img = UIGraphicsGetImageFromCurrentImageContext();
-    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl %i", ((int)img));
     UIGraphicsEndImageContext();
 
     GLUIImage* glu = [[GLUIImage alloc] initWithImage:img];
     Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalImpl((BRIDGE_CAST void*) glu, 255, x, y, width, height, 0);
 #ifndef CN1_USE_ARC
     [glu release];
+#endif
 #endif
 }
 
@@ -933,8 +931,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRoundRectMutableImp
     // Dead under Metal -- MutableGraphics goes through the alpha-mask
     // Metal pipeline (build path, Renderer.c -> R8 MTLTexture ->
     // DrawTextureAlphaMask op tagged with currentMutableImage).
-    return;
-#endif
+#else
     CGContextRef context = UIGraphicsGetCurrentContext();
     if (currentMutableTransformSet) {
         CGContextSaveGState(context);
@@ -944,6 +941,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRoundRectMutableImp
     if (currentMutableTransformSet) {
         CGContextRestoreGState(context);
     }
+#endif
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRoundRectGlobalImpl
@@ -951,19 +949,18 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRoundRectGlobalImpl
 #ifdef CN1_USE_METAL
     // Dead under Metal -- GlobalGraphics routes through the alpha-mask
     // Metal pipeline.
-    return;
-#endif
+#else
     UIGraphicsBeginImageContextWithOptions(CGSizeMake(width, height), NO, 1.0);
     CGContextRef context = UIGraphicsGetCurrentContext();
     CGContextFillPath(roundRect(context, color, alpha, 0, 0, width, height, arcWidth, arcHeight));
     UIImage* img = UIGraphicsGetImageFromCurrentImageContext();
-    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl %i", ((int)img));
     UIGraphicsEndImageContext();
 
     GLUIImage* glu = [[GLUIImage alloc] initWithImage:img];
     Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalImpl((BRIDGE_CAST void*)glu, 255, x, y, width, height, 0);
 #ifndef CN1_USE_ARC
     [glu release];
+#endif
 #endif
 }
 
@@ -1019,8 +1016,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawArcMutableImpl
     // Dead under Metal -- MutableGraphics builds a GeneralPath via
     // drawingArcPath.arc(...) and routes through nativeDrawShape (alpha-mask
     // Metal pipeline tagged with currentMutableImage).
-    return;
-#endif
+#else
     CGContextRef context = UIGraphicsGetCurrentContext();
     if (currentMutableTransformSet) {
         CGContextSaveGState(context);
@@ -1030,6 +1026,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawArcMutableImpl
     if (currentMutableTransformSet) {
         CGContextRestoreGState(context);
     }
+#endif
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRadialGradientMutableImpl
@@ -1070,8 +1067,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeFillArcMutableImpl
     // composes through the AlphaMaskRadial pipeline at draw time
     // (DrawTextureAlphaMask.execute checks PaintOp and routes to
     // CN1MetalDrawAlphaMaskRadial).
-    return;
-#endif
+#else
     CGContextRef context = UIGraphicsGetCurrentContext();
     if (currentMutableTransformSet) {
         CGContextSaveGState(context);
@@ -1087,6 +1083,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeFillArcMutableImpl
     if (currentMutableTransformSet) {
         CGContextRestoreGState(context);
     }
+#endif
 }
 
 // START ES2 ADDITION: Drawing Shapes ------------------------------------------------------------------------------
@@ -1596,15 +1593,13 @@ void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingShapeMutable
     // express axis-aligned rects. A future improvement could rasterise the
     // shape into a stencil/alpha mask. For now treat as "no clip" so
     // subsequent draws still render.
-    return;
-#endif
+    (void)numCommands; (void)commands; (void)numPoints; (void)points;
+#else
     CGContextRef context = UIGraphicsGetCurrentContext();
-    //CN1Log(@"Native mutable clipping applied %i on context %i x: %i y: %i width: %i height: %i", clipApplied, (int)context, x, y, width, height);
-    //if(clipApplied) {
     CGContextRestoreGState(context);
-    //}
     CGContextSaveGState(context);
     CGContextClip(Java_com_codename1_impl_ios_IOSImplementation_drawPath(CN1_THREAD_GET_STATE_PASS_ARG numCommands, commands, numPoints, points));
+#endif
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingGlobalImpl

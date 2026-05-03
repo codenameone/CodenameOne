@@ -54,10 +54,9 @@ static BOOL currentTransformInitialized = NO;
 {
 #ifdef CN1_USE_METAL
     CN1MetalSetTransform(m);
-    return;
-#endif
+#else
     glSetTransformES2(m);
-
+#endif
 }
 
 +(GLKMatrix4)currentTransform

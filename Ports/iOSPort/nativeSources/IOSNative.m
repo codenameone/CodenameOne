@@ -1048,21 +1048,22 @@ void com_codename1_impl_ios_IOSNative_nativeFillShapeMutable___int_int_int_byte_
     // through createAlphaMask + drawTextureAlphaMask (alpha-mask Metal
     // pipeline tagged with currentMutableImage). The Java side gates
     // with `metalRendering` before calling this JNI.
-    return;
-#endif
+    (void)color; (void)alpha; (void)commandsLen; (void)commandsArr; (void)pointsLen; (void)pointsArr;
+#else
     POOL_BEGIN();
     [UIColorFromRGB(color, alpha) set];
     CGContextRef context = drawPath(CN1_THREAD_STATE_PASS_ARG commandsLen, commandsArr, pointsLen, pointsArr);
     CGContextFillPath(context);
     POOL_END();
-
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_nativeDrawShapeMutable___int_int_int_byte_1ARRAY_int_float_1ARRAY_float_int_int_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT color, JAVA_INT alpha, JAVA_INT commandsLen, JAVA_OBJECT commandsArr, JAVA_INT pointsLen, JAVA_OBJECT pointsArr, JAVA_FLOAT lineWidth, JAVA_INT capStyle, JAVA_INT joinStyle, JAVA_FLOAT mitreLimit) {
 #ifdef CN1_USE_METAL
     // Same rationale as nativeFillShapeMutable above.
-    return;
-#endif
+    (void)color; (void)alpha; (void)commandsLen; (void)commandsArr; (void)pointsLen; (void)pointsArr;
+    (void)lineWidth; (void)capStyle; (void)joinStyle; (void)mitreLimit;
+#else
     POOL_BEGIN();
     if ([CodenameOne_GLViewController isCurrentMutableTransformSet]) {
         CGContextSaveGState(UIGraphicsGetCurrentContext());
@@ -1117,6 +1118,7 @@ void com_codename1_impl_ios_IOSNative_nativeDrawShapeMutable___int_int_int_byte_
         CGContextRestoreGState(context);
     }
     POOL_END();
+#endif
 }
 
 
@@ -8535,14 +8537,14 @@ void com_codename1_impl_ios_IOSNative_nativeDeleteTexture___long(CN1_THREAD_STAT
     // Texture handle is a CFBridgingRetain'd id<MTLTexture>; release it to
     // drop the retain that nativePathRendererCreateTexture took.
     CFBridgingRelease((CFTypeRef)(void *)(uintptr_t)textureName);
-    return;
-#endif
+#else
     dispatch_async(dispatch_get_main_queue(), ^{
         GLuint tex = (GLuint)textureName;
         //POOL_BEGIN();
         glDeleteTextures(1, &tex);
         //POOL_END();
     });
+#endif
 }
 
 

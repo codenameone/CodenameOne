@@ -112,8 +112,7 @@ static GLuint getOGLProgram(){
 -(void)execute {
 #ifdef CN1_USE_METAL
     CN1MetalFillRect(color, alpha, x, y, width, height);
-    return;
-#endif
+#else
     //[UIColorFromRGB(color, alpha) set];
     //CGContextFillRect(context, CGRectMake(x, y, width, height));
     //GlColorFromRGB(color, alpha);
@@ -175,9 +174,10 @@ static GLuint getOGLProgram(){
     
     glDisableVertexAttribArray(vertexCoordAtt);
     GLErrorLog;
-    
+
     //glUseProgram(CN1activeProgram);
     //GLErrorLog;
+#endif
 }
 #else
 -(void)execute {

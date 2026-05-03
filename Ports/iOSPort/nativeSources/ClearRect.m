@@ -103,8 +103,7 @@ static GLuint getOGLProgram(){
 -(void)execute {
 #ifdef CN1_USE_METAL
     CN1MetalClearRect(x, y, width, height);
-    return;
-#endif
+#else
     glUseProgram(getOGLProgram());
     GLfloat xOffset = 0;
     GLfloat yOffset = 0;
@@ -150,9 +149,10 @@ static GLuint getOGLProgram(){
     
     _glEnable(GL_BLEND);
     GLErrorLog;
-    
+
     glDisableVertexAttribArray(vertexCoordAtt);
     GLErrorLog;
+#endif
 }
 #else
 -(void)execute {
@@ -165,7 +165,7 @@ static GLuint getOGLProgram(){
         x, y + height,
         x + width, y + height
     };
-    
+
     GLErrorLog;
     _glVertexPointer(2, GL_FLOAT, 0, vertexes);
     _glEnableClientState(GL_VERTEX_ARRAY);

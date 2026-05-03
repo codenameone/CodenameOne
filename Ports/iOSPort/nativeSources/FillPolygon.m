@@ -127,8 +127,7 @@ static GLuint getOGLProgram(){
 {
 #ifdef CN1_USE_METAL
     CN1MetalFillPolygon(x, y, numPoints, color, alpha);
-    return;
-#endif
+#else
     glUseProgram(getOGLProgram());
 
     float alph = ((float)alpha)/255.0;
@@ -193,11 +192,11 @@ static GLuint getOGLProgram(){
     
     //glUseProgram(CN1activeProgram);
     //GLErrorLog;
-    
-    
-    // ---------- end
-    
 
+
+    // ---------- end
+
+#endif // CN1_USE_METAL
 }
 
 -(void)dealloc

@@ -106,8 +106,7 @@ static CGRect drawingRect;
     if (sy < 0) { sh += sy; sy = 0; }
     CN1MetalSetScissor(sx, sy, sw, sh);
     clipApplied = (sw > 0 && sh > 0);
-    return;
-#endif
+#else
 #ifdef USE_ES2
     if ( texture != 0 || numPoints > 0 ){
         clipX = x; clipY=y; clipW=width; clipH=height;
@@ -226,6 +225,7 @@ static CGRect drawingRect;
 #endif
         clipApplied = NO;
     }
+#endif // CN1_USE_METAL
 
 }
 

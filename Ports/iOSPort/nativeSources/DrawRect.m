@@ -110,8 +110,7 @@ static GLuint getOGLProgram(){
 -(void)execute {
 #ifdef CN1_USE_METAL
     CN1MetalDrawRect(color, alpha, x, y, width, height);
-    return;
-#endif
+#else
     glUseProgram(getOGLProgram());
 
     GLKVector4 colorV = GLKVector4Make(((float)((color >> 16) & 0xff))/255.0, \
@@ -162,9 +161,10 @@ static GLuint getOGLProgram(){
     //GLErrorLog;
     glDisableVertexAttribArray(vertexCoordAtt);
     GLErrorLog;
-    
+
     //glUseProgram(CN1activeProgram);
     //GLErrorLog;
+#endif // CN1_USE_METAL
 }
 #else
 -(void)execute {

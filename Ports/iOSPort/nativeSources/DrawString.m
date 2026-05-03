@@ -134,8 +134,7 @@ static GLuint getOGLProgram(){
 -(void)execute {
 #ifdef CN1_USE_METAL
     CN1MetalDrawString(str, font, color, alpha, x, y);
-    return;
-#endif
+#else
     glUseProgram(getOGLProgram());
     GLuint textureName = 0;
     DrawStringTextureCache *cachedTex = [DrawStringTextureCache checkCache:str f:font c:color a:255];
@@ -263,12 +262,13 @@ static GLuint getOGLProgram(){
     
     glDisableVertexAttribArray(vertexCoordAtt);
     GLErrorLog;
-    
+
     glBindTexture(GL_TEXTURE_2D, 0);
     GLErrorLog;
-    
+
     //glUseProgram(CN1activeProgram);
     //GLErrorLog;
+#endif // CN1_USE_METAL
 }
 
 #else

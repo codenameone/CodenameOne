@@ -109,8 +109,7 @@ static GLuint getOGLProgram(){
 -(void)execute {
 #ifdef CN1_USE_METAL
     CN1MetalDrawImage([img getMTLTexture], alpha, x, y, width, height);
-    return;
-#endif
+#else
     glUseProgram(getOGLProgram());
     GLKVector4 color = GLKVector4Make(((float)alpha) / 255.0f, ((float)alpha) / 255.0f, ((float)alpha) / 255.0f, ((float)alpha) / 255.0f);
     
@@ -247,9 +246,10 @@ static GLuint getOGLProgram(){
     
     glBindTexture(GL_TEXTURE_2D, 0);
     GLErrorLog;
-    
+
     //glUseProgram(CN1activeProgram);
     //GLErrorLog;
+#endif // CN1_USE_METAL
 
 }
 

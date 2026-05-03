@@ -374,8 +374,7 @@ static DrawTextureAlphaMaskOGLProgram* getOGLProgram() {
         }
     }
     CN1MetalDrawAlphaMask(tex, color, alpha, x, y, w, h);
-    return;
-#endif
+#else
     //RadialGradientPaint * gp = [[RadialGradientPaint alloc ]initWithArgs:0 y:0 width:[CodenameOne_GLViewController instance].view.bounds.size.width*2 height:[CodenameOne_GLViewController instance].view.bounds.size.height*2 startColor:0x0 endColor:0xffffff];
     //[PaintOp setCurrent:gp];
 
@@ -485,9 +484,10 @@ static DrawTextureAlphaMaskOGLProgram* getOGLProgram() {
     
     glDisableVertexAttribArray(p.vertexCoordAtt);
     GLErrorLog;
-    
+
     glBindTexture(GL_TEXTURE_2D, 0);
     GLErrorLog;
+#endif // CN1_USE_METAL
 }
 #else
 -(void)execute {}
