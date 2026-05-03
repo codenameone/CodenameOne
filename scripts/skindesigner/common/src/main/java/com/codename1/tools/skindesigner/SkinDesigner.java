@@ -1945,7 +1945,8 @@ public class SkinDesigner extends Lifecycle {
         String theme = queryParam(href, "theme");
         if ("dark".equalsIgnoreCase(theme)) return true;
         if ("light".equalsIgnoreCase(theme)) return false;
-        return Display.getInstance().isDarkMode();
+        Boolean platformDark = Display.getInstance().isDarkMode();
+        return platformDark != null && platformDark.booleanValue();
     }
 
     private String queryParam(String href, String name) {

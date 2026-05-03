@@ -73,13 +73,13 @@ SkinDesignerBrandLogoDark {
 SkinDesignerBrandTitle {
     color: #112247;
     font-size: 3.4mm;
-    font-family: "native:MainMedium";
+    font-family: "native:MainLight";
     padding: 0.6mm 0.4mm;
 }
 SkinDesignerBrandTitleDark {
     color: #f5f8ff;
     font-size: 3.4mm;
-    font-family: "native:MainMedium";
+    font-family: "native:MainLight";
     padding: 0.6mm 0.4mm;
 }
 
@@ -185,13 +185,13 @@ SkinDesignerStepperNumPendingDark {
 SkinDesignerStepperLabelActive {
     color: #2f6bff;
     font-size: 2.8mm;
-    font-family: "native:MainMedium";
+    font-family: "native:MainLight";
     padding: 0;
 }
 SkinDesignerStepperLabelActiveDark {
     color: #4d86ff;
     font-size: 2.8mm;
-    font-family: "native:MainMedium";
+    font-family: "native:MainLight";
     padding: 0;
 }
 SkinDesignerStepperLabelDone {
@@ -301,7 +301,7 @@ SkinDesignerStepScrollDark { background: transparent; padding: 0; }
 SkinDesignerH1 {
     color: #112247;
     font-size: 5.0mm;
-    font-family: "native:MainMedium";
+    font-family: "native:MainLight";
     padding: 0.4mm 0;
     margin: 0;
     background: transparent;
@@ -310,7 +310,7 @@ SkinDesignerH1 {
 SkinDesignerH1Dark {
     color: #f5f8ff;
     font-size: 5.0mm;
-    font-family: "native:MainMedium";
+    font-family: "native:MainLight";
     padding: 0.4mm 0;
     margin: 0;
     background: transparent;
@@ -319,7 +319,7 @@ SkinDesignerH1Dark {
 SkinDesignerH3 {
     color: #112247;
     font-size: 3.4mm;
-    font-family: "native:MainMedium";
+    font-family: "native:MainLight";
     padding: 0.4mm 0;
     margin: 0;
     background: transparent;
@@ -327,7 +327,7 @@ SkinDesignerH3 {
 SkinDesignerH3Dark {
     color: #f5f8ff;
     font-size: 3.4mm;
-    font-family: "native:MainMedium";
+    font-family: "native:MainLight";
     padding: 0.4mm 0;
     margin: 0;
     background: transparent;
@@ -583,7 +583,7 @@ SkinDesignerCardOverlay {
     font-size: 0.5mm;
 }
 SkinDesignerCardOverlay.pressed {
-    background: rgba(47,107,255,0.05);
+    background: #f5f8ff;
     color: transparent;
     border: none;
     padding: 0;
@@ -599,7 +599,7 @@ SkinDesignerCardOverlayDark {
     font-size: 0.5mm;
 }
 SkinDesignerCardOverlayDark.pressed {
-    background: rgba(77,134,255,0.08);
+    background: #163575;
     color: transparent;
     border: none;
     padding: 0;
@@ -1210,7 +1210,7 @@ SkinDesignerPresetSelected {
     margin: 0.3mm;
 }
 SkinDesignerPresetSelectedDark {
-    background: rgba(77,134,255,0.16);
+    background: #1c3a7a;
     border: 2px solid #4d86ff;
     border-radius: 2mm;
     padding: 1.6mm 1mm;
@@ -1255,7 +1255,7 @@ SkinDesignerCutoutRowSelected {
     margin: 0.3mm 0;
 }
 SkinDesignerCutoutRowSelectedDark {
-    background: rgba(77,134,255,0.16);
+    background: #1c3a7a;
     border: 1px solid #4d86ff;
     border-radius: 1.4mm;
     padding: 1mm 1.4mm;
@@ -1299,7 +1299,7 @@ SkinDesignerCutoutEditor {
     margin: 0.4mm 0;
 }
 SkinDesignerCutoutEditorDark {
-    background: rgba(77,134,255,0.16);
+    background: #1c3a7a;
     border-radius: 1.4mm;
     padding: 1.4mm;
     margin: 0.4mm 0;
