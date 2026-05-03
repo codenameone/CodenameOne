@@ -2967,12 +2967,23 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private static native boolean isIPad();
     
     
+    // Codename One has always preferred to work in CSS pixels (logical
+    // "real" pixels) end-to-end on the JS port -- we don't auto-scale to
+    // device pixels. Defaulting ``overridePixelRatio`` to 1 keeps:
+    //   * the canvas backing dimensions equal to CSS dimensions (no
+    //     HiDPI 2x backing surface),
+    //   * pointer-event coordinates flowing through unmultiplied (so a
+    //     click at CSS (574, 455) is delivered to Form.pointerPressed
+    //     as (574, 455), not (1148, 910) on a retina display),
+    //   * scaleCoord / unscaleCoord becoming no-ops.
+    // Anyone who specifically wants HiDPI rendering can opt in via the
+    // ``?pixelRatio=2`` URL parameter.
     @JSBody(params={}, script="if (window.overridePixelRatio === undefined) {"
             + "    var ratioStr = getParameterByName('pixelRatio');"
             + "    if (ratioStr != '') {"
             + "        window.overridePixelRatio = parseFloat(ratioStr);"
             + "    } else {"
-            + "        window.overridePixelRatio = 0;"
+            + "        window.overridePixelRatio = 1;"
             + "    }"
             + "    if (window.cn1ScaleCoord === undefined){ window.cn1ScaleCoord = function(x) { return x===-1?-1:x/(window.overridePixelRatio || window.devicePixelRatio || 1.0);};}"
             + "    if (window.cn1UnscaleCoord === undefined){ window.cn1UnscaleCoord = function(x) { return x===-1?-1:x*(window.overridePixelRatio || window.devicePixelRatio || 1.0);};}"

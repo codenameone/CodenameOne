@@ -1246,6 +1246,9 @@ bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getParameterByName
 });
 
 bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getDevicePixelRatio__R_double", "cn1_com_codename1_impl_html5_HTML5Implementation_getDevicePixelRatio___R_double"], function*() {
+  // Default to 1: Codename One's JS port works end-to-end in CSS
+  // ("real") pixels and skips HiDPI auto-scaling of the canvas /
+  // pointer events. Use ``?pixelRatio=2`` to opt back in.
   const ratioOverride = getQueryParameter("pixelRatio");
   const win = global.window || global;
   if (ratioOverride != null && ratioOverride !== "") {
@@ -1253,10 +1256,10 @@ bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getDevicePixelRati
     if (!isNaN(parsed) && parsed > 0) {
       win.overridePixelRatio = parsed;
     } else {
-      win.overridePixelRatio = 0;
+      win.overridePixelRatio = 1;
     }
   } else if (typeof win.overridePixelRatio === "undefined") {
-    win.overridePixelRatio = 0;
+    win.overridePixelRatio = 1;
   }
   if (typeof win.cn1ScaleCoord === "undefined") {
     win.cn1ScaleCoord = function(x) {
