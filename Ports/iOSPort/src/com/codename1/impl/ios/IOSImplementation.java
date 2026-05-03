@@ -4947,8 +4947,20 @@ public class IOSImplementation extends CodenameOneImplementation {
             if (metalRendering) {
                 if (drawingArcPath == null) drawingArcPath = new GeneralPath();
                 drawingArcPath.reset();
-                drawingArcPath.moveTo(x + width / 2, y + height / 2);
-                drawingArcPath.arc(x, y, width, height, startAngle * Math.PI / 180, arcAngle * Math.PI / 180, true);
+                if (arcAngle >= 360 || arcAngle <= -360) {
+                    // Full circle/ellipse: omit the moveTo(center). With it
+                    // the path is center -> arc start -> 360 around -> close
+                    // back to center, which Renderer.c rasterises as a
+                    // pacman with a visible slice line from center to the
+                    // start point. Switch's thumb fillArc(0, 360) was
+                    // rendering that slice as a dark line through the
+                    // white thumb.
+                    drawingArcPath.arc(x, y, width, height, startAngle * Math.PI / 180, arcAngle * Math.PI / 180, false);
+                } else {
+                    // Partial arc renders as a pie slice: center -> arc -> back to center.
+                    drawingArcPath.moveTo(x + width / 2, y + height / 2);
+                    drawingArcPath.arc(x, y, width, height, startAngle * Math.PI / 180, arcAngle * Math.PI / 180, true);
+                }
                 drawingArcPath.closePath();
                 nativeFillShape(drawingArcPath);
                 return;
@@ -5590,14 +5602,22 @@ public class IOSImplementation extends CodenameOneImplementation {
         void nativeFillArc(int color, int alpha, int x, int y, int width, int height, int startAngle, int arcAngle) {
             // Turns out that using a Shape instead of using a Shader is much faster so we just pipe this
             // through to DrawShape.
-            // See https://gist.github.com/shannah/85d93674d709c7733e98 for Shader implementation that we decided 
+            // See https://gist.github.com/shannah/85d93674d709c7733e98 for Shader implementation that we decided
             // not to use.
             if (drawingArcPath == null) {
                 drawingArcPath = new GeneralPath();
             }
             drawingArcPath.reset();
-            drawingArcPath.moveTo(x + width / 2, y + height / 2);
-            drawingArcPath.arc(x, y, width, height, startAngle * Math.PI / 180, arcAngle * Math.PI / 180, true);
+            if (arcAngle >= 360 || arcAngle <= -360) {
+                // Full circle/ellipse: skip moveTo(center). Without this the
+                // path is center -> arc start -> 360 -> close back to
+                // center, which rasterises as a pacman with a visible
+                // slice line through the fill (broken thumb on Switch).
+                drawingArcPath.arc(x, y, width, height, startAngle * Math.PI / 180, arcAngle * Math.PI / 180, false);
+            } else {
+                drawingArcPath.moveTo(x + width / 2, y + height / 2);
+                drawingArcPath.arc(x, y, width, height, startAngle * Math.PI / 180, arcAngle * Math.PI / 180, true);
+            }
             drawingArcPath.closePath();
             nativeFillShape(drawingArcPath);
         }
