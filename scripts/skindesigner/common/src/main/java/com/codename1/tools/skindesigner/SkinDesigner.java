@@ -406,11 +406,18 @@ public class SkinDesigner extends Lifecycle {
         for (int i = 0; i < filterIds.length; i++) {
             final String id = filterIds[i];
             Button b = new Button(filterLabels[i]);
-            b.setUIID("all".equals(id) ? "SkinDesignerFilterTagActive" : "SkinDesignerFilterTag");
+            b.setUIID(themedUiid(
+                    "all".equals(id) ? "SkinDesignerFilterTagActive" : "SkinDesignerFilterTag",
+                    websiteDarkMode));
             b.addActionListener(e -> {
                 activeFilter[0] = id;
+                // Compose the dark suffix when needed, otherwise the chips
+                // would all flash to their light-mode UIID on every click.
                 for (int j = 0; j < filters.length; j++) {
-                    filters[j].setUIID(filterIds[j].equals(id) ? "SkinDesignerFilterTagActive" : "SkinDesignerFilterTag");
+                    String base = filterIds[j].equals(id)
+                            ? "SkinDesignerFilterTagActive"
+                            : "SkinDesignerFilterTag";
+                    filters[j].setUIID(themedUiid(base, websiteDarkMode));
                 }
                 // Repaint the chip change immediately, then defer the (slow)
                 // grid rebuild to the next event-loop tick so the press
@@ -1696,28 +1703,32 @@ public class SkinDesigner extends Lifecycle {
         float vbToPx = (float) device.resolutionW / DevicePreview.VB_W;
         int safeTopPx = Math.round(effectiveSafeTopVB * vbToPx);
         int safeBottomPx = Math.round(skin.safeBottom * vbToPx);
-        int safeX = bezelPx;
-        int safeY = bezelPx + safeTopPx;
+
+        // Safe area is consumed by Container.snapToSafeAreaInternal, which
+        // treats the rect's X/Y as inset margins from the *display* origin
+        // (not the skin image). So write 0,Y,W,H in display-relative coords:
+        // origin (0,0) is the screen top-left, Y is the top inset, etc.
         int safeW = device.resolutionW;
         int safeH = Math.max(1, device.resolutionH - safeTopPx - safeBottomPx);
-
-        p.put("safePortraitX", String.valueOf(safeX));
-        p.put("safePortraitY", String.valueOf(safeY));
+        p.put("safePortraitX", "0");
+        p.put("safePortraitY", String.valueOf(safeTopPx));
         p.put("safePortraitWidth", String.valueOf(safeW));
         p.put("safePortraitHeight", String.valueOf(safeH));
-        // Landscape is portrait rotated 90° clockwise — swap accordingly
-        int landTotalW = totalH;
-        int landTotalH = totalW;
-        int landSafeX = bezelPx + safeBottomPx; // bottom edge becomes left
-        int landSafeY = bezelPx;
+
+        // Landscape is portrait rotated 90° clockwise. The display now has
+        // width = portraitH and height = portraitW. The portrait top inset
+        // becomes the landscape *left* inset; the portrait bottom inset
+        // becomes the landscape right inset.
         int landSafeW = Math.max(1, device.resolutionH - safeTopPx - safeBottomPx);
         int landSafeH = device.resolutionW;
-        // Suppress unused-var warnings on totals
-        if (landTotalW + landTotalH == 0) {} // no-op
-        p.put("safeLandscapeX", String.valueOf(landSafeX));
-        p.put("safeLandscapeY", String.valueOf(landSafeY));
+        p.put("safeLandscapeX", String.valueOf(safeTopPx));
+        p.put("safeLandscapeY", "0");
         p.put("safeLandscapeWidth", String.valueOf(landSafeW));
         p.put("safeLandscapeHeight", String.valueOf(landSafeH));
+
+        // bezelPx is unused now that the safe-area coords are display-relative,
+        // but skin generation still needs it elsewhere.
+        if (bezelPx < 0) { /* keep var alive */ }
         return p;
     }
 
