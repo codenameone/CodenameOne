@@ -73,7 +73,7 @@ log "Capturing screenshots via $SCREENSHOT_MAIN -> $OUT_DIR"
     mvn -B -ntp -DskipTests exec:java \
         "-Dexec.mainClass=$SCREENSHOT_MAIN" \
         "-Dexec.args=$OUT_DIR" \
-        -Dexec.classpathScope=compile )
+        -Dexec.classpathScope=test )
 
 log "Verifying captured PNGs"
 missing=0
