@@ -195,7 +195,31 @@ static CGSize cn1OrientationCorrectSize(UIView *view) {
     return size;
 }
 BOOL forceSlideUpField;
-static UIScrollView *cn1StatusBarTapProxy = nil;
+
+// UIScrollView subclass used solely to receive the status-bar tap
+// (scrollViewShouldScrollToTop:) on iOS. Touches must pass through to the
+// underlying GL view, so we always return NO from pointInside:.
+// layoutSubviews keeps contentSize larger than the bounds so iOS considers
+// the scroll view actually scrollable, which is required for the system to
+// dispatch the scroll-to-top message.
+@interface CN1StatusBarTapProxyView : UIScrollView
+@end
+@implementation CN1StatusBarTapProxyView
+- (BOOL)pointInside:(CGPoint)point withEvent:(UIEvent *)event {
+    return NO;
+}
+- (void)layoutSubviews {
+    [super layoutSubviews];
+    CGSize sz = self.bounds.size;
+    if (sz.width < 1) sz.width = 1;
+    self.contentSize = CGSizeMake(sz.width, sz.height + 1);
+    if (self.contentOffset.y <= 0) {
+        self.contentOffset = CGPointMake(0, 1);
+    }
+}
+@end
+
+static CN1StatusBarTapProxyView *cn1StatusBarTapProxy = nil;
 
 
 // 1 for portrait lock, and 2 for landscape lock
@@ -572,6 +596,11 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
             utv.blockPaste = CN1_blockPaste || blockCopyPaste;
             utv.blockCopy = CN1_blockCopy || blockCopyPaste;
             utv.blockCut = CN1_blockCut || blockCopyPaste;
+            // Avoid competing with the CN1 status-bar tap proxy: iOS only fires
+            // scrollViewShouldScrollToTop: when exactly one scroll view has
+            // scrollsToTop=YES, and UITextView's internal scroll view defaults
+            // to YES.
+            utv.scrollsToTop = NO;
             [utv setBackgroundColor:[UIColor clearColor]];
             [utv.layer setBorderColor:[[UIColor clearColor] CGColor]];
             [utv.layer setBorderWidth:0];
@@ -1946,17 +1975,37 @@ static CodenameOne_GLViewController *sharedSingleton;
 
 - (void)cn1InstallStatusBarTapProxy {
     if (cn1StatusBarTapProxy != nil) {
+        // Re-attach if it was detached and ensure it sits on top so it isn't
+        // hidden by peer components added later in the view hierarchy.
+        if (cn1StatusBarTapProxy.superview != self.view) {
+            [cn1StatusBarTapProxy removeFromSuperview];
+            [self.view addSubview:cn1StatusBarTapProxy];
+        } else {
+            [self.view bringSubviewToFront:cn1StatusBarTapProxy];
+        }
         return;
     }
-    cn1StatusBarTapProxy = [[UIScrollView alloc] initWithFrame:self.view.bounds];
+    cn1StatusBarTapProxy = [[CN1StatusBarTapProxyView alloc] initWithFrame:self.view.bounds];
     cn1StatusBarTapProxy.delegate = self;
     cn1StatusBarTapProxy.backgroundColor = [UIColor clearColor];
-    cn1StatusBarTapProxy.contentSize = CGSizeMake(1, 2);
-    cn1StatusBarTapProxy.contentOffset = CGPointMake(0, 1);
     cn1StatusBarTapProxy.scrollsToTop = YES;
-    cn1StatusBarTapProxy.userInteractionEnabled = NO;
+    // userInteractionEnabled must remain YES; some iOS versions skip the
+    // scrollViewShouldScrollToTop: dispatch for views that have it disabled.
+    // pointInside: in the subclass ensures touches still pass through.
+    cn1StatusBarTapProxy.userInteractionEnabled = YES;
+    cn1StatusBarTapProxy.scrollEnabled = YES;
+    cn1StatusBarTapProxy.showsVerticalScrollIndicator = NO;
+    cn1StatusBarTapProxy.showsHorizontalScrollIndicator = NO;
+    cn1StatusBarTapProxy.bounces = NO;
     cn1StatusBarTapProxy.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     cn1StatusBarTapProxy.alpha = 0.0f;
+#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 110000
+    if (@available(iOS 11.0, *)) {
+        cn1StatusBarTapProxy.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
+    }
+#endif
+    cn1StatusBarTapProxy.contentSize = CGSizeMake(self.view.bounds.size.width, self.view.bounds.size.height + 1);
+    cn1StatusBarTapProxy.contentOffset = CGPointMake(0, 1);
     [self.view addSubview:cn1StatusBarTapProxy];
 }
 
@@ -2032,6 +2081,10 @@ bool lockDrawing;
     [super viewDidAppear:animated];
     [self becomeFirstResponder];
     [self updateCanvas:animated];
+    // Re-install / bring the status-bar tap proxy to the front. Native peers
+    // (browsers, video, etc.) added after viewDidLoad can obscure it or push
+    // sibling scroll views into the hierarchy.
+    [self cn1InstallStatusBarTapProxy];
     //replaceViewDidAppear
 }
 
