@@ -803,6 +803,14 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_gausianBlurImage___long_float(CN1_THR
     // shadow rings end up showing through as visible artefacts on the
     // final thumb composite.
     if ([glu mtlMutableTexture] != nil) {
+        // Force drawFrame to drain any pending ExecutableOps for this image
+        // before sampling. Without the flush the GPU never executes the
+        // shadow-ring fillArc calls; CN1MetalReadMutableImageAsUIImage
+        // would then sample the cleared (zero-alpha) texture and the blur
+        // input is empty. Mirrors imageRgbToIntArrayImpl's drain dance.
+        extern int displayWidth;
+        extern int displayHeight;
+        [[CodenameOne_GLViewController instance] flushBuffer:nil x:0 y:0 width:displayWidth height:displayHeight];
         original = CN1MetalReadMutableImageAsUIImage(glu);
     }
     if (original == nil) {
