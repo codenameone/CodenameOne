@@ -4988,24 +4988,29 @@ public class IOSImplementation extends CodenameOneImplementation {
                 p.closePath();
                 return p;
             }
+            // Detect zero-length straight edges (pill: arcWidth == box height
+            // so rx == width/2; or circle: rx == width/2 && ry == height/2).
+            // Renderer.c rasterises a zero-length lineTo as a phantom edge that
+            // breaks the fill -- the Switch pill was rendering with a
+            // triangular tear right where a zero-length top/bottom edge
+            // sat between two abutting corners. Skip the line segments
+            // when rx >= width/2 or ry >= height/2.
+            boolean hasTopBottomEdges = rx < width / 2f;
+            boolean hasLeftRightEdges = ry < height / 2f;
             // joinPath=true on each arc so the corners connect to the
             // adjacent line segments via lineTo instead of starting a new
-            // sub-path. With joinPath=false (the prior code) each arc was
-            // an independent moveTo'd sub-path, and Renderer.c rendered the
-            // whole thing as 4 disconnected pacman pieces. For pills
-            // (arcWidth == arcHeight == box height, so rx = ry = h/2 and the
-            // straight edges between corners collapse to zero length) this
-            // showed as the Switch track rendering as two separate semicircle
-            // wedges facing inward instead of one solid pill.
+            // sub-path. With joinPath=false the corners were independent
+            // moveTo'd sub-paths and the whole thing rendered as 4
+            // disconnected pacman pieces.
             p.moveTo(x + rx, y);
-            p.lineTo(x + width - rx, y);
-            p.arc(x + width - 2*rx, y,             2*rx, 2*ry, -Math.PI / 2,  Math.PI / 2, true);
-            p.lineTo(x + width,     y + height - ry);
-            p.arc(x + width - 2*rx, y + height - 2*ry, 2*rx, 2*ry, 0,           Math.PI / 2, true);
-            p.lineTo(x + rx,        y + height);
-            p.arc(x,                y + height - 2*ry, 2*rx, 2*ry, Math.PI / 2, Math.PI / 2, true);
-            p.lineTo(x,             y + ry);
-            p.arc(x,                y,             2*rx, 2*ry, Math.PI,     Math.PI / 2, true);
+            if (hasTopBottomEdges) p.lineTo(x + width - rx, y);
+            p.arc(x + width - 2*rx, y,                 2*rx, 2*ry, -Math.PI / 2, Math.PI / 2, true);
+            if (hasLeftRightEdges) p.lineTo(x + width, y + height - ry);
+            p.arc(x + width - 2*rx, y + height - 2*ry, 2*rx, 2*ry, 0,            Math.PI / 2, true);
+            if (hasTopBottomEdges) p.lineTo(x + rx, y + height);
+            p.arc(x,                y + height - 2*ry, 2*rx, 2*ry, Math.PI / 2,  Math.PI / 2, true);
+            if (hasLeftRightEdges) p.lineTo(x, y + ry);
+            p.arc(x,                y,                 2*rx, 2*ry, Math.PI,      Math.PI / 2, true);
             p.closePath();
             return p;
         }
@@ -5575,16 +5580,19 @@ public class IOSImplementation extends CodenameOneImplementation {
             // joinPath=true on each arc so corners connect to adjacent line
             // segments via lineTo (single sub-path) instead of starting a
             // new sub-path each. See MutableGraphics.roundRectPath for the
-            // pill-rendering bug this avoids.
+            // pill-rendering bug this avoids; same zero-length-edge skip
+            // for pills/circles.
+            boolean hasTopBottomEdges = rx < width / 2f;
+            boolean hasLeftRightEdges = ry < height / 2f;
             p.moveTo(x + rx, y);
-            p.lineTo(x + width - rx, y);
-            p.arc(x + width - 2*rx, y,             2*rx, 2*ry, -Math.PI / 2,  Math.PI / 2, true);
-            p.lineTo(x + width,     y + height - ry);
-            p.arc(x + width - 2*rx, y + height - 2*ry, 2*rx, 2*ry, 0,           Math.PI / 2, true);
-            p.lineTo(x + rx,        y + height);
-            p.arc(x,                y + height - 2*ry, 2*rx, 2*ry, Math.PI / 2, Math.PI / 2, true);
-            p.lineTo(x,             y + ry);
-            p.arc(x,                y,             2*rx, 2*ry, Math.PI,     Math.PI / 2, true);
+            if (hasTopBottomEdges) p.lineTo(x + width - rx, y);
+            p.arc(x + width - 2*rx, y,                 2*rx, 2*ry, -Math.PI / 2, Math.PI / 2, true);
+            if (hasLeftRightEdges) p.lineTo(x + width, y + height - ry);
+            p.arc(x + width - 2*rx, y + height - 2*ry, 2*rx, 2*ry, 0,            Math.PI / 2, true);
+            if (hasTopBottomEdges) p.lineTo(x + rx, y + height);
+            p.arc(x,                y + height - 2*ry, 2*rx, 2*ry, Math.PI / 2,  Math.PI / 2, true);
+            if (hasLeftRightEdges) p.lineTo(x, y + ry);
+            p.arc(x,                y,                 2*rx, 2*ry, Math.PI,      Math.PI / 2, true);
             p.closePath();
             return p;
         }
