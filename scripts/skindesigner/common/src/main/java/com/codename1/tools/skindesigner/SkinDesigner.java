@@ -1792,6 +1792,19 @@ public class SkinDesigner extends Lifecycle {
         p.put("overrideNames", overrideNames(device));
 
         int bezelPx = skinBezelInPx(totalW, totalH);
+        // roundScreen=true switches the simulator from the skin_map-driven
+        // path (which clips UI to non-skin pixels) to the display-rect path
+        // where the skin is painted *over* the rendered UI (JavaSEPort
+        // line ~1622). That overlay rendering is what makes Dynamic Island
+        // and other in-screen cutouts appear "floating" on top of the
+        // status bar / app content rather than carved out of it.
+        p.put("roundScreen", "true");
+        float framePxScale = ((float) device.resolutionW) / DevicePreview.VB_W;
+        int topCutoutPxForDisplay = computeTopCutoutPx(framePxScale);
+        p.put("displayX", String.valueOf(bezelPx));
+        p.put("displayY", String.valueOf(bezelPx + topCutoutPxForDisplay));
+        p.put("displayWidth", String.valueOf(device.resolutionW));
+        p.put("displayHeight", String.valueOf(device.resolutionH));
         // Notch cutouts live in the top frame extension above the screen,
         // so they don't eat into safeTop. But islands and punch-holes are
         // drawn floating *inside* the screen and the iOS status bar
