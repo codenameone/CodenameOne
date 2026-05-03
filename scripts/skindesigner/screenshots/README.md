@@ -1,27 +1,33 @@
 # Skin Designer screenshots
 
 This directory drives the developer-guide screenshots for the Skin
-Designer chapter. The pipeline runs entirely inside Codename One —
-`Display.captureScreen()` produces the PNGs, no AWT Robot or external
-xvfb capture step.
+Designer chapter. The capture runs entirely inside Codename One in
+quiet mode — no skin window, no source-watcher, no AWT Robot, no
+external xvfb capture step.
 
 ## How it works
 
 `scripts/skindesigner/common/src/main/java/.../screenshots/ScreenshotApp.java`
-is a `Lifecycle` subclass that walks each wizard stage:
+is a plain `main()` class that:
 
 1. Wipes the persisted wizard state in `Preferences` / `Storage`.
 2. Sets the `cn1.skindesigner.demo*` system properties for the next
    scenario (step / device / source / sidebar tab / preset).
-3. Calls `new SkinDesigner().runApp()` to build a fresh wizard form.
-4. Waits 1.5 s for layout to settle.
-5. Calls `Display.getInstance().captureScreen()` and saves the result
-   via `Storage.getInstance().createOutputStream(name + ".png")` —
-   on the JavaSE port that lands at `~/.cn1/<name>.png`.
+3. Calls `Display.init(new Container())` once for the whole run, then
+   `new SkinDesigner().runApp()` per scenario to build a fresh form.
+4. On the EDT, lays out the form at iPhone-class dimensions and calls
+   `form.toImage()` to render off-screen.
+5. Writes each PNG straight to disk via `cn1.ImageIO`.
 
-After every scenario finishes, the app calls
-`Display.exitApplication()`. The shell script then copies the PNGs out
-of `~/.cn1/` and into `docs/developer-guide/img/skin-designer/`.
+`take-screenshots.sh` invokes this via:
+
+```
+mvn -pl common exec:java \
+    -Dexec.mainClass=com.codename1.tools.skindesigner.screenshots.ScreenshotApp \
+    -Dexec.args="$OUT_DIR"
+```
+
+— no cn1:simulator, no `verify` lifecycle, no JFrame.
 
 ## Running locally
 
@@ -30,15 +36,15 @@ scripts/skindesigner/screenshots/take-screenshots.sh
 ```
 
 Requires Java 17 + Maven on `PATH`. On Linux you also need `xvfb-run`
-for headless JavaSE simulator runs (`sudo apt-get install xvfb`); on
-macOS the script falls back to a regular simulator launch and you'll
-see the wizard window briefly per scenario.
+because CN1's `Display.init` still pokes
+`Toolkit.getDefaultToolkit()`. On macOS the script falls back to a
+direct `mvn` invocation.
 
 ## Demo overrides
 
-`SkinDesigner.applyDemoOverrides()` reads these system properties from
-the JVM and, if present, replaces the loaded persisted state with the
-specified values:
+`SkinDesigner.applyDemoOverrides()` reads these system properties
+from the JVM and, if present, replaces the loaded persisted state
+with the specified values:
 
 | Property                              | Effect                                  |
 | ------------------------------------- | --------------------------------------- |
@@ -52,7 +58,8 @@ specified values:
 
 ## CI
 
-`.github/workflows/skin-designer-screenshots.yml` runs the script on
-`workflow_dispatch` and on PRs that touch the harness or wizard code,
-uploads the PNGs as an artifact, and on manual dispatch opens an
-automated PR if the committed images drifted.
+The Hugo website build (`.github/workflows/website-docs.yml`) runs
+this script before invoking `scripts/website/build.sh`, so the
+freshly generated PNGs are rsynced into `static/developer-guide/img/`
+on every run. Nothing about the screenshots ends up committed —
+they are produced on demand by the website pipeline.

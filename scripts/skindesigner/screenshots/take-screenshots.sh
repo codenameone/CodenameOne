@@ -1,15 +1,21 @@
 #!/usr/bin/env bash
-# Run the Skin Designer's ScreenshotApp Lifecycle inside the JavaSE
-# simulator. Each scenario calls Display.captureScreen() and saves the
-# PNG via Storage; on JavaSE that lands in ~/.cn1/. We then copy those
-# PNGs into docs/developer-guide/img/skin-designer/.
+# Generate the per-stage Skin Designer screenshots referenced by the
+# developer-guide chapter.
 #
-# Run by .github/workflows/skin-designer-screenshots.yml on a schedule
-# and on workflow_dispatch. Locally (Linux):
+# Boots Codename One in quiet mode (no skin window, no source-watcher)
+# via mvn exec:java on ScreenshotApp.main. ScreenshotApp walks the
+# wizard scenarios on the EDT and writes each Form.toImage() PNG into
+# OUT_DIR. Replaces the older Lifecycle + cn1:simulator path that hung
+# inside CI.
+#
+# Run by .github/workflows/website-docs.yml ahead of the Hugo build.
+# Locally:
 #
 #     scripts/skindesigner/screenshots/take-screenshots.sh
 #
-# Requires Java 17 + Maven on PATH. Linux: xvfb-run for headless capture.
+# Requires Java 17 + Maven on PATH. On Linux you also need xvfb so
+# AWT's font/graphics initialisation can succeed (CN1 Display.init
+# still pokes Toolkit.getDefaultToolkit()).
 set -euo pipefail
 
 log() { echo "[skin-designer-screenshots] $1" >&2; }
@@ -21,7 +27,6 @@ REPO_ROOT="$(cd "$SKIN_DESIGNER_DIR/../.." && pwd)"
 OUT_DIR="${OUT_DIR:-$REPO_ROOT/docs/developer-guide/img/skin-designer}"
 mkdir -p "$OUT_DIR"
 
-# Names match the SCENARIOS array in ScreenshotApp.java; keep in sync.
 SCREENSHOT_NAMES=(
     "skin-designer-stage-1-device"
     "skin-designer-stage-2-source"
@@ -31,14 +36,10 @@ SCREENSHOT_NAMES=(
     "skin-designer-stage-4-done"
 )
 
-# Storage on the JavaSE port lives at ~/.cn1; the ScreenshotApp writes
-# each scenario as <name>.png into Storage.
-STORAGE_DIR="$HOME/.cn1"
-
-# Wipe any stale screenshots from a previous run so a partial run can
-# never report success with old files.
+# Wipe stale outputs so a partial run can never report success with old
+# files.
 for name in "${SCREENSHOT_NAMES[@]}"; do
-    rm -f "$STORAGE_DIR/$name.png"
+    rm -f "$OUT_DIR/$name.png"
 done
 
 # Ensure the cn1lib's extracted main.zip exists. The Codename One plugin's
@@ -51,43 +52,35 @@ if [ -f "$SKIN_DESIGNER_DIR/cn1libs/ZipSupport.cn1lib" ] && [ ! -f "$ZIP_LIB_DIR
     unzip -p "$SKIN_DESIGNER_DIR/cn1libs/ZipSupport.cn1lib" main.zip > "$ZIP_LIB_DIR/jars/main.zip"
 fi
 
-log "Building Skin Designer (mvn -DskipTests install)"
-# The CN1 plugin's css goal instantiates the designer (JavaSEPort) to
-# compile theme.css; that path queries getDefaultScreenDevice() and
-# throws HeadlessException on a CI runner without a display. Wrap mvn
-# in xvfb-run when available (Linux) so the install step can complete.
-if command -v xvfb-run >/dev/null 2>&1; then
-    (cd "$SKIN_DESIGNER_DIR" && xvfb-run -a -s "-screen 0 1600x1100x24" \
-        mvn -B -ntp -DskipTests install)
-else
-    (cd "$SKIN_DESIGNER_DIR" && mvn -B -ntp -DskipTests install)
-fi
+# CN1 plugin steps (CSS compile, compliance check) instantiate JavaSEPort
+# which queries getDefaultScreenDevice(); on a CI runner without a display
+# that throws HeadlessException. Wrap mvn in xvfb-run when available.
+mvn_with_display() {
+    if command -v xvfb-run >/dev/null 2>&1; then
+        xvfb-run -a -s "-screen 0 1280x900x24" "$@"
+    else
+        "$@"
+    fi
+}
 
-# The CN1 Maven plugin composes codename1.mainClass from the package +
-# mainName at startup. We override codename1.mainClass directly here so
-# the simulator launches our ScreenshotApp instead of the regular
-# SkinDesigner.
+log "Building Skin Designer common (mvn -DskipTests install)"
+( cd "$SKIN_DESIGNER_DIR" && mvn_with_display \
+    mvn -B -ntp -DskipTests install -pl common -am )
+
 SCREENSHOT_MAIN="com.codename1.tools.skindesigner.screenshots.ScreenshotApp"
-log "Running simulator with $SCREENSHOT_MAIN"
-RUN_CMD=(mvn -B -ntp -Psimulator -DskipTests
-         -Dcodename1.platform=javase
-         "-Dcodename1.mainClass=$SCREENSHOT_MAIN"
-         -f "$SKIN_DESIGNER_DIR/javase/pom.xml"
-         verify)
+log "Capturing screenshots via $SCREENSHOT_MAIN -> $OUT_DIR"
+( cd "$SKIN_DESIGNER_DIR/common" && mvn_with_display \
+    mvn -B -ntp -DskipTests exec:java \
+        "-Dexec.mainClass=$SCREENSHOT_MAIN" \
+        "-Dexec.args=$OUT_DIR" \
+        -Dexec.classpathScope=compile )
 
-if command -v xvfb-run >/dev/null 2>&1; then
-    xvfb-run -a -s "-screen 0 1600x1100x24" "${RUN_CMD[@]}"
-else
-    "${RUN_CMD[@]}"
-fi
-
-log "Copying generated PNGs out of $STORAGE_DIR"
+log "Verifying captured PNGs"
 missing=0
 for name in "${SCREENSHOT_NAMES[@]}"; do
-    src="$STORAGE_DIR/$name.png"
+    src="$OUT_DIR/$name.png"
     if [ -f "$src" ]; then
-        cp "$src" "$OUT_DIR/$name.png"
-        log "  -> $OUT_DIR/$name.png"
+        log "  ok: $src"
     else
         log "  ! missing: $src"
         missing=$((missing + 1))

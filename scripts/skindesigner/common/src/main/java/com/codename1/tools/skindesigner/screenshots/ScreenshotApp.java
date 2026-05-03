@@ -1,35 +1,38 @@
 package com.codename1.tools.skindesigner.screenshots;
 
-import com.codename1.io.Log;
 import com.codename1.io.Preferences;
-import com.codename1.io.Storage;
-import com.codename1.system.Lifecycle;
 import com.codename1.tools.skindesigner.SkinDesigner;
 import com.codename1.tools.skindesigner.SkinModel;
 import com.codename1.ui.CN;
 import com.codename1.ui.Display;
+import com.codename1.ui.Form;
 import com.codename1.ui.Image;
 import com.codename1.ui.util.ImageIO;
-import com.codename1.ui.util.UITimer;
-import java.io.IOException;
+
+import java.awt.Container;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.OutputStream;
 
 /**
- * Lifecycle entry point used by the developer-guide screenshot pipeline.
- * Drives the Skin Designer through each wizard stage and saves a PNG per
- * stage via {@link Display#captureScreen()} into Storage.
+ * Headless screenshot harness for the developer guide. Boots Codename One
+ * in quiet mode (no skin window, no source-watcher), walks the wizard
+ * scenarios on the EDT, captures each form via {@link Form#toImage()},
+ * and writes the PNG straight to disk.
  *
- * <p>On the JavaSE port, Storage maps to {@code ~/.cn1/&lt;name&gt;}, so
- * {@code take-screenshots.sh} just copies those files into
- * {@code docs/developer-guide/img/skin-designer/}.
- *
- * <p>Run via:
+ * <p>Run via the website CI step or the helper script:
  * <pre>
- *   ./run.sh simulator          # but with -Dcodename1.mainName=ScreenshotApp
+ *   mvn -pl common exec:java \
+ *       -Dexec.mainClass=com.codename1.tools.skindesigner.screenshots.ScreenshotApp \
+ *       -Dexec.args="path/to/output/dir"
  * </pre>
- * which the wrapper script handles.
+ *
+ * <p>The previous version of this class extended {@code Lifecycle} and was
+ * driven by the cn1:simulator goal; that path booted the full simulator
+ * (skin window, CEF, source-change watcher) and never reliably exited
+ * inside CI. This rewrite avoids the simulator entirely.
  */
-public class ScreenshotApp extends Lifecycle {
+public class ScreenshotApp {
 
     /** Each row drives one screenshot:
      *  {fileName, demoStep, demoDevice, demoSource, demoSidebarTab, demoPreset}. */
@@ -42,61 +45,96 @@ public class ScreenshotApp extends Lifecycle {
             {"skin-designer-stage-4-done",           "3", "apple_apple_iphone_16_pro", "shape", null,      "island"},
     };
 
-    /** Persistent wizard state keys we have to wipe between scenarios so
-     *  each screenshot starts from a clean slate. Mirrors the keys used
-     *  inside SkinDesigner / SkinModel. */
+    /** Persistent wizard state keys we wipe between scenarios so each
+     *  screenshot starts from a clean slate. */
     private static final String[] WIZARD_PREF_KEYS = {
             "wiz.step", "wiz.deviceId", "wiz.source", "wiz.hasImage",
     };
 
-    /** Time to wait after each renderStep before capturing, in ms. The
-     *  wizard rebuilds via revalidate() + applyDarkRecursive — give it a
-     *  full 1.5 s on JavaSE so layout/animations settle before the
-     *  screenshot. */
-    private static final int RENDER_DELAY_MS = 1500;
+    /** Render dimensions. iPhone 16 Pro point size — wide enough that the
+     *  wizard's two-column editor layout matches what a user sees on a
+     *  phone-class viewport. */
+    private static final int WIDTH = 390;
+    private static final int HEIGHT = 844;
 
-    @Override
-    public void runApp() {
-        Log.p("[skin-designer-screenshots] starting; scenarios=" + SCENARIOS.length);
-        runScenario(0);
+    public static void main(String[] args) throws Exception {
+        File outDir = resolveOutDir(args);
+        if (!outDir.mkdirs() && !outDir.isDirectory()) {
+            throw new RuntimeException("Could not create output dir: " + outDir);
+        }
+        log("output dir: " + outDir.getAbsolutePath());
+
+        Container hostPanel = new Container();
+        hostPanel.setSize(WIDTH, HEIGHT);
+        Display.init(hostPanel);
+
+        for (String[] s : SCENARIOS) {
+            renderAndSave(s, outDir);
+        }
+
+        Display.deinitialize();
+        // exitApplication closes the EDT; explicit System.exit guarantees
+        // the harness returns control to the shell even if a stray AWT
+        // thread is still alive.
+        System.exit(0);
     }
 
-    private void runScenario(final int idx) {
-        if (idx >= SCENARIOS.length) {
-            Log.p("[skin-designer-screenshots] done; exiting");
-            // Small delay so the final capture flushes to disk before VM exit.
-            UITimer.timer(300, false, Display.getInstance().getCurrent(),
-                    () -> Display.getInstance().exitApplication());
-            return;
-        }
-        final String[] s = SCENARIOS[idx];
-        Log.p("[skin-designer-screenshots] scenario " + (idx + 1) + "/" + SCENARIOS.length
-                + " -> " + s[0]);
+    private static void renderAndSave(final String[] s, final File outDir) {
+        Display.getInstance().callSeriallyAndWait(() -> {
+            try {
+                resetWizardState();
+                applyDemoProperties(s);
 
-        resetWizardState();
-        applyDemoProperties(s);
+                new SkinDesigner().runApp();
+                Form f = Display.getInstance().getCurrent();
+                if (f == null) {
+                    log("no current form for " + s[0]);
+                    return;
+                }
+                f.setSize(new com.codename1.ui.geom.Dimension(WIDTH, HEIGHT));
+                f.setX(0);
+                f.setY(0);
+                f.layoutContainer();
+                f.revalidate();
 
-        // Re-initialise the wizard. Each scenario builds a fresh
-        // SkinDesigner because runApp captures `this` into action listeners
-        // and we want the screenshot to reflect a clean restart.
-        new SkinDesigner().runApp();
-
-        UITimer.timer(RENDER_DELAY_MS, false, Display.getInstance().getCurrent(), () -> {
-            captureAndSave(s[0]);
-            // Yield once before the next scenario so the EDT has a chance
-            // to drain any queued repaints from the capture step.
-            CN.callSerially(() -> runScenario(idx + 1));
+                Image img = f.toImage();
+                if (img == null) {
+                    log("toImage returned null for " + s[0]);
+                    return;
+                }
+                File out = new File(outDir, s[0] + ".png");
+                try (OutputStream os = new FileOutputStream(out)) {
+                    ImageIO.getImageIO().save(img, os, ImageIO.FORMAT_PNG, 1.0f);
+                }
+                log("saved " + out.getName() + " (" + img.getWidth() + "x" + img.getHeight() + ")");
+            } catch (Exception err) {
+                err.printStackTrace();
+            }
         });
     }
 
-    private void resetWizardState() {
+    private static File resolveOutDir(String[] args) {
+        if (args != null && args.length > 0 && args[0] != null && !args[0].isEmpty()) {
+            return new File(args[0]).getAbsoluteFile();
+        }
+        String prop = System.getProperty("skindesigner.screenshotsDir");
+        if (prop != null && !prop.isEmpty()) {
+            return new File(prop).getAbsoluteFile();
+        }
+        // Default: <repo>/docs/developer-guide/img/skin-designer relative
+        // to the common module's basedir (scripts/skindesigner/common/).
+        return new File(System.getProperty("user.dir"),
+                "../../../docs/developer-guide/img/skin-designer").getAbsoluteFile();
+    }
+
+    private static void resetWizardState() {
         for (String k : WIZARD_PREF_KEYS) {
             Preferences.delete(k);
         }
         SkinModel.clearPersisted();
     }
 
-    private void applyDemoProperties(String[] s) {
+    private static void applyDemoProperties(String[] s) {
         setProp("cn1.skindesigner.demoStep",       s[1]);
         setProp("cn1.skindesigner.demoDevice",     s[2]);
         setProp("cn1.skindesigner.demoSource",     s[3]);
@@ -112,21 +150,7 @@ public class ScreenshotApp extends Lifecycle {
         }
     }
 
-    private void captureAndSave(String name) {
-        try {
-            Image img = Display.getInstance().captureScreen();
-            if (img == null) {
-                Log.p("[skin-designer-screenshots] captureScreen returned null for " + name);
-                return;
-            }
-            String fileName = name + ".png";
-            try (OutputStream os = Storage.getInstance().createOutputStream(fileName)) {
-                ImageIO.getImageIO().save(img, os, ImageIO.FORMAT_PNG, 1.0f);
-            }
-            Log.p("[skin-designer-screenshots] saved " + fileName
-                    + " (" + img.getWidth() + "x" + img.getHeight() + ")");
-        } catch (IOException err) {
-            Log.e(err);
-        }
+    private static void log(String msg) {
+        System.out.println("[skin-designer-screenshots] " + msg);
     }
 }
