@@ -1023,6 +1023,12 @@ BOOL CN1MetalReadMutableImagePixels(GLUIImage *image, int *outARGB,
     return YES;
 }
 
+// CGDataProviderCreateWithData expects a C function pointer for the
+// release callback, not a block, so this lives at file scope.
+static void cn1MetalReadbackFreeData(void * __unused info, const void *data, size_t __unused size) {
+    free((void *)data);
+}
+
 UIImage *CN1MetalReadMutableImageAsUIImage(GLUIImage *image) {
     if (image == nil) return nil;
     id<MTLTexture> tex = [image mtlMutableTexture];
@@ -1077,12 +1083,10 @@ UIImage *CN1MetalReadMutableImageAsUIImage(GLUIImage *image) {
 #endif
 
     // Wrap the BGRA buffer as a CGImage / UIImage. The provider takes
-    // ownership of the malloc'd bytes via the freeData callback.
+    // ownership of the malloc'd bytes via the freeData callback below.
     CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
     CGDataProviderRef provider = CGDataProviderCreateWithData(NULL, bytes, byteCount,
-        ^(void * __unused info, const void *data, size_t __unused size) {
-            free((void *)data);
-        });
+        cn1MetalReadbackFreeData);
     CGImageRef cgImg = CGImageCreate((size_t)texW, (size_t)texH, 8, 32, rowBytes, cs,
         (CGBitmapInfo)(kCGBitmapByteOrder32Little | kCGImageAlphaPremultipliedFirst),
         provider, NULL, NO, kCGRenderingIntentDefault);
