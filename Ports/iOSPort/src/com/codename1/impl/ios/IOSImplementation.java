@@ -1020,23 +1020,29 @@ public class IOSImplementation extends CodenameOneImplementation {
                     }
                     if ( currentEditing != null ){
                         int align = currentEditing.getStyle().getAlignment();
+                        // iosReturnExitsEditing: opt-in client property that makes Return on a
+                        // multi-line TextArea exit editing (firing the Done listener) instead of
+                        // inserting a newline -- mirrors iOS Reminders task-title behavior.
+                        boolean returnExitsEditing = Boolean.TRUE.equals(cmp.getClientProperty("iosReturnExitsEditing"))
+                                && !currentEditing.isSingleLineTextArea();
                         nativeInstance.editStringAt(x,
                                 y,
                                 w,
                                 h,
                                 fnt.peer, currentEditing.isSingleLineTextArea(),
                                 currentEditing.getRows(), maxSize, constraint, text, forceSlideUp,
-                                stl.getFgColor(), 0,//peer, 
+                                stl.getFgColor(), 0,//peer,
                                 pt,
                                 pb,
                                 pl,
-                                pr, 
+                                pr,
                                 hint,
                                 hintColor,
-                                showToolbar, 
+                                showToolbar,
                                 Boolean.TRUE.equals(cmp.getClientProperty("blockCopyPaste")),
                                 DefaultLookAndFeel.reverseAlignForBidi(cmp, align),
-                                currentEditing.getVerticalAlignment());
+                                currentEditing.getVerticalAlignment(),
+                                returnExitsEditing);
                     }
                 }
             });
