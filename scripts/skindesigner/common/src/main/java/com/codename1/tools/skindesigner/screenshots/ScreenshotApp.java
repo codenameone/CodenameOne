@@ -7,6 +7,7 @@ import com.codename1.ui.CN;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Image;
+import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.ImageIO;
 
 import java.awt.Container;
@@ -67,6 +68,13 @@ public class ScreenshotApp {
         Container hostPanel = new Container();
         hostPanel.setSize(WIDTH, HEIGHT);
         Display.init(hostPanel);
+
+        // Lifecycle.start() normally pulls in the bundled theme.res via
+        // UIManager.initFirstTheme. We bypass Lifecycle entirely (no
+        // simulator), so do the same load by hand — without the theme,
+        // Form.getToolbar() returns null because globalToobarBool isn't
+        // set, and SkinDesigner.runApp NPEs on its first toolbar tweak.
+        UIManager.initFirstTheme("/theme");
 
         for (String[] s : SCENARIOS) {
             renderAndSave(s, outDir);
