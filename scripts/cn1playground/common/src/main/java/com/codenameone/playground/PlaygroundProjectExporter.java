@@ -266,6 +266,9 @@ final class PlaygroundProjectExporter {
 
     private String codenameOneSettings(String appName) {
         return "codename1.arg.java.version=17\n"
+                + "codename1.arg.nativeTheme=modern\n"
+                + "codename1.arg.ios.themeMode=modern\n"
+                + "codename1.arg.and.themeMode=modern\n"
                 + "codename1.mainName=" + appName + "\n"
                 + "codename1.packageName=" + PACKAGE_NAME + "\n"
                 + "codename1.displayName=" + appName + "\n"
@@ -499,7 +502,13 @@ final class PlaygroundProjectExporter {
                 if (trimmed.startsWith("package ")) {
                     continue;
                 }
-                if ("root;".equals(trimmed) || "ctx.log(\"Preview built successfully\");".equals(trimmed)) {
+                // Skip a bare trailing component-identifier line - the playground
+                // runner accepts that as the implicit return value, but the
+                // generated Lifecycle source has no use for it (it shows the
+                // detected Form / wraps the detected Container instead).
+                if ("root;".equals(trimmed)
+                        || "form;".equals(trimmed)
+                        || "ctx.log(\"Preview built successfully\");".equals(trimmed)) {
                     continue;
                 }
                 String formVar = detectDeclaredVariableName(trimmed, "Form");

@@ -4929,16 +4929,27 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             return;
         }
         try {
-            // Resolve desired theme flavor. cn1.androidTheme is the new per-CN1
-            // hint (material | hololight | legacy). The Material 3 modern theme
-            // is opt-in via cn1.androidTheme=material / modern. Default is
-            // android_holo_light - what master shipped and what existing
-            // screenshot goldens are anchored against. The ancient pre-Holo
-            // androidTheme.res is only reached via explicit and.hololight=true
-            // (historical back-compat) or cn1.androidTheme=legacy.
-            String mode = Display.getInstance().getProperty("cn1.androidTheme", null);
+            // Resolve desired theme flavor. and.themeMode is the per-platform
+            // hint (auto | modern | material | hololight | legacy); the legacy
+            // name cn1.androidTheme is still honored for back-compat. The
+            // cross-platform shortcut nativeTheme=modern/legacy (deprecated
+            // alias: cn1.nativeTheme) feeds in when no platform-specific hint
+            // is set. Default stays on android_holo_light - what master
+            // shipped and what existing screenshot goldens are anchored
+            // against. The ancient pre-Holo androidTheme.res is only reached
+            // via explicit and.hololight=true (historical back-compat) or
+            // and.themeMode=legacy.
+            Display d = Display.getInstance();
+            String mode = d.getProperty("and.themeMode",
+                    d.getProperty("cn1.androidTheme", null));
             if (mode == null) {
-                if ("true".equalsIgnoreCase(Display.getInstance().getProperty("and.hololight", "false"))) {
+                String shared = d.getProperty("nativeTheme",
+                        d.getProperty("cn1.nativeTheme", null));
+                if ("modern".equalsIgnoreCase(shared)) {
+                    mode = "material";
+                } else if ("legacy".equalsIgnoreCase(shared)) {
+                    mode = "hololight";
+                } else if ("true".equalsIgnoreCase(d.getProperty("and.hololight", "false"))) {
                     mode = "legacy";
                 } else {
                     mode = "hololight";
@@ -4948,7 +4959,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
 
             String resPath;
-            if ("material".equals(mode) || "modern".equals(mode)) {
+            if ("material".equals(mode) || "modern".equals(mode) || "auto".equals(mode)) {
                 resPath = "/AndroidMaterialTheme.res";
             } else if ("hololight".equals(mode) || "holo".equals(mode)) {
                 resPath = "/android_holo_light.res";

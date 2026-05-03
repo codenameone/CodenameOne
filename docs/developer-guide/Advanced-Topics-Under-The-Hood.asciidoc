@@ -313,11 +313,11 @@ Only supported for App Store builds. See https://www.codenameone.com/developer-g
 |ios.themeMode
 |`auto` (default), `modern`, `ios7`, `legacy`. `auto` (unset) keeps the existing iOS 7 flat theme so pre-refactor screenshot goldens and apps see no behavior change. `modern` / `liquid` opts in to the CSS-generated iOS Modern (liquid-glass) theme shipped from `native-themes/ios-modern/theme.css`. `ios7` / `flat` is the same as `auto` - pre-liquid iOS 7 flat theme; `legacy` / `iphone` loads the pre-iOS 7 iPhone theme. The `auto` -> modern flip is planned for a future release.
 
-|cn1.androidTheme
-|`hololight` (default), `material`, `legacy`. Default is `hololight` (Android Holo Light, what the framework shipped on API 14+ before this refactor). `material` / `modern` opts in to the CSS-generated Android Material 3 theme from `native-themes/android-material/theme.css`. `legacy` loads the pre-Holo Android theme. `and.hololight=true` is still accepted for back-compat and maps to `hololight`. The default stays on `hololight` until you flip in a future release.
+|and.themeMode
+|`auto`, `modern` / `material`, `hololight` (default for existing apps), `legacy`. `auto` and `modern` / `material` opt in to the CSS-generated Android Material 3 theme from `native-themes/android-material/theme.css`. `hololight` is Android Holo Light (what the framework shipped on API 14+ before this refactor). `legacy` loads the pre-Holo Android theme. The legacy alias `cn1.androidTheme` is still accepted, and `and.hololight=true` still maps to `hololight`. The default stays on `hololight` for existing apps until you flip in a future release.
 
-|cn1.nativeTheme
-|`modern`, `legacy`, `custom` (default unset). Cross-platform override that sets both `ios.themeMode` and `cn1.androidTheme` together when those aren't set explicitly. `modern` = liquid glass + Material 3, `legacy` = iOS 7 flat + Holo Light, `custom` disables the framework native theme entirely.
+|nativeTheme
+|`modern`, `legacy`, `custom` (default unset). Cross-platform override that sets both `ios.themeMode` and `and.themeMode` together when those aren't set explicitly. `modern` = liquid glass + Material 3, `legacy` = iOS 7 flat + Holo Light, `custom` disables the framework native theme entirely. The legacy alias `cn1.nativeTheme` is still accepted.
 
 |ios.interface_orientation
 |UIInterfaceOrientationPortrait by default. Indicates the  orientation, one or more of (separated by colon :): `UIInterfaceOrientationPortrait`, `UIInterfaceOrientationPortraitUpsideDown`, `UIInterfaceOrientationLandscapeLeft`, `UIInterfaceOrientationLandscapeRight`. Notice that the IDE plugin has an "Interface Orientation" combo box you *should* use under the iOS section.

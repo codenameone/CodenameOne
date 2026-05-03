@@ -30,25 +30,27 @@ legacy theme it always did.
 pre-iOS 7 theme. The `auto` -> `modern` flip is planned for a
 future release.
 
-|`cn1.androidTheme`
-|`hololight` (default) +
-`material` / `modern` +
+|`and.themeMode`
+|`auto` / `modern` / `material` +
+`hololight` (legacy default) +
 `legacy`
-|`hololight` is Android Holo Light. `material` / `modern` opts in
-to the modern theme generated from
-`native-themes/android-material/theme.css`. `legacy` is the
-pre-Holo theme.
+|`auto` and `modern` / `material` opt in to the modern theme
+generated from `native-themes/android-material/theme.css`.
+`hololight` is Android Holo Light (the pre-modern default for
+existing apps). `legacy` is the pre-Holo theme. The legacy
+alias `cn1.androidTheme` is still honored for back-compat.
 
-|`cn1.nativeTheme`
+|`nativeTheme`
 |`modern` / `legacy` / `custom`
 |Cross-platform shortcut that sets both `ios.themeMode` and
-`cn1.androidTheme` together. `modern` = liquid glass + Material 3,
+`and.themeMode` together. `modern` = liquid glass + Material 3,
 `legacy` = iOS 7 + Holo Light, `custom` disables the framework
-theme entirely so your own `theme.css` owns the base layer.
+theme entirely so your own `theme.css` owns the base layer. The
+legacy alias `cn1.nativeTheme` is still honored for back-compat.
 |===
 
 The legacy `and.hololight=true` hint still works and maps to
-`cn1.androidTheme=hololight`.
+`and.themeMode=hololight`.
 
 === Light and dark mode
 
