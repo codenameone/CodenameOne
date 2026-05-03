@@ -1449,10 +1449,13 @@ public class SkinDesigner extends Lifecycle {
     }
 
     private int skinBezelInPx(int totalW, int totalH) {
-        // Bezel is stored relative to the design's 320×620 viewbox; scale up to
-        // device pixels so screen position lands at (bezel, bezel) within the
-        // generated image.
-        return Math.round(((float) skin.bezel / DevicePreview.VB_W) * totalW);
+        // Use the SAME formula as generatePortraitImage so safe-area
+        // coordinates align with where the screen actually starts in the
+        // generated skin image. Previously we mixed two different scaling
+        // strategies — buildProperties wrote safePortraitY against
+        // bezelPx_a but the image was generated with bezelPx_b — leaving
+        // the safe area off by ~10px on high-res devices.
+        return Math.round(skin.bezel * ((float) device.resolutionW / DevicePreview.VB_W));
     }
 
     private int skinCornerInPx(int totalW) {
@@ -1654,12 +1657,20 @@ public class SkinDesigner extends Lifecycle {
         p.put("systemFontFamily", device.systemFont);
         p.put("proportionalFontFamily", device.proportionalFont);
         p.put("monospaceFontFamily", device.monoFont);
-        p.put("smallFontSize", String.valueOf(device.fontSmall));
-        p.put("mediumFontSize", String.valueOf(device.fontMedium));
-        p.put("largeFontSize", String.valueOf(device.fontLarge));
-        // CN1's pixelRatio is *pixels per millimeter*; convert from PPI.
-        double ppmm = device.ppi / 25.4;
-        p.put("pixelRatio", String.valueOf(ppmm));
+        // Don't write smallFontSize/mediumFontSize/largeFontSize. The
+        // simulator (JavaSEPort line ~2870) auto-derives correct sizes
+        // from pixelMilliRatio when those are absent:
+        //     med = round(2.6 * ppmm), sm = 2 * ppmm, la = 3.3 * ppmm
+        // Our DeviceDatabase entries store iOS-style point values
+        // (12/15/22), and writing those overrides the simulator's
+        // physical-pixel computation — on a 460 ppi device that's a
+        // sub-millimeter font and the UI text is unreadable.
+        // Also write `ppi` so the simulator computes pixelMilliRatio = ppi/25.4
+        // (it prefers `ppi` over `pixelRatio`).
+        p.put("ppi", String.valueOf(device.ppi));
+        // Keep pixelRatio (= pixels per millimeter) as a fallback for older
+        // skin loaders that didn't read `ppi`.
+        p.put("pixelRatio", String.valueOf(device.ppi / 25.4));
         p.put("overrideNames", overrideNames(device));
 
         int bezelPx = skinBezelInPx(totalW, totalH);
