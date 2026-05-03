@@ -91,11 +91,16 @@
     checkBoxUncheckedIconInt: 59693;
     radioCheckedIconInt: 59447;
     radioUncheckedIconInt: 59446;
-    /* Dialog sizing/layout constants the legacy iOS7 theme set and
-       the modern theme had been missing. Without these the framework
-       falls back to a wider default Dialog layout that left
-       Dialog.show("Clicked","Clicked item N","OK",null) ballooning to
-       near-full screen with the body floating in empty space. */
+    /* Dialog sizing/layout constants. dialogPosition is the load-bearing
+       one: without it Dialog.show() falls through to Form.showDialog()
+       which always positions the dialog with 20%/10%/20% screen-edge
+       margins (Form.java showDialog), making the dialog ~60%x70% of
+       the screen regardless of content - so even an empty dialog reads
+       as huge. With dialogPosition set, Dialog.showImpl routes through
+       showPacked() which sizes to the content's preferred size. The
+       boolean constants below tune button-area rendering (compact
+       title, grid commands) but don't affect outer sizing. */
+    dialogPosition: Center;
     hideEmptyTitleBool: true;
     shrinkPopupTitleBool: true;
     dialogButtonCommandsBool: true;
