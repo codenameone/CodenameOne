@@ -1475,53 +1475,77 @@ public class SkinDesigner extends Lifecycle {
      * with alpha=0) starts at (bezelPx, bezelPx) and spans the full device
      * resolution.
      */
+    /**
+     * How tall the top frame extension needs to be (in physical pixels) to
+     * fit any cutouts the user added above the screen rect. Matches the
+     * builtin iPhone X / 11 / 12 / 13 skin convention where the notch sits
+     * in the device frame above the screen, leaving a gap.
+     */
+    private int computeTopCutoutPx(float scale) {
+        int maxExtentVB = 0;
+        for (SkinModel.Cutout c : skin.cutouts) {
+            int extentVB;
+            if (SkinModel.CUTOUT_NOTCH.equals(c.type)) {
+                // Notch is anchored at the top of the frame and protrudes down c.h vb px.
+                extentVB = c.h;
+            } else {
+                // Island / hole: c.y is the gap between cutout bottom and screen top
+                // (in viewbox space). Extent above screen = c.y + c.h.
+                extentVB = c.y + c.h;
+            }
+            if (extentVB > maxExtentVB) {
+                maxExtentVB = extentVB;
+            }
+        }
+        return Math.round(maxExtentVB * scale);
+    }
+
     private Image generatePortraitImage() {
         if (SkinModel.SOURCE_IMAGE.equals(source) && bodyImage != null) {
             return generateImageBased();
         }
-        // Resolve bezel/corner from the design viewbox into device-pixel space.
-        // Use a sensible fixed bezel (in device px) so that on large devices the
-        // frame stays modest. The user-facing bezel value (in viewbox px) is
-        // remapped onto a per-device device-pixel value.
         float framePxScale = ((float) device.resolutionW) / DevicePreview.VB_W;
         int bezelPx = Math.round(skin.bezel * framePxScale);
         int cornerPx = Math.round(skin.cornerR * framePxScale);
+        int screenCornerPx = Math.max(0, cornerPx - Math.round(8 * framePxScale));
+        int topCutoutPx = computeTopCutoutPx(framePxScale);
         int totalW = device.resolutionW + bezelPx * 2;
-        int totalH = device.resolutionH + bezelPx * 2;
+        int totalH = device.resolutionH + bezelPx * 2 + topCutoutPx;
+        int screenY = bezelPx + topCutoutPx;
 
-        // Start with a solid dark frame
         Image base = Image.createImage(totalW, totalH, 0xff121822);
         Graphics g = base.getGraphics();
         g.setAntiAliased(true);
-
-        // Inner highlight to fake a gradient edge
         g.setColor(0x2a2f3a);
         int inset = Math.max(1, totalW / 200);
         g.fillRoundRect(inset, inset, totalW - inset * 2, totalH - inset * 2,
                 Math.max(0, (cornerPx - inset) * 2), Math.max(0, (cornerPx - inset) * 2));
 
-        // Carve the rounded shape: paint outside the round-rect transparent
         int[] data = base.getRGB();
         applyRoundRectAlphaMask(data, totalW, totalH, 0, 0, totalW, totalH, cornerPx);
 
-        // Carve the screen (alpha=0 inside)
-        carveScreenRect(data, totalW, totalH, bezelPx, bezelPx,
-                device.resolutionW, device.resolutionH);
+        // Carve the screen with rounded corners — the frame material left at
+        // the corners gives the visible rounded screen edge.
+        carveRoundedScreenRect(data, totalW, totalH, bezelPx, screenY,
+                device.resolutionW, device.resolutionH, screenCornerPx);
 
-        // Carve cutouts (still alpha=0)
-        applyCutouts(data, totalW, totalH, bezelPx, bezelPx,
-                device.resolutionW, device.resolutionH, framePxScale);
+        // Cutouts hang from the bottom of the top frame extension into the
+        // gap above the screen, never inside the screen rect.
+        applyTopFrameCutouts(data, totalW, totalH, bezelPx, screenY,
+                device.resolutionW, framePxScale);
 
         return Image.createImage(data, totalW, totalH);
     }
 
     private Image generateImageBased() {
-        // Fit the uploaded image into a (device.resolutionW + 2*bezelPx) canvas
         float framePxScale = ((float) device.resolutionW) / DevicePreview.VB_W;
         int bezelPx = Math.round(skin.bezel * framePxScale);
         int cornerPx = Math.round(skin.cornerR * framePxScale);
+        int screenCornerPx = Math.max(0, cornerPx - Math.round(8 * framePxScale));
+        int topCutoutPx = computeTopCutoutPx(framePxScale);
         int totalW = device.resolutionW + bezelPx * 2;
-        int totalH = device.resolutionH + bezelPx * 2;
+        int totalH = device.resolutionH + bezelPx * 2 + topCutoutPx;
+        int screenY = bezelPx + topCutoutPx;
 
         Image canvas = Image.createImage(totalW, totalH, 0);
         Graphics g = canvas.getGraphics();
@@ -1533,21 +1557,31 @@ public class SkinDesigner extends Lifecycle {
 
         int[] data = canvas.getRGB();
         applyRoundRectAlphaMask(data, totalW, totalH, 0, 0, totalW, totalH, cornerPx);
-        carveScreenRect(data, totalW, totalH, bezelPx, bezelPx,
-                device.resolutionW, device.resolutionH);
-        applyCutouts(data, totalW, totalH, bezelPx, bezelPx,
-                device.resolutionW, device.resolutionH, framePxScale);
+        carveRoundedScreenRect(data, totalW, totalH, bezelPx, screenY,
+                device.resolutionW, device.resolutionH, screenCornerPx);
+        applyTopFrameCutouts(data, totalW, totalH, bezelPx, screenY,
+                device.resolutionW, framePxScale);
         return Image.createImage(data, totalW, totalH);
     }
 
     private Image generateOverlay(int totalW, int totalH, int bezelPx) {
+        // The screen rect in skin_map.png matches where it lives in skin.png:
+        // shifted DOWN by the top-frame cutout extension so the simulator
+        // sees the screen starting below the cutout.
+        float framePxScale = ((float) device.resolutionW) / DevicePreview.VB_W;
+        int topCutoutPx = computeTopCutoutPx(framePxScale);
+        int screenY = bezelPx + topCutoutPx;
         Image overlay = Image.createImage(totalW, totalH, 0);
         Graphics g = overlay.getGraphics();
         g.setColor(0x000000);
-        g.fillRect(bezelPx, bezelPx, device.resolutionW, device.resolutionH);
+        g.fillRect(bezelPx, screenY, device.resolutionW, device.resolutionH);
         return overlay;
     }
 
+    /** Carves a rectangular block transparent (alpha=0). Used by the
+     *  rounded-corner variant after it decides which pixels lie inside
+     *  the rounded shape. */
+    @SuppressWarnings("unused")
     private void carveScreenRect(int[] data, int w, int h, int x, int y, int rw, int rh) {
         int x2 = Math.min(w, x + rw);
         int y2 = Math.min(h, y + rh);
@@ -1555,6 +1589,73 @@ public class SkinDesigner extends Lifecycle {
             int row = yy * w;
             for (int xx = Math.max(0, x); xx < x2; xx++) {
                 data[row + xx] = 0;
+            }
+        }
+    }
+
+    /** Like {@link #carveScreenRect} but only carves the inside of a
+     *  rounded rect — the four corner pixels remain frame material so the
+     *  rendered screen looks rounded inside the bezel. */
+    private void carveRoundedScreenRect(int[] data, int w, int h,
+                                        int x, int y, int rw, int rh, int radius) {
+        int r = Math.max(0, Math.min(radius, Math.min(rw, rh) / 2));
+        int r2 = r * r;
+        int rightInner = x + rw - r - 1;
+        int bottomInner = y + rh - r - 1;
+        int x2 = Math.min(w, x + rw);
+        int y2 = Math.min(h, y + rh);
+        for (int yy = Math.max(0, y); yy < y2; yy++) {
+            int row = yy * w;
+            for (int xx = Math.max(0, x); xx < x2; xx++) {
+                if (r == 0) {
+                    data[row + xx] = 0;
+                    continue;
+                }
+                int relX = xx - x;
+                int relY = yy - y;
+                int dx, dy;
+                if (relX < r && relY < r) {
+                    dx = r - relX; dy = r - relY;
+                } else if (xx > rightInner && relY < r) {
+                    dx = xx - rightInner; dy = r - relY;
+                } else if (relX < r && yy > bottomInner) {
+                    dx = r - relX; dy = yy - bottomInner;
+                } else if (xx > rightInner && yy > bottomInner) {
+                    dx = xx - rightInner; dy = yy - bottomInner;
+                } else {
+                    data[row + xx] = 0;
+                    continue;
+                }
+                if (dx * dx + dy * dy <= r2) {
+                    data[row + xx] = 0;
+                }
+            }
+        }
+    }
+
+    /**
+     * Renders cutouts in the frame extension above the screen, never inside
+     * the screen rect. The cutout's bottom edge sits {@code c.y * scale} px
+     * above the screen top; for notch (c.y=0) the bottom touches the screen.
+     */
+    private void applyTopFrameCutouts(int[] data, int w, int h,
+                                      int bezelPx, int screenY, int sw, float scale) {
+        int cx = bezelPx + sw / 2;
+        for (SkinModel.Cutout c : skin.cutouts) {
+            int cw = Math.round(c.w * scale);
+            int ch = Math.round(c.h * scale);
+            int ox = cx + Math.round(c.x * scale);
+            int yOffset = Math.round(c.y * scale);
+            int oy = screenY - yOffset - ch;
+            if (SkinModel.CUTOUT_NOTCH.equals(c.type)) {
+                int x0 = ox - cw / 2;
+                fillRect(data, w, h, x0, oy, cw, ch);
+            } else if (SkinModel.CUTOUT_ISLAND.equals(c.type)) {
+                int x0 = ox - cw / 2;
+                fillRoundedRect(data, w, h, x0, oy, cw, ch, ch / 2);
+            } else if (SkinModel.CUTOUT_HOLE.equals(c.type)) {
+                int r = cw / 2;
+                fillCircle(data, w, h, ox, oy + ch / 2, r);
             }
         }
     }
@@ -1586,26 +1687,8 @@ public class SkinDesigner extends Lifecycle {
         }
     }
 
-    private void applyCutouts(int[] data, int w, int h,
-                              int screenX, int screenY, int sw, int sh, float scale) {
-        int cx = screenX + sw / 2;
-        for (SkinModel.Cutout c : skin.cutouts) {
-            int cw = Math.round(c.w * scale);
-            int ch = Math.round(c.h * scale);
-            int ox = cx + Math.round(c.x * scale);
-            int oy = screenY + Math.round(c.y * scale);
-            if (SkinModel.CUTOUT_NOTCH.equals(c.type)) {
-                int x0 = ox - cw / 2;
-                fillRect(data, w, h, x0, screenY, cw, ch);
-            } else if (SkinModel.CUTOUT_ISLAND.equals(c.type)) {
-                int x0 = ox - cw / 2;
-                fillRoundedRect(data, w, h, x0, oy, cw, ch, ch / 2);
-            } else if (SkinModel.CUTOUT_HOLE.equals(c.type)) {
-                int r = cw / 2;
-                fillCircle(data, w, h, ox, oy + ch / 2, r);
-            }
-        }
-    }
+    // applyCutouts (the old in-screen renderer) replaced by
+    // applyTopFrameCutouts which positions cutouts above the screen.
 
     private void fillRect(int[] data, int w, int h, int x, int y, int rw, int rh) {
         int x2 = Math.min(w, x + rw);
@@ -1681,27 +1764,12 @@ public class SkinDesigner extends Lifecycle {
         p.put("overrideNames", overrideNames(device));
 
         int bezelPx = skinBezelInPx(totalW, totalH);
-        // Effective safe-top must cover any cutouts the user added (notch,
-        // island, hole) that intrude into the screen, otherwise content
-        // would render under them. Use the deepest cutout extent in the
-        // viewbox space, then take max with the user-set skin.safeTop.
-        int cutoutSafeTopVB = 0;
-        for (SkinModel.Cutout c : skin.cutouts) {
-            int extent;
-            if (SkinModel.CUTOUT_NOTCH.equals(c.type)) {
-                // Notches start at y=0 and protrude h px down.
-                extent = c.h;
-            } else {
-                // Island / hole y is from screen top; bottom edge is y + h.
-                extent = c.y + c.h;
-            }
-            if (extent > cutoutSafeTopVB) {
-                cutoutSafeTopVB = extent;
-            }
-        }
-        int effectiveSafeTopVB = Math.max(skin.safeTop, cutoutSafeTopVB);
+        // Cutouts now live in the top frame extension (above the screen
+        // rect), so they no longer eat into the screen area and we don't
+        // need to extend safeTop to cover them. Just translate the
+        // user-configured safeTop / safeBottom into device pixels.
         float vbToPx = (float) device.resolutionW / DevicePreview.VB_W;
-        int safeTopPx = Math.round(effectiveSafeTopVB * vbToPx);
+        int safeTopPx = Math.round(skin.safeTop * vbToPx);
         int safeBottomPx = Math.round(skin.safeBottom * vbToPx);
 
         // Safe area is consumed by Container.snapToSafeAreaInternal, which
