@@ -226,6 +226,7 @@ static CN1StatusBarTapProxyView *cn1StatusBarTapProxy = nil;
 int orientationLock = 0;
 int upsideDownMultiplier = -1;
 int currentlyEditingMaxLength;
+BOOL currentlyReturnExitsEditing = NO;
 
 #ifndef CN1_USE_ARC
 NSAutoreleasePool *globalCodenameOnePool;
@@ -357,13 +358,17 @@ void cn1_setStyleDoneButton(CN1_THREAD_STATE_MULTI_ARG UIBarButtonItem* btn) {
 void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 (CN1_THREAD_STATE_MULTI_ARG int x, int y, int w, int h, void* font, int isSingleLine, int rows, int maxSize,
  int constraint, const char* str, int len, BOOL forceSlideUp,
- int color, JAVA_LONG imagePeer, int padTop, int padBottom, int padLeft, int padRight, NSString* hintString, int hintColor, BOOL showToolbar, BOOL blockCopyPaste, int alignment, int verticalAlignment) {
+ int color, JAVA_LONG imagePeer, int padTop, int padBottom, int padLeft, int padRight, NSString* hintString, int hintColor, BOOL showToolbar, BOOL blockCopyPaste, int alignment, int verticalAlignment, BOOL returnExitsEditing) {
     // don't show toolbar in iOS 8 in landscape since there is just no room for that...
     if(isIOS8() && displayHeight < displayWidth) {
         showToolbar = NO;
     }
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl");
     currentlyEditingMaxLength = maxSize;
+    // Honored by the UITextView shouldChangeTextInRange: delegate (EAGLView/METALView) to
+    // intercept Return on multi-line text areas when the iosReturnExitsEditing client
+    // property is set on the editing component.
+    currentlyReturnExitsEditing = returnExitsEditing && !isSingleLine;
     dispatch_sync(dispatch_get_main_queue(), ^{
         if(editingComponent != nil) {
             [editingComponent resignFirstResponder];
@@ -615,6 +620,13 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
             }
             utv.text = [NSString stringWithUTF8String:str];
             utv.delegate = [[CodenameOne_GLViewController instance] eaglView];
+
+            // When iosReturnExitsEditing is set on a multi-line TextArea, present the
+            // Return key as "Done" -- the actual exit-on-return is enforced by the
+            // shouldChangeTextInRange: delegate, which intercepts a "\n" replacement.
+            if (currentlyReturnExitsEditing) {
+                utv.returnKeyType = UIReturnKeyDone;
+            }
             
             // Apply constraints for multiline text view
             // INITIAL_CAPS_WORD
