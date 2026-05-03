@@ -1,0 +1,99 @@
+name: Skin Designer Screenshots
+
+# Generates the per-stage Skin Designer screenshots referenced by the
+# developer guide chapter. Runs the wizard inside the JavaSE simulator
+# under xvfb, captures Robot screenshots for each stage via the harness in
+# scripts/skindesigner/screenshots/, and opens a PR if the PNGs in
+# docs/developer-guide/img/skin-designer/ drifted.
+#
+# The skin designer UI changes much less often than the bundled device
+# database, so this workflow only runs on demand or when the harness /
+# skin-designer code changes — not on the device-DB-update cron.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'scripts/skindesigner/screenshots/**'
+      - 'scripts/skindesigner/common/src/main/java/com/codename1/tools/skindesigner/**'
+      - 'scripts/skindesigner/common/src/main/css/theme.css'
+      - '.github/workflows/skin-designer-screenshots.yml'
+
+permissions:
+  actions: write
+  contents: write
+  pull-requests: write
+
+jobs:
+  generate-screenshots:
+    if: github.repository == 'codenameone/CodenameOne'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up xvfb
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb
+
+      - name: Cache Maven packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-skin-designer-screenshots-m2-${{ hashFiles('scripts/skindesigner/**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-skin-designer-screenshots-m2-
+
+      - name: Bootstrap Codename One tooling
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.codenameone"
+          # The Maven plugin checks for these files before allowing a
+          # local build. The build client jar is only used by builds that
+          # deploy to the build cloud, but the file must exist.
+          cp maven/CodeNameOneBuildClient.jar "$HOME/.codenameone/CodeNameOneBuildClient.jar"
+          touch "$HOME/.codenameone/guibuilder.jar"
+
+      - name: Take Skin Designer screenshots
+        run: ./scripts/skindesigner/screenshots/take-screenshots.sh
+
+      - name: Show diff
+        run: |
+          git --no-pager diff --stat -- docs/developer-guide/img/skin-designer/
+
+      - name: Upload screenshots as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: skin-designer-screenshots
+          path: docs/developer-guide/img/skin-designer/*.png
+          if-no-files-found: warn
+
+      - name: Open refresh PR if screenshots drifted
+        if: github.event_name == 'workflow_dispatch'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          commit-message: "Refresh Skin Designer developer-guide screenshots"
+          title: "Refresh Skin Designer developer-guide screenshots"
+          body: |
+            ## Summary
+            - Re-ran `scripts/skindesigner/screenshots/take-screenshots.sh`
+              and updated the per-stage PNGs under
+              `docs/developer-guide/img/skin-designer/`.
+
+            Created automatically by the Skin Designer screenshots workflow.
+          base: master
+          branch: automation/skin-designer-screenshots
+          delete-branch: true
+          labels: |
+            documentation
+            automation

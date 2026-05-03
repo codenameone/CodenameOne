@@ -159,11 +159,52 @@ public class SkinDesigner extends Lifecycle {
                 Log.e(err);
             }
         }
+        // Demo / screenshot harness override. Set on the JVM command line via:
+        //   -Dcn1.skindesigner.demoStep=2
+        //   -Dcn1.skindesigner.demoDevice=apple_iphone_16_pro
+        //   -Dcn1.skindesigner.demoSource=shape
+        //   -Dcn1.skindesigner.demoSidebarTab=cutouts
+        //   -Dcn1.skindesigner.demoPreset=island
+        // Used by the screenshot harness in scripts/skindesigner/screenshots/
+        // to take repeatable per-step screenshots for the developer guide.
+        applyDemoOverrides();
         if (step >= STEP_SOURCE && device == null) {
             step = STEP_DEVICE;
         }
         if (step >= STEP_EDIT && source == null) {
             step = STEP_SOURCE;
+        }
+    }
+
+    private void applyDemoOverrides() {
+        String demoDev = CN.getProperty("cn1.skindesigner.demoDevice", null);
+        if (demoDev != null && !demoDev.isEmpty()) {
+            DeviceDatabase.Device d = DeviceDatabase.findById(demoDev);
+            if (d != null) {
+                device = d;
+                skin = new SkinModel();
+                skin.resetForDevice(d);
+            }
+        }
+        String demoSrc = CN.getProperty("cn1.skindesigner.demoSource", null);
+        if (demoSrc != null && !demoSrc.isEmpty()) {
+            source = demoSrc;
+        }
+        String demoStep = CN.getProperty("cn1.skindesigner.demoStep", null);
+        if (demoStep != null) {
+            try {
+                step = Math.max(STEP_DEVICE, Math.min(STEP_DONE, Integer.parseInt(demoStep)));
+            } catch (NumberFormatException ignored) {
+                // ignore, keep persisted value
+            }
+        }
+        String demoTab = CN.getProperty("cn1.skindesigner.demoSidebarTab", null);
+        if (demoTab != null && !demoTab.isEmpty()) {
+            activeSidebarTab = demoTab;
+        }
+        String demoPreset = CN.getProperty("cn1.skindesigner.demoPreset", null);
+        if (demoPreset != null && !demoPreset.isEmpty()) {
+            applyPreset(demoPreset);
         }
     }
 
