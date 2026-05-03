@@ -139,6 +139,16 @@ ADB_BIN="$(command -v adb)"
 ra_log "ADB connected devices:"
 "$ADB_BIN" devices -l | sed 's/^/[run-android-instrumentation-tests]   /'
 
+# Bump the device-side logcat ring buffer before clearing it. The default on
+# Android emulators is 256K-1M per buffer, which is too small for our test
+# suite: a single screenshot can emit ~70 base64 chunk lines (~500 bytes
+# each), and across 90+ tests the main buffer has been observed to wrap
+# mid-suite, dropping a chunk line and causing `Cn1ssChunkTools` to fail
+# reassembly with a gap error. 16 MiB is plenty for a single suite run and
+# matches what `adb logcat -G` accepts on every supported emulator image.
+# Failing to set the buffer is non-fatal — older platforms silently ignore -G.
+ra_log "Bumping device logcat ring buffer to 16M (mitigates chunk-line drops)"
+"$ADB_BIN" logcat -G 16M >/dev/null 2>&1 || true
 ra_log "Clearing logcat buffer"
 "$ADB_BIN" logcat -c || true
 
@@ -370,6 +380,40 @@ if [ "${#FAILED_TESTS[@]}" -gt 0 ] && [ -n "${PACKAGE_NAME:-}" ]; then
       if [ "$INSTALL_RC" -ne 0 ]; then
         ra_log "WARN: adb install reported failure; the am start below will likely fail too"
       fi
+
+      # Wait for PackageManager to finish indexing the freshly-installed APK.
+      # `adb install` returns Success as soon as the APK lands on the device,
+      # but the launcher Intent isn't resolvable until pm has registered
+      # every component in the manifest. Without this wait, `am start` in the
+      # following block races and prints "Activity not started, unable to
+      # resolve Intent" — exactly the failure the previous version of this
+      # block kept hitting on busy emulators (see PR #4856 build for the
+      # observed timing). Poll `cmd package resolve-activity --brief` for
+      # the same MAIN/LAUNCHER intent we are about to fire; it returns the
+      # `<pkg>/<.Activity>` triple once the launcher is ready. Cap at 30s
+      # because indexing usually finishes in < 5s but slow CI runners can
+      # take longer.
+      ra_log "Waiting for PackageManager to register launcher activity for $PACKAGE_NAME"
+      RESOLVE_DEADLINE=$(( $(date +%s) + 30 ))
+      LAUNCHER_RESOLVED=0
+      while [ "$(date +%s)" -lt "$RESOLVE_DEADLINE" ]; do
+        RESOLVE_OUT="$("$ADB_BIN" shell cmd package resolve-activity --brief \
+            -a android.intent.action.MAIN \
+            -c android.intent.category.LAUNCHER \
+            "$PACKAGE_NAME" 2>/dev/null | tr -d '\r')" || RESOLVE_OUT=""
+        # `resolve-activity --brief` prints the matching component on a line
+        # of the form `<package>/<activity>`. Newer Android prepends a
+        # `priority=...` line we want to ignore, so match by substring.
+        if printf '%s\n' "$RESOLVE_OUT" | grep -q "^${PACKAGE_NAME}/"; then
+          LAUNCHER_RESOLVED=1
+          ra_log "PackageManager resolved launcher: $(printf '%s\n' "$RESOLVE_OUT" | grep "^${PACKAGE_NAME}/" | head -n1)"
+          break
+        fi
+        sleep 1
+      done
+      if [ "$LAUNCHER_RESOLVED" -eq 0 ]; then
+        ra_log "WARN: PackageManager did not report launcher activity within 30s; attempting am start anyway"
+      fi
     else
       ra_log "ERROR: cannot reinstall — APK not found at $MAIN_APK"
     fi
@@ -384,23 +428,53 @@ if [ "${#FAILED_TESTS[@]}" -gt 0 ] && [ -n "${PACKAGE_NAME:-}" ]; then
   # (the script would exit at the failing pipeline). Logging both the exit
   # code and the raw output is the whole point of this block — see the
   # "RIGHT FIX" comment above.
-  ra_log "Relaunching $PACKAGE_NAME via 'am start -W -a MAIN -c LAUNCHER -p $PACKAGE_NAME'"
-  if AM_START_OUT="$("$ADB_BIN" shell am start -W \
-      -a android.intent.action.MAIN \
-      -c android.intent.category.LAUNCHER \
-      -p "$PACKAGE_NAME" 2>&1 | tr -d '\r')"; then
-    AM_START_RC=0
-  else
-    AM_START_RC=$?
-  fi
-  ra_log "am start exit=${AM_START_RC}, output:"
-  printf '%s\n' "$AM_START_OUT" | sed 's/^/[run-android-instrumentation-tests]   /'
-
-  AM_STATUS="$(printf '%s\n' "$AM_START_OUT" \
-      | awk -F= '/^[[:space:]]*Status[[:space:]]*=/ {print $2; exit}' \
-      | tr -d '[:space:]')"
+  #
+  # Retry the start a few times. Even after `cmd package resolve-activity`
+  # reports the launcher, `am start` can race a still-completing
+  # PackageManager scan and return "unable to resolve Intent". Each retry
+  # waits 2s — empirically enough to clear the race.
+  AM_STATUS=""
+  for _amattempt in 1 2 3; do
+    ra_log "Relaunching $PACKAGE_NAME via 'am start -W -a MAIN -c LAUNCHER -p $PACKAGE_NAME' (attempt ${_amattempt})"
+    if AM_START_OUT="$("$ADB_BIN" shell am start -W \
+        -a android.intent.action.MAIN \
+        -c android.intent.category.LAUNCHER \
+        -p "$PACKAGE_NAME" 2>&1 | tr -d '\r')"; then
+      AM_START_RC=0
+    else
+      AM_START_RC=$?
+    fi
+    ra_log "am start exit=${AM_START_RC}, output:"
+    printf '%s\n' "$AM_START_OUT" | sed 's/^/[run-android-instrumentation-tests]   /'
+    AM_STATUS="$(printf '%s\n' "$AM_START_OUT" \
+        | awk -F= '/^[[:space:]]*Status[[:space:]]*=/ {print $2; exit}' \
+        | tr -d '[:space:]')"
+    if [ "${AM_STATUS:-}" = "ok" ]; then
+      break
+    fi
+    if [ "$_amattempt" -lt 3 ]; then
+      ra_log "am start did not report Status=ok (got '${AM_STATUS:-<empty>}'); retrying in 2s"
+      sleep 2
+    fi
+  done
   if [ "${AM_STATUS:-}" != "ok" ]; then
-    ra_log "WARN: am start did not report Status=ok (got '${AM_STATUS:-<empty>}'); the app may not be running"
+    ra_log "WARN: am start still did not report Status=ok after retries; falling back to monkey launcher"
+    # `monkey -p <pkg> -c LAUNCHER 1` synthesises a single LAUNCHER intent
+    # via the system input pipe and bypasses am start's intent-resolution
+    # path. Some Android versions can't resolve via `am start -p` even
+    # after pm has indexed, but monkey still works because it asks pm
+    # directly for the LAUNCHER activity. Treat its output as best-effort:
+    # the pidof check below is the source of truth for whether the app
+    # actually came up.
+    if MONKEY_OUT="$("$ADB_BIN" shell monkey \
+        -p "$PACKAGE_NAME" \
+        -c android.intent.category.LAUNCHER 1 2>&1 | tr -d '\r')"; then
+      MONKEY_RC=0
+    else
+      MONKEY_RC=$?
+    fi
+    ra_log "monkey launcher exit=${MONKEY_RC}, output:"
+    printf '%s\n' "$MONKEY_OUT" | sed 's/^/[run-android-instrumentation-tests]   /'
   fi
 
   # Verify the process is actually up before committing to a 10-minute
