@@ -41,6 +41,16 @@ for name in "${SCREENSHOT_NAMES[@]}"; do
     rm -f "$STORAGE_DIR/$name.png"
 done
 
+# Ensure the cn1lib's extracted main.zip exists. The Codename One plugin's
+# install-cn1lib goal usually creates this on first checkout, but on CI we
+# do it ourselves so the build doesn't depend on external state.
+ZIP_LIB_DIR="$SKIN_DESIGNER_DIR/cn1libs/ZipSupport"
+if [ -f "$SKIN_DESIGNER_DIR/cn1libs/ZipSupport.cn1lib" ] && [ ! -f "$ZIP_LIB_DIR/jars/main.zip" ]; then
+    log "Extracting ZipSupport cn1lib"
+    mkdir -p "$ZIP_LIB_DIR/jars"
+    unzip -p "$SKIN_DESIGNER_DIR/cn1libs/ZipSupport.cn1lib" main.zip > "$ZIP_LIB_DIR/jars/main.zip"
+fi
+
 log "Building Skin Designer (mvn -DskipTests install)"
 (cd "$SKIN_DESIGNER_DIR" && mvn -B -ntp -DskipTests install)
 
