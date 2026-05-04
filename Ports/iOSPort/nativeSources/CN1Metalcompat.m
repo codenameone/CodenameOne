@@ -851,16 +851,91 @@ void CN1MetalEnsureMutableTexture(GLUIImage *image, int width, int height) {
     // blue arcs visible through the green mutableWithAlpha box: GL renders
     // them blue with a faint green wash; pre-fix Metal rendered them
     // turquoise.)
+    // Single command buffer combining clear + (optional) UIImage seed.
+    // The seed render pass loadAction=Load reads the cleared bg from the
+    // earlier subpass within the same cb -- using two separate cb's
+    // would race because cb commit is async on the queue and the seed
+    // pass's Load could capture pre-clear state. Render-pass-based seed
+    // (vs blit) is required because CN1MetalTextureFromUIImage allocates
+    // RGBA8Unorm textures while the mutable target is BGRA8Unorm; a
+    // blit would copy raw bytes and swap R/B, the textured pipeline's
+    // sampler does the format conversion automatically.
     id<MTLCommandQueue> queue = CN1MetalCommandQueue();
+    UIImage *existingUI = [image getImage];
     if (queue != nil) {
-        id<MTLCommandBuffer> clearCb = [queue commandBuffer];
+        id<MTLCommandBuffer> setupCb = [queue commandBuffer];
+
+        // Pass 1: clear to bg colour.
         MTLRenderPassDescriptor *clearPass = [MTLRenderPassDescriptor renderPassDescriptor];
         clearPass.colorAttachments[0].texture = tex;
         clearPass.colorAttachments[0].loadAction = MTLLoadActionClear;
         clearPass.colorAttachments[0].storeAction = MTLStoreActionStore;
         clearPass.colorAttachments[0].clearColor = MTLClearColorMake(r * a, g * a, b * a, a);
-        [[clearCb renderCommandEncoderWithDescriptor:clearPass] endEncoding];
-        [clearCb commit];
+        [[setupCb renderCommandEncoderWithDescriptor:clearPass] endEncoding];
+
+        // Pass 2: if the GLUIImage has an existing UIImage (e.g. it was
+        // returned by gausianBlurImage / FontImage / etc.), seed the
+        // freshly-cleared mutable texture with those pixels so subsequent
+        // draws layer on top. Without this seed gausianBlurImage's blurred
+        // shadow halo (Switch's createRoundThumbImage path) is lost the
+        // moment the next draw triggers EnsureMutableTexture, and the
+        // composited Switch ends up with no outline halo around the thumb.
+        // GL's startDrawingOnImageImpl gets this implicitly by drawing the
+        // existing UIImage into the CG context.
+        ensurePipelineCache();
+        id<MTLRenderPipelineState> seedState = (existingUI != nil && pipelineCache != nil)
+            ? [pipelineCache pipelineFor:CN1MetalPipelineTexturedRGBA]
+            : nil;
+        if (seedState != nil) {
+            id<MTLTexture> srcTex = CN1MetalTextureFromUIImage(existingUI);
+            if (srcTex != nil) {
+                MTLRenderPassDescriptor *seedPass = [MTLRenderPassDescriptor renderPassDescriptor];
+                seedPass.colorAttachments[0].texture = tex;
+                seedPass.colorAttachments[0].loadAction = MTLLoadActionLoad;
+                seedPass.colorAttachments[0].storeAction = MTLStoreActionStore;
+                id<MTLRenderCommandEncoder> seedEnc = [setupCb renderCommandEncoderWithDescriptor:seedPass];
+                [seedEnc setViewport:(MTLViewport){0.0, 0.0, (double)width, (double)height, 0.0, 1.0}];
+                [seedEnc setRenderPipelineState:seedState];
+
+                CN1MetalMatrices seedMatrices;
+                seedMatrices.projection = mutableProjection(width, height);
+                seedMatrices.modelView = identityMatrix();
+                seedMatrices.transform = identityMatrix();
+
+                float seedVerts[8] = {
+                    0.0f,         0.0f,
+                    (float)width, 0.0f,
+                    0.0f,         (float)height,
+                    (float)width, (float)height
+                };
+                // V flipped: source memory_row_0 = visual BOTTOM (no CTM
+                // flip in CN1MetalTextureFromUIImage), so we want V=1 at
+                // dest top (sample source's last memory row = visual top
+                // there) and V=0 at dest bottom.
+                float seedTexcoords[8] = {
+                    0.0f, 1.0f,
+                    1.0f, 1.0f,
+                    0.0f, 0.0f,
+                    1.0f, 0.0f
+                };
+                simd_float4 seedTint = (simd_float4){ 1.0f, 1.0f, 1.0f, 1.0f };
+                [seedEnc setVertexBytes:seedVerts length:sizeof(seedVerts) atIndex:0];
+                [seedEnc setVertexBytes:&seedMatrices length:sizeof(seedMatrices) atIndex:1];
+                [seedEnc setVertexBytes:seedTexcoords length:sizeof(seedTexcoords) atIndex:2];
+                [seedEnc setFragmentBytes:&seedTint length:sizeof(seedTint) atIndex:0];
+                [seedEnc setFragmentTexture:srcTex atIndex:0];
+                [seedEnc drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0 vertexCount:4];
+                [seedEnc endEncoding];
+#ifndef CN1_USE_ARC
+                // CN1MetalTextureFromUIImage returns a +1 retain. Metal
+                // keeps the texture alive internally for the duration of
+                // the encoded work, so dropping the retain now is safe.
+                [srcTex release];
+#endif
+            }
+        }
+
+        [setupCb commit];
     }
     [image setMtlMutableTexture:tex width:width height:height];
     // setMtlMutableTexture retains; balance the +1 from
