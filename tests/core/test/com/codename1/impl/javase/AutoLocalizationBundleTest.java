@@ -4,6 +4,8 @@ import com.codename1.testing.AbstractTest;
 import com.codename1.ui.plaf.UIManager;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.OutputStream;
 import java.lang.reflect.Constructor;
 import java.util.HashMap;
 import java.util.Map;
@@ -79,6 +81,7 @@ public class AutoLocalizationBundleTest extends AbstractTest {
             assertEqual("true", bundleReloadedMap.get("@rtl"), "Existing meta-key values should still be returned");
 
             verifySetBundleSmokeOnFreshProject(ctor, tempDir);
+            verifySetBundleHealsLegacyWormholeFile(ctor, tempDir);
 
             return true;
         } finally {
@@ -113,6 +116,71 @@ public class AutoLocalizationBundleTest extends AbstractTest {
             // Pre-fix: throws StringIndexOutOfBoundsException out of parseTextFieldInputMode.
             manager.setBundle(freshBundleMap);
             assertSame(freshBundleMap, manager.getBundle(), "setBundle should install the AutoLocalizationBundle on a fresh project");
+        } finally {
+            manager.setBundle(savedBundle);
+        }
+    }
+
+    /// Reproduces ThomasH99's report on issue #4850: even after the @-key fabrication
+    /// guard shipped in 7.0.237, existing user projects still crash the same way during
+    /// `cn1:css` because their on-disk `Bundle.properties` was poisoned by older
+    /// Codename One versions whose `AutoLocalizationBundle.get` echoed and persisted
+    /// `@key=@key` self-references.
+    ///
+    /// Pre-cleanup-fix:
+    /// - `loadFromFile` reads `@im=@im` and `@im-@im=@im-@im` straight into the Hashtable.
+    /// - `setBundle` calls `bundle.get("@im")` -> super.get returns the persisted "@im"
+    ///   (not null), so the @-prefix null-guard added in `ba8044ef0` is bypassed.
+    /// - setBundle tokenizes "@im" to `["@im"]`, looks up "@im-@im" (returns the persisted
+    ///   "@im-@im" string), and `parseTextFieldInputMode("@im-@im")` crashes on
+    ///   `substring(0, indexOf('='))` for a token with no `=`.
+    ///
+    /// Post-cleanup-fix:
+    /// - `loadFromFile` drops `@k=@k` self-references at load time and rewrites the file,
+    ///   so the bundle behaves like a fresh one and self-heals legacy projects.
+    private void verifySetBundleHealsLegacyWormholeFile(Constructor<?> ctor, File tempDir) throws Exception {
+        File legacyProjectDir = new File(tempDir, "legacy-project");
+        File legacyL10nDir = new File(legacyProjectDir, "src" + File.separator + "main" + File.separator + "l10n");
+        if (!legacyL10nDir.mkdirs()) {
+            throw new RuntimeException("Failed to create legacy l10n dir " + legacyL10nDir);
+        }
+        File legacyBundleFile = new File(legacyL10nDir, "Bundle.properties");
+
+        Properties poisoned = new Properties();
+        poisoned.setProperty("@im", "@im");
+        poisoned.setProperty("@im-@im", "@im-@im");
+        poisoned.setProperty("@rtl", "@rtl");
+        poisoned.setProperty("hello", "world");
+        try (OutputStream out = new FileOutputStream(legacyBundleFile)) {
+            poisoned.store(out, "legacy wormhole-poisoned bundle");
+        }
+
+        Object legacyBundle = ctor.newInstance(legacyBundleFile, null);
+        @SuppressWarnings("unchecked")
+        Map<String, String> legacyBundleMap = (Map<String, String>) legacyBundle;
+
+        // The constructor must self-heal the in-memory state: `@k=@k` self-references
+        // are read from disk but should not flow through to callers.
+        assertNull(legacyBundleMap.get("@im"), "Legacy `@im=@im` self-reference must be healed at load");
+        assertNull(legacyBundleMap.get("@im-@im"), "Legacy `@im-@im=@im-@im` self-reference must be healed at load");
+        assertNull(legacyBundleMap.get("@rtl"), "Legacy `@rtl=@rtl` self-reference must be healed at load");
+        assertEqual("world", legacyBundleMap.get("hello"), "Non-wormhole entries must survive the load-time clean");
+
+        // The on-disk file must also be rewritten so the corruption doesn't keep biting
+        // on every subsequent simulator boot.
+        Properties cleaned = load(legacyBundleFile);
+        assertNull(cleaned.getProperty("@im"), "Legacy `@im=@im` self-reference must be wiped from the file");
+        assertNull(cleaned.getProperty("@im-@im"), "Legacy `@im-@im=@im-@im` self-reference must be wiped from the file");
+        assertNull(cleaned.getProperty("@rtl"), "Legacy `@rtl=@rtl` self-reference must be wiped from the file");
+        assertEqual("world", cleaned.getProperty("hello"), "Non-wormhole entries must survive the file rewrite");
+
+        UIManager manager = UIManager.getInstance();
+        Map<String, String> savedBundle = manager.getBundle();
+        try {
+            // Pre-cleanup-fix: throws StringIndexOutOfBoundsException out of
+            // parseTextFieldInputMode because `bundle.get("@im")` returned "@im".
+            manager.setBundle(legacyBundleMap);
+            assertSame(legacyBundleMap, manager.getBundle(), "setBundle should install the bundle on a legacy poisoned project");
         } finally {
             manager.setBundle(savedBundle);
         }
