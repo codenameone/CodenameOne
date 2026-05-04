@@ -4858,6 +4858,74 @@ public class JavaSEPort extends CodenameOneImplementation {
             m.removeAll();
         }
         final JMenu skinMenu = m;
+
+        // Top-level: file picker for a user-supplied .skin
+        JMenuItem addSkin = new JMenuItem("Add Skin");
+        addSkin.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent ae) {
+                FileDialog picker = new FileDialog(frm, "Add Skin");
+                picker.setMode(FileDialog.LOAD);
+                picker.setFilenameFilter(new FilenameFilter() {
+                    public boolean accept(File file, String string) {
+                        return string.endsWith(".skin");
+                    }
+                });
+                picker.setModal(true);
+                picker.setVisible(true);
+                String file = picker.getFile();
+                if (file != null) {
+                    if (netMonitor != null) {
+                        netMonitor.dispose();
+                        netMonitor = null;
+                    }
+                    if (perfMonitor != null) {
+                        perfMonitor.dispose();
+                        perfMonitor = null;
+                    }
+                    String mainClass = System.getProperty("MainClass");
+                    if (mainClass != null) {
+                        Preferences p = Preferences.userNodeForPackage(JavaSEPort.class);
+                        p.put("skin", picker.getDirectory() + File.separator + file);
+                        deinitializeSync();
+                        frm.dispose();
+                        System.setProperty("reload.simulator", "true");
+                    } else {
+                        loadSkinFile(picker.getDirectory() + File.separator + file, frm);
+                        refreshSkin(frm);
+                    }
+                }
+            }
+        });
+        skinMenu.add(addSkin);
+
+        // Top-level: hand off to the hosted Skin Designer for building
+        // a new skin from scratch. Replaces the bundled gallery; the
+        // pre-built skins all live behind the "Legacy Skins" submenu.
+        JMenuItem designerItem = new JMenuItem("Skin Designer");
+        designerItem.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent ae) {
+                try {
+                    Desktop.getDesktop().browse(new URI("https://www.codenameone.com/skindesigner/"));
+                } catch (Exception err) {
+                    Logger.getLogger(JavaSEPort.class.getName()).log(Level.WARNING,
+                            "Could not open Skin Designer in browser", err);
+                }
+            }
+        });
+        skinMenu.add(designerItem);
+
+        skinMenu.addSeparator();
+
+        final JMenu legacyMenu = new JMenu("Legacy Skins");
+        legacyMenu.setDoubleBuffered(true);
+        skinMenu.add(legacyMenu);
+        populateLegacySkinsMenu(frm, legacyMenu);
+        return skinMenu;
+    }
+
+    private void populateLegacySkinsMenu(final JFrame frm, final JMenu legacyMenu) throws MalformedURLException {
+        legacyMenu.removeAll();
+        final JMenu skinMenu = legacyMenu;
         Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
         String skinNames = pref.get("skins", DEFAULT_SKINS);
         if (skinNames != null) {
@@ -5173,7 +5241,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                                             downloadMessage.setVisible(false);
                                             d.setVisible(false);
                                             try {
-                                                createSkinsMenu(frm, skinMenu);
+                                                populateLegacySkinsMenu(frm, skinMenu);
                                             } catch (MalformedURLException ex) {
                                                 Logger.getLogger(JavaSEPort.class.getName()).log(Level.SEVERE, null, ex);
                                             }
@@ -5197,47 +5265,6 @@ public class JavaSEPort extends CodenameOneImplementation {
                 });
 
 
-            }
-        });
-
-        skinMenu.addSeparator();
-        JMenuItem addSkin = new JMenuItem("Add New...");
-        skinMenu.add(addSkin);
-        addSkin.addActionListener(new ActionListener() {
-
-            public void actionPerformed(ActionEvent ae) {
-                FileDialog picker = new FileDialog(frm, "Add Skin");
-                picker.setMode(FileDialog.LOAD);
-                picker.setFilenameFilter(new FilenameFilter() {
-
-                    public boolean accept(File file, String string) {
-                        return string.endsWith(".skin");
-                    }
-                });
-                picker.setModal(true);
-                picker.setVisible(true);
-                String file = picker.getFile();
-                if (file != null) {
-                    if (netMonitor != null) {
-                        netMonitor.dispose();
-                        netMonitor = null;
-                    }
-                    if (perfMonitor != null) {
-                        perfMonitor.dispose();
-                        perfMonitor = null;
-                    }
-                    String mainClass = System.getProperty("MainClass");
-                    if (mainClass != null) {
-                        Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
-                        pref.put("skin", picker.getDirectory() + File.separator + file);
-                        deinitializeSync();
-                        frm.dispose();
-                        System.setProperty("reload.simulator", "true");
-                    } else {
-                        loadSkinFile(picker.getDirectory() + File.separator + file, frm);
-                        refreshSkin(frm);
-                    }
-                }
             }
         });
 
@@ -5285,10 +5312,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                         }
                         
                     }
-                
+
             }
         });
-        return skinMenu;
     }
 
     InputStream openSkinsURL() throws IOException {
