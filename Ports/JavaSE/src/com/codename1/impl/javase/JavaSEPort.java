@@ -14443,10 +14443,36 @@ public class JavaSEPort extends CodenameOneImplementation {
                 properties.clear();
                 properties.load(in);
                 super.clear();
+                java.util.List<String> wormholeKeys = null;
                 for (String name : properties.stringPropertyNames()) {
-                    putInternal(name, properties.getProperty(name));
+                    String value = properties.getProperty(name);
+                    // Legacy self-heal for issue #4850: older Codename One versions
+                    // (<= 7.0.236) whose `get(Object)` echoed missing keys back as
+                    // their own value persisted those echoes to disk. Now that the
+                    // @-key auto-fabrication guard is in place new echoes are
+                    // blocked, but on-disk `@k=@k` entries written by older
+                    // versions still flow through `super.get` as non-null and
+                    // crash `UIManager.setBundle` -> `parseTextFieldInputMode` on
+                    // a token with no `=`. Drop them at load time and rewrite the
+                    // file so legacy projects self-heal on the next simulator
+                    // boot instead of crashing forever.
+                    if (name != null && name.startsWith("@") && name.equals(value)) {
+                        if (wormholeKeys == null) {
+                            wormholeKeys = new java.util.ArrayList<String>();
+                        }
+                        wormholeKeys.add(name);
+                        continue;
+                    }
+                    putInternal(name, value);
                 }
-                dirty = false;
+                if (wormholeKeys != null) {
+                    for (String name : wormholeKeys) {
+                        properties.remove(name);
+                    }
+                    persist();
+                } else {
+                    dirty = false;
+                }
             } catch (IOException err) {
                 Log.e(err);
             }

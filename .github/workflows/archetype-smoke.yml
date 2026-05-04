@@ -1,0 +1,64 @@
+name: Archetype simulator smoke
+
+# Smoke-tests that an archetype-generated project can run `cn1:css` (the
+# CN1CSSCLI subprocess that boots JavaSEPort) with `cn1.autoDefaultResourceBundle`
+# forced on. This reproduces the user-side preference state that masked
+# issue #4850 in CI for six months: the bug was deterministic on the user
+# code path but invisible to CI runners with the default-false preference.
+#
+# Path-gated to the modules whose changes can break this code path so we
+# don't run the heavy archetype-generate-and-build for unrelated edits.
+on:
+  pull_request:
+    branches: [ master ]
+    paths:
+      - 'Ports/JavaSE/**'
+      - 'CodenameOneDesigner/**'
+      - 'CodenameOne/src/com/codename1/ui/plaf/UIManager.java'
+      - 'maven/codenameone-maven-plugin/**'
+      - 'maven/integration-tests/cn1app-archetype-test.sh'
+      - 'maven/integration-tests/inc/**'
+      - '.github/workflows/archetype-smoke.yml'
+  push:
+    branches: [ master ]
+    paths:
+      - 'Ports/JavaSE/**'
+      - 'CodenameOneDesigner/**'
+      - 'CodenameOne/src/com/codename1/ui/plaf/UIManager.java'
+      - 'maven/codenameone-maven-plugin/**'
+      - 'maven/integration-tests/cn1app-archetype-test.sh'
+      - 'maven/integration-tests/inc/**'
+      - '.github/workflows/archetype-smoke.yml'
+
+jobs:
+  archetype-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK 8
+        uses: actions/setup-java@v4
+        with:
+          java-version: '8'
+          distribution: 'temurin'
+          cache: 'maven'
+      - name: Install xvfb
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends xvfb
+      - name: Build Codename One Maven artifacts
+        run: |
+          cd maven
+          xvfb-run -a mvn install -Plocal-dev-javase -DskipTests -Dmaven.javadoc.skip=true
+      - name: Fetch and install archetype projects
+        uses: carlosperate/download-file-action@v1.0.3
+        with:
+          file-url: https://github.com/shannah/cn1-maven-archetypes/archive/refs/heads/master.zip
+          file-name: cn1-maven-archetypes.zip
+      - name: Install archetype to local repo
+        run: |
+          unzip cn1-maven-archetypes.zip
+          cd cn1-maven-archetypes-master
+          xvfb-run -a mvn install archetype:update-local-catalog -Plocal-dev-javase
+          xvfb-run -a mvn archetype:crawl -Plocal-dev-javase
+      - name: Run archetype simulator smoke (auto-bundle pref forced on)
+        run: |
+          cd maven/integration-tests
+          xvfb-run -a bash cn1app-archetype-test.sh
