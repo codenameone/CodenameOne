@@ -3,11 +3,11 @@
 var o = {};
 
     o.shouldExecute_ = function(callback) {
-        callback.error(new Error("Not implemented yet"));
+        callback.complete(true);
     };
 
     o.isSupported_ = function(callback) {
-        callback.complete(false);
+        callback.complete(true);
     };
 
 exports.com_codename1_tools_skindesigner_ShouldExecute= o;

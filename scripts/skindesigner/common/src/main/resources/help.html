@@ -4,6 +4,49 @@
         <title>Help</title>
         <meta charset="windows-1252">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+            body {
+                margin: 0;
+                padding: 1.25rem;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                line-height: 1.45;
+                background: #ffffff;
+                color: #111111;
+            }
+            a {
+                color: #1565c0;
+            }
+            code {
+                background: rgba(0, 0, 0, 0.08);
+                padding: 0.1rem 0.25rem;
+                border-radius: 4px;
+            }
+            body.dark {
+                background: #121212;
+                color: #f1f1f1;
+            }
+            body.dark a {
+                color: #8ab4f8;
+            }
+            body.dark code {
+                background: rgba(255, 255, 255, 0.14);
+            }
+        </style>
+        <script>
+            (function() {
+                function applyTheme() {
+                    var params = new URLSearchParams(window.location.search || "");
+                    var theme = params.get("theme");
+                    var dark = theme === "dark";
+                    if (dark) {
+                        document.body.classList.add("dark");
+                    } else {
+                        document.body.classList.remove("dark");
+                    }
+                }
+                window.addEventListener("DOMContentLoaded", applyTheme);
+            })();
+        </script>
     </head>
     <body>
         <h1>Skin Designer Help</h1>

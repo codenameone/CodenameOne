@@ -1,0 +1,91 @@
+name: Skin Designer Device DB Update
+
+# Runs only on master so it doesn't fire on every PR that touches the script.
+# Each run pulls a small batch of the latest GSMArena entries and merges them
+# into the bundled devices.json. Slow-and-steady avoids the 30+ minute scrapes
+# that risk IP bans and CI cancellation.
+on:
+  schedule:
+    # Every 6 hours. Each run only scrapes the "latest mobiles" page, so we
+    # accumulate fresh devices without ever doing a multi-thousand-page crawl.
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "trickle (~50 latest) or full (all curated brands)"
+        required: false
+        default: "trickle"
+        type: choice
+        options: [trickle, full]
+
+permissions:
+  actions: write
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-device-db:
+    # Only run on the canonical repo's master, never on forks or feature branches.
+    if: github.repository == 'codenameone/CodenameOne' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Restore HTML scrape cache
+        uses: actions/cache@v4
+        with:
+          path: scripts/skindesigner/tools/devicedb/cache
+          key: skin-designer-devicedb-cache-${{ github.run_id }}
+          restore-keys: |
+            skin-designer-devicedb-cache-
+
+      - name: Trickle scrape (~50 latest)
+        if: github.event_name == 'schedule' || github.event.inputs.mode == 'trickle' || github.event.inputs.mode == ''
+        run: |
+          python3 scripts/skindesigner/tools/devicedb/build_devices_json.py \
+            --mode latest --limit 50 --delay 2.0 --max-pages 1
+
+      - name: Full scrape (all curated brands)
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'full'
+        run: |
+          python3 scripts/skindesigner/tools/devicedb/build_devices_json.py \
+            --mode brands --delay 2.0 --max-pages 12
+
+      - name: Bail out if nothing changed
+        id: diff
+        run: |
+          if git diff --quiet -- scripts/skindesigner/common/src/main/resources/devices.json; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Device DB unchanged; nothing to commit."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            git --no-pager diff --stat -- scripts/skindesigner/common/src/main/resources/devices.json
+          fi
+
+      - name: Create pull request
+        if: steps.diff.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          commit-message: "Refresh Skin Designer device database"
+          title: "Refresh Skin Designer device database"
+          body: |
+            ## Summary
+            - Regenerates `scripts/skindesigner/common/src/main/resources/devices.json`
+              by scraping a small batch of the latest devices from GSMArena and
+              merging into the existing catalog.
+
+            Created automatically by the Skin Designer device DB workflow.
+          base: master
+          branch: automation/skin-designer-device-db
+          delete-branch: true
+          labels: |
+            dependencies
+            automation
