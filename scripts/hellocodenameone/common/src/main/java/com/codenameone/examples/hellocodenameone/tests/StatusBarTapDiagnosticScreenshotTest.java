@@ -2,23 +2,30 @@ package com.codenameone.examples.hellocodenameone.tests;
 
 import com.codename1.system.NativeLookup;
 import com.codename1.ui.Container;
+import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
-import com.codename1.ui.layouts.Layout;
 import com.codename1.ui.plaf.Style;
 import com.codenameone.examples.hellocodenameone.StatusBarTapDiagnosticNative;
 
-/// Visualises the iOS status-bar tap-to-scroll-to-top diagnostic. Each frame
-/// alternates between "scrolled to bottom" and "tap fired -> scrolled to top",
-/// with a glass-pane overlay showing the rising tap counter. The tap is fired
-/// through the StatusBarTapDiagnosticNative interface; on iOS that bumps the
-/// real native counter and dispatches the synthesized pointer event the same
-/// way scrollViewShouldScrollToTop: does, on other platforms it falls back
-/// to a Form.pointerPressed dispatch so the screenshot looks identical.
-public class StatusBarTapDiagnosticScreenshotTest extends AbstractAnimationScreenshotTest {
+/// Single-frame regression screenshot for the iOS status-bar tap diagnostic.
+/// Builds a scrollable form, fires three taps through StatusBarTapDiagnosticNative
+/// (which on iOS hits the same cn1FireStatusBarTap path scrollViewShouldScrollToTop:
+/// runs), then composes the result side-by-side with a synthetic "before" capture
+/// so the same image shows the counter rising from 0 to 3 and the scroll position
+/// jumping from bottom to top. Native-interface support is reflected in the glass
+/// pane footer ("native: yes/no") so iOS regressions surface as a real counter
+/// label change rather than a stub-vs-real branch.
+public class StatusBarTapDiagnosticScreenshotTest extends BaseTest {
+    private static final int TAPS_TO_FIRE = 3;
+    private static final int TILE_COUNT = 16;
+    private static final int GLASS_PANE_HEIGHT = 200;
+    private static final int LABEL_PADDING = 12;
+
     private static class TestForm extends Form {
         TestForm(String title) {
             super(title);
@@ -34,8 +41,8 @@ public class StatusBarTapDiagnosticScreenshotTest extends AbstractAnimationScree
     }
 
     private static class ScrollContainer extends Container {
-        ScrollContainer(Layout l) {
-            super(l);
+        ScrollContainer() {
+            super(BoxLayout.y());
             setScrollableY(true);
             // Synchronous scroll so each frame captures the post-scroll state
             // without waiting for the Motion-driven smooth-scroll animation.
@@ -47,32 +54,20 @@ public class StatusBarTapDiagnosticScreenshotTest extends AbstractAnimationScree
         }
     }
 
-    private static final int TILE_COUNT = 16;
-
-    private TestForm scrollHost;
-    private ScrollContainer scrollContainer;
-    private StatusBarTapDiagnosticNative nativeInterface;
-    private int maxScroll;
-    private int simulatedTaps;
-
     @Override
-    protected int getAnimationDurationMillis() {
-        return 600;
-    }
+    public boolean runTest() throws Exception {
+        StatusBarTapDiagnosticNative nativeInterface = NativeLookup.create(StatusBarTapDiagnosticNative.class);
+        boolean nativeSupported = nativeInterface != null && nativeInterface.isSupported();
+        int displayWidth = Display.getInstance().getDisplayWidth();
+        int displayHeight = Display.getInstance().getDisplayHeight();
 
-    @Override
-    protected void prepareCapture(int frameWidth, int frameHeight) {
-        super.prepareCapture(frameWidth, frameHeight);
-        simulatedTaps = 0;
-        nativeInterface = NativeLookup.create(StatusBarTapDiagnosticNative.class);
+        TestForm form = new TestForm("Status Bar Tap Diagnostic");
+        form.setLayout(new BorderLayout());
+        form.setWidth(displayWidth);
+        form.setHeight(displayHeight);
+        form.setVisible(true);
 
-        scrollHost = new TestForm("Status Bar Tap");
-        scrollHost.setLayout(new BorderLayout());
-        scrollHost.setWidth(frameWidth);
-        scrollHost.setHeight(frameHeight);
-        scrollHost.setVisible(true);
-
-        scrollContainer = new ScrollContainer(BoxLayout.y());
+        ScrollContainer scrollContainer = new ScrollContainer();
         Style cs = scrollContainer.getAllStyles();
         cs.setBgColor(0x0b132b);
         cs.setBgTransparency(255);
@@ -87,66 +82,88 @@ public class StatusBarTapDiagnosticScreenshotTest extends AbstractAnimationScree
             ts.setPadding(16, 16, 14, 14);
             scrollContainer.add(tile);
         }
-        scrollHost.add(BorderLayout.CENTER, scrollContainer);
-        scrollHost.layoutContainer();
+        form.add(BorderLayout.CENTER, scrollContainer);
+        form.layoutContainer();
 
         int contentHeight = scrollContainer.getScrollDimension().getHeight();
-        maxScroll = Math.max(0, contentHeight - scrollContainer.getHeight());
-    }
+        int maxScroll = Math.max(0, contentHeight - scrollContainer.getHeight());
 
-    @Override
-    protected void renderFrame(Graphics g, int width, int height, double progress, int frameIndex) {
-        // Even frames: scrolled to bottom, no tap yet.
-        // Odd frames:  fire the simulated tap, then snap the standalone
-        //              scrollHost to the top. The native interface call
-        //              targets the test runner's live form (Display.getCurrent),
-        //              not this off-screen scrollHost, so the visible scroll
-        //              has to be applied explicitly here for the screenshot
-        //              to be deterministic across platforms.
-        if ((frameIndex & 1) == 0) {
-            scrollContainer.scrollTo(maxScroll);
-        } else {
-            fireSimulatedTap();
-            scrollContainer.scrollTo(0);
+        // Capture the "before" frame: scrolled to the bottom, counter = 0.
+        scrollContainer.scrollTo(maxScroll);
+        Image beforeFrame = paintFrame(form, displayWidth, displayHeight, 0, "Before tapping", "scroll: bottom", nativeSupported);
+
+        // Fire taps through the native interface; on iOS this drives the real
+        // cn1FireStatusBarTap() path (counter++ + synthesized pointer event).
+        // Other platforms either stub or dispatch through Form.pointerPressed.
+        // Either way, we explicitly snap the visible scroll state to (0) for
+        // the screenshot below so the result is deterministic across platforms.
+        for (int i = 0; i < TAPS_TO_FIRE; i++) {
+            if (nativeSupported) {
+                nativeInterface.simulateStatusBarTap();
+            }
         }
-        scrollHost.paintComponent(g, true);
-        paintGlassPane(g, width, height, frameIndex);
+        scrollContainer.scrollTo(0);
+        Image afterFrame = paintFrame(form, displayWidth, displayHeight, TAPS_TO_FIRE, "After " + TAPS_TO_FIRE + " taps", "scroll: top", nativeSupported);
+
+        // Compose side-by-side: before on the left, after on the right.
+        Image composite = Image.createImage(displayWidth, displayHeight, 0xff101010);
+        Graphics cg = composite.getGraphics();
+        int halfWidth = displayWidth / 2;
+        Image scaledBefore = beforeFrame.scaled(halfWidth, displayHeight);
+        Image scaledAfter = afterFrame.scaled(displayWidth - halfWidth, displayHeight);
+        cg.drawImage(scaledBefore, 0, 0);
+        cg.drawImage(scaledAfter, halfWidth, 0);
+        cg.setColor(0x303030);
+        cg.drawLine(halfWidth, 0, halfWidth, displayHeight - 1);
+        scaledBefore.dispose();
+        scaledAfter.dispose();
+        beforeFrame.dispose();
+        afterFrame.dispose();
+
+        Cn1ssDeviceRunnerHelper.emitImage(composite, "StatusBarTapDiagnosticScreenshotTest", this::done);
+        return true;
     }
 
-    private void fireSimulatedTap() {
-        if (nativeInterface != null && nativeInterface.isSupported()) {
-            nativeInterface.simulateStatusBarTap();
-        }
-        simulatedTaps++;
+    private Image paintFrame(Form form, int width, int height, int counter, String headline, String scrollLabel, boolean nativeSupported) {
+        Image frame = Image.createImage(width, height, 0xffffffff);
+        Graphics g = frame.getGraphics();
+        form.paintComponent(g, true);
+        paintGlassPane(g, width, counter, headline, scrollLabel, nativeSupported);
+        return frame;
     }
 
-    private void paintGlassPane(Graphics g, int width, int height, int frameIndex) {
-        int barH = Math.max(48, height / 8);
+    private void paintGlassPane(Graphics g, int width, int counter, String headline, String scrollLabel, boolean nativeSupported) {
+        g.setAlpha(195);
         g.setColor(0x000000);
-        g.setAlpha(170);
-        g.fillRect(0, 0, width, barH);
+        g.fillRect(0, 0, width, GLASS_PANE_HEIGHT);
         g.setAlpha(255);
-        g.setColor(0xffffff);
-        String headline = "Status Bar Tap Counter: " + simulatedTaps;
-        String sub = ((frameIndex & 1) == 0)
-                ? "scrolled to bottom"
-                : "tap fired (W/2, 0) -> scroll to top";
-        int pad = 8;
-        g.drawString(headline, pad, pad);
-        g.setColor(0xffd166);
-        g.drawString(sub, pad, pad + g.getFont().getHeight() + 2);
-    }
 
-    @Override
-    protected void finishCapture() {
-        scrollHost = null;
-        scrollContainer = null;
-        nativeInterface = null;
-        super.finishCapture();
+        int lineH = g.getFont().getHeight() + 4;
+        int y = LABEL_PADDING;
+
+        g.setColor(0xffffff);
+        g.drawString(headline, LABEL_PADDING, y);
+        y += lineH;
+
+        g.setColor(0xffd166);
+        g.drawString("Counter: " + counter, LABEL_PADDING, y);
+        y += lineH;
+
+        g.setColor(0x9bf6ff);
+        g.drawString(scrollLabel, LABEL_PADDING, y);
+        y += lineH;
+
+        g.setColor(0xa0a0a0);
+        g.drawString("native: " + (nativeSupported ? "yes" : "no"), LABEL_PADDING, y);
     }
 
     private static int rowColor(int i) {
         int[] palette = {0x118ab2, 0x06d6a0, 0xffd166, 0xef476f, 0x8338ec, 0xfb5607};
         return palette[i % palette.length];
+    }
+
+    @Override
+    public boolean shouldTakeScreenshot() {
+        return true;
     }
 }

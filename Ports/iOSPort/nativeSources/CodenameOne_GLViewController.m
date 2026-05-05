@@ -239,6 +239,13 @@ BOOL cn1IsStatusBarTapProxyInstalled() {
     return cn1StatusBarTapProxy != nil && cn1StatusBarTapProxy.superview != nil;
 }
 
+// Forward declarations -- the actual definitions of pointerPressedC and
+// pointerReleasedC live further down in this file, but cn1FireStatusBarTap
+// (defined immediately below so it sits next to the static counter state it
+// drives) needs to call them.
+extern void pointerPressedC(int* x, int* y, int length);
+extern void pointerReleasedC(int* x, int* y, int length);
+
 // Fires the same diagnostic-counter bump and synthesized pointer event the
 // scrollViewShouldScrollToTop: delegate dispatches. Exposed so an
 // instrumented native interface can drive the path from a screenshot test
