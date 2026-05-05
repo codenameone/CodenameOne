@@ -6488,7 +6488,36 @@ public class IOSImplementation extends CodenameOneImplementation {
         if(key.equalsIgnoreCase("UDID")) {
             return nativeInstance.getUDID();
         }
-        
+        if("cn1.iosStatusBarTap.count".equals(key)) {
+            return String.valueOf(nativeInstance.getStatusBarTapCount());
+        }
+        if("cn1.iosStatusBarTap.lastEpochMillis".equals(key)) {
+            return String.valueOf(nativeInstance.getStatusBarTapLastEpochMillis());
+        }
+        if("cn1.iosStatusBarTap.lastX".equals(key)) {
+            return String.valueOf(nativeInstance.getStatusBarTapLastX());
+        }
+        if("cn1.iosStatusBarTap.lastY".equals(key)) {
+            return String.valueOf(nativeInstance.getStatusBarTapLastY());
+        }
+        if("cn1.iosStatusBarTap.proxyInstalled".equals(key)) {
+            return String.valueOf(nativeInstance.isStatusBarTapProxyInstalled());
+        }
+        if("cn1.iosStatusBarTap.diagnostics".equals(key)) {
+            int count = nativeInstance.getStatusBarTapCount();
+            long lastTime = nativeInstance.getStatusBarTapLastEpochMillis();
+            int lastX = nativeInstance.getStatusBarTapLastX();
+            int lastY = nativeInstance.getStatusBarTapLastY();
+            boolean installed = nativeInstance.isStatusBarTapProxyInstalled();
+            StringBuilder sb = new StringBuilder();
+            sb.append("count=").append(count);
+            sb.append(", lastEpochMillis=").append(lastTime);
+            sb.append(", lastX=").append(lastX);
+            sb.append(", lastY=").append(lastY);
+            sb.append(", proxyInstalled=").append(installed);
+            return sb.toString();
+        }
+
         return super.getProperty(key, defaultValue);
     }
 

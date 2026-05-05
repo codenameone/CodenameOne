@@ -4692,6 +4692,32 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getDeviceName__(CN1_THREAD_STATE_MU
     return fromNSString(CN1_THREAD_STATE_PASS_ARG [[UIDevice currentDevice] name]);
 }
 
+extern int cn1GetStatusBarTapCount();
+extern double cn1GetStatusBarTapLastEpochMillis();
+extern int cn1GetStatusBarTapLastX();
+extern int cn1GetStatusBarTapLastY();
+extern BOOL cn1IsStatusBarTapProxyInstalled();
+
+JAVA_INT com_codename1_impl_ios_IOSNative_getStatusBarTapCount__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return (JAVA_INT)cn1GetStatusBarTapCount();
+}
+
+JAVA_LONG com_codename1_impl_ios_IOSNative_getStatusBarTapLastEpochMillis__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return (JAVA_LONG)cn1GetStatusBarTapLastEpochMillis();
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_getStatusBarTapLastX__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return (JAVA_INT)cn1GetStatusBarTapLastX();
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_getStatusBarTapLastY__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return (JAVA_INT)cn1GetStatusBarTapLastY();
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isStatusBarTapProxyInstalled__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return cn1IsStatusBarTapProxyInstalled() ? JAVA_TRUE : JAVA_FALSE;
+}
+
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isGoodLocation___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     POOL_BEGIN();
     CLLocationManager* l = (BRIDGE_CAST CLLocationManager*)((void *)peer);
@@ -9248,6 +9274,26 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getOSVersion___R_java_lang_String(C
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getDeviceName___R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
     return com_codename1_impl_ios_IOSNative_getDeviceName__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_getStatusBarTapCount___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return com_codename1_impl_ios_IOSNative_getStatusBarTapCount__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
+
+JAVA_LONG com_codename1_impl_ios_IOSNative_getStatusBarTapLastEpochMillis___R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return com_codename1_impl_ios_IOSNative_getStatusBarTapLastEpochMillis__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_getStatusBarTapLastX___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return com_codename1_impl_ios_IOSNative_getStatusBarTapLastX__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_getStatusBarTapLastY___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return com_codename1_impl_ios_IOSNative_getStatusBarTapLastY__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isStatusBarTapProxyInstalled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return com_codename1_impl_ios_IOSNative_isStatusBarTapProxyInstalled__(CN1_THREAD_STATE_PASS_ARG instanceObject);
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isGoodLocation___long_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {

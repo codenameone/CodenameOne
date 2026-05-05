@@ -84,6 +84,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new StickyHeaderSlideTransitionScreenshotTest(),
             new StickyHeaderFadeTransitionScreenshotTest(),
             new TensileBounceScreenshotTest(),
+            new StatusBarTapDiagnosticScreenshotTest(),
             new ComponentReplaceFadeScreenshotTest(),
             new ComponentReplaceSlideScreenshotTest(),
             new ComponentReplaceFlipScreenshotTest(),
@@ -292,6 +293,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
         return "KotlinUiTest".equals(testName)
                 || "MainScreenScreenshotTest".equals(testName)
                 || "SheetScreenshotTest".equals(testName)
+                || "StatusBarTapDiagnosticScreenshotTest".equals(testName)
                 || "ImageViewerNavigationScreenshotTest".equals(testName)
                 || "TabsScreenshotTest".equals(testName)
                 || "TextAreaAlignmentScreenshotTest".equals(testName)

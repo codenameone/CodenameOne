@@ -324,6 +324,17 @@ public final class IOSNative {
     native String getUDID();
     native String getOSVersion();
     native String getDeviceName();
+
+    // Diagnostics for the status-bar tap-to-scroll-to-top path. Surfaced to
+    // user code via Display.getProperty("cn1.iosStatusBarTap.*") in
+    // IOSImplementation. Lets developers detect on-device whether iOS is
+    // delivering the scroll-to-top message at all when the gesture does
+    // nothing visibly.
+    native int getStatusBarTapCount();
+    native long getStatusBarTapLastEpochMillis();
+    native int getStatusBarTapLastX();
+    native int getStatusBarTapLastY();
+    native boolean isStatusBarTapProxyInstalled();
     
     // location manager
     native boolean isGPSEnabled();
