@@ -7,6 +7,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -82,6 +83,9 @@ public class AutoLocalizationBundleTest extends AbstractTest {
 
             verifySetBundleSmokeOnFreshProject(ctor, tempDir);
             verifySetBundleHealsLegacyWormholeFile(ctor, tempDir);
+            verifyFindLocalizationDirectoryDoesNotAutoCreate(tempDir);
+            verifyFindLocalizationDirectoryWalksToCommonSibling(tempDir);
+            verifyFindDefaultBundleReturnsNullWhenNoBundleFile(tempDir);
 
             return true;
         } finally {
@@ -184,6 +188,85 @@ public class AutoLocalizationBundleTest extends AbstractTest {
         } finally {
             manager.setBundle(savedBundle);
         }
+    }
+
+    /// Issue #4850 root cause: `findLocalizationDirectory` used to call
+    /// `mkdirs()` on `<cwd>/src/main/l10n` whenever the directory was missing,
+    /// then `findDefaultLocalizationBundleFile` returned a non-existent
+    /// `Bundle.properties` path as a fallback. The CSS subprocess inherits cwd
+    /// = `javase/`, so this auto-created a ghost bundle in the wrong module
+    /// that older CN1 versions then poisoned with `@im=@im`. After this fix,
+    /// no l10n dir on disk = no auto-bundle (project-level opt-in).
+    private void verifyFindLocalizationDirectoryDoesNotAutoCreate(File tempDir) throws Exception {
+        File freshModule = new File(tempDir, "no-l10n-module");
+        if (!freshModule.mkdirs()) {
+            throw new RuntimeException("Failed to create test module dir " + freshModule);
+        }
+
+        Method findLocDir = Class.forName("com.codename1.impl.javase.JavaSEPort")
+                .getDeclaredMethod("findLocalizationDirectory", File.class);
+        findLocDir.setAccessible(true);
+
+        Object result = findLocDir.invoke(null, freshModule);
+        assertNull(result, "findLocalizationDirectory must return null when no l10n dir exists");
+
+        File ghostDir = new File(freshModule, "src" + File.separator + "main" + File.separator + "l10n");
+        assertBool(!ghostDir.exists(), "findLocalizationDirectory must not auto-create src/main/l10n");
+    }
+
+    /// Issue #4850: the simulator forks `cn1:run` from `javase/` while the
+    /// developer's bundles live in the sibling `common/` module. The new
+    /// `findLocalizationDirectory` walks up to find `../common/src/main/l10n`
+    /// when the current module has no l10n dir of its own, mirroring
+    /// `CSSWatcher.addLocalizationCandidates`.
+    private void verifyFindLocalizationDirectoryWalksToCommonSibling(File tempDir) throws Exception {
+        File rootProject = new File(tempDir, "multi-module-project");
+        File javaseModule = new File(rootProject, "javase");
+        File commonL10n = new File(rootProject, "common" + File.separator + "src" + File.separator + "main" + File.separator + "l10n");
+        if (!javaseModule.mkdirs() || !commonL10n.mkdirs()) {
+            throw new RuntimeException("Failed to create multi-module project layout under " + rootProject);
+        }
+
+        Method findLocDir = Class.forName("com.codename1.impl.javase.JavaSEPort")
+                .getDeclaredMethod("findLocalizationDirectory", File.class);
+        findLocDir.setAccessible(true);
+
+        File result = (File) findLocDir.invoke(null, javaseModule);
+        assertNotNull(result, "findLocalizationDirectory must locate sibling common/src/main/l10n");
+        assertEqual(commonL10n.getCanonicalPath(), result.getCanonicalPath(),
+                "findLocalizationDirectory should resolve to the common module's l10n dir when cwd is javase");
+
+        // Local module wins when both exist.
+        File javaseL10n = new File(javaseModule, "src" + File.separator + "main" + File.separator + "l10n");
+        if (!javaseL10n.mkdirs()) {
+            throw new RuntimeException("Failed to create local l10n dir " + javaseL10n);
+        }
+        File preferLocal = (File) findLocDir.invoke(null, javaseModule);
+        assertEqual(javaseL10n.getCanonicalPath(), preferLocal.getCanonicalPath(),
+                "Local module's l10n dir should take precedence over common");
+    }
+
+    /// `findDefaultLocalizationBundleFile` previously returned a non-existent
+    /// `Bundle.properties` path when the dir was empty; that triggered
+    /// `AutoLocalizationBundle.persist()` to create the empty file even when
+    /// the project shipped no bundles. Now it returns null and
+    /// `enableAutoLocalizationBundle` no-ops.
+    private void verifyFindDefaultBundleReturnsNullWhenNoBundleFile(File tempDir) throws Exception {
+        File emptyL10nModule = new File(tempDir, "empty-l10n-module");
+        File emptyL10n = new File(emptyL10nModule, "src" + File.separator + "main" + File.separator + "l10n");
+        if (!emptyL10n.mkdirs()) {
+            throw new RuntimeException("Failed to create empty l10n dir " + emptyL10n);
+        }
+
+        Method findDefaultBundle = Class.forName("com.codename1.impl.javase.JavaSEPort")
+                .getDeclaredMethod("findDefaultLocalizationBundleFile", File.class);
+        findDefaultBundle.setAccessible(true);
+
+        Object result = findDefaultBundle.invoke(null, emptyL10nModule);
+        assertNull(result, "findDefaultLocalizationBundleFile must return null when the l10n dir has no .properties files");
+
+        File preferred = new File(emptyL10n, "Bundle.properties");
+        assertBool(!preferred.exists(), "findDefaultLocalizationBundleFile must not create Bundle.properties");
     }
 
     private Properties load(File file) throws Exception {

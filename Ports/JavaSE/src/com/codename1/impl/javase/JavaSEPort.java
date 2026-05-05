@@ -14337,8 +14337,18 @@ public class JavaSEPort extends CodenameOneImplementation {
         autoLocalizationBundle = null;
     }
 
-    private File findDefaultLocalizationBundleFile() {
-        File localizationDir = findLocalizationDirectory();
+    File findDefaultLocalizationBundleFile() {
+        return findDefaultLocalizationBundleFile(getCWD());
+    }
+
+    // Returns null when no real bundle file exists. Previously this method
+    // returned a non-existent `Bundle.properties` path as a fallback, which
+    // combined with `findLocalizationDirectory`'s old mkdirs() to create empty
+    // ghost bundles in modules the developer never asked to localize. Now the
+    // auto-bundle activates only when the developer ships at least one
+    // bundle file, matching the project-level opt-in semantics.
+    static File findDefaultLocalizationBundleFile(File projectDir) {
+        File localizationDir = findLocalizationDirectory(projectDir);
         if (localizationDir == null) {
             return null;
         }
@@ -14372,10 +14382,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             java.util.Collections.sort(bundles);
             return bundles.get(0);
         }
-        return preferred;
+        return null;
     }
 
-    private void collectLocalizationBundles(File dir, java.util.List<File> out) {
+    private static void collectLocalizationBundles(File dir, java.util.List<File> out) {
         File[] files = dir.listFiles();
         if (files == null) {
             return;
@@ -14389,24 +14399,48 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
-    private File findLocalizationDirectory() {
-        File projectDir = getCWD();
-        File[] candidates = new File[]{
-            new File(projectDir, "src" + File.separator + "main" + File.separator + "l10n"),
-            new File(projectDir, "l10n"),
-            new File(projectDir, "src" + File.separator + "l10n")
-        };
+    File findLocalizationDirectory() {
+        return findLocalizationDirectory(getCWD());
+    }
+
+    // Resolves the project's localization bundle directory for the auto-bundle.
+    //
+    // The simulator forks `cn1:run` from the `javase/` module, so cwd is `javase/`
+    // -- but the developer's bundles live in the sibling `common/` module under
+    // `common/src/main/l10n`. Issue #4850: previous versions of this method
+    // looked only at cwd, missed the real bundle, and then auto-created a
+    // throwaway `javase/src/main/l10n/Bundle.properties` via mkdirs(). The
+    // throwaway file accumulated wormhole-poisoned `@im=@im` entries from older
+    // CN1 versions; even after users cleaned the *real* bundle in `common/`,
+    // every CN1CSSCLI subprocess respawn loaded the ghost bundle from `javase/`,
+    // crashed inside `parseTextFieldInputMode`, and CSSWatcher restarted it in
+    // an infinite respawn loop.
+    //
+    // New rules:
+    //  1. Check the current module first (cwd/src/main/{l10n,i18n}).
+    //  2. Then check the sibling `common/` module (matches CN1 maven layout
+    //     and CSSWatcher.addLocalizationCandidates).
+    //  3. Never auto-create the directory. Project-level opt-in: if the
+    //     developer hasn't set up localization, the auto-bundle is a no-op.
+    static File findLocalizationDirectory(File projectDir) {
+        if (projectDir == null) {
+            return null;
+        }
+        java.util.List<File> candidates = new java.util.ArrayList<File>();
+        candidates.add(new File(projectDir, "src" + File.separator + "main" + File.separator + "l10n"));
+        candidates.add(new File(projectDir, "src" + File.separator + "main" + File.separator + "i18n"));
+        candidates.add(new File(projectDir, "l10n"));
+        candidates.add(new File(projectDir, "src" + File.separator + "l10n"));
+        File parent = projectDir.getParentFile();
+        if (parent != null) {
+            File commonModule = new File(parent, "common");
+            candidates.add(new File(commonModule, "src" + File.separator + "main" + File.separator + "l10n"));
+            candidates.add(new File(commonModule, "src" + File.separator + "main" + File.separator + "i18n"));
+        }
         for (File dir : candidates) {
-            if (dir.exists() && dir.isDirectory()) {
+            if (dir != null && dir.exists() && dir.isDirectory()) {
                 return dir;
             }
-        }
-        File fallback = candidates[0];
-        if (!fallback.exists()) {
-            fallback.mkdirs();
-        }
-        if (fallback.exists() && fallback.isDirectory()) {
-            return fallback;
         }
         return null;
     }
