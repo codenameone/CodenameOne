@@ -45,6 +45,7 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.list.DefaultListModel;
 import com.codename1.ui.plaf.Border;
@@ -781,7 +782,11 @@ public class Picker extends Button {
             switch (entry.alignment) {
                 case Component.CENTER:
                     if (center == null) {
-                        center = new Container(BoxLayout.x());
+                        // FlowLayout(CENTER) so the buttons actually center inside
+                        // the BorderLayout.CENTER slot below; BoxLayout.x() would
+                        // pack them at the slot's left edge, which is the bug from
+                        // https://github.com/codenameone/CodenameOne/issues/4819.
+                        center = new Container(new FlowLayout(Component.CENTER, Component.CENTER));
                         $(center).selectAllStyles().setMargin(0).setPadding(0).setBorder(Border.createEmpty()).setBgTransparency(0);
                     }
                     center.add(button);
