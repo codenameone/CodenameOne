@@ -4502,6 +4502,95 @@ public class JavaSEPort extends CodenameOneImplementation {
         });
         simulateMenu.add(pushSim);
 
+        // Mirrors scrollViewShouldScrollToTop: in CodenameOne_GLViewController.m
+        // which dispatches a synthetic tap at (displayWidth/2, 0). The
+        // simulator otherwise can't reproduce that path because clicking the
+        // visible status bar just hits the bar directly.
+        JMenuItem statusBarTapDiag = new JMenuItem("iOS Status Bar Tap");
+        statusBarTapDiag.setToolTipText("Synthesizes the (displayWidth/2, 0) tap that iOS dispatches when the status bar is tapped, and reports which component would receive it.");
+        statusBarTapDiag.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                Form f = Display.getInstance().getCurrent();
+                if (f == null) {
+                    JOptionPane.showMessageDialog(canvas, "No current form to tap.");
+                    return;
+                }
+                int tapX = getDisplayWidthImpl() / 2;
+                int tapY = 0;
+                StringBuilder report = new StringBuilder();
+                report.append("Simulating the iOS status-bar tap path.\n");
+                report.append("iOS native code synthesizes a tap at (displayWidth/2, 0)\n");
+                report.append("when scrollViewShouldScrollToTop: fires.\n\n");
+                report.append("Tap coordinates: (").append(tapX).append(", ").append(tapY).append(")\n\n");
+
+                UIManager um = f.getUIManager();
+                boolean paintsTitleBar = um.isThemeConstant("paintsTitleBarBool", false);
+                boolean scrollsUp = um.isThemeConstant("statusBarScrollsUpBool", true);
+                report.append("paintsTitleBarBool   = ").append(paintsTitleBar).append("\n");
+                report.append("statusBarScrollsUpBool = ").append(scrollsUp).append("\n\n");
+
+                if (!paintsTitleBar) {
+                    report.append("WARNING: paintsTitleBarBool is false. Form.createStatusBar()\n");
+                    report.append("is not invoked, so no StatusBar component exists. Add\n");
+                    report.append("    paintsTitleBarBool: true;\n");
+                    report.append("    includeNativeBool: true;\n");
+                    report.append("to your CSS #Constants block to enable the iOS behavior.\n\n");
+                }
+                if (paintsTitleBar && !scrollsUp) {
+                    report.append("WARNING: statusBarScrollsUpBool is false. The StatusBar is\n");
+                    report.append("created as a non-tappable Container, so no tap-to-scroll\n");
+                    report.append("listener is wired up.\n\n");
+                }
+
+                Component responder = f.getResponderAt(tapX, tapY);
+                if (responder == null) {
+                    report.append("No responder at (").append(tapX).append(", ").append(tapY).append(").\n");
+                    report.append("On a device the iOS-synthesized tap will silently no-op.\n");
+                } else {
+                    String uiid = responder.getUIID();
+                    report.append("Responder at top-center:\n");
+                    report.append("  class = ").append(responder.getClass().getName()).append("\n");
+                    report.append("  UIID  = ").append(uiid).append("\n");
+                    com.codename1.ui.geom.Rectangle bounds = new com.codename1.ui.geom.Rectangle(
+                            responder.getAbsoluteX(), responder.getAbsoluteY(),
+                            responder.getWidth(), responder.getHeight());
+                    report.append("  bounds = ").append(bounds.getX()).append(",").append(bounds.getY())
+                            .append(" ").append(bounds.getSize().getWidth()).append("x").append(bounds.getSize().getHeight()).append("\n\n");
+                    if ("StatusBar".equals(uiid) || "StatusBarLandscape".equals(uiid)) {
+                        report.append("OK: this is the built-in StatusBar component. The iOS\n");
+                        report.append("tap-to-scroll-to-top should work on a device, provided\n");
+                        report.append("the native iOS theme is included (includeNativeBool).\n");
+                    } else {
+                        report.append("PROBLEM: the responder is NOT the built-in StatusBar.\n");
+                        report.append("On an iOS device the synthesized tap will be delivered\n");
+                        report.append("to this component instead of the scroll-to-top button,\n");
+                        report.append("so the standard iOS gesture appears broken.\n\n");
+                        report.append("Common causes:\n");
+                        report.append("  - A custom component overlaps the top-center pixel\n");
+                        report.append("    (e.g. a Toolbar side menu icon, an absolute-laid-out\n");
+                        report.append("    PeerComponent, or a translucent overlay).\n");
+                        report.append("  - The StatusBar UIID was zeroed out so the button has\n");
+                        report.append("    no height, letting another component sit on top.\n");
+                        report.append("  - Form.createStatusBar() was overridden without wiring\n");
+                        report.append("    a tap-to-scroll listener.\n");
+                    }
+                }
+
+                Log.p(report.toString());
+                JavaSEPort.this.pointerPressed(tapX, tapY);
+                JavaSEPort.this.pointerReleased(tapX, tapY);
+
+                JTextArea ta = new JTextArea(report.toString());
+                ta.setEditable(false);
+                ta.setFont(new java.awt.Font(java.awt.Font.MONOSPACED, java.awt.Font.PLAIN, 12));
+                JScrollPane sp = new JScrollPane(ta);
+                sp.setPreferredSize(new java.awt.Dimension(560, 360));
+                JOptionPane.showMessageDialog(canvas, sp, "iOS Status Bar Tap Diagnostic", JOptionPane.INFORMATION_MESSAGE);
+            }
+        });
+        simulateMenu.add(statusBarTapDiag);
+
         if (appFrame == null) {
             toolsMenu.add(componentTreeInspector);
         }
