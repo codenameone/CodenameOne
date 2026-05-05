@@ -354,8 +354,12 @@ public abstract class CodenameOneImplementation {
                 int dotIdx = clsName == null ? -1 : clsName.lastIndexOf('.');
                 int cap = clsName == null ? 0 : clsName.length();
                 int safeEnd = dotIdx;
-                if (safeEnd < 0) safeEnd = 0;
-                if (safeEnd > cap) safeEnd = cap;
+                if (safeEnd < 0) {
+                    safeEnd = 0;
+                }
+                if (safeEnd > cap) {
+                    safeEnd = cap;
+                }
                 if (safeEnd == 0 || clsName == null) {
                     packageName = "";
                 } else {
