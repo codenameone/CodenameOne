@@ -24,6 +24,7 @@ package com.codename1.components;
 
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
+import com.codename1.ui.Graphics;
 import com.codename1.ui.events.ScrollListener;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
@@ -71,19 +72,19 @@ import java.util.List;
 ///
 /// @author Shai Almog
 public class StickyHeaderContainer extends Container {
-    /// Replace the pinned header without a fade or shift. As the next
-    /// section's header rises into the pinned slot from below it slides
-    /// over the pinned header (which is hidden during the overlap) and
-    /// then takes its place once it reaches the top.
+    /// Replace the pinned header without a fade or shift. The pinned
+    /// header stays in place until the rising section reaches the slot
+    /// top, at which point the swap is instant. The rising header is
+    /// hidden behind the pinned slot during the overlap.
     public static final int TRANSITION_NONE = 0;
     /// As the next section's header rises into the pinned slot from below
     /// it pushes the pinned header up and out of the slot in sync with
     /// the scroll, replacing it once the rising header reaches the top.
     public static final int TRANSITION_SLIDE = 1;
     /// As the next section's header rises into the pinned slot from below
-    /// the pinned header fades to transparency, revealing the rising
-    /// header behind it. The swap happens once the rising header reaches
-    /// the top and the pinned header has fully faded.
+    /// the pinned header both slides up and fades to transparency, so
+    /// it dissolves out of the slot while the rising header takes its
+    /// place. The swap happens once the rising header reaches the top.
     public static final int TRANSITION_FADE = 2;
 
     private final ScrollContainer scroller;
@@ -102,6 +103,14 @@ public class StickyHeaderContainer extends Container {
     private int pushOffset;
     private int stickyHostBaseY;
 
+    /// Reverse-activation hysteresis. Once a section is pinned, scroll
+    /// inertia tends to bounce a few pixels past the swap boundary; if
+    /// each bounce flipped the active section the pinned header would
+    /// visibly jitter as it teleports between scroller-tracked and
+    /// slot-fixed positions. Suppressing tiny reverse swaps inside this
+    /// window absorbs the bounce.
+    private static final int SWAP_HYSTERESIS_PIXELS = 4;
+
     private static class Section {
         final Component header;
         final Container placeholder;
@@ -119,7 +128,7 @@ public class StickyHeaderContainer extends Container {
     public StickyHeaderContainer() {
         super();
         scroller = new ScrollContainer();
-        stickyHost = new Container(new BorderLayout());
+        stickyHost = new StickyHostContainer();
 
         setLayout(new StickyOverlayLayout());
         super.addComponent(scroller);
@@ -131,6 +140,37 @@ public class StickyHeaderContainer extends Container {
                 updateSticky();
             }
         });
+    }
+
+    /// Overlay host that always paints its parent's background under the
+    /// pinned header. This keeps a transparent header UIID from showing
+    /// scroller content through the slot during a transition.
+    private final class StickyHostContainer extends Container {
+        StickyHostContainer() {
+            super(new BorderLayout());
+        }
+
+        @Override
+        public void paintBackground(Graphics g) {
+            Container parent = StickyHeaderContainer.this;
+            Style ps = parent.getStyle();
+            byte transparency = ps.getBgTransparency();
+            if (transparency != 0 && g.isAlphaSupported()) {
+                int oldColor = g.getColor();
+                int oldAlpha = g.getAlpha();
+                g.setColor(ps.getBgColor());
+                g.setAlpha(transparency & 0xff);
+                g.fillRect(getX(), getY(), getWidth(), getHeight());
+                g.setColor(oldColor);
+                g.setAlpha(oldAlpha);
+            } else if (transparency != 0) {
+                int oldColor = g.getColor();
+                g.setColor(ps.getBgColor());
+                g.fillRect(getX(), getY(), getWidth(), getHeight());
+                g.setColor(oldColor);
+            }
+            super.paintBackground(g);
+        }
     }
 
     private static final class ScrollContainer extends Container {
@@ -305,6 +345,23 @@ public class StickyHeaderContainer extends Container {
             }
         }
 
+        if (newActive < activeIndex && activeIndex >= 0) {
+            // Inertial bounce on iOS routinely overshoots the swap
+            // boundary by a few pixels. If we deactivate immediately the
+            // pinned header teleports back into the scroller and is
+            // re-activated on the next forward bounce, producing a
+            // visible jitter. Hold the current active section across
+            // tiny reverse excursions; a real backwards scroll past the
+            // hysteresis window still deactivates normally.
+            Section curr = sections.get(activeIndex);
+            if (curr.placeholder.getParent() == scroller) { //NOPMD CompareObjectsWithEquals
+                int distancePastBoundary = curr.placeholder.getY() - sy;
+                if (distancePastBoundary > 0 && distancePastBoundary <= SWAP_HYSTERESIS_PIXELS) {
+                    newActive = activeIndex;
+                }
+            }
+        }
+
         boolean activationChanged = (newActive != activeIndex);
         if (activationChanged) {
             applyActivation(newActive);
@@ -438,15 +495,25 @@ public class StickyHeaderContainer extends Container {
                 break;
             }
             case TRANSITION_NONE: {
-                // Hide the pinned header so the next section, which is
-                // already rising into this slot through the scroller, is
-                // visible underneath. The swap restores visibility.
+                // Keep the pinned header in place at full opacity. The
+                // rising section's header is below the slot in the
+                // scroller and stays hidden behind the pinned host until
+                // the swap, which is instant — that is the "no
+                // transition" semantic. Hiding the host here would
+                // expose scroller content (e.g. the previous section's
+                // last entry) where the slot used to be.
                 stickyHost.setY(stickyHostBaseY);
                 stickyHost.getAllStyles().setOpacity(255);
-                stickyHost.setVisible(false);
+                stickyHost.setVisible(true);
                 break;
             }
             case TRANSITION_FADE: {
+                // Combined slide-and-fade so the rising header is
+                // visibly filling the slot from below while the pinned
+                // header dissolves on its way out. With a fade-only
+                // implementation the user sees the slot become empty as
+                // the pinned header alpha drops, since the rising
+                // header is still well below the slot top.
                 int alpha = 255;
                 if (activeH > 0) {
                     alpha = 255 - (pushOffset * 255) / activeH;
@@ -456,7 +523,7 @@ public class StickyHeaderContainer extends Container {
                         alpha = 255;
                     }
                 }
-                stickyHost.setY(stickyHostBaseY);
+                stickyHost.setY(stickyHostBaseY - pushOffset);
                 stickyHost.getAllStyles().setOpacity(alpha);
                 stickyHost.setVisible(true);
                 break;
