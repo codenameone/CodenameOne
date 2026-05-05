@@ -289,14 +289,35 @@ void CN1MetalFillRect(int color, int alpha, int x, int y, int width, int height)
 // The standard fix is to offset the line's endpoints by half a pixel so
 // the line passes through the pixel-centre of a single row. The GL ES2
 // DrawLine / DrawRect ops already do this (DrawLine.m:122, DrawRect.m:122).
-// Without this, drawRect's many concentric 1-px outlines (the
-// graphics-draw-rect test) blurred together into a solid block instead
-// of the visible per-iteration stripes the GL render shows.
+//
+// One catch: `MTLPrimitiveTypeLine` clips at the viewport boundary, and
+// pushing endpoints to `(coord + 0.5)` shoves a line that ends at the
+// viewport's right/bottom edge (pixel coord == viewport size) just
+// outside the [-1, 1] NDC range. For DrawLine that's used inside
+// graphics tests like TileImage's source bitmap (a 20x20 mutable image
+// drawn with `drawLine(0, 0, 20, 20)` and `drawLine(20, 0, 0, 20)`),
+// pushing the (20, 20) endpoint to (20.5, 20.5) makes the GPU clip the
+// line entirely, leaving the resulting tile a solid colour with no X
+// at all. Snap each endpoint independently: only nudge to a pixel
+// centre when doing so would not push it past the viewport, otherwise
+// pull back from the boundary by 0.5 to keep the line inside.
+//
+// DrawRect doesn't need that guard -- its end vertex is `x + width`,
+// which is always one pixel past the rect's last drawn pixel, so
+// `+ 0.5` lands inside the visible viewport for any valid rect (and
+// rect's right/bottom-edge lines are *supposed* to be flush against
+// the viewport edge in their natural use case).
+static inline float lineCoord(int v, int extent) {
+    if (extent > 0 && v >= extent) return (float)v - 0.5f;
+    return (float)v + 0.5f;
+}
 void CN1MetalDrawLine(int color, int alpha, int x1, int y1, int x2, int y2) {
     simd_float4 colorV = premultipliedColor(color, alpha);
+    int fbW = currentFramebufferWidth;
+    int fbH = currentFramebufferHeight;
     float vertices[4] = {
-        (float)x1 + 0.5f, (float)y1 + 0.5f,
-        (float)x2 + 0.5f, (float)y2 + 0.5f
+        lineCoord(x1, fbW), lineCoord(y1, fbH),
+        lineCoord(x2, fbW), lineCoord(y2, fbH)
     };
     drawSolidPrimitive(MTLPrimitiveTypeLine, vertices, 2, colorV);
 }
