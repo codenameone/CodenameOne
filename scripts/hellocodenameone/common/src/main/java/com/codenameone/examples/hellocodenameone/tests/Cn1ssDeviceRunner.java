@@ -84,6 +84,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new StickyHeaderSlideTransitionScreenshotTest(),
             new StickyHeaderFadeTransitionScreenshotTest(),
             new TensileBounceScreenshotTest(),
+            new StatusBarTapDiagnosticScreenshotTest(),
             new ComponentReplaceFadeScreenshotTest(),
             new ComponentReplaceSlideScreenshotTest(),
             new ComponentReplaceFlipScreenshotTest(),
@@ -274,6 +275,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 || "StickyHeaderSlideTransitionScreenshotTest".equals(testName)
                 || "StickyHeaderFadeTransitionScreenshotTest".equals(testName)
                 || "TensileBounceScreenshotTest".equals(testName)
+                || "StatusBarTapDiagnosticScreenshotTest".equals(testName)
                 || "ComponentReplaceFadeScreenshotTest".equals(testName)
                 || "ComponentReplaceSlideScreenshotTest".equals(testName)
                 || "ComponentReplaceFlipScreenshotTest".equals(testName)

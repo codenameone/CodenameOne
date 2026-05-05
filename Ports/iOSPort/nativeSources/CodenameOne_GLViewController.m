@@ -239,6 +239,26 @@ BOOL cn1IsStatusBarTapProxyInstalled() {
     return cn1StatusBarTapProxy != nil && cn1StatusBarTapProxy.superview != nil;
 }
 
+// Fires the same diagnostic-counter bump and synthesized pointer event the
+// scrollViewShouldScrollToTop: delegate dispatches. Exposed so an
+// instrumented native interface can drive the path from a screenshot test
+// without waiting for a real status-bar tap.
+void cn1FireStatusBarTap() {
+    int xArray[1];
+    int yArray[1];
+    xArray[0] = displayWidth / 2;
+    yArray[0] = 0;
+    cn1StatusBarTapCount++;
+    cn1StatusBarTapLastEpochMillis = [[NSDate date] timeIntervalSince1970] * 1000.0;
+    cn1StatusBarTapLastX = xArray[0];
+    cn1StatusBarTapLastY = yArray[0];
+    pointerPressedC(xArray, yArray, 1);
+    pointerReleasedC(xArray, yArray, 1);
+    if (cn1StatusBarTapProxy != nil) {
+        cn1StatusBarTapProxy.contentOffset = CGPointMake(0, 1);
+    }
+}
+
 
 // 1 for portrait lock, and 2 for landscape lock
 int orientationLock = 0;
@@ -2041,17 +2061,7 @@ static CodenameOne_GLViewController *sharedSingleton;
 
 - (BOOL)scrollViewShouldScrollToTop:(UIScrollView *)scrollView {
     if (scrollView == cn1StatusBarTapProxy) {
-        int xArray[1];
-        int yArray[1];
-        xArray[0] = displayWidth / 2;
-        yArray[0] = 0;
-        cn1StatusBarTapCount++;
-        cn1StatusBarTapLastEpochMillis = [[NSDate date] timeIntervalSince1970] * 1000.0;
-        cn1StatusBarTapLastX = xArray[0];
-        cn1StatusBarTapLastY = yArray[0];
-        pointerPressedC(xArray, yArray, 1);
-        pointerReleasedC(xArray, yArray, 1);
-        cn1StatusBarTapProxy.contentOffset = CGPointMake(0, 1);
+        cn1FireStatusBarTap();
         return NO;
     }
     return YES;
