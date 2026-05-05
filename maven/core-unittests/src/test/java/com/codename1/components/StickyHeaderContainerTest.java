@@ -203,21 +203,27 @@ class StickyHeaderContainerTest extends UITestBase {
     }
 
     @FormTest
-    void noneStyleHidesStickyHostDuringOverlap() {
+    void noneStyleKeepsStickyHostInPlaceDuringOverlap() {
         StickyHeaderContainer sticky = build(3);
         sticky.setTransitionStyle(StickyHeaderContainer.TRANSITION_NONE);
 
         sticky.setScrollPosition(100);
         sticky.updateSticky();
+        int baseY = sticky.getStickyHost().getY();
         assertTrue(sticky.getStickyHost().isVisible(),
                 "host stays visible when there is no overlap");
 
-        // Inside the push window: NONE hides the host so the rising
-        // section header in the scroller is what the user sees.
+        // Inside the push window: NONE keeps the host pinned in place
+        // and fully opaque so the rising section in the scroller below
+        // does not bleed through where the slot used to be.
         sticky.setScrollPosition(SECTION_STRIDE - HEADER_HEIGHT + 20);
         sticky.updateSticky();
-        assertFalse(sticky.getStickyHost().isVisible(),
-                "NONE must hide the host so the rising header covers the slot");
+        assertTrue(sticky.getStickyHost().isVisible(),
+                "NONE must keep the host visible during the overlap");
+        assertEquals(baseY, sticky.getStickyHost().getY(),
+                "NONE must not shift the host while overlapping");
+        assertEquals(255, sticky.getStickyHost().getStyle().getOpacity(),
+                "NONE keeps the host fully opaque");
 
         // Past the boundary: new section is pinned, host shows again.
         sticky.setScrollPosition(SECTION_STRIDE + 10);
@@ -228,28 +234,65 @@ class StickyHeaderContainerTest extends UITestBase {
     }
 
     @FormTest
-    void fadeStyleReducesStickyHostOpacityWithPush() {
+    void fadeStyleSlidesAndFadesStickyHostWithPush() {
         StickyHeaderContainer sticky = build(3);
         sticky.setTransitionStyle(StickyHeaderContainer.TRANSITION_FADE);
 
         sticky.setScrollPosition(100);
         sticky.updateSticky();
+        int baseY = sticky.getStickyHost().getY();
         assertEquals(255, sticky.getStickyHost().getStyle().getOpacity(),
                 "fully opaque outside the push window");
 
         sticky.setScrollPosition(SECTION_STRIDE - HEADER_HEIGHT + 25);
         sticky.updateSticky();
-        // pushOffset = 25 of 50 → alpha = 255 - 25*255/50 = 127 (or 128 by rounding)
+        // pushOffset = 25 of 50 → host slides up by 25 AND alpha = 127
+        // (or 128 by rounding). The combined slide+fade gives the rising
+        // header room to rise into the slot from below while the pinned
+        // header dissolves out the top.
         int alpha = sticky.getStickyHost().getStyle().getOpacity();
         assertTrue(alpha > 100 && alpha < 160,
                 "fade alpha should be roughly half-way through, was " + alpha);
+        assertEquals(baseY - 25, sticky.getStickyHost().getY(),
+                "FADE must shift the host up by the push offset");
         assertTrue(sticky.getStickyHost().isVisible());
 
-        // After the swap: full opacity again on the new header.
+        // After the swap: full opacity again on the new header,
+        // host returns to the base Y.
         sticky.setScrollPosition(SECTION_STRIDE + 10);
         sticky.updateSticky();
         assertEquals(1, sticky.getActiveSectionIndex());
         assertEquals(255, sticky.getStickyHost().getStyle().getOpacity());
+        assertEquals(baseY, sticky.getStickyHost().getY());
+    }
+
+    @FormTest
+    void shortReverseScrollDoesNotFlipActiveSection() {
+        // 4 sections so that scrollDimension > viewport height + the
+        // boundary positions used below; otherwise non-tensile scrollers
+        // clamp scrollY into a range that hides this hysteresis window.
+        StickyHeaderContainer sticky = build(4);
+
+        sticky.setScrollPosition(SECTION_STRIDE + 5);
+        sticky.updateSticky();
+        assertEquals(1, sticky.getActiveSectionIndex());
+
+        // Tiny reverse bounce of 1 pixel past the boundary — well
+        // inside the hysteresis window — must not deactivate section 1.
+        // Without hysteresis an inertial bounce here would teleport the
+        // pinned header back into the scroller and re-pin it on the
+        // next forward bounce, producing a visible jitter.
+        sticky.setScrollPosition(SECTION_STRIDE - 1);
+        sticky.updateSticky();
+        assertEquals(1, sticky.getActiveSectionIndex(),
+                "small inertial bounces must not flip the active section");
+
+        // A larger reverse scroll past the hysteresis window does
+        // deactivate as before.
+        sticky.setScrollPosition(SECTION_STRIDE - 20);
+        sticky.updateSticky();
+        assertEquals(0, sticky.getActiveSectionIndex(),
+                "scrolling well back past the boundary deactivates");
     }
 
     @FormTest
