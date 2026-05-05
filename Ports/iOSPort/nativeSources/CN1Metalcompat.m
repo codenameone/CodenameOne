@@ -282,21 +282,35 @@ void CN1MetalFillRect(int color, int alpha, int x, int y, int width, int height)
     drawQuad(CN1MetalPipelineSolidColor, vertices, NULL, colorV, nil);
 }
 
+// GPU line rasterisation snaps each line to the pixel grid: a horizontal
+// line at integer y straddles the boundary between row y-1 and row y, so
+// hardware antialiasing splits the coverage between two rows at half
+// intensity each -- the line ends up looking 2 px wide and washed out.
+// The standard fix is to offset the line's endpoints by half a pixel so
+// the line passes through the pixel-centre of a single row. The GL ES2
+// DrawLine / DrawRect ops already do this (DrawLine.m:122, DrawRect.m:122).
+// Without this, drawRect's many concentric 1-px outlines (the
+// graphics-draw-rect test) blurred together into a solid block instead
+// of the visible per-iteration stripes the GL render shows.
 void CN1MetalDrawLine(int color, int alpha, int x1, int y1, int x2, int y2) {
     simd_float4 colorV = premultipliedColor(color, alpha);
-    float vertices[4] = { (float)x1, (float)y1, (float)x2, (float)y2 };
+    float vertices[4] = {
+        (float)x1 + 0.5f, (float)y1 + 0.5f,
+        (float)x2 + 0.5f, (float)y2 + 0.5f
+    };
     drawSolidPrimitive(MTLPrimitiveTypeLine, vertices, 2, colorV);
 }
 
 void CN1MetalDrawRect(int color, int alpha, int x, int y, int width, int height) {
     simd_float4 colorV = premultipliedColor(color, alpha);
-    // Closed rectangle outline as a 5-vertex line strip.
+    // Closed rectangle outline as a 5-vertex line strip. +0.5 on every
+    // vertex for the same pixel-centre reason as CN1MetalDrawLine.
     float vertices[10] = {
-        (float)x,         (float)y,
-        (float)(x+width), (float)y,
-        (float)(x+width), (float)(y+height),
-        (float)x,         (float)(y+height),
-        (float)x,         (float)y
+        (float)x         + 0.5f, (float)y          + 0.5f,
+        (float)(x+width) + 0.5f, (float)y          + 0.5f,
+        (float)(x+width) + 0.5f, (float)(y+height) + 0.5f,
+        (float)x         + 0.5f, (float)(y+height) + 0.5f,
+        (float)x         + 0.5f, (float)y          + 0.5f
     };
     drawSolidPrimitive(MTLPrimitiveTypeLineStrip, vertices, 5, colorV);
 }
