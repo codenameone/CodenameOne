@@ -4914,32 +4914,51 @@ public class IOSImplementation extends CodenameOneImplementation {
                 p.closePath();
                 return p;
             }
-            // joinPath=true on each arc so the corners connect to the
-            // adjacent line segments via lineTo instead of starting a new
-            // sub-path. With joinPath=false (the prior code) each arc was
-            // an independent moveTo'd sub-path, and Renderer.c rendered the
-            // whole thing as 4 disconnected pacman pieces.
+            // Trace the round-rect outline as a single closed sub-path going
+            // CW in screen coords (Y-down): top edge -> top-right corner ->
+            // right edge -> bottom-right corner -> bottom edge -> bottom-left
+            // corner -> left edge -> top-left corner -> close.
             //
-            // Skip the lineTos when their endpoints would coincide with the
-            // arc's join target (pill case: rx == width/2 collapses the top
-            // and bottom edges; ry == height/2 collapses the left and right
-            // edges). Emitting a zero-length lineTo into the path leaves a
-            // phantom edge that Renderer.c's winding pass interprets as a
-            // tear, which is what made the Switch pill render with a
-            // triangular wedge cut into it.
+            // Each corner arc starts where the previous edge ended and ends
+            // where the next edge begins, so every joinPath=true draws a
+            // zero-length connector. cn1's GeneralPath.arc internally negates
+            // the angles (math-Y-up convention -> screen-Y-down via
+            // -startAngle / -sweepAngle in addToPath), and getPointAtAngle
+            // uses cy + b*sin(theta), which means a user-facing angle of
+            // +pi/2 evaluates to (cx, cy - b) in screen coords (top of bbox)
+            // and 0 evaluates to (cx + a, cy) (right). Sweep -pi/2 traces a
+            // single quadrant CW visually. Concretely:
+            //   top-right    : start +pi/2 (top),    sweep -pi/2 -> right
+            //   bottom-right : start  0    (right),  sweep -pi/2 -> bottom
+            //   bottom-left  : start -pi/2 (bottom), sweep -pi/2 -> left
+            //   top-left     : start +pi   (left),   sweep -pi/2 -> top
+            // The previous version used sweep +pi/2 with the opposite start
+            // angles, which produced an arc traversing the *opposite*
+            // quadrant of the corner bbox. For pills (where adjacent corner
+            // bboxes overlap because h-2ry == 0) the resulting path looped
+            // back through the bbox interior and Renderer.c's winding-fill
+            // pass interpreted that as a tear -- visible as the Switch
+            // track's right-half collapsing into a triangular wedge.
+            //
+            // Skip the inter-corner lineTos when their endpoints would
+            // coincide with the next arc's join target (pill case: rx ==
+            // width/2 collapses the top/bottom edges; ry == height/2
+            // collapses the left/right edges). Emitting a zero-length lineTo
+            // would leave a phantom edge that the winding pass also reads
+            // as a tear.
             boolean hasTopBottomEdges = rx < width / 2f;
             boolean hasLeftRightEdges = ry < height / 2f;
             float twoRx = 2f * rx;
             float twoRy = 2f * ry;
             p.moveTo(x + rx, y);
             if (hasTopBottomEdges) p.lineTo(x + width - rx, y);
-            p.arc(x + width - twoRx, y,                  twoRx, twoRy, -Math.PI / 2, Math.PI / 2, true);
+            p.arc(x + width - twoRx, y,                  twoRx, twoRy,  Math.PI / 2, -Math.PI / 2, true);
             if (hasLeftRightEdges) p.lineTo(x + width, y + height - ry);
-            p.arc(x + width - twoRx, y + height - twoRy, twoRx, twoRy, 0,            Math.PI / 2, true);
+            p.arc(x + width - twoRx, y + height - twoRy, twoRx, twoRy,  0,           -Math.PI / 2, true);
             if (hasTopBottomEdges) p.lineTo(x + rx, y + height);
-            p.arc(x,                 y + height - twoRy, twoRx, twoRy, Math.PI / 2,  Math.PI / 2, true);
+            p.arc(x,                 y + height - twoRy, twoRx, twoRy, -Math.PI / 2, -Math.PI / 2, true);
             if (hasLeftRightEdges) p.lineTo(x, y + ry);
-            p.arc(x,                 y,                  twoRx, twoRy, Math.PI,      Math.PI / 2, true);
+            p.arc(x,                 y,                  twoRx, twoRy,  Math.PI,     -Math.PI / 2, true);
             p.closePath();
             return p;
         }
@@ -5475,24 +5494,24 @@ public class IOSImplementation extends CodenameOneImplementation {
                 p.closePath();
                 return p;
             }
-            // joinPath=true on each arc so corners connect to adjacent line
-            // segments via lineTo (single sub-path); skip lineTos that
-            // would have zero length (pill / circle cases). See
-            // MutableGraphics.roundRectPath for the rendering bug this
-            // avoids.
+            // CW screen-coord traversal with sweep=-pi/2 per corner -- see
+            // MutableGraphics.roundRectPath above for the angle-convention
+            // analysis and why sweep=+pi/2 (the prior code) traced the
+            // opposite quadrant of each corner bbox and produced a
+            // triangular tear on pills.
             boolean hasTopBottomEdges = rx < width / 2f;
             boolean hasLeftRightEdges = ry < height / 2f;
             float twoRx = 2f * rx;
             float twoRy = 2f * ry;
             p.moveTo(x + rx, y);
             if (hasTopBottomEdges) p.lineTo(x + width - rx, y);
-            p.arc(x + width - twoRx, y,                  twoRx, twoRy, -Math.PI / 2, Math.PI / 2, true);
+            p.arc(x + width - twoRx, y,                  twoRx, twoRy,  Math.PI / 2, -Math.PI / 2, true);
             if (hasLeftRightEdges) p.lineTo(x + width, y + height - ry);
-            p.arc(x + width - twoRx, y + height - twoRy, twoRx, twoRy, 0,            Math.PI / 2, true);
+            p.arc(x + width - twoRx, y + height - twoRy, twoRx, twoRy,  0,           -Math.PI / 2, true);
             if (hasTopBottomEdges) p.lineTo(x + rx, y + height);
-            p.arc(x,                 y + height - twoRy, twoRx, twoRy, Math.PI / 2,  Math.PI / 2, true);
+            p.arc(x,                 y + height - twoRy, twoRx, twoRy, -Math.PI / 2, -Math.PI / 2, true);
             if (hasLeftRightEdges) p.lineTo(x, y + ry);
-            p.arc(x,                 y,                  twoRx, twoRy, Math.PI,      Math.PI / 2, true);
+            p.arc(x,                 y,                  twoRx, twoRy,  Math.PI,     -Math.PI / 2, true);
             p.closePath();
             return p;
         }
