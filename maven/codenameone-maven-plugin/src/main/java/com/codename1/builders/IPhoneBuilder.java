@@ -2807,7 +2807,14 @@ public class IPhoneBuilder extends Executor {
         // resulting partial Info.plist already contains the correct
         // CFBundleIcons entries, so we deliberately do not inject any
         // CFBundleAlternateIcons fragment here. Doing so would conflict with
-        // actool's output during the Info.plist merge.
+        // actool's output during the Info.plist merge. We do, however, need
+        // to inject CFBundleIconName -- without it actool will not emit the
+        // partial Info.plist containing CFBundleIcons / CFBundleAlternateIcons,
+        // and -[UIApplication setAlternateIconName:] would then fail at runtime
+        // because the bundle does not advertise the alternate icons.
+        if (!localizedIcons.isEmpty() && !inject.contains("CFBundleIconName")) {
+            inject += "\n<key>CFBundleIconName</key>\n<string>AppIcon</string>";
+        }
         String locationUsageDescription = null;
         if (xcodeVersion >= 9) {
             if ( (locationUsageDescription = request.getArg("ios.locationUsageDescription", null)) != null ){
