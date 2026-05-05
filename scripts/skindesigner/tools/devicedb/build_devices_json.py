@@ -331,6 +331,20 @@ def merge(existing: list[dict], fresh: list[dict]) -> list[dict]:
     return list(by_id.values())
 
 
+def _devices_changed(existing: list[dict], merged: list[dict]) -> bool:
+    """True iff the device records (ignoring order) actually differ."""
+    if len(existing) != len(merged):
+        return True
+    old_by_id = {r["id"]: r for r in existing}
+    new_by_id = {r["id"]: r for r in merged}
+    if old_by_id.keys() != new_by_id.keys():
+        return True
+    for k, old in old_by_id.items():
+        if old != new_by_id[k]:
+            return True
+    return False
+
+
 def load_existing(path: str) -> list[dict]:
     if not os.path.exists(path):
         return []
@@ -342,62 +356,15 @@ def load_existing(path: str) -> list[dict]:
         return []
 
 
-RE_LATEST_LINK = re.compile(
-    r'<a href="([a-z0-9_()]+-\d+\.php)"[^>]*>\s*<img[^>]*alt="([^"]+)"[^>]*>\s*</a>',
-    re.I,
-)
-
-
-def walk_latest(*, max_pages: int = 1, delay: float = 1.0) -> Iterable[tuple[str, str, str]]:
-    """Yields (phone_url, brand, model) from latest-mobiles.php3.
-
-    The "latest" page lists newly-added devices across every brand. It's the
-    cheapest source of fresh data — one or two listing pages cover the last
-    few weeks of releases.
-    """
-    seen_pages: set[str] = set()
-    queue: list[str] = ["latest-mobiles.php3"]
-    pages_fetched = 0
-    while queue and pages_fetched < max_pages:
-        page = queue.pop(0)
-        if page in seen_pages:
-            continue
-        seen_pages.add(page)
-        pages_fetched += 1
-        try:
-            html = http_get(BASE + page, delay=delay)
-        except RuntimeError as err:
-            sys.stderr.write(f"  ! latest page {page} failed: {err}\n")
-            continue
-        for m in RE_LATEST_LINK.finditer(html):
-            phone_url = m.group(1)
-            if phone_url.endswith("-review.php"):
-                continue
-            alt = unescape(m.group(2)).strip()
-            # alt is "<Brand> <Model>"; split on first space to recover.
-            parts = alt.split(" ", 1)
-            brand = parts[0] if parts else "Unknown"
-            model = parts[1] if len(parts) > 1 else alt
-            yield phone_url, brand, model
-        # Pagination: latest-mobiles-pN.php
-        for m in RE_NAV_PAGE.finditer(html):
-            np = m.group(1)
-            if np.startswith("latest-mobiles") and np not in seen_pages:
-                queue.append(np)
-
-
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                   formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--mode", choices=("brands", "latest"), default="brands",
-                     help="brands = walk per-brand listings (large/slow); "
-                          "latest = scrape recent additions only (fast/trickle)")
     ap.add_argument("--brands", default=",".join(DEFAULT_BRANDS),
                      help="Comma-separated brand slugs (no .php). Use --full to walk all brands instead.")
     ap.add_argument("--full", action="store_true",
-                     help="Discover and walk every brand on makers.php3 (only with --mode brands)")
+                     help="Discover and walk every brand on makers.php3")
     ap.add_argument("--max-pages", type=int, default=10,
-                     help="Cap on listing pages walked per brand (or per latest run)")
+                     help="Cap on listing pages walked per brand")
     ap.add_argument("--min-year", type=int, default=2014,
                      help="Drop devices announced before this year")
     ap.add_argument("--delay", type=float, default=1.0,
@@ -415,11 +382,25 @@ def main() -> int:
     seen: set[str] = set()
     total_phones = 0
 
-    if args.mode == "latest":
-        sys.stderr.write(f"Trickle-scraping latest-mobiles "
-                          f"(max-pages={args.max_pages}, limit={args.limit or 'none'}, "
-                          f"delay={args.delay}s)…\n")
-        for url, brand, model in walk_latest(max_pages=args.max_pages, delay=args.delay):
+    if args.full:
+        sys.stderr.write("Discovering all brands…\n")
+        all_brands = discover_brands()
+        target = [(s, l) for s, l in all_brands if s.endswith(tuple(f"-{i}" for i in range(1000)))]
+        if not target:
+            target = all_brands
+    else:
+        slugs = [b.strip() for b in args.brands.split(",") if b.strip()]
+        try:
+            label_map = dict(discover_brands())
+        except Exception:
+            label_map = {}
+        target = [(s, brand_label_from_slug(s, label_map)) for s in slugs]
+
+    sys.stderr.write(f"Scraping {len(target)} brand(s) at {args.delay}s/request…\n")
+
+    for slug, label in target:
+        sys.stderr.write(f"\n=== {label} [{slug}] ===\n")
+        for url, model in walk_brand(slug, max_pages=args.max_pages, delay=args.delay):
             if url in seen:
                 continue
             seen.add(url)
@@ -429,60 +410,33 @@ def main() -> int:
                 sys.stderr.write(f"  ! skip {url}: {err}\n")
                 continue
             specs = parse_phone_page(html)
-            rec = normalise(brand, model, specs)
+            rec = normalise(label, model, specs)
             if rec is not None and rec["year"] >= args.min_year:
                 fresh.append(rec)
                 total_phones += 1
                 if args.limit and total_phones >= args.limit:
                     sys.stderr.write(f"  · hit --limit {args.limit}, stopping\n")
                     break
-    else:
-        if args.full:
-            sys.stderr.write("Discovering all brands…\n")
-            all_brands = discover_brands()
-            target = [(s, l) for s, l in all_brands if s.endswith(tuple(f"-{i}" for i in range(1000)))]
-            if not target:
-                target = all_brands
-        else:
-            slugs = [b.strip() for b in args.brands.split(",") if b.strip()]
-            try:
-                label_map = dict(discover_brands())
-            except Exception:
-                label_map = {}
-            target = [(s, brand_label_from_slug(s, label_map)) for s in slugs]
-
-        sys.stderr.write(f"Scraping {len(target)} brand(s) at {args.delay}s/request…\n")
-
-        for slug, label in target:
-            sys.stderr.write(f"\n=== {label} [{slug}] ===\n")
-            for url, model in walk_brand(slug, max_pages=args.max_pages, delay=args.delay):
-                if url in seen:
-                    continue
-                seen.add(url)
-                try:
-                    html = http_get(BASE + url, delay=args.delay, use_cache=use_cache)
-                except RuntimeError as err:
-                    sys.stderr.write(f"  ! skip {url}: {err}\n")
-                    continue
-                specs = parse_phone_page(html)
-                rec = normalise(label, model, specs)
-                if rec is not None and rec["year"] >= args.min_year:
-                    fresh.append(rec)
-                    total_phones += 1
-                    if args.limit and total_phones >= args.limit:
-                        sys.stderr.write(f"  · hit --limit {args.limit}, stopping\n")
-                        break
-            if args.limit and total_phones >= args.limit:
-                break
+        if args.limit and total_phones >= args.limit:
+            break
 
     merged = merge(existing, fresh)
     merged.sort(key=lambda r: (-(r["year"] or 0), r["brand"].lower(), r["name"].lower()))
+
+    # Don't rewrite the file when no device record actually changed. The
+    # envelope (version/generator/source) shifting is not a reason to spam
+    # PRs; only real device-data changes warrant a commit.
+    if not _devices_changed(existing, merged):
+        sys.stderr.write(
+            f"\nNo device records changed ({len(fresh)} scraped, "
+            f"{len(merged)} total); leaving {args.out} untouched.\n"
+        )
+        return 0
 
     payload = {
         "version": 2,
         "generator": "build_devices_json.py",
         "source": BASE,
-        "fresh_count": len(fresh),
         "count": len(merged),
         "devices": merged,
     }

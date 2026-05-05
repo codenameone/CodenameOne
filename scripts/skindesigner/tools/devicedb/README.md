@@ -82,11 +82,11 @@ curated list misses a brand someone needs):
 
 ## Refreshing in CI
 
-`.github/workflows/skin-designer-devices-update.yml` runs the scraper on the
-1st of each month and opens an automated PR if the JSON drifted. The HTML
-cache is persisted across runs via `actions/cache` so the scrape only
-re-fetches phones whose pages changed. Run it manually via the Actions tab
-when you want a fresh dump.
+`.github/workflows/skin-designer-devices-update.yml` runs the scraper every
+Monday at 03:00 UTC and opens an automated PR only when device records
+actually change. The HTML cache is persisted across runs via `actions/cache`
+so scrapes after the first cold run only re-fetch phones whose pages
+changed. Trigger it manually via the Actions tab when you want a fresh dump.
 
 ## Notes / caveats
 

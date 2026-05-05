@@ -1,22 +1,13 @@
 name: Skin Designer Device DB Update
 
-# Runs only on master so it doesn't fire on every PR that touches the script.
-# Each run pulls a small batch of the latest GSMArena entries and merges them
-# into the bundled devices.json. Slow-and-steady avoids the 30+ minute scrapes
-# that risk IP bans and CI cancellation.
+# Walks GSMArena's curated brand listings once a week and merges any new
+# phones/tablets into the bundled devices.json. The HTML cache is persisted
+# across runs so re-fetches are limited to pages that actually changed.
 on:
   schedule:
-    # Every 6 hours. Each run only scrapes the "latest mobiles" page, so we
-    # accumulate fresh devices without ever doing a multi-thousand-page crawl.
-    - cron: '0 */6 * * *'
+    # Mondays at 03:00 UTC. Weekly is plenty — phones don't release that fast.
+    - cron: '0 3 * * 1'
   workflow_dispatch:
-    inputs:
-      mode:
-        description: "trickle (~50 latest) or full (all curated brands)"
-        required: false
-        default: "trickle"
-        type: choice
-        options: [trickle, full]
 
 permissions:
   actions: write
@@ -28,7 +19,9 @@ jobs:
     # Only run on the canonical repo's master, never on forks or feature branches.
     if: github.repository == 'codenameone/CodenameOne' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # Cold runs (empty cache) can take 30–60 min to walk the curated brands;
+    # warm runs are typically a few minutes.
+    timeout-minutes: 75
 
     steps:
       - name: Check out repository
@@ -47,17 +40,10 @@ jobs:
           restore-keys: |
             skin-designer-devicedb-cache-
 
-      - name: Trickle scrape (~50 latest)
-        if: github.event_name == 'schedule' || github.event.inputs.mode == 'trickle' || github.event.inputs.mode == ''
+      - name: Scrape curated brands
         run: |
           python3 scripts/skindesigner/tools/devicedb/build_devices_json.py \
-            --mode latest --limit 50 --delay 2.0 --max-pages 1
-
-      - name: Full scrape (all curated brands)
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'full'
-        run: |
-          python3 scripts/skindesigner/tools/devicedb/build_devices_json.py \
-            --mode brands --delay 2.0 --max-pages 12
+            --delay 2.0 --max-pages 12
 
       - name: Bail out if nothing changed
         id: diff
@@ -79,8 +65,8 @@ jobs:
           body: |
             ## Summary
             - Regenerates `scripts/skindesigner/common/src/main/resources/devices.json`
-              by scraping a small batch of the latest devices from GSMArena and
-              merging into the existing catalog.
+              by walking the curated GSMArena brand pages and merging new
+              entries into the existing catalog.
 
             Created automatically by the Skin Designer device DB workflow.
           base: master
