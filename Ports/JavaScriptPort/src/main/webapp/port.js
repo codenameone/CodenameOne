@@ -4485,16 +4485,39 @@ const initImplOriginal = (function() {
          typeof global[initImplMethodId + "__impl"] === "function" ? global[initImplMethodId + "__impl"] : null;
 })();
 
+// The mangler rewrites class-specific names (``cn1_<class>_initImpl_*``) and
+// dispatch-id names (``cn1_s_initImpl_*``) to *different* short symbols.
+// Class methods maps key on the dispatch-id form, so binding only the
+// class-specific form (which is what bindCiFallback's name list would
+// normally carry) leaves resolveVirtual finding the original translated
+// $aJ4 in cls.methods first and never consulting the override stashed
+// under nativeMethods[$aJ4]. Include both forms so installVirtualOverride
+// patches the dispatch-id slot as well.
 bindCiFallback("CodenameOneImplementation.initImplSafe", [
   initImplMethodId,
-  initImplMethodId + "__impl"
+  initImplMethodId + "__impl",
+  "cn1_s_initImpl_java_lang_Object",
+  "cn1_s_initImpl_java_lang_Object__impl"
 ], function*(__cn1ThisObject, m) {
   if (typeof initImplOriginal === "function") {
     try {
       return yield* cn1_ivAdapt(initImplOriginal(__cn1ThisObject, m));
     } catch (err) {
       const message = String(err && err.message ? err.message : err || "");
-      if (message.indexOf("__classDef") >= 0 || message.indexOf("lastIndexOf") >= 0 || message.indexOf("substring") >= 0) {
+      // Translated Java exceptions arrive as plain JS objects with __class
+      // set to the (mangled) Java class name. ``String(err)`` yields
+      // ``[object Object]`` for those, so the message-substring check below
+      // would silently rethrow real AIOOBE/NPE/StringIndexOOB cases coming
+      // out of m.getClass().getName().substring(0, lastIndexOf('.')) — the
+      // exact recovery path this shim is for. Recognise them by class so the
+      // recovery still kicks in on Safari/WebKit (where the translator
+      // peephole strips the source-side defensive clamps in initImpl).
+      const cls = err && err.__class ? String(err.__class) : "";
+      const isJavaIndexEx = cls.indexOf("ArrayIndexOutOfBounds") >= 0
+              || cls.indexOf("StringIndexOutOfBounds") >= 0
+              || cls.indexOf("NullPointer") >= 0;
+      if (message.indexOf("__classDef") >= 0 || message.indexOf("lastIndexOf") >= 0
+              || message.indexOf("substring") >= 0 || isJavaIndexEx) {
         emitCiFallbackMarker("CodenameOneImplementation.initImplSafe.recover", "HIT");
         // The original initImpl calls init(m) first, then m.getClass().getName().
         // If we land here, init(m) already succeeded – only the getClass/getName
