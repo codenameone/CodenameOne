@@ -498,7 +498,7 @@ public class StickyHeaderContainer extends Container {
                 // Keep the pinned header in place at full opacity. The
                 // rising section's header is below the slot in the
                 // scroller and stays hidden behind the pinned host until
-                // the swap, which is instant — that is the "no
+                // the swap, which is instant -- that is the "no
                 // transition" semantic. Hiding the host here would
                 // expose scroller content (e.g. the previous section's
                 // last entry) where the slot used to be.
