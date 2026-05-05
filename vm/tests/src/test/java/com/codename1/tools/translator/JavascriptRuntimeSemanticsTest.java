@@ -296,6 +296,24 @@ class JavascriptRuntimeSemanticsTest {
 
     @ParameterizedTest
     @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void preservesF2IInvokeReceiverInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsF2IInvokeReceiverApp.java", "JsF2IInvokeReceiverApp");
+
+        // (int) 7.9f = 7. setMaskedValue stores (7 ^ 0x5A) = 0x5D. marker
+        // = 0x33; final result = 0x5D ^ 0x33 = 0x6E = 110. If Rule 9b
+        // collapsed the receiver/arg pushes incorrectly because the
+        // f2i ``stack.q() | 0`` arg expression slipped past its
+        // balanced-parens EXPR pattern, dispatch would land on the
+        // float wrapper and throw VIRTUAL_FAIL or write the wrong field.
+        assertEquals(110, result.result,
+                "Translated invokevirtual with an F2I-coerced arg must keep the receiver in slot 0 — "
+                        + "not get swapped with the coerced int by the peephole. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
     void preservesIteratorCoordinateCopyWithHardcodedSegmentCountsInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
         WorkerRunResult result = translateAndRunFixture(config, "JsIteratorCoordinateCopyApp.java", "JsIteratorCoordinateCopyApp");
 

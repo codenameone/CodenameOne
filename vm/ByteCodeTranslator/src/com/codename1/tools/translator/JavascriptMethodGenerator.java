@@ -957,16 +957,27 @@ final class JavascriptMethodGenerator {
             // push still requires the simple identifier/bracket shape
             // so the rewrite stays safe. 2-level nested calls (e.g.
             // ``yield* $fn(stack.q())``) stay on the slow path.
+            //
+            // The negative lookahead ``(?!stack\.q\()`` rejects EXPR
+            // shapes that include a stack pop (``stack.q()|0`` from
+            // F2I/I2B/I2C/I2S/L2I/D2I etc.). Such pops consume the
+            // FIRST push, so the rule's invariant — that the call
+            // block's outer ``stack.q()`` will pop the second push —
+            // no longer holds, and inlining would emit the receiver
+            // and arg in swapped slots. (Reproduced as
+            // setBgTransparency((int) f) → "Missing virtual method on
+            // float" in Toolbar.show*SidemenuImpl.)
             s = s.replaceAll(
-                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(((?:[^;{}()]|\\([^()]*\\))+)\\);?\\s*\\{ let __arg0 = stack\\.q\\(\\); stack\\.p\\(yield\\* cn1_iv1\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0\\)\\); (pc = \\d+; break;) \\}",
+                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(((?:(?!stack\\.q\\()[^;{}()]|\\([^()]*\\))+)\\);?\\s*\\{ let __arg0 = stack\\.q\\(\\); stack\\.p\\(yield\\* cn1_iv1\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0\\)\\); (pc = \\d+; break;) \\}",
                     "stack.p(yield* cn1_iv1($1, \"$3\", $2)); $4");
             // Rule 9: same as Rule 8 but for void return.
             s = s.replaceAll(
                     "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{ let __arg0 = stack\\.q\\(\\); yield\\* cn1_iv1\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0\\); (pc = \\d+; break;) \\}",
                     "yield* cn1_iv1($1, \"$3\", $2); $4");
             // Rule 9b: extended arg — balanced-parens variant of Rule 9.
+            // See Rule 8b for the ``(?!stack\.q\()`` lookahead rationale.
             s = s.replaceAll(
-                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(((?:[^;{}()]|\\([^()]*\\))+)\\);?\\s*\\{ let __arg0 = stack\\.q\\(\\); yield\\* cn1_iv1\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0\\); (pc = \\d+; break;) \\}",
+                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(((?:(?!stack\\.q\\()[^;{}()]|\\([^()]*\\))+)\\);?\\s*\\{ let __arg0 = stack\\.q\\(\\); yield\\* cn1_iv1\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0\\); (pc = \\d+; break;) \\}",
                     "yield* cn1_iv1($1, \"$3\", $2); $4");
             // Rule 10: 2-arg virtual with target + two args all pushed.
             //   stack.p(T); stack.p(A0); stack.p(A1);
@@ -976,8 +987,9 @@ final class JavascriptMethodGenerator {
                     "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*stack\\.p\\(([^;(){},]+)\\);?\\s*\\{ let __arg1 = stack\\.q\\(\\); let __arg0 = stack\\.q\\(\\); stack\\.p\\(yield\\* cn1_iv2\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0, __arg1\\)\\); (pc = \\d+; break;) \\}",
                     "stack.p(yield* cn1_iv2($1, \"$4\", $2, $3)); $5");
             // Rule 10c: 2-arg virtual with balanced-parens args.
+            // See Rule 8b for the ``(?!stack\.q\()`` lookahead rationale.
             s = s.replaceAll(
-                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(((?:[^;{}()]|\\([^()]*\\))+)\\);?\\s*stack\\.p\\(((?:[^;{}()]|\\([^()]*\\))+)\\);?\\s*\\{ let __arg1 = stack\\.q\\(\\); let __arg0 = stack\\.q\\(\\); stack\\.p\\(yield\\* cn1_iv2\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0, __arg1\\)\\); (pc = \\d+; break;) \\}",
+                    "stack\\.p\\(([a-zA-Z_\\$][\\w\\$]*(?:\\[\\d+\\])*(?:\\[\"[\\w\\$]+\"\\])*)\\);?\\s*stack\\.p\\(((?:(?!stack\\.q\\()[^;{}()]|\\([^()]*\\))+)\\);?\\s*stack\\.p\\(((?:(?!stack\\.q\\()[^;{}()]|\\([^()]*\\))+)\\);?\\s*\\{ let __arg1 = stack\\.q\\(\\); let __arg0 = stack\\.q\\(\\); stack\\.p\\(yield\\* cn1_iv2\\(stack\\.q\\(\\), \"([^\"]+)\", __arg0, __arg1\\)\\); (pc = \\d+; break;) \\}",
                     "stack.p(yield* cn1_iv2($1, \"$4\", $2, $3)); $5");
             // Rule 11: 0-arg INVOKESPECIAL with inline target.
             //   stack.p(T); stack.p(yield* $ctor(stack.q())); pc = N; break;
