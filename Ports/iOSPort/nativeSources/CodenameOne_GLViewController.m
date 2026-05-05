@@ -221,6 +221,24 @@ BOOL forceSlideUpField;
 
 static CN1StatusBarTapProxyView *cn1StatusBarTapProxy = nil;
 
+// Diagnostic counters for the status-bar tap-to-scroll-to-top path. Exposed
+// to Java via Display.getProperty("cn1.iosStatusBarTap.*") so users can
+// confirm whether iOS actually delivered the scroll-to-top message and
+// what coordinates were synthesized into CodenameOne. Useful when the
+// gesture appears to do nothing on a device but works in the simulator.
+static int cn1StatusBarTapCount = 0;
+static double cn1StatusBarTapLastEpochMillis = 0;
+static int cn1StatusBarTapLastX = -1;
+static int cn1StatusBarTapLastY = -1;
+
+int cn1GetStatusBarTapCount() { return cn1StatusBarTapCount; }
+double cn1GetStatusBarTapLastEpochMillis() { return cn1StatusBarTapLastEpochMillis; }
+int cn1GetStatusBarTapLastX() { return cn1StatusBarTapLastX; }
+int cn1GetStatusBarTapLastY() { return cn1StatusBarTapLastY; }
+BOOL cn1IsStatusBarTapProxyInstalled() {
+    return cn1StatusBarTapProxy != nil && cn1StatusBarTapProxy.superview != nil;
+}
+
 
 // 1 for portrait lock, and 2 for landscape lock
 int orientationLock = 0;
@@ -2027,6 +2045,10 @@ static CodenameOne_GLViewController *sharedSingleton;
         int yArray[1];
         xArray[0] = displayWidth / 2;
         yArray[0] = 0;
+        cn1StatusBarTapCount++;
+        cn1StatusBarTapLastEpochMillis = [[NSDate date] timeIntervalSince1970] * 1000.0;
+        cn1StatusBarTapLastX = xArray[0];
+        cn1StatusBarTapLastY = yArray[0];
         pointerPressedC(xArray, yArray, 1);
         pointerReleasedC(xArray, yArray, 1);
         cn1StatusBarTapProxy.contentOffset = CGPointMake(0, 1);
