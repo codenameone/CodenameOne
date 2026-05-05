@@ -1734,6 +1734,24 @@
       hostBridge.invoke(data.symbol, data.args || [], target || global.__parparWorker, data.id);
       return;
     }
+    if (data.type === 'host-call-batch') {
+      // Batched fire-and-forget JSO bridge ops. The worker emits these
+      // at end-of-drain to amortise structured-clone postMessage cost
+      // across all canvas/DOM setters or void method calls in a paint
+      // burst. Each op carries its own ``__cn1_no_response`` flag, so
+      // hostBridge.invoke skips the postHostCallback path naturally.
+      var ops = data.ops || [];
+      for (var oi = 0; oi < ops.length; oi++) {
+        try {
+          hostBridge.invoke('__cn1_jso_bridge__', [ops[oi]], target || global.__parparWorker, 0);
+        } catch (e) {
+          if (global.console && typeof global.console.error === 'function') {
+            global.console.error('host-call-batch op[' + oi + '] failed: ' + (e && e.message || e));
+          }
+        }
+      }
+      return;
+    }
     if (data.type === 'result') {
       global.__parparResult = data;
       global.cn1Started = true;

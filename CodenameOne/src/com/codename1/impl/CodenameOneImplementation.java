@@ -337,15 +337,30 @@ public abstract class CodenameOneImplementation {
     /// - `m`: the object passed to the Display init method
     public final void initImpl(Object m) {
         init(m);
+        // Defensive: ParparVM JS-port translator's peephole optimiser
+        // strips the ``dotIdx >= 0`` IFLT branch in front of the
+        // ``clsName.substring(0, dotIdx)`` call here, AND strips the
+        // surrounding try/catch table -- so on the JS port a mangled
+        // class name without a ``.`` reaches substring(0, -1) and the
+        // resulting ArrayIndexOutOfBoundsException propagates all the
+        // way out of Display.init, ending the bootstrap. Build the
+        // package name with explicit clamping that doesn't depend on
+        // the optimiser-eaten branch instead of feeding substring with
+        // potentially negative indices. Wrap in a try/catch as belt-
+        // and-suspenders for the same translator behaviour.
         if (m != null) {
-            // Defensive: ParparVM JS port surfaces ArrayIndexOutOfBoundsException
-            // here when getName()/lastIndexOf interact with mangled class names.
-            // Failing the whole boot for a packageName lookup is wrong; fall
-            // back to "" if anything throws.
             try {
                 String clsName = m.getClass().getName();
-                int dotIdx = clsName.lastIndexOf('.');
-                packageName = dotIdx >= 0 ? clsName.substring(0, dotIdx) : "";
+                int dotIdx = clsName == null ? -1 : clsName.lastIndexOf('.');
+                int cap = clsName == null ? 0 : clsName.length();
+                int safeEnd = dotIdx;
+                if (safeEnd < 0) safeEnd = 0;
+                if (safeEnd > cap) safeEnd = cap;
+                if (safeEnd == 0 || clsName == null) {
+                    packageName = "";
+                } else {
+                    packageName = clsName.substring(0, safeEnd);
+                }
             } catch (Throwable t) {
                 packageName = "";
             }

@@ -34,6 +34,7 @@ const VM_PROTOCOL = Object.freeze({
     UI_EVENT: "ui-event",
     TIMER_WAKE: "timer-wake",
     HOST_CALL: "host-call",
+    HOST_CALL_BATCH: "host-call-batch",
     HOST_CALLBACK: "host-callback",
     PROTOCOL_INFO: "protocol-info",
     PROTOCOL: "protocol",
@@ -580,6 +581,17 @@ const jvm = {
   // chain and recursively producing more canvas ops.
   atomicThread: null,
   pendingHostCalls: Object.create(null),
+  // Batched fire-and-forget JSO bridge ops. Every canvas/DOM setter or
+  // void method call inside a paint frame produces a HOST_CALL that
+  // doesn't expect a reply. Instead of posting them one by one
+  // (hundreds per frame -> hundreds of structured-clone serialisations
+  // and worker->main postMessage trips during boot), we accumulate
+  // them per drain burst and flush as a single ``host-call-batch``
+  // message at the end of drain (or before any round-trip
+  // ``invokeHostNative``, to preserve op ordering on the host side).
+  // The browser bridge unpacks the batch and replays each op in
+  // submission order.
+  pendingFireAndForget: [],
   eventQueue: [],
   mainClass: null,
   mainMethod: null,
@@ -1254,21 +1266,24 @@ const jvm = {
                 || bridge.returnClass == null;
         const isFireAndForget = (bridge.kind === "setter") || (bridge.kind === "method" && isVoid);
         if (isFireAndForget) {
-          emitVmMessage({
-            type: self.protocol.messages.HOST_CALL,
-            id: self.nextHostCallId++,
-            symbol: "__cn1_jso_bridge__",
-            args: self.toHostTransferArg([{
-              receiver: receiver,
-              receiverClass: (receiver && receiver.__cn1HostClass) ? receiver.__cn1HostClass : className,
-              kind: bridge.kind,
-              member: bridge.member,
-              args: transferableArgs,
-              __cn1_no_response: true
-            }])
+          // Batch fire-and-forget ops; ``flushPendingFireAndForget``
+          // sends the whole batch as a single ``host-call-batch``
+          // message either at end-of-drain or right before the next
+          // round-trip ``invokeHostNative``. Order is preserved.
+          self.pendingFireAndForget.push({
+            receiver: receiver,
+            receiverClass: (receiver && receiver.__cn1HostClass) ? receiver.__cn1HostClass : className,
+            kind: bridge.kind,
+            member: bridge.member,
+            args: transferableArgs,
+            __cn1_no_response: true
           });
           return null;
         }
+        // A round-trip is about to fire; the host must see all
+        // previously-queued fire-and-forget ops first to keep
+        // canvas state consistent.
+        self.flushPendingFireAndForget();
         const hostResult = yield self.invokeHostNative("__cn1_jso_bridge__", [{
           receiver: receiver,
           receiverClass: (receiver && receiver.__cn1HostClass) ? receiver.__cn1HostClass : className,
@@ -2072,6 +2087,22 @@ const jvm = {
     this.enqueue(thread);
     return thread;
   },
+  flushPendingFireAndForget() {
+    if (this.pendingFireAndForget.length === 0) return;
+    const batch = this.pendingFireAndForget;
+    this.pendingFireAndForget = [];
+    // toHostTransferArg sanitises each op (resolving JSO wrappers,
+    // wrapping callbacks, etc.) -- still cheaper amortised across
+    // the whole batch than per-op postMessage roundtrips.
+    const safeOps = new Array(batch.length);
+    for (let i = 0; i < batch.length; i++) {
+      safeOps[i] = this.toHostTransferArg(batch[i]);
+    }
+    emitVmMessage({
+      type: this.protocol.messages.HOST_CALL_BATCH || "host-call-batch",
+      ops: safeOps
+    });
+  },
   enqueue(thread, value) {
     thread.waiting = null;
     thread.resumeValue = value;
@@ -2170,6 +2201,10 @@ const jvm = {
     } finally {
       this.currentThread = null;
       this.draining = false;
+      // Drain burst is over -- ship any queued fire-and-forget JSO
+      // ops to the host as a single batch postMessage. Saves
+      // hundreds of structured-clone roundtrips per paint frame.
+      this.flushPendingFireAndForget();
     }
   },
   // Cooperative scheduler bookkeeping: see field comments above.
@@ -2281,6 +2316,10 @@ const jvm = {
       for (let i = 0; i < rawArgs.length; i++) {
         safeArgs[i] = this.toHostTransferArg(rawArgs[i]);
       }
+      // Round-trip HOST_CALL needs prior fire-and-forget batch
+      // delivered first or the host will execute the round-trip
+      // op against an out-of-date canvas state.
+      this.flushPendingFireAndForget();
       emitVmMessage({ type: this.protocol.messages.HOST_CALL, id: yielded.id, symbol: yielded.symbol, args: safeArgs });
       return;
     }
