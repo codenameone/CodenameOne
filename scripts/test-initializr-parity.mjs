@@ -7,8 +7,8 @@ import { chromium } from 'playwright';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const URL_TEAVM = 'https://www.codenameone.com/initializr/';
-const URL_PARPAR = 'https://pr-4795-website-preview.codenameone.pages.dev/initializr/';
+const URL_TEAVM = process.env.URL_TEAVM || 'https://www.codenameone.com/initializr/';
+const URL_PARPAR = process.env.URL_PARPAR || 'https://pr-4795-website-preview.codenameone.pages.dev/initializr/';
 
 async function openSession(label, url) {
   const browser = await chromium.launch();
