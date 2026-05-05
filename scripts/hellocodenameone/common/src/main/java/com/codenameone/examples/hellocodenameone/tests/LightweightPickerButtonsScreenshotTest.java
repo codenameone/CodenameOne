@@ -13,14 +13,20 @@ import java.time.ZoneId;
 import java.util.Date;
 
 /**
- * Captures the lightweight Picker popup with custom buttons in every
- * supported placement / alignment combination. Originally a single
- * baseline shot ({@code LightweightPickerButtons}); extended to a suite
- * after issue #4819 where {@code Component.CENTER} alignment silently
- * left-aligned the buttons. The expanded variants are the regression
- * fence: each placement and each alignment now has its own golden so a
- * future change to the row layout cannot ship without one of the
- * screenshots disagreeing.
+ * Captures the lightweight Picker popup with custom buttons across the
+ * placement and alignment combinations that matter. Originally a single
+ * baseline shot ({@code LightweightPickerButtons}); extended after
+ * issue #4819 where {@code Component.CENTER} alignment silently
+ * left-aligned the buttons.
+ *
+ * The variant count is intentionally trimmed to four: each variant
+ * cycle (popup show, throttled chunk emission, popup dismiss) costs
+ * roughly 5-6s on Android, and {@code Cn1ssDeviceRunner}'s per-test
+ * deadline is 30s on native platforms. The {@code _between_mixed}
+ * shot subsumes isolated LEFT / CENTER / RIGHT BETWEEN_CANCEL_AND_DONE
+ * captures: it lays out all three alignments in the same row with
+ * explicit L / C / R labels, so a regression that re-broke any of
+ * them would visibly collapse one column toward another.
  */
 public class LightweightPickerButtonsScreenshotTest extends BaseTest {
     private Form form;
@@ -63,23 +69,12 @@ public class LightweightPickerButtonsScreenshotTest extends BaseTest {
                         addPlus7(LightweightPopupButtonPlacement.BELOW_SPINNER, Component.LEFT);
                     }
                 }),
-                new Variant("LightweightPickerButtons_between_center", new Runnable() {
-                    @Override
-                    public void run() {
-                        addToday(LightweightPopupButtonPlacement.BETWEEN_CANCEL_AND_DONE, Component.CENTER);
-                    }
-                }),
-                new Variant("LightweightPickerButtons_between_right", new Runnable() {
-                    @Override
-                    public void run() {
-                        addToday(LightweightPopupButtonPlacement.BETWEEN_CANCEL_AND_DONE, Component.RIGHT);
-                    }
-                }),
                 new Variant("LightweightPickerButtons_between_mixed", new Runnable() {
                     @Override
                     public void run() {
-                        // Same placement, three alignments: a regression here
-                        // would visibly collapse one column toward another.
+                        // Same placement, three alignments: covers the bug
+                        // from #4819 (CENTER had been left-aligning) and
+                        // the LEFT / RIGHT siblings in one shot.
                         picker.addLightweightPopupButton("L", null,
                                 LightweightPopupButtonPlacement.BETWEEN_CANCEL_AND_DONE, Component.LEFT);
                         picker.addLightweightPopupButton("C", null,
@@ -131,10 +126,13 @@ public class LightweightPickerButtonsScreenshotTest extends BaseTest {
         picker.setDate(fixedDate);
         variant.configure.run();
         picker.startEditingAsync();
-        // Wait for the popup to slide up and the spinner cells to settle
-        // before grabbing the screenshot. 1000ms matches the Android budget
-        // we use on the original single-shot version of this test.
-        UITimer.timer(1000, false, form, new Runnable() {
+        // Wait for the popup to slide up before screenshotting. Each
+        // variant cycle (wait + chunk-throttled emit + popup dismiss)
+        // costs ~5s on Android, and the per-test deadline in
+        // Cn1ssDeviceRunner is 30s, so this budget can't be padded.
+        // 600ms is generous: the InteractionDialog transition is
+        // <300ms and setDate is applied synchronously above.
+        UITimer.timer(600, false, form, new Runnable() {
             @Override
             public void run() {
                 Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot(variant.imageName, new Runnable() {
