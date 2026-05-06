@@ -103,6 +103,15 @@ def _find_first(page, selectors: list[str], *, timeout: int = 15000):
     raise AdapterError(f"none of the selectors matched: {selectors}: {last_error}")
 
 
+def _trim_for_meta_description(text: str, limit: int = 155) -> str:
+    """Trim a description to Yoast's preferred meta-description length, on a word boundary."""
+    text = (text or "").strip()
+    if len(text) <= limit:
+        return text
+    truncated = text[:limit].rsplit(" ", 1)[0].rstrip(",.;:")
+    return truncated + "…"
+
+
 def _load_base64_storage_state(env_var: str) -> Path:
     """Decode a base64-encoded storage_state JSON from an env var to a temp file."""
     encoded = os.environ[env_var]
@@ -145,6 +154,7 @@ class FoojayAdapter:
     REST_POSTS_ENDPOINT = "https://foojay.io/wp-json/wp/v2/posts"
     REST_TAGS_ENDPOINT = "https://foojay.io/wp-json/wp/v2/tags"
     REST_MEDIA_ENDPOINT = "https://foojay.io/wp-json/wp/v2/media"
+    XMLRPC_ENDPOINT = "https://foojay.io/xmlrpc.php"
 
     # Pre-resolved category and tag IDs (from /wp-json/wp/v2/categories?search=java
     # and /wp-json/wp/v2/tags?slug=codenameone). The tag is created lazily on
@@ -229,11 +239,29 @@ class FoojayAdapter:
         post_id = data.get("id")
         if not post_id:
             raise AdapterError(f"REST response missing post id: {data}")
+
+        # Yoast meta (canonical / SEO title / metadesc) is not REST-writable on
+        # foojay's Yoast install. wp-admin form-submit is blocked by Cloudflare.
+        # XML-RPC's wp.editPost with custom_fields bypasses both restrictions
+        # and successfully writes the underscore-prefixed meta keys.
+        yoast_set = False
+        try:
+            self._set_yoast_meta_via_xmlrpc(
+                post_id=post_id,
+                canonical=ctx.post.canonical_url,
+                seo_title=ctx.post.title,
+                metadesc=_trim_for_meta_description(excerpt),
+            )
+            yoast_set = True
+        except Exception as err:  # noqa: BLE001 — Yoast meta is best-effort
+            print(f"  [foojay] XML-RPC Yoast meta write failed (non-fatal): {err}", file=sys.stderr)
+
         return {
             "id": post_id,
             "url": f"https://foojay.io/wp-admin/post.php?post={post_id}&action=edit",
             "preview_url": data.get("link"),
             "featured_media_id": featured_media_id,
+            "yoast_meta_set": yoast_set,
             "syndicated_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
         }
 
@@ -267,7 +295,7 @@ class FoojayAdapter:
         import urllib.request as _ur
         # Download bytes
         req = _ur.Request(image_url, headers={"User-Agent": _UA_STR})
-        with _ur.urlopen(req, timeout=60) as resp:
+        with _ur.urlopen(req, timeout=120) as resp:
             image_bytes = resp.read()
             content_type = resp.headers.get("Content-Type", "image/jpeg")
         filename = image_url.rsplit("/", 1)[-1].split("?", 1)[0] or "cover.jpg"
@@ -292,6 +320,65 @@ class FoojayAdapter:
         except Exception:  # noqa: BLE001 — title is cosmetic
             pass
         return media_id
+
+    def _set_yoast_meta_via_xmlrpc(self, post_id: int, canonical: str,
+                                   seo_title: str, metadesc: str) -> None:
+        """Update Yoast SEO post meta via XML-RPC's wp.editPost custom_fields.
+
+        REST silently drops these meta keys (not registered for REST writes)
+        and the wp-admin form-submit path is challenged by Cloudflare.
+        XML-RPC accepts underscore-prefixed meta keys via custom_fields and
+        is not Cloudflare-protected on foojay.
+        """
+        import urllib.error as _ue
+        import urllib.request as _ur
+        import xml.sax.saxutils as _su
+
+        user = os.environ["FOOJAY_USER"]
+        pwd = os.environ["FOOJAY_PASSWORD"]
+
+        def cf_member(key: str, value: str) -> str:
+            return (
+                "<value><struct>"
+                f"<member><name>key</name><value><string>{_su.escape(key)}</string></value></member>"
+                f"<member><name>value</name><value><string>{_su.escape(value)}</string></value></member>"
+                "</struct></value>"
+            )
+
+        custom_fields_xml = "".join([
+            cf_member("_yoast_wpseo_canonical", canonical),
+            cf_member("_yoast_wpseo_title", seo_title),
+            cf_member("_yoast_wpseo_metadesc", metadesc),
+        ])
+        envelope = (
+            '<?xml version="1.0"?>'
+            '<methodCall><methodName>wp.editPost</methodName><params>'
+            "<param><value><int>1</int></value></param>"
+            f"<param><value><string>{_su.escape(user)}</string></value></param>"
+            f"<param><value><string>{_su.escape(pwd)}</string></value></param>"
+            f"<param><value><int>{int(post_id)}</int></value></param>"
+            "<param><value><struct>"
+            f"<member><name>custom_fields</name><value><array><data>{custom_fields_xml}</data></array></value></member>"
+            "</struct></value></param>"
+            "</params></methodCall>"
+        )
+        req = _ur.Request(
+            self.XMLRPC_ENDPOINT,
+            data=envelope.encode("utf-8"),
+            method="POST",
+        )
+        req.add_header("Content-Type", "text/xml")
+        req.add_header("User-Agent", _UA_STR)
+        try:
+            with _ur.urlopen(req, timeout=60) as response:
+                body = response.read().decode("utf-8", errors="replace")
+        except _ue.HTTPError as err:
+            detail = err.read().decode("utf-8", errors="replace")
+            raise RuntimeError(f"xmlrpc HTTP {err.code}: {detail}") from err
+        if "<fault>" in body:
+            raise RuntimeError(f"xmlrpc fault: {body[:500]}")
+        if "<boolean>1</boolean>" not in body:
+            raise RuntimeError(f"xmlrpc unexpected response: {body[:500]}")
 
     def _rest_get(self, url: str, cookie_header: str, nonce: str) -> Any:
         import urllib.request as _ur
