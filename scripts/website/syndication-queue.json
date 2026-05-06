@@ -1,0 +1,4 @@
+{
+  "_comment": "Queue of browser-only syndication tasks consumed by the Codename One Syndicator Firefox extension. The extension polls https://raw.githubusercontent.com/codenameone/CodenameOne/master/scripts/website/syndication-queue.json and processes any task whose id is not already in the user's local 'completed_tasks' list. Tasks are appended by scripts/website/queue_browser_syndication.py which is invoked by the daily blog-syndication workflow.",
+  "tasks": []
+}
