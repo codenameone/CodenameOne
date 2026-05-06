@@ -33,8 +33,8 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Run syndication script
-        id: syndicate
+      - name: Run API syndication script
+        id: syndicate_api
         env:
           DEVTO_API_KEY: ${{ secrets.DEVTO_API_KEY }}
           HASHNODE_TOKEN: ${{ secrets.HASHNODE_TOKEN }}
@@ -46,6 +46,54 @@ jobs:
           else
             python3 scripts/website/syndicate_blog_posts.py
           fi
+
+      - name: Detect browser-syndication credentials
+        id: browser_creds
+        env:
+          FOOJAY_USER: ${{ secrets.FOOJAY_USER }}
+          HACKERNOON_USER: ${{ secrets.HACKERNOON_USER }}
+          DZONE_USER: ${{ secrets.DZONE_USER }}
+          MEDIUM_STORAGE_STATE: ${{ secrets.MEDIUM_STORAGE_STATE }}
+        run: |
+          if [ -n "${FOOJAY_USER}" ] || [ -n "${HACKERNOON_USER}" ] || [ -n "${DZONE_USER}" ] || [ -n "${MEDIUM_STORAGE_STATE}" ]; then
+            echo "any_configured=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "any_configured=false" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Install Playwright dependencies
+        if: ${{ steps.browser_creds.outputs.any_configured == 'true' }}
+        run: |
+          set -euo pipefail
+          pip install playwright
+          playwright install --with-deps chromium
+
+      - name: Run browser syndication script
+        if: ${{ steps.browser_creds.outputs.any_configured == 'true' }}
+        env:
+          FOOJAY_USER: ${{ secrets.FOOJAY_USER }}
+          FOOJAY_PASSWORD: ${{ secrets.FOOJAY_PASSWORD }}
+          HACKERNOON_USER: ${{ secrets.HACKERNOON_USER }}
+          HACKERNOON_PASSWORD: ${{ secrets.HACKERNOON_PASSWORD }}
+          DZONE_USER: ${{ secrets.DZONE_USER }}
+          DZONE_PASSWORD: ${{ secrets.DZONE_PASSWORD }}
+          MEDIUM_STORAGE_STATE: ${{ secrets.MEDIUM_STORAGE_STATE }}
+        run: |
+          set -euo pipefail
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            python3 scripts/website/syndicate_browser_posts.py --dry-run
+          else
+            python3 scripts/website/syndicate_browser_posts.py
+          fi
+
+      - name: Upload syndication screenshots on failure
+        if: ${{ always() && hashFiles('docs/website/reports/syndication-screenshots/**/*.png') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: syndication-screenshots
+          path: docs/website/reports/syndication-screenshots/
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Commit updated syndication state
         if: ${{ inputs.dry_run != true }}
