@@ -1231,6 +1231,18 @@ final class JavascriptMethodGenerator {
         // anything whose textual shape doesn't fit the expected
         // ``case N: { ... }`` block emit.
         s = rewriteStackToRegisters(s);
+        // Strip the wrapping ``{ ... }`` around case bodies that don't
+        // declare any block-scoped binding. The translator always emits
+        // ``case N: { body }`` so it can wrap ``let v = ...; ...`` /
+        // ``let _0 = ...; ...`` sub-blocks for ASTORE and arg-marshalling
+        // sequences without scope leakage. After
+        // ``rewriteStackToRegisters`` collapses S.p/S.q to register
+        // assignments, many cases reduce to ``s<N>=...; pc=M; break;``
+        // -- no ``let`` at the case-body level, so the wrapping block is
+        // pure overhead. esbuild keeps the braces because the body
+        // contains a ``break`` statement which it doesn't recognize as
+        // safe to unwrap. We strip them here.
+        s = stripUnneededCaseBraces(s);
         return s;
     }
 
@@ -5012,6 +5024,164 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             }
         }
         return findActualStaticOwner(ownerClass.getBaseClassObject(), name, desc);
+    }
+
+    /**
+     * Walk the post-rewriter body and strip ``case N: { ... }`` wrapping
+     * braces when the body doesn't declare any block-scoped binding
+     * (``let`` / ``const`` / ``function`` / ``class``). The body becomes
+     * a sequence of statements directly following the case label, which
+     * is legal switch-statement shape in JS.
+     *
+     * Conservative: only strips when the case body has NO ``let``,
+     * ``const``, ``function``, or ``class`` token at any depth. Inner
+     * ``let v = ...`` inside an inner ``{...}`` block is fine for scope
+     * reasons but for safety we keep the wrapping braces if they wrap
+     * any inner declaration that the wrapping was actually keeping out
+     * of the outer switch scope.
+     *
+     * Pre-mangler bodies still have whitespace (multi-line case body),
+     * so we accept either dense (``case N:{...}``) or spaced
+     * (``case N: {\n        ... }\n      ``) forms.
+     */
+    private static String stripUnneededCaseBraces(String body) {
+        // Find each ``case <digits>:`` followed by an optional newline /
+        // whitespace and an opening ``{``. If the matching ``}`` is the
+        // case-body close (followed by another ``case`` / ``default`` /
+        // end-of-switch), and the body has no ``let`` / ``const`` /
+        // ``function`` / ``class`` declaration, drop the braces.
+        StringBuilder out = new StringBuilder(body.length());
+        int i = 0;
+        int len = body.length();
+        while (i < len) {
+            // Skip strings -- preserve verbatim.
+            char ch = body.charAt(i);
+            if (ch == '"' || ch == '\'') {
+                int end = skipStringLiteral(body, i);
+                if (end < 0) {
+                    out.append(body, i, len);
+                    return out.toString();
+                }
+                out.append(body, i, end + 1);
+                i = end + 1;
+                continue;
+            }
+            // Look for ``case `` (not preceded by an identifier char).
+            if (ch == 'c' && body.startsWith("case", i)
+                    && (i == 0 || !isIdentPart(body.charAt(i - 1)))
+                    && i + 4 < len && Character.isWhitespace(body.charAt(i + 4))) {
+                int p = i + 4;
+                while (p < len && Character.isWhitespace(body.charAt(p))) {
+                    p++;
+                }
+                int numStart = p;
+                while (p < len && Character.isDigit(body.charAt(p))) {
+                    p++;
+                }
+                if (p == numStart) {
+                    out.append(ch);
+                    i++;
+                    continue;
+                }
+                while (p < len && Character.isWhitespace(body.charAt(p))) {
+                    p++;
+                }
+                if (p >= len || body.charAt(p) != ':') {
+                    out.append(ch);
+                    i++;
+                    continue;
+                }
+                // We have ``case <digits> :``. Look for the body's ``{``.
+                int afterColon = p + 1;
+                int q = afterColon;
+                while (q < len && Character.isWhitespace(body.charAt(q))) {
+                    q++;
+                }
+                if (q >= len || body.charAt(q) != '{') {
+                    // Bare label -- emit verbatim.
+                    out.append(body, i, afterColon);
+                    i = afterColon;
+                    continue;
+                }
+                int closeBrace = matchBrace(body, q);
+                if (closeBrace < 0) {
+                    out.append(body, i, afterColon);
+                    i = afterColon;
+                    continue;
+                }
+                String caseBody = body.substring(q + 1, closeBrace);
+                if (caseBodyHasBlockDeclaration(caseBody)) {
+                    out.append(body, i, closeBrace + 1);
+                    i = closeBrace + 1;
+                    continue;
+                }
+                // Strip the wrapping ``{`` and ``}``. Emit
+                // ``case <N>:`` then the inner body.
+                out.append(body, i, afterColon);
+                out.append(' ');
+                out.append(caseBody);
+                i = closeBrace + 1;
+                continue;
+            }
+            out.append(ch);
+            i++;
+        }
+        return out.toString();
+    }
+
+    /**
+     * Scan the case body text for a top-level ``let`` / ``const`` /
+     * ``function`` / ``class`` token. ``let`` inside an inner ``{...}``
+     * block doesn't disqualify the outer braces — JS scope already
+     * isolates it via the inner block.
+     */
+    private static boolean caseBodyHasBlockDeclaration(String body) {
+        int braceDepth = 0;
+        int parenDepth = 0;
+        int bracketDepth = 0;
+        int len = body.length();
+        for (int i = 0; i < len; i++) {
+            char c = body.charAt(i);
+            if (c == '"' || c == '\'') {
+                int end = skipStringLiteral(body, i);
+                if (end < 0) {
+                    return true;
+                }
+                i = end;
+                continue;
+            }
+            if (c == '{') { braceDepth++; continue; }
+            if (c == '}') { braceDepth--; continue; }
+            if (c == '(') { parenDepth++; continue; }
+            if (c == ')') { parenDepth--; continue; }
+            if (c == '[') { bracketDepth++; continue; }
+            if (c == ']') { bracketDepth--; continue; }
+            if (braceDepth != 0 || parenDepth != 0 || bracketDepth != 0) {
+                continue;
+            }
+            // Top-level only: check for declaration keywords.
+            if (c == 'l' && body.startsWith("let", i)
+                    && (i == 0 || !isIdentPart(body.charAt(i - 1)))
+                    && i + 3 < len && !isIdentPart(body.charAt(i + 3))) {
+                return true;
+            }
+            if (c == 'c' && body.startsWith("const", i)
+                    && (i == 0 || !isIdentPart(body.charAt(i - 1)))
+                    && i + 5 < len && !isIdentPart(body.charAt(i + 5))) {
+                return true;
+            }
+            if (c == 'c' && body.startsWith("class", i)
+                    && (i == 0 || !isIdentPart(body.charAt(i - 1)))
+                    && i + 5 < len && !isIdentPart(body.charAt(i + 5))) {
+                return true;
+            }
+            if (c == 'f' && body.startsWith("function", i)
+                    && (i == 0 || !isIdentPart(body.charAt(i - 1)))
+                    && i + 8 < len && !isIdentPart(body.charAt(i + 8))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     // -----------------------------------------------------------------
