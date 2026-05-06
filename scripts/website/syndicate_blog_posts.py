@@ -40,11 +40,17 @@ ELIGIBILITY_FLOOR = dt.date(2026, 4, 30)  # posts must be strictly newer than th
 MIN_AGE_DAYS = 7
 
 CN1_BLURB = (
-    "> **What is Codename One?** Codename One is an open-source framework for "
-    "building native iOS, Android, desktop, and web apps from a single Java "
-    "or Kotlin codebase. Learn more at "
-    "[codenameone.com](https://www.codenameone.com/)."
+    '<aside style="border-left: 4px solid #007aff; background: #f6f8fa; '
+    'padding: 14px 18px; margin: 24px 0; border-radius: 4px; font-size: 0.95em;">'
+    "<strong>What is Codename One?</strong> Codename One is an open-source "
+    "framework for building native iOS, Android, desktop, and web apps from a "
+    "single Java or Kotlin codebase. Learn more at "
+    '<a href="https://www.codenameone.com/">codenameone.com</a>.</aside>'
 )
+
+# Hugo-only tail blocks that should not be syndicated.
+_HUGO_FOOTER_RE = re.compile(r"\n\s*---\s*\n+##\s*Discussion\b.*\Z", re.DOTALL | re.IGNORECASE)
+_HUGO_SHORTCODE_RE = re.compile(r"\{\{<[^>]*>\}\}|\{\{%[^%]*%\}\}")
 
 DEVTO_TAGS = ["java", "mobile", "android", "ios"]
 HASHNODE_TAGS = [
@@ -254,6 +260,8 @@ def insert_blurb(body: str, blurb: str) -> str:
 
 def render_syndicated_body(post: Post) -> str:
     body = post.body.strip("\n")
+    body = _HUGO_FOOTER_RE.sub("", body)
+    body = _HUGO_SHORTCODE_RE.sub("", body).rstrip()
     body = absolutize_links(body)
     body = insert_blurb(body, CN1_BLURB)
     return body
