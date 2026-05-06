@@ -73,7 +73,16 @@ public class NetworkConnection implements JavaScriptNetworkAdapter.Connection {
         if (!isOpen){
             isOpen = true;
             req.open(httpMethod, url, false);
-            req.overrideMimeType("text/plain; charset=x-user-defined");
+            // ``responseType = "arraybuffer"`` lets the browser hand back
+            // a typed-array view of the bytes directly. The previous
+            // ``overrideMimeType("text/plain; charset=x-user-defined")``
+            // path forced ``toResponseBytes`` to fall through to a
+            // per-character ``out.set(i, ...)`` loop -- one JSO bridge
+            // call per response byte, dominating any non-trivial HTTP
+            // response on the worker. ``toResponseBytes`` already takes
+            // the fast arraybuffer path when ``getResponse()`` is set;
+            // this just makes that branch the actual hot path.
+            req.setResponseType("arraybuffer");
         }
     }
 
