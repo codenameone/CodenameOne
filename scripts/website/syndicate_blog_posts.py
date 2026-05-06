@@ -310,9 +310,17 @@ def publish_to_devto(post: Post, body_markdown: str, api_key: str, draft: bool =
         headers={"api-key": api_key, "Accept": "application/vnd.forem.api-v1+json"},
         payload=payload,
     )
+    article_id = response.get("id")
+    # The URL field on dev.to returns the public canonical URL of the article,
+    # but for unpublished drafts that URL 404s for anyone who is not the author.
+    # In draft mode point users at the dashboard, where the draft is editable.
+    if draft and article_id:
+        url = f"https://dev.to/dashboard/{article_id}/edit"
+    else:
+        url = response.get("url") or response.get("canonical_url")
     return {
-        "id": response.get("id"),
-        "url": response.get("url") or response.get("canonical_url"),
+        "id": article_id,
+        "url": url,
         "syndicated_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
     }
 

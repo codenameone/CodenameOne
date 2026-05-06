@@ -54,10 +54,12 @@ SITE_PROFILES: dict[str, dict] = {
     "dzone": {
         "signin_url": "https://dzone.com/users/login.html",
         "cookie_host_glob": "%dzone.com",
-        # DZone uses JSESSIONID for the auth session; a signed-in session also
-        # has the SPRING_SECURITY_REMEMBER_ME_COOKIE on long-lived logins.
+        # DZone uses Spring Security's `remember-me` cookie for long-lived auth
+        # plus a per-session `dz<hash>` cookie. Either one signals a logged-in
+        # session.
         "is_logged_in": lambda cookies: any(
-            c.get("name") in ("JSESSIONID", "SPRING_SECURITY_REMEMBER_ME_COOKIE")
+            c.get("name") == "remember-me" or (c.get("name") or "").startswith("dz")
+            and (c.get("name") or "") not in ("dzuuid",)  # dzuuid is anonymous
             for c in cookies
         ),
     },
@@ -137,12 +139,27 @@ def _firefox_storage_state(cookies_db: Path, host_glob: str) -> dict:
             "value": value,
             "domain": host if host.startswith(".") else "." + host,
             "path": path or "/",
-            "expires": float(expiry) if expiry else -1.0,
+            "expires": _normalize_expiry(expiry),
             "httpOnly": bool(is_http_only),
             "secure": bool(is_secure),
             "sameSite": samesite_map.get(int(same_site or 0), "None"),
         })
     return {"cookies": cookies, "origins": []}
+
+
+def _normalize_expiry(raw: float | int | None) -> float:
+    """Coerce a Firefox cookies.sqlite expiry into a Playwright-acceptable value.
+
+    Playwright wants seconds-since-epoch (positive number) or -1 for session.
+    Firefox stores `expiry` in seconds in older code but in milliseconds in
+    newer entries. Anything past ~year 5138 must be milliseconds — divide.
+    """
+    if not raw:
+        return -1.0
+    value = float(raw)
+    if value > 1e11:  # > ~year 5138 in seconds; treat as milliseconds.
+        value = value / 1000.0
+    return value
 
 
 def main(argv: list[str]) -> int:

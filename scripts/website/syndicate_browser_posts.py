@@ -103,7 +103,11 @@ def _find_first(page, selectors: list[str], *, timeout: int = 15000):
     raise AdapterError(f"none of the selectors matched: {selectors}: {last_error}")
 
 
-def _trim_for_meta_description(text: str, limit: int = 155) -> str:
+def _escape_html(text: str) -> str:
+    return (text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
+
+
+def _trim_for_meta_description(text: str, limit: int = 140) -> str:
     """Trim a description to Yoast's preferred meta-description length, on a word boundary."""
     text = (text or "").strip()
     if len(text) <= limit:
@@ -435,7 +439,11 @@ class HackerNoonAdapter:
     TITLE_SELECTORS = ["textarea[name='title'][placeholder='Title']"]
     DESCRIPTION_SELECTORS = ["textarea[placeholder*='brief description' i]"]
     BODY_QUILL_SELECTORS = ["div.ql-editor[contenteditable='true']"]
-    SUBMIT_FOR_REVIEW_SELECTORS = ["button:has-text('Submit Story for Review')"]
+    # Save creates a draft. Submit Story for Review! sends to editorial and
+    # only enables once additional fields (image, categories, tags) are set —
+    # the syndication script intentionally targets Save so the draft lands
+    # for the user to review, refine, then submit for editorial publish.
+    SAVE_DRAFT_SELECTORS = ["button:text-is('Save')"]
 
     @staticmethod
     def is_configured() -> bool:
@@ -474,12 +482,14 @@ class HackerNoonAdapter:
         raise AdapterError("hackernoon login: hasAuthCookie not set within 30s")
 
     def submit_draft(self, page, ctx: AdapterContext) -> dict[str, Any]:
-        page.goto(self.NEW_DRAFT_URL, wait_until="domcontentloaded", timeout=45000)
-        page.wait_for_timeout(3000)
-        _find_first(page, self.START_DRAFT_SELECTORS).click()
+        page.goto(self.NEW_DRAFT_URL, wait_until="networkidle", timeout=60000)
+        # SPA needs additional time after networkidle to hydrate the buttons.
+        start_locator = page.locator(self.START_DRAFT_SELECTORS[0]).first
+        start_locator.wait_for(state="visible", timeout=30000)
+        start_locator.click()
         # Lands on app.hackernoon.com/articles/new — Quill needs a moment to mount.
         page.wait_for_url("**/articles/**", timeout=30000)
-        page.wait_for_timeout(4000)
+        page.wait_for_timeout(5000)
 
         title_field = page.locator(self.TITLE_SELECTORS[0])
         title_field.wait_for(state="visible", timeout=15000)
@@ -519,8 +529,13 @@ class HackerNoonAdapter:
             shot = _save_screenshot(page, ctx.post.slug, "hackernoon-editor")
             return {"validated": True, "screenshot": str(shot)}
 
-        _find_first(page, self.SUBMIT_FOR_REVIEW_SELECTORS).click()
-        page.wait_for_load_state("networkidle", timeout=30000)
+        # Two "Save" buttons exist — one in the article toolbar (no class)
+        # and one in some side panel (class="btn"). The first visible one in
+        # the toolbar is the one we want.
+        page.locator(self.SAVE_DRAFT_SELECTORS[0]).first.click()
+        # Save returns to the editor with a saved-draft toast; the URL gains
+        # a /draftId/<slug> segment.
+        page.wait_for_timeout(5000)
         return {
             "url": page.url,
             "syndicated_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
@@ -528,39 +543,24 @@ class HackerNoonAdapter:
 
 
 class DZoneAdapter:
-    """DZone — AngularJS login form gated by invisible reCAPTCHA.
+    """DZone — AngularJS login form gated by invisible reCAPTCHA, body editor
+    is Froala. Uses storage-state auth (DZONE_STORAGE_STATE) since password
+    login can't pass reCAPTCHA from headless Playwright.
 
-    Password-based login does not work from Playwright: DZone's doLogin()
-    requires a reCAPTCHA token (visible in scope.credentials.recaptchaToken)
-    that Google's invisible reCAPTCHA does not issue to headless browsers.
-    The auth request is never sent and login fails silently.
-
-    Use the storage-state path: export your logged-in DZone session from
-    a real browser and pass it as DZONE_STORAGE_STATE (base64-encoded JSON,
-    same shape as MEDIUM_STORAGE_STATE — generate it with
-    scripts/website/export_medium_storage.py --from-firefox-profile after
-    swapping the cookie host filter).
-
-    Selectors below for the article editor have NOT been validated against
-    the live site.
+    Live editor URL: /content/article/post.html (the create-form). The Save
+    Draft button is enabled once title + body have content.
     """
 
     name = "dzone"
-    EDITOR_URL = "https://dzone.com/articles/new"
+    EDITOR_URL = "https://dzone.com/content/article/post.html"
 
-    TITLE_SELECTORS = ["input[name='title']", "input#title"]
-    BODY_IFRAME_SELECTORS = ["iframe.tox-edit-area__iframe", "iframe[id$='_ifr']"]
-    CANONICAL_SELECTORS = [
-        "input[name='originalUrl']",
-        "input[name='canonicalUrl']",
-        "input[placeholder*='canonical' i]",
-        "input[placeholder*='original' i]",
-    ]
-    SAVE_DRAFT_SELECTORS = [
-        "button:has-text('Save Draft')",
-        "button:has-text('Save as draft')",
-        "button[name='saveDraft']",
-    ]
+    TITLE_SELECTORS = ["textarea[name='title'][placeholder='Enter Title Here']"]
+    SUBTITLE_SELECTORS = ["textarea[name='subtitle']"]
+    META_DESCRIPTION_SELECTORS = ["#meta-description-textarea"]
+    # Froala renders the editable area as a contenteditable div with class
+    # `fr-element`. Clicking puts the cursor in the body so keystrokes land.
+    BODY_FROALA_SELECTORS = ["div.fr-element[contenteditable='true']"]
+    SAVE_DRAFT_SELECTORS = ["button:has-text('Save draft')"]
 
     @staticmethod
     def is_configured() -> bool:
@@ -569,37 +569,72 @@ class DZoneAdapter:
     def login(self, page) -> None:
         # Storage state is loaded into the browser context up-front; nothing
         # to do here. If the cookies have expired the editor page will bounce
-        # back to login and the editor selectors will time out — at which
-        # point the user needs to refresh DZONE_STORAGE_STATE.
+        # back to login — at which point the user needs to refresh
+        # DZONE_STORAGE_STATE via export_storage_state.py.
         return
 
     def submit_draft(self, page, ctx: AdapterContext) -> dict[str, Any]:
-        page.goto(self.EDITOR_URL, wait_until="domcontentloaded")
-        _find_first(page, self.TITLE_SELECTORS).fill(ctx.post.title)
+        page.goto(self.EDITOR_URL, wait_until="domcontentloaded", timeout=60000)
+        page.wait_for_timeout(5000)
 
-        # TinyMCE body lives inside an iframe.
-        iframe_handle = _find_first(page, self.BODY_IFRAME_SELECTORS)
-        frame = iframe_handle.content_frame()
-        if frame is None:
-            raise AdapterError("could not access TinyMCE iframe content frame")
-        frame.locator("body").click()
-        # Paste raw markdown as text — DZone's editor accepts it but renders
-        # it as plain text. Editor reviewer will tidy before publishing.
-        page.evaluate("text => navigator.clipboard.writeText(text)", ctx.body_markdown)
-        frame.locator("body").press("Meta+V" if sys.platform == "darwin" else "Control+V")
+        title = page.locator(self.TITLE_SELECTORS[0])
+        title.wait_for(state="visible", timeout=20000)
+        title.click()
+        title.press_sequentially(ctx.post.title, delay=5)
 
-        try:
-            field = _find_first(page, self.CANONICAL_SELECTORS, timeout=3000)
-            field.fill(ctx.post.canonical_url)
-        except AdapterError:
-            pass
+        # Subtitle / TL;DR — use the post's description if present.
+        description = str(ctx.post.front_matter.get("description") or "").strip()
+        if description:
+            try:
+                sub = page.locator(self.SUBTITLE_SELECTORS[0])
+                sub.wait_for(state="visible", timeout=5000)
+                sub.click()
+                sub.press_sequentially(description[:300], delay=5)
+            except Exception:  # noqa: BLE001
+                pass
+            try:
+                meta = page.locator(self.META_DESCRIPTION_SELECTORS[0])
+                meta.wait_for(state="visible", timeout=5000)
+                meta.click()
+                meta.press_sequentially(description[:155], delay=5)
+            except Exception:  # noqa: BLE001
+                pass
+
+        # Body — Froala rich-text editor. Use Froala's JS API to set HTML
+        # directly; clipboard paste into the contenteditable is unreliable
+        # (Froala's paste handler often discards or transforms the input).
+        body_with_canonical = (
+            f"<p><em>Originally published at <a href=\"{ctx.post.canonical_url}\">"
+            f"{ctx.post.canonical_url}</a></em></p>\n\n"
+            f"<pre>{_escape_html(ctx.body_markdown)}</pre>"
+        )
+        body = page.locator(self.BODY_FROALA_SELECTORS[0]).first
+        body.wait_for(state="visible", timeout=15000)
+        body.click()
+        result = page.evaluate(
+            """(html) => {
+              const fr = document.querySelector("div.fr-element[contenteditable='true']");
+              if (window.FroalaEditor && window.FroalaEditor.INSTANCES && window.FroalaEditor.INSTANCES.length) {
+                const inst = window.FroalaEditor.INSTANCES[0];
+                inst.html.set(html);
+                if (inst.events && inst.events.trigger) inst.events.trigger('contentChanged');
+                return {via: 'froala-api', length: inst.html.get().length};
+              }
+              if (fr) { fr.innerHTML = html; fr.dispatchEvent(new Event('input', {bubbles: true})); return {via: 'fallback', length: fr.innerHTML.length}; }
+              return {via: 'none'};
+            }""",
+            body_with_canonical,
+        )
+        if result.get("via") == "none":
+            raise AdapterError("could not access Froala editor instance")
+        page.wait_for_timeout(2000)
 
         if ctx.validate_only:
             shot = _save_screenshot(page, ctx.post.slug, "dzone-editor")
             return {"validated": True, "screenshot": str(shot)}
 
-        _find_first(page, self.SAVE_DRAFT_SELECTORS).click()
-        page.wait_for_load_state("networkidle", timeout=20000)
+        page.locator(self.SAVE_DRAFT_SELECTORS[0]).first.click()
+        page.wait_for_timeout(5000)
         return {
             "url": page.url,
             "syndicated_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
@@ -624,16 +659,10 @@ class MediumAdapter:
     name = "medium"
     EDITOR_URL = "https://medium.com/new-story"
 
-    TITLE_SELECTORS = [
-        "h3[data-default-value*='Title' i]",
-        "[data-default-value*='Title' i]",
-        "h3.graf--title",
-    ]
-    BODY_SELECTORS = [
-        "[data-default-value*='your story' i]",
-        "p[data-default-value*='Tell your story' i]",
-        ".section-content [contenteditable='true']",
-    ]
+    # Medium's editor is a single contenteditable div with placeholder
+    # "Title\nTell your story…" — first line typed becomes the H3 title,
+    # everything after is body. Auto-saves a few seconds after typing pauses.
+    EDITOR_SELECTOR = "div.postArticle-content[contenteditable='true']"
     SETTINGS_BUTTON_SELECTORS = [
         "button:has-text('Story settings')",
         "button[aria-label*='settings' i]",
@@ -641,10 +670,6 @@ class MediumAdapter:
     CANONICAL_FIELD_SELECTORS = [
         "input[placeholder*='canonical' i]",
         "input[placeholder*='URL of original' i]",
-    ]
-    SAVE_AS_DRAFT_SELECTORS = [
-        # Medium auto-saves drafts; an explicit Save Draft action isn't
-        # always necessary, but the keyboard shortcut Cmd/Ctrl+S works.
     ]
 
     @staticmethod
@@ -660,30 +685,33 @@ class MediumAdapter:
         return
 
     def submit_draft(self, page, ctx: AdapterContext) -> dict[str, Any]:
-        page.goto(self.EDITOR_URL, wait_until="domcontentloaded")
-        _find_first(page, self.TITLE_SELECTORS).fill(ctx.post.title)
-        body_field = _find_first(page, self.BODY_SELECTORS)
-        body_field.click()
-        page.evaluate("text => navigator.clipboard.writeText(text)", ctx.body_markdown)
+        page.goto(self.EDITOR_URL, wait_until="domcontentloaded", timeout=45000)
+        page.wait_for_timeout(5000)
+        editor = page.locator(self.EDITOR_SELECTOR).first
+        editor.wait_for(state="visible", timeout=20000)
+        editor.click()
+        # Type the title, press Enter to drop into the body section, then
+        # paste the body. Medium auto-saves a few seconds after typing pauses.
+        page.keyboard.type(ctx.post.title, delay=5)
+        page.keyboard.press("Enter")
+        body_with_canonical = (
+            f"Originally published at {ctx.post.canonical_url}\n\n"
+            + ctx.body_markdown
+        )
+        page.evaluate("text => navigator.clipboard.writeText(text)", body_with_canonical)
         page.keyboard.press("Meta+V" if sys.platform == "darwin" else "Control+V")
-
-        # Set canonical via Story settings panel.
-        try:
-            _find_first(page, self.SETTINGS_BUTTON_SELECTORS, timeout=3000).click()
-            field = _find_first(page, self.CANONICAL_FIELD_SELECTORS, timeout=5000)
-            field.fill(ctx.post.canonical_url)
-            # Close the settings panel
-            page.keyboard.press("Escape")
-        except AdapterError:
-            pass
 
         if ctx.validate_only:
             shot = _save_screenshot(page, ctx.post.slug, "medium-editor")
             return {"validated": True, "screenshot": str(shot)}
 
-        # Force-save the draft via keyboard shortcut, then capture the URL.
-        page.keyboard.press("Meta+S" if sys.platform == "darwin" else "Control+S")
-        page.wait_for_timeout(2000)
+        # Wait for Medium's auto-save to kick in. Medium redirects from
+        # /new-story to /p/<draftId>/edit once the first save completes.
+        try:
+            page.wait_for_url("**/p/*/edit", timeout=45000)
+        except Exception:  # noqa: BLE001
+            page.wait_for_timeout(8000)  # fall back to a long wait
+
         return {
             "url": page.url,
             "syndicated_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
