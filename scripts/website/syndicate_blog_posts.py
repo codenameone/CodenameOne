@@ -314,18 +314,16 @@ def publish_to_devto(post: Post, body_markdown: str, api_key: str) -> dict[str, 
 def publish_to_foojay(post: Post, body_markdown: str, user: str, password: str) -> dict[str, Any]:
     """Create a draft post on foojay.io via the WordPress REST API.
 
-    foojay editorial reviews and publishes the draft, so the canonical link is
-    surfaced as a visible note at the top of the post rather than wired into
-    an SEO plugin's meta field (which varies by site configuration).
+    foojay editorial reviews and publishes the draft. foojay runs Yoast SEO,
+    which registers _yoast_wpseo_canonical as a REST-exposed post meta, so we
+    set the canonical there rather than as visible body text.
     """
-    canonical_note = (
-        f"*Originally published on the [Codename One blog]({post.canonical_url}).*\n\n"
-    )
     excerpt = str(post.front_matter.get("description") or "").strip()
     payload: dict[str, Any] = {
         "title": post.title,
-        "content": canonical_note + body_markdown,
+        "content": body_markdown,
         "status": "draft",
+        "meta": {"_yoast_wpseo_canonical": post.canonical_url},
     }
     if excerpt:
         payload["excerpt"] = excerpt[:500]
