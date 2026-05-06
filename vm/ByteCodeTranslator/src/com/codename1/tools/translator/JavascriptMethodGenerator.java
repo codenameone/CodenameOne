@@ -1152,7 +1152,114 @@ final class JavascriptMethodGenerator {
             s = s.replaceAll("S\\.p\\(([^,(){}]+)\\)\\s*[;,]\\s*S\\.p\\(([^,(){}]+)\\)",
                     "S.p($1,$2)");
         } while (!prevS.equals(s));
+        // Replace the locals frame array with named locals.
+        // ``let L = _F(N, T, A1, A2, ...)`` is the switch+pc
+        // prelude; uses are ``L[0]``, ``L[1]``, etc. Each ``L[i]``
+        // is 4 chars; replacing with ``l<i>`` (e.g. ``l3``) saves
+        // ~2 chars per access. Initializr has ~80k accesses, so
+        // ~160 KiB raw savings. The straight-line emission path
+        // already uses named ``l0, l1, ...`` locals, so we're
+        // bringing the switch+pc emit in line with it.
+        s = renameLocalsArrayToNamedLocals(s);
         return s;
+    }
+
+    /**
+     * Find ``let L=_F(N,arg0,arg1,...);`` (or with whitespace)
+     * and convert to named local-variable declarations
+     * ``let l0=arg0,l1=arg1,...,lN-1;``. Then replace every
+     * ``L[i]`` access in the body with ``l<i>``. Per-method --
+     * only fires for methods that emitted the full switch+pc
+     * locals frame; straight-line methods don't have ``_F`` and
+     * already use named locals.
+     */
+    private static String renameLocalsArrayToNamedLocals(String body) {
+        java.util.regex.Pattern letL = java.util.regex.Pattern.compile(
+                "let\\s+L\\s*=\\s*_F\\s*\\(\\s*(\\d+)\\s*((?:,[^,()]+)*)\\s*\\)\\s*;");
+        java.util.regex.Matcher m = letL.matcher(body);
+        if (!m.find()) {
+            return body;
+        }
+        int totalSize;
+        try {
+            totalSize = Integer.parseInt(m.group(1));
+        } catch (NumberFormatException e) {
+            return body;
+        }
+        if (totalSize <= 0 || totalSize > 256) {
+            // Sanity bound: avoid pathological sizes.
+            return body;
+        }
+        // Collect comma-separated args (group(2) starts with leading
+        // comma if present).
+        java.util.List<String> args = new java.util.ArrayList<String>();
+        String tail = m.group(2);
+        if (tail != null && !tail.isEmpty()) {
+            // Skip leading comma, then split on `,` -- args are
+            // captured as ``[^,()]`` so they have no commas/parens.
+            String[] parts = tail.substring(1).split(",");
+            for (String p : parts) {
+                args.add(p.trim());
+            }
+        }
+        // Build the replacement: declarations for slots 0..totalSize-1.
+        StringBuilder repl = new StringBuilder();
+        repl.append("let ");
+        for (int i = 0; i < totalSize; i++) {
+            if (i > 0) {
+                repl.append(",");
+            }
+            repl.append("l").append(i);
+            if (i < args.size()) {
+                repl.append("=").append(args.get(i));
+            }
+        }
+        repl.append(";");
+        // Replace the matched ``let L=_F(...);`` and rewrite L[i] in
+        // the rest of the body. We do NOT touch L[i] inside string
+        // literals; the walker tracks string state to be safe.
+        StringBuilder out = new StringBuilder(body.length());
+        out.append(body, 0, m.start());
+        out.append(repl);
+        int rest = m.end();
+        char inString = 0;
+        for (int i = rest; i < body.length(); ) {
+            char c = body.charAt(i);
+            if (inString != 0) {
+                out.append(c);
+                if (c == '\\' && i + 1 < body.length()) {
+                    out.append(body.charAt(i + 1));
+                    i += 2; continue;
+                }
+                if (c == inString) inString = 0;
+                i++; continue;
+            }
+            if (c == '"' || c == '\'' || c == '`') {
+                out.append(c);
+                inString = c;
+                i++; continue;
+            }
+            // Match ``L[<digits>]`` -- ensure we're not inside a
+            // larger identifier (``XL[0]`` shouldn't be touched,
+            // though that pattern shouldn't occur here).
+            if (c == 'L' && i + 1 < body.length() && body.charAt(i + 1) == '[') {
+                if (i == rest || !isIdentPart(body.charAt(i - 1))) {
+                    int end = i + 2;
+                    int numStart = end;
+                    while (end < body.length() && Character.isDigit(body.charAt(end))) {
+                        end++;
+                    }
+                    if (end > numStart && end < body.length() && body.charAt(end) == ']') {
+                        out.append('l').append(body, numStart, end);
+                        i = end + 1;
+                        continue;
+                    }
+                }
+            }
+            out.append(c);
+            i++;
+        }
+        return out.toString();
     }
 
     /**
