@@ -4609,37 +4609,57 @@ public class JavaSEPort extends CodenameOneImplementation {
         });
         toolsMenu.add(testRecorderMenu);
 
-        /*
         JMenu darkLightModeMenu = new JMenu("Dark/Light Mode");
-        simulatorMenu.add(darkLightModeMenu);
-        final JRadioButtonMenuItem darkMode = new JRadioButtonMenuItem("Dark Mode");
-        final JRadioButtonMenuItem lightMode = new JRadioButtonMenuItem("Light Mode");
-        final JRadioButtonMenuItem unsupportedMode = new JRadioButtonMenuItem("Unsupported");
-        ButtonGroup group = new ButtonGroup();
-        group.add(darkMode);
-        group.add(lightMode);
-        group.add(unsupportedMode);
-        darkMode.addActionListener(new ActionListener() {
+        simulateMenu.add(darkLightModeMenu);
+        final JRadioButtonMenuItem darkModeItem = new JRadioButtonMenuItem("Dark Mode");
+        final JRadioButtonMenuItem lightModeItem = new JRadioButtonMenuItem("Light Mode");
+        final JRadioButtonMenuItem unsupportedModeItem = new JRadioButtonMenuItem("Unsupported");
+        ButtonGroup darkModeGroup = new ButtonGroup();
+        darkModeGroup.add(darkModeItem);
+        darkModeGroup.add(lightModeItem);
+        darkModeGroup.add(unsupportedModeItem);
+
+        String savedDarkMode = pref.get("cn1.simulator.darkMode", "unsupported");
+        if ("dark".equals(savedDarkMode)) {
+            darkMode = Boolean.TRUE;
+            darkModeItem.setSelected(true);
+        } else if ("light".equals(savedDarkMode)) {
+            darkMode = Boolean.FALSE;
+            lightModeItem.setSelected(true);
+        } else {
+            darkMode = null;
+            unsupportedModeItem.setSelected(true);
+        }
+
+        darkModeItem.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                JavaSEPort.this.darkMode = true;
+                JavaSEPort.this.darkMode = Boolean.TRUE;
+                pref.put("cn1.simulator.darkMode", "dark");
+                refreshSkin(frm);
             }
         });
 
-        lightMode.addActionListener(new ActionListener() {
+        lightModeItem.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                JavaSEPort.this.darkMode = false;
+                JavaSEPort.this.darkMode = Boolean.FALSE;
+                pref.put("cn1.simulator.darkMode", "light");
+                refreshSkin(frm);
             }
         });
 
-        unsupportedMode.addActionListener(new ActionListener() {
+        unsupportedModeItem.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
                 JavaSEPort.this.darkMode = null;
+                pref.put("cn1.simulator.darkMode", "unsupported");
+                refreshSkin(frm);
             }
         });
-        */
+        darkLightModeMenu.add(darkModeItem);
+        darkLightModeMenu.add(lightModeItem);
+        darkLightModeMenu.add(unsupportedModeItem);
 
         manualPurchaseSupported = pref.getBoolean("manualPurchaseSupported", true);
         managedPurchaseSupported = pref.getBoolean("managedPurchaseSupported", true);
