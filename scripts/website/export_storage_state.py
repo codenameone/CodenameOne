@@ -1,21 +1,23 @@
 #!/usr/bin/env python3
-"""Export a Medium login session as a base64 string for the MEDIUM_STORAGE_STATE secret.
+"""Export a logged-in browser session for syndication targets that block
+password-based automation (Medium has no password login at all; DZone
+gates its login form behind invisible reCAPTCHA).
 
-Medium has no password-based REST API and no password-based login form —
-only OAuth (Google/Apple/Facebook) and email magic-link. The browser-based
-syndicator therefore needs a saved Playwright storageState (cookies +
-localStorage) instead of credentials.
+Two paths:
 
-Usage:
+    --from-firefox-profile   read cookies straight from your existing Firefox
+                             profile's cookies.sqlite (no second login)
+    --browser {chrome,...}   launch Playwright with the chosen browser, open
+                             the site's signin page, poll for auth cookies
 
-    python3 scripts/website/export_medium_storage.py
-        # opens a headed browser; you log in; press Enter when done
-        # script writes ./medium-storage-state.json AND prints the base64
-        # representation that you paste as the MEDIUM_STORAGE_STATE secret
+Output is a Playwright storageState JSON written to disk and (unless
+--no-base64) a base64 blob ready to paste as the {SITE}_STORAGE_STATE
+repo secret consumed by syndicate_browser_posts.py.
 
-If the user has Google Chrome installed, the script uses Chrome (channel=
-"chrome") so the browser the user sees is the same brand they are used to.
-Otherwise it falls back to Playwright's bundled Chromium.
+Examples:
+
+    python3 scripts/website/export_storage_state.py --site medium --from-firefox-profile
+    python3 scripts/website/export_storage_state.py --site dzone --browser firefox
 """
 
 from __future__ import annotations
@@ -33,27 +35,41 @@ from pathlib import Path
 
 
 DEFAULT_OUTPUT = Path("medium-storage-state.json")
-SIGNIN_URL = "https://medium.com/m/signin"
-# Medium assigns every visitor a `uid` cookie. Anonymous visitors get a value
-# prefixed with `lo_` ("logged-out"); a real signed-in user gets a value
-# without that prefix. We use that distinction to detect login completion.
-ANON_UID_PREFIX = "lo_"
 DEFAULT_TIMEOUT_SECONDS = 600  # 10 minutes for the user to complete login
 
-
-def _is_logged_in(cookies: list[dict]) -> bool:
-    for c in cookies:
-        if c.get("name") == "uid":
-            value = c.get("value") or ""
-            if value and not value.startswith(ANON_UID_PREFIX):
-                return True
-    return False
+# Per-target site profile. Each entry knows where to land in a launched browser,
+# which cookie domain to filter from a Firefox profile, and how to recognize
+# a logged-in session (a function over the captured cookie list).
+SITE_PROFILES: dict[str, dict] = {
+    "medium": {
+        "signin_url": "https://medium.com/m/signin",
+        "cookie_host_glob": "%medium.com",
+        # Medium assigns every visitor a `uid` cookie. Anonymous visitors get a
+        # value prefixed with `lo_`; a signed-in user gets one without it.
+        "is_logged_in": lambda cookies: any(
+            c.get("name") == "uid" and not (c.get("value") or "").startswith("lo_")
+            for c in cookies
+        ),
+    },
+    "dzone": {
+        "signin_url": "https://dzone.com/users/login.html",
+        "cookie_host_glob": "%dzone.com",
+        # DZone uses JSESSIONID for the auth session; a signed-in session also
+        # has the SPRING_SECURITY_REMEMBER_ME_COOKIE on long-lived logins.
+        "is_logged_in": lambda cookies: any(
+            c.get("name") in ("JSESSIONID", "SPRING_SECURITY_REMEMBER_ME_COOKIE")
+            for c in cookies
+        ),
+    },
+}
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output", default=str(DEFAULT_OUTPUT),
-                        help=f"Path to write the storage state JSON (default: {DEFAULT_OUTPUT})")
+    parser.add_argument("--site", choices=sorted(SITE_PROFILES), default="medium",
+                        help="Which target site to capture a session for (default: medium).")
+    parser.add_argument("--output", default=None,
+                        help="Path to write the storage state JSON (default: <site>-storage-state.json)")
     parser.add_argument("--no-base64", action="store_true",
                         help="Skip printing the base64 blob (just write the JSON file).")
     parser.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT_SECONDS,
@@ -97,7 +113,7 @@ def _locate_firefox_profile(explicit: str | None) -> Path:
     return Path(max(candidates, key=lambda p: Path(p).stat().st_mtime))
 
 
-def _firefox_storage_state(cookies_db: Path) -> dict:
+def _firefox_storage_state(cookies_db: Path, host_glob: str) -> dict:
     # Copy to a temp file because Firefox holds a write lock on the live DB.
     with tempfile.NamedTemporaryFile(suffix=".sqlite", delete=False) as tmp:
         tmp_path = Path(tmp.name)
@@ -106,7 +122,8 @@ def _firefox_storage_state(cookies_db: Path) -> dict:
         conn = sqlite3.connect(f"file:{tmp_path}?mode=ro", uri=True)
         cur = conn.execute(
             "SELECT name, value, host, path, expiry, isSecure, isHttpOnly, sameSite "
-            "FROM moz_cookies WHERE host LIKE '%medium.com'"
+            "FROM moz_cookies WHERE host LIKE ?",
+            (host_glob,),
         )
         rows = cur.fetchall()
         conn.close()
@@ -130,7 +147,9 @@ def _firefox_storage_state(cookies_db: Path) -> dict:
 
 def main(argv: list[str]) -> int:
     args = parse_args(argv)
-    output_path = Path(args.output).resolve()
+    profile = SITE_PROFILES[args.site]
+    output_path = Path(args.output or f"{args.site}-storage-state.json").resolve()
+    secret_name = f"{args.site.upper()}_STORAGE_STATE"
 
     if args.from_firefox_profile is not None:
         try:
@@ -138,11 +157,11 @@ def main(argv: list[str]) -> int:
         except RuntimeError as err:
             print(f"Error: {err}", file=sys.stderr)
             return 1
-        print(f"Reading Medium cookies from Firefox profile: {cookies_db}")
-        state = _firefox_storage_state(cookies_db)
-        if not _is_logged_in(state["cookies"]):
-            print("Error: this Firefox profile does not appear to be logged in to Medium "
-                  "(no `uid` cookie without the `lo_` prefix).", file=sys.stderr)
+        print(f"Reading {args.site} cookies from Firefox profile: {cookies_db}")
+        state = _firefox_storage_state(cookies_db, profile["cookie_host_glob"])
+        if not profile["is_logged_in"](state["cookies"]):
+            print(f"Error: this Firefox profile does not appear to be logged in to {args.site}.",
+                  file=sys.stderr)
             return 1
         output_path.write_text(json.dumps(state), encoding="utf-8")
         print(f"Wrote storage state: {output_path}")
@@ -150,7 +169,7 @@ def main(argv: list[str]) -> int:
         if not args.no_base64:
             encoded = base64.b64encode(output_path.read_bytes()).decode("ascii")
             print()
-            print("Paste the following as the MEDIUM_STORAGE_STATE repository secret:")
+            print(f"Paste the following as the {secret_name} repository secret:")
             print("-" * 72)
             print(encoded)
             print("-" * 72)
@@ -192,11 +211,11 @@ def main(argv: list[str]) -> int:
             ),
         )
         page = context.new_page()
-        page.goto(SIGNIN_URL)
+        page.goto(profile["signin_url"])
 
         print()
         print("=" * 72)
-        print("A browser window has opened on Medium's sign-in page.")
+        print(f"A browser window has opened on {args.site}'s sign-in page.")
         print("Log in (Google / email / whatever you normally use).")
         if args.interactive:
             print("When you can see your Medium home or profile, return here and press Enter.")
@@ -216,17 +235,17 @@ def main(argv: list[str]) -> int:
             deadline = time.time() + args.timeout
             detected = False
             while time.time() < deadline:
-                if _is_logged_in(context.cookies("https://medium.com/")):
+                if profile["is_logged_in"](context.cookies(profile["signin_url"])):
                     detected = True
                     break
                 time.sleep(3)
             if not detected:
-                print("Timed out waiting for Medium login — no `uid` cookie without the `lo_` prefix.",
+                print(f"Timed out waiting for {args.site} login — auth cookies not detected.",
                       file=sys.stderr)
                 browser.close()
                 return 1
-            print("Logged-in `uid` cookie detected — capturing session state…")
-            # Give Medium a couple seconds to finish setting localStorage.
+            print("Logged-in cookies detected — capturing session state…")
+            # Give the site a couple seconds to finish setting localStorage.
             time.sleep(3)
 
         state = context.storage_state()
@@ -243,7 +262,7 @@ def main(argv: list[str]) -> int:
 
     encoded = base64.b64encode(output_path.read_bytes()).decode("ascii")
     print()
-    print("Paste the following as the MEDIUM_STORAGE_STATE repository secret:")
+    print(f"Paste the following as the {secret_name} repository secret:")
     print("-" * 72)
     print(encoded)
     print("-" * 72)

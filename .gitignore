@@ -30,8 +30,8 @@
 **/dist/*
 *.zip
 CodenameOneDesigner/src/version.properties
-medium-storage-state.json
-medium-storage-state.*.json
+*-storage-state.json
+*-storage-state.*.json
 /Ports/iOSPort/build/
 /Ports/iOSPort/dist/
 Ports/iOSPort/nbproject/private/private.xml

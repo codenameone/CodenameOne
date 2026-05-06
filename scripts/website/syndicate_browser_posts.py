@@ -98,6 +98,15 @@ def _find_first(page, selectors: list[str], *, timeout: int = 15000):
     raise AdapterError(f"none of the selectors matched: {selectors}: {last_error}")
 
 
+def _load_base64_storage_state(env_var: str) -> Path:
+    """Decode a base64-encoded storage_state JSON from an env var to a temp file."""
+    encoded = os.environ[env_var]
+    decoded = base64.b64decode(encoded)
+    path = Path(f"/tmp/{env_var.lower()}.json")
+    path.write_bytes(decoded)
+    return path
+
+
 def _save_screenshot(page, slug: str, label: str) -> Path:
     SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
     stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
@@ -225,22 +234,15 @@ class HackerNoonAdapter:
     """
 
     name = "hackernoon"
-    LOGIN_URL = "https://app.hackernoon.com/sign-in"
+    LOGIN_URL = "https://hackernoon.com/login"
     EDITOR_URL = "https://app.hackernoon.com/new-story"
 
-    USER_SELECTORS = [
-        "input[type='email']",
-        "input[name='email']",
-        "input[placeholder*='mail' i]",
-    ]
-    PASSWORD_SELECTORS = [
-        "input[type='password']",
-        "input[name='password']",
-    ]
+    USER_SELECTORS = ["input#email"]
+    PASSWORD_SELECTORS = ["input#password"]
     SUBMIT_SELECTORS = [
-        "button[type='submit']",
-        "button:has-text('Sign in')",
+        "button:has-text('LOG IN')",
         "button:has-text('Log in')",
+        "button:has-text('Login')",
     ]
     TITLE_SELECTORS = [
         "[data-placeholder='Title']",
@@ -267,10 +269,32 @@ class HackerNoonAdapter:
 
     def login(self, page) -> None:
         page.goto(self.LOGIN_URL, wait_until="domcontentloaded")
-        _find_first(page, self.USER_SELECTORS).fill(os.environ["HACKERNOON_USER"])
-        _find_first(page, self.PASSWORD_SELECTORS).fill(os.environ["HACKERNOON_PASSWORD"])
+        # Dismiss the Iubenda cookie consent banner if it overlays the page.
+        try:
+            page.click(".iubenda-cs-accept-btn, .iubenda-cs-reject-btn", timeout=3000)
+        except Exception:  # noqa: BLE001
+            pass
+        # The form is React-controlled; .fill() sets DOM .value but doesn't
+        # update React's internal state, so doLogin() runs with empty fields.
+        # Type per-character to dispatch the events React's onChange listens for.
+        email = _find_first(page, self.USER_SELECTORS)
+        email.click()
+        email.press_sequentially(os.environ["HACKERNOON_USER"], delay=10)
+        pwd = _find_first(page, self.PASSWORD_SELECTORS)
+        pwd.click()
+        pwd.press_sequentially(os.environ["HACKERNOON_PASSWORD"], delay=10)
         _find_first(page, self.SUBMIT_SELECTORS).click()
-        page.wait_for_url("**/dashboard*", timeout=25000)
+        page.wait_for_load_state("networkidle", timeout=30000)
+        # HackerNoon stays on /login if credentials were rejected; raise so the
+        # caller surfaces the explicit "Invalid email or password" rather than
+        # timing out later in the editor flow.
+        if page.url.rstrip("/").endswith("/login"):
+            err = page.evaluate(
+                "() => { const t = document.body.innerText; "
+                "const m = t.match(/Invalid[^\\n]*|Incorrect[^\\n]*/i); "
+                "return m ? m[0] : null; }"
+            )
+            raise AdapterError(err or "login redirected back to /login (auth failed)")
 
     def submit_draft(self, page, ctx: AdapterContext) -> dict[str, Any]:
         page.goto(self.EDITOR_URL, wait_until="domcontentloaded")
@@ -303,20 +327,26 @@ class HackerNoonAdapter:
 
 
 class DZoneAdapter:
-    """DZone — email/password login, TinyMCE-based article editor.
+    """DZone — AngularJS login form gated by invisible reCAPTCHA.
 
-    Selectors below have NOT been validated against the live site. The body
-    field is inside a TinyMCE iframe; the adapter pastes the markdown as
-    plain text and the editor will need a manual cleanup pass before publish.
+    Password-based login does not work from Playwright: DZone's doLogin()
+    requires a reCAPTCHA token (visible in scope.credentials.recaptchaToken)
+    that Google's invisible reCAPTCHA does not issue to headless browsers.
+    The auth request is never sent and login fails silently.
+
+    Use the storage-state path: export your logged-in DZone session from
+    a real browser and pass it as DZONE_STORAGE_STATE (base64-encoded JSON,
+    same shape as MEDIUM_STORAGE_STATE — generate it with
+    scripts/website/export_medium_storage.py --from-firefox-profile after
+    swapping the cookie host filter).
+
+    Selectors below for the article editor have NOT been validated against
+    the live site.
     """
 
     name = "dzone"
-    LOGIN_URL = "https://dzone.com/users/login.html"
     EDITOR_URL = "https://dzone.com/articles/new"
 
-    USER_SELECTORS = ["input[name='username']", "input[type='email']"]
-    PASSWORD_SELECTORS = ["input[name='password']", "input[type='password']"]
-    SUBMIT_SELECTORS = ["button[type='submit']", "button:has-text('Log in')"]
     TITLE_SELECTORS = ["input[name='title']", "input#title"]
     BODY_IFRAME_SELECTORS = ["iframe.tox-edit-area__iframe", "iframe[id$='_ifr']"]
     CANONICAL_SELECTORS = [
@@ -333,14 +363,14 @@ class DZoneAdapter:
 
     @staticmethod
     def is_configured() -> bool:
-        return bool(os.environ.get("DZONE_USER") and os.environ.get("DZONE_PASSWORD"))
+        return bool(os.environ.get("DZONE_STORAGE_STATE"))
 
     def login(self, page) -> None:
-        page.goto(self.LOGIN_URL, wait_until="domcontentloaded")
-        _find_first(page, self.USER_SELECTORS).fill(os.environ["DZONE_USER"])
-        _find_first(page, self.PASSWORD_SELECTORS).fill(os.environ["DZONE_PASSWORD"])
-        _find_first(page, self.SUBMIT_SELECTORS).click()
-        page.wait_for_load_state("networkidle", timeout=20000)
+        # Storage state is loaded into the browser context up-front; nothing
+        # to do here. If the cookies have expired the editor page will bounce
+        # back to login and the editor selectors will time out — at which
+        # point the user needs to refresh DZONE_STORAGE_STATE.
+        return
 
     def submit_draft(self, page, ctx: AdapterContext) -> dict[str, Any]:
         page.goto(self.EDITOR_URL, wait_until="domcontentloaded")
@@ -422,11 +452,7 @@ class MediumAdapter:
 
     @staticmethod
     def storage_state_path() -> Path:
-        encoded = os.environ["MEDIUM_STORAGE_STATE"]
-        decoded = base64.b64decode(encoded)
-        path = Path("/tmp/medium-storage-state.json")
-        path.write_bytes(decoded)
-        return path
+        return _load_base64_storage_state("MEDIUM_STORAGE_STATE")
 
     def login(self, page) -> None:
         # No-op: storage state was loaded into the browser context already.
@@ -491,6 +517,8 @@ def run_adapter(adapter, post: Post, body_markdown: str, headed: bool, validate_
         }
         if isinstance(adapter, MediumAdapter):
             context_kwargs["storage_state"] = str(MediumAdapter.storage_state_path())
+        elif isinstance(adapter, DZoneAdapter):
+            context_kwargs["storage_state"] = str(_load_base64_storage_state("DZONE_STORAGE_STATE"))
 
         context = browser.new_context(**context_kwargs)
         # Grant clipboard access so navigator.clipboard.writeText() succeeds.
