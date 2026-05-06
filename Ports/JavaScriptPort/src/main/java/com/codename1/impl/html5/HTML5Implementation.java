@@ -7705,6 +7705,17 @@ public class HTML5Implementation extends CodenameOneImplementation {
     
     
     
+    // Asset bytes cache. CN1's Resources / UIManager bootstrap reads the
+    // same .res file (e.g. iOS7Theme.res) multiple times during a single
+    // boot — once for the requested theme, again as a layered fallback,
+    // and once more from the EncodedImage multi-image lazy load. Each
+    // call hit the network synchronously; iOS7Theme.res alone was
+    // downloaded 3x = ~1.4 MB wasted on the wire. Cache the bytes once
+    // they've been fetched and serve a fresh ArrayBufferInputStream over
+    // the same Uint8Array on every subsequent open.
+    private static final java.util.Map<String, Uint8Array> assetByteCache =
+            new java.util.HashMap<String, Uint8Array>();
+
     public InputStream getArrayBufferInputStream(String url){
         String dataURL = ((WindowExt)window).getCn1().getBundledAssetAsDataURL(url);
         if (dataURL != null) {
@@ -7716,9 +7727,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
             } catch (IOException ex) {
                 ex.printStackTrace();
             }
-            
+
         }
-        
+
         if (isMediaResource(url)){
             ArrayBufferInputStream out = new ArrayBufferInputStream(Uint8Array.create(0), null);
             out.setSrc(url);
@@ -7727,6 +7738,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
         final XMLHttpRequest req = XMLHttpRequest.create();
         if (url.indexOf("assets/") == 0 && url.indexOf("?") == -1) {
             url = url + "?v=" + getBuildVersion();
+        }
+        Uint8Array cachedBytes = assetByteCache.get(url);
+        if (cachedBytes != null) {
+            return new ArrayBufferInputStream(cachedBytes, "arraybuffer");
         }
         req.open("get", url, false);
         req.overrideMimeType("text/plain; charset=x-user-defined");
@@ -7740,7 +7755,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
             System.out.println("Status code was "+req.getStatus());
             return null;
         }
-        
+
+        assetByteCache.put(url, responseBytes);
         ArrayBufferInputStream out = new ArrayBufferInputStream(responseBytes, req.getResponseType());
         return out;
     }
