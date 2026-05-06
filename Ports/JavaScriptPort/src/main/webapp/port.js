@@ -954,18 +954,31 @@ bindNative(["cn1_com_codename1_html5_js_core_JSArray_create_int_R_com_codename1_
 });
 
 bindNative(["cn1_com_codename1_html5_js_browser_Window_current_R_com_codename1_html5_js_browser_Window", "cn1_com_codename1_html5_js_browser_Window_current___R_com_codename1_html5_js_browser_Window"], function*() {
+  // Cache the main-thread window reference: it never changes for
+  // the lifetime of the worker, but ``Window.current()`` on the JS
+  // port is called dozens of times during boot (UIManager,
+  // Resources, BrowserComponent ... 42 invocations on Initializr
+  // boot in profiling), and each one was a worker->main HOST_CALL
+  // round-trip via ``__cn1_dom_window_current__``. Caching turns
+  // 42 round-trips into 1.
+  if (self.__cn1WindowWrapper) {
+    return self.__cn1WindowWrapper;
+  }
   const nativeWindow = global.window;
   const hasDomWindow = !!(nativeWindow && nativeWindow.document);
+  let wrapper;
   if (!hasDomWindow && typeof jvm.invokeHostNative === "function") {
     const hostWindow = yield jvm.invokeHostNative("__cn1_dom_window_current__", []);
     if (hostWindow != null) {
-      const workerWrapper = jvm.wrapJsObject(hostWindow, "com_codename1_html5_js_browser_Window");
-      jvm.enhanceJsWrapper(workerWrapper, "com_codename1_impl_html5_JSOImplementations_WindowExt");
-      return workerWrapper;
+      wrapper = jvm.wrapJsObject(hostWindow, "com_codename1_html5_js_browser_Window");
+      jvm.enhanceJsWrapper(wrapper, "com_codename1_impl_html5_JSOImplementations_WindowExt");
+      self.__cn1WindowWrapper = wrapper;
+      return wrapper;
     }
   }
-  const wrapper = jvm.wrapJsObject((hasDomWindow ? nativeWindow : null) || global.self || global, "com_codename1_html5_js_browser_Window");
+  wrapper = jvm.wrapJsObject((hasDomWindow ? nativeWindow : null) || global.self || global, "com_codename1_html5_js_browser_Window");
   jvm.enhanceJsWrapper(wrapper, "com_codename1_impl_html5_JSOImplementations_WindowExt");
+  self.__cn1WindowWrapper = wrapper;
   return wrapper;
 });
 
@@ -975,6 +988,13 @@ bindNative([
 ], function*(__cn1ThisObject) {
   const documentExtClass = "com_codename1_impl_html5_JSOImplementations_DocumentExt";
   const win = jvm.unwrapJsValue(__cn1ThisObject);
+  // Cache the document wrapper per host-window receiver. Boot
+  // calls ``Window.getDocument`` 9-10 times via UIManager /
+  // BrowserComponent / Resources init; each was a round-trip JSO
+  // bridge call. The host-thread document never changes.
+  if (win && win.__cn1HostRef != null && win.__cn1CachedDocWrapper) {
+    return win.__cn1CachedDocWrapper;
+  }
   if (win && win.__cn1HostRef != null && typeof jvm.invokeHostNative === "function") {
     const hostResult = yield jvm.invokeHostNative("__cn1_jso_bridge__", [{
       receiver: win,
@@ -987,6 +1007,7 @@ bindNative([
     }
     const docWrapper = jvm.wrapJsObject(hostResult, "com_codename1_html5_js_dom_HTMLDocument");
     jvm.enhanceJsWrapper(docWrapper, documentExtClass);
+    try { win.__cn1CachedDocWrapper = docWrapper; } catch (_e) {}
     return docWrapper;
   }
   if (typeof jvm.invokeHostNative === "function" && (!win || !win.document)) {

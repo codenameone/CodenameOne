@@ -576,41 +576,49 @@ public class HTML5Graphics {
    
     
     
+    /**
+     * Measure ``text`` with the given CSS font using a worker-side
+     * OffscreenCanvas. Returns the rounded pixel width or ``-1`` when
+     * OffscreenCanvas isn't available (older browsers / Safari < 16.4).
+     *
+     * Empirical Initializr boot before this fast path: 56 measureText
+     * calls routed through the main thread, each costing 3
+     * round-trips (getFont, measureText, TextMetrics.width) = ~168
+     * round-trips. The OffscreenCanvas path stays entirely in the
+     * worker.
+     */
+    @JSBody(params = {"css", "text"}, script = ""
+            + "if (typeof OffscreenCanvas !== 'function') return -1;"
+            + "var ctx = self.__cn1OcCtx;"
+            + "if (ctx === null) return -1;"
+            + "if (ctx === undefined) {"
+            + "  try { ctx = new OffscreenCanvas(1, 1).getContext('2d'); }"
+            + "  catch (e) { self.__cn1OcCtx = null; return -1; }"
+            + "  if (!ctx) { self.__cn1OcCtx = null; return -1; }"
+            + "  self.__cn1OcCtx = ctx;"
+            + "}"
+            + "var f = (typeof jvm !== 'undefined' && typeof jvm.toNativeString === 'function' && css && css.__class === 'java_lang_String') ? jvm.toNativeString(css) : String(css);"
+            + "var s = (typeof jvm !== 'undefined' && typeof jvm.toNativeString === 'function' && text && text.__class === 'java_lang_String') ? jvm.toNativeString(text) : String(text);"
+            + "if (ctx.font !== f) ctx.font = f;"
+            + "return Math.round(ctx.measureText(s).width);")
+    private static native int stringWidthOffscreen(String css, String text);
+
     public int charsWidth(Object nativeFont, char[] ch, int offset, int length) {
-        return JavaScriptTextMetricsAdapter.charsWidth(new JavaScriptTextMetricsAdapter.FontMetricsContext() {
-            @Override
-            public String getCurrentFont() {
-                return context.getFont();
-            }
-
-            @Override
-            public void setCurrentFont(String fontCss) {
-                context.setFont(fontCss);
-            }
-
-            @Override
-            public int measureWidth(String text) {
-                return (int)context.measureText(text).getWidth();
-            }
-        }, new JavaScriptTextMetricsAdapter.FontCssSupplier<NativeFont>() {
-            @Override
-            public String getCss(NativeFont font) {
-                return font.getCSS();
-            }
-
-            @Override
-            public int getHeight(NativeFont font) {
-                return font.fontHeight();
-            }
-
-            @Override
-            public int getAscent(NativeFont font) {
-                return font.fontAscent();
-            }
-        }, (NativeFont) nativeFont, ch, offset, length);
+        return stringWidth(nativeFont, new String(ch, offset, length));
     }
-    
+
+
     public int stringWidth(Object nativeFont, String str) {
+        // Fast path: measure on a worker-side OffscreenCanvas. The
+        // legacy path round-tripped 3x to the main thread per call
+        // (getFont, measureText, TextMetrics.width) -- ~168
+        // round-trips during Initializr boot alone. OffscreenCanvas
+        // keeps the entire call in the worker.
+        NativeFont font = (NativeFont) nativeFont;
+        int offscreenWidth = stringWidthOffscreen(font.getCSS(), str);
+        if (offscreenWidth >= 0) {
+            return offscreenWidth + 1;
+        }
         return JavaScriptTextMetricsAdapter.stringWidth(new JavaScriptTextMetricsAdapter.FontMetricsContext() {
             @Override
             public String getCurrentFont() {
