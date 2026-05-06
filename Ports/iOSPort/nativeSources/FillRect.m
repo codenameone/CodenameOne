@@ -24,6 +24,9 @@
 #import "CodenameOne_GLViewController.h"
 #include "xmlvm.h"
 #include "TargetConditionals.h"
+#ifdef CN1_USE_METAL
+#import "CN1Metalcompat.h"
+#endif
 
 #ifdef USE_ES2
 extern GLKMatrix4 CN1modelViewMatrix;
@@ -107,6 +110,9 @@ static GLuint getOGLProgram(){
 }
 #ifdef USE_ES2
 -(void)execute {
+#ifdef CN1_USE_METAL
+    CN1MetalFillRect(color, alpha, x, y, width, height);
+#else
     //[UIColorFromRGB(color, alpha) set];
     //CGContextFillRect(context, CGRectMake(x, y, width, height));
     //GlColorFromRGB(color, alpha);
@@ -168,9 +174,10 @@ static GLuint getOGLProgram(){
     
     glDisableVertexAttribArray(vertexCoordAtt);
     GLErrorLog;
-    
+
     //glUseProgram(CN1activeProgram);
     //GLErrorLog;
+#endif
 }
 #else
 -(void)execute {

@@ -25,6 +25,9 @@
 #import "PaintOp.h"
 #import "RadialGradientPaint.h"
 #import "CodenameOne_GLViewController.h"
+#ifdef CN1_USE_METAL
+#import "CN1Metalcompat.h"
+#endif
 
 #ifdef USE_ES2
 extern GLKMatrix4 CN1modelViewMatrix;
@@ -275,7 +278,7 @@ static DrawTextureAlphaMaskOGLProgram* getOGLProgram() {
 
 @implementation DrawTextureAlphaMask
 
--(id)initWithArgs:(GLuint)pTextName color:(int)pColor alpha:(int)pAlpha x:(int)pX y:(int)pY w:(int)pW h:(int)pH
+-(id)initWithArgs:(JAVA_LONG)pTextName color:(int)pColor alpha:(int)pAlpha x:(int)pX y:(int)pY w:(int)pW h:(int)pH
 {
     textureName = pTextName;
     color = pColor;
@@ -284,20 +287,102 @@ static DrawTextureAlphaMaskOGLProgram* getOGLProgram() {
     y = pY;
     w = pW;
     h = pH;
+#ifdef CN1_USE_METAL
+    // The handle is a CFBridgingRetain'd id<MTLTexture> owned by the Java
+    // TextureAlphaMask object (which the textureCache holds only as a
+    // SoftWeak ref). With the concurrent GC, finalize() can run between
+    // op queueing and drawFrame draining; finalize -> dispose ->
+    // nativeDeleteTexture -> CFBridgingRelease drops the +1, and we'd
+    // sample a freed texture at execute time. Take an additional retain
+    // here so the texture survives until this op deallocs after drain.
+    if (textureName != 0) {
+        CFRetain((CFTypeRef)(void *)(uintptr_t)textureName);
+    }
+    // Snapshot the active RadialGradientPaint at queue time so the op
+    // renders the gradient even after the mutable-side unapplyPaint clears
+    // PaintOp.currentMutable. Read from currentMutable -- the screen path
+    // already queues a RadialGradientPaint op that runs in-order with
+    // execute, so its mutation happens between this op's queue and execute.
+    hasRadialPaint = NO;
+    PaintOp *snapshot = [PaintOp getCurrentMutable];
+    if (snapshot != NULL && [snapshot isKindOfClass:[RadialGradientPaint class]]) {
+        RadialGradientPaint *g = (RadialGradientPaint *)snapshot;
+        hasRadialPaint = YES;
+        radialStartColor = g.startColor;
+        radialEndColor = g.endColor;
+        radialX = g.x;
+        radialY = g.y;
+        radialWidth = g.width;
+        radialHeight = g.height;
+    }
+#endif
     return self;
 }
+
+#ifdef CN1_USE_METAL
+-(void)dealloc {
+    if (textureName != 0) {
+        CFRelease((CFTypeRef)(void *)(uintptr_t)textureName);
+    }
+#ifndef CN1_USE_ARC
+    [super dealloc];
+#endif
+}
+#endif
 #ifdef USE_ES2
 -(void)execute
 {
-    
+#ifdef CN1_USE_METAL
+    if (textureName == 0) {
+        CN1Log(@"Attempt to draw null alpha-mask texture. Skipping");
+        return;
+    }
+    // textureName is a CFBridgingRetain'd id<MTLTexture> set up by
+    // IOSNative.m's nativePathRendererCreateTexture under Metal. Just bridge
+    // back to the Obj-C handle (no transfer of ownership) and dispatch.
+    id<MTLTexture> tex = (__bridge id<MTLTexture>)(void *)(uintptr_t)textureName;
+    // Resolve the radial-gradient paint differently per target:
+    //
+    //   Mutable (target != nil): the Java-side applyPaint() and
+    //     unapplyPaint() invoke applyRadialGradientPaintMutable /
+    //     clearRadialGradientPaintMutable as direct C calls -- they set and
+    //     clear PaintOp.currentMutable synchronously around the queue call,
+    //     before drainOps runs. Reading PaintOp.currentMutable at execute
+    //     time is too late; use the snapshot captured at init.
+    //
+    //   Screen (target == nil): the Java-side applyPaint() invokes
+    //     applyRadialGradientPaintGlobal which queues a RadialGradientPaint
+    //     op into the same queue as this DrawTextureAlphaMask op. Its
+    //     execute sets PaintOp.current just before our execute runs, so
+    //     reading it here is correct.
+    if (target != nil && hasRadialPaint) {
+        CN1MetalDrawAlphaMaskRadial(tex, x, y, w, h,
+                                    radialStartColor, radialEndColor,
+                                    (float)radialX, (float)radialY,
+                                    (float)radialWidth, (float)radialHeight);
+        return;
+    }
+    if (target == nil) {
+        PaintOp *paint = [PaintOp getCurrent];
+        if (paint != NULL && [paint isKindOfClass:[RadialGradientPaint class]]) {
+            RadialGradientPaint *g = (RadialGradientPaint *)paint;
+            CN1MetalDrawAlphaMaskRadial(tex, x, y, w, h,
+                                        g.startColor, g.endColor,
+                                        (float)g.x, (float)g.y,
+                                        (float)g.width, (float)g.height);
+            return;
+        }
+    }
+    CN1MetalDrawAlphaMask(tex, color, alpha, x, y, w, h);
+#else
     //RadialGradientPaint * gp = [[RadialGradientPaint alloc ]initWithArgs:0 y:0 width:[CodenameOne_GLViewController instance].view.bounds.size.width*2 height:[CodenameOne_GLViewController instance].view.bounds.size.height*2 startColor:0x0 endColor:0xffffff];
     //[PaintOp setCurrent:gp];
-    
+
     if ( textureName == 0 ){
         CN1Log(@"Attempt to draw null texture.  Skipping");
     }
     DrawTextureAlphaMaskOGLProgram* p = getOGLProgram();
-    
+
     glUseProgram(p.program);
     float alph = ((float)alpha)/255.0;
     GLKVector4 colorV = GLKVector4Make(((float)((color >> 16) & 0xff))/255.0*alph, \
@@ -313,7 +398,7 @@ static DrawTextureAlphaMaskOGLProgram* getOGLProgram() {
     
     glActiveTexture(GL_TEXTURE0);
     GLErrorLog;
-    glBindTexture(GL_TEXTURE_2D, textureName);
+    glBindTexture(GL_TEXTURE_2D, (GLuint)textureName);
     GLErrorLog;
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     GLErrorLog;
@@ -399,9 +484,10 @@ static DrawTextureAlphaMaskOGLProgram* getOGLProgram() {
     
     glDisableVertexAttribArray(p.vertexCoordAtt);
     GLErrorLog;
-    
+
     glBindTexture(GL_TEXTURE_2D, 0);
     GLErrorLog;
+#endif // CN1_USE_METAL
 }
 #else
 -(void)execute {}

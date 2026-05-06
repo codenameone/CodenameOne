@@ -24,6 +24,10 @@
 #import <QuartzCore/QuartzCore.h>
 #import "CodenameOne_GLViewController.h"
 #import "EAGLView.h"
+#ifdef CN1_USE_METAL
+#import "METALView.h"
+#import "CN1Metalcompat.h"
+#endif
 #import "ExecutableOp.h"
 #import "FillRect.h"
 #import "ClipRect.h"
@@ -961,6 +965,13 @@ CGContextRef roundRect(CGContextRef context, int color, int alpha, int x, int y,
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRoundRectMutableImpl
 (int color, int alpha, int x, int y, int width, int height, int arcWidth, int arcHeight) {
+#ifdef CN1_USE_METAL
+    // Dead under Metal -- MutableGraphics builds a round-rect GeneralPath
+    // and routes it through the alpha-mask Metal pipeline (Renderer.c ->
+    // R8 MTLTexture -> DrawTextureAlphaMask op tagged with the mutable
+    // target). The Java side gates with `metalRendering` before calling
+    // this JNI.
+#else
     CGContextRef context = UIGraphicsGetCurrentContext();
     if (currentMutableTransformSet) {
         CGContextSaveGState(context);
@@ -970,12 +981,20 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRoundRectMutableImp
     if (currentMutableTransformSet) {
         CGContextRestoreGState(context);
     }
+#endif
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_setAntiAliasedMutableImpl
 (JAVA_BOOLEAN antialiased) {
+#ifdef CN1_USE_METAL
+    // Metal pipelines are antialiased by default; CG's runtime AA toggle
+    // has no direct equivalent. The visible behaviour matches
+    // "antialiased=YES" everywhere on Metal.
+    (void)antialiased;
+#else
     CGContextRef context = UIGraphicsGetCurrentContext();
     CGContextSetAllowsAntialiasing(context, antialiased);
+#endif
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_resetAffineGlobal() {
@@ -1000,23 +1019,32 @@ extern void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalI
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRoundRectGlobalImpl
 (int color, int alpha, int x, int y, int width, int height, int arcWidth, int arcHeight) {
+#ifdef CN1_USE_METAL
+    // Dead under Metal -- GlobalGraphics builds a round-rect GeneralPath
+    // and routes it through nativeDrawShape (alpha-mask Metal pipeline).
+#else
     UIGraphicsBeginImageContextWithOptions(CGSizeMake(width, height), NO, 1.0);
     CGContextRef context = UIGraphicsGetCurrentContext();
     CGContextStrokePath(roundRect(context, color, alpha, 0, 0, width, height, arcWidth, arcHeight));
     UIImage* img = UIGraphicsGetImageFromCurrentImageContext();
-    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl %i", ((int)img));
     UIGraphicsEndImageContext();
-    
+
     GLUIImage* glu = [[GLUIImage alloc] initWithImage:img];
     Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalImpl((BRIDGE_CAST void*) glu, 255, x, y, width, height, 0);
 #ifndef CN1_USE_ARC
     [glu release];
+#endif
 #endif
 }
 
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRoundRectMutableImpl
 (int color, int alpha, int x, int y, int width, int height, int arcWidth, int arcHeight) {
+#ifdef CN1_USE_METAL
+    // Dead under Metal -- MutableGraphics goes through the alpha-mask
+    // Metal pipeline (build path, Renderer.c -> R8 MTLTexture ->
+    // DrawTextureAlphaMask op tagged with currentMutableImage).
+#else
     CGContextRef context = UIGraphicsGetCurrentContext();
     if (currentMutableTransformSet) {
         CGContextSaveGState(context);
@@ -1026,21 +1054,26 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRoundRectMutableImp
     if (currentMutableTransformSet) {
         CGContextRestoreGState(context);
     }
+#endif
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRoundRectGlobalImpl
 (int color, int alpha, int x, int y, int width, int height, int arcWidth, int arcHeight) {
+#ifdef CN1_USE_METAL
+    // Dead under Metal -- GlobalGraphics routes through the alpha-mask
+    // Metal pipeline.
+#else
     UIGraphicsBeginImageContextWithOptions(CGSizeMake(width, height), NO, 1.0);
     CGContextRef context = UIGraphicsGetCurrentContext();
     CGContextFillPath(roundRect(context, color, alpha, 0, 0, width, height, arcWidth, arcHeight));
     UIImage* img = UIGraphicsGetImageFromCurrentImageContext();
-    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl %i", ((int)img));
     UIGraphicsEndImageContext();
-    
+
     GLUIImage* glu = [[GLUIImage alloc] initWithImage:img];
     Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalImpl((BRIDGE_CAST void*)glu, 255, x, y, width, height, 0);
 #ifndef CN1_USE_ARC
     [glu release];
+#endif
 #endif
 }
 
@@ -1092,6 +1125,11 @@ CGContextRef drawArc(CGContextRef context, int color, int alpha, int x, int y, i
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawArcMutableImpl
 (int color, int alpha, int x, int y, int width, int height, int startAngle, int angle) {
+#ifdef CN1_USE_METAL
+    // Dead under Metal -- MutableGraphics builds a GeneralPath via
+    // drawingArcPath.arc(...) and routes through nativeDrawShape (alpha-mask
+    // Metal pipeline tagged with currentMutableImage).
+#else
     CGContextRef context = UIGraphicsGetCurrentContext();
     if (currentMutableTransformSet) {
         CGContextSaveGState(context);
@@ -1101,6 +1139,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawArcMutableImpl
     if (currentMutableTransformSet) {
         CGContextRestoreGState(context);
     }
+#endif
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRadialGradientMutableImpl
@@ -1134,6 +1173,14 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRadialGradientMutab
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeFillArcMutableImpl
 (int color, int alpha, int x, int y, int width, int height, int startAngle, int angle) {
+#ifdef CN1_USE_METAL
+    // Dead under Metal -- MutableGraphics builds drawingArcPath via
+    // GeneralPath.arc(...) and routes through nativeFillShape (alpha-mask
+    // Metal pipeline tagged with currentMutableImage). RadialGradientPaint
+    // composes through the AlphaMaskRadial pipeline at draw time
+    // (DrawTextureAlphaMask.execute checks PaintOp and routes to
+    // CN1MetalDrawAlphaMaskRadial).
+#else
     CGContextRef context = UIGraphicsGetCurrentContext();
     if (currentMutableTransformSet) {
         CGContextSaveGState(context);
@@ -1149,6 +1196,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeFillArcMutableImpl
     if (currentMutableTransformSet) {
         CGContextRestoreGState(context);
     }
+#endif
 }
 
 // START ES2 ADDITION: Drawing Shapes ------------------------------------------------------------------------------
@@ -1199,15 +1247,28 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawPathImpl
 }
 
 
-void Java_com_codename1_impl_ios_IOSImplementation_drawTextureAlphaMaskImpl(GLuint textureName, int color, int alpha, int x, int y, int w, int h)
+void Java_com_codename1_impl_ios_IOSImplementation_drawTextureAlphaMaskImpl(JAVA_LONG textureName, int color, int alpha, int x, int y, int w, int h)
 {
-    
+
     DrawTextureAlphaMask *f = [[DrawTextureAlphaMask alloc] initWithArgs:textureName color:color alpha:alpha x:x y:y w:w h:h];
+#ifdef CN1_USE_METAL
+    // If a mutable image is the current draw target (the Java side called
+    // startDrawingOnImage(...) to begin painting INTO an Image), tag the op
+    // so drawFrame's drain (Phase 3 v2) routes it to that image's encoder
+    // instead of the screen encoder. This is what unifies mutable-image
+    // shape rendering with the screen pipeline -- the same alpha-mask
+    // texture goes to the same Metal alpha-mask shader, just bound to a
+    // different render target.
+    GLUIImage *mutableTarget = [CodenameOne_GLViewController instance].currentMutableImage;
+    if (mutableTarget != nil) {
+        [f setTarget:mutableTarget];
+    }
+#endif
     [CodenameOne_GLViewController upcoming:f];
 #ifndef CN1_USE_ARC
     [f release];
 #endif
-    
+
 }
 
 // END ES2 ADDITION -------------------------------------------------------------------------------------------------
@@ -1243,6 +1304,23 @@ void com_codename1_impl_ios_IOSImplementation_nativeSetTransformMutableImpl___fl
                                                                                                                                                                                JAVA_INT originX, JAVA_INT originY
                                                                                                                                                                                )
 {
+#ifdef CN1_USE_METAL
+    {
+        GLUIImage *target = [CodenameOne_GLViewController instance].currentMutableImage;
+        if (target == nil) return;
+        GLKMatrix4 m = GLKMatrix4MakeAndTranspose(a0,a1,a2,a3,
+                                                  b0,b1,b2,b3,
+                                                  c0,c1,c2,c3,
+                                                  d0,d1,d2,d3);
+        SetTransform *f = [[SetTransform alloc] initWithArgs:m originX:originX originY:originY];
+        [f setTarget:target];
+        [CodenameOne_GLViewController upcoming:f];
+#ifndef CN1_USE_ARC
+        [f release];
+#endif
+        return;
+    }
+#endif
 #ifdef USE_ES2
     POOL_BEGIN();
     currentMutableTransformSet = NO;
@@ -1258,7 +1336,7 @@ void com_codename1_impl_ios_IOSImplementation_nativeSetTransformMutableImpl___fl
     for(int i=0; i<16; i++) caMatrix[i] = glMatrix[i]; //this will do the typecast if needed
 
     output = *((CATransform3D *)caMatrix);
-    
+
     if (!CATransform3DIsIdentity(output)) {
         CGAffineTransform affine = CATransform3DGetAffineTransform(output);
         currentMutableTransform = affine;
@@ -1445,6 +1523,20 @@ void Java_com_codename1_impl_ios_IOSNative_nativeDrawShadowMutable(CN1_THREAD_ST
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageMutableImpl
 (void* peer, int alpha, int x, int y, int width, int height, int renderingHints) {
+#ifdef CN1_USE_METAL
+    {
+        GLUIImage *target = [CodenameOne_GLViewController instance].currentMutableImage;
+        if (target == nil) return;
+        DrawImage *f = [[DrawImage alloc] initWithArgs:alpha xpos:x ypos:y i:(BRIDGE_CAST GLUIImage*)peer w:width h:height];
+        [f setRenderingHints:renderingHints];
+        [f setTarget:target];
+        [CodenameOne_GLViewController upcoming:f];
+#ifndef CN1_USE_ARC
+        [f release];
+#endif
+        return;
+    }
+#endif
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageMutableImpl %i started at %i, %i", (int)peer, x, y);
     UIImage* i = [(BRIDGE_CAST GLUIImage*)peer getImage];
     CGContextRef context = UIGraphicsGetCurrentContext();
@@ -1583,6 +1675,19 @@ void Java_com_codename1_impl_ios_IOSImplementation_flushBufferImpl
 
 void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingMutableImpl
 (int x, int y, int width, int height, int clipApplied) {
+#ifdef CN1_USE_METAL
+    {
+        GLUIImage *target = [CodenameOne_GLViewController instance].currentMutableImage;
+        if (target == nil) return;
+        ClipRect *f = [[ClipRect alloc] initWithArgs:x ypos:y w:width h:height f:clipApplied];
+        [f setTarget:target];
+        [[CodenameOne_GLViewController instance] upcomingAddClip:f];
+#ifndef CN1_USE_ARC
+        [f release];
+#endif
+        return;
+    }
+#endif
     CGContextRef context = UIGraphicsGetCurrentContext();
     //CN1Log(@"Native mutable clipping applied %i on context %i x: %i y: %i width: %i height: %i", clipApplied, (int)context, x, y, width, height);
     //if(clipApplied) {
@@ -1596,13 +1701,18 @@ void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingMutableImpl
 void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingShapeMutableImpl
 (int numCommands, JAVA_OBJECT commands, int numPoints, JAVA_OBJECT points)
 {
+#ifdef CN1_USE_METAL
+    // Shape clipping for mutable images on Metal: scissor rect can only
+    // express axis-aligned rects. A future improvement could rasterise the
+    // shape into a stencil/alpha mask. For now treat as "no clip" so
+    // subsequent draws still render.
+    (void)numCommands; (void)commands; (void)numPoints; (void)points;
+#else
     CGContextRef context = UIGraphicsGetCurrentContext();
-    //CN1Log(@"Native mutable clipping applied %i on context %i x: %i y: %i width: %i height: %i", clipApplied, (int)context, x, y, width, height);
-    //if(clipApplied) {
     CGContextRestoreGState(context);
-    //}
     CGContextSaveGState(context);
     CGContextClip(Java_com_codename1_impl_ios_IOSImplementation_drawPath(CN1_THREAD_GET_STATE_PASS_ARG numCommands, commands, numPoints, points));
+#endif
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingGlobalImpl
@@ -1659,6 +1769,19 @@ void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingPolygonGloba
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineMutableImpl
 (int color, int alpha, int x1, int y1, int x2, int y2) {
+#ifdef CN1_USE_METAL
+    {
+        GLUIImage *target = [CodenameOne_GLViewController instance].currentMutableImage;
+        if (target == nil) return;
+        DrawLine *f = [[DrawLine alloc] initWithArgs:color a:alpha xpos1:x1 ypos1:y1 xpos2:x2 ypos2:y2];
+        [f setTarget:target];
+        [CodenameOne_GLViewController upcoming:f];
+#ifndef CN1_USE_ARC
+        [f release];
+#endif
+        return;
+    }
+#endif
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineMutableImpl started");
     [UIColorFromRGB(color, alpha) set];
     CGContextRef context = UIGraphicsGetCurrentContext();
@@ -1699,6 +1822,19 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeRotateGlobalImpl
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectMutableImpl
 (int color, int alpha, int x, int y, int width, int height) {
+#ifdef CN1_USE_METAL
+    {
+        GLUIImage *target = [CodenameOne_GLViewController instance].currentMutableImage;
+        if (target == nil) return;
+        FillRect *f = [[FillRect alloc] initWithArgs:color a:alpha xpos:x ypos:y w:width h:height];
+        [f setTarget:target];
+        [CodenameOne_GLViewController upcoming:f];
+#ifndef CN1_USE_ARC
+        [f release];
+#endif
+        return;
+    }
+#endif
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectMutableImpl started");
     [UIColorFromRGB(color, alpha) set];
     CGContextRef context = UIGraphicsGetCurrentContext();
@@ -1714,6 +1850,19 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectMutableImpl
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_clearRectMutable(int x, int y, int w, int h) {
+#ifdef CN1_USE_METAL
+    {
+        GLUIImage *target = [CodenameOne_GLViewController instance].currentMutableImage;
+        if (target == nil) return;
+        ClearRect *f = [[ClearRect alloc] initWithArgs:x ypos:y w:w h:h];
+        [f setTarget:target];
+        [CodenameOne_GLViewController upcoming:f];
+#ifndef CN1_USE_ARC
+        [f release];
+#endif
+        return;
+    }
+#endif
     CGContextRef context = UIGraphicsGetCurrentContext();
     if (currentMutableTransformSet) {
         CGContextSaveGState(context);
@@ -1723,7 +1872,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_clearRectMutable(int x, int y
     if (currentMutableTransformSet) {
         CGContextRestoreGState(context);
     }
-    
+
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_clearRectGlobal(int x, int y, int w, int h) {
@@ -1747,6 +1896,19 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectGlobalImpl
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRectMutableImpl
 (int color, int alpha, int x, int y, int width, int height) {
+#ifdef CN1_USE_METAL
+    {
+        GLUIImage *target = [CodenameOne_GLViewController instance].currentMutableImage;
+        if (target == nil) return;
+        DrawRect *f = [[DrawRect alloc] initWithArgs:color a:alpha xpos:x ypos:y w:width h:height];
+        [f setTarget:target];
+        [CodenameOne_GLViewController upcoming:f];
+#ifndef CN1_USE_ARC
+        [f release];
+#endif
+        return;
+    }
+#endif
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRectMutableImpl started");
     [UIColorFromRGB(color, alpha) set];
     CGContextRef context = UIGraphicsGetCurrentContext();
@@ -1774,6 +1936,19 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRectGlobalImpl
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringMutableImpl
 (int color, int alpha, void* fontPeer, NSString* str, int x, int y) {
+#ifdef CN1_USE_METAL
+    {
+        GLUIImage *target = [CodenameOne_GLViewController instance].currentMutableImage;
+        if (target == nil) return;
+        DrawString *f = [[DrawString alloc] initWithArgs:color a:alpha xpos:x ypos:y s:str f:(BRIDGE_CAST UIFont*)fontPeer];
+        [f setTarget:target];
+        [CodenameOne_GLViewController upcoming:f];
+#ifndef CN1_USE_ARC
+        [f release];
+#endif
+        return;
+    }
+#endif
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringMutableImpl started");
     [[CodenameOne_GLViewController instance] drawString:color alpha:alpha font:(BRIDGE_CAST UIFont*)fontPeer str:str x:x y:y];
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringMutableImpl finished");
@@ -1802,18 +1977,41 @@ void* Java_com_codename1_impl_ios_IOSImplementation_createNativeMutableImageImpl
     //[img retain];
     //CN1Log(@"createNativeMutableImageImpl finished %i ", (int)img);
     GLUIImage* gl = [[GLUIImage alloc] initWithImage:img];
+#ifdef CN1_USE_METAL
+    // Phase 3 v2: stash the fill colour so when startDrawingOnImage
+    // lazily allocates the Metal render-target texture (via
+    // CN1MetalEnsureMutableTexture), the clear pass uses this colour
+    // instead of (0,0,0,0). Mirrors UIRectFill(argb) above for the CG
+    // backing, so screen-side DrawImage of a freshly-created mutable
+    // sees the same starting pixels regardless of which backing wins.
+    [gl setMtlMutableInitialARGB:argb];
+#endif
     return (BRIDGE_CAST void*)gl;
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_startDrawingOnImageImpl
 (int width, int height, void *peer) {
+#ifdef CN1_USE_METAL
+    {
+        // Phase 3 v2: ensure the mutable image has a Metal render-target
+        // texture sized to the requested dims, then publish it as the
+        // current mutable target. Subsequent nativeXxxMutableImpl JNIs
+        // queue ExecutableOps tagged with this target; drawFrame opens an
+        // encoder against the texture when it drains them.
+        GLUIImage *gl = (BRIDGE_CAST GLUIImage*)peer;
+        CN1MetalEnsureMutableTexture(gl, width, height);
+        [CodenameOne_GLViewController instance].currentMutableImage = gl;
+        currentMutableTransformSet = NO;
+        return;
+    }
+#endif
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_startDrawingOnImageImpl");
     UIImage* original = [(BRIDGE_CAST GLUIImage*)peer getImage];
     UIGraphicsBeginImageContextWithOptions(CGSizeMake(width, height), NO, 1.0);
     if(original != NULL) {
         [original drawAtPoint:CGPointZero];
     }
-    
+
     CGContextRef context = UIGraphicsGetCurrentContext();
     CGContextSaveGState(context);
     [CodenameOne_GLViewController instance].currentMutableImage = (BRIDGE_CAST GLUIImage*)peer;
@@ -1822,6 +2020,19 @@ void Java_com_codename1_impl_ios_IOSImplementation_startDrawingOnImageImpl
 }
 
 void* Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl() {
+#ifdef CN1_USE_METAL
+    {
+        // Phase 3 v2: clear the current mutable target. Pending ops (queued
+        // between Begin/Finish) will drain on the next drawFrame; the
+        // mutable's MTLTexture continues to hold its accumulated pixels.
+        // Readback paths (Image.getRGB, encode-as-PNG/JPEG, toImage)
+        // explicitly call CN1MetalFlushMutableImageSync before reading.
+        GLUIImage *gl = [CodenameOne_GLViewController instance].currentMutableImage;
+        [CodenameOne_GLViewController instance].currentMutableImage = nil;
+        currentMutableTransformSet = NO;
+        return (BRIDGE_CAST void*)gl;
+    }
+#endif
     UIImage* img = UIGraphicsGetImageFromCurrentImageContext();
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl %i", ((int)img));
     UIGraphicsEndImageContext();
@@ -1834,6 +2045,47 @@ void* Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl() {
 
 void Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayImpl
 (void* peer, int* arr, int x, int y, int width, int height, int imgWidth, int imgHeight) {
+#ifdef CN1_USE_METAL
+    {
+        // Phase 3 v2 readback. Was disabled in 9b2aaf11d on suspicion of a
+        // DrawImage-test hang (GPU memory pressure → nextDrawable wedge),
+        // but the legacy CG-from-UIImage fallback returns the stale
+        // initial-fill pixels for any mutable that's been drawn into via
+        // Metal — animation/transition tests added in master #4821 then
+        // emit empty grids and downstream EDT scheduling stalls trying
+        // to advance to the next test.
+        //
+        // The original GPU-pressure concern is mitigated by the resource-
+        // leak fix in commit e548d1afb (each transient GLUIImage no longer
+        // pins +1 retains on its mtlMutableTexture / command buffer / read
+        // textures). Reinstate the path so getRGB sees real Metal pixels.
+        //
+        // If we're still inside a draw-on-image session we must close it
+        // first so the queued ops are visible to the drain (mirrors the
+        // legacy path's finishDrawingOnImageImpl call below).
+        GLUIImage *gl = (BRIDGE_CAST GLUIImage*)peer;
+        if ([gl mtlMutableTexture] != nil) {
+            BOOL stillDrawing = (((BRIDGE_CAST void*)[CodenameOne_GLViewController instance].currentMutableImage) == peer);
+            BOOL savedTransformSet = currentMutableTransformSet;
+            if (stillDrawing) {
+                Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl();
+            }
+            // flushBuffer dispatches synchronously to main and runs
+            // drawFrame, which drains queued ExecutableOps -- including
+            // any with target=this image -- through Begin/End mutable
+            // encoders so the texture is up-to-date. The bounding rect
+            // doesn't matter for the queue drain (drawFrame uses it only
+            // for ClipRect.setDrawRect on screen ops).
+            [[CodenameOne_GLViewController instance] flushBuffer:nil x:0 y:0 width:displayWidth height:displayHeight];
+            CN1MetalReadMutableImagePixels(gl, arr, x, y, width, height, imgWidth, imgHeight);
+            if (stillDrawing) {
+                Java_com_codename1_impl_ios_IOSImplementation_startDrawingOnImageImpl(imgWidth, imgHeight, peer);
+                currentMutableTransformSet = savedTransformSet;
+            }
+            return;
+        }
+    }
+#endif
     BOOL currentlyDrawing = NO;
     BOOL oldCurrentMutableTransformSet = currentMutableTransformSet;
     if(((BRIDGE_CAST void*)[CodenameOne_GLViewController instance].currentMutableImage) == peer) {
@@ -1889,6 +2141,18 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeTileImageGlobalImpl
         Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl();
     }
     TileImage* f = [[TileImage alloc] initWithArgs:alpha xpos:x ypos:y i:(BRIDGE_CAST GLUIImage*)peer w:width h:height];
+#ifdef CN1_USE_METAL
+    // Phase 3 v2: if a mutable target is currently active, tag the op
+    // so drawFrame's drain routes it to the mutable's encoder. Java's
+    // tileImage(graphics, ...) sets this up by calling ng.checkControl
+    // before the JNI -- on the mutable branch, currentMutableImage =
+    // panelImg; on the screen branch, the GlobalGraphics.checkControl
+    // path cleared it via finishDrawingOnImage so it's nil here.
+    GLUIImage *target = [CodenameOne_GLViewController instance].currentMutableImage;
+    if (target != nil) {
+        [f setTarget:target];
+    }
+#endif
     [CodenameOne_GLViewController upcoming:f];
 #ifndef CN1_USE_ARC
     [f release];
@@ -2293,13 +2557,25 @@ EAGLView* lastFoundEaglView;
  * we need to obtain the EAGLView.
  */
 -(EAGLView*) eaglView {
-    if ([self.view class] == [EAGLView class]) {
+    // Under CN1_USE_METAL the rendering view is a METALView, not an EAGLView.
+    // Both classes conform to CN1RenderingView, so the return value is used
+    // through the shared protocol surface (setFramebuffer, presentFramebuffer,
+    // updateFrameBufferSize:h:, addPeerComponent:, peerComponentsLayer).
+    // The declared return type stays EAGLView* for ABI stability; the cast is
+    // duck-typed. Any EAGLView-only call site (e.g. -setContext:) is guarded
+    // by #ifndef CN1_USE_METAL.
+#ifdef CN1_USE_METAL
+    Class renderingClass = [METALView class];
+#else
+    Class renderingClass = [EAGLView class];
+#endif
+    if ([self.view class] == renderingClass) {
         lastFoundEaglView = (EAGLView*)self.view;
         return (EAGLView*)self.view;
     }
     for (UIView* child in self.view.subviews) {
-        
-        if ([child class] == [EAGLView class]) {
+
+        if ([child class] == renderingClass) {
             lastFoundEaglView = (EAGLView*)child;
             return (EAGLView*)child;
         }
@@ -2358,7 +2634,10 @@ EAGLView* lastFoundEaglView;
     [aContext release];
 #endif
 	
+#ifndef CN1_USE_METAL
+    // METALView has no GL context. Under CN1_USE_METAL this call is a no-op.
     [[self eaglView] setContext:context];
+#endif
     [[self eaglView] setFramebuffer];
     //self.view.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     //self.view.autoresizesSubviews = YES;
@@ -2995,11 +3274,44 @@ BOOL prefersStatusBarHidden = NO;
                 [currentTarget removeAllObjects];
             }
             GLErrorLog;
+#ifdef CN1_USE_METAL
+            // Phase 3 v2: walk the queue, switching encoders when target
+            // changes. nil target = screen (already opened by setFramebuffer
+            // at top of drawFrame). non-nil target = mutable GLUIImage --
+            // open a fresh CB+encoder against its texture, drain its ops,
+            // commit (no wait) at next switch or end. Readback paths call
+            // CN1MetalFlushMutableImageSync to wait on the commit.
+            GLUIImage *currentDrainTarget = nil;
+            BOOL mutableEncoderOpen = NO;
+            for (ExecutableOp *ex in cp) {
+                GLUIImage *opTarget = [ex target];
+                if (opTarget != currentDrainTarget) {
+                    if (mutableEncoderOpen) {
+                        CN1MetalEndMutableImageDraw(currentDrainTarget);
+                        mutableEncoderOpen = NO;
+                    }
+                    currentDrainTarget = opTarget;
+                    if (opTarget != nil) {
+                        mutableEncoderOpen = CN1MetalBeginMutableImageDraw(opTarget);
+                    }
+                }
+                // Skip mutable ops whose encoder failed to open. Screen
+                // ops (target=nil) always execute against the screen
+                // encoder set up by setFramebuffer.
+                if (opTarget != nil && !mutableEncoderOpen) continue;
+                [ex executeWithClipping];
+                GLErrorLog;
+            }
+            if (mutableEncoderOpen) {
+                CN1MetalEndMutableImageDraw(currentDrainTarget);
+            }
+#else
             for(ExecutableOp* ex in cp) {
                 [ex executeWithClipping];
                 //[ex executeWithLog];
                 GLErrorLog;
             }
+#endif
             //CN1Log(@"Total memory is: %i", [ExecutableOp get_free_memory]);
 #ifndef CN1_USE_ARC
             [cp release];

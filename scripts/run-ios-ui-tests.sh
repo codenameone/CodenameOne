@@ -163,7 +163,22 @@ fi
 SCHEME="$REQUESTED_SCHEME"
 ri_log "Using scheme $SCHEME"
 
-SCREENSHOT_REF_DIR="$SCRIPT_DIR/ios/screenshots"
+# The golden-image directory defaults to scripts/ios/screenshots for the
+# OpenGL backend. Callers can override via SCREENSHOT_REF_DIR (absolute or
+# relative to the repo root) so parallel backends -- like the Metal port --
+# can ship their own golden set. See Ports/iOSPort/METAL_PORT_STATUS.md.
+if [ -n "${SCREENSHOT_REF_DIR:-}" ]; then
+  if [ ! -d "$SCREENSHOT_REF_DIR" ]; then
+    ri_log "SCREENSHOT_REF_DIR override '$SCREENSHOT_REF_DIR' is not a directory" >&2
+    exit 3
+  fi
+  # Convert to absolute so downstream tools (cn1ss-helpers, etc.) don't
+  # trip over cwd changes.
+  SCREENSHOT_REF_DIR="$(cd "$SCREENSHOT_REF_DIR" && pwd)"
+  ri_log "Using screenshot reference dir from SCREENSHOT_REF_DIR: $SCREENSHOT_REF_DIR"
+else
+  SCREENSHOT_REF_DIR="$SCRIPT_DIR/ios/screenshots"
+fi
 SCREENSHOT_TMP_DIR="$(mktemp -d "${TMPDIR}/cn1-ios-tests-XXXXXX" 2>/dev/null || echo "${TMPDIR}/cn1-ios-tests")"
 SCREENSHOT_RAW_DIR="$SCREENSHOT_TMP_DIR/raw"
 SCREENSHOT_PREVIEW_DIR="$SCREENSHOT_TMP_DIR/previews"
@@ -663,7 +678,15 @@ APP_PROCESS_NAME="${WRAPPER_NAME%.app}"
   echo "App Launch : $(( (LAUNCH_END - LAUNCH_START) * 1000 )) ms" >> "$ARTIFACTS_DIR/ios-test-stats.txt"
 
 END_MARKER="CN1SS:SUITE:FINISHED"
-TIMEOUT_SECONDS=300
+# Per-suite budget (seconds). The 300 -> 600 bump from earlier landed
+# back when the suite was ~37 tests; it has since grown to ~90, and the
+# OpenGL build runs noticeably slower per test than the Metal build on
+# the macos-15-arm64 runners. CI build 25414437442 captured 44 of the
+# 90 GL screenshots before the previous 600s cap fired (the remainder
+# came up as missing-reference). Bump to 1500s to give the GL run
+# headroom while still staying well under any reasonable CI slot length;
+# the env override stays for local runs that want to push it further.
+TIMEOUT_SECONDS="${CN1SS_SUITE_TIMEOUT_SECONDS:-1500}"
 START_TIME="$(date +%s)"
 ri_log "Waiting for DeviceRunner completion marker ($END_MARKER)"
 while true; do
@@ -808,10 +831,14 @@ SUMMARY_FILE="$SCREENSHOT_TMP_DIR/screenshot-summary.txt"
 COMMENT_FILE="$SCREENSHOT_TMP_DIR/screenshot-comment.md"
 
 export CN1SS_PREVIEW_DIR="$SCREENSHOT_PREVIEW_DIR"
-export CN1SS_COMMENT_MARKER="<!-- CN1SS_IOS_COMMENT -->"
-export CN1SS_COMMENT_LOG_PREFIX="[run-ios-device-tests]"
-export CN1SS_PREVIEW_SUBDIR="ios"
-export CN1SS_SUCCESS_MESSAGE="✅ Native iOS screenshot tests passed."
+# All four of these are tunable from the caller so the Metal job can post
+# a separate PR comment instead of overwriting the GL job's comment.
+# Keep the historical GL defaults so existing GL invocations are unchanged.
+export CN1SS_COMMENT_MARKER="${CN1SS_COMMENT_MARKER:-<!-- CN1SS_IOS_COMMENT -->}"
+export CN1SS_COMMENT_LOG_PREFIX="${CN1SS_COMMENT_LOG_PREFIX:-[run-ios-device-tests]}"
+export CN1SS_PREVIEW_SUBDIR="${CN1SS_PREVIEW_SUBDIR:-ios}"
+export CN1SS_SUCCESS_MESSAGE="${CN1SS_SUCCESS_MESSAGE:-✅ Native iOS screenshot tests passed.}"
+REPORT_TITLE="${CN1SS_REPORT_TITLE:-iOS screenshot updates}"
 
 # Load VM translation time if available
 CN1SS_VM_TIME=0
@@ -823,7 +850,7 @@ export CN1SS_VM_TIME
 export CN1SS_COMPILATION_TIME="$COMPILATION_TIME"
 
 cn1ss_process_and_report \
-  "iOS screenshot updates" \
+  "$REPORT_TITLE" \
   "$COMPARE_JSON" \
   "$SUMMARY_FILE" \
   "$COMMENT_FILE" \
@@ -840,5 +867,30 @@ if [ -n "$BASE64_BENCHMARK_FAILURE_LINE" ]; then
   ri_log "STAGE:BENCHMARK_FAILED -> $BASE64_BENCHMARK_FAILURE_LINE"
   exit 16
 fi
+
+# Guard: the suite must produce at least this many screenshots. A bug in
+# the rendering pipeline (e.g. a hang during one test) used to surface as
+# "Compared 1 screenshot" -- the suite would silently exit early after
+# SIGTERM and we'd accept the run as green. The threshold is intentionally
+# below the current suite size (~37 graphics tests) to allow legitimate
+# additions/removals; raise it deliberately when adding tests.
+MIN_SCREENSHOTS="${CN1SS_MIN_SCREENSHOTS:-30}"
+if [ -s "$COMPARE_JSON" ]; then
+  ACTUAL_COUNT="$(python3 -c "import json,sys
+try:
+    with open(sys.argv[1]) as f:
+        d = json.load(f)
+    print(len(d.get('results', [])))
+except Exception as e:
+    print(0)" "$COMPARE_JSON" 2>/dev/null || echo 0)"
+else
+  ACTUAL_COUNT=0
+fi
+if [ "$ACTUAL_COUNT" -lt "$MIN_SCREENSHOTS" ]; then
+  ri_log "STAGE:SCREENSHOT_COUNT_REGRESSION -> got $ACTUAL_COUNT, expected >= $MIN_SCREENSHOTS"
+  ri_log "Suite likely hung or crashed early; check device-runner.log for SIGTERM and the last CN1SS:METAL_DIAG / CN1SS:INFO:suite entries."
+  exit 17
+fi
+ri_log "Screenshot count check passed: $ACTUAL_COUNT >= $MIN_SCREENSHOTS"
 
 exit $comment_rc

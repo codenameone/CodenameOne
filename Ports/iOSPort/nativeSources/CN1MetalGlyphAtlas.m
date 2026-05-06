@@ -1,0 +1,340 @@
+// CN1MetalGlyphAtlas.m
+//
+// Phase 4 implementation. See header for design rationale.
+//
+// Rasterisation pattern: CGBitmapContext with DeviceGray colorspace +
+// kCGImageAlphaNone + white fill. CTFontDrawGlyphs in default Y-up CG
+// renders the glyph into the bitmap such that memory_row_0 holds the
+// padded TOP of the slot and memory_row_(gh-1) the padded BOTTOM —
+// i.e. right-side-up in raster memory order, ready for V=0-at-top
+// sampling.
+
+#import "CN1ES2compat.h"
+#ifdef CN1_USE_METAL
+#import "CN1MetalGlyphAtlas.h"
+
+#define CN1_METAL_ATLAS_INITIAL_W 1024
+#define CN1_METAL_ATLAS_INITIAL_H 1024
+#define CN1_METAL_ATLAS_MAX_W     2048
+#define CN1_METAL_ATLAS_MAX_H     2048
+#define CN1_METAL_ATLAS_PADDING   1
+#define CN1_METAL_ATLAS_GLYPH_MAX 256  // sanity limit on per-glyph bitmap dim
+
+extern id<MTLDevice> CN1MetalDevice(void);
+
+// Simple fixed-size array cache (linear scan). Replaced an
+// NSMutableDictionary that was hanging on CI's iPhone 17 Pro sim during
+// the second lookup of the same key — issue reproduced with diagnostic
+// logging in commit 330fcdc10. Linear scan over <=64 entries is fine.
+//
+// `lastUsedTick` is bumped to a monotonic counter on every cache hit and
+// at insertion, so the LRU eviction below picks the entry that was
+// touched longest ago. Without this the cache used to flat-out reject
+// new fonts once full, and any text rendered after the 16th unique
+// (font, pointSize) request silently dropped on the Metal path -- the
+// bug that made ToolbarTheme / TextFieldTheme / etc. render blank
+// because by the time those tests ran (positions 58-67 in the suite),
+// the cache had already been filled by earlier graphics tests and all
+// further atlasForFont:: calls returned nil.
+#define CN1_METAL_ATLAS_CACHE_MAX 64
+typedef struct {
+    NSString             *key;
+    CN1MetalGlyphAtlas   *atlas;
+    uint64_t              lastUsedTick;
+} CN1MetalAtlasCacheEntry;
+static CN1MetalAtlasCacheEntry atlasCacheEntries[CN1_METAL_ATLAS_CACHE_MAX];
+static int                     atlasCacheCount = 0;
+static uint64_t                atlasCacheTick = 0;
+
+@implementation CN1MetalGlyphSlot
+@end
+
+@interface CN1MetalGlyphAtlas () {
+    NSString                                *_fontKey;
+    CTFontRef                                _ctFont;
+    int                                      _textureWidth;
+    int                                      _textureHeight;
+    id<MTLTexture>                           _texture;
+    NSMutableDictionary<NSNumber *,
+                        CN1MetalGlyphSlot *> *_slots;
+    int                                      _shelfY;
+    int                                      _shelfHeight;
+    int                                      _cursorX;
+}
+@end
+
+@implementation CN1MetalGlyphAtlas
+
++ (nullable instancetype)atlasForFont:(nonnull UIFont *)font {
+    NSString *key = [NSString stringWithFormat:@"%@|%g", font.fontName, (double)font.pointSize];
+    atlasCacheTick++;
+    for (int i = 0; i < atlasCacheCount; i++) {
+        if ([atlasCacheEntries[i].key isEqualToString:key]) {
+            atlasCacheEntries[i].lastUsedTick = atlasCacheTick;
+            return atlasCacheEntries[i].atlas;
+        }
+    }
+    CN1MetalGlyphAtlas *fresh = [[CN1MetalGlyphAtlas alloc] initWithFont:font key:key];
+    if (fresh == nil) return nil;
+    // Note: this file builds without ARC (cn1's iOS port keeps
+    // CLANG_ENABLE_OBJC_ARC=NO; see METALView.m's #ifndef CN1_USE_ARC).
+    // The static C-struct pointers therefore do NOT auto-retain — we
+    // own a strong reference to each cached entry by transferring the
+    // alloc/init +1 (for `fresh`) and the [copy] +1 (for `key`)
+    // straight into the cache. The previous NSMutableDictionary cache
+    // hung on its second lookup because the dictionary itself, created
+    // via [NSMutableDictionary dictionary] (autoreleased), was
+    // deallocated when the autorelease pool drained between frames.
+    int slot;
+    if (atlasCacheCount < CN1_METAL_ATLAS_CACHE_MAX) {
+        slot = atlasCacheCount++;
+    } else {
+        // LRU eviction: pick the entry with the smallest lastUsedTick.
+        // Skipping this turned every overflow request into a nil return
+        // and the calling CN1MetalDrawString silently dropped the string.
+        slot = 0;
+        uint64_t oldest = atlasCacheEntries[0].lastUsedTick;
+        for (int i = 1; i < CN1_METAL_ATLAS_CACHE_MAX; i++) {
+            if (atlasCacheEntries[i].lastUsedTick < oldest) {
+                oldest = atlasCacheEntries[i].lastUsedTick;
+                slot = i;
+            }
+        }
+        // Drop the +1 retains held by the slot before overwriting:
+        // key was [key copy] (+1) and atlas was alloc/init (+1). Without
+        // releasing them the cache leaks one NSString and one MTLTexture-
+        // backed atlas per eviction under MRR.
+#ifndef CN1_USE_ARC
+        [atlasCacheEntries[slot].key release];
+        [atlasCacheEntries[slot].atlas release];
+#endif
+        atlasCacheEntries[slot].key = nil;
+        atlasCacheEntries[slot].atlas = nil;
+    }
+    atlasCacheEntries[slot].key = [key copy];
+    atlasCacheEntries[slot].atlas = fresh;
+    atlasCacheEntries[slot].lastUsedTick = atlasCacheTick;
+    return fresh;
+}
+
+- (instancetype)initWithFont:(UIFont *)uifont key:(NSString *)key {
+    self = [super init];
+    if (self == nil) return nil;
+    id<MTLDevice> device = CN1MetalDevice();
+    if (device == nil) return nil;
+
+    _fontKey = [key copy];
+    // Build the CTFont from UIFont's descriptor, NOT from .fontName.
+    // iOS system fonts have private names like ".SFUI-Regular" and
+    // CTFontCreateWithName silently falls back to Times for those —
+    // text on the screen path then renders as a serif Times Roman
+    // instead of the requested system font. UIFontDescriptor and
+    // CTFontDescriptor are toll-free bridged, so casting through
+    // .fontDescriptor preserves the actual font identity.
+    CTFontDescriptorRef ctDesc = (__bridge CTFontDescriptorRef)uifont.fontDescriptor;
+    _ctFont = CTFontCreateWithFontDescriptor(ctDesc, uifont.pointSize, NULL);
+    if (_ctFont == NULL) return nil;
+
+    _textureWidth = CN1_METAL_ATLAS_INITIAL_W;
+    _textureHeight = CN1_METAL_ATLAS_INITIAL_H;
+
+    MTLTextureDescriptor *desc = [MTLTextureDescriptor
+        texture2DDescriptorWithPixelFormat:MTLPixelFormatR8Unorm
+        width:(NSUInteger)_textureWidth
+        height:(NSUInteger)_textureHeight
+        mipmapped:NO];
+    desc.usage = MTLTextureUsageShaderRead;
+    _texture = [device newTextureWithDescriptor:desc];
+    if (_texture == nil) {
+        CFRelease(_ctFont);
+        _ctFont = NULL;
+        return nil;
+    }
+
+    // alloc+init (NOT [NSMutableDictionary dictionary]) so the +1 retain
+    // is owned by us and survives the next autorelease pool drain. This
+    // file builds without ARC and direct ivar assignment doesn't auto-
+    // retain. Same bug as the static atlasCache had — discovered when
+    // CI hung at the runs loop in CN1MetalDrawString because slotForGlyph
+    // dereferenced a deallocated _slots dictionary.
+    _slots = [[NSMutableDictionary alloc] init];
+    _shelfY = CN1_METAL_ATLAS_PADDING;
+    _shelfHeight = 0;
+    _cursorX = CN1_METAL_ATLAS_PADDING;
+
+    return self;
+}
+
+- (void)dealloc {
+    if (_ctFont != NULL) {
+        CFRelease(_ctFont);
+        _ctFont = NULL;
+    }
+    // Non-ARC: release the +1 retains held by these ivars. _fontKey was
+    // [key copy] (+1), _texture was [device newTextureWithDescriptor:]
+    // (the "new" prefix returns +1), _slots was [[NSMutableDictionary
+    // alloc] init] (+1). Without these releases the MTLTexture and slot
+    // dictionary leak each time CN1MetalReleaseCaches drops an atlas.
+    [_fontKey release]; _fontKey = nil;
+    [_texture release]; _texture = nil;
+    [_slots release];   _slots = nil;
+#ifndef CN1_USE_ARC
+    [super dealloc];
+#endif
+}
+
+- (id<MTLTexture>)texture { return _texture; }
+- (int)textureWidth      { return _textureWidth; }
+- (int)textureHeight     { return _textureHeight; }
+- (CTFontRef)ctFont      { return _ctFont; }
+
+- (BOOL)tryGrowAtlas {
+    if (_textureWidth >= CN1_METAL_ATLAS_MAX_W && _textureHeight >= CN1_METAL_ATLAS_MAX_H) return NO;
+    id<MTLDevice> device = CN1MetalDevice();
+    if (device == nil) return NO;
+
+    int newW = MIN(_textureWidth * 2,  CN1_METAL_ATLAS_MAX_W);
+    int newH = MIN(_textureHeight * 2, CN1_METAL_ATLAS_MAX_H);
+
+    MTLTextureDescriptor *desc = [MTLTextureDescriptor
+        texture2DDescriptorWithPixelFormat:MTLPixelFormatR8Unorm
+        width:(NSUInteger)newW height:(NSUInteger)newH mipmapped:NO];
+    desc.usage = MTLTextureUsageShaderRead;
+    id<MTLTexture> newTex = [device newTextureWithDescriptor:desc];
+    if (newTex == nil) return NO;
+
+    // Drop slots; next reference re-rasterises into the larger atlas.
+    [_slots removeAllObjects];
+    _shelfY = CN1_METAL_ATLAS_PADDING;
+    _shelfHeight = 0;
+    _cursorX = CN1_METAL_ATLAS_PADDING;
+#ifndef CN1_USE_ARC
+    // Release the previous _texture's +1 retain (held since alloc-init or
+    // the previous tryGrowAtlas) before overwriting the ivar with newTex's
+    // +1; otherwise every grow leaks the previous atlas texture.
+    [_texture release];
+#endif
+    _texture = newTex;
+    _textureWidth = newW;
+    _textureHeight = newH;
+    return YES;
+}
+
+- (CN1MetalGlyphSlot *)slotForGlyph:(CGGlyph)glyph {
+    NSNumber *key = @(glyph);
+    CN1MetalGlyphSlot *cached = _slots[key];
+    if (cached != nil) return cached;
+
+    CGRect bbox = CGRectZero;
+    CGSize advance = CGSizeZero;
+    CTFontGetBoundingRectsForGlyphs(_ctFont, kCTFontOrientationHorizontal, &glyph, &bbox, 1);
+    CTFontGetAdvancesForGlyphs(_ctFont, kCTFontOrientationHorizontal, &glyph, &advance, 1);
+
+    // Empty glyph (space, control char, etc): record zero-width slot so
+    // subsequent calls hit the cache fast and DrawString just consumes
+    // the advance without emitting a quad.
+    if (bbox.size.width <= 0 || bbox.size.height <= 0) {
+        CN1MetalGlyphSlot *empty = [[CN1MetalGlyphSlot alloc] init];
+        empty.atlasX = 0; empty.atlasY = 0;
+        empty.width = 0;  empty.height = 0;
+        empty.bearingX = 0; empty.bearingY = 0;
+        empty.bboxWidth = 0; empty.bboxHeight = 0;
+        _slots[key] = empty;
+        return empty;
+    }
+
+    int gw = (int)ceilf((float)bbox.size.width)  + 2 * CN1_METAL_ATLAS_PADDING;
+    int gh = (int)ceilf((float)bbox.size.height) + 2 * CN1_METAL_ATLAS_PADDING;
+    // Refuse oversized glyphs: protects the bitmap allocation if a font
+    // returns absurd metrics. A 256x256 cap is plenty for system text.
+    if (gw > CN1_METAL_ATLAS_GLYPH_MAX || gh > CN1_METAL_ATLAS_GLYPH_MAX) return nil;
+
+    // Shelf-pack: open a new shelf if current one is too narrow to fit.
+    if (_cursorX + gw > _textureWidth - CN1_METAL_ATLAS_PADDING) {
+        _shelfY += _shelfHeight + CN1_METAL_ATLAS_PADDING;
+        _cursorX = CN1_METAL_ATLAS_PADDING;
+        _shelfHeight = 0;
+    }
+    if (_shelfY + gh > _textureHeight - CN1_METAL_ATLAS_PADDING) {
+        if (![self tryGrowAtlas]) return nil;
+        if (_cursorX + gw > _textureWidth - CN1_METAL_ATLAS_PADDING ||
+            _shelfY + gh > _textureHeight - CN1_METAL_ATLAS_PADDING) {
+            return nil;
+        }
+    }
+    if (gh > _shelfHeight) _shelfHeight = gh;
+
+    int slotX = _cursorX;
+    int slotY = _shelfY;
+    _cursorX += gw + CN1_METAL_ATLAS_PADDING;
+
+    // Rasterise into a local R8 buffer using DeviceGray + kCGImageAlphaNone
+    // + white fill. CTFontDrawGlyphs renders the glyph paths in white
+    // (== 0xff in the R8 pixel) on a black (== 0x00) background; sampled
+    // through cn1_fs_alpha_mask the .r channel becomes alpha coverage.
+    //
+    // Y-up CG default: drawing the glyph at user origin
+    // (padding - bearingX, padding - bearingY) places the bbox at user
+    // x ∈ [padding, padding + bbox.width], y ∈ [padding, padding + bbox.height].
+    // Memory layout (Apple bitmap convention: memory_row_0 at TOP of bitmap)
+    // maps user-y=padding+bbox.height → memory_row_(padding-1) and
+    // user-y=padding → memory_row_(gh-1-padding); i.e. the glyph occupies
+    // memory rows [padding-1 .. gh-1-padding] right-side-up. memory_row_0
+    // is the TOP padding band, memory_row_(gh-1) the BOTTOM padding band.
+    size_t bytesPerRow = (size_t)gw;
+    void *pixels = calloc((size_t)gh * bytesPerRow, 1);
+    if (pixels == NULL) return nil;
+    CGColorSpaceRef cs = CGColorSpaceCreateDeviceGray();
+    CGContextRef ctx = CGBitmapContextCreate(pixels, (size_t)gw, (size_t)gh, 8,
+                                             bytesPerRow, cs,
+                                             (CGBitmapInfo)kCGImageAlphaNone);
+    CGColorSpaceRelease(cs);
+    if (ctx == NULL) {
+        free(pixels);
+        return nil;
+    }
+    CGContextSetGrayFillColor(ctx, 1.0, 1.0);
+
+    CGPoint origin = CGPointMake((CGFloat)CN1_METAL_ATLAS_PADDING - bbox.origin.x,
+                                 (CGFloat)CN1_METAL_ATLAS_PADDING - bbox.origin.y);
+    CTFontDrawGlyphs(_ctFont, &glyph, &origin, 1, ctx);
+    CGContextRelease(ctx);
+
+    [_texture replaceRegion:MTLRegionMake2D((NSUInteger)slotX, (NSUInteger)slotY,
+                                            (NSUInteger)gw, (NSUInteger)gh)
+                mipmapLevel:0
+                  withBytes:pixels
+                bytesPerRow:bytesPerRow];
+    free(pixels);
+
+    CN1MetalGlyphSlot *slot = [[CN1MetalGlyphSlot alloc] init];
+    slot.atlasX = slotX;
+    slot.atlasY = slotY;
+    slot.width = gw;
+    slot.height = gh;
+    slot.bearingX = (float)bbox.origin.x;
+    slot.bearingY = (float)bbox.origin.y;
+    slot.bboxWidth = (float)bbox.size.width;
+    slot.bboxHeight = (float)bbox.size.height;
+    _slots[key] = slot;
+    return slot;
+}
+
+@end
+
+// Drop every cached atlas. Called by CN1MetalReleaseCaches on
+// UIApplicationDidReceiveMemoryWarning. Each entry's key (NSString,
+// retained via [copy]) and atlas (CN1MetalGlyphAtlas, retained via the
+// alloc/init +1 transferred in atlasForFont:) own +1 retains under
+// MRR; release them explicitly. Subsequent lookups re-create on demand.
+void CN1MetalGlyphAtlasReleaseAll(void) {
+    for (int i = 0; i < atlasCacheCount; i++) {
+        [atlasCacheEntries[i].key release];
+        [atlasCacheEntries[i].atlas release];
+        atlasCacheEntries[i].key = nil;
+        atlasCacheEntries[i].atlas = nil;
+    }
+    atlasCacheCount = 0;
+}
+
+#endif // CN1_USE_METAL

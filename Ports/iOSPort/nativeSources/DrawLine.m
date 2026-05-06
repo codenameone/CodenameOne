@@ -23,6 +23,9 @@
 #import "DrawLine.h"
 #import "CodenameOne_GLViewController.h"
 #include "xmlvm.h"
+#ifdef CN1_USE_METAL
+#import "CN1Metalcompat.h"
+#endif
 #ifdef USE_ES2
 extern GLKMatrix4 CN1modelViewMatrix;
 extern GLKMatrix4 CN1projectionMatrix;
@@ -104,6 +107,9 @@ static GLuint getOGLProgram(){
 
 #ifdef USE_ES2
 -(void)execute {
+#ifdef CN1_USE_METAL
+    CN1MetalDrawLine(color, alpha, x1, y1, x2, y2);
+#else
     glUseProgram(getOGLProgram());
     
     GLKVector4 colorV = GLKVector4Make(((float)((color >> 16) & 0xff))/255.0, \
@@ -157,9 +163,10 @@ static GLuint getOGLProgram(){
         glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
         GLErrorLog;
     }
-    
+
     //glUseProgram(CN1activeProgram);
     //GLErrorLog;
+#endif // CN1_USE_METAL
 }
 #else
 -(void)execute {

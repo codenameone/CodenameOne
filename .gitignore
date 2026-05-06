@@ -100,3 +100,4 @@ dependency-reduced-pom.xml
 /.playwright-cli
 package-lock.json
 package.json
+.claude/

@@ -46,7 +46,12 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     // throttles 500-byte chunks at 30ms each to keep logcat from dropping
     // lines, so a 60KB PNG plus its preview takes ~6s per appearance, and
     // a dual-appearance test like SpanLabelTheme legitimately needs ~12s
-    // even on a healthy device).
+    // even on a healthy device). The 30s figure also covers the iOS Metal
+    // port's mutable rendering, which allocates a temp UIImage + MTLTexture
+    // per round-rect / arc / gradient call (the CG-rasterise-then-DrawImage
+    // bridge), so FillRoundRect / DrawRoundRect and DrawImage on slow CI
+    // simulators legitimately blow past the 10s budget while still making
+    // forward progress.
     private static final int TEST_TIMEOUT_MS_HTML5 = 10000;
     private static final int TEST_TIMEOUT_MS_NATIVE = 30000;
     private static final int TEST_POLL_INTERVAL_MS = 50;
@@ -154,7 +159,8 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new CallDetectionAPITest(),
             new LocalNotificationOverrideTest(),
             new Base64NativePerformanceTest(),
-            new AccessibilityTest()
+            new AccessibilityTest(),
+            new MutableImageReadbackTest()
     };
 
     private static BaseTest prependedTest;

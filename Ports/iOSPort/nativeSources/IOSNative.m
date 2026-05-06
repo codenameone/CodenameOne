@@ -28,6 +28,9 @@
 #include "xmlvm.h"
 #include "java_lang_String.h"
 #import "CN1ES2compat.h"
+#ifdef CN1_USE_METAL
+#import "CN1Metalcompat.h"
+#endif
 #import <objc/runtime.h>
 
 #ifndef NEW_CODENAME_ONE_VM
@@ -437,6 +440,15 @@ void com_codename1_impl_ios_IOSNative_initVM__(CN1_THREAD_STATE_MULTI_ARG JAVA_O
     POOL_END();
 }
 
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isMetalRendering__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject)
+{
+#ifdef CN1_USE_METAL
+    return JAVA_TRUE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+
 void xmlvm_init_native_com_codename1_impl_ios_IOSNative()
 {
 }
@@ -780,8 +792,34 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_gausianBlurImage___long_float(CN1_THR
         Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl();
     }
 
-    UIImage* original = [glu getImage];
-    
+    UIImage* original = nil;
+#ifdef CN1_USE_METAL
+    // On Metal the mutable's pixels live in mtlMutableTexture, not in
+    // [glu getImage]; the latter returns the original (likely empty)
+    // UIImage that was used to construct the GLUIImage. Read the GPU
+    // texture back to a UIImage so CIGaussianBlur sees actual pixels.
+    // Switch's createRoundThumbImage depends on this -- without it the
+    // blur runs on transparent input, returns empty, and the pre-blur
+    // shadow rings end up showing through as visible artefacts on the
+    // final thumb composite.
+    if ([glu mtlMutableTexture] != nil) {
+        // Force drawFrame to drain any pending ExecutableOps for this image
+        // before sampling. Without the flush the GPU never executes the
+        // shadow-ring fillArc calls; CN1MetalReadMutableImageAsUIImage
+        // would then sample the cleared (zero-alpha) texture and the blur
+        // input is empty. Mirrors imageRgbToIntArrayImpl's drain dance.
+        extern int displayWidth;
+        extern int displayHeight;
+        [[CodenameOne_GLViewController instance] flushBuffer:nil x:0 y:0 width:displayWidth height:displayHeight];
+        original = CN1MetalReadMutableImageAsUIImage(glu);
+    }
+    if (original == nil) {
+        original = [glu getImage];
+    }
+#else
+    original = [glu getImage];
+#endif
+
     // taken from: http://stackoverflow.com/a/19433086/756809
     CIFilter *gaussianBlurFilter = [CIFilter filterWithName:@"CIGaussianBlur"];
     [gaussianBlurFilter setDefaults];
@@ -789,14 +827,14 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_gausianBlurImage___long_float(CN1_THR
     [gaussianBlurFilter setValue:inputImage forKey:kCIInputImageKey];
     NSNumber *radiusNumber = [NSNumber numberWithFloat:radius];
     [gaussianBlurFilter setValue:radiusNumber forKey:kCIInputRadiusKey];
-    
+
     CIImage *outputImage = [gaussianBlurFilter outputImage];
     CIContext *context   = [CIContext contextWithOptions:nil];
     CGImageRef cgimg     = [context createCGImage:outputImage fromRect:[inputImage extent]];
     UIImage *image       = [UIImage imageWithCGImage:cgimg];
     CGImageRelease(cgimg);
     GLUIImage* gl = [[GLUIImage alloc] initWithImage:image];
-    
+
     POOL_END();
     return (BRIDGE_CAST void*)gl;
 }
@@ -1023,23 +1061,35 @@ extern CGContextRef Java_com_codename1_impl_ios_IOSImplementation_drawPath(CN1_T
 static CGContextRef drawPath(CN1_THREAD_STATE_MULTI_ARG JAVA_INT commandsLen, JAVA_OBJECT commandsArr, JAVA_INT pointsLen, JAVA_OBJECT pointsArr) {
 
     return Java_com_codename1_impl_ios_IOSImplementation_drawPath(CN1_THREAD_STATE_PASS_ARG commandsLen, commandsArr, pointsLen, pointsArr);
-    
-   
+
+
 
 }
 
 
 //native void nativeFillShapeMutable(int color, int alpha, int commandsLen, byte[] commandsArr, int pointsLen, float[] pointsArr);
 void com_codename1_impl_ios_IOSNative_nativeFillShapeMutable___int_int_int_byte_1ARRAY_int_float_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT color, JAVA_INT alpha, JAVA_INT commandsLen, JAVA_OBJECT commandsArr, JAVA_INT pointsLen, JAVA_OBJECT pointsArr) {
+#ifdef CN1_USE_METAL
+    // Dead under Metal -- MutableGraphics.nativeFillShape now routes
+    // through createAlphaMask + drawTextureAlphaMask (alpha-mask Metal
+    // pipeline tagged with currentMutableImage). The Java side gates
+    // with `metalRendering` before calling this JNI.
+    (void)color; (void)alpha; (void)commandsLen; (void)commandsArr; (void)pointsLen; (void)pointsArr;
+#else
     POOL_BEGIN();
     [UIColorFromRGB(color, alpha) set];
     CGContextRef context = drawPath(CN1_THREAD_STATE_PASS_ARG commandsLen, commandsArr, pointsLen, pointsArr);
     CGContextFillPath(context);
     POOL_END();
-    
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_nativeDrawShapeMutable___int_int_int_byte_1ARRAY_int_float_1ARRAY_float_int_int_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT color, JAVA_INT alpha, JAVA_INT commandsLen, JAVA_OBJECT commandsArr, JAVA_INT pointsLen, JAVA_OBJECT pointsArr, JAVA_FLOAT lineWidth, JAVA_INT capStyle, JAVA_INT joinStyle, JAVA_FLOAT mitreLimit) {
+#ifdef CN1_USE_METAL
+    // Same rationale as nativeFillShapeMutable above.
+    (void)color; (void)alpha; (void)commandsLen; (void)commandsArr; (void)pointsLen; (void)pointsArr;
+    (void)lineWidth; (void)capStyle; (void)joinStyle; (void)mitreLimit;
+#else
     POOL_BEGIN();
     if ([CodenameOne_GLViewController isCurrentMutableTransformSet]) {
         CGContextSaveGState(UIGraphicsGetCurrentContext());
@@ -1094,6 +1144,7 @@ void com_codename1_impl_ios_IOSNative_nativeDrawShapeMutable___int_int_int_byte_
         CGContextRestoreGState(context);
     }
     POOL_END();
+#endif
 }
 
 
@@ -2429,6 +2480,31 @@ void com_codename1_impl_ios_IOSNative_fillLinearGradientGlobal___int_int_int_int
 }
 
 void com_codename1_impl_ios_IOSNative_fillRectRadialGradientMutable___int_int_int_int_int_int_float_float_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT width, JAVA_INT height, JAVA_FLOAT relativeX, JAVA_FLOAT relativeY, JAVA_FLOAT relativeSize) {
+#ifdef CN1_USE_METAL
+    {
+        // Phase 3 v2: route through ExecutableOp queue. type=1 is
+        // GRAD_TYPE_RADIAL inside DrawGradient; CN1MetalDrawGradient
+        // handles the radial branch identically to the global path.
+        GLUIImage *target = [CodenameOne_GLViewController instance].currentMutableImage;
+        if (target == nil) return;
+        DrawGradient *d = [[DrawGradient alloc] initWithArgs:1
+                                                  startColorA:n1
+                                                    endColorA:n2
+                                                          xA:n3
+                                                          yA:n4
+                                                       widthA:width
+                                                      heightA:height
+                                                   relativeXA:relativeX
+                                                   relativeYA:relativeY
+                                                relativeSizeA:relativeSize];
+        [d setTarget:target];
+        [CodenameOne_GLViewController upcoming:d];
+#ifndef CN1_USE_ARC
+        [d release];
+#endif
+        return;
+    }
+#endif
     POOL_BEGIN();
     float alpha1 = 1.0;
     if (((n1 >> 24) & 0xff) != 0) {
@@ -2467,6 +2543,32 @@ void com_codename1_impl_ios_IOSNative_fillRectRadialGradientMutable___int_int_in
 }
 
 void com_codename1_impl_ios_IOSNative_fillLinearGradientMutable___int_int_int_int_int_int_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT width, JAVA_INT height, JAVA_BOOLEAN n7) {
+#ifdef CN1_USE_METAL
+    {
+        // Phase 3 v2: route the mutable linear-gradient through the
+        // ExecutableOp queue so it lands in the mutable's MTLTexture,
+        // not the now-nil UIGraphicsGetCurrentContext(). 2 = horizontal,
+        // 3 = vertical -- matches DrawGradient's enum.
+        GLUIImage *target = [CodenameOne_GLViewController instance].currentMutableImage;
+        if (target == nil) return;
+        DrawGradient *d = [[DrawGradient alloc] initWithArgs:(n7 ? 2 : 3)
+                                                  startColorA:n1
+                                                    endColorA:n2
+                                                          xA:n3
+                                                          yA:n4
+                                                       widthA:width
+                                                      heightA:height
+                                                   relativeXA:0
+                                                   relativeYA:0
+                                                relativeSizeA:0];
+        [d setTarget:target];
+        [CodenameOne_GLViewController upcoming:d];
+#ifndef CN1_USE_ARC
+        [d release];
+#endif
+        return;
+    }
+#endif
     POOL_BEGIN();
 
     float alpha1 = 1.0;
@@ -6099,10 +6201,74 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createImageFile___long_boolean_int_in
 #ifndef CN1_USE_ARC
     [(BRIDGE_CAST GLUIImage*)((void *)imagePeer) retain];
 #endif
+#ifdef CN1_USE_METAL
+    // Phase 3 v2: PNG/JPEG encoding sources from [GLUIImage getImage] which
+    // is the original UIImage backing — initial-fill colour for any mutable
+    // that's been drawn into via Metal. Drain the op queue first so the
+    // mutable's MTLTexture has the latest pixels, then read those pixels
+    // into a fresh UIImage and encode that. flushBuffer already dispatches
+    // sync to the main thread and runs drawFrame; doing it OUTSIDE the
+    // dispatch_sync block below avoids the nested-dispatch_sync deadlock
+    // that would otherwise occur (we'd be waiting on main to run drawFrame
+    // while main is waiting on us to free the dispatch_sync slot).
+    {
+        GLUIImage *glllOuter = (BRIDGE_CAST GLUIImage*)((void *)imagePeer);
+        if ([glllOuter mtlMutableTexture] != nil) {
+            BOOL stillDrawing = (((BRIDGE_CAST void*)[CodenameOne_GLViewController instance].currentMutableImage) == ((void *)imagePeer));
+            if (stillDrawing) {
+                Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl();
+            }
+            int dw = Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl();
+            int dh = Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl();
+            [[CodenameOne_GLViewController instance] flushBuffer:nil x:0 y:0 width:dw height:dh];
+            if (stillDrawing) {
+                int restoreW = [glllOuter mtlMutableWidth];
+                int restoreH = [glllOuter mtlMutableHeight];
+                Java_com_codename1_impl_ios_IOSImplementation_startDrawingOnImageImpl(restoreW, restoreH, (void *)imagePeer);
+            }
+        }
+    }
+#endif
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         GLUIImage* glll = (BRIDGE_CAST GLUIImage*)((void *)imagePeer);
-        UIImage* i = [glll getImage];
+        UIImage* i = nil;
+#ifdef CN1_USE_METAL
+        // If the image has live Metal pixels, blit-and-read into a fresh
+        // UIImage so PNG/JPEG encoding sees post-draw content rather than
+        // the stale UIImage initial-fill backing.
+        if ([glll mtlMutableTexture] != nil) {
+            int srcW = [glll mtlMutableWidth];
+            int srcH = [glll mtlMutableHeight];
+            if (srcW > 0 && srcH > 0) {
+                int *pixels = (int *)malloc((size_t)srcW * (size_t)srcH * sizeof(int));
+                if (pixels != NULL) {
+                    if (CN1MetalReadMutableImagePixels(glll, pixels, 0, 0, srcW, srcH, srcW, srcH)) {
+                        // CN1MetalReadMutableImagePixels writes ARGB ints; wrap as a
+                        // CGImage with RGBA byte order (the alpha-first/last and
+                        // R/B swap matches what UIKit expects for iOS little-endian).
+                        CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
+                        CGContextRef ctx = CGBitmapContextCreate(pixels, (size_t)srcW, (size_t)srcH, 8,
+                                                                  (size_t)srcW * 4, cs,
+                                                                  kCGBitmapByteOrder32Little | kCGImageAlphaPremultipliedFirst);
+                        CGColorSpaceRelease(cs);
+                        if (ctx != NULL) {
+                            CGImageRef cgImg = CGBitmapContextCreateImage(ctx);
+                            CGContextRelease(ctx);
+                            if (cgImg != NULL) {
+                                i = [UIImage imageWithCGImage:cgImg scale:1.0 orientation:UIImageOrientationUp];
+                                CGImageRelease(cgImg);
+                            }
+                        }
+                    }
+                    free(pixels);
+                }
+            }
+        }
+#endif
+        if (i == nil) {
+            i = [glll getImage];
+        }
         if(width == -1) {
             float aspect = height / i.size.height;
             blockWidth = (int)(i.size.width * aspect);
@@ -6119,7 +6285,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createImageFile___long_boolean_int_in
         } else {
             data = UIImagePNGRepresentation(i);
         }
-        
+
 #ifndef CN1_USE_ARC
         [data retain];
 #endif
@@ -8416,22 +8582,29 @@ void com_codename1_impl_ios_IOSNative_nativeDrawPath___int_int_long(CN1_THREAD_S
     
 }
 
-extern void Java_com_codename1_impl_ios_IOSImplementation_drawTextureAlphaMaskImpl(GLuint textureName, int color, int alpha, int x, int y, int w, int h);
+extern void Java_com_codename1_impl_ios_IOSImplementation_drawTextureAlphaMaskImpl(JAVA_LONG textureName, int color, int alpha, int x, int y, int w, int h);
 void com_codename1_impl_ios_IOSNative_drawTextureAlphaMask___long_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG textureName, JAVA_INT color, JAVA_INT alpha, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h)
 {
-    Java_com_codename1_impl_ios_IOSImplementation_drawTextureAlphaMaskImpl((GLuint)textureName, color, alpha, x, y, w, h);
-    
-    
+    Java_com_codename1_impl_ios_IOSImplementation_drawTextureAlphaMaskImpl(textureName, color, alpha, x, y, w, h);
+
+
 }
 
 void com_codename1_impl_ios_IOSNative_nativeDeleteTexture___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG textureName)
 {
+    if (textureName == 0) return;
+#ifdef CN1_USE_METAL
+    // Texture handle is a CFBridgingRetain'd id<MTLTexture>; release it to
+    // drop the retain that nativePathRendererCreateTexture took.
+    CFBridgingRelease((CFTypeRef)(void *)(uintptr_t)textureName);
+#else
     dispatch_async(dispatch_get_main_queue(), ^{
         GLuint tex = (GLuint)textureName;
         //POOL_BEGIN();
         glDeleteTextures(1, &tex);
         //POOL_END();
     });
+#endif
 }
 
 
@@ -8501,8 +8674,46 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_nativePathRendererToARGB___long_int
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathRendererCreateTexture___long(JAVA_OBJECT instanceObject, JAVA_LONG renderer)
 {
+#ifdef CN1_USE_METAL
+    {
+        Renderer *r = (Renderer*)renderer;
+        JAVA_INT outputBounds[4];
+        Renderer_getOutputBounds(renderer, (JAVA_INT*)&outputBounds);
+        if (outputBounds[2] < 0 || outputBounds[3] < 0) return 0;
+        JAVA_INT x = min(outputBounds[0], outputBounds[2]);
+        JAVA_INT y = min(outputBounds[1], outputBounds[3]);
+        JAVA_INT width = outputBounds[2] - outputBounds[0];
+        JAVA_INT height = outputBounds[3] - outputBounds[1];
+        if (width < 0) width = -width;
+        if (height < 0) height = -height;
+        if (width == 0 || height == 0) return 0;
+        AlphaConsumer ac;
+        ac.originX = x; ac.originY = y; ac.width = width; ac.height = height;
+        jbyte *maskArray = malloc(sizeof(jbyte) * ac.width * ac.height);
+        ac.alphas = maskArray;
+        Renderer_produceAlphas(renderer, &ac);
+        // Build R8 MTLTexture from the alpha bytes; CFBridgingRetain so the
+        // Java-side handle (returned as JAVA_LONG) keeps the texture alive
+        // until nativeDeleteTexture releases it.
+        id<MTLTexture> tex = CN1MetalCreateAlphaMaskTexture((const uint8_t *)maskArray, width, height);
+        free(maskArray);
+        if (tex == nil) return 0;
+        // Under MRR, CFBridgingRetain calls CFRetain (no ownership transfer
+        // like ARC's __bridge_retained). CN1MetalCreateAlphaMaskTexture
+        // returns a +1 (newTextureWithDescriptor), and CFBridgingRetain adds
+        // a second +1, for a net +2. Java's nativeDeleteTexture only
+        // CFBridgingReleases once on dispose, so we'd leak one full alpha-
+        // mask MTLTexture per drawShape call. Release the local tex once
+        // CF holds its retain via CFBridgingRetain.
+        JAVA_LONG handle = (JAVA_LONG)(uintptr_t)CFBridgingRetain(tex);
+#ifndef CN1_USE_ARC
+        [tex release];
+#endif
+        return handle;
+    }
+#endif
 #ifdef USE_ES2
-    
+
     __block JAVA_LONG outTexture = NULL;
     
     dispatch_sync(dispatch_get_main_queue(), ^{
@@ -8946,6 +9157,10 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getVKBWidth___R_int(CN1_THREAD_STATE_M
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isPainted___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
     return com_codename1_impl_ios_IOSNative_isPainted__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isMetalRendering___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return com_codename1_impl_ios_IOSNative_isMetalRendering__(CN1_THREAD_STATE_PASS_ARG instanceObject);
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_nativeIsAlphaMaskSupportedGlobal___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject)
