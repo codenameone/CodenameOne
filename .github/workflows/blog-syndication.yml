@@ -51,19 +51,23 @@ jobs:
         id: browser_creds
         env:
           FOOJAY_USER: ${{ secrets.FOOJAY_USER }}
-          HACKERNOON_USER: ${{ secrets.HACKERNOON_USER }}
         run: |
-          if [ -n "${FOOJAY_USER}" ] || [ -n "${HACKERNOON_USER}" ]; then
+          if [ -n "${FOOJAY_USER}" ]; then
             echo "any_configured=true" >> "${GITHUB_OUTPUT}"
           else
             echo "any_configured=false" >> "${GITHUB_OUTPUT}"
           fi
 
+      - name: Install markdown package (for browser-extension queue HTML)
+        run: |
+          set -euo pipefail
+          pip install markdown
+
       - name: Install Playwright dependencies
         if: ${{ steps.browser_creds.outputs.any_configured == 'true' }}
         run: |
           set -euo pipefail
-          pip install playwright markdown
+          pip install playwright
           playwright install --with-deps chromium
 
       - name: Run browser syndication script
@@ -71,8 +75,6 @@ jobs:
         env:
           FOOJAY_USER: ${{ secrets.FOOJAY_USER }}
           FOOJAY_PASSWORD: ${{ secrets.FOOJAY_PASSWORD }}
-          HACKERNOON_USER: ${{ secrets.HACKERNOON_USER }}
-          HACKERNOON_PASSWORD: ${{ secrets.HACKERNOON_PASSWORD }}
         run: |
           set -euo pipefail
           if [ "${{ inputs.dry_run }}" = "true" ]; then
