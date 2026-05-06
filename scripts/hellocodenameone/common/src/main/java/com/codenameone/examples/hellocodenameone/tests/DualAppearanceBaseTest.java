@@ -9,6 +9,7 @@ import com.codename1.ui.Font;
 import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Painter;
+import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.Layout;
 import com.codename1.ui.plaf.Style;
@@ -150,10 +151,36 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
                     // race over the same transitioning buffer and produce
                     // byte-identical PNGs (classic symptom was
                     // ButtonTheme_light.png == ButtonTheme_dark.png).
-                    Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot(imageName, next);
+                    //
+                    // Even with that chain in place, on iOS Metal the
+                    // light->dark show transition was leaving the previous
+                    // frame's pixels in the CAMetalLayer at the moment
+                    // cn1_captureView ran with afterScreenUpdates:NO, so
+                    // the dark-tagged screenshot grabbed light-form pixels
+                    // (visible victims: DialogTheme_dark, FloatingAction-
+                    // ButtonTheme_light). Pump three Display.callSerially
+                    // hops before emit so at least three EDT paint cycles
+                    // (and therefore three Metal frame presents) land
+                    // between the form's own onShowCompleted hand-off and
+                    // the actual capture; combined with the createEmpty()
+                    // transition below this gives the new form's pixels
+                    // time to reach the front buffer.
+                    Display.getInstance().callSerially(() ->
+                        Display.getInstance().callSerially(() ->
+                            Display.getInstance().callSerially(() ->
+                                Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot(imageName, next))));
                 });
             }
         };
+        // Skip the form-show transition entirely. The default fade/slide
+        // takes ~300ms during which CN1 is still drawing the *previous*
+        // form into the back buffer; on iOS Metal that means the screen-
+        // shot's CAMetalLayer contents linger on the old frame even after
+        // onShowCompleted fires. createEmpty() makes form.show() switch
+        // synchronously so onShowCompleted fires with the new form
+        // already painted, removing the transition window from the race.
+        form.setTransitionInAnimator(CommonTransitions.createEmpty());
+        form.setTransitionOutAnimator(CommonTransitions.createEmpty());
         populate(form, suffix);
         if (textured) {
             // The ContentPane sits on top of the Form and paints its own
