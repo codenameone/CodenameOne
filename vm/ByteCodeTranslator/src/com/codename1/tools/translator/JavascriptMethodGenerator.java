@@ -1127,6 +1127,31 @@ final class JavascriptMethodGenerator {
         // has finished. Strings (``"..."`` / ``'...'``) are excluded so
         // theme-key literals containing the word ``stack`` survive.
         s = shortenStackAndLocals(s);
+        // Final size pass: merge consecutive ``S.p(X),S.p(Y)`` into
+        // ``S.p(X,Y)``. ``Array.prototype.push(...args)`` pushes
+        // every argument in order, so multi-arg push is
+        // semantically identical to a comma-sequence of single
+        // pushes (X is fully evaluated before Y in both forms).
+        // Conservative shape: each push arg captured as
+        // ``[^,(){}]+`` -- bails if the arg contains a comma or
+        // any bracket. That excludes ``yield*$fn(a,b)`` / ``L[0]``
+        // etc., but matches the simpler literal / identifier /
+        // dot-property pushes. Iterate so 3+ chains collapse to a
+        // single multi-arg call.
+        // The translator's per-instruction emit puts each push on
+        // its own statement, so the body shape we see at this
+        // point is ``S.p(X);\n  S.p(Y);`` (newline + indent
+        // between pushes), not ``S.p(X),S.p(Y)``. Esbuild
+        // collapses ``;`` to ``,`` later. We do the merge here so
+        // the pre-minify text already carries the multi-arg push,
+        // which then survives any further peephole and esbuild
+        // passes intact.
+        String prevS;
+        do {
+            prevS = s;
+            s = s.replaceAll("S\\.p\\(([^,(){}]+)\\)\\s*[;,]\\s*S\\.p\\(([^,(){}]+)\\)",
+                    "S.p($1,$2)");
+        } while (!prevS.equals(s));
         return s;
     }
 
