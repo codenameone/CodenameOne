@@ -107,6 +107,18 @@ def _escape_html(text: str) -> str:
     return (text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
 
 
+def _markdown_to_html(text: str) -> str:
+    """Render a Hugo-flavoured markdown post to HTML for paste-into-editor.
+
+    Falls back to <pre>-wrapped escaped text if python-markdown is unavailable.
+    """
+    try:
+        import markdown as _md
+    except ImportError:
+        return f"<pre>{_escape_html(text)}</pre>"
+    return _md.markdown(text, extensions=["extra", "fenced_code", "sane_lists"], output_format="html5")
+
+
 def _trim_for_meta_description(text: str, limit: int = 140) -> str:
     """Trim a description to Yoast's preferred meta-description length, on a word boundary."""
     text = (text or "").strip()
@@ -491,10 +503,13 @@ class HackerNoonAdapter:
         page.wait_for_url("**/articles/**", timeout=30000)
         page.wait_for_timeout(5000)
 
+        # Title is a React-controlled textarea. press_sequentially loses
+        # leading characters intermittently (HN's React handlers debounce);
+        # .fill() sets the value via the host CDP InputHandler API which
+        # React handles correctly.
         title_field = page.locator(self.TITLE_SELECTORS[0])
         title_field.wait_for(state="visible", timeout=15000)
-        title_field.click()
-        title_field.press_sequentially(ctx.post.title, delay=5)
+        title_field.fill(ctx.post.title)
 
         # Description (used by HackerNoon as the SEO description / preview).
         description = str(ctx.post.front_matter.get("description") or "").strip()
@@ -502,28 +517,53 @@ class HackerNoonAdapter:
             try:
                 desc = page.locator(self.DESCRIPTION_SELECTORS[0])
                 desc.wait_for(state="visible", timeout=5000)
-                desc.click()
-                desc.press_sequentially(description[:300], delay=5)
+                desc.fill(description[:300])
             except Exception:  # noqa: BLE001
                 pass
 
-        # Body — Quill rich-text editor. Pasting markdown lands as plain text;
-        # the user can refine in the editor before clicking Submit-for-Review.
-        # Prepend an "Originally published at" note so the editorial reviewer
-        # can wire up the canonical and credit before publishing.
-        body_with_canonical = (
-            f"Originally published at {ctx.post.canonical_url}\n\n"
+        # Body — Quill rich-text editor. Pasting markdown as text lands as a
+        # plain blob with no formatting (no headings, images, code blocks,
+        # etc.). Convert markdown to HTML and inject via Quill's clipboard
+        # API which translates HTML into Quill's Delta format.
+        body_html = _markdown_to_html(
+            f"*Originally published at [{ctx.post.canonical_url}]"
+            f"({ctx.post.canonical_url})*\n\n"
             + ctx.body_markdown
         )
         body = page.locator(self.BODY_QUILL_SELECTORS[0])
         body.wait_for(state="visible", timeout=15000)
         body.click()
-        # Quill's contenteditable accepts text via the keyboard. Use insertText
-        # via the clipboard for speed; per-character typing on a 20k-char post
-        # would take far too long.
-        page.evaluate("text => navigator.clipboard.writeText(text)", body_with_canonical)
-        page.keyboard.press("Meta+V" if sys.platform == "darwin" else "Control+V")
-        page.wait_for_timeout(1000)
+        result = page.evaluate(
+            """(html) => {
+              const ce = document.querySelector("div.ql-editor[contenteditable='true']");
+              if (!ce) return {via: 'none'};
+              // Quill stores instance refs via .__quill on the container, or
+              // via Quill.find(). Walk up from the .ql-editor to find the
+              // container Quill was created on.
+              if (window.Quill && window.Quill.find) {
+                let container = ce.parentElement;
+                let q = null;
+                for (let i = 0; i < 5 && container; i++) {
+                  q = window.Quill.find(container);
+                  if (q) break;
+                  container = container.parentElement;
+                }
+                if (q && q.clipboard && q.clipboard.dangerouslyPasteHTML) {
+                  q.setText('');  // clear placeholder before pasting
+                  q.clipboard.dangerouslyPasteHTML(0, html, 'api');
+                  return {via: 'quill', length: q.getLength()};
+                }
+              }
+              // Fallback: inject as innerHTML and fire input events.
+              ce.innerHTML = html;
+              ce.dispatchEvent(new Event('input', {bubbles: true}));
+              return {via: 'fallback', length: ce.innerHTML.length};
+            }""",
+            body_html,
+        )
+        if result.get("via") == "none":
+            raise AdapterError("could not access Quill editor instance")
+        page.wait_for_timeout(1500)
 
         if ctx.validate_only:
             shot = _save_screenshot(page, ctx.post.slug, "hackernoon-editor")

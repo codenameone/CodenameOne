@@ -65,7 +65,7 @@ jobs:
         if: ${{ steps.browser_creds.outputs.any_configured == 'true' }}
         run: |
           set -euo pipefail
-          pip install playwright
+          pip install playwright markdown
           playwright install --with-deps chromium
 
       - name: Run browser syndication script
