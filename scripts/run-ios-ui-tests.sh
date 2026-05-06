@@ -678,13 +678,15 @@ APP_PROCESS_NAME="${WRAPPER_NAME%.app}"
   echo "App Launch : $(( (LAUNCH_END - LAUNCH_START) * 1000 )) ms" >> "$ARTIFACTS_DIR/ios-test-stats.txt"
 
 END_MARKER="CN1SS:SUITE:FINISHED"
-# 600s budget for the entire suite. Was 300s, but iOS simulator perf
-# varies between CI runners and the 37-test suite plus a couple of
-# 10-second test timeouts (FillRoundRect / DrawRoundRect on the Metal
-# build) was hitting the cap intermittently -- producing 10 screenshots
-# instead of 37 when the simulator was slow that day. 600s is still well
-# under any reasonable CI slot length and gives headroom for outliers.
-TIMEOUT_SECONDS=600
+# Per-suite budget (seconds). The 300 -> 600 bump from earlier landed
+# back when the suite was ~37 tests; it has since grown to ~90, and the
+# OpenGL build runs noticeably slower per test than the Metal build on
+# the macos-15-arm64 runners. CI build 25414437442 captured 44 of the
+# 90 GL screenshots before the previous 600s cap fired (the remainder
+# came up as missing-reference). Bump to 1500s to give the GL run
+# headroom while still staying well under any reasonable CI slot length;
+# the env override stays for local runs that want to push it further.
+TIMEOUT_SECONDS="${CN1SS_SUITE_TIMEOUT_SECONDS:-1500}"
 START_TIME="$(date +%s)"
 ri_log "Waiting for DeviceRunner completion marker ($END_MARKER)"
 while true; do
