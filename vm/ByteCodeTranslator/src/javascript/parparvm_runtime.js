@@ -2793,6 +2793,11 @@ global._E = function(table, pc, err, stack) {
 // on arrays is safe.
 Array.prototype.p = Array.prototype.push;
 Array.prototype.q = Array.prototype.pop;
+// ``stack.t()`` is "peek" (return top of stack without popping).
+// The translator emits ~3.1k DUP-style ``S[S.length-1]`` reads
+// per build; replacing them with ``S.t()`` saves ~10 chars per
+// occurrence (~30 KiB raw on Initializr's translated_app.js).
+Array.prototype.t = function() { return this[this.length - 1]; };
 global.bindNative = bindNative;
 global.global = global;
 global.__parparInstallNativeBindings = installNativeBindings;

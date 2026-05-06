@@ -1084,6 +1084,13 @@ final class JavascriptMethodGenerator {
         // remaining use of a slot, leaving its bare declaration as
         // dead bytes. Each dead decl is ~8 chars.
         s = removeDeadLetDecls(s);
+        // Compress ``stack[stack.length - 1]`` (DUP-style peek) to
+        // ``stack.t()``. The runtime adds
+        // ``Array.prototype.t = function(){return this[this.length-1];}``
+        // alongside the existing ``.p``/``.q`` push/pop helpers.
+        // ~10 chars saved per occurrence; 3k+ occurrences in the
+        // Initializr build = ~30 KiB raw.
+        s = s.replaceAll("stack\\[stack\\.length - 1\\]", "stack.t()");
         // Post-pass: strip ``case N:`` labels that aren't actually
         // jump targets (no ``pc=N`` writes them anywhere in the body
         // and they're not a try/catch handler / start / end pc, and
