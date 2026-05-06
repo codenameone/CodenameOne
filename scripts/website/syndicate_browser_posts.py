@@ -327,7 +327,11 @@ class FoojayAdapter:
                 f"{self.REST_MEDIA_ENDPOINT}/{media_id}", cookie_header, nonce,
                 {"title": title, "alt_text": title},
             )
-        except Exception:  # noqa: BLE001 — title is cosmetic
+        except Exception:  # noqa: BLE001
+            # The media-item title and alt text are cosmetic — the upload
+            # itself already succeeded and the post will reference the
+            # returned media id regardless. Swallow any follow-up rename
+            # error so the caller still gets the upload result.
             pass
         return media_id
 
@@ -443,7 +447,11 @@ def run_adapter(adapter, post: Post, body_markdown: str, headed: bool, validate_
         # Grant clipboard access so navigator.clipboard.writeText() succeeds.
         try:
             context.grant_permissions(["clipboard-read", "clipboard-write"])
-        except Exception:  # noqa: BLE001 — Firefox/WebKit don't support all permissions
+        except Exception:  # noqa: BLE001
+            # Firefox and WebKit reject the chromium-only clipboard-* perms.
+            # Adapters that need the clipboard fall back to other paths
+            # (Quill API, Froala API, execCommand insertHTML), so a refusal
+            # here is non-fatal.
             pass
 
         page = context.new_page()

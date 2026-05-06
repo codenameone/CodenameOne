@@ -368,7 +368,6 @@ def publish_to_hashnode(post: Post, body_markdown: str, token: str, publication_
     data = response.get("data") or {}
     if draft:
         node = data.get("createDraft", {}).get("draft", {})
-        slug = node.get("slug")
         url = f"https://hashnode.com/draft/{node.get('id')}" if node.get("id") else None
     else:
         node = data.get("publishPost", {}).get("post", {})
