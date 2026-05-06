@@ -1161,8 +1161,43 @@ final class JavascriptMethodGenerator {
         // already uses named ``l0, l1, ...`` locals, so we're
         // bringing the switch+pc emit in line with it.
         s = renameLocalsArrayToNamedLocals(s);
+        // Collapse ``S.p(yield*X(args)),l<N>=S.q()`` into a direct
+        // ``l<N>=yield*X(args)``. The push-yield-pop sequence is
+        // a JVM ASTORE following an INVOKESPECIAL/INVOKEVIRTUAL
+        // -- after collapse merged the case bodies, the push and
+        // pop end up adjacent in the same case, but the existing
+        // peephole rules (which target receiver+arg setup pre-
+        // call) don't recognize this post-call shape. Saves ~6
+        // chars per match. Conservative: arg list captured as
+        // either a balanced single-paren group or no inner
+        // parens, so calls whose args contain other generator
+        // invocations (``yield*$Y(...)`` nested inside) fall out.
+        // Iterates so chained patterns collapse fully.
+        // Pre-minify, the per-instruction emit puts each statement
+        // on its own line with leading whitespace, so the boundary
+        // between the push-yield call and the next pop-store is
+        // ``;\n        `` (or post-collapse: ``;`` between merged
+        // case bodies). Match flexibly so the regex fires both
+        // pre- and post-merge.
+        do {
+            prevS = s;
+            // Diagnostic: count if simpler patterns match. The
+            // failure mode we're debugging is "regex matches in
+            // node + standalone Java test, never in per-method
+            // body". Logging at three precision levels to find
+            // which sub-pattern is missing.
+            // Function name allowed shapes: ``cn1_<long>`` (pre-
+            // mangler) or ``$<short>`` (post-mangler). Mangler is
+            // a Python script that runs AFTER the translator, so
+            // at this point we always see the cn1_<long> form, but
+            // accept either to be future-proof.
+            s = s.replaceAll(
+                    "S\\.p\\((yield\\*\\s*[\\w$]+\\((?:[^()]|\\([^()]*\\))*\\))\\)\\s*[,;]\\s*l(\\d+)\\s*=\\s*S\\.q\\(\\)",
+                    "l$2=$1");
+        } while (!prevS.equals(s));
         return s;
     }
+
 
     /**
      * Find ``let L=_F(N,arg0,arg1,...);`` (or with whitespace)
