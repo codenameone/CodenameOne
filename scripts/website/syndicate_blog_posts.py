@@ -19,6 +19,7 @@ library available.
 from __future__ import annotations
 
 import argparse
+import base64
 import datetime as dt
 import json
 import os
@@ -53,6 +54,9 @@ HASHNODE_TAGS = [
     {"slug": "android", "name": "Android"},
     {"slug": "ios", "name": "iOS"},
 ]
+
+FOOJAY_ENDPOINT = "https://foojay.io/wp-json/wp/v2/posts"
+DEFAULT_PLATFORMS = "devto,hashnode,foojay"
 
 
 @dataclass
@@ -257,10 +261,15 @@ def render_syndicated_body(post: Post) -> str:
     return body
 
 
+USER_AGENT = "CodenameOneBlogSyndicator/1.0 (+https://github.com/codenameone/CodenameOne)"
+
+
 def http_post_json(url: str, headers: dict[str, str], payload: dict[str, Any]) -> dict[str, Any]:
     data = json.dumps(payload).encode("utf-8")
     request = urllib.request.Request(url, data=data, method="POST")
     request.add_header("Content-Type", "application/json")
+    request.add_header("User-Agent", USER_AGENT)
+    request.add_header("Accept", "application/json")
     for key, value in headers.items():
         request.add_header(key, value)
     try:
@@ -298,6 +307,44 @@ def publish_to_devto(post: Post, body_markdown: str, api_key: str) -> dict[str, 
     return {
         "id": response.get("id"),
         "url": response.get("url") or response.get("canonical_url"),
+        "syndicated_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
+    }
+
+
+def publish_to_foojay(post: Post, body_markdown: str, user: str, password: str) -> dict[str, Any]:
+    """Create a draft post on foojay.io via the WordPress REST API.
+
+    foojay editorial reviews and publishes the draft, so the canonical link is
+    surfaced as a visible note at the top of the post rather than wired into
+    an SEO plugin's meta field (which varies by site configuration).
+    """
+    canonical_note = (
+        f"*Originally published on the [Codename One blog]({post.canonical_url}).*\n\n"
+    )
+    excerpt = str(post.front_matter.get("description") or "").strip()
+    payload: dict[str, Any] = {
+        "title": post.title,
+        "content": canonical_note + body_markdown,
+        "status": "draft",
+    }
+    if excerpt:
+        payload["excerpt"] = excerpt[:500]
+
+    creds = base64.b64encode(f"{user}:{password}".encode("utf-8")).decode("ascii")
+    response = http_post_json(
+        FOOJAY_ENDPOINT,
+        headers={"Authorization": f"Basic {creds}"},
+        payload=payload,
+    )
+    edit_link = None
+    raw_link = response.get("link")
+    if isinstance(response.get("id"), int):
+        edit_link = f"https://foojay.io/wp-admin/post.php?post={response['id']}&action=edit"
+    return {
+        "id": response.get("id"),
+        "url": edit_link or raw_link,
+        "preview_url": raw_link,
+        "status": response.get("status"),
         "syndicated_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
     }
 
@@ -345,8 +392,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--dry-run", action="store_true", help="Do not call any APIs; print what would happen.")
     parser.add_argument(
         "--platforms",
-        default="devto,hashnode",
-        help="Comma-separated subset of platforms to consider (default: devto,hashnode).",
+        default=DEFAULT_PLATFORMS,
+        help=f"Comma-separated subset of platforms to consider (default: {DEFAULT_PLATFORMS}).",
     )
     parser.add_argument(
         "--today",
@@ -377,13 +424,41 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+def is_platform_configured(platform: str) -> bool:
+    if platform == "devto":
+        return bool(os.environ.get("DEVTO_API_KEY"))
+    if platform == "hashnode":
+        return bool(os.environ.get("HASHNODE_TOKEN") and os.environ.get("HASHNODE_PUBLICATION_ID"))
+    if platform == "foojay":
+        return bool(os.environ.get("FOOJAY_USER") and os.environ.get("FOOJAY_PASSWORD"))
+    return False
+
+
 def main(argv: list[str]) -> int:
     args = parse_args(argv)
     today = dt.date.fromisoformat(args.today) if args.today else dt.date.today()
     floor = dt.date.fromisoformat(args.floor)
-    platforms = [p.strip() for p in args.platforms.split(",") if p.strip()]
+    requested_platforms = [p.strip() for p in args.platforms.split(",") if p.strip()]
     blog_dir = Path(args.blog_dir)
     state_file = Path(args.state_file)
+
+    if args.dry_run:
+        platforms = requested_platforms
+    else:
+        platforms = []
+        for platform in requested_platforms:
+            if is_platform_configured(platform):
+                platforms.append(platform)
+            else:
+                # Skipping an unconfigured platform here (instead of failing) keeps
+                # the candidate selector from getting stuck on a post that can never
+                # be fully syndicated. Once the missing creds appear, the next run
+                # picks up where this one left off.
+                print(f"[{platform}] credentials not configured; skipping platform.")
+
+    if not platforms:
+        print("No platforms are configured; nothing to do.")
+        return 0
 
     posts = discover_posts(blog_dir)
     state = State.load(state_file)
@@ -394,10 +469,6 @@ def main(argv: list[str]) -> int:
 
     print(f"Selected post: {candidate.slug} (date={candidate.date.isoformat()})")
     body_markdown = render_syndicated_body(candidate)
-
-    devto_key = os.environ.get("DEVTO_API_KEY", "")
-    hashnode_token = os.environ.get("HASHNODE_TOKEN", "")
-    hashnode_publication = os.environ.get("HASHNODE_PUBLICATION_ID", "")
 
     any_change = False
     failures: list[str] = []
@@ -411,15 +482,21 @@ def main(argv: list[str]) -> int:
             continue
         try:
             if platform == "devto":
-                if not devto_key:
-                    raise RuntimeError("DEVTO_API_KEY is not set")
-                result = publish_to_devto(candidate, body_markdown, devto_key)
+                result = publish_to_devto(candidate, body_markdown, os.environ["DEVTO_API_KEY"])
             elif platform == "hashnode":
-                if not hashnode_token:
-                    raise RuntimeError("HASHNODE_TOKEN is not set")
-                if not hashnode_publication:
-                    raise RuntimeError("HASHNODE_PUBLICATION_ID is not set")
-                result = publish_to_hashnode(candidate, body_markdown, hashnode_token, hashnode_publication)
+                result = publish_to_hashnode(
+                    candidate,
+                    body_markdown,
+                    os.environ["HASHNODE_TOKEN"],
+                    os.environ["HASHNODE_PUBLICATION_ID"],
+                )
+            elif platform == "foojay":
+                result = publish_to_foojay(
+                    candidate,
+                    body_markdown,
+                    os.environ["FOOJAY_USER"],
+                    os.environ["FOOJAY_PASSWORD"],
+                )
             else:
                 raise RuntimeError(f"unknown platform: {platform}")
         except Exception as err:  # noqa: BLE001 — surface any failure as per-platform
