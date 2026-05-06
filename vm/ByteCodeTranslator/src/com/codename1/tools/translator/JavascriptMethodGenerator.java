@@ -1364,6 +1364,17 @@ final class JavascriptMethodGenerator {
                     // the suffix is purely numeric so we don't catch
                     // hypothetical future names like ``__cn1ArgList``.
                     out.append('A').append(word, 8, word.length());
+                } else if (word.length() > 5
+                        && word.charAt(0) == '_'
+                        && word.charAt(1) == '_'
+                        && word.startsWith("__arg")
+                        && allDigits(word, 5)) {
+                    // ``__arg<N>`` (used inside invoke peephole arg
+                    // blocks) -> ``_<N>``. ~25k decl + use sites,
+                    // each saves 4 chars (``__arg0`` 6 -> ``_0`` 2).
+                    // Distinct from ``__cn1Arg<N>`` (parameter names
+                    // at function-scope) handled above.
+                    out.append('_').append(word, 5, word.length());
                 } else {
                     out.append(word);
                 }
