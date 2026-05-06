@@ -52,10 +52,8 @@ jobs:
         env:
           FOOJAY_USER: ${{ secrets.FOOJAY_USER }}
           HACKERNOON_USER: ${{ secrets.HACKERNOON_USER }}
-          DZONE_STORAGE_STATE: ${{ secrets.DZONE_STORAGE_STATE }}
-          MEDIUM_STORAGE_STATE: ${{ secrets.MEDIUM_STORAGE_STATE }}
         run: |
-          if [ -n "${FOOJAY_USER}" ] || [ -n "${HACKERNOON_USER}" ] || [ -n "${DZONE_STORAGE_STATE}" ] || [ -n "${MEDIUM_STORAGE_STATE}" ]; then
+          if [ -n "${FOOJAY_USER}" ] || [ -n "${HACKERNOON_USER}" ]; then
             echo "any_configured=true" >> "${GITHUB_OUTPUT}"
           else
             echo "any_configured=false" >> "${GITHUB_OUTPUT}"
@@ -75,8 +73,6 @@ jobs:
           FOOJAY_PASSWORD: ${{ secrets.FOOJAY_PASSWORD }}
           HACKERNOON_USER: ${{ secrets.HACKERNOON_USER }}
           HACKERNOON_PASSWORD: ${{ secrets.HACKERNOON_PASSWORD }}
-          DZONE_STORAGE_STATE: ${{ secrets.DZONE_STORAGE_STATE }}
-          MEDIUM_STORAGE_STATE: ${{ secrets.MEDIUM_STORAGE_STATE }}
         run: |
           set -euo pipefail
           if [ "${{ inputs.dry_run }}" = "true" ]; then
@@ -84,6 +80,11 @@ jobs:
           else
             python3 scripts/website/syndicate_browser_posts.py
           fi
+
+      - name: Queue browser-extension syndication tasks (Medium, DZone)
+        run: |
+          set -euo pipefail
+          python3 scripts/website/queue_browser_syndication.py
 
       - name: Upload syndication screenshots on failure
         if: ${{ always() && hashFiles('docs/website/reports/syndication-screenshots/**/*.png') != '' }}
@@ -94,16 +95,16 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-      - name: Commit updated syndication state
+      - name: Commit updated syndication state and queue
         if: ${{ inputs.dry_run != true }}
         run: |
           set -euo pipefail
-          if git diff --quiet -- scripts/website/syndication-state.json; then
-            echo "No state changes to commit."
+          if git diff --quiet -- scripts/website/syndication-state.json scripts/website/syndication-queue.json; then
+            echo "No state or queue changes to commit."
             exit 0
           fi
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git add scripts/website/syndication-state.json
+          git add scripts/website/syndication-state.json scripts/website/syndication-queue.json
           git commit -m "ci: record blog syndication results"
           git push

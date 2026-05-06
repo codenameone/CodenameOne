@@ -26,10 +26,12 @@ are missing, just like the API script):
 
     foojay     : FOOJAY_USER, FOOJAY_PASSWORD
     hackernoon : HACKERNOON_USER, HACKERNOON_PASSWORD
-    dzone      : DZONE_USER, DZONE_PASSWORD
-    medium     : MEDIUM_STORAGE_STATE  (base64-encoded Playwright storageState
-                                        JSON exported from a logged-in session
-                                        — Medium has no password login flow)
+
+DZone and Medium are NOT driven from this Playwright script — both sit
+behind aggressive Cloudflare bot detection that cannot be bypassed
+reliably from headless automation. They are queued to the Codename One
+Syndicator Firefox extension instead, which runs inside the user's
+already-trusted browser session. See scripts/syndication-extension/.
 """
 
 from __future__ import annotations
@@ -39,6 +41,7 @@ import base64
 import datetime as dt
 import json
 import os
+import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -60,7 +63,11 @@ from syndicate_blog_posts import (  # noqa: E402  (intentional path injection)
 
 
 SCREENSHOT_DIR = Path(__file__).resolve().parents[2] / "docs" / "website" / "reports" / "syndication-screenshots"
-DEFAULT_PLATFORMS = "foojay,hackernoon,dzone,medium"
+# DZone and Medium are no longer driven from this Playwright script — both
+# are gated by Cloudflare bot detection that headless browsers cannot pass
+# reliably. Their syndication is queued to the Codename One Syndicator
+# Firefox extension via scripts/website/queue_browser_syndication.py.
+DEFAULT_PLATFORMS = "foojay,hackernoon"
 
 _UA_STR = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_0) AppleWebKit/537.36 "
@@ -119,6 +126,28 @@ def _download_to_temp(url: str) -> Path:
     with os.fdopen(fd, "wb") as out:
         out.write(data)
     return Path(name)
+
+
+_CODE_BLOCK_RE = re.compile(
+    r'<pre><code class="language-(?P<lang>[\w+-]+)">(?P<body>.*?)</code></pre>',
+    re.DOTALL,
+)
+
+
+def _retag_code_blocks_for_quill(html: str) -> str:
+    """Convert python-markdown's <pre><code class="language-X"> to a form
+    Quill's syntax module recognises. Quill exposes the language on the
+    <pre> via data-language; without it, Quill's auto-detect frequently
+    mis-tags Java as JavaScript.
+    """
+    def replace(match: re.Match) -> str:
+        lang = match.group("lang")
+        body = match.group("body")
+        return (
+            f'<pre class="ql-syntax language-{lang}" data-language="{lang}" '
+            f'spellcheck="false">{body}</pre>'
+        )
+    return _CODE_BLOCK_RE.sub(replace, html)
 
 
 def _markdown_to_html(text: str) -> str:
@@ -524,31 +553,21 @@ class HackerNoonAdapter:
         page.wait_for_url("**/articles/**", timeout=30000)
         page.wait_for_timeout(5000)
 
-        # Title is a React-controlled textarea. .fill() leaves it empty, and
-        # press_sequentially with a small delay (5-10ms) drops leading chars
-        # because HN's React onChange debounces faster than the keystrokes.
-        # An 80ms-per-key delay is slow enough that every key registers.
+        # Title is a React-controlled textarea in the viewport. .fill() leaves
+        # it empty, and press_sequentially with a small delay (5-10ms) drops
+        # leading chars because HN's React onChange debounces faster than the
+        # keystrokes. An 80ms-per-key delay is slow enough that every key
+        # registers.
         title_field = page.locator(self.TITLE_SELECTORS[0])
         title_field.wait_for(state="visible", timeout=15000)
         title_field.click()
         title_field.press_sequentially(ctx.post.title, delay=80)
 
-        # Description (used by HackerNoon as the SEO description / preview).
-        description = str(ctx.post.front_matter.get("description") or "").strip()
-        if description:
-            try:
-                desc = page.locator(self.DESCRIPTION_SELECTORS[0])
-                desc.wait_for(state="visible", timeout=5000)
-                desc.click()
-                desc.press_sequentially(description[:300], delay=20)
-            except Exception:  # noqa: BLE001
-                pass
-
-        # Body — Quill rich-text editor. Convert markdown to HTML so headings,
-        # images, links, and code fences render. Inject via Quill's clipboard
-        # API which translates HTML into Quill's Delta format. The visible
-        # canonical reference is set in Story Settings below, not in the body.
+        # Body — Quill rich-text editor in the viewport. Convert markdown to
+        # HTML so headings, images, links, and code fences render. Inject via
+        # Quill's clipboard API which translates HTML into Quill's Delta.
         body_html = _markdown_to_html(ctx.body_markdown)
+        body_html = _retag_code_blocks_for_quill(body_html)
         body = page.locator(self.BODY_QUILL_SELECTORS[0])
         body.wait_for(state="visible", timeout=15000)
         body.click()
@@ -580,27 +599,58 @@ class HackerNoonAdapter:
             raise AdapterError("could not access Quill editor instance")
         page.wait_for_timeout(1500)
 
+        # Description and Story Settings (No, canonical) live in HN's right
+        # drawer with its own internal scroll container. scroll_into_view
+        # only scrolls the page, leaving these elements outside the viewport
+        # and unclickable. Set them via JS instead — value via React's native
+        # property setter (so React's onChange fires), and click() called
+        # directly on the button element.
+        description = str(ctx.post.front_matter.get("description") or "").strip()
+        if description:
+            page.evaluate(
+                """({sel, value}) => {
+                  const el = document.querySelector(sel);
+                  if (!el) return false;
+                  const setter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el), 'value').set;
+                  setter.call(el, value);
+                  el.dispatchEvent(new Event('input', {bubbles: true}));
+                  return true;
+                }""",
+                {"sel": self.DESCRIPTION_SELECTORS[0], "value": description[:300]},
+            )
+
         # Cover image — download from canonical to a temp file, upload via
         # the file input that accepts image/*. set_input_files works without
-        # the file picker dialog actually opening.
+        # the file picker dialog opening and ignores viewport position.
         if ctx.post.cover_image:
             try:
                 cover_path = _download_to_temp(ctx.post.cover_image)
                 page.locator(self.COVER_IMAGE_FILE_INPUT_SELECTORS[0]).first.set_input_files(str(cover_path))
-                page.wait_for_timeout(4000)  # let the upload complete
+                page.wait_for_timeout(6000)  # let HN process and crop the upload
             except Exception as err:  # noqa: BLE001
                 print(f"  [hackernoon] cover image upload failed (non-fatal): {err}", file=sys.stderr)
 
-        # Story Settings drawer: tell HN this story is not original on
-        # HackerNoon and provide the canonical URL.
+        # "Is this story original on HackerNoon?" → No  +  canonical URL
         try:
-            no_btn = page.locator(self.NOT_ORIGINAL_NO_SELECTOR).first
-            no_btn.scroll_into_view_if_needed(timeout=10000)
-            no_btn.click()
+            page.evaluate(
+                """() => {
+                  const no = Array.from(document.querySelectorAll('button.css-p9s3bq'))
+                    .find(b => /^no$/i.test((b.textContent||'').trim()));
+                  if (no) no.click();
+                }"""
+            )
             page.wait_for_timeout(1500)
-            canonical_input = page.locator(self.CANONICAL_INPUT_SELECTORS[0]).first
-            canonical_input.scroll_into_view_if_needed(timeout=5000)
-            canonical_input.fill(ctx.post.canonical_url)
+            page.evaluate(
+                """(url) => {
+                  const el = document.querySelector('input.firstSeenAt');
+                  if (!el) return false;
+                  const setter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el), 'value').set;
+                  setter.call(el, url);
+                  el.dispatchEvent(new Event('input', {bubbles: true}));
+                  return true;
+                }""",
+                ctx.post.canonical_url,
+            )
             page.wait_for_timeout(500)
         except Exception as err:  # noqa: BLE001
             print(f"  [hackernoon] canonical setup failed (non-fatal): {err}", file=sys.stderr)
@@ -617,187 +667,9 @@ class HackerNoonAdapter:
         }
 
 
-class DZoneAdapter:
-    """DZone — AngularJS login form gated by invisible reCAPTCHA, body editor
-    is Froala. Uses storage-state auth (DZONE_STORAGE_STATE) since password
-    login can't pass reCAPTCHA from headless Playwright.
-
-    Live editor URL: /content/article/post.html (the create-form). The Save
-    Draft button is enabled once title + body have content.
-    """
-
-    name = "dzone"
-    EDITOR_URL = "https://dzone.com/content/article/post.html"
-
-    TITLE_SELECTORS = ["textarea[name='title'][placeholder='Enter Title Here']"]
-    SUBTITLE_SELECTORS = ["textarea[name='subtitle']"]
-    META_DESCRIPTION_SELECTORS = ["#meta-description-textarea"]
-    # Froala renders the editable area as a contenteditable div with class
-    # `fr-element`. Clicking puts the cursor in the body so keystrokes land.
-    BODY_FROALA_SELECTORS = ["div.fr-element[contenteditable='true']"]
-    SAVE_DRAFT_SELECTORS = ["button:has-text('Save draft')"]
-
-    @staticmethod
-    def is_configured() -> bool:
-        return bool(os.environ.get("DZONE_STORAGE_STATE"))
-
-    def login(self, page) -> None:
-        # Storage state is loaded into the browser context up-front; nothing
-        # to do here. If the cookies have expired the editor page will bounce
-        # back to login — at which point the user needs to refresh
-        # DZONE_STORAGE_STATE via export_storage_state.py.
-        return
-
-    def submit_draft(self, page, ctx: AdapterContext) -> dict[str, Any]:
-        page.goto(self.EDITOR_URL, wait_until="domcontentloaded", timeout=60000)
-        page.wait_for_timeout(5000)
-
-        title = page.locator(self.TITLE_SELECTORS[0])
-        title.wait_for(state="visible", timeout=20000)
-        title.click()
-        title.press_sequentially(ctx.post.title, delay=5)
-
-        # Subtitle / TL;DR — use the post's description if present.
-        description = str(ctx.post.front_matter.get("description") or "").strip()
-        if description:
-            try:
-                sub = page.locator(self.SUBTITLE_SELECTORS[0])
-                sub.wait_for(state="visible", timeout=5000)
-                sub.click()
-                sub.press_sequentially(description[:300], delay=5)
-            except Exception:  # noqa: BLE001
-                pass
-            try:
-                meta = page.locator(self.META_DESCRIPTION_SELECTORS[0])
-                meta.wait_for(state="visible", timeout=5000)
-                meta.click()
-                meta.press_sequentially(description[:155], delay=5)
-            except Exception:  # noqa: BLE001
-                pass
-
-        # Body — Froala rich-text editor. Use Froala's JS API to set HTML
-        # directly; clipboard paste into the contenteditable is unreliable
-        # (Froala's paste handler often discards or transforms the input).
-        body_with_canonical = (
-            f"<p><em>Originally published at <a href=\"{ctx.post.canonical_url}\">"
-            f"{ctx.post.canonical_url}</a></em></p>\n\n"
-            f"<pre>{_escape_html(ctx.body_markdown)}</pre>"
-        )
-        body = page.locator(self.BODY_FROALA_SELECTORS[0]).first
-        body.wait_for(state="visible", timeout=15000)
-        body.click()
-        result = page.evaluate(
-            """(html) => {
-              const fr = document.querySelector("div.fr-element[contenteditable='true']");
-              if (window.FroalaEditor && window.FroalaEditor.INSTANCES && window.FroalaEditor.INSTANCES.length) {
-                const inst = window.FroalaEditor.INSTANCES[0];
-                inst.html.set(html);
-                if (inst.events && inst.events.trigger) inst.events.trigger('contentChanged');
-                return {via: 'froala-api', length: inst.html.get().length};
-              }
-              if (fr) { fr.innerHTML = html; fr.dispatchEvent(new Event('input', {bubbles: true})); return {via: 'fallback', length: fr.innerHTML.length}; }
-              return {via: 'none'};
-            }""",
-            body_with_canonical,
-        )
-        if result.get("via") == "none":
-            raise AdapterError("could not access Froala editor instance")
-        page.wait_for_timeout(2000)
-
-        if ctx.validate_only:
-            shot = _save_screenshot(page, ctx.post.slug, "dzone-editor")
-            return {"validated": True, "screenshot": str(shot)}
-
-        page.locator(self.SAVE_DRAFT_SELECTORS[0]).first.click()
-        page.wait_for_timeout(5000)
-        return {
-            "url": page.url,
-            "syndicated_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
-        }
-
-
-class MediumAdapter:
-    """Medium — no password login flow, so this adapter relies on a saved
-    Playwright storageState (cookies + localStorage) loaded from the
-    ``MEDIUM_STORAGE_STATE`` env var (base64-encoded JSON).
-
-    To produce one:
-
-        $ python3 -c "from playwright.sync_api import sync_playwright as p; \\
-              ctx=p().start().chromium.launch(headless=False).new_context(); \\
-              page=ctx.new_page(); page.goto('https://medium.com/m/signin'); \\
-              input('Log in then press Enter...'); \\
-              ctx.storage_state(path='medium-state.json')"
-        $ base64 -i medium-state.json | pbcopy   # paste as MEDIUM_STORAGE_STATE
-    """
-
-    name = "medium"
-    EDITOR_URL = "https://medium.com/new-story"
-
-    # Medium's editor is a single contenteditable div with placeholder
-    # "Title\nTell your story…" — first line typed becomes the H3 title,
-    # everything after is body. Auto-saves a few seconds after typing pauses.
-    EDITOR_SELECTOR = "div.postArticle-content[contenteditable='true']"
-    SETTINGS_BUTTON_SELECTORS = [
-        "button:has-text('Story settings')",
-        "button[aria-label*='settings' i]",
-    ]
-    CANONICAL_FIELD_SELECTORS = [
-        "input[placeholder*='canonical' i]",
-        "input[placeholder*='URL of original' i]",
-    ]
-
-    @staticmethod
-    def is_configured() -> bool:
-        return bool(os.environ.get("MEDIUM_STORAGE_STATE"))
-
-    @staticmethod
-    def storage_state_path() -> Path:
-        return _load_base64_storage_state("MEDIUM_STORAGE_STATE")
-
-    def login(self, page) -> None:
-        # No-op: storage state was loaded into the browser context already.
-        return
-
-    def submit_draft(self, page, ctx: AdapterContext) -> dict[str, Any]:
-        page.goto(self.EDITOR_URL, wait_until="domcontentloaded", timeout=45000)
-        page.wait_for_timeout(5000)
-        editor = page.locator(self.EDITOR_SELECTOR).first
-        editor.wait_for(state="visible", timeout=20000)
-        editor.click()
-        # Type the title, press Enter to drop into the body section, then
-        # paste the body. Medium auto-saves a few seconds after typing pauses.
-        page.keyboard.type(ctx.post.title, delay=5)
-        page.keyboard.press("Enter")
-        body_with_canonical = (
-            f"Originally published at {ctx.post.canonical_url}\n\n"
-            + ctx.body_markdown
-        )
-        page.evaluate("text => navigator.clipboard.writeText(text)", body_with_canonical)
-        page.keyboard.press("Meta+V" if sys.platform == "darwin" else "Control+V")
-
-        if ctx.validate_only:
-            shot = _save_screenshot(page, ctx.post.slug, "medium-editor")
-            return {"validated": True, "screenshot": str(shot)}
-
-        # Wait for Medium's auto-save to kick in. Medium redirects from
-        # /new-story to /p/<draftId>/edit once the first save completes.
-        try:
-            page.wait_for_url("**/p/*/edit", timeout=45000)
-        except Exception:  # noqa: BLE001
-            page.wait_for_timeout(8000)  # fall back to a long wait
-
-        return {
-            "url": page.url,
-            "syndicated_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
-        }
-
-
 ADAPTERS: dict[str, Callable[[], Any]] = {
     "foojay": FoojayAdapter,
     "hackernoon": HackerNoonAdapter,
-    "dzone": DZoneAdapter,
-    "medium": MediumAdapter,
 }
 
 
@@ -816,11 +688,6 @@ def run_adapter(adapter, post: Post, body_markdown: str, headed: bool, validate_
             "viewport": {"width": 1400, "height": 900},
             "user_agent": _UA_STR,
         }
-        if isinstance(adapter, MediumAdapter):
-            context_kwargs["storage_state"] = str(MediumAdapter.storage_state_path())
-        elif isinstance(adapter, DZoneAdapter):
-            context_kwargs["storage_state"] = str(_load_base64_storage_state("DZONE_STORAGE_STATE"))
-
         context = browser.new_context(**context_kwargs)
         # Grant clipboard access so navigator.clipboard.writeText() succeeds.
         try:
