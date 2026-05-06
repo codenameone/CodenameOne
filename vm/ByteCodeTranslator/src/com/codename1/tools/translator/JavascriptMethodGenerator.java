@@ -1099,14 +1099,20 @@ final class JavascriptMethodGenerator {
     }
 
     /**
-     * Rename whole-word ``stack`` → ``S`` and ``locals`` → ``L`` in a
-     * method body, skipping string literals. Both identifiers are
-     * emitter-private (the only generator that uses them is the
-     * switch+pc interpreter prelude in ``appendMethodImpl``), so a
-     * scope-local rename is safe — but the body can contain
-     * ``_L("...")`` literals from LDC instructions whose text might
-     * happen to contain ``stack`` or ``locals``. Walk the buffer
-     * tracking string state so those survive.
+     * Rename whole-word ``stack`` → ``S``, ``locals`` → ``L``,
+     * ``__cn1ThisObject`` → ``T``, and ``__cn1Arg<N>`` → ``A<N>`` in
+     * a method body, skipping string literals and comments. All four
+     * identifiers are emitter-private — they appear only in
+     * ``appendMethodImpl`` (and a couple of straight-line setup
+     * helpers that share the same name space) — so a per-method
+     * rename is safe. Strings (``"..."`` / ``'...'`` / template
+     * literals) are tracked so theme-key strings or mangled
+     * symbol-table literals like ``"$T"`` / ``"$A2"`` are preserved.
+     *
+     * Per-method savings on the Initializr translated_app.js
+     * (post-esbuild minify):
+     *   - stack / locals: ~1.3 MiB raw, ~120 KiB gzip
+     *   - __cn1ThisObject / __cn1Arg<N>: ~660 KiB raw, ~70 KiB gzip
      */
     private static String shortenStackAndLocals(String body) {
         int len = body.length();
@@ -1173,7 +1179,7 @@ final class JavascriptMethodGenerator {
                     continue;
                 }
             }
-            if ((c == 's' || c == 'l') && isIdentStart(body, i)) {
+            if ((c == 's' || c == 'l' || c == '_') && isIdentStart(body, i)) {
                 int end = i + 1;
                 while (end < len && isIdentPart(body.charAt(end))) {
                     end++;
@@ -1183,6 +1189,17 @@ final class JavascriptMethodGenerator {
                     out.append('S');
                 } else if ("locals".equals(word)) {
                     out.append('L');
+                } else if ("__cn1ThisObject".equals(word)) {
+                    out.append('T');
+                } else if (word.length() > 7
+                        && word.charAt(0) == '_'
+                        && word.charAt(1) == '_'
+                        && word.startsWith("__cn1Arg")
+                        && allDigits(word, 8)) {
+                    // ``__cn1Arg<N>`` → ``A<N>``. Only collapse when
+                    // the suffix is purely numeric so we don't catch
+                    // hypothetical future names like ``__cn1ArgList``.
+                    out.append('A').append(word, 8, word.length());
                 } else {
                     out.append(word);
                 }
@@ -1199,6 +1216,19 @@ final class JavascriptMethodGenerator {
         if (i > 0) {
             char prev = body.charAt(i - 1);
             if (Character.isLetterOrDigit(prev) || prev == '_' || prev == '$') {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean allDigits(String s, int from) {
+        if (from >= s.length()) {
+            return false;
+        }
+        for (int k = from; k < s.length(); k++) {
+            char ch = s.charAt(k);
+            if (ch < '0' || ch > '9') {
                 return false;
             }
         }
