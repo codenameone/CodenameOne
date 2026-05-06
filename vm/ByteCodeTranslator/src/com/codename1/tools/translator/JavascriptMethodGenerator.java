@@ -1149,6 +1149,17 @@ final class JavascriptMethodGenerator {
         String prevS;
         do {
             prevS = s;
+            // Simple-arg variadic merge. We do NOT merge when the
+            // second push is a ``yield*`` -- that would defer the
+            // first push past a yield boundary, which moves the
+            // first arg's value out of the worker's stack while a
+            // potential exception thrown from the yielded callee
+            // is being unwound. ``_E(__cn1TryCatch, pc, err, S)``
+            // dispatches catch handlers using the current depth of
+            // ``S``; missing one entry breaks the handler's stack
+            // expectation and surfaces as a NullPointerException
+            // deep in the resume path. Keep yields out of the
+            // multi-arg push merge.
             s = s.replaceAll("S\\.p\\(([^,(){}]+)\\)\\s*[;,]\\s*S\\.p\\(([^,(){}]+)\\)",
                     "S.p($1,$2)");
         } while (!prevS.equals(s));
