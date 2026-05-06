@@ -560,7 +560,16 @@ if [ -f "$DIST_DIR/index.html" ] && ! grep -q "<!-- cn1-prefetch -->" "$DIST_DIR
 // Same-origin fetch to populate the HTTP cache before the worker
 // issues its blocking sync XHR for the same URL. We don't await
 // the response -- the browser handles the rest in the background.
-try { fetch('theme.res').catch(function(){}); } catch (e) {}
+//
+// ``assets/iOS7Theme.res`` includes the ``?v=1.0`` query that
+// HTML5Implementation.getArrayBufferInputStream appends at sync-
+// XHR time. Build version is hardcoded to "1.0" by the build
+// script's ByteCodeTranslator invocation so this query string is
+// stable.
+try {
+  fetch('theme.res').catch(function(){});
+  fetch('assets/iOS7Theme.res?v=1.0').catch(function(){});
+} catch (e) {}
 </script>
 <!-- cn1-prefetch -->
 PREFETCH
