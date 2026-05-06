@@ -983,6 +983,40 @@ bindNative(["cn1_com_codename1_html5_js_browser_Window_current_R_com_codename1_h
 });
 
 bindNative([
+  "cn1_com_codename1_impl_html5_JSOImplementations_WindowExt_getCn1_R_com_codename1_impl_html5_JSOImplementations_CN1Native",
+  "cn1_com_codename1_impl_html5_JSOImplementations_WindowExt_getCn1___R_com_codename1_impl_html5_JSOImplementations_CN1Native"
+], function*(__cn1ThisObject) {
+  // Cache the CN1Native bridge handle. ``WindowExt.getCn1()`` is
+  // the entry point to the host bridge object (cn1HostBridge); it
+  // never changes for the worker's lifetime, but is fetched ~5
+  // times during boot and ~once per resource fetch / native call
+  // afterwards. Worker-side cache turns N round-trips into 1.
+  const win = jvm.unwrapJsValue(__cn1ThisObject);
+  if (win && win.__cn1CachedCn1Wrapper) {
+    return win.__cn1CachedCn1Wrapper;
+  }
+  if (win && win.__cn1HostRef != null && typeof jvm.invokeHostNative === "function") {
+    const hostResult = yield jvm.invokeHostNative("__cn1_jso_bridge__", [{
+      receiver: win,
+      kind: "getter",
+      member: "cn1",
+      args: []
+    }]);
+    if (hostResult == null) return null;
+    const wrapper = jvm.wrapJsObject(hostResult, "com_codename1_impl_html5_JSOImplementations_CN1Native");
+    try { win.__cn1CachedCn1Wrapper = wrapper; } catch (_e) {}
+    return wrapper;
+  }
+  // Direct-context (worker has its own window with cn1) fall-through
+  if (win && win.cn1 != null) {
+    const wrapper = jvm.wrapJsObject(win.cn1, "com_codename1_impl_html5_JSOImplementations_CN1Native");
+    try { win.__cn1CachedCn1Wrapper = wrapper; } catch (_e) {}
+    return wrapper;
+  }
+  return null;
+});
+
+bindNative([
   "cn1_com_codename1_html5_js_browser_Window_getDocument_R_com_codename1_html5_js_dom_HTMLDocument",
   "cn1_com_codename1_html5_js_browser_Window_getDocument___R_com_codename1_html5_js_dom_HTMLDocument"
 ], function*(__cn1ThisObject) {

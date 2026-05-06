@@ -7715,9 +7715,19 @@ public class HTML5Implementation extends CodenameOneImplementation {
     // the same Uint8Array on every subsequent open.
     private static final java.util.Map<String, Uint8Array> assetByteCache =
             new java.util.HashMap<String, Uint8Array>();
+    // Cache of URLs that the host bundle does NOT have. The
+    // ``getBundledAssetAsDataURL`` host call returns null for any
+    // URL the app didn't embed -- Initializr embeds none, so all
+    // ~5 boot calls returned null. Cache the negative result so
+    // repeats hit the in-worker cache instead of round-tripping.
+    // We never cache the positive case because the data URL would
+    // be huge to keep around when we already process the bytes.
+    private static final java.util.Set<String> bundledAssetMissCache =
+            new java.util.HashSet<String>();
 
     public InputStream getArrayBufferInputStream(String url){
-        String dataURL = ((WindowExt)window).getCn1().getBundledAssetAsDataURL(url);
+        String dataURL = bundledAssetMissCache.contains(url) ? null
+                : ((WindowExt)window).getCn1().getBundledAssetAsDataURL(url);
         if (dataURL != null) {
             Blob blob = ((WindowExt)window).Base64ToBlob(dataURL);
             ArrayBufferInputStream out;
@@ -7727,7 +7737,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
             } catch (IOException ex) {
                 ex.printStackTrace();
             }
-
+        } else {
+            bundledAssetMissCache.add(url);
         }
 
         if (isMediaResource(url)){
