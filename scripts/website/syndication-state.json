@@ -1,0 +1,4 @@
+{
+  "_comment": "Tracks blog posts syndicated by scripts/website/syndicate_blog_posts.py. Keyed by post slug. Each platform sub-object records the remote URL/id and ISO timestamp once syndication succeeds.",
+  "posts": {}
+}
