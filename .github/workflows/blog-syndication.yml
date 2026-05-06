@@ -39,11 +39,6 @@ jobs:
           DEVTO_API_KEY: ${{ secrets.DEVTO_API_KEY }}
           HASHNODE_TOKEN: ${{ secrets.HASHNODE_TOKEN }}
           HASHNODE_PUBLICATION_ID: ${{ secrets.HASHNODE_PUBLICATION_ID }}
-          # Optional: foojay submits a draft via WP REST. Add FOOJAY_USER /
-          # FOOJAY_PASSWORD as repo secrets to enable; until then the script
-          # automatically skips foojay.
-          FOOJAY_USER: ${{ secrets.FOOJAY_USER }}
-          FOOJAY_PASSWORD: ${{ secrets.FOOJAY_PASSWORD }}
         run: |
           set -euo pipefail
           if [ "${{ inputs.dry_run }}" = "true" ]; then

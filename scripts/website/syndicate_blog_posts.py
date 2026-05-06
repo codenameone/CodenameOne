@@ -19,7 +19,6 @@ library available.
 from __future__ import annotations
 
 import argparse
-import base64
 import datetime as dt
 import json
 import os
@@ -55,8 +54,7 @@ HASHNODE_TAGS = [
     {"slug": "ios", "name": "iOS"},
 ]
 
-FOOJAY_ENDPOINT = "https://foojay.io/wp-json/wp/v2/posts"
-DEFAULT_PLATFORMS = "devto,hashnode,foojay"
+DEFAULT_PLATFORMS = "devto,hashnode"
 
 
 @dataclass
@@ -311,42 +309,6 @@ def publish_to_devto(post: Post, body_markdown: str, api_key: str) -> dict[str, 
     }
 
 
-def publish_to_foojay(post: Post, body_markdown: str, user: str, password: str) -> dict[str, Any]:
-    """Create a draft post on foojay.io via the WordPress REST API.
-
-    foojay editorial reviews and publishes the draft. foojay runs Yoast SEO,
-    which registers _yoast_wpseo_canonical as a REST-exposed post meta, so we
-    set the canonical there rather than as visible body text.
-    """
-    excerpt = str(post.front_matter.get("description") or "").strip()
-    payload: dict[str, Any] = {
-        "title": post.title,
-        "content": body_markdown,
-        "status": "draft",
-        "meta": {"_yoast_wpseo_canonical": post.canonical_url},
-    }
-    if excerpt:
-        payload["excerpt"] = excerpt[:500]
-
-    creds = base64.b64encode(f"{user}:{password}".encode("utf-8")).decode("ascii")
-    response = http_post_json(
-        FOOJAY_ENDPOINT,
-        headers={"Authorization": f"Basic {creds}"},
-        payload=payload,
-    )
-    edit_link = None
-    raw_link = response.get("link")
-    if isinstance(response.get("id"), int):
-        edit_link = f"https://foojay.io/wp-admin/post.php?post={response['id']}&action=edit"
-    return {
-        "id": response.get("id"),
-        "url": edit_link or raw_link,
-        "preview_url": raw_link,
-        "status": response.get("status"),
-        "syndicated_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
-    }
-
-
 def publish_to_hashnode(post: Post, body_markdown: str, token: str, publication_id: str) -> dict[str, Any]:
     mutation = """
     mutation PublishPost($input: PublishPostInput!) {
@@ -427,8 +389,6 @@ def is_platform_configured(platform: str) -> bool:
         return bool(os.environ.get("DEVTO_API_KEY"))
     if platform == "hashnode":
         return bool(os.environ.get("HASHNODE_TOKEN") and os.environ.get("HASHNODE_PUBLICATION_ID"))
-    if platform == "foojay":
-        return bool(os.environ.get("FOOJAY_USER") and os.environ.get("FOOJAY_PASSWORD"))
     return False
 
 
@@ -487,13 +447,6 @@ def main(argv: list[str]) -> int:
                     body_markdown,
                     os.environ["HASHNODE_TOKEN"],
                     os.environ["HASHNODE_PUBLICATION_ID"],
-                )
-            elif platform == "foojay":
-                result = publish_to_foojay(
-                    candidate,
-                    body_markdown,
-                    os.environ["FOOJAY_USER"],
-                    os.environ["FOOJAY_PASSWORD"],
                 )
             else:
                 raise RuntimeError(f"unknown platform: {platform}")
