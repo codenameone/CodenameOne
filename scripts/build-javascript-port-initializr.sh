@@ -531,17 +531,53 @@ if [ -f "$DIST_DIR/index.html" ] && ! grep -q "initializr_native_handlers.js" "$
   bj_log "Patched index.html to load native impl and host-bridge handlers"
 fi
 
-# NOTE: an earlier revision injected <link rel="preload"> hints for
-# worker.js / translated_app.js / theme.res / assets/iOS7Theme.res.
-# Empirically that made boot SLOWER, not faster: the worker's sync
-# XHR uses a different credentials mode than ``preload as=fetch``
-# (so the browser treated the entries as unmatchable and re-fetched
-# from the network), and the ``?v=1.0`` cache-buster appended by
-# HTML5Implementation.getArrayBufferInputStream means the preload
-# URL doesn't match the actual XHR URL anyway. Keeping the hook
-# disabled here so a future change can flip it back on once the
-# worker side switches to async ``fetch()`` with explicit
-# ``credentials: "same-origin"``.
+# Inject a script that pre-fetches the boot-critical theme assets
+# in parallel with worker startup. This fires before
+# ``browser_bridge.js`` creates the worker, so the browser starts
+# the network request immediately. By the time the worker runs its
+# blocking sync XHR for the same URL the response is already in
+# the HTTP cache.
+#
+# Using inline ``fetch(url)`` (default same-origin credentials) is
+# what matches the worker's XHR cache key. An earlier draft used
+# ``<link rel="preload" as="fetch" crossorigin="anonymous">`` which
+# made boot SLOWER -- the explicit ``crossorigin="anonymous"``
+# downgraded the request to no-credentials mode, so the worker's
+# default-credentials XHR couldn't reuse the preloaded bytes. The
+# bare ``fetch(url)`` call sidesteps that mismatch.
+#
+# We DON'T preload ``assets/iOS7Theme.res`` because
+# HTML5Implementation.getArrayBufferInputStream appends
+# ``?v=<getBuildVersion()>`` to ``assets/`` paths -- the preload URL
+# would need the same query string to match. The build version is
+# resolved at runtime so we'd have to special-case it here. Theme
+# at the bundle root (no ``assets/`` prefix) gets no cache-buster
+# so it preloads cleanly.
+if [ -f "$DIST_DIR/index.html" ] && ! grep -q "<!-- cn1-prefetch -->" "$DIST_DIR/index.html"; then
+  prefetch_file="$(mktemp)"
+  cat > "$prefetch_file" <<'PREFETCH'
+<script>/* cn1-prefetch */
+// Same-origin fetch to populate the HTTP cache before the worker
+// issues its blocking sync XHR for the same URL. We don't await
+// the response -- the browser handles the rest in the background.
+try { fetch('theme.res').catch(function(){}); } catch (e) {}
+</script>
+<!-- cn1-prefetch -->
+PREFETCH
+  python3 - "$DIST_DIR/index.html" "$prefetch_file" <<'PYEOF'
+import sys, pathlib
+html_path = pathlib.Path(sys.argv[1])
+prefetch_path = pathlib.Path(sys.argv[2])
+html = html_path.read_text(encoding='utf-8')
+inject = prefetch_path.read_text(encoding='utf-8')
+needle = '<script src="js/push.js"></script>'
+if needle in html:
+  html = html.replace(needle, inject + needle, 1)
+  html_path.write_text(html, encoding='utf-8')
+PYEOF
+  rm -f "$prefetch_file"
+  bj_log "Patched index.html with cn1-prefetch theme.res hint"
+fi
 
 # --- Post-translation minimisation pass -------------------------------------
 # A raw ByteCodeTranslator JS bundle for Initializr is ~90 MiB and consists
