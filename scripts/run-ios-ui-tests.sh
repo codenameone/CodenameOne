@@ -831,10 +831,14 @@ SUMMARY_FILE="$SCREENSHOT_TMP_DIR/screenshot-summary.txt"
 COMMENT_FILE="$SCREENSHOT_TMP_DIR/screenshot-comment.md"
 
 export CN1SS_PREVIEW_DIR="$SCREENSHOT_PREVIEW_DIR"
-export CN1SS_COMMENT_MARKER="<!-- CN1SS_IOS_COMMENT -->"
-export CN1SS_COMMENT_LOG_PREFIX="[run-ios-device-tests]"
-export CN1SS_PREVIEW_SUBDIR="ios"
-export CN1SS_SUCCESS_MESSAGE="✅ Native iOS screenshot tests passed."
+# All four of these are tunable from the caller so the Metal job can post
+# a separate PR comment instead of overwriting the GL job's comment.
+# Keep the historical GL defaults so existing GL invocations are unchanged.
+export CN1SS_COMMENT_MARKER="${CN1SS_COMMENT_MARKER:-<!-- CN1SS_IOS_COMMENT -->}"
+export CN1SS_COMMENT_LOG_PREFIX="${CN1SS_COMMENT_LOG_PREFIX:-[run-ios-device-tests]}"
+export CN1SS_PREVIEW_SUBDIR="${CN1SS_PREVIEW_SUBDIR:-ios}"
+export CN1SS_SUCCESS_MESSAGE="${CN1SS_SUCCESS_MESSAGE:-✅ Native iOS screenshot tests passed.}"
+REPORT_TITLE="${CN1SS_REPORT_TITLE:-iOS screenshot updates}"
 
 # Load VM translation time if available
 CN1SS_VM_TIME=0
@@ -846,7 +850,7 @@ export CN1SS_VM_TIME
 export CN1SS_COMPILATION_TIME="$COMPILATION_TIME"
 
 cn1ss_process_and_report \
-  "iOS screenshot updates" \
+  "$REPORT_TITLE" \
   "$COMPARE_JSON" \
   "$SUMMARY_FILE" \
   "$COMMENT_FILE" \
