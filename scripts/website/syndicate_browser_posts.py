@@ -417,92 +417,110 @@ class HackerNoonAdapter:
     """
 
     name = "hackernoon"
-    LOGIN_URL = "https://hackernoon.com/login"
-    EDITOR_URL = "https://app.hackernoon.com/new-story"
+    HOME_URL = "https://hackernoon.com/"
+    NEW_DRAFT_URL = "https://hackernoon.com/new"
 
-    USER_SELECTORS = ["input#email"]
-    PASSWORD_SELECTORS = ["input#password"]
-    SUBMIT_SELECTORS = [
-        "button:has-text('LOG IN')",
-        "button:has-text('Log in')",
-        "button:has-text('Login')",
-    ]
-    TITLE_SELECTORS = [
-        "[data-placeholder='Title']",
-        "[contenteditable='true'][placeholder*='Title']",
-        "textarea[placeholder*='Title']",
-    ]
-    BODY_SELECTORS = [
-        "[data-placeholder*='your story' i]",
-        "[contenteditable='true'][placeholder*='Tell your story' i]",
-    ]
-    SAVE_DRAFT_SELECTORS = [
-        "button:has-text('Save Draft')",
-        "button:has-text('Save as draft')",
-    ]
-    CANONICAL_FIELD_SELECTORS = [
-        "input[name='canonical']",
-        "input[placeholder*='canonical' i]",
-        "input[placeholder*='original URL' i]",
-    ]
+    # Login is via a drawer that opens when you click the header "Login" button
+    # on the public hackernoon.com pages — there is no standalone /login page
+    # that submits successfully (the visible /login form is decorative; the
+    # working form is in the drawer).
+    HEADER_LOGIN_BUTTON_SELECTORS = ["button:text-is('Login')"]
+    DRAWER_EMAIL_SELECTORS = ["input[type=email][placeholder='Email']"]
+    DRAWER_PASSWORD_SELECTORS = ["input[type=password][placeholder='Password']"]
+    DRAWER_SUBMIT_SELECTORS = ["button:text-is('Log In')"]
+
+    # Editor — Quill-based. Reached via "Start Draft" button on /new which
+    # navigates to app.hackernoon.com/articles/new.
+    START_DRAFT_SELECTORS = ["button:text-is('Start Draft')"]
+    TITLE_SELECTORS = ["textarea[name='title'][placeholder='Title']"]
+    DESCRIPTION_SELECTORS = ["textarea[placeholder*='brief description' i]"]
+    BODY_QUILL_SELECTORS = ["div.ql-editor[contenteditable='true']"]
+    SUBMIT_FOR_REVIEW_SELECTORS = ["button:has-text('Submit Story for Review')"]
 
     @staticmethod
     def is_configured() -> bool:
         return bool(os.environ.get("HACKERNOON_USER") and os.environ.get("HACKERNOON_PASSWORD"))
 
     def login(self, page) -> None:
-        page.goto(self.LOGIN_URL, wait_until="domcontentloaded")
+        page.goto(self.HOME_URL, wait_until="domcontentloaded", timeout=30000)
         # Dismiss the Iubenda cookie consent banner if it overlays the page.
         try:
             page.click(".iubenda-cs-accept-btn, .iubenda-cs-reject-btn", timeout=3000)
         except Exception:  # noqa: BLE001
             pass
-        # The form is React-controlled; .fill() sets DOM .value but doesn't
-        # update React's internal state, so doLogin() runs with empty fields.
-        # Type per-character to dispatch the events React's onChange listens for.
-        email = _find_first(page, self.USER_SELECTORS)
+        # Open the login drawer via the header Login button. There may be
+        # multiple "Login" buttons on the page (header + footer); .first picks
+        # the visible header one.
+        page.locator(self.HEADER_LOGIN_BUTTON_SELECTORS[0]).first.click()
+        # Drawer is React-controlled; type per-character so React's onChange
+        # actually updates state instead of being silently ignored.
+        email = page.locator(self.DRAWER_EMAIL_SELECTORS[0])
+        email.wait_for(state="visible", timeout=15000)
         email.click()
         email.press_sequentially(os.environ["HACKERNOON_USER"], delay=10)
-        pwd = _find_first(page, self.PASSWORD_SELECTORS)
+        pwd = page.locator(self.DRAWER_PASSWORD_SELECTORS[0])
         pwd.click()
         pwd.press_sequentially(os.environ["HACKERNOON_PASSWORD"], delay=10)
-        _find_first(page, self.SUBMIT_SELECTORS).click()
-        page.wait_for_load_state("networkidle", timeout=30000)
-        # HackerNoon stays on /login if credentials were rejected; raise so the
-        # caller surfaces the explicit "Invalid email or password" rather than
-        # timing out later in the editor flow.
-        if page.url.rstrip("/").endswith("/login"):
-            err = page.evaluate(
-                "() => { const t = document.body.innerText; "
-                "const m = t.match(/Invalid[^\\n]*|Incorrect[^\\n]*/i); "
-                "return m ? m[0] : null; }"
-            )
-            raise AdapterError(err or "login redirected back to /login (auth failed)")
+        page.locator(self.DRAWER_SUBMIT_SELECTORS[0]).click()
+        # Successful login sets a `hasAuthCookie` cookie on .hackernoon.com
+        # and the drawer disappears. Wait for the cookie rather than a URL
+        # change because the page may stay on the homepage.
+        deadline = dt.datetime.now() + dt.timedelta(seconds=30)
+        while dt.datetime.now() < deadline:
+            cookies = page.context.cookies("https://hackernoon.com/")
+            if any(c.get("name") == "hasAuthCookie" for c in cookies):
+                return
+            page.wait_for_timeout(500)
+        raise AdapterError("hackernoon login: hasAuthCookie not set within 30s")
 
     def submit_draft(self, page, ctx: AdapterContext) -> dict[str, Any]:
-        page.goto(self.EDITOR_URL, wait_until="domcontentloaded")
-        _find_first(page, self.TITLE_SELECTORS).fill(ctx.post.title)
+        page.goto(self.NEW_DRAFT_URL, wait_until="domcontentloaded", timeout=45000)
+        page.wait_for_timeout(3000)
+        _find_first(page, self.START_DRAFT_SELECTORS).click()
+        # Lands on app.hackernoon.com/articles/new — Quill needs a moment to mount.
+        page.wait_for_url("**/articles/**", timeout=30000)
+        page.wait_for_timeout(4000)
 
-        body_field = _find_first(page, self.BODY_SELECTORS)
-        body_field.click()
-        page.evaluate("text => navigator.clipboard.writeText(text)", ctx.body_markdown)
+        title_field = page.locator(self.TITLE_SELECTORS[0])
+        title_field.wait_for(state="visible", timeout=15000)
+        title_field.click()
+        title_field.press_sequentially(ctx.post.title, delay=5)
+
+        # Description (used by HackerNoon as the SEO description / preview).
+        description = str(ctx.post.front_matter.get("description") or "").strip()
+        if description:
+            try:
+                desc = page.locator(self.DESCRIPTION_SELECTORS[0])
+                desc.wait_for(state="visible", timeout=5000)
+                desc.click()
+                desc.press_sequentially(description[:300], delay=5)
+            except Exception:  # noqa: BLE001
+                pass
+
+        # Body — Quill rich-text editor. Pasting markdown lands as plain text;
+        # the user can refine in the editor before clicking Submit-for-Review.
+        # Prepend an "Originally published at" note so the editorial reviewer
+        # can wire up the canonical and credit before publishing.
+        body_with_canonical = (
+            f"Originally published at {ctx.post.canonical_url}\n\n"
+            + ctx.body_markdown
+        )
+        body = page.locator(self.BODY_QUILL_SELECTORS[0])
+        body.wait_for(state="visible", timeout=15000)
+        body.click()
+        # Quill's contenteditable accepts text via the keyboard. Use insertText
+        # via the clipboard for speed; per-character typing on a 20k-char post
+        # would take far too long.
+        page.evaluate("text => navigator.clipboard.writeText(text)", body_with_canonical)
         page.keyboard.press("Meta+V" if sys.platform == "darwin" else "Control+V")
-
-        # Canonical field lives behind a settings panel; selectors here will
-        # almost certainly need adjustment. Don't fail the run if it's hidden.
-        try:
-            field = _find_first(page, self.CANONICAL_FIELD_SELECTORS, timeout=3000)
-            field.fill(ctx.post.canonical_url)
-        except AdapterError:
-            pass
+        page.wait_for_timeout(1000)
 
         if ctx.validate_only:
             shot = _save_screenshot(page, ctx.post.slug, "hackernoon-editor")
             return {"validated": True, "screenshot": str(shot)}
 
-        _find_first(page, self.SAVE_DRAFT_SELECTORS).click()
-        # Drafts land at /draft/<slug-or-id> on HackerNoon
-        page.wait_for_url("**/draft/**", timeout=20000)
+        _find_first(page, self.SUBMIT_FOR_REVIEW_SELECTORS).click()
+        page.wait_for_load_state("networkidle", timeout=30000)
         return {
             "url": page.url,
             "syndicated_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),

@@ -289,12 +289,12 @@ def http_post_json(url: str, headers: dict[str, str], payload: dict[str, Any]) -
     return json.loads(body)
 
 
-def publish_to_devto(post: Post, body_markdown: str, api_key: str) -> dict[str, Any]:
+def publish_to_devto(post: Post, body_markdown: str, api_key: str, draft: bool = False) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "article": {
             "title": post.title,
             "body_markdown": body_markdown,
-            "published": True,
+            "published": not draft,
             "canonical_url": post.canonical_url,
             "tags": DEVTO_TAGS,
             "description": str(post.front_matter.get("description") or "")[:250] or None,
@@ -317,14 +317,24 @@ def publish_to_devto(post: Post, body_markdown: str, api_key: str) -> dict[str, 
     }
 
 
-def publish_to_hashnode(post: Post, body_markdown: str, token: str, publication_id: str) -> dict[str, Any]:
-    mutation = """
-    mutation PublishPost($input: PublishPostInput!) {
-      publishPost(input: $input) {
-        post { id slug url }
-      }
-    }
-    """.strip()
+def publish_to_hashnode(post: Post, body_markdown: str, token: str, publication_id: str,
+                        draft: bool = False) -> dict[str, Any]:
+    if draft:
+        mutation = """
+        mutation CreateDraft($input: CreateDraftInput!) {
+          createDraft(input: $input) {
+            draft { id slug }
+          }
+        }
+        """.strip()
+    else:
+        mutation = """
+        mutation PublishPost($input: PublishPostInput!) {
+          publishPost(input: $input) {
+            post { id slug url }
+          }
+        }
+        """.strip()
 
     input_obj: dict[str, Any] = {
         "title": post.title,
@@ -347,10 +357,17 @@ def publish_to_hashnode(post: Post, body_markdown: str, token: str, publication_
     )
     if response.get("errors"):
         raise RuntimeError(f"hashnode GraphQL errors: {response['errors']}")
-    published = (response.get("data") or {}).get("publishPost", {}).get("post", {})
+    data = response.get("data") or {}
+    if draft:
+        node = data.get("createDraft", {}).get("draft", {})
+        slug = node.get("slug")
+        url = f"https://hashnode.com/draft/{node.get('id')}" if node.get("id") else None
+    else:
+        node = data.get("publishPost", {}).get("post", {})
+        url = node.get("url")
     return {
-        "id": published.get("id"),
-        "url": published.get("url"),
+        "id": node.get("id"),
+        "url": url,
         "syndicated_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
     }
 
@@ -358,6 +375,8 @@ def publish_to_hashnode(post: Post, body_markdown: str, token: str, publication_
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dry-run", action="store_true", help="Do not call any APIs; print what would happen.")
+    parser.add_argument("--draft-mode", action="store_true",
+                        help="Create as draft (dev.to: published=false; Hashnode: createDraft) instead of publishing. Useful for verifying formatting without going live.")
     parser.add_argument(
         "--platforms",
         default=DEFAULT_PLATFORMS,
@@ -448,13 +467,17 @@ def main(argv: list[str]) -> int:
             continue
         try:
             if platform == "devto":
-                result = publish_to_devto(candidate, body_markdown, os.environ["DEVTO_API_KEY"])
+                result = publish_to_devto(
+                    candidate, body_markdown, os.environ["DEVTO_API_KEY"],
+                    draft=args.draft_mode,
+                )
             elif platform == "hashnode":
                 result = publish_to_hashnode(
                     candidate,
                     body_markdown,
                     os.environ["HASHNODE_TOKEN"],
                     os.environ["HASHNODE_PUBLICATION_ID"],
+                    draft=args.draft_mode,
                 )
             else:
                 raise RuntimeError(f"unknown platform: {platform}")
