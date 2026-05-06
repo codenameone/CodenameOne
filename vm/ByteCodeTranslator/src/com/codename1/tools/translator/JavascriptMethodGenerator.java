@@ -5301,9 +5301,15 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                     int depth = a.branchDepths[j];
                     Integer tgtIdx = labelToIdx.get(target);
                     if (tgtIdx == null) {
-                        // Branch to unknown label -- bail; could mean a
-                        // ``default:`` jump or some unparsed shape.
-                        return body;
+                        // Branch target has no matching ``case`` label
+                        // in the parsed switch body. The translator can
+                        // emit ``{ pc=N; break; }`` blocks pointing at
+                        // pruned/never-emitted PCs (e.g., a dangling
+                        // continuation after a return) — at runtime
+                        // these fall through to ``default:return``.
+                        // Skip recording; do NOT bail on the whole
+                        // method.
+                        continue;
                     }
                     if (entryDepths[tgtIdx] < 0) {
                         entryDepths[tgtIdx] = depth;
@@ -5323,6 +5329,25 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                 }
             }
         } while (changed);
+        // Safety: every case in the parsed list MUST have a known entry
+        // depth. If any case wasn't reached by propagation, leaving its
+        // body verbatim would break the runtime — the surrounding
+        // ``let S = []`` is about to be replaced with named registers,
+        // so any ``S.p()`` / ``S.q()`` left inside the unreachable
+        // case's body would reference an undefined identifier the
+        // first time runtime dispatch lands there. Bail conservatively.
+        for (int i = 0; i < n; i++) {
+            if (entryDepths[i] < 0) {
+                // Only ignore unreachable cases whose body has no S
+                // references (e.g., empty bare-case labels) -- those
+                // are safe to keep verbatim. Cases with S.p / S.q
+                // contents that we never reached force a bail.
+                int[] c = cases.get(i);
+                if (caseBodyHasStackRef(body, c[1], c[2])) {
+                    return body;
+                }
+            }
+        }
         // Rewrite each reachable case body using its computed entry
         // depth. Unreachable cases (still ``-1``) survive verbatim --
         // they can't execute but may carry a label that some emit
@@ -5376,6 +5401,38 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             result = result.substring(0, idx) + regDecl.toString() + result.substring(idx + len);
         }
         return result;
+    }
+
+    /**
+     * Check whether the case body contains any S.p / S.q / S.t reference
+     * that would be broken if the surrounding ``let S = []`` is replaced
+     * with named registers but this case body isn't rewritten. Used to
+     * decide whether to bail on the rewrite when an "unreachable" case
+     * is left verbatim.
+     */
+    private static boolean caseBodyHasStackRef(String body, int from, int to) {
+        for (int i = from; i < to; i++) {
+            char ch = body.charAt(i);
+            if (ch == '"' || ch == '\'') {
+                int end = skipStringLiteral(body, i);
+                if (end < 0 || end >= to) {
+                    return true;
+                }
+                i = end;
+                continue;
+            }
+            if (ch == 'S' && i + 2 < to && body.charAt(i + 1) == '.') {
+                char before = i > 0 ? body.charAt(i - 1) : ' ';
+                if (Character.isLetterOrDigit(before) || before == '_' || before == '$') {
+                    continue;
+                }
+                char op = body.charAt(i + 2);
+                if (op == 'p' || op == 'q' || op == 't') {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /**
