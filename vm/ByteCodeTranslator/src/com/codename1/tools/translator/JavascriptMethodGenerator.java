@@ -1106,6 +1106,16 @@ final class JavascriptMethodGenerator {
         // the time we get here all the bodies have been emitted, so
         // the labels themselves are pure overhead.
         s = stripDeadCaseLabels(s);
+        // Collapse ``pc = N; break } case N: {`` immediate-jump
+        // sequences when N is set in exactly one place. The runtime
+        // does ``set pc, exit switch, re-enter switch via for(;;),
+        // dispatch to case N`` — a no-op when N is the immediately
+        // following case and nothing else jumps there. Saves
+        // ``pc = N; break } case N: {`` (≈18 chars) per match.
+        // esbuild --minify-syntax already collapses many of these,
+        // but only when the case body is empty / pure-comment;
+        // ours aren't, so esbuild leaves them. We do it here.
+        s = collapseUniqueImmediateCaseFallthrough(s);
         // Final pass: shorten the per-method local registers ``stack``
         // → ``S`` and ``locals`` → ``L``. They appear ~210k times
         // (stack.p / stack.q / locals[N] / let stack=… / let locals=…)
@@ -1443,6 +1453,111 @@ final class JavascriptMethodGenerator {
             out.append(c);
             i++;
         }
+        return prefix + out + suffix;
+    }
+
+    /**
+     * Collapse ``pc = N; break } case N: {`` (or the post-peephole
+     * ``pc=N;break}case N:{``) into a single ``;`` when ``pc = N``
+     * appears only at this one site in the method body. The runtime
+     * sets pc, exits the switch, re-iterates the for(;;), and
+     * dispatches back to ``case N:`` -- a no-op when no other code
+     * path reaches case N. Saves ~18 chars per match.
+     *
+     * Conservative: only fires when (a) the source pc value matches
+     * the destination case label, (b) the case has a body (``case
+     * N: { ... }`` shape, not bare ``case N:``), and (c) the same
+     * integer appears exactly once after ``pc = `` / ``pc=``
+     * elsewhere in the method body. esbuild --minify-syntax catches
+     * empty-body case fall-throughs but won't merge case bodies
+     * across yields, so most of our hits are residual.
+     */
+    private static String collapseUniqueImmediateCaseFallthrough(String body) {
+        int switchOpen = body.indexOf("switch (pc) {");
+        int searchOffset;
+        if (switchOpen >= 0) {
+            searchOffset = switchOpen + "switch (pc) ".length();
+        } else {
+            switchOpen = body.indexOf("switch(pc){");
+            if (switchOpen < 0) {
+                return body;
+            }
+            searchOffset = switchOpen + "switch(pc)".length();
+        }
+        int blockOpen = body.indexOf('{', searchOffset);
+        if (blockOpen < 0) {
+            return body;
+        }
+        int depth = 1, j = blockOpen + 1;
+        char inString = 0;
+        while (j < body.length() && depth > 0) {
+            char c = body.charAt(j);
+            if (inString != 0) {
+                if (c == '\\' && j + 1 < body.length()) { j += 2; continue; }
+                if (c == inString) inString = 0;
+            } else if (c == '"' || c == '\'' || c == '`') {
+                inString = c;
+            } else if (c == '{') {
+                depth++;
+            } else if (c == '}') {
+                depth--;
+                if (depth == 0) break;
+            }
+            j++;
+        }
+        if (depth != 0) return body;
+        String prefix = body.substring(0, blockOpen + 1);
+        String region = body.substring(blockOpen + 1, j);
+        String suffix = body.substring(j);
+
+        // Count occurrences of every digit literal that appears as
+        // a target in any ``pc = <expr>`` write. Critical: a
+        // ``pc = cond ? 5 : 3`` expression sets pc to 5 OR 3, so
+        // both are reached -- if we only counted direct ``pc=N``
+        // assignments we'd undercount and incorrectly collapse a
+        // case that's still reachable via a ternary, producing a
+        // runtime NPE (default:return falls off the case dispatch).
+        // ``[^;}]+`` matches up to the next statement terminator
+        // (``)`` is allowed inside the RHS so calls like
+        // ``S.q() == null`` don't truncate); then digit-run
+        // extraction grabs every integer literal mentioned.
+        java.util.Map<String, Integer> pcCount = new java.util.HashMap<String, Integer>();
+        java.util.regex.Matcher pcWrites = java.util.regex.Pattern.compile(
+                "pc\\s*=\\s*([^;}]+)").matcher(region);
+        java.util.regex.Pattern digitRun = java.util.regex.Pattern.compile("\\d+");
+        while (pcWrites.find()) {
+            String rhs = pcWrites.group(1);
+            java.util.regex.Matcher digits = digitRun.matcher(rhs);
+            while (digits.find()) {
+                String num = digits.group();
+                Integer prev = pcCount.get(num);
+                pcCount.put(num, prev == null ? 1 : prev + 1);
+            }
+        }
+
+        // Apply: ``pc = N; break; } case N: {`` (and the no-space
+        // variant). The trailing ``{`` opens a new case body that
+        // we want to merge with the prior one, so we just replace
+        // the whole stretch with ``;``. This collapses two case
+        // bodies into one syntactically.
+        java.util.regex.Pattern pat = java.util.regex.Pattern.compile(
+                "pc\\s*=\\s*(\\d+)\\s*;\\s*break\\s*;?\\s*\\}\\s*case\\s+(\\d+)\\s*:\\s*\\{");
+        java.util.regex.Matcher m = pat.matcher(region);
+        StringBuilder out = new StringBuilder(region.length());
+        int last = 0;
+        while (m.find()) {
+            String src = m.group(1);
+            String dst = m.group(2);
+            if (!src.equals(dst)) continue;
+            Integer count = pcCount.get(src);
+            if (count == null || count != 1) continue;
+            out.append(region, last, m.start());
+            // Replace with empty (just falls through into the body
+            // that came after ``case N: {``).
+            last = m.end();
+        }
+        if (last == 0) return body;
+        out.append(region, last, region.length());
         return prefix + out + suffix;
     }
 
