@@ -107,6 +107,20 @@ def _escape_html(text: str) -> str:
     return (text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
 
 
+def _download_to_temp(url: str) -> Path:
+    """Download a remote file to a tempfile and return the local path."""
+    import tempfile
+    import urllib.request as _ur
+    req = _ur.Request(url, headers={"User-Agent": _UA_STR})
+    with _ur.urlopen(req, timeout=120) as resp:
+        data = resp.read()
+    suffix = Path(url.split("?", 1)[0]).suffix or ".jpg"
+    fd, name = tempfile.mkstemp(suffix=suffix)
+    with os.fdopen(fd, "wb") as out:
+        out.write(data)
+    return Path(name)
+
+
 def _markdown_to_html(text: str) -> str:
     """Render a Hugo-flavoured markdown post to HTML for paste-into-editor.
 
@@ -451,6 +465,13 @@ class HackerNoonAdapter:
     TITLE_SELECTORS = ["textarea[name='title'][placeholder='Title']"]
     DESCRIPTION_SELECTORS = ["textarea[placeholder*='brief description' i]"]
     BODY_QUILL_SELECTORS = ["div.ql-editor[contenteditable='true']"]
+    COVER_IMAGE_FILE_INPUT_SELECTORS = ["input[type=file][accept*='image']"]
+    # Story Settings drawer — for canonical / non-original-story flag. The
+    # `css-p9s3bq` class is shared by both Yes and No buttons in the drawer;
+    # the corresponding modal also has Yes/No buttons (class="negative")
+    # which would be ambiguous, so we restrict to the drawer styling.
+    NOT_ORIGINAL_NO_SELECTOR = "button.css-p9s3bq:text-is('No')"
+    CANONICAL_INPUT_SELECTORS = ["input.firstSeenAt", "input[placeholder='www.example.com/yourstory']"]
     # Save creates a draft. Submit Story for Review! sends to editorial and
     # only enables once additional fields (image, categories, tags) are set —
     # the syndication script intentionally targets Save so the draft lands
@@ -503,13 +524,14 @@ class HackerNoonAdapter:
         page.wait_for_url("**/articles/**", timeout=30000)
         page.wait_for_timeout(5000)
 
-        # Title is a React-controlled textarea. press_sequentially loses
-        # leading characters intermittently (HN's React handlers debounce);
-        # .fill() sets the value via the host CDP InputHandler API which
-        # React handles correctly.
+        # Title is a React-controlled textarea. .fill() leaves it empty, and
+        # press_sequentially with a small delay (5-10ms) drops leading chars
+        # because HN's React onChange debounces faster than the keystrokes.
+        # An 80ms-per-key delay is slow enough that every key registers.
         title_field = page.locator(self.TITLE_SELECTORS[0])
         title_field.wait_for(state="visible", timeout=15000)
-        title_field.fill(ctx.post.title)
+        title_field.click()
+        title_field.press_sequentially(ctx.post.title, delay=80)
 
         # Description (used by HackerNoon as the SEO description / preview).
         description = str(ctx.post.front_matter.get("description") or "").strip()
@@ -517,19 +539,16 @@ class HackerNoonAdapter:
             try:
                 desc = page.locator(self.DESCRIPTION_SELECTORS[0])
                 desc.wait_for(state="visible", timeout=5000)
-                desc.fill(description[:300])
+                desc.click()
+                desc.press_sequentially(description[:300], delay=20)
             except Exception:  # noqa: BLE001
                 pass
 
-        # Body — Quill rich-text editor. Pasting markdown as text lands as a
-        # plain blob with no formatting (no headings, images, code blocks,
-        # etc.). Convert markdown to HTML and inject via Quill's clipboard
-        # API which translates HTML into Quill's Delta format.
-        body_html = _markdown_to_html(
-            f"*Originally published at [{ctx.post.canonical_url}]"
-            f"({ctx.post.canonical_url})*\n\n"
-            + ctx.body_markdown
-        )
+        # Body — Quill rich-text editor. Convert markdown to HTML so headings,
+        # images, links, and code fences render. Inject via Quill's clipboard
+        # API which translates HTML into Quill's Delta format. The visible
+        # canonical reference is set in Story Settings below, not in the body.
+        body_html = _markdown_to_html(ctx.body_markdown)
         body = page.locator(self.BODY_QUILL_SELECTORS[0])
         body.wait_for(state="visible", timeout=15000)
         body.click()
@@ -537,9 +556,6 @@ class HackerNoonAdapter:
             """(html) => {
               const ce = document.querySelector("div.ql-editor[contenteditable='true']");
               if (!ce) return {via: 'none'};
-              // Quill stores instance refs via .__quill on the container, or
-              // via Quill.find(). Walk up from the .ql-editor to find the
-              // container Quill was created on.
               if (window.Quill && window.Quill.find) {
                 let container = ce.parentElement;
                 let q = null;
@@ -549,12 +565,11 @@ class HackerNoonAdapter:
                   container = container.parentElement;
                 }
                 if (q && q.clipboard && q.clipboard.dangerouslyPasteHTML) {
-                  q.setText('');  // clear placeholder before pasting
+                  q.setText('');
                   q.clipboard.dangerouslyPasteHTML(0, html, 'api');
                   return {via: 'quill', length: q.getLength()};
                 }
               }
-              // Fallback: inject as innerHTML and fire input events.
               ce.innerHTML = html;
               ce.dispatchEvent(new Event('input', {bubbles: true}));
               return {via: 'fallback', length: ce.innerHTML.length};
@@ -565,16 +580,36 @@ class HackerNoonAdapter:
             raise AdapterError("could not access Quill editor instance")
         page.wait_for_timeout(1500)
 
+        # Cover image — download from canonical to a temp file, upload via
+        # the file input that accepts image/*. set_input_files works without
+        # the file picker dialog actually opening.
+        if ctx.post.cover_image:
+            try:
+                cover_path = _download_to_temp(ctx.post.cover_image)
+                page.locator(self.COVER_IMAGE_FILE_INPUT_SELECTORS[0]).first.set_input_files(str(cover_path))
+                page.wait_for_timeout(4000)  # let the upload complete
+            except Exception as err:  # noqa: BLE001
+                print(f"  [hackernoon] cover image upload failed (non-fatal): {err}", file=sys.stderr)
+
+        # Story Settings drawer: tell HN this story is not original on
+        # HackerNoon and provide the canonical URL.
+        try:
+            no_btn = page.locator(self.NOT_ORIGINAL_NO_SELECTOR).first
+            no_btn.scroll_into_view_if_needed(timeout=10000)
+            no_btn.click()
+            page.wait_for_timeout(1500)
+            canonical_input = page.locator(self.CANONICAL_INPUT_SELECTORS[0]).first
+            canonical_input.scroll_into_view_if_needed(timeout=5000)
+            canonical_input.fill(ctx.post.canonical_url)
+            page.wait_for_timeout(500)
+        except Exception as err:  # noqa: BLE001
+            print(f"  [hackernoon] canonical setup failed (non-fatal): {err}", file=sys.stderr)
+
         if ctx.validate_only:
             shot = _save_screenshot(page, ctx.post.slug, "hackernoon-editor")
             return {"validated": True, "screenshot": str(shot)}
 
-        # Two "Save" buttons exist — one in the article toolbar (no class)
-        # and one in some side panel (class="btn"). The first visible one in
-        # the toolbar is the one we want.
         page.locator(self.SAVE_DRAFT_SELECTORS[0]).first.click()
-        # Save returns to the editor with a saved-draft toast; the URL gains
-        # a /draftId/<slug> segment.
         page.wait_for_timeout(5000)
         return {
             "url": page.url,
