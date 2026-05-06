@@ -1084,6 +1084,21 @@ final class JavascriptMethodGenerator {
         // remaining use of a slot, leaving its bare declaration as
         // dead bytes. Each dead decl is ~8 chars.
         s = removeDeadLetDecls(s);
+        // Post-pass: strip ``case N:`` labels that aren't actually
+        // jump targets (no ``pc=N`` writes them anywhere in the body
+        // and they're not a try/catch handler / start / end pc, and
+        // they're not the entry case 0). About 30% of the case
+        // labels in our switch+pc emit are dead -- 40k+ instances on
+        // Initializr's translated_app.js (~340 KB raw / ~30 KB gz).
+        //
+        // Why does the translator emit them at all? ``computeJumpTargets``
+        // adds ``i+1`` to the target set for non-throwing-checked
+        // instructions so the switch+pc emit doesn't accidentally
+        // drop their body via ``!isTarget && !blockOpen`` -> continue.
+        // The result is a label at every "could-throw" boundary. By
+        // the time we get here all the bodies have been emitted, so
+        // the labels themselves are pure overhead.
+        s = stripDeadCaseLabels(s);
         // Final pass: shorten the per-method local registers ``stack``
         // → ``S`` and ``locals`` → ``L``. They appear ~210k times
         // (stack.p / stack.q / locals[N] / let stack=… / let locals=…)
@@ -1237,6 +1252,191 @@ final class JavascriptMethodGenerator {
 
     private static boolean isIdentPart(char c) {
         return Character.isLetterOrDigit(c) || c == '_' || c == '$';
+    }
+
+    /**
+     * Strip ``case N:`` labels from a method body when N is never set
+     * via ``pc=N`` AND isn't a try/catch boundary AND isn't the
+     * entry case 0. About 30% of the case labels in the switch+pc
+     * emit fall into this category — they exist solely because
+     * ``computeJumpTargets`` adds ``i+1`` to the target set for
+     * non-throwing-checked instructions to keep their bodies from
+     * being eliminated, but the resulting label has no real
+     * dispatcher pointing at it. By the time we run this post-pass
+     * the body has already been emitted, so the labels are pure
+     * overhead.
+     *
+     * Operates only inside the ``switch(pc){ ... default:return}``
+     * block; everything outside that scope passes through verbatim.
+     * Tracks string state so values like ``_L("case 5:")`` aren't
+     * mistakenly stripped (none should be in mangled output, but
+     * the walker is cheap insurance).
+     */
+    private static String stripDeadCaseLabels(String body) {
+        // Find the switch(pc){ ... } region. We expect exactly one
+        // such block per method body; the case+pc emit is gated on
+        // the method needing the interpreter so methods that took
+        // the straight-line path don't enter this scope.
+        // Translator emits ``switch (pc) {`` (with whitespace);
+        // post-peephole rules collapse to ``switch(pc){``. Match
+        // either form so this pass works pre- and post-peephole.
+        int switchOpen = body.indexOf("switch (pc) {");
+        int searchOffset;
+        if (switchOpen >= 0) {
+            searchOffset = switchOpen + "switch (pc) ".length();
+        } else {
+            switchOpen = body.indexOf("switch(pc){");
+            if (switchOpen < 0) {
+                return body;
+            }
+            searchOffset = switchOpen + "switch(pc)".length();
+        }
+        int blockOpen = body.indexOf('{', searchOffset);
+        if (blockOpen < 0) {
+            return body;
+        }
+        // Brace-balance to find the closing }
+        int depth = 1, j = blockOpen + 1;
+        char inString = 0;
+        while (j < body.length() && depth > 0) {
+            char c = body.charAt(j);
+            if (inString != 0) {
+                if (c == '\\' && j + 1 < body.length()) { j += 2; continue; }
+                if (c == inString) { inString = 0; }
+            } else if (c == '"' || c == '\'' || c == '`') {
+                inString = c;
+            } else if (c == '{') {
+                depth++;
+            } else if (c == '}') {
+                depth--;
+                if (depth == 0) break;
+            }
+            j++;
+        }
+        if (depth != 0) {
+            return body;
+        }
+        String prefix = body.substring(0, blockOpen + 1);
+        String region = body.substring(blockOpen + 1, j);
+        String suffix = body.substring(j);
+
+        // Collect every integer that's a real jump target inside the region.
+        // Sources:
+        //   - ``pc=<expr>`` writes; we extract every digit run from the RHS
+        //     so ternaries like ``pc=cond?A:B`` contribute both A and B.
+        //   - ``__cn1TryCatch`` table entries ``{s:N,e:M,h:K,t:"..."}``
+        //     above the switch — those are part of the prefix, but
+        //     handler pcs land in the region's case dispatch via
+        //     ``pc=handler`` set by exception unwind, so we already
+        //     pick them up via the pc=expr scan. Try-range start/end
+        //     pcs in the table can ALSO be reached only via fall-through
+        //     within the case run, so they don't strictly need their
+        //     own case label — but the runtime's findExceptionHandler
+        //     reads pc from the frame and dispatches, so handler pcs
+        //     must remain. The pc=expr scan covers the dispatch path.
+        java.util.Set<String> liveTargets = new java.util.HashSet<String>();
+        // Initial entry pc -- ``pc=0`` is set in the prelude's
+        // ``let pc=0`` so case 0 is always reachable.
+        liveTargets.add("0");
+        // Also scan ``__cn1TryCatch`` table from the prefix for
+        // {s:N,e:M,h:K,...} so handler / range pcs aren't dropped.
+        java.util.regex.Matcher tryRangesPrefix = java.util.regex.Pattern.compile(
+                "\\{s:(\\d+),e:(\\d+),h:(\\d+),").matcher(prefix);
+        while (tryRangesPrefix.find()) {
+            liveTargets.add(tryRangesPrefix.group(3));
+        }
+        java.util.regex.Matcher tryRanges = java.util.regex.Pattern.compile(
+                "\\{s:(\\d+),e:(\\d+),h:(\\d+),").matcher(region);
+        while (tryRanges.find()) {
+            liveTargets.add(tryRanges.group(3));
+        }
+        // Match both ``pc=N`` (post-peephole/inline) and ``pc = N``
+        // (pre-peephole emission with whitespace). Capture
+        // everything up to the next statement terminator (``;`` or
+        // closing brace) and let ``digitRun`` pluck out the integer
+        // values. We DON'T stop at ``)`` because expressions like
+        // ``pc = S.q() == null ? 79 : 57`` would truncate at the
+        // ``S.q()`` call's close-paren and miss the real target
+        // numerals. Over-marking integer literals from other parts
+        // of the same expression (e.g. method args) is safe — it
+        // just means we keep an unused case label, never strip a
+        // live one.
+        java.util.regex.Matcher pcWrites = java.util.regex.Pattern.compile(
+                "pc\\s*=\\s*([^;}]+)").matcher(region);
+        java.util.regex.Pattern digitRun = java.util.regex.Pattern.compile("\\d+");
+        while (pcWrites.find()) {
+            String rhs = pcWrites.group(1);
+            java.util.regex.Matcher digits = digitRun.matcher(rhs);
+            while (digits.find()) {
+                liveTargets.add(digits.group());
+            }
+        }
+
+        // Now strip ``case N:`` labels not in liveTargets, but ONLY
+        // at the top level of the outer switch(pc) -- i.e. brace
+        // depth == 0 relative to the region. Java ``switch`` statements
+        // in user code are emitted as a NESTED switch inside a case
+        // body (``let __switchValue = stack.q()|0; switch(__switchValue)
+        // { case 5: pc=12; break; ... }``), and those nested case
+        // labels match user values, NOT pc -- they must NOT be
+        // touched. Multi-label chains like ``case 5:case 6:case 7:
+        // {...}`` are processed label-by-label; if 6 is dead but 5
+        // and 7 are live we keep ``case 5:case 7:{...}``. Preserve
+        // ``default:`` always.
+        StringBuilder out = new StringBuilder(region.length());
+        int i = 0;
+        char rInString = 0;
+        int braceDepth = 0; // 0 == outer switch(pc) body level
+        while (i < region.length()) {
+            char c = region.charAt(i);
+            if (rInString != 0) {
+                out.append(c);
+                if (c == '\\' && i + 1 < region.length()) {
+                    out.append(region.charAt(i + 1));
+                    i += 2; continue;
+                }
+                if (c == rInString) rInString = 0;
+                i++; continue;
+            }
+            if (c == '"' || c == '\'' || c == '`') {
+                out.append(c);
+                rInString = c;
+                i++; continue;
+            }
+            if (c == '{') {
+                out.append(c);
+                braceDepth++;
+                i++; continue;
+            }
+            if (c == '}') {
+                out.append(c);
+                braceDepth--;
+                i++; continue;
+            }
+            // Only consider case labels at the top level of the
+            // outer switch. Nested user switches live at depth >= 1.
+            if (braceDepth == 0 && region.startsWith("case ", i)) {
+                int end = i + 5;
+                int numStart = end;
+                while (end < region.length() && Character.isDigit(region.charAt(end))) {
+                    end++;
+                }
+                if (end > numStart && end < region.length() && region.charAt(end) == ':') {
+                    String num = region.substring(numStart, end);
+                    int after = end + 1;
+                    if (!liveTargets.contains(num)) {
+                        i = after;
+                        continue;
+                    }
+                    out.append(region, i, after);
+                    i = after;
+                    continue;
+                }
+            }
+            out.append(c);
+            i++;
+        }
+        return prefix + out + suffix;
     }
 
 
