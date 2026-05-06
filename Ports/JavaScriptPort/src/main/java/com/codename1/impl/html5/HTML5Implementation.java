@@ -7913,7 +7913,24 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
             @Override
             public boolean hasLoadedImage() {
-                return img != null && loaded;
+                // The ``loaded`` flag is set asynchronously from the
+                // HTMLImageElement's "load" event listener installed in
+                // ``NativeImage.load()``. Between createNativeImage()
+                // returning and the listener firing, the element can be
+                // fully decoded (naturalWidth > 0) while ``loaded`` is
+                // still false. ``JavaScriptNativeImageAdapter.resolveWidth``
+                // falls through to a hard-coded 10 fallback in that
+                // window, which the caller (typically EncodedImage.getWidth)
+                // then *caches* as the recorded width. The real PNG
+                // arrives later, but EncodedImage now records 10 — so
+                // every drawImage call from then on scales the actual
+                // 125x24 corner image down to 10x24 and the rounded
+                // shape disappears (Initializr Dialog 9-piece border).
+                //
+                // Treat the image as loaded as soon as the underlying
+                // element exposes a positive natural size, regardless of
+                // whether the async ``load`` event has fired yet.
+                return img != null && (loaded || img.getNaturalWidth() > 0);
             }
 
             @Override
