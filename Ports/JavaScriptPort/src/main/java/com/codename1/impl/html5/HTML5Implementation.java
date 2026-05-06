@@ -7861,16 +7861,39 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
     
     private NativeImage createNativeImage(byte[] bytes, int offset, int len){
+        // The previous path called ``arr.set(i, bytes[i+offset])`` per
+        // byte -- one JSO bridge call per element, ~50k calls for a
+        // typical theme PNG, ~50 such images per theme load. With
+        // ``copyBytesToUint8Array`` the entire copy lives in JS and
+        // executes as a single typed-array memcpy: ~hundreds of times
+        // faster on the Initializr profile (theme decode 979 ms ->
+        // see ``run:lifecycle.init`` perf marker).
         Uint8Array arr = Uint8Array.create(len);
-        for (int i=0; i<len; i++){
-            arr.set(i, bytes[i+offset]);
-        }
+        copyBytesToUint8Array(bytes, offset, len, arr);
         Blob blob = BlobUtil.createBlob(arr, "image/png");
         NativeImage nimg = new NativeImage();
         nimg.img = renderingBackend.createBlobImageElement(blob);
         nimg.load();
         return nimg;
     }
+
+    /**
+     * Bulk-copy ``len`` bytes from a Java ``byte[]`` (sliced at
+     * ``offset``) into a freshly-allocated Uint8Array. Java byte
+     * arrays land on the worker side as plain JS Arrays of signed
+     * integers, but ``Uint8Array.set(arrayLike)`` coerces each
+     * element through ``ToUint8``, matching the per-element
+     * ``arr.set(i, bytes[i+offset]) & 0xff`` semantics of the loop
+     * this replaces.
+     */
+    @JSBody(params = {"bytes", "offset", "len", "out"}, script = ""
+            + "var src = bytes;"
+            + "if (offset === 0 && len === src.length) {"
+            + "  out.set(src);"
+            + "} else {"
+            + "  out.set(src.subarray ? src.subarray(offset, offset + len) : src.slice(offset, offset + len));"
+            + "}")
+    private static native void copyBytesToUint8Array(byte[] bytes, int offset, int len, Uint8Array out);
 
     @JSBody(params={"str"}, script="return encodeURIComponent(str)")
     private native static String encodeURIComponent(String str);
