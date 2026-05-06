@@ -7744,7 +7744,18 @@ public class HTML5Implementation extends CodenameOneImplementation {
             return new ArrayBufferInputStream(cachedBytes, "arraybuffer");
         }
         req.open("get", url, false);
-        req.overrideMimeType("text/plain; charset=x-user-defined");
+        // ``responseType = "arraybuffer"`` lets the browser hand back a
+        // typed-array view of the bytes directly. The previous path used
+        // ``overrideMimeType("text/plain; charset=x-user-defined")`` and
+        // then walked the response string char-by-char into a fresh
+        // Uint8Array -- ~735k JS->JSO ``out.set(i, ...)`` calls for
+        // theme.res, ~939 ms wall on the worker per fetch. With the
+        // arraybuffer path the same fetch lands in ~3 ms (measured on
+        // localhost). Falls back to the text/charset path when the
+        // arraybuffer response is empty (some hosts strip the response
+        // body for non-2xx, in which case the text path's status
+        // diagnostics are still useful).
+        req.setResponseType("arraybuffer");
         req.send();
 
         Uint8Array responseBytes = toResponseBytes(req);

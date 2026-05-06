@@ -531,6 +531,18 @@ if [ -f "$DIST_DIR/index.html" ] && ! grep -q "initializr_native_handlers.js" "$
   bj_log "Patched index.html to load native impl and host-bridge handlers"
 fi
 
+# NOTE: an earlier revision injected <link rel="preload"> hints for
+# worker.js / translated_app.js / theme.res / assets/iOS7Theme.res.
+# Empirically that made boot SLOWER, not faster: the worker's sync
+# XHR uses a different credentials mode than ``preload as=fetch``
+# (so the browser treated the entries as unmatchable and re-fetched
+# from the network), and the ``?v=1.0`` cache-buster appended by
+# HTML5Implementation.getArrayBufferInputStream means the preload
+# URL doesn't match the actual XHR URL anyway. Keeping the hook
+# disabled here so a future change can flip it back on once the
+# worker side switches to async ``fetch()`` with explicit
+# ``credentials: "same-origin"``.
+
 # --- Post-translation minimisation pass -------------------------------------
 # A raw ByteCodeTranslator JS bundle for Initializr is ~90 MiB and consists
 # overwhelmingly of repeated long identifiers (e.g. "cn1_com_codename1_ui_
