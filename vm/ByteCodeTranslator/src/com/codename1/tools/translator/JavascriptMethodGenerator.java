@@ -1190,13 +1190,23 @@ final class JavascriptMethodGenerator {
         // ``;\n        `` (or post-collapse: ``;`` between merged
         // case bodies). Match flexibly so the regex fires both
         // pre- and post-merge.
+        // Collapse ``S.p(X); return S.q();`` -> ``return X;``.
+        // JVM IRETURN/ARETURN-after-push emits a push immediately
+        // followed by a pop-and-return; net effect is just
+        // ``return X``. ~2,000 sites on Initializr; ~10 chars
+        // saved per match. esbuild --minify-syntax later
+        // transforms our intermediate form into ``return
+        // S.p(X),S.q()`` via comma-sequence shortcut, but
+        // collapsing here happens BEFORE that and produces a
+        // shorter ``return X`` directly.
         do {
             prevS = s;
-            // Diagnostic: count if simpler patterns match. The
-            // failure mode we're debugging is "regex matches in
-            // node + standalone Java test, never in per-method
-            // body". Logging at three precision levels to find
-            // which sub-pattern is missing.
+            s = s.replaceAll(
+                    "S\\.p\\(([^,(){}]+)\\)\\s*;\\s*return\\s+S\\.q\\(\\)",
+                    "return $1");
+        } while (!prevS.equals(s));
+        do {
+            prevS = s;
             // Function name allowed shapes: ``cn1_<long>`` (pre-
             // mangler) or ``$<short>`` (post-mangler). Mangler is
             // a Python script that runs AFTER the translator, so
