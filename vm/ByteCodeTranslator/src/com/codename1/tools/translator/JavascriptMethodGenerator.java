@@ -16,6 +16,7 @@ import com.codename1.tools.translator.bytecodes.TryCatch;
 import com.codename1.tools.translator.bytecodes.TypeInstruction;
 import com.codename1.tools.translator.bytecodes.VarOp;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -1216,6 +1217,20 @@ final class JavascriptMethodGenerator {
                     "S\\.p\\((yield\\*\\s*[\\w$]+\\((?:[^()]|\\([^()]*\\))*\\))\\)\\s*[,;]\\s*l(\\d+)\\s*=\\s*S\\.q\\(\\)",
                     "l$2=$1");
         } while (!prevS.equals(s));
+        // Final structural change: replace the dynamic ``S`` array
+        // (``S.p(X)`` / ``S.q()`` push/pop) with named registers
+        // ``s0, s1, ...``. The translator emits an interpreter loop
+        // whose stack is unbounded but bytecode verifier guarantees
+        // a UNIQUE stack depth at the entry to every case label.
+        // We forward-propagate that depth from ``case 0`` and rewrite
+        // each case body to use the absolute slot number as a register
+        // name. Saves ~2 chars per push and ~3 per pop -- on the order
+        // of ~250 KiB raw on the Initializr bundle -- and gives esbuild
+        // / engines more leverage to coalesce reads. Bails on methods
+        // with try-catch (``_E`` operates on the live ``S`` array) and
+        // anything whose textual shape doesn't fit the expected
+        // ``case N: { ... }`` block emit.
+        s = rewriteStackToRegisters(s);
         return s;
     }
 
@@ -4997,5 +5012,996 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             }
         }
         return findActualStaticOwner(ownerClass.getBaseClassObject(), name, desc);
+    }
+
+    // -----------------------------------------------------------------
+    // Register-based rewrite of the switch+pc interpreter body.
+    //
+    // The straight-line emitter (appendStraightLineMethodBody) already
+    // uses named ``s0, s1, ...`` registers because it has a static
+    // depth tracker. Methods that branch fall back to the dynamic ``S``
+    // array; this pass moves those onto registers too by computing
+    // entry depths via forward propagation across cases (the JVM
+    // verifier guarantees uniqueness, so propagation either succeeds
+    // cleanly or we bail).
+    //
+    // Bail conditions:
+    //  * try/catch -- ``_E(__cn1TryCatch, pc, err, S)`` reads the live
+    //    array to push the exception into slot 0 of the catch frame.
+    //  * Couldn't find the ``let S = [];`` / ``switch (pc) {`` shape.
+    //  * ``S`` escapes the switch in a context other than push/pop/peek
+    //    (e.g., passed to a runtime helper that takes the array).
+    //  * Verifier disagreement (two paths converge on a case at
+    //    different depths) or stack underflow during simulation.
+    // -----------------------------------------------------------------
+    private static String rewriteStackToRegisters(String body) {
+        // Kill-switch for the register rewrite. Set
+        // ``-Dparparvm.js.regs.off=1`` to skip the pass entirely; useful
+        // for bisecting failures and measuring the pass's contribution
+        // independent of other peephole work.
+        if (System.getProperty("parparvm.js.regs.off") != null) {
+            return body;
+        }
+        if (body.indexOf("__cn1TryCatch") >= 0) {
+            return body;
+        }
+        // ``S`` must only appear as ``S.p(``, ``S.q()``, ``S.t()`` or
+        // in the ``let S = [];`` / ``let S=[];`` initializer. Anything
+        // else (``S.length``, ``S[idx]``, ``foo(S)``) means we'd
+        // mistranslate the body.
+        if (containsForeignStackUse(body)) {
+            return body;
+        }
+        int letSIdx;
+        int letSLen;
+        int probe = body.indexOf("let S = [];");
+        if (probe >= 0) {
+            letSIdx = probe;
+            letSLen = "let S = [];".length();
+        } else {
+            probe = body.indexOf("let S=[];");
+            if (probe < 0) {
+                return body;
+            }
+            letSIdx = probe;
+            letSLen = "let S=[];".length();
+        }
+        int swKw = body.indexOf("switch", letSIdx);
+        if (swKw < 0) {
+            return body;
+        }
+        int swOpen = body.indexOf('{', swKw);
+        if (swOpen < 0) {
+            return body;
+        }
+        int swClose = matchBrace(body, swOpen);
+        if (swClose < 0) {
+            return body;
+        }
+        List<int[]> cases = parseCases(body, swOpen + 1, swClose);
+        if (cases == null || cases.isEmpty()) {
+            return body;
+        }
+        Map<Integer, Integer> labelToIdx = new HashMap<Integer, Integer>();
+        for (int i = 0; i < cases.size(); i++) {
+            labelToIdx.put(cases.get(i)[0], i);
+        }
+        Integer caseZeroIdx = labelToIdx.get(0);
+        if (caseZeroIdx == null) {
+            return body;
+        }
+        int n = cases.size();
+        int[] entryDepths = new int[n];
+        java.util.Arrays.fill(entryDepths, -1);
+        entryDepths[caseZeroIdx] = 0;
+        // Per-case analysis is pure (deterministic given the body
+        // text), so cache the result so the fixed-point loop doesn't
+        // re-walk every case body each iteration.
+        CaseAnalysis[] analyses = new CaseAnalysis[n];
+        // Iteratively propagate entry depths to fixed point.
+        boolean changed;
+        int iter = 0;
+        do {
+            changed = false;
+            if (iter++ > 200) {
+                return body;
+            }
+            for (int i = 0; i < n; i++) {
+                if (entryDepths[i] < 0) {
+                    continue;
+                }
+                if (analyses[i] == null) {
+                    int[] c = cases.get(i);
+                    CaseAnalysis a = analyzeCase(body, c[1], c[2], entryDepths[i]);
+                    if (a == null) {
+                        return body;
+                    }
+                    analyses[i] = a;
+                } else if (analyses[i].entryDepth != entryDepths[i]) {
+                    int[] c = cases.get(i);
+                    CaseAnalysis a = analyzeCase(body, c[1], c[2], entryDepths[i]);
+                    if (a == null) {
+                        return body;
+                    }
+                    analyses[i] = a;
+                }
+                CaseAnalysis a = analyses[i];
+                for (int j = 0; j < a.branchCount; j++) {
+                    int target = a.branchTargets[j];
+                    int depth = a.branchDepths[j];
+                    Integer tgtIdx = labelToIdx.get(target);
+                    if (tgtIdx == null) {
+                        // Branch to unknown label -- bail; could mean a
+                        // ``default:`` jump or some unparsed shape.
+                        return body;
+                    }
+                    if (entryDepths[tgtIdx] < 0) {
+                        entryDepths[tgtIdx] = depth;
+                        changed = true;
+                    } else if (entryDepths[tgtIdx] != depth) {
+                        return body;
+                    }
+                }
+                if (a.fallsThrough && i + 1 < n) {
+                    int next = i + 1;
+                    if (entryDepths[next] < 0) {
+                        entryDepths[next] = a.exitDepth;
+                        changed = true;
+                    } else if (entryDepths[next] != a.exitDepth) {
+                        return body;
+                    }
+                }
+            }
+        } while (changed);
+        // Rewrite each reachable case body using its computed entry
+        // depth. Unreachable cases (still ``-1``) survive verbatim --
+        // they can't execute but may carry a label that some emit
+        // path references; safer to leave intact than strip.
+        StringBuilder out = new StringBuilder(body.length());
+        int last = 0;
+        int globalMaxSlot = -1;
+        for (int i = 0; i < n; i++) {
+            int[] c = cases.get(i);
+            int bs = c[1];
+            int be = c[2];
+            out.append(body, last, bs);
+            int entry = entryDepths[i];
+            if (entry < 0) {
+                out.append(body, bs, be);
+            } else {
+                CaseRewrite r = rewriteCaseBody(body, bs, be, entry);
+                if (r == null) {
+                    return body;
+                }
+                out.append(r.text);
+                if (r.maxSlot > globalMaxSlot) {
+                    globalMaxSlot = r.maxSlot;
+                }
+            }
+            last = be;
+        }
+        out.append(body, last, body.length());
+        String result = out.toString();
+        // Replace ``let S = [];`` with ``let s0,s1,...,sN;``. If the
+        // method actually never observes a stack slot (e.g., empty
+        // method that just returns), drop the declaration entirely.
+        StringBuilder regDecl = new StringBuilder();
+        if (globalMaxSlot >= 0) {
+            regDecl.append("let ");
+            for (int i = 0; i <= globalMaxSlot; i++) {
+                if (i > 0) {
+                    regDecl.append(",");
+                }
+                regDecl.append("s").append(i);
+            }
+            regDecl.append(";");
+        }
+        int idx = result.indexOf("let S = [];");
+        int len = "let S = [];".length();
+        if (idx < 0) {
+            idx = result.indexOf("let S=[];");
+            len = "let S=[];".length();
+        }
+        if (idx >= 0) {
+            result = result.substring(0, idx) + regDecl.toString() + result.substring(idx + len);
+        }
+        return result;
+    }
+
+    /**
+     * Conservative check: flag any ``S`` reference that isn't ``S.p(``,
+     * ``S.q()``, ``S.t()``, or part of the ``let S = []`` initializer.
+     * The body is per-method, so ``S`` shouldn't escape to a helper.
+     * Returning true forces ``rewriteStackToRegisters`` to bail.
+     */
+    private static boolean containsForeignStackUse(String body) {
+        int len = body.length();
+        for (int i = 0; i < len; i++) {
+            char ch = body.charAt(i);
+            if (ch == '"' || ch == '\'') {
+                int end = skipStringLiteral(body, i);
+                if (end < 0) {
+                    return true;
+                }
+                i = end;
+                continue;
+            }
+            if (ch != 'S') {
+                continue;
+            }
+            char before = i > 0 ? body.charAt(i - 1) : ' ';
+            if (Character.isLetterOrDigit(before) || before == '_' || before == '$') {
+                continue;
+            }
+            int j = i + 1;
+            char nx = j < len ? body.charAt(j) : ' ';
+            if (nx == '.') {
+                if (j + 2 < len) {
+                    char op = body.charAt(j + 1);
+                    char paren = body.charAt(j + 2);
+                    if ((op == 'p' || op == 'q' || op == 't') && paren == '(') {
+                        // Recognized stack op; advance past ``S.x(``.
+                        i = j + 2;
+                        continue;
+                    }
+                }
+                // ``S.length``, ``S.foo`` -- foreign use.
+                return true;
+            }
+            if (nx == '[' || nx == '(') {
+                // ``S[idx]`` or ``S(args)`` -- foreign use.
+                return true;
+            }
+            if (nx == ' ' || nx == '=') {
+                // ``S = ...`` is the initializer; check.
+                int k = j;
+                while (k < len && body.charAt(k) == ' ') {
+                    k++;
+                }
+                if (k < len && body.charAt(k) == '=') {
+                    // ``S = [...]`` initializer is fine, swallow up to
+                    // the terminating ``;``.
+                    int semi = body.indexOf(';', k);
+                    if (semi < 0) {
+                        return true;
+                    }
+                    i = semi;
+                    continue;
+                }
+                return true;
+            }
+            // Other punctuation following ``S`` (``,`` / ``)`` etc.) is
+            // a bare identifier reference -- foreign.
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Find matching ``}`` for the ``{`` at ``open``. Tracks string
+     * literals so braces inside ``"...\}..."`` don't confuse us. Returns
+     * the matching ``}`` index, or -1 if mismatched.
+     */
+    private static int matchBrace(String body, int open) {
+        int depth = 0;
+        int len = body.length();
+        for (int i = open; i < len; i++) {
+            char ch = body.charAt(i);
+            if (ch == '"' || ch == '\'') {
+                int end = skipStringLiteral(body, i);
+                if (end < 0) {
+                    return -1;
+                }
+                i = end;
+                continue;
+            }
+            if (ch == '{') {
+                depth++;
+            } else if (ch == '}') {
+                depth--;
+                if (depth == 0) {
+                    return i;
+                }
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * Skip past a JS string literal starting at ``start`` (``"``/``'``).
+     * Returns the index of the closing quote, or -1 if unterminated.
+     * Handles backslash escapes.
+     */
+    private static int skipStringLiteral(String body, int start) {
+        char quote = body.charAt(start);
+        int len = body.length();
+        int i = start + 1;
+        while (i < len) {
+            char ch = body.charAt(i);
+            if (ch == '\\') {
+                i += 2;
+                continue;
+            }
+            if (ch == quote) {
+                return i;
+            }
+            i++;
+        }
+        return -1;
+    }
+
+    /**
+     * Parse case labels inside a switch body. Returns a list of
+     * ``[label, bodyStart, bodyEnd]`` triples in textual order. The body
+     * range ``[bodyStart, bodyEnd)`` is the executable region for the
+     * case -- for ``case N: {...}`` it's ``{...}`` inclusive; for a bare
+     * ``case N:`` (line-number marker) the range is empty (start == end).
+     * Returns null if anything looks malformed (e.g., a ``default``
+     * label whose body would shift positions).
+     */
+    private static List<int[]> parseCases(String body, int from, int to) {
+        List<int[]> result = new ArrayList<int[]>();
+        int i = from;
+        while (i < to) {
+            // Skip whitespace.
+            while (i < to && Character.isWhitespace(body.charAt(i))) {
+                i++;
+            }
+            if (i >= to) {
+                break;
+            }
+            if (body.charAt(i) == '}') {
+                break;
+            }
+            // Expect ``case <digits> :``.
+            if (body.startsWith("case", i)) {
+                int p = i + 4;
+                while (p < to && Character.isWhitespace(body.charAt(p))) {
+                    p++;
+                }
+                int numStart = p;
+                while (p < to && Character.isDigit(body.charAt(p))) {
+                    p++;
+                }
+                if (p == numStart) {
+                    return null;
+                }
+                int label;
+                try {
+                    label = Integer.parseInt(body.substring(numStart, p));
+                } catch (NumberFormatException ex) {
+                    return null;
+                }
+                while (p < to && Character.isWhitespace(body.charAt(p))) {
+                    p++;
+                }
+                if (p >= to || body.charAt(p) != ':') {
+                    return null;
+                }
+                p++;
+                // Skip whitespace after `:`.
+                int afterColon = p;
+                while (p < to && Character.isWhitespace(body.charAt(p))) {
+                    p++;
+                }
+                if (p < to && body.charAt(p) == '{') {
+                    int closeBrace = matchBrace(body, p);
+                    if (closeBrace < 0 || closeBrace > to) {
+                        return null;
+                    }
+                    result.add(new int[] {label, p, closeBrace + 1});
+                    i = closeBrace + 1;
+                } else {
+                    // Bare ``case N:`` -- empty body.
+                    result.add(new int[] {label, afterColon, afterColon});
+                    i = afterColon;
+                }
+                continue;
+            }
+            if (body.startsWith("default", i)) {
+                // ``default:return}`` or similar -- end of meaningful
+                // body. We don't rewrite default arms; stop here.
+                break;
+            }
+            return null;
+        }
+        return result;
+    }
+
+    /**
+     * Holds the per-case analysis result: max slot referenced, the exit
+     * stack depth (when the case falls through to the next), and the
+     * branch table (each ``pc=N;break`` records a target label and the
+     * stack depth at that point).
+     */
+    private static final class CaseAnalysis {
+        int entryDepth;
+        int exitDepth;
+        boolean fallsThrough;
+        int maxSlot;
+        int branchCount;
+        int[] branchTargets;
+        int[] branchDepths;
+    }
+
+    private static final class CaseRewrite {
+        String text;
+        int maxSlot;
+    }
+
+    /**
+     * Walk a case body, simulating stack push/pop/peek operations to
+     * compute exit depth and branch-target depths. Returns null on bail
+     * conditions: stack underflow, malformed S.p arglist, or anything
+     * we can't parse cleanly. Verifies parens balance and ignores
+     * occurrences inside string literals.
+     */
+    private static CaseAnalysis analyzeCase(String body, int from, int to, int entryDepth) {
+        CaseAnalysis a = new CaseAnalysis();
+        a.entryDepth = entryDepth;
+        a.maxSlot = entryDepth - 1; // before this case, slots 0..entry-1 already in use
+        a.branchTargets = new int[8];
+        a.branchDepths = new int[8];
+        a.branchCount = 0;
+        int[] depthHolder = new int[] {entryDepth};
+        int[] maxSlotHolder = new int[] {a.maxSlot};
+        boolean[] terminatesHolder = new boolean[] {false};
+        if (!walkSimulate(body, from, to, depthHolder, maxSlotHolder, a, terminatesHolder)) {
+            return null;
+        }
+        a.maxSlot = maxSlotHolder[0];
+        a.exitDepth = depthHolder[0];
+        a.fallsThrough = !terminatesHolder[0];
+        return a;
+    }
+
+    /**
+     * Walk-and-simulate worker shared by analyzeCase. Returns false on
+     * bail. Mutates depthHolder[0] / maxSlotHolder[0] / terminatesHolder[0]
+     * and appends branches to the analysis.
+     */
+    private static boolean walkSimulate(String body, int from, int to, int[] depthHolder,
+            int[] maxSlotHolder, CaseAnalysis a, boolean[] terminatesHolder) {
+        int i = from;
+        while (i < to) {
+            char ch = body.charAt(i);
+            if (ch == '"' || ch == '\'') {
+                int end = skipStringLiteral(body, i);
+                if (end < 0 || end >= to) {
+                    return false;
+                }
+                i = end + 1;
+                continue;
+            }
+            // Detect ``S.p(`` / ``S.q()`` / ``S.t()`` (S preceded by
+            // non-identifier char so we don't match ``cn1Frame``-style
+            // suffixes).
+            if (ch == 'S' && i + 2 < to && body.charAt(i + 1) == '.') {
+                char before = i > 0 ? body.charAt(i - 1) : ' ';
+                if (!Character.isLetterOrDigit(before) && before != '_' && before != '$') {
+                    char op = body.charAt(i + 2);
+                    if (op == 'p' && i + 3 < to && body.charAt(i + 3) == '(') {
+                        // S.p(EXPR1, EXPR2, ...) -- each top-level comma
+                        // separates an argument; each argument pushes
+                        // one slot.
+                        int closeParen = matchPushParen(body, i + 3, to);
+                        if (closeParen < 0) {
+                            return false;
+                        }
+                        int argStart = i + 4;
+                        int p = argStart;
+                        int parenDepth = 0;
+                        while (p < closeParen) {
+                            char c2 = body.charAt(p);
+                            if (c2 == '"' || c2 == '\'') {
+                                int e = skipStringLiteral(body, p);
+                                if (e < 0 || e >= closeParen) {
+                                    return false;
+                                }
+                                p = e + 1;
+                                continue;
+                            }
+                            if (c2 == '(') {
+                                parenDepth++;
+                                p++;
+                                continue;
+                            }
+                            if (c2 == ')') {
+                                parenDepth--;
+                                p++;
+                                continue;
+                            }
+                            if (c2 == ',' && parenDepth == 0) {
+                                // Process argStart..p as one push expr.
+                                if (!walkSimulate(body, argStart, p, depthHolder, maxSlotHolder, a, terminatesHolder)) {
+                                    return false;
+                                }
+                                int slot = depthHolder[0];
+                                if (slot > maxSlotHolder[0]) {
+                                    maxSlotHolder[0] = slot;
+                                }
+                                depthHolder[0]++;
+                                argStart = p + 1;
+                                p = argStart;
+                                continue;
+                            }
+                            // S.p / S.q / S.t inside the arg expression
+                            // are handled by the recursive walkSimulate.
+                            p++;
+                        }
+                        // Last arg (or only arg).
+                        if (argStart < closeParen) {
+                            if (!walkSimulate(body, argStart, closeParen, depthHolder, maxSlotHolder, a, terminatesHolder)) {
+                                return false;
+                            }
+                            int slot = depthHolder[0];
+                            if (slot > maxSlotHolder[0]) {
+                                maxSlotHolder[0] = slot;
+                            }
+                            depthHolder[0]++;
+                        }
+                        i = closeParen + 1;
+                        continue;
+                    }
+                    if (op == 'q' && i + 4 < to && body.charAt(i + 3) == '(' && body.charAt(i + 4) == ')') {
+                        if (depthHolder[0] <= 0) {
+                            return false;
+                        }
+                        depthHolder[0]--;
+                        i += 5;
+                        continue;
+                    }
+                    if (op == 't' && i + 4 < to && body.charAt(i + 3) == '(' && body.charAt(i + 4) == ')') {
+                        if (depthHolder[0] <= 0) {
+                            return false;
+                        }
+                        // Peek doesn't change depth; slot used = depth-1
+                        int slot = depthHolder[0] - 1;
+                        if (slot > maxSlotHolder[0]) {
+                            maxSlotHolder[0] = slot;
+                        }
+                        i += 5;
+                        continue;
+                    }
+                }
+            }
+            // ``pc = N`` followed by ``;break`` records a branch.
+            if (ch == 'p' && i + 1 < to && body.charAt(i + 1) == 'c'
+                    && (i == 0 || !isIdentPart(body.charAt(i - 1)))) {
+                int p = i + 2;
+                while (p < to && Character.isWhitespace(body.charAt(p))) {
+                    p++;
+                }
+                if (p < to && body.charAt(p) == '=') {
+                    // It's a ``pc=`` assignment. Scan for the rhs and
+                    // determine if it's literal-N (then branch) or
+                    // ternary/expr (which also resolves to N at run
+                    // time but contains S.q operations we still need
+                    // to simulate). Walk the expression up to the
+                    // terminator (`;` or end of statement) and record
+                    // any literal targets we can statically derive.
+                    p++;
+                    // Walk RHS, accumulating until we hit a top-level
+                    // ``;``. Record S.q/S.p effects via recursion.
+                    int rhsStart = p;
+                    int rhsEnd = findStatementEnd(body, p, to);
+                    if (rhsEnd < 0) {
+                        return false;
+                    }
+                    // Simulate stack effects inside RHS first.
+                    if (!walkSimulate(body, rhsStart, rhsEnd, depthHolder, maxSlotHolder, a, terminatesHolder)) {
+                        return false;
+                    }
+                    // Extract literal targets from RHS textually.
+                    extractBranchTargets(body, rhsStart, rhsEnd, depthHolder[0], a);
+                    i = rhsEnd;
+                    continue;
+                }
+            }
+            // ``return``, ``throw``: terminating.
+            if ((ch == 'r' && body.startsWith("return", i)
+                    && (i == 0 || !isIdentPart(body.charAt(i - 1)))
+                    && (i + 6 >= to || !isIdentPart(body.charAt(i + 6))))
+                    || (ch == 't' && body.startsWith("throw", i)
+                            && (i == 0 || !isIdentPart(body.charAt(i - 1)))
+                            && (i + 5 >= to || !isIdentPart(body.charAt(i + 5))))) {
+                int kwLen = ch == 'r' ? 6 : 5;
+                int rhsStart = i + kwLen;
+                int rhsEnd = findStatementEnd(body, rhsStart, to);
+                if (rhsEnd < 0) {
+                    return false;
+                }
+                if (!walkSimulate(body, rhsStart, rhsEnd, depthHolder, maxSlotHolder, a, terminatesHolder)) {
+                    return false;
+                }
+                terminatesHolder[0] = true;
+                i = rhsEnd;
+                continue;
+            }
+            // ``break`` exits the enclosing switch -- no syntactic fall-
+            // through to the next case label. (Translated emit only uses
+            // ``break`` to terminate ``pc=N;break`` sequences and bare
+            // case-body terminators; we never emit nested loops in case
+            // bodies, so a top-level ``break`` always means "end of case".)
+            if (ch == 'b' && body.startsWith("break", i)
+                    && (i == 0 || !isIdentPart(body.charAt(i - 1)))
+                    && (i + 5 >= to || !isIdentPart(body.charAt(i + 5)))) {
+                terminatesHolder[0] = true;
+                i += 5;
+                continue;
+            }
+            // Recurse into nested ``{...}`` blocks (``let v = S.q();``
+            // wrapped in a let-scoping block).
+            if (ch == '{') {
+                int closeBrace = matchBrace(body, i);
+                if (closeBrace < 0 || closeBrace >= to) {
+                    return false;
+                }
+                if (!walkSimulate(body, i + 1, closeBrace, depthHolder, maxSlotHolder, a, terminatesHolder)) {
+                    return false;
+                }
+                i = closeBrace + 1;
+                continue;
+            }
+            i++;
+        }
+        return true;
+    }
+
+    /**
+     * Find the index of the matching ``)`` for the ``(`` at ``openIdx``.
+     * Tracks string literals. Returns the close-paren index, or -1.
+     */
+    private static int matchPushParen(String body, int openIdx, int to) {
+        int depth = 0;
+        for (int i = openIdx; i < to; i++) {
+            char ch = body.charAt(i);
+            if (ch == '"' || ch == '\'') {
+                int end = skipStringLiteral(body, i);
+                if (end < 0 || end >= to) {
+                    return -1;
+                }
+                i = end;
+                continue;
+            }
+            if (ch == '(') {
+                depth++;
+            } else if (ch == ')') {
+                depth--;
+                if (depth == 0) {
+                    return i;
+                }
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * Find the end of a statement starting at ``from`` -- the matching
+     * top-level ``;`` or ``,`` or ``}`` (whichever closes the
+     * statement). Tracks paren / brace / bracket / string nesting.
+     */
+    private static int findStatementEnd(String body, int from, int to) {
+        int parenDepth = 0;
+        int braceDepth = 0;
+        int bracketDepth = 0;
+        for (int i = from; i < to; i++) {
+            char ch = body.charAt(i);
+            if (ch == '"' || ch == '\'') {
+                int end = skipStringLiteral(body, i);
+                if (end < 0 || end >= to) {
+                    return -1;
+                }
+                i = end;
+                continue;
+            }
+            if (ch == '(') {
+                parenDepth++;
+            } else if (ch == ')') {
+                if (parenDepth == 0) {
+                    return i;
+                }
+                parenDepth--;
+            } else if (ch == '{') {
+                braceDepth++;
+            } else if (ch == '}') {
+                if (braceDepth == 0) {
+                    return i;
+                }
+                braceDepth--;
+            } else if (ch == '[') {
+                bracketDepth++;
+            } else if (ch == ']') {
+                bracketDepth--;
+            } else if (ch == ';' && parenDepth == 0 && braceDepth == 0 && bracketDepth == 0) {
+                return i;
+            } else if (ch == ',' && parenDepth == 0 && braceDepth == 0 && bracketDepth == 0) {
+                return i;
+            }
+        }
+        return to;
+    }
+
+    /**
+     * Pull literal branch targets (``digits``) out of a ``pc = ...``
+     * RHS. The translator only emits two shapes:
+     *
+     *   pc = N                      (single literal target)
+     *   pc = COND ? A : B           (ternary with literal A and B)
+     *
+     * We walk the RHS at TOP LEVEL only -- digit literals nested
+     * inside parens (e.g., ``<0``, ``& 31``) are operands of the
+     * condition expression, not branch targets. After top-level
+     * ``?`` and ``:`` we expect a literal target; otherwise the
+     * whole RHS (trimmed) should reduce to a literal.
+     */
+    private static void extractBranchTargets(String body, int from, int to, int depth, CaseAnalysis a) {
+        int parenDepth = 0;
+        int braceDepth = 0;
+        int bracketDepth = 0;
+        boolean expectingTarget = false;
+        boolean sawTernaryOp = false;
+        int i = from;
+        while (i < to) {
+            char ch = body.charAt(i);
+            if (ch == '"' || ch == '\'') {
+                int end = skipStringLiteral(body, i);
+                if (end < 0 || end >= to) {
+                    return;
+                }
+                i = end + 1;
+                continue;
+            }
+            if (ch == '(') { parenDepth++; i++; continue; }
+            if (ch == ')') { parenDepth--; i++; continue; }
+            if (ch == '{') { braceDepth++; i++; continue; }
+            if (ch == '}') { braceDepth--; i++; continue; }
+            if (ch == '[') { bracketDepth++; i++; continue; }
+            if (ch == ']') { bracketDepth--; i++; continue; }
+            boolean topLevel = parenDepth == 0 && braceDepth == 0 && bracketDepth == 0;
+            if (topLevel && (ch == '?' || ch == ':')) {
+                expectingTarget = true;
+                sawTernaryOp = true;
+                i++;
+                continue;
+            }
+            if (topLevel && Character.isWhitespace(ch)) {
+                i++;
+                continue;
+            }
+            if (topLevel && expectingTarget && Character.isDigit(ch)
+                    && (i == from || !isIdentPart(body.charAt(i - 1)))) {
+                int numStart = i;
+                while (i < to && Character.isDigit(body.charAt(i))) {
+                    i++;
+                }
+                int label = Integer.parseInt(body.substring(numStart, i));
+                addBranch(a, label, depth);
+                expectingTarget = false;
+                continue;
+            }
+            if (topLevel) {
+                expectingTarget = false;
+            }
+            i++;
+        }
+        // Single-target shape: ``pc = N`` (no ternary). Find the only
+        // top-level digit literal in the RHS.
+        if (!sawTernaryOp) {
+            int parenDepth2 = 0;
+            int braceDepth2 = 0;
+            int bracketDepth2 = 0;
+            int j = from;
+            while (j < to) {
+                char ch = body.charAt(j);
+                if (ch == '"' || ch == '\'') {
+                    int end = skipStringLiteral(body, j);
+                    if (end < 0 || end >= to) {
+                        return;
+                    }
+                    j = end + 1;
+                    continue;
+                }
+                if (ch == '(') { parenDepth2++; j++; continue; }
+                if (ch == ')') { parenDepth2--; j++; continue; }
+                if (ch == '{') { braceDepth2++; j++; continue; }
+                if (ch == '}') { braceDepth2--; j++; continue; }
+                if (ch == '[') { bracketDepth2++; j++; continue; }
+                if (ch == ']') { bracketDepth2--; j++; continue; }
+                boolean topLevel2 = parenDepth2 == 0 && braceDepth2 == 0 && bracketDepth2 == 0;
+                if (topLevel2 && Character.isDigit(ch)
+                        && (j == from || !isIdentPart(body.charAt(j - 1)))) {
+                    int numStart = j;
+                    while (j < to && Character.isDigit(body.charAt(j))) {
+                        j++;
+                    }
+                    int label = Integer.parseInt(body.substring(numStart, j));
+                    addBranch(a, label, depth);
+                    return;
+                }
+                j++;
+            }
+        }
+    }
+
+    private static void addBranch(CaseAnalysis a, int target, int depth) {
+        for (int j = 0; j < a.branchCount; j++) {
+            if (a.branchTargets[j] == target) {
+                return;
+            }
+        }
+        if (a.branchCount == a.branchTargets.length) {
+            int[] nt = new int[a.branchCount * 2];
+            int[] nd = new int[a.branchCount * 2];
+            System.arraycopy(a.branchTargets, 0, nt, 0, a.branchCount);
+            System.arraycopy(a.branchDepths, 0, nd, 0, a.branchCount);
+            a.branchTargets = nt;
+            a.branchDepths = nd;
+        }
+        a.branchTargets[a.branchCount] = target;
+        a.branchDepths[a.branchCount] = depth;
+        a.branchCount++;
+    }
+
+    /**
+     * Rewrite a case body using the given entry depth. Walks the body
+     * char-by-char, replacing S.p(EXPR) with sN=EXPR (where N is
+     * computed dynamically) and S.q()/S.t() with sN.
+     */
+    private static CaseRewrite rewriteCaseBody(String body, int from, int to, int entryDepth) {
+        StringBuilder out = new StringBuilder(to - from);
+        int[] depthHolder = new int[] {entryDepth};
+        int[] maxSlotHolder = new int[] {entryDepth - 1};
+        if (!rewriteSpan(body, from, to, depthHolder, maxSlotHolder, out)) {
+            return null;
+        }
+        CaseRewrite r = new CaseRewrite();
+        r.text = out.toString();
+        r.maxSlot = maxSlotHolder[0];
+        return r;
+    }
+
+    /**
+     * Recursive textual rewrite worker. Mirrors ``walkSimulate`` but
+     * emits transformed text. Returns false on bail.
+     */
+    private static boolean rewriteSpan(String body, int from, int to, int[] depthHolder,
+            int[] maxSlotHolder, StringBuilder out) {
+        int i = from;
+        while (i < to) {
+            char ch = body.charAt(i);
+            if (ch == '"' || ch == '\'') {
+                int end = skipStringLiteral(body, i);
+                if (end < 0 || end >= to) {
+                    return false;
+                }
+                out.append(body, i, end + 1);
+                i = end + 1;
+                continue;
+            }
+            if (ch == 'S' && i + 2 < to && body.charAt(i + 1) == '.') {
+                char before = i > 0 ? body.charAt(i - 1) : ' ';
+                if (!Character.isLetterOrDigit(before) && before != '_' && before != '$') {
+                    char op = body.charAt(i + 2);
+                    if (op == 'p' && i + 3 < to && body.charAt(i + 3) == '(') {
+                        int closeParen = matchPushParen(body, i + 3, to);
+                        if (closeParen < 0) {
+                            return false;
+                        }
+                        // Split args by top-level commas. For each arg,
+                        // emit ``s<depth>=<rewritten arg>;`` (using ``,``
+                        // separator so chained pushes inside an
+                        // expression stay as a comma-sequence — important
+                        // for ``return S.p(X),S.q()`` patterns).
+                        int argStart = i + 4;
+                        int p = argStart;
+                        int parenDepth = 0;
+                        boolean firstArg = true;
+                        while (p < closeParen) {
+                            char c2 = body.charAt(p);
+                            if (c2 == '"' || c2 == '\'') {
+                                int e = skipStringLiteral(body, p);
+                                if (e < 0 || e >= closeParen) {
+                                    return false;
+                                }
+                                p = e + 1;
+                                continue;
+                            }
+                            if (c2 == '(') {
+                                parenDepth++;
+                                p++;
+                                continue;
+                            }
+                            if (c2 == ')') {
+                                parenDepth--;
+                                p++;
+                                continue;
+                            }
+                            if (c2 == ',' && parenDepth == 0) {
+                                if (!firstArg) {
+                                    out.append(',');
+                                }
+                                if (!emitPushArg(body, argStart, p, depthHolder, maxSlotHolder, out)) {
+                                    return false;
+                                }
+                                firstArg = false;
+                                argStart = p + 1;
+                                p = argStart;
+                                continue;
+                            }
+                            p++;
+                        }
+                        // Last arg (or only arg).
+                        if (argStart < closeParen) {
+                            if (!firstArg) {
+                                out.append(',');
+                            }
+                            if (!emitPushArg(body, argStart, closeParen, depthHolder, maxSlotHolder, out)) {
+                                return false;
+                            }
+                        }
+                        i = closeParen + 1;
+                        continue;
+                    }
+                    if (op == 'q' && i + 4 < to && body.charAt(i + 3) == '(' && body.charAt(i + 4) == ')') {
+                        if (depthHolder[0] <= 0) {
+                            return false;
+                        }
+                        depthHolder[0]--;
+                        out.append('s').append(depthHolder[0]);
+                        i += 5;
+                        continue;
+                    }
+                    if (op == 't' && i + 4 < to && body.charAt(i + 3) == '(' && body.charAt(i + 4) == ')') {
+                        if (depthHolder[0] <= 0) {
+                            return false;
+                        }
+                        int slot = depthHolder[0] - 1;
+                        if (slot > maxSlotHolder[0]) {
+                            maxSlotHolder[0] = slot;
+                        }
+                        out.append('s').append(slot);
+                        i += 5;
+                        continue;
+                    }
+                }
+            }
+            if (ch == '{') {
+                int closeBrace = matchBrace(body, i);
+                if (closeBrace < 0 || closeBrace >= to) {
+                    return false;
+                }
+                out.append('{');
+                if (!rewriteSpan(body, i + 1, closeBrace, depthHolder, maxSlotHolder, out)) {
+                    return false;
+                }
+                out.append('}');
+                i = closeBrace + 1;
+                continue;
+            }
+            out.append(ch);
+            i++;
+        }
+        return true;
+    }
+
+    /**
+     * Emit one push-argument expression: rewrite the RHS recursively
+     * (so any nested S.q shows up inline with the right slot index)
+     * and then append ``s<depth>=<rhs>``, advancing depth.
+     */
+    private static boolean emitPushArg(String body, int from, int to, int[] depthHolder,
+            int[] maxSlotHolder, StringBuilder out) {
+        StringBuilder rhs = new StringBuilder(to - from);
+        if (!rewriteSpan(body, from, to, depthHolder, maxSlotHolder, rhs)) {
+            return false;
+        }
+        int slot = depthHolder[0];
+        if (slot > maxSlotHolder[0]) {
+            maxSlotHolder[0] = slot;
+        }
+        out.append('s').append(slot).append('=').append(rhs);
+        depthHolder[0]++;
+        return true;
     }
 }
