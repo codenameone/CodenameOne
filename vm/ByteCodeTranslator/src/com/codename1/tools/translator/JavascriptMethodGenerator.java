@@ -1084,7 +1084,129 @@ final class JavascriptMethodGenerator {
         // remaining use of a slot, leaving its bare declaration as
         // dead bytes. Each dead decl is ~8 chars.
         s = removeDeadLetDecls(s);
+        // Final pass: shorten the per-method local registers ``stack``
+        // → ``S`` and ``locals`` → ``L``. They appear ~210k times
+        // (stack.p / stack.q / locals[N] / let stack=… / let locals=…)
+        // in the Initializr translated_app.js — renaming to single
+        // chars saves ~1.1 MiB raw of identifier bytes (~13% of the
+        // generated JS) before brotli, and ~120 KiB after. The peephole
+        // rules above all operate on the long names so they keep firing
+        // unchanged; the rename runs strictly after every other peephole
+        // has finished. Strings (``"..."`` / ``'...'``) are excluded so
+        // theme-key literals containing the word ``stack`` survive.
+        s = shortenStackAndLocals(s);
         return s;
+    }
+
+    /**
+     * Rename whole-word ``stack`` → ``S`` and ``locals`` → ``L`` in a
+     * method body, skipping string literals. Both identifiers are
+     * emitter-private (the only generator that uses them is the
+     * switch+pc interpreter prelude in ``appendMethodImpl``), so a
+     * scope-local rename is safe — but the body can contain
+     * ``_L("...")`` literals from LDC instructions whose text might
+     * happen to contain ``stack`` or ``locals``. Walk the buffer
+     * tracking string state so those survive.
+     */
+    private static String shortenStackAndLocals(String body) {
+        int len = body.length();
+        if (len == 0) {
+            return body;
+        }
+        StringBuilder out = new StringBuilder(len);
+        int i = 0;
+        char inString = 0;
+        boolean inLineComment = false;
+        boolean inBlockComment = false;
+        while (i < len) {
+            char c = body.charAt(i);
+            if (inLineComment) {
+                out.append(c);
+                if (c == '\n') {
+                    inLineComment = false;
+                }
+                i++;
+                continue;
+            }
+            if (inBlockComment) {
+                out.append(c);
+                if (c == '*' && i + 1 < len && body.charAt(i + 1) == '/') {
+                    out.append(body.charAt(i + 1));
+                    i += 2;
+                    inBlockComment = false;
+                    continue;
+                }
+                i++;
+                continue;
+            }
+            if (inString != 0) {
+                out.append(c);
+                if (c == '\\' && i + 1 < len) {
+                    out.append(body.charAt(i + 1));
+                    i += 2;
+                    continue;
+                }
+                if (c == inString) {
+                    inString = 0;
+                }
+                i++;
+                continue;
+            }
+            if (c == '"' || c == '\'' || c == '`') {
+                out.append(c);
+                inString = c;
+                i++;
+                continue;
+            }
+            if (c == '/' && i + 1 < len) {
+                char nx = body.charAt(i + 1);
+                if (nx == '/') {
+                    out.append(c).append(nx);
+                    i += 2;
+                    inLineComment = true;
+                    continue;
+                }
+                if (nx == '*') {
+                    out.append(c).append(nx);
+                    i += 2;
+                    inBlockComment = true;
+                    continue;
+                }
+            }
+            if ((c == 's' || c == 'l') && isIdentStart(body, i)) {
+                int end = i + 1;
+                while (end < len && isIdentPart(body.charAt(end))) {
+                    end++;
+                }
+                String word = body.substring(i, end);
+                if ("stack".equals(word)) {
+                    out.append('S');
+                } else if ("locals".equals(word)) {
+                    out.append('L');
+                } else {
+                    out.append(word);
+                }
+                i = end;
+                continue;
+            }
+            out.append(c);
+            i++;
+        }
+        return out.toString();
+    }
+
+    private static boolean isIdentStart(String body, int i) {
+        if (i > 0) {
+            char prev = body.charAt(i - 1);
+            if (Character.isLetterOrDigit(prev) || prev == '_' || prev == '$') {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean isIdentPart(char c) {
+        return Character.isLetterOrDigit(c) || c == '_' || c == '$';
     }
 
 
