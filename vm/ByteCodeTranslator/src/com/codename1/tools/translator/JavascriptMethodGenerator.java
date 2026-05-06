@@ -1174,11 +1174,18 @@ final class JavascriptMethodGenerator {
      * already use named locals.
      */
     private static String renameLocalsArrayToNamedLocals(String body) {
+        // Try the _F prelude first: ``let L=_F(N, T, A1, A2, ...);``
         java.util.regex.Pattern letL = java.util.regex.Pattern.compile(
                 "let\\s+L\\s*=\\s*_F\\s*\\(\\s*(\\d+)\\s*((?:,[^,()]+)*)\\s*\\)\\s*;");
         java.util.regex.Matcher m = letL.matcher(body);
         if (!m.find()) {
-            return body;
+            // Fall back to the _N prelude (long/double-arg methods):
+            //   ``let L=_N(N); ...; L[0]=T; L[1]=A1; L[2]=null; L[3]=A2; ...``
+            // The L[i]=expr; assignments aren't comma-listed; they
+            // appear as separate statements right after the _N call
+            // (interleaved with ``let S=[];`` and ``let pc=0;`` --
+            // the assignments themselves are contiguous though).
+            return renameLocalsNPrelude(body);
         }
         int totalSize;
         try {
@@ -1244,6 +1251,135 @@ final class JavascriptMethodGenerator {
             // though that pattern shouldn't occur here).
             if (c == 'L' && i + 1 < body.length() && body.charAt(i + 1) == '[') {
                 if (i == rest || !isIdentPart(body.charAt(i - 1))) {
+                    int end = i + 2;
+                    int numStart = end;
+                    while (end < body.length() && Character.isDigit(body.charAt(end))) {
+                        end++;
+                    }
+                    if (end > numStart && end < body.length() && body.charAt(end) == ']') {
+                        out.append('l').append(body, numStart, end);
+                        i = end + 1;
+                        continue;
+                    }
+                }
+            }
+            out.append(c);
+            i++;
+        }
+        return out.toString();
+    }
+
+    /**
+     * Variant for methods using the _N(N) prelude (double/long
+     * arguments). The emit shape is
+     *   ``let L=_N(N);let S=[];let pc=0;L[0]=T;L[1]=A1; ...``
+     * Match the ``let L=_N(N);`` and the run of ``L[i]=expr;``
+     * statements that follow (interleaved with the ``let S=[]``
+     * / ``let pc=0`` lines), then rewrite to a single
+     * ``let l0=T,l1=A1,l2,l3,...`` named-local declaration.
+     * Gracefully bails if the shape doesn't fully match.
+     */
+    private static String renameLocalsNPrelude(String body) {
+        java.util.regex.Pattern letN = java.util.regex.Pattern.compile(
+                "let\\s+L\\s*=\\s*_N\\s*\\(\\s*(\\d+)\\s*\\)\\s*;");
+        java.util.regex.Matcher m = letN.matcher(body);
+        if (!m.find()) {
+            return body;
+        }
+        int totalSize;
+        try {
+            totalSize = Integer.parseInt(m.group(1));
+        } catch (NumberFormatException e) {
+            return body;
+        }
+        if (totalSize <= 0 || totalSize > 256) {
+            return body;
+        }
+        // Walk forward from the match end, collecting any
+        // ``L[i]=expr;`` statements (and skipping over the
+        // intervening ``let S=[];`` / ``let pc=0;`` lines).
+        java.util.Map<Integer, String> initExprs = new java.util.HashMap<Integer, String>();
+        int scanPos = m.end();
+        java.util.regex.Pattern lAssign = java.util.regex.Pattern.compile(
+                "L\\[(\\d+)\\]\\s*=\\s*([^;]+);");
+        java.util.regex.Pattern letPrelude = java.util.regex.Pattern.compile(
+                "\\s*let\\s+S\\s*=\\s*\\[\\s*\\]\\s*;|\\s*let\\s+pc\\s*=\\s*0\\s*;|\\s+");
+        while (scanPos < body.length()) {
+            java.util.regex.Matcher pre = letPrelude.matcher(body).region(scanPos, body.length());
+            pre.useAnchoringBounds(true);
+            if (pre.lookingAt()) {
+                scanPos = pre.end();
+                continue;
+            }
+            java.util.regex.Matcher la = lAssign.matcher(body).region(scanPos, body.length());
+            la.useAnchoringBounds(true);
+            if (la.lookingAt()) {
+                int idx;
+                try {
+                    idx = Integer.parseInt(la.group(1));
+                } catch (NumberFormatException nfe) {
+                    break;
+                }
+                if (idx < 0 || idx >= totalSize) break;
+                String expr = la.group(2).trim();
+                // Don't overwrite an earlier assignment for the
+                // same slot -- we only inline the FIRST.
+                if (!initExprs.containsKey(idx)) {
+                    initExprs.put(idx, expr);
+                }
+                scanPos = la.end();
+                continue;
+            }
+            break;
+        }
+        if (initExprs.isEmpty()) {
+            return body;
+        }
+        // Build merged decl ``let l0=expr0,l1=expr1,...,lN-1;``
+        // where slots without an init expression decl with no value.
+        StringBuilder repl = new StringBuilder();
+        repl.append("let ");
+        for (int i = 0; i < totalSize; i++) {
+            if (i > 0) repl.append(",");
+            repl.append("l").append(i);
+            String expr = initExprs.get(i);
+            if (expr != null) {
+                repl.append("=").append(expr);
+            }
+        }
+        repl.append(";");
+
+        // Replace the matched ``let L=_N(N);`` and consume the
+        // assignment statements + intermixed prelude lines we
+        // walked over. The ``let S=[];`` / ``let pc=0;`` are
+        // re-emitted before the merged decl so they're still in
+        // scope.
+        StringBuilder out = new StringBuilder(body.length());
+        out.append(body, 0, m.start());
+        out.append("let S=[];let pc=0;");
+        out.append(repl);
+
+        // Now rewrite L[i] → l<i> in the rest of the body, skipping
+        // string literals.
+        char inString = 0;
+        for (int i = scanPos; i < body.length(); ) {
+            char c = body.charAt(i);
+            if (inString != 0) {
+                out.append(c);
+                if (c == '\\' && i + 1 < body.length()) {
+                    out.append(body.charAt(i + 1));
+                    i += 2; continue;
+                }
+                if (c == inString) inString = 0;
+                i++; continue;
+            }
+            if (c == '"' || c == '\'' || c == '`') {
+                out.append(c);
+                inString = c;
+                i++; continue;
+            }
+            if (c == 'L' && i + 1 < body.length() && body.charAt(i + 1) == '[') {
+                if (i == scanPos || !isIdentPart(body.charAt(i - 1))) {
                     int end = i + 2;
                     int numStart = end;
                     while (end < body.length() && Character.isDigit(body.charAt(end))) {
