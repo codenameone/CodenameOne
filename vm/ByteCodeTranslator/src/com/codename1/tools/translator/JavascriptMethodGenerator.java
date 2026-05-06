@@ -5385,12 +5385,39 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                     p++;
                 }
                 if (p < to && body.charAt(p) == '{') {
+                    // The translator may emit ``case N: { body1 } { body2 }``
+                    // shapes when consecutive instructions each open their
+                    // own block but neither sets pc / breaks. Treat all
+                    // dangling ``{...}`` blocks following this case label
+                    // (until the next ``case`` / ``default`` / end-of-
+                    // switch) as part of this case's body.
                     int closeBrace = matchBrace(body, p);
                     if (closeBrace < 0 || closeBrace > to) {
                         return null;
                     }
-                    result.add(new int[] {label, p, closeBrace + 1});
-                    i = closeBrace + 1;
+                    int bodyEnd = closeBrace + 1;
+                    int q = bodyEnd;
+                    while (q < to) {
+                        while (q < to && Character.isWhitespace(body.charAt(q))) {
+                            q++;
+                        }
+                        if (q >= to) {
+                            break;
+                        }
+                        if (body.charAt(q) == '{') {
+                            int innerClose = matchBrace(body, q);
+                            if (innerClose < 0 || innerClose > to) {
+                                return null;
+                            }
+                            bodyEnd = innerClose + 1;
+                            q = bodyEnd;
+                            continue;
+                        }
+                        // ``case`` / ``default`` / ``}`` — stop extending.
+                        break;
+                    }
+                    result.add(new int[] {label, p, bodyEnd});
+                    i = bodyEnd;
                 } else {
                     // Bare ``case N:`` -- empty body.
                     result.add(new int[] {label, afterColon, afterColon});
