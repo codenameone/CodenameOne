@@ -307,6 +307,16 @@ if [ "${#TEAVM_JARS[@]}" -gt 0 ]; then
     )
   done
   rm -rf "$STAGE_CLASSES/org/teavm/classlib/impl/report"
+  # Drop TeaVM-internal locale/Unicode/timezone data resources. They are
+  # baked into TeaVM's classlib jar for the original TeaVM compile path
+  # (which generates Java metadata resources via build-time generators);
+  # ParparVM's translator never references these files, and the bundled
+  # JS code does not open ``cldr-json.zip`` / ``UnicodeData.txt`` /
+  # ``tzdata*.zip`` at runtime. Together they are ~18 MiB of dead bytes
+  # that the translator would otherwise mirror into the served bundle.
+  rm -f "$STAGE_CLASSES/org/teavm/classlib/impl/unicode/cldr-json.zip"
+  rm -f "$STAGE_CLASSES/org/teavm/classlib/impl/unicode/UnicodeData.txt"
+  rm -rf "$STAGE_CLASSES/org/teavm/classlib/impl/tz"
 fi
 
 bj_log "Compiling JavaScript-port runtime sources"
