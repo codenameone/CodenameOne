@@ -6123,7 +6123,226 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             repl.append(region, cursor, region.length());
             return repl.toString();
         }
+        // Multi-incoming small-body duplication: when a case has 2 or
+        // 3 incoming branches, all of them simple ``pc=N;break;`` (no
+        // ternary), all forward, and the body is small enough that
+        // duplicating saves bytes vs keeping the case label, inline
+        // the body at each source and drop the case.
+        //
+        // Per-occurrence cost model: the case label costs
+        // {@code "case N:".length()} bytes; each incoming
+        // {@code pc=N;break;} costs about 11 bytes. Inlining replaces
+        // every {@code pc=N;break;} with the body text (length B) and
+        // drops the case label. For N incomings we save
+        // {@code labelCost + N*sourceLen - N*B} bytes total -- so
+        // N=2 is profitable when B is comfortably below the typical
+        // {@code pc=NN;break;} length, N=3 even more so.
+        for (int i = 0; i < cases.size(); i++) {
+            int[] c = cases.get(i);
+            int targetLabel = c[0];
+            if (targetLabel == 0) {
+                continue;
+            }
+            Integer cnt = pcCount.get(targetLabel);
+            if (cnt == null || cnt < 2 || cnt > 3) {
+                continue;
+            }
+            int bs = c[1];
+            int be = c[2];
+            int caseLabelStart = c[3];
+            String caseBody = region.substring(bs, be);
+            if (caseBodyHasBlockDeclaration(caseBody)) {
+                continue;
+            }
+            String bodyForDup = stripLeadingTerminators(caseBody);
+            // Skip if body is empty (would just remove the case
+            // label at each goto source -- already handled by other
+            // passes when terminating).
+            if (bodyForDup.isEmpty()) {
+                continue;
+            }
+            // Skip when body starts with ``case`` / ``default``
+            // (parser quirk: empty fall-through cases shouldn't be
+            // duplicated as their textual body bleeds into the next
+            // case label).
+            if (bodyForDup.startsWith("case ") || bodyForDup.startsWith("default")) {
+                continue;
+            }
+            List<int[]> sources = findAllSimpleGotoSources(region, targetLabel);
+            if (sources == null || sources.size() != cnt) {
+                // Some incoming refs aren't plain ``pc=N;break;``
+                // (e.g. one is a ternary RHS) -- can't fold them all.
+                continue;
+            }
+            // Forward only: every source must come textually before
+            // the case label. Backward gotos are loop heads and
+            // duplicating them would change semantics.
+            boolean allForward = true;
+            int totalSrcLen = 0;
+            for (int[] s : sources) {
+                if (s[1] > caseLabelStart) {
+                    allForward = false;
+                    break;
+                }
+                totalSrcLen += (s[1] - s[0]);
+            }
+            if (!allForward) {
+                continue;
+            }
+            int caseSpan = be - caseLabelStart;
+            int oldBytes = totalSrcLen + caseSpan;
+            int newBytes = sources.size() * bodyForDup.length();
+            if (newBytes >= oldBytes) {
+                continue;
+            }
+            // Build replacement: walk forward, emit prefix up to each
+            // source (rewriting trailing ``,`` to ``;`` so a
+            // statement-shaped body like ``return X`` parses), inline
+            // the body at the source, then emit the rest -- skipping
+            // the case label/body range when we get there.
+            StringBuilder out = new StringBuilder(region.length());
+            int cursor = 0;
+            for (int[] s : sources) {
+                int srcStart = s[0];
+                int srcEnd = s[1];
+                int charBefore = srcStart > 0 ? region.charAt(srcStart - 1) : ' ';
+                if (charBefore == ',') {
+                    out.append(region, cursor, srcStart - 1);
+                    out.append(';');
+                } else {
+                    out.append(region, cursor, srcStart);
+                }
+                out.append(bodyForDup);
+                cursor = srcEnd;
+            }
+            if (cursor > caseLabelStart) {
+                // A source range overlaps the case label -- shouldn't
+                // happen for forward-only sources but bail safely.
+                continue;
+            }
+            out.append(region, cursor, caseLabelStart);
+            out.append(region, be, region.length());
+            return out.toString();
+        }
         return null;
+    }
+
+    /**
+     * Like {@link #findSimpleGotoSource} but accumulates every
+     * matching {@code pc=<targetLabel>;break;} statement instead of
+     * stopping at the first. Returns null if any reference to the
+     * label does NOT match the simple-goto shape (e.g. it appears
+     * inside a ternary {@code pc=cond?A:B;break;} RHS) -- in that
+     * case the multi-incoming fold can't safely dispatch every
+     * incoming, since one source has no straight {@code pc=N;break;}
+     * to substitute.
+     */
+    private static List<int[]> findAllSimpleGotoSources(String region, int targetLabel) {
+        List<int[]> out = new ArrayList<int[]>();
+        int i = 0;
+        int len = region.length();
+        while (i < len) {
+            char ch = region.charAt(i);
+            if (ch == '"' || ch == '\'') {
+                int end = skipStringLiteral(region, i);
+                if (end < 0) {
+                    return null;
+                }
+                i = end + 1;
+                continue;
+            }
+            if (ch == 'p' && i + 1 < len && region.charAt(i + 1) == 'c'
+                    && (i == 0 || !isIdentPart(region.charAt(i - 1)))
+                    && i + 2 < len && !isIdentPart(region.charAt(i + 2))) {
+                int p = i + 2;
+                while (p < len && Character.isWhitespace(region.charAt(p))) {
+                    p++;
+                }
+                if (p < len && region.charAt(p) == '='
+                        && (p + 1 >= len || region.charAt(p + 1) != '=')) {
+                    int rhsStart = p + 1;
+                    int rhsEnd = findStatementEnd(region, rhsStart, len);
+                    if (rhsEnd < 0) {
+                        return null;
+                    }
+                    int t = rhsStart;
+                    while (t < rhsEnd && Character.isWhitespace(region.charAt(t))) {
+                        t++;
+                    }
+                    int numStart = t;
+                    while (t < rhsEnd && Character.isDigit(region.charAt(t))) {
+                        t++;
+                    }
+                    int numEnd = t;
+                    int afterDigits = t;
+                    while (t < rhsEnd && Character.isWhitespace(region.charAt(t))) {
+                        t++;
+                    }
+                    if (numStart < numEnd && t == rhsEnd) {
+                        int n = Integer.parseInt(region.substring(numStart, numEnd));
+                        if (n == targetLabel) {
+                            int q = rhsEnd;
+                            if (q < len && region.charAt(q) == ';') {
+                                q++;
+                                while (q < len && Character.isWhitespace(region.charAt(q))) {
+                                    q++;
+                                }
+                                if (q + 4 < len && region.startsWith("break", q)
+                                        && (q + 5 >= len || !isIdentPart(region.charAt(q + 5)))) {
+                                    int afterBreak = q + 5;
+                                    if (afterBreak < len && region.charAt(afterBreak) == ';') {
+                                        afterBreak++;
+                                    }
+                                    out.add(new int[] {i, afterBreak});
+                                    i = afterBreak;
+                                    continue;
+                                }
+                            }
+                        } else if (afterDigits == rhsEnd) {
+                            // Plain ``pc=<otherLiteral>;`` -- not our
+                            // target, skip past and keep scanning.
+                            i = rhsEnd;
+                            continue;
+                        }
+                    }
+                    // RHS isn't a plain literal (e.g. ternary). If
+                    // the RHS *mentions* targetLabel as one of its
+                    // ternary branches, the multi-incoming fold
+                    // can't substitute the body here cleanly --
+                    // signal that to the caller.
+                    String rhs = region.substring(rhsStart, rhsEnd);
+                    if (containsLabelLiteral(rhs, targetLabel)) {
+                        return null;
+                    }
+                    i = rhsEnd;
+                    continue;
+                }
+            }
+            i++;
+        }
+        return out;
+    }
+
+    /**
+     * Returns true when the (whitespace-trimmed) {@code pc=...} RHS
+     * mentions the integer literal {@code label} at top level --
+     * indicating a non-simple goto (typically a ternary branch). We
+     * scan for ``<digits>`` runs not preceded or followed by another
+     * digit so {@code 12} doesn't match a {@code 1} target inside it.
+     */
+    private static boolean containsLabelLiteral(String rhs, int label) {
+        String needle = Integer.toString(label);
+        int idx = 0;
+        while ((idx = rhs.indexOf(needle, idx)) >= 0) {
+            char prev = idx > 0 ? rhs.charAt(idx - 1) : ' ';
+            int afterIdx = idx + needle.length();
+            char next = afterIdx < rhs.length() ? rhs.charAt(afterIdx) : ' ';
+            if (!Character.isDigit(prev) && !Character.isDigit(next)) {
+                return true;
+            }
+            idx = afterIdx;
+        }
+        return false;
     }
 
     /**
