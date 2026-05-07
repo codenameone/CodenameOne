@@ -1256,6 +1256,14 @@ final class JavascriptMethodGenerator {
         // handles non-adjacent forward gotos and iterates to fixed
         // point, dissolving entire linear chains.
         s = inlineUniqueSourceCases(s);
+        // The translator emits ``function*?<name>(T, A1, A2){let l0=T,
+        // l1=A1, l2=A2, ...;`` — i.e., the params are named after the
+        // shortened ``__cn1This`` / ``__cn1Arg<N>`` aliases (T and AN)
+        // and then the prelude copies them into named locals lN. JS
+        // function params are themselves local bindings, so naming the
+        // params lN directly lets us drop the copy entirely. Saves
+        // ~3-5 chars per arg per method.
+        s = renameParamsToLocals(s);
         return s;
     }
 
@@ -5037,6 +5045,285 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             }
         }
         return findActualStaticOwner(ownerClass.getBaseClassObject(), name, desc);
+    }
+
+    /**
+     * Skip the param-to-local copy prelude by naming the function
+     * parameters directly as ``l0, l1, ...``. Pre-rename, the translator
+     * emits:
+     *
+     *   function*?<name>(T, A1, A2){let l0=T,l1=A1,l2=A2,l3,l4;...}
+     *
+     * Post-rename:
+     *
+     *   function*?<name>(l0, l1, l2){let l3,l4;...}
+     *
+     * Saves ~3-5 chars per arg per method. ``T`` is the short alias for
+     * ``__cn1ThisObject`` (instance methods); ``A<N>`` for
+     * ``__cn1Arg<N>``. Both only appear in the param list and the let
+     * prelude after all earlier rename passes, so a textual substitution
+     * is safe within the function body.
+     *
+     * Bails:
+     *   * Unrecognized prelude shape (e.g., long/double argument
+     *     interleaving that breaks the consecutive ``l<i>=A<i>``
+     *     mapping)
+     *   * Wrapper functions (no ``let l0=...`` prelude — body is a
+     *     pass-through ``return yield* impl(args)``)
+     *   * Synchronized methods that emit ``let __cn1Monitor`` before
+     *     the locals frame
+     */
+    private static String renameParamsToLocals(String body) {
+        if (!body.startsWith("function")) {
+            return body;
+        }
+        // Bail on synchronized methods. The translator emits
+        // ``let __cn1Monitor = T;`` (or ``= jvm.getClassObject(...)``
+        // for static synchronized) AFTER the locals prelude — that ``T``
+        // would dangle if we renamed the function param away from T.
+        // We could rename T → l0 in that decl too, but it's a small
+        // population (~200 methods) and skipping is safer.
+        if (body.indexOf("__cn1Monitor") >= 0) {
+            return body;
+        }
+        // Skip ``function`` keyword and optional ``*``.
+        int p = 8;
+        while (p < body.length() && Character.isWhitespace(body.charAt(p))) {
+            p++;
+        }
+        if (p < body.length() && body.charAt(p) == '*') {
+            p++;
+            while (p < body.length() && Character.isWhitespace(body.charAt(p))) {
+                p++;
+            }
+        }
+        // Function name.
+        int nameStart = p;
+        while (p < body.length() && (isIdentPart(body.charAt(p)))) {
+            p++;
+        }
+        if (p == nameStart) {
+            return body;
+        }
+        while (p < body.length() && Character.isWhitespace(body.charAt(p))) {
+            p++;
+        }
+        if (p >= body.length() || body.charAt(p) != '(') {
+            return body;
+        }
+        int paramOpen = p;
+        int paramClose = body.indexOf(')', paramOpen);
+        if (paramClose < 0) {
+            return body;
+        }
+        // No params? Nothing to do.
+        String paramListRaw = body.substring(paramOpen + 1, paramClose);
+        if (paramListRaw.trim().isEmpty()) {
+            return body;
+        }
+        String[] paramsRaw = paramListRaw.split(",");
+        List<String> params = new ArrayList<String>();
+        for (String pr : paramsRaw) {
+            String t = pr.trim();
+            if (t.isEmpty()) {
+                return body;
+            }
+            // Verify each is ``T`` or ``A\d+``. Other shapes mean we
+            // already touched this method or the rename pass didn't
+            // run; bail.
+            if (!t.equals("T") && !t.matches("A\\d+")) {
+                return body;
+            }
+            params.add(t);
+        }
+        // Find ``{`` opening the body.
+        int braceOpen = body.indexOf('{', paramClose);
+        if (braceOpen < 0) {
+            return body;
+        }
+        // Find the let prelude.
+        int letPos = braceOpen + 1;
+        while (letPos < body.length() && Character.isWhitespace(body.charAt(letPos))) {
+            letPos++;
+        }
+        if (!body.startsWith("let ", letPos) && !body.startsWith("let\t", letPos)
+                && !body.startsWith("let\n", letPos)) {
+            return body;
+        }
+        int decStart = letPos + 4;
+        while (decStart < body.length() && Character.isWhitespace(body.charAt(decStart))) {
+            decStart++;
+        }
+        // Walk the prelude collecting ``l<idx>`` or ``l<idx>=<paramName>`` decls.
+        List<int[]> declParsed = new ArrayList<int[]>();
+        // Each entry: [localIdx, kind] where kind = 0 (unassigned), 1 (=T), 2+i (=A<i>).
+        // For the rebuild we also need the literal RHS.
+        Map<Integer, String> assignment = new HashMap<Integer, String>();
+        Set<Integer> declaredLocals = new java.util.LinkedHashSet<Integer>();
+        int q = decStart;
+        while (q < body.length()) {
+            // Parse ``l<digits>``
+            if (body.charAt(q) != 'l') {
+                return body;
+            }
+            int idxStart = q + 1;
+            int idxEnd = idxStart;
+            while (idxEnd < body.length() && Character.isDigit(body.charAt(idxEnd))) {
+                idxEnd++;
+            }
+            if (idxEnd == idxStart) {
+                return body;
+            }
+            int localIdx = Integer.parseInt(body.substring(idxStart, idxEnd));
+            if (declaredLocals.contains(localIdx)) {
+                return body; // duplicate
+            }
+            declaredLocals.add(localIdx);
+            int after = idxEnd;
+            while (after < body.length() && Character.isWhitespace(body.charAt(after))) {
+                after++;
+            }
+            if (after < body.length() && body.charAt(after) == '=') {
+                // Has assignment. Parse RHS.
+                int rhsStart = after + 1;
+                while (rhsStart < body.length() && Character.isWhitespace(body.charAt(rhsStart))) {
+                    rhsStart++;
+                }
+                int rhsEnd = rhsStart;
+                if (rhsEnd < body.length() && body.charAt(rhsEnd) == 'T') {
+                    rhsEnd++;
+                } else if (rhsEnd < body.length() && body.charAt(rhsEnd) == 'A') {
+                    rhsEnd++;
+                    while (rhsEnd < body.length() && Character.isDigit(body.charAt(rhsEnd))) {
+                        rhsEnd++;
+                    }
+                    if (rhsEnd == rhsStart + 1) {
+                        return body;
+                    }
+                } else {
+                    return body;
+                }
+                String rhs = body.substring(rhsStart, rhsEnd);
+                assignment.put(localIdx, rhs);
+                q = rhsEnd;
+            } else {
+                q = after;
+            }
+            while (q < body.length() && Character.isWhitespace(body.charAt(q))) {
+                q++;
+            }
+            if (q >= body.length()) {
+                return body;
+            }
+            if (body.charAt(q) == ',') {
+                q++;
+                while (q < body.length() && Character.isWhitespace(body.charAt(q))) {
+                    q++;
+                }
+                continue;
+            }
+            if (body.charAt(q) == ';') {
+                break;
+            }
+            return body;
+        }
+        if (q >= body.length() || body.charAt(q) != ';') {
+            return body;
+        }
+        int preludeEnd = q + 1;
+        // Verify every param has an assignment.
+        Map<String, Integer> paramToLocal = new HashMap<String, Integer>();
+        for (Map.Entry<Integer, String> e : assignment.entrySet()) {
+            paramToLocal.put(e.getValue(), e.getKey());
+        }
+        for (String pName : params) {
+            if (!paramToLocal.containsKey(pName)) {
+                return body;
+            }
+        }
+        // Build new param list (rename to l<idx>).
+        StringBuilder newParams = new StringBuilder();
+        for (int i = 0; i < params.size(); i++) {
+            if (i > 0) {
+                newParams.append(",");
+            }
+            newParams.append("l").append(paramToLocal.get(params.get(i)));
+        }
+        // Build new prelude: ONLY the unused locals (those without an
+        // assignment), preserving original declaration order.
+        StringBuilder newPrelude = new StringBuilder();
+        boolean firstUnused = true;
+        for (Integer idx : declaredLocals) {
+            if (assignment.containsKey(idx)) {
+                continue;
+            }
+            if (firstUnused) {
+                newPrelude.append("let ");
+                firstUnused = false;
+            } else {
+                newPrelude.append(",");
+            }
+            newPrelude.append("l").append(idx);
+        }
+        if (!firstUnused) {
+            newPrelude.append(";");
+        }
+        // Defensive: scan the body AFTER the prelude for any reference
+        // to ``T`` or ``A<N>`` (one of the param names). After all
+        // earlier rename passes, these names should only appear in the
+        // function param list and the prelude — but synchronized
+        // methods also write ``let __cn1Monitor = T`` (pre-existing
+        // bail above), and unusual emit shapes might place them
+        // elsewhere. If we'd dangle a reference, bail.
+        if (containsParamReference(body, preludeEnd, body.length(), params)) {
+            return body;
+        }
+        // Reassemble: function ... ( + newParams + ) ... { + newPrelude + body-after-prelude
+        StringBuilder out = new StringBuilder(body.length());
+        out.append(body, 0, paramOpen + 1);
+        out.append(newParams);
+        out.append(body, paramClose, braceOpen + 1);
+        out.append(newPrelude);
+        out.append(body, preludeEnd, body.length());
+        return out.toString();
+    }
+
+    /**
+     * Scan a region for whole-identifier references to any of the
+     * supplied param names. Used by ``renameParamsToLocals`` as a
+     * post-prelude safety check. Skips occurrences inside string
+     * literals.
+     */
+    private static boolean containsParamReference(String body, int from, int to, List<String> params) {
+        Set<String> set = new HashSet<String>(params);
+        for (int i = from; i < to; i++) {
+            char ch = body.charAt(i);
+            if (ch == '"' || ch == '\'') {
+                int end = skipStringLiteral(body, i);
+                if (end < 0 || end >= to) {
+                    return true;
+                }
+                i = end;
+                continue;
+            }
+            // Look for identifier start: T or A<digit>
+            if (ch == 'T' || ch == 'A') {
+                char before = i > 0 ? body.charAt(i - 1) : ' ';
+                if (Character.isLetterOrDigit(before) || before == '_' || before == '$') {
+                    continue;
+                }
+                int idEnd = i + 1;
+                while (idEnd < to && isIdentPart(body.charAt(idEnd))) {
+                    idEnd++;
+                }
+                String ident = body.substring(i, idEnd);
+                if (set.contains(ident)) {
+                    return true;
+                }
+                i = idEnd - 1;
+            }
+        }
+        return false;
     }
 
     /**
