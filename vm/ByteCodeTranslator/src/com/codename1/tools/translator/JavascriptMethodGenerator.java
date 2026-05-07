@@ -1271,6 +1271,16 @@ final class JavascriptMethodGenerator {
         // dispatch -- the for-loop iterates exactly once before BODY
         // terminates. Strip the wrapper.
         s = stripSingleCaseSwitchWrapper(s);
+        // FINAL pass: rename per-method local identifiers to single-
+        // letter aliases. Saves ~300+ KiB raw on Initializr because
+        // ``s0``, ``s1``, ``l0``, ``pc`` etc. account for the bulk of
+        // identifier bytes — TeaVM uses ``a``, ``b``, ``c`` etc. for
+        // the same purpose. esbuild's ``--minify-identifiers`` would
+        // also rename them but renames TOP-LEVEL too, breaking
+        // cross-file dispatch (our $XX short-form names are referenced
+        // from parparvm_runtime.js / port.js). A per-method local-only
+        // rewrite avoids that.
+        s = renameLocalsToShortAliases(s);
         return s;
     }
 
@@ -5052,6 +5062,196 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             }
         }
         return findActualStaticOwner(ownerClass.getBaseClassObject(), name, desc);
+    }
+
+    /**
+     * Rename per-method local identifiers (function params, ``lN``
+     * locals, ``sN`` registers, ``pc``) to single-letter aliases.
+     * Operates on the WHOLE function body — header + body. Skips
+     * string literals.
+     *
+     * Design constraints:
+     * 1. Only renames LOCAL identifiers (params + things declared in
+     *    inner ``let`` / ``var`` statements). Top-level / cross-file
+     *    names (``$XX``, ``_T``, ``_O``, runtime helpers) stay intact.
+     * 2. Avoids 1-char names already used by inner block-let
+     *    temporaries (``b``, ``a``, ``v``, ``arr``, etc.).
+     * 3. Sorted by usage frequency — most-referenced local gets the
+     *    shortest available alias.
+     * 4. JS reserved words (``in``, ``do``, ``if``, etc.) excluded.
+     *
+     * If a method has more distinct identifiers than free 1-char
+     * aliases, only the most-used ones get renamed; the rest stay
+     * 2-char.
+     */
+    private static String renameLocalsToShortAliases(String body) {
+        if (!body.startsWith("function")) {
+            return body;
+        }
+        // Step 1: collect every ``lN``, ``sN``, ``pc``, plus function
+        // params, plus identifiers we should AVOID using as targets
+        // (inner let-block temporaries, JS keywords, runtime helper
+        // names appearing in the body).
+        Map<String, Integer> usage = new HashMap<String, Integer>();
+        Set<String> reserved = new HashSet<String>();
+        Set<String> renameTargets = new HashSet<String>();
+
+        // Walk the body once to populate. Use char-level scanning with
+        // string-literal awareness.
+        int i = 0;
+        int len = body.length();
+        while (i < len) {
+            char ch = body.charAt(i);
+            if (ch == '"' || ch == '\'') {
+                int end = skipStringLiteral(body, i);
+                if (end < 0) {
+                    return body;
+                }
+                i = end + 1;
+                continue;
+            }
+            if (Character.isLetter(ch) || ch == '_' || ch == '$') {
+                int idStart = i;
+                int j = i + 1;
+                while (j < len && isIdentPart(body.charAt(j))) {
+                    j++;
+                }
+                String ident = body.substring(idStart, j);
+                // Classify:
+                //  * lN, sN, pc → rename target. Track usage.
+                //  * Other 1-char identifier (inner let-block temp) →
+                //    add to ``reserved`` so we don't pick it as alias.
+                //  * Multi-char (e.g., yield, function, return,
+                //    __cn1Error, $xx) → ignored.
+                if (isMethodLocalToRename(ident)) {
+                    renameTargets.add(ident);
+                    Integer prev = usage.get(ident);
+                    usage.put(ident, prev == null ? 1 : prev + 1);
+                } else if (ident.length() == 1
+                        && (Character.isLetter(ident.charAt(0))
+                                || ident.charAt(0) == '_'
+                                || ident.charAt(0) == '$')) {
+                    reserved.add(ident);
+                }
+                i = j;
+                continue;
+            }
+            i++;
+        }
+        if (renameTargets.isEmpty()) {
+            return body;
+        }
+        // Step 2: build alias pool. Single-letter ASCII alpha minus
+        // reserved minus JS keywords minus single-letter identifiers
+        // that look like our rename targets (none of l/s/p — wait,
+        // our rename targets are multi-char, so the single chars
+        // ``l``, ``s``, ``p`` are FREE unless used elsewhere).
+        List<String> pool = new ArrayList<String>();
+        String alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        Set<String> jsKeywords = new HashSet<String>();
+        for (String kw : new String[] {"in", "do", "if", "of"}) {
+            jsKeywords.add(kw);
+        }
+        for (int k = 0; k < alphabet.length(); k++) {
+            String c = String.valueOf(alphabet.charAt(k));
+            if (reserved.contains(c) || jsKeywords.contains(c)) {
+                continue;
+            }
+            pool.add(c);
+        }
+        if (pool.isEmpty()) {
+            return body;
+        }
+        // Step 3: assign aliases. Sort targets by usage count (descending).
+        List<String> targetsSorted = new ArrayList<String>(renameTargets);
+        targetsSorted.sort(new java.util.Comparator<String>() {
+            @Override
+            public int compare(String a, String b) {
+                int ua = usage.get(a);
+                int ub = usage.get(b);
+                if (ua != ub) {
+                    return Integer.compare(ub, ua);
+                }
+                return a.compareTo(b);
+            }
+        });
+        Map<String, String> renameMap = new HashMap<String, String>();
+        int poolIdx = 0;
+        for (String target : targetsSorted) {
+            if (poolIdx >= pool.size()) {
+                break;
+            }
+            String alias = pool.get(poolIdx++);
+            // Only rename if the alias is shorter than the target.
+            // (lN where N has 2+ digits is already ≥3 chars; ``a`` is
+            // worth it. Single-char target like ``c`` doesn't win.)
+            if (alias.length() < target.length()) {
+                renameMap.put(target, alias);
+            }
+        }
+        if (renameMap.isEmpty()) {
+            return body;
+        }
+        // Step 4: apply rename. Walk body, replace whole-identifier
+        // occurrences of any key in renameMap with its mapped alias.
+        StringBuilder out = new StringBuilder(body.length());
+        i = 0;
+        while (i < len) {
+            char ch = body.charAt(i);
+            if (ch == '"' || ch == '\'') {
+                int end = skipStringLiteral(body, i);
+                if (end < 0) {
+                    return body;
+                }
+                out.append(body, i, end + 1);
+                i = end + 1;
+                continue;
+            }
+            if (Character.isLetter(ch) || ch == '_' || ch == '$') {
+                int idStart = i;
+                int j = i + 1;
+                while (j < len && isIdentPart(body.charAt(j))) {
+                    j++;
+                }
+                String ident = body.substring(idStart, j);
+                String alias = renameMap.get(ident);
+                if (alias != null) {
+                    out.append(alias);
+                } else {
+                    out.append(ident);
+                }
+                i = j;
+                continue;
+            }
+            out.append(ch);
+            i++;
+        }
+        return out.toString();
+    }
+
+    /**
+     * Identify identifiers that are method-local rename targets:
+     * ``lN`` (locals), ``sN`` (registers), ``pc`` (program counter).
+     * Excludes single-char vars (``l``, ``s`` alone), and ensures
+     * the suffix is digits only.
+     */
+    private static boolean isMethodLocalToRename(String ident) {
+        if ("pc".equals(ident)) {
+            return true;
+        }
+        if (ident.length() < 2) {
+            return false;
+        }
+        char first = ident.charAt(0);
+        if (first != 'l' && first != 's') {
+            return false;
+        }
+        for (int i = 1; i < ident.length(); i++) {
+            if (!Character.isDigit(ident.charAt(i))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
