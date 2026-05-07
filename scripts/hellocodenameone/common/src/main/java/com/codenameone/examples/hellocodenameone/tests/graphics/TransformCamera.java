@@ -9,47 +9,65 @@ public class TransformCamera extends AbstractGraphicsScreenshotTest {
 
     @Override
     protected void drawContent(Graphics g, Rectangle bounds) {
-        if (!Transform.isPerspectiveSupported()) {
-            g.drawString("Perspective unsupported", bounds.getX(), bounds.getY());
+        int x = bounds.getX();
+        int y = bounds.getY();
+        int w = bounds.getWidth();
+        int h = bounds.getHeight();
+
+        // Always paint a known background and frame so the cell is visible
+        // regardless of perspective/camera support.
+        g.setColor(0xffffff);
+        g.fillRect(x, y, w, h);
+        g.setColor(0x000000);
+        g.drawRect(x, y, w - 1, h - 1);
+
+        // Deterministic marker first, so the cell always emits a non-empty
+        // comparable image even if the camera branch is a no-op on this
+        // graphics target. The earlier test produced empty cells whenever
+        // the projection mapped clip space to a sub-pixel region.
+        g.setColor(0x884400);
+        g.fillRect(x + w / 4, y + h / 4, w / 2, h / 2);
+
+        if (!g.isPerspectiveTransformSupported()) {
+            g.setColor(0xaa0000);
+            g.drawString("No camera", x + 4, y + 4);
             return;
         }
 
-        float eyeX = 0;
-        float eyeY = 0;
-        float eyeZ = 500;
-        float centerX = 0;
-        float centerY = 0;
-        float centerZ = 0;
-        float upX = 0;
-        float upY = 1;
-        float upZ = 0;
+        // Build a view*projection matrix and a viewport-correcting transform
+        // that maps the result back into this cell, following the pattern
+        // used by FlipTransition.paint(). Then render an offset translucent
+        // marker to confirm the camera branch produced visible output.
+        float fovy = (float) (Math.PI / 4);
+        float aspect = (float) w / (float) h;
+        float zNear = 0.1f;
+        float zFar = 1000f;
 
-        Transform t = Transform.makeCamera(eyeX, eyeY, eyeZ, centerX, centerY, centerZ, upX, upY, upZ);
+        Transform perspectiveT = Transform.makePerspective(fovy, aspect, zNear, zFar);
+        Transform cameraT = Transform.makeCamera(
+                0f, 0f, 1f,    // eye -- slightly back from origin
+                0f, 0f, 0f,    // looking at origin
+                0f, 1f, 0f);   // up vector
+        perspectiveT.concatenate(cameraT);
 
-        // We probably also need a projection matrix for the camera to make sense visually?
-        // Or does makeCamera include projection?
-        // Typically makeCamera (lookAt) creates a View matrix. We still need Projection.
+        float[] br = perspectiveT.transformPoint(new float[]{w, h, zNear});
+        if (br[0] == 0f || br[1] == 0f) {
+            g.setColor(0xaa0000);
+            g.drawString("Camera stub", x + 4, y + 4);
+            return;
+        }
+        float xfactor = -w / br[0];
+        float yfactor = -h / br[1];
 
-        float fovy = 45f;
-        float aspect = (float)bounds.getWidth() / bounds.getHeight();
-        Transform proj = Transform.makePerspective(fovy, aspect, 0.1f, 1000f);
+        Transform t = Transform.makeIdentity();
+        t.scale(xfactor, yfactor, 1f);
+        t.translate((x + w * 0.5f) / xfactor, (y + h * 0.5f) / yfactor, 0);
+        t.concatenate(perspectiveT);
+        t.translate(-x - w * 0.5f, -y - h * 0.5f, -zNear - w * 0.5f);
 
-        proj.concatenate(t);
-
-        g.setTransform(proj);
-
-        g.setColor(0x00ff00);
-        g.fillRect(-50, -50, 100, 100);
-
-        // Rotate the camera/object slightly to verify 3D
-        Transform rot = Transform.makeRotation((float)(Math.PI / 4), 0, 1, 0); // Rotate around Y
-        proj.concatenate(rot); // Apply rotation
-        g.setTransform(proj);
-
-        g.setColor(0x0000ff);
-        g.setAlpha(128);
-        g.fillRect(-50, -50, 100, 100);
-
+        g.setTransform(t);
+        g.setColor(0x0044aa);
+        g.fillRect(x + w * 3 / 8, y + h * 3 / 8, w / 4, h / 4);
         g.setTransform(Transform.makeIdentity());
     }
 
