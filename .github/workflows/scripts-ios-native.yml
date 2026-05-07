@@ -20,8 +20,6 @@ on:
       - '!CodenameOne/src/**/*.md'
       - 'Ports/iOSPort/**'
       - '!Ports/iOSPort/**/*.md'
-      - 'native-themes/ios-modern/**'
-      - '!native-themes/ios-modern/**/*.md'
       - 'vm/**'
       - '!vm/**/*.md'
       - 'tests/**'
@@ -49,8 +47,6 @@ on:
       - '!CodenameOne/src/**/*.md'
       - 'Ports/iOSPort/**'
       - '!Ports/iOSPort/**/*.md'
-      - 'native-themes/ios-modern/**'
-      - '!native-themes/ios-modern/**/*.md'
       - 'vm/**'
       - '!vm/**/*.md'
       - 'tests/**'
@@ -112,7 +108,7 @@ jobs:
         id: src_hash
         run: |
           set -euo pipefail
-          SRC_HASH=$(find CodenameOne/src Ports/iOSPort vm/JavaAPI vm/ByteCodeTranslator Themes native-themes \
+          SRC_HASH=$(find CodenameOne/src Ports/iOSPort vm/JavaAPI vm/ByteCodeTranslator Themes \
               -type f \( -name '*.java' -o -name '*.m' -o -name '*.h' -o -name '*.xml' -o -name '*.properties' -o -name '*.css' \) 2>/dev/null \
               | sort | xargs shasum -a 256 | shasum -a 256 | awk '{print $1}')
           POM_HASH=$(find . -name 'pom.xml' -not -path './scripts/*' 2>/dev/null \

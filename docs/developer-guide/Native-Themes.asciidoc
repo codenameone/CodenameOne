@@ -149,11 +149,8 @@ inherits from it.
 |===
 
 To rebrand the app, override the colour at the role level rather
-than touching every UIID. The example below layers a teal palette
-on top from your app's own `theme.css`; if you'd rather edit the
-shipped theme directly and ship a fully recoloured `.res`, see
-`Recolouring the accent palette via CSS variables` further down -
-that path lets a single variable edit drive every accent UIID.
+than touching every UIID. For example, to flip the primary
+container palette to teal:
 
 [source,css]
 ----
@@ -244,134 +241,6 @@ To layer a brand colour on top, override `RaisedButton` and
 accent-driven UIIDs the same way as Android above. The colour names
 match Apple's `UIColor.systemBlue` etc. so you can mirror the SF
 Symbols semantics if you want.
-
-=== Recolouring the accent palette via CSS variables
-
-Both shipped themes expose their accent palette as CSS variables
-inside the `#Constants` block at the top of the theme file, so a
-single edit recolours every accent-bearing component without
-re-declaring rules per UIID. This is the simplest way to ship a
-rebranded native theme with your app.
-
-.iOS modern (`native-themes/ios-modern/theme.css`)
-[cols="2,1,1", options="header"]
-|===
-|Variable |Light |Dark
-
-|`--accent-color`
-|`#007aff`
-|`#0a84ff`
-
-|`--accent-pressed-color`
-|`#0064d1`
-|`#64b1ff`
-
-|`--accent-disabled-color`
-|`#b3d4ff`
-|`#004a99`
-
-|`--accent-on-color`
-|`#ffffff`
-|(same)
-|===
-
-Drives `Button`, `RaisedButton`, `CheckBox.selected`,
-`RadioButton.selected`, `OnOffSwitch`, `BackCommand`,
-`TitleCommand`, `FloatingActionButton`.
-
-.Android Material 3 (`native-themes/android-material/theme.css`)
-[cols="2,1,1,2", options="header"]
-|===
-|Variable |Light |Dark |Material 3 token
-
-|`--accent-color`
-|`#6750a4`
-|`#d0bcff`
-|`primary`
-
-|`--accent-on-color`
-|`#ffffff`
-|`#381e72`
-|`on-primary`
-
-|`--accent-container-color`
-|`#eaddff`
-|`#4f378b`
-|`primary-container`
-
-|`--accent-on-container-color`
-|`#21005d`
-|`#eaddff`
-|`on-primary-container`
-
-|`--accent-pressed-color`
-|`#d0bcff`
-|`#4f378b`
-|`state-pressed`
-|===
-
-Drives `Button`, `RaisedButton`, `FlatButton`, `CheckBox.selected`,
-`RadioButton.selected`, `Switch.selected`, `OnOffSwitch`,
-`BackCommand`, `TitleCommand`, `Tab.selected`, `SelectedTab`,
-`SideCommand.pressed`, `MultiButton.pressed`,
-`FloatingActionButton`.
-
-==== Forking a theme to rebrand
-
-Copy the native theme into your project, edit the variable values,
-and rebuild:
-
-[source,bash]
-----
-cp -R native-themes/ios-modern native-themes/ios-myapp
-$EDITOR native-themes/ios-myapp/theme.css
-./scripts/build-native-themes.sh
-----
-
-For example, to flip the iOS accent from system blue to brand
-magenta in both light and dark mode, change just the variable
-declarations at the top of the file:
-
-[source,css]
-----
-#Constants {
-    --accent-color: #d81b60;
-    --accent-color-dark: #ff80ab;
-    --accent-pressed-color: #b71c5c;
-    --accent-pressed-color-dark: #f06292;
-    --accent-disabled-color: #ffd6e2;
-    --accent-disabled-color-dark: #4a0026;
-    --accent-on-color: #ffffff;
-    /* ... existing constants below ... */
-}
-----
-
-Every UIID listed above picks up the new colour. No per-UIID rule
-edits needed.
-
-==== When variable substitution applies
-
-The CSS compiler resolves `var()` references at *theme-compile
-time* - the next run of `scripts/build-native-themes.sh` bakes
-the values into the `.res` file. This is what you want when
-shipping a customised theme with your app: edit the source, build
-once, ship the `.res`.
-
-It is *not* a runtime mechanism. Two cases where the variable
-indirection does **not** propagate:
-
-* **Layered app `theme.css` redefining a variable.** Your app's
-  `theme.css` is compiled into a separate `.res` and merged at
-  startup; redeclaring `--accent-color` there has no effect on
-  the already-baked native theme styles. Override the specific
-  UIIDs instead (see `Customising in your own theme` below), or
-  fork the native theme.
-* **Switching the accent palette while the app is running.**
-  Live theming, in-app accent toggles, A/B tests - use the
-  `UIManager.addThemeProps` path documented in the next section.
-
-In practice neither is a problem: most apps fork once at build
-time and ship a single recoloured native theme.
 
 === Runtime palette override
 
@@ -514,12 +383,6 @@ RaisedButton.disabled { background-color: #ffd6e2; color: #ffffff; }
 
 The user's CSS is layered on top of the native theme at app launch,
 so refresh / restart picks the override up.
-
-For a wholesale accent rebrand, forking the shipped theme.css and
-editing its CSS variables (see `Recolouring the accent palette via
-CSS variables` above) is usually less code than redeclaring every
-accent-bearing UIID here. Layering remains the right choice when
-you want to keep the framework's accent and only tweak a few UIIDs.
 
 === Inheriting from a native UIID
 
