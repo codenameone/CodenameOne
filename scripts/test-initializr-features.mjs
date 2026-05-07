@@ -1,0 +1,362 @@
+// Comprehensive feature test for the Initializr JS-port bundle. Each
+// scenario reloads the page so leftover modal/menu state from one
+// scenario does not pollute the next.
+//
+// Scenarios:
+//   1. textfield: click MyAppName, expect "Main Class" label stays
+//      visible (the d91a4f975 fix)
+//   2. dialog: click Hello-World button, dialog body should fill
+//      with the dialog's white bg
+//   3. side-menu: hamburger animation should not flicker through
+//      many distinct states
+//   4. template-buttons: each radio button click should swap
+//      selection -- previously-selected button transitions away
+//      from the bright-blue selected color, the clicked one
+//      transitions toward it
+//   5. toggle-mashing: rapidly click toggle buttons; worker should
+//      remain alive afterwards
+//
+// Run: node scripts/test-initializr-features.mjs [bundle.zip]
+
+import { chromium } from 'playwright';
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import { spawn, execSync } from 'node:child_process';
+
+const REPO_ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
+const DEFAULT_BUNDLE = path.join(REPO_ROOT, 'scripts/initializr/javascript/target/initializr-javascript-port.zip');
+const bundle = process.argv[2] || DEFAULT_BUNDLE;
+if (!fs.existsSync(bundle)) {
+  console.error('bundle not found:', bundle);
+  process.exit(2);
+}
+
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'init-features-'));
+const bundleDir = path.join(tmpDir, 'bundle');
+fs.mkdirSync(bundleDir);
+execSync(`unzip -q "${bundle}" -d "${bundleDir}"`);
+const distEntry = fs.readdirSync(bundleDir)
+  .filter(n => fs.statSync(path.join(bundleDir, n)).isDirectory())[0];
+const distDir = path.join(bundleDir, distEntry);
+
+const PORT = 8775;
+const server = spawn('python3', ['-m', 'http.server', String(PORT), '--directory', distDir],
+    { stdio: ['ignore', 'ignore', 'pipe'] });
+await new Promise(r => setTimeout(r, 800));
+
+const browser = await chromium.launch({ headless: true });
+
+const ART_DIR = '/tmp/init-features-artifacts';
+fs.mkdirSync(ART_DIR, { recursive: true });
+// Wipe stale screenshots from previous runs so reading them after a
+// failure can't surface a misleading older state.
+for (const f of fs.readdirSync(ART_DIR)) fs.unlinkSync(path.join(ART_DIR, f));
+
+const failures = [];
+function fail(label, msg) {
+  console.log(`[features]  FAIL ${label}: ${msg}`);
+  failures.push(`${label}: ${msg}`);
+}
+
+// Each scenario opens its own fresh page so menu / dialog state from a
+// previous scenario can't bleed in. Returns { page, messages, pageErrors,
+// canvasBox, snap(label) }.
+async function bootScenario(scenarioLabel) {
+  const page = await browser.newPage({
+    viewport: { width: 1280, height: 900 },
+    deviceScaleFactor: 2,
+  });
+  const messages = [];
+  const pageErrors = [];
+  page.on('console', msg => messages.push(`[${msg.type()}] ${msg.text()}`));
+  page.on('pageerror', err => {
+    pageErrors.push(err.message);
+    messages.push(`[pageerror] ${err.message}`);
+  });
+  page.on('worker', worker => {
+    worker.on('console', msg => messages.push(`[worker:${msg.type()}] ${msg.text()}`));
+  });
+
+  await page.goto(`http://127.0.0.1:${PORT}/`);
+
+  const bootStart = Date.now();
+  while (Date.now() - bootStart < 60_000) {
+    if (messages.some(m => m.includes('main-thread-completed'))) break;
+    await new Promise(r => setTimeout(r, 250));
+  }
+  await new Promise(r => setTimeout(r, 3000));
+
+  const canvasBox = await page.evaluate(() => {
+    const c = document.querySelector('canvas');
+    if (!c) return null;
+    const r = c.getBoundingClientRect();
+    return { x: r.left, y: r.top, w: r.width, h: r.height,
+             pxW: c.width, pxH: c.height };
+  });
+
+  async function snap(label) {
+    const out = path.join(ART_DIR, `${scenarioLabel}-${label}.png`);
+    await page.locator('canvas').screenshot({ path: out }).catch(() => {});
+    return out;
+  }
+  await snap('boot');
+  return { page, messages, pageErrors, canvasBox, snap };
+}
+
+async function teardown(s) {
+  await s.page.close();
+}
+
+// Sample a horizontal canvas strip in CSS coords (x, y, w, h relative
+// to canvas). Returns transparent / opaque-white / opaque-dark fractions.
+async function sampleStrip(s, xCss, yCss, wCss, hCss) {
+  return await s.page.evaluate(({ x, y, w, h }) => {
+    const c = document.querySelector('canvas');
+    if (!c) return null;
+    const r = c.getBoundingClientRect();
+    const sx = c.width / r.width, sy = c.height / r.height;
+    const px = Math.max(0, Math.floor((x - r.left) * sx));
+    const py = Math.max(0, Math.floor((y - r.top) * sy));
+    const pw = Math.max(1, Math.min(c.width - px, Math.floor(w * sx)));
+    const ph = Math.max(1, Math.min(c.height - py, Math.floor(h * sy)));
+    const ctx = c.getContext('2d');
+    const img = ctx.getImageData(px, py, pw, ph).data;
+    let total = 0, transparent = 0, white = 0, dark = 0;
+    let rSum = 0, gSum = 0, bSum = 0, opaque = 0;
+    for (let p = 0; p < img.length; p += 4) {
+      total++;
+      if (img[p+3] === 0) { transparent++; continue; }
+      opaque++;
+      const lum = (img[p] + img[p+1] + img[p+2]) / 3 | 0;
+      if (lum > 220) white++;
+      if (lum < 60) dark++;
+      rSum += img[p]; gSum += img[p+1]; bSum += img[p+2];
+    }
+    return {
+      transparentFrac: transparent / total,
+      opaqueWhiteFrac: white / total,
+      opaqueDarkFrac: dark / total,
+      meanR: opaque ? rSum / opaque | 0 : 0,
+      meanG: opaque ? gSum / opaque | 0 : 0,
+      meanB: opaque ? bSum / opaque | 0 : 0,
+    };
+  }, { x: xCss, y: yCss, w: wCss, h: hCss });
+}
+function colorDist(a, b) {
+  return Math.max(Math.abs(a.r - b.r), Math.abs(a.g - b.g), Math.abs(a.b - b.b));
+}
+
+// 16x16 grayscale signature for canvas-state diffing.
+async function canvasSig(s) {
+  return await s.page.evaluate(() => {
+    const c = document.querySelector('canvas');
+    if (!c) return null;
+    const w = c.width, h = c.height;
+    const ctx = c.getContext('2d');
+    const img = ctx.getImageData(0, 0, w, h).data;
+    const sx = Math.floor(w / 16), sy = Math.floor(h / 16);
+    let str = '';
+    for (let y = 0; y < 16; y++)
+      for (let x = 0; x < 16; x++) {
+        const px = (y * sy * w + x * sx) * 4;
+        const lum = (img[px] + img[px + 1] + img[px + 2]) / 3 | 0;
+        str += lum.toString(16).padStart(2, '0');
+      }
+    return str;
+  });
+}
+function sigDiff(a, b) {
+  if (!a || !b) return -1;
+  let d = 0;
+  for (let i = 0; i < a.length; i += 2) if (a.substring(i, i+2) !== b.substring(i, i+2)) d++;
+  return d;
+}
+
+// Scenario 1: TextField click should not blank the "Main Class" label.
+async function scenarioTextfield() {
+  const s = await bootScenario('01-textfield');
+  try {
+    const before = await sampleStrip(s, s.canvasBox.x + 60, s.canvasBox.y + 215, 540, 30);
+    await s.page.mouse.click(s.canvasBox.x + 220, s.canvasBox.y + 258);
+    for (let i = 0; i < 60; i++) {
+      await new Promise(r => setTimeout(r, 100));
+      const present = await s.page.evaluate(() =>
+          !!document.querySelector('input.cn1-edit-string'));
+      if (present) break;
+    }
+    await new Promise(r => setTimeout(r, 1200));
+    const after = await sampleStrip(s, s.canvasBox.x + 60, s.canvasBox.y + 215, 540, 30);
+    await s.snap('after-click');
+    if (after && after.transparentFrac > 0.05) {
+      fail('01-textfield', `label area went ${(after.transparentFrac*100).toFixed(1)}% transparent (was ${(before.transparentFrac*100).toFixed(1)}%)`);
+    }
+  } finally { await teardown(s); }
+}
+
+// Scenario 2: Hello dialog should render its body with white bg.
+async function scenarioDialog() {
+  const s = await bootScenario('02-dialog');
+  try {
+    await s.page.mouse.click(s.canvasBox.x + 936, s.canvasBox.y + 141);
+    await new Promise(r => setTimeout(r, 4000));
+    await s.snap('open');
+    const body = await sampleStrip(s, s.canvasBox.x + 400, s.canvasBox.y + 380, 480, 90);
+    console.log(`[features] dialog body: white=${(body.opaqueWhiteFrac*100).toFixed(1)}% ` +
+        `dark=${(body.opaqueDarkFrac*100).toFixed(1)}% transparent=${(body.transparentFrac*100).toFixed(1)}%`);
+    if (body.opaqueDarkFrac > 0.10) {
+      fail('02-dialog', `${(body.opaqueDarkFrac*100).toFixed(1)}% dark pixels in dialog body -- bg fill missed area`);
+    }
+    if (body.transparentFrac > 0.05) {
+      fail('02-dialog', `${(body.transparentFrac*100).toFixed(1)}% transparent in dialog body`);
+    }
+  } finally { await teardown(s); }
+}
+
+// Scenario 3: Side menu open should not flicker through dozens of states.
+async function scenarioSideMenu() {
+  const s = await bootScenario('03-side-menu');
+  try {
+    const sigs = [];
+    const openTask = s.page.mouse.click(s.canvasBox.x + 698, s.canvasBox.y + 100);
+    for (let i = 0; i < 16; i++) {
+      await new Promise(r => setTimeout(r, 120));
+      const sig = await canvasSig(s);
+      if (sig) sigs.push(sig);
+    }
+    await openTask;
+    await new Promise(r => setTimeout(r, 1000));
+    await s.snap('open');
+    const distinct = new Set(sigs);
+    console.log(`[features] side-menu animation: ${sigs.length} samples, ${distinct.size} distinct`);
+    if (distinct.size > 10) {
+      fail('03-side-menu', `${distinct.size}/${sigs.length} distinct canvas states during open animation -- continuous full-canvas redraw`);
+    }
+  } finally { await teardown(s); }
+}
+
+// Scenario 4: Template buttons (radio in ButtonGroup) -- click each in
+// turn, verify previous selection turns away from blue and clicked one
+// turns toward blue. We sample a single pixel-block per button and
+// compare R/G/B.
+async function scenarioTemplateButtons() {
+  const s = await bootScenario('04-template');
+  try {
+    // Coordinates at deviceScaleFactor=2, viewport 1280x900:
+    //   BAREBONES (195, 405)   KOTLIN (465, 405)
+    //   GRUB      (195, 442)   TWEET  (465, 442)
+    const buttons = {
+      barebones: [195, 405],
+      kotlin:    [465, 405],
+      grub:      [195, 442],
+      tweet:     [465, 442],
+    };
+    async function buttonColor(name) {
+      const [x, y] = buttons[name];
+      const r = await sampleStrip(s, s.canvasBox.x + x - 30, s.canvasBox.y + y - 4, 60, 8);
+      return { r: r.meanR, g: r.meanG, b: r.meanB };
+    }
+    // Initial: BAREBONES selected.
+    let prevSelected = 'barebones';
+    const initialColors = {};
+    for (const k of Object.keys(buttons)) initialColors[k] = await buttonColor(k);
+    console.log(`[features] initial colors: barebones=${JSON.stringify(initialColors.barebones)} ` +
+        `kotlin=${JSON.stringify(initialColors.kotlin)}`);
+
+    const sequence = ['kotlin', 'grub', 'tweet', 'barebones'];
+    for (const name of sequence) {
+      const [x, y] = buttons[name];
+      const beforeNew = await buttonColor(name);
+      const beforePrev = await buttonColor(prevSelected);
+      // Use down/up to mimic a real user gesture, with a small dwell
+      // so the engine has time to fire mousedown handlers separately.
+      await s.page.mouse.move(s.canvasBox.x + x, s.canvasBox.y + y);
+      await s.page.mouse.down();
+      await new Promise(r => setTimeout(r, 50));
+      await s.page.mouse.up();
+      // Poll for the click's effect to settle. Some templates trigger
+      // heavy theme reloads (CSS bundles) that can take >5 s. Wait up
+      // to 15 s for the new button to actually go selected.
+      let settled = false;
+      for (let i = 0; i < 30; i++) {
+        await new Promise(r => setTimeout(r, 500));
+        const c = await buttonColor(name);
+        if (colorDist(beforeNew, c) > 30) { settled = true; break; }
+      }
+      console.log(`[features]   ${name} settled=${settled}`);
+      await s.snap(`after-${name}`);
+      const afterNew = await buttonColor(name);
+      const afterPrev = await buttonColor(prevSelected);
+      const newDelta = colorDist(beforeNew, afterNew);
+      const prevDelta = colorDist(beforePrev, afterPrev);
+      console.log(`[features] click ${name}: new-button color delta=${newDelta} prev-button (${prevSelected}) delta=${prevDelta}`);
+      if (newDelta < 30) {
+        fail(`04-template-${name}`, `clicking ${name} did not change its colour (delta=${newDelta}) -- click was dropped or the action listener hung`);
+      }
+      if (prevDelta < 30) {
+        fail(`04-template-${name}`, `previously-selected ${prevSelected} did NOT redraw to unselected (delta=${prevDelta}) -- ButtonGroup.deselect did not propagate to a paint`);
+      }
+      prevSelected = name;
+    }
+  } finally { await teardown(s); }
+}
+
+// Scenario 5: Mashing toggle buttons should not freeze the worker.
+async function scenarioToggleMashing() {
+  const s = await bootScenario('05-toggle-mashing');
+  try {
+    const sigBefore = await canvasSig(s);
+    // Rapid-fire clicks alternating between IDE row (~y=525) and Theme
+    // row (~y=580). 60 clicks, spaced 30 ms apart.
+    for (let i = 0; i < 60; i++) {
+      const x = 180 + (i % 4) * 80;
+      const y = (i % 2 === 0) ? 525 : 580;
+      await s.page.mouse.click(s.canvasBox.x + x, s.canvasBox.y + y);
+      await new Promise(r => setTimeout(r, 30));
+    }
+    await new Promise(r => setTimeout(r, 2000));
+    await s.snap('after-mash');
+    // Liveness probe: click a known interactive surface and verify
+    // canvas changes within 4 s.
+    const sigBeforeProbe = await canvasSig(s);
+    await s.page.mouse.click(s.canvasBox.x + 593, s.canvasBox.y + 525);
+    let live = false;
+    for (let i = 0; i < 16; i++) {
+      await new Promise(r => setTimeout(r, 250));
+      const now = await canvasSig(s);
+      if (sigDiff(sigBeforeProbe, now) > 1) { live = true; break; }
+    }
+    if (!live) {
+      fail('05-toggle-mashing', `worker is unresponsive after 60 rapid toggle clicks (canvas unchanged 4 s after a known-good click)`);
+    }
+  } finally { await teardown(s); }
+}
+
+const scenarios = [
+  ['01-textfield',    scenarioTextfield],
+  ['02-dialog',       scenarioDialog],
+  ['03-side-menu',    scenarioSideMenu],
+  ['04-template',     scenarioTemplateButtons],
+  ['05-toggle-mash',  scenarioToggleMashing],
+];
+
+for (const [name, fn] of scenarios) {
+  console.log(`\n=== ${name} ===`);
+  try {
+    await fn();
+  } catch (err) {
+    fail(name, `scenario threw: ${err.message}`);
+  }
+}
+
+console.log(`\n[features] artifacts -> ${ART_DIR}`);
+await browser.close();
+server.kill();
+
+if (failures.length === 0) {
+  console.log('[features] PASS');
+  process.exit(0);
+}
+console.log(`\n[features] FAIL: ${failures.length} sub-test(s) failed`);
+failures.forEach(f => console.log('  -', f));
+process.exit(1);
