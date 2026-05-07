@@ -6144,7 +6144,13 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                 continue;
             }
             Integer cnt = pcCount.get(targetLabel);
-            if (cnt == null || cnt < 2 || cnt > 3) {
+            // Allow up to 6 incoming branches; the byte-savings gate
+            // below filters anything where duplication doesn't pay
+            // off. The 6 ceiling is a guardrail against pathological
+            // hub cases (a single tiny body with hundreds of incoming
+            // refs would still pass the size gate but blow up parse
+            // time at runtime).
+            if (cnt == null || cnt < 2 || cnt > 6) {
                 continue;
             }
             int bs = c[1];
