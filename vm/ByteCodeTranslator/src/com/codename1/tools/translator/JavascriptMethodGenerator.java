@@ -5427,12 +5427,20 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
      * Determine whether a case body terminates control flow on every
      * exit -- ends with ``return`` / ``throw`` / ``pc=...; break``.
      * Conservative: the body must end with such a terminator (after
-     * trailing whitespace / semicolon).
+     * trailing whitespace / semicolon). If the last top-level statement
+     * is a ``{...}`` block, recursively check the block's contents —
+     * ``case 5: STMTS; { let v = ...; pc=N; break; }`` is a perfectly
+     * valid terminator (the ``break`` exits the switch even from
+     * inside a nested block).
      */
     private static boolean bodyTerminates(String body) {
-        int end = body.length();
+        return bodyTerminatesRange(body, 0, body.length());
+    }
+
+    private static boolean bodyTerminatesRange(String body, int start, int endIn) {
+        int end = endIn;
         // Trim trailing whitespace and stray ``;``.
-        while (end > 0) {
+        while (end > start) {
             char c = body.charAt(end - 1);
             if (Character.isWhitespace(c) || c == ';') {
                 end--;
@@ -5440,19 +5448,61 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                 break;
             }
         }
-        if (end == 0) {
+        if (end == start) {
+            return false;
+        }
+        // If the body ends with ``}`` (a nested block), recurse into
+        // that block's contents.
+        if (body.charAt(end - 1) == '}') {
+            // Find the matching ``{``.
+            int depth = 0;
+            int innerEnd = end - 1;
+            int innerStart = -1;
+            for (int i = end - 1; i >= start; i--) {
+                char c = body.charAt(i);
+                if (c == '"' || c == '\'') {
+                    // Crude reverse scan; skip back to opening quote.
+                    int j = i - 1;
+                    while (j >= start && body.charAt(j) != c) {
+                        j--;
+                    }
+                    i = j;
+                    continue;
+                }
+                if (c == '}') {
+                    depth++;
+                } else if (c == '{') {
+                    depth--;
+                    if (depth == 0) {
+                        innerStart = i;
+                        break;
+                    }
+                }
+            }
+            if (innerStart >= 0) {
+                // Recurse on the inner contents.
+                if (bodyTerminatesRange(body, innerStart + 1, innerEnd)) {
+                    return true;
+                }
+                // The nested block doesn't terminate — but the outer
+                // body might still have a terminator after a previous
+                // statement. Walk back from innerStart looking for an
+                // earlier ``return`` / ``throw`` / ``break``... but
+                // that would mean the nested block is unreachable, an
+                // unusual shape we don't need to optimise.
+            }
             return false;
         }
         // Look for ``break`` at the end.
-        if (end >= 5 && body.startsWith("break", end - 5)
-                && (end - 5 == 0 || !isIdentPart(body.charAt(end - 6)))) {
+        if (end - 5 >= start && body.startsWith("break", end - 5)
+                && (end - 5 == start || !isIdentPart(body.charAt(end - 6)))) {
             return true;
         }
         // ``return X`` or ``return``: scan back for the keyword. Use a
         // simple heuristic: split on top-level ``;`` and check the last
         // top-level statement.
-        int lastSemi = findLastTopLevelSemicolon(body, 0, end);
-        int stmtStart = lastSemi < 0 ? 0 : lastSemi + 1;
+        int lastSemi = findLastTopLevelSemicolon(body, start, end);
+        int stmtStart = lastSemi < 0 ? start : lastSemi + 1;
         while (stmtStart < end && Character.isWhitespace(body.charAt(stmtStart))) {
             stmtStart++;
         }
