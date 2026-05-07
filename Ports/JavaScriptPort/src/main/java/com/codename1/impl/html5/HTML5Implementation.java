@@ -2299,12 +2299,32 @@ public class HTML5Implementation extends CodenameOneImplementation {
         context.beginPath();
         context.rect(frame.getCropX(), frame.getCropY(), frame.getCropW(), frame.getCropH());
         context.clip();
-        // Wipe the drain region before the ops repaint it. Each drain carries a full
-        // paint for its crop (form/body/toolbar/overlay), so stale pixels must not
-        // bleed through from the previous drain. Without this, title bars from prior
-        // forms accumulated across tests because the new form's paint did not always
-        // cover every pixel in the toolbar region.
-        context.clearRect(frame.getCropX(), frame.getCropY(), frame.getCropW(), frame.getCropH());
+        // Wipe the drain region only when this frame is repainting the
+        // *entire* canvas (form transitions, full-screen redraws). Each
+        // such drain carries a full paint, so stale pixels must not
+        // bleed through from the previous drain -- without this, title
+        // bars from prior forms accumulated across tests because the new
+        // form's paint did not always cover every pixel in the toolbar
+        // region.
+        //
+        // Skipping the clear for partial-frame drains is the fix for the
+        // "label-area-goes-transparent" bug: when two non-adjacent
+        // components (say, a TextField and the right-aligned ``?`` help
+        // button on the row above) both queue a repaint, the framework's
+        // paintDirty unions their absolute bounds into a single crop
+        // rect that spans both -- but the actual paint ops only cover
+        // each component's individual clip. Clearing the union here
+        // wipes the gap between them (the "Main Class" label) without
+        // any follow-up paint, leaving alpha=0 pixels where the page
+        // background shows through. Per-component opaque bg fills cover
+        // their own bounds either way; sibling components whose bounds
+        // happen to fall inside the union but who are NOT in the dirty
+        // list keep their previous pixels.
+        if (frame.getCropX() == 0 && frame.getCropY() == 0
+                && frame.getCropW() >= outputCanvas.getWidth()
+                && frame.getCropH() >= outputCanvas.getHeight()) {
+            context.clearRect(frame.getCropX(), frame.getCropY(), frame.getCropW(), frame.getCropH());
+        }
 
         for (ExecutableOp op : frame.getOps()){
             op.execute(context);
