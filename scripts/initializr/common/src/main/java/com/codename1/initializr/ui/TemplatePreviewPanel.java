@@ -35,6 +35,11 @@ public class TemplatePreviewPanel {
     private ProjectOptions options = ProjectOptions.defaults();
     private Form lastLiveForm;
     private Button lastLiveHelloButton;
+    /// Tracks the last custom-CSS string that was applied to the
+    /// global theme. When the next template change carries an empty
+    /// or unchanged custom CSS we can skip the (very expensive on the
+    /// JS port) restoreThemeDefaults -> UIManager.setThemeProps reset.
+    private String lastAppliedCustomCss = "";
 
     public TemplatePreviewPanel(Template template) {
         this.template = template;
@@ -79,7 +84,20 @@ public class TemplatePreviewPanel {
     }
 
     private Form createBarebonesPreviewForm(ProjectOptions options) {
-        restoreThemeDefaults();
+        // Only call restoreThemeDefaults when we previously applied
+        // *custom* CSS that mutated the theme -- the call ultimately
+        // invokes UIManager.setThemeProps which is heavy on the JS
+        // port (a large theme reset triggers an EDT-bound
+        // setThemePropsImpl + LookAndFeel.refreshTheme(true) sweep
+        // that on a worker thread can take many seconds and during
+        // which all subsequent input is dropped). Skipping the call
+        // when no custom CSS was active is safe: the global theme
+        // hasn't been mutated, so there is nothing to restore.
+        String currentCustomCss = normalizeCustomCss(options == null ? "" : options.customThemeCss);
+        if (lastAppliedCustomCss != null && lastAppliedCustomCss.length() > 0) {
+            restoreThemeDefaults();
+        }
+        lastAppliedCustomCss = currentCustomCss;
         installBundle(options);
         Form form = new Form("Hi World", BoxLayout.y());
         Button helloButton = new Button("Hello World");
