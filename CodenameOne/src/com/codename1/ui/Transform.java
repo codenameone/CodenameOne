@@ -792,6 +792,16 @@ public class Transform {
                 initNativeTransform();
                 t.initNativeTransform();
                 impl.copyTransform(t.nativeTransform, nativeTransform);
+                // Mark the cached native matrix as dirty so subsequent
+                // getNativeTransform() calls re-run initNativeTransform.
+                // For TYPE_UNKNOWN this is a no-op for the matrix data
+                // itself, but it triggers any platform-side code that
+                // listens on initNativeTransform to refresh its cache --
+                // the iOS Metal port has shown that without this flag
+                // setTransform(composed) silently fails to apply on the
+                // form-Graphics screen encoder while the equivalent
+                // g.rotate / g.scale / g.translate path renders correctly.
+                dirty = true;
                 break;
         }
 
