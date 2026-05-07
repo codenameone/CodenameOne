@@ -179,10 +179,271 @@ final class JavascriptBundleWriter {
         for (int i = 0; i < leadCount; i++) {
             String suffix = leadCount >= 10 ? String.format("_%02d", i + 1) : String.format("_%d", i + 1);
             Files.write(new File(outputDirectory, "translated_app" + suffix + ".js").toPath(),
-                    chunks.get(i).toString().getBytes(StandardCharsets.UTF_8));
+                    hoistStringConstants(chunks.get(i).toString()).getBytes(StandardCharsets.UTF_8));
         }
         Files.write(new File(outputDirectory, "translated_app.js").toPath(),
-                tail.toString().getBytes(StandardCharsets.UTF_8));
+                hoistStringConstants(tail.toString()).getBytes(StandardCharsets.UTF_8));
+    }
+
+    /**
+     * Identifier-character set used to detect hoistable string bodies.
+     * A body matches if every char satisfies these rules AND length >= 4.
+     * The character set deliberately excludes anything that needs JS
+     * escaping ({@code \"}, {@code \\}, etc.) so a literal text-level
+     * substitution of {@code "BODY"} -> alias is byte-equivalent to a
+     * JS-aware rewrite -- the hoist pass cannot accidentally truncate or
+     * splice an escaped string.
+     */
+    private static boolean isHoistableIdentChar(char c) {
+        return (c >= 'a' && c <= 'z')
+                || (c >= 'A' && c <= 'Z')
+                || (c >= '0' && c <= '9')
+                || c == '_';
+    }
+
+    /**
+     * Repeated long string literals (mostly JNI-form dispatch ids like
+     * {@code "cn1_s_getHeight_R_int"} -- ~750 occurrences -- and the
+     * shorter {@code "com_codename1_html5_js_JSObject"} markers used by
+     * runtime helpers) make up roughly 100 KiB of the emitted bundle.
+     * Hoist the most-used pure-identifier strings to const aliases at
+     * the head of the chunk and substitute the literal occurrences with
+     * the alias name.
+     *
+     * <p>Why pure identifiers only: a body containing escape characters
+     * could theoretically be the rest of a different string after an
+     * escape sequence we don't decode, so restricting to
+     * {@code [A-Za-z0-9_]+} keeps the byte-level substitution provably
+     * safe -- the literal {@code "BODY"} cannot appear inside a
+     * different JS string, regex, or template, because every other
+     * string-bearing token contains either a closing delimiter or an
+     * escape we'd notice.
+     *
+     * <p>Why a const alias prelude: esbuild minification is not part of
+     * the JS-port build pipeline, so identifiers and string literals
+     * ship verbatim. A {@code const} declared at top of the chunk is in
+     * scope for every translated method body and the {@code _Z(...)}
+     * class registrations that follow, with no runtime overhead beyond
+     * a one-time const binding.
+     *
+     * <p>Aliases use the {@code _q*} prefix, which the byte-code-to-JS
+     * mangle scheme has never produced (see existing usages of
+     * {@code _O}, {@code _L}, {@code _Z} in parparvm_runtime.js); the
+     * generator names start with {@code $} or a letter.
+     */
+    private static String hoistStringConstants(String src) {
+        // First pass: walk the source, find every "..." literal that is
+        // a pure identifier of length >= 4. Skip single-quoted strings
+        // and template literals (JS-port currently emits a few of each
+        // -- see iOS7Theme CSS strings -- and we mustn't recurse into
+        // their content). We don't strip comments because the translator
+        // never emits comments.
+        int n = src.length();
+        Map<String, Integer> counts = new HashMap<String, Integer>();
+        int i = 0;
+        while (i < n) {
+            char c = src.charAt(i);
+            if (c == '"') {
+                int j = i + 1;
+                boolean pure = true;
+                while (j < n) {
+                    char d = src.charAt(j);
+                    if (d == '\\') {
+                        pure = false;
+                        j += 2;
+                        continue;
+                    }
+                    if (d == '"') {
+                        break;
+                    }
+                    if (!isHoistableIdentChar(d)) {
+                        pure = false;
+                    }
+                    j++;
+                }
+                if (j >= n) {
+                    break;
+                }
+                int bodyLen = j - i - 1;
+                if (pure && bodyLen >= 4) {
+                    String body = src.substring(i + 1, j);
+                    Integer prev = counts.get(body);
+                    counts.put(body, prev == null ? 1 : prev + 1);
+                }
+                i = j + 1;
+            } else if (c == '\'') {
+                // Skip single-quoted string body without inspecting it.
+                int j = i + 1;
+                while (j < n) {
+                    char d = src.charAt(j);
+                    if (d == '\\') { j += 2; continue; }
+                    if (d == '\'') break;
+                    j++;
+                }
+                if (j >= n) break;
+                i = j + 1;
+            } else if (c == '`') {
+                // Skip template literal body. Interpolations ${...} are
+                // JS code that may contain its own quoted strings; we
+                // don't recurse for simplicity. Translated_app.js only
+                // contains a handful of plain `...` literals (no ${}).
+                int j = i + 1;
+                while (j < n) {
+                    char d = src.charAt(j);
+                    if (d == '\\') { j += 2; continue; }
+                    if (d == '`') break;
+                    j++;
+                }
+                if (j >= n) break;
+                i = j + 1;
+            } else {
+                i++;
+            }
+        }
+
+        // Pick aliases for the bodies whose hoist net is positive,
+        // sorted by descending byte savings so the highest-value strings
+        // get the shortest aliases.
+        List<Map.Entry<String, Integer>> sorted = new ArrayList<Map.Entry<String, Integer>>(counts.entrySet());
+        Collections.sort(sorted, new Comparator<Map.Entry<String, Integer>>() {
+            @Override
+            public int compare(Map.Entry<String, Integer> a, Map.Entry<String, Integer> b) {
+                long sa = (long) (a.getKey().length() - 1) * a.getValue();
+                long sb = (long) (b.getKey().length() - 1) * b.getValue();
+                if (sa != sb) {
+                    return sa < sb ? 1 : -1;
+                }
+                return a.getKey().compareTo(b.getKey());
+            }
+        });
+        Map<String, String> aliases = new HashMap<String, String>();
+        StringBuilder prelude = new StringBuilder();
+        int aliasIdx = 0;
+        for (Map.Entry<String, Integer> e : sorted) {
+            String body = e.getKey();
+            int uses = e.getValue();
+            if (uses < 2) {
+                continue;
+            }
+            String alias = computeAlias(aliasIdx);
+            int aliasLen = alias.length();
+            // Each occurrence saves (body.length() + 2 - aliasLen) bytes
+            // (literal "BODY" -> alias). One-time cost is the const
+            // entry: ',ALIAS="BODY"' = aliasLen + body.length() + 4.
+            long saving = (long) (body.length() + 2 - aliasLen) * uses
+                    - (aliasLen + body.length() + 4);
+            if (saving <= 0) {
+                continue;
+            }
+            aliases.put(body, alias);
+            if (prelude.length() == 0) {
+                prelude.append("const ");
+            } else {
+                prelude.append(',');
+            }
+            prelude.append(alias).append("=\"").append(body).append('"');
+            aliasIdx++;
+        }
+        if (aliases.isEmpty()) {
+            return src;
+        }
+        prelude.append(";\n");
+
+        // Second pass: rebuild the file, substituting "BODY" -> alias
+        // wherever we previously matched a hoistable double-quoted body.
+        // Walk the same way we did for counting so we never substitute
+        // inside single-quoted, template, or unhoistable strings.
+        StringBuilder out = new StringBuilder(src.length());
+        out.append(prelude);
+        i = 0;
+        while (i < n) {
+            char c = src.charAt(i);
+            if (c == '"') {
+                int j = i + 1;
+                boolean pure = true;
+                while (j < n) {
+                    char d = src.charAt(j);
+                    if (d == '\\') {
+                        pure = false;
+                        j += 2;
+                        continue;
+                    }
+                    if (d == '"') {
+                        break;
+                    }
+                    if (!isHoistableIdentChar(d)) {
+                        pure = false;
+                    }
+                    j++;
+                }
+                if (j >= n) {
+                    out.append(src, i, n);
+                    break;
+                }
+                int bodyLen = j - i - 1;
+                String alias = null;
+                if (pure && bodyLen >= 4) {
+                    String body = src.substring(i + 1, j);
+                    alias = aliases.get(body);
+                }
+                if (alias != null) {
+                    out.append(alias);
+                } else {
+                    out.append(src, i, j + 1);
+                }
+                i = j + 1;
+            } else if (c == '\'') {
+                int j = i + 1;
+                while (j < n) {
+                    char d = src.charAt(j);
+                    if (d == '\\') { j += 2; continue; }
+                    if (d == '\'') break;
+                    j++;
+                }
+                if (j >= n) { out.append(src, i, n); break; }
+                out.append(src, i, j + 1);
+                i = j + 1;
+            } else if (c == '`') {
+                int j = i + 1;
+                while (j < n) {
+                    char d = src.charAt(j);
+                    if (d == '\\') { j += 2; continue; }
+                    if (d == '`') break;
+                    j++;
+                }
+                if (j >= n) { out.append(src, i, n); break; }
+                out.append(src, i, j + 1);
+                i = j + 1;
+            } else {
+                out.append(c);
+                i++;
+            }
+        }
+        return out.toString();
+    }
+
+    /**
+     * Generate an alias name for the given index, drawing from a base-62
+     * digit stream prefixed with {@code _q}. The prefix has never been
+     * emitted by the translator's identifier scheme, so collisions with
+     * generator-emitted locals or class-method short names are
+     * structurally impossible -- {@code parparvm_runtime.js} uses
+     * {@code _O}, {@code _L}, {@code _T}, {@code _I}, {@code _Z} and
+     * the per-method renamer uses single ASCII letters and {@code $X}.
+     */
+    private static String computeAlias(int idx) {
+        // Base-62 digits: 0-9 a-z A-Z. Single suffix gives 62 aliases
+        // (_q0 .. _qZ); double suffix gives 62*62 = 3844 more.
+        String digits = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        if (idx < 62) {
+            return "_q" + digits.charAt(idx);
+        }
+        idx -= 62;
+        if (idx < 62 * 62) {
+            return "_q" + digits.charAt(idx / 62) + digits.charAt(idx % 62);
+        }
+        idx -= 62 * 62;
+        return "_q" + digits.charAt(idx / (62 * 62)) + digits.charAt((idx / 62) % 62) + digits.charAt(idx % 62);
     }
 
     private static int bootstrapPriority(ByteCodeClass cls) {
