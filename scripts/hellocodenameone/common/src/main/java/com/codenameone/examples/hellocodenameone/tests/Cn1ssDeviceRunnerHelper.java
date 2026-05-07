@@ -11,6 +11,8 @@ import com.codename1.util.Base64;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 interface Cn1ssDeviceRunnerHelper {
     int CHUNK_SIZE_ANDROID = 500;
@@ -70,7 +72,14 @@ interface Cn1ssDeviceRunnerHelper {
             ByteArrayOutputStream pngOut = new ByteArrayOutputStream(Math.max(1024, width * height / 2));
             io.save(image, pngOut, ImageIO.FORMAT_PNG, 1f);
             byte[] pngBytes = pngOut.toByteArray();
-            println("CN1SS:INFO:test=" + safeName + " png_bytes=" + pngBytes.length);
+            String hash = fnv1a64Hex(pngBytes);
+            println("CN1SS:INFO:test=" + safeName + " png_bytes=" + pngBytes.length
+                    + " png_fnv1a64=" + hash);
+            String previous = Cn1ssHashTracker.recordAndCheck(hash, safeName);
+            if (previous != null) {
+                println("CN1SS:WARN:test=" + safeName
+                        + " duplicate_image_with=" + previous + " png_fnv1a64=" + hash);
+            }
             emitChannel(pngBytes, safeName, "");
 
             byte[] preview = encodePreview(io, image, safeName);
@@ -121,7 +130,14 @@ interface Cn1ssDeviceRunnerHelper {
                 ByteArrayOutputStream pngOut = new ByteArrayOutputStream(Math.max(1024, width * height / 2));
                 io.save(screenshot, pngOut, ImageIO.FORMAT_PNG, 1f);
                 byte[] pngBytes = pngOut.toByteArray();
-                println("CN1SS:INFO:test=" + safeName + " png_bytes=" + pngBytes.length);
+                String hash = fnv1a64Hex(pngBytes);
+                println("CN1SS:INFO:test=" + safeName + " png_bytes=" + pngBytes.length
+                        + " png_fnv1a64=" + hash);
+                String previous = Cn1ssHashTracker.recordAndCheck(hash, safeName);
+                if (previous != null) {
+                    println("CN1SS:WARN:test=" + safeName
+                            + " duplicate_image_with=" + previous + " png_fnv1a64=" + hash);
+                }
                 emitChannel(pngBytes, safeName, "");
 
                 byte[] preview = encodePreview(io, screenshot, safeName);
@@ -276,5 +292,67 @@ interface Cn1ssDeviceRunnerHelper {
 
     static boolean isHtml5() {
         return "HTML5".equals(Display.getInstance().getPlatformName());
+    }
+
+    /// Computes a 64-bit FNV-1a hash of the given bytes. FNV-1a is fast and
+    /// has no platform dependencies (no java.security, no java.util.zip
+    /// CRC32 wrapping subtleties). 64 bits is enough to make accidental
+    /// collisions on real-world PNG payloads vanishingly unlikely while
+    /// keeping the hash short enough to log on a single line. The mixup
+    /// detector in `Cn1ssHashTracker` calls this on every emitted image so
+    /// that two tests producing bit-identical bytes (the symptom of an iOS
+    /// Metal stale-frame capture: MultiButtonTheme_light returning Tabs
+    /// Theme_light's pixels because the CAMetalLayer hadn't been re-
+    /// presented in time) get flagged with a CN1SS:WARN line.
+    static String fnv1a64Hex(byte[] bytes) {
+        long h = 0xcbf29ce484222325L;
+        long prime = 0x100000001b3L;
+        for (int i = 0; i < bytes.length; i++) {
+            h ^= bytes[i] & 0xff;
+            h *= prime;
+        }
+        StringBuilder sb = new StringBuilder(16);
+        for (int i = 60; i >= 0; i -= 4) {
+            int nib = (int) ((h >>> i) & 0xf);
+            sb.append((char) (nib < 10 ? '0' + nib : 'a' + (nib - 10)));
+        }
+        return sb.toString();
+    }
+}
+
+/// Tracks recently-emitted screenshot hashes per test name so a stale-frame
+/// capture (the same PNG bytes attributed to two different tests in a row)
+/// gets surfaced via CN1SS:WARN markers instead of silently shipping the
+/// wrong image to the comparator. Keeps the most recent 64 entries.
+///
+/// Lives in a separate package-private class because Cn1ssDeviceRunnerHelper
+/// is an interface and can't hold mutable static state.
+final class Cn1ssHashTracker {
+    private static final int MAX_TRACKED = 64;
+    // LinkedHashMap with access-order=false (default) -> oldest-first iter.
+    // We cap at MAX_TRACKED entries by dropping the head when oversized.
+    private static final Map<String, String> hashToTest = new LinkedHashMap<>();
+
+    private Cn1ssHashTracker() {
+    }
+
+    /// Records the hash for `safeName` and returns the test name that
+    /// previously emitted the same hash, or null if this is the first time.
+    /// Caller logs a CN1SS:WARN line when a duplicate is found so the
+    /// downstream comparator can flag the affected test as a likely
+    /// stale-frame capture.
+    static synchronized String recordAndCheck(String hashHex, String safeName) {
+        String previous = hashToTest.get(hashHex);
+        if (previous != null && previous.equals(safeName)) {
+            // Same test re-captured (e.g. light->dark sequencing chains
+            // through the same emitter); not a mixup. Don't flag.
+            return null;
+        }
+        hashToTest.put(hashHex, safeName);
+        if (hashToTest.size() > MAX_TRACKED) {
+            String oldest = hashToTest.keySet().iterator().next();
+            hashToTest.remove(oldest);
+        }
+        return previous;
     }
 }
