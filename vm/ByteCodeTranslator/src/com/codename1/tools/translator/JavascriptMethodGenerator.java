@@ -1264,6 +1264,13 @@ final class JavascriptMethodGenerator {
         // params lN directly lets us drop the copy entirely. Saves
         // ~3-5 chars per arg per method.
         s = renameParamsToLocals(s);
+        // After all the structural folds, many methods reduce to a
+        // single ``case 0:`` with a body that terminates and has no
+        // ``pc=`` references. The surrounding ``for(;;) switch(pc) {
+        // case 0: BODY default:return }`` wrapper is then redundant
+        // dispatch -- the for-loop iterates exactly once before BODY
+        // terminates. Strip the wrapper.
+        s = stripSingleCaseSwitchWrapper(s);
         return s;
     }
 
@@ -5045,6 +5052,393 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             }
         }
         return findActualStaticOwner(ownerClass.getBaseClassObject(), name, desc);
+    }
+
+    /**
+     * Strip the ``for(;;) switch(pc) { case 0: BODY default:return }``
+     * wrapper for methods that fold down to a single case with a
+     * terminating body and no ``pc=`` references. After all folds,
+     * such a method's body runs straight through and the dispatch loop
+     * just gets in the way.
+     *
+     * Pre-strip:
+     *
+     *   let l0=...,l1=...,...,pc=0;
+     *   for(;;)switch(pc){case 0: BODY default:return}
+     *
+     * Post-strip:
+     *
+     *   let l0=...,l1=...,...;
+     *   BODY
+     *
+     * Bails:
+     *   * Method has try/catch (the ``try { switch ... } catch
+     *     (__cn1Error) { ... }`` wrapper is meaningful).
+     *   * Synchronized methods (the ``try { ... } finally {
+     *     _mx(__cn1Monitor); }`` wraps the switch).
+     *   * BODY has any ``pc=`` reference (would dangle outside switch).
+     *   * BODY contains ``break`` outside any nested switch / loop —
+     *     unreachable code should have been stripped already, but if
+     *     the body's terminator is ``pc=N; break``, ``break`` outside
+     *     a switch is a SyntaxError.
+     *   * BODY doesn't terminate cleanly.
+     */
+    private static String stripSingleCaseSwitchWrapper(String body) {
+        if (body.indexOf("__cn1TryCatch") >= 0) {
+            return body;
+        }
+        if (body.indexOf("__cn1Monitor") >= 0) {
+            return body;
+        }
+        // Find the ``for(;;)switch(pc){case 0:...default:return}``
+        // wrapper. Accept both compact (post-mangler) and spaced shapes.
+        String[] kws = {
+                "for(;;)switch(pc){case 0:",
+                "for(;;) switch(pc){case 0:",
+                "for(;;)switch(pc){ case 0:",
+                "for(;;) switch(pc){ case 0:",
+                "while (true) {\n    switch (pc) {\n      case 0:",
+                "while (true) {\n  switch (pc) {\n    case 0:"
+        };
+        int wrapperStart = -1;
+        String matchedKw = null;
+        for (String kw : kws) {
+            int p = body.indexOf(kw);
+            if (p >= 0) {
+                wrapperStart = p;
+                matchedKw = kw;
+                break;
+            }
+        }
+        if (wrapperStart < 0) {
+            return body;
+        }
+        int bodyStart = wrapperStart + matchedKw.length();
+        // Find the closing ``}`` of the for-switch wrapper. We need the
+        // outermost ``}`` matching the ``for(;;)switch(pc){`` block. For
+        // the compact form, that's the brace after ``default:return``.
+        // For the spaced form there's an outer brace for the while {}
+        // and an inner one for the switch {}. Easiest: locate
+        // ``default:return`` within the wrapper and capture
+        // ``BODY`` as the text up to it.
+        int defaultPos = body.indexOf("default:return", bodyStart);
+        if (defaultPos < 0) {
+            return body;
+        }
+        // BODY is bodyStart .. defaultPos. Verify there are no other
+        // ``case <digits>:`` labels in BODY (single-case requirement).
+        if (containsAnotherCaseLabel(body, bodyStart, defaultPos)) {
+            return body;
+        }
+        // Verify BODY has no ``pc=`` references at any depth.
+        if (containsPcAssignment(body, bodyStart, defaultPos)) {
+            return body;
+        }
+        // Verify BODY has no ``break`` outside a nested ``switch`` /
+        // ``while`` / ``for``. The case body can have a trailing
+        // outer-switch ``break`` that the for-switch wrapper's
+        // dispatch loop swallows, but once the wrapper is stripped the
+        // break would be a SyntaxError. Bail rather than guess which
+        // breaks to drop.
+        if (containsDanglingBreak(body, bodyStart, defaultPos)) {
+            return body;
+        }
+        // BODY must terminate.
+        String bodyContent = body.substring(bodyStart, defaultPos);
+        if (!bodyTerminates(bodyContent)) {
+            return body;
+        }
+        // Find end of the wrapper: ``default:return}`` followed by
+        // either ``}`` (compact: switch close) or whitespace/newlines
+        // and ``}\n  }`` (spaced: switch close, then while close).
+        int wrapperEnd;
+        if (matchedKw.startsWith("for(;;)")) {
+            // Compact: ``default:return}`` -- one closing brace.
+            int afterDefault = defaultPos + "default:return".length();
+            if (afterDefault < body.length() && body.charAt(afterDefault) == '}') {
+                wrapperEnd = afterDefault + 1;
+            } else {
+                return body;
+            }
+        } else {
+            // Spaced: ``default:return}\n  }\n``. Find the two closing
+            // braces.
+            int afterDefault = defaultPos + "default:return".length();
+            // skip optional ``;``
+            if (afterDefault < body.length() && body.charAt(afterDefault) == ';') {
+                afterDefault++;
+            }
+            // First close: switch
+            if (afterDefault >= body.length() || body.charAt(afterDefault) != '}') {
+                return body;
+            }
+            int p = afterDefault + 1;
+            while (p < body.length() && Character.isWhitespace(body.charAt(p))) {
+                p++;
+            }
+            // Second close: while
+            if (p >= body.length() || body.charAt(p) != '}') {
+                return body;
+            }
+            wrapperEnd = p + 1;
+        }
+        // Find the ``,pc=0`` (or ``;\n  let pc = 0;``) preceding the
+        // wrapper so we can drop it -- the body no longer needs the pc
+        // variable.
+        int letPcDrop = findAndStripPcDecl(body, 0, wrapperStart);
+        if (letPcDrop < 0) {
+            return body;
+        }
+        // Reassemble: everything up to letPcDrop (with the pc decl
+        // removed) + body content + everything after wrapperEnd.
+        StringBuilder out = new StringBuilder(body.length());
+        // Section 1: 0 .. letPcDrop start (encoded by the result)
+        // findAndStripPcDecl returns the index where the pc decl ENDS;
+        // we use it together with a separate "where it starts"... let
+        // me redesign this helper to return the modified prefix
+        // directly.
+        out.append(stripPcDecl(body, 0, wrapperStart));
+        // Section 2: BODY
+        out.append(bodyContent);
+        // Section 3: text after the wrapper
+        out.append(body, wrapperEnd, body.length());
+        return out.toString();
+    }
+
+    /**
+     * Stub used by stripSingleCaseSwitchWrapper to indicate failure.
+     * Return -1 to signal "couldn't find pc decl, bail."
+     */
+    private static int findAndStripPcDecl(String body, int from, int to) {
+        // Confirm there's some ``pc=0`` or ``pc = 0`` in [from, to).
+        int p = body.indexOf("pc=0", from);
+        if (p < 0 || p >= to) {
+            p = body.indexOf("pc = 0", from);
+        }
+        if (p < 0 || p >= to) {
+            return -1;
+        }
+        return p;
+    }
+
+    /**
+     * Strip the ``,pc=0`` from a let decl in body[from..to). Handles
+     * both ``let l0=T,...,pc=0;`` and ``let pc=0;`` (standalone)
+     * variants. Returns the stripped prefix string.
+     */
+    private static String stripPcDecl(String body, int from, int to) {
+        // Look for ``,pc=0`` or ``,pc = 0`` followed by either ``;`` or
+        // ``,`` (more decls follow).
+        int searchEnd = to;
+        // Compact: ``,pc=0;`` or ``,pc=0,``
+        int p = body.indexOf(",pc=0", from);
+        if (p >= 0 && p < searchEnd) {
+            int after = p + 5;
+            if (after < to && (body.charAt(after) == ';' || body.charAt(after) == ',')) {
+                // Strip ",pc=0"
+                StringBuilder sb = new StringBuilder();
+                sb.append(body, from, p);
+                sb.append(body, p + 5, to);
+                return sb.toString();
+            }
+        }
+        // Compact at start of let: ``let pc=0;``
+        int q = body.indexOf("let pc=0;", from);
+        if (q >= 0 && q < searchEnd) {
+            StringBuilder sb = new StringBuilder();
+            sb.append(body, from, q);
+            sb.append(body, q + 9, to);
+            return sb.toString();
+        }
+        // Spaced: ``let pc = 0;``
+        int r = body.indexOf("let pc = 0;", from);
+        if (r >= 0 && r < searchEnd) {
+            StringBuilder sb = new StringBuilder();
+            sb.append(body, from, r);
+            sb.append(body, r + 11, to);
+            return sb.toString();
+        }
+        // Spaced: ``,pc = 0``
+        int s = body.indexOf(",pc = 0", from);
+        if (s >= 0 && s < searchEnd) {
+            int after = s + 7;
+            if (after < to && (body.charAt(after) == ';' || body.charAt(after) == ',')) {
+                StringBuilder sb = new StringBuilder();
+                sb.append(body, from, s);
+                sb.append(body, s + 7, to);
+                return sb.toString();
+            }
+        }
+        // Couldn't strip -- return original prefix.
+        return body.substring(from, to);
+    }
+
+    /**
+     * Check whether body[from..to) contains any ``case <digits>:``
+     * label at top level (paren / brace / bracket / string-aware).
+     */
+    private static boolean containsAnotherCaseLabel(String body, int from, int to) {
+        int parenDepth = 0;
+        int braceDepth = 0;
+        int bracketDepth = 0;
+        for (int i = from; i < to; i++) {
+            char ch = body.charAt(i);
+            if (ch == '"' || ch == '\'') {
+                int end = skipStringLiteral(body, i);
+                if (end < 0 || end >= to) {
+                    return true;
+                }
+                i = end;
+                continue;
+            }
+            if (ch == '(') { parenDepth++; continue; }
+            if (ch == ')') { parenDepth--; continue; }
+            if (ch == '{') { braceDepth++; continue; }
+            if (ch == '}') { braceDepth--; continue; }
+            if (ch == '[') { bracketDepth++; continue; }
+            if (ch == ']') { bracketDepth--; continue; }
+            if (parenDepth == 0 && braceDepth == 0 && bracketDepth == 0) {
+                if (ch == 'c' && body.startsWith("case", i)
+                        && (i == 0 || !isIdentPart(body.charAt(i - 1)))
+                        && i + 4 < to && (Character.isWhitespace(body.charAt(i + 4))
+                                || Character.isDigit(body.charAt(i + 4)))) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Check whether body[from..to) contains a ``break`` keyword that
+     * isn't enclosed by a nested ``switch`` / ``while`` / ``for`` /
+     * ``do`` block. Such a break would target the for-switch wrapper
+     * we're about to strip and turn into a SyntaxError.
+     *
+     * Approximate: track an enclosing-loop counter via keyword
+     * detection. ``switch`` / ``while`` / ``for`` / ``do`` followed
+     * (eventually) by a ``{`` opens an enclosing scope; the matching
+     * ``}`` closes it. Inside ``{ ... }`` blocks that don't start with
+     * one of those keywords (let-scoping blocks), breaks STILL target
+     * the nearest enclosing loop / switch — i.e., they don't escape a
+     * generic ``{...}`` block. We model that by tracking which braces
+     * correspond to loop/switch openers.
+     */
+    private static boolean containsDanglingBreak(String body, int from, int to) {
+        // Stack: each entry is the loop/switch nesting depth at which
+        // a brace opens. We push true when ``{`` follows a
+        // switch/while/for/do keyword, false otherwise.
+        java.util.Deque<Boolean> braceStack = new java.util.ArrayDeque<Boolean>();
+        boolean expectLoopBrace = false;
+        for (int i = from; i < to; i++) {
+            char ch = body.charAt(i);
+            if (ch == '"' || ch == '\'') {
+                int end = skipStringLiteral(body, i);
+                if (end < 0 || end >= to) {
+                    return true;
+                }
+                i = end;
+                continue;
+            }
+            if (Character.isWhitespace(ch)) {
+                continue;
+            }
+            // Detect keywords (whole identifier).
+            if ((ch == 's' || ch == 'w' || ch == 'f' || ch == 'd')
+                    && (i == 0 || !isIdentPart(body.charAt(i - 1)))) {
+                if (body.startsWith("switch", i) && i + 6 < to && !isIdentPart(body.charAt(i + 6))) {
+                    expectLoopBrace = true;
+                    i += 5;
+                    continue;
+                }
+                if (body.startsWith("while", i) && i + 5 < to && !isIdentPart(body.charAt(i + 5))) {
+                    expectLoopBrace = true;
+                    i += 4;
+                    continue;
+                }
+                if (body.startsWith("for", i) && i + 3 < to && !isIdentPart(body.charAt(i + 3))) {
+                    expectLoopBrace = true;
+                    i += 2;
+                    continue;
+                }
+                if (body.startsWith("do", i) && i + 2 < to && !isIdentPart(body.charAt(i + 2))) {
+                    expectLoopBrace = true;
+                    i += 1;
+                    continue;
+                }
+            }
+            if (ch == '{') {
+                braceStack.push(expectLoopBrace);
+                expectLoopBrace = false;
+                continue;
+            }
+            if (ch == '}') {
+                if (!braceStack.isEmpty()) {
+                    braceStack.pop();
+                }
+                continue;
+            }
+            // ``break`` outside any loop/switch brace is dangling.
+            if (ch == 'b' && body.startsWith("break", i)
+                    && (i == 0 || !isIdentPart(body.charAt(i - 1)))
+                    && i + 5 < to && !isIdentPart(body.charAt(i + 5))) {
+                boolean inLoopOrSwitch = false;
+                for (Boolean b : braceStack) {
+                    if (Boolean.TRUE.equals(b)) {
+                        inLoopOrSwitch = true;
+                        break;
+                    }
+                }
+                if (!inLoopOrSwitch) {
+                    return true;
+                }
+                i += 4;
+                continue;
+            }
+            // Reset expectLoopBrace if non-whitespace, non-paren char.
+            // We allow ``switch (cond) {`` so we accept ``(`` between
+            // keyword and ``{``.
+            if (ch != '(' && ch != ')') {
+                // Only reset if we hit something that's neither part of
+                // ``switch (...)`` / ``for (...)`` etc.
+                // Conservative: only reset on ``;`` or ``}``.
+                if (ch == ';') {
+                    expectLoopBrace = false;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Check whether body[from..to) contains any ``pc<ws>=`` assignment
+     * (whole-identifier ``pc``, paren / brace / bracket / string-aware).
+     */
+    private static boolean containsPcAssignment(String body, int from, int to) {
+        for (int i = from; i < to; i++) {
+            char ch = body.charAt(i);
+            if (ch == '"' || ch == '\'') {
+                int end = skipStringLiteral(body, i);
+                if (end < 0 || end >= to) {
+                    return true;
+                }
+                i = end;
+                continue;
+            }
+            if (ch == 'p' && i + 1 < to && body.charAt(i + 1) == 'c'
+                    && (i == 0 || !isIdentPart(body.charAt(i - 1)))
+                    && i + 2 < to && !isIdentPart(body.charAt(i + 2))) {
+                int p = i + 2;
+                while (p < to && Character.isWhitespace(body.charAt(p))) {
+                    p++;
+                }
+                if (p < to && body.charAt(p) == '='
+                        && (p + 1 >= to || body.charAt(p + 1) != '=')) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /**
