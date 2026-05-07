@@ -1243,6 +1243,19 @@ final class JavascriptMethodGenerator {
         // contains a ``break`` statement which it doesn't recognize as
         // safe to unwrap. We strip them here.
         s = stripUnneededCaseBraces(s);
+        // Inline unique-source goto chains. After register-rewrite +
+        // brace-strip, many switch+pc methods boil down to chains of
+        // ``case M: ..., pc=N; break;`` → ``case N: ...; pc=Q; break;``
+        // where each ``pc=N`` reference is the ONLY one in the method.
+        // The case label is then pure overhead — we can move case N's
+        // body inline at the source and drop the label entirely. The
+        // existing ``collapseUniqueImmediateCaseFallthrough`` only
+        // handled IMMEDIATELY adjacent cases (and its post-rewrite
+        // pattern no longer matches, since brace-strip removed the
+        // ``}`` between break and the next case label). This pass
+        // handles non-adjacent forward gotos and iterates to fixed
+        // point, dissolving entire linear chains.
+        s = inlineUniqueSourceCases(s);
         return s;
     }
 
@@ -5027,6 +5040,379 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
     }
 
     /**
+     * Inline unique-source goto chains in the post-register-rewrite,
+     * post-brace-strip switch+pc body. Iteratively folds:
+     *
+     *   case M: STMTS, pc=N; break; ... case N: BODY
+     *
+     * into:
+     *
+     *   case M: STMTS; BODY      (case N's label removed)
+     *
+     * when ``pc=N`` (or its mention in any ``pc=...`` RHS, including
+     * ternary branches) appears in EXACTLY ONE place in the entire
+     * method body. Iterating to fixed point dissolves linear chains
+     * fully — three hops collapse into a single case body, and the
+     * intermediate case labels disappear.
+     *
+     * Bails:
+     *   * ``__cn1TryCatch`` methods (the ``_E`` dispatcher relies on
+     *     pc indices matching the try-catch table)
+     *   * Backward gotos (target case label appears textually BEFORE
+     *     the source) — those are loops; folding would copy the body
+     *     above the source which is fine, but tracking it correctly
+     *     requires more care than the forward case
+     *   * Cases whose body contains a top-level ``let`` / ``const`` /
+     *     ``function`` / ``class`` declaration — moving the body up
+     *     into another case's scope could collide with sibling cases
+     */
+    private static String inlineUniqueSourceCases(String body) {
+        if (body.indexOf("__cn1TryCatch") >= 0) {
+            return body;
+        }
+        int swPos = body.indexOf("switch(pc){");
+        int swKwLen = "switch(pc){".length();
+        if (swPos < 0) {
+            swPos = body.indexOf("switch (pc) {");
+            swKwLen = "switch (pc) {".length();
+            if (swPos < 0) {
+                return body;
+            }
+        }
+        int swOpen = swPos + swKwLen - 1;
+        if (swOpen >= body.length() || body.charAt(swOpen) != '{') {
+            return body;
+        }
+        int swClose = matchBrace(body, swOpen);
+        if (swClose < 0) {
+            return body;
+        }
+        String prefix = body.substring(0, swOpen + 1);
+        String region = body.substring(swOpen + 1, swClose);
+        String suffix = body.substring(swClose);
+        int iter = 0;
+        while (iter++ < 200) {
+            String next = applyOneInlineFold(region);
+            if (next == null) {
+                break;
+            }
+            region = next;
+        }
+        return prefix + region + suffix;
+    }
+
+    /**
+     * One iteration of {@link #inlineUniqueSourceCases}. Returns a new
+     * region with one fold applied, or null if no foldable target was
+     * found.
+     */
+    private static String applyOneInlineFold(String region) {
+        List<int[]> cases = parseCases(region, 0, region.length());
+        if (cases == null || cases.isEmpty()) {
+            return null;
+        }
+        // Count pc=<digits> references per integer. A ``pc=cond?A:B``
+        // RHS counts BOTH A and B as potential targets (the ternary
+        // sets pc to one of them at runtime). We extract every digit
+        // run from each ``pc=...`` RHS.
+        Map<Integer, Integer> pcCount = new HashMap<Integer, Integer>();
+        countPcReferences(region, 0, region.length(), pcCount);
+        // Index: label → case-list index for fast lookup.
+        Map<Integer, Integer> labelToIdx = new HashMap<Integer, Integer>();
+        for (int i = 0; i < cases.size(); i++) {
+            labelToIdx.put(cases.get(i)[0], i);
+        }
+        // Look for a foldable simple-goto: a ``pc=<literal>`` where the
+        // literal is unique-source AND the source RHS is exactly that
+        // literal (not a ternary). The source statement must be
+        // ``pc=N;break;`` (with optional whitespace).
+        for (int i = 0; i < cases.size(); i++) {
+            int[] c = cases.get(i);
+            int targetLabel = c[0];
+            if (targetLabel == 0) {
+                continue;
+            }
+            Integer cnt = pcCount.get(targetLabel);
+            if (cnt == null || cnt != 1) {
+                continue;
+            }
+            // Locate the unique pc=<targetLabel> reference. We scan the
+            // region for ``pc<ws>=<ws><digits>`` shapes; the unique
+            // reference is the only one whose digit literal equals
+            // targetLabel. Reject ternary RHS shapes (``pc=cond?A:B``)
+            // — those are conditionals, not simple gotos.
+            int[] srcRange = findSimpleGotoSource(region, targetLabel);
+            if (srcRange == null) {
+                continue;
+            }
+            int srcStart = srcRange[0];
+            int srcEnd = srcRange[1];
+            // Forward only: the case-N entry in cases[] should be at a
+            // textual position AFTER srcEnd. If targetCase is BEFORE
+            // srcStart, this is a backward (loop) goto -- skip.
+            int caseLabelStart = c[3];
+            int caseBodyEnd = c[2];
+            if (caseLabelStart < srcEnd) {
+                continue;
+            }
+            // Reject if case body has a top-level block-scoped
+            // declaration -- inlining could collide with sibling-case
+            // declarations sharing the switch's scope.
+            int bs = c[1];
+            int be = c[2];
+            String caseBody = region.substring(bs, be);
+            if (caseBodyHasBlockDeclaration(caseBody)) {
+                continue;
+            }
+            // Build replacement region.
+            //
+            //  Forward layout:
+            //      [0 .. srcStart) [pc=N;break;] [srcEnd .. caseLabelStart) [case N: BODY] [caseBodyEnd .. end)
+            //  After fold:
+            //      [0 .. srcStart) BODY          [srcEnd .. caseLabelStart)                  [caseBodyEnd .. end)
+            //
+            //  If srcStart is preceded by ``,`` (part of a comma-
+            //  expression in the source case body), convert that
+            //  trailing comma into a ``;`` so ``return`` / ``throw``
+            //  in the inlined body parses as a fresh statement rather
+            //  than a comma operator (which is a syntax error for
+            //  ``return X``).
+            StringBuilder out = new StringBuilder(region.length());
+            int charBefore = srcStart > 0 ? region.charAt(srcStart - 1) : ' ';
+            if (charBefore == ',') {
+                out.append(region, 0, srcStart - 1);
+                out.append(';');
+            } else {
+                out.append(region, 0, srcStart);
+            }
+            out.append(caseBody);
+            out.append(region, srcEnd, caseLabelStart);
+            out.append(region, caseBodyEnd, region.length());
+            return out.toString();
+        }
+        return null;
+    }
+
+    /**
+     * Count every digit literal appearing as a target on the RHS of
+     * ``pc = <expr>`` in the region. A ``pc = cond ? A : B`` RHS
+     * counts both A and B; this gives the upper bound on incoming
+     * branches per case label, which is the count we need to decide
+     * whether a label is unique-source.
+     */
+    private static void countPcReferences(String region, int from, int to, Map<Integer, Integer> out) {
+        int i = from;
+        while (i < to) {
+            char ch = region.charAt(i);
+            if (ch == '"' || ch == '\'') {
+                int end = skipStringLiteral(region, i);
+                if (end < 0 || end >= to) {
+                    return;
+                }
+                i = end + 1;
+                continue;
+            }
+            if (ch == 'p' && i + 1 < to && region.charAt(i + 1) == 'c'
+                    && (i == 0 || !isIdentPart(region.charAt(i - 1)))
+                    && i + 2 < to && !isIdentPart(region.charAt(i + 2))) {
+                int p = i + 2;
+                while (p < to && Character.isWhitespace(region.charAt(p))) {
+                    p++;
+                }
+                if (p < to && region.charAt(p) == '=' && (p + 1 >= to || region.charAt(p + 1) != '=')) {
+                    int rhsStart = p + 1;
+                    int rhsEnd = findStatementEnd(region, rhsStart, to);
+                    if (rhsEnd < 0) {
+                        return;
+                    }
+                    countDigitLiteralsInRhs(region, rhsStart, rhsEnd, out);
+                    i = rhsEnd;
+                    continue;
+                }
+            }
+            i++;
+        }
+    }
+
+    /**
+     * Pull integer literals out of a ``pc=<expr>`` RHS, accounting for
+     * nesting. We only count digits at top level OR after ``?`` / ``:``
+     * tokens (the ternary branch slots). Digits nested inside parens
+     * (``<0`` style comparisons) are operands, not branch targets.
+     */
+    private static void countDigitLiteralsInRhs(String region, int from, int to, Map<Integer, Integer> out) {
+        int parenDepth = 0;
+        int braceDepth = 0;
+        int bracketDepth = 0;
+        boolean expectingTarget = false;
+        boolean sawTernary = false;
+        int i = from;
+        while (i < to) {
+            char ch = region.charAt(i);
+            if (ch == '"' || ch == '\'') {
+                int end = skipStringLiteral(region, i);
+                if (end < 0 || end >= to) {
+                    return;
+                }
+                i = end + 1;
+                continue;
+            }
+            if (ch == '(') { parenDepth++; i++; continue; }
+            if (ch == ')') { parenDepth--; i++; continue; }
+            if (ch == '{') { braceDepth++; i++; continue; }
+            if (ch == '}') { braceDepth--; i++; continue; }
+            if (ch == '[') { bracketDepth++; i++; continue; }
+            if (ch == ']') { bracketDepth--; i++; continue; }
+            boolean topLevel = parenDepth == 0 && braceDepth == 0 && bracketDepth == 0;
+            if (topLevel && (ch == '?' || ch == ':')) {
+                expectingTarget = true;
+                sawTernary = true;
+                i++;
+                continue;
+            }
+            if (topLevel && Character.isWhitespace(ch)) {
+                i++;
+                continue;
+            }
+            if (topLevel && expectingTarget && Character.isDigit(ch)
+                    && (i == from || !isIdentPart(region.charAt(i - 1)))) {
+                int numStart = i;
+                while (i < to && Character.isDigit(region.charAt(i))) {
+                    i++;
+                }
+                int label = Integer.parseInt(region.substring(numStart, i));
+                Integer prev = out.get(label);
+                out.put(label, prev == null ? 1 : prev + 1);
+                expectingTarget = false;
+                continue;
+            }
+            if (topLevel) {
+                expectingTarget = false;
+            }
+            i++;
+        }
+        // Single-target case (no ternary): the entire RHS is one
+        // integer literal.
+        if (!sawTernary) {
+            int parenDepth2 = 0;
+            int braceDepth2 = 0;
+            int bracketDepth2 = 0;
+            int j = from;
+            while (j < to) {
+                char ch = region.charAt(j);
+                if (ch == '"' || ch == '\'') {
+                    int end = skipStringLiteral(region, j);
+                    if (end < 0 || end >= to) {
+                        return;
+                    }
+                    j = end + 1;
+                    continue;
+                }
+                if (ch == '(') { parenDepth2++; j++; continue; }
+                if (ch == ')') { parenDepth2--; j++; continue; }
+                if (ch == '{') { braceDepth2++; j++; continue; }
+                if (ch == '}') { braceDepth2--; j++; continue; }
+                if (ch == '[') { bracketDepth2++; j++; continue; }
+                if (ch == ']') { bracketDepth2--; j++; continue; }
+                boolean topLevel2 = parenDepth2 == 0 && braceDepth2 == 0 && bracketDepth2 == 0;
+                if (topLevel2 && Character.isDigit(ch)
+                        && (j == from || !isIdentPart(region.charAt(j - 1)))) {
+                    int numStart = j;
+                    while (j < to && Character.isDigit(region.charAt(j))) {
+                        j++;
+                    }
+                    int label = Integer.parseInt(region.substring(numStart, j));
+                    Integer prev = out.get(label);
+                    out.put(label, prev == null ? 1 : prev + 1);
+                    return;
+                }
+                j++;
+            }
+        }
+    }
+
+    /**
+     * Find the unique simple-goto source for a target label. Returns
+     * ``[srcStart, srcEnd)`` covering the ``pc=N;break;`` (or
+     * ``pc = N; break;``) literal, or null if:
+     *   - no occurrence of ``pc=N`` exists,
+     *   - the unique occurrence isn't a simple goto (e.g., it's a
+     *     ternary branch), or
+     *   - the occurrence isn't followed by ``break;``.
+     */
+    private static int[] findSimpleGotoSource(String region, int targetLabel) {
+        int i = 0;
+        int len = region.length();
+        while (i < len) {
+            char ch = region.charAt(i);
+            if (ch == '"' || ch == '\'') {
+                int end = skipStringLiteral(region, i);
+                if (end < 0) {
+                    return null;
+                }
+                i = end + 1;
+                continue;
+            }
+            if (ch == 'p' && i + 1 < len && region.charAt(i + 1) == 'c'
+                    && (i == 0 || !isIdentPart(region.charAt(i - 1)))
+                    && i + 2 < len && !isIdentPart(region.charAt(i + 2))) {
+                int p = i + 2;
+                while (p < len && Character.isWhitespace(region.charAt(p))) {
+                    p++;
+                }
+                if (p < len && region.charAt(p) == '='
+                        && (p + 1 >= len || region.charAt(p + 1) != '=')) {
+                    int rhsStart = p + 1;
+                    int rhsEnd = findStatementEnd(region, rhsStart, len);
+                    if (rhsEnd < 0) {
+                        return null;
+                    }
+                    // Trim leading whitespace from rhs.
+                    int t = rhsStart;
+                    while (t < rhsEnd && Character.isWhitespace(region.charAt(t))) {
+                        t++;
+                    }
+                    // Check if RHS is exactly ``<digits>`` (no ternary,
+                    // no parens, no anything else).
+                    int numStart = t;
+                    while (t < rhsEnd && Character.isDigit(region.charAt(t))) {
+                        t++;
+                    }
+                    int numEnd = t;
+                    while (t < rhsEnd && Character.isWhitespace(region.charAt(t))) {
+                        t++;
+                    }
+                    if (numStart < numEnd && t == rhsEnd) {
+                        int n = Integer.parseInt(region.substring(numStart, numEnd));
+                        if (n == targetLabel) {
+                            // Confirm followed by ``;break;``.
+                            int q = rhsEnd;
+                            if (q < len && region.charAt(q) == ';') {
+                                q++;
+                                while (q < len && Character.isWhitespace(region.charAt(q))) {
+                                    q++;
+                                }
+                                if (q + 4 < len && region.startsWith("break", q)
+                                        && (q + 5 >= len || !isIdentPart(region.charAt(q + 5)))) {
+                                    int afterBreak = q + 5;
+                                    if (afterBreak < len && region.charAt(afterBreak) == ';') {
+                                        afterBreak++;
+                                    }
+                                    return new int[] {i, afterBreak};
+                                }
+                            }
+                        }
+                    }
+                    i = rhsEnd;
+                    continue;
+                }
+            }
+            i++;
+        }
+        return null;
+    }
+
+    /**
      * Walk the post-rewriter body and strip ``case N: { ... }`` wrapping
      * braces when the body doesn't declare any block-scoped binding
      * (``let`` / ``const`` / ``function`` / ``class``). The body becomes
@@ -5582,6 +5968,7 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             }
             // Expect ``case <digits> :``.
             if (body.startsWith("case", i)) {
+                int caseLabelStart = i;
                 int p = i + 4;
                 while (p < to && Character.isWhitespace(body.charAt(p))) {
                     p++;
@@ -5643,12 +6030,23 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                         // ``case`` / ``default`` / ``}`` — stop extending.
                         break;
                     }
-                    result.add(new int[] {label, p, bodyEnd});
+                    result.add(new int[] {label, p, bodyEnd, caseLabelStart});
                     i = bodyEnd;
-                } else {
-                    // Bare ``case N:`` -- empty body.
-                    result.add(new int[] {label, afterColon, afterColon});
+                } else if (p < to && (body.startsWith("case", p) || body.startsWith("default", p))) {
+                    // Bare ``case N:`` immediately followed by another
+                    // case label or default — empty body, fall-through.
+                    result.add(new int[] {label, afterColon, afterColon, caseLabelStart});
                     i = afterColon;
+                } else {
+                    // Post-brace-strip: ``case N: STMTS`` (no surrounding
+                    // braces). The body extends until the next ``case``
+                    // / ``default`` / closing ``}``. Track paren / brace
+                    // / bracket / string nesting so we don't trip on
+                    // ``case`` keywords appearing inside string literals
+                    // or nested blocks.
+                    int bodyEnd = findUnbracedCaseEnd(body, afterColon, to);
+                    result.add(new int[] {label, afterColon, bodyEnd, caseLabelStart});
+                    i = bodyEnd;
                 }
                 continue;
             }
@@ -5660,6 +6058,53 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             return null;
         }
         return result;
+    }
+
+    /**
+     * Find where an unbraced case body ends — at the next ``case`` /
+     * ``default`` keyword at top level, or at the closing ``}`` of the
+     * surrounding switch. Tracks paren / brace / bracket / string
+     * nesting so a ``case`` keyword nested inside (e.g.) an inner
+     * switch isn't mistaken for the outer-case end marker.
+     */
+    private static int findUnbracedCaseEnd(String body, int from, int to) {
+        int parenDepth = 0;
+        int braceDepth = 0;
+        int bracketDepth = 0;
+        int i = from;
+        while (i < to) {
+            char ch = body.charAt(i);
+            if (ch == '"' || ch == '\'') {
+                int end = skipStringLiteral(body, i);
+                if (end < 0 || end >= to) {
+                    return to;
+                }
+                i = end + 1;
+                continue;
+            }
+            if (ch == '(') { parenDepth++; i++; continue; }
+            if (ch == ')') { parenDepth--; i++; continue; }
+            if (ch == '{') { braceDepth++; i++; continue; }
+            if (ch == '}') { braceDepth--; i++; continue; }
+            if (ch == '[') { bracketDepth++; i++; continue; }
+            if (ch == ']') { bracketDepth--; i++; continue; }
+            if (parenDepth == 0 && braceDepth == 0 && bracketDepth == 0) {
+                if (ch == 'c' && body.startsWith("case", i)
+                        && (i == 0 || !isIdentPart(body.charAt(i - 1)))
+                        && i + 4 < to
+                        && (Character.isWhitespace(body.charAt(i + 4))
+                                || Character.isDigit(body.charAt(i + 4)))) {
+                    return i;
+                }
+                if (ch == 'd' && body.startsWith("default", i)
+                        && (i == 0 || !isIdentPart(body.charAt(i - 1)))
+                        && i + 7 < to && !isIdentPart(body.charAt(i + 7))) {
+                    return i;
+                }
+            }
+            i++;
+        }
+        return to;
     }
 
     /**
