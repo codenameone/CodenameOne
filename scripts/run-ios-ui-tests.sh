@@ -785,6 +785,21 @@ for test in "${TEST_NAMES[@]}"; do
   else
     ri_log "Primary decode failed for '$test'; trying fallback log"
     if [ -s "$FALLBACK_LOG" ] && source_label="$(cn1ss_decode_test_png "$test" "$dest" "SIMLOG:$FALLBACK_LOG")"; then
+      # Without these two lines, tests that needed the fallback log were
+      # decoded but not added to TEST_OUTPUT_ENTRIES, so the comparator
+      # silently skipped them -- iOS Metal compared 84 screenshots vs the
+      # 89 it had streams for, with 5 large transition tests
+      # (SlideHorizontal*, SlideVertical, SlideFadeTitle, CoverHorizontal)
+      # missing from the report because their ~288-chunk streams hit
+      # logcat-style line drops in device-runner.log but survived in the
+      # syslog fallback.
+      TEST_OUTPUT_ENTRIES+=("${test}${PAIR_SEP}${dest}")
+      preview_dest="$SCREENSHOT_PREVIEW_DIR/${test}.jpg"
+      if preview_source="$(cn1ss_decode_test_preview "$test" "$preview_dest" "SIMLOG:$FALLBACK_LOG")"; then
+        ri_log "Decoded preview for '$test' from fallback (source=${preview_source}, size: $(cn1ss_file_size "$preview_dest") bytes)"
+      else
+        rm -f "$preview_dest" 2>/dev/null || true
+      fi
       ri_log "Decoded screenshot for '$test' from fallback (size: $(cn1ss_file_size "$dest") bytes)"
     else
       ri_log "FATAL: Failed to extract/decode CN1SS payload for test '$test'"
