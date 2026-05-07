@@ -5,7 +5,8 @@
  * rounded/pill borders, state selectors via .pressed / .selected /
  * .disabled. Light and dark palettes live at the bottom of this file
  * in a prefers-color-scheme block the compiler rewrites into $DarkUIID
- * entries.
+ * entries. Colors are inlined (not CSS variables) because the rewriter
+ * operates at string level and doesn't re-scope :root declarations.
  *
  * Material 3 baseline palette reference:
  *   primary               #6750a4 dark #d0bcff
@@ -23,39 +24,12 @@
  *   state-disabled        #e0dce4 dark #2b2930
  *   on-disabled           #a5a0ab dark #5c5967
  *
- * Accent palette is declared as CSS variables inside #Constants so a
- * fork of this file can recolor every accent-bearing component
- * (Button, RaisedButton, FlatButton, CheckBox.selected,
- * RadioButton.selected, Switch.selected, OnOffSwitch, BackCommand,
- * TitleCommand, Tab.selected, SideCommand.pressed, MultiButton.pressed,
- * FloatingActionButton) by changing one declaration. The compiler
- * resolves var() at parse time, so layering an unrelated theme.css
- * that only redefines the variable does NOT retroactively recolor
- * the already-baked styles - runtime accent override still goes
- * through UIManager.addThemeProps on the specific UIIDs (see
- * PaletteOverrideThemeScreenshotTest).
+ * Overridable palette: user apps layer their own theme.css or runtime
+ * UIManager.addThemeProps on top of this theme - see
+ * PaletteOverrideThemeScreenshotTest for a working example.
  */
 
 #Constants {
-    /* Material 3 primary accent palette - see header for the override
-       semantics. Variable names mirror the M3 token names: --accent
-       maps to "primary", --accent-on to "on-primary", --accent-container
-       to "primary-container", --accent-on-container to
-       "on-primary-container", --accent-pressed to "state-pressed".
-       Each pair has a -dark counterpart used by the corresponding
-       $DarkUIID entries the dark @media block compiles into. Keep
-       both halves in sync if a token shifts. */
-    --accent-color: #6750a4;
-    --accent-color-dark: #d0bcff;
-    --accent-on-color: #ffffff;
-    --accent-on-color-dark: #381e72;
-    --accent-container-color: #eaddff;
-    --accent-container-color-dark: #4f378b;
-    --accent-on-container-color: #21005d;
-    --accent-on-container-color-dark: #eaddff;
-    --accent-pressed-color: #d0bcff;
-    --accent-pressed-color-dark: #4f378b;
-
     includeNativeBool: false;
     darkModeBool: true;
     commandBehavior: Native;
@@ -146,8 +120,8 @@ SpanLabelText { cn1-derive: Label; background-color: transparent; }
    only honours base-level cn1-derive), so explicit values are the
    reliable fix. */
 Button {
-    color: var(--accent-on-color, #ffffff);
-    background-color: var(--accent-color, #6750a4);
+    color: #ffffff;
+    background-color: #6750a4;
     padding: 1.5mm 4mm 1.5mm 4mm;
     margin: 0.8mm;
     font-family: "native:MainRegular";
@@ -156,8 +130,8 @@ Button {
     text-align: center;
 }
 Button.pressed {
-    color: var(--accent-on-container-color, #21005d);
-    background-color: var(--accent-pressed-color, #d0bcff);
+    color: #21005d;
+    background-color: #d0bcff;
     padding: 1.5mm 4mm 1.5mm 4mm;
     margin: 0.8mm;
     font-family: "native:MainRegular";
@@ -181,8 +155,8 @@ Button.disabled {
    dark mode where Button's own container color otherwise matches. */
 RaisedButton {
     cn1-derive: Button;
-    color: var(--accent-on-container-color, #21005d);
-    background-color: var(--accent-container-color, #eaddff);
+    color: #21005d;
+    background-color: #eaddff;
     padding: 1.5mm 4mm 1.5mm 4mm;
     margin: 0.8mm;
     font-family: "native:MainRegular";
@@ -191,8 +165,8 @@ RaisedButton {
     text-align: center;
 }
 RaisedButton.pressed {
-    color: var(--accent-on-container-color, #21005d);
-    background-color: var(--accent-pressed-color, #d0bcff);
+    color: #21005d;
+    background-color: #d0bcff;
     padding: 1.5mm 4mm 1.5mm 4mm;
     margin: 0.8mm;
     font-family: "native:MainRegular";
@@ -214,11 +188,11 @@ RaisedButton.disabled {
 FlatButton {
     cn1-derive: Button;
     background-color: transparent;
-    color: var(--accent-color, #6750a4);
+    color: #6750a4;
     cn1-background-type: cn1-pill-border;
     text-align: center;
 }
-FlatButton.pressed { background-color: var(--accent-container-color, #eaddff); color: var(--accent-on-container-color, #21005d); cn1-background-type: cn1-pill-border; }
+FlatButton.pressed { background-color: #eaddff; color: #21005d; cn1-background-type: cn1-pill-border; }
 
 TextField {
     color: #1d1b20;
@@ -259,7 +233,7 @@ CheckBox {
     font-size: 3.5mm;
     icon-gap: 2mm;
 }
-CheckBox.selected { color: var(--accent-color, #6750a4); }
+CheckBox.selected { color: #6750a4; }
 CheckBox.disabled { color: #a5a0ab; background-color: #e0dce4; }
 
 RadioButton {
@@ -271,7 +245,7 @@ RadioButton {
     font-size: 3.5mm;
     icon-gap: 2mm;
 }
-RadioButton.selected { color: var(--accent-color, #6750a4); }
+RadioButton.selected { color: #6750a4; }
 RadioButton.disabled { color: #a5a0ab; background-color: #e0dce4; }
 
 /* Switch's track left-edge aligns with Label's text left-edge
@@ -283,7 +257,7 @@ Switch {
     margin: 1mm 1.5mm 1mm 1.5mm;
     text-align: left;
 }
-Switch.selected { color: var(--accent-on-color, #ffffff); background-color: var(--accent-color, #6750a4); }
+Switch.selected { color: #ffffff; background-color: #6750a4; }
 Switch.disabled { color: #a5a0ab; background-color: #e0dce4; }
 
 OnOffSwitch {
@@ -293,7 +267,7 @@ OnOffSwitch {
     padding: 1mm 2mm 1mm 2mm;
     cn1-background-type: cn1-pill-border;
 }
-OnOffSwitch.selected { background-color: var(--accent-color, #6750a4); color: var(--accent-on-color, #ffffff); }
+OnOffSwitch.selected { background-color: #6750a4; color: #ffffff; }
 
 Toolbar {
     background-color: #fef7ff;
@@ -320,8 +294,8 @@ Title {
 }
 MainTitle { cn1-derive: Title; }
 
-BackCommand { cn1-derive: Button; background-color: transparent; color: var(--accent-color, #6750a4); padding: 1mm 2mm 1mm 2mm; }
-TitleCommand { cn1-derive: Button; background-color: transparent; color: var(--accent-color, #6750a4); padding: 1mm 2mm 1mm 2mm; }
+BackCommand { cn1-derive: Button; background-color: transparent; color: #6750a4; padding: 1mm 2mm 1mm 2mm; }
+TitleCommand { cn1-derive: Button; background-color: transparent; color: #6750a4; padding: 1mm 2mm 1mm 2mm; }
 
 /* Material 3 top tabs: flat surface with selected tab underlined by
    color rather than a pill fill. No border-radius here -
@@ -339,10 +313,10 @@ Tab {
     font-size: 3.5mm;
     text-align: center;
 }
-Tab.selected { color: var(--accent-color, #6750a4); background-color: #fef7ff; }
-Tab.pressed { color: var(--accent-on-container-color, #21005d); background-color: var(--accent-container-color, #eaddff); }
+Tab.selected { color: #6750a4; background-color: #fef7ff; }
+Tab.pressed { color: #21005d; background-color: #eaddff; }
 
-SelectedTab { cn1-derive: Tab; color: var(--accent-color, #6750a4); }
+SelectedTab { cn1-derive: Tab; color: #6750a4; }
 UnselectedTab { cn1-derive: Tab; color: #49454f; }
 
 SideNavigationPanel { background-color: #fef7ff; padding: 0; margin: 0; }
@@ -354,7 +328,7 @@ SideCommand {
     padding: 2mm 3mm 2mm 3mm;
     margin: 0;
 }
-SideCommand.pressed { background-color: var(--accent-container-color, #eaddff); }
+SideCommand.pressed { background-color: #eaddff; }
 
 List { background-color: #fef7ff; padding: 0; margin: 0; }
 
@@ -374,7 +348,7 @@ MultiButton {
     font-family: "native:MainRegular";
     font-size: 3.5mm;
 }
-MultiButton.pressed { background-color: var(--accent-container-color, #eaddff); }
+MultiButton.pressed { background-color: #eaddff; }
 MultiButton.disabled { color: #a5a0ab; background-color: #e0dce4; }
 
 MultiLine1 { cn1-derive: Label; color: #1d1b20; font-family: "native:MainBold"; }
@@ -415,14 +389,14 @@ DialogContentPane { background-color: transparent; padding: 2mm; margin: 0; }
 DialogCommandArea { background-color: transparent; padding: 1mm; }
 
 FloatingActionButton {
-    color: var(--accent-on-container-color, #21005d);
-    background-color: var(--accent-container-color, #eaddff);
+    color: #21005d;
+    background-color: #eaddff;
     padding: 3mm;
     margin: 3mm;
     font-family: "native:MainBold";
     cn1-background-type: cn1-pill-border;
 }
-FloatingActionButton.pressed { background-color: var(--accent-pressed-color, #d0bcff); }
+FloatingActionButton.pressed { background-color: #d0bcff; }
 
 Separator { background-color: #cac4d0; padding: 0; margin: 0; }
 PopupContent {
@@ -447,21 +421,16 @@ PopupContent {
     /* Re-declare cn1-background-type on each dark Button override -
        the compiler doesn't carry the light declaration's pill border
        forward into the $Dark<UIID> entries. */
-    Button { color: var(--accent-on-color-dark, #381e72); background-color: var(--accent-color-dark, #d0bcff); cn1-background-type: cn1-pill-border; }
-    Button.pressed { background-color: var(--accent-pressed-color-dark, #4f378b); color: var(--accent-on-container-color-dark, #eaddff); cn1-background-type: cn1-pill-border; }
+    Button { color: #381e72; background-color: #d0bcff; cn1-background-type: cn1-pill-border; }
+    Button.pressed { background-color: #4f378b; color: #eaddff; cn1-background-type: cn1-pill-border; }
     Button.disabled { color: #5c5967; background-color: #2b2930; cn1-background-type: cn1-pill-border; }
 
-    RaisedButton { color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-container-color-dark, #4f378b); cn1-background-type: cn1-pill-border; }
-    /* Dark RaisedButton.pressed bg is the LIGHT --accent-color value
-       (#6750a4) on purpose - the comment on the light RaisedButton
-       above explains the "bumped surface" choice that keeps it
-       visually distinct from regular Button.pressed in dark mode.
-       Left inline so it doesn't masquerade as an accent-token role. */
-    RaisedButton.pressed { color: var(--accent-on-container-color-dark, #eaddff); background-color: #6750a4; cn1-background-type: cn1-pill-border; }
+    RaisedButton { color: #eaddff; background-color: #4f378b; cn1-background-type: cn1-pill-border; }
+    RaisedButton.pressed { color: #eaddff; background-color: #6750a4; cn1-background-type: cn1-pill-border; }
     RaisedButton.disabled { background-color: #2b2930; color: #5c5967; cn1-background-type: cn1-pill-border; }
 
-    FlatButton { color: var(--accent-color-dark, #d0bcff); background-color: transparent; cn1-background-type: cn1-pill-border; }
-    FlatButton.pressed { background-color: var(--accent-pressed-color-dark, #4f378b); color: var(--accent-on-container-color-dark, #eaddff); cn1-background-type: cn1-pill-border; }
+    FlatButton { color: #d0bcff; background-color: transparent; cn1-background-type: cn1-pill-border; }
+    FlatButton.pressed { background-color: #4f378b; color: #eaddff; cn1-background-type: cn1-pill-border; }
 
     TextField { color: #e6e0e9; background-color: #211f26; }
     TextField.pressed { background-color: #49454f; }
@@ -472,42 +441,42 @@ PopupContent {
     TextHint { color: #938f99; }
 
     CheckBox { color: #e6e0e9; background-color: transparent; }
-    CheckBox.selected { color: var(--accent-color-dark, #d0bcff); }
+    CheckBox.selected { color: #d0bcff; }
     CheckBox.disabled { color: #5c5967; background-color: #2b2930; }
     RadioButton { color: #e6e0e9; background-color: transparent; }
-    RadioButton.selected { color: var(--accent-color-dark, #d0bcff); }
+    RadioButton.selected { color: #d0bcff; }
     RadioButton.disabled { color: #5c5967; background-color: #2b2930; }
 
     Switch { color: #938f99; background-color: #49454f; }
-    Switch.selected { color: var(--accent-on-color-dark, #381e72); background-color: var(--accent-color-dark, #d0bcff); }
+    Switch.selected { color: #381e72; background-color: #d0bcff; }
     Switch.disabled { color: #5c5967; background-color: #2b2930; }
 
-    OnOffSwitch { color: var(--accent-on-color-dark, #381e72); background-color: #49454f; }
-    OnOffSwitch.selected { background-color: var(--accent-color-dark, #d0bcff); color: var(--accent-on-color-dark, #381e72); }
+    OnOffSwitch { color: #381e72; background-color: #49454f; }
+    OnOffSwitch.selected { background-color: #d0bcff; color: #381e72; }
 
     Toolbar { background-color: #141218; color: #e6e0e9; }
     TitleArea { background-color: #141218; color: #e6e0e9; }
     Title { color: #e6e0e9; background-color: #141218; }
     MainTitle { color: #e6e0e9; background-color: #141218; }
-    BackCommand { color: var(--accent-color-dark, #d0bcff); background-color: transparent; }
-    TitleCommand { color: var(--accent-color-dark, #d0bcff); background-color: transparent; }
+    BackCommand { color: #d0bcff; background-color: transparent; }
+    TitleCommand { color: #d0bcff; background-color: transparent; }
 
     Tabs { background-color: #141218; }
     TabsContainer { background-color: #141218; color: #e6e0e9; }
     Tab { color: #cac4d0; background-color: #141218; }
-    Tab.selected { color: var(--accent-color-dark, #d0bcff); background-color: #141218; }
-    Tab.pressed { color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-pressed-color-dark, #4f378b); }
-    SelectedTab { color: var(--accent-color-dark, #d0bcff); }
+    Tab.selected { color: #d0bcff; background-color: #141218; }
+    Tab.pressed { color: #eaddff; background-color: #4f378b; }
+    SelectedTab { color: #d0bcff; }
     UnselectedTab { color: #cac4d0; }
 
     SideNavigationPanel { background-color: #141218; }
     SideCommand { color: #e6e0e9; background-color: transparent; }
-    SideCommand.pressed { background-color: var(--accent-pressed-color-dark, #4f378b); }
+    SideCommand.pressed { background-color: #4f378b; }
 
     List { background-color: #141218; }
     ListRenderer { color: #e6e0e9; background-color: transparent; }
     MultiButton { background-color: #141218; color: #e6e0e9; }
-    MultiButton.pressed { background-color: var(--accent-pressed-color-dark, #4f378b); }
+    MultiButton.pressed { background-color: #4f378b; }
     MultiLine1 { color: #e6e0e9; }
     MultiLine2 { color: #cac4d0; }
     MultiLine3 { color: #938f99; }
@@ -520,8 +489,8 @@ PopupContent {
     DialogCommandArea { background-color: #211f26; }
     PopupContent { background-color: #211f26; color: #e6e0e9; }
 
-    FloatingActionButton { color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-container-color-dark, #4f378b); }
-    FloatingActionButton.pressed { background-color: var(--accent-color-dark, #d0bcff); }
+    FloatingActionButton { color: #eaddff; background-color: #4f378b; }
+    FloatingActionButton.pressed { background-color: #d0bcff; }
 
     Separator { background-color: #49454f; }
 }
