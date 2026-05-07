@@ -422,6 +422,41 @@ final class JavascriptBundleWriter {
                 if (j >= n) { out.append(src, i, n); break; }
                 out.append(src, i, j + 1);
                 i = j + 1;
+            } else if (c == ',') {
+                // Object-key alias rewrite: when an unquoted body that
+                // already has an alias appears as a key inside an object
+                // literal (``,KEY:VAL``), rewrite it to the computed
+                // form ``,[ALIAS]:VAL``. Saves
+                // ``len(KEY) - len(ALIAS) - 2`` bytes per occurrence.
+                //
+                // Why ``,`` only and not ``{``: ``{ KEY: ... }`` is also
+                // valid as a *block* containing a labeled statement, and
+                // the translator emits both. After ``,`` we're always
+                // inside a list context (function args, array, obj
+                // literal); only obj literals accept ``KEY:`` shape, so
+                // matching after ``,`` is unambiguous. This skips the
+                // first key of each object literal but keeps every
+                // subsequent key, which is enough to recover most of
+                // the byte savings on the ``_Z({m:{a:fn,b:fn,...}})``
+                // class-table entries that dominate the obj-key uses.
+                out.append(c);
+                int peek = i + 1;
+                while (peek < n) {
+                    char d = src.charAt(peek);
+                    if (!isHoistableIdentChar(d)) break;
+                    peek++;
+                }
+                int bodyLen = peek - i - 1;
+                if (bodyLen >= 4 && peek < n && src.charAt(peek) == ':') {
+                    String body = src.substring(i + 1, peek);
+                    String alias = aliases.get(body);
+                    if (alias != null && (long) (body.length() - alias.length() - 2) > 0) {
+                        out.append('[').append(alias).append(']');
+                        i = peek;
+                        continue;
+                    }
+                }
+                i++;
             } else {
                 out.append(c);
                 i++;
