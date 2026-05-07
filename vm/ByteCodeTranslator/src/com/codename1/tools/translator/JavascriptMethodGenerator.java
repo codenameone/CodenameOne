@@ -5190,7 +5190,313 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             out.append(region, caseBodyEnd, region.length());
             return out.toString();
         }
+        // Ternary fold: ``pc=COND?A:B;break;`` where both A and B are
+        // unique-source AND have terminating bodies → ``if(COND){bodyA}
+        // else{bodyB}``. Drops case A and case B labels.
+        int[] ternary = findTernaryFoldCandidate(region, pcCount, labelToIdx, cases);
+        if (ternary != null) {
+            int srcStart = ternary[0];
+            int srcEnd = ternary[1];
+            int condStart = ternary[2];
+            int condEnd = ternary[3];
+            int caseAIdx = ternary[4];
+            int caseBIdx = ternary[5];
+            int[] caseA = cases.get(caseAIdx);
+            int[] caseB = cases.get(caseBIdx);
+            String cond = region.substring(condStart, condEnd).trim();
+            String bodyA = region.substring(caseA[1], caseA[2]).trim();
+            String bodyB = region.substring(caseB[1], caseB[2]).trim();
+            // Strip leading whitespace / comma from bodies.
+            bodyA = stripLeadingTerminators(bodyA);
+            bodyB = stripLeadingTerminators(bodyB);
+            StringBuilder repl = new StringBuilder(region.length());
+            int charBefore2 = srcStart > 0 ? region.charAt(srcStart - 1) : ' ';
+            if (charBefore2 == ',') {
+                repl.append(region, 0, srcStart - 1);
+                repl.append(';');
+            } else {
+                repl.append(region, 0, srcStart);
+            }
+            repl.append("if(").append(cond).append("){").append(bodyA).append("}else{").append(bodyB).append("}");
+            // After srcEnd: emit the rest of the region, skipping case A
+            // and case B label regions.
+            int aStart = caseA[3];
+            int aEnd = caseA[2];
+            int bStart = caseB[3];
+            int bEnd = caseB[2];
+            int[][] skips;
+            if (aStart < bStart) {
+                skips = new int[][] {{aStart, aEnd}, {bStart, bEnd}};
+            } else {
+                skips = new int[][] {{bStart, bEnd}, {aStart, aEnd}};
+            }
+            int cursor = srcEnd;
+            for (int[] skip : skips) {
+                if (skip[0] < cursor) {
+                    // Skip range overlaps already-emitted text; bail.
+                    return null;
+                }
+                repl.append(region, cursor, skip[0]);
+                cursor = skip[1];
+            }
+            repl.append(region, cursor, region.length());
+            return repl.toString();
+        }
         return null;
+    }
+
+    /**
+     * Strip a leading comma or semicolon from a case body string. Used
+     * by the ternary fold to clean up bodies that start with a stray
+     * separator from the post-brace-strip emit.
+     */
+    private static String stripLeadingTerminators(String s) {
+        int i = 0;
+        while (i < s.length() && (s.charAt(i) == ',' || s.charAt(i) == ';' || Character.isWhitespace(s.charAt(i)))) {
+            i++;
+        }
+        return s.substring(i);
+    }
+
+    /**
+     * Find a ternary pc-set whose two targets are both unique-source
+     * AND have terminating bodies. Returns ``[srcStart, srcEnd,
+     * condStart, condEnd, caseAIdx, caseBIdx]`` or null.
+     *
+     * Source shape: ``pc=COND?A:B;break;`` where A and B are integer
+     * literals at the top level of the RHS (after ``?`` / ``:``
+     * respectively), and the source statement ends with ``;break;``.
+     *
+     * Forward only: both target cases must appear textually AFTER the
+     * source. Body must terminate (return / throw / pc=...;break) and
+     * have no top-level ``let`` / ``const`` / ``function`` / ``class``.
+     */
+    private static int[] findTernaryFoldCandidate(String region,
+            Map<Integer, Integer> pcCount, Map<Integer, Integer> labelToIdx, List<int[]> cases) {
+        int i = 0;
+        int len = region.length();
+        while (i < len) {
+            char ch = region.charAt(i);
+            if (ch == '"' || ch == '\'') {
+                int end = skipStringLiteral(region, i);
+                if (end < 0) {
+                    return null;
+                }
+                i = end + 1;
+                continue;
+            }
+            if (ch == 'p' && i + 1 < len && region.charAt(i + 1) == 'c'
+                    && (i == 0 || !isIdentPart(region.charAt(i - 1)))
+                    && i + 2 < len && !isIdentPart(region.charAt(i + 2))) {
+                int p = i + 2;
+                while (p < len && Character.isWhitespace(region.charAt(p))) {
+                    p++;
+                }
+                if (p < len && region.charAt(p) == '='
+                        && (p + 1 >= len || region.charAt(p + 1) != '=')) {
+                    int rhsStart = p + 1;
+                    int rhsEnd = findStatementEnd(region, rhsStart, len);
+                    if (rhsEnd < 0) {
+                        return null;
+                    }
+                    // Look for ternary structure: top-level ``?`` and ``:``
+                    int qPos = findTopLevel(region, rhsStart, rhsEnd, '?');
+                    int cPos = qPos < 0 ? -1 : findTopLevel(region, qPos + 1, rhsEnd, ':');
+                    if (qPos > 0 && cPos > qPos) {
+                        // Parse A (after ?, before :)
+                        int aStart = qPos + 1;
+                        while (aStart < cPos && Character.isWhitespace(region.charAt(aStart))) {
+                            aStart++;
+                        }
+                        int aEnd = aStart;
+                        while (aEnd < cPos && Character.isDigit(region.charAt(aEnd))) {
+                            aEnd++;
+                        }
+                        int afterA = aEnd;
+                        while (afterA < cPos && Character.isWhitespace(region.charAt(afterA))) {
+                            afterA++;
+                        }
+                        int bStart = cPos + 1;
+                        while (bStart < rhsEnd && Character.isWhitespace(region.charAt(bStart))) {
+                            bStart++;
+                        }
+                        int bEnd = bStart;
+                        while (bEnd < rhsEnd && Character.isDigit(region.charAt(bEnd))) {
+                            bEnd++;
+                        }
+                        int afterB = bEnd;
+                        while (afterB < rhsEnd && Character.isWhitespace(region.charAt(afterB))) {
+                            afterB++;
+                        }
+                        if (aStart < aEnd && afterA == cPos && bStart < bEnd && afterB == rhsEnd) {
+                            int A = Integer.parseInt(region.substring(aStart, aEnd));
+                            int B = Integer.parseInt(region.substring(bStart, bEnd));
+                            // Verify followed by ``;break;``
+                            int q = rhsEnd;
+                            if (q < len && region.charAt(q) == ';') {
+                                q++;
+                                while (q < len && Character.isWhitespace(region.charAt(q))) {
+                                    q++;
+                                }
+                                if (q + 4 < len && region.startsWith("break", q)
+                                        && (q + 5 >= len || !isIdentPart(region.charAt(q + 5)))) {
+                                    int afterBreak = q + 5;
+                                    if (afterBreak < len && region.charAt(afterBreak) == ';') {
+                                        afterBreak++;
+                                    }
+                                    // Verify A and B are unique-source AND
+                                    // both labels exist in cases.
+                                    Integer countA = pcCount.get(A);
+                                    Integer countB = pcCount.get(B);
+                                    Integer idxA = labelToIdx.get(A);
+                                    Integer idxB = labelToIdx.get(B);
+                                    if (countA != null && countA == 1
+                                            && countB != null && countB == 1
+                                            && idxA != null && idxB != null
+                                            && A != B) {
+                                        int[] caseA = cases.get(idxA);
+                                        int[] caseB = cases.get(idxB);
+                                        // Forward only: both cases AFTER source.
+                                        if (caseA[3] >= afterBreak && caseB[3] >= afterBreak) {
+                                            // Bodies must not have top-level let.
+                                            String bA = region.substring(caseA[1], caseA[2]);
+                                            String bB = region.substring(caseB[1], caseB[2]);
+                                            if (!caseBodyHasBlockDeclaration(bA)
+                                                    && !caseBodyHasBlockDeclaration(bB)
+                                                    && bodyTerminates(bA)
+                                                    && bodyTerminates(bB)) {
+                                                // condStart = rhsStart (after =) trimmed of leading ws
+                                                int condStart = rhsStart;
+                                                while (condStart < qPos && Character.isWhitespace(region.charAt(condStart))) {
+                                                    condStart++;
+                                                }
+                                                int condEnd = qPos;
+                                                while (condEnd > condStart && Character.isWhitespace(region.charAt(condEnd - 1))) {
+                                                    condEnd--;
+                                                }
+                                                return new int[] {i, afterBreak, condStart, condEnd, idxA, idxB};
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    i = rhsEnd;
+                    continue;
+                }
+            }
+            i++;
+        }
+        return null;
+    }
+
+    /**
+     * Find the first occurrence of ``ch`` at top level (paren / brace
+     * / bracket depth zero, not in a string literal) in
+     * ``region[from..to)``. Returns -1 if not found.
+     */
+    private static int findTopLevel(String region, int from, int to, char ch) {
+        int parenDepth = 0;
+        int braceDepth = 0;
+        int bracketDepth = 0;
+        for (int i = from; i < to; i++) {
+            char c = region.charAt(i);
+            if (c == '"' || c == '\'') {
+                int end = skipStringLiteral(region, i);
+                if (end < 0 || end >= to) {
+                    return -1;
+                }
+                i = end;
+                continue;
+            }
+            if (c == '(') { parenDepth++; continue; }
+            if (c == ')') { parenDepth--; continue; }
+            if (c == '{') { braceDepth++; continue; }
+            if (c == '}') { braceDepth--; continue; }
+            if (c == '[') { bracketDepth++; continue; }
+            if (c == ']') { bracketDepth--; continue; }
+            if (c == ch && parenDepth == 0 && braceDepth == 0 && bracketDepth == 0) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * Determine whether a case body terminates control flow on every
+     * exit -- ends with ``return`` / ``throw`` / ``pc=...; break``.
+     * Conservative: the body must end with such a terminator (after
+     * trailing whitespace / semicolon).
+     */
+    private static boolean bodyTerminates(String body) {
+        int end = body.length();
+        // Trim trailing whitespace and stray ``;``.
+        while (end > 0) {
+            char c = body.charAt(end - 1);
+            if (Character.isWhitespace(c) || c == ';') {
+                end--;
+            } else {
+                break;
+            }
+        }
+        if (end == 0) {
+            return false;
+        }
+        // Look for ``break`` at the end.
+        if (end >= 5 && body.startsWith("break", end - 5)
+                && (end - 5 == 0 || !isIdentPart(body.charAt(end - 6)))) {
+            return true;
+        }
+        // ``return X`` or ``return``: scan back for the keyword. Use a
+        // simple heuristic: split on top-level ``;`` and check the last
+        // top-level statement.
+        int lastSemi = findLastTopLevelSemicolon(body, 0, end);
+        int stmtStart = lastSemi < 0 ? 0 : lastSemi + 1;
+        while (stmtStart < end && Character.isWhitespace(body.charAt(stmtStart))) {
+            stmtStart++;
+        }
+        if (stmtStart + 6 <= end && body.startsWith("return", stmtStart)
+                && (stmtStart + 6 == end || !isIdentPart(body.charAt(stmtStart + 6)))) {
+            return true;
+        }
+        if (stmtStart + 5 <= end && body.startsWith("throw", stmtStart)
+                && (stmtStart + 5 == end || !isIdentPart(body.charAt(stmtStart + 5)))) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Find the last top-level ``;`` in ``s[from..to)`` (paren / brace /
+     * bracket / string-aware). Returns -1 if none.
+     */
+    private static int findLastTopLevelSemicolon(String s, int from, int to) {
+        int parenDepth = 0;
+        int braceDepth = 0;
+        int bracketDepth = 0;
+        int last = -1;
+        for (int i = from; i < to; i++) {
+            char c = s.charAt(i);
+            if (c == '"' || c == '\'') {
+                int end = skipStringLiteral(s, i);
+                if (end < 0 || end >= to) {
+                    return last;
+                }
+                i = end;
+                continue;
+            }
+            if (c == '(') { parenDepth++; continue; }
+            if (c == ')') { parenDepth--; continue; }
+            if (c == '{') { braceDepth++; continue; }
+            if (c == '}') { braceDepth--; continue; }
+            if (c == '[') { bracketDepth++; continue; }
+            if (c == ']') { bracketDepth--; continue; }
+            if (c == ';' && parenDepth == 0 && braceDepth == 0 && bracketDepth == 0) {
+                last = i;
+            }
+        }
+        return last;
     }
 
     /**
