@@ -23,56 +23,66 @@ public class TransformPerspective extends AbstractGraphicsScreenshotTest {
         g.setColor(0x000000);
         g.drawRect(x, y, w - 1, h - 1);
 
-        // Draw a deterministic marker first so the test always produces a
-        // non-empty, comparable image even if the perspective branch is a
-        // no-op on this graphics target. The earlier test relied entirely on
-        // the perspective output being visible, which it isn't on platforms
-        // that map clip space directly to pixels (the resulting fill lands
-        // within ±1 pixel of the screen origin).
-        g.setColor(0x008800);
-        g.fillRect(x + w / 4, y + h / 4, w / 2, h / 2);
-
         // The mutable-image graphics on the iOS Metal port returns false here
         // even though the static Transform.isPerspectiveSupported() check
         // returns true for the global path. Use the per-graphics check.
         if (!g.isPerspectiveTransformSupported()) {
             g.setColor(0xaa0000);
             g.drawString("No perspective", x + 4, y + 4);
+            // Always emit a marker so the cell isn't blank on platforms that
+            // can't run perspective on this graphics target.
+            g.setColor(0x008800);
+            g.fillRect(x + w / 4, y + h / 4, w / 2, h / 2);
             return;
         }
 
-        // Exercise the perspective API: build a perspective matrix, then
-        // build a viewport-correcting transform that maps the perspective
-        // output back to pixel coordinates inside this cell. Render a small
-        // blue square that lands inside the green marker so we can confirm
-        // the perspective branch produced visible output. The viewport
-        // mapping pattern matches FlipTransition.paint() (line 295-307).
+        // Build a Viewport * Perspective * Model matrix that lands inside the
+        // cell. Earlier this test passed the raw clip-space output of
+        // makePerspective straight to fillRect, so the rect projected to a
+        // sub-pixel region around the screen origin and rendered nothing
+        // visible. The FlipTransition viewport pattern collapses at cell
+        // scale (the small per-cell scale factor multiplied back through the
+        // perspective gives nearly identity), so build the viewport directly:
+        // Viewport(NDC -> cell pixels) * Perspective * Translate(viewer).
         float fovy = (float) (Math.PI / 4);
         float aspect = (float) w / (float) h;
-        float zNear = 0.1f;
+        float zNear = 1f;
         float zFar = 1000f;
+        // Place the model quad at z=zViewer in view space. For portrait cells
+        // aspect = w/h < 1, so x is amplified more than y by the perspective.
+        // |zViewer| ~= 300 keeps a 100x100 quad inside NDC (±1) on portrait
+        // screens with headroom for a 36 deg Y rotation.
+        float zViewer = -300f;
 
-        Transform perspectiveT = Transform.makePerspective(fovy, aspect, zNear, zFar);
-        float[] br = perspectiveT.transformPoint(new float[]{w, h, zNear});
-        if (br[0] == 0f || br[1] == 0f) {
-            // Defensive: avoid divide-by-zero if the perspective stub is a
-            // no-op on this platform. Fall through with the marker only.
-            g.setColor(0xaa0000);
-            g.drawString("Perspective stub", x + 4, y + 4);
-            return;
-        }
-        float xfactor = -w / br[0];
-        float yfactor = -h / br[1];
+        Transform mvp = Transform.makeIdentity();
+        // Viewport: NDC (-1..1, -1..1) -> cell pixels (cell_x..cell_x+w,
+        // cell_y..cell_y+h). Y is flipped because perspective NDC has +y up
+        // but screen has +y down.
+        mvp.translate(x + w * 0.5f, y + h * 0.5f);
+        mvp.scale(w * 0.5f, -h * 0.5f, 1f);
+        // Perspective projection.
+        Transform persp = Transform.makePerspective(fovy, aspect, zNear, zFar);
+        mvp.concatenate(persp);
+        // Model translation: push the quad into the frustum.
+        mvp.translate(0, 0, zViewer);
 
-        Transform t = Transform.makeIdentity();
-        t.scale(xfactor, yfactor, 1f);
-        t.translate((x + w * 0.5f) / xfactor, (y + h * 0.5f) / yfactor, 0);
-        t.concatenate(perspectiveT);
-        t.translate(-x - w * 0.5f, -y - h * 0.5f, -zNear - w * 0.5f);
+        g.setTransform(mvp);
 
-        g.setTransform(t);
+        // Solid green quad (centred, no rotation) -- foreshortened only by
+        // the perspective divide.
+        g.setColor(0x008800);
+        g.fillRect(-50, -50, 100, 100);
+
+        // Same quad rotated 36 deg around the Y axis so the foreshortening
+        // is visible -- left edge moves toward the camera, right edge away.
+        Transform rotated = mvp.copy();
+        rotated.rotate((float) (Math.PI / 5), 0, 1, 0);
+        g.setTransform(rotated);
         g.setColor(0x0000aa);
-        g.fillRect(x + w * 3 / 8, y + h * 3 / 8, w / 4, h / 4);
+        g.setAlpha(160);
+        g.fillRect(-50, -50, 100, 100);
+        g.setAlpha(255);
+
         g.setTransform(Transform.makeIdentity());
     }
 
