@@ -11,8 +11,6 @@ import com.codename1.util.Base64;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.util.LinkedHashMap;
-import java.util.Map;
 
 interface Cn1ssDeviceRunnerHelper {
     int CHUNK_SIZE_ANDROID = 500;
@@ -327,11 +325,24 @@ interface Cn1ssDeviceRunnerHelper {
 ///
 /// Lives in a separate package-private class because Cn1ssDeviceRunnerHelper
 /// is an interface and can't hold mutable static state.
+///
+/// Storage uses two parallel arrays (hash[i] paired with testName[i]) rather
+/// than a HashMap-typed static field. The Cn1ssDeviceRunner header-comment
+/// at lines 215-222 documents that "static collections initialised via a
+/// static method call ... broke iOS class loading -- Cn1ssDeviceRunner
+/// failed to load before runSuite() could even log a single starting
+/// test=... entry, leaving the suite to time out at the 300s end-marker
+/// deadline." The first attempt at this tracker used `private static final
+/// Map<String, String> hashToTest = new LinkedHashMap<>()` and reproduced
+/// exactly that symptom on the iOS Metal CI run -- the simulator booted,
+/// installed the app, then never emitted a single CN1SS line and timed
+/// out at 30 minutes. Plain primitive arrays of String avoid touching the
+/// HashMap class init path during the host class's `<clinit>`.
 final class Cn1ssHashTracker {
     private static final int MAX_TRACKED = 64;
-    // LinkedHashMap with access-order=false (default) -> oldest-first iter.
-    // We cap at MAX_TRACKED entries by dropping the head when oversized.
-    private static final Map<String, String> hashToTest = new LinkedHashMap<>();
+    private static final String[] hashes = new String[MAX_TRACKED];
+    private static final String[] tests = new String[MAX_TRACKED];
+    private static int count;
 
     private Cn1ssHashTracker() {
     }
@@ -341,17 +352,36 @@ final class Cn1ssHashTracker {
     /// Caller logs a CN1SS:WARN line when a duplicate is found so the
     /// downstream comparator can flag the affected test as a likely
     /// stale-frame capture.
+    ///
+    /// O(MAX_TRACKED) per call -- 64-entry linear scan is trivial vs the
+    /// PNG hash itself (which scans every byte of the image).
     static synchronized String recordAndCheck(String hashHex, String safeName) {
-        String previous = hashToTest.get(hashHex);
-        if (previous != null && previous.equals(safeName)) {
-            // Same test re-captured (e.g. light->dark sequencing chains
-            // through the same emitter); not a mixup. Don't flag.
-            return null;
+        String previous = null;
+        for (int i = 0; i < count; i++) {
+            if (hashHex.equals(hashes[i])) {
+                previous = tests[i];
+                if (safeName.equals(previous)) {
+                    // Same test re-captured (e.g. light->dark sequencing
+                    // chains through the same emitter); not a mixup.
+                    return null;
+                }
+                break;
+            }
         }
-        hashToTest.put(hashHex, safeName);
-        if (hashToTest.size() > MAX_TRACKED) {
-            String oldest = hashToTest.keySet().iterator().next();
-            hashToTest.remove(oldest);
+        if (count < MAX_TRACKED) {
+            hashes[count] = hashHex;
+            tests[count] = safeName;
+            count++;
+        } else {
+            // Ring-buffer-style: overwrite the oldest entry. We keep
+            // insertion order roughly via an arraycopy shift; dropping
+            // exactly MAX_TRACKED entries means each call to this branch
+            // moves up to 64 references, which is still well below the
+            // cost of the FNV-1a scan over a 70KB PNG.
+            System.arraycopy(hashes, 1, hashes, 0, MAX_TRACKED - 1);
+            System.arraycopy(tests, 1, tests, 0, MAX_TRACKED - 1);
+            hashes[MAX_TRACKED - 1] = hashHex;
+            tests[MAX_TRACKED - 1] = safeName;
         }
         return previous;
     }
