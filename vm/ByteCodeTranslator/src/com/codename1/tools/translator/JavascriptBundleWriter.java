@@ -195,10 +195,18 @@ final class JavascriptBundleWriter {
      * splice an escaped string.
      */
     private static boolean isHoistableIdentChar(char c) {
+        // The translator's mangle scheme also emits {@code $}-prefixed
+        // names ({@code $a}, {@code $XX}, ...) and these appear inside
+        // quoted strings as args to {@code _O("$Xx")} class lookups
+        // and dispatch-id args to {@code cn1_iv*}. They share the same
+        // safety property as {@code [A-Za-z0-9_]} bodies (no escape
+        // sequences possible), so include {@code $} in the hoistable
+        // alphabet to widen coverage.
         return (c >= 'a' && c <= 'z')
                 || (c >= 'A' && c <= 'Z')
                 || (c >= '0' && c <= '9')
-                || c == '_';
+                || c == '_'
+                || c == '$';
     }
 
     /**
