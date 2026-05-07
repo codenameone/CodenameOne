@@ -211,11 +211,19 @@ public class Cn1ssChunkTools {
     /// `CN1SS:INFO:test=<name> png_bytes=<n> png_fnv1a64=<hex>` once the
     /// image bytes are encoded; matching against the assembled stream's
     /// hash gives an integrity check against silent chunk corruption.
+    ///
+    /// The negative lookahead `(?![A-Za-z0-9_.\-])` after the test name is
+    /// load-bearing -- a plain `\b` word boundary lets the regex match
+    /// `graphics-draw-string-decorated` when the caller asked for
+    /// `graphics-draw-string`, because `\b` is satisfied by the boundary
+    /// between `g` (word char) and `-` (non-word char). The lookahead
+    /// rejects the suffix continuation by checking the next char is not in
+    /// the test-name character class used by CHUNK_PATTERN.
     private static String readAdvertisedHash(Path path, String testName) throws IOException {
         String text = Files.readString(path, StandardCharsets.UTF_8);
         Pattern info = Pattern.compile(
                 "CN1SS:INFO:test=" + Pattern.quote(testName)
-                        + "\\b[^\\n]*?\\bpng_fnv1a64=([0-9a-fA-F]{16})");
+                        + "(?![A-Za-z0-9_.\\-])[^\\n]*?\\bpng_fnv1a64=([0-9a-fA-F]{16})");
         Matcher m = info.matcher(text);
         String latest = null;
         while (m.find()) {
@@ -252,11 +260,14 @@ public class Cn1ssChunkTools {
     private static long readTotalBase64Length(Path path, String testName, String channel) throws IOException {
         // The INFO line is always emitted on the default channel regardless of
         // whether the chunks themselves go to a side channel like PREVIEW, so
-        // we only filter by test name here.
+        // we only filter by test name here. See readAdvertisedHash for why
+        // the lookahead is required instead of `\b` -- prefixes like
+        // `graphics-draw-string` would otherwise match `graphics-draw-
+        // string-decorated`.
         String text = Files.readString(path, StandardCharsets.UTF_8);
         Pattern info = Pattern.compile(
                 "CN1SS:INFO:test=" + Pattern.quote(testName)
-                        + "\\b[^\\n]*?\\btotal_b64_len=(\\d+)");
+                        + "(?![A-Za-z0-9_.\\-])[^\\n]*?\\btotal_b64_len=(\\d+)");
         Matcher m = info.matcher(text);
         long latest = -1;
         // The same test may emit multiple channels (PNG + PREVIEW). Without a
