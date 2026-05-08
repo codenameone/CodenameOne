@@ -352,6 +352,12 @@ public final class String implements CharSequence, Comparable<String> {
         return null; //TODO codavaj!!
     }
 
+    /// Replaces each substring of this string that matches the literal target sequence with the specified literal replacement sequence.
+    /// The replacement proceeds from the beginning of the string to the end, for example, replacing "aa" with "b" in the string "aaa" will result in "ba" rather than "ab".
+    public java.lang.String replace(java.lang.CharSequence target, java.lang.CharSequence replacement){
+        return null; //TODO codavaj!!
+    }
+
     /// Tests if this string starts with the specified prefix.
     public boolean startsWith(java.lang.String prefix){
         return false; //TODO codavaj!!
