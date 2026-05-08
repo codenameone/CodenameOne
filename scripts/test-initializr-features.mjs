@@ -59,9 +59,28 @@ function fail(label, msg) {
   failures.push(`${label}: ${msg}`);
 }
 
+// Boot deadlines. The first version of this test waited 60 s for
+// ``main-thread-completed`` and then proceeded REGARDLESS -- which
+// meant a regression that made boot take 90 s+ silently passed boot
+// and started clicking on a half-loaded page, where every assertion
+// failed on a transparent canvas with confusing "click was dropped"
+// messages. The pre-fix bundle finished in ~2 s; anything substantially
+// longer is a regression worth flagging immediately.
+//
+// ``BOOT_COMPLETE_BUDGET_MS`` is the soft upper bound for
+// ``main-thread-completed`` -- exceeding it fails the scenario hard
+// instead of silently letting the rest of the test run on a wedged
+// page. ``FIRST_PAINT_BUDGET_MS`` enforces that the canvas actually
+// shows non-trivial content (the rendered Initializr UI) before any
+// scenario starts measuring colours; the boot lifecycle marker can
+// fire while the canvas is still all-white if the post-boot paint
+// pipeline has stalled.
+const BOOT_COMPLETE_BUDGET_MS = Number(process.env.CN1_BOOT_BUDGET_MS) || 15_000;
+const FIRST_PAINT_BUDGET_MS = Number(process.env.CN1_FIRST_PAINT_BUDGET_MS) || 20_000;
+
 // Each scenario opens its own fresh page so menu / dialog state from a
 // previous scenario can't bleed in. Returns { page, messages, pageErrors,
-// canvasBox, snap(label) }.
+// canvasBox, snap(label), bootMs, firstPaintMs }.
 async function bootScenario(scenarioLabel) {
   const page = await browser.newPage({
     viewport: { width: 1280, height: 900 },
@@ -78,14 +97,71 @@ async function bootScenario(scenarioLabel) {
     worker.on('console', msg => messages.push(`[worker:${msg.type()}] ${msg.text()}`));
   });
 
+  const bootStart = Date.now();
   await page.goto(`http://127.0.0.1:${PORT}/`);
 
-  const bootStart = Date.now();
-  while (Date.now() - bootStart < 60_000) {
-    if (messages.some(m => m.includes('main-thread-completed'))) break;
-    await new Promise(r => setTimeout(r, 250));
+  // Phase 1: wait for the worker to finish its lifecycle.start chain.
+  let bootMs = null;
+  while (Date.now() - bootStart < BOOT_COMPLETE_BUDGET_MS) {
+    if (messages.some(m => m.includes('main-thread-completed'))) {
+      bootMs = Date.now() - bootStart;
+      break;
+    }
+    await new Promise(r => setTimeout(r, 100));
   }
-  await new Promise(r => setTimeout(r, 3000));
+  if (bootMs === null) {
+    const out = path.join(ART_DIR, `${scenarioLabel}-boot-timeout.png`);
+    await page.locator('canvas').screenshot({ path: out }).catch(() => {});
+    throw new Error(
+      `boot did not reach main-thread-completed in ${BOOT_COMPLETE_BUDGET_MS} ms ` +
+      `(this is the regression that surfaced as the deployed UI being stuck ` +
+      `on the Loading... splash). Tail of console:\n  ` +
+      messages.slice(-5).map(m => m.slice(0, 200)).join('\n  '));
+  }
+
+  // Phase 2: wait for non-trivial canvas content. ``main-thread-completed``
+  // means the EDT lifecycle finished, but the FIRST paint cycle (which
+  // queues ops to ``pendingDisplay`` and posts a requestAnimationFrame)
+  // has its own latency. If the rAF reply from the main thread never
+  // comes back -- or comes back into a worker still bottle-necked on
+  // its own queue -- the canvas stays white. Hard-fail rather than
+  // proceed to click on a still-blank page.
+  let firstPaintMs = null;
+  const paintDeadline = bootStart + BOOT_COMPLETE_BUDGET_MS + FIRST_PAINT_BUDGET_MS;
+  while (Date.now() < paintDeadline) {
+    const nonWhite = await page.evaluate(() => {
+      const c = document.querySelector('canvas');
+      if (!c || c.width === 0) return 0;
+      try {
+        const img = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+        let nw = 0;
+        // 16x sample stride is enough to detect "is anything at all
+        // drawn"; we only need to distinguish all-white from rendered.
+        for (let i = 0; i < img.length; i += 64) {
+          const lum = (img[i]+img[i+1]+img[i+2])/3;
+          if (img[i+3] > 0 && lum < 240) nw++;
+        }
+        return nw;
+      } catch { return 0; }
+    });
+    if (nonWhite > 200) {
+      firstPaintMs = Date.now() - bootStart;
+      break;
+    }
+    await new Promise(r => setTimeout(r, 100));
+  }
+  if (firstPaintMs === null) {
+    const out = path.join(ART_DIR, `${scenarioLabel}-no-paint.png`);
+    await page.locator('canvas').screenshot({ path: out }).catch(() => {});
+    throw new Error(
+      `canvas never rendered non-trivial content within ` +
+      `${BOOT_COMPLETE_BUDGET_MS + FIRST_PAINT_BUDGET_MS} ms ` +
+      `(boot lifecycle finished at ${bootMs} ms, then nothing painted -- ` +
+      `screenshot at ${out})`);
+  }
+  console.log(`[features] ${scenarioLabel} boot: lifecycle@${bootMs}ms firstPaint@${firstPaintMs}ms`);
+
+  await new Promise(r => setTimeout(r, 1500));
 
   const canvasBox = await page.evaluate(() => {
     const c = document.querySelector('canvas');
@@ -101,7 +177,7 @@ async function bootScenario(scenarioLabel) {
     return out;
   }
   await snap('boot');
-  return { page, messages, pageErrors, canvasBox, snap };
+  return { page, messages, pageErrors, canvasBox, snap, bootMs, firstPaintMs };
 }
 
 async function teardown(s) {

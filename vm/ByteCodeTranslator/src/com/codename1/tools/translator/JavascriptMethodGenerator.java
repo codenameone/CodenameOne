@@ -2134,29 +2134,20 @@ final class JavascriptMethodGenerator {
         if (hasTryCatch) {
             appendTryCatchTable(out, instructions, labelToIndex);
         }
-        // Cooperative budget yield. Every generator-method invocation
-        // checks the wall-clock time since drain() last started a step
-        // and yields {sleep:0} when the budget is exceeded. This is
-        // the JS port's only way to preempt long synchronous
-        // Java-to-Java chains: drain()'s 8 ms budget only fires
-        // BETWEEN ``generator.next()`` calls, not within one, so
-        // without this seed point a ~30-second chain (e.g.
-        // UIManager.setThemeProps -> theme rebuild) blocks the worker
-        // message loop and drops every queued user event.
-        //
-        // ``_Y`` is a no-op when called from inside a class <clinit>
-        // (the synchronous run-to-completion driver in
-        // ensureClassInitialized cannot honour real suspensions) and
-        // when the wall-clock budget has not yet elapsed. The cost
-        // when it doesn't yield is one timestamp diff plus a
-        // comparison, identical for every call -- still cheap enough
-        // to land at every method entry.
+        // Cooperative budget yield. Opt-in via the system property
+        // ``parparvm.js.preemptYield=1``. When enabled, every
+        // generator-method invocation checks ``_Yc()`` (counter-amortised
+        // wall-clock test against ``__cn1TickStartedAt``) and yields
+        // ``_Yv = {op:"sleep",millis:0}`` when the budget is exceeded.
+        // Disabled by default while we tune the overhead; the runtime
+        // half of the machinery (``_Yc``/``_Yv``/``__cn1TickReset`` +
+        // the clinit-depth gate in ``ensureClassInitialized``) ships
+        // unconditionally so the gate can be flipped without a
+        // translator rebuild.
         //
         // Sync (non-generator) methods skip this -- they cannot yield.
-        // The chain still gets a yield point each time it crosses
-        // back into a generator frame, which in practice is roughly
-        // every virtual dispatch / interface call.
-        if (methodSuspending && !"__CLINIT__".equals(method.getMethodName())) {
+        if (methodSuspending && !"__CLINIT__".equals(method.getMethodName())
+                && Boolean.getBoolean("parparvm.js.preemptYield")) {
             out.append("  if(_Yc())yield _Yv;\n");
         }
         if (method.isSynchronizedMethod()) {
@@ -2767,11 +2758,10 @@ final class JavascriptMethodGenerator {
             for (int i = 0; i < ctx.getMaxObservedStack(); i++) {
                 body.append("  let s").append(i).append(";\n");
             }
-            // Cooperative budget yield -- straight-line variant.
-            // See appendMethodImpl for the rationale; emitted before
-            // any synchronized-monitor entry so the yield doesn't
-            // happen while holding the lock.
-            if (method.isJavascriptSuspending() && !"__CLINIT__".equals(method.getMethodName())) {
+            // Cooperative budget yield -- straight-line variant. Opt-in
+            // via ``parparvm.js.preemptYield``. See appendMethodImpl.
+            if (method.isJavascriptSuspending() && !"__CLINIT__".equals(method.getMethodName())
+                    && Boolean.getBoolean("parparvm.js.preemptYield")) {
                 body.append("  if(_Yc())yield _Yv;\n");
             }
             if (method.isSynchronizedMethod()) {
