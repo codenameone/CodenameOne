@@ -718,6 +718,11 @@ public class IPhoneBuilder extends Executor {
         } else {
             new File(buildinRes, "MainWindowMETAL.xib").delete();
             new File(buildinRes, "CodenameOne_METALViewController.xib").delete();
+            // The .metal shader file isn't guarded by an #ifdef like the
+            // companion .m files, so leaving it in the project forces Xcode
+            // to invoke the Metal toolchain — which Xcode 26 ships as a
+            // separately-downloaded component that build servers don't have.
+            new File(buildinRes, "CN1MetalShaders.metal").delete();
         }
 
 
