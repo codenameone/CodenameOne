@@ -3632,6 +3632,20 @@ public class CSSTheme {
             if (b != null) {
                 return b;
             }
+            // If this Element set its own (non-bound) value for the
+            // CSS property, don't inherit a binding from the parent.
+            // Example: `Button { color: var(--accent) }` plus
+            // `Button.disabled { color: #a5a0ab }` - the disabled state
+            // EXPLICITLY overrode the colour with a literal, so reading
+            // the parent's accent binding for `Button.dis#fgColor` would
+            // wire the disabled state to the runtime accent override
+            // even though the disabled rule deliberately broke that
+            // link. Only fall through to the parent when this Element
+            // has no explicit value of its own (e.g. a derive-only
+            // child, or the implicit unselected state).
+            if (style.get(cssProperty) != null) {
+                return null;
+            }
             // anyNodeStyle.parent points back to itself (default field
             // initializer); stop the walk there to avoid infinite
             // recursion. Any binding declared on anyNodeStyle is still
