@@ -1336,6 +1336,12 @@ public class IPhoneBuilder extends Executor {
                 try(Writer fios = new OutputStreamWriter(Files.newOutputStream(appDelH.toPath()), StandardCharsets.UTF_8)) {
                     String str = new String(data, StandardCharsets.UTF_8);
                     str = str.replace("//#define CN1_INCLUDE_NOTIFICATIONS", "#define CN1_INCLUDE_NOTIFICATIONS");
+                    if (request.getArg("ios.notificationPermissionAtLaunch", "false").equalsIgnoreCase("true")) {
+                        // Restore pre-#4876 behavior: prompt for notification permission
+                        // in didFinishLaunchingWithOptions instead of on first registerPush /
+                        // sendLocalNotification call.
+                        str = str.replace("//#define CN1_NOTIFICATION_PERMISSION_AT_LAUNCH", "#define CN1_NOTIFICATION_PERMISSION_AT_LAUNCH");
+                    }
                     fios.write(str);
                 }
 

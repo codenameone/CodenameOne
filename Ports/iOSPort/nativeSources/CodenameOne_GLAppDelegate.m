@@ -355,14 +355,21 @@ static void installSignalHandlers() {
 #ifdef CN1_INCLUDE_NOTIFICATIONS
     if (@available(iOS 10, *)) {
         if (isIOS10()) {
+            // Set the notification center delegate at launch so delivery callbacks route
+            // correctly. The auth prompt is deferred to registerPush / sendLocalNotification
+            // so the developer can show their own rationale first (matches Android, see
+            // issue #4876). Set the ios.notificationPermissionAtLaunch=true build hint to
+            // restore the legacy launch-time prompt for backward compatibility.
             UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
             center.delegate = self;
+#ifdef CN1_NOTIFICATION_PERMISSION_AT_LAUNCH
 #if !TARGET_OS_SIMULATOR
             [center requestAuthorizationWithOptions:(UNAuthorizationOptionSound | UNAuthorizationOptionAlert | UNAuthorizationOptionBadge) completionHandler:^(BOOL granted, NSError * _Nullable error){
                 if( !error ) {}
             }];
 #endif
-        } 
+#endif
+        }
     }
 #endif
     

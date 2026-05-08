@@ -307,6 +307,9 @@ Only supported for App Store builds. See https://www.codenameone.com/developer-g
 |ios.detectJailbreak
 |true/false (defaults to false). When true, the iOS app will exit on launch if it detects that it's running on a jailbroken device.
 
+|ios.notificationPermissionAtLaunch
+|true/false (defaults to false). Backward-compatibility flag for the pre-issue-#4876 behavior. By default, the iOS notification permission prompt is deferred until the app calls `Push.register()` or schedules a `LocalNotification`, matching the Android flow and giving the developer a chance to display a rationale screen first. Set this hint to `true` to restore the legacy behavior in which the prompt fires automatically inside `application:didFinishLaunchingWithOptions:` as soon as the app launches. Existing apps relying on the prompt being shown at launch should set this to `true`; new apps should leave it disabled and trigger the prompt explicitly when they are ready to ask for permission.
+
 |ios.applicationQueriesSchemes
 |Comma separated list of url schemes that `canExecute` will respect on iOS. If the url scheme isn't mentioned here `canExecute` will return false starting with iOS 9. Notice that this collides with `ios.plistInject` when used with the `<key>LSApplicationQueriesSchemes</key>...` value so you should use one or the other. For example, to enable `canExecute` for a url like `myurl://xys` you can use: `myurl,myotherurl`
 
