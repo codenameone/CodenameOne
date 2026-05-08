@@ -13,23 +13,23 @@ import java.util.Hashtable;
  * Verifies that a sub-theme can re-skin the native palette without
  * touching the native theme's CSS source.
  *
- * The native CSS declares a palette (--cn1-accent, --cn1-primary etc.)
- * that's inlined into each UIID at compile time. At runtime a user app
- * overrides specific colors by layering an additional {@link Hashtable}
- * of theme props on top of the installed native theme via
- * {@link UIManager#addThemeProps}. This test installs a magenta
- * override - vivid enough that a visual diff against the native
- * baseline is unmistakable - and verifies both the light and dark
- * captures pick it up.
+ * The native CSS declares an accent palette via `var(--accent-color,
+ * fallback)` references. The compiler bakes the fallback into each
+ * UIID at compile time AND emits `@cn1-bind:&lt;UIID&gt;.&lt;key&gt;=accent-color`
+ * constants alongside, so the .res ships with every accent-bearing
+ * UIID quietly tracking the underlying palette variable. At app
+ * launch the user calls
+ * {@link UIManager#addThemeProps(Hashtable)} with a single
+ * `@accent-color`-style constant per palette role and the runtime
+ * binding pass overlays the override onto every bound UIID at once -
+ * no per-UIID rule duplication, no theme recompile.
  *
- * The override is installed once when the suite reaches this test; the
- * light capture exercises it with the light base styles, the dark
- * capture exercises it with the base styles picking up the
- * {@code $Dark<UIID>} variants merged under the same override layer.
- * Because {@link Style#setBgColor} on an override key blows away the
- * {@code $Dark} variant for that specific key, the dark capture also
- * ends up showing the override color - proving the override reaches
- * every appearance.
+ * This test installs a magenta override - vivid enough that a visual
+ * diff against the native baseline is unmistakable - and verifies both
+ * the light and dark captures pick it up. The light capture exercises
+ * the light base styles; the dark capture exercises the
+ * {@code $Dark<UIID>} variants which are bound to the matching
+ * `-dark` palette variables.
  */
 public class PaletteOverrideThemeScreenshotTest extends DualAppearanceBaseTest {
 
@@ -77,30 +77,36 @@ public class PaletteOverrideThemeScreenshotTest extends DualAppearanceBaseTest {
 
     /**
      * Adds a palette-override layer on top of the installed native
-     * theme. Uses {@link UIManager#addThemeProps} so the native theme
-     * stays resident underneath - the override table only has to
-     * redeclare the handful of keys it wants to change, plus the
-     * matching {@code $Dark} keys so the override applies in dark
-     * mode too.
+     * theme by declaring `@`-prefixed accent constants. The runtime
+     * binding pass in {@link UIManager} fans each constant out to every
+     * bound UIID/state/dark variant, so this short Hashtable replaces
+     * the 12+ explicit per-UIID keys the override used to require.
+     *
+     * Both Android and iOS native themes share the same variable
+     * vocabulary (see native-themes/&lt;family&gt;/theme.css `#Constants`).
+     * The Android theme additionally exposes M3-flavoured container
+     * tokens (`accent-container-color`, `accent-on-container-color`)
+     * which we override too so RaisedButton-style "tonal" surfaces also
+     * pick up the magenta - leaving them at the default would let
+     * Android-only RaisedButton.bgColor remain at the M3 baseline tone
+     * even though Button.fgColor and the matching iOS RaisedButton
+     * already shifted.
      */
     private void installPaletteOverride() {
         Hashtable override = new Hashtable();
-        override.put("RaisedButton.bgColor", OVERRIDE_ACCENT);
-        override.put("RaisedButton.fgColor", OVERRIDE_ACCENT_TEXT);
-        override.put("RaisedButton.press#bgColor", OVERRIDE_ACCENT_PRESSED);
-        override.put("RaisedButton.press#fgColor", OVERRIDE_ACCENT_TEXT);
-        override.put("Button.fgColor", OVERRIDE_ACCENT);
-        override.put("Button.press#fgColor", OVERRIDE_ACCENT_PRESSED);
-        // Dark override mirrors the light override so the magenta
-        // applies across both appearances. A real user theme would
-        // probably choose two variants; this test keeps them identical
-        // for easy visual confirmation.
-        override.put("$DarkRaisedButton.bgColor", OVERRIDE_ACCENT);
-        override.put("$DarkRaisedButton.fgColor", OVERRIDE_ACCENT_TEXT);
-        override.put("$DarkRaisedButton.press#bgColor", OVERRIDE_ACCENT_PRESSED);
-        override.put("$DarkRaisedButton.press#fgColor", OVERRIDE_ACCENT_TEXT);
-        override.put("$DarkButton.fgColor", OVERRIDE_ACCENT);
-        override.put("$DarkButton.press#fgColor", OVERRIDE_ACCENT_PRESSED);
+        override.put("@accent-color", OVERRIDE_ACCENT);
+        override.put("@accent-color-dark", OVERRIDE_ACCENT);
+        override.put("@accent-pressed-color", OVERRIDE_ACCENT_PRESSED);
+        override.put("@accent-pressed-color-dark", OVERRIDE_ACCENT_PRESSED);
+        override.put("@accent-on-color", OVERRIDE_ACCENT_TEXT);
+        override.put("@accent-on-color-dark", OVERRIDE_ACCENT_TEXT);
+        // Material 3 RaisedButton uses the "container" tonal pair; iOS
+        // ignores these vars (no bindings reference them) so it's safe
+        // to set them unconditionally for both platforms.
+        override.put("@accent-container-color", OVERRIDE_ACCENT);
+        override.put("@accent-container-color-dark", OVERRIDE_ACCENT);
+        override.put("@accent-on-container-color", OVERRIDE_ACCENT_TEXT);
+        override.put("@accent-on-container-color-dark", OVERRIDE_ACCENT_TEXT);
         UIManager.getInstance().addThemeProps(override);
     }
 }
