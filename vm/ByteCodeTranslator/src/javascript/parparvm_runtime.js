@@ -815,19 +815,55 @@ const jvm = {
     const clinitMethodId = "cn1_" + className + "___CLINIT__";
     const clinit = this.nativeMethods[clinitMethodId] || cls.clinit;
     if (clinit) {
-      const result = clinit();
+      // Track depth: any code reached transitively from a clinit
+      // must NOT cooperatively yield, because the run-to-completion
+      // loop below cannot honour {sleep:N>0}/{wait:...} (the worker
+      // is single-threaded and the surrounding caller is blocked on
+      // this synchronous step). The translator-emitted budget yield
+      // (``yield* _Y()`` at every generator-method entry) reads
+      // ``jvm.__cn1ClinitDepth`` and short-circuits to a no-op when
+      // it is non-zero.
+      jvm.__cn1ClinitDepth = (jvm.__cn1ClinitDepth || 0) + 1;
+      let result;
+      try {
+        result = clinit();
+      } catch (e) {
+        jvm.__cn1ClinitDepth--;
+        cls.initializing = false;
+        throw e;
+      }
       // A clinit declared synchronous by the translator returns a
       // non-iterable value (usually ``null``) and has no suspension
       // points — nothing to drive. Only generator-shaped results need
       // the step-until-done loop.
       if (result && typeof result.next === "function") {
-        let step = result.next();
-        while (!step.done) {
-          if (step.value && (step.value.op === "sleep" || step.value.op === "wait")) {
-            throw new Error("Blocking static initializers are not supported in javascript backend");
+        try {
+          let step = result.next();
+          while (!step.done) {
+            // Tolerate {sleep:0} produced by the budget-yield helper:
+            // inside clinit we are synchronous, so a "cooperative
+            // hand-off" simply means continue stepping. {sleep:N>0}
+            // and {wait:...} genuinely cannot be honoured (the worker
+            // is single-threaded and the surrounding caller is blocked
+            // on this synchronous step). Other ops (HOST_CALL etc.)
+            // were never explicitly handled here pre-budget-yield --
+            // keep that pass-through behaviour so any clinit that
+            // happens to make a host call continues to silently
+            // step (the runtime never had clinits that legitimately
+            // suspended; if one ever does land here it will just
+            // misbehave, same as before).
+            if (step.value && (
+                (step.value.op === "sleep" && (step.value.millis | 0) > 0)
+                || step.value.op === "wait")) {
+              throw new Error("Blocking static initializers are not supported in javascript backend");
+            }
+            step = result.next();
           }
-          step = result.next();
+        } finally {
+          jvm.__cn1ClinitDepth--;
         }
+      } else {
+        jvm.__cn1ClinitDepth--;
       }
     }
     cls.initializing = false;
@@ -2162,6 +2198,12 @@ const jvm = {
           vmTrace("runtime.drain.first-step.thread-" + thread.id + ":" + threadDebugLabel(thread.object));
         }
         let result;
+        // Restart the cooperative tick budget so ``yield* _Y()``
+        // boundaries reached during this generator step measure
+        // straight-line time within THIS step. See the
+        // ``_Y`` / ``__cn1TickReset`` block at the top of this
+        // file for the rationale.
+        __cn1TickReset();
         if (thread.resumeError) {
           const resumeError = thread.resumeError;
           thread.resumeError = null;
@@ -2709,6 +2751,77 @@ jvm.iO = function(value, className) {
   }
   return false;
 };
+// === Cooperative tick budget ===
+// Generic preemption mechanism. Long synchronous Java-to-Java call
+// chains (e.g. UIManager.setThemeProps -> buildTheme ->
+// installNativeTheme -> refreshTheme(true), which is just one of many
+// realistic chains an app can write without any "obvious red flag"
+// in the source) keep ``thread.generator.next()`` running for
+// hundreds of milliseconds at a time. While it runs the worker's
+// message loop is starved -- pointer events, host callbacks, and
+// requestAnimationFrame replies all sit unprocessed and the user
+// observes a frozen UI.
+//
+// drain()'s 8 ms budget cannot help here: it only checks the deadline
+// BETWEEN ``generator.next()`` calls, not within one. To preempt
+// inside a long chain we need yield points seeded INSIDE generator
+// methods. The translator emits ``yield* _Y()`` at the entry of every
+// generator method (see JavascriptMethodGenerator.appendMethodImpl);
+// this helper does a single timestamp diff against
+// ``__cn1TickStartedAt`` and yields ``{op:"sleep", millis:0}`` only
+// when the budget has been exceeded AND we are not currently inside
+// a class <clinit> (clinit is driven by a synchronous run-to-
+// completion loop in ensureClassInitialized that cannot honour real
+// suspensions).
+//
+// drain() resets ``__cn1TickStartedAt`` before every
+// ``generator.next()`` so each step gets a fresh budget. The actual
+// yield is rare -- only chains that exceed the budget pay the cost
+// of a real cooperative hand-off.
+let __cn1TickStartedAt = 0;
+const __cn1TickBudgetMs = 400;
+function __cn1TickReset() {
+  __cn1TickCounter = 0;
+  if (typeof global.performance !== "undefined" && global.performance
+      && typeof global.performance.now === "function") {
+    __cn1TickStartedAt = global.performance.now();
+  } else {
+    __cn1TickStartedAt = Date.now();
+  }
+}
+global.__cn1TickReset = __cn1TickReset;
+// ``_Yc`` is a fast plain-function predicate the translator pairs
+// with a sentinel yield. The emit pattern at every generator-method
+// entry is: ``if(_Yc())yield _Yv;`` -- this avoids allocating a
+// generator object per method invocation (which a ``yield* _Y()``
+// helper would have done; CN1 apps invoke many thousands of generator
+// methods per second on the worker).
+//
+// Hot-path: most calls hit only the counter increment + comparison
+// (~5 ns), since invoking ``performance.now()`` on every method
+// entry across thousands of entries per millisecond is what makes
+// boot time-budget-aware in the first place but also adds tens of
+// percent overhead. We amortise: after every ``__cn1TickStride``
+// counter ticks we drop into the slow path which actually queries
+// the wall clock and resets/yields if the budget has elapsed. The
+// counter is reset to zero when drain() restarts a generator step,
+// so fresh steps start fast again.
+const _Yv = { op: "sleep", millis: 0 };
+const __cn1TickStride = 256;
+let __cn1TickCounter = 0;
+function _Yc() {
+  if (++__cn1TickCounter < __cn1TickStride) return false;
+  __cn1TickCounter = 0;
+  if (jvm.__cn1ClinitDepth) return false;
+  const now = (typeof global.performance !== "undefined" && global.performance
+      && typeof global.performance.now === "function")
+      ? global.performance.now() : Date.now();
+  if ((now - __cn1TickStartedAt) < __cn1TickBudgetMs) return false;
+  __cn1TickStartedAt = now;
+  return true;
+}
+global._Yc = _Yc;
+global._Yv = _Yv;
 // Top-level 2-char globals for the ~15k ``jvm.*`` call sites in
 // translated code. Dropping the ``jvm.`` prefix (4 chars) saves
 // ~60 KiB raw. ``_``-prefix names can never collide with a mangler-

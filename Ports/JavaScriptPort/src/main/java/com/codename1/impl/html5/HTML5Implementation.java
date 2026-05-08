@@ -2829,7 +2829,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 }
             }
             String nativeTheme = Display.getInstance().getProperty("javascript.native.theme", defaultTheme);
-            Log.p("[installNativeTheme] attempting to load theme from " + nativeTheme);
             Resources r;
             try {
                 r = Resources.open(nativeTheme);
@@ -2837,22 +2836,17 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 // Fall back to the legacy theme if the chosen .res isn't in
                 // the JS bundle (partial build, missing mirror step, etc.).
                 String fallback = isAndroid_() ? "/android_holo_light.res" : "/iOS7Theme.res";
-                Log.p("[installNativeTheme] " + nativeTheme + " missing, falling back to " + fallback);
                 r = Resources.open(fallback);
             }
-            Log.p("[installNativeTheme] loaded theme resources, theme names: " + java.util.Arrays.toString(r.getThemeResourceNames()));
             Hashtable tp = r.getTheme(r.getThemeResourceNames()[0]);
-            
+
             tp.put("StatusBar.padding", "0,0,0,0");
-            
+
             UIManager.getInstance().setThemeProps(tp);
-            Log.p("[installNativeTheme] successfully installed theme");
             return;
     	} catch (IOException ex){
-            Log.p("[installNativeTheme] IOException loading theme: " + (ex.getMessage() != null ? ex.getMessage() : "null"));
             Log.e(ex);
     	} catch (Exception ex) {
-            Log.p("[installNativeTheme] Exception loading theme: " + ex.getClass().getName() + ": " + (ex.getMessage() != null ? ex.getMessage() : "null"));
             Log.e(ex);
         }
         return;

@@ -2134,6 +2134,31 @@ final class JavascriptMethodGenerator {
         if (hasTryCatch) {
             appendTryCatchTable(out, instructions, labelToIndex);
         }
+        // Cooperative budget yield. Every generator-method invocation
+        // checks the wall-clock time since drain() last started a step
+        // and yields {sleep:0} when the budget is exceeded. This is
+        // the JS port's only way to preempt long synchronous
+        // Java-to-Java chains: drain()'s 8 ms budget only fires
+        // BETWEEN ``generator.next()`` calls, not within one, so
+        // without this seed point a ~30-second chain (e.g.
+        // UIManager.setThemeProps -> theme rebuild) blocks the worker
+        // message loop and drops every queued user event.
+        //
+        // ``_Y`` is a no-op when called from inside a class <clinit>
+        // (the synchronous run-to-completion driver in
+        // ensureClassInitialized cannot honour real suspensions) and
+        // when the wall-clock budget has not yet elapsed. The cost
+        // when it doesn't yield is one timestamp diff plus a
+        // comparison, identical for every call -- still cheap enough
+        // to land at every method entry.
+        //
+        // Sync (non-generator) methods skip this -- they cannot yield.
+        // The chain still gets a yield point each time it crosses
+        // back into a generator frame, which in practice is roughly
+        // every virtual dispatch / interface call.
+        if (methodSuspending && !"__CLINIT__".equals(method.getMethodName())) {
+            out.append("  if(_Yc())yield _Yv;\n");
+        }
         if (method.isSynchronizedMethod()) {
             out.append("  let __cn1Monitor = ").append(method.isStatic() ? "jvm.getClassObject(\"" + cls.getClsName() + "\")" : "__cn1ThisObject").append(";\n");
             // ``yield* _me(...)`` lets the calling green thread park if
@@ -2741,6 +2766,13 @@ final class JavascriptMethodGenerator {
             }
             for (int i = 0; i < ctx.getMaxObservedStack(); i++) {
                 body.append("  let s").append(i).append(";\n");
+            }
+            // Cooperative budget yield -- straight-line variant.
+            // See appendMethodImpl for the rationale; emitted before
+            // any synchronized-monitor entry so the yield doesn't
+            // happen while holding the lock.
+            if (method.isJavascriptSuspending() && !"__CLINIT__".equals(method.getMethodName())) {
+                body.append("  if(_Yc())yield _Yv;\n");
             }
             if (method.isSynchronizedMethod()) {
                 body.append("  let __cn1Monitor = ").append(method.isStatic() ? "jvm.getClassObject(\"" + cls.getClsName() + "\")" : "__cn1ThisObject").append(";\n");
