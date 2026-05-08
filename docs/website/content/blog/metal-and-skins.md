@@ -5,6 +5,7 @@ url: /blog/metal-and-skins/
 date: '2026-05-08'
 author: Shai Almog
 description: A new Metal rendering backend for iOS, a browser-hosted Skin Designer that retires the skin downloader, an iOS Reminders-style Return-as-Done flag, status-bar tap diagnostics, a simulator dark/light toggle, and a candid look at how we balance quality with the speed of a small open source company.
+feed_html: '<img src="https://www.codenameone.com/blog/metal-and-skins.jpg" alt="Metal and Skins" /> A new Metal rendering backend for iOS, a browser-hosted Skin Designer that retires the skin downloader, an iOS Reminders-style Return-as-Done flag, status-bar tap diagnostics, a simulator dark/light toggle, and a candid look at how we balance quality with the speed of a small open source company. Build hint to enable Metal: <pre>ios.metal=true</pre> -- the default flips within two weeks.'
 ---
 
 ![Metal and Skins](/blog/metal-and-skins.jpg)
