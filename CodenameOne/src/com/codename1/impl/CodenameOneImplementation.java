@@ -1517,22 +1517,6 @@ public abstract class CodenameOneImplementation {
         return false;
     }
 
-    /// When `#isTranslationSupported()` returns false, Graphics.java accumulates
-    /// xTranslate/yTranslate locally and bakes them into the vertex coordinates
-    /// passed to the impl's fill primitives. If the impl's render path then
-    /// applies the user's setTransform matrix on top of those already-translated
-    /// vertices (e.g. iOS Metal's GPU vertex shader does
-    /// `projection * modelView * userTransform * pos`), the translation is
-    /// double-counted for any non-translation matrix and the output ends up
-    /// off-screen. Override this and return true so Graphics.setTransform
-    /// conjugates the user's matrix with T(xTranslate, yTranslate) before
-    /// passing it to the impl, restoring translate-independent semantics.
-    /// Default: false (Android's setTransform path produces visible output
-    /// without the conjugation, so opting in there would change pixels).
-    public boolean isSetTransformTranslationConjugationRequired() {
-        return false;
-    }
-
     /// Translates the X/Y location for drawing on the underlying surface. Translation
     /// is incremental so the new value will be added to the current translation and
     /// in order to reset translation we have to invoke

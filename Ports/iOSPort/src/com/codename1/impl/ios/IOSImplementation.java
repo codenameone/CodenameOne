@@ -4219,26 +4219,15 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public boolean isTranslationSupported() {
         //return true;
-        // We'll leave this as false until the next iteration...
-        // ES2 should allow us to do all of this using transforms but
+        // We'll leave this as false until the next iteration... 
+        // ES2 should allow us to do all of this using transforms but 
         // let's take small steps first
         return false;
     }
 
-    @Override
-    public boolean isSetTransformTranslationConjugationRequired() {
-        // The iOS render path bakes xTranslate/yTranslate into vertex coords
-        // (since isTranslationSupported() is false) and the GPU then applies
-        // the user's setTransform matrix on top, double-counting the
-        // translation for any non-translation matrix and pushing output
-        // off-screen. Conjugating in Graphics.setTransform restores
-        // translate-independent semantics on this port.
-        return true;
-    }
-
-
-
-
+    
+    
+    
     public void shear(Object nativeGraphics, float x, float y) {
         ((NativeGraphics)nativeGraphics).shear(x, y);
     }
