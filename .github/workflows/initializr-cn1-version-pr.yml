@@ -47,6 +47,31 @@ jobs:
           echo "developer-guide.pdf did not appear on release $RELEASE_TAG within 30 minutes"
           exit 1
 
+      - name: Wait for codenameone-maven-plugin on Maven Central
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          # PR-triggered workflows like cn1playground-language and
+          # archetype-smoke try to resolve com.codenameone:codenameone-maven-plugin
+          # at the new version from Maven Central as soon as the PR opens.
+          # Sonatype Central -> repo1.maven.org propagation can take 30+
+          # minutes after publish, so wait for the artifact to be visible
+          # before creating the PR.
+          set +e
+          version="${RELEASE_TAG#v}"
+          url="https://repo1.maven.org/maven2/com/codenameone/codenameone-maven-plugin/${version}/codenameone-maven-plugin-${version}.pom"
+          for i in $(seq 1 90); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "$url")
+            if [ "$code" = "200" ]; then
+              echo "codenameone-maven-plugin ${version} is on Maven Central"
+              exit 0
+            fi
+            echo "[$i/90] Waiting for codenameone-maven-plugin ${version} on Maven Central (last code=$code)"
+            sleep 20
+          done
+          echo "codenameone-maven-plugin ${version} did not appear on Maven Central within 30 minutes"
+          exit 1
+
       - name: Update Initializr Codename One versions
         run: ./scripts/initializr/update-cn1-version.sh "${{ github.event.release.tag_name || github.ref_name }}"
 

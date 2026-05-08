@@ -83,6 +83,18 @@ jobs:
         run: |
           git clone https://github.com/shannah/cn1-maven-archetypes
           cd cn1-maven-archetypes
+          # Pin maven-resources-plugin: Maven Central currently advertises
+          # maven-resources-plugin 4.0.0-beta-1 as the latest release, and
+          # that build requires Java 17 + Maven 4. The cn1-maven-archetypes
+          # parent pom does not pin a version, so the deploy resolves the
+          # beta and fails on this Java 8 / Maven 3.9 runner. Inject a
+          # pluginManagement entry into the first <build> block (top-level,
+          # not the sign-artifacts profile build) before the deploy.
+          sed -i '1,/<build>/s|<build>|<build><pluginManagement><plugins><plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-resources-plugin</artifactId><version>3.3.1</version></plugin></plugins></pluginManagement>|' pom.xml
+          if ! grep -q 'maven-resources-plugin</artifactId><version>3.3.1' pom.xml; then
+            echo "Failed to inject maven-resources-plugin pin into archetypes pom.xml" >&2
+            exit 1
+          fi
           bash update-version.sh "$GITHUB_REF_NAME"
           export GPG_TTY=$(tty)
           xvfb-run -a mvn deploy -Psign-artifacts -Dgpg.passphrase=$MAVEN_GPG_PASSPHRASE -Plocal-dev-javase
