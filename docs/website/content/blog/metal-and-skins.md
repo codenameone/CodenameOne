@@ -110,21 +110,33 @@ If you only want a skin and don't care how it is built, pick a device, accept th
 
 **Stage 1, pick a device.** The first step shows a card per device from the bundled catalog. The search box filters by name (it matches both the model and the brand) and the chips below narrow by form factor: All / Phones / Tablets / Foldables. Picking a device pulls in its resolution, PPI, screen size, default safe-area insets, and the iOS or Android system font names from the catalog, then seeds a sensible starting frame: notch, island, or hole presets are applied automatically based on the device's hardware. The catalog is large, the grid is capped to the most recent matches by default, type into the search field to find older or less-common devices.
 
+![Skin Designer stage 1, device picker](https://www.codenameone.com/developer-guide/img/skin-designer/skin-designer-stage-1-device.png)
+
 **Stage 2, pick a starting source.** There are three ways to seed the skin's body image:
 
 * *Pick a shape* generates the device frame procedurally from a small preset library (rounded rect, notch, dynamic island, punch-hole, corner hole, classic home-button). The frame is rendered as a dark gradient with the screen rect (and any cutouts) carved into it. Best when you want a generic-looking iPhone or Android frame and don't care about exact hardware fidelity.
 * *Upload an image* opens an image picker. The wizard scales the image into the device's resolution, then carves the screen rect and cutouts on top. Use this when you have a marketing render of the specific device you are targeting.
 * *Blank rectangle* collapses the bezel and corner radius to almost nothing, drops every cutout, and turns the home indicator off. The screen fills the entire skin. Useful for desktop or web simulators where the device frame would just be visual noise.
 
+![Skin Designer stage 2, source picker](https://www.codenameone.com/developer-guide/img/skin-designer/skin-designer-stage-2-source.png)
+
 **Stage 3, the editor.** The editor is split into two panes: a live preview on the left that paints the device frame, screen tint, cutouts, and home indicator, and a sidebar on the right with three tabs.
 
 The *Shape* tab shows a preset grid (Rounded rect, Notch, Dynamic Island, Punch-hole, Corner hole, Classic home) and dimension fields for corner radius, bezel thickness, and a toggle for the bottom home indicator. iPhones from X onward and most modern Androids should leave the indicator on, classic devices with a hardware home button should turn it off.
 
+![Skin Designer stage 3, Shape tab](https://www.codenameone.com/developer-guide/img/skin-designer/skin-designer-stage-3-editor-shape.png)
+
 The *Cutouts* tab lists every cutout currently on the skin. Tap a row to expand its width, height, and offset fields. The three add buttons at the bottom seed a sensible default of each type. *Notch* (180 x 30 viewbox px) is a physical hardware cutout drawn in the device frame above the screen rect, mirroring iPhone X / 11 / 12 / 13 hardware. *Island* (120 x 35) is a Dynamic Island, software-reserved space rendered as an opaque pill inside the screen rect, floating on top of the iOS status bar. *Hole* (28 x 28) is an Android punch-hole camera, rendered like the island. When the wizard generates the `.skin`, it automatically extends `safePortraitTop` to cover any in-screen cutouts so app content lands below the floating shape.
+
+![Skin Designer stage 3, Cutouts tab](https://www.codenameone.com/developer-guide/img/skin-designer/skin-designer-stage-3-editor-cutouts.png)
 
 The *Info* tab is mostly read-only and shows what is about to be written into `skin.properties`: name, width, height, PPI, pixels-per-millimeter, and the user-editable safe-area insets. The wizard intentionally does *not* write `smallFontSize`, `mediumFontSize`, or `largeFontSize`, when those are absent the simulator auto-derives them from `pixelMilliRatio`, which is what you want on high-PPI screens.
 
+![Skin Designer stage 3, Info tab](https://www.codenameone.com/developer-guide/img/skin-designer/skin-designer-stage-3-editor-info.png)
+
 **Stage 4, finish and download.** Clicking *Finish* renders the portrait skin image at the device's actual resolution with rounded corners, transparent screen, opaque cutouts, and a home indicator if enabled. It synthesises the landscape skin by 90-degree rotation, writes the `skin_map.png` overlays that mark the screen rectangle for the simulator's screen-position detection, bundles the appropriate native theme inside the skin zip, and writes `skin.properties` with the platform metadata, safe-area, PPI, and display rect. Clicking *Download skin* hands the file to the browser's download dialog. After the file is on disk, drop it into your simulator's skins folder (or use the *Add* command in the simulator's *Skins* menu) and your new device should appear in the picker.
+
+![Skin Designer stage 4, finish and download](https://www.codenameone.com/developer-guide/img/skin-designer/skin-designer-stage-4-done.png)
 
 A generated `.skin` is just a renamed zip:
 
