@@ -5,6 +5,7 @@ url: /blog/liquid-glass-material-3-modern-native-themes/
 date: '2026-05-01'
 author: Shai Almog
 description: New iOS Modern (liquid glass) and Android Material 3 native themes, how they work in the Playground, in the simulator, and on devices, plus a week of performance and look-and-feel improvements including sticky headers.
+feed_html: '<img src="https://www.codenameone.com/blog/liquid-glass-material-3-modern-native-themes.jpg" alt="Liquid Glass, Material 3, And A Lot Of Plumbing" /> New iOS Modern (liquid glass) and Android Material 3 native themes, how they work in the Playground, in the simulator, and on devices, plus a week of performance and look-and-feel improvements including sticky headers. Cross-platform shortcut: <pre>nativeTheme=modern</pre>; finer control via <pre>ios.themeMode=modern</pre> and <pre>and.themeMode=modern</pre>.'
 ---
 
 ![Header Image](/blog/liquid-glass-material-3-modern-native-themes.jpg)
