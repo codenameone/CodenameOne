@@ -1,7 +1,7 @@
 package com.codenameone.examples.hellocodenameone.tests.graphics;
 
 import com.codename1.ui.Graphics;
-import com.codename1.ui.Image;
+import com.codename1.ui.Transform;
 import com.codename1.ui.geom.Rectangle;
 import com.codenameone.examples.hellocodenameone.tests.AbstractGraphicsScreenshotTest;
 
@@ -24,49 +24,29 @@ public class Scale extends AbstractGraphicsScreenshotTest {
             return;
         }
 
-        // Earlier iterations of this test relied on g.setTransform(t) where t
-        // composed translate + scale. iOS Metal applies the user's matrix on
-        // top of xTranslate-shifted vertex coordinates, and the cell-origin
-        // translation in t double-counted xTranslate so the fill landed
-        // off-screen and the cell rendered blank. Conjugating in
-        // Graphics.setTransform fixed that test but broke other CN1 paths
-        // (LightweightPicker / scene Node) that intentionally bake xTranslate
-        // into their own transforms.
-        //
-        // Render the gradient at native 200x100 resolution into a mutable
-        // Image instead, then drawImage it stretched to the cell halves. The
-        // mutable-image graphics has xTranslate=0 so g.fillLinearGradient
-        // inside that context works without any setTransform gymnastics, and
-        // drawImage's scale arguments make the cell-side scaling explicit.
-        Image base = Image.createImage(200, 100);
-        Graphics ig = base.getGraphics();
-        ig.fillLinearGradient(0xff0000, 0x0000ff, 0, 0, 200, 100, true);
+        // The earlier test built a transform via separate g.translate + g.scale
+        // calls. On the JavaSE port g.translate(int, int) is a no-op (translate
+        // is expected to be embedded in the native graphics) and on iOS the
+        // form-graphics path doesn't compose g.scale with the cell offset
+        // either, so the gradient fill landed off-cell. Build a single
+        // Transform that combines translate + scale and apply it once.
+        float xScale = w / 200f;
+        float yScale = h / 200f;
+        Transform t = Transform.makeIdentity();
+        t.translate(x, y);
+        t.scale(xScale, yScale);
+        g.setTransform(t);
 
-        int halfH = h / 2;
-        // Top half: gradient drawn at full cell width and half cell height.
-        g.drawImage(base, x, y, w, halfH);
+        // Top half of cell.
+        g.fillLinearGradient(0xff0000, 0x0000ff, 0, 0, 200, 100, true);
 
-        // Bottom half: same gradient mirrored horizontally to demonstrate the
-        // scale(-1, 1) effect from the original test. Mirror by reading the
-        // image into a 200x100 RGB buffer, flipping X, and drawing the
-        // mirrored copy stretched to the cell's bottom half.
-        Image mirrored = mirrorX(base);
-        g.drawImage(mirrored, x, y + halfH, w, h - halfH);
-    }
+        // Mirror X via scale(-1, 1) and draw the bottom half so the gradient
+        // runs right-to-left.
+        t.scale(-1, 1);
+        g.setTransform(t);
+        g.fillLinearGradient(0xff0000, 0x0000ff, -200, 100, 200, 100, true);
 
-    private static Image mirrorX(Image src) {
-        int w = src.getWidth();
-        int h = src.getHeight();
-        int[] rgb = src.getRGB();
-        int[] flipped = new int[rgb.length];
-        for (int row = 0; row < h; row++) {
-            int srcRow = row * w;
-            int dstRow = row * w;
-            for (int col = 0; col < w; col++) {
-                flipped[dstRow + col] = rgb[srcRow + (w - 1 - col)];
-            }
-        }
-        return Image.createImage(flipped, w, h);
+        g.setTransform(Transform.makeIdentity());
     }
 
     @Override
