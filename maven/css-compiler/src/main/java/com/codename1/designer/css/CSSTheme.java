@@ -5004,6 +5004,21 @@ public class CSSTheme {
                 } else {
                     out.opacity(255);
                 }
+                // When the source background-color came from a var()
+                // expansion, flip the RoundBorder into "uiid mode" so it
+                // paints via the Style's bgPainter (i.e. Style.bgColor)
+                // at render time instead of the static color baked into
+                // the border at compile time. Without this, a runtime
+                // `@accent-color` override updates themeProps[bgColor]
+                // correctly but the visible pill stays at the compile-
+                // time fallback because RoundBorder.fillShape uses its
+                // own field. Only flip when the binding is present so
+                // legacy themes that rely on the baked-color path keep
+                // their existing rendering.
+                if (backgroundColor instanceof ScaledUnit
+                        && ((ScaledUnit) backgroundColor).bindingVarName != null) {
+                    out.uiid(true);
+                }
             } else {
                 out.opacity(0);
             }

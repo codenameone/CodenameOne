@@ -71,6 +71,46 @@ public class NativeThemeBindingsTest extends UITestBase {
                 "@accent-color override should retune every UIID bound to --accent-color");
     }
 
+    @Test
+    public void androidMaterialThemeBindingRetunesButton() throws Exception {
+        File themeFile = locateNativeTheme("AndroidMaterialTheme.res");
+        if (themeFile == null) {
+            return;
+        }
+        Resources res;
+        InputStream stream = new FileInputStream(themeFile);
+        try {
+            res = Resources.open(stream);
+        } finally {
+            stream.close();
+        }
+        String[] themeNames = res.getThemeResourceNames();
+        assertNotNull(themeNames);
+        Hashtable theme = res.getTheme(themeNames[0]);
+        assertNotNull(theme);
+
+        // M3 baseline primary is #6750a4 → "6750a4" when stored via
+        // Integer.toHexString.
+        assertEquals("6750a4", theme.get("Button.bgColor"));
+        assertEquals("accent-color", theme.get("@cn1-bind:Button.bgColor"));
+
+        UIManager.getInstance().setThemeProps(theme);
+
+        Button defaultBtn = new Button("default");
+        defaultBtn.setUIID("Button");
+        assertEquals(0x6750a4, defaultBtn.getUnselectedStyle().getBgColor(),
+                "Android M3 button bg should pick up the inlined fallback when no override is supplied");
+
+        Hashtable override = new Hashtable();
+        override.put("@accent-color", "ff2d95");
+        UIManager.getInstance().addThemeProps(override);
+
+        Button retuned = new Button("magenta");
+        retuned.setUIID("Button");
+        assertEquals(0xff2d95, retuned.getUnselectedStyle().getBgColor(),
+                "@accent-color override should retune Button.bgColor on the Android Material 3 theme");
+    }
+
     /// Searches a few well-known relative locations for a freshly-built
     /// native theme `.res`. We surfboard up a few directory levels
     /// because the surefire `user.dir` lands inside the unittests
