@@ -10584,6 +10584,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     @Override
+    public boolean isSetTransformTranslationConjugationRequired() {
+        // Android's render path mirrors iOS: xTranslate/yTranslate accumulate
+        // in Graphics.java (since isTranslationSupported() is false) and end
+        // up baked into vertex coordinates. AndroidGraphics applies the
+        // user's setTransform matrix on top via canvas.concat at draw time,
+        // which double-counts the cell origin for any non-translation
+        // matrix. The displacement is small at typical phone resolutions
+        // (which is why the visual effect on Android is "shifted a bit"
+        // rather than the off-screen rendering iOS Metal exhibits) but it
+        // still differs from the user's intent. Conjugating in
+        // Graphics.setTransform yields the same "transform applies in local
+        // coordinates" contract as iOS, so identical CN1 code produces
+        // identical output across both ports.
+        return true;
+    }
+
+    @Override
     public boolean isPerspectiveTransformSupported() {
 
         return true;

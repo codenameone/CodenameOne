@@ -359,7 +359,14 @@ public class Node {
         Transform newT = Transform.isPerspectiveSupported() && scene != null && scene.camera.get() != null ?
                 scene.camera.get().getTransform() : Transform.makeIdentity();
         if (getScene() != null) {
-            newT.translate(getScene().getAbsoluteX(), getScene().getAbsoluteY());
+            // The screen-translate component is contributed by the Graphics
+            // object's xTranslate/yTranslate (the cumulative parent
+            // translates applied during paint) -- on platforms where
+            // Graphics.setTransform() conjugates the user matrix with that
+            // translation, it would be double-counted if we baked
+            // scene.absX/absY in here too. Stop at the local-to-scene
+            // transform; the platform places it at the scene's screen
+            // origin.
             newT.concatenate(getLocalToSceneTransform());
         }
         return newT;
@@ -381,9 +388,16 @@ public class Node {
                 scene.camera.get().getTransform() :
                 Transform.makeIdentity();
         if (getScene() != null) {
-            newT.translate(getScene().getAbsoluteX(), getScene().getAbsoluteY());
+            // Earlier this conjugated localToScene with T(scene.absX,
+            // absY) so that, when applied to the xTranslate-shifted vertex
+            // coords the platform passed to the GPU, the rendering landed
+            // back at the scene's screen origin. Graphics.setTransform()
+            // now performs that conjugation uniformly across iOS / Android
+            // / JavaSE, so applying it manually here would double the
+            // translation and push the spinner rows off-cell. Hand the
+            // platform the local transform; it places it at xTranslate/
+            // yTranslate, which is the scene's screen origin during paint.
             newT.concatenate(getLocalToSceneTransform());
-            newT.translate(-scene.getAbsoluteX(), -scene.getAbsoluteY());
         }
         g.setTransform(newT);
         int alpha = g.getAlpha();
