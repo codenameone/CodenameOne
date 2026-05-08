@@ -2402,10 +2402,17 @@ public class IOSImplementation extends CodenameOneImplementation {
             ng.transform = transform == null ? null : transform.copy();
         }
         ng.transformApplied = false;
-        // Match the rotate/scale/translate/resetAffine paths: the cached
-        // clip / inverseClip / inverseTransform are derived from the previous
-        // transform, so replacing the transform must invalidate them or
-        // subsequent loadClipBounds / inverseClip calls return stale values.
+        // The cached clip / inverseClip / inverseTransform are derived from
+        // the current transform; replacing the transform leaves them
+        // pointing at the previous transform's space. Subsequent draw ops
+        // (e.g. fillRect or fillLinearGradient on the form Graphics) read
+        // those caches via loadClipBounds / inverseClip and end up clipped
+        // to the wrong region, which is why TransformRotation and
+        // Scale/AffineScale produced empty top cells on iOS Metal while
+        // the equivalent rotation via g.rotate (which DOES invalidate
+        // these flags, line 5513) rendered correctly. Match the
+        // rotate/scale/translate/resetAffine paths so the cache is rebuilt
+        // before the next draw.
         ng.clipDirty = true;
         ng.inverseClipDirty = true;
         ng.inverseTransformDirty = true;
