@@ -20,7 +20,7 @@
 </modules>
   <properties>
     <cn1.plugin.version>${cn1.version}</cn1.plugin.version>
-    <cn1.version>7.0.237</cn1.version>
+    <cn1.version>7.0.240</cn1.version>
     <!-- cn1.registry.version pins the bean-shell access registry one
          release behind cn1.version. The registry is consumed by the
          deployed JavaScript cloud build, which lags the release
