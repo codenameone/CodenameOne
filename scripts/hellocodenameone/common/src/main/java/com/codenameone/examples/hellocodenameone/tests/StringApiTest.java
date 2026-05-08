@@ -24,7 +24,7 @@ public class StringApiTest extends BaseTest {
 
             // String.replaceAll - regex-driven substitution via JdkApiRewriteHelper -> RE
             assertEqual("XbXcX", "aabacaa".replaceAll("a+", "X"), "replaceAll greedy + quantifier failed");
-            assertEqual("xByB", "aBaB".replaceAll("a", "x"), "replaceAll literal token failed");
+            assertEqual("xBxB", "aBaB".replaceAll("a", "x"), "replaceAll literal token failed");
             assertEqual("ABC", "abc".replaceAll("[a-z]", "$0").toUpperCase(),
                     "replaceAll with $0 backreference / toUpperCase pipeline failed");
             assertEqual("--", "ab".replaceAll(".", "-"), "replaceAll '.' should match every character");
