@@ -145,9 +145,10 @@ public final class Graphics {
             yTranslate += y;
             // The conjugation in setTransform() depends on the current
             // xTranslate/yTranslate. If the user accumulated more translation
-            // after a non-identity setTransform, re-conjugate so the impl's
-            // baked matrix stays consistent with the new translation.
-            if (userTransform != null) {
+            // after a non-identity setTransform on a platform that requires
+            // conjugation (iOS), re-conjugate so the impl's baked matrix
+            // stays consistent with the new translation.
+            if (userTransform != null && impl.isSetTransformTranslationConjugationRequired()) {
                 Transform composed = Transform.makeTranslation(xTranslate, yTranslate);
                 composed.concatenate(userTransform);
                 composed.translate(-xTranslate, -yTranslate);
@@ -1179,18 +1180,28 @@ public final class Graphics {
     ///
     /// - #setTransform(com.codename1.ui.geom.Matrix, int, int)
     public void setTransform(Transform transform) {
-        // On platforms where impl.isTranslationSupported() is false (iOS), the
-        // Graphics class accumulates xTranslate/yTranslate locally and bakes
-        // them into the vertex coordinates passed to the impl's fill primitives.
-        // The user's transform is then applied by the GPU on top of those
-        // already-translated vertices, which double-counts the translation for
-        // any non-translation matrix (rotate, scale, shear). To match the
-        // semantics of platforms that fold translate into the canvas matrix
-        // (Android, JavaSE), conjugate the user's matrix with T(xTranslate,
-        // yTranslate) so its effect is independent of any prior g.translate()
-        // calls.
+        // Some platforms accumulate xTranslate/yTranslate in Graphics.java
+        // (because impl.isTranslationSupported()=false) AND apply the user's
+        // setTransform matrix on top of the xTranslate-shifted vertex
+        // coordinates in the GPU pipeline -- this double-counts the
+        // translation for any non-translation matrix (rotate, scale, shear)
+        // and throws output off-screen. iOS Metal in particular surfaces the
+        // bug starkly: graphics-affine-scale's screen-mode top cells render
+        // blank because translate(18,18)*scale(2.65,5.36) * (1134,279) lands
+        // at (3023,1513), outside the 1170×2532 framebuffer. To make the
+        // user-visible setTransform consistent with platforms that fold
+        // translate into the canvas matrix (Android), conjugate the user's
+        // matrix with T(xTranslate, yTranslate) so its effect is independent
+        // of any prior g.translate() calls. Other platforms whose impl
+        // already gives setTransform that semantics (Android Skia, where the
+        // canvas matrix concat happens at draw time and accumulates with the
+        // user's matrix in a way that produced "shift but not vanish" before
+        // this fix) opt out by leaving
+        // isSetTransformTranslationConjugationRequired() false so the path
+        // is purely additive for the platforms that need it.
         if (transform != null && !transform.isIdentity()
-                && (xTranslate != 0 || yTranslate != 0)) {
+                && (xTranslate != 0 || yTranslate != 0)
+                && impl.isSetTransformTranslationConjugationRequired()) {
             userTransform = transform.copy();
             Transform composed = Transform.makeTranslation(xTranslate, yTranslate);
             composed.concatenate(transform);
