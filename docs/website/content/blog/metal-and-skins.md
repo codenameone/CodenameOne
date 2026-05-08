@@ -152,6 +152,16 @@ Apple-iPhone-16-Pro.skin/
 
 The full developer-guide chapter at [Skin-Designer.asciidoc](https://github.com/codenameone/CodenameOne/blob/master/docs/developer-guide/Skin-Designer.asciidoc) walks through every stage with annotated screenshots and documents the `skin.properties` keys the wizard writes (`roundScreen`, `displayX/Y/Width/Height`, `safePortrait*`, `safeLandscape*`, `overrideNames`, system font families, PPI, and pixel ratio).
 
+### Eating our own dog food
+
+While we're talking about the Skin Designer, this is the right moment to point out something I think is genuinely worth highlighting. The [Initializr](/initializr/), the [Playground](/playground/), and the [Skin Designer](/skindesigner/) are all open source Codename One apps. They are written in Java using the same Codename One UI framework you use to build your iOS and Android apps, and they are deployed to the browser through our JavaScript port.
+
+Every interaction you have with these tools, the device picker grid, the live preview rendering the device frame and cutouts, the form-driven editor with its tabbed sidebar, the file generation that bundles a `.skin` zip in your browser tab, is the same Codename One code that ships in your apps. The `Container`, `Form`, `BoxLayout`, theming, and event-handling code is identical to what you would write for a phone build. The JavaScript port translates it into something a browser can run.
+
+These three tools are the most direct demonstration we can give of what Codename One is capable of: real, non-trivial UIs, with state, file I/O, image generation, and complex layouts, running smoothly inside a browser tab. If you have ever wondered whether the JavaScript port is production-grade enough for a real application, the Initializr, Playground, and Skin Designer are your answer. They are also the answer to "can Codename One build apps that go beyond mobile". Same codebase, deployed to a fourth target, with no rewrite.
+
+The source for all three lives in the same [CodenameOne](https://github.com/codenameone/CodenameOne) repository the framework itself does. If you want to see how a non-trivial Codename One app is structured, those are three good places to start reading.
+
 ## iOS multi-line TextArea: Return as Done
 
 [PR #4859](https://github.com/codenameone/CodenameOne/pull/4859), driven by issue [#4854](https://github.com/codenameone/CodenameOne/issues/4854), gives multi-line `TextArea` an opt-in flag that makes the iOS keyboard's Return key act as Done. It closes the editor and fires the Done listener instead of inserting a newline. This is the iOS Reminders-app behaviour: a growing, multi-line task-title field where Return finishes the entry.
