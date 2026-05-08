@@ -25,6 +25,65 @@ public class CSSLocalizationTest {
     public static void main(String[] args) throws Exception {
         testLoadLocalizationBundles();
         testApplyLocalizationBundles();
+        testLoadLocalizationBundlesUtf8();
+        testLoadLocalizationBundlesLatin1Fallback();
+        testLoadLocalizationBundlesUnicodeEscape();
+    }
+
+    private static void testLoadLocalizationBundlesUtf8() throws Exception {
+        Path tempDir = Files.createTempDirectory("cn1-css-localization-utf8");
+        try {
+            Path localizationRoot = Files.createDirectory(tempDir.resolve("l10n"));
+            // The exact string from issue #4883 — UTF-8 encoded Italian with accented à.
+            String value = "Non ci sono ancora attività. Usa il pulsante flottante per aggiungere la prima routine.";
+            Files.write(localizationRoot.resolve("Bundle_it.properties"),
+                    ("home.empty=" + value + System.lineSeparator()).getBytes(StandardCharsets.UTF_8));
+
+            Map<String, Map<String, Map<String, String>>> bundles = loadLocalizationBundles(localizationRoot.toFile());
+            Map<String, Map<String, String>> bundle = bundles.get("Bundle");
+            assertTrue(bundle != null, "Bundle should be detected");
+            assertEquals(bundle.get("it"), stringMap("home.empty", value),
+                    "UTF-8 encoded accented characters should round-trip");
+        } finally {
+            deleteRecursively(tempDir);
+        }
+    }
+
+    private static void testLoadLocalizationBundlesLatin1Fallback() throws Exception {
+        Path tempDir = Files.createTempDirectory("cn1-css-localization-latin1");
+        try {
+            Path localizationRoot = Files.createDirectory(tempDir.resolve("l10n"));
+            // Pre-Java-9 native2ascii-style file: ISO-8859-1 with a literal accented byte.
+            String value = "café";
+            Files.write(localizationRoot.resolve("Bundle_fr.properties"),
+                    ("greeting=" + value + System.lineSeparator()).getBytes(StandardCharsets.ISO_8859_1));
+
+            Map<String, Map<String, Map<String, String>>> bundles = loadLocalizationBundles(localizationRoot.toFile());
+            Map<String, Map<String, String>> bundle = bundles.get("Bundle");
+            assertTrue(bundle != null, "Bundle should be detected");
+            assertEquals(bundle.get("fr"), stringMap("greeting", value),
+                    "Latin-1 (legacy) bytes should fall back from UTF-8 decoding");
+        } finally {
+            deleteRecursively(tempDir);
+        }
+    }
+
+    private static void testLoadLocalizationBundlesUnicodeEscape() throws Exception {
+        Path tempDir = Files.createTempDirectory("cn1-css-localization-uesc");
+        try {
+            Path localizationRoot = Files.createDirectory(tempDir.resolve("l10n"));
+            // native2ascii output: pure ASCII with backslash-u escapes.
+            Files.write(localizationRoot.resolve("Bundle_it.properties"),
+                    ("home.empty=attivit\\u00e0" + System.lineSeparator()).getBytes(StandardCharsets.US_ASCII));
+
+            Map<String, Map<String, Map<String, String>>> bundles = loadLocalizationBundles(localizationRoot.toFile());
+            Map<String, Map<String, String>> bundle = bundles.get("Bundle");
+            assertTrue(bundle != null, "Bundle should be detected");
+            assertEquals(bundle.get("it"), stringMap("home.empty", "attività"),
+                    "\\uXXXX escapes should still be decoded");
+        } finally {
+            deleteRecursively(tempDir);
+        }
     }
 
     private static void testLoadLocalizationBundles() throws Exception {

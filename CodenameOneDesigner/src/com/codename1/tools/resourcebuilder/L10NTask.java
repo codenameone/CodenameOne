@@ -27,9 +27,7 @@ package com.codename1.tools.resourcebuilder;
 import com.codename1.ui.util.EditableResources;
 import java.io.DataOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.List;
@@ -67,9 +65,7 @@ public class L10NTask extends ResourceTask {
                 throw new BuildException("Both name and file attributes of the locale task are required attributes");
             }
             Properties p = new Properties();
-            InputStream i = new FileInputStream(l.getFile());
-            p.load(i);
-            i.close();
+            PropertiesUtil.loadUtf8WithFallback(l.getFile(), p);
             e.addLocale(getName(), l.getName());
             for(Object key : p.keySet()) {
                 e.setLocaleProperty(getName(), l.getName(), (String)key, p.getProperty((String)key));

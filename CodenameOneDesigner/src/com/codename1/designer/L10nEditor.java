@@ -26,6 +26,7 @@ package com.codename1.designer;
 
 import com.codename1.designer.ResourceEditorView;
 import com.codename1.io.CSVParser;
+import com.codename1.tools.resourcebuilder.PropertiesUtil;
 import com.codename1.ui.plaf.Accessor;
 import com.codename1.ui.resource.util.SwingRenderer;
 import com.codename1.ui.util.EditableResources;
@@ -987,7 +988,7 @@ private void importResourceActionPerformed(java.awt.event.ActionEvent evt) {//GE
                             }
                         } else {
                             Properties prop = new Properties();
-                            prop.load(f);
+                            PropertiesUtil.loadUtf8WithFallback(files[0], prop);
                             for (Object key : prop.keySet()) {
                                 res.setLocaleProperty(localeName, locale, (String)key, prop.getProperty((String)key));
                             }
