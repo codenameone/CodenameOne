@@ -24,18 +24,48 @@ import java.util.Hashtable;
  * binding pass overlays the override onto every bound UIID at once -
  * no per-UIID rule duplication, no theme recompile.
  *
- * This test installs a magenta override - vivid enough that a visual
- * diff against the native baseline is unmistakable - and verifies both
- * the light and dark captures pick it up. The light capture exercises
- * the light base styles; the dark capture exercises the
- * {@code $Dark<UIID>} variants which are bound to the matching
- * `-dark` palette variables.
+ * This test installs a magenta override on the primary accent and a
+ * vivid teal on the disabled accent. The teal is the load-bearing
+ * choice for cross-platform coverage: on iOS Modern the only visible
+ * widgets that rebind when accent-color changes are RaisedButton +
+ * Button (which the magenta already exercises), but the disabled
+ * RaisedButton stays at the default light-blue accent-disabled tone
+ * unless `@accent-disabled-color` is also retuned. Adding the teal
+ * therefore produces a visible iOS pixel diff against a baseline that
+ * predates the binding mechanism, confirming the binding fires on iOS
+ * and isn't merely a no-op coincidence with the magenta. Android
+ * Material 3 doesn't bind its disabled state to accent-disabled (its
+ * disabled colours are hard-coded in CSS), so the teal is iOS-only;
+ * Android's diff is driven by the magenta `@accent-container-color`
+ * retuning RaisedButton's tonal fill.
+ *
+ * The light capture exercises the light base styles; the dark capture
+ * exercises the {@code $Dark<UIID>} variants which are bound to the
+ * matching `-dark` palette variables.
+ *
+ * Suite hygiene: this test installs the `@`-prefixed override
+ * constants once during the light populate(). DualAppearanceBaseTest's
+ * `finish()` runs after the dark capture and reloads `/theme` via
+ * {@link UIManager#initFirstTheme}, which routes through
+ * `setThemePropsImpl` and clears `themeConstants` before re-populating
+ * from the freshly-loaded theme - so the `@accent-color` (etc.)
+ * constants do NOT survive into the next test in the suite. The
+ * test's slot in `Cn1ssDeviceRunner` (after the theme-fidelity
+ * sub-suite, before OrientationLock) keeps it on the back end of the
+ * run regardless, so any future regression that drops
+ * `initFirstTheme` would still only affect tests that explicitly opt
+ * in to this run's tail.
  */
 public class PaletteOverrideThemeScreenshotTest extends DualAppearanceBaseTest {
 
     private static final String OVERRIDE_ACCENT = "ff2d95";
     private static final String OVERRIDE_ACCENT_PRESSED = "c71a75";
     private static final String OVERRIDE_ACCENT_TEXT = "ffffff";
+    /// Vivid teal for the disabled accent slot. Distinct from the iOS
+    /// Modern light/dark blue defaults (#b3d4ff / #004a99) and from the
+    /// magenta accent so the disabled RaisedButton on the form reads
+    /// as a third independent colour at a glance.
+    private static final String OVERRIDE_ACCENT_DISABLED = "00b894";
     private boolean overrideInstalled;
 
     @Override
@@ -93,6 +123,23 @@ public class PaletteOverrideThemeScreenshotTest extends DualAppearanceBaseTest {
      * already shifted.
      */
     private void installPaletteOverride() {
+        // Sanity check: log if a previous test in the suite leaked an
+        // accent constant into themeConstants. The test class that
+        // runs immediately before us (DarkLightShowcaseThemeScreenshot
+        // Test) does not touch the accent vocabulary, and the
+        // theme-fidelity tests that precede it install the modern
+        // theme via DualAppearanceBaseTest.installModernThemeIfRequest
+        // ed which routes through setThemeProps -> setThemePropsImpl
+        // -> themeConstants.clear(). So the expected pre-state here
+        // is "no @accent-color set". Any leaked value surfaces as a
+        // CN1SS:WARN line in the run log, making post-mortem
+        // investigation of suite-state cross-talk much cheaper.
+        String stale = UIManager.getInstance().getThemeConstant("accent-color", null);
+        if (stale != null) {
+            System.out.println("CN1SS:WARN:test=PaletteOverrideThemeScreenshotTest "
+                    + "stale-accent-color=" + stale
+                    + " (a previous test left an @accent-color constant in UIManager state)");
+        }
         Hashtable override = new Hashtable();
         override.put("@accent-color", OVERRIDE_ACCENT);
         override.put("@accent-color-dark", OVERRIDE_ACCENT);
@@ -100,6 +147,21 @@ public class PaletteOverrideThemeScreenshotTest extends DualAppearanceBaseTest {
         override.put("@accent-pressed-color-dark", OVERRIDE_ACCENT_PRESSED);
         override.put("@accent-on-color", OVERRIDE_ACCENT_TEXT);
         override.put("@accent-on-color-dark", OVERRIDE_ACCENT_TEXT);
+        // iOS-only: retunes the disabled RaisedButton's bg and the
+        // disabled Button.fgColor away from the platform accent-
+        // disabled blue. Without this slot, iOS captures resolve to
+        // byte-identical pixels as the pre-binding baseline (every
+        // visible widget on the form happens to bind to accent-color
+        // / accent-on-color, both of which still produce the same
+        // magenta the old per-UIID override forced). Including a
+        // unique colour here makes the iOS diff vs baseline
+        // unambiguous and proves the runtime binding fires on iOS too.
+        // Android Material 3 leaves disabled-state colours hard-coded
+        // in CSS, so this constant has no Android effect (and that's
+        // fine - Android's accent-container-color override below
+        // produces its own visible diff there).
+        override.put("@accent-disabled-color", OVERRIDE_ACCENT_DISABLED);
+        override.put("@accent-disabled-color-dark", OVERRIDE_ACCENT_DISABLED);
         // Material 3 RaisedButton uses the "container" tonal pair; iOS
         // ignores these vars (no bindings reference them) so it's safe
         // to set them unconditionally for both platforms.
