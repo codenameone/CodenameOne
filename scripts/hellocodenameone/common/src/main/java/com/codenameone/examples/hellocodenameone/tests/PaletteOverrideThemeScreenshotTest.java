@@ -17,12 +17,18 @@ import java.util.Hashtable;
  * fallback)` references. The compiler bakes the fallback into each
  * UIID at compile time AND emits `@cn1-bind:&lt;UIID&gt;.&lt;key&gt;=accent-color`
  * constants alongside, so the .res ships with every accent-bearing
- * UIID quietly tracking the underlying palette variable. At app
- * launch the user calls
- * {@link UIManager#addThemeProps(Hashtable)} with a single
- * `@accent-color`-style constant per palette role and the runtime
- * binding pass overlays the override onto every bound UIID at once -
- * no per-UIID rule duplication, no theme recompile.
+ * UIID quietly tracking the underlying palette variable. The
+ * recommended override path is from the user app's own `theme.css`
+ * (see Native-Themes docs - declaring `--accent-color: #ff2d95;`
+ * inside the app's `#Constants` block exports it as a
+ * `@accent-color` theme constant which the framework then fans out
+ * to every bound UIID at theme-install time). This screenshot test
+ * exercises the equivalent runtime path -
+ * {@link UIManager#addThemeProps(Hashtable)} with the same
+ * `@`-prefixed constants - because (a) screenshot tests cannot
+ * easily mutate the app's compiled theme.css, and (b) the runtime
+ * mechanism is what ships for dynamic theming use cases (in-app
+ * accent toggles, A/B tests, branded flavours).
  *
  * This test installs a magenta override on the primary accent and a
  * vivid teal on the disabled accent. The teal is the load-bearing

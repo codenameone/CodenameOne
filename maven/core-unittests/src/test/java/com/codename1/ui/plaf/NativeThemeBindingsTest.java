@@ -53,6 +53,10 @@ public class NativeThemeBindingsTest extends UITestBase {
         // expected default is "7aff" rather than "007aff".
         assertEquals("7aff", theme.get("Button.fgColor"));
         assertEquals("accent-color", theme.get("@cn1-bind:Button.fgColor"));
+        // `#Constants { --accent-color: #007aff; }` in the native
+        // theme.css is exported as a `@accent-color` theme constant so
+        // a user app's theme.css can override it via the same syntax.
+        assertEquals("007AFF", theme.get("@accent-color"));
 
         UIManager.getInstance().setThemeProps(theme);
 
@@ -93,6 +97,14 @@ public class NativeThemeBindingsTest extends UITestBase {
         // Integer.toHexString.
         assertEquals("6750a4", theme.get("Button.bgColor"));
         assertEquals("accent-color", theme.get("@cn1-bind:Button.bgColor"));
+        // Native theme.css declares `#Constants { --accent-color: #6750a4; }`
+        // and the Flute compiler now exports that as a `@accent-color`
+        // theme constant in addition to the parser-internal var() lookup.
+        // This is what lets a user app's theme.css redeclare
+        // `#Constants { --accent-color: #ff2d95; }` and have it propagate
+        // through the runtime binding pass to every UIID bound to
+        // --accent-color in this parent theme.
+        assertEquals("6750A4", theme.get("@accent-color"));
 
         UIManager.getInstance().setThemeProps(theme);
 

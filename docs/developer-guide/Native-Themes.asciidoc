@@ -247,18 +247,20 @@ accent-driven UIIDs the same way as Android above. The colour names
 match Apple's `UIColor.systemBlue` etc. so you can mirror the SF
 Symbols semantics if you want.
 
-=== Runtime accent palette override
+=== Accent palette override
 
 Both shipped native themes expose their accent palette as named
-constants you can retune at runtime through `UIManager.addThemeProps`.
-The CSS source uses `var(--accent-color, fallback)` references so
-the fallback ships as the baked-in default (the .res file loads
-fine with no override) and the compiler additionally emits a
+constants you can retune from your app's own `theme.css` (or, for
+dynamic theming, at runtime). The CSS source uses
+`var(--accent-color, fallback)` references so the fallback ships as
+the baked-in default (the .res file loads fine with no override)
+and the compiler additionally emits a
 `@cn1-bind:<UIID>.<key>=accent-color` constant alongside each
-affected style key. At app launch you push a tiny Hashtable of
-`@`-prefixed accent constants and the runtime UIManager fans the
-overrides out to every bound UIID at once - no per-UIID rule
-duplication, no theme recompile.
+affected style key. When the resolved theme constants pick up a new
+`@accent-color` value (whether from your CSS or via runtime
+`UIManager.addThemeProps`), the framework fans the override out to
+every bound UIID at once - no per-UIID rule duplication, no theme
+recompile.
 
 .iOS modern (`native-themes/ios-modern/theme.css`)
 [cols="2,1,1,3", options="header"]
@@ -324,6 +326,51 @@ duplication, no theme recompile.
 |`state-pressed`
 |===
 
+==== Override from your app's `theme.css` (recommended)
+
+Redeclare the accent variable inside the `#Constants` block of your
+app's `theme.css`. The framework's CSS compiler exports any
+`--name` declaration in `#Constants` as a `@name` theme constant,
+so the value flows through the same binding pass that handles
+runtime overrides:
+
+[source,css]
+----
+#Constants {
+    includeNativeBool: true;
+    darkModeBool: true;
+
+    /* Override the native theme's accent palette. The compiler picks
+       up these declarations from #Constants and exports them as
+       @accent-color / @accent-color-dark theme constants so every
+       UIID bound to var(--accent-color) in the parent native theme
+       picks them up at app launch - no per-UIID rule edit needed. */
+    --accent-color: #ff2d95;
+    --accent-color-dark: #ff2d95;
+    --accent-pressed-color: #c71a75;
+    --accent-pressed-color-dark: #c71a75;
+    --accent-on-color: #ffffff;
+
+    /* Material 3 RaisedButton uses a separate "container" tonal
+       pair; iOS ignores these (no bindings reference them) so it's
+       safe to set them unconditionally. */
+    --accent-container-color: #ff2d95;
+    --accent-container-color-dark: #ff2d95;
+    --accent-on-container-color: #ffffff;
+    --accent-on-container-color-dark: #ffffff;
+}
+----
+
+Bindings that reference a constant you did not override stay at
+their baked-in default, so a partial override (e.g. just
+`--accent-color`) is fine.
+
+==== Runtime override
+
+For dynamic theming - in-app accent toggles, branded flavours,
+A/B tests - push the same constants through
+`UIManager.addThemeProps` after the theme has been installed:
+
 [source,java]
 ----
 Hashtable override = new Hashtable();
@@ -332,8 +379,6 @@ override.put("@accent-color-dark", "ff2d95");
 override.put("@accent-pressed-color", "c71a75");
 override.put("@accent-pressed-color-dark", "c71a75");
 override.put("@accent-on-color", "ffffff");
-// Android-only tonal pair; iOS ignores these (no bindings reference
-// them) so it's safe to set them unconditionally.
 override.put("@accent-container-color", "ff2d95");
 override.put("@accent-container-color-dark", "ff2d95");
 override.put("@accent-on-container-color", "ffffff");
@@ -344,30 +389,25 @@ Form.getCurrentForm().refreshTheme();
 
 Values can be passed with or without the leading `#` and in any
 case; the runtime accepts `"ff2d95"`, `"#FF2D95"`, and the 3-digit
-shorthand `"#f0a"` interchangeably. Bindings that reference a
-constant you did not override stay at their baked-in default, so a
-partial override (e.g. just `@accent-color`) is fine.
+shorthand `"#f0a"` interchangeably.
 
 `PaletteOverrideThemeScreenshotTest` in the hellocodenameone test
-suite is the worked example - it flips the primary accent to
-magenta at runtime and re-renders the same form across both light
-and dark capture, on both native themes.
+suite exercises this path against both native themes, light + dark.
 
-==== When the runtime override path doesn't apply
+==== When the override path doesn't apply
 
 The binding mechanism handles every accent UIID the shipped themes
 expose. For other widgets - or when you want to override a colour
 the native CSS hard-codes (e.g. the iOS `success` green on
 `Switch.selected`) - either:
 
-* Layer a redeclaration in your app's `theme.css` (see
-  `Customising in your own theme` below). Compile-time, ships with
-  the .res. Right when you want a permanent rebrand and you control
-  the build.
+* Layer a per-UIID redeclaration in your app's `theme.css` (see
+  `Customising in your own theme` below). Right when you want to
+  tweak a UIID the binding vocabulary doesn't already cover.
 * Or pass the specific UIID/state key directly into
   `UIManager.addThemeProps` (`Switch.sel#bgColor` etc.). Runtime,
   bypasses the binding system. Right when you need a one-off colour
-  tweak the binding vocabulary doesn't already cover.
+  tweak you can't anchor in CSS.
 
 === Platform-specific UIIDs
 
@@ -491,12 +531,14 @@ RaisedButton.disabled { background-color: #ffd6e2; color: #ffffff; }
 The user's CSS is layered on top of the native theme at app launch,
 so refresh / restart picks the override up.
 
-For a wholesale accent rebrand consider the runtime
-`@accent-color`-style override in `Runtime accent palette override`
-above - it's a one-line `addThemeProps` call versus the per-UIID
-redeclaration here. Layering remains the right choice for tweaking
-non-accent UIIDs (typography, spacing, surface fills) the runtime
-binding vocabulary doesn't cover.
+For a wholesale accent rebrand prefer redeclaring the
+`--accent-color` (etc.) variables in your `#Constants` block - see
+`Override from your app's theme.css` above. That single declaration
+fans out through every UIID bound to the variable in the native
+theme, no per-UIID rules required. Per-UIID redeclaration here
+remains the right choice for tweaking non-accent properties
+(typography, spacing, surface fills) the binding vocabulary doesn't
+cover.
 
 === Inheriting from a native UIID
 

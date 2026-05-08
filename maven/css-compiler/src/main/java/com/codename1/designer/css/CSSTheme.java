@@ -2054,6 +2054,22 @@ public class CSSTheme {
                     }
                 } else if (lu.getLexicalUnitType() == LexicalUnit.SAC_INTEGER) {
                     res.setThemeProperty(themeName, "@"+constantKey, String.valueOf(((ScaledUnit)lu).getIntegerValue()));
+                } else if (lu.getLexicalUnitType() == LexicalUnit.SAC_RGBCOLOR
+                        || (lu.getLexicalUnitType() == LexicalUnit.SAC_FUNCTION
+                                && ("rgb".equals(lu.getFunctionName())
+                                        || "rgba".equals(lu.getFunctionName())
+                                        || "cn1rgb".equals(lu.getFunctionName())
+                                        || "cn1rgba".equals(lu.getFunctionName())))) {
+                    // Hex / rgb() / rgba() color literals declared in
+                    // #Constants. Stored as a plain hex string (no `#`,
+                    // lowercase, 6 chars) which is the format
+                    // UIManager's themeConstants and the runtime
+                    // applyThemeBindings pass expect for color values.
+                    // Lets a user theme.css declare e.g.
+                    // `#Constants { --accent-color: #ff2d95; }` and have
+                    // it propagate to every UIID bound to --accent-color
+                    // in the parent native theme.
+                    res.setThemeProperty(themeName, "@"+constantKey, getColorString(lu));
                 }
             } catch (RuntimeException t) {
                 System.err.println("\nAn error occurred processing constant key "+constantKey);
@@ -7280,6 +7296,35 @@ public class CSSTheme {
         return -1;
     }
 
+    /// Checks whether the supplied `currSelectors` currently parsing
+    /// declarations is the special `#Constants` pseudo-element CN1
+    /// themes use to declare theme constants (rather than UIID styling
+    /// rules). Used by the `cn1--&lt;name&gt;` short-circuit in `property_`
+    /// to decide whether to ALSO emit the declaration as a `@&lt;name&gt;`
+    /// theme constant - so a user theme.css can override a native
+    /// theme's bound palette purely from CSS.
+    private static boolean isInsideConstantsBlock(SelectorList currSelectors) {
+        if (currSelectors == null) {
+            return false;
+        }
+        int len = currSelectors.getLength();
+        for (int i = 0; i < len; i++) {
+            Selector sel = currSelectors.item(i);
+            if (sel.getSelectorType() != Selector.SAC_CONDITIONAL_SELECTOR) {
+                continue;
+            }
+            ConditionalSelector csel = (ConditionalSelector) sel;
+            if (csel.getCondition().getConditionType() != Condition.SAC_ID_CONDITION) {
+                continue;
+            }
+            AttributeCondition acond = (AttributeCondition) csel.getCondition();
+            if ("Constants".equalsIgnoreCase(acond.getValue())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static int findMatchingBrace(String css, int openPos) {
         int depth = 0;
         int len = css.length();
@@ -7527,8 +7572,41 @@ public class CSSTheme {
 
                 private void property_(String string, LexicalUnit _lu, boolean bln) throws CSSException {
                     if (string.startsWith("cn1--")) {
-                        
+
                         variables.put(string, _lu);
+                        // When the `--name` declaration sits inside the
+                        // `#Constants` pseudo-element, ALSO export it as a
+                        // `@name` theme constant. This is the load-bearing
+                        // hook that lets a user app's theme.css override a
+                        // native-theme palette variable purely from CSS:
+                        // the native theme declares `#Constants {
+                        // --accent-color: #007aff; }` which becomes a
+                        // theme constant, the user's theme.css redeclares
+                        // the same `#Constants { --accent-color: #ff2d95; }`
+                        // override which loads later (after the native
+                        // theme is layered in via includeNativeBool=true)
+                        // and overwrites the constant. UIManager's
+                        // applyThemeBindings then retunes every UIID
+                        // bound to that variable. Without this dual
+                        // emission `--name` would only live in the
+                        // parser-internal variables map and never reach
+                        // the runtime.
+                        if (currSelectors != null
+                                && isInsideConstantsBlock(currSelectors)) {
+                            String constantName = string.substring("cn1--".length());
+                            if (constantName.length() > 0) {
+                                // Evaluate via the same path the rest of
+                                // updateResources expects: wraps raw
+                                // LexicalUnitImpls into ScaledUnits so
+                                // downstream getColorString() and friends
+                                // see the chain shape they were written
+                                // against (red/green/blue ScaledUnits
+                                // for SAC_RGBCOLOR), not the raw Flute
+                                // LexicalUnitImpl which would crash on
+                                // the ScaledUnit cast.
+                                theme.constants.put(constantName, evaluate(_lu));
+                            }
+                        }
                         return;
                     }
 
