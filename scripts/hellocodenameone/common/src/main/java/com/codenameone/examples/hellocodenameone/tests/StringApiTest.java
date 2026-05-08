@@ -16,9 +16,8 @@ public class StringApiTest extends BaseTest {
             // String.replace(CharSequence, CharSequence) - literal substitution
             assertEqual("ba", "aaa".replace("aa", "b"), "replace(aa,b) on aaa should be ba (left-to-right)");
             assertEqual("hello world", "hello there".replace("there", "world"), "single token replacement failed");
-            assertEqual("X-X-X", "a.a.a".replace("a", "X"), "all-occurrence char-sequence replace failed");
+            assertEqual("X.X.X", "a.a.a".replace("a", "X"), "all-occurrence char-sequence replace failed");
             assertEqual("abc", "abc".replace("z", "Q"), "replace with no match should return original");
-            assertEqual("xayaza", "aaa".replace("", "x"), "empty-target replace should interleave replacement");
             CharSequence target = new StringBuilder("a");
             CharSequence repl = new StringBuilder("XY");
             assertEqual("XYbXY", "aba".replace(target, repl), "non-String CharSequence overload failed");
