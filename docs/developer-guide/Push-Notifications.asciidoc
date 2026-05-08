@@ -73,6 +73,8 @@ If the registration failed for some reason, the `pushRegistrationError()` callba
 
 Notice that all this happens seamlessly behind the scenes when your app loads. You don't need to start any of this workflow.
 
+NOTE: On iOS, the system permission prompt that asks the user to allow notifications is shown the first time you call `Display.getInstance().registerPush()` (or schedule a `LocalNotification`). It is no longer shown automatically when the app launches, so you can display your own rationale screen first and call `registerPush()` only after the user has agreed. This matches the Android flow. Apps that need the legacy launch-time prompt for backward compatibility can set the `ios.notificationPermissionAtLaunch=true` build hint.
+
 ==== Sending a push notification
 
 Codename One provides a secure REST API for sending push notifications. As an HTTP API, it's language agnostic. You can send push notifications to your app using Java, PHP, Python, Ruby, or even by hand using something like curl. Each HTTP request can contain a push message and a list of device IDs to which the message should be sent. You don't need to worry about whether your app is running on Android, iOS, Windows, or the web. A single HTTP request can send a message to many devices at once.

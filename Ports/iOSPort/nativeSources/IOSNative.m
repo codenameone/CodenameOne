@@ -10114,6 +10114,15 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_sendLocalNotification___java_lang_Str
         UNNotificationTrigger *trigger = cn1CreateNotificationTrigger(fireDate, repeatType);
         UNNotificationRequest *request = [UNNotificationRequest requestWithIdentifier:notificationIdString content:content trigger:trigger];
         UNUserNotificationCenter* center = [UNUserNotificationCenter currentNotificationCenter];
+        // Request notification authorization on first schedule so local-notification-only
+        // apps still get prompted (the launch-time prompt was removed for issue #4876).
+        // The system shows the dialog at most once; later calls are a no-op.
+        [center requestAuthorizationWithOptions:(UNAuthorizationOptionAlert + UNAuthorizationOptionSound + UNAuthorizationOptionBadge)
+            completionHandler:^(BOOL granted, NSError * _Nullable authError) {
+                if (authError != nil) {
+                    CN1Log(@"Local notification authorization request failed: %@", authError.localizedDescription);
+                }
+        }];
         cn1CancelScheduledLocalNotificationById(notificationIdString);
         [center addNotificationRequest:request withCompletionHandler:^(NSError * _Nullable error) {
             if (error != nil) {
