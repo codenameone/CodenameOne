@@ -44,30 +44,41 @@ jobs:
           MAVEN_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
 
-      - name: Verify main artifacts on Maven Central
-        id: verify-main
+      - name: Confirm main artifacts on Maven Central (only after deploy failure)
+        id: confirm-main
+        if: steps.deploy-main.outcome == 'failure'
+        continue-on-error: true
         run: |
           # central-publishing-maven-plugin 0.8.0 occasionally reports
           # "Deployment failed while publishing" even when the bundle was
-          # actually accepted and published. Confirm by polling Central
-          # directly so a false-positive plugin error does not block the
-          # archetype deploy below.
+          # actually accepted and published. As a safety net for that
+          # false-positive case, poll Maven Central for the artifact.
+          # Skipped when the deploy already reported success (the artifact
+          # may still be propagating from Sonatype Central to repo1; that
+          # propagation can take 30+ minutes and isn't worth blocking on).
           set +e
-          for i in $(seq 1 30); do
+          for i in $(seq 1 90); do
             code=$(curl -s -o /dev/null -w "%{http_code}" \
               "https://repo1.maven.org/maven2/com/codenameone/codenameone-maven-plugin/${GITHUB_REF_NAME}/codenameone-maven-plugin-${GITHUB_REF_NAME}.pom")
             if [ "$code" = "200" ]; then
               echo "Confirmed codenameone-maven-plugin ${GITHUB_REF_NAME} on Maven Central"
               exit 0
             fi
-            echo "[$i/30] Waiting for codenameone-maven-plugin ${GITHUB_REF_NAME} on Maven Central (last code=$code)"
-            sleep 10
+            echo "[$i/90] Waiting for codenameone-maven-plugin ${GITHUB_REF_NAME} on Maven Central (last code=$code)"
+            sleep 20
           done
-          echo "codenameone-maven-plugin ${GITHUB_REF_NAME} did not appear on Maven Central within 5 minutes"
+          echo "codenameone-maven-plugin ${GITHUB_REF_NAME} did not appear on Maven Central within 30 minutes"
+          exit 1
+
+      - name: Fail when main release did not complete
+        if: steps.deploy-main.outcome != 'success' && steps.confirm-main.outcome != 'success'
+        run: |
+          echo "Main release failed: deploy reported failure and the artifact never appeared on Maven Central."
           exit 1
 
       - name: Deploy archetypes to Maven Central
         id: deploy-archetypes
+        if: steps.deploy-main.outcome == 'success' || steps.confirm-main.outcome == 'success'
         continue-on-error: true
         run: |
           git clone https://github.com/shannah/cn1-maven-archetypes
@@ -80,13 +91,15 @@ jobs:
           MAVEN_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
 
-      - name: Verify archetypes on Maven Central
+      - name: Confirm archetypes on Maven Central (only after deploy failure)
+        id: confirm-archetypes
+        if: steps.deploy-archetypes.outcome == 'failure'
+        continue-on-error: true
         run: |
           # cn1-maven-archetypes uses an even older central-publishing-maven-plugin
           # (0.7.0) and is susceptible to the same false-positive failure.
-          # Confirm the archetypes by polling Central directly.
           set +e
-          for i in $(seq 1 30); do
+          for i in $(seq 1 90); do
             app_code=$(curl -s -o /dev/null -w "%{http_code}" \
               "https://repo1.maven.org/maven2/com/codenameone/cn1app-archetype/${GITHUB_REF_NAME}/cn1app-archetype-${GITHUB_REF_NAME}.pom")
             lib_code=$(curl -s -o /dev/null -w "%{http_code}" \
@@ -95,9 +108,17 @@ jobs:
               echo "Confirmed cn1app-archetype and cn1lib-archetype ${GITHUB_REF_NAME} on Maven Central"
               exit 0
             fi
-            echo "[$i/30] Waiting for archetypes ${GITHUB_REF_NAME} on Maven Central (cn1app=$app_code, cn1lib=$lib_code)"
-            sleep 10
+            echo "[$i/90] Waiting for archetypes ${GITHUB_REF_NAME} on Maven Central (cn1app=$app_code, cn1lib=$lib_code)"
+            sleep 20
           done
-          echo "Archetypes ${GITHUB_REF_NAME} did not appear on Maven Central within 5 minutes"
+          echo "Archetypes ${GITHUB_REF_NAME} did not appear on Maven Central within 30 minutes"
+          exit 1
+
+      - name: Fail when archetype release did not complete
+        if: |
+          (steps.deploy-main.outcome == 'success' || steps.confirm-main.outcome == 'success') &&
+          steps.deploy-archetypes.outcome != 'success' && steps.confirm-archetypes.outcome != 'success'
+        run: |
+          echo "Archetype release failed: deploy reported failure and the artifacts never appeared on Maven Central."
           exit 1
       

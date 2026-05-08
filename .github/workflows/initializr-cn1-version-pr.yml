@@ -1,9 +1,12 @@
 name: Website CN1 Version PR
 
 on:
-  push:
-    tags:
-      - "*"
+  # Trigger only on release publication. The developer-guide.pdf is
+  # attached to the release by developer-guide-docs.yml a few minutes
+  # after the release is published, and the PR opened here triggers
+  # website-docs which depends on that asset. Firing on tag-push as
+  # well would create the PR before the asset exists. We still wait
+  # below to cover the gap between release publish and asset upload.
   release:
     types:
       - published
@@ -18,6 +21,31 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Wait for developer-guide.pdf on the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          # The website-docs workflow triggered by this PR resolves the
+          # developer-guide.pdf URL from the latest release. That asset is
+          # uploaded by developer-guide-docs.yml a few minutes after the
+          # release is published, so wait for it before creating the PR.
+          set +e
+          for i in $(seq 1 60); do
+            if gh release view "$RELEASE_TAG" \
+                --repo "$GITHUB_REPOSITORY" \
+                --json assets \
+                --jq '.assets[].name' 2>/dev/null \
+                | grep -Fxq 'developer-guide.pdf'; then
+              echo "developer-guide.pdf is attached to release $RELEASE_TAG"
+              exit 0
+            fi
+            echo "[$i/60] Waiting for developer-guide.pdf on release $RELEASE_TAG"
+            sleep 30
+          done
+          echo "developer-guide.pdf did not appear on release $RELEASE_TAG within 30 minutes"
+          exit 1
 
       - name: Update Initializr Codename One versions
         run: ./scripts/initializr/update-cn1-version.sh "${{ github.event.release.tag_name || github.ref_name }}"
