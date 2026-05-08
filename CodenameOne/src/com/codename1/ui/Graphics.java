@@ -59,6 +59,12 @@ public final class Graphics {
     private int xTranslate;
     private int yTranslate;
     private Transform translation;
+    /// User's last setTransform() argument (or null if identity). On platforms
+    /// where impl.isTranslationSupported()=false the impl actually stores a
+    /// translation-conjugated version of this matrix so the user-visible
+    /// transform is independent of g.translate(); getTransform() must therefore
+    /// return the original.
+    private Transform userTransform;
     private GeneralPath tmpClipShape;
     /// A buffer shape to use when we need to transform a shape
     private int color;
@@ -137,6 +143,16 @@ public final class Graphics {
         } else {
             xTranslate += x;
             yTranslate += y;
+            // The conjugation in setTransform() depends on the current
+            // xTranslate/yTranslate. If the user accumulated more translation
+            // after a non-identity setTransform, re-conjugate so the impl's
+            // baked matrix stays consistent with the new translation.
+            if (userTransform != null) {
+                Transform composed = Transform.makeTranslation(xTranslate, yTranslate);
+                composed.concatenate(userTransform);
+                composed.translate(-xTranslate, -yTranslate);
+                impl.setTransform(nativeGraphics, composed);
+            }
         }
     }
 
@@ -1129,6 +1145,9 @@ public final class Graphics {
     ///
     /// - #setTransform
     public Transform getTransform() {
+        if (userTransform != null) {
+            return userTransform.copy();
+        }
         return impl.getTransform(nativeGraphics);
 
     }
@@ -1160,7 +1179,27 @@ public final class Graphics {
     ///
     /// - #setTransform(com.codename1.ui.geom.Matrix, int, int)
     public void setTransform(Transform transform) {
-        impl.setTransform(nativeGraphics, transform);
+        // On platforms where impl.isTranslationSupported() is false (iOS), the
+        // Graphics class accumulates xTranslate/yTranslate locally and bakes
+        // them into the vertex coordinates passed to the impl's fill primitives.
+        // The user's transform is then applied by the GPU on top of those
+        // already-translated vertices, which double-counts the translation for
+        // any non-translation matrix (rotate, scale, shear). To match the
+        // semantics of platforms that fold translate into the canvas matrix
+        // (Android, JavaSE), conjugate the user's matrix with T(xTranslate,
+        // yTranslate) so its effect is independent of any prior g.translate()
+        // calls.
+        if (transform != null && !transform.isIdentity()
+                && (xTranslate != 0 || yTranslate != 0)) {
+            userTransform = transform.copy();
+            Transform composed = Transform.makeTranslation(xTranslate, yTranslate);
+            composed.concatenate(transform);
+            composed.translate(-xTranslate, -yTranslate);
+            impl.setTransform(nativeGraphics, composed);
+        } else {
+            userTransform = null;
+            impl.setTransform(nativeGraphics, transform);
+        }
     }
 
     /// Loads the provided transform with the current transform applied to this graphics context.
@@ -1169,6 +1208,10 @@ public final class Graphics {
     ///
     /// - `t`: An "out" parameter to be filled with the current transform.
     public void getTransform(Transform t) {
+        if (userTransform != null) {
+            t.setTransform(userTransform);
+            return;
+        }
         impl.getTransform(nativeGraphics, t);
     }
 
@@ -1576,6 +1619,7 @@ public final class Graphics {
         impl.resetAffine(nativeGraphics);
         scaleX = 1;
         scaleY = 1;
+        userTransform = null;
     }
 
     /// Scales the coordinate system using the affine transform
