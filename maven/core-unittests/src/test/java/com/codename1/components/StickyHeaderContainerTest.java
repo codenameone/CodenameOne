@@ -203,6 +203,51 @@ class StickyHeaderContainerTest extends UITestBase {
     }
 
     @FormTest
+    void slidePushTracksScrollListenerWithoutManualUpdate() {
+        // Real scrolling drives the host via the inner ScrollContainer's
+        // ScrollListener — there is no second manual updateSticky() call
+        // to correct stale values. The listener path must compute the push
+        // off the *new* scroll position, not the value captured before the
+        // event fired, otherwise the pinned header lags the scroll by the
+        // jump size and a fast drag can cross the entire push window
+        // while pushOffset is still 0 — which presents visually as the
+        // rising header sliding *under* the pinned one with no slide.
+        StickyHeaderContainer sticky = build(3);
+        sticky.setTransitionStyle(StickyHeaderContainer.TRANSITION_SLIDE);
+
+        sticky.setScrollPosition(100);
+        int baseY = sticky.getStickyHost().getY();
+
+        sticky.setScrollPosition(SECTION_STRIDE - HEADER_HEIGHT + 30);
+        assertEquals(baseY - 30, sticky.getStickyHost().getY(),
+                "the listener-driven path must shift the host by the push offset");
+        assertEquals(30, (int) (sticky.getTransitionProgress() * HEADER_HEIGHT),
+                "transition progress should match the push offset");
+    }
+
+    @FormTest
+    void slidePushSurvivesLargeJumpAcrossPushWindow() {
+        // Drag/momentum scrolls deliver multi-pixel jumps. A single
+        // setScrollY that crosses from "well clear of the boundary" to
+        // "near the swap" must already report a non-zero push offset so
+        // the visual catches up in one step. With a stale-scroll-driven
+        // implementation the push remains 0 across the entire window
+        // and only updates on the *next* event, by which point the user
+        // has already seen the rising header reach the slot top.
+        StickyHeaderContainer sticky = build(3);
+        sticky.setTransitionStyle(StickyHeaderContainer.TRANSITION_SLIDE);
+
+        sticky.setScrollPosition(100);
+        int baseY = sticky.getStickyHost().getY();
+        assertEquals(baseY, sticky.getStickyHost().getY());
+
+        // One big jump straight into the push window.
+        sticky.setScrollPosition(SECTION_STRIDE - 5);
+        assertEquals(baseY - (HEADER_HEIGHT - 5), sticky.getStickyHost().getY(),
+                "a multi-pixel jump must immediately reflect the new push offset");
+    }
+
+    @FormTest
     void noneStyleKeepsStickyHostInPlaceDuringOverlap() {
         StickyHeaderContainer sticky = build(3);
         sticky.setTransitionStyle(StickyHeaderContainer.TRANSITION_NONE);
