@@ -465,34 +465,22 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
             g.setAlpha(180);
             int diagonalOffset = -h; // start off-screen so the pattern fills
             int band = 0;
-            int[] xCoords = new int[4];
-            int[] yCoords = new int[4];
             while (diagonalOffset < w + h) {
                 g.setColor(palette[band % palette.length]);
-                // Each band is a parallelogram with two horizontal edges
-                // (top at y, bottom at y+h) and two diagonal edges. Fill
-                // it with one fillPolygon call rather than per-row
-                // fillRect: at phone resolution h is ~2500 px and there
-                // are ~50 bands, so the scanline approach used to issue
-                // ~125k draw calls per backdrop. On iOS Metal each
-                // fillRect submits a fresh setRenderPipelineState +
-                // setVertexBytes pair, and at that volume the CAMetalLayer
-                // command-buffer commit was stalling the dark-mode
-                // transition for TabsTheme by 18 minutes. Polygon fill
-                // is one draw call per band (50 total) and is universally
-                // supported by every CN1 port we ship (Graphics.fillPolygon
-                // is a core API, not a port-specific extension). The
-                // previous comment on this loop suggested otherwise; it
-                // was wrong.
-                xCoords[0] = x + diagonalOffset;
-                yCoords[0] = y;
-                xCoords[1] = x + diagonalOffset + bandW;
-                yCoords[1] = y;
-                xCoords[2] = x + diagonalOffset + bandW + h;
-                yCoords[2] = y + h;
-                xCoords[3] = x + diagonalOffset + h;
-                yCoords[3] = y + h;
-                g.fillPolygon(xCoords, yCoords, 4);
+                // diagonal band = a quad from (diagonalOffset, 0) to
+                // (diagonalOffset + bandW, 0) down to (diagonalOffset + bandW + h, h)
+                // / (diagonalOffset + h, h). Approximate with scanlines so
+                // this stays portable across ports that may lack fillPolygon.
+                for (int row = 0; row < h; row++) {
+                    int x0 = x + diagonalOffset + row;
+                    int x1 = x0 + bandW;
+                    if (x1 < x || x0 > x + w) {
+                        continue;
+                    }
+                    if (x0 < x) x0 = x;
+                    if (x1 > x + w) x1 = x + w;
+                    g.fillRect(x0, y + row, x1 - x0, 1);
+                }
                 diagonalOffset += bandW;
                 band++;
             }
