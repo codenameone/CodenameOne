@@ -306,7 +306,21 @@ public class ChartComponent extends Component {
         }
 
 
-        util.paintChart(g, chart, getBounds(), getAbsoluteX(), getAbsoluteY());
+        try {
+            System.out.println("CN1SS:DBG:ChartComponent.paint:start chart=" + chart.getClass().getSimpleName()
+                    + " absX=" + getAbsoluteX() + " absY=" + getAbsoluteY()
+                    + " bx=" + getBounds().getX() + " by=" + getBounds().getY()
+                    + " bw=" + getBounds().getWidth() + " bh=" + getBounds().getHeight()
+                    + " gxT=" + g.getTranslateX() + " gyT=" + g.getTranslateY()
+                    + " gclipX=" + g.getClipX() + " gclipY=" + g.getClipY()
+                    + " gclipW=" + g.getClipWidth() + " gclipH=" + g.getClipHeight());
+            util.paintChart(g, chart, getBounds(), getAbsoluteX(), getAbsoluteY());
+            System.out.println("CN1SS:DBG:ChartComponent.paint:end chart=" + chart.getClass().getSimpleName());
+        } catch (Throwable t) {
+            System.out.println("CN1SS:DBG:ChartComponent.paint:exception chart=" + chart.getClass().getSimpleName()
+                    + " err=" + t);
+            t.printStackTrace();
+        }
 
         if (transformed) {
             g.setTransform(tmpTransform);
