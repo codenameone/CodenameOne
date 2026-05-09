@@ -18,22 +18,13 @@ public class ChartLineScreenshotTest extends AbstractChartScreenshotTest {
 
     @Override
     protected AbstractChart buildChart() {
+        // Diagnostic: empty dataset so drawSeries is never invoked. If
+        // chart-line still produces a blank PNG with no series + everything
+        // else off, the bug is in XYChart.draw's pre-series setup or in the
+        // form / paint pipeline interaction with ChartComponent. If chart-line
+        // *now* renders an empty (but non-blank) form, drawSeries' drawPath
+        // is the iOS-specific culprit.
         XYMultipleSeriesDataset dataset = new XYMultipleSeriesDataset();
-        XYSeries north = new XYSeries("North");
-        north.add(2018, 12);
-        north.add(2019, 16);
-        north.add(2020, 22);
-        north.add(2021, 18);
-        north.add(2022, 28);
-        dataset.addSeries(north);
-
-        XYSeries south = new XYSeries("South");
-        south.add(2018, 8);
-        south.add(2019, 11);
-        south.add(2020, 13);
-        south.add(2021, 16);
-        south.add(2022, 19);
-        dataset.addSeries(south);
 
         XYMultipleSeriesRenderer renderer = new XYMultipleSeriesRenderer();
         renderer.setLabelsTextSize(20);
@@ -56,7 +47,7 @@ public class ChartLineScreenshotTest extends AbstractChartScreenshotTest {
         // renderer.setYTitle("Value");
         renderer.setXLabels(5);
         renderer.setYLabels(5);
-        renderer.setShowGrid(true);
+        // renderer.setShowGrid(true);  // diagnostic: keep grid off
 
         XYSeriesRenderer northRenderer = new XYSeriesRenderer();
         northRenderer.setColor(ColorUtil.rgb(0x0a, 0x66, 0xff));
