@@ -27,6 +27,16 @@ import java.util.Date;
  * captures: it lays out all three alignments in the same row with
  * explicit L / C / R labels, so a regression that re-broke any of
  * them would visibly collapse one column toward another.
+ *
+ * Doubles as a regression test for issue #4897 (live propagation of
+ * {@code setDate} to the visible spinner wheels). Each variant opens
+ * the popup with {@code new Date()} (so the wheels start at whatever
+ * day the test runs), then calls {@code picker.setDate(fixedDate)}
+ * after the slide-up to spin them to a known calendar position before
+ * the screenshot. The committed baselines all show April 11 2026 -
+ * if the live-propagation regresses the wheels will keep showing the
+ * runtime "today" instead and the diff will fail every day except by
+ * coincidence.
  */
 public class LightweightPickerButtonsScreenshotTest extends BaseTest {
     private Form form;
@@ -50,7 +60,11 @@ public class LightweightPickerButtonsScreenshotTest extends BaseTest {
         picker = new Picker();
         picker.setType(Display.PICKER_TYPE_DATE);
         picker.setUseLightweightPopup(true);
-        picker.setDate(fixedDate);
+        // Initial value is "today" so the wheels open at a per-run date; each
+        // variant cycle then spins them to fixedDate via the live-propagation
+        // path (#4897) before screenshot, which is what makes the baselines
+        // date-independent.
+        picker.setDate(new Date());
         form.add(picker);
         form.show();
         return true;
@@ -123,25 +137,38 @@ public class LightweightPickerButtonsScreenshotTest extends BaseTest {
         }
         final Variant variant = variants[index];
         picker.clearLightweightPopupButtons();
-        picker.setDate(fixedDate);
+        // Open at "today" so the wheels start somewhere date-dependent. The
+        // setDate(fixedDate) call below (post-show) then exercises the
+        // #4897 live-propagation path to drive the wheels to a stable
+        // calendar position before we capture.
+        picker.setDate(new Date());
         variant.configure.run();
         picker.startEditingAsync();
-        // Wait for the popup to slide up before screenshotting. Each
-        // variant cycle (wait + chunk-throttled emit + popup dismiss)
-        // costs ~5s on Android, and the per-test deadline in
-        // Cn1ssDeviceRunner is 30s, so this budget can't be padded.
-        // 600ms is generous: the InteractionDialog transition is
-        // <300ms and setDate is applied synchronously above.
+        // First wait: InteractionDialog slide-up. <300ms in practice; 600ms
+        // is the budget the original test used and stays inside the per-test
+        // 30s deadline once the second wait below is added.
         UITimer.timer(600, false, form, new Runnable() {
             @Override
             public void run() {
-                Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot(variant.imageName, new Runnable() {
+                // Live-propagate the deterministic fixedDate to the visible
+                // wheels. Pre-#4897 this had no effect while the popup was
+                // showing, so the wheels would stay on "today" and the
+                // screenshot diff would fail any day other than April 11.
+                picker.setDate(fixedDate);
+                // Second wait: give the wheels a couple of frames to settle
+                // at the new month/day/year before snapping the PNG.
+                UITimer.timer(400, false, form, new Runnable() {
                     @Override
                     public void run() {
-                        picker.stopEditing(new Runnable() {
+                        Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot(variant.imageName, new Runnable() {
                             @Override
                             public void run() {
-                                runVariantsFrom(index + 1);
+                                picker.stopEditing(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        runVariantsFrom(index + 1);
+                                    }
+                                });
                             }
                         });
                     }
