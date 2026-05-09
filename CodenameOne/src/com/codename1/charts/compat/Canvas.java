@@ -178,7 +178,7 @@ public class Canvas {
         // (x, y) is in chart-local coords; Graphics.setTransform now
         // conjugates with the active xTranslate/yTranslate, so we must NOT
         // bake `absoluteX - bounds.getX()` (= xTranslate) into the rotation
-        // centre here — that would apply the conjugation twice and rotate
+        // centre here -- that would apply the conjugation twice and rotate
         // the chart around a point well off-screen.
         Transform t = g.getTransform();
         t.rotate((float) (angle * Math.PI / 180.0), x, y);
