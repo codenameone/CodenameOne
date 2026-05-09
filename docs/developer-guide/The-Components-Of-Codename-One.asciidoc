@@ -2900,6 +2900,35 @@ wb.setURL("jar:///Page.html");
 
 IMPORTANT: On Android a native indicator might show up when the web page is loading. This can be disabled using the `Display.getInstance().setProperty("WebLoadingHidden", "true");` call. You need to invoke this once.
 
+==== Troubleshooting "Failed to create CEF browser" on Linux
+
+In the Simulator, `BrowserComponent` is rendered by the bundled https://bitbucket.org/chromiumembedded/java-cef[CEF] (Chromium Embedded Framework) port. On Linux, `BrowserComponent.isNativeBrowserSupported()` may return `true` and yet creating the component throws `RuntimeException: Failed to create CEF browser`, with a root cause similar to:
+
+[source]
+----
+java.lang.UnsatisfiedLinkError: .../codenameone-cef-*-linux64.zip-extracted/lib/linux64/libjcef.so:
+    .../lib/linux64/libjawt.so: version `SUNWprivate_1.1' not found
+    (required by .../lib/linux64/libjcef.so)
+----
+
+The native CEF library (`libjcef.so`) is loaded with a sibling `libjawt.so` shipped inside the CEF archive. That copy of `libjawt.so` expects symbols (`SUNWprivate_1.1`) provided by the JDK's own `libjawt.so` and the matching `libjvm.so`. When the JVM running the Simulator does not expose those symbols at load time -- typically because the dynamic linker does not have the JDK's native library directories on its search path -- the load fails before any browser is created. This is purely a Simulator/desktop concern; the same code runs unchanged on Android and iOS.
+
+The fix is to launch the IDE (and therefore the Simulator JVM) with `JAVA_HOME` and `LD_LIBRARY_PATH` pointing at a supported JDK. For example, on Linux Mint / Ubuntu wrap the IDE startup script:
+
+[source,bash]
+----
+#!/bin/bash
+export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+export LD_LIBRARY_PATH=$JAVA_HOME/lib:$JAVA_HOME/lib/server${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
+exec /path/to/your/ide "$@"
+----
+
+After relaunching the IDE through this wrapper, `BrowserComponent` instantiation succeeds in the Simulator. Any JDK from 11 through 25 that is supported for running the Simulator works -- the important part is that `LD_LIBRARY_PATH` resolves to that JDK's `lib` and `lib/server` directories so the bundled `libjcef.so` finds a compatible `libjawt`/`libjvm` pair.
+
+TIP: If `BrowserComponent` instantiation fails on Linux, log the environment with `CN.getProperty("java.home", "<unset>")`, `CN.getProperty("JAVA_HOME", "<unset>")` and `CN.getProperty("LD_LIBRARY_PATH", "<unset>")`. An `<unset>` value for `LD_LIBRARY_PATH` while the IDE was launched from a desktop shortcut is the typical fingerprint of this problem -- desktop launchers do not source your shell profile.
+
+NOTE: This issue does not affect packaged native applications, only the desktop Simulator running on Linux.
+
 ==== BrowserComponent hierarchy
 
 When Codename One packages applications into native apps it hides a lot of details to make the process simpler. One of the things hidden is the fact that you aren't dealing with a JAR anymore, so
