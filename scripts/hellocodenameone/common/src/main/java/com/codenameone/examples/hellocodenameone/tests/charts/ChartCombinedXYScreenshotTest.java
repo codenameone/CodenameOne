@@ -9,6 +9,7 @@ import com.codename1.charts.views.AbstractChart;
 import com.codename1.charts.views.BarChart;
 import com.codename1.charts.views.CombinedXYChart;
 import com.codename1.charts.views.LineChart;
+import com.codename1.charts.views.PointStyle;
 import com.codename1.charts.views.ScatterChart;
 
 /// CombinedXYChart layers BarChart, LineChart, and ScatterChart on the same
@@ -62,6 +63,15 @@ public class ChartCombinedXYScreenshotTest extends AbstractChartScreenshotTest {
 
         XYSeriesRenderer markersR = new XYSeriesRenderer();
         markersR.setColor(ColorUtil.rgb(0x42, 0xa7, 0x6f));
+        // ScatterChart paths default the point style to PointStyle.POINT,
+        // which routes through Canvas.drawPoint() -- the chart-package compat
+        // shim explicitly throws "Not supported yet." there. CombinedXY
+        // includes a Scatter chart def that paints on top of the line/bar
+        // ones, so we'd hit the unimplemented drawPoint and the whole
+        // suite hangs waiting for done(). Pick CIRCLE explicitly so the
+        // marker layer renders with a real shape primitive.
+        markersR.setPointStyle(PointStyle.CIRCLE);
+        markersR.setFillPoints(true);
         renderer.addSeriesRenderer(markersR);
 
         // CombinedXYChart matches against AbstractChart.getChartType() which
