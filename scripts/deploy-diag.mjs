@@ -1,0 +1,20 @@
+import { chromium } from 'playwright';
+const URL = 'https://pr-4795-website-preview.codenameone.pages.dev/initializr-app/?parparDiag=1';
+const browser = await chromium.launch({ headless: true });
+const page = await browser.newPage({ viewport:{width:1280,height:900}, deviceScaleFactor:2 });
+const t0 = Date.now();
+const messages = [];
+page.on('console', msg => messages.push(`+${Date.now()-t0}ms [${msg.type()}] ${msg.text()}`));
+page.on('pageerror', err => messages.push(`+${Date.now()-t0}ms [pageerror] ${err.message}`));
+page.on('worker', w => w.on('console', msg => messages.push(`+${Date.now()-t0}ms [w:${msg.type()}] ${msg.text()}`)));
+page.on('requestfailed', req => messages.push(`+${Date.now()-t0}ms [reqfail] ${req.url()}: ${req.failure().errorText}`));
+
+await page.goto(URL);
+await new Promise(r => setTimeout(r, 30000));
+console.log('=== last 60 messages ===');
+messages.slice(-60).forEach(m => console.log(m.slice(0,250)));
+console.log(`=== completed: ${messages.some(m => m.includes('main-thread-completed'))}`);
+console.log(`=== errors: ${messages.filter(m => m.includes('error')).length}`);
+console.log(`=== pageerrors: ${messages.filter(m => m.includes('[pageerror]')).length}`);
+console.log(`=== reqfails: ${messages.filter(m => m.includes('[reqfail]')).length}`);
+await browser.close();
