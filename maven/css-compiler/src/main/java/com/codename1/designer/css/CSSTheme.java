@@ -883,14 +883,21 @@ public class CSSTheme {
         CN1Gradient gradient;
 
         LexicalUnit next, prev, param;
-        
-        
+
+        /// Set to the originating CSS variable name (no `--` prefix) when this
+        /// unit is the result of expanding a `var(--name, fallback)` reference.
+        /// `evaluate()` carries it down so `apply()` can stash a runtime binding
+        /// on the owning Element, letting `updateResources()` emit a
+        /// `@cn1-bind:&lt;themeKey&gt;=&lt;name&gt;` constant alongside the resolved
+        /// default value. Null on units that did not originate from a var().
+        String bindingVarName;
+
         ScaledUnit(LexicalUnit src, double dpi, int screenWidth, int screenHeight) {
             this.src = src;
             this.dpi = dpi;
             this.screenWidth = screenWidth;
             this.screenHeight = screenHeight;
-            
+
         }
 
 
@@ -1690,6 +1697,28 @@ public class CSSTheme {
         return key.indexOf('.', id.length() + 1) == -1;
     }
 
+    /// Emits a `@cn1-bind:&lt;themeKey&gt;=&lt;varName&gt;` constant when the source
+    /// Element has a `var()` binding for the given CSS property. This lets
+    /// the runtime UIManager retune every UIID that referenced the same
+    /// `--name` constant via a single `addThemeProps({"@name": value})`
+    /// call without forcing the theme to be recompiled.
+    ///
+    /// `stateEl` is the per-state Element (Unselected / Selected / Pressed
+    /// / Disabled). Its `resolveBinding` walks up to the parent UIID
+    /// Element so a base `Button { color: var(--accent) }` rule still
+    /// emits a binding for the per-state `Button.press#fgColor` even when
+    /// `Button.pressed` did not redeclare `color`.
+    private void emitColorBinding(EditableResources res, String themeName, String themeKey, Element stateEl, String cssProperty) {
+        if (stateEl == null) {
+            return;
+        }
+        String varName = stateEl.resolveBinding(cssProperty);
+        if (varName == null || varName.length() == 0) {
+            return;
+        }
+        res.setThemeProperty(themeName, "@cn1-bind:" + themeKey, varName);
+    }
+
     public void updateResources() {
         if (res != null) {
             Map<String, Object> themeData = res.getTheme(themeName);
@@ -1840,12 +1869,16 @@ public class CSSTheme {
 
                 currToken = "fgColor";
                 res.setThemeProperty(themeName, unselId+".fgColor", el.getThemeFgColor(unselectedStyles));
+                emitColorBinding(res, themeName, unselId+".fgColor", el.getUnselected(), "color");
                 currToken = "selected fgColor";
                 res.setThemeProperty(themeName, selId+"#fgColor", el.getThemeFgColor(selectedStyles));
+                emitColorBinding(res, themeName, selId+"#fgColor", el.getSelected(), "color");
                 currToken = "pressed fgColor";
                 res.setThemeProperty(themeName, pressedId+"#fgColor", el.getThemeFgColor(pressedStyles));
+                emitColorBinding(res, themeName, pressedId+"#fgColor", el.getPressed(), "color");
                 currToken = "disabled fgColor";
                 res.setThemeProperty(themeName, disabledId+"#fgColor", el.getThemeFgColor(disabledStyles));
+                emitColorBinding(res, themeName, disabledId+"#fgColor", el.getDisabled(), "color");
 
                 currToken = "fgAlpha";
                 res.setThemeProperty(themeName, unselId+".fgAlpha", el.getThemeFgAlpha(unselectedStyles));
@@ -1858,12 +1891,16 @@ public class CSSTheme {
 
                 currToken = "bgColor";
                 res.setThemeProperty(themeName, unselId+".bgColor", el.getThemeBgColor(unselectedStyles));
+                emitColorBinding(res, themeName, unselId+".bgColor", el.getUnselected(), "background-color");
                 currToken = "selected bgColor";
                 res.setThemeProperty(themeName, selId+"#bgColor", el.getThemeBgColor(selectedStyles));
+                emitColorBinding(res, themeName, selId+"#bgColor", el.getSelected(), "background-color");
                 currToken = "pressed bgColor";
                 res.setThemeProperty(themeName, pressedId+"#bgColor", el.getThemeBgColor(pressedStyles));
+                emitColorBinding(res, themeName, pressedId+"#bgColor", el.getPressed(), "background-color");
                 currToken = "disabled bgColor";
                 res.setThemeProperty(themeName, disabledId+"#bgColor", el.getThemeBgColor(disabledStyles));
+                emitColorBinding(res, themeName, disabledId+"#bgColor", el.getDisabled(), "background-color");
 
                 currToken = "transparency";
                 res.setThemeProperty(themeName, unselId+".transparency", el.getThemeTransparency(unselectedStyles));
@@ -2017,6 +2054,22 @@ public class CSSTheme {
                     }
                 } else if (lu.getLexicalUnitType() == LexicalUnit.SAC_INTEGER) {
                     res.setThemeProperty(themeName, "@"+constantKey, String.valueOf(((ScaledUnit)lu).getIntegerValue()));
+                } else if (lu.getLexicalUnitType() == LexicalUnit.SAC_RGBCOLOR
+                        || (lu.getLexicalUnitType() == LexicalUnit.SAC_FUNCTION
+                                && ("rgb".equals(lu.getFunctionName())
+                                        || "rgba".equals(lu.getFunctionName())
+                                        || "cn1rgb".equals(lu.getFunctionName())
+                                        || "cn1rgba".equals(lu.getFunctionName())))) {
+                    // Hex / rgb() / rgba() color literals declared in
+                    // #Constants. Stored as a plain hex string (no `#`,
+                    // lowercase, 6 chars) which is the format
+                    // UIManager's themeConstants and the runtime
+                    // applyThemeBindings pass expect for color values.
+                    // Lets a user theme.css declare e.g.
+                    // `#Constants { --accent-color: #ff2d95; }` and have
+                    // it propagate to every UIID bound to --accent-color
+                    // in the parent native theme.
+                    res.setThemeProperty(themeName, "@"+constantKey, getColorString(lu));
                 }
             } catch (RuntimeException t) {
                 System.err.println("\nAn error occurred processing constant key "+constantKey);
@@ -3224,7 +3277,18 @@ public class CSSTheme {
     public class Element {
         Element parent = anyNodeStyle;
         Map properties = new LinkedHashMap();
-        
+
+        /// Records `(cssProperty -&gt; varName)` for any property on this
+        /// Element whose value was set via a `var(--name, fallback)`
+        /// expansion. Populated by `apply(Element, String, LexicalUnit)`
+        /// from `ScaledUnit.bindingVarName` and consumed by
+        /// `updateResources()` to emit `@cn1-bind:&lt;themeKey&gt;=&lt;name&gt;`
+        /// constants. Each state sub-Element (unselected / selected /
+        /// pressed / disabled) keeps its own map so per-state var
+        /// references map cleanly to the corresponding `Button.press#fgColor`
+        /// shape.
+        Map<String, String> bindings = new LinkedHashMap<String, String>();
+
         Element unselected;
         Element selected;
         Element pressed;
@@ -3552,7 +3616,49 @@ public class CSSTheme {
             }
             return disabled;
         }
-        
+
+        /// Returns the var name a given CSS property is bound to, walking
+        /// the current Element first and falling back to its `parent`
+        /// chain. State sub-Elements have their parent set to the
+        /// owning UIID Element (see `getUnselected/Selected/Pressed/Disabled`)
+        /// so a `Button { color: var(--accent) }` binding visible on the
+        /// Button base also reaches `Button.press#fgColor` whenever
+        /// `Button.pressed` did not redeclare `color`. Likewise a
+        /// `cn1-derive: Button` chain inherits Button's bindings so
+        /// derived UIIDs retune in lockstep when the user overrides the
+        /// referenced theme constant.
+        String resolveBinding(String cssProperty) {
+            String b = bindings.get(cssProperty);
+            if (b != null) {
+                return b;
+            }
+            // If this Element set its own (non-bound) value for the
+            // CSS property, don't inherit a binding from the parent.
+            // Example: `Button { color: var(--accent) }` plus
+            // `Button.disabled { color: #a5a0ab }` - the disabled state
+            // EXPLICITLY overrode the colour with a literal, so reading
+            // the parent's accent binding for `Button.dis#fgColor` would
+            // wire the disabled state to the runtime accent override
+            // even though the disabled rule deliberately broke that
+            // link. Only fall through to the parent when this Element
+            // has no explicit value of its own (e.g. a derive-only
+            // child, or the implicit unselected state).
+            if (style.get(cssProperty) != null) {
+                return null;
+            }
+            // anyNodeStyle.parent points back to itself (default field
+            // initializer); stop the walk there to avoid infinite
+            // recursion. Any binding declared on anyNodeStyle is still
+            // returned by the bindings.get() check above.
+            if (this == anyNodeStyle) {
+                return null;
+            }
+            if (parent != null && parent != this) {
+                return parent.resolveBinding(cssProperty);
+            }
+            return null;
+        }
+
         void put(String key, Object value) {
             style.put(key, value);
         }
@@ -4928,6 +5034,21 @@ public class CSSTheme {
                 } else {
                     out.opacity(255);
                 }
+                // When the source background-color came from a var()
+                // expansion, flip the RoundBorder into "uiid mode" so it
+                // paints via the Style's bgPainter (i.e. Style.bgColor)
+                // at render time instead of the static color baked into
+                // the border at compile time. Without this, a runtime
+                // `@accent-color` override updates themeProps[bgColor]
+                // correctly but the visible pill stays at the compile-
+                // time fallback because RoundBorder.fillShape uses its
+                // own field. Only flip when the binding is present so
+                // legacy themes that rely on the baked-color path keep
+                // their existing rendering.
+                if (backgroundColor instanceof ScaledUnit
+                        && ((ScaledUnit) backgroundColor).bindingVarName != null) {
+                    out.uiid(true);
+                }
             } else {
                 out.opacity(0);
             }
@@ -5559,7 +5680,19 @@ public class CSSTheme {
     
     
     public void apply(Element style, String property, LexicalUnit value) {
-        
+        // Capture any var() binding tagged onto the head ScaledUnit so the
+        // owning Element knows this property is bound to a runtime
+        // overridable theme constant. We record on every property so
+        // `updateResources()` only has to look in one place; emission to
+        // the .res is gated on whether the resulting theme key is one of
+        // the accent-bearing color outputs (fg/bg color today).
+        if (value instanceof ScaledUnit) {
+            String varName = ((ScaledUnit) value).bindingVarName;
+            if (varName != null && varName.length() > 0) {
+                style.bindings.put(property, varName);
+            }
+        }
+
         switch (property) {
             case "refresh-images":
                 refreshImages = true;
@@ -7177,6 +7310,35 @@ public class CSSTheme {
         return -1;
     }
 
+    /// Checks whether the supplied `currSelectors` currently parsing
+    /// declarations is the special `#Constants` pseudo-element CN1
+    /// themes use to declare theme constants (rather than UIID styling
+    /// rules). Used by the `cn1--&lt;name&gt;` short-circuit in `property_`
+    /// to decide whether to ALSO emit the declaration as a `@&lt;name&gt;`
+    /// theme constant - so a user theme.css can override a native
+    /// theme's bound palette purely from CSS.
+    private static boolean isInsideConstantsBlock(SelectorList currSelectors) {
+        if (currSelectors == null) {
+            return false;
+        }
+        int len = currSelectors.getLength();
+        for (int i = 0; i < len; i++) {
+            Selector sel = currSelectors.item(i);
+            if (sel.getSelectorType() != Selector.SAC_CONDITIONAL_SELECTOR) {
+                continue;
+            }
+            ConditionalSelector csel = (ConditionalSelector) sel;
+            if (csel.getCondition().getConditionType() != Condition.SAC_ID_CONDITION) {
+                continue;
+            }
+            AttributeCondition acond = (AttributeCondition) csel.getCondition();
+            if ("Constants".equalsIgnoreCase(acond.getValue())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static int findMatchingBrace(String css, int openPos) {
         int depth = 0;
         int len = css.length();
@@ -7372,6 +7534,22 @@ public class CSSTheme {
                         } else {
                             su = evaluate(new ScaledUnit(varVal, theme.currentDpi, theme.getPreviewScreenWidth(), theme.getPreviewScreenHeight()));
                         }
+                        // Tag the resolved unit with the originating var name
+                        // (sans the `cn1--` prefix the loader rewrites `--` to)
+                        // so apply() can stash a runtime binding on the owning
+                        // Element. We tag the head only - the chain after the
+                        // var() expansion stays unbound.
+                        if (su != null && varname != null) {
+                            String bare = varname;
+                            if (bare.startsWith("cn1--")) {
+                                bare = bare.substring("cn1--".length());
+                            } else if (bare.startsWith("--")) {
+                                bare = bare.substring(2);
+                            }
+                            if (bare.length() > 0) {
+                                su.bindingVarName = bare;
+                            }
+                        }
                         // Evaluate the variable value in case it also includes other variables that need to be evaluated.
                         //ScaledUnit su = evaluate(new ScaledUnit(varVal, theme.currentDpi, theme.getPreviewScreenWidth(), theme.getPreviewScreenHeight()));
                         LexicalUnit toAppend = lu.getNextLexicalUnit();
@@ -7408,8 +7586,41 @@ public class CSSTheme {
 
                 private void property_(String string, LexicalUnit _lu, boolean bln) throws CSSException {
                     if (string.startsWith("cn1--")) {
-                        
+
                         variables.put(string, _lu);
+                        // When the `--name` declaration sits inside the
+                        // `#Constants` pseudo-element, ALSO export it as a
+                        // `@name` theme constant. This is the load-bearing
+                        // hook that lets a user app's theme.css override a
+                        // native-theme palette variable purely from CSS:
+                        // the native theme declares `#Constants {
+                        // --accent-color: #007aff; }` which becomes a
+                        // theme constant, the user's theme.css redeclares
+                        // the same `#Constants { --accent-color: #ff2d95; }`
+                        // override which loads later (after the native
+                        // theme is layered in via includeNativeBool=true)
+                        // and overwrites the constant. UIManager's
+                        // applyThemeBindings then retunes every UIID
+                        // bound to that variable. Without this dual
+                        // emission `--name` would only live in the
+                        // parser-internal variables map and never reach
+                        // the runtime.
+                        if (currSelectors != null
+                                && isInsideConstantsBlock(currSelectors)) {
+                            String constantName = string.substring("cn1--".length());
+                            if (constantName.length() > 0) {
+                                // Evaluate via the same path the rest of
+                                // updateResources expects: wraps raw
+                                // LexicalUnitImpls into ScaledUnits so
+                                // downstream getColorString() and friends
+                                // see the chain shape they were written
+                                // against (red/green/blue ScaledUnits
+                                // for SAC_RGBCOLOR), not the raw Flute
+                                // LexicalUnitImpl which would crash on
+                                // the ScaledUnit cast.
+                                theme.constants.put(constantName, evaluate(_lu));
+                            }
+                        }
                         return;
                     }
 

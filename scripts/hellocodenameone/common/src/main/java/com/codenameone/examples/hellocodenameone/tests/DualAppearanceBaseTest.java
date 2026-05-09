@@ -433,6 +433,15 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
      */
     private static final class TextureBackdropPainter implements Painter {
         private final boolean dark;
+        // Cache the rendered pattern as an Image so subsequent paints blit
+        // a single bitmap instead of re-running the scanline loop. The
+        // form's settle window emits ~30 paints at 60Hz before the
+        // screenshot fires; without the cache that's ~30 * 50_bands *
+        // 2532_rows = ~3.8M fillRect calls per capture, which on iOS
+        // Metal saturates the CAMetalLayer command buffer enough to time
+        // the CI screenshot step out. With the cache it's 1 fillRect for
+        // the first paint and 1 drawImage for each later one.
+        private com.codename1.ui.Image cached;
 
         TextureBackdropPainter(boolean dark) {
             this.dark = dark;
@@ -440,18 +449,30 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
 
         @Override
         public void paint(Graphics g, Rectangle rect) {
-            int prevColor = g.getColor();
-            int prevAlpha = g.getAlpha();
             int x = rect.getX();
             int y = rect.getY();
             int w = rect.getWidth();
             int h = rect.getHeight();
+            if (w <= 0 || h <= 0) {
+                return;
+            }
+            if (cached == null || cached.getWidth() != w || cached.getHeight() != h) {
+                cached = renderTexture(w, h);
+            }
+            if (cached != null) {
+                g.drawImage(cached, x, y);
+            }
+        }
+
+        private com.codename1.ui.Image renderTexture(int w, int h) {
+            com.codename1.ui.Image img = com.codename1.ui.Image.createImage(w, h, 0xffffffff);
+            Graphics ig = img.getGraphics();
 
             // Base fill - a neutral mid-tone so stripes have somewhere
             // to sit. Dark mode uses a dark base, light uses a light base.
-            g.setAlpha(255);
-            g.setColor(dark ? 0x202030 : 0xf0e8f8);
-            g.fillRect(x, y, w, h);
+            ig.setAlpha(255);
+            ig.setColor(dark ? 0x202030 : 0xf0e8f8);
+            ig.fillRect(0, 0, w, h);
 
             // Diagonal stripes painted as rotated rectangles. 6mm-ish band
             // width reads well at phone resolution. Palette is kept
@@ -462,31 +483,29 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
             int[] lightPalette = { 0xff7eb2, 0x7ec8ff, 0xffd67e, 0x9affc8, 0xd8a0ff };
             int[] darkPalette  = { 0x882244, 0x224488, 0x886622, 0x226644, 0x664488 };
             int[] palette = dark ? darkPalette : lightPalette;
-            g.setAlpha(180);
+            ig.setAlpha(180);
             int diagonalOffset = -h; // start off-screen so the pattern fills
             int band = 0;
             while (diagonalOffset < w + h) {
-                g.setColor(palette[band % palette.length]);
+                ig.setColor(palette[band % palette.length]);
                 // diagonal band = a quad from (diagonalOffset, 0) to
                 // (diagonalOffset + bandW, 0) down to (diagonalOffset + bandW + h, h)
                 // / (diagonalOffset + h, h). Approximate with scanlines so
                 // this stays portable across ports that may lack fillPolygon.
                 for (int row = 0; row < h; row++) {
-                    int x0 = x + diagonalOffset + row;
+                    int x0 = diagonalOffset + row;
                     int x1 = x0 + bandW;
-                    if (x1 < x || x0 > x + w) {
+                    if (x1 < 0 || x0 > w) {
                         continue;
                     }
-                    if (x0 < x) x0 = x;
-                    if (x1 > x + w) x1 = x + w;
-                    g.fillRect(x0, y + row, x1 - x0, 1);
+                    if (x0 < 0) x0 = 0;
+                    if (x1 > w) x1 = w;
+                    ig.fillRect(x0, row, x1 - x0, 1);
                 }
                 diagonalOffset += bandW;
                 band++;
             }
-
-            g.setAlpha(prevAlpha);
-            g.setColor(prevColor);
+            return img;
         }
     }
 }

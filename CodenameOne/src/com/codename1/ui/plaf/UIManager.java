@@ -1802,6 +1802,8 @@ public class UIManager {
             this.themeProps.put(key, themeProps.get(key));
         }
 
+        applyThemeBindings();
+
         updateLargerTextScaleSettingFromTheme();
 
         if (!this.themeProps.containsKey("PickerButtonBar.derive")) {
@@ -1861,6 +1863,99 @@ public class UIManager {
             }
         }
 
+    }
+
+    /// Theme entries can be bound to a named theme constant via a
+    /// `@cn1-bind:&lt;themeKey&gt;=&lt;varName&gt;` pseudo-constant emitted by the CSS
+    /// compiler when it expands a `var(--name, fallback)` reference. The
+    /// compiler still inlines `fallback` as the baked-in default (so themes
+    /// load correctly with no override), but additionally records that the
+    /// resolved style property tracks `--name`.
+    ///
+    /// At runtime, callers tune the palette by injecting an `@&lt;varName&gt;`
+    /// constant via [#addThemeProps]. This method walks the binding entries
+    /// and overlays the override value onto every bound style key, so a
+    /// single `addThemeProps({"@accent-color": "ff2d95"})` call retunes
+    /// every UIID whose CSS rule referenced `var(--accent-color, ...)`.
+    /// Bindings without a matching override are left at their baked-in
+    /// default (whatever was already in themeProps from the initial load).
+    private void applyThemeBindings() {
+        if (themeConstants == null || themeConstants.isEmpty() || themeProps == null) {
+            return;
+        }
+        final String prefix = "cn1-bind:";
+        for (Map.Entry<String, Object> entry : themeConstants.entrySet()) {
+            String constantKey = entry.getKey();
+            if (constantKey == null || !constantKey.startsWith(prefix)) {
+                continue;
+            }
+            Object varNameObj = entry.getValue();
+            if (!(varNameObj instanceof String)) {
+                continue;
+            }
+            String varName = ((String) varNameObj).trim();
+            if (varName.length() == 0) {
+                continue;
+            }
+            Object override = themeConstants.get(varName);
+            if (!(override instanceof String)) {
+                continue;
+            }
+            String themeKey = constantKey.substring(prefix.length());
+            if (themeKey.length() == 0) {
+                continue;
+            }
+            // Only retune keys that are already present in themeProps so a
+            // stale binding entry (left over after the bound rule was
+            // dropped from the source CSS) can't materialize a phantom
+            // style key from the user's override value.
+            if (!themeProps.containsKey(themeKey)) {
+                continue;
+            }
+            String overrideValue = (String) override;
+            if (themeKey.endsWith("Color")) {
+                overrideValue = normalizeBoundColorValue(overrideValue);
+                if (overrideValue == null) {
+                    continue;
+                }
+            }
+            themeProps.put(themeKey, overrideValue);
+        }
+    }
+
+    /// `loadTheme` stores color theme entries as plain hex strings (no `#`,
+    /// lowercase). User-supplied overrides may use either form, so trim a
+    /// leading `#` and lowercase the value before assigning it to a bound
+    /// color key. Returns null when the value can't be parsed as a 3- or
+    /// 6-digit hex color so the binding falls through to its default.
+    private static String normalizeBoundColorValue(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        String value = raw.trim();
+        if (value.length() == 0) {
+            return null;
+        }
+        if (value.charAt(0) == '#') {
+            value = value.substring(1);
+        }
+        if (value.length() == 3) {
+            char r = value.charAt(0);
+            char g = value.charAt(1);
+            char b = value.charAt(2);
+            value = "" + r + r + g + g + b + b;
+        }
+        if (value.length() != 6) {
+            return null;
+        }
+        for (int i = 0; i < 6; i++) {
+            char c = value.charAt(i);
+            boolean hex = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+            if (!hex) {
+                return null;
+            }
+        }
+        return value.toLowerCase();
     }
 
     private Map<String, String> parseCache() {
