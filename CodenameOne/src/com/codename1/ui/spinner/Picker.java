@@ -120,6 +120,10 @@ public class Picker extends Button {
     private Runnable stopEditingCallback;
     private boolean suppressPaint;
     private final ArrayList<LightweightPopupButton> lightweightPopupButtons = new ArrayList<LightweightPopupButton>();
+    /// While the lightweight popup is on screen this points at the live spinner widget
+    /// so that setters propagate into the visible wheels and getters read the wheel
+    /// position. Null whenever the popup is not showing.
+    private InternalPickerWidget currentSpinner;
 
     /// Placement options for custom lightweight popup buttons.
     public static final class LightweightPopupButtonPlacement {
@@ -463,6 +467,12 @@ public class Picker extends Button {
 
             private void endEditing(int command, InteractionDialog dlg, InternalPickerWidget spinner) {
                 currentInput = null;
+                if (currentSpinner == spinner) { //NOPMD CompareObjectsWithEquals
+                    // Clear before reading so external action listeners triggered by
+                    // fireActionEvent see getDate() return the just-committed value
+                    // rather than the (about-to-disappear) wheel state.
+                    currentSpinner = null;
+                }
                 restoreContentPane();
                 dlg.disposeToTheBottom();
                 if (command != COMMAND_CANCEL) {
@@ -516,6 +526,7 @@ public class Picker extends Button {
                     default:
                         throw new IllegalArgumentException("Unsupported picker type " + type);
                 }
+                currentSpinner = spinner;
                 final InteractionDialog dlg = new InteractionDialog() {
 
                     ActionListener keyListener;
@@ -588,8 +599,8 @@ public class Picker extends Button {
                         .setBgTransparency(0)
                         .setMargin(0)
                         .setPaddingMillimeters(3f, 0);
-                Container topCustomButtons = createLightweightPopupButtonRow(spinner, LightweightPopupButtonPlacement.ABOVE_SPINNER, isTablet);
-                Container bottomCustomButtons = createLightweightPopupButtonRow(spinner, LightweightPopupButtonPlacement.BELOW_SPINNER, isTablet);
+                Container topCustomButtons = createLightweightPopupButtonRow(LightweightPopupButtonPlacement.ABOVE_SPINNER, isTablet);
+                Container bottomCustomButtons = createLightweightPopupButtonRow(LightweightPopupButtonPlacement.BELOW_SPINNER, isTablet);
                 if (topCustomButtons != null || bottomCustomButtons != null) {
                     Container spinnerSection = new Container(new BorderLayout());
                     spinnerSection.add(BorderLayout.CENTER, wrapper);
@@ -685,7 +696,7 @@ public class Picker extends Button {
                     west.add(nextButton);
                 }
 
-                Container centerButtons = createLightweightPopupButtonRow(spinner, LightweightPopupButtonPlacement.BETWEEN_CANCEL_AND_DONE, isTablet);
+                Container centerButtons = createLightweightPopupButtonRow(LightweightPopupButtonPlacement.BETWEEN_CANCEL_AND_DONE, isTablet);
                 Container buttonBar = BorderLayout.centerEastWest(centerButtons, doneButton, west);
                 buttonBar.setUIID(isTablet ? "PickerButtonBarTablet" : "PickerButtonBar");
                 dlg.getContentPane().add(BorderLayout.NORTH, buttonBar);
@@ -759,7 +770,7 @@ public class Picker extends Button {
         updateValue();
     }
 
-    private Container createLightweightPopupButtonRow(final InternalPickerWidget spinner, int placement, boolean isTablet) {
+    private Container createLightweightPopupButtonRow(int placement, boolean isTablet) {
         Container left = null;
         Container center = null;
         Container right = null;
@@ -775,8 +786,6 @@ public class Picker extends Button {
                     if (popupButton.action != null) {
                         popupButton.action.run();
                     }
-                    spinner.setValue(value);
-                    updateValue();
                 }
             });
             switch (entry.alignment) {
@@ -1188,25 +1197,49 @@ public class Picker extends Button {
         }
     }
 
+    /// Returns the value currently visible to the user: the live spinner wheel value while
+    /// the lightweight popup is showing, otherwise the committed `value` field.
+    private Object currentValue() {
+        if (currentSpinner != null) {
+            return currentSpinner.getValue();
+        }
+        return value;
+    }
+
     /// Returns the date, this value is used both for type date/date and time. Notice that this
-    /// value isn't used for time
+    /// value isn't used for time.
+    ///
+    /// While the lightweight popup is on screen this returns the value visible on the scroll
+    /// wheels (which only becomes the committed value once the user presses Done), so a custom
+    /// popup button can read it to compute a relative date. The native picker does not expose
+    /// the in-progress wheel state, so while a native picker is on screen this still returns
+    /// the last committed value.
     ///
     /// #### Returns
     ///
     /// the date object
     public Date getDate() {
-        return (Date) value;
+        return (Date) currentValue();
     }
 
     /// Sets the date, this value is used both for type date/date and time. Notice that this
-    /// value isn't used for time. Notice that this value will have no effect if the picker
-    /// is currently showing.
+    /// value isn't used for time.
+    ///
+    /// If the lightweight popup is currently on screen the visible scroll wheels are also
+    /// moved to the new value, so a custom popup button can do `setDate(getDate() + n)` and
+    /// have the wheels reflect it (see `#addLightweightPopupButton(String, Runnable)`).
+    /// The native picker is read-only while shown - calling `setDate` against a Picker whose
+    /// native popup is open updates the committed `value` but leaves the on-screen wheels
+    /// unchanged until the user dismisses and re-opens the picker.
     ///
     /// #### Parameters
     ///
     /// - `d`: the new date
     public void setDate(Date d) {
         value = d;
+        if (currentSpinner != null) {
+            currentSpinner.setValue(d);
+        }
         updateValue();
     }
 
@@ -1332,6 +1365,7 @@ public class Picker extends Button {
                     @Override
                     public void close() throws Exception {
                         currentInput = null;
+                        currentSpinner = null;
                         if (sizeChanged != null) {
                             f.removeSizeChangedListener(sizeChanged);
                         }
@@ -1458,33 +1492,44 @@ public class Picker extends Button {
         updateValue();
     }
 
-    /// Returns the current string
+    /// Returns the current string. While the lightweight popup is on screen this returns the
+    /// value visible on the scroll wheel; the native picker does not expose its in-progress
+    /// wheel state, so while a native picker is on screen this still returns the last
+    /// committed value.
     ///
     /// #### Returns
     ///
     /// the selected string
     public String getSelectedString() {
-        return (String) value;
+        return (String) currentValue();
     }
 
-    /// Sets the current value in a string array picker
+    /// Sets the current value in a string array picker. If the lightweight popup is on screen
+    /// the visible scroll wheel is also moved to the new value; the native picker is read-only
+    /// while shown so against a native popup this updates only the committed value.
     ///
     /// #### Parameters
     ///
     /// - `str`: the current value
     public void setSelectedString(String str) {
         value = str;
+        if (currentSpinner != null) {
+            currentSpinner.setValue(str);
+        }
         updateValue();
     }
 
-    /// Returns the index of the selected string
+    /// Returns the index of the selected string. While the lightweight popup is on screen
+    /// this returns the index visible on the scroll wheel; the native picker still returns
+    /// the last committed index.
     ///
     /// #### Returns
     ///
     /// the selected string offset or -1
     public int getSelectedStringIndex() {
+        Object current = currentValue();
         int offset = 0;
-        if (value == null) {
+        if (current == null) {
             for (String s : (String[]) metaData) {
                 if (s == null) {
                     return offset;
@@ -1494,7 +1539,7 @@ public class Picker extends Button {
             return -1;
         }
         for (String s : (String[]) metaData) {
-            if (value.equals(s)) {
+            if (current.equals(s)) {
                 return offset;
             }
             offset++;
@@ -1502,13 +1547,18 @@ public class Picker extends Button {
         return -1;
     }
 
-    /// Returns the index of the selected string
+    /// Sets the index of the selected string. If the lightweight popup is on screen the
+    /// visible wheel is also moved to the new value; the native picker is read-only while
+    /// shown so against a native popup this updates only the committed value.
     ///
     /// #### Parameters
     ///
     /// - `index`: sets the index of the selected string
     public void setSelectedStringIndex(int index) {
         value = ((String[]) metaData)[index];
+        if (currentSpinner != null) {
+            currentSpinner.setValue(value);
+        }
         updateValue();
     }
 
@@ -1603,23 +1653,30 @@ public class Picker extends Button {
     }
 
     /// This value is only used for time type and is ignored in the case of date and time where
-    /// both are embedded within the date.
+    /// both are embedded within the date. While the lightweight popup is on screen this
+    /// returns the value visible on the scroll wheels; the native picker still returns the
+    /// last committed value.
     ///
     /// #### Returns
     ///
     /// the time value as minutes since midnight e.g. 630 is 10:30am
     public int getTime() {
-        return ((Integer) value).intValue();
+        return ((Integer) currentValue()).intValue();
     }
 
     /// This value is only used for time type and is ignored in the case of date and time where
-    /// both are embedded within the date.
+    /// both are embedded within the date. If the lightweight popup is on screen the visible
+    /// scroll wheels are also moved to the new value; the native picker is read-only while
+    /// shown so against a native popup this updates only the committed value.
     ///
     /// #### Parameters
     ///
     /// - `time`: the time value as minutes since midnight e.g. 630 is 10:30am
     public void setTime(int time) {
         value = Integer.valueOf(time);
+        if (currentSpinner != null) {
+            currentSpinner.setValue(value);
+        }
         updateValue();
     }
 
@@ -1653,7 +1710,9 @@ public class Picker extends Button {
         setDuration(hour * 60L * 60 * 1000L + minute * 60L * 1000L);
     }
 
-    /// This value is used for the duration type.
+    /// This value is used for the duration type. While the lightweight popup is on screen
+    /// this returns the value visible on the scroll wheels; the native picker still returns
+    /// the last committed value.
     ///
     /// #### Returns
     ///
@@ -1665,10 +1724,12 @@ public class Picker extends Button {
     ///
     /// - #getDurationMinutes()
     public long getDuration() {
-        return (Long) value;
+        return (Long) currentValue();
     }
 
-    /// This value is only used for duration type.
+    /// This value is only used for duration type. If the lightweight popup is on screen the
+    /// visible scroll wheels are also moved to the new value; the native picker is read-only
+    /// while shown so against a native popup this updates only the committed value.
     ///
     /// #### Parameters
     ///
@@ -1685,6 +1746,9 @@ public class Picker extends Button {
     /// - #getDurationMinutes()
     public void setDuration(long duration) {
         value = Long.valueOf(duration);
+        if (currentSpinner != null) {
+            currentSpinner.setValue(value);
+        }
         updateValue();
     }
 
