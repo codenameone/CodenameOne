@@ -1170,7 +1170,14 @@ public class Sheet extends Container {
 
                 if (parent != null && parent.getComponentForm() != null) {
                     cnt.remove();
-                    parent.getComponentForm().revalidateLater();
+                    Form parentForm = parent.getComponentForm();
+                    parentForm.revalidateLater();
+                    // revalidateLater() only schedules work for the next
+                    // paint cycle, but cnt.remove() does not by itself wake
+                    // the EDT, so without an explicit repaint here the
+                    // form's dim overlay remains on screen until the next
+                    // user input. See issue #4899.
+                    parentForm.repaint();
                     fireCloseEvent(true);
                     stopTrackingBounds();
 
@@ -1226,7 +1233,14 @@ public class Sheet extends Container {
                 Container parent = cnt.getParent();
                 if (parent != null && cnt.getComponentForm() != null) {
                     cnt.remove();
-                    parent.getComponentForm().revalidateLater();
+                    Form parentForm = parent.getComponentForm();
+                    parentForm.revalidateLater();
+                    // revalidateLater() only schedules work for the next
+                    // paint cycle, but cnt.remove() does not by itself wake
+                    // the EDT, so without an explicit repaint here the
+                    // form's dim overlay remains on screen until the next
+                    // user input. See issue #4899.
+                    parentForm.repaint();
                     fireCloseEvent(true);
                     stopTrackingBounds();
                 }

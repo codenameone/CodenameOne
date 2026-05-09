@@ -202,6 +202,191 @@ class SheetSwipeToDismissTest extends UITestBase {
                 "Sheet Y must not move when drag starts outside the title bar");
     }
 
+    /// Reproduction for issue #4899 - after a swipe-to-dismiss the underlying
+    /// Form remains painted with the Sheet's dim overlay until the next user
+    /// input wakes the EDT. The dismiss completes (`cnt.remove()` succeeds
+    /// and the `Sheet` is gone), but the only repaint scheduled against the
+    /// form is `revalidateLater()`, which only does its work if a *future*
+    /// paint cycle calls `flushRevalidateQueue`. Nothing in the dismiss path
+    /// puts the form into the impl's paint queue, so the EDT goes idle with
+    /// stale dim pixels still on screen.
+    ///
+    /// We assert the loop precondition that, immediately after the dismiss,
+    /// either a paint is pending against the form or another animation is
+    /// going to run a paint cycle for us. Without the fix neither holds.
+    @FormTest
+    void swipeDismissTriggersFormRepaint() throws Exception {
+        Form form = showFormWithSheet("Repaint After Swipe");
+        Sheet sheet = Sheet.getCurrentSheet();
+        assertNotNull(sheet);
+
+        Container titleBar = getTitleBar(sheet);
+        int x = titleBar.getAbsoluteX() + titleBar.getWidth() / 2;
+        int startY = titleBar.getAbsoluteY() + titleBar.getHeight() / 2;
+        int dragDistance = (int) (sheet.getHeight() * 0.6);
+
+        dragSheet(x, startY, 0, dragDistance, 5);
+        implementation.dispatchPointerRelease(x, startY + dragDistance);
+        flushSerialCalls();
+
+        // Drive any in-flight animation through to completion *and* clear the
+        // paint queue between iterations, so by the time we inspect state the
+        // queue reflects only what the dismiss path itself scheduled, not
+        // leftovers from earlier animation frames.
+        awaitAnimationsFlushingPaintQueue(form);
+
+        assertNull(Sheet.getCurrentSheet(),
+                "Sanity: sheet must be dismissed before checking repaint state");
+
+        assertPaintScheduledOrAnimating(form,
+                "After a swipe-to-dismiss the form must be queued for repaint "
+                        + "(or another animation must keep the EDT awake) so "
+                        + "the dim overlay is cleared. Otherwise the EDT "
+                        + "idles with stale dim pixels until the user taps.");
+    }
+
+    /// Companion test: the same assertion holds when the user closes the
+    /// sheet via the back/close button. This path goes through `Sheet#hide`
+    /// and `Container#animateUnlayout`, which we expect to leave the form
+    /// in a paintable state.
+    @FormTest
+    void backButtonDismissTriggersFormRepaint() throws Exception {
+        Form form = showFormWithSheetDriven("Repaint After Back Button");
+        Sheet sheet = Sheet.getCurrentSheet();
+        assertNotNull(sheet);
+
+        // Calling back() directly is what the back-button ActionListener
+        // does. With no parent sheet this routes to hide(duration), which
+        // is the path the user reports as "working fine" -- the baseline
+        // we want to compare swipe-dismiss against.
+        sheet.back(300);
+        flushSerialCalls();
+        assertTrue(form.getAnimationManager().isAnimating(),
+                "Sanity: hide() must add an animation to the manager");
+
+        awaitAnimationsFlushingPaintQueue(form);
+
+        assertNull(Sheet.getCurrentSheet(),
+                "Sanity: sheet must be dismissed before checking repaint state");
+        assertPaintScheduledOrAnimating(form,
+                "After a back-button dismiss the form must be queued for "
+                        + "repaint so the dim overlay is cleared");
+    }
+
+    /// Variant of `showFormWithSheet` that drives the show animation through
+    /// `updateAnimations` instead of `flush()`. flush() clears the anims
+    /// queue but leaves the AnimationManager's `uiMutations` cache holding a
+    /// reference to the (now drained) UIMutation, which then silently
+    /// absorbs subsequent animations like `hide()` -- the new animation
+    /// never reaches the anims queue and never runs. Routing the show
+    /// through `updateAnimations` clears `uiMutations` properly so later
+    /// `hide()` / `animateDismissFromDrag` calls land on a fresh queue.
+    private Form showFormWithSheetDriven(String title) throws Exception {
+        implementation.setBuiltinSoundsEnabled(false);
+        Form form = Display.getInstance().getCurrent();
+        form.removeAll();
+        form.setLayout(new BorderLayout());
+
+        Sheet sheet = new Sheet(null, title);
+        sheet.getContentPane().add(new Label("Content"));
+        sheet.show(0);
+        AnimationManager am = form.getAnimationManager();
+        long deadline = System.currentTimeMillis() + 1000;
+        while (am.isAnimating() && System.currentTimeMillis() < deadline) {
+            am.updateAnimations();
+            flushSerialCalls();
+            sleepQuietly(5);
+        }
+        am.updateAnimations();
+        flushSerialCalls();
+        return form;
+    }
+
+    /// Drives the animation queue to completion the same way `awaitAnimations`
+    /// does, but additionally clears the impl paint queue right before the
+    /// final completion frame so that the only paints we observe afterwards
+    /// are the ones scheduled by the dismissal's completion runnable. The
+    /// MorphAnimation path runs `cnt.repaint()` on every tick - those are
+    /// cancelled by `cnt.remove()` but not until inside the same
+    /// updateAnimations call - and we want the test to be insensitive to
+    /// any frame ordering that survives the cancellation.
+    private void awaitAnimationsFlushingPaintQueue(Form form) throws Exception {
+        AnimationManager am = form.getAnimationManager();
+        long deadline = System.currentTimeMillis() + 3000;
+        // Drain mid-animation paints by clearing on each tick *except* the
+        // last one. We detect "last one" by sampling isAnimating just before
+        // the next tick: when it flips false, the next updateAnimations
+        // call is the one that runs the completion runnable.
+        while (am.isAnimating() && System.currentTimeMillis() < deadline) {
+            clearPaintQueue();
+            am.updateAnimations();
+            flushSerialCalls();
+            sleepQuietly(10);
+        }
+        // One final tick (covers the case where a MorphAnimation finished
+        // and the completion runnable has already executed inside the loop,
+        // that runnable's repaint() lives in the paint queue and we don't
+        // touch it from here on).
+        am.updateAnimations();
+        flushSerialCalls();
+    }
+
+    private void clearPaintQueue() throws Exception {
+        Class<?> implClass = Class.forName("com.codename1.impl.CodenameOneImplementation");
+        Field fillField = implClass.getDeclaredField("paintQueueFill");
+        Field queueField = implClass.getDeclaredField("paintQueue");
+        fillField.setAccessible(true);
+        queueField.setAccessible(true);
+        synchronized (implementation) {
+            Object queue = queueField.get(implementation);
+            int len = java.lang.reflect.Array.getLength(queue);
+            for (int i = 0; i < len; i++) {
+                java.lang.reflect.Array.set(queue, i, null);
+            }
+            fillField.setInt(implementation, 0);
+        }
+    }
+
+    /// Verifies that the EDT will perform a paint that covers the form
+    /// content. A repaint is "scheduled" if the impl paint queue holds the
+    /// form, the content pane, or an ancestor of the content. Equivalently,
+    /// if another animation is still running, a paint cycle will follow
+    /// regardless and the assertion is satisfied.
+    private void assertPaintScheduledOrAnimating(Form form, String message) throws Exception {
+        AnimationManager am = form.getAnimationManager();
+        if (am.isAnimating()) {
+            return;
+        }
+        Class<?> implClass = Class.forName("com.codename1.impl.CodenameOneImplementation");
+        Field fillField = implClass.getDeclaredField("paintQueueFill");
+        Field queueField = implClass.getDeclaredField("paintQueue");
+        fillField.setAccessible(true);
+        queueField.setAccessible(true);
+        int fill = fillField.getInt(implementation);
+        Object queue = queueField.get(implementation);
+
+        Component content = form.getContentPane();
+        boolean covered = false;
+        StringBuilder seen = new StringBuilder("[");
+        for (int i = 0; i < fill; i++) {
+            Object entry = java.lang.reflect.Array.get(queue, i);
+            if (entry == null) {
+                continue;
+            }
+            if (seen.length() > 1) {
+                seen.append(", ");
+            }
+            seen.append(entry.getClass().getSimpleName());
+            if (entry == form || entry == content) {
+                covered = true;
+            } else if (entry instanceof Container && ((Container) entry).contains(content)) {
+                covered = true;
+            }
+        }
+        seen.append("]");
+        assertTrue(covered, message + ". paintQueue=" + seen);
+    }
+
     private Form showFormWithSheet(String title) {
         implementation.setBuiltinSoundsEnabled(false);
         Form form = Display.getInstance().getCurrent();
