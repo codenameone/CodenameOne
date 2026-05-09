@@ -8,6 +8,44 @@ public final class JdkApiRewriteHelper {
     private JdkApiRewriteHelper() {
     }
 
+    public static String replaceAll(String source, String regex, String replacement) {
+        if (source == null) {
+            throw new NullPointerException("source is null");
+        }
+        if (regex == null) {
+            throw new NullPointerException("regex is null");
+        }
+        if (replacement == null) {
+            throw new NullPointerException("replacement is null");
+        }
+        try {
+            return new RE(regex).subst(source, replacement, RE.REPLACE_ALL | RE.REPLACE_BACKREFERENCES);
+        } catch (RESyntaxException ex) {
+            return com.codename1.util.StringUtil.replaceAll(source, regex, replacement);
+        }
+    }
+
+    public static String replaceFirst(String source, String regex, String replacement) {
+        if (source == null) {
+            throw new NullPointerException("source is null");
+        }
+        if (regex == null) {
+            throw new NullPointerException("regex is null");
+        }
+        if (replacement == null) {
+            throw new NullPointerException("replacement is null");
+        }
+        try {
+            return new RE(regex).subst(source, replacement, RE.REPLACE_FIRSTONLY | RE.REPLACE_BACKREFERENCES);
+        } catch (RESyntaxException ex) {
+            int idx = source.indexOf(regex);
+            if (idx < 0) {
+                return source;
+            }
+            return source.substring(0, idx) + replacement + source.substring(idx + regex.length());
+        }
+    }
+
     public static String[] split(String source, String regex) {
         return split(source, regex, 0);
     }
