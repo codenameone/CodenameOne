@@ -5727,24 +5727,6 @@ static UIView* cn1_rootViewForCapture(UIView *view) {
     return rootView;
 }
 
-// Recursively collect all CN1StatusBarTapProxyView instances under `root` so the
-// caller can temporarily hide them during screen capture (the proxy must stay
-// in the hierarchy with alpha=1.0 so iOS continues routing
-// UIStatusBarTapAction → scrollViewShouldScrollToTop:, but compositing it
-// through renderInContext: introduces a 1-pixel diff that breaks every iOS
-// screenshot test).
-static void cn1_collectStatusBarTapProxies(UIView *root, NSMutableArray<UIView *> *out) {
-    if (root == nil) {
-        return;
-    }
-    if ([NSStringFromClass([root class]) isEqualToString:@"CN1StatusBarTapProxyView"]) {
-        [out addObject:root];
-    }
-    for (UIView *sub in root.subviews) {
-        cn1_collectStatusBarTapProxies(sub, out);
-    }
-}
-
 static UIImage* cn1_captureView(UIView *view) {
     UIView *rootView = cn1_rootViewForCapture(view);
     if (rootView == nil) {
@@ -5765,17 +5747,6 @@ static UIImage* cn1_captureView(UIView *view) {
 
     [rootView layoutIfNeeded];
 
-    // Temporarily hide every status-bar tap proxy in the hierarchy so the
-    // capture matches the visual output the user sees. We restore the
-    // original alphas in @finally below.
-    NSMutableArray<UIView *> *proxies = [NSMutableArray array];
-    cn1_collectStatusBarTapProxies(rootView, proxies);
-    NSMutableArray<NSNumber *> *savedAlphas = [NSMutableArray arrayWithCapacity:proxies.count];
-    for (UIView *p in proxies) {
-        [savedAlphas addObject:@(p.alpha)];
-        p.alpha = 0.0f;
-    }
-
     cn1_renderViewIntoContext(view, rootView, ctx);
 
     CodenameOne_GLViewController *controller = [CodenameOne_GLViewController instance];
@@ -5788,11 +5759,6 @@ static UIImage* cn1_captureView(UIView *view) {
 
     UIImage *image = UIGraphicsGetImageFromCurrentImageContext();
     UIGraphicsEndImageContext();
-
-    for (NSUInteger i = 0; i < proxies.count; i++) {
-        UIView *p = proxies[i];
-        p.alpha = [savedAlphas[i] floatValue];
-    }
 
     if (rootView != view) {
         CGRect targetFrame = [rootView convertRect:view.bounds fromView:view];

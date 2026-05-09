@@ -2324,14 +2324,21 @@ static CodenameOne_GLViewController *sharedSingleton;
 #endif
 
 - (void)cn1InstallStatusBarTapProxy {
+    // Install the proxy as a sibling of self.view at the UIWindow level (not
+    // as a descendant of self.view). iOS still walks the entire window
+    // hierarchy when routing UIStatusBarTapAction → scrollViewShouldScrollToTop:,
+    // so the proxy is found, but cn1_captureView (which renders self.view's
+    // subtree) doesn't include it, so screenshot tests are not affected.
+    UIWindow *window = self.view.window;
+    if (window == nil) {
+        // Window isn't attached yet (viewDidLoad runs before the view is
+        // installed in a window). viewDidAppear calls us again -- skip.
+        return;
+    }
     if (cn1StatusBarTapProxy != nil) {
-        // Re-attach if it was detached and ensure it sits on top so it isn't
-        // hidden by peer components added later in the view hierarchy.
-        if (cn1StatusBarTapProxy.superview != self.view) {
+        if (cn1StatusBarTapProxy.superview != window) {
             [cn1StatusBarTapProxy removeFromSuperview];
-            [self.view addSubview:cn1StatusBarTapProxy];
-        } else {
-            [self.view bringSubviewToFront:cn1StatusBarTapProxy];
+            [window addSubview:cn1StatusBarTapProxy];
         }
         // Update frame to just the status-bar strip whenever we re-attach;
         // safeAreaInsets.top is sometimes 0 at viewDidLoad and only correct
@@ -2339,7 +2346,7 @@ static CodenameOne_GLViewController *sharedSingleton;
         [self cn1UpdateStatusBarTapProxyFrame];
         return;
     }
-    cn1StatusBarTapProxy = [[CN1StatusBarTapProxyView alloc] initWithFrame:self.view.bounds];
+    cn1StatusBarTapProxy = [[CN1StatusBarTapProxyView alloc] initWithFrame:window.bounds];
     cn1StatusBarTapProxy.delegate = self;
     cn1StatusBarTapProxy.backgroundColor = [UIColor clearColor];
     cn1StatusBarTapProxy.scrollsToTop = YES;
@@ -2364,15 +2371,17 @@ static CodenameOne_GLViewController *sharedSingleton;
         cn1StatusBarTapProxy.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
     }
 #endif
-    cn1StatusBarTapProxy.contentSize = CGSizeMake(self.view.bounds.size.width, 100);
+    cn1StatusBarTapProxy.contentSize = CGSizeMake(window.bounds.size.width, 100);
     cn1StatusBarTapProxy.contentOffset = CGPointMake(0, 1);
-    [self.view addSubview:cn1StatusBarTapProxy];
+    [window addSubview:cn1StatusBarTapProxy];
     [self cn1UpdateStatusBarTapProxyFrame];
 }
 
 - (void)cn1UpdateStatusBarTapProxyFrame {
     if (cn1StatusBarTapProxy == nil) return;
-    CGFloat width = self.view.bounds.size.width;
+    UIWindow *window = cn1StatusBarTapProxy.window;
+    if (window == nil) window = self.view.window;
+    CGFloat width = (window != nil) ? window.bounds.size.width : self.view.bounds.size.width;
     if (width < 1) width = 1;
     CGFloat statusBarHeight = 44.0;
     if (@available(iOS 11.0, *)) {
