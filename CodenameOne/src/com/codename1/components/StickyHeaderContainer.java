@@ -137,7 +137,15 @@ public class StickyHeaderContainer extends Container {
         scroller.addScrollListener(new ScrollListener() {
             @Override
             public void scrollChanged(int scrollX, int scrollY, int oldscrollX, int oldscrollY) {
-                updateSticky();
+                // The ScrollContainer fires this event before its
+                // internal scrollY field is updated, so reading it back
+                // via getScrollY() returns the previous value. Drive the
+                // recompute off the new scroll position the listener was
+                // handed: a single multi-pixel drag/momentum step that
+                // crosses the push window otherwise sees pushOffset stuck
+                // at 0 and the rising header appears to slide *under* the
+                // pinned header instead of pushing it out.
+                updateSticky(scrollY);
             }
         });
     }
@@ -174,6 +182,8 @@ public class StickyHeaderContainer extends Container {
     }
 
     private static final class ScrollContainer extends Container {
+        boolean suppressLaidOutClamp;
+
         ScrollContainer() {
             super(BoxLayout.y());
             setScrollableY(true);
@@ -181,6 +191,23 @@ public class StickyHeaderContainer extends Container {
 
         void setScrollYExposed(int y) {
             setScrollY(y);
+        }
+
+        @Override
+        protected void laidOut() {
+            if (suppressLaidOutClamp) {
+                // applyActivation() relayouts the scroller from inside
+                // the ScrollListener, before the outer setScrollY has
+                // committed the new scrollY. Component#laidOut() would
+                // then read the stale scrollY, decide it overflows, and
+                // recursively call setScrollY(maxScroll) -- which fires
+                // our listener again, flips the activation back, and
+                // leaves activeIndex inconsistent with the scroll the
+                // user requested. The outer setScrollY will write the
+                // correct scrollY moments later, so skip the clamp.
+                return;
+            }
+            super.laidOut();
         }
     }
 
@@ -317,6 +344,10 @@ public class StickyHeaderContainer extends Container {
     /// event; call it explicitly when section content has been mutated
     /// outside of a normal layout cycle.
     public void updateSticky() {
+        updateSticky(scroller.getScrollY());
+    }
+
+    private void updateSticky(int sy) {
         if (sections.isEmpty()) {
             deactivate();
             return;
@@ -324,7 +355,6 @@ public class StickyHeaderContainer extends Container {
         if (scroller.getHeight() <= 0) {
             return;
         }
-        int sy = scroller.getScrollY();
         int newActive = -1;
         for (int i = 0; i < sections.size(); i++) {
             Section s = sections.get(i);
@@ -365,7 +395,10 @@ public class StickyHeaderContainer extends Container {
         boolean activationChanged = (newActive != activeIndex);
         if (activationChanged) {
             applyActivation(newActive);
-            sy = scroller.getScrollY();
+            // Don't re-read scroller.getScrollY() here: when invoked
+            // from the ScrollListener, the scroller hasn't yet updated
+            // its internal scrollY field, so getScrollY() would return
+            // the stale value and undo the parameter we were handed.
         }
 
         int newPush = computePushOffset(sy);
@@ -463,7 +496,12 @@ public class StickyHeaderContainer extends Container {
         // push window.
         pushOffset = 0;
 
-        scroller.layoutContainer();
+        scroller.suppressLaidOutClamp = true;
+        try {
+            scroller.layoutContainer();
+        } finally {
+            scroller.suppressLaidOutClamp = false;
+        }
         stickyHost.layoutContainer();
         layoutContainer();
     }
