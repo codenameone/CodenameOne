@@ -149,6 +149,24 @@ public class Picker extends Button {
         }
     }
 
+    /// Listener fired when a custom popup button is pressed. Static (rather than an anonymous
+    /// inner class) so it does not retain a reference to the enclosing `Picker`; the only
+    /// state it needs is the matching `LightweightPopupButton` whose `action` it invokes.
+    private static final class PopupButtonActionListener implements ActionListener {
+        private final LightweightPopupButton popupButton;
+
+        private PopupButtonActionListener(LightweightPopupButton popupButton) {
+            this.popupButton = popupButton;
+        }
+
+        @Override
+        public void actionPerformed(ActionEvent evt) {
+            if (popupButton.action != null) {
+                popupButton.action.run();
+            }
+        }
+    }
+
     /// Default constructor
     public Picker() {
         setUIIDFinal("Picker");
@@ -778,16 +796,8 @@ public class Picker extends Button {
             if (entry.placement != placement) {
                 continue;
             }
-            final LightweightPopupButton popupButton = entry;
-            Button button = new Button(popupButton.text, isTablet ? "PickerButtonTablet" : "PickerButton");
-            button.addActionListener(new ActionListener() {
-                @Override
-                public void actionPerformed(ActionEvent evt) {
-                    if (popupButton.action != null) {
-                        popupButton.action.run();
-                    }
-                }
-            });
+            Button button = new Button(entry.text, isTablet ? "PickerButtonTablet" : "PickerButton");
+            button.addActionListener(new PopupButtonActionListener(entry));
             switch (entry.alignment) {
                 case Component.CENTER:
                     if (center == null) {
