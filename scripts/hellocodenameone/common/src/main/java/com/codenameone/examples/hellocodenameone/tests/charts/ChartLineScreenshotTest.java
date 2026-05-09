@@ -40,8 +40,20 @@ public class ChartLineScreenshotTest extends AbstractChartScreenshotTest {
         renderer.setAxisTitleTextSize(20);
         renderer.setLegendTextSize(20);
         renderer.setMargins(new int[]{36, 60, 24, 24});
-        renderer.setXTitle("Year");
-        renderer.setYTitle("Value");
+        // Diagnostic: turn off labels + legend + grid + axes so XYChart.draw
+        // paints essentially nothing beyond drawSeries (the line strokes).
+        // If chart-line renders an empty white form on iOS GL/Metal under
+        // this minimal config we know the form / paint pipeline is working
+        // and the bug is in one of the disabled code paths
+        // (drawText / drawLegend / drawGrid / drawAxes). If it stays blank
+        // even with everything off, something fundamental about XYChart's
+        // first paint is breaking iOS rendering.
+        renderer.setShowLabels(false);
+        renderer.setShowLegend(false);
+        renderer.setShowGrid(false);
+        renderer.setShowAxes(false);
+        // renderer.setXTitle("Year");
+        // renderer.setYTitle("Value");
         renderer.setXLabels(5);
         renderer.setYLabels(5);
         renderer.setShowGrid(true);
