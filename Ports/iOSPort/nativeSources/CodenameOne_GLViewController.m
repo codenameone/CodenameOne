@@ -201,21 +201,29 @@ static CGSize cn1OrientationCorrectSize(UIView *view) {
 BOOL forceSlideUpField;
 
 // UIScrollView subclass used solely to receive the status-bar tap
-// (scrollViewShouldScrollToTop:) on iOS. Touches must pass through to the
-// underlying GL view, so we always return NO from pointInside:.
-// layoutSubviews keeps contentSize larger than the bounds so iOS considers
-// the scroll view actually scrollable, which is required for the system to
-// dispatch the scroll-to-top message.
+// (scrollViewShouldScrollToTop:) on iOS. Verified against iOS 26 simulator:
+// the scene receives UIStatusBarTapAction but UIKit only routes it to a
+// scroll view that passes a strict combination of checks --
+//   * frame intersects the status-bar strip (so we pin frame to that
+//     strip rather than the whole view; a full-screen frame caused iOS
+//     to skip the dispatch entirely).
+//   * alpha == 1.0 (fully transparent backgroundColor still counts as
+//     visible; alpha == 0 / 0.004 was rejected by iOS 13+).
+//   * pointInside returns YES at the tap location (default behavior with
+//     a strip-shaped frame is exactly what we want).
+//   * scrollsToTop=YES, scrollEnabled=YES, !hidden, contentOffset.y > 0,
+//     contentSize > bounds.
+// layoutSubviews keeps contentSize one point larger than the bounds so the
+// "must be scrollable" check passes regardless of how the strip resizes
+// on rotation / safe-area changes.
 @interface CN1StatusBarTapProxyView : UIScrollView
 @end
 @implementation CN1StatusBarTapProxyView
-- (BOOL)pointInside:(CGPoint)point withEvent:(UIEvent *)event {
-    return NO;
-}
 - (void)layoutSubviews {
     [super layoutSubviews];
     CGSize sz = self.bounds.size;
     if (sz.width < 1) sz.width = 1;
+    if (sz.height < 1) sz.height = 1;
     self.contentSize = CGSizeMake(sz.width, sz.height + 1);
     if (self.contentOffset.y <= 0) {
         self.contentOffset = CGPointMake(0, 1);
@@ -258,7 +266,28 @@ void cn1FireStatusBarTap() {
     int xArray[1];
     int yArray[1];
     xArray[0] = displayWidth / 2;
-    yArray[0] = 0;
+    // y=0 lands above CN1's StatusBar Container -- the form has a small
+    // top padding/margin (typically ~9pt; 27px at 3x) before the toolbar
+    // starts. We synthesize the tap at the middle of safeAreaInsets.top
+    // (in native pixels) to land squarely inside the StatusBar bar that
+    // Toolbar.initTitleBarStatus creates, so its pointer-released listener
+    // (which scrolls the form to top) actually fires.
+    CGFloat statusBarPoints = 22.0;
+    if (cn1StatusBarTapProxy != nil && cn1StatusBarTapProxy.window != nil) {
+        if (@available(iOS 11.0, *)) {
+            CGFloat top = cn1StatusBarTapProxy.window.safeAreaInsets.top;
+            if (top > 0) {
+                statusBarPoints = top;
+            }
+        }
+    }
+    // scaleValue is the device pixel scale (1, 2, 3 on iOS); displayWidth
+    // is already in native pixels, so multiply points by scaleValue to
+    // stay in the same coordinate system.
+    int statusBarPxNative = (int)(statusBarPoints * scaleValue);
+    // Aim for the middle of the safe-area top strip; fall back to 30 if
+    // the math degenerated.
+    yArray[0] = statusBarPxNative > 6 ? statusBarPxNative / 2 : 30;
     cn1StatusBarTapCount++;
     cn1StatusBarTapLastEpochMillis = [[NSDate date] timeIntervalSince1970] * 1000.0;
     cn1StatusBarTapLastX = xArray[0];
@@ -2304,30 +2333,61 @@ static CodenameOne_GLViewController *sharedSingleton;
         } else {
             [self.view bringSubviewToFront:cn1StatusBarTapProxy];
         }
+        // Update frame to just the status-bar strip whenever we re-attach;
+        // safeAreaInsets.top is sometimes 0 at viewDidLoad and only correct
+        // by viewDidAppear.
+        [self cn1UpdateStatusBarTapProxyFrame];
         return;
     }
     cn1StatusBarTapProxy = [[CN1StatusBarTapProxyView alloc] initWithFrame:self.view.bounds];
     cn1StatusBarTapProxy.delegate = self;
     cn1StatusBarTapProxy.backgroundColor = [UIColor clearColor];
     cn1StatusBarTapProxy.scrollsToTop = YES;
-    // userInteractionEnabled must remain YES; some iOS versions skip the
+    // userInteractionEnabled must remain YES; iOS skips the
     // scrollViewShouldScrollToTop: dispatch for views that have it disabled.
-    // pointInside: in the subclass ensures touches still pass through.
+    // Touches in the rest of the screen pass through naturally because the
+    // proxy frame is pinned to just the status-bar strip.
     cn1StatusBarTapProxy.userInteractionEnabled = YES;
     cn1StatusBarTapProxy.scrollEnabled = YES;
     cn1StatusBarTapProxy.showsVerticalScrollIndicator = NO;
     cn1StatusBarTapProxy.showsHorizontalScrollIndicator = NO;
     cn1StatusBarTapProxy.bounces = NO;
-    cn1StatusBarTapProxy.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    cn1StatusBarTapProxy.alpha = 0.0f;
+    // Don't autoresize height -- cn1UpdateStatusBarTapProxyFrame manually
+    // pins the proxy to just the status-bar strip; FlexibleWidth +
+    // FlexibleBottomMargin keep that strip stuck to the top on rotation.
+    cn1StatusBarTapProxy.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleBottomMargin;
+    cn1StatusBarTapProxy.alpha = 1.0f;
+    cn1StatusBarTapProxy.hidden = NO;
+    cn1StatusBarTapProxy.opaque = NO;
 #if __IPHONE_OS_VERSION_MAX_ALLOWED >= 110000
     if (@available(iOS 11.0, *)) {
         cn1StatusBarTapProxy.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
     }
 #endif
-    cn1StatusBarTapProxy.contentSize = CGSizeMake(self.view.bounds.size.width, self.view.bounds.size.height + 1);
+    cn1StatusBarTapProxy.contentSize = CGSizeMake(self.view.bounds.size.width, 100);
     cn1StatusBarTapProxy.contentOffset = CGPointMake(0, 1);
     [self.view addSubview:cn1StatusBarTapProxy];
+    [self cn1UpdateStatusBarTapProxyFrame];
+}
+
+- (void)cn1UpdateStatusBarTapProxyFrame {
+    if (cn1StatusBarTapProxy == nil) return;
+    CGFloat width = self.view.bounds.size.width;
+    if (width < 1) width = 1;
+    CGFloat statusBarHeight = 44.0;
+    if (@available(iOS 11.0, *)) {
+        CGFloat inset = self.view.safeAreaInsets.top;
+        if (inset > statusBarHeight) {
+            statusBarHeight = inset;
+        }
+    }
+    // Cap to a sensible upper bound -- iPhone Pro Max with Dynamic Island is
+    // around 60pt; never exceed 80pt of touch area.
+    if (statusBarHeight > 80) statusBarHeight = 80;
+    if (statusBarHeight < 20) statusBarHeight = 20;
+    cn1StatusBarTapProxy.frame = CGRectMake(0, 0, width, statusBarHeight);
+    cn1StatusBarTapProxy.contentSize = CGSizeMake(width, statusBarHeight + 1);
+    cn1StatusBarTapProxy.contentOffset = CGPointMake(0, 1);
 }
 
 - (BOOL)scrollViewShouldScrollToTop:(UIScrollView *)scrollView {
