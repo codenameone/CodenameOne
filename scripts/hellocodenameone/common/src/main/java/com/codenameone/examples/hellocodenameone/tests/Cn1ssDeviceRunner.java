@@ -32,6 +32,20 @@ import com.codenameone.examples.hellocodenameone.tests.graphics.TransformCamera;
 import com.codenameone.examples.hellocodenameone.tests.graphics.TransformPerspective;
 import com.codenameone.examples.hellocodenameone.tests.graphics.TransformRotation;
 import com.codenameone.examples.hellocodenameone.tests.graphics.TransformTranslation;
+import com.codenameone.examples.hellocodenameone.tests.charts.ChartBarScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.ChartBubbleScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.ChartCombinedXYScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.ChartCubicLineScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.ChartDoughnutScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.ChartLineScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.ChartPieScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.ChartRadarScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.ChartRangeBarScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.ChartRotatedScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.ChartScatterScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.ChartStackedBarScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.ChartTimeChartScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.ChartTransformScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.accessibility.AccessibilityTest;
 
 
@@ -119,6 +133,29 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new TransformRotation(),
             new TransformPerspective(),
             new TransformCamera(),
+            // ChartComponent coverage. The 2026-05-09 conjugation refactor in
+            // Graphics.setTransform / iOS / Android / JavaSE / JS dropped
+            // ChartComponent.paint's manual T(absX) * X * T(-absX)
+            // compensation; without screenshot baselines for the major chart
+            // types a regression in the chart render path goes silent until
+            // a user reports it. Cover one test per chart family + two
+            // dedicated transform paths (scale + rotate) so the
+            // ChartComponent.setTransform branch (the one the refactor
+            // directly touched) has explicit visual coverage.
+            new ChartLineScreenshotTest(),
+            new ChartCubicLineScreenshotTest(),
+            new ChartBarScreenshotTest(),
+            new ChartStackedBarScreenshotTest(),
+            new ChartRangeBarScreenshotTest(),
+            new ChartScatterScreenshotTest(),
+            new ChartBubbleScreenshotTest(),
+            new ChartPieScreenshotTest(),
+            new ChartDoughnutScreenshotTest(),
+            new ChartRadarScreenshotTest(),
+            new ChartTimeChartScreenshotTest(),
+            new ChartCombinedXYScreenshotTest(),
+            new ChartTransformScreenshotTest(),
+            new ChartRotatedScreenshotTest(),
             new BrowserComponentScreenshotTest(),
             new MediaPlaybackScreenshotTest(),
             new SheetScreenshotTest(),

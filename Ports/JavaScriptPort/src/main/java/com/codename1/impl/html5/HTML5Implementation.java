@@ -5789,6 +5789,19 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
 
     @Override
+    public boolean isSetTransformTranslationConjugationRequired() {
+        // The HTML5 render path mirrors iOS / Android: xTranslate /
+        // yTranslate accumulate in Graphics.java (since
+        // isTranslationSupported() is false) and end up baked into the
+        // coordinates passed to fill primitives, while setTransform
+        // replaces the canvas matrix outright. Conjugating the user matrix
+        // with T(xTranslate, yTranslate) in Graphics.setTransform yields
+        // the same "transform applies in local coordinates" contract as
+        // every other CN1 port.
+        return true;
+    }
+
+    @Override
     public void concatenateTransform(Object t1, Object t2) {
         ((JSAffineTransform)t1).concatenate((JSAffineTransform)t2);
     }

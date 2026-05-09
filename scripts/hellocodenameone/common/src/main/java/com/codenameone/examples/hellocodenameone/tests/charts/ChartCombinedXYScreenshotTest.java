@@ -1,0 +1,78 @@
+package com.codenameone.examples.hellocodenameone.tests.charts;
+
+import com.codename1.charts.models.XYMultipleSeriesDataset;
+import com.codename1.charts.models.XYSeries;
+import com.codename1.charts.renderers.XYMultipleSeriesRenderer;
+import com.codename1.charts.renderers.XYSeriesRenderer;
+import com.codename1.charts.util.ColorUtil;
+import com.codename1.charts.views.AbstractChart;
+import com.codename1.charts.views.CombinedXYChart;
+
+/// CombinedXYChart layers BarChart, LineChart, and ScatterChart on the same
+/// dataset axes -- exercises the multi-renderer dispatch in CombinedXYChart
+/// where each child chart's draw is invoked in sequence with the same g
+/// state.
+public class ChartCombinedXYScreenshotTest extends AbstractChartScreenshotTest {
+
+    @Override
+    protected AbstractChart buildChart() {
+        XYMultipleSeriesDataset dataset = new XYMultipleSeriesDataset();
+
+        XYSeries bars = new XYSeries("Bars");
+        bars.add(1, 12);
+        bars.add(2, 18);
+        bars.add(3, 15);
+        bars.add(4, 22);
+        bars.add(5, 17);
+        dataset.addSeries(bars);
+
+        XYSeries trend = new XYSeries("Trend");
+        trend.add(1, 14);
+        trend.add(2, 16);
+        trend.add(3, 19);
+        trend.add(4, 20);
+        trend.add(5, 23);
+        dataset.addSeries(trend);
+
+        XYSeries markers = new XYSeries("Markers");
+        markers.add(1, 8);
+        markers.add(2, 11);
+        markers.add(3, 13);
+        markers.add(4, 14);
+        markers.add(5, 18);
+        dataset.addSeries(markers);
+
+        XYMultipleSeriesRenderer renderer = new XYMultipleSeriesRenderer();
+        renderer.setLabelsTextSize(20);
+        renderer.setLegendTextSize(20);
+        renderer.setMargins(new int[]{36, 60, 24, 24});
+        renderer.setShowGrid(true);
+
+        XYSeriesRenderer barR = new XYSeriesRenderer();
+        barR.setColor(ColorUtil.rgb(0x6c, 0x3a, 0xb6));
+        renderer.addSeriesRenderer(barR);
+
+        XYSeriesRenderer trendR = new XYSeriesRenderer();
+        trendR.setColor(ColorUtil.rgb(0xee, 0x4a, 0x4a));
+        trendR.setLineWidth(3f);
+        renderer.addSeriesRenderer(trendR);
+
+        XYSeriesRenderer markersR = new XYSeriesRenderer();
+        markersR.setColor(ColorUtil.rgb(0x42, 0xa7, 0x6f));
+        renderer.addSeriesRenderer(markersR);
+
+        CombinedXYChart.XYCombinedChartDef[] chartDefs =
+                new CombinedXYChart.XYCombinedChartDef[]{
+                        new CombinedXYChart.XYCombinedChartDef("BarChart", 0),
+                        new CombinedXYChart.XYCombinedChartDef("LineChart", 1),
+                        new CombinedXYChart.XYCombinedChartDef("ScatterChart", 2)
+                };
+
+        return new CombinedXYChart(dataset, renderer, chartDefs);
+    }
+
+    @Override
+    protected String screenshotName() {
+        return "chart-combined-xy";
+    }
+}
