@@ -101,18 +101,12 @@ public abstract class XYChart extends AbstractChart {
     /// - `paint`: the paint
     @Override
     public void draw(Canvas canvas, int x, int y, int width, int height, Paint paint) {
-        System.out.println("CN1SS:DBG:XYChart.draw:enter cls=" + getClass().getSimpleName()
-                + " x=" + x + " y=" + y + " w=" + width + " h=" + height
-                + " antialias=" + mRenderer.isAntialiasing());
         paint.setAntiAlias(mRenderer.isAntialiasing());
         int legendSize = getLegendSize(mRenderer, height / 5, mRenderer.getAxisTitleTextSize());
         int[] margins = mRenderer.getMargins();
         int left = x + margins[1] + (int) mRenderer.getAxisTitleTextSize() + (mRenderer.isShowLabels() ? (int) mRenderer.getLabelsTextSize() : 0);
         int top = y + margins[0];
         int right = x + width - margins[3];
-        System.out.println("CN1SS:DBG:XYChart.draw:bounds left=" + left + " top=" + top
-                + " right=" + right + " legendSize=" + legendSize + " axisTitleTextSize=" + (int) mRenderer.getAxisTitleTextSize()
-                + " margins=[" + margins[0] + "," + margins[1] + "," + margins[2] + "," + margins[3] + "]");
         int sLength = mDataset.getSeriesCount();
         String[] titles = new String[sLength];
         for (int i = 0; i < sLength; i++) {
@@ -164,7 +158,6 @@ public abstract class XYChart extends AbstractChart {
         }
         maxScaleNumber++;
         if (maxScaleNumber < 0) {
-            System.out.println("CN1SS:DBG:XYChart.draw:earlyReturn maxScaleNumber=" + maxScaleNumber);
             return;
         }
         double[] minX = new double[maxScaleNumber];
@@ -501,7 +494,6 @@ public abstract class XYChart extends AbstractChart {
         if (rotate) {
             transform(canvas, angle, true);
         }
-        System.out.println("CN1SS:DBG:XYChart.draw:exit cls=" + getClass().getSimpleName());
     }
 
     protected List<Double> getXLabels(double min, double max, int count) {
