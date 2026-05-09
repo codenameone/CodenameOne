@@ -408,18 +408,7 @@ jobs:
             "${{ steps.build-ios-app.outputs.workspace }}" \
             "" \
             "${{ steps.build-ios-app.outputs.scheme }}"
-        # The Metal screenshot suite has been running right at the
-        # 30-min wall on several recent PRs (the suite finishes ~28m
-        # into the step). The latest run timed out around TabsTheme
-        # after the runner appeared to stall on the preview-chunk
-        # streaming for a particularly large capture (preview JPEG
-        # blew past max_preview_bytes even at quality=6 and the
-        # logcat replay went silent for ~18 minutes before the timer
-        # fired). Bump to 45 minutes so we get headroom for the
-        # logcat-buffer recovery path and don't conflate "Metal port
-        # genuinely hung" with "step timer fired during a slow
-        # chunk-stream replay" - the two need different responses.
-        timeout-minutes: 45
+        timeout-minutes: 30
 
       - name: Publish Metal screenshot summary
         # Surfaces run-ios-ui-tests.sh's comparison result in the job's
