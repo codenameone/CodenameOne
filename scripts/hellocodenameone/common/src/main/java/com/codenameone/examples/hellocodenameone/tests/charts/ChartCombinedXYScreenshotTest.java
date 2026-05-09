@@ -6,7 +6,10 @@ import com.codename1.charts.renderers.XYMultipleSeriesRenderer;
 import com.codename1.charts.renderers.XYSeriesRenderer;
 import com.codename1.charts.util.ColorUtil;
 import com.codename1.charts.views.AbstractChart;
+import com.codename1.charts.views.BarChart;
 import com.codename1.charts.views.CombinedXYChart;
+import com.codename1.charts.views.LineChart;
+import com.codename1.charts.views.ScatterChart;
 
 /// CombinedXYChart layers BarChart, LineChart, and ScatterChart on the same
 /// dataset axes -- exercises the multi-renderer dispatch in CombinedXYChart
@@ -61,11 +64,15 @@ public class ChartCombinedXYScreenshotTest extends AbstractChartScreenshotTest {
         markersR.setColor(ColorUtil.rgb(0x42, 0xa7, 0x6f));
         renderer.addSeriesRenderer(markersR);
 
+        // CombinedXYChart matches against AbstractChart.getChartType() which
+        // returns the bare-type string ("Bar", "Line", "Scatter") -- using
+        // BarChart.TYPE etc. avoids hard-coding a string we'd have to
+        // remember to keep in sync.
         CombinedXYChart.XYCombinedChartDef[] chartDefs =
                 new CombinedXYChart.XYCombinedChartDef[]{
-                        new CombinedXYChart.XYCombinedChartDef("BarChart", 0),
-                        new CombinedXYChart.XYCombinedChartDef("LineChart", 1),
-                        new CombinedXYChart.XYCombinedChartDef("ScatterChart", 2)
+                        new CombinedXYChart.XYCombinedChartDef(BarChart.TYPE, 0),
+                        new CombinedXYChart.XYCombinedChartDef(LineChart.TYPE, 1),
+                        new CombinedXYChart.XYCombinedChartDef(ScatterChart.TYPE, 2)
                 };
 
         return new CombinedXYChart(dataset, renderer, chartDefs);

@@ -14,14 +14,21 @@ public class ChartBubbleScreenshotTest extends AbstractChartScreenshotTest {
     protected AbstractChart buildChart() {
         XYMultipleSeriesDataset dataset = new XYMultipleSeriesDataset();
         XYValueSeries series = new XYValueSeries("Throughput");
-        series.add(1, 5, 10);
-        series.add(2, 8, 18);
-        series.add(3, 12, 9);
-        series.add(4, 15, 24);
-        series.add(5, 18, 15);
-        series.add(6, 21, 30);
-        series.add(7, 24, 12);
-        series.add(8, 27, 26);
+        // Use explicit double literals for every argument: with bare int
+        // literals Java resolves `series.add(1, 5, 10)` to the inherited
+        // XYSeries.add(int index, double x, double y) signature (insert at
+        // an explicit list index) instead of XYValueSeries' three-double
+        // bubble add. The list is empty when the first call lands at index
+        // 1, so that picks IndexOutOfBoundsException instead of the chart
+        // we wanted.
+        series.add(1d, 5d, 10d);
+        series.add(2d, 8d, 18d);
+        series.add(3d, 12d, 9d);
+        series.add(4d, 15d, 24d);
+        series.add(5d, 18d, 15d);
+        series.add(6d, 21d, 30d);
+        series.add(7d, 24d, 12d);
+        series.add(8d, 27d, 26d);
         dataset.addSeries(series);
 
         XYMultipleSeriesRenderer renderer = new XYMultipleSeriesRenderer();
