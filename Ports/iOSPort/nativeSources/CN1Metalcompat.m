@@ -40,6 +40,35 @@ static int currentFramebufferWidth = 0;
 static int currentFramebufferHeight = 0;
 static CN1MetalPipelineCache *pipelineCache = nil;
 
+// --------------- Per-encoder state cache ---------------
+//
+// Every drawQuad / drawSolidPrimitive used to call setRenderPipelineState
+// and re-upload the matrix struct via setVertexBytes, even when the prior
+// draw used the same pipeline and the matrices hadn't changed. For one-off
+// fills that's fine, but UI code routinely emits a long burst of same-
+// pipeline same-matrix solid-colour fills (gradients-as-scanlines, the
+// hellocodenameone TextureBackdropPainter's diagonal stripes when a port
+// lacks fillPolygon, RoundRectBorder's per-row interior fill, etc.). At
+// burst counts of 100k+ draws, the redundant per-call setVertexBytes for
+// a 192-byte matrix struct + the redundant pipeline state-set choke the
+// CAMetalLayer command buffer to the point where a textured-backdrop
+// dark-mode capture stalled the iOS Metal screenshot suite for ~18
+// minutes (until the surrounding step's wall-clock timeout).
+//
+// Track the last-bound pipeline + matrix bytes per encoder; only forward
+// to Metal when they actually changed. Invalidated on every `activeEncoder
+// = ...` assignment because Metal command encoders don't carry state
+// between encoders -- a fresh encoder needs the first call to actually
+// bind the state, even if nominally it matches the previous encoder's.
+static __unsafe_unretained id<MTLRenderPipelineState> lastBoundPipelineState = nil;
+static CN1MetalMatrices lastBoundMatrices;
+static BOOL lastBoundMatricesValid = NO;
+
+static inline void invalidateEncoderStateCache(void) {
+    lastBoundPipelineState = nil;
+    lastBoundMatricesValid = NO;
+}
+
 #define CN1_MATRIX_STACK_DEPTH 32
 static simd_float4x4 modelViewStack[CN1_MATRIX_STACK_DEPTH];
 static int modelViewStackTop = 0;
@@ -78,6 +107,7 @@ void CN1MetalBeginFrame(id<MTLRenderCommandEncoder> encoder,
                         int framebufferWidth,
                         int framebufferHeight) {
     activeEncoder = encoder;
+    invalidateEncoderStateCache();
     currentProjection = projection;
     currentFramebufferWidth = framebufferWidth;
     currentFramebufferHeight = framebufferHeight;
@@ -92,6 +122,7 @@ void CN1MetalBeginFrame(id<MTLRenderCommandEncoder> encoder,
 
 void CN1MetalEndFrame(void) {
     activeEncoder = nil;
+    invalidateEncoderStateCache();
 }
 
 id<MTLRenderCommandEncoder> CN1MetalActiveEncoder(void) {
@@ -209,6 +240,36 @@ static CN1MetalMatrices currentMatrices(void) {
     return m;
 }
 
+// Binds `state` on activeEncoder only when it differs from the last
+// pipeline state we bound on this encoder. Saves a Metal API call per
+// draw in the (very common) burst case where many consecutive draws
+// reuse the same pipeline (e.g. solid-colour fillRect storms from
+// gradient/scanline approximations).
+static inline void bindPipelineStateIfChanged(id<MTLRenderPipelineState> state) {
+    if (state == lastBoundPipelineState) return;
+    [activeEncoder setRenderPipelineState:state];
+    lastBoundPipelineState = state;
+}
+
+// setVertexBytes for the matrix struct dominates the CPU cost of a
+// burst of fills (it's a 192-byte copy into the encoder's argument
+// scratch on every call). Skip the upload when the matrix snapshot is
+// byte-identical to the last one we uploaded on this encoder. The
+// matrix mutators (Set/LoadIdentity/Push/Pop/Scale/Translate/Rotate)
+// don't touch this cache themselves -- they only mutate the global
+// matrix state; the cache compares against the bytes we last wrote
+// and naturally re-uploads on the next draw if they've drifted.
+static inline void uploadMatricesIfChanged(NSUInteger atIndex) {
+    CN1MetalMatrices matrices = currentMatrices();
+    if (lastBoundMatricesValid &&
+        memcmp(&matrices, &lastBoundMatrices, sizeof(matrices)) == 0) {
+        return;
+    }
+    [activeEncoder setVertexBytes:&matrices length:sizeof(matrices) atIndex:atIndex];
+    lastBoundMatrices = matrices;
+    lastBoundMatricesValid = YES;
+}
+
 static void drawQuad(CN1MetalPipeline pipeline,
                      const float vertices[8],
                      const float *texcoords, // may be NULL
@@ -217,13 +278,12 @@ static void drawQuad(CN1MetalPipeline pipeline,
     if (activeEncoder == nil || pipelineCache == nil) return;
     id<MTLRenderPipelineState> state = [pipelineCache pipelineFor:pipeline];
     if (state == nil) return;
-    [activeEncoder setRenderPipelineState:state];
+    bindPipelineStateIfChanged(state);
 
     // buffer(0): positions (8 floats = 4 x (x,y))
     [activeEncoder setVertexBytes:vertices length:sizeof(float) * 8 atIndex:0];
     // buffer(1): matrices
-    CN1MetalMatrices matrices = currentMatrices();
-    [activeEncoder setVertexBytes:&matrices length:sizeof(matrices) atIndex:1];
+    uploadMatricesIfChanged(1);
     // buffer(2): optional texcoords (only textured/alpha-mask pipelines read this)
     if (texcoords != NULL) {
         [activeEncoder setVertexBytes:texcoords length:sizeof(float) * 8 atIndex:2];
@@ -251,10 +311,9 @@ static void drawSolidPrimitive(MTLPrimitiveType primitive,
     size_t byteCount = sizeof(float) * 2 * (size_t)vertexCount;
     if (byteCount > 4096) return;
 
-    [activeEncoder setRenderPipelineState:state];
+    bindPipelineStateIfChanged(state);
     [activeEncoder setVertexBytes:vertices length:byteCount atIndex:0];
-    CN1MetalMatrices matrices = currentMatrices();
-    [activeEncoder setVertexBytes:&matrices length:sizeof(matrices) atIndex:1];
+    uploadMatricesIfChanged(1);
     [activeEncoder setFragmentBytes:&color length:sizeof(color) atIndex:0];
     [activeEncoder drawPrimitives:primitive vertexStart:0 vertexCount:(NSUInteger)vertexCount];
 }
@@ -612,10 +671,9 @@ static void drawGradientQuad(CN1MetalPipeline pipeline,
     if (activeEncoder == nil || pipelineCache == nil) return;
     id<MTLRenderPipelineState> state = [pipelineCache pipelineFor:pipeline];
     if (state == nil) return;
-    [activeEncoder setRenderPipelineState:state];
+    bindPipelineStateIfChanged(state);
     [activeEncoder setVertexBytes:vertices  length:sizeof(float) * 8 atIndex:0];
-    CN1MetalMatrices matrices = currentMatrices();
-    [activeEncoder setVertexBytes:&matrices  length:sizeof(matrices)  atIndex:1];
+    uploadMatricesIfChanged(1);
     [activeEncoder setVertexBytes:texcoords length:sizeof(float) * 8 atIndex:2];
     [activeEncoder setFragmentBytes:&startColor length:sizeof(startColor) atIndex:0];
     [activeEncoder setFragmentBytes:&endColor   length:sizeof(endColor)   atIndex:1];
@@ -743,7 +801,7 @@ void CN1MetalDrawAlphaMaskRadial(id<MTLTexture> texture,
     if (activeEncoder == nil || pipelineCache == nil) return;
     id<MTLRenderPipelineState> state = [pipelineCache pipelineFor:CN1MetalPipelineAlphaMaskRadial];
     if (state == nil) return;
-    [activeEncoder setRenderPipelineState:state];
+    bindPipelineStateIfChanged(state);
 
     float vertices[8] = {
         (float)x,           (float)y,
@@ -758,8 +816,7 @@ void CN1MetalDrawAlphaMaskRadial(id<MTLTexture> texture,
         1.0f, 1.0f
     };
     [activeEncoder setVertexBytes:vertices length:sizeof(float) * 8 atIndex:0];
-    CN1MetalMatrices matrices = currentMatrices();
-    [activeEncoder setVertexBytes:&matrices length:sizeof(matrices) atIndex:1];
+    uploadMatricesIfChanged(1);
     [activeEncoder setVertexBytes:texcoords length:sizeof(float) * 8 atIndex:2];
 
     // Premultiplied colours so blending produces the right output.
@@ -1011,6 +1068,7 @@ BOOL CN1MetalBeginMutableImageDraw(GLUIImage *image) {
     savedScreenStateValid = YES;
 
     activeEncoder = enc;
+    invalidateEncoderStateCache();
     currentProjection = mutableProjection(w, h);
     currentFramebufferWidth = w;
     currentFramebufferHeight = h;
@@ -1037,6 +1095,7 @@ void CN1MetalEndMutableImageDraw(GLUIImage *image) {
     // queue continue to use the screen encoder.
     if (savedScreenStateValid) {
         activeEncoder = savedScreenEncoder;
+        invalidateEncoderStateCache();
         currentProjection = savedScreenProjection;
         currentFramebufferWidth = savedScreenFw;
         currentFramebufferHeight = savedScreenFh;
