@@ -465,22 +465,29 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
             g.setAlpha(180);
             int diagonalOffset = -h; // start off-screen so the pattern fills
             int band = 0;
+            int[] xCoords = new int[4];
+            int[] yCoords = new int[4];
             while (diagonalOffset < w + h) {
                 g.setColor(palette[band % palette.length]);
-                // diagonal band = a quad from (diagonalOffset, 0) to
-                // (diagonalOffset + bandW, 0) down to (diagonalOffset + bandW + h, h)
-                // / (diagonalOffset + h, h). Approximate with scanlines so
-                // this stays portable across ports that may lack fillPolygon.
-                for (int row = 0; row < h; row++) {
-                    int x0 = x + diagonalOffset + row;
-                    int x1 = x0 + bandW;
-                    if (x1 < x || x0 > x + w) {
-                        continue;
-                    }
-                    if (x0 < x) x0 = x;
-                    if (x1 > x + w) x1 = x + w;
-                    g.fillRect(x0, y + row, x1 - x0, 1);
-                }
+                // Each band is a parallelogram: (offset, 0) ->
+                // (offset + bandW, 0) -> (offset + bandW + h, h) ->
+                // (offset + h, h). One fillPolygon per band rather than
+                // per-row fillRect: at phone resolution h is ~2500 px and
+                // there are ~50 bands, so the scanline approach used to
+                // issue ~125k draw calls per backdrop. On iOS Metal that
+                // call volume stalled the dark-mode transition for
+                // TabsTheme. Polygon fill is one draw call per band (50
+                // total) and fillPolygon is core CN1 API supported by
+                // every port we ship.
+                xCoords[0] = x + diagonalOffset;
+                yCoords[0] = y;
+                xCoords[1] = x + diagonalOffset + bandW;
+                yCoords[1] = y;
+                xCoords[2] = x + diagonalOffset + bandW + h;
+                yCoords[2] = y + h;
+                xCoords[3] = x + diagonalOffset + h;
+                yCoords[3] = y + h;
+                g.fillPolygon(xCoords, yCoords, 4);
                 diagonalOffset += bandW;
                 band++;
             }
