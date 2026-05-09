@@ -34,7 +34,13 @@ import com.codename1.ui.geom.Rectangle2D;
 public class Paint { // PMD Fix: UnusedPrivateField removed redundant antiAlias flag
     private Font typeface = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_SMALL);
     private int strokeCap = Cap.BUTT;
-    private int strokeJoin = Join.BEVEL;
+    // DIAGNOSTIC: was Join.BEVEL. iOS form-Graphics drawShape with the
+    // chart's BEVEL-joined stroked path was leaving the GL/Metal command
+    // buffer in a state that aborted the entire frame (form title bar
+    // included). graphics-draw-shape on the same harness uses
+    // JOIN_MITER / JOIN_ROUND and renders correctly. Switch the chart-
+    // package default to MITER to confirm BEVEL is the iOS Stroker bug.
+    private int strokeJoin = Join.MITER;
     private float strokeMiter = 1f;
 
     private Style style = Style.STROKE;
