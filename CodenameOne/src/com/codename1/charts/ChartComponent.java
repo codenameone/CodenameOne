@@ -278,6 +278,22 @@ public class ChartComponent extends Component {
         super.paint(g);
         boolean oldAntialias = g.isAntiAliased();
         g.setAntiAliased(true);
+        // Clip the chart paint to the component's bounds. Previously the
+        // chart drew with whatever clip the parent container had set up
+        // (typically the parent's content area). On the iOS GL+Metal
+        // form-Graphics, drawSeries' GeneralPath -> drawShape ->
+        // TextureAlphaMask path was leaving the on-screen frame buffer
+        // empty -- the alpha-mask quad was being drawn at coordinates
+        // that overlapped large clip-rejected regions, and the resulting
+        // command buffer state caused iOS to drop the entire frame
+        // (form title bar included). Pinning the clip to the chart's own
+        // bounds lets iOS short-circuit the rejected pixels at clip-test
+        // time instead of letting them propagate through the alpha-mask
+        // pipeline. Mirrors the AbstractGraphicsScreenshotTest /
+        // CleanPaintComponent pattern (which uses pushClip + drawShape
+        // and renders correctly on iOS).
+        g.pushClip();
+        g.clipRect(getX(), getY(), getWidth(), getHeight());
 
         boolean transformed = false;
         if (getTransform() != null) {
@@ -311,7 +327,7 @@ public class ChartComponent extends Component {
         if (transformed) {
             g.setTransform(tmpTransform);
         }
-
+        g.popClip();
         g.setAntiAliased(oldAntialias);
     }
 
