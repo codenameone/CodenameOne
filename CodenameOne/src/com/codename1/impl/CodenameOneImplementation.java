@@ -1517,33 +1517,7 @@ public abstract class CodenameOneImplementation {
         return false;
     }
 
-    /// When `#isTranslationSupported()` returns false, Graphics.java keeps
-    /// `xTranslate`/`yTranslate` in its own state and bakes them into the
-    /// vertex coordinates passed to fill primitives. If the impl's render
-    /// path then applies the user's setTransform matrix on top of those
-    /// already-translated vertices (e.g. iOS Metal's
-    /// `projection * modelView * userTransform * pos` shader, or
-    /// AndroidGraphics's `canvas.concat(t); canvas.drawRect(x+xT, y+yT)`),
-    /// the translation is double-counted for any non-translation matrix and
-    /// the rendered output is shifted off-cell -- noticeable on Android
-    /// (small displacement) and catastrophic on iOS Metal at native pixel
-    /// resolution (output goes off-screen entirely). Override this and
-    /// return true so `Graphics.setTransform` conjugates the user's matrix
-    /// with `T(xTranslate, yTranslate)` before passing it to the impl,
-    /// restoring "transform applies in local coordinates" semantics across
-    /// every isTranslationSupported=false port.
-    ///
-    /// Internal Graphics.java callers that historically baked
-    /// xTranslate/yTranslate into their own setTransform argument
-    /// (com.codename1.ui.scene.Node, com.codename1.charts.ChartComponent,
-    /// FlipTransition perspective branch, ...) must drop the manual
-    /// conjugation when this returns true so the platform-side conjugation
-    /// doesn't double up.
-    public boolean isSetTransformTranslationConjugationRequired() {
-        return false;
-    }
-
-    /// Translates the X/Y location for drawing on the underlying surface. Translation
+/// Translates the X/Y location for drawing on the underlying surface. Translation
     /// is incremental so the new value will be added to the current translation and
     /// in order to reset translation we have to invoke
     /// `translate(-getTranslateX(), -getTranslateY())`

@@ -330,7 +330,6 @@ extern BOOL isRetinaBug();
     if (self.renderCommandEncoder == nil) {
         // Nothing was encoded (setFramebuffer was not called after the
         // previous present). Nothing to do.
-        NSLog(@"CN1SS:DBG:METALView.presentFramebuffer: renderCommandEncoder=nil");
         self.commandBuffer = nil;
         return NO;
     }
@@ -347,7 +346,6 @@ extern BOOL isRetinaBug();
     if (dr == nil) {
         // Memory pressure dropped the drawable. Commit render work so
         // screenTexture still updates; skip this frame's present.
-        NSLog(@"CN1SS:DBG:METALView.presentFramebuffer: drawable=nil, committing without present");
         [self.commandBuffer commit];
         self.commandBuffer = nil;
         return NO;

@@ -276,12 +276,10 @@ static void drawQuad(CN1MetalPipeline pipeline,
                      simd_float4 color,
                      id<MTLTexture> texture) {
     if (activeEncoder == nil || pipelineCache == nil) {
-        NSLog(@"CN1SS:DBG:drawQuad: rejected encoder=%p cache=%p pipeline=%d", (void *)activeEncoder, (void *)pipelineCache, (int)pipeline);
         return;
     }
     id<MTLRenderPipelineState> state = [pipelineCache pipelineFor:pipeline];
     if (state == nil) {
-        NSLog(@"CN1SS:DBG:drawQuad: rejected state=nil pipeline=%d", (int)pipeline);
         return;
     }
     bindPipelineStateIfChanged(state);
@@ -337,9 +335,6 @@ static simd_float4 premultipliedColor(int color, int alpha) {
 // --------------- Public draw primitives ---------------
 
 void CN1MetalFillRect(int color, int alpha, int x, int y, int width, int height) {
-    if ((width >= 800 || height >= 800) && alpha > 0) {
-        NSLog(@"CN1SS:DBG:CN1MetalFillRect: large color=0x%06x alpha=%d x=%d y=%d w=%d h=%d", color & 0xffffff, alpha, x, y, width, height);
-    }
     simd_float4 colorV = premultipliedColor(color, alpha);
     float vertices[8] = {
         (float)x,         (float)y,
@@ -754,12 +749,10 @@ void CN1MetalDrawGradient(int type, int startColor, int endColor,
 
 id<MTLTexture> CN1MetalCreateAlphaMaskTexture(const uint8_t *bytes, int width, int height) {
     if (bytes == NULL || width <= 0 || height <= 0) {
-        NSLog(@"CN1SS:DBG:CN1MetalCreateAlphaMaskTexture: rejected bytes=%p w=%d h=%d", bytes, width, height);
         return nil;
     }
     id<MTLDevice> device = CN1MetalDevice();
     if (device == nil) {
-        NSLog(@"CN1SS:DBG:CN1MetalCreateAlphaMaskTexture: device=nil");
         return nil;
     }
     MTLTextureDescriptor *desc = [MTLTextureDescriptor
@@ -768,26 +761,20 @@ id<MTLTexture> CN1MetalCreateAlphaMaskTexture(const uint8_t *bytes, int width, i
     desc.usage = MTLTextureUsageShaderRead;
     id<MTLTexture> tex = [device newTextureWithDescriptor:desc];
     if (tex == nil) {
-        NSLog(@"CN1SS:DBG:CN1MetalCreateAlphaMaskTexture: newTextureWithDescriptor=nil w=%d h=%d", width, height);
         return nil;
     }
     [tex replaceRegion:MTLRegionMake2D(0, 0, width, height)
            mipmapLevel:0
              withBytes:bytes
            bytesPerRow:width];
-    NSLog(@"CN1SS:DBG:CN1MetalCreateAlphaMaskTexture: tex=%p w=%d h=%d", (void *)tex, width, height);
     return tex;
 }
 
 void CN1MetalDrawAlphaMask(id<MTLTexture> texture, int color, int alpha,
                            int x, int y, int width, int height) {
     if (texture == nil) {
-        NSLog(@"CN1SS:DBG:CN1MetalDrawAlphaMask: rejected texture=nil x=%d y=%d w=%d h=%d", x, y, width, height);
         return;
     }
-    NSLog(@"CN1SS:DBG:CN1MetalDrawAlphaMask: tex=%p color=0x%08x alpha=%d x=%d y=%d w=%d h=%d activeEncoder=%p pipelineCache=%p",
-          (void *)texture, color, alpha, x, y, width, height,
-          (void *)activeEncoder, (void *)pipelineCache);
     // The AlphaMask fragment shader (cn1_fs_alpha_mask) does:
     //   float a = sample(tex).r;
     //   return float4(color.rgb * a, color.a * a);

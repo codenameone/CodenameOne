@@ -4232,22 +4232,6 @@ public class IOSImplementation extends CodenameOneImplementation {
         return false;
     }
 
-    @Override
-    public boolean isSetTransformTranslationConjugationRequired() {
-        // The iOS render path bakes xTranslate/yTranslate into vertex coords
-        // (since isTranslationSupported() is false) and the GPU vertex
-        // shader then applies the user's setTransform matrix on top
-        // (`projection * modelView * userTransform * pos`). For any
-        // non-translation matrix this double-counts the cell origin and
-        // throws output off-screen at native pixel resolution. Conjugation
-        // in Graphics.setTransform restores "transform applies in local
-        // coordinates" semantics on this port.
-        return true;
-    }
-
-
-
-
     public void shear(Object nativeGraphics, float x, float y) {
         ((NativeGraphics)nativeGraphics).shear(x, y);
     }

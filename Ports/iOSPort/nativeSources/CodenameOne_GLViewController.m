@@ -1260,8 +1260,6 @@ void Java_com_codename1_impl_ios_IOSImplementation_drawTextureAlphaMaskImpl(JAVA
     // texture goes to the same Metal alpha-mask shader, just bound to a
     // different render target.
     GLUIImage *mutableTarget = [CodenameOne_GLViewController instance].currentMutableImage;
-    NSLog(@"CN1SS:DBG:drawTextureAlphaMaskImpl: targetSet=%d x=%d y=%d w=%d h=%d alpha=%d",
-          mutableTarget != nil, x, y, w, h, alpha);
     if (mutableTarget != nil) {
         [f setTarget:mutableTarget];
     }

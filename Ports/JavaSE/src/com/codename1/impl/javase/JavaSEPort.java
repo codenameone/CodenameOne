@@ -9258,21 +9258,6 @@ public class JavaSEPort extends CodenameOneImplementation {
         return true;
     }
 
-    @Override
-    public boolean isSetTransformTranslationConjugationRequired() {
-        // JavaSE's render path is identical in shape to Android's:
-        // xTranslate/yTranslate accumulate in Graphics.java (since
-        // isTranslationSupported() is false) and end up baked into the
-        // coordinates passed to fill primitives, while setTransform()
-        // replaces the AWT Graphics2D matrix outright. Applying the user
-        // matrix to xTranslate-shifted coordinates double-counts the cell
-        // origin -- visible as a slight shift at simulator resolution.
-        // Conjugating in Graphics.setTransform yields the same "transform
-        // applies in local coordinates" contract as iOS / Android.
-        return true;
-    }
-
-
     /**
      * Checks of the Transform class can be used on this platform to perform perspective transforms. 
      *  This is similar to

@@ -59,13 +59,13 @@ public final class Graphics {
     private int xTranslate;
     private int yTranslate;
     private Transform translation;
-    /// Last non-identity argument to setTransform(). When the impl returns
-    /// true from isSetTransformTranslationConjugationRequired(), the matrix
-    /// actually pushed to impl.setTransform is
-    /// `T(xTranslate) * userTransform * T(-xTranslate)`, so the user-visible
-    /// transform applies to local coordinates regardless of any prior
-    /// g.translate(). getTransform() returns this original (un-conjugated)
-    /// matrix.
+    /// Last non-identity argument to setTransform(). When the impl has
+    /// `isTranslationSupported() == false` (every active port today: iOS,
+    /// Android, JavaSE, JavaScript), the matrix actually pushed to
+    /// impl.setTransform is `T(xTranslate) * userTransform * T(-xTranslate)`,
+    /// so the user-visible transform applies to local coordinates regardless
+    /// of any prior g.translate(). getTransform() returns this original
+    /// (un-conjugated) matrix.
     private Transform userTransform;
     private GeneralPath tmpClipShape;
     /// A buffer shape to use when we need to transform a shape
@@ -149,8 +149,7 @@ public final class Graphics {
             // xTranslate/yTranslate. If the user accumulated more
             // translation after setting a non-identity transform,
             // re-conjugate so the impl-side matrix stays in sync.
-            if (userTransform != null
-                    && impl.isSetTransformTranslationConjugationRequired()) {
+            if (userTransform != null) {
                 Transform composed = Transform.makeTranslation(xTranslate, yTranslate);
                 composed.concatenate(userTransform);
                 composed.translate(-xTranslate, -yTranslate);
@@ -1191,13 +1190,9 @@ public final class Graphics {
         // (rotate, scale, shear) -- the gradient ends up off-cell or
         // off-screen. Conjugate the user's matrix with T(xTranslate,
         // yTranslate) so its effect is independent of any prior g.translate
-        // call, matching the Android Skia / JavaSE Graphics2D semantics that
-        // the framework's own callers (LinearGradientPaint, etc.) work
-        // around manually today. Impls that don't need this opt out via
-        // isSetTransformTranslationConjugationRequired() returning false.
+        // call, matching Android Skia / JavaSE Graphics2D semantics.
         if (transform != null && !transform.isIdentity()
-                && (xTranslate != 0 || yTranslate != 0)
-                && impl.isSetTransformTranslationConjugationRequired()) {
+                && (xTranslate != 0 || yTranslate != 0)) {
             userTransform = transform.copy();
             Transform composed = Transform.makeTranslation(xTranslate, yTranslate);
             composed.concatenate(transform);
