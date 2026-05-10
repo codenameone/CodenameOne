@@ -138,16 +138,37 @@ extern BOOL isRetinaBug();
         metalLayer.opaque = TRUE;
         metalLayer.pixelFormat = MTLPixelFormatBGRA8Unorm;
         metalLayer.framebufferOnly = YES;
-        // sRGB colourspace so colours match the GL path's CAEAGLLayer
-        // output. Without this, CG-rasterised images and gradients
-        // (DeviceRGB-tagged in their CGBitmapContext) display slightly
-        // brighter on Metal because the layer treats their bytes as
-        // linear-RGB instead of sRGB-encoded.
+        // Colour space for the Metal layer. Default is sRGB so colours
+        // match the GL path's CAEAGLLayer output: without it, CG-rasterised
+        // images and gradients (DeviceRGB-tagged in their CGBitmapContext)
+        // display slightly brighter on Metal because the layer treats
+        // their bytes as linear-RGB instead of sRGB-encoded.
+        //
+        // The build hint `ios.metal.colorSpace` selects the value (see
+        // IPhoneBuilder, which injects one of the CN1_METAL_COLORSPACE_*
+        // defines below). Set the hint to "none" to leave the layer's
+        // colorspace property untouched (system default).
+#if defined(CN1_METAL_COLORSPACE_NONE)
+        // Skip setting metalLayer.colorspace entirely.
+#else
+  #if defined(CN1_METAL_COLORSPACE_DISPLAY_P3)
+        CGColorSpaceRef cs = CGColorSpaceCreateWithName(kCGColorSpaceDisplayP3);
+  #elif defined(CN1_METAL_COLORSPACE_DEVICE_RGB)
+        CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
+  #elif defined(CN1_METAL_COLORSPACE_LINEAR_SRGB)
+        CGColorSpaceRef cs = CGColorSpaceCreateWithName(kCGColorSpaceLinearSRGB);
+  #elif defined(CN1_METAL_COLORSPACE_EXTENDED_SRGB)
+        CGColorSpaceRef cs = CGColorSpaceCreateWithName(kCGColorSpaceExtendedSRGB);
+  #elif defined(CN1_METAL_COLORSPACE_EXTENDED_LINEAR_SRGB)
+        CGColorSpaceRef cs = CGColorSpaceCreateWithName(kCGColorSpaceExtendedLinearSRGB);
+  #else
         CGColorSpaceRef cs = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
+  #endif
         if (cs != NULL) {
             metalLayer.colorspace = cs;
             CGColorSpaceRelease(cs);
         }
+#endif
         // Cap drawable pool to 3 so the GPU has at most one render in
         // flight while CPU prepares the next two. Higher counts trade
         // smoothness for latency and memory; 3 is the iOS default for
