@@ -275,6 +275,7 @@ public class ChartComponent extends Component {
     /// - `g`
     @Override
     public void paint(Graphics g) {
+        System.out.println("CN1SS:DBG:ChartComponent.paint chart=" + chart.getClass().getSimpleName());
         super.paint(g);
         boolean oldAntialias = g.isAntiAliased();
         g.setAntiAliased(true);
