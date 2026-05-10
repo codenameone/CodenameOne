@@ -324,6 +324,27 @@ bj_log "Compiling JavaScript-port runtime sources"
 cp -R "$PORT_CLASSES"/. "$STAGE_CLASSES"/
 
 bj_log "Running ByteCodeTranslator for $DIST_APP_NAME"
+# Enable the cooperative preempt-yield emit by default for the
+# initializr build. Without it, heavy synchronous Java chains (e.g.
+# UIManager.setThemeProps fired by the Initializr template-button
+# click handler) block the worker's message loop for ~1 s, during
+# which the canvas can't paint and the user sees stale intermediate
+# state -- the "Loading is slow / clicking shows artifacts that take
+# noticeable cycles to update" symptom on the deploy preview. The
+# emit costs ~85 KB raw on translated_app.js but moves the port
+# closer to preemptive multithreading.
+#
+# Hellocodenameone's screenshot test pipeline (separate build script)
+# does NOT set this flag because the always-on emit pushed that
+# pipeline past its 720 s deadline -- the screenshot harness boots
+# the bundle ~80 times sequentially and the per-method-entry overhead
+# accumulates faster than for a single-boot UI.
+#
+# Override with ``PARPARVM_INITIALIZR_PREEMPT_YIELD=0`` if you need
+# to A/B test against the no-preempt baseline.
+if [ "${PARPARVM_INITIALIZR_PREEMPT_YIELD:-1}" = "1" ]; then
+  PARPARVM_TRANSLATOR_OPTS="${PARPARVM_TRANSLATOR_OPTS:-} -Dparparvm.js.preemptYield=true"
+fi
 "$JAVA_BIN" ${PARPARVM_TRANSLATOR_OPTS:-} -cp "$PARPARVM_COMPILER" com.codename1.tools.translator.ByteCodeTranslator \
   javascript \
   "$STAGE_CLASSES" \
