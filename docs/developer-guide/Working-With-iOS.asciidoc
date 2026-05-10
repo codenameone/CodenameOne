@@ -177,6 +177,40 @@ NOTE: This is supported for pro users as part of the crash protection feature.
 To take advantage of that capability use the build hint `ios.testFlight=true` and then submit the app to the store for
 beta testing. Make sure to use a release build target.
 
+=== Choosing a colour space for the Metal renderer
+
+When the Metal rendering backend is enabled with `ios.metal=true`, the `CAMetalLayer` is configured with the sRGB colour space by default. This matches the behaviour of the legacy OpenGL ES 2 backend on `CAEAGLLayer`: CG-rasterised images and gradients (which are tagged `DeviceRGB` in their `CGBitmapContext`) end up displayed with the same brightness on both backends.
+
+For most apps the default is the right choice. Apps that need a different colour profile -- for example, wide-gamut artwork that should be displayed in Display P3, or a strictly device-RGB pipeline that matches a custom rendering toolchain -- can override the choice with the `ios.metal.colorSpace` build hint:
+
+[cols="1,3"]
+|===
+| Value | Effect
+
+| `sRGB` (default)
+| Sets `metalLayer.colorspace` to `kCGColorSpaceSRGB`. Use this unless you have a specific reason not to.
+
+| `displayP3`
+| Sets `metalLayer.colorspace` to `kCGColorSpaceDisplayP3`. Use for wide-gamut content on devices with a P3 display.
+
+| `deviceRGB`
+| Calls `CGColorSpaceCreateDeviceRGB()`. Skips sRGB gamma encoding -- raw bytes are written to the layer.
+
+| `linearSRGB`
+| Sets `metalLayer.colorspace` to `kCGColorSpaceLinearSRGB` for linear (non-gamma-encoded) sRGB output.
+
+| `extendedSRGB`
+| Sets `metalLayer.colorspace` to `kCGColorSpaceExtendedSRGB` (extended-range sRGB, allows values outside [0,1]).
+
+| `extendedLinearSRGB`
+| Sets `metalLayer.colorspace` to `kCGColorSpaceExtendedLinearSRGB`.
+
+| `none`
+| Leaves `metalLayer.colorspace` unset, so Metal uses the system default for the device.
+|===
+
+NOTE: The hint only takes effect when `ios.metal=true`. With the OpenGL ES 2 backend the layer is `CAEAGLLayer` and the colour space is fixed by the system.
+
 === Accessing insecure URL's
 
 Due to security exploits Apple blocked some access to insecure URL's which means that http code that worked before could stop working for you on iOS 9+. This is a good move, you should use https and avoid http as much as possible but that's sometimes impractical when working with an internal or debug environment.

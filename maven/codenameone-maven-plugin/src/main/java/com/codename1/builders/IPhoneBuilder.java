@@ -710,6 +710,8 @@ public class IPhoneBuilder extends Executor {
             try {
                 File CN1ES2compat = new File(buildinRes, "CN1ES2compat.h");
                 replaceInFile(CN1ES2compat, "//#define CN1_USE_METAL", "#define CN1_USE_METAL");
+                String colorSpaceDefine = resolveMetalColorSpaceDefine(request.getArg("ios.metal.colorSpace", "sRGB"));
+                replaceInFile(CN1ES2compat, "//#define CN1_METAL_COLORSPACE_PLACEHOLDER", colorSpaceDefine);
                 copy(new File(buildinRes, "MainWindowMETAL.xib"), new File(buildinRes, "MainWindow.xib"));
                 copy(new File(buildinRes, "CodenameOne_METALViewController.xib"), new File(buildinRes, "CodenameOne_GLViewController.xib"));
             } catch (Exception ex) {
@@ -3098,6 +3100,37 @@ public class IPhoneBuilder extends Executor {
             log("JDK " + version + " does not support -source/-target 1.6. Compiling iOS stubs with -source/-target 8.");
         }
         return new String[]{source, target};
+    }
+
+    private String resolveMetalColorSpaceDefine(String hint) {
+        String value = hint == null ? "sRGB" : hint.trim();
+        if (value.length() == 0) {
+            value = "sRGB";
+        }
+        String key = value.toLowerCase().replace("-", "").replace("_", "");
+        if (key.equals("srgb")) {
+            return "#define CN1_METAL_COLORSPACE_SRGB";
+        }
+        if (key.equals("displayp3") || key.equals("p3")) {
+            return "#define CN1_METAL_COLORSPACE_DISPLAY_P3";
+        }
+        if (key.equals("devicergb") || key.equals("device")) {
+            return "#define CN1_METAL_COLORSPACE_DEVICE_RGB";
+        }
+        if (key.equals("linearsrgb") || key.equals("linear")) {
+            return "#define CN1_METAL_COLORSPACE_LINEAR_SRGB";
+        }
+        if (key.equals("extendedsrgb")) {
+            return "#define CN1_METAL_COLORSPACE_EXTENDED_SRGB";
+        }
+        if (key.equals("extendedlinearsrgb")) {
+            return "#define CN1_METAL_COLORSPACE_EXTENDED_LINEAR_SRGB";
+        }
+        if (key.equals("none") || key.equals("default") || key.equals("system")) {
+            return "#define CN1_METAL_COLORSPACE_NONE";
+        }
+        log("Unknown ios.metal.colorSpace value: " + hint + " - falling back to sRGB");
+        return "#define CN1_METAL_COLORSPACE_SRGB";
     }
 
     private String resolveXcodebuild() {

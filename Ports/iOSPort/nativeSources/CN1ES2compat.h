@@ -25,6 +25,17 @@
 // activated and the OpenGL ES 2 backend stays linked but unused. See
 // Ports/iOSPort/METAL_PORT_STATUS.md for the migration plan.
 //#define CN1_USE_METAL
+// IPhoneBuilder.java replaces the line below with one of:
+//   #define CN1_METAL_COLORSPACE_SRGB
+//   #define CN1_METAL_COLORSPACE_DISPLAY_P3
+//   #define CN1_METAL_COLORSPACE_DEVICE_RGB
+//   #define CN1_METAL_COLORSPACE_LINEAR_SRGB
+//   #define CN1_METAL_COLORSPACE_EXTENDED_SRGB
+//   #define CN1_METAL_COLORSPACE_EXTENDED_LINEAR_SRGB
+//   #define CN1_METAL_COLORSPACE_NONE
+// based on the `ios.metal.colorSpace` build hint. METALView.m falls back
+// to sRGB when none of these are defined.
+//#define CN1_METAL_COLORSPACE_PLACEHOLDER
 #define USE_ES2 1
 enum CN1GLenum {
     CN1_GL_ALPHA_TEXTURE,
