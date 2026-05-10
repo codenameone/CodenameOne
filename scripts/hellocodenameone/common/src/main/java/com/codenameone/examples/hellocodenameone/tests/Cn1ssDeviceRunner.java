@@ -32,6 +32,7 @@ import com.codenameone.examples.hellocodenameone.tests.graphics.TransformCamera;
 import com.codenameone.examples.hellocodenameone.tests.graphics.TransformPerspective;
 import com.codenameone.examples.hellocodenameone.tests.graphics.TransformRotation;
 import com.codenameone.examples.hellocodenameone.tests.graphics.TransformTranslation;
+import com.codenameone.examples.hellocodenameone.tests.graphics.LargeStrokeDirtyClipTest;
 import com.codenameone.examples.hellocodenameone.tests.charts.ChartBarScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.charts.ChartBubbleScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.charts.ChartCombinedXYScreenshotTest;
@@ -133,6 +134,16 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new TransformRotation(),
             new TransformPerspective(),
             new TransformCamera(),
+            // Standalone repro for the iOS form-Graphics dirty-region
+            // clipping edge case that makes the XY chart screenshot tests
+            // come back blank: a single Component in BorderLayout.CENTER
+            // whose paint() draws a large stroked GeneralPath via
+            // g.drawShape(...). If iOS captures a non-blank PNG with the
+            // polyline visible the bug is specific to ChartComponent's
+            // paint cycle; if it captures a blank PNG we have a minimal
+            // reproduction the iOS-port fix can iterate against without
+            // spinning up the entire chart-package.
+            new LargeStrokeDirtyClipTest(),
             // ChartComponent coverage. The 2026-05-09 conjugation refactor in
             // Graphics.setTransform / iOS / Android / JavaSE / JS dropped
             // ChartComponent.paint's manual T(absX) * X * T(-absX)
