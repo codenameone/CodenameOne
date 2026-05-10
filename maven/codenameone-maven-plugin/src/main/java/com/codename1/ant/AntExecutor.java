@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
+import java.io.UnsupportedEncodingException;
 import java.util.Properties;
 
 import org.apache.tools.ant.BuildException;
@@ -42,8 +43,14 @@ public class AntExecutor {
         ByteArrayOutputStream captured = new ByteArrayOutputStream();
         PrintStream originalOut = System.out;
         PrintStream originalErr = System.err;
-        PrintStream teeOut = new PrintStream(new TeeOutputStream(originalOut, captured), true);
-        PrintStream teeErr = new PrintStream(new TeeOutputStream(originalErr, captured), true);
+        PrintStream teeOut;
+        PrintStream teeErr;
+        try {
+            teeOut = new PrintStream(new TeeOutputStream(originalOut, captured), true, "UTF-8");
+            teeErr = new PrintStream(new TeeOutputStream(originalErr, captured), true, "UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            throw new IllegalStateException("UTF-8 not supported", e);
+        }
 
         DefaultLogger consoleLogger = new DefaultLogger();
         consoleLogger.setErrorPrintStream(teeErr);
@@ -89,7 +96,13 @@ public class AntExecutor {
                 project.fireBuildFinished(buildException);
                 teeOut.flush();
                 teeErr.flush();
-                String detail = extractServerErrorDetail(captured.toString());
+                String capturedText;
+                try {
+                    capturedText = captured.toString("UTF-8");
+                } catch (UnsupportedEncodingException e) {
+                    throw new IllegalStateException("UTF-8 not supported", e);
+                }
+                String detail = extractServerErrorDetail(capturedText);
                 StringBuilder message = new StringBuilder("Ant task failed: ").append(buildException.getMessage());
                 if (detail != null) {
                     message.append(System.lineSeparator()).append(detail);
@@ -131,20 +144,6 @@ public class AntExecutor {
             }
         }
         return sb.length() == 0 ? null : sb.toString();
-    }
-
-    /**
-     * Logger to log output generated while executing ant script in console
-     *
-     * @return
-     */
-    private static DefaultLogger getConsoleLogger() {
-        DefaultLogger consoleLogger = new DefaultLogger();
-        consoleLogger.setErrorPrintStream(System.err);
-        consoleLogger.setOutputPrintStream(System.out);
-        consoleLogger.setMessageOutputLevel(Project.MSG_INFO);
-
-        return consoleLogger;
     }
 
     /**
