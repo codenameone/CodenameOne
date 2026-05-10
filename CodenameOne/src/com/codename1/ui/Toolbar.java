@@ -2533,6 +2533,14 @@ public class Toolbar extends Container {
             if (((BorderLayout) getLayout()).getNorth() == null) {
                 Container bar = new Container();
                 if (getUIManager().isThemeConstant("statusBarScrollsUpBool", true)) {
+                    // Without grabsPointerEvents the bar isn't a "responder" as
+                    // far as Form.getResponderAt is concerned (it's a plain
+                    // Container with only a pointer-released listener), so the
+                    // iOS-synthesized status-bar tap at (displayWidth/2, 0)
+                    // would walk past it and hit the empty space behind. With
+                    // it, the bar shows up in getResponderAt and the iOS
+                    // cn1FireStatusBarTap path lands on it deterministically.
+                    bar.setGrabsPointerEvents(true);
                     bar.addPointerReleasedListener(new ActionListener() {
                         @Override
                         public void actionPerformed(ActionEvent evt) {
