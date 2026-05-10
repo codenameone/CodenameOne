@@ -1558,8 +1558,23 @@ public class IOSImplementation extends CodenameOneImplementation {
         ((NativeGraphics)graphics).color = RGB;
     }
 
-    public void setAlpha(Object graphics, int alpha) {        
-        ((NativeGraphics)graphics).alpha = alpha;
+    public void setAlpha(Object graphics, int alpha) {
+        NativeGraphics ng = (NativeGraphics)graphics;
+        int oldAlpha = ng.alpha;
+        ng.alpha = alpha;
+        if (alpha == 0 && oldAlpha != 0) {
+            // Log + stack trace whenever a non-zero alpha gets clobbered to 0,
+            // so chart-line's blank-render bug can be bisected to its source
+            // in core / chart / transition code without dumping every setAlpha
+            // call. Restricted to the alpha != oldAlpha edge so a pre-zero
+            // form's repaints don't drown the log in duplicates.
+            try {
+                throw new RuntimeException("CN1SS:DBG:setAlpha(0) trace");
+            } catch (RuntimeException ex) {
+                com.codename1.io.Log.p("CN1SS:DBG:setAlpha 0 from oldAlpha=" + oldAlpha);
+                com.codename1.io.Log.e(ex);
+            }
+        }
     }
 
     public int getAlpha(Object graphics) {
