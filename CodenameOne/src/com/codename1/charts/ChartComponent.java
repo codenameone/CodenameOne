@@ -275,35 +275,6 @@ public class ChartComponent extends Component {
     /// - `g`
     @Override
     public void paint(Graphics g) {
-        // Re-queue ourselves on the paint queue so we paint again on the
-        // NEXT paintDirty cycle. Without this, on the iOS GL+Metal port the
-        // chart goes blank after the slide-in transition completes -- the
-        // port's CADisplayLink keeps the form's paintBackgrounds heartbeat
-        // alive at ~50fps, but the dirty-region clip from
-        // CodenameOneImplementation.paintDirty (line 808-814) restricts the
-        // wrapper's clip to whatever small region was last invalidated
-        // (status-bar diagnostics, transition residue), and the chart's
-        // bounds don't intersect that clip. Component.paintInternalImpl
-        // (line 2996) then short-circuits ChartComponent.paint via the
-        // bounds.intersects(clip) test, so the alpha-mask textures we
-        // wrote into the screenTexture during the slide-in are clobbered
-        // by the form's full-screen body bg fillRect (which IS still queued
-        // each frame) and the captured PNG is uniform body bg. Round
-        // charts (PieChart / DoughnutChart) appear to paint enough
-        // additional frames during their fade-in that the screenshot's
-        // capture-time happens to land on a frame where their content was
-        // freshly written, but XYChart-derived charts paint only ~5 frames
-        // during their slide-in and lose every subsequent frame.
-        //
-        // repaint() adds THIS to the paint queue with dirtyRegion = our
-        // bounds, so the next paintDirty will set the wrapper clip to the
-        // chart's bounds and call paintComponent on us -- the chart pixels
-        // get refreshed every paintDirty cycle while we're on screen. The
-        // loop is bounded by the EDT's paint rate (the paintDirty swap of
-        // paintQueue/paintQueueTemp resets paintQueueFill to 0 each pass)
-        // so it doesn't grow unbounded; it just costs one ChartComponent
-        // paint per EDT idle wake-up while the chart is visible.
-        repaint();
         super.paint(g);
         boolean oldAntialias = g.isAntiAliased();
         g.setAntiAliased(true);
