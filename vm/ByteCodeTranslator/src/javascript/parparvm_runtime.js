@@ -1265,7 +1265,9 @@ const jvm = {
       }
       const bridge = self.parseJsoBridgeMethod(className, methodId);
       const nativeArgs = self.toNativeJsArgs(args || []);
-      if (receiver && receiver.__cn1HostRef != null) {
+      // ``receiver`` is guaranteed non-null at this point -- the
+      // ``receiver == null`` throw above precedes us.
+      if (receiver.__cn1HostRef != null) {
         const transferableArgs = new Array(nativeArgs.length);
         for (let i = 0; i < nativeArgs.length; i++) {
           const arg = nativeArgs[i];

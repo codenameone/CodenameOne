@@ -4,8 +4,6 @@ const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: {width:1280,height:900}, deviceScaleFactor:2 });
 const t0 = Date.now();
 let firstPaintMs = null;
-const hostCallStarts = [];
-const hostCallReturns = [];
 page.on('console', msg => {
   const text = msg.text();
   if (text.includes('main-thread-completed')) {

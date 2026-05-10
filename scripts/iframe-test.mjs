@@ -10,7 +10,7 @@ page.on('pageerror', err => messages.push(`+${Date.now()-t0}ms [ERR] ${err.messa
 await page.goto(URL);
 
 // Wait for iframe to load and check its canvas
-let bootMs = null, firstPaintMs = null;
+let firstPaintMs = null;
 while (Date.now() - t0 < 30000) {
   const status = await page.evaluate(() => {
     const f = document.querySelector('#cn1-initializr-frame');

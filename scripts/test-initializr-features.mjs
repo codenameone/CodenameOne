@@ -560,7 +560,6 @@ async function scenarioIframeLoader() {
 async function scenarioToggleMashing() {
   const s = await bootScenario('05-toggle-mashing');
   try {
-    const sigBefore = await canvasSig(s);
     // Rapid-fire clicks alternating between IDE row (~y=525) and Theme
     // row (~y=580). 60 clicks, spaced 30 ms apart.
     for (let i = 0; i < 60; i++) {
