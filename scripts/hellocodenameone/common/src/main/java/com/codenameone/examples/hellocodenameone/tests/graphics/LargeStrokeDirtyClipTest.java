@@ -129,6 +129,43 @@ public class LargeStrokeDirtyClipTest extends BaseTest {
             g.concatenateAlpha(alpha2);
             g.drawShape(p2, new Stroke(3f, Stroke.CAP_BUTT, Stroke.JOIN_BEVEL, 1f));
 
+            // Mirror XYChart.draw lines 347-360: after drawSeries, the chart
+            // unconditionally calls drawBackground() 4 times to mask the
+            // margin strips. The color passed is mRenderer.getMarginsColor()
+            // which defaults to NO_COLOR = 0. ColorUtil.IColor(0) maps
+            // alpha 0 to 255 (the chart treats "no alpha set" as opaque),
+            // so applyPaint ends up calling g.setColor(0) +
+            // g.concatenateAlpha(255) and then g.fillRect(...) -- i.e.
+            // 4 OPAQUE-BLACK fillRects covering the margin frame.
+            // pie/doughnut/radar charts don't use XYChart so they skip
+            // this. If iOS Metal chokes on a setColor(0) + fillRect after
+            // a drawShape with a non-zero color, this is what reproduces
+            // the chart-line blank.
+            int viewW = getWidth();
+            int viewH = getHeight();
+            int marginTop = 36;
+            int marginLeft = 60;
+            int marginBottom = 24;
+            int marginRight = 24;
+            int dataLeft = x + marginLeft;
+            int dataTop = y + marginTop;
+            int dataRight = x + viewW - marginRight;
+            int dataBottom = y + viewH - marginBottom;
+            g.setColor(0);
+            int marginAlpha = 0;
+            if (marginAlpha == 0) {
+                marginAlpha = 255;
+            }
+            g.concatenateAlpha(marginAlpha);
+            // bottom strip (under data area)
+            g.fillRect(x, dataBottom, viewW, viewH - (dataBottom - y));
+            // top strip
+            g.fillRect(x, y, viewW, marginTop);
+            // left strip (HORIZONTAL orientation default)
+            g.fillRect(x, y, dataLeft - x, viewH);
+            // right strip
+            g.fillRect(dataRight, y, marginRight, viewH);
+
             g.setAntiAliased(oldAA);
         }
     }
