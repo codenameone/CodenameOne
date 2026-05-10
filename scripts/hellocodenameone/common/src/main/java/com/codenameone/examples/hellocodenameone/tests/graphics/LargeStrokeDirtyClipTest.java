@@ -61,21 +61,40 @@ public class LargeStrokeDirtyClipTest extends BaseTest {
             if (!g.isShapeSupported()) {
                 return;
             }
-            // Polyline shaped like an XYChart series line: full component
-            // width, ~5 segments, deeper into the component bounds than
-            // the existing graphics-draw-shape's per-cell triangle.
+            // Mirror XYChart's drawSeries: two stroked polylines back to
+            // back, both spanning the full component width. chart-line
+            // has 2 series (north + south) and emits two drawShape calls
+            // sharing the same Stroke / coordinate space; the previous
+            // single-polyline version of this test (8926797c9) rendered
+            // fine on iOS Metal so the ONE drawShape path isn't broken.
+            // If TWO drawShape calls in sequence reproduce the blank,
+            // we've isolated the iOS edge case to either the Stroker /
+            // alpha-mask creation collision or the encoder state between
+            // two consecutive drawShape ops.
             int x = getX();
             int y = getY();
             int w = getWidth();
             int h = getHeight();
-            GeneralPath p = new GeneralPath();
-            p.moveTo(x + w * 0.05f, y + h * 0.85f);
-            p.lineTo(x + w * 0.25f, y + h * 0.70f);
-            p.lineTo(x + w * 0.45f, y + h * 0.55f);
-            p.lineTo(x + w * 0.65f, y + h * 0.40f);
-            p.lineTo(x + w * 0.85f, y + h * 0.20f);
+
+            GeneralPath p1 = new GeneralPath();
+            p1.moveTo(x + w * 0.05f, y + h * 0.85f);
+            p1.lineTo(x + w * 0.25f, y + h * 0.70f);
+            p1.lineTo(x + w * 0.45f, y + h * 0.55f);
+            p1.lineTo(x + w * 0.65f, y + h * 0.40f);
+            p1.lineTo(x + w * 0.85f, y + h * 0.20f);
+
+            GeneralPath p2 = new GeneralPath();
+            p2.moveTo(x + w * 0.05f, y + h * 0.95f);
+            p2.lineTo(x + w * 0.25f, y + h * 0.92f);
+            p2.lineTo(x + w * 0.45f, y + h * 0.86f);
+            p2.lineTo(x + w * 0.65f, y + h * 0.79f);
+            p2.lineTo(x + w * 0.85f, y + h * 0.74f);
+
+            Stroke stroke = new Stroke(3f, Stroke.CAP_BUTT, Stroke.JOIN_MITER, 1f);
             g.setColor(0x0a66ff);
-            g.drawShape(p, new Stroke(3f, Stroke.CAP_BUTT, Stroke.JOIN_MITER, 1f));
+            g.drawShape(p1, stroke);
+            g.setColor(0xee4a4a);
+            g.drawShape(p2, stroke);
         }
     }
 
