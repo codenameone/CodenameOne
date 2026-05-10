@@ -61,16 +61,13 @@ public class LargeStrokeDirtyClipTest extends BaseTest {
             if (!g.isShapeSupported()) {
                 return;
             }
-            // Mirror XYChart's drawSeries: two stroked polylines back to
-            // back, both spanning the full component width. chart-line
-            // has 2 series (north + south) and emits two drawShape calls
-            // sharing the same Stroke / coordinate space; the previous
-            // single-polyline version of this test (8926797c9) rendered
-            // fine on iOS Metal so the ONE drawShape path isn't broken.
-            // If TWO drawShape calls in sequence reproduce the blank,
-            // we've isolated the iOS edge case to either the Stroker /
-            // alpha-mask creation collision or the encoder state between
-            // two consecutive drawShape ops.
+            // Mirror ChartComponent.paint's exact prologue: stash AA and
+            // force-enable it. ChartComponent does this even though the
+            // existing graphics-draw-shape test toggles AA without issue;
+            // the chart's pattern is set-AA-then-many-draws which the
+            // graphics tests don't replicate.
+            boolean oldAA = g.isAntiAliased();
+            g.setAntiAliased(true);
             int x = getX();
             int y = getY();
 
@@ -105,14 +102,34 @@ public class LargeStrokeDirtyClipTest extends BaseTest {
             p2.lineTo(left + 3 * xStep, bottom - (16 - 8) * yScale);
             p2.lineTo(left + 4 * xStep, bottom - (19 - 8) * yScale);
 
-            // BEVEL join + miterLimit 1.0 -- chart-package's Paint
-            // defaults (compat/Paint.java line 37). MITER worked in
-            // the previous version; BEVEL is the unexercised path.
-            Stroke stroke = new Stroke(3f, Stroke.CAP_BUTT, Stroke.JOIN_BEVEL, 1f);
-            g.setColor(0x0a66ff);
-            g.drawShape(p1, stroke);
-            g.setColor(0xee4a4a);
-            g.drawShape(p2, stroke);
+            // Mirror Canvas.applyPaint + canvas.drawPath: a NEW Stroke
+            // is constructed per drawShape call (compat/Canvas.java
+            // getStroke()), and applyPaint runs setColor + a
+            // concatenateAlpha(alpha) before each draw. The Canvas
+            // wrapper preserves these per-shape allocations in
+            // chart-line; if creating a fresh Stroke per draw or the
+            // concatenateAlpha call interacts badly with iOS's
+            // textureCache / encoder state between two drawShape ops,
+            // this is where the bug surfaces.
+            int color1 = 0xff0a66ff;
+            g.setColor(color1);
+            int alpha1 = (color1 >>> 24) & 0xff;
+            if (alpha1 == 0) {
+                alpha1 = 255;
+            }
+            g.concatenateAlpha(alpha1);
+            g.drawShape(p1, new Stroke(3f, Stroke.CAP_BUTT, Stroke.JOIN_BEVEL, 1f));
+
+            int color2 = 0xffee4a4a;
+            g.setColor(color2);
+            int alpha2 = (color2 >>> 24) & 0xff;
+            if (alpha2 == 0) {
+                alpha2 = 255;
+            }
+            g.concatenateAlpha(alpha2);
+            g.drawShape(p2, new Stroke(3f, Stroke.CAP_BUTT, Stroke.JOIN_BEVEL, 1f));
+
+            g.setAntiAliased(oldAA);
         }
     }
 
