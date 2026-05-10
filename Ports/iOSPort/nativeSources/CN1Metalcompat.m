@@ -337,6 +337,9 @@ static simd_float4 premultipliedColor(int color, int alpha) {
 // --------------- Public draw primitives ---------------
 
 void CN1MetalFillRect(int color, int alpha, int x, int y, int width, int height) {
+    if ((width >= 800 || height >= 800) && alpha > 0) {
+        NSLog(@"CN1SS:DBG:CN1MetalFillRect: large color=0x%06x alpha=%d x=%d y=%d w=%d h=%d", color & 0xffffff, alpha, x, y, width, height);
+    }
     simd_float4 colorV = premultipliedColor(color, alpha);
     float vertices[8] = {
         (float)x,         (float)y,
