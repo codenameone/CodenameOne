@@ -505,9 +505,20 @@ public class Toolbar extends Container {
         if (rightSidemenuDialog != null && rightSidemenuDialog.isShowing()) {
             return;
         }
+        // Capture the host form before remove() detaches cnt -- after
+        // remove() cnt.getComponentForm() returns null.
+        Form host = cnt.getComponentForm();
         Style s = cnt.getUnselectedStyle();
         s.setBgTransparency(0);
         cnt.remove();
+        // Issue #4912: cnt.remove() does not by itself trigger a
+        // form-level repaint, so the previous frame's shaded pixels
+        // can linger in the simulator and JS render buffer until
+        // something else forces a redraw. revalidateLater queues a
+        // single relayout/repaint pass for the next paint cycle.
+        if (host != null) {
+            host.revalidateLater();
+        }
     }
 
     /// Returns the Toolbar title Component.
