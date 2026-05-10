@@ -73,24 +73,42 @@ public class LargeStrokeDirtyClipTest extends BaseTest {
             // two consecutive drawShape ops.
             int x = getX();
             int y = getY();
-            int w = getWidth();
-            int h = getHeight();
+
+            // Hard-code the exact path coordinates XYChart.drawSeries
+            // produces for chart-line's data (years 2018-2022, north
+            // values 12,16,22,18,28; south values 8,11,13,16,19) on
+            // iPhone 16 portrait. Non-monotonic Y path is the chart-line
+            // case the previous monotonic-up test (1b000bdb4) didn't
+            // exercise, and the BEVEL join + 1.0 miter limit plus
+            // fractional X coords (xPxPerUnit ~= 262.75) match what the
+            // iOS Stroker actually receives from chart-line. If THIS
+            // version reproduces the blank, the bug is in the
+            // Stroker / alpha-mask path for non-monotonic + fractional
+            // strokes; if it renders, ChartComponent is wrapping or
+            // setting Graphics state we haven't matched yet.
+            float left = x + 102f;
+            float bottom = y + 1714f;
+            float xStep = 262.75f;
+            float yScale = 83.8f;
 
             GeneralPath p1 = new GeneralPath();
-            p1.moveTo(x + w * 0.05f, y + h * 0.85f);
-            p1.lineTo(x + w * 0.25f, y + h * 0.70f);
-            p1.lineTo(x + w * 0.45f, y + h * 0.55f);
-            p1.lineTo(x + w * 0.65f, y + h * 0.40f);
-            p1.lineTo(x + w * 0.85f, y + h * 0.20f);
+            p1.moveTo(left,             bottom - (12 - 8) * yScale);
+            p1.lineTo(left + xStep,     bottom - (16 - 8) * yScale);
+            p1.lineTo(left + 2 * xStep, bottom - (22 - 8) * yScale);
+            p1.lineTo(left + 3 * xStep, bottom - (18 - 8) * yScale);
+            p1.lineTo(left + 4 * xStep, bottom - (28 - 8) * yScale);
 
             GeneralPath p2 = new GeneralPath();
-            p2.moveTo(x + w * 0.05f, y + h * 0.95f);
-            p2.lineTo(x + w * 0.25f, y + h * 0.92f);
-            p2.lineTo(x + w * 0.45f, y + h * 0.86f);
-            p2.lineTo(x + w * 0.65f, y + h * 0.79f);
-            p2.lineTo(x + w * 0.85f, y + h * 0.74f);
+            p2.moveTo(left,             bottom - (8  - 8) * yScale);
+            p2.lineTo(left + xStep,     bottom - (11 - 8) * yScale);
+            p2.lineTo(left + 2 * xStep, bottom - (13 - 8) * yScale);
+            p2.lineTo(left + 3 * xStep, bottom - (16 - 8) * yScale);
+            p2.lineTo(left + 4 * xStep, bottom - (19 - 8) * yScale);
 
-            Stroke stroke = new Stroke(3f, Stroke.CAP_BUTT, Stroke.JOIN_MITER, 1f);
+            // BEVEL join + miterLimit 1.0 -- chart-package's Paint
+            // defaults (compat/Paint.java line 37). MITER worked in
+            // the previous version; BEVEL is the unexercised path.
+            Stroke stroke = new Stroke(3f, Stroke.CAP_BUTT, Stroke.JOIN_BEVEL, 1f);
             g.setColor(0x0a66ff);
             g.drawShape(p1, stroke);
             g.setColor(0xee4a4a);
