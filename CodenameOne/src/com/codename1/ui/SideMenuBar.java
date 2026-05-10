@@ -787,6 +787,13 @@ public class SideMenuBar extends MenuBar {
                     ((BorderLayout) titleArea.getLayout()).setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE);
                 }
             }
+            // Defensive: when this form is shown immediately after a side-menu
+            // close (issue #4895), the title area can have been laid out
+            // before the openButton was attached. Mark the openButton for a
+            // fresh preferred-size calc and queue a relayout for the next
+            // paint so the hamburger isn't rendered at width 0.
+            openButton.setShouldCalcPreferredSize(true);
+            titleArea.revalidateLater();
         }
         if (cmd != null) {
             String placement = (String) cmd.getClientProperty(COMMAND_PLACEMENT_KEY);
