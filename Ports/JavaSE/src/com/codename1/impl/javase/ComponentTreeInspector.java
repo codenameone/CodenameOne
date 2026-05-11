@@ -580,18 +580,32 @@ private void refreshTreeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-F
     }
     
     private void editStyle() {
-        File cn1dir = new File(System.getProperty("user.home"), ".codenameone");
-        if(!cn1dir.exists()) {
-            JOptionPane.showMessageDialog(this, "Please open the designer once by opening the theme.res file", "Error Opening Designer", JOptionPane.ERROR_MESSAGE);
-            return;
+        // Prefer the version-pinned designer jar that the Maven plugin pulled into m2.
+        // Fallback to the legacy ~/.codenameone/designer_*.jar files (managed by UpdateCodenameOne).
+        File resourceEditor = null;
+        if (System.getProperty("codename1.designer.jar", null) != null) {
+            resourceEditor = new File(System.getProperty("codename1.designer.jar"));
         }
-        File resourceEditor = new File(cn1dir, "designer_1.jar");
-        if(!resourceEditor.exists()) {
-            resourceEditor = new File(cn1dir, "designer.jar");
+        if (resourceEditor == null || !resourceEditor.exists()) {
+            File m2Designer = com.codename1.impl.javase.util.MavenUtils.findDesignerJarInM2();
+            if (m2Designer != null) {
+                resourceEditor = m2Designer;
+            }
         }
-        if(!resourceEditor.exists()) {
-            JOptionPane.showMessageDialog(this, "Please open the designer once by opening the theme.res file", "Error Opening Designer", JOptionPane.ERROR_MESSAGE);
-            return;
+        if (resourceEditor == null || !resourceEditor.exists()) {
+            File cn1dir = new File(System.getProperty("user.home"), ".codenameone");
+            if(!cn1dir.exists()) {
+                JOptionPane.showMessageDialog(this, "Please open the designer once by opening the theme.res file", "Error Opening Designer", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            resourceEditor = new File(cn1dir, "designer_1.jar");
+            if(!resourceEditor.exists()) {
+                resourceEditor = new File(cn1dir, "designer.jar");
+            }
+            if(!resourceEditor.exists()) {
+                JOptionPane.showMessageDialog(this, "Please open the designer once by opening the theme.res file", "Error Opening Designer", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
         }
         
         File javaBin = new File(System.getProperty("java.home") + File.separator + "bin" + File.separator + "java.exe");

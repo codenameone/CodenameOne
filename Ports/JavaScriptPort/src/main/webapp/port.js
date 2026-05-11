@@ -4131,19 +4131,38 @@ function emitCn1ssChunks(base64, testName, channelName) {
   const prefix = "CN1SS" + channel;
   const test = normalizeCn1ssTestName(testName);
   const streamKey = channel + "|" + test;
-  let nextIndex = cn1ssChunkIndexByStream[streamKey] || 0;
+  // The chunk index must be the byte offset within the emitted base64
+  // stream, not a sequential counter. Cn1ssChunkTools (and the iOS / Android
+  // / JavaSE Cn1ssDeviceRunnerHelper.emitChannel emitters) read the index
+  // back as an offset to verify the reassembled stream covers
+  // [0, total_b64_len) with no gaps or overlaps. The previous sequential
+  // counter made every JS chunk look like it overlapped its predecessor by
+  // chunkSize - 1 bytes at offset 1, so the consumer rejected every JS
+  // screenshot as "incomplete chunk stream" and the JS pipeline silently
+  // dropped every chart / graphics test. cn1ssChunkIndexByStream still
+  // tracks the running byte offset so callers that emit a single test in
+  // multiple emitCn1ssChunks(...) bursts produce a contiguous stream.
+  const startOffset = cn1ssChunkIndexByStream[streamKey] || 0;
   const chunkSize = 8000;
   for (let offset = 0; offset < base64.length; offset += chunkSize) {
     const payload = base64.substring(offset, offset + chunkSize);
-    const index = String(nextIndex++).padStart(6, "0");
+    const index = String(startOffset + offset).padStart(6, "0");
     emitDiagLine(prefix + ":" + test + ":" + index + ":" + payload);
   }
-  cn1ssChunkIndexByStream[streamKey] = nextIndex;
+  cn1ssChunkIndexByStream[streamKey] = startOffset + base64.length;
   if (base64.length === 0) {
-    const index = String(nextIndex).padStart(6, "0");
+    const index = String(startOffset).padStart(6, "0");
     emitDiagLine(prefix + ":" + test + ":" + index + ":");
-    cn1ssChunkIndexByStream[streamKey] = nextIndex + 1;
   }
+  // Emit the Java-side end-of-channel summary so Cn1ssChunkTools'
+  // readTotalBase64Length() can verify the reassembled length matches what
+  // the emitter advertised. Without this the integrity check is best-effort
+  // (we still detect gaps/overlaps via the offset walk) but a stream that
+  // truncates after its last chunk would only be caught by the PNG trailer
+  // check downstream, which is platform-specific.
+  emitDiagLine("CN1SS:INFO:test=" + test
+    + " chunks=" + Math.max(1, Math.ceil(base64.length / chunkSize))
+    + " total_b64_len=" + base64.length);
   // Emit END marker matching the Java emitChannel convention so the
   // downstream cn1ss_list_tests / cn1ss_decode helpers can detect the stream.
   emitDiagLine(prefix + ":END:" + test);

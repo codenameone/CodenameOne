@@ -272,6 +272,22 @@ public class CSSWatcher implements Runnable {
         File designerJar = new File(cn1Home, "designer_1.jar");
         if (System.getProperty("codename1.designer.jar", null) != null) {
             designerJar = new File(System.getProperty("codename1.designer.jar", null));
+        } else {
+            // The Maven plugin declares codenameone-designer as a plugin dependency, so any
+            // CN1 mojo invocation has already pulled the version-pinned designer jar into m2.
+            // Prefer that over ~/.codenameone/designer_1.jar (which is managed by UpdateCodenameOne
+            // and routinely lags behind the plugin version, producing confusing CSS failures).
+            File m2Designer = com.codename1.impl.javase.util.MavenUtils.findDesignerJarInM2();
+            if (m2Designer != null) {
+                designerJar = m2Designer;
+            } else if (designerJar.exists()) {
+                System.err.println("[CSSWatcher] Warning: codename1.designer.jar system property is not set "
+                        + "and no version-pinned designer was found in the local Maven repository; "
+                        + "falling back to " + designerJar.getAbsolutePath() + ". This file is "
+                        + "managed by UpdateCodenameOne and may be older than the CN1 plugin in use. "
+                        + "If CSS compilation fails, launch the simulator via the Maven cn1:run goal "
+                        + "(which both fetches the right designer into m2 and pins it via -Dcodename1.designer.jar).");
+            }
         }
         String cefDir = System.getProperty("cef.dir", cn1Home + File.separator + "cef");
         

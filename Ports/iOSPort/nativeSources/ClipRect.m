@@ -22,6 +22,9 @@
  */
 #import "ClipRect.h"
 #import "CodenameOne_GLViewController.h"
+#ifdef CN1_USE_METAL
+#import "CN1Metalcompat.h"
+#endif
 #import "FillRect.h"
 #ifdef USE_ES2
 #import "DrawTextureAlphaMask.h"
@@ -92,6 +95,18 @@ static CGRect drawingRect;
 }
 
 -(void)execute {
+#ifdef CN1_USE_METAL
+    // Phase 2: handle only the rectangular scissor case via Metal's
+    // setScissorRect. Stencil-based clipping for texture/polygon clips
+    // is deferred to a later phase -- those currently fall back to a
+    // bounding-box scissor (incorrect for non-rectangular masks but
+    // does not crash).
+    int sx = x, sy = y, sw = width, sh = height;
+    if (sx < 0) { sw += sx; sx = 0; }
+    if (sy < 0) { sh += sy; sy = 0; }
+    CN1MetalSetScissor(sx, sy, sw, sh);
+    clipApplied = (sw > 0 && sh > 0);
+#else
 #ifdef USE_ES2
     if ( texture != 0 || numPoints > 0 ){
         clipX = x; clipY=y; clipW=width; clipH=height;
@@ -210,6 +225,7 @@ static CGRect drawingRect;
 #endif
         clipApplied = NO;
     }
+#endif // CN1_USE_METAL
 
 }
 

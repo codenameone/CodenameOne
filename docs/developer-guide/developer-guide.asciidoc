@@ -92,6 +92,8 @@ include::Working-with-Mac-OS-X.asciidoc[]
 
 include::Working-With-CodenameOne-Sources.asciidoc[]
 
+include::Skin-Designer.asciidoc[]
+
 include::Maven-Appendix-Archetypes.adoc[]
 
 include::Maven-Appendix-Goals.adoc[]

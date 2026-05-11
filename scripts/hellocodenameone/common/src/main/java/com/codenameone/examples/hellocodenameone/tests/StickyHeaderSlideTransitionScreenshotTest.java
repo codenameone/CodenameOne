@@ -3,14 +3,11 @@ package com.codenameone.examples.hellocodenameone.tests;
 import com.codename1.components.StickyHeaderContainer;
 import com.codename1.ui.Graphics;
 
-/// Slow-scroll demo: holds the scroll position just past one section
-/// boundary and steps `AnimationTime` through a single forward slide
-/// transition so each frame samples the swap at progress 0%, 20%, …, 100%.
-/// Shows the outgoing header sliding upward out of the slot while the
-/// incoming header rises into place.
+/// Slow-scroll demo: holds section A pinned and steps the scroll position
+/// through the push window so each frame samples a different overlap
+/// fraction. Shows the next section's header rising into the slot and
+/// pushing the pinned header up and out in sync with scroll.
 public class StickyHeaderSlideTransitionScreenshotTest extends AbstractStickyHeaderScreenshotTest {
-    private boolean transitionTriggered;
-    private int targetScrollY;
 
     @Override
     protected int getAnimationDurationMillis() {
@@ -20,30 +17,39 @@ public class StickyHeaderSlideTransitionScreenshotTest extends AbstractStickyHea
     @Override
     protected void configureTransition(StickyHeaderContainer sticky) {
         sticky.setTransitionStyle(StickyHeaderContainer.TRANSITION_SLIDE);
-        // Match the capture window so progress maps 1:1 onto the 6 frames.
-        sticky.setTransitionDurationMillis(getAnimationDurationMillis());
     }
 
     @Override
     protected void prepareCapture(int frameWidth, int frameHeight) {
         super.prepareCapture(frameWidth, frameHeight);
-        // Pre-pin the first section so the captured swap is the second
-        // boundary - that way the demo shows a header-to-header replacement
-        // rather than a header materialising from nothing.
-        int stride = sectionStrideHeight();
-        sticky.setScrollPosition(stride - 1);
+        // Pin the first section so the captured push is a header-to-header
+        // replacement rather than one materialising from nothing.
+        sticky.setScrollPosition(1);
         sticky.updateSticky();
-        targetScrollY = stride * 2 - 1;
-        transitionTriggered = false;
     }
 
     @Override
     protected void renderFrame(Graphics g, int width, int height, double progress, int frameIndex) {
-        if (frameIndex == 0 && !transitionTriggered) {
-            sticky.setScrollPosition(targetScrollY);
+        int sectionStride = sectionStrideHeight();
+        int headerH = pinnedHeaderHeight();
+        if (sectionStride > 0 && headerH > 0) {
+            // Walk scroll from the moment the next header touches the slot
+            // (relY == headerH, push == 0) to one pixel before the swap
+            // (relY == 1, push == headerH - 1).
+            int startScroll = sectionStride - headerH;
+            int span = headerH - 1;
+            int scrollY = startScroll + (int) Math.round(progress * span);
+            sticky.setScrollPosition(scrollY);
             sticky.updateSticky();
-            transitionTriggered = true;
         }
         host.paintComponent(g, true);
+    }
+
+    private int pinnedHeaderHeight() {
+        int h = sticky.getStickyHost().getHeight();
+        if (h <= 0 && !sticky.getStickyHeaders().isEmpty()) {
+            h = sticky.getStickyHeaders().get(0).getPreferredH();
+        }
+        return h;
     }
 }

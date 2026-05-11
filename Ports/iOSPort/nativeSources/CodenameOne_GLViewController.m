@@ -24,6 +24,10 @@
 #import <QuartzCore/QuartzCore.h>
 #import "CodenameOne_GLViewController.h"
 #import "EAGLView.h"
+#ifdef CN1_USE_METAL
+#import "METALView.h"
+#import "CN1Metalcompat.h"
+#endif
 #import "ExecutableOp.h"
 #import "FillRect.h"
 #import "ClipRect.h"
@@ -167,14 +171,140 @@ static void updateDisplayMetricsFromView(UIView *view) {
     displayWidth = (int)(view.bounds.size.width * scaleValue);
     displayHeight = (int)(view.bounds.size.height * scaleValue);
 }
+
+// On iPad with UIScene, view.bounds (and even window.bounds) can transiently
+// be in the snapshot orientation between sceneDidEnterBackground and the
+// first post-foreground layout pass. Cross-check against the windowScene's
+// interfaceOrientation -- which reflects what the user actually sees -- and
+// swap the dimensions if they contradict it. Without this, sampling bounds
+// during the foreground transition publishes a swapped-dimension
+// screenSizeChanged event between stop and start (issue #4767).
+static CGSize cn1OrientationCorrectSize(UIView *view) {
+    CGSize size = view.bounds.size;
+#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 130000
+    if (@available(iOS 13.0, *)) {
+        UIWindowScene *scene = view.window.windowScene;
+        if (scene != nil) {
+            UIInterfaceOrientation o = scene.interfaceOrientation;
+            if (o != UIInterfaceOrientationUnknown) {
+                BOOL shouldBePortrait = UIInterfaceOrientationIsPortrait(o);
+                BOOL isPortrait = size.height >= size.width;
+                if (shouldBePortrait != isPortrait) {
+                    return CGSizeMake(size.height, size.width);
+                }
+            }
+        }
+    }
+#endif
+    return size;
+}
 BOOL forceSlideUpField;
-static UIScrollView *cn1StatusBarTapProxy = nil;
+
+// UIScrollView subclass used solely to receive the status-bar tap
+// (scrollViewShouldScrollToTop:) on iOS. Verified against iOS 26 simulator:
+// the scene receives UIStatusBarTapAction but UIKit only routes it to a
+// scroll view that passes a strict combination of checks --
+//   * frame intersects the status-bar strip (so we pin frame to that
+//     strip rather than the whole view; a full-screen frame caused iOS
+//     to skip the dispatch entirely).
+//   * alpha == 1.0 (fully transparent backgroundColor still counts as
+//     visible; alpha == 0 / 0.004 was rejected by iOS 13+).
+//   * pointInside returns YES at the tap location (default behavior with
+//     a strip-shaped frame is exactly what we want).
+//   * scrollsToTop=YES, scrollEnabled=YES, !hidden, contentOffset.y > 0,
+//     contentSize > bounds.
+// layoutSubviews keeps contentSize one point larger than the bounds so the
+// "must be scrollable" check passes regardless of how the strip resizes
+// on rotation / safe-area changes.
+@interface CN1StatusBarTapProxyView : UIScrollView
+@end
+@implementation CN1StatusBarTapProxyView
+- (void)layoutSubviews {
+    [super layoutSubviews];
+    CGSize sz = self.bounds.size;
+    if (sz.width < 1) sz.width = 1;
+    if (sz.height < 1) sz.height = 1;
+    self.contentSize = CGSizeMake(sz.width, sz.height + 1);
+    if (self.contentOffset.y <= 0) {
+        self.contentOffset = CGPointMake(0, 1);
+    }
+}
+@end
+
+static CN1StatusBarTapProxyView *cn1StatusBarTapProxy = nil;
+
+// Diagnostic counters for the status-bar tap-to-scroll-to-top path. Exposed
+// to Java via Display.getProperty("cn1.iosStatusBarTap.*") so users can
+// confirm whether iOS actually delivered the scroll-to-top message and
+// what coordinates were synthesized into CodenameOne. Useful when the
+// gesture appears to do nothing on a device but works in the simulator.
+static int cn1StatusBarTapCount = 0;
+static double cn1StatusBarTapLastEpochMillis = 0;
+static int cn1StatusBarTapLastX = -1;
+static int cn1StatusBarTapLastY = -1;
+
+int cn1GetStatusBarTapCount() { return cn1StatusBarTapCount; }
+double cn1GetStatusBarTapLastEpochMillis() { return cn1StatusBarTapLastEpochMillis; }
+int cn1GetStatusBarTapLastX() { return cn1StatusBarTapLastX; }
+int cn1GetStatusBarTapLastY() { return cn1StatusBarTapLastY; }
+BOOL cn1IsStatusBarTapProxyInstalled() {
+    return cn1StatusBarTapProxy != nil && cn1StatusBarTapProxy.superview != nil;
+}
+
+// Forward declarations -- the actual definitions of pointerPressedC and
+// pointerReleasedC live further down in this file, but cn1FireStatusBarTap
+// (defined immediately below so it sits next to the static counter state it
+// drives) needs to call them.
+extern void pointerPressedC(int* x, int* y, int length);
+extern void pointerReleasedC(int* x, int* y, int length);
+
+// Fires the same diagnostic-counter bump and synthesized pointer event the
+// scrollViewShouldScrollToTop: delegate dispatches. Exposed so an
+// instrumented native interface can drive the path from a screenshot test
+// without waiting for a real status-bar tap.
+void cn1FireStatusBarTap() {
+    int xArray[1];
+    int yArray[1];
+    xArray[0] = displayWidth / 2;
+    // y=0 lands above CN1's StatusBar Container -- the form has a small
+    // top padding/margin (typically ~9pt; 27px at 3x) before the toolbar
+    // starts. We synthesize the tap at the middle of safeAreaInsets.top
+    // (in native pixels) to land squarely inside the StatusBar bar that
+    // Toolbar.initTitleBarStatus creates, so its pointer-released listener
+    // (which scrolls the form to top) actually fires.
+    CGFloat statusBarPoints = 22.0;
+    if (cn1StatusBarTapProxy != nil && cn1StatusBarTapProxy.window != nil) {
+        if (@available(iOS 11.0, *)) {
+            CGFloat top = cn1StatusBarTapProxy.window.safeAreaInsets.top;
+            if (top > 0) {
+                statusBarPoints = top;
+            }
+        }
+    }
+    // scaleValue is the device pixel scale (1, 2, 3 on iOS); displayWidth
+    // is already in native pixels, so multiply points by scaleValue to
+    // stay in the same coordinate system.
+    int statusBarPxNative = (int)(statusBarPoints * scaleValue);
+    // Aim for the middle of the safe-area top strip; fall back to 30 if
+    // the math degenerated.
+    yArray[0] = statusBarPxNative > 6 ? statusBarPxNative / 2 : 30;
+    cn1StatusBarTapCount++;
+    cn1StatusBarTapLastEpochMillis = [[NSDate date] timeIntervalSince1970] * 1000.0;
+    cn1StatusBarTapLastX = xArray[0];
+    cn1StatusBarTapLastY = yArray[0];
+    pointerPressedC(xArray, yArray, 1);
+    pointerReleasedC(xArray, yArray, 1);
+    if (cn1StatusBarTapProxy != nil) {
+        cn1StatusBarTapProxy.contentOffset = CGPointMake(0, 1);
+    }
+}
 
 
 // 1 for portrait lock, and 2 for landscape lock
 int orientationLock = 0;
 int upsideDownMultiplier = -1;
 int currentlyEditingMaxLength;
+BOOL currentlyReturnExitsEditing = NO;
 
 #ifndef CN1_USE_ARC
 NSAutoreleasePool *globalCodenameOnePool;
@@ -306,13 +436,17 @@ void cn1_setStyleDoneButton(CN1_THREAD_STATE_MULTI_ARG UIBarButtonItem* btn) {
 void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 (CN1_THREAD_STATE_MULTI_ARG int x, int y, int w, int h, void* font, int isSingleLine, int rows, int maxSize,
  int constraint, const char* str, int len, BOOL forceSlideUp,
- int color, JAVA_LONG imagePeer, int padTop, int padBottom, int padLeft, int padRight, NSString* hintString, int hintColor, BOOL showToolbar, BOOL blockCopyPaste, int alignment, int verticalAlignment) {
+ int color, JAVA_LONG imagePeer, int padTop, int padBottom, int padLeft, int padRight, NSString* hintString, int hintColor, BOOL showToolbar, BOOL blockCopyPaste, int alignment, int verticalAlignment, BOOL returnExitsEditing) {
     // don't show toolbar in iOS 8 in landscape since there is just no room for that...
     if(isIOS8() && displayHeight < displayWidth) {
         showToolbar = NO;
     }
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl");
     currentlyEditingMaxLength = maxSize;
+    // Honored by the UITextView shouldChangeTextInRange: delegate (EAGLView/METALView) to
+    // intercept Return on multi-line text areas when the iosReturnExitsEditing client
+    // property is set on the editing component.
+    currentlyReturnExitsEditing = returnExitsEditing && !isSingleLine;
     dispatch_sync(dispatch_get_main_queue(), ^{
         if(editingComponent != nil) {
             [editingComponent resignFirstResponder];
@@ -545,6 +679,11 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
             utv.blockPaste = CN1_blockPaste || blockCopyPaste;
             utv.blockCopy = CN1_blockCopy || blockCopyPaste;
             utv.blockCut = CN1_blockCut || blockCopyPaste;
+            // Avoid competing with the CN1 status-bar tap proxy: iOS only fires
+            // scrollViewShouldScrollToTop: when exactly one scroll view has
+            // scrollsToTop=YES, and UITextView's internal scroll view defaults
+            // to YES.
+            utv.scrollsToTop = NO;
             [utv setBackgroundColor:[UIColor clearColor]];
             [utv.layer setBorderColor:[[UIColor clearColor] CGColor]];
             [utv.layer setBorderWidth:0];
@@ -559,6 +698,13 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
             }
             utv.text = [NSString stringWithUTF8String:str];
             utv.delegate = [[CodenameOne_GLViewController instance] eaglView];
+
+            // When iosReturnExitsEditing is set on a multi-line TextArea, present the
+            // Return key as "Done" -- the actual exit-on-return is enforced by the
+            // shouldChangeTextInRange: delegate, which intercepts a "\n" replacement.
+            if (currentlyReturnExitsEditing) {
+                utv.returnKeyType = UIReturnKeyDone;
+            }
             
             // Apply constraints for multiline text view
             // INITIAL_CAPS_WORD
@@ -848,6 +994,13 @@ CGContextRef roundRect(CGContextRef context, int color, int alpha, int x, int y,
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRoundRectMutableImpl
 (int color, int alpha, int x, int y, int width, int height, int arcWidth, int arcHeight) {
+#ifdef CN1_USE_METAL
+    // Dead under Metal -- MutableGraphics builds a round-rect GeneralPath
+    // and routes it through the alpha-mask Metal pipeline (Renderer.c ->
+    // R8 MTLTexture -> DrawTextureAlphaMask op tagged with the mutable
+    // target). The Java side gates with `metalRendering` before calling
+    // this JNI.
+#else
     CGContextRef context = UIGraphicsGetCurrentContext();
     if (currentMutableTransformSet) {
         CGContextSaveGState(context);
@@ -857,12 +1010,20 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRoundRectMutableImp
     if (currentMutableTransformSet) {
         CGContextRestoreGState(context);
     }
+#endif
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_setAntiAliasedMutableImpl
 (JAVA_BOOLEAN antialiased) {
+#ifdef CN1_USE_METAL
+    // Metal pipelines are antialiased by default; CG's runtime AA toggle
+    // has no direct equivalent. The visible behaviour matches
+    // "antialiased=YES" everywhere on Metal.
+    (void)antialiased;
+#else
     CGContextRef context = UIGraphicsGetCurrentContext();
     CGContextSetAllowsAntialiasing(context, antialiased);
+#endif
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_resetAffineGlobal() {
@@ -887,23 +1048,32 @@ extern void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalI
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRoundRectGlobalImpl
 (int color, int alpha, int x, int y, int width, int height, int arcWidth, int arcHeight) {
+#ifdef CN1_USE_METAL
+    // Dead under Metal -- GlobalGraphics builds a round-rect GeneralPath
+    // and routes it through nativeDrawShape (alpha-mask Metal pipeline).
+#else
     UIGraphicsBeginImageContextWithOptions(CGSizeMake(width, height), NO, 1.0);
     CGContextRef context = UIGraphicsGetCurrentContext();
     CGContextStrokePath(roundRect(context, color, alpha, 0, 0, width, height, arcWidth, arcHeight));
     UIImage* img = UIGraphicsGetImageFromCurrentImageContext();
-    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl %i", ((int)img));
     UIGraphicsEndImageContext();
-    
+
     GLUIImage* glu = [[GLUIImage alloc] initWithImage:img];
     Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalImpl((BRIDGE_CAST void*) glu, 255, x, y, width, height, 0);
 #ifndef CN1_USE_ARC
     [glu release];
+#endif
 #endif
 }
 
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRoundRectMutableImpl
 (int color, int alpha, int x, int y, int width, int height, int arcWidth, int arcHeight) {
+#ifdef CN1_USE_METAL
+    // Dead under Metal -- MutableGraphics goes through the alpha-mask
+    // Metal pipeline (build path, Renderer.c -> R8 MTLTexture ->
+    // DrawTextureAlphaMask op tagged with currentMutableImage).
+#else
     CGContextRef context = UIGraphicsGetCurrentContext();
     if (currentMutableTransformSet) {
         CGContextSaveGState(context);
@@ -913,21 +1083,26 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRoundRectMutableImp
     if (currentMutableTransformSet) {
         CGContextRestoreGState(context);
     }
+#endif
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRoundRectGlobalImpl
 (int color, int alpha, int x, int y, int width, int height, int arcWidth, int arcHeight) {
+#ifdef CN1_USE_METAL
+    // Dead under Metal -- GlobalGraphics routes through the alpha-mask
+    // Metal pipeline.
+#else
     UIGraphicsBeginImageContextWithOptions(CGSizeMake(width, height), NO, 1.0);
     CGContextRef context = UIGraphicsGetCurrentContext();
     CGContextFillPath(roundRect(context, color, alpha, 0, 0, width, height, arcWidth, arcHeight));
     UIImage* img = UIGraphicsGetImageFromCurrentImageContext();
-    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl %i", ((int)img));
     UIGraphicsEndImageContext();
-    
+
     GLUIImage* glu = [[GLUIImage alloc] initWithImage:img];
     Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalImpl((BRIDGE_CAST void*)glu, 255, x, y, width, height, 0);
 #ifndef CN1_USE_ARC
     [glu release];
+#endif
 #endif
 }
 
@@ -979,6 +1154,11 @@ CGContextRef drawArc(CGContextRef context, int color, int alpha, int x, int y, i
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawArcMutableImpl
 (int color, int alpha, int x, int y, int width, int height, int startAngle, int angle) {
+#ifdef CN1_USE_METAL
+    // Dead under Metal -- MutableGraphics builds a GeneralPath via
+    // drawingArcPath.arc(...) and routes through nativeDrawShape (alpha-mask
+    // Metal pipeline tagged with currentMutableImage).
+#else
     CGContextRef context = UIGraphicsGetCurrentContext();
     if (currentMutableTransformSet) {
         CGContextSaveGState(context);
@@ -988,6 +1168,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawArcMutableImpl
     if (currentMutableTransformSet) {
         CGContextRestoreGState(context);
     }
+#endif
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRadialGradientMutableImpl
@@ -1021,6 +1202,14 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRadialGradientMutab
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeFillArcMutableImpl
 (int color, int alpha, int x, int y, int width, int height, int startAngle, int angle) {
+#ifdef CN1_USE_METAL
+    // Dead under Metal -- MutableGraphics builds drawingArcPath via
+    // GeneralPath.arc(...) and routes through nativeFillShape (alpha-mask
+    // Metal pipeline tagged with currentMutableImage). RadialGradientPaint
+    // composes through the AlphaMaskRadial pipeline at draw time
+    // (DrawTextureAlphaMask.execute checks PaintOp and routes to
+    // CN1MetalDrawAlphaMaskRadial).
+#else
     CGContextRef context = UIGraphicsGetCurrentContext();
     if (currentMutableTransformSet) {
         CGContextSaveGState(context);
@@ -1036,6 +1225,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeFillArcMutableImpl
     if (currentMutableTransformSet) {
         CGContextRestoreGState(context);
     }
+#endif
 }
 
 // START ES2 ADDITION: Drawing Shapes ------------------------------------------------------------------------------
@@ -1086,15 +1276,28 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawPathImpl
 }
 
 
-void Java_com_codename1_impl_ios_IOSImplementation_drawTextureAlphaMaskImpl(GLuint textureName, int color, int alpha, int x, int y, int w, int h)
+void Java_com_codename1_impl_ios_IOSImplementation_drawTextureAlphaMaskImpl(JAVA_LONG textureName, int color, int alpha, int x, int y, int w, int h)
 {
-    
+
     DrawTextureAlphaMask *f = [[DrawTextureAlphaMask alloc] initWithArgs:textureName color:color alpha:alpha x:x y:y w:w h:h];
+#ifdef CN1_USE_METAL
+    // If a mutable image is the current draw target (the Java side called
+    // startDrawingOnImage(...) to begin painting INTO an Image), tag the op
+    // so drawFrame's drain (Phase 3 v2) routes it to that image's encoder
+    // instead of the screen encoder. This is what unifies mutable-image
+    // shape rendering with the screen pipeline -- the same alpha-mask
+    // texture goes to the same Metal alpha-mask shader, just bound to a
+    // different render target.
+    GLUIImage *mutableTarget = [CodenameOne_GLViewController instance].currentMutableImage;
+    if (mutableTarget != nil) {
+        [f setTarget:mutableTarget];
+    }
+#endif
     [CodenameOne_GLViewController upcoming:f];
 #ifndef CN1_USE_ARC
     [f release];
 #endif
-    
+
 }
 
 // END ES2 ADDITION -------------------------------------------------------------------------------------------------
@@ -1130,6 +1333,23 @@ void com_codename1_impl_ios_IOSImplementation_nativeSetTransformMutableImpl___fl
                                                                                                                                                                                JAVA_INT originX, JAVA_INT originY
                                                                                                                                                                                )
 {
+#ifdef CN1_USE_METAL
+    {
+        GLUIImage *target = [CodenameOne_GLViewController instance].currentMutableImage;
+        if (target == nil) return;
+        GLKMatrix4 m = GLKMatrix4MakeAndTranspose(a0,a1,a2,a3,
+                                                  b0,b1,b2,b3,
+                                                  c0,c1,c2,c3,
+                                                  d0,d1,d2,d3);
+        SetTransform *f = [[SetTransform alloc] initWithArgs:m originX:originX originY:originY];
+        [f setTarget:target];
+        [CodenameOne_GLViewController upcoming:f];
+#ifndef CN1_USE_ARC
+        [f release];
+#endif
+        return;
+    }
+#endif
 #ifdef USE_ES2
     POOL_BEGIN();
     currentMutableTransformSet = NO;
@@ -1145,7 +1365,7 @@ void com_codename1_impl_ios_IOSImplementation_nativeSetTransformMutableImpl___fl
     for(int i=0; i<16; i++) caMatrix[i] = glMatrix[i]; //this will do the typecast if needed
 
     output = *((CATransform3D *)caMatrix);
-    
+
     if (!CATransform3DIsIdentity(output)) {
         CGAffineTransform affine = CATransform3DGetAffineTransform(output);
         currentMutableTransform = affine;
@@ -1332,6 +1552,20 @@ void Java_com_codename1_impl_ios_IOSNative_nativeDrawShadowMutable(CN1_THREAD_ST
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageMutableImpl
 (void* peer, int alpha, int x, int y, int width, int height, int renderingHints) {
+#ifdef CN1_USE_METAL
+    {
+        GLUIImage *target = [CodenameOne_GLViewController instance].currentMutableImage;
+        if (target == nil) return;
+        DrawImage *f = [[DrawImage alloc] initWithArgs:alpha xpos:x ypos:y i:(BRIDGE_CAST GLUIImage*)peer w:width h:height];
+        [f setRenderingHints:renderingHints];
+        [f setTarget:target];
+        [CodenameOne_GLViewController upcoming:f];
+#ifndef CN1_USE_ARC
+        [f release];
+#endif
+        return;
+    }
+#endif
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageMutableImpl %i started at %i, %i", (int)peer, x, y);
     UIImage* i = [(BRIDGE_CAST GLUIImage*)peer getImage];
     CGContextRef context = UIGraphicsGetCurrentContext();
@@ -1470,6 +1704,19 @@ void Java_com_codename1_impl_ios_IOSImplementation_flushBufferImpl
 
 void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingMutableImpl
 (int x, int y, int width, int height, int clipApplied) {
+#ifdef CN1_USE_METAL
+    {
+        GLUIImage *target = [CodenameOne_GLViewController instance].currentMutableImage;
+        if (target == nil) return;
+        ClipRect *f = [[ClipRect alloc] initWithArgs:x ypos:y w:width h:height f:clipApplied];
+        [f setTarget:target];
+        [[CodenameOne_GLViewController instance] upcomingAddClip:f];
+#ifndef CN1_USE_ARC
+        [f release];
+#endif
+        return;
+    }
+#endif
     CGContextRef context = UIGraphicsGetCurrentContext();
     //CN1Log(@"Native mutable clipping applied %i on context %i x: %i y: %i width: %i height: %i", clipApplied, (int)context, x, y, width, height);
     //if(clipApplied) {
@@ -1483,13 +1730,18 @@ void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingMutableImpl
 void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingShapeMutableImpl
 (int numCommands, JAVA_OBJECT commands, int numPoints, JAVA_OBJECT points)
 {
+#ifdef CN1_USE_METAL
+    // Shape clipping for mutable images on Metal: scissor rect can only
+    // express axis-aligned rects. A future improvement could rasterise the
+    // shape into a stencil/alpha mask. For now treat as "no clip" so
+    // subsequent draws still render.
+    (void)numCommands; (void)commands; (void)numPoints; (void)points;
+#else
     CGContextRef context = UIGraphicsGetCurrentContext();
-    //CN1Log(@"Native mutable clipping applied %i on context %i x: %i y: %i width: %i height: %i", clipApplied, (int)context, x, y, width, height);
-    //if(clipApplied) {
     CGContextRestoreGState(context);
-    //}
     CGContextSaveGState(context);
     CGContextClip(Java_com_codename1_impl_ios_IOSImplementation_drawPath(CN1_THREAD_GET_STATE_PASS_ARG numCommands, commands, numPoints, points));
+#endif
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingGlobalImpl
@@ -1546,6 +1798,19 @@ void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingPolygonGloba
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineMutableImpl
 (int color, int alpha, int x1, int y1, int x2, int y2) {
+#ifdef CN1_USE_METAL
+    {
+        GLUIImage *target = [CodenameOne_GLViewController instance].currentMutableImage;
+        if (target == nil) return;
+        DrawLine *f = [[DrawLine alloc] initWithArgs:color a:alpha xpos1:x1 ypos1:y1 xpos2:x2 ypos2:y2];
+        [f setTarget:target];
+        [CodenameOne_GLViewController upcoming:f];
+#ifndef CN1_USE_ARC
+        [f release];
+#endif
+        return;
+    }
+#endif
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineMutableImpl started");
     [UIColorFromRGB(color, alpha) set];
     CGContextRef context = UIGraphicsGetCurrentContext();
@@ -1586,6 +1851,19 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeRotateGlobalImpl
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectMutableImpl
 (int color, int alpha, int x, int y, int width, int height) {
+#ifdef CN1_USE_METAL
+    {
+        GLUIImage *target = [CodenameOne_GLViewController instance].currentMutableImage;
+        if (target == nil) return;
+        FillRect *f = [[FillRect alloc] initWithArgs:color a:alpha xpos:x ypos:y w:width h:height];
+        [f setTarget:target];
+        [CodenameOne_GLViewController upcoming:f];
+#ifndef CN1_USE_ARC
+        [f release];
+#endif
+        return;
+    }
+#endif
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectMutableImpl started");
     [UIColorFromRGB(color, alpha) set];
     CGContextRef context = UIGraphicsGetCurrentContext();
@@ -1601,6 +1879,19 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectMutableImpl
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_clearRectMutable(int x, int y, int w, int h) {
+#ifdef CN1_USE_METAL
+    {
+        GLUIImage *target = [CodenameOne_GLViewController instance].currentMutableImage;
+        if (target == nil) return;
+        ClearRect *f = [[ClearRect alloc] initWithArgs:x ypos:y w:w h:h];
+        [f setTarget:target];
+        [CodenameOne_GLViewController upcoming:f];
+#ifndef CN1_USE_ARC
+        [f release];
+#endif
+        return;
+    }
+#endif
     CGContextRef context = UIGraphicsGetCurrentContext();
     if (currentMutableTransformSet) {
         CGContextSaveGState(context);
@@ -1610,7 +1901,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_clearRectMutable(int x, int y
     if (currentMutableTransformSet) {
         CGContextRestoreGState(context);
     }
-    
+
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_clearRectGlobal(int x, int y, int w, int h) {
@@ -1634,6 +1925,19 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectGlobalImpl
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRectMutableImpl
 (int color, int alpha, int x, int y, int width, int height) {
+#ifdef CN1_USE_METAL
+    {
+        GLUIImage *target = [CodenameOne_GLViewController instance].currentMutableImage;
+        if (target == nil) return;
+        DrawRect *f = [[DrawRect alloc] initWithArgs:color a:alpha xpos:x ypos:y w:width h:height];
+        [f setTarget:target];
+        [CodenameOne_GLViewController upcoming:f];
+#ifndef CN1_USE_ARC
+        [f release];
+#endif
+        return;
+    }
+#endif
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRectMutableImpl started");
     [UIColorFromRGB(color, alpha) set];
     CGContextRef context = UIGraphicsGetCurrentContext();
@@ -1661,6 +1965,19 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRectGlobalImpl
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringMutableImpl
 (int color, int alpha, void* fontPeer, NSString* str, int x, int y) {
+#ifdef CN1_USE_METAL
+    {
+        GLUIImage *target = [CodenameOne_GLViewController instance].currentMutableImage;
+        if (target == nil) return;
+        DrawString *f = [[DrawString alloc] initWithArgs:color a:alpha xpos:x ypos:y s:str f:(BRIDGE_CAST UIFont*)fontPeer];
+        [f setTarget:target];
+        [CodenameOne_GLViewController upcoming:f];
+#ifndef CN1_USE_ARC
+        [f release];
+#endif
+        return;
+    }
+#endif
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringMutableImpl started");
     [[CodenameOne_GLViewController instance] drawString:color alpha:alpha font:(BRIDGE_CAST UIFont*)fontPeer str:str x:x y:y];
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringMutableImpl finished");
@@ -1689,18 +2006,41 @@ void* Java_com_codename1_impl_ios_IOSImplementation_createNativeMutableImageImpl
     //[img retain];
     //CN1Log(@"createNativeMutableImageImpl finished %i ", (int)img);
     GLUIImage* gl = [[GLUIImage alloc] initWithImage:img];
+#ifdef CN1_USE_METAL
+    // Phase 3 v2: stash the fill colour so when startDrawingOnImage
+    // lazily allocates the Metal render-target texture (via
+    // CN1MetalEnsureMutableTexture), the clear pass uses this colour
+    // instead of (0,0,0,0). Mirrors UIRectFill(argb) above for the CG
+    // backing, so screen-side DrawImage of a freshly-created mutable
+    // sees the same starting pixels regardless of which backing wins.
+    [gl setMtlMutableInitialARGB:argb];
+#endif
     return (BRIDGE_CAST void*)gl;
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_startDrawingOnImageImpl
 (int width, int height, void *peer) {
+#ifdef CN1_USE_METAL
+    {
+        // Phase 3 v2: ensure the mutable image has a Metal render-target
+        // texture sized to the requested dims, then publish it as the
+        // current mutable target. Subsequent nativeXxxMutableImpl JNIs
+        // queue ExecutableOps tagged with this target; drawFrame opens an
+        // encoder against the texture when it drains them.
+        GLUIImage *gl = (BRIDGE_CAST GLUIImage*)peer;
+        CN1MetalEnsureMutableTexture(gl, width, height);
+        [CodenameOne_GLViewController instance].currentMutableImage = gl;
+        currentMutableTransformSet = NO;
+        return;
+    }
+#endif
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_startDrawingOnImageImpl");
     UIImage* original = [(BRIDGE_CAST GLUIImage*)peer getImage];
     UIGraphicsBeginImageContextWithOptions(CGSizeMake(width, height), NO, 1.0);
     if(original != NULL) {
         [original drawAtPoint:CGPointZero];
     }
-    
+
     CGContextRef context = UIGraphicsGetCurrentContext();
     CGContextSaveGState(context);
     [CodenameOne_GLViewController instance].currentMutableImage = (BRIDGE_CAST GLUIImage*)peer;
@@ -1709,6 +2049,19 @@ void Java_com_codename1_impl_ios_IOSImplementation_startDrawingOnImageImpl
 }
 
 void* Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl() {
+#ifdef CN1_USE_METAL
+    {
+        // Phase 3 v2: clear the current mutable target. Pending ops (queued
+        // between Begin/Finish) will drain on the next drawFrame; the
+        // mutable's MTLTexture continues to hold its accumulated pixels.
+        // Readback paths (Image.getRGB, encode-as-PNG/JPEG, toImage)
+        // explicitly call CN1MetalFlushMutableImageSync before reading.
+        GLUIImage *gl = [CodenameOne_GLViewController instance].currentMutableImage;
+        [CodenameOne_GLViewController instance].currentMutableImage = nil;
+        currentMutableTransformSet = NO;
+        return (BRIDGE_CAST void*)gl;
+    }
+#endif
     UIImage* img = UIGraphicsGetImageFromCurrentImageContext();
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl %i", ((int)img));
     UIGraphicsEndImageContext();
@@ -1721,6 +2074,47 @@ void* Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl() {
 
 void Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayImpl
 (void* peer, int* arr, int x, int y, int width, int height, int imgWidth, int imgHeight) {
+#ifdef CN1_USE_METAL
+    {
+        // Phase 3 v2 readback. Was disabled in 9b2aaf11d on suspicion of a
+        // DrawImage-test hang (GPU memory pressure → nextDrawable wedge),
+        // but the legacy CG-from-UIImage fallback returns the stale
+        // initial-fill pixels for any mutable that's been drawn into via
+        // Metal — animation/transition tests added in master #4821 then
+        // emit empty grids and downstream EDT scheduling stalls trying
+        // to advance to the next test.
+        //
+        // The original GPU-pressure concern is mitigated by the resource-
+        // leak fix in commit e548d1afb (each transient GLUIImage no longer
+        // pins +1 retains on its mtlMutableTexture / command buffer / read
+        // textures). Reinstate the path so getRGB sees real Metal pixels.
+        //
+        // If we're still inside a draw-on-image session we must close it
+        // first so the queued ops are visible to the drain (mirrors the
+        // legacy path's finishDrawingOnImageImpl call below).
+        GLUIImage *gl = (BRIDGE_CAST GLUIImage*)peer;
+        if ([gl mtlMutableTexture] != nil) {
+            BOOL stillDrawing = (((BRIDGE_CAST void*)[CodenameOne_GLViewController instance].currentMutableImage) == peer);
+            BOOL savedTransformSet = currentMutableTransformSet;
+            if (stillDrawing) {
+                Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl();
+            }
+            // flushBuffer dispatches synchronously to main and runs
+            // drawFrame, which drains queued ExecutableOps -- including
+            // any with target=this image -- through Begin/End mutable
+            // encoders so the texture is up-to-date. The bounding rect
+            // doesn't matter for the queue drain (drawFrame uses it only
+            // for ClipRect.setDrawRect on screen ops).
+            [[CodenameOne_GLViewController instance] flushBuffer:nil x:0 y:0 width:displayWidth height:displayHeight];
+            CN1MetalReadMutableImagePixels(gl, arr, x, y, width, height, imgWidth, imgHeight);
+            if (stillDrawing) {
+                Java_com_codename1_impl_ios_IOSImplementation_startDrawingOnImageImpl(imgWidth, imgHeight, peer);
+                currentMutableTransformSet = savedTransformSet;
+            }
+            return;
+        }
+    }
+#endif
     BOOL currentlyDrawing = NO;
     BOOL oldCurrentMutableTransformSet = currentMutableTransformSet;
     if(((BRIDGE_CAST void*)[CodenameOne_GLViewController instance].currentMutableImage) == peer) {
@@ -1776,6 +2170,18 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeTileImageGlobalImpl
         Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl();
     }
     TileImage* f = [[TileImage alloc] initWithArgs:alpha xpos:x ypos:y i:(BRIDGE_CAST GLUIImage*)peer w:width h:height];
+#ifdef CN1_USE_METAL
+    // Phase 3 v2: if a mutable target is currently active, tag the op
+    // so drawFrame's drain routes it to the mutable's encoder. Java's
+    // tileImage(graphics, ...) sets this up by calling ng.checkControl
+    // before the JNI -- on the mutable branch, currentMutableImage =
+    // panelImg; on the screen branch, the GlobalGraphics.checkControl
+    // path cleared it via finishDrawingOnImage so it's nil here.
+    GLUIImage *target = [CodenameOne_GLViewController instance].currentMutableImage;
+    if (target != nil) {
+        [f setTarget:target];
+    }
+#endif
     [CodenameOne_GLViewController upcoming:f];
 #ifndef CN1_USE_ARC
     [f release];
@@ -1918,30 +2324,84 @@ static CodenameOne_GLViewController *sharedSingleton;
 #endif
 
 - (void)cn1InstallStatusBarTapProxy {
-    if (cn1StatusBarTapProxy != nil) {
+    // Install the proxy as a sibling of self.view at the UIWindow level (not
+    // as a descendant of self.view). iOS still walks the entire window
+    // hierarchy when routing UIStatusBarTapAction → scrollViewShouldScrollToTop:,
+    // so the proxy is found, but cn1_captureView (which renders self.view's
+    // subtree) doesn't include it, so screenshot tests are not affected.
+    UIWindow *window = self.view.window;
+    if (window == nil) {
+        // Window isn't attached yet (viewDidLoad runs before the view is
+        // installed in a window). viewDidAppear calls us again -- skip.
         return;
     }
-    cn1StatusBarTapProxy = [[UIScrollView alloc] initWithFrame:self.view.bounds];
+    if (cn1StatusBarTapProxy != nil) {
+        if (cn1StatusBarTapProxy.superview != window) {
+            [cn1StatusBarTapProxy removeFromSuperview];
+            [window addSubview:cn1StatusBarTapProxy];
+        }
+        // Update frame to just the status-bar strip whenever we re-attach;
+        // safeAreaInsets.top is sometimes 0 at viewDidLoad and only correct
+        // by viewDidAppear.
+        [self cn1UpdateStatusBarTapProxyFrame];
+        return;
+    }
+    cn1StatusBarTapProxy = [[CN1StatusBarTapProxyView alloc] initWithFrame:window.bounds];
     cn1StatusBarTapProxy.delegate = self;
     cn1StatusBarTapProxy.backgroundColor = [UIColor clearColor];
-    cn1StatusBarTapProxy.contentSize = CGSizeMake(1, 2);
-    cn1StatusBarTapProxy.contentOffset = CGPointMake(0, 1);
     cn1StatusBarTapProxy.scrollsToTop = YES;
-    cn1StatusBarTapProxy.userInteractionEnabled = NO;
-    cn1StatusBarTapProxy.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    cn1StatusBarTapProxy.alpha = 0.0f;
-    [self.view addSubview:cn1StatusBarTapProxy];
+    // userInteractionEnabled must remain YES; iOS skips the
+    // scrollViewShouldScrollToTop: dispatch for views that have it disabled.
+    // Touches in the rest of the screen pass through naturally because the
+    // proxy frame is pinned to just the status-bar strip.
+    cn1StatusBarTapProxy.userInteractionEnabled = YES;
+    cn1StatusBarTapProxy.scrollEnabled = YES;
+    cn1StatusBarTapProxy.showsVerticalScrollIndicator = NO;
+    cn1StatusBarTapProxy.showsHorizontalScrollIndicator = NO;
+    cn1StatusBarTapProxy.bounces = NO;
+    // Don't autoresize height -- cn1UpdateStatusBarTapProxyFrame manually
+    // pins the proxy to just the status-bar strip; FlexibleWidth +
+    // FlexibleBottomMargin keep that strip stuck to the top on rotation.
+    cn1StatusBarTapProxy.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleBottomMargin;
+    cn1StatusBarTapProxy.alpha = 1.0f;
+    cn1StatusBarTapProxy.hidden = NO;
+    cn1StatusBarTapProxy.opaque = NO;
+#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 110000
+    if (@available(iOS 11.0, *)) {
+        cn1StatusBarTapProxy.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
+    }
+#endif
+    cn1StatusBarTapProxy.contentSize = CGSizeMake(window.bounds.size.width, 100);
+    cn1StatusBarTapProxy.contentOffset = CGPointMake(0, 1);
+    [window addSubview:cn1StatusBarTapProxy];
+    [self cn1UpdateStatusBarTapProxyFrame];
+}
+
+- (void)cn1UpdateStatusBarTapProxyFrame {
+    if (cn1StatusBarTapProxy == nil) return;
+    UIWindow *window = cn1StatusBarTapProxy.window;
+    if (window == nil) window = self.view.window;
+    CGFloat width = (window != nil) ? window.bounds.size.width : self.view.bounds.size.width;
+    if (width < 1) width = 1;
+    CGFloat statusBarHeight = 44.0;
+    if (@available(iOS 11.0, *)) {
+        CGFloat inset = self.view.safeAreaInsets.top;
+        if (inset > statusBarHeight) {
+            statusBarHeight = inset;
+        }
+    }
+    // Cap to a sensible upper bound -- iPhone Pro Max with Dynamic Island is
+    // around 60pt; never exceed 80pt of touch area.
+    if (statusBarHeight > 80) statusBarHeight = 80;
+    if (statusBarHeight < 20) statusBarHeight = 20;
+    cn1StatusBarTapProxy.frame = CGRectMake(0, 0, width, statusBarHeight);
+    cn1StatusBarTapProxy.contentSize = CGSizeMake(width, statusBarHeight + 1);
+    cn1StatusBarTapProxy.contentOffset = CGPointMake(0, 1);
 }
 
 - (BOOL)scrollViewShouldScrollToTop:(UIScrollView *)scrollView {
     if (scrollView == cn1StatusBarTapProxy) {
-        int xArray[1];
-        int yArray[1];
-        xArray[0] = displayWidth / 2;
-        yArray[0] = 0;
-        pointerPressedC(xArray, yArray, 1);
-        pointerReleasedC(xArray, yArray, 1);
-        cn1StatusBarTapProxy.contentOffset = CGPointMake(0, 1);
+        cn1FireStatusBarTap();
         return NO;
     }
     return YES;
@@ -2005,6 +2465,10 @@ bool lockDrawing;
     [super viewDidAppear:animated];
     [self becomeFirstResponder];
     [self updateCanvas:animated];
+    // Re-install / bring the status-bar tap proxy to the front. Native peers
+    // (browsers, video, etc.) added after viewDidLoad can obscure it or push
+    // sibling scroll views into the hierarchy.
+    [self cn1InstallStatusBarTapProxy];
     //replaceViewDidAppear
 }
 
@@ -2020,22 +2484,22 @@ bool lockDrawing;
     if(touchesArray != nil) {
         [touchesArray removeAllObjects];
     }
-    int currentWidth = (int)self.view.bounds.size.width * scaleValue;
+    CGSize size = cn1OrientationCorrectSize(self.view);
     //if(currentWidth != displayWidth) {
     // Note:  While it may be tempting to only update the frame buffer if the size has changed,
-    // doing that causes a bug whereby the app may paint with the wrong dimensions 
+    // doing that causes a bug whereby the app may paint with the wrong dimensions
     // when opening from the background on iPad with multitasking enabled.
     // https://github.com/codenameone/CodenameOne/issues/2819
     // This may be caused by the fact the getDisplayWidthImpl() and getDisplayHeightImpl() update
     // the display width/height each time to match the view, without performing other resizing
     // details, so it is possible that the size change event still needs to be sent
     // even if the display width already matches the value we're given here.
-    [[self eaglView] updateFrameBufferSize:(int)self.view.bounds.size.width h:(int)self.view.bounds.size.height];
-    updateDisplayMetricsFromView(self.view);
-    displayWidth = currentWidth;
+    [[self eaglView] updateFrameBufferSize:(int)size.width h:(int)size.height];
+    displayWidth = (int)size.width * scaleValue;
+    displayHeight = (int)size.height * scaleValue;
     screenSizeChanged(displayWidth, displayHeight);
     //}
-    
+
 }
 
 - (BOOL)canBecomeFirstResponder {
@@ -2162,13 +2626,25 @@ EAGLView* lastFoundEaglView;
  * we need to obtain the EAGLView.
  */
 -(EAGLView*) eaglView {
-    if ([self.view class] == [EAGLView class]) {
+    // Under CN1_USE_METAL the rendering view is a METALView, not an EAGLView.
+    // Both classes conform to CN1RenderingView, so the return value is used
+    // through the shared protocol surface (setFramebuffer, presentFramebuffer,
+    // updateFrameBufferSize:h:, addPeerComponent:, peerComponentsLayer).
+    // The declared return type stays EAGLView* for ABI stability; the cast is
+    // duck-typed. Any EAGLView-only call site (e.g. -setContext:) is guarded
+    // by #ifndef CN1_USE_METAL.
+#ifdef CN1_USE_METAL
+    Class renderingClass = [METALView class];
+#else
+    Class renderingClass = [EAGLView class];
+#endif
+    if ([self.view class] == renderingClass) {
         lastFoundEaglView = (EAGLView*)self.view;
         return (EAGLView*)self.view;
     }
     for (UIView* child in self.view.subviews) {
-        
-        if ([child class] == [EAGLView class]) {
+
+        if ([child class] == renderingClass) {
             lastFoundEaglView = (EAGLView*)child;
             return (EAGLView*)child;
         }
@@ -2227,7 +2703,10 @@ EAGLView* lastFoundEaglView;
     [aContext release];
 #endif
 	
+#ifndef CN1_USE_METAL
+    // METALView has no GL context. Under CN1_USE_METAL this call is a no-op.
     [[self eaglView] setContext:context];
+#endif
     [[self eaglView] setFramebuffer];
     //self.view.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     //self.view.autoresizesSubviews = YES;
@@ -2864,11 +3343,44 @@ BOOL prefersStatusBarHidden = NO;
                 [currentTarget removeAllObjects];
             }
             GLErrorLog;
+#ifdef CN1_USE_METAL
+            // Phase 3 v2: walk the queue, switching encoders when target
+            // changes. nil target = screen (already opened by setFramebuffer
+            // at top of drawFrame). non-nil target = mutable GLUIImage --
+            // open a fresh CB+encoder against its texture, drain its ops,
+            // commit (no wait) at next switch or end. Readback paths call
+            // CN1MetalFlushMutableImageSync to wait on the commit.
+            GLUIImage *currentDrainTarget = nil;
+            BOOL mutableEncoderOpen = NO;
+            for (ExecutableOp *ex in cp) {
+                GLUIImage *opTarget = [ex target];
+                if (opTarget != currentDrainTarget) {
+                    if (mutableEncoderOpen) {
+                        CN1MetalEndMutableImageDraw(currentDrainTarget);
+                        mutableEncoderOpen = NO;
+                    }
+                    currentDrainTarget = opTarget;
+                    if (opTarget != nil) {
+                        mutableEncoderOpen = CN1MetalBeginMutableImageDraw(opTarget);
+                    }
+                }
+                // Skip mutable ops whose encoder failed to open. Screen
+                // ops (target=nil) always execute against the screen
+                // encoder set up by setFramebuffer.
+                if (opTarget != nil && !mutableEncoderOpen) continue;
+                [ex executeWithClipping];
+                GLErrorLog;
+            }
+            if (mutableEncoderOpen) {
+                CN1MetalEndMutableImageDraw(currentDrainTarget);
+            }
+#else
             for(ExecutableOp* ex in cp) {
                 [ex executeWithClipping];
                 //[ex executeWithLog];
                 GLErrorLog;
             }
+#endif
             //CN1Log(@"Total memory is: %i", [ExecutableOp get_free_memory]);
 #ifndef CN1_USE_ARC
             [cp release];

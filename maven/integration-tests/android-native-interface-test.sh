@@ -1,5 +1,10 @@
 #!/bin/bash
-exit 0  #Failing for some reason... need to investigate, but will do it later
+# Disabled pending investigation. Previously this script started with `exit 0`
+# directly, which silently masqueraded as a green check in `all.sh` (which uses
+# `set -e` and would otherwise have surfaced the disablement). Print an
+# explicit SKIP line so the suite log makes the gap visible.
+echo "[SKIP] android-native-interface-test.sh - disabled, needs reinvestigation"
+exit 0
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 set -e
 source $SCRIPTPATH/inc/env.sh

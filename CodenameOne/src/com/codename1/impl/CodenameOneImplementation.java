@@ -1545,7 +1545,7 @@ public abstract class CodenameOneImplementation {
         return false;
     }
 
-    /// Translates the X/Y location for drawing on the underlying surface. Translation
+/// Translates the X/Y location for drawing on the underlying surface. Translation
     /// is incremental so the new value will be added to the current translation and
     /// in order to reset translation we have to invoke
     /// `translate(-getTranslateX(), -getTranslateY())`

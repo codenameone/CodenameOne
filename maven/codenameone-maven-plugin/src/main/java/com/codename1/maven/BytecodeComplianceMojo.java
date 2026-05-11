@@ -92,6 +92,14 @@ public class BytecodeComplianceMojo extends AbstractCN1Mojo {
                 MethodRef.virtual("java/lang/String", "split", "(Ljava/lang/String;I)[Ljava/lang/String;"),
                 MethodRef.staticRef(JDK_API_REWRITE_HELPER_INTERNAL_NAME, "split", "(Ljava/lang/String;Ljava/lang/String;I)[Ljava/lang/String;")
         );
+        rules.put(
+                MethodRef.virtual("java/lang/String", "replaceAll", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;"),
+                MethodRef.staticRef(JDK_API_REWRITE_HELPER_INTERNAL_NAME, "replaceAll", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;")
+        );
+        rules.put(
+                MethodRef.virtual("java/lang/String", "replaceFirst", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;"),
+                MethodRef.staticRef(JDK_API_REWRITE_HELPER_INTERNAL_NAME, "replaceFirst", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;")
+        );
         return Collections.unmodifiableMap(rules);
     }
 

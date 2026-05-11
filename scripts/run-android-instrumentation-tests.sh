@@ -139,6 +139,16 @@ ADB_BIN="$(command -v adb)"
 ra_log "ADB connected devices:"
 "$ADB_BIN" devices -l | sed 's/^/[run-android-instrumentation-tests]   /'
 
+# Bump the device-side logcat ring buffer before clearing it. The default on
+# Android emulators is 256K-1M per buffer, which is too small for our test
+# suite: a single screenshot can emit ~70 base64 chunk lines (~500 bytes
+# each), and across 90+ tests the main buffer has been observed to wrap
+# mid-suite, dropping a chunk line and causing `Cn1ssChunkTools` to fail
+# reassembly with a gap error. 16 MiB is plenty for a single suite run and
+# matches what `adb logcat -G` accepts on every supported emulator image.
+# Failing to set the buffer is non-fatal — older platforms silently ignore -G.
+ra_log "Bumping device logcat ring buffer to 16M (mitigates chunk-line drops)"
+"$ADB_BIN" logcat -G 16M >/dev/null 2>&1 || true
 ra_log "Clearing logcat buffer"
 "$ADB_BIN" logcat -c || true
 
@@ -289,20 +299,44 @@ done
 # start` (no Gradle, no recompile, no reinstall) and re-decode just the
 # tests that previously failed. The on-device suite re-emits every test;
 # we only redo the work for the ones that need recovery.
+#
+# Why launching the main activity is enough to rerun the suite:
+#   HelloCodenameOne.runApp() (the Lifecycle entry point packaged in the
+#   main APK) spawns a worker thread that calls Cn1ssDeviceRunner.runSuite(),
+#   which iterates every BaseTest and emits CN1SS:* markers via System.out.
+#   The instrumentation runner is just a thin wrapper around the same
+#   launch — we can drive it directly from adb.
+#
+# RIGHT FIX, KEEP IT THAT WAY:
+#   * Re-install the main APK before relaunching. The Gradle
+#     `connectedAndroidTest` task uninstalls BOTH the .test APK and the
+#     app-under-test APK at teardown (look for two "DeviceConnector ...
+#     uninstalling <pkg>" lines in the gradle log to confirm). So by the
+#     time this retry block runs, the package is gone — `am start` then
+#     fails with "Activity not started, unable to resolve Intent ... pkg=
+#     <package>" no matter how cleanly we launch it. We sidestep that by
+#     running `pm list packages` to check installation state and `adb
+#     install -r $MAIN_APK` to put the APK back when missing. We don't
+#     need the .test APK for the retry — the main APK contains
+#     Cn1ssDeviceRunner and re-runs the entire suite when launched.
+#   * Use `am start -W -a MAIN -c LAUNCHER -p $PACKAGE_NAME` to launch by
+#     intent filter rather than resolving the launcher activity component
+#     name. Older (`cmd package resolve-activity --brief`) returned just the
+#     `pkg/.Activity` component; newer Android prepends a "priority=…" line
+#     and may add leading whitespace, which broke our pattern match and
+#     silently fell back to `monkey`. Filter-based launch sidesteps the
+#     parsing entirely.
+#   * `-W` (wait + summary) returns a `Status=ok` line we can inspect.
+#   * Capture and log the output. DO NOT redirect to /dev/null and DO NOT
+#     use `|| true` to silence non-zero exits — the previous version did
+#     both, so when relaunch failed we got 600s of silence and zero signal
+#     to debug from. If this code path goes quiet on you in the future,
+#     check that nobody re-added an output redirect.
+#   * Verify the app process is actually running before committing to a
+#     10-minute wait. If it isn't, fail fast with a clear log line so the
+#     CI surfaces the problem in seconds, not minutes.
 if [ "${#FAILED_TESTS[@]}" -gt 0 ] && [ -n "${PACKAGE_NAME:-}" ]; then
   ra_log "STAGE:RETRY -> Attempting decode recovery for: ${FAILED_TESTS[*]}"
-
-  # Resolve the package's launcher activity component so `am start` can
-  # invoke it directly. Falls back to the package name's main activity
-  # convention if cmd-package fails.
-  LAUNCH_COMPONENT=""
-  if RESOLVE_OUT="$("$ADB_BIN" shell cmd package resolve-activity --brief "$PACKAGE_NAME" 2>/dev/null | tr -d '\r' | tail -n1)"; then
-    LAUNCH_COMPONENT="${RESOLVE_OUT//[$'\t']/}"
-  fi
-  case "$LAUNCH_COMPONENT" in
-    "$PACKAGE_NAME"/*) ;;
-    *) LAUNCH_COMPONENT="" ;;
-  esac
 
   # Stop the original logcat tail so the new capture starts cleanly. The
   # cleanup trap watches LOGCAT_PID, so reassign it to the retry tail
@@ -323,18 +357,154 @@ if [ "${#FAILED_TESTS[@]}" -gt 0 ] && [ -n "${PACKAGE_NAME:-}" ]; then
   LOGCAT_PID="$RETRY_LOGCAT_PID"
   sleep 2
 
-  if [ -n "$LAUNCH_COMPONENT" ]; then
-    ra_log "Relaunching $LAUNCH_COMPONENT via adb am start"
-    "$ADB_BIN" shell am start -n "$LAUNCH_COMPONENT" >/dev/null 2>&1 || true
+  # Re-install the main APK if Gradle has already uninstalled it (it
+  # uninstalls both APKs at teardown — see the comment block above for the
+  # diagnostic that surfaced this). Match the package name with `grep -x`
+  # rather than relying on `pm list packages`'s substring filter so we
+  # don't get a false positive from `<pkg>.test` or any other prefixed
+  # package that happens to be present.
+  if "$ADB_BIN" shell pm list packages "$PACKAGE_NAME" 2>/dev/null \
+      | tr -d '\r' | grep -qx "package:$PACKAGE_NAME"; then
+    ra_log "$PACKAGE_NAME already installed; skipping reinstall"
   else
-    ra_log "Relaunching package $PACKAGE_NAME via monkey (launcher component unresolved)"
-    "$ADB_BIN" shell monkey -p "$PACKAGE_NAME" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1 || true
+    MAIN_APK="$GRADLE_PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk"
+    if [ -f "$MAIN_APK" ]; then
+      ra_log "$PACKAGE_NAME not installed; reinstalling from $MAIN_APK"
+      if INSTALL_OUT="$("$ADB_BIN" install -r "$MAIN_APK" 2>&1 | tr -d '\r')"; then
+        INSTALL_RC=0
+      else
+        INSTALL_RC=$?
+      fi
+      ra_log "adb install exit=${INSTALL_RC}, output:"
+      printf '%s\n' "$INSTALL_OUT" | sed 's/^/[run-android-instrumentation-tests]   /'
+      if [ "$INSTALL_RC" -ne 0 ]; then
+        ra_log "WARN: adb install reported failure; the am start below will likely fail too"
+      fi
+
+      # Wait for PackageManager to finish indexing the freshly-installed APK.
+      # `adb install` returns Success as soon as the APK lands on the device,
+      # but the launcher Intent isn't resolvable until pm has registered
+      # every component in the manifest. Without this wait, `am start` in the
+      # following block races and prints "Activity not started, unable to
+      # resolve Intent" — exactly the failure the previous version of this
+      # block kept hitting on busy emulators (see PR #4856 build for the
+      # observed timing). Poll `cmd package resolve-activity --brief` for
+      # the same MAIN/LAUNCHER intent we are about to fire; it returns the
+      # `<pkg>/<.Activity>` triple once the launcher is ready. Cap at 30s
+      # because indexing usually finishes in < 5s but slow CI runners can
+      # take longer.
+      ra_log "Waiting for PackageManager to register launcher activity for $PACKAGE_NAME"
+      RESOLVE_DEADLINE=$(( $(date +%s) + 30 ))
+      LAUNCHER_RESOLVED=0
+      while [ "$(date +%s)" -lt "$RESOLVE_DEADLINE" ]; do
+        RESOLVE_OUT="$("$ADB_BIN" shell cmd package resolve-activity --brief \
+            -a android.intent.action.MAIN \
+            -c android.intent.category.LAUNCHER \
+            "$PACKAGE_NAME" 2>/dev/null | tr -d '\r')" || RESOLVE_OUT=""
+        # `resolve-activity --brief` prints the matching component on a line
+        # of the form `<package>/<activity>`. Newer Android prepends a
+        # `priority=...` line we want to ignore, so match by substring.
+        if printf '%s\n' "$RESOLVE_OUT" | grep -q "^${PACKAGE_NAME}/"; then
+          LAUNCHER_RESOLVED=1
+          ra_log "PackageManager resolved launcher: $(printf '%s\n' "$RESOLVE_OUT" | grep "^${PACKAGE_NAME}/" | head -n1)"
+          break
+        fi
+        sleep 1
+      done
+      if [ "$LAUNCHER_RESOLVED" -eq 0 ]; then
+        ra_log "WARN: PackageManager did not report launcher activity within 30s; attempting am start anyway"
+      fi
+    else
+      ra_log "ERROR: cannot reinstall — APK not found at $MAIN_APK"
+    fi
   fi
 
-  RETRY_TIMEOUT=600
+  # Launch by intent filter (action=MAIN, category=LAUNCHER, filtered to
+  # our package). This avoids the launcher-component-resolution dance and
+  # works across Android versions. `-W` blocks until the activity is up
+  # and prints a Status= line we can parse.
+  # `set -euo pipefail` is on for this script, so capture the exit status
+  # via if/then/else; a bare `RC=$?` after the assignment would never run
+  # (the script would exit at the failing pipeline). Logging both the exit
+  # code and the raw output is the whole point of this block — see the
+  # "RIGHT FIX" comment above.
+  #
+  # Retry the start a few times. Even after `cmd package resolve-activity`
+  # reports the launcher, `am start` can race a still-completing
+  # PackageManager scan and return "unable to resolve Intent". Each retry
+  # waits 2s — empirically enough to clear the race.
+  AM_STATUS=""
+  for _amattempt in 1 2 3; do
+    ra_log "Relaunching $PACKAGE_NAME via 'am start -W -a MAIN -c LAUNCHER -p $PACKAGE_NAME' (attempt ${_amattempt})"
+    if AM_START_OUT="$("$ADB_BIN" shell am start -W \
+        -a android.intent.action.MAIN \
+        -c android.intent.category.LAUNCHER \
+        -p "$PACKAGE_NAME" 2>&1 | tr -d '\r')"; then
+      AM_START_RC=0
+    else
+      AM_START_RC=$?
+    fi
+    ra_log "am start exit=${AM_START_RC}, output:"
+    printf '%s\n' "$AM_START_OUT" | sed 's/^/[run-android-instrumentation-tests]   /'
+    AM_STATUS="$(printf '%s\n' "$AM_START_OUT" \
+        | awk -F= '/^[[:space:]]*Status[[:space:]]*=/ {print $2; exit}' \
+        | tr -d '[:space:]')"
+    if [ "${AM_STATUS:-}" = "ok" ]; then
+      break
+    fi
+    if [ "$_amattempt" -lt 3 ]; then
+      ra_log "am start did not report Status=ok (got '${AM_STATUS:-<empty>}'); retrying in 2s"
+      sleep 2
+    fi
+  done
+  if [ "${AM_STATUS:-}" != "ok" ]; then
+    ra_log "WARN: am start still did not report Status=ok after retries; falling back to monkey launcher"
+    # `monkey -p <pkg> -c LAUNCHER 1` synthesises a single LAUNCHER intent
+    # via the system input pipe and bypasses am start's intent-resolution
+    # path. Some Android versions can't resolve via `am start -p` even
+    # after pm has indexed, but monkey still works because it asks pm
+    # directly for the LAUNCHER activity. Treat its output as best-effort:
+    # the pidof check below is the source of truth for whether the app
+    # actually came up.
+    if MONKEY_OUT="$("$ADB_BIN" shell monkey \
+        -p "$PACKAGE_NAME" \
+        -c android.intent.category.LAUNCHER 1 2>&1 | tr -d '\r')"; then
+      MONKEY_RC=0
+    else
+      MONKEY_RC=$?
+    fi
+    ra_log "monkey launcher exit=${MONKEY_RC}, output:"
+    printf '%s\n' "$MONKEY_OUT" | sed 's/^/[run-android-instrumentation-tests]   /'
+  fi
+
+  # Verify the process is actually up before committing to a 10-minute
+  # wait. `pidof` exits non-zero with empty output when nothing matches.
+  # Try a few times because activity launch can race the first poll on
+  # slower emulators.
+  RETRY_PID=""
+  for _attempt in 1 2 3 4 5; do
+    # `pidof` exits non-zero when no match. Under pipefail+errexit that
+    # would kill the script, so explicitly tolerate the empty result.
+    RETRY_PID="$("$ADB_BIN" shell pidof "$PACKAGE_NAME" 2>/dev/null | tr -d '[:space:]\r')" || RETRY_PID=""
+    if [ -n "$RETRY_PID" ]; then break; fi
+    sleep 1
+  done
+  if [ -z "$RETRY_PID" ]; then
+    # No process => app didn't launch. Skip the long wait so the CI
+    # surfaces the failure quickly; the connectedAndroidTest-retry.log
+    # artifact will contain whatever logcat captured.
+    ra_log "ERROR: $PACKAGE_NAME process not detected after relaunch; skipping retry wait"
+    RETRY_TIMEOUT=0
+  else
+    ra_log "Retry app PID: $RETRY_PID"
+    RETRY_TIMEOUT=600
+  fi
+
   RETRY_START="$(date +%s)"
-  ra_log "Waiting up to ${RETRY_TIMEOUT}s for retry — will short-circuit as soon as every previously-failed test re-emits its CN1SS:END marker"
-  while true; do
+  if [ "$RETRY_TIMEOUT" -gt 0 ]; then
+    ra_log "Waiting up to ${RETRY_TIMEOUT}s for retry — will short-circuit as soon as every previously-failed test re-emits its CN1SS:END marker"
+  fi
+  while [ "$RETRY_TIMEOUT" -gt 0 ]; do
     have_all_ends=1
     for failed_test in "${FAILED_TESTS[@]}"; do
       if ! grep -q "CN1SS:END:${failed_test}" "$RETRY_LOG" 2>/dev/null; then

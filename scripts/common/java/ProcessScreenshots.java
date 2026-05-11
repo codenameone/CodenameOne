@@ -446,12 +446,20 @@ public class ProcessScreenshots {
         int colorType = 0;
         int interlace = 0;
         List<byte[]> idatChunks = new ArrayList<>();
+        boolean sawIend = false;
         while (offset + 8 <= data.length) {
             int length = readInt(data, offset);
             byte[] type = java.util.Arrays.copyOfRange(data, offset + 4, offset + 8);
             offset += 8;
-            if (offset + length + 4 > data.length) {
-                throw new IOException("PNG chunk truncated before CRC while processing: " + path);
+            // PNG chunk length is a 31-bit unsigned int; readInt returns it as
+            // signed, so a negative value here is by definition out-of-range.
+            // This typically means we've walked off the end of the valid chunks
+            // into trailing garbage (e.g., a truncated capture missing IEND);
+            // surface a clear message instead of letting Arrays.copyOfRange
+            // throw the cryptic "<from> > <to>" IllegalArgumentException.
+            if (length < 0 || offset + length + 4 > data.length) {
+                throw new IOException("PNG chunk truncated or out-of-range length while processing: " + path
+                        + " (chunk length=" + length + ", offset=" + offset + ", file size=" + data.length + ")");
             }
             byte[] chunkData = java.util.Arrays.copyOfRange(data, offset, offset + length);
             offset += length + 4; // skip data + CRC
@@ -470,8 +478,12 @@ public class ProcessScreenshots {
             } else if ("IDAT".equals(chunkType)) {
                 idatChunks.add(chunkData);
             } else if ("IEND".equals(chunkType)) {
+                sawIend = true;
                 break;
             }
+        }
+        if (!sawIend) {
+            throw new IOException("PNG missing IEND chunk (truncated capture?) while processing: " + path);
         }
         if (width <= 0 || height <= 0) {
             throw new IOException("Missing IHDR chunk on " + path);

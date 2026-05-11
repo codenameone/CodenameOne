@@ -1,0 +1,112 @@
+name: Syndicate Blog Posts
+
+on:
+  schedule:
+    # Daily at 13:00 UTC. Runs from the default branch only, per GitHub's cron rules.
+    - cron: '0 13 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Skip API calls and only print what would happen.'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: blog-syndication
+  cancel-in-progress: false
+
+jobs:
+  syndicate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          # Token with write scope so the post-run commit can push the state file.
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run API syndication script
+        id: syndicate_api
+        env:
+          DEVTO_API_KEY: ${{ secrets.DEVTO_API_KEY }}
+          HASHNODE_TOKEN: ${{ secrets.HASHNODE_TOKEN }}
+          HASHNODE_PUBLICATION_ID: ${{ secrets.HASHNODE_PUBLICATION_ID }}
+        run: |
+          set -euo pipefail
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            python3 scripts/website/syndicate_blog_posts.py --dry-run
+          else
+            python3 scripts/website/syndicate_blog_posts.py
+          fi
+
+      - name: Detect browser-syndication credentials
+        id: browser_creds
+        env:
+          FOOJAY_USER: ${{ secrets.FOOJAY_USER }}
+        run: |
+          if [ -n "${FOOJAY_USER}" ]; then
+            echo "any_configured=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "any_configured=false" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Install markdown package (for browser-extension queue HTML)
+        run: |
+          set -euo pipefail
+          pip install markdown
+
+      - name: Install Playwright dependencies
+        if: ${{ steps.browser_creds.outputs.any_configured == 'true' }}
+        run: |
+          set -euo pipefail
+          pip install playwright
+          playwright install --with-deps chromium
+
+      - name: Run browser syndication script
+        if: ${{ steps.browser_creds.outputs.any_configured == 'true' }}
+        env:
+          FOOJAY_USER: ${{ secrets.FOOJAY_USER }}
+          FOOJAY_PASSWORD: ${{ secrets.FOOJAY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            python3 scripts/website/syndicate_browser_posts.py --dry-run
+          else
+            python3 scripts/website/syndicate_browser_posts.py
+          fi
+
+      - name: Queue browser-extension syndication tasks (Medium, DZone)
+        run: |
+          set -euo pipefail
+          python3 scripts/website/queue_browser_syndication.py
+
+      - name: Upload syndication screenshots on failure
+        if: ${{ always() && hashFiles('docs/website/reports/syndication-screenshots/**/*.png') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: syndication-screenshots
+          path: docs/website/reports/syndication-screenshots/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Commit updated syndication state and queue
+        if: ${{ inputs.dry_run != true }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- scripts/website/syndication-state.json scripts/website/syndication-queue.json; then
+            echo "No state or queue changes to commit."
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add scripts/website/syndication-state.json scripts/website/syndication-queue.json
+          git commit -m "ci: record blog syndication results"
+          git push

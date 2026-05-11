@@ -1,0 +1,3 @@
+# Local HTML cache from build_devices_json.py — never commit, it's just a
+# CI/disk-speed optimisation.
+cache/

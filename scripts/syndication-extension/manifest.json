@@ -1,0 +1,41 @@
+{
+  "manifest_version": 3,
+  "name": "Codename One Syndicator",
+  "version": "0.1.0",
+  "description": "Syndicates Codename One blog posts to sites that block headless automation (Medium, DZone). Runs inside the user's logged-in browser session, so requests carry a real browser fingerprint and bypass Cloudflare bot detection.",
+  "permissions": [
+    "storage",
+    "alarms",
+    "tabs",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://medium.com/*",
+    "https://dzone.com/*",
+    "https://raw.githubusercontent.com/codenameone/CodenameOne/*"
+  ],
+  "background": {
+    "scripts": ["background.js"]
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "syndicator@codenameone.com"
+    }
+  },
+  "action": {
+    "default_title": "Codename One Syndicator",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://medium.com/new-story", "https://medium.com/p/*/edit"],
+      "js": ["adapters/common.js", "adapters/medium.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://dzone.com/content/article/*"],
+      "js": ["adapters/common.js", "adapters/dzone.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

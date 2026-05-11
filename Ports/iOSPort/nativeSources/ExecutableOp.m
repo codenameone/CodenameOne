@@ -120,4 +120,13 @@ static BOOL blockDrawing = NO;
     return nil;
 }
 
+#ifdef CN1_USE_METAL
+-(GLUIImage*)target {
+    return target;
+}
+-(void)setTarget:(GLUIImage*)t {
+    target = t;
+}
+#endif
+
 @end

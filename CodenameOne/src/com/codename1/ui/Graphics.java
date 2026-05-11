@@ -59,6 +59,14 @@ public final class Graphics {
     private int xTranslate;
     private int yTranslate;
     private Transform translation;
+    /// Last non-identity argument to setTransform(). When the impl has
+    /// `isTranslationSupported() == false` (every active port today: iOS,
+    /// Android, JavaSE, JavaScript), the matrix actually pushed to
+    /// impl.setTransform is `T(xTranslate) * userTransform * T(-xTranslate)`,
+    /// so the user-visible transform applies to local coordinates regardless
+    /// of any prior g.translate(). getTransform() returns this original
+    /// (un-conjugated) matrix.
+    private Transform userTransform;
     private GeneralPath tmpClipShape;
     /// A buffer shape to use when we need to transform a shape
     private int color;
@@ -137,6 +145,16 @@ public final class Graphics {
         } else {
             xTranslate += x;
             yTranslate += y;
+            // The conjugation in setTransform() depends on the current
+            // xTranslate/yTranslate. If the user accumulated more
+            // translation after setting a non-identity transform,
+            // re-conjugate so the impl-side matrix stays in sync.
+            if (userTransform != null) {
+                Transform composed = Transform.makeTranslation(xTranslate, yTranslate);
+                composed.concatenate(userTransform);
+                composed.translate(-xTranslate, -yTranslate);
+                impl.setTransform(nativeGraphics, composed);
+            }
         }
     }
 
@@ -1129,6 +1147,9 @@ public final class Graphics {
     ///
     /// - #setTransform
     public Transform getTransform() {
+        if (userTransform != null) {
+            return userTransform.copy();
+        }
         return impl.getTransform(nativeGraphics);
 
     }
@@ -1160,7 +1181,27 @@ public final class Graphics {
     ///
     /// - #setTransform(com.codename1.ui.geom.Matrix, int, int)
     public void setTransform(Transform transform) {
-        impl.setTransform(nativeGraphics, transform);
+        // On platforms where impl.isTranslationSupported() is false, this
+        // Graphics object accumulates xTranslate/yTranslate locally and bakes
+        // them into vertex coordinates passed to impl fill primitives. The
+        // user's setTransform matrix is then applied by the underlying
+        // platform on top of those already-translated vertices, which
+        // double-counts the cell origin for any non-translation matrix
+        // (rotate, scale, shear) -- the gradient ends up off-cell or
+        // off-screen. Conjugate the user's matrix with T(xTranslate,
+        // yTranslate) so its effect is independent of any prior g.translate
+        // call, matching Android Skia / JavaSE Graphics2D semantics.
+        if (transform != null && !transform.isIdentity()
+                && (xTranslate != 0 || yTranslate != 0)) {
+            userTransform = transform.copy();
+            Transform composed = Transform.makeTranslation(xTranslate, yTranslate);
+            composed.concatenate(transform);
+            composed.translate(-xTranslate, -yTranslate);
+            impl.setTransform(nativeGraphics, composed);
+        } else {
+            userTransform = null;
+            impl.setTransform(nativeGraphics, transform);
+        }
     }
 
     /// Loads the provided transform with the current transform applied to this graphics context.
@@ -1169,6 +1210,10 @@ public final class Graphics {
     ///
     /// - `t`: An "out" parameter to be filled with the current transform.
     public void getTransform(Transform t) {
+        if (userTransform != null) {
+            t.setTransform(userTransform);
+            return;
+        }
         impl.getTransform(nativeGraphics, t);
     }
 
@@ -1576,6 +1621,7 @@ public final class Graphics {
         impl.resetAffine(nativeGraphics);
         scaleX = 1;
         scaleY = 1;
+        userTransform = null;
     }
 
     /// Scales the coordinate system using the affine transform

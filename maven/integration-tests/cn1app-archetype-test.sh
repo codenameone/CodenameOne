@@ -2,6 +2,15 @@
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 set -e
 source $SCRIPTPATH/inc/env.sh
+source $SCRIPTPATH/inc/auto-bundle-pref.sh
+
+# Force `cn1.autoDefaultResourceBundle=true` for the duration of the test so
+# the `cn1:css` subprocess takes the JavaSEPort.enableAutoLocalizationBundle
+# branch -- the same path that crashed for end users in #4850 but is invisible
+# in CI under the default-false preference.
+set_auto_bundle_pref true
+trap 'set_auto_bundle_pref false' EXIT
+
 cd $SCRIPTPATH/build
 if [ -d myapp1 ]; then
   rm -rf myapp1

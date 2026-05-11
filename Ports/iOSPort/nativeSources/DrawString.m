@@ -24,6 +24,9 @@
 #import "CodenameOne_GLViewController.h"
 #import "DrawStringTextureCache.h"
 #include "xmlvm.h"
+#ifdef CN1_USE_METAL
+#import "CN1Metalcompat.h"
+#endif
 
 extern float scaleValue;
 #ifdef USE_ES2
@@ -129,6 +132,9 @@ static GLuint getOGLProgram(){
 
 #ifdef USE_ES2
 -(void)execute {
+#ifdef CN1_USE_METAL
+    CN1MetalDrawString(str, font, color, alpha, x, y);
+#else
     glUseProgram(getOGLProgram());
     GLuint textureName = 0;
     DrawStringTextureCache *cachedTex = [DrawStringTextureCache checkCache:str f:font c:color a:255];
@@ -256,12 +262,13 @@ static GLuint getOGLProgram(){
     
     glDisableVertexAttribArray(vertexCoordAtt);
     GLErrorLog;
-    
+
     glBindTexture(GL_TEXTURE_2D, 0);
     GLErrorLog;
-    
+
     //glUseProgram(CN1activeProgram);
     //GLErrorLog;
+#endif // CN1_USE_METAL
 }
 
 #else

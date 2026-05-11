@@ -32,6 +32,21 @@ import com.codenameone.examples.hellocodenameone.tests.graphics.TransformCamera;
 import com.codenameone.examples.hellocodenameone.tests.graphics.TransformPerspective;
 import com.codenameone.examples.hellocodenameone.tests.graphics.TransformRotation;
 import com.codenameone.examples.hellocodenameone.tests.graphics.TransformTranslation;
+import com.codenameone.examples.hellocodenameone.tests.graphics.LargeStrokeDirtyClipTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.ChartBarScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.ChartBubbleScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.ChartCombinedXYScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.ChartCubicLineScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.ChartDoughnutScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.ChartLineScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.ChartPieScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.ChartRadarScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.ChartRangeBarScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.ChartRotatedScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.ChartScatterScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.ChartStackedBarScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.ChartTimeChartScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.ChartTransformScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.accessibility.AccessibilityTest;
 
 
@@ -46,7 +61,12 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     // throttles 500-byte chunks at 30ms each to keep logcat from dropping
     // lines, so a 60KB PNG plus its preview takes ~6s per appearance, and
     // a dual-appearance test like SpanLabelTheme legitimately needs ~12s
-    // even on a healthy device).
+    // even on a healthy device). The 30s figure also covers the iOS Metal
+    // port's mutable rendering, which allocates a temp UIImage + MTLTexture
+    // per round-rect / arc / gradient call (the CG-rasterise-then-DrawImage
+    // bridge), so FillRoundRect / DrawRoundRect and DrawImage on slow CI
+    // simulators legitimately blow past the 10s budget while still making
+    // forward progress.
     private static final int TEST_TIMEOUT_MS_HTML5 = 10000;
     private static final int TEST_TIMEOUT_MS_NATIVE = 30000;
     private static final int TEST_POLL_INTERVAL_MS = 50;
@@ -84,6 +104,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new StickyHeaderSlideTransitionScreenshotTest(),
             new StickyHeaderFadeTransitionScreenshotTest(),
             new TensileBounceScreenshotTest(),
+            new StatusBarTapDiagnosticScreenshotTest(),
             new ComponentReplaceFadeScreenshotTest(),
             new ComponentReplaceSlideScreenshotTest(),
             new ComponentReplaceFlipScreenshotTest(),
@@ -113,6 +134,39 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new TransformRotation(),
             new TransformPerspective(),
             new TransformCamera(),
+            // Standalone repro for the iOS form-Graphics dirty-region
+            // clipping edge case that makes the XY chart screenshot tests
+            // come back blank: a single Component in BorderLayout.CENTER
+            // whose paint() draws a large stroked GeneralPath via
+            // g.drawShape(...). If iOS captures a non-blank PNG with the
+            // polyline visible the bug is specific to ChartComponent's
+            // paint cycle; if it captures a blank PNG we have a minimal
+            // reproduction the iOS-port fix can iterate against without
+            // spinning up the entire chart-package.
+            new LargeStrokeDirtyClipTest(),
+            // ChartComponent coverage. The 2026-05-09 conjugation refactor in
+            // Graphics.setTransform / iOS / Android / JavaSE / JS dropped
+            // ChartComponent.paint's manual T(absX) * X * T(-absX)
+            // compensation; without screenshot baselines for the major chart
+            // types a regression in the chart render path goes silent until
+            // a user reports it. Cover one test per chart family + two
+            // dedicated transform paths (scale + rotate) so the
+            // ChartComponent.setTransform branch (the one the refactor
+            // directly touched) has explicit visual coverage.
+            new ChartLineScreenshotTest(),
+            new ChartCubicLineScreenshotTest(),
+            new ChartBarScreenshotTest(),
+            new ChartStackedBarScreenshotTest(),
+            new ChartRangeBarScreenshotTest(),
+            new ChartScatterScreenshotTest(),
+            new ChartBubbleScreenshotTest(),
+            new ChartPieScreenshotTest(),
+            new ChartDoughnutScreenshotTest(),
+            new ChartRadarScreenshotTest(),
+            new ChartTimeChartScreenshotTest(),
+            new ChartCombinedXYScreenshotTest(),
+            new ChartTransformScreenshotTest(),
+            new ChartRotatedScreenshotTest(),
             new BrowserComponentScreenshotTest(),
             new MediaPlaybackScreenshotTest(),
             new SheetScreenshotTest(),
@@ -146,6 +200,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new SimdApiTest(),
             new SimdLargeAllocaTest(),
             new StreamApiTest(),
+            new StringApiTest(),
             new TimeApiTest(),
             new Java17Tests(),
             new BackgroundThreadUiAccessTest(),
@@ -153,7 +208,8 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new CallDetectionAPITest(),
             new LocalNotificationOverrideTest(),
             new Base64NativePerformanceTest(),
-            new AccessibilityTest()
+            new AccessibilityTest(),
+            new MutableImageReadbackTest()
     };
 
     private static BaseTest prependedTest;
@@ -275,6 +331,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
         return "KotlinUiTest".equals(testName)
                 || "MainScreenScreenshotTest".equals(testName)
                 || "SheetScreenshotTest".equals(testName)
+                || "StatusBarTapDiagnosticScreenshotTest".equals(testName)
                 || "ImageViewerNavigationScreenshotTest".equals(testName)
                 || "TabsScreenshotTest".equals(testName)
                 || "TextAreaAlignmentScreenshotTest".equals(testName)
@@ -309,7 +366,32 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 || "TransformCamera".equals(testName)
                 || "TransformPerspective".equals(testName)
                 || "TransformRotation".equals(testName)
-                || "TransformTranslation".equals(testName);
+                || "TransformTranslation".equals(testName)
+                // Chart screenshot tests: each ChartComponent renders ~12-30
+                // styled primitives plus axis labels and a legend, so the
+                // chunked PNG/JPEG output ends up in the 30-60KB range per
+                // test. The JS port's 150s browser-lifetime budget can't
+                // afford 14 of those on top of the existing screenshot suite
+                // -- on the previous run every chart test came back empty
+                // because the EDT had already started the suite-shutdown
+                // fast-forward by the time they were invoked. Re-enable
+                // selectively when the JS port moves to a longer-lived
+                // harness; chart-package coverage stays on iOS / Android /
+                // JavaSE in the meantime.
+                || "ChartLineScreenshotTest".equals(testName)
+                || "ChartCubicLineScreenshotTest".equals(testName)
+                || "ChartBarScreenshotTest".equals(testName)
+                || "ChartStackedBarScreenshotTest".equals(testName)
+                || "ChartRangeBarScreenshotTest".equals(testName)
+                || "ChartScatterScreenshotTest".equals(testName)
+                || "ChartBubbleScreenshotTest".equals(testName)
+                || "ChartPieScreenshotTest".equals(testName)
+                || "ChartDoughnutScreenshotTest".equals(testName)
+                || "ChartRadarScreenshotTest".equals(testName)
+                || "ChartTimeChartScreenshotTest".equals(testName)
+                || "ChartCombinedXYScreenshotTest".equals(testName)
+                || "ChartTransformScreenshotTest".equals(testName)
+                || "ChartRotatedScreenshotTest".equals(testName);
     }
 
     private void awaitTestCompletion(int index, BaseTest testClass, String testName, long deadline) {

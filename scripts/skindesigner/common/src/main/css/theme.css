@@ -1,55 +1,1380 @@
-/** Define Theme Constants here */
+/* ==========================================================================
+   Skin Designer — wizard styling
+   Mapped from /tmp/skin-designer/project/assets/{tokens,app}.css onto the
+   Codename One CSS subset. Each design token shows up here as a UIID; the
+   *Dark variants are toggled at runtime by themedUiid() in SkinDesigner.java.
+   ========================================================================== */
+
 #Constants {
     includeNativeBool: true;
     defaultSourceDPIInt: "0";
     useLargerTextScaleBool: true;
 }
 
-/** Style for Button class */
-Button {
+/* --- Form / shell ---------------------------------------------------- */
+
+SkinDesignerForm {
+    background: #f3f4f7;
+}
+SkinDesignerFormDark {
+    background: #071b4d;
+}
+
+SkinDesignerBody {
+    background: #f3f4f7;
+    padding: 0;
+}
+SkinDesignerBodyDark {
+    background: #071b4d;
+}
+
+Toolbar { background: #ffffff; }
+ToolbarDark { background: #102b66; }
+Title { color: #112247; background: #ffffff; font-family: "native:MainLight"; }
+TitleDark { color: #f5f8ff; background: #102b66; font-family: "native:MainLight"; }
+Command { color: #112247; background: transparent; }
+CommandDark { color: #f5f8ff; background: transparent; }
+
+/* --- Topbar ---------------------------------------------------------- */
+
+SkinDesignerTopbar {
+    background: #ffffff;
+    border-bottom: 1px solid #d9dee8;
+    padding: 1.2mm 2.4mm;
+}
+SkinDesignerTopbarDark {
+    background: #102b66;
+    border-bottom: 1px solid #4c6ea8;
+    padding: 1.2mm 2.4mm;
+}
+
+SkinDesignerBrand { padding: 0 1mm 0 0; }
+SkinDesignerBrandDark { padding: 0 1mm 0 0; }
+
+/* Material phone icon in CN1 brand blue. Avoid background+border-radius which
+ * the CN1 CSS subset would render as a 9-piece image and clip the glyph. */
+SkinDesignerBrandLogo {
+    color: #2f6bff;
+    background: transparent;
+    padding: 0.4mm 0.8mm;
+    margin: 0.2mm 0.6mm 0.2mm 0;
+    font-size: 5.4mm;
+    text-align: center;
+}
+SkinDesignerBrandLogoDark {
+    color: #4d86ff;
+    background: transparent;
+    padding: 0.4mm 0.8mm;
+    margin: 0.2mm 0.6mm 0.2mm 0;
+    font-size: 5.4mm;
+    text-align: center;
+}
+
+SkinDesignerBrandTitle {
+    color: #112247;
+    font-size: 3.4mm;
+    font-family: "native:MainLight";
+    padding: 0.6mm 0.4mm;
+}
+SkinDesignerBrandTitleDark {
+    color: #f5f8ff;
+    font-size: 3.4mm;
+    font-family: "native:MainLight";
+    padding: 0.6mm 0.4mm;
+}
+
+/* --- Stepper --------------------------------------------------------- */
+
+SkinDesignerStepper {
+    background: transparent;
+    padding: 0;
+}
+SkinDesignerStepperDark { background: transparent; padding: 0; }
+
+/* Step item — number-badge + label side-by-side. The active step gets a
+ * translucent blue pill behind it so the user sees where they are in the
+ * wizard at a glance. */
+SkinDesignerStepperItemActive {
+    background: cn1-pill-border;
+    background-color: #e8f0ff;
+    padding: 0.8mm 2.4mm;
+    margin: 0 0.6mm;
+}
+SkinDesignerStepperItemActiveDark {
+    background: cn1-pill-border;
+    background-color: #1c3a7a;
+    padding: 0.8mm 2.4mm;
+    margin: 0 0.6mm;
+}
+SkinDesignerStepperItemDone,
+SkinDesignerStepperItemPending {
+    background: transparent;
+    padding: 0.8mm 2.4mm;
+    margin: 0 0.6mm;
+}
+SkinDesignerStepperItemDoneDark,
+SkinDesignerStepperItemPendingDark {
+    background: transparent;
+    padding: 0.8mm 2.4mm;
+    margin: 0 0.6mm;
+}
+
+/* Number badges — Label sized to a square in code, cn1-pill-border draws a
+ * true circle, padding kept symmetric so the digit lands centered. */
+SkinDesignerStepperNumActive {
+    background: cn1-pill-border;
+    background-color: #2f6bff;
+    color: #ffffff;
+    padding: 0;
+    margin: 0 1.2mm 0 0;
+    font-size: 2.6mm;
+    font-family: "native:MainBold";
+    text-align: center;
+}
+SkinDesignerStepperNumActiveDark {
+    background: cn1-pill-border;
+    background-color: #4d86ff;
+    color: #ffffff;
+    padding: 0;
+    margin: 0 1.2mm 0 0;
+    font-size: 2.6mm;
+    font-family: "native:MainBold";
+    text-align: center;
+}
+SkinDesignerStepperNumDone {
+    background: cn1-pill-border;
+    background-color: #b8d532;
+    color: #112247;
+    padding: 0;
+    margin: 0 1.2mm 0 0;
+    font-size: 2.4mm;
+    font-family: "native:MainBold";
+    text-align: center;
+}
+SkinDesignerStepperNumDoneDark {
+    background: cn1-pill-border;
+    background-color: #b8d532;
+    color: #0a2460;
+    padding: 0;
+    margin: 0 1.2mm 0 0;
+    font-size: 2.4mm;
+    font-family: "native:MainBold";
+    text-align: center;
+}
+SkinDesignerStepperNumPending {
+    background: cn1-pill-border;
+    background-color: #d9dee8;
+    color: #ffffff;
+    padding: 0;
+    margin: 0 1.2mm 0 0;
+    font-size: 2.6mm;
+    font-family: "native:MainBold";
+    text-align: center;
+}
+SkinDesignerStepperNumPendingDark {
+    background: cn1-pill-border;
+    background-color: #4c6ea8;
+    color: #102b66;
+    padding: 0;
+    margin: 0 1.2mm 0 0;
+    font-size: 2.6mm;
+    font-family: "native:MainBold";
+    text-align: center;
+}
+
+SkinDesignerStepperLabelActive {
+    color: #2f6bff;
+    font-size: 2.8mm;
+    font-family: "native:MainLight";
+    padding: 0;
+}
+SkinDesignerStepperLabelActiveDark {
+    color: #4d86ff;
+    font-size: 2.8mm;
+    font-family: "native:MainLight";
+    padding: 0;
+}
+SkinDesignerStepperLabelDone {
+    color: #112247;
+    font-size: 2.8mm;
+    font-family: "native:MainLight";
+    padding: 0;
+}
+SkinDesignerStepperLabelDoneDark {
+    color: #f5f8ff;
+    font-size: 2.8mm;
+    font-family: "native:MainLight";
+    padding: 0;
+}
+SkinDesignerStepperLabelPending {
+    color: #7f8aa3;
+    font-size: 2.8mm;
+    font-family: "native:MainLight";
+    padding: 0;
+}
+SkinDesignerStepperLabelPendingDark {
+    color: #a8b8da;
+    font-size: 2.8mm;
+    font-family: "native:MainLight";
+    padding: 0;
+}
+
+/* Em-dash separator between stepper items. Single character, transparent
+ * background — keeps BoxLayout from over-stretching it into a thick bar. */
+SkinDesignerStepperSep {
+    background: transparent;
+    color: #b8c1d4;
+    font-family: "native:MainLight";
+    font-size: 3mm;
+    padding: 0;
+    margin: 0 0.4mm;
+}
+SkinDesignerStepperSepDark {
+    background: transparent;
+    color: #4c6ea8;
+    font-family: "native:MainLight";
+    font-size: 3mm;
+    padding: 0;
+    margin: 0 0.4mm;
+}
+
+SkinDesignerWizardNav { background: transparent; padding: 0; }
+SkinDesignerWizardNavDark { background: transparent; padding: 0; }
+
+/* --- Status bar ------------------------------------------------------ */
+
+SkinDesignerStatusbar {
+    background: #ffffff;
+    border-top: 1px solid #d9dee8;
+    padding: 0.4mm 1.4mm;
+}
+SkinDesignerStatusbarDark {
+    background: #102b66;
+    border-top: 1px solid #4c6ea8;
+    padding: 0.4mm 1.4mm;
+}
+
+SkinDesignerStatusName,
+SkinDesignerStatusSpec {
+    color: #7f8aa3;
+    font-size: 2.4mm;
+    font-family: "native:MainLight";
+    padding: 0.2mm 0;
+}
+SkinDesignerStatusNameDark,
+SkinDesignerStatusSpecDark {
+    color: #a8b8da;
+    font-size: 2.4mm;
+    font-family: "native:MainLight";
+    padding: 0.2mm 0;
+}
+
+/* --- Step container -------------------------------------------------- */
+
+SkinDesignerStepRoot {
+    background: #f3f4f7;
+    padding: 0;
+}
+SkinDesignerStepRootDark { background: #071b4d; padding: 0; }
+
+SkinDesignerStepHead {
+    background: transparent;
+    padding: 2mm 4mm 1mm 4mm;
+}
+SkinDesignerStepHeadDark { background: transparent; padding: 2mm 4mm 1mm 4mm; }
+
+SkinDesignerStepHeadInner { background: transparent; padding: 0 0 0.6mm 0; }
+SkinDesignerStepHeadInnerDark { background: transparent; padding: 0 0 0.6mm 0; }
+
+SkinDesignerStepBody {
+    background: transparent;
+    padding: 4mm 6mm;
+}
+SkinDesignerStepBodyDark { background: transparent; padding: 4mm 6mm; }
+
+SkinDesignerStepScroll {
+    background: transparent;
+    padding: 0;
+}
+SkinDesignerStepScrollDark { background: transparent; padding: 0; }
+
+SkinDesignerH1 {
+    color: #112247;
+    font-size: 5.0mm;
+    font-family: "native:MainLight";
+    padding: 0.4mm 0;
+    margin: 0;
+    background: transparent;
+    text-align: center;
+}
+SkinDesignerH1Dark {
+    color: #f5f8ff;
+    font-size: 5.0mm;
+    font-family: "native:MainLight";
+    padding: 0.4mm 0;
+    margin: 0;
+    background: transparent;
+    text-align: center;
+}
+SkinDesignerH3 {
+    color: #112247;
+    font-size: 3.4mm;
+    font-family: "native:MainLight";
+    padding: 0.4mm 0;
+    margin: 0;
+    background: transparent;
+}
+SkinDesignerH3Dark {
+    color: #f5f8ff;
+    font-size: 3.4mm;
+    font-family: "native:MainLight";
+    padding: 0.4mm 0;
+    margin: 0;
+    background: transparent;
+}
+SkinDesignerSub {
+    color: #4a5775;
+    background: transparent;
+    border: none;
+    font-size: 2.8mm;
+    font-family: "native:MainLight";
+    padding: 0;
+    margin: 0;
+    text-align: center;
+}
+SkinDesignerSubDark {
+    color: #c8d4ee;
+    background: transparent;
+    border: none;
+    font-size: 2.8mm;
+    font-family: "native:MainLight";
+    padding: 0;
+    margin: 0;
+    text-align: center;
+}
+SkinDesignerSubBold {
+    color: #112247;
+    background: transparent;
+    border: none;
+    font-size: 2.8mm;
+    font-family: "native:MainBold";
+    padding: 0;
+    margin: 0;
+}
+SkinDesignerSubBoldDark {
+    color: #f5f8ff;
+    background: transparent;
+    border: none;
+    font-size: 2.8mm;
+    font-family: "native:MainBold";
+    padding: 0;
+    margin: 0;
+}
+
+/* SpanLabel container — uses textUIID = SkinDesignerSub so the wrapped
+ * Labels pick up the correct color/font. The container itself is
+ * styling-free so it doesn't paint a border beneath the text. */
+SkinDesignerSubBlock {
+    background: transparent;
+    border: none;
+    padding: 0 4mm;
+    margin: 0 0 0.6mm 0;
+}
+SkinDesignerSubBlockDark {
+    background: transparent;
+    border: none;
+    padding: 0 4mm;
+    margin: 0 0 0.6mm 0;
+}
+
+SkinDesignerSourcePBlock {
+    background: transparent;
+    border: none;
+    padding: 0;
+    margin: 0.6mm 0 0 0;
+}
+SkinDesignerSourcePBlockDark {
+    background: transparent;
+    border: none;
+    padding: 0;
+    margin: 0.6mm 0 0 0;
+}
+
+/* --- Buttons --------------------------------------------------------- */
+
+/* Solid-color buttons with a small native rounded border. The CN1 CSS
+ * subset gives us cn1-round-border (true rounded rectangle, no 9-piece
+ * fallback). Each button has explicit .pressed and .disabled selectors so
+ * the toolkit's default (washed-out, square) press style never appears. */
+SkinDesignerPrimaryButton {
+    border-radius: 1.6mm;
+    color: #ffffff;
+    background: #2f6bff;
+    padding: 2mm 4mm;
+    margin: 1mm;
+    font-family: "native:MainBold";
+    font-size: 2.8mm;
+    text-align: center;
+}
+SkinDesignerPrimaryButton.pressed {
+    border-radius: 1.6mm;
+    color: #ffffff;
+    background: #1f4ec9;
+    padding: 2mm 4mm;
+    margin: 1mm;
+    font-family: "native:MainBold";
+    font-size: 2.8mm;
+    text-align: center;
+}
+SkinDesignerPrimaryButton.disabled {
+    border-radius: 1.6mm;
+    color: #ffffff;
+    background: #b3c8ff;
+    padding: 2mm 4mm;
+    margin: 1mm;
+    font-family: "native:MainBold";
+    font-size: 2.8mm;
+    text-align: center;
+}
+SkinDesignerPrimaryButtonDark {
+    border-radius: 1.6mm;
+    color: #ffffff;
+    background: #4d86ff;
+    padding: 2mm 4mm;
+    margin: 1mm;
+    font-family: "native:MainBold";
+    font-size: 2.8mm;
+    text-align: center;
+}
+SkinDesignerPrimaryButtonDark.pressed {
+    border-radius: 1.6mm;
+    color: #ffffff;
+    background: #2f6bff;
+    padding: 2mm 4mm;
+    margin: 1mm;
+    font-family: "native:MainBold";
+    font-size: 2.8mm;
+    text-align: center;
+}
+SkinDesignerPrimaryButtonDark.disabled {
+    border-radius: 1.6mm;
+    color: #a8b8da;
+    background: #1f4ec9;
+    padding: 2mm 4mm;
+    margin: 1mm;
+    font-family: "native:MainBold";
+    font-size: 2.8mm;
+    text-align: center;
+}
+
+SkinDesignerSecondaryButton {
+    border-radius: 1.6mm;
+    color: #112247;
+    background: #ffffff;
+    padding: 2mm 4mm;
+    margin: 1mm;
+    font-family: "native:MainLight";
+    font-size: 2.8mm;
+    text-align: center;
+}
+SkinDesignerSecondaryButton.pressed {
+    border-radius: 1.6mm;
+    color: #112247;
+    background: #e8eef9;
+    padding: 2mm 4mm;
+    margin: 1mm;
+    font-family: "native:MainLight";
+    font-size: 2.8mm;
+    text-align: center;
+}
+SkinDesignerSecondaryButtonDark {
+    border-radius: 1.6mm;
+    color: #f5f8ff;
+    background: #102b66;
+    padding: 2mm 4mm;
+    margin: 1mm;
+    font-family: "native:MainLight";
+    font-size: 2.8mm;
+    text-align: center;
+}
+SkinDesignerSecondaryButtonDark.pressed {
+    border-radius: 1.6mm;
+    color: #f5f8ff;
+    background: #163575;
+    padding: 2mm 4mm;
+    margin: 1mm;
+    font-family: "native:MainLight";
+    font-size: 2.8mm;
+    text-align: center;
+}
+
+SkinDesignerGhostButton {
+    color: #112247;
+    background: transparent;
+    padding: 1.4mm 3mm;
+    margin: 0.4mm;
+    font-family: "native:MainLight";
+    font-size: 2.6mm;
+}
+SkinDesignerGhostButton.pressed {
+    color: #2f6bff;
+    background: transparent;
+    padding: 1.4mm 3mm;
+    margin: 0.4mm;
+    font-family: "native:MainLight";
+    font-size: 2.6mm;
+}
+SkinDesignerGhostButtonDark {
+    color: #f5f8ff;
+    background: transparent;
+    padding: 1.4mm 3mm;
+    margin: 0.4mm;
+    font-family: "native:MainLight";
+    font-size: 2.6mm;
+}
+SkinDesignerGhostButtonDark.pressed {
+    color: #4d86ff;
+    background: transparent;
+    padding: 1.4mm 3mm;
+    margin: 0.4mm;
+    font-family: "native:MainLight";
+    font-size: 2.6mm;
+}
+
+SkinDesignerIconButton {
+    color: #7f8aa3;
+    background: transparent;
+    padding: 1.2mm;
+    margin: 0;
+    font-size: 2.8mm;
+}
+SkinDesignerIconButton.pressed {
+    color: #2f6bff;
+    background: transparent;
+    padding: 1.2mm;
+    margin: 0;
+    font-size: 2.8mm;
+}
+SkinDesignerIconButtonDark {
+    color: #a8b8da;
+    background: transparent;
+    padding: 1.2mm;
+    margin: 0;
+    font-size: 2.8mm;
+}
+SkinDesignerIconButtonDark.pressed {
+    color: #4d86ff;
+    background: transparent;
+    padding: 1.2mm;
+    margin: 0;
+    font-size: 2.8mm;
+}
+
+/* Transparent overlay button covering a clickable card via LayeredLayout.
+ * No background, no border, no padding — it just sits on top and absorbs
+ * pointer events so the entire card is one tap target inside scrollable
+ * parents (where addPointerReleasedListener on a Container was unreliable). */
+SkinDesignerCardOverlay {
+    background: transparent;
+    color: transparent;
+    border: none;
+    padding: 0;
+    margin: 0;
+    font-size: 0.5mm;
+}
+SkinDesignerCardOverlay.pressed {
+    background: #f5f8ff;
+    color: transparent;
+    border: none;
+    padding: 0;
+    margin: 0;
+    font-size: 0.5mm;
+}
+SkinDesignerCardOverlayDark {
+    background: transparent;
+    color: transparent;
+    border: none;
+    padding: 0;
+    margin: 0;
+    font-size: 0.5mm;
+}
+SkinDesignerCardOverlayDark.pressed {
+    background: #163575;
+    color: transparent;
+    border: none;
+    padding: 0;
+    margin: 0;
+    font-size: 0.5mm;
+}
+
+SkinDesignerFooter {
+    background: #ffffff;
+    border-top: 1px solid #d9dee8;
+    padding: 2mm 3.2mm;
+}
+SkinDesignerFooterDark {
+    background: #102b66;
+    border-top: 1px solid #4c6ea8;
+    padding: 2mm 3.2mm;
+}
+
+/* --- Search / filter chips ------------------------------------------ */
+
+SkinDesignerSearchField {
+    border-radius: 1.4mm;
+    color: #112247;
+    background: #ffffff;
+    padding: 1.6mm 2.4mm;
+    margin: 0.6mm;
+    font-family: "native:MainLight";
+    font-size: 3mm;
+}
+SkinDesignerSearchFieldDark {
+    border-radius: 1.4mm;
+    color: #f5f8ff;
+    background: #0e2a61;
+    padding: 1.6mm 2.4mm;
+    margin: 0.6mm;
     font-family: "native:MainLight";
     font-size: 3mm;
 }
 
-/** Style for App Title Bar Text */
-Title {
+SkinDesignerFilterRow {
+    background: transparent;
+    padding: 0;
+    margin: 0;
+}
+SkinDesignerFilterRowDark { background: transparent; padding: 0; margin: 0; }
+
+/* Filter chips — small enough that cn1-pill-border draws a true pill. */
+SkinDesignerFilterTag {
+    background: cn1-pill-border;
+    color: #7f8aa3;
+    background-color: #ffffff;
+    padding: 0.8mm 2.4mm;
+    margin: 0.4mm;
     font-family: "native:MainLight";
-    font-size: 6mm;
+    font-size: 2.6mm;
+}
+SkinDesignerFilterTag.pressed {
+    background: cn1-pill-border;
+    color: #112247;
+    background-color: #e8eef9;
+    padding: 0.8mm 2.4mm;
+    margin: 0.4mm;
+    font-family: "native:MainLight";
+    font-size: 2.6mm;
+}
+SkinDesignerFilterTagDark {
+    background: cn1-pill-border;
+    color: #a8b8da;
+    background-color: #102b66;
+    padding: 0.8mm 2.4mm;
+    margin: 0.4mm;
+    font-family: "native:MainLight";
+    font-size: 2.6mm;
+}
+SkinDesignerFilterTagDark.pressed {
+    background: cn1-pill-border;
+    color: #f5f8ff;
+    background-color: #163575;
+    padding: 0.8mm 2.4mm;
+    margin: 0.4mm;
+    font-family: "native:MainLight";
+    font-size: 2.6mm;
+}
+SkinDesignerFilterTagActive {
+    background: cn1-pill-border;
+    color: #ffffff;
+    background-color: #2f6bff;
+    padding: 0.8mm 2.4mm;
+    margin: 0.4mm;
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+}
+SkinDesignerFilterTagActive.pressed {
+    background: cn1-pill-border;
+    color: #ffffff;
+    background-color: #1f4ec9;
+    padding: 0.8mm 2.4mm;
+    margin: 0.4mm;
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+}
+SkinDesignerFilterTagActiveDark {
+    background: cn1-pill-border;
+    color: #ffffff;
+    background-color: #4d86ff;
+    padding: 0.8mm 2.4mm;
+    margin: 0.4mm;
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+}
+SkinDesignerFilterTagActiveDark.pressed {
+    background: cn1-pill-border;
+    color: #ffffff;
+    background-color: #2f6bff;
+    padding: 0.8mm 2.4mm;
+    margin: 0.4mm;
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
 }
 
-/** Style for Dialog body */
-DialogBody {
-    font-family: "native:MainLight";
+SkinDesignerGroupLabel {
+    color: #7f8aa3;
+    font-size: 2.2mm;
+    font-family: "native:MainBold";
+    padding: 1.2mm 1mm 0.4mm 1mm;
+    margin: 0;
+    background: transparent;
+}
+SkinDesignerGroupLabelDark { color: #a8b8da; font-size: 2.2mm; font-family: "native:MainBold"; padding: 1.2mm 1mm 0.4mm 1mm; margin: 0; background: transparent; }
+
+SkinDesignerCardRow {
+    background: transparent;
+    padding: 0 1.4mm;
+    margin: 0.6mm 0;
+}
+SkinDesignerCardRowDark { background: transparent; padding: 0 1.4mm; margin: 0.6mm 0; }
+
+/* --- Device cards --------------------------------------------------- */
+
+SkinDesignerDeviceGrid {
+    background: transparent;
+    padding: 0 4mm 4mm 4mm;
+}
+SkinDesignerDeviceGridDark { background: transparent; padding: 0 4mm 4mm 4mm; }
+
+SkinDesignerDeviceCard {
+    border-radius: 2mm;
+    background: #ffffff;
+    padding: 2.4mm 2.6mm;
+    margin: 1mm;
+}
+SkinDesignerDeviceCardHover {
+    border-radius: 2mm;
+    background: #f3f7ff;
+    border: 1px solid #2f6bff;
+    padding: 2.4mm 2.6mm;
+    margin: 1mm;
+}
+SkinDesignerDeviceCardDark {
+    border-radius: 2mm;
+    background: #102b66;
+    padding: 2.4mm 2.6mm;
+    margin: 1mm;
+}
+SkinDesignerDeviceCardHoverDark {
+    border-radius: 2mm;
+    background: #163575;
+    border: 1px solid #4d86ff;
+    padding: 2.4mm 2.6mm;
+    margin: 1mm;
+}
+SkinDesignerDeviceCardSelected {
+    border-radius: 2mm;
+    background: #e8f0ff;
+    padding: 2.4mm 2.6mm;
+    margin: 1mm;
+}
+SkinDesignerDeviceCardSelectedHover {
+    border-radius: 2mm;
+    background: #d8e6ff;
+    border: 1px solid #2f6bff;
+    padding: 2.4mm 2.6mm;
+    margin: 1mm;
+}
+SkinDesignerDeviceCardSelectedDark {
+    border-radius: 2mm;
+    background: #1c3a7a;
+    padding: 2.4mm 2.6mm;
+    margin: 1mm;
+}
+SkinDesignerDeviceCardSelectedHoverDark {
+    border-radius: 2mm;
+    background: #244790;
+    border: 1px solid #4d86ff;
+    padding: 2.4mm 2.6mm;
+    margin: 1mm;
+}
+
+SkinDesignerOsMark {
+    border-radius: 1mm;
+    color: #112247;
+    background: #f7f8fb;
+    padding: 0.8mm;
+    margin: 0 1mm 0 0;
+    font-size: 3.2mm;
+    text-align: center;
+}
+SkinDesignerOsMarkDark {
+    border-radius: 1mm;
+    color: #f5f8ff;
+    background: #163575;
+    padding: 0.8mm;
+    margin: 0 1mm 0 0;
+    font-size: 3.2mm;
+    text-align: center;
+}
+
+SkinDesignerDeviceName {
+    color: #112247;
     font-size: 2.8mm;
+    font-family: "native:MainBold";
+    padding: 0.4mm;
 }
-
-/** Style for Dialog title bar text */
-DialogTitle {
+SkinDesignerDeviceNameDark {
+    color: #f5f8ff;
+    font-size: 2.8mm;
+    font-family: "native:MainBold";
+    padding: 0.4mm;
+}
+SkinDesignerDeviceSpec {
+    color: #7f8aa3;
+    font-size: 2.2mm;
     font-family: "native:MainLight";
-    font-size: 4.5mm;
+    padding: 0.4mm;
+}
+SkinDesignerDeviceSpecDark {
+    color: #a8b8da;
+    font-size: 2.2mm;
+    font-family: "native:MainLight";
+    padding: 0.4mm;
+}
+SkinDesignerDeviceCheck {
+    color: #2f6bff;
+    background: transparent;
+    padding: 0;
+    font-size: 3mm;
+}
+SkinDesignerDeviceCheckDark {
+    color: #4d86ff;
+    background: transparent;
+    padding: 0;
+    font-size: 3mm;
 }
 
-/** Style for the side menu */
-SideNavigationPanel {
-    background: white;
-    padding: 2mm 1mm 1mm 1mm;
+/* --- Source step ---------------------------------------------------- */
+
+SkinDesignerSourceRow {
+    background: transparent;
+    padding: 4mm 6mm;
+}
+SkinDesignerSourceRowDark { background: transparent; padding: 4mm 6mm; }
+
+/* Source cards — rounded body. SkinDesigner.java's pointerHover override
+ * swaps the wrapper's UIID to *Hover variants on cursor enter so we get a
+ * true hover effect (CN1's CSS subset has no :hover state). */
+SkinDesignerSourceCard {
+    border-radius: 3mm;
+    background: #ffffff;
+    padding: 6mm 4mm;
+    margin: 2mm;
+}
+SkinDesignerSourceCardHover {
+    border-radius: 3mm;
+    background: #f3f7ff;
+    border: 2px solid #2f6bff;
+    padding: 6mm 4mm;
+    margin: 2mm;
+}
+SkinDesignerSourceCard.pressed {
+    border-radius: 3mm;
+    background: #e8f0ff;
+    padding: 6mm 4mm;
+    margin: 2mm;
+}
+SkinDesignerSourceCardDark {
+    border-radius: 3mm;
+    background: #102b66;
+    padding: 6mm 4mm;
+    margin: 2mm;
+}
+SkinDesignerSourceCardHoverDark {
+    border-radius: 3mm;
+    background: #163575;
+    border: 2px solid #4d86ff;
+    padding: 6mm 4mm;
+    margin: 2mm;
+}
+SkinDesignerSourceCardDark.pressed {
+    border-radius: 3mm;
+    background: #1c3a7a;
+    padding: 6mm 4mm;
+    margin: 2mm;
 }
 
-@media platform-ios {
-    /** iOS Only styles for side menu. */
-    SideNavigationPanel {
-        /** Extra top padding to deal with notch on iPhoneX */
-        padding: 6mm 1mm 1mm 1mm;
-    }
+SkinDesignerSourceIll {
+    border-radius: 2mm;
+    background: #f7f8fb;
+    color: #7f8aa3;
+    padding: 5mm;
+    margin: 0 0 2mm 0;
+    text-align: center;
+    font-size: 8mm;
 }
-
-/** Style for commands in side menu. */
-SideCommand {
-    padding: 1mm;
+SkinDesignerSourceIllDark {
+    border-radius: 2mm;
+    background: #163575;
+    color: #a8b8da;
+    padding: 5mm;
+    margin: 0 0 2mm 0;
+    text-align: center;
+    font-size: 8mm;
+}
+SkinDesignerSourceP {
+    background: transparent;
     border: none;
-    text-decoration: none;
-    color: black;
+    color: #4a5775;
+    font-size: 2.6mm;
     font-family: "native:MainLight";
-    font-size: 4mm;
-    border-bottom: 2px solid #cccccc;
+    padding: 0.4mm 0;
+    margin: 0.6mm 0 0 0;
 }
+SkinDesignerSourcePDark {
+    background: transparent;
+    border: none;
+    color: #c8d4ee;
+    font-size: 2.6mm;
+    font-family: "native:MainLight";
+    padding: 0.4mm 0;
+    margin: 0.6mm 0 0 0;
+}
+
+/* --- Editor / stage / sidebar --------------------------------------- */
+
+SkinDesignerStage {
+    background: #fafafc;
+    padding: 0;
+}
+SkinDesignerStageDark { background: #112f70; padding: 0; }
+
+SkinDesignerStageChips {
+    background: transparent;
+    padding: 0.5mm;
+}
+SkinDesignerStageChipsDark { background: transparent; padding: 0.5mm; }
+
+SkinDesignerInfoChip {
+    background: #ffffff;
+    border: 1px solid #d9dee8;
+    border-radius: 1.4mm;
+    padding: 0.6mm 1.4mm;
+    margin: 0.5mm;
+    font-size: 2.2mm;
+}
+SkinDesignerInfoChipDark {
+    background: #102b66;
+    border: 1px solid #4c6ea8;
+    border-radius: 1.4mm;
+    padding: 0.6mm 1.4mm;
+    margin: 0.5mm;
+    font-size: 2.2mm;
+}
+SkinDesignerChipKey {
+    color: #7f8aa3;
+    font-size: 2.2mm;
+    font-family: "native:MainLight";
+    padding: 0 0.4mm 0 0;
+}
+SkinDesignerChipKeyDark { color: #a8b8da; font-size: 2.2mm; font-family: "native:MainLight"; padding: 0 0.4mm 0 0; }
+SkinDesignerChipValue {
+    color: #112247;
+    font-size: 2.2mm;
+    font-family: "native:MainBold";
+    padding: 0;
+}
+SkinDesignerChipValueDark { color: #f5f8ff; font-size: 2.2mm; font-family: "native:MainBold"; padding: 0; }
+
+DevicePreview {
+    background: transparent;
+    padding: 4mm;
+}
+DevicePreviewDark { background: transparent; padding: 4mm; }
+
+SkinDesignerSidebar {
+    background: #ffffff;
+    border-left: 1px solid #d9dee8;
+    padding: 0;
+}
+SkinDesignerSidebarDark {
+    background: #102b66;
+    border-left: 1px solid #4c6ea8;
+    padding: 0;
+}
+
+SkinDesignerSidebarTabs {
+    background: #ffffff;
+    border-bottom: 1px solid #d9dee8;
+    padding: 0;
+}
+SkinDesignerSidebarTabsDark {
+    background: #102b66;
+    border-bottom: 1px solid #4c6ea8;
+    padding: 0;
+}
+
+SkinDesignerSidebarTab {
+    color: #7f8aa3;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 1.6mm 1mm;
+    margin: 0;
+    font-family: "native:MainLight";
+    font-size: 2.6mm;
+    text-align: center;
+}
+SkinDesignerSidebarTabDark {
+    color: #a8b8da;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 1.6mm 1mm;
+    margin: 0;
+    font-family: "native:MainLight";
+    font-size: 2.6mm;
+    text-align: center;
+}
+SkinDesignerSidebarTabActive {
+    color: #2f6bff;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid #2f6bff;
+    padding: 1.6mm 1mm;
+    margin: 0;
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+    text-align: center;
+}
+SkinDesignerSidebarTabActiveDark {
+    color: #4d86ff;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid #4d86ff;
+    padding: 1.6mm 1mm;
+    margin: 0;
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+    text-align: center;
+}
+
+SkinDesignerSidebarBody {
+    background: #ffffff;
+    padding: 2mm;
+}
+SkinDesignerSidebarBodyDark { background: #102b66; padding: 2mm; }
+
+SkinDesignerSidebarFoot {
+    background: #ffffff;
+    border-top: 1px solid #d9dee8;
+    padding: 1.4mm 2mm;
+}
+SkinDesignerSidebarFootDark {
+    background: #102b66;
+    border-top: 1px solid #4c6ea8;
+    padding: 1.4mm 2mm;
+}
+
+/* --- Sections / fields --------------------------------------------- */
+
+SkinDesignerSectionLabel {
+    color: #7f8aa3;
+    font-size: 2.2mm;
+    font-family: "native:MainBold";
+    padding: 1.4mm 0 0.6mm 0;
+}
+SkinDesignerSectionLabelDark {
+    color: #a8b8da;
+    font-size: 2.2mm;
+    font-family: "native:MainBold";
+    padding: 1.4mm 0 0.6mm 0;
+}
+
+SkinDesignerHelpBlock {
+    color: #a0a8ba;
+    background: #f7f8fb;
+    border-radius: 1.4mm;
+    padding: 1.4mm 1.8mm;
+    margin: 0 0 1.4mm 0;
+    font-size: 2.2mm;
+    font-family: "native:MainLight";
+}
+SkinDesignerHelpBlockDark {
+    color: #7e93bc;
+    background: #163575;
+    border-radius: 1.4mm;
+    padding: 1.4mm 1.8mm;
+    margin: 0 0 1.4mm 0;
+    font-size: 2.2mm;
+    font-family: "native:MainLight";
+}
+
+SkinDesignerEmptyHint {
+    color: #a0a8ba;
+    background: transparent;
+    padding: 2mm;
+    margin: 0;
+    font-size: 2.4mm;
+    font-family: "native:MainLight";
+    text-align: center;
+}
+SkinDesignerEmptyHintDark { color: #7e93bc; background: transparent; padding: 2mm; margin: 0; font-size: 2.4mm; font-family: "native:MainLight"; text-align: center; }
+
+SkinDesignerFieldLabel {
+    color: #7f8aa3;
+    font-size: 2.2mm;
+    font-family: "native:MainLight";
+    padding: 0.4mm 0;
+    margin: 0;
+}
+SkinDesignerFieldLabelDark {
+    color: #a8b8da;
+    font-size: 2.2mm;
+    font-family: "native:MainLight";
+    padding: 0.4mm 0;
+    margin: 0;
+}
+
+SkinDesignerField {
+    color: #112247;
+    background: #ffffff;
+    border: 1px solid #d9dee8;
+    border-radius: 1.4mm;
+    padding: 1mm 1.4mm;
+    margin: 0.3mm;
+    font-family: "native:MainLight";
+    font-size: 2.6mm;
+}
+SkinDesignerFieldDark {
+    color: #f5f8ff;
+    background: #0e2a61;
+    border: 1px solid #4c6ea8;
+    border-radius: 1.4mm;
+    padding: 1mm 1.4mm;
+    margin: 0.3mm;
+    font-family: "native:MainLight";
+    font-size: 2.6mm;
+}
+
+SkinDesignerFieldReadonly {
+    color: #7f8aa3;
+    background: #f7f8fb;
+    border: 1px solid #d9dee8;
+    border-radius: 1.4mm;
+    padding: 1mm 1.4mm;
+    margin: 0.3mm;
+    font-family: "native:MainLight";
+    font-size: 2.6mm;
+}
+SkinDesignerFieldReadonlyDark {
+    color: #a8b8da;
+    background: #163575;
+    border: 1px solid #4c6ea8;
+    border-radius: 1.4mm;
+    padding: 1mm 1.4mm;
+    margin: 0.3mm;
+    font-family: "native:MainLight";
+    font-size: 2.6mm;
+}
+
+SkinDesignerFieldRow { background: transparent; padding: 0; margin: 0.4mm 0; }
+SkinDesignerFieldRowDark { background: transparent; padding: 0; margin: 0.4mm 0; }
+SkinDesignerFieldGrid { background: transparent; padding: 0; margin: 0.4mm 0; }
+SkinDesignerFieldGridDark { background: transparent; padding: 0; margin: 0.4mm 0; }
+
+/* --- Preset tiles -------------------------------------------------- */
+
+SkinDesignerPresetGrid { background: transparent; padding: 0; }
+SkinDesignerPresetGridDark { background: transparent; padding: 0; }
+
+SkinDesignerPreset {
+    background: #f7f8fb;
+    border: 1px solid #d9dee8;
+    border-radius: 2mm;
+    padding: 1.6mm 1mm;
+    margin: 0.3mm;
+}
+SkinDesignerPresetDark {
+    background: #163575;
+    border: 1px solid #4c6ea8;
+    border-radius: 2mm;
+    padding: 1.6mm 1mm;
+    margin: 0.3mm;
+}
+SkinDesignerPresetSelected {
+    background: #e8f0ff;
+    border: 2px solid #2f6bff;
+    border-radius: 2mm;
+    padding: 1.6mm 1mm;
+    margin: 0.3mm;
+}
+SkinDesignerPresetSelectedDark {
+    background: #1c3a7a;
+    border: 2px solid #4d86ff;
+    border-radius: 2mm;
+    padding: 1.6mm 1mm;
+    margin: 0.3mm;
+}
+SkinDesignerPresetIcon {
+    color: #112247;
+    background: transparent;
+    padding: 0.4mm;
+}
+SkinDesignerPresetIconDark { color: #f5f8ff; background: transparent; padding: 0.4mm; }
+SkinDesignerPresetLabel {
+    color: #7f8aa3;
+    font-size: 2mm;
+    font-family: "native:MainLight";
+    padding: 0.4mm;
+    text-align: center;
+}
+SkinDesignerPresetLabelDark { color: #a8b8da; font-size: 2mm; font-family: "native:MainLight"; padding: 0.4mm; text-align: center; }
+
+/* --- Cutout list --------------------------------------------------- */
+
+SkinDesignerCutoutRow {
+    background: #f7f8fb;
+    border: 1px solid #d9dee8;
+    border-radius: 1.4mm;
+    padding: 1mm 1.4mm;
+    margin: 0.3mm 0;
+}
+SkinDesignerCutoutRowDark {
+    background: #163575;
+    border: 1px solid #4c6ea8;
+    border-radius: 1.4mm;
+    padding: 1mm 1.4mm;
+    margin: 0.3mm 0;
+}
+SkinDesignerCutoutRowSelected {
+    background: #e8f0ff;
+    border: 1px solid #2f6bff;
+    border-radius: 1.4mm;
+    padding: 1mm 1.4mm;
+    margin: 0.3mm 0;
+}
+SkinDesignerCutoutRowSelectedDark {
+    background: #1c3a7a;
+    border: 1px solid #4d86ff;
+    border-radius: 1.4mm;
+    padding: 1mm 1.4mm;
+    margin: 0.3mm 0;
+}
+SkinDesignerCutoutSwatch {
+    background: #112247;
+    color: #112247;
+    border-radius: 0.8mm;
+    padding: 0.6mm;
+    margin: 0 0.6mm 0 0;
+    font-size: 1mm;
+}
+SkinDesignerCutoutSwatchDark {
+    background: #f5f8ff;
+    color: #f5f8ff;
+    border-radius: 0.8mm;
+    padding: 0.6mm;
+    margin: 0 0.6mm 0 0;
+    font-size: 1mm;
+}
+SkinDesignerCutoutName {
+    color: #112247;
+    font-size: 2.6mm;
+    font-family: "native:MainBold";
+    padding: 0.4mm;
+}
+SkinDesignerCutoutNameDark { color: #f5f8ff; font-size: 2.6mm; font-family: "native:MainBold"; padding: 0.4mm; }
+SkinDesignerCutoutType {
+    color: #7f8aa3;
+    font-family: "native:MainLight";
+    font-size: 2mm;
+    padding: 0 0.6mm;
+}
+SkinDesignerCutoutTypeDark { color: #a8b8da; font-family: "native:MainLight"; font-size: 2mm; padding: 0 0.6mm; }
+
+SkinDesignerCutoutEditor {
+    background: #e8f0ff;
+    border-radius: 1.4mm;
+    padding: 1.4mm;
+    margin: 0.4mm 0;
+}
+SkinDesignerCutoutEditorDark {
+    background: #1c3a7a;
+    border-radius: 1.4mm;
+    padding: 1.4mm;
+    margin: 0.4mm 0;
+}
+
+/* --- Done step ----------------------------------------------------- */
+
+SkinDesignerDoneRoot {
+    background: #f3f4f7;
+    padding: 8mm 4mm;
+}
+SkinDesignerDoneRootDark {
+    background: #071b4d;
+    padding: 8mm 4mm;
+}
+/* Subtler success badge: smaller diameter, lighter green ring, finer
+ * check icon (sized in code via FontImage.setMaterialIcon). */
+SkinDesignerDoneCheck {
+    background: cn1-pill-border;
+    background-color: #e8f3c8;
+    color: #6e8a1a;
+    padding: 2.4mm;
+    margin: 1mm;
+    font-size: 5mm;
+    text-align: center;
+}
+SkinDesignerDoneCheckDark {
+    background: cn1-pill-border;
+    background-color: #2c4216;
+    color: #b8d532;
+    padding: 2.4mm;
+    margin: 1mm;
+    font-size: 5mm;
+    text-align: center;
+}
+
+SkinDesignerSummary {
+    background: #ffffff;
+    border: 1px solid #d9dee8;
+    border-radius: 2.4mm;
+    padding: 4mm;
+    margin: 2mm;
+    font-size: 2.6mm;
+}
+SkinDesignerSummaryDark {
+    background: #102b66;
+    border: 1px solid #4c6ea8;
+    border-radius: 2.4mm;
+    padding: 4mm;
+    margin: 2mm;
+    font-size: 2.6mm;
+}
+SkinDesignerSummaryRow {
+    background: transparent;
+    border-bottom: 1px solid #d9dee8;
+    padding: 1mm 0;
+    margin: 0;
+}
+SkinDesignerSummaryRowDark {
+    background: transparent;
+    border-bottom: 1px solid #4c6ea8;
+    padding: 1mm 0;
+    margin: 0;
+}
+SkinDesignerSummaryKey {
+    color: #7f8aa3;
+    font-size: 2.6mm;
+    font-family: "native:MainLight";
+    padding: 0.4mm;
+}
+SkinDesignerSummaryKeyDark { color: #a8b8da; font-size: 2.6mm; font-family: "native:MainLight"; padding: 0.4mm; }
+SkinDesignerSummaryValue {
+    color: #112247;
+    font-size: 2.6mm;
+    font-family: "native:MainBold";
+    padding: 0.4mm;
+}
+SkinDesignerSummaryValueDark { color: #f5f8ff; font-size: 2.6mm; font-family: "native:MainBold"; padding: 0.4mm; }

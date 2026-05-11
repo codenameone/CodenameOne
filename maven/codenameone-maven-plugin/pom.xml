@@ -296,7 +296,10 @@
                         <configuration>
                             <target>
                                 <mkdir dir="${project.build.outputDirectory}"/>
+                                <mkdir dir="${project.build.outputDirectory}/com/codename1/maven"/>
                                 <copy file="${cn1.binaries}/Stubber.jar" todir="${project.build.outputDirectory}"/>
+                                <copy file="${maven.multiModuleProjectDirectory}/UpdateCodenameOne.jar"
+                                      todir="${project.build.outputDirectory}/com/codename1/maven"/>
                             </target>
                         </configuration>
 

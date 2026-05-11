@@ -46,14 +46,23 @@ public final class IOSNative {
     
     //native void startMainThread(Runnable r);
     native void initVM();
+
+    /// Returns true on iOS builds compiled with -Dios.metal=true (i.e.
+    /// CN1_USE_METAL is defined in CN1ES2compat.h). Java-side code that
+    /// needs to branch between the GL and Metal mutable-image rendering
+    /// paths queries this once at init -- there is no other reliable
+    /// source of truth on the Java side since the build flag only
+    /// affects native compilation.
+    native boolean isMetalRendering();
     static native void deinitializeVM();
     native boolean isPainted();
     native int getDisplayWidth();
     native int getDisplayHeight();
-    native void editStringAt(int x, int y, int w, int h, long peer, boolean singleLine, 
-            int rows, int maxSize, int constraint, String text, boolean forceSlideUp, 
+    native void editStringAt(int x, int y, int w, int h, long peer, boolean singleLine,
+            int rows, int maxSize, int constraint, String text, boolean forceSlideUp,
             int color, long imagePeer, int padTop, int padBottom, int padLeft, int padRight,
-            String hint, int hintColor, boolean showToolbar, boolean blockCopyPaste, int alignment, int verticalAlignment);
+            String hint, int hintColor, boolean showToolbar, boolean blockCopyPaste, int alignment, int verticalAlignment,
+            boolean returnExitsEditing);
     native void resizeNativeTextView(int x, int y, int w, int h, int padTop, int padRight, int padBottom, int padLeft);
     native void flushBuffer(long peer, int x, int y, int width, int height);
     native void imageRgbToIntArray(long imagePeer, int[] arr, int x, int y, int width, int height, int imgWidth, int imgHeight);
@@ -323,6 +332,17 @@ public final class IOSNative {
     native String getUDID();
     native String getOSVersion();
     native String getDeviceName();
+
+    // Diagnostics for the status-bar tap-to-scroll-to-top path. Surfaced to
+    // user code via Display.getProperty("cn1.iosStatusBarTap.*") in
+    // IOSImplementation. Lets developers detect on-device whether iOS is
+    // delivering the scroll-to-top message at all when the gesture does
+    // nothing visibly.
+    native int getStatusBarTapCount();
+    native long getStatusBarTapLastEpochMillis();
+    native int getStatusBarTapLastX();
+    native int getStatusBarTapLastY();
+    native boolean isStatusBarTapProxyInstalled();
     
     // location manager
     native boolean isGPSEnabled();

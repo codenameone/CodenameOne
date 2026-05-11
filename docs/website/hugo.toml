@@ -92,6 +92,13 @@ url = "/playground/"
 weight = 17
 
 [[menu.main]]
+parent = "developers"
+name = "Skin Designer"
+url = "/skindesigner/"
+weight = 18
+
+
+[[menu.main]]
 identifier = "resources"
 name = "RESOURCES"
 url = "#"

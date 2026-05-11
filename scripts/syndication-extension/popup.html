@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CN1 Syndicator</title>
+<style>
+  body { font-family: -apple-system, system-ui, sans-serif; font-size: 13px; width: 360px; padding: 12px; margin: 0; }
+  h1 { font-size: 14px; margin: 0 0 8px 0; }
+  button { width: 100%; padding: 8px; margin-bottom: 6px; cursor: pointer; }
+  .row { padding: 6px 0; border-bottom: 1px solid #eee; }
+  .ok { color: #207520; }
+  .fail { color: #b22; }
+  .meta { color: #666; font-size: 11px; }
+  pre { background: #f5f5f5; padding: 8px; border-radius: 4px; max-height: 160px; overflow: auto; font-size: 11px; }
+</style>
+</head>
+<body>
+<h1>Codename One Syndicator</h1>
+<button id="poll">Poll syndication queue now</button>
+<button id="clear">Clear completed list</button>
+<div id="status" class="meta"></div>
+<h2 style="font-size:12px;margin:10px 0 4px 0;">Pending</h2>
+<div id="pending"></div>
+<h2 style="font-size:12px;margin:10px 0 4px 0;">Completed</h2>
+<div id="completed"></div>
+<h2 style="font-size:12px;margin:10px 0 4px 0;">State patch (paste into syndication-state.json)</h2>
+<pre id="state-patch">(none yet)</pre>
+<script src="popup.js"></script>
+</body>
+</html>

@@ -22,6 +22,8 @@ name: Test Android build scripts
       - '!CodenameOne/src/**/*.md'
       - 'Ports/Android/**'
       - '!Ports/Android/**/*.md'
+      - 'native-themes/android-material/**'
+      - '!native-themes/android-material/**/*.md'
       - 'maven/**'
       - '!maven/core-unittests/**'
       - 'tests/**'
@@ -49,6 +51,8 @@ name: Test Android build scripts
       - '!CodenameOne/src/**/*.md'
       - 'Ports/Android/**'
       - '!Ports/Android/**/*.md'
+      - 'native-themes/android-material/**'
+      - '!native-themes/android-material/**/*.md'
       - 'maven/**'
       - '!maven/core-unittests/**'
       - 'tests/**'
@@ -182,6 +186,21 @@ jobs:
         with:
           name: android-gradle-logs
           path: artifacts/*gradle*.log
+          if-no-files-found: warn
+          retention-days: 14
+          compression-level: 6
+      # Logcat captures from connectedAndroidTest and the in-script retry
+      # (`connectedAndroidTest.log`, `connectedAndroidTest-retry.log`). These
+      # are the only place to debug CN1SS chunk-decode flakes — they hold
+      # the raw base64 chunks plus the `am start` / pidof diagnostics. If
+      # this upload step disappears, the next decode flake will be
+      # un-debuggable: keep it.
+      - name: Upload Android instrumentation logs
+        if: always() && matrix.id == 'default'
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-instrumentation-logs
+          path: artifacts/connectedAndroidTest*.log
           if-no-files-found: warn
           retention-days: 14
           compression-level: 6

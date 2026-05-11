@@ -4,17 +4,21 @@ on:
   pull_request:
     paths:
       - 'docs/website/**'
+      - 'docs/developer-guide/**'
       - 'scripts/cn1playground/**'
       - 'scripts/initializr/**'
       - 'scripts/website/**'
+      - 'scripts/skindesigner/**'
       - '.github/workflows/website-docs.yml'
   push:
     branches: [main, master]
     paths:
       - 'docs/website/**'
+      - 'docs/developer-guide/**'
       - 'scripts/cn1playground/**'
       - 'scripts/initializr/**'
       - 'scripts/website/**'
+      - 'scripts/skindesigner/**'
       - '.github/workflows/website-docs.yml'
   workflow_dispatch:
 
@@ -74,6 +78,28 @@ jobs:
           scripts/website/update_developer_guide_redirect.sh
         env:
           GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Set up Java 17 for Skin Designer screenshots
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up xvfb for headless simulator
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb
+
+      - name: Bootstrap Codename One tooling for screenshots
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.codenameone"
+          cp maven/CodeNameOneBuildClient.jar "$HOME/.codenameone/CodeNameOneBuildClient.jar"
+          touch "$HOME/.codenameone/guibuilder.jar"
+
+      - name: Generate Skin Designer screenshots
+        run: ./scripts/skindesigner/screenshots/take-screenshots.sh
 
       - name: Set up Java 25 for website build
         uses: actions/setup-java@v4

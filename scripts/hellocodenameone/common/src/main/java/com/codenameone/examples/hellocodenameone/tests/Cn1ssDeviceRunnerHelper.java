@@ -122,7 +122,14 @@ interface Cn1ssDeviceRunnerHelper {
             ByteArrayOutputStream pngOut = new ByteArrayOutputStream(Math.max(1024, width * height / 2));
             io.save(image, pngOut, ImageIO.FORMAT_PNG, 1f);
             byte[] pngBytes = pngOut.toByteArray();
-            println("CN1SS:INFO:test=" + safeName + " png_bytes=" + pngBytes.length);
+            String hash = fnv1a64Hex(pngBytes);
+            println("CN1SS:INFO:test=" + safeName + " png_bytes=" + pngBytes.length
+                    + " png_fnv1a64=" + hash);
+            String previous = Cn1ssHashTracker.recordAndCheck(hash, safeName);
+            if (previous != null) {
+                println("CN1SS:WARN:test=" + safeName
+                        + " duplicate_image_with=" + previous + " png_fnv1a64=" + hash);
+            }
             emitChannel(pngBytes, safeName, "");
 
             byte[] preview = encodePreview(io, image, safeName);
@@ -173,7 +180,14 @@ interface Cn1ssDeviceRunnerHelper {
                 ByteArrayOutputStream pngOut = new ByteArrayOutputStream(Math.max(1024, width * height / 2));
                 io.save(screenshot, pngOut, ImageIO.FORMAT_PNG, 1f);
                 byte[] pngBytes = pngOut.toByteArray();
-                println("CN1SS:INFO:test=" + safeName + " png_bytes=" + pngBytes.length);
+                String hash = fnv1a64Hex(pngBytes);
+                println("CN1SS:INFO:test=" + safeName + " png_bytes=" + pngBytes.length
+                        + " png_fnv1a64=" + hash);
+                String previous = Cn1ssHashTracker.recordAndCheck(hash, safeName);
+                if (previous != null) {
+                    println("CN1SS:WARN:test=" + safeName
+                            + " duplicate_image_with=" + previous + " png_fnv1a64=" + hash);
+                }
                 emitChannel(pngBytes, safeName, "");
 
                 byte[] preview = encodePreview(io, screenshot, safeName);
@@ -362,5 +376,99 @@ interface Cn1ssDeviceRunnerHelper {
 
     static boolean isHtml5() {
         return "HTML5".equals(Display.getInstance().getPlatformName());
+    }
+
+    /// Computes a 64-bit FNV-1a hash of the given bytes. FNV-1a is fast and
+    /// has no platform dependencies (no java.security, no java.util.zip
+    /// CRC32 wrapping subtleties). 64 bits is enough to make accidental
+    /// collisions on real-world PNG payloads vanishingly unlikely while
+    /// keeping the hash short enough to log on a single line. The mixup
+    /// detector in `Cn1ssHashTracker` calls this on every emitted image so
+    /// that two tests producing bit-identical bytes (the symptom of an iOS
+    /// Metal stale-frame capture: MultiButtonTheme_light returning Tabs
+    /// Theme_light's pixels because the CAMetalLayer hadn't been re-
+    /// presented in time) get flagged with a CN1SS:WARN line.
+    static String fnv1a64Hex(byte[] bytes) {
+        long h = 0xcbf29ce484222325L;
+        long prime = 0x100000001b3L;
+        for (int i = 0; i < bytes.length; i++) {
+            h ^= bytes[i] & 0xff;
+            h *= prime;
+        }
+        StringBuilder sb = new StringBuilder(16);
+        for (int i = 60; i >= 0; i -= 4) {
+            int nib = (int) ((h >>> i) & 0xf);
+            sb.append((char) (nib < 10 ? '0' + nib : 'a' + (nib - 10)));
+        }
+        return sb.toString();
+    }
+}
+
+/// Tracks recently-emitted screenshot hashes per test name so a stale-frame
+/// capture (the same PNG bytes attributed to two different tests in a row)
+/// gets surfaced via CN1SS:WARN markers instead of silently shipping the
+/// wrong image to the comparator. Keeps the most recent 64 entries.
+///
+/// Lives in a separate package-private class because Cn1ssDeviceRunnerHelper
+/// is an interface and can't hold mutable static state.
+///
+/// Storage uses two parallel arrays (hash[i] paired with testName[i]) rather
+/// than a HashMap-typed static field. The Cn1ssDeviceRunner header-comment
+/// at lines 215-222 documents that "static collections initialised via a
+/// static method call ... broke iOS class loading -- Cn1ssDeviceRunner
+/// failed to load before runSuite() could even log a single starting
+/// test=... entry, leaving the suite to time out at the 300s end-marker
+/// deadline." The first attempt at this tracker used `private static final
+/// Map<String, String> hashToTest = new LinkedHashMap<>()` and reproduced
+/// exactly that symptom on the iOS Metal CI run -- the simulator booted,
+/// installed the app, then never emitted a single CN1SS line and timed
+/// out at 30 minutes. Plain primitive arrays of String avoid touching the
+/// HashMap class init path during the host class's `<clinit>`.
+final class Cn1ssHashTracker {
+    private static final int MAX_TRACKED = 64;
+    private static final String[] hashes = new String[MAX_TRACKED];
+    private static final String[] tests = new String[MAX_TRACKED];
+    private static int count;
+
+    private Cn1ssHashTracker() {
+    }
+
+    /// Records the hash for `safeName` and returns the test name that
+    /// previously emitted the same hash, or null if this is the first time.
+    /// Caller logs a CN1SS:WARN line when a duplicate is found so the
+    /// downstream comparator can flag the affected test as a likely
+    /// stale-frame capture.
+    ///
+    /// O(MAX_TRACKED) per call -- 64-entry linear scan is trivial vs the
+    /// PNG hash itself (which scans every byte of the image).
+    static synchronized String recordAndCheck(String hashHex, String safeName) {
+        String previous = null;
+        for (int i = 0; i < count; i++) {
+            if (hashHex.equals(hashes[i])) {
+                previous = tests[i];
+                if (safeName.equals(previous)) {
+                    // Same test re-captured (e.g. light->dark sequencing
+                    // chains through the same emitter); not a mixup.
+                    return null;
+                }
+                break;
+            }
+        }
+        if (count < MAX_TRACKED) {
+            hashes[count] = hashHex;
+            tests[count] = safeName;
+            count++;
+        } else {
+            // Ring-buffer-style: overwrite the oldest entry. We keep
+            // insertion order roughly via an arraycopy shift; dropping
+            // exactly MAX_TRACKED entries means each call to this branch
+            // moves up to 64 references, which is still well below the
+            // cost of the FNV-1a scan over a 70KB PNG.
+            System.arraycopy(hashes, 1, hashes, 0, MAX_TRACKED - 1);
+            System.arraycopy(tests, 1, tests, 0, MAX_TRACKED - 1);
+            hashes[MAX_TRACKED - 1] = hashHex;
+            tests[MAX_TRACKED - 1] = safeName;
+        }
+        return previous;
     }
 }

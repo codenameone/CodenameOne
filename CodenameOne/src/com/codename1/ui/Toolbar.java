@@ -505,9 +505,20 @@ public class Toolbar extends Container {
         if (rightSidemenuDialog != null && rightSidemenuDialog.isShowing()) {
             return;
         }
+        // Capture the host form before remove() detaches cnt -- after
+        // remove() cnt.getComponentForm() returns null.
+        Form host = cnt.getComponentForm();
         Style s = cnt.getUnselectedStyle();
         s.setBgTransparency(0);
         cnt.remove();
+        // Issue #4912: cnt.remove() does not by itself trigger a
+        // form-level repaint, so the previous frame's shaded pixels
+        // can linger in the simulator and JS render buffer until
+        // something else forces a redraw. revalidateLater queues a
+        // single relayout/repaint pass for the next paint cycle.
+        if (host != null) {
+            host.revalidateLater();
+        }
     }
 
     /// Returns the Toolbar title Component.
@@ -2533,6 +2544,14 @@ public class Toolbar extends Container {
             if (((BorderLayout) getLayout()).getNorth() == null) {
                 Container bar = new Container();
                 if (getUIManager().isThemeConstant("statusBarScrollsUpBool", true)) {
+                    // Without grabsPointerEvents the bar isn't a "responder" as
+                    // far as Form.getResponderAt is concerned (it's a plain
+                    // Container with only a pointer-released listener), so the
+                    // iOS-synthesized status-bar tap at (displayWidth/2, 0)
+                    // would walk past it and hit the empty space behind. With
+                    // it, the bar shows up in getResponderAt and the iOS
+                    // cn1FireStatusBarTap path lands on it deterministically.
+                    bar.setGrabsPointerEvents(true);
                     bar.addPointerReleasedListener(new ActionListener() {
                         @Override
                         public void actionPerformed(ActionEvent evt) {

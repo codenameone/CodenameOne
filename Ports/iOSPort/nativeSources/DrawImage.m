@@ -1,6 +1,9 @@
 #import "DrawImage.h"
 #import "CodenameOne_GLViewController.h"
 #include "xmlvm.h"
+#ifdef CN1_USE_METAL
+#import "CN1Metalcompat.h"
+#endif
 
 #ifdef USE_ES2
 extern GLKMatrix4 CN1modelViewMatrix;
@@ -104,6 +107,9 @@ static GLuint getOGLProgram(){
 }
 #ifdef USE_ES2
 -(void)execute {
+#ifdef CN1_USE_METAL
+    CN1MetalDrawImage([img getMTLTexture], alpha, x, y, width, height);
+#else
     glUseProgram(getOGLProgram());
     GLKVector4 color = GLKVector4Make(((float)alpha) / 255.0f, ((float)alpha) / 255.0f, ((float)alpha) / 255.0f, ((float)alpha) / 255.0f);
     
@@ -240,9 +246,10 @@ static GLuint getOGLProgram(){
     
     glBindTexture(GL_TEXTURE_2D, 0);
     GLErrorLog;
-    
+
     //glUseProgram(CN1activeProgram);
     //GLErrorLog;
+#endif // CN1_USE_METAL
 
 }
 

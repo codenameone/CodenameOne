@@ -23,6 +23,9 @@
 #import "DrawRect.h"
 #import "CodenameOne_GLViewController.h"
 #include "xmlvm.h"
+#ifdef CN1_USE_METAL
+#import "CN1Metalcompat.h"
+#endif
 
 #ifdef USE_ES2
 extern GLKMatrix4 CN1modelViewMatrix;
@@ -105,8 +108,11 @@ static GLuint getOGLProgram(){
 }
 #ifdef USE_ES2
 -(void)execute {
+#ifdef CN1_USE_METAL
+    CN1MetalDrawRect(color, alpha, x, y, width, height);
+#else
     glUseProgram(getOGLProgram());
-    
+
     GLKVector4 colorV = GLKVector4Make(((float)((color >> 16) & 0xff))/255.0, \
                    ((float)((color >> 8) & 0xff))/255.0, ((float)(color & 0xff))/255.0, ((float)alpha)/255.0);
     
@@ -155,9 +161,10 @@ static GLuint getOGLProgram(){
     //GLErrorLog;
     glDisableVertexAttribArray(vertexCoordAtt);
     GLErrorLog;
-    
+
     //glUseProgram(CN1activeProgram);
     //GLErrorLog;
+#endif // CN1_USE_METAL
 }
 #else
 -(void)execute {

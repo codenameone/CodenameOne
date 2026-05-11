@@ -46,7 +46,6 @@ final class PlaygroundExamples {
             fab.addActionListener(e -> Dialog.show("FAB", "Tapped!", "OK", null));
 
             ctx.log("Preview built successfully");
-            form;
             """;
 
     static final String HELLO_WORLD_SCRIPT = """
@@ -55,7 +54,6 @@ final class PlaygroundExamples {
 
             Container root = new Container(BoxLayout.y());
             root.add(new Label("Hello, World!"));
-            root;
             """;
 
     static final String DATE_PICKER_SCRIPT = """
@@ -68,7 +66,6 @@ final class PlaygroundExamples {
             datePicker.setType(Display.PICKER_TYPE_DATE);
             root.add(new Label("Pick a date:"));
             root.add(datePicker);
-            root;
             """;
 
     static final String BUILD_METHOD_SCRIPT = """
@@ -137,8 +134,6 @@ final class PlaygroundExamples {
             Button cancel = new Button("Cancel");
             FontImage.setMaterialIcon(cancel, FontImage.MATERIAL_CLOSE);
             form.add(cancel);
-
-            form;
             """;
 
     static final String LIST_SCRIPT = """
@@ -166,7 +161,6 @@ final class PlaygroundExamples {
                 form.add(row);
             }
             ctx.log("List sample loaded");
-            form;
             """;
 
     static final String UI_SHOWCASE_SCRIPT = """
@@ -209,8 +203,6 @@ final class PlaygroundExamples {
             FloatingActionButton fab = FloatingActionButton.createFAB(FontImage.MATERIAL_EDIT);
             fab.bindFabToContainer(form.getContentPane());
             fab.addActionListener(e -> Dialog.show("Edit", "FAB tapped.", "OK", null));
-
-            form;
             """;
 
     static final String TABS_SCRIPT = """
@@ -241,7 +233,6 @@ final class PlaygroundExamples {
                     new Label("ada@analytical.engine"),
                     new Button("Sign out")));
             form.add(BorderLayout.CENTER, tabs);
-            form;
             """;
 
     static final String BROWSER_SCRIPT = """
@@ -252,7 +243,6 @@ final class PlaygroundExamples {
             BrowserComponent browser = new BrowserComponent();
             browser.setPage("<html><body style='font-family: sans-serif; padding: 16px;'><h2>BrowserComponent</h2><p>Embedded web content works in the preview.</p><button onclick=\\"document.body.style.background='#dbeafe'\\">Change background</button></body></html>", "https://www.codenameone.com");
             root.add(BorderLayout.CENTER, browser);
-            root;
             """;
 
     static final String NETWORK_SCRIPT = """
@@ -288,7 +278,6 @@ final class PlaygroundExamples {
                 }
             });
             root.addAll(fetch, output);
-            root;
             """;
 
     static final String REST_SCRIPT = """
@@ -314,7 +303,6 @@ final class PlaygroundExamples {
                 });
             });
             root.addAll(load, output);
-            root;
             """;
 
     static final String CAMERA_SCRIPT = """
@@ -348,7 +336,6 @@ final class PlaygroundExamples {
                 }
             });
             root.addAll(photo, audio, status);
-            root;
             """;
 
     static final Sample[] SAMPLES = new Sample[]{

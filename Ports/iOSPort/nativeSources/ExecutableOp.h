@@ -21,6 +21,11 @@
  * need additional information or have any questions.
  */
 #import <Foundation/Foundation.h>
+// CN1ES2compat.h gates CN1_USE_METAL (the iOS builder uncomments
+// //#define CN1_USE_METAL at the top). The ExecutableOp.target ivar
+// and accessors below are conditional on CN1_USE_METAL, so .h and .m
+// must both see the same definition. Importing here ensures that.
+#import "CN1ES2compat.h"
 
 extern void logGlErrorAt(const char *f, int l);
 extern int nextPowerOf2(int val);
@@ -48,8 +53,16 @@ green:((float)((rgbValue >> 8) & 0xff))/255.0 blue:((float)(rgbValue & 0xff))/25
 
 #endif
 
-@interface ExecutableOp : NSObject {
+@class GLUIImage;
 
+@interface ExecutableOp : NSObject {
+#ifdef CN1_USE_METAL
+    // Phase 3: render target for this op. nil = screen drawable (default,
+    // existing GL/Metal screen pipeline). non-nil = a mutable image whose
+    // backing MTLTexture should receive this op. drawFrame walks the queue
+    // and switches encoders when target changes between ops.
+    __unsafe_unretained GLUIImage *target;
+#endif
 }
 
 +(natural_t) get_free_memory;
@@ -58,4 +71,8 @@ green:((float)((rgbValue >> 8) & 0xff))/255.0 blue:((float)(rgbValue & 0xff))/25
 -(void)execute;
 -(void)executeWithLog;
 -(NSString*)getName;
+#ifdef CN1_USE_METAL
+-(GLUIImage*)target;
+-(void)setTarget:(GLUIImage*)t;
+#endif
 @end

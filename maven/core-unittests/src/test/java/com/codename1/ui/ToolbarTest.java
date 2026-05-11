@@ -208,6 +208,87 @@ class ToolbarTest extends UITestBase {
         assertEquals(1, overflowInvocation[0], "Overflow command should be invoked");
     }
 
+    /// Regression test for issue #4912: after closing the hamburger
+    /// side menu the underlying Form remained "shaded" in the
+    /// simulator and the JS port. The Toolbar.class layered pane
+    /// carries a dim backdrop (bgTransparency over bgColor=0) that
+    /// is painted over the form while the menu is open. The dispose
+    /// onDisposed callback detached the pane and zeroed the tint,
+    /// but did not queue a form-level revalidate; the user's
+    /// confirmed workaround was to call form.revalidateLater() in
+    /// response to the close, and that workaround was promoted into
+    /// detachToolbarLayeredPane.
+    ///
+    /// The dispose animation is disabled via reflection so the
+    /// detach runs synchronously inside closeLeftSideMenu, and the
+    /// assertions check both that the pane is gone AND that the
+    /// form has been added back to the revalidate queue so the
+    /// next paint cycle overdraws any stale shaded pixels.
+    @FormTest
+    void closeLeftSideMenuClearsShadedBackdropAfterAnimation() throws Exception {
+        implementation.setBuiltinSoundsEnabled(false);
+        Toolbar.setOnTopSideMenu(true);
+
+        Form form = Display.getInstance().getCurrent();
+        Toolbar toolbar = new Toolbar();
+        form.setToolbar(toolbar);
+        form.show();
+        form.getAnimationManager().flush();
+        flushSerialCalls();
+
+        toolbar.addCommandToSideMenu("Entry", null, evt -> { });
+
+        toolbar.openSideMenu();
+        form.getAnimationManager().flush();
+        flushSerialCalls();
+        awaitAnimations(form);
+        assertTrue(toolbar.isSideMenuShowing(), "Side menu should be showing after open");
+
+        Container pane = form.getFormLayeredPane(Toolbar.class, false);
+        int openTransparency = pane.getUnselectedStyle().getBgTransparency() & 0xff;
+        assertTrue(openTransparency > 0,
+                "Backdrop pane should be tinted while menu is open (was " + openTransparency + ")");
+
+        // Disable the dispose animation so closeLeftSideMenu runs the
+        // detach callback synchronously. The bug being tested is not
+        // about animation timing -- it is about whether the form is
+        // re-queued for layout/repaint once the dim pane is gone.
+        java.lang.reflect.Field dialogField = Toolbar.class.getDeclaredField("sidemenuDialog");
+        dialogField.setAccessible(true);
+        Object dialog = dialogField.get(toolbar);
+        java.lang.reflect.Method setAnimateShow = dialog.getClass().getMethod("setAnimateShow", boolean.class);
+        setAnimateShow.invoke(dialog, false);
+
+        // Drain any pending revalidate state so we can detect a fresh
+        // revalidate request triggered specifically by close.
+        flushSerialCalls();
+        boolean revalidatePendingBeforeClose = isFormInRevalidateQueue(form);
+
+        toolbar.closeLeftSideMenu();
+
+        assertNull(pane.getParent(),
+                "Toolbar layered pane should be detached once the synchronous dispose runs");
+        assertEquals(0, pane.getUnselectedStyle().getBgTransparency() & 0xff,
+                "Backdrop tint must be cleared so a stale reference cannot re-shade the form (issue #4912)");
+        assertFalse(toolbar.isSideMenuShowing(),
+                "Side menu should no longer be reported as showing after synchronous close");
+
+        assertTrue(isFormInRevalidateQueue(form) && !revalidatePendingBeforeClose,
+                "closeLeftSideMenu should queue a form revalidateLater after detaching the "
+                        + "shaded backdrop pane (issue #4912 -- without this the form stays "
+                        + "shaded until the user does something that forces a redraw)");
+    }
+
+    private static boolean isFormInRevalidateQueue(Form form) throws Exception {
+        java.lang.reflect.Field f = Form.class.getDeclaredField("pendingRevalidateQueue");
+        f.setAccessible(true);
+        Object queue = f.get(form);
+        if (queue instanceof java.util.Collection) {
+            return ((java.util.Collection<?>) queue).contains(form);
+        }
+        return false;
+    }
+
     /// Regression test for the JavaScript port "ghost side menu +
     /// previous preview visible as background" bug. closeLeftSideMenu
     /// used to synchronously detach the Toolbar's FormLayeredPane

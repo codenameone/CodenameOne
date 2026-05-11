@@ -30,6 +30,7 @@ import com.codename1.designer.css.CSSTheme.WebViewProvider;
 import com.codename1.impl.javase.CN1Bootstrap;
 import com.codename1.io.Log;
 import com.codename1.io.Util;
+import com.codename1.tools.resourcebuilder.PropertiesUtil;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.CN;
 import com.codename1.ui.Component;
@@ -1106,9 +1107,7 @@ public class CN1CSSCLI {
                                 return;
                             }
                             Properties props = new Properties();
-                            try (InputStream is = Files.newInputStream(p)) {
-                                props.load(is);
-                            }
+                            PropertiesUtil.loadUtf8WithFallback(p.toFile(), props);
                             Map<String, Map<String, String>> baseBundles = bundles.computeIfAbsent(baseName, k -> new LinkedHashMap<>());
                             Map<String, String> translations = new LinkedHashMap<>();
                             for (Map.Entry<Object, Object> entry : props.entrySet()) {

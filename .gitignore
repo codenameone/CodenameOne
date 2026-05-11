@@ -30,6 +30,8 @@
 **/dist/*
 *.zip
 CodenameOneDesigner/src/version.properties
+*-storage-state.json
+*-storage-state.*.json
 /Ports/iOSPort/build/
 /Ports/iOSPort/dist/
 Ports/iOSPort/nbproject/private/private.xml
@@ -100,3 +102,4 @@ dependency-reduced-pom.xml
 /.playwright-cli
 package-lock.json
 package.json
+.claude/

@@ -687,6 +687,46 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
     }
 
     /**
+     * Replaces each substring of this string that matches the literal target sequence with the specified literal replacement sequence.
+     * The replacement proceeds from the beginning of the string to the end, for example, replacing "aa" with "b" in the string "aaa" will result in "ba" rather than "ab".
+     */
+    public java.lang.String replace(java.lang.CharSequence target, java.lang.CharSequence replacement) {
+        if (target == null) {
+            throw new NullPointerException("target");
+        }
+        if (replacement == null) {
+            throw new NullPointerException("replacement");
+        }
+        java.lang.String targetStr = target.toString();
+        java.lang.String replacementStr = replacement.toString();
+        int targetLen = targetStr.length();
+        if (targetLen == 0) {
+            int len = count;
+            StringBuilder sb = new StringBuilder(len + (len + 1) * replacementStr.length());
+            sb.append(replacementStr);
+            for (int i = 0; i < len; i++) {
+                sb.append(value[offset + i]);
+                sb.append(replacementStr);
+            }
+            return sb.toString();
+        }
+        int idx = indexOf(targetStr);
+        if (idx < 0) {
+            return this;
+        }
+        StringBuilder sb = new StringBuilder(count);
+        int prev = 0;
+        while (idx >= 0) {
+            sb.append(value, offset + prev, idx - prev);
+            sb.append(replacementStr);
+            prev = idx + targetLen;
+            idx = indexOf(targetStr, prev);
+        }
+        sb.append(value, offset + prev, count - prev);
+        return sb.toString();
+    }
+
+    /**
      * Tests if this string starts with the specified prefix.
      */
     public boolean startsWith(java.lang.String prefix){

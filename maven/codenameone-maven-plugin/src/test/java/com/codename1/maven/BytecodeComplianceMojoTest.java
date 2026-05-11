@@ -137,6 +137,32 @@ class BytecodeComplianceMojoTest {
     }
 
     @Test
+    void rewritesStringReplaceAllInvocations(@TempDir Path tempDir) throws Exception {
+        Path outputDir = tempDir.resolve("classes");
+        Files.createDirectories(outputDir);
+        Path classFile = writeStringRegexInvocationClass(outputDir, "app/StringReplaceAllUser", "replaceAll");
+
+        BytecodeComplianceMojo mojo = new BytecodeComplianceMojo();
+        applyInvocationRewrites(mojo, outputDir.toFile());
+
+        byte[] rewritten = Files.readAllBytes(classFile);
+        assertTrue(containsMethodInsn(rewritten, "com/codename1/impl/JdkApiRewriteHelper", "replaceAll", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;", Opcodes.INVOKESTATIC));
+    }
+
+    @Test
+    void rewritesStringReplaceFirstInvocations(@TempDir Path tempDir) throws Exception {
+        Path outputDir = tempDir.resolve("classes");
+        Files.createDirectories(outputDir);
+        Path classFile = writeStringRegexInvocationClass(outputDir, "app/StringReplaceFirstUser", "replaceFirst");
+
+        BytecodeComplianceMojo mojo = new BytecodeComplianceMojo();
+        applyInvocationRewrites(mojo, outputDir.toFile());
+
+        byte[] rewritten = Files.readAllBytes(classFile);
+        assertTrue(containsMethodInsn(rewritten, "com/codename1/impl/JdkApiRewriteHelper", "replaceFirst", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;", Opcodes.INVOKESTATIC));
+    }
+
+    @Test
     void allowsRewriteHelperCallsAfterSplitRewrite(@TempDir Path tempDir) throws Exception {
         Path outputDir = tempDir.resolve("classes");
         Files.createDirectories(outputDir);
@@ -433,6 +459,36 @@ class BytecodeComplianceMojoTest {
         run.visitInsn(Opcodes.POP);
         run.visitInsn(Opcodes.RETURN);
         run.visitMaxs(2, 0);
+        run.visitEnd();
+
+        writer.visitEnd();
+        Path classFile = root.resolve(className + ".class");
+        Files.createDirectories(classFile.getParent());
+        Files.write(classFile, writer.toByteArray());
+        return classFile;
+    }
+
+    private Path writeStringRegexInvocationClass(Path root, String className, String methodName) throws Exception {
+        ClassWriter writer = new ClassWriter(0);
+        writer.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, className, null, "java/lang/Object", null);
+
+        MethodVisitor init = writer.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
+        init.visitCode();
+        init.visitVarInsn(Opcodes.ALOAD, 0);
+        init.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
+        init.visitInsn(Opcodes.RETURN);
+        init.visitMaxs(1, 1);
+        init.visitEnd();
+
+        MethodVisitor run = writer.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "run", "()V", null, null);
+        run.visitCode();
+        run.visitLdcInsn("aaa");
+        run.visitLdcInsn("a");
+        run.visitLdcInsn("b");
+        run.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", methodName, "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;", false);
+        run.visitInsn(Opcodes.POP);
+        run.visitInsn(Opcodes.RETURN);
+        run.visitMaxs(3, 0);
         run.visitEnd();
 
         writer.visitEnd();

@@ -24,6 +24,9 @@
 #ifdef USE_ES2
 #import <GLKit/GLKit.h>
 #import "CodenameOne_GLViewController.h"
+#ifdef CN1_USE_METAL
+#import "CN1Metalcompat.h"
+#endif
 
 static GLKMatrix4 currentTransform;
 static BOOL currentTransformInitialized = NO;
@@ -49,8 +52,11 @@ static BOOL currentTransformInitialized = NO;
 
 -(void)execute
 {
+#ifdef CN1_USE_METAL
+    CN1MetalSetTransform(m);
+#else
     glSetTransformES2(m);
-                      
+#endif
 }
 
 +(GLKMatrix4)currentTransform

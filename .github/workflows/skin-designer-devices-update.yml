@@ -1,0 +1,77 @@
+name: Skin Designer Device DB Update
+
+# Walks GSMArena's curated brand listings once a week and merges any new
+# phones/tablets into the bundled devices.json. The HTML cache is persisted
+# across runs so re-fetches are limited to pages that actually changed.
+on:
+  schedule:
+    # Mondays at 03:00 UTC. Weekly is plenty — phones don't release that fast.
+    - cron: '0 3 * * 1'
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-device-db:
+    # Only run on the canonical repo's master, never on forks or feature branches.
+    if: github.repository == 'codenameone/CodenameOne' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    # Cold runs (empty cache) can take 30–60 min to walk the curated brands;
+    # warm runs are typically a few minutes.
+    timeout-minutes: 75
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Restore HTML scrape cache
+        uses: actions/cache@v4
+        with:
+          path: scripts/skindesigner/tools/devicedb/cache
+          key: skin-designer-devicedb-cache-${{ github.run_id }}
+          restore-keys: |
+            skin-designer-devicedb-cache-
+
+      - name: Scrape curated brands
+        run: |
+          python3 scripts/skindesigner/tools/devicedb/build_devices_json.py \
+            --delay 2.0 --max-pages 12
+
+      - name: Bail out if nothing changed
+        id: diff
+        run: |
+          if git diff --quiet -- scripts/skindesigner/common/src/main/resources/devices.json; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Device DB unchanged; nothing to commit."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            git --no-pager diff --stat -- scripts/skindesigner/common/src/main/resources/devices.json
+          fi
+
+      - name: Create pull request
+        if: steps.diff.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          commit-message: "Refresh Skin Designer device database"
+          title: "Refresh Skin Designer device database"
+          body: |
+            ## Summary
+            - Regenerates `scripts/skindesigner/common/src/main/resources/devices.json`
+              by walking the curated GSMArena brand pages and merging new
+              entries into the existing catalog.
+
+            Created automatically by the Skin Designer device DB workflow.
+          base: master
+          branch: automation/skin-designer-device-db
+          delete-branch: true
+          labels: |
+            dependencies
+            automation

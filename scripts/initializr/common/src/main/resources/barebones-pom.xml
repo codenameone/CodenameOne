@@ -53,14 +53,18 @@
 
                                     <mkdir dir="${user.home}/.codenameone"/>
                                     <mkdir dir="${project.build.directory}/codenameone/tmpProject"/>
+                                    <!-- usetimestamp re-downloads UpdateCodenameOne.jar when the
+                                         remote is newer than the local copy; skipexisting="true"
+                                         pinned users to whatever stale copy was first downloaded
+                                         and led to outdated guibuilder/designer jars. -->
                                     <get src="https://www.codenameone.com/files/updates/UpdateCodenameOne.jar"
                                          dest="${user.home}/UpdateCodenameOne.jar"
-                                         skipexisting="true"
+                                         usetimestamp="true"
                                          ignoreerrors="true"/>
 
                                     <get src="https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/UpdateCodenameOne.jar"
                                          dest="${user.home}/UpdateCodenameOne.jar"
-                                         skipexisting="true"
+                                         usetimestamp="true"
                                          ignoreerrors="false"/>
                                     <java jar="${user.home}/UpdateCodenameOne.jar" fork="true">
                                         <arg value="${project.build.directory}/codenameone/tmpProject"/>

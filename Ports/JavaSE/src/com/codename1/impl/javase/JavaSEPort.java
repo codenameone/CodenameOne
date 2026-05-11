@@ -1232,6 +1232,126 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     /**
+     * Resolves the override theme for the "auto" Native Theme menu choice.
+     * Reads ios.themeMode / and.themeMode / nativeTheme from the project's
+     * build hints (loaded into system properties as
+     * codename1.arg.&lt;hint&gt;), falling back to the deprecated
+     * cn1.androidTheme / cn1.nativeTheme aliases. When no hint is set, the
+     * platformName drives the choice and "ios" / "and" map to the modern
+     * themes that initializr / Playground now default to. Returns the
+     * theme resource basename (without ".res") or {@code null} to fall back
+     * to the skin's embedded theme.
+     */
+    private static String resolveAutoNativeTheme(String platformName) {
+        if ("ios".equals(platformName)) {
+            String iosMode = buildHint("ios.themeMode");
+            if (iosMode != null) {
+                if ("modern".equalsIgnoreCase(iosMode) || "liquid".equalsIgnoreCase(iosMode)) {
+                    return "iOSModernTheme";
+                }
+                if ("ios7".equalsIgnoreCase(iosMode) || "flat".equalsIgnoreCase(iosMode)) {
+                    return "iOS7Theme";
+                }
+                if ("legacy".equalsIgnoreCase(iosMode) || "iphone".equalsIgnoreCase(iosMode)) {
+                    return "iPhoneTheme";
+                }
+            }
+            String shared = sharedNativeThemeHint();
+            if ("legacy".equalsIgnoreCase(shared)) {
+                return "iOS7Theme";
+            }
+            if ("custom".equalsIgnoreCase(shared)) {
+                return null;
+            }
+            // Default for an iOS skin is the modern theme.
+            return "iOSModernTheme";
+        }
+        if ("and".equals(platformName)) {
+            String andMode = buildHint("and.themeMode");
+            if (andMode == null) {
+                andMode = buildHint("cn1.androidTheme");
+            }
+            if (andMode != null) {
+                if ("modern".equalsIgnoreCase(andMode) || "material".equalsIgnoreCase(andMode)) {
+                    return "AndroidMaterialTheme";
+                }
+                if ("hololight".equalsIgnoreCase(andMode) || "holo".equalsIgnoreCase(andMode)) {
+                    return "android_holo_light";
+                }
+                if ("legacy".equalsIgnoreCase(andMode)) {
+                    return "androidTheme";
+                }
+            }
+            String shared = sharedNativeThemeHint();
+            if ("legacy".equalsIgnoreCase(shared)) {
+                return "android_holo_light";
+            }
+            if ("custom".equalsIgnoreCase(shared)) {
+                return null;
+            }
+            // Default for an Android skin is Material 3.
+            return "AndroidMaterialTheme";
+        }
+        return null;
+    }
+
+    private static String sharedNativeThemeHint() {
+        String v = buildHint("nativeTheme");
+        if (v == null) {
+            v = buildHint("cn1.nativeTheme");
+        }
+        return v;
+    }
+
+    /**
+     * Reads a build hint from the runtime - first the
+     * codename1.arg.&lt;name&gt; system property (set by the
+     * Maven plugin / Simulator), then the loaded
+     * codenameone_settings.properties on disk so unit-test invocations
+     * without the simulator wrapper still see the value.
+     */
+    private static String buildHint(String name) {
+        String v = System.getProperty("codename1.arg." + name);
+        if (v != null && !v.isEmpty()) {
+            return v;
+        }
+        Properties cnop = loadCodenameOneSettings();
+        if (cnop != null) {
+            v = cnop.getProperty("codename1.arg." + name);
+            if (v != null && !v.isEmpty()) {
+                return v;
+            }
+        }
+        return null;
+    }
+
+    private static Properties cachedCnopProperties;
+    private static long cachedCnopMtime = -1L;
+
+    private static Properties loadCodenameOneSettings() {
+        File f = new File(getCWD(), "codenameone_settings.properties");
+        if (!f.exists()) {
+            f = new File(getCWD(), "common" + File.separator + "codenameone_settings.properties");
+        }
+        if (!f.exists()) {
+            return null;
+        }
+        long mtime = f.lastModified();
+        if (cachedCnopProperties != null && cachedCnopMtime == mtime) {
+            return cachedCnopProperties;
+        }
+        Properties p = new Properties();
+        try (FileInputStream in = new FileInputStream(f)) {
+            p.load(in);
+        } catch (IOException ex) {
+            return cachedCnopProperties;
+        }
+        cachedCnopProperties = p;
+        cachedCnopMtime = mtime;
+        return p;
+    }
+
+    /**
      * @return the useNativeInput
      */
     public static boolean isUseNativeInput() {
@@ -2735,7 +2855,17 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             landscapeSkinHotspots = new HashMap<Point, Integer>();
             landscapeScreenCoordinates = new Rectangle();
-            if(props.getProperty("roundScreen", "false").equalsIgnoreCase("true")) {
+            boolean roundScreen = props.getProperty("roundScreen", "false").equalsIgnoreCase("true");
+            boolean hasSafeAreaProps =
+                    props.getProperty("safePortraitX") != null ||
+                    props.getProperty("safePortraitY") != null ||
+                    props.getProperty("safePortraitWidth") != null ||
+                    props.getProperty("safePortraitHeight") != null ||
+                    props.getProperty("safeLandscapeX") != null ||
+                    props.getProperty("safeLandscapeY") != null ||
+                    props.getProperty("safeLandscapeWidth") != null ||
+                    props.getProperty("safeLandscapeHeight") != null;
+            if(roundScreen) {
                 safeAreaLandscape = new Rectangle();
                 safeAreaPortrait = new Rectangle();
 
@@ -2764,6 +2894,22 @@ public class JavaSEPort extends CodenameOneImplementation {
             } else {
                 initializeCoordinates(map, props, portraitSkinHotspots, portraitScreenCoordinates);
                 initializeCoordinates(landscapeMap, props, landscapeSkinHotspots, landscapeScreenCoordinates);
+                if (hasSafeAreaProps) {
+                    safeAreaPortrait = new Rectangle();
+                    safeAreaLandscape = new Rectangle();
+                    safeAreaPortrait.setBounds(
+                            Integer.parseInt(props.getProperty("safePortraitX", "" + portraitScreenCoordinates.x)),
+                            Integer.parseInt(props.getProperty("safePortraitY", "" + portraitScreenCoordinates.y)),
+                            Integer.parseInt(props.getProperty("safePortraitWidth", "" + portraitScreenCoordinates.width)),
+                            Integer.parseInt(props.getProperty("safePortraitHeight", "" + portraitScreenCoordinates.height))
+                    );
+                    safeAreaLandscape.setBounds(
+                            Integer.parseInt(props.getProperty("safeLandscapeX", "" + landscapeScreenCoordinates.x)),
+                            Integer.parseInt(props.getProperty("safeLandscapeY", "" + landscapeScreenCoordinates.y)),
+                            Integer.parseInt(props.getProperty("safeLandscapeWidth", "" + landscapeScreenCoordinates.width)),
+                            Integer.parseInt(props.getProperty("safeLandscapeHeight", "" + landscapeScreenCoordinates.height))
+                    );
+                }
             }
 
 
@@ -2775,20 +2921,21 @@ public class JavaSEPort extends CodenameOneImplementation {
             // plus the legacy ones). The user can override via the
             // Simulator's "Native Theme" submenu (stored in the
             // simulatorNativeTheme Preference) or the cn1.forceSimulatorTheme
-            // system property. If neither is set, platformName maps ios ->
-            // iOSModernTheme and and -> AndroidMaterialTheme. Anything else
-            // keeps whatever the skin archive embedded.
+            // system property. When "auto" is selected we consult the
+            // project's build hints (ios.themeMode / and.themeMode /
+            // nativeTheme, plus the deprecated cn1.androidTheme /
+            // cn1.nativeTheme aliases) so a project that opted in to
+            // ios.themeMode=modern actually previews with the modern
+            // theme instead of an unrelated default. If no hint is set we
+            // keep mapping platformName ios -> iOSModernTheme and
+            // and -> AndroidMaterialTheme - the new defaults shipped by
+            // the initializr / Playground - so a brand new simulator run
+            // matches what the device build will look like.
             String overrideTheme = System.getProperty("cn1.forceSimulatorTheme",
                     Preferences.userNodeForPackage(JavaSEPort.class)
                             .get("simulatorNativeTheme", null));
             if (overrideTheme == null || overrideTheme.isEmpty() || "auto".equalsIgnoreCase(overrideTheme)) {
-                if ("ios".equals(platformName)) {
-                    overrideTheme = "iOSModernTheme";
-                } else if ("and".equals(platformName)) {
-                    overrideTheme = "AndroidMaterialTheme";
-                } else {
-                    overrideTheme = null;
-                }
+                overrideTheme = resolveAutoNativeTheme(platformName);
             } else if ("embedded".equalsIgnoreCase(overrideTheme)) {
                 // Explicit "keep the skin's embedded theme".
                 overrideTheme = null;
@@ -3607,6 +3754,30 @@ public class JavaSEPort extends CodenameOneImplementation {
         });
     }
 
+    private static Component findStatusBarComponent(Form f) {
+        if (f == null || f.getToolbar() == null) {
+            return null;
+        }
+        return findStatusBarIn(f.getToolbar());
+    }
+
+    private static Component findStatusBarIn(com.codename1.ui.Container c) {
+        for (int i = 0; i < c.getComponentCount(); i++) {
+            Component child = c.getComponentAt(i);
+            String uiid = child.getUIID();
+            if ("StatusBar".equals(uiid) || "StatusBarLandscape".equals(uiid)) {
+                return child;
+            }
+            if (child instanceof com.codename1.ui.Container) {
+                Component nested = findStatusBarIn((com.codename1.ui.Container) child);
+                if (nested != null) {
+                    return nested;
+                }
+            }
+        }
+        return null;
+    }
+
     private void installMenu(final JFrame frm, boolean desktopSkin) throws IOException{
         final Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
         JMenuBar bar = new JMenuBar();
@@ -3666,6 +3837,41 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         });
         simulatorMenu.add(autoLocalizationMenu);
+
+        // Rotate menu item: only added when app-frame mode is off. The
+        // app-frame toolbar already exposes Portrait / Landscape RotateAction
+        // buttons, so duplicating them in the menu would be confusing. When
+        // the user has Single Window mode disabled there is no toolbar, so
+        // the only way to rotate is via this menu item - it was lost when
+        // the toolbar buttons were introduced and the menu entry was
+        // removed wholesale instead of gated behind appFrame == null.
+        final JMenuItem rotateMenu = new JMenuItem("Rotate");
+        rotateMenu.setEnabled(!desktopSkin);
+        rotateMenu.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                setPortrait(!portrait);
+                Container parent = canvas.getParent();
+                parent.remove(canvas);
+                canvas.setForcedSize(new java.awt.Dimension(
+                        (int) (getSkin().getWidth() * zoomLevel),
+                        (int) (getSkin().getHeight() * zoomLevel)));
+                if (window != null) {
+                    window.setSize(new java.awt.Dimension(
+                            (int) (getSkin().getWidth() * zoomLevel),
+                            (int) (getSkin().getHeight() * zoomLevel)));
+                }
+                java.awt.Container top = ((JComponent) parent).getTopLevelAncestor();
+                top.revalidate();
+                top.repaint();
+                parent.add(BorderLayout.CENTER, canvas);
+                if (window != null) {
+                    window.pack();
+                }
+                JavaSEPort.this.sizeChanged(getScreenCoordinates().width, getScreenCoordinates().height);
+            }
+        });
+        if (appFrame == null) simulatorMenu.add(rotateMenu);
 
         final JCheckBoxMenuItem zoomMenu = new JCheckBoxMenuItem("Zoom", scrollableSkin);
         if (appFrame == null) simulatorMenu.add(zoomMenu);
@@ -4320,6 +4526,103 @@ public class JavaSEPort extends CodenameOneImplementation {
         });
         simulateMenu.add(pushSim);
 
+        // Mirrors cn1FireStatusBarTap in CodenameOne_GLViewController.m, which
+        // synthesizes a tap inside CN1's StatusBar component (the bar at the
+        // top of Toolbar created by Toolbar.initTitleBarStatus). The native
+        // code now aims at safeAreaInsets.top/2 rather than y=0 because y=0
+        // lands above the StatusBar's absoluteY (Form has a small top
+        // padding); we mirror that here so the simulator menu reproduces what
+        // the device actually does.
+        JMenuItem statusBarTapDiag = new JMenuItem("iOS Status Bar Tap");
+        statusBarTapDiag.setToolTipText("Synthesizes the tap that iOS dispatches when the status bar is tapped, and reports which component receives it.");
+        statusBarTapDiag.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                Form f = Display.getInstance().getCurrent();
+                if (f == null) {
+                    JOptionPane.showMessageDialog(canvas, "No current form to tap.");
+                    return;
+                }
+                int tapX = getDisplayWidthImpl() / 2;
+                // Locate the StatusBar component and aim the synthesized tap
+                // squarely inside it. This matches what cn1FireStatusBarTap
+                // does on iOS using safeAreaInsets.top/2 in native pixels.
+                int tapY = 1;
+                Component statusBarComponent = findStatusBarComponent(f);
+                if (statusBarComponent != null) {
+                    tapY = statusBarComponent.getAbsoluteY()
+                            + Math.max(1, statusBarComponent.getHeight() / 2);
+                }
+
+                StringBuilder report = new StringBuilder();
+                report.append("Simulating the iOS status-bar tap path.\n");
+                report.append("iOS native code synthesizes a tap inside the StatusBar\n");
+                report.append("(safeAreaInsets.top/2) when scrollViewShouldScrollToTop: fires.\n\n");
+                report.append("Tap coordinates: (").append(tapX).append(", ").append(tapY).append(")\n\n");
+
+                UIManager um = f.getUIManager();
+                boolean paintsTitleBar = um.isThemeConstant("paintsTitleBarBool", false);
+                boolean scrollsUp = um.isThemeConstant("statusBarScrollsUpBool", true);
+                report.append("paintsTitleBarBool   = ").append(paintsTitleBar).append("\n");
+                report.append("statusBarScrollsUpBool = ").append(scrollsUp).append("\n\n");
+
+                if (!paintsTitleBar) {
+                    report.append("WARNING: paintsTitleBarBool is false. No StatusBar bar is\n");
+                    report.append("added to the toolbar, so the iOS scroll-to-top gesture has\n");
+                    report.append("nothing to deliver to. Add\n");
+                    report.append("    paintsTitleBarBool: true;\n");
+                    report.append("    includeNativeBool: true;\n");
+                    report.append("to your CSS #Constants block to enable the iOS behavior.\n\n");
+                }
+                if (paintsTitleBar && !scrollsUp) {
+                    report.append("WARNING: statusBarScrollsUpBool is false. The StatusBar is\n");
+                    report.append("created without a pointer-released listener, so taps on it\n");
+                    report.append("don't scroll to top.\n\n");
+                }
+
+                if (statusBarComponent == null) {
+                    report.append("PROBLEM: no StatusBar component found on the current form's\n");
+                    report.append("toolbar. iOS-synthesized tap will silently no-op.\n");
+                } else {
+                    String uiid = statusBarComponent.getUIID();
+                    report.append("StatusBar component:\n");
+                    report.append("  class = ").append(statusBarComponent.getClass().getName()).append("\n");
+                    report.append("  UIID  = ").append(uiid).append("\n");
+                    report.append("  bounds = ").append(statusBarComponent.getAbsoluteX()).append(',')
+                            .append(statusBarComponent.getAbsoluteY()).append(' ')
+                            .append(statusBarComponent.getWidth()).append('x')
+                            .append(statusBarComponent.getHeight()).append("\n\n");
+                    Component responder = f.getResponderAt(tapX, tapY);
+                    if (responder == statusBarComponent) {
+                        report.append("OK: getResponderAt returns the StatusBar at the tap point.\n");
+                        report.append("On a device the iOS scroll-to-top gesture will deliver here.\n");
+                    } else if (responder != null) {
+                        report.append("WARNING: getResponderAt returns a different component:\n");
+                        report.append("  class = ").append(responder.getClass().getName()).append("\n");
+                        report.append("  UIID  = ").append(responder.getUIID()).append("\n");
+                        report.append("That component will receive the synthesized tap instead.\n");
+                    } else {
+                        report.append("Note: getResponderAt returned null at (").append(tapX).append(",")
+                                .append(tapY).append("). The StatusBar Container does not respond\n");
+                        report.append("to pointer events directly, but Form.pointerPressed delivers\n");
+                        report.append("via getComponentAt so the listener still fires.\n");
+                    }
+                }
+
+                Log.p(report.toString());
+                JavaSEPort.this.pointerPressed(tapX, tapY);
+                JavaSEPort.this.pointerReleased(tapX, tapY);
+
+                JTextArea ta = new JTextArea(report.toString());
+                ta.setEditable(false);
+                ta.setFont(new java.awt.Font(java.awt.Font.MONOSPACED, java.awt.Font.PLAIN, 12));
+                JScrollPane sp = new JScrollPane(ta);
+                sp.setPreferredSize(new java.awt.Dimension(560, 360));
+                JOptionPane.showMessageDialog(canvas, sp, "iOS Status Bar Tap Diagnostic", JOptionPane.INFORMATION_MESSAGE);
+            }
+        });
+        simulateMenu.add(statusBarTapDiag);
+
         if (appFrame == null) {
             toolsMenu.add(componentTreeInspector);
         }
@@ -4338,37 +4641,57 @@ public class JavaSEPort extends CodenameOneImplementation {
         });
         toolsMenu.add(testRecorderMenu);
 
-        /*
         JMenu darkLightModeMenu = new JMenu("Dark/Light Mode");
-        simulatorMenu.add(darkLightModeMenu);
-        final JRadioButtonMenuItem darkMode = new JRadioButtonMenuItem("Dark Mode");
-        final JRadioButtonMenuItem lightMode = new JRadioButtonMenuItem("Light Mode");
-        final JRadioButtonMenuItem unsupportedMode = new JRadioButtonMenuItem("Unsupported");
-        ButtonGroup group = new ButtonGroup();
-        group.add(darkMode);
-        group.add(lightMode);
-        group.add(unsupportedMode);
-        darkMode.addActionListener(new ActionListener() {
+        simulateMenu.add(darkLightModeMenu);
+        final JRadioButtonMenuItem darkModeItem = new JRadioButtonMenuItem("Dark Mode");
+        final JRadioButtonMenuItem lightModeItem = new JRadioButtonMenuItem("Light Mode");
+        final JRadioButtonMenuItem unsupportedModeItem = new JRadioButtonMenuItem("Unsupported");
+        ButtonGroup darkModeGroup = new ButtonGroup();
+        darkModeGroup.add(darkModeItem);
+        darkModeGroup.add(lightModeItem);
+        darkModeGroup.add(unsupportedModeItem);
+
+        String savedDarkMode = pref.get("cn1.simulator.darkMode", "unsupported");
+        if ("dark".equals(savedDarkMode)) {
+            darkMode = Boolean.TRUE;
+            darkModeItem.setSelected(true);
+        } else if ("light".equals(savedDarkMode)) {
+            darkMode = Boolean.FALSE;
+            lightModeItem.setSelected(true);
+        } else {
+            darkMode = null;
+            unsupportedModeItem.setSelected(true);
+        }
+
+        darkModeItem.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                JavaSEPort.this.darkMode = true;
+                JavaSEPort.this.darkMode = Boolean.TRUE;
+                pref.put("cn1.simulator.darkMode", "dark");
+                refreshSkin(frm);
             }
         });
 
-        lightMode.addActionListener(new ActionListener() {
+        lightModeItem.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                JavaSEPort.this.darkMode = false;
+                JavaSEPort.this.darkMode = Boolean.FALSE;
+                pref.put("cn1.simulator.darkMode", "light");
+                refreshSkin(frm);
             }
         });
 
-        unsupportedMode.addActionListener(new ActionListener() {
+        unsupportedModeItem.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
                 JavaSEPort.this.darkMode = null;
+                pref.put("cn1.simulator.darkMode", "unsupported");
+                refreshSkin(frm);
             }
         });
-        */
+        darkLightModeMenu.add(darkModeItem);
+        darkLightModeMenu.add(lightModeItem);
+        darkLightModeMenu.add(unsupportedModeItem);
 
         manualPurchaseSupported = pref.getBoolean("manualPurchaseSupported", true);
         managedPurchaseSupported = pref.getBoolean("managedPurchaseSupported", true);
@@ -4671,7 +4994,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             bar.add(simulateMenu);
             bar.add(toolsMenu);
             bar.add(skinMenu);
-            bar.add(createNativeThemeMenu());
+            bar.add(createNativeThemeMenu(frm));
             bar.add(helpMenu);
         }
 
@@ -4780,18 +5103,21 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
     
     /**
-     * Build the Native Theme override menu. By default the simulator picks a
-     * theme from the current skin's platformName ("ios" -&gt; iOSModernTheme,
-     * "and" -&gt; AndroidMaterialTheme); this menu lets the user force one
-     * of the shipped themes or "Use skin's embedded theme" to bypass the
-     * heuristic entirely. Selection is written to the simulatorNativeTheme
-     * Preference and the simulator is reloaded.
+     * Build the Native Theme override menu. "Auto" defers to the project's
+     * build hints (ios.themeMode / and.themeMode / nativeTheme) so a project
+     * that opted in via codenameone_settings.properties previews with the
+     * theme it would ship with; the explicit choices below force a
+     * specific theme regardless of build hints. Selection is written to
+     * the simulatorNativeTheme Preference and the simulator is reloaded
+     * via {@code reload.simulator} - the same mechanism the skin menu
+     * uses, so disposing the JFrame is what actually triggers the
+     * Simulator polling thread to pick up the new theme.
      */
-    private JMenu createNativeThemeMenu() {
+    private JMenu createNativeThemeMenu(final JFrame frm) {
         JMenu m = new JMenu("Native Theme");
         m.setDoubleBuffered(true);
         String[][] items = {
-            {"auto", "Auto (based on skin)"},
+            {"auto", "Auto (from build hints)"},
             {"iOSModernTheme", "iOS Modern (Liquid Glass)"},
             {"iOS7Theme", "iOS 7 (Flat)"},
             {"iPhoneTheme", "iPhone (Pre-Flat)"},
@@ -4810,10 +5136,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                 public void actionPerformed(ActionEvent e) {
                     Preferences.userNodeForPackage(JavaSEPort.class)
                             .put("simulatorNativeTheme", entry[0]);
+                    deinitializeSync();
+                    frm.dispose();
                     System.setProperty("reload.simulator", "true");
-                    if (window != null) {
-                        window.dispose();
-                    }
                 }
             });
             group.add(mi);
@@ -4832,6 +5157,74 @@ public class JavaSEPort extends CodenameOneImplementation {
             m.removeAll();
         }
         final JMenu skinMenu = m;
+
+        // Top-level: file picker for a user-supplied .skin
+        JMenuItem addSkin = new JMenuItem("Add Skin");
+        addSkin.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent ae) {
+                FileDialog picker = new FileDialog(frm, "Add Skin");
+                picker.setMode(FileDialog.LOAD);
+                picker.setFilenameFilter(new FilenameFilter() {
+                    public boolean accept(File file, String string) {
+                        return string.endsWith(".skin");
+                    }
+                });
+                picker.setModal(true);
+                picker.setVisible(true);
+                String file = picker.getFile();
+                if (file != null) {
+                    if (netMonitor != null) {
+                        netMonitor.dispose();
+                        netMonitor = null;
+                    }
+                    if (perfMonitor != null) {
+                        perfMonitor.dispose();
+                        perfMonitor = null;
+                    }
+                    String mainClass = System.getProperty("MainClass");
+                    if (mainClass != null) {
+                        Preferences p = Preferences.userNodeForPackage(JavaSEPort.class);
+                        p.put("skin", picker.getDirectory() + File.separator + file);
+                        deinitializeSync();
+                        frm.dispose();
+                        System.setProperty("reload.simulator", "true");
+                    } else {
+                        loadSkinFile(picker.getDirectory() + File.separator + file, frm);
+                        refreshSkin(frm);
+                    }
+                }
+            }
+        });
+        skinMenu.add(addSkin);
+
+        // Top-level: hand off to the hosted Skin Designer for building
+        // a new skin from scratch. Replaces the bundled gallery; the
+        // pre-built skins all live behind the "Legacy Skins" submenu.
+        JMenuItem designerItem = new JMenuItem("Skin Designer");
+        designerItem.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent ae) {
+                try {
+                    Desktop.getDesktop().browse(new URI("https://www.codenameone.com/skindesigner/"));
+                } catch (Exception err) {
+                    Logger.getLogger(JavaSEPort.class.getName()).log(Level.WARNING,
+                            "Could not open Skin Designer in browser", err);
+                }
+            }
+        });
+        skinMenu.add(designerItem);
+
+        skinMenu.addSeparator();
+
+        final JMenu legacyMenu = new JMenu("Legacy Skins");
+        legacyMenu.setDoubleBuffered(true);
+        skinMenu.add(legacyMenu);
+        populateLegacySkinsMenu(frm, legacyMenu);
+        return skinMenu;
+    }
+
+    private void populateLegacySkinsMenu(final JFrame frm, final JMenu legacyMenu) throws MalformedURLException {
+        legacyMenu.removeAll();
+        final JMenu skinMenu = legacyMenu;
         Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
         String skinNames = pref.get("skins", DEFAULT_SKINS);
         if (skinNames != null) {
@@ -5147,7 +5540,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                                             downloadMessage.setVisible(false);
                                             d.setVisible(false);
                                             try {
-                                                createSkinsMenu(frm, skinMenu);
+                                                populateLegacySkinsMenu(frm, skinMenu);
                                             } catch (MalformedURLException ex) {
                                                 Logger.getLogger(JavaSEPort.class.getName()).log(Level.SEVERE, null, ex);
                                             }
@@ -5171,47 +5564,6 @@ public class JavaSEPort extends CodenameOneImplementation {
                 });
 
 
-            }
-        });
-
-        skinMenu.addSeparator();
-        JMenuItem addSkin = new JMenuItem("Add New...");
-        skinMenu.add(addSkin);
-        addSkin.addActionListener(new ActionListener() {
-
-            public void actionPerformed(ActionEvent ae) {
-                FileDialog picker = new FileDialog(frm, "Add Skin");
-                picker.setMode(FileDialog.LOAD);
-                picker.setFilenameFilter(new FilenameFilter() {
-
-                    public boolean accept(File file, String string) {
-                        return string.endsWith(".skin");
-                    }
-                });
-                picker.setModal(true);
-                picker.setVisible(true);
-                String file = picker.getFile();
-                if (file != null) {
-                    if (netMonitor != null) {
-                        netMonitor.dispose();
-                        netMonitor = null;
-                    }
-                    if (perfMonitor != null) {
-                        perfMonitor.dispose();
-                        perfMonitor = null;
-                    }
-                    String mainClass = System.getProperty("MainClass");
-                    if (mainClass != null) {
-                        Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
-                        pref.put("skin", picker.getDirectory() + File.separator + file);
-                        deinitializeSync();
-                        frm.dispose();
-                        System.setProperty("reload.simulator", "true");
-                    } else {
-                        loadSkinFile(picker.getDirectory() + File.separator + file, frm);
-                        refreshSkin(frm);
-                    }
-                }
             }
         });
 
@@ -5259,10 +5611,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                         }
                         
                     }
-                
+
             }
         });
-        return skinMenu;
     }
 
     InputStream openSkinsURL() throws IOException {
@@ -8938,7 +9289,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     public boolean isTransformSupported(){
         return true;
     }
-    
+
     /**
      * Checks of the Transform class can be used on this platform to perform perspective transforms. 
      *  This is similar to
@@ -14127,8 +14478,18 @@ public class JavaSEPort extends CodenameOneImplementation {
         autoLocalizationBundle = null;
     }
 
-    private File findDefaultLocalizationBundleFile() {
-        File localizationDir = findLocalizationDirectory();
+    File findDefaultLocalizationBundleFile() {
+        return findDefaultLocalizationBundleFile(getCWD());
+    }
+
+    // Returns null when no real bundle file exists. Previously this method
+    // returned a non-existent `Bundle.properties` path as a fallback, which
+    // combined with `findLocalizationDirectory`'s old mkdirs() to create empty
+    // ghost bundles in modules the developer never asked to localize. Now the
+    // auto-bundle activates only when the developer ships at least one
+    // bundle file, matching the project-level opt-in semantics.
+    static File findDefaultLocalizationBundleFile(File projectDir) {
+        File localizationDir = findLocalizationDirectory(projectDir);
         if (localizationDir == null) {
             return null;
         }
@@ -14162,10 +14523,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             java.util.Collections.sort(bundles);
             return bundles.get(0);
         }
-        return preferred;
+        return null;
     }
 
-    private void collectLocalizationBundles(File dir, java.util.List<File> out) {
+    private static void collectLocalizationBundles(File dir, java.util.List<File> out) {
         File[] files = dir.listFiles();
         if (files == null) {
             return;
@@ -14179,24 +14540,48 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
-    private File findLocalizationDirectory() {
-        File projectDir = getCWD();
-        File[] candidates = new File[]{
-            new File(projectDir, "src" + File.separator + "main" + File.separator + "l10n"),
-            new File(projectDir, "l10n"),
-            new File(projectDir, "src" + File.separator + "l10n")
-        };
+    File findLocalizationDirectory() {
+        return findLocalizationDirectory(getCWD());
+    }
+
+    // Resolves the project's localization bundle directory for the auto-bundle.
+    //
+    // The simulator forks `cn1:run` from the `javase/` module, so cwd is `javase/`
+    // -- but the developer's bundles live in the sibling `common/` module under
+    // `common/src/main/l10n`. Issue #4850: previous versions of this method
+    // looked only at cwd, missed the real bundle, and then auto-created a
+    // throwaway `javase/src/main/l10n/Bundle.properties` via mkdirs(). The
+    // throwaway file accumulated wormhole-poisoned `@im=@im` entries from older
+    // CN1 versions; even after users cleaned the *real* bundle in `common/`,
+    // every CN1CSSCLI subprocess respawn loaded the ghost bundle from `javase/`,
+    // crashed inside `parseTextFieldInputMode`, and CSSWatcher restarted it in
+    // an infinite respawn loop.
+    //
+    // New rules:
+    //  1. Check the current module first (cwd/src/main/{l10n,i18n}).
+    //  2. Then check the sibling `common/` module (matches CN1 maven layout
+    //     and CSSWatcher.addLocalizationCandidates).
+    //  3. Never auto-create the directory. Project-level opt-in: if the
+    //     developer hasn't set up localization, the auto-bundle is a no-op.
+    static File findLocalizationDirectory(File projectDir) {
+        if (projectDir == null) {
+            return null;
+        }
+        java.util.List<File> candidates = new java.util.ArrayList<File>();
+        candidates.add(new File(projectDir, "src" + File.separator + "main" + File.separator + "l10n"));
+        candidates.add(new File(projectDir, "src" + File.separator + "main" + File.separator + "i18n"));
+        candidates.add(new File(projectDir, "l10n"));
+        candidates.add(new File(projectDir, "src" + File.separator + "l10n"));
+        File parent = projectDir.getParentFile();
+        if (parent != null) {
+            File commonModule = new File(parent, "common");
+            candidates.add(new File(commonModule, "src" + File.separator + "main" + File.separator + "l10n"));
+            candidates.add(new File(commonModule, "src" + File.separator + "main" + File.separator + "i18n"));
+        }
         for (File dir : candidates) {
-            if (dir.exists() && dir.isDirectory()) {
+            if (dir != null && dir.exists() && dir.isDirectory()) {
                 return dir;
             }
-        }
-        File fallback = candidates[0];
-        if (!fallback.exists()) {
-            fallback.mkdirs();
-        }
-        if (fallback.exists() && fallback.isDirectory()) {
-            return fallback;
         }
         return null;
     }
@@ -14233,10 +14618,36 @@ public class JavaSEPort extends CodenameOneImplementation {
                 properties.clear();
                 properties.load(in);
                 super.clear();
+                java.util.List<String> wormholeKeys = null;
                 for (String name : properties.stringPropertyNames()) {
-                    putInternal(name, properties.getProperty(name));
+                    String value = properties.getProperty(name);
+                    // Legacy self-heal for issue #4850: older Codename One versions
+                    // (<= 7.0.236) whose `get(Object)` echoed missing keys back as
+                    // their own value persisted those echoes to disk. Now that the
+                    // @-key auto-fabrication guard is in place new echoes are
+                    // blocked, but on-disk `@k=@k` entries written by older
+                    // versions still flow through `super.get` as non-null and
+                    // crash `UIManager.setBundle` -> `parseTextFieldInputMode` on
+                    // a token with no `=`. Drop them at load time and rewrite the
+                    // file so legacy projects self-heal on the next simulator
+                    // boot instead of crashing forever.
+                    if (name != null && name.startsWith("@") && name.equals(value)) {
+                        if (wormholeKeys == null) {
+                            wormholeKeys = new java.util.ArrayList<String>();
+                        }
+                        wormholeKeys.add(name);
+                        continue;
+                    }
+                    putInternal(name, value);
                 }
-                dirty = false;
+                if (wormholeKeys != null) {
+                    for (String name : wormholeKeys) {
+                        properties.remove(name);
+                    }
+                    persist();
+                } else {
+                    dirty = false;
+                }
             } catch (IOException err) {
                 Log.e(err);
             }
@@ -14295,6 +14706,15 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (key instanceof String) {
                 String strKey = (String) key;
                 if (value == null) {
+                    // Don't auto-fabricate values for meta-keys like @rtl, @im, @im-<name>.
+                    // These are configuration entries that callers (e.g. UIManager.setBundle)
+                    // distinguish from "missing" by checking for null. If we echo the key back
+                    // as the value, setBundle will treat "@im" as a real input-mode descriptor,
+                    // tokenize it, and crash inside parseTextFieldInputMode when the resulting
+                    // token has no '='.
+                    if (strKey.startsWith("@")) {
+                        return null;
+                    }
                     String autoValue = strKey;
                     putInternal(strKey, autoValue);
                     storeEntry(strKey, autoValue, true);

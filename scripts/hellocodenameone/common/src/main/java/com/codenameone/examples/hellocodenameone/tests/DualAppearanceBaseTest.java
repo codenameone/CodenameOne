@@ -9,6 +9,7 @@ import com.codename1.ui.Font;
 import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Painter;
+import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.Layout;
 import com.codename1.ui.plaf.Style;
@@ -150,10 +151,36 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
                     // race over the same transitioning buffer and produce
                     // byte-identical PNGs (classic symptom was
                     // ButtonTheme_light.png == ButtonTheme_dark.png).
-                    Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot(imageName, next);
+                    //
+                    // Even with that chain in place, on iOS Metal the
+                    // light->dark show transition was leaving the previous
+                    // frame's pixels in the CAMetalLayer at the moment
+                    // cn1_captureView ran with afterScreenUpdates:NO, so
+                    // the dark-tagged screenshot grabbed light-form pixels
+                    // (visible victims: DialogTheme_dark, FloatingAction-
+                    // ButtonTheme_light). Pump three Display.callSerially
+                    // hops before emit so at least three EDT paint cycles
+                    // (and therefore three Metal frame presents) land
+                    // between the form's own onShowCompleted hand-off and
+                    // the actual capture; combined with the createEmpty()
+                    // transition below this gives the new form's pixels
+                    // time to reach the front buffer.
+                    Display.getInstance().callSerially(() ->
+                        Display.getInstance().callSerially(() ->
+                            Display.getInstance().callSerially(() ->
+                                Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot(imageName, next))));
                 });
             }
         };
+        // Skip the form-show transition entirely. The default fade/slide
+        // takes ~300ms during which CN1 is still drawing the *previous*
+        // form into the back buffer; on iOS Metal that means the screen-
+        // shot's CAMetalLayer contents linger on the old frame even after
+        // onShowCompleted fires. createEmpty() makes form.show() switch
+        // synchronously so onShowCompleted fires with the new form
+        // already painted, removing the transition window from the race.
+        form.setTransitionInAnimator(CommonTransitions.createEmpty());
+        form.setTransitionOutAnimator(CommonTransitions.createEmpty());
         populate(form, suffix);
         if (textured) {
             // The ContentPane sits on top of the Form and paints its own
@@ -406,6 +433,15 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
      */
     private static final class TextureBackdropPainter implements Painter {
         private final boolean dark;
+        // Cache the rendered pattern as an Image so subsequent paints blit
+        // a single bitmap instead of re-running the scanline loop. The
+        // form's settle window emits ~30 paints at 60Hz before the
+        // screenshot fires; without the cache that's ~30 * 50_bands *
+        // 2532_rows = ~3.8M fillRect calls per capture, which on iOS
+        // Metal saturates the CAMetalLayer command buffer enough to time
+        // the CI screenshot step out. With the cache it's 1 fillRect for
+        // the first paint and 1 drawImage for each later one.
+        private com.codename1.ui.Image cached;
 
         TextureBackdropPainter(boolean dark) {
             this.dark = dark;
@@ -413,18 +449,30 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
 
         @Override
         public void paint(Graphics g, Rectangle rect) {
-            int prevColor = g.getColor();
-            int prevAlpha = g.getAlpha();
             int x = rect.getX();
             int y = rect.getY();
             int w = rect.getWidth();
             int h = rect.getHeight();
+            if (w <= 0 || h <= 0) {
+                return;
+            }
+            if (cached == null || cached.getWidth() != w || cached.getHeight() != h) {
+                cached = renderTexture(w, h);
+            }
+            if (cached != null) {
+                g.drawImage(cached, x, y);
+            }
+        }
+
+        private com.codename1.ui.Image renderTexture(int w, int h) {
+            com.codename1.ui.Image img = com.codename1.ui.Image.createImage(w, h, 0xffffffff);
+            Graphics ig = img.getGraphics();
 
             // Base fill - a neutral mid-tone so stripes have somewhere
             // to sit. Dark mode uses a dark base, light uses a light base.
-            g.setAlpha(255);
-            g.setColor(dark ? 0x202030 : 0xf0e8f8);
-            g.fillRect(x, y, w, h);
+            ig.setAlpha(255);
+            ig.setColor(dark ? 0x202030 : 0xf0e8f8);
+            ig.fillRect(0, 0, w, h);
 
             // Diagonal stripes painted as rotated rectangles. 6mm-ish band
             // width reads well at phone resolution. Palette is kept
@@ -435,31 +483,29 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
             int[] lightPalette = { 0xff7eb2, 0x7ec8ff, 0xffd67e, 0x9affc8, 0xd8a0ff };
             int[] darkPalette  = { 0x882244, 0x224488, 0x886622, 0x226644, 0x664488 };
             int[] palette = dark ? darkPalette : lightPalette;
-            g.setAlpha(180);
+            ig.setAlpha(180);
             int diagonalOffset = -h; // start off-screen so the pattern fills
             int band = 0;
             while (diagonalOffset < w + h) {
-                g.setColor(palette[band % palette.length]);
+                ig.setColor(palette[band % palette.length]);
                 // diagonal band = a quad from (diagonalOffset, 0) to
                 // (diagonalOffset + bandW, 0) down to (diagonalOffset + bandW + h, h)
                 // / (diagonalOffset + h, h). Approximate with scanlines so
                 // this stays portable across ports that may lack fillPolygon.
                 for (int row = 0; row < h; row++) {
-                    int x0 = x + diagonalOffset + row;
+                    int x0 = diagonalOffset + row;
                     int x1 = x0 + bandW;
-                    if (x1 < x || x0 > x + w) {
+                    if (x1 < 0 || x0 > w) {
                         continue;
                     }
-                    if (x0 < x) x0 = x;
-                    if (x1 > x + w) x1 = x + w;
-                    g.fillRect(x0, y + row, x1 - x0, 1);
+                    if (x0 < 0) x0 = 0;
+                    if (x1 > w) x1 = w;
+                    ig.fillRect(x0, row, x1 - x0, 1);
                 }
                 diagonalOffset += bandW;
                 band++;
             }
-
-            g.setAlpha(prevAlpha);
-            g.setColor(prevColor);
+            return img;
         }
     }
 }

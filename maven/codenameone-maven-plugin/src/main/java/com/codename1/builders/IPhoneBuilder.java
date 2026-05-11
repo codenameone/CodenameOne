@@ -356,12 +356,14 @@ public class IPhoneBuilder extends Executor {
         }
 
         debug("Xcode version is "+xcodeVersion);
-        // ios.themeMode stays the platform-specific knob; cn1.nativeTheme is
+        // ios.themeMode stays the platform-specific knob; nativeTheme is
         // the cross-platform meta hint. modern / legacy on the meta hint
         // translate to the equivalent iOS values when ios.themeMode is unset.
+        // cn1.nativeTheme is honored as a deprecated alias for nativeTheme.
         String iosMode = request.getArg("ios.themeMode", null);
         if (iosMode == null) {
-            String sharedMode = request.getArg("cn1.nativeTheme", null);
+            String sharedMode = request.getArg("nativeTheme",
+                    request.getArg("cn1.nativeTheme", null));
             if ("legacy".equalsIgnoreCase(sharedMode)) {
                 iosMode = "ios7";
             } else if ("modern".equalsIgnoreCase(sharedMode)) {
@@ -708,6 +710,8 @@ public class IPhoneBuilder extends Executor {
             try {
                 File CN1ES2compat = new File(buildinRes, "CN1ES2compat.h");
                 replaceInFile(CN1ES2compat, "//#define CN1_USE_METAL", "#define CN1_USE_METAL");
+                String colorSpaceDefine = resolveMetalColorSpaceDefine(request.getArg("ios.metal.colorSpace", "sRGB"));
+                replaceInFile(CN1ES2compat, "//#define CN1_METAL_COLORSPACE_PLACEHOLDER", colorSpaceDefine);
                 copy(new File(buildinRes, "MainWindowMETAL.xib"), new File(buildinRes, "MainWindow.xib"));
                 copy(new File(buildinRes, "CodenameOne_METALViewController.xib"), new File(buildinRes, "CodenameOne_GLViewController.xib"));
             } catch (Exception ex) {
@@ -716,6 +720,11 @@ public class IPhoneBuilder extends Executor {
         } else {
             new File(buildinRes, "MainWindowMETAL.xib").delete();
             new File(buildinRes, "CodenameOne_METALViewController.xib").delete();
+            // The .metal shader file isn't guarded by an #ifdef like the
+            // companion .m files, so leaving it in the project forces Xcode
+            // to invoke the Metal toolchain — which Xcode 26 ships as a
+            // separately-downloaded component that build servers don't have.
+            new File(buildinRes, "CN1MetalShaders.metal").delete();
         }
 
 
@@ -1329,6 +1338,12 @@ public class IPhoneBuilder extends Executor {
                 try(Writer fios = new OutputStreamWriter(Files.newOutputStream(appDelH.toPath()), StandardCharsets.UTF_8)) {
                     String str = new String(data, StandardCharsets.UTF_8);
                     str = str.replace("//#define CN1_INCLUDE_NOTIFICATIONS", "#define CN1_INCLUDE_NOTIFICATIONS");
+                    if (request.getArg("ios.notificationPermissionAtLaunch", "false").equalsIgnoreCase("true")) {
+                        // Restore pre-#4876 behavior: prompt for notification permission
+                        // in didFinishLaunchingWithOptions instead of on first registerPush /
+                        // sendLocalNotification call.
+                        str = str.replace("//#define CN1_NOTIFICATION_PERMISSION_AT_LAUNCH", "#define CN1_NOTIFICATION_PERMISSION_AT_LAUNCH");
+                    }
                     fios.write(str);
                 }
 
@@ -2805,7 +2820,14 @@ public class IPhoneBuilder extends Executor {
         // resulting partial Info.plist already contains the correct
         // CFBundleIcons entries, so we deliberately do not inject any
         // CFBundleAlternateIcons fragment here. Doing so would conflict with
-        // actool's output during the Info.plist merge.
+        // actool's output during the Info.plist merge. We do, however, need
+        // to inject CFBundleIconName -- without it actool will not emit the
+        // partial Info.plist containing CFBundleIcons / CFBundleAlternateIcons,
+        // and -[UIApplication setAlternateIconName:] would then fail at runtime
+        // because the bundle does not advertise the alternate icons.
+        if (!localizedIcons.isEmpty() && !inject.contains("CFBundleIconName")) {
+            inject += "\n<key>CFBundleIconName</key>\n<string>AppIcon</string>";
+        }
         String locationUsageDescription = null;
         if (xcodeVersion >= 9) {
             if ( (locationUsageDescription = request.getArg("ios.locationUsageDescription", null)) != null ){
@@ -3080,6 +3102,37 @@ public class IPhoneBuilder extends Executor {
         return new String[]{source, target};
     }
 
+    private String resolveMetalColorSpaceDefine(String hint) {
+        String value = hint == null ? "sRGB" : hint.trim();
+        if (value.length() == 0) {
+            value = "sRGB";
+        }
+        String key = value.toLowerCase().replace("-", "").replace("_", "");
+        if (key.equals("srgb")) {
+            return "#define CN1_METAL_COLORSPACE_SRGB";
+        }
+        if (key.equals("displayp3") || key.equals("p3")) {
+            return "#define CN1_METAL_COLORSPACE_DISPLAY_P3";
+        }
+        if (key.equals("devicergb") || key.equals("device")) {
+            return "#define CN1_METAL_COLORSPACE_DEVICE_RGB";
+        }
+        if (key.equals("linearsrgb") || key.equals("linear")) {
+            return "#define CN1_METAL_COLORSPACE_LINEAR_SRGB";
+        }
+        if (key.equals("extendedsrgb")) {
+            return "#define CN1_METAL_COLORSPACE_EXTENDED_SRGB";
+        }
+        if (key.equals("extendedlinearsrgb")) {
+            return "#define CN1_METAL_COLORSPACE_EXTENDED_LINEAR_SRGB";
+        }
+        if (key.equals("none") || key.equals("default") || key.equals("system")) {
+            return "#define CN1_METAL_COLORSPACE_NONE";
+        }
+        log("Unknown ios.metal.colorSpace value: " + hint + " - falling back to sRGB");
+        return "#define CN1_METAL_COLORSPACE_SRGB";
+    }
+
     private String resolveXcodebuild() {
         String explicitXcodebuild = System.getenv("XCODEBUILD");
         if (explicitXcodebuild != null && explicitXcodebuild.length() > 0) {
@@ -3176,32 +3229,65 @@ public class IPhoneBuilder extends Executor {
             mapping.append("@\"").append(entry.getValue()).append("\": @\"").append(entry.getKey()).append("\"");
         }
         mapping.append(" }");
+        // Wait for UIApplicationDidBecomeActiveNotification before calling
+        // -[UIApplication setAlternateIconName:]. Calling from didFinishLaunching --
+        // even via dispatch_async on the main queue -- routinely fails with
+        // NSCocoaErrorDomain Code=3072 ("operation was cancelled") because the
+        // system alert iOS shows for an icon change has no active foreground scene
+        // to anchor to yet. Deferring to the active state fixes the silent failure
+        // that the user reported on top of #4870. The completion handler is wired
+        // up so any remaining bundle-configuration problem surfaces in the device
+        // log instead of being swallowed (the original nil handler hid this).
         return "\n    // Codename One localized app icon selection\n"
                 + "    if ([[UIApplication sharedApplication] respondsToSelector:@selector(setAlternateIconName:completionHandler:)]) {\n"
                 + "        NSDictionary *cn1LocalizedIcons =\n"
                 + mapping + ";\n"
-                + "        NSString *cn1CurrentIcon = [[UIApplication sharedApplication] alternateIconName];\n"
-                + "        NSString *cn1TargetIcon = nil;\n"
-                + "        NSArray *cn1PrefLangs = [NSLocale preferredLanguages];\n"
-                + "        if (cn1PrefLangs.count > 0) {\n"
-                + "            NSString *cn1PrefLang = [cn1PrefLangs objectAtIndex:0];\n"
-                + "            NSArray *cn1LangParts = [cn1PrefLang componentsSeparatedByCharactersInSet:\n"
-                + "                [NSCharacterSet characterSetWithCharactersInString:@\"-_\"]];\n"
-                + "            if (cn1LangParts.count >= 2) {\n"
-                + "                NSString *cn1Key = [NSString stringWithFormat:@\"%@_%@\",\n"
-                + "                    [[cn1LangParts objectAtIndex:0] lowercaseString],\n"
-                + "                    [[cn1LangParts objectAtIndex:1] uppercaseString]];\n"
-                + "                cn1TargetIcon = [cn1LocalizedIcons objectForKey:cn1Key];\n"
+                + "        void (^cn1ApplyIcon)(void) = ^{\n"
+                + "            NSString *cn1CurrentIcon = [[UIApplication sharedApplication] alternateIconName];\n"
+                + "            NSString *cn1TargetIcon = nil;\n"
+                + "            NSArray *cn1PrefLangs = [NSLocale preferredLanguages];\n"
+                + "            if (cn1PrefLangs.count > 0) {\n"
+                + "                NSString *cn1PrefLang = [cn1PrefLangs objectAtIndex:0];\n"
+                + "                NSArray *cn1LangParts = [cn1PrefLang componentsSeparatedByCharactersInSet:\n"
+                + "                    [NSCharacterSet characterSetWithCharactersInString:@\"-_\"]];\n"
+                + "                if (cn1LangParts.count >= 2) {\n"
+                + "                    NSString *cn1Key = [NSString stringWithFormat:@\"%@_%@\",\n"
+                + "                        [[cn1LangParts objectAtIndex:0] lowercaseString],\n"
+                + "                        [[cn1LangParts objectAtIndex:1] uppercaseString]];\n"
+                + "                    cn1TargetIcon = [cn1LocalizedIcons objectForKey:cn1Key];\n"
+                + "                }\n"
+                + "                if (cn1TargetIcon == nil && cn1LangParts.count >= 1) {\n"
+                + "                    NSString *cn1Key = [[cn1LangParts objectAtIndex:0] lowercaseString];\n"
+                + "                    cn1TargetIcon = [cn1LocalizedIcons objectForKey:cn1Key];\n"
+                + "                }\n"
                 + "            }\n"
-                + "            if (cn1TargetIcon == nil && cn1LangParts.count >= 1) {\n"
-                + "                NSString *cn1Key = [[cn1LangParts objectAtIndex:0] lowercaseString];\n"
-                + "                cn1TargetIcon = [cn1LocalizedIcons objectForKey:cn1Key];\n"
+                + "            BOOL cn1NeedsUpdate = (cn1TargetIcon == nil && cn1CurrentIcon != nil)\n"
+                + "                || (cn1TargetIcon != nil && ![cn1TargetIcon isEqualToString:cn1CurrentIcon]);\n"
+                + "            if (!cn1NeedsUpdate) {\n"
+                + "                return;\n"
                 + "            }\n"
-                + "        }\n"
-                + "        BOOL cn1NeedsUpdate = (cn1TargetIcon == nil && cn1CurrentIcon != nil)\n"
-                + "            || (cn1TargetIcon != nil && ![cn1TargetIcon isEqualToString:cn1CurrentIcon]);\n"
-                + "        if (cn1NeedsUpdate) {\n"
-                + "            [[UIApplication sharedApplication] setAlternateIconName:cn1TargetIcon completionHandler:nil];\n"
+                + "            NSString *cn1FinalTarget = cn1TargetIcon;\n"
+                + "            [[UIApplication sharedApplication] setAlternateIconName:cn1FinalTarget completionHandler:^(NSError * _Nullable cn1IconErr) {\n"
+                + "                if (cn1IconErr != nil) {\n"
+                + "                    NSLog(@\"[CodenameOne] Failed to set alternate app icon '%@': %@\", cn1FinalTarget ?: @\"(primary)\", cn1IconErr);\n"
+                + "                } else {\n"
+                + "                    NSLog(@\"[CodenameOne] Set alternate app icon to '%@'\", cn1FinalTarget ?: @\"(primary)\");\n"
+                + "                }\n"
+                + "            }];\n"
+                + "        };\n"
+                + "        if ([UIApplication sharedApplication].applicationState == UIApplicationStateActive) {\n"
+                + "            dispatch_async(dispatch_get_main_queue(), cn1ApplyIcon);\n"
+                + "        } else {\n"
+                + "            __block id cn1ActiveObs = nil;\n"
+                + "            cn1ActiveObs = [[NSNotificationCenter defaultCenter]\n"
+                + "                addObserverForName:UIApplicationDidBecomeActiveNotification object:nil queue:[NSOperationQueue mainQueue]\n"
+                + "                usingBlock:^(NSNotification *cn1Note) {\n"
+                + "                    if (cn1ActiveObs != nil) {\n"
+                + "                        [[NSNotificationCenter defaultCenter] removeObserver:cn1ActiveObs];\n"
+                + "                        cn1ActiveObs = nil;\n"
+                + "                    }\n"
+                + "                    cn1ApplyIcon();\n"
+                + "                }];\n"
                 + "        }\n"
                 + "    }\n";
     }

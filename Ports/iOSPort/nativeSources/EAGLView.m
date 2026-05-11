@@ -376,12 +376,20 @@ extern int displayHeight;
 }
 
 extern int currentlyEditingMaxLength;
+extern BOOL currentlyReturnExitsEditing;
 - (BOOL)textField:(UITextField *)textField shouldChangeCharactersInRange:(NSRange)range replacementString:(NSString *)string {
     NSUInteger newLength = (textField.text.length - range.length) + string.length;
     return (newLength <= currentlyEditingMaxLength);
 }
 
 -(BOOL)textView:(UITextView *)textView shouldChangeTextInRange:(NSRange)range replacementText:(NSString *)text {
+    // iosReturnExitsEditing: treat a Return keypress on a multi-line text view as Done.
+    // Only intercept a single "\n" replacement so pasted text containing newlines is
+    // unaffected.
+    if (currentlyReturnExitsEditing && [text isEqualToString:@"\n"]) {
+        [self keyboardDoneClicked];
+        return NO;
+    }
     NSUInteger newLength = (textView.text.length - range.length) + text.length;
     return (newLength <= currentlyEditingMaxLength);
 }

@@ -1,9 +1,12 @@
 name: Website CN1 Version PR
 
 on:
-  push:
-    tags:
-      - "*"
+  # Trigger only on release publication. The developer-guide.pdf is
+  # attached to the release by developer-guide-docs.yml a few minutes
+  # after the release is published, and the PR opened here triggers
+  # website-docs which depends on that asset. Firing on tag-push as
+  # well would create the PR before the asset exists. We still wait
+  # below to cover the gap between release publish and asset upload.
   release:
     types:
       - published
@@ -19,6 +22,56 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Wait for developer-guide.pdf on the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          # The website-docs workflow triggered by this PR resolves the
+          # developer-guide.pdf URL from the latest release. That asset is
+          # uploaded by developer-guide-docs.yml a few minutes after the
+          # release is published, so wait for it before creating the PR.
+          set +e
+          for i in $(seq 1 60); do
+            if gh release view "$RELEASE_TAG" \
+                --repo "$GITHUB_REPOSITORY" \
+                --json assets \
+                --jq '.assets[].name' 2>/dev/null \
+                | grep -Fxq 'developer-guide.pdf'; then
+              echo "developer-guide.pdf is attached to release $RELEASE_TAG"
+              exit 0
+            fi
+            echo "[$i/60] Waiting for developer-guide.pdf on release $RELEASE_TAG"
+            sleep 30
+          done
+          echo "developer-guide.pdf did not appear on release $RELEASE_TAG within 30 minutes"
+          exit 1
+
+      - name: Wait for codenameone-maven-plugin on Maven Central
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          # PR-triggered workflows like cn1playground-language and
+          # archetype-smoke try to resolve com.codenameone:codenameone-maven-plugin
+          # at the new version from Maven Central as soon as the PR opens.
+          # Sonatype Central -> repo1.maven.org propagation can take 30+
+          # minutes after publish, so wait for the artifact to be visible
+          # before creating the PR.
+          set +e
+          version="${RELEASE_TAG#v}"
+          url="https://repo1.maven.org/maven2/com/codenameone/codenameone-maven-plugin/${version}/codenameone-maven-plugin-${version}.pom"
+          for i in $(seq 1 90); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "$url")
+            if [ "$code" = "200" ]; then
+              echo "codenameone-maven-plugin ${version} is on Maven Central"
+              exit 0
+            fi
+            echo "[$i/90] Waiting for codenameone-maven-plugin ${version} on Maven Central (last code=$code)"
+            sleep 20
+          done
+          echo "codenameone-maven-plugin ${version} did not appear on Maven Central within 30 minutes"
+          exit 1
+
       - name: Update Initializr Codename One versions
         run: ./scripts/initializr/update-cn1-version.sh "${{ github.event.release.tag_name || github.ref_name }}"
 
@@ -28,6 +81,13 @@ jobs:
       - name: Create pull request
         uses: peter-evans/create-pull-request@v6
         with:
+          # PRs created with the default GITHUB_TOKEN do not trigger pull_request
+          # workflows (GitHub's anti-recursion rule), so the bump PR ships with no
+          # CI coverage. Authenticate as a real user so workflows like
+          # cn1playground-language and website-docs run as they would on a manual PR.
+          # CN1SS_GH_TOKEN is the same fine-grained PAT used by the screenshot
+          # workflows (see scripts-android.yml header for rotation instructions).
+          token: ${{ secrets.CN1SS_GH_TOKEN }}
           base: ${{ github.event.repository.default_branch }}
           commit-message: "scripts/website: bump Codename One versions to ${{ github.event.release.tag_name || github.ref_name }}"
           title: "scripts/website: bump Codename One versions to ${{ github.event.release.tag_name || github.ref_name }}"

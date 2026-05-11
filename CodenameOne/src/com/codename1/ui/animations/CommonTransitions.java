@@ -862,6 +862,25 @@ public final class CommonTransitions extends Transition {
                     paintInterformContainers(g);
                     return;
                 case TYPE_SLIDE_AND_FADE: {
+                    // Final transition frame: instead of repeating the cross-
+                    // fade (which intentionally leaves both source + dest
+                    // titles visible at varying alpha), paint the destination
+                    // form fully. The form's normal paint clears the title
+                    // area properly, which matters on persistent-backing
+                    // renderers (iOS Metal MTLLoadActionLoad) that faithfully
+                    // preserve every previous-frame pixel -- without this
+                    // cleanup, the cross-fade's accumulated alpha-blended
+                    // title pixels remain in the screenTexture and the next
+                    // captured frame shows two titles overlapping. iOS GL ES2
+                    // happens to mask this because CAEAGLLayer.retainBacking
+                    // is permissively lossy about partial-alpha pixels.
+                    if (firstFinished) {
+                        Form finalForm = (Form) getDestination();
+                        if (finalForm != null) {
+                            paint(g, finalForm, 0, 0, true);
+                        }
+                        return;
+                    }
 
                     Form sourceForm = (Form) getSource();
                     Form destForm = (Form) getDestination();

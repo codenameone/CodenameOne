@@ -26,10 +26,20 @@ public class OrientationLockScreenshotTest extends BaseTest {
             protected void onShowCompleted() {
                 CN.lockOrientation(false);
                 waitForOrientation(this, false, () -> {
-                    waitFor(50);
-                    Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot("landscape", () -> {
-                        CN.lockOrientation(true);
-                        waitForOrientation(this, true, OrientationLockScreenshotTest.this::done);
+                    // The simulator rotation animation can land in slightly
+                    // different sub-pixel positions if we capture the form too
+                    // early after CN.isPortrait() flips. Mirror BaseTest's
+                    // 1500ms readiness timer so the screenshot waits for the
+                    // post-rotation layout pass to settle and revalidate the
+                    // form layout once before snapping; otherwise this test
+                    // produces 4-7% AA-only diffs run-over-run.
+                    revalidate();
+                    UITimer.timer(1500, false, this, () -> {
+                        revalidate();
+                        Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot("landscape", () -> {
+                            CN.lockOrientation(true);
+                            waitForOrientation(this, true, OrientationLockScreenshotTest.this::done);
+                        });
                     });
                 });
             }
