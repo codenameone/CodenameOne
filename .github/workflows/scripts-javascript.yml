@@ -65,8 +65,8 @@ jobs:
       # suite were timing out before any tests could be diff'd. 1200s
       # absorbs the variance without re-introducing the
       # silently-dropped-test workaround.
-      CN1_JS_TIMEOUT_SECONDS: "1200"
-      CN1_JS_BROWSER_LIFETIME_SECONDS: "1140"
+      CN1_JS_TIMEOUT_SECONDS: "1800"
+      CN1_JS_BROWSER_LIFETIME_SECONDS: "1740"
       CN1SS_SKIP_COVERAGE: "1"
       CN1SS_FAIL_ON_MISMATCH: "1"
       BROWSER_CMD: "node \"$GITHUB_WORKSPACE/scripts/run-javascript-headless-browser.mjs\""

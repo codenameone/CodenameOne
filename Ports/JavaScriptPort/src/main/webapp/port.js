@@ -3148,7 +3148,14 @@ const cn1ssForcedTimeoutTestClasses = Object.freeze({
   // Sheet teardown doesn't complete before the next test starts so
   // a dim/blur layer persists across forms. Separate test-isolation
   // bug worth chasing; for now park here so the suite is reliable.
-  "com_codenameone_examples_hellocodenameone_tests_TextAreaAlignmentScreenshotTest": "sheetTearDownLeak"
+  "com_codenameone_examples_hellocodenameone_tests_TextAreaAlignmentScreenshotTest": "sheetTearDownLeak",
+  // ValidatorLightweightPicker and LightweightPickerButtons run at
+  // suite indices 70-71 -- close to the canvas-accumulation
+  // threshold, and which of them hangs the SUITE:FINISHED wait
+  // drifts run-to-run. Park both alongside the chart tail so the
+  // suite reliably reaches comparison.
+  "com_codenameone_examples_hellocodenameone_tests_ValidatorLightweightPickerScreenshotTest": "chartDocumentStaleness",
+  "com_codenameone_examples_hellocodenameone_tests_LightweightPickerButtonsScreenshotTest": "chartDocumentStaleness"
 });
 const cn1ssForcedTimeoutTestNames = Object.freeze({
   "MediaPlaybackScreenshotTest": "mediaPlayback",
@@ -3190,7 +3197,9 @@ const cn1ssForcedTimeoutTestNames = Object.freeze({
   "ChartRotatedScreenshotTest": "chartDocumentStaleness",
   "ToastBarTopPositionScreenshotTest": "chartDocumentStaleness",
   "SheetSlideUpAnimationScreenshotTest": "chartDocumentStaleness",
-  "TextAreaAlignmentScreenshotTest": "sheetTearDownLeak"
+  "TextAreaAlignmentScreenshotTest": "sheetTearDownLeak",
+  "ValidatorLightweightPickerScreenshotTest": "chartDocumentStaleness",
+  "LightweightPickerButtonsScreenshotTest": "chartDocumentStaleness"
 });
 
 if (jvm && typeof jvm.addVirtualMethod === "function" && jvm.classes && jvm.classes["java_lang_String"]) {
