@@ -9,6 +9,7 @@ import com.codename1.impl.javase.AbstractBrowserWindowSE;
 import com.codename1.impl.javase.BrowserWindowFactory;
 import com.codename1.impl.javase.IBrowserComponent;
 import com.codename1.impl.javase.JavaSEPort;
+import com.codename1.impl.javase.ffmpeg.FFMPEGMedia;
 import static com.codename1.impl.javase.JavaSEPort.checkForPermission;
 import static com.codename1.impl.javase.JavaSEPort.retinaScale;
 import com.codename1.io.Log;
@@ -93,6 +94,9 @@ public class JavaFXSEPort extends JavaSEPort {
     
      @Override
     public AsyncResource<Media> createMediaAsync(String uriAddress, final boolean isVideo, final Runnable onCompletion) {
+        if ("ffmpeg".equalsIgnoreCase(System.getProperty("cn1.javase.mediaImplementation", "")) && FFMPEGMedia.isConfigured()) {
+            return super.createMediaAsync(uriAddress, isVideo, onCompletion);
+        }
         
         final AsyncResource<Media> out = new AsyncResource<Media>();
         if(!checkForPermission("android.permission.READ_PHONE_STATE", "This is required to play media")){
@@ -161,6 +165,9 @@ public class JavaFXSEPort extends JavaSEPort {
      */
     @Override
     public AsyncResource<Media> createMediaAsync(final InputStream stream, final String mimeType, final Runnable onCompletion) {
+        if ("ffmpeg".equalsIgnoreCase(System.getProperty("cn1.javase.mediaImplementation", "")) && FFMPEGMedia.isConfigured()) {
+            return super.createMediaAsync(stream, mimeType, onCompletion);
+        }
         final AsyncResource<Media> out = new AsyncResource<Media>();
         if(!checkForPermission("android.permission.READ_PHONE_STATE", "This is required to play media")){
             out.error(new IOException("android.permission.READ_PHONE_STATE is required to play media"));

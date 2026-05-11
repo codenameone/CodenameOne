@@ -67,19 +67,16 @@
                     <systemPath>${cn1.binaries}/jfxrt.jar</systemPath>
                     <optional>true</optional>
                 </dependency>
-                <dependency>
-                    <groupId>com.codenameone</groupId>
-                    <artifactId>jcef</artifactId>
-                    <version>6.0.0</version>
-                    <scope>system</scope>
-                    <systemPath>${cn1.binaries}/javase/jcef.jar</systemPath>
-                    <optional>true</optional>
-                </dependency>
             </dependencies>
         </profile>
     </profiles>
 
     <dependencies>
+        <dependency>
+            <groupId>me.friwi</groupId>
+            <artifactId>jcef-api</artifactId>
+            <optional>true</optional>
+        </dependency>
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-core</artifactId>

@@ -23,8 +23,6 @@ import java.util.List;
 import javax.swing.JFrame;
 import org.cef.CefApp;
 import org.cef.CefSettings;
-import org.cef.browser.CN1CefBrowserFactory;
-import org.cef.browser.CefBrowserFactory;
 
 /**
  *
@@ -57,12 +55,6 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
         }
         return false;
     }
-    static {
-        
-       CefBrowserFactory.setInstance(new CN1CefBrowserFactory());
-       
-    }
-    
     private static boolean isWindows() {
         return (OS.indexOf("win") >= 0);
     }
