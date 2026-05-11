@@ -3105,50 +3105,25 @@ const cn1ssForcedTimeoutTestClasses = Object.freeze({
   "com_codenameone_examples_hellocodenameone_tests_FloatingActionButtonThemeScreenshotTest": "themeScreenshot",
   "com_codenameone_examples_hellocodenameone_tests_SpanLabelThemeScreenshotTest": "themeScreenshot",
   "com_codenameone_examples_hellocodenameone_tests_DarkLightShowcaseThemeScreenshotTest": "themeScreenshot",
-  "com_codenameone_examples_hellocodenameone_tests_PaletteOverrideThemeScreenshotTest": "themeScreenshot",
-  // Animation/transition grid skip removed — tests are temporarily enabled
-  // on JS port to surface internal port issues that may correlate with
-  // the dialog/Form pipeline bugs being investigated. SheetSlideUpAnimation
-  // (#4835) is brand-new on master; let it run too so any JS-port regression
-  // it surfaces is caught here rather than masked by a skip.
-  // Screenshot-emitting tests whose chunk streams the JS port truncates
-  // under console.log line drops. Cn1ssChunkTools's gap detection (added
-  // in 963dd5af) correctly fails the resulting partial PNGs; force-finalise
-  // them on JS until the port emits chunks reliably.
-  "com_codenameone_examples_hellocodenameone_tests_KotlinUiTest": "jsChunkDrop",
-  "com_codenameone_examples_hellocodenameone_tests_MainScreenScreenshotTest": "jsChunkDrop",
-  "com_codenameone_examples_hellocodenameone_tests_SheetScreenshotTest": "jsChunkDrop",
-  "com_codenameone_examples_hellocodenameone_tests_ImageViewerNavigationScreenshotTest": "jsChunkDrop",
-  "com_codenameone_examples_hellocodenameone_tests_TabsScreenshotTest": "jsChunkDrop",
-  "com_codenameone_examples_hellocodenameone_tests_TextAreaAlignmentScreenshotTest": "jsChunkDrop",
-  "com_codenameone_examples_hellocodenameone_tests_ToastBarTopPositionScreenshotTest": "jsChunkDrop",
-  "com_codenameone_examples_hellocodenameone_tests_ValidatorLightweightPickerScreenshotTest": "jsChunkDrop",
-  "com_codenameone_examples_hellocodenameone_tests_LightweightPickerButtonsScreenshotTest": "jsChunkDrop",
-  "com_codenameone_examples_hellocodenameone_tests_graphics_AffineScale": "jsChunkDrop",
-  "com_codenameone_examples_hellocodenameone_tests_graphics_Clip": "jsChunkDrop",
-  "com_codenameone_examples_hellocodenameone_tests_graphics_DrawArc": "jsChunkDrop",
-  "com_codenameone_examples_hellocodenameone_tests_graphics_DrawGradient": "jsChunkDrop",
-  "com_codenameone_examples_hellocodenameone_tests_graphics_DrawImage": "jsChunkDrop",
-  "com_codenameone_examples_hellocodenameone_tests_graphics_DrawLine": "jsChunkDrop",
-  "com_codenameone_examples_hellocodenameone_tests_graphics_DrawRect": "jsChunkDrop",
-  "com_codenameone_examples_hellocodenameone_tests_graphics_DrawRoundRect": "jsChunkDrop",
-  "com_codenameone_examples_hellocodenameone_tests_graphics_DrawShape": "jsChunkDrop",
-  "com_codenameone_examples_hellocodenameone_tests_graphics_DrawString": "jsChunkDrop",
-  "com_codenameone_examples_hellocodenameone_tests_graphics_DrawStringDecorated": "jsChunkDrop",
-  "com_codenameone_examples_hellocodenameone_tests_graphics_FillArc": "jsChunkDrop",
-  "com_codenameone_examples_hellocodenameone_tests_graphics_FillPolygon": "jsChunkDrop",
-  "com_codenameone_examples_hellocodenameone_tests_graphics_FillRect": "jsChunkDrop",
-  "com_codenameone_examples_hellocodenameone_tests_graphics_FillRoundRect": "jsChunkDrop",
-  "com_codenameone_examples_hellocodenameone_tests_graphics_FillShape": "jsChunkDrop",
-  "com_codenameone_examples_hellocodenameone_tests_graphics_FillTriangle": "jsChunkDrop",
-  "com_codenameone_examples_hellocodenameone_tests_graphics_Rotate": "jsChunkDrop",
-  "com_codenameone_examples_hellocodenameone_tests_graphics_Scale": "jsChunkDrop",
-  "com_codenameone_examples_hellocodenameone_tests_graphics_StrokeTest": "jsChunkDrop",
-  "com_codenameone_examples_hellocodenameone_tests_graphics_TileImage": "jsChunkDrop",
-  "com_codenameone_examples_hellocodenameone_tests_graphics_TransformCamera": "jsChunkDrop",
-  "com_codenameone_examples_hellocodenameone_tests_graphics_TransformPerspective": "jsChunkDrop",
-  "com_codenameone_examples_hellocodenameone_tests_graphics_TransformRotation": "jsChunkDrop",
-  "com_codenameone_examples_hellocodenameone_tests_graphics_TransformTranslation": "jsChunkDrop"
+  "com_codenameone_examples_hellocodenameone_tests_PaletteOverrideThemeScreenshotTest": "themeScreenshot"
+  // jsChunkDrop block removed. The screenshot tests below were
+  // previously force-finalised because the JS port's chunk emitter
+  // (``emitCn1ssChunks`` in this file) used a SEQUENTIAL counter for
+  // the chunk index instead of a byte offset; Cn1ssChunkTools'
+  // gap-detection rejected every JS PNG as "incomplete chunk stream"
+  // (overlap of chunkSize-1 bytes at offset 1) and the JS pipeline
+  // silently dropped every chart / graphics / dialog-style test.
+  // Fixed on master in #4875 (8582151ec) -- the chunk index is now
+  // the byte offset and an end-of-channel summary is emitted so the
+  // decoder can verify the reassembled length. With that fix landed,
+  // KotlinUiTest, MainScreenScreenshotTest, SheetScreenshotTest, the
+  // ImageViewer / Tabs / TextArea / ToastBar / picker tests, and the
+  // entire ``tests.graphics.*`` grid (AffineScale, Clip, DrawArc,
+  // DrawGradient, DrawImage, DrawLine, DrawRect, DrawRoundRect,
+  // DrawShape, DrawString, DrawStringDecorated, FillArc, FillPolygon,
+  // FillRect, FillRoundRect, FillShape, FillTriangle, Rotate, Scale,
+  // StrokeTest, TileImage, TransformCamera, TransformPerspective,
+  // TransformRotation, TransformTranslation) all run normally on JS.
 });
 const cn1ssForcedTimeoutTestNames = Object.freeze({
   "MediaPlaybackScreenshotTest": "mediaPlayback",
@@ -3173,50 +3148,13 @@ const cn1ssForcedTimeoutTestNames = Object.freeze({
   "FloatingActionButtonThemeScreenshotTest": "themeScreenshot",
   "SpanLabelThemeScreenshotTest": "themeScreenshot",
   "DarkLightShowcaseThemeScreenshotTest": "themeScreenshot",
-  "PaletteOverrideThemeScreenshotTest": "themeScreenshot",
-  // Animation/transition grid skip removed — tests are temporarily enabled
-  // on JS port to surface internal port issues that may correlate with
-  // the dialog/Form pipeline bugs being investigated. SheetSlideUpAnimation
-  // (#4835) is brand-new on master; let it run too so any JS-port regression
-  // it surfaces is caught here rather than masked by a skip.
-  // Screenshot-emitting tests whose chunk streams the JS port truncates
-  // under console.log line drops. Cn1ssChunkTools's gap detection (added
-  // in 963dd5af) correctly fails the resulting partial PNGs; force-finalise
-  // them on JS until the port emits chunks reliably.
-  "KotlinUiTest": "jsChunkDrop",
-  "MainScreenScreenshotTest": "jsChunkDrop",
-  "SheetScreenshotTest": "jsChunkDrop",
-  "ImageViewerNavigationScreenshotTest": "jsChunkDrop",
-  "TabsScreenshotTest": "jsChunkDrop",
-  "TextAreaAlignmentScreenshotTest": "jsChunkDrop",
-  "ToastBarTopPositionScreenshotTest": "jsChunkDrop",
-  "ValidatorLightweightPickerScreenshotTest": "jsChunkDrop",
-  "LightweightPickerButtonsScreenshotTest": "jsChunkDrop",
-  "AffineScale": "jsChunkDrop",
-  "Clip": "jsChunkDrop",
-  "DrawArc": "jsChunkDrop",
-  "DrawGradient": "jsChunkDrop",
-  "DrawImage": "jsChunkDrop",
-  "DrawLine": "jsChunkDrop",
-  "DrawRect": "jsChunkDrop",
-  "DrawRoundRect": "jsChunkDrop",
-  "DrawShape": "jsChunkDrop",
-  "DrawString": "jsChunkDrop",
-  "DrawStringDecorated": "jsChunkDrop",
-  "FillArc": "jsChunkDrop",
-  "FillPolygon": "jsChunkDrop",
-  "FillRect": "jsChunkDrop",
-  "FillRoundRect": "jsChunkDrop",
-  "FillShape": "jsChunkDrop",
-  "FillTriangle": "jsChunkDrop",
-  "Rotate": "jsChunkDrop",
-  "Scale": "jsChunkDrop",
-  "StrokeTest": "jsChunkDrop",
-  "TileImage": "jsChunkDrop",
-  "TransformCamera": "jsChunkDrop",
-  "TransformPerspective": "jsChunkDrop",
-  "TransformRotation": "jsChunkDrop",
-  "TransformTranslation": "jsChunkDrop"
+  "PaletteOverrideThemeScreenshotTest": "themeScreenshot"
+  // See the matching comment in cn1ssForcedTimeoutTestClasses above:
+  // the jsChunkDrop short-name entries (KotlinUiTest,
+  // MainScreenScreenshotTest, SheetScreenshotTest, the ImageViewer /
+  // Tabs / TextArea / ToastBar / picker tests, and the
+  // tests.graphics.* grid) have been removed because the chunk emitter
+  // bug they worked around is fixed on master in #4875 (8582151ec).
 });
 
 if (jvm && typeof jvm.addVirtualMethod === "function" && jvm.classes && jvm.classes["java_lang_String"]) {
