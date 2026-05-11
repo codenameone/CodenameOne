@@ -9,6 +9,7 @@ import com.codename1.util.StringUtil;
 import com.codenameone.examples.hellocodenameone.NativeInterfaceLanguageValidator;
 import com.codenameone.examples.hellocodenameone.tests.graphics.AffineScale;
 import com.codenameone.examples.hellocodenameone.tests.graphics.Clip;
+import com.codenameone.examples.hellocodenameone.tests.graphics.ClipUnderScaleTranslate;
 import com.codenameone.examples.hellocodenameone.tests.graphics.DrawArc;
 import com.codenameone.examples.hellocodenameone.tests.graphics.DrawGradient;
 import com.codenameone.examples.hellocodenameone.tests.graphics.DrawImage;
@@ -128,6 +129,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new FillShape(),
             new StrokeTest(),
             new Clip(),
+            new ClipUnderScaleTranslate(),
             new TileImage(),
             new Rotate(),
             new TransformTranslation(),
@@ -361,6 +363,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 // graphics tests
                 || "AffineScale".equals(testName)
                 || "Clip".equals(testName)
+                || "ClipUnderScaleTranslate".equals(testName)
                 || "DrawArc".equals(testName)
                 || "DrawGradient".equals(testName)
                 || "DrawImage".equals(testName)
