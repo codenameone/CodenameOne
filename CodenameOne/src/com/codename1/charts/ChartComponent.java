@@ -288,12 +288,17 @@ public class ChartComponent extends Component {
             g.getTransform(tmpTransform);
 
             if (currentTransform == null) {
-                currentTransform = Transform.makeTranslation(getAbsoluteX(), getAbsoluteY());
+                currentTransform = Transform.makeIdentity();
             } else {
-                currentTransform.setTranslation(getAbsoluteX(), getAbsoluteY());
+                currentTransform.setIdentity();
             }
             currentTransform.concatenate(transform);
-            currentTransform.translate(-getAbsoluteX(), -getAbsoluteY());
+            // Earlier this conjugated `transform` with T(absX, absY) to
+            // compensate for the xTranslate/yTranslate the platform was
+            // adding to vertex coords. Graphics.setTransform() now performs
+            // that conjugation uniformly across iOS / Android / JavaSE, so
+            // doing it manually here would shift the chart by 2*absX,
+            // 2*absY. Pass the user's transform through unchanged.
 
             g.setTransform(currentTransform);
         } else {

@@ -314,9 +314,45 @@ public class PostPrComment {
         ProcessResult status = runGit(worktree, env, true, "status", "--porcelain");
         if (!status.stdout.trim().isEmpty()) {
             runGit(worktree, env, "commit", "-m", "Add previews for PR #" + prNumber);
-            ProcessResult push = runGit(worktree, env, false, "push", "origin", "HEAD:cn1ss-previews");
-            if (push.exitCode != 0) {
-                throw new IOException(push.stderr.isEmpty() ? push.stdout : push.stderr);
+            // Concurrent jobs (build-ios + build-ios-metal) can both try to
+            // push to cn1ss-previews; the loser gets "rejected (fetch first)"
+            // which previously aborted the comment-post step and left the PR
+            // showing stale screenshots. Retry with a fetch + rebase so each
+            // CI job's preview commit is appended onto the latest tip.
+            int maxAttempts = 5;
+            ProcessResult push = null;
+            for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+                push = runGit(worktree, env, false, "push", "origin", "HEAD:cn1ss-previews");
+                if (push.exitCode == 0) {
+                    break;
+                }
+                if (attempt == maxAttempts) {
+                    throw new IOException(push.stderr.isEmpty() ? push.stdout : push.stderr);
+                }
+                log("Preview push attempt " + attempt + " rejected; fetching + rebasing and retrying");
+                runGit(worktree, env, false, "fetch", "origin", "cn1ss-previews");
+                ProcessResult rebase = runGit(worktree, env, false, "rebase", "FETCH_HEAD");
+                if (rebase.exitCode != 0) {
+                    runGit(worktree, env, false, "rebase", "--abort");
+                    // The same prNumber/subdir directory was overwritten by
+                    // the other job. Reset our index to FETCH_HEAD's tree and
+                    // re-apply our preview files on top so we get a clean
+                    // single commit.
+                    runGit(worktree, env, false, "reset", "--hard", "FETCH_HEAD");
+                    Files.createDirectories(dest);
+                    for (Path source : imageFiles) {
+                        Files.copy(source, dest.resolve(source.getFileName()),
+                                java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                    }
+                    runGit(worktree, env, "add", "-A", ".");
+                    ProcessResult status2 = runGit(worktree, env, true, "status", "--porcelain");
+                    if (status2.stdout.trim().isEmpty()) {
+                        log("Preview branch already up-to-date after rebase for PR #" + prNumber);
+                        push = new ProcessResult(0, "", "");
+                        break;
+                    }
+                    runGit(worktree, env, "commit", "-m", "Add previews for PR #" + prNumber);
+                }
             }
             log("Published " + imageFiles.size() + " preview(s) to cn1ss-previews/pr-" + prNumber);
         } else {

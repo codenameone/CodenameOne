@@ -9289,7 +9289,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     public boolean isTransformSupported(){
         return true;
     }
-    
+
     /**
      * Checks of the Transform class can be used on this platform to perform perspective transforms. 
      *  This is similar to

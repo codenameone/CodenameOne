@@ -1558,7 +1558,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         ((NativeGraphics)graphics).color = RGB;
     }
 
-    public void setAlpha(Object graphics, int alpha) {        
+    public void setAlpha(Object graphics, int alpha) {
         ((NativeGraphics)graphics).alpha = alpha;
     }
 
@@ -2402,9 +2402,22 @@ public class IOSImplementation extends CodenameOneImplementation {
             ng.transform = transform == null ? null : transform.copy();
         }
         ng.transformApplied = false;
+        // The cached clip / inverseClip / inverseTransform are derived from
+        // the current transform; replacing the transform leaves them
+        // pointing at the previous transform's space. Subsequent draw ops
+        // (e.g. fillRect or fillLinearGradient on the form Graphics) read
+        // those caches via loadClipBounds / inverseClip and end up clipped
+        // to the wrong region, which is why TransformRotation and
+        // Scale/AffineScale produced empty top cells on iOS Metal while
+        // the equivalent rotation via g.rotate (which DOES invalidate
+        // these flags, line 5513) rendered correctly. Match the
+        // rotate/scale/translate/resetAffine paths so the cache is rebuilt
+        // before the next draw.
+        ng.clipDirty = true;
+        ng.inverseClipDirty = true;
+        ng.inverseTransformDirty = true;
         ng.checkControl();
         ng.applyTransform();
-        
     }
     
     public void setNativeTransformGlobal(Transform transform){
@@ -4213,15 +4226,12 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public boolean isTranslationSupported() {
         //return true;
-        // We'll leave this as false until the next iteration... 
-        // ES2 should allow us to do all of this using transforms but 
+        // We'll leave this as false until the next iteration...
+        // ES2 should allow us to do all of this using transforms but
         // let's take small steps first
         return false;
     }
 
-    
-    
-    
     public void shear(Object nativeGraphics, float x, float y) {
         ((NativeGraphics)nativeGraphics).shear(x, y);
     }

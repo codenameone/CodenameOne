@@ -68,13 +68,34 @@ public class Canvas {
     }
 
 
-    private void applyPaint(Paint paint) {
-        applyPaint(paint, false);
+    private int applyPaint(Paint paint) {
+        return applyPaint(paint, false);
     }
 
 
-    private void applyPaint(Paint paint, boolean forText) {
-        //Log.p("Applyingn paint : "+paint);
+    /// Applies the chart-package Paint (color + alpha + optional typeface)
+    /// onto `g` and returns the alpha value that was on `g` before this call.
+    ///
+    /// The return value is critical: callers MUST pass it to `g.setAlpha(...)`
+    /// after each draw. `Graphics.concatenateAlpha(int)` is *multiplicative*
+    /// -- alpha = oldAlpha * newAlpha / 255 -- and the chart's grid-line color
+    /// is `argb(75, 200, 200, 200)`, so a single grid-line draw collapses
+    /// alpha to 75/255 ~ 29%. After three or four grid-line draws alpha
+    /// underflows to 0, and every later draw on the same Graphics is invisible
+    /// (paint-color alpha 255 short-circuits in concatenateAlpha so it can
+    /// never recover from 0). On iOS Metal+GL this manifested as XYChart
+    /// screenshots rendering as 45927-byte blank PNGs while RoundChart
+    /// (pie/doughnut/radar) -- whose paint chain runs through paths that hit
+    /// `g.setAlpha(...)` directly -- rendered fine.
+    ///
+    /// Restoring alpha to the entry value after each draw keeps each
+    /// `drawXxx` operation alpha-isolated, which is the contract Android's
+    /// real `Canvas` already enforces (its `Paint.alpha` is per-draw, not
+    /// accumulated). Other CN1 ports masked the cascade because their
+    /// renderers don't latch alpha across draws the way the iOS GL/Metal
+    /// op-queue does, but the bug was always present at the API level.
+    private int applyPaint(Paint paint, boolean forText) {
+        int oldAlpha = g.getAlpha();
         g.setColor(paint.getColor());
         int alpha = ColorUtil.alpha(paint.getColor());
         g.concatenateAlpha(alpha);
@@ -92,39 +113,44 @@ public class Canvas {
                 g.setFont(null);
             }
         }
-
-
+        return oldAlpha;
     }
 
 
     public void drawRect(float left, float top, float right, float bottom, Paint paint) {
-        applyPaint(paint);
-        Paint.Style style = paint.getStyle();
-        if (Paint.Style.FILL.equals(style)) {
-            //Log.p("Filling it");
-            g.fillRect((int) left, (int) top, (int) right - (int) left, (int) bottom - (int) top);
-        } else if (Paint.Style.STROKE.equals(style)) {
-            g.drawRect((int) left, (int) top, (int) right - (int) left, (int) bottom - (int) top);
-        } else if (Paint.Style.FILL_AND_STROKE.equals(style)) {
-            g.fillRect((int) left, (int) top, (int) right - (int) left, (int) bottom - (int) top);
-            //g.drawRect((int)left+bounds.getX(), (int)top+bounds.getY(), (int)right-(int)left, (int)bottom-(int)top);
+        int oldAlpha = applyPaint(paint);
+        try {
+            Paint.Style style = paint.getStyle();
+            if (Paint.Style.FILL.equals(style)) {
+                //Log.p("Filling it");
+                g.fillRect((int) left, (int) top, (int) right - (int) left, (int) bottom - (int) top);
+            } else if (Paint.Style.STROKE.equals(style)) {
+                g.drawRect((int) left, (int) top, (int) right - (int) left, (int) bottom - (int) top);
+            } else if (Paint.Style.FILL_AND_STROKE.equals(style)) {
+                g.fillRect((int) left, (int) top, (int) right - (int) left, (int) bottom - (int) top);
+                //g.drawRect((int)left+bounds.getX(), (int)top+bounds.getY(), (int)right-(int)left, (int)bottom-(int)top);
+            }
+        } finally {
+            g.setAlpha(oldAlpha);
         }
-
-
     }
 
     public void drawText(String string, float x, float y, Paint paint) {
-        applyPaint(paint, true);
-        int offX = 0;
-        int offY = 0;
-        if (paint.getTextAlign() == Component.CENTER) {
-            offX = -g.getFont().stringWidth(string) / 2;
-        } else if (paint.getTextAlign() == Component.RIGHT) {
-            offX = -g.getFont().stringWidth(string);
-        }
-        int h = g.getFont().getAscent();
+        int oldAlpha = applyPaint(paint, true);
+        try {
+            int offX = 0;
+            int offY = 0;
+            if (paint.getTextAlign() == Component.CENTER) {
+                offX = -g.getFont().stringWidth(string) / 2;
+            } else if (paint.getTextAlign() == Component.RIGHT) {
+                offX = -g.getFont().stringWidth(string);
+            }
+            int h = g.getFont().getAscent();
 
-        g.drawString(string, (int) x + offX, (int) y - h + offY);
+            g.drawString(string, (int) x + offX, (int) y - h + offY);
+        } finally {
+            g.setAlpha(oldAlpha);
+        }
     }
 
     public int getHeight() {
@@ -154,32 +180,41 @@ public class Canvas {
 
 
     public void drawPath(Shape p, Paint paint) {
-
-        applyPaint(paint);
-        Paint.Style style = paint.getStyle();
-        if (style.equals(Paint.Style.FILL)) {
-            g.fillShape(p);
-            //g.drawShape(p, getStroke(paint));
-        } else if (style.equals(Paint.Style.STROKE)) {
-            g.drawShape(p, getStroke(paint));
-        } else if (style.equals(Paint.Style.FILL_AND_STROKE)) {
-            g.fillShape(p);
-            g.drawShape(p, getStroke(paint));
+        int oldAlpha = applyPaint(paint);
+        try {
+            Paint.Style style = paint.getStyle();
+            if (style.equals(Paint.Style.FILL)) {
+                g.fillShape(p);
+                //g.drawShape(p, getStroke(paint));
+            } else if (style.equals(Paint.Style.STROKE)) {
+                g.drawShape(p, getStroke(paint));
+            } else if (style.equals(Paint.Style.FILL_AND_STROKE)) {
+                g.fillShape(p);
+                g.drawShape(p, getStroke(paint));
+            }
+        } finally {
+            g.setAlpha(oldAlpha);
         }
-
     }
 
     public void drawLine(float x1, float y1, float x2, float y2, Paint paint) {
-        applyPaint(paint);
-        g.drawLine((int) x1, (int) y1, (int) x2, (int) y2);
+        int oldAlpha = applyPaint(paint);
+        try {
+            g.drawLine((int) x1, (int) y1, (int) x2, (int) y2);
+        } finally {
+            g.setAlpha(oldAlpha);
+        }
     }
 
     public void rotate(float angle, float x, float y) {
-        //Log.p("Rotating by angle "+angle);
+        // (x, y) is in chart-local coords; Graphics.setTransform now
+        // conjugates with the active xTranslate/yTranslate, so we must NOT
+        // bake `absoluteX - bounds.getX()` (= xTranslate) into the rotation
+        // centre here -- that would apply the conjugation twice and rotate
+        // the chart around a point well off-screen.
         Transform t = g.getTransform();
-        t.rotate((float) (angle * Math.PI / 180.0), x + absoluteX - bounds.getX(), y + absoluteY - bounds.getY());
+        t.rotate((float) (angle * Math.PI / 180.0), x, y);
         g.setTransform(t);
-
     }
 
     public void scale(float x, float y) {
@@ -203,20 +238,23 @@ public class Canvas {
 
 
     public void drawArc(Rectangle2D oval, float currentAngle, float sweepAngle, boolean useCenter, Paint paint) {
-        applyPaint(paint);
-        Paint.Style style = paint.getStyle();
-        if (Paint.Style.FILL.equals(style)) {
-            g.fillArc((int) Math.round(oval.getX()), (int) Math.round(oval.getY()), (int) Math.round(oval.getWidth()), (int) Math.round(oval.getHeight()), -(int) Math.floor(currentAngle), -(int) Math.ceil(sweepAngle));
+        int oldAlpha = applyPaint(paint);
+        try {
+            Paint.Style style = paint.getStyle();
+            if (Paint.Style.FILL.equals(style)) {
+                g.fillArc((int) Math.round(oval.getX()), (int) Math.round(oval.getY()), (int) Math.round(oval.getWidth()), (int) Math.round(oval.getHeight()), -(int) Math.floor(currentAngle), -(int) Math.ceil(sweepAngle));
 
-        } else if (Paint.Style.STROKE.equals(style)) {
-            g.drawArc((int) Math.round(oval.getX()), (int) Math.round(oval.getY()), (int) Math.round(oval.getWidth()), (int) Math.round(oval.getHeight()), -(int) Math.floor(currentAngle), -(int) Math.ceil(sweepAngle));
+            } else if (Paint.Style.STROKE.equals(style)) {
+                g.drawArc((int) Math.round(oval.getX()), (int) Math.round(oval.getY()), (int) Math.round(oval.getWidth()), (int) Math.round(oval.getHeight()), -(int) Math.floor(currentAngle), -(int) Math.ceil(sweepAngle));
 
-        } else if (Paint.Style.FILL_AND_STROKE.equals(style)) {
-            g.fillArc((int) Math.round(oval.getX()), (int) Math.round(oval.getY()), (int) Math.round(oval.getWidth()), (int) Math.round(oval.getHeight()), -(int) Math.floor(currentAngle), -(int) Math.ceil(sweepAngle));
-            g.drawArc((int) Math.round(oval.getX()), (int) Math.round(oval.getY()), (int) Math.round(oval.getWidth()), (int) Math.round(oval.getHeight()), -(int) Math.floor(currentAngle), -(int) Math.ceil(sweepAngle));
+            } else if (Paint.Style.FILL_AND_STROKE.equals(style)) {
+                g.fillArc((int) Math.round(oval.getX()), (int) Math.round(oval.getY()), (int) Math.round(oval.getWidth()), (int) Math.round(oval.getHeight()), -(int) Math.floor(currentAngle), -(int) Math.ceil(sweepAngle));
+                g.drawArc((int) Math.round(oval.getX()), (int) Math.round(oval.getY()), (int) Math.round(oval.getWidth()), (int) Math.round(oval.getHeight()), -(int) Math.floor(currentAngle), -(int) Math.ceil(sweepAngle));
 
+            }
+        } finally {
+            g.setAlpha(oldAlpha);
         }
-
     }
 
     public void drawArcWithGradient(Rectangle2D oval, float currentAngle, float sweepAngle, boolean useCenter, Paint paint, GradientDrawable gradient) {
@@ -228,19 +266,21 @@ public class Canvas {
     }
 
     public void drawRoundRect(Rectangle2D rect, float rx, float ry, Paint mPaint) {
-        applyPaint(mPaint);
-        Paint.Style style = mPaint.getStyle();
-        if (Paint.Style.FILL.equals(style)) {
-            g.fillRoundRect((int) rect.getX(), (int) rect.getY(), (int) (rect.getWidth()), (int) (rect.getHeight()), (int) rx, (int) ry);
-        } else if (Paint.Style.STROKE.equals(style)) {
+        int oldAlpha = applyPaint(mPaint);
+        try {
+            Paint.Style style = mPaint.getStyle();
+            if (Paint.Style.FILL.equals(style)) {
+                g.fillRoundRect((int) rect.getX(), (int) rect.getY(), (int) (rect.getWidth()), (int) (rect.getHeight()), (int) rx, (int) ry);
+            } else if (Paint.Style.STROKE.equals(style)) {
+                g.drawRoundRect((int) rect.getX(), (int) rect.getY(), (int) (rect.getWidth()), (int) (rect.getHeight()), (int) rx, (int) ry);
+            } else if (Paint.Style.FILL_AND_STROKE.equals(style)) {
+                g.fillRoundRect((int) rect.getX(), (int) rect.getY(), (int) (rect.getWidth()), (int) (rect.getHeight()), (int) rx, (int) ry);
+                g.drawRoundRect((int) rect.getX(), (int) rect.getY(), getWidth(), (int) (rect.getHeight()), (int) rx, (int) ry);
+            }
             g.drawRoundRect((int) rect.getX(), (int) rect.getY(), (int) (rect.getWidth()), (int) (rect.getHeight()), (int) rx, (int) ry);
-        } else if (Paint.Style.FILL_AND_STROKE.equals(style)) {
-            g.fillRoundRect((int) rect.getX(), (int) rect.getY(), (int) (rect.getWidth()), (int) (rect.getHeight()), (int) rx, (int) ry);
-            g.drawRoundRect((int) rect.getX(), (int) rect.getY(), getWidth(), (int) (rect.getHeight()), (int) rx, (int) ry);
+        } finally {
+            g.setAlpha(oldAlpha);
         }
-        g.drawRoundRect((int) rect.getX(), (int) rect.getY(), (int) (rect.getWidth()), (int) (rect.getHeight()), (int) rx, (int) ry);
-
-
     }
 
     public void drawBitmap(Image img, float left, float top, Paint paint) {

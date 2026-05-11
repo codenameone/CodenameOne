@@ -372,18 +372,47 @@ public abstract class AbstractChart {
         path.moveTo(tempDrawPoints[0], tempDrawPoints[1]);
         path.lineTo(tempDrawPoints[2], tempDrawPoints[3]);
 
+        // Track the running endpoint of the open subpath so we can emit a
+        // moveTo only when the data actually skips a segment (an off-screen
+        // point was filtered out via `continue`). The original loop emitted
+        // `path.moveTo(tempDrawPoints[0..1])` before EVERY lineTo, which
+        // produces N disjoint single-segment subpaths for an N-point line.
+        // The iOS GL+Metal form-Graphics drawShape -> TextureAlphaMask path
+        // crashes the on-screen frame buffer when fed a multi-subpath stroke
+        // covering most of the form (the chart fills BorderLayout.CENTER) --
+        // every other port (Skia / JavaFX / mutable-image NativeGraphics)
+        // happily collapses the redundant moveTos but iOS form-Graphics
+        // ends up with the entire frame dropped (form title bar disappears
+        // along with the chart). Emit moveTo only when the previous segment
+        // was skipped or the next segment doesn't continue from the running
+        // endpoint, so an unfiltered line series renders as a single
+        // continuous polyline -- byte-equivalent to the historical output on
+        // every port that handled the multi-subpath form, and the form
+        // actually paints on iOS.
+        float lastEndX = tempDrawPoints[2];
+        float lastEndY = tempDrawPoints[3];
+        boolean haveOpenSubpath = true;
+
         int length = points.size();
         for (int i = 4; i < length; i += 2) {
             if ((points.get(i - 1) < 0 && points.get(i + 1) < 0)
                     || (points.get(i - 1) > height && points.get(i + 1) > height)) {
+                haveOpenSubpath = false;
                 continue;
             }
             tempDrawPoints = calculateDrawPoints(points.get(i - 2), points.get(i - 1), points.get(i),
                     points.get(i + 1), height, width);
             if (!circular) {
-                path.moveTo(tempDrawPoints[0], tempDrawPoints[1]);
+                if (!haveOpenSubpath
+                        || tempDrawPoints[0] != lastEndX
+                        || tempDrawPoints[1] != lastEndY) {
+                    path.moveTo(tempDrawPoints[0], tempDrawPoints[1]);
+                }
             }
             path.lineTo(tempDrawPoints[2], tempDrawPoints[3]);
+            lastEndX = tempDrawPoints[2];
+            lastEndY = tempDrawPoints[3];
+            haveOpenSubpath = true;
         }
         if (circular) {
             path.lineTo(points.get(0), points.get(1));
@@ -415,18 +444,35 @@ public abstract class AbstractChart {
         path.moveTo(tempDrawPoints[0], tempDrawPoints[1]);
         path.lineTo(tempDrawPoints[2], tempDrawPoints[3]);
 
+        // See the List<Float> overload above for the rationale: collapse
+        // redundant moveTos so an unfiltered line series renders as a
+        // single continuous polyline rather than N disjoint single-segment
+        // subpaths. iOS form-Graphics drawShape -> TextureAlphaMask drops
+        // the entire frame when fed the multi-subpath form.
+        float lastEndX = tempDrawPoints[2];
+        float lastEndY = tempDrawPoints[3];
+        boolean haveOpenSubpath = true;
+
         int length = points.length;
         for (int i = 4; i < length; i += 2) {
             if ((points[i - 1] < 0 && points[i + 1] < 0)
                     || (points[i - 1] > height && points[i + 1] > height)) {
+                haveOpenSubpath = false;
                 continue;
             }
             tempDrawPoints = calculateDrawPoints(points[i - 2], points[i - 1], points[i], points[i + 1],
                     height, width);
             if (!circular) {
-                path.moveTo(tempDrawPoints[0], tempDrawPoints[1]);
+                if (!haveOpenSubpath
+                        || tempDrawPoints[0] != lastEndX
+                        || tempDrawPoints[1] != lastEndY) {
+                    path.moveTo(tempDrawPoints[0], tempDrawPoints[1]);
+                }
             }
             path.lineTo(tempDrawPoints[2], tempDrawPoints[3]);
+            lastEndX = tempDrawPoints[2];
+            lastEndY = tempDrawPoints[3];
+            haveOpenSubpath = true;
         }
         if (circular) {
             path.lineTo(points[0], points[1]);

@@ -275,9 +275,13 @@ static void drawQuad(CN1MetalPipeline pipeline,
                      const float *texcoords, // may be NULL
                      simd_float4 color,
                      id<MTLTexture> texture) {
-    if (activeEncoder == nil || pipelineCache == nil) return;
+    if (activeEncoder == nil || pipelineCache == nil) {
+        return;
+    }
     id<MTLRenderPipelineState> state = [pipelineCache pipelineFor:pipeline];
-    if (state == nil) return;
+    if (state == nil) {
+        return;
+    }
     bindPipelineStateIfChanged(state);
 
     // buffer(0): positions (8 floats = 4 x (x,y))
@@ -744,15 +748,21 @@ void CN1MetalDrawGradient(int type, int startColor, int endColor,
 // --------------- Alpha mask rendering (path-based shapes) ---------------
 
 id<MTLTexture> CN1MetalCreateAlphaMaskTexture(const uint8_t *bytes, int width, int height) {
-    if (bytes == NULL || width <= 0 || height <= 0) return nil;
+    if (bytes == NULL || width <= 0 || height <= 0) {
+        return nil;
+    }
     id<MTLDevice> device = CN1MetalDevice();
-    if (device == nil) return nil;
+    if (device == nil) {
+        return nil;
+    }
     MTLTextureDescriptor *desc = [MTLTextureDescriptor
         texture2DDescriptorWithPixelFormat:MTLPixelFormatR8Unorm
         width:width height:height mipmapped:NO];
     desc.usage = MTLTextureUsageShaderRead;
     id<MTLTexture> tex = [device newTextureWithDescriptor:desc];
-    if (tex == nil) return nil;
+    if (tex == nil) {
+        return nil;
+    }
     [tex replaceRegion:MTLRegionMake2D(0, 0, width, height)
            mipmapLevel:0
              withBytes:bytes
@@ -762,7 +772,9 @@ id<MTLTexture> CN1MetalCreateAlphaMaskTexture(const uint8_t *bytes, int width, i
 
 void CN1MetalDrawAlphaMask(id<MTLTexture> texture, int color, int alpha,
                            int x, int y, int width, int height) {
-    if (texture == nil) return;
+    if (texture == nil) {
+        return;
+    }
     // The AlphaMask fragment shader (cn1_fs_alpha_mask) does:
     //   float a = sample(tex).r;
     //   return float4(color.rgb * a, color.a * a);
