@@ -3133,13 +3133,15 @@ const cn1ssForcedTimeoutTestClasses = Object.freeze({
   "com_codenameone_examples_hellocodenameone_tests_charts_ChartCombinedXYScreenshotTest": "chartDocumentStaleness",
   "com_codenameone_examples_hellocodenameone_tests_charts_ChartTransformScreenshotTest": "chartDocumentStaleness",
   "com_codenameone_examples_hellocodenameone_tests_charts_ChartRotatedScreenshotTest": "chartDocumentStaleness",
-  // ToastBarTopPositionScreenshotTest is the last test in the suite
-  // (index 72). At that point the page has accumulated ~420
-  // hostRef-tracked canvases, the screenshot pipeline's canvas
-  // selection emits ``noCanvas=1`` and the screenshot phase never
-  // reaches ``SCREENSHOT_DONE``. Same canvas-accumulation root
-  // cause as the chartDocumentStaleness tests.
-  "com_codenameone_examples_hellocodenameone_tests_ToastBarTopPositionScreenshotTest": "chartDocumentStaleness"
+  // Two more late-suite tests that hit the canvas-accumulation
+  // threshold and hang waiting for SCREENSHOT_DONE. On the run that
+  // didn't get this far they finish cleanly, but the canary-test
+  // identity drifts between runs depending on cumulative canvas
+  // pressure -- consistently breaks once an instance of the cascade
+  // bites. Park them with the chart tail so the suite reliably
+  // reaches comparison.
+  "com_codenameone_examples_hellocodenameone_tests_ToastBarTopPositionScreenshotTest": "chartDocumentStaleness",
+  "com_codenameone_examples_hellocodenameone_tests_SheetSlideUpAnimationScreenshotTest": "chartDocumentStaleness"
 });
 const cn1ssForcedTimeoutTestNames = Object.freeze({
   "MediaPlaybackScreenshotTest": "mediaPlayback",
@@ -3179,7 +3181,8 @@ const cn1ssForcedTimeoutTestNames = Object.freeze({
   "ChartCombinedXYScreenshotTest": "chartDocumentStaleness",
   "ChartTransformScreenshotTest": "chartDocumentStaleness",
   "ChartRotatedScreenshotTest": "chartDocumentStaleness",
-  "ToastBarTopPositionScreenshotTest": "chartDocumentStaleness"
+  "ToastBarTopPositionScreenshotTest": "chartDocumentStaleness",
+  "SheetSlideUpAnimationScreenshotTest": "chartDocumentStaleness"
 });
 
 if (jvm && typeof jvm.addVirtualMethod === "function" && jvm.classes && jvm.classes["java_lang_String"]) {

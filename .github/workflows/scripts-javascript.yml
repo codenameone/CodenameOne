@@ -53,21 +53,20 @@ jobs:
       GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
       ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/javascript-ui-tests
       # CN1_JS_TIMEOUT_SECONDS guards the per-suite SUITE:FINISHED wait.
-      # The structural-optimization landing slowed cooperative-scheduler
-      # progress on bytecode-translator output; with cn1_ivAdapt wrapping
-      # at every hand-written port.js dispatch site, the screenshot suite
-      # now reaches the runTest phase. Once the RTA fix landed and
-      # Spinner3D started rendering its full date-wheel content (instead
-      # of the blank no-op the previous build emitted), the
-      # LightweightPicker / ValidatorLightweightPicker tests went from
-      # ~instant to ~30s each on shared GHA runners — the real paint
-      # path through SpinnerNode.layoutChildren / TextPainter.paint
-      # adds wall-clock work that the blank fallback skipped. 720s
-      # gives the slow-runner tail enough headroom to complete the
-      # full 35-test suite without re-introducing the blank-spinner
-      # regression as a workaround.
-      CN1_JS_TIMEOUT_SECONDS: "720"
-      CN1_JS_BROWSER_LIFETIME_SECONDS: "660"
+      # Bumped from 720s to 1200s after merging master's #4875 chunk-emit
+      # fix and removing the ``jsChunkDrop`` skip block in port.js: with
+      # the previously-silent graphics / chart / kotlin / mainscreen /
+      # transition tests now actually rendering and emitting full PNG
+      # streams instead of being dropped, the 73-test suite walks at
+      # ~10 s/test on shared GHA runners and lands 12-17 min wall-clock
+      # depending on canvas-accumulation pressure later in the run. The
+      # 720s budget was too tight: comparison-step runs succeed at 12-14
+      # min but SUITE:FINISHED-wait runs that race the bottom of the
+      # suite were timing out before any tests could be diff'd. 1200s
+      # absorbs the variance without re-introducing the
+      # silently-dropped-test workaround.
+      CN1_JS_TIMEOUT_SECONDS: "1200"
+      CN1_JS_BROWSER_LIFETIME_SECONDS: "1140"
       CN1SS_SKIP_COVERAGE: "1"
       CN1SS_FAIL_ON_MISMATCH: "1"
       BROWSER_CMD: "node \"$GITHUB_WORKSPACE/scripts/run-javascript-headless-browser.mjs\""
