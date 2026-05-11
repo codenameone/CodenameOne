@@ -8,29 +8,14 @@ import com.codename1.ui.geom.GeneralPath;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codenameone.examples.hellocodenameone.tests.BaseTest;
 
-/// Minimal reproduction of the iOS chart-line blank-render: a single
-/// Component in BorderLayout.CENTER that draws a large stroked
-/// GeneralPath via `g.drawShape(...)` during its initial paint and then
-/// never invalidates itself again. No UITimer / animation / peer view --
-/// the form is shown, the slide-in transition completes, and nothing
-/// else triggers a repaint until the screenshot fires 1500ms later.
-///
-/// graphics-draw-shape already proves drawShape itself works on iOS
-/// (its 2x2 grid renders correctly on GL+Metal). What's different here
-/// is that the form has NO continuous activity after the initial paint.
-/// chart-line shows the same pattern: the chart's paint cycle ends at
-/// the end of the slide-in transition and nothing else queues a paint.
-/// On iOS GL+Metal the captured PNG of chart-line is uniform body-bg
-/// with even the form title bar missing -- something in iOS's
-/// presentDrawable / CALayer compositor pipeline is failing to keep
-/// the last-presented frame visible when no further paints arrive.
-///
-/// If THIS test renders the polyline correctly, the bug is specific to
-/// ChartComponent's paint cycle and we'll need to look at what it does
-/// differently from a vanilla `Component.paint` (transform handling,
-/// Canvas wrapper layer, multi-call drawText/drawLine sequence, etc).
-/// If THIS test goes blank, ChartComponent is innocent and the bug is
-/// in iOS Metal / GL's idle-frame compositor handling.
+/// Regression test for the chart Canvas alpha-leak fix (commit 4e3f8b47b).
+/// Draws the chart-line dataset's two stroked polylines + four opaque-black
+/// margin fillRects (mirroring XYChart.draw's drawSeries + drawBackground
+/// margin-mask sequence) using raw `g.drawShape` / `g.fillRect` instead of
+/// the chart-package compat Canvas. Sized by `getWidth()` / `getHeight()`
+/// so it captures the same chart-line geometry on every pipeline (iOS
+/// 1179x2556, Android emulator 320x640, JS, JavaSE) and isn't sensitive
+/// to platform resolution.
 public class LargeStrokeDirtyClipTest extends BaseTest {
 
     @Override
@@ -61,56 +46,54 @@ public class LargeStrokeDirtyClipTest extends BaseTest {
             if (!g.isShapeSupported()) {
                 return;
             }
-            // Mirror ChartComponent.paint's exact prologue: stash AA and
-            // force-enable it. ChartComponent does this even though the
-            // existing graphics-draw-shape test toggles AA without issue;
-            // the chart's pattern is set-AA-then-many-draws which the
-            // graphics tests don't replicate.
+            // Mirror ChartComponent.paint's prologue: stash and force AA on.
             boolean oldAA = g.isAntiAliased();
             g.setAntiAliased(true);
+
+            // Use relative coords so the test renders correctly across every
+            // platform pipeline: iOS at 1179x2556 native, Android emulator at
+            // 320x640, JS at desktop dimensions, JavaSE at simulator. The
+            // earlier hard-coded iPhone coords drew off-screen on Android.
             int x = getX();
             int y = getY();
-
-            // Hard-code the exact path coordinates XYChart.drawSeries
-            // produces for chart-line's data (years 2018-2022, north
-            // values 12,16,22,18,28; south values 8,11,13,16,19) on
-            // iPhone 16 portrait. Non-monotonic Y path is the chart-line
-            // case the previous monotonic-up test (1b000bdb4) didn't
-            // exercise, and the BEVEL join + 1.0 miter limit plus
-            // fractional X coords (xPxPerUnit ~= 262.75) match what the
-            // iOS Stroker actually receives from chart-line. If THIS
-            // version reproduces the blank, the bug is in the
-            // Stroker / alpha-mask path for non-monotonic + fractional
-            // strokes; if it renders, ChartComponent is wrapping or
-            // setting Graphics state we haven't matched yet.
-            float left = x + 102f;
-            float bottom = y + 1714f;
-            float xStep = 262.75f;
-            float yScale = 83.8f;
+            int viewW = getWidth();
+            int viewH = getHeight();
+            float marginTop    = viewH * 0.014f;  // matches chart-line frame proportions on iPhone
+            float marginBottom = viewH * 0.009f;
+            float marginLeft   = viewW * 0.051f;
+            float marginRight  = viewW * 0.020f;
+            float dataLeft   = x + marginLeft;
+            float dataTop    = y + marginTop;
+            float dataRight  = x + viewW - marginRight;
+            float dataBottom = y + viewH - marginBottom;
+            float dataW = dataRight - dataLeft;
+            float dataH = dataBottom - dataTop;
+            // chart-line dataset: north (12,16,22,18,28), south (8,11,13,16,19).
+            // Mapping the 5 (x,y) pairs into [dataLeft..dataRight] x
+            // [dataBottom..dataTop] reproduces the non-monotonic Y path that
+            // the iOS Stroker / alpha-mask path receives from chart-line,
+            // independent of native screen resolution.
+            float xStep = dataW / 4f;
+            float yScale = dataH / 20f;
+            float baseline = dataBottom;
 
             GeneralPath p1 = new GeneralPath();
-            p1.moveTo(left,             bottom - (12 - 8) * yScale);
-            p1.lineTo(left + xStep,     bottom - (16 - 8) * yScale);
-            p1.lineTo(left + 2 * xStep, bottom - (22 - 8) * yScale);
-            p1.lineTo(left + 3 * xStep, bottom - (18 - 8) * yScale);
-            p1.lineTo(left + 4 * xStep, bottom - (28 - 8) * yScale);
+            p1.moveTo(dataLeft,                 baseline - (12 - 8) * yScale);
+            p1.lineTo(dataLeft + xStep,         baseline - (16 - 8) * yScale);
+            p1.lineTo(dataLeft + 2 * xStep,     baseline - (22 - 8) * yScale);
+            p1.lineTo(dataLeft + 3 * xStep,     baseline - (18 - 8) * yScale);
+            p1.lineTo(dataLeft + 4 * xStep,     baseline - (28 - 8) * yScale);
 
             GeneralPath p2 = new GeneralPath();
-            p2.moveTo(left,             bottom - (8  - 8) * yScale);
-            p2.lineTo(left + xStep,     bottom - (11 - 8) * yScale);
-            p2.lineTo(left + 2 * xStep, bottom - (13 - 8) * yScale);
-            p2.lineTo(left + 3 * xStep, bottom - (16 - 8) * yScale);
-            p2.lineTo(left + 4 * xStep, bottom - (19 - 8) * yScale);
+            p2.moveTo(dataLeft,                 baseline - (8  - 8) * yScale);
+            p2.lineTo(dataLeft + xStep,         baseline - (11 - 8) * yScale);
+            p2.lineTo(dataLeft + 2 * xStep,     baseline - (13 - 8) * yScale);
+            p2.lineTo(dataLeft + 3 * xStep,     baseline - (16 - 8) * yScale);
+            p2.lineTo(dataLeft + 4 * xStep,     baseline - (19 - 8) * yScale);
 
-            // Mirror Canvas.applyPaint + canvas.drawPath: a NEW Stroke
-            // is constructed per drawShape call (compat/Canvas.java
-            // getStroke()), and applyPaint runs setColor + a
-            // concatenateAlpha(alpha) before each draw. The Canvas
-            // wrapper preserves these per-shape allocations in
-            // chart-line; if creating a fresh Stroke per draw or the
-            // concatenateAlpha call interacts badly with iOS's
-            // textureCache / encoder state between two drawShape ops,
-            // this is where the bug surfaces.
+            // Same setColor + concatenateAlpha + drawShape pattern that
+            // Canvas.applyPaint / canvas.drawPath uses for chart-line's
+            // polylines, with the chart's BEVEL join and CAP_BUTT cap.
             int color1 = 0xff0a66ff;
             g.setColor(color1);
             int alpha1 = (color1 >>> 24) & 0xff;
@@ -129,28 +112,11 @@ public class LargeStrokeDirtyClipTest extends BaseTest {
             g.concatenateAlpha(alpha2);
             g.drawShape(p2, new Stroke(3f, Stroke.CAP_BUTT, Stroke.JOIN_BEVEL, 1f));
 
-            // Mirror XYChart.draw lines 347-360: after drawSeries, the chart
-            // unconditionally calls drawBackground() 4 times to mask the
-            // margin strips. The color passed is mRenderer.getMarginsColor()
-            // which defaults to NO_COLOR = 0. ColorUtil.IColor(0) maps
-            // alpha 0 to 255 (the chart treats "no alpha set" as opaque),
-            // so applyPaint ends up calling g.setColor(0) +
-            // g.concatenateAlpha(255) and then g.fillRect(...) -- i.e.
-            // 4 OPAQUE-BLACK fillRects covering the margin frame.
-            // pie/doughnut/radar charts don't use XYChart so they skip
-            // this. If iOS Metal chokes on a setColor(0) + fillRect after
-            // a drawShape with a non-zero color, this is what reproduces
-            // the chart-line blank.
-            int viewW = getWidth();
-            int viewH = getHeight();
-            int marginTop = 36;
-            int marginLeft = 60;
-            int marginBottom = 24;
-            int marginRight = 24;
-            int dataLeft = x + marginLeft;
-            int dataTop = y + marginTop;
-            int dataRight = x + viewW - marginRight;
-            int dataBottom = y + viewH - marginBottom;
+            // Mirror XYChart.draw's 4 unconditional margin fillRects with
+            // marginsColor == NO_COLOR (0). ColorUtil.IColor(0) maps alpha 0
+            // -> 255 (chart-package historical "0 means opaque" rule), so
+            // applyPaint emits setColor(0) + concatenateAlpha(255) +
+            // fillRect, i.e. four opaque-black strips around the data area.
             g.setColor(0);
             int marginAlpha = 0;
             if (marginAlpha == 0) {
@@ -158,13 +124,13 @@ public class LargeStrokeDirtyClipTest extends BaseTest {
             }
             g.concatenateAlpha(marginAlpha);
             // bottom strip (under data area)
-            g.fillRect(x, dataBottom, viewW, viewH - (dataBottom - y));
+            g.fillRect(x, (int) dataBottom, viewW, viewH - (int) (dataBottom - y));
             // top strip
-            g.fillRect(x, y, viewW, marginTop);
+            g.fillRect(x, y, viewW, (int) marginTop);
             // left strip (HORIZONTAL orientation default)
-            g.fillRect(x, y, dataLeft - x, viewH);
+            g.fillRect(x, y, (int) (dataLeft - x), viewH);
             // right strip
-            g.fillRect(dataRight, y, marginRight, viewH);
+            g.fillRect((int) dataRight, y, (int) marginRight, viewH);
 
             g.setAntiAliased(oldAA);
         }
