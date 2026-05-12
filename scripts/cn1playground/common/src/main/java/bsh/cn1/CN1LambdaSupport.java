@@ -9,6 +9,15 @@ import bsh.UtilEvalError;
 public final class CN1LambdaSupport {
     private static final ThreadLocal<Interpreter> CURRENT_INTERPRETER = new ThreadLocal<Interpreter>();
     private static final ThreadLocal<NameSpace> CURRENT_NAMESPACE = new ThreadLocal<NameSpace>();
+    private static final ThreadLocal<LambdaErrorHandler> CURRENT_ERROR_HANDLER = new ThreadLocal<LambdaErrorHandler>();
+
+    /** Callback invoked when a lambda body raises an exception during
+     * {@link LambdaValue#invoke(Object[])}. Lets a host (e.g. the
+     * playground UI) surface runtime failures that would otherwise be
+     * lost to the EDT's silent exception handling. */
+    public interface LambdaErrorHandler {
+        void onLambdaError(Throwable error, String bodySource);
+    }
 
     private CN1LambdaSupport() {
     }
@@ -33,6 +42,19 @@ public final class CN1LambdaSupport {
         CURRENT_NAMESPACE.remove();
     }
 
+    /** Register a {@link LambdaErrorHandler} that will be captured by any
+     * {@link LambdaValue} created on this thread while the handler is
+     * active. The captured handler stays with the lambda for its
+     * lifetime so errors raised on later EDT firings can still surface
+     * back to the host. */
+    public static void pushErrorHandler(LambdaErrorHandler handler) {
+        CURRENT_ERROR_HANDLER.set(handler);
+    }
+
+    public static void clearErrorHandler() {
+        CURRENT_ERROR_HANDLER.remove();
+    }
+
     public static LambdaValue lambda(String[] parameterNames, String bodySource) {
         Interpreter interpreter = CURRENT_INTERPRETER.get();
         if (interpreter == null) {
@@ -40,7 +62,8 @@ public final class CN1LambdaSupport {
         }
         NameSpace activeNs = CURRENT_NAMESPACE.get();
         NameSpace parentNs = activeNs != null ? activeNs : interpreter.getNameSpace();
-        return new LambdaValue(interpreter, parentNs, sanitizeParams(parameterNames), bodySource == null ? "" : bodySource);
+        return new LambdaValue(interpreter, parentNs, sanitizeParams(parameterNames),
+                bodySource == null ? "" : bodySource, CURRENT_ERROR_HANDLER.get());
     }
 
     private static String[] sanitizeParams(String[] parameterNames) {
@@ -135,12 +158,15 @@ public final class CN1LambdaSupport {
         private final NameSpace parentNameSpace;
         private final String[] parameterNames;
         private final String bodySource;
+        private final LambdaErrorHandler errorHandler;
 
-        LambdaValue(Interpreter interpreter, NameSpace parentNameSpace, String[] parameterNames, String bodySource) {
+        LambdaValue(Interpreter interpreter, NameSpace parentNameSpace, String[] parameterNames,
+                String bodySource, LambdaErrorHandler errorHandler) {
             this.interpreter = interpreter;
             this.parentNameSpace = parentNameSpace;
             this.parameterNames = parameterNames;
             this.bodySource = bodySource;
+            this.errorHandler = errorHandler;
         }
 
         /** Runnable adapter — zero-arg lambda. */
@@ -206,7 +232,9 @@ public final class CN1LambdaSupport {
                     lambdaNs.setVariable(parameterNames[i], safeArgs[i], false);
                 }
             } catch (UtilEvalError ex) {
-                throw ex.toEvalError(null, null);
+                EvalError converted = ex.toEvalError(null, null);
+                reportError(converted);
+                throw converted;
             }
             Interpreter prevInterpreter = CURRENT_INTERPRETER.get();
             NameSpace prevNamespace = CURRENT_NAMESPACE.get();
@@ -216,6 +244,12 @@ public final class CN1LambdaSupport {
                 synchronized (interpreter) {
                     return Primitive.unwrap(interpreter.eval(bodySource, lambdaNs));
                 }
+            } catch (EvalError ex) {
+                reportError(ex);
+                throw ex;
+            } catch (RuntimeException ex) {
+                reportError(ex);
+                throw ex;
             } finally {
                 if (prevInterpreter != null) {
                     CURRENT_INTERPRETER.set(prevInterpreter);
@@ -227,6 +261,17 @@ public final class CN1LambdaSupport {
                 } else {
                     CURRENT_NAMESPACE.remove();
                 }
+            }
+        }
+
+        private void reportError(Throwable error) {
+            if (errorHandler == null) {
+                return;
+            }
+            try {
+                errorHandler.onLambdaError(error, bodySource);
+            } catch (Throwable ignored) {
+                // Reporter failures must not displace the real lambda error.
             }
         }
     }

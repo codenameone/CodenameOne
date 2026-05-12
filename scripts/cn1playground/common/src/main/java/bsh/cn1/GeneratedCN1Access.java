@@ -726,6 +726,7 @@ public final class GeneratedCN1Access implements CN1Access {
         "com.codenameone.playground.CN1Playground",
         "com.codenameone.playground.PlaygroundContext",
         "com.codenameone.playground.PlaygroundContext.Logger",
+        "com.codenameone.playground.PlaygroundContext.RuntimeErrorReporter",
         "com.codenameone.playground.PlaygroundLambdaBridge",
         "com.codenameone.playground.PlaygroundListenerBridge",
         "com.codenameone.playground.WebsiteThemeNative",
@@ -1599,8 +1600,9 @@ public final class GeneratedCN1Access implements CN1Access {
         index.put("com.codename1.xml.XMLParser", splitMembers(""));
         index.put("com.codename1.xml.XMLWriter", splitMembers(""));
         index.put("com.codenameone.playground.CN1Playground", splitMembers("destroy()getTheme()init(Object)runApp()start()stop()"));
-        index.put("com.codenameone.playground.PlaygroundContext", splitMembers("captureShownForm(Form)clearCreatedComponents()clearPreview()clearShownForm()getCreatedComponents()getFirstCreatedComponent()getFirstCreatedForm()getHostForm()getPreviewRoot()getShownForm()getTheme()log(String)recordCreatedComponent(Component)refreshPreview()setTitle(String)debug(String)getCurrent()interceptMethodInvocation(Object, String, Object[])notifyConstructed(Object)"));
+        index.put("com.codenameone.playground.PlaygroundContext", splitMembers("captureShownForm(Form)clearCreatedComponents()clearPreview()clearShownForm()getCreatedComponents()getFirstCreatedComponent()getFirstCreatedForm()getHostForm()getPreviewRoot()getShownForm()getTheme()log(String)recordCreatedComponent(Component)refreshPreview()reportRuntimeError(String, Throwable)setTitle(String)debug(String)getCurrent()interceptMethodInvocation(Object, String, Object[])notifyConstructed(Object)"));
         index.put("com.codenameone.playground.PlaygroundContext.Logger", splitMembers("log(String)"));
+        index.put("com.codenameone.playground.PlaygroundContext.RuntimeErrorReporter", splitMembers("reportRuntimeError(String, Throwable)"));
         index.put("com.codenameone.playground.PlaygroundLambdaBridge", splitMembers("lambda(Object[], String)lambda(String[], String)"));
         index.put("com.codenameone.playground.PlaygroundListenerBridge", splitMembers("actionListener(Object)networkListener(Object)onComplete(Object)runnable(Object)"));
         index.put("com.codenameone.playground.WebsiteThemeNative", splitMembers("isDarkMode()isSupported()notifyUiReady()"));
@@ -1608,10 +1610,10 @@ public final class GeneratedCN1Access implements CN1Access {
         index.put("java.io.ByteArrayOutputStream", splitMembers(""));
         index.put("java.io.DataInput", splitMembers(""));
         index.put("java.io.DataInputStream", splitMembers(""));
-        index.put("java.io.DataOutput", splitMembers(""));
     }
 
     private static void fillMethodIndex10(Map<String, String[]> index) {
+        index.put("java.io.DataOutput", splitMembers(""));
         index.put("java.io.DataOutputStream", splitMembers(""));
         index.put("java.io.EOFException", splitMembers(""));
         index.put("java.io.Flushable", splitMembers(""));
@@ -1675,10 +1677,10 @@ public final class GeneratedCN1Access implements CN1Access {
         index.put("java.lang.OutOfMemoryError", splitMembers(""));
         index.put("java.lang.Override", splitMembers(""));
         index.put("java.lang.Runnable", splitMembers(""));
-        index.put("java.lang.Runtime", splitMembers(""));
     }
 
     private static void fillMethodIndex11(Map<String, String[]> index) {
+        index.put("java.lang.Runtime", splitMembers(""));
         index.put("java.lang.RuntimeException", splitMembers(""));
         index.put("java.lang.SafeVarargs", splitMembers(""));
         index.put("java.lang.SecurityException", splitMembers(""));
@@ -1742,10 +1744,10 @@ public final class GeneratedCN1Access implements CN1Access {
         index.put("java.util.Comparator", splitMembers(""));
         index.put("java.util.ConcurrentModificationException", splitMembers(""));
         index.put("java.util.Date", splitMembers(""));
-        index.put("java.util.Deque", splitMembers(""));
     }
 
     private static void fillMethodIndex12(Map<String, String[]> index) {
+        index.put("java.util.Deque", splitMembers(""));
         index.put("java.util.Dictionary", splitMembers(""));
         index.put("java.util.EmptyStackException", splitMembers(""));
         index.put("java.util.Enumeration", splitMembers(""));
@@ -2476,6 +2478,7 @@ public final class GeneratedCN1Access implements CN1Access {
         index.put("com.codenameone.playground.CN1Playground", splitMembers(""));
         index.put("com.codenameone.playground.PlaygroundContext", splitMembers(""));
         index.put("com.codenameone.playground.PlaygroundContext.Logger", splitMembers(""));
+        index.put("com.codenameone.playground.PlaygroundContext.RuntimeErrorReporter", splitMembers(""));
         index.put("com.codenameone.playground.PlaygroundLambdaBridge", splitMembers(""));
         index.put("com.codenameone.playground.PlaygroundListenerBridge", splitMembers(""));
         index.put("com.codenameone.playground.WebsiteThemeNative", splitMembers(""));
@@ -2483,10 +2486,10 @@ public final class GeneratedCN1Access implements CN1Access {
         index.put("java.io.ByteArrayOutputStream", splitMembers(""));
         index.put("java.io.DataInput", splitMembers(""));
         index.put("java.io.DataInputStream", splitMembers(""));
-        index.put("java.io.DataOutput", splitMembers(""));
     }
 
     private static void fillFieldIndex10(Map<String, String[]> index) {
+        index.put("java.io.DataOutput", splitMembers(""));
         index.put("java.io.DataOutputStream", splitMembers(""));
         index.put("java.io.EOFException", splitMembers(""));
         index.put("java.io.Flushable", splitMembers(""));
@@ -2550,10 +2553,10 @@ public final class GeneratedCN1Access implements CN1Access {
         index.put("java.lang.OutOfMemoryError", splitMembers(""));
         index.put("java.lang.Override", splitMembers(""));
         index.put("java.lang.Runnable", splitMembers(""));
-        index.put("java.lang.Runtime", splitMembers(""));
     }
 
     private static void fillFieldIndex11(Map<String, String[]> index) {
+        index.put("java.lang.Runtime", splitMembers(""));
         index.put("java.lang.RuntimeException", splitMembers(""));
         index.put("java.lang.SafeVarargs", splitMembers(""));
         index.put("java.lang.SecurityException", splitMembers(""));
@@ -2617,10 +2620,10 @@ public final class GeneratedCN1Access implements CN1Access {
         index.put("java.util.Comparator", splitMembers(""));
         index.put("java.util.ConcurrentModificationException", splitMembers(""));
         index.put("java.util.Date", splitMembers(""));
-        index.put("java.util.Deque", splitMembers(""));
     }
 
     private static void fillFieldIndex12(Map<String, String[]> index) {
+        index.put("java.util.Deque", splitMembers(""));
         index.put("java.util.Dictionary", splitMembers(""));
         index.put("java.util.EmptyStackException", splitMembers(""));
         index.put("java.util.Enumeration", splitMembers(""));

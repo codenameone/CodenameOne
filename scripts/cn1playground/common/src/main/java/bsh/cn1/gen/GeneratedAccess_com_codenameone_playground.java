@@ -33,6 +33,9 @@ public final class GeneratedAccess_com_codenameone_playground {
         if ("Logger".equals(simpleName)) {
             return com.codenameone.playground.PlaygroundContext.Logger.class;
         }
+        if ("RuntimeErrorReporter".equals(simpleName)) {
+            return com.codenameone.playground.PlaygroundContext.RuntimeErrorReporter.class;
+        }
         if ("PlaygroundLambdaBridge".equals(simpleName)) {
             return com.codenameone.playground.PlaygroundLambdaBridge.class;
         }
@@ -50,6 +53,10 @@ public final class GeneratedAccess_com_codenameone_playground {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Form.class, com.codename1.ui.Container.class, com.codename1.ui.util.Resources.class, com.codenameone.playground.PlaygroundContext.Logger.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Form.class, com.codename1.ui.Container.class, com.codename1.ui.util.Resources.class, com.codenameone.playground.PlaygroundContext.Logger.class}, false);
                 return new com.codenameone.playground.PlaygroundContext((com.codename1.ui.Form) adaptedArgs[0], (com.codename1.ui.Container) adaptedArgs[1], (com.codename1.ui.util.Resources) adaptedArgs[2], (com.codenameone.playground.PlaygroundContext.Logger) adaptedArgs[3]);
+            }
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Form.class, com.codename1.ui.Container.class, com.codename1.ui.util.Resources.class, com.codenameone.playground.PlaygroundContext.Logger.class, com.codenameone.playground.PlaygroundContext.RuntimeErrorReporter.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Form.class, com.codename1.ui.Container.class, com.codename1.ui.util.Resources.class, com.codenameone.playground.PlaygroundContext.Logger.class, com.codenameone.playground.PlaygroundContext.RuntimeErrorReporter.class}, false);
+                return new com.codenameone.playground.PlaygroundContext((com.codename1.ui.Form) adaptedArgs[0], (com.codename1.ui.Container) adaptedArgs[1], (com.codename1.ui.util.Resources) adaptedArgs[2], (com.codenameone.playground.PlaygroundContext.Logger) adaptedArgs[3], (com.codenameone.playground.PlaygroundContext.RuntimeErrorReporter) adaptedArgs[4]);
             }
         }
         throw unsupportedConstruct(type, safeArgs);
@@ -126,9 +133,16 @@ public final class GeneratedAccess_com_codenameone_playground {
                 unsupported = ex;
             }
         }
+        if (target instanceof com.codenameone.playground.PlaygroundContext.RuntimeErrorReporter) {
+            try {
+                return invoke5((com.codenameone.playground.PlaygroundContext.RuntimeErrorReporter) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
         if (target instanceof com.codenameone.playground.WebsiteThemeNative) {
             try {
-                return invoke5((com.codenameone.playground.WebsiteThemeNative) target, name, safeArgs);
+                return invoke6((com.codenameone.playground.WebsiteThemeNative) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
@@ -248,6 +262,12 @@ public final class GeneratedAccess_com_codenameone_playground {
                 typedTarget.refreshPreview(); return null;
             }
         }
+        if ("reportRuntimeError".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Throwable.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Throwable.class}, false);
+                typedTarget.reportRuntimeError((java.lang.String) adaptedArgs[0], (java.lang.Throwable) adaptedArgs[1]); return null;
+            }
+        }
         if ("setTitle".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -309,7 +329,17 @@ public final class GeneratedAccess_com_codenameone_playground {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke5(com.codenameone.playground.WebsiteThemeNative typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke5(com.codenameone.playground.PlaygroundContext.RuntimeErrorReporter typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("reportRuntimeError".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Throwable.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Throwable.class}, false);
+                typedTarget.reportRuntimeError((java.lang.String) adaptedArgs[0], (java.lang.Throwable) adaptedArgs[1]); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke6(com.codenameone.playground.WebsiteThemeNative typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("isDarkMode".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.isDarkMode();
