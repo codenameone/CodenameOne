@@ -176,6 +176,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new TextAreaAlignmentScreenshotTest(),
             new ValidatorLightweightPickerScreenshotTest(),
             new LightweightPickerButtonsScreenshotTest(),
+            new PickerCancelRestoreTest(),
             new ToastBarTopPositionScreenshotTest(),
             // Native-theme fidelity tests (Phase 7): each emits a light+dark PNG pair
             // so the iOS Modern and Android Material themes get exercised per UIID.
