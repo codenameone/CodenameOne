@@ -117,11 +117,18 @@ jobs:
         # Surface regressions in the simulator-side helpers (CSSWatcher
         # localization, MavenUtils designer-jar resolution, JavaSEPort font
         # mapping). Without this step the tests in maven/javase compile but
-        # never execute on PRs.
+        # never execute on PRs. We install the javase module's transitive
+        # deps first (sqlite-jdbc, factory, etc. -- earlier steps don't
+        # publish them to the local repo) so the test invocation can resolve
+        # them, then run javase's tests in isolation.
         working-directory: maven
         env:
           CN1_BINARIES: ${{ github.workspace }}/maven/target/cn1-binaries
         run: |
+          mvn -B -Dmaven.javadoc.skip=true \
+            -Dcodename1.platform=javase \
+            -Dcn1.binaries="${CN1_BINARIES}" \
+            -pl javase -am -Plocal-dev-javase -DskipTests install
           mvn -B -Dmaven.javadoc.skip=true \
             -Dcodename1.platform=javase \
             -Dcn1.binaries="${CN1_BINARIES}" \

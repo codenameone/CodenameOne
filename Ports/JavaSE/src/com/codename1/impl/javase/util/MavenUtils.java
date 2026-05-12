@@ -143,10 +143,25 @@ public class MavenUtils {
         return null;
     }
 
+    private static final String INNER_JAR_NAME = "designer_1.jar";
+
+    /**
+     * Extracts the single expected inner jar from the designer wrapper artifact.
+     *
+     * <p>The wrapper produced by {@code maven/designer/pom.xml} contains exactly
+     * one entry named {@code designer_1.jar} at the root. To stay safe against
+     * Zip Slip even if an unexpected artifact is dropped in m2, this method:
+     * (1) writes only to a single, fixed destination path under {@code destDir}
+     * (never derived from the archive's entry name), and (2) skips any entry
+     * whose name isn't the literal expected filename. A malicious entry like
+     * {@code ../../etc/passwd} therefore never participates in path
+     * construction; in the worst case the loop finds no match and throws.</p>
+     */
     private static void extractInnerJar(File wrapperZip, File destDir) throws IOException {
         if (!destDir.exists() && !destDir.mkdirs() && !destDir.isDirectory()) {
             throw new IOException("Could not create designer extraction directory: " + destDir.getAbsolutePath());
         }
+        File innerJar = new File(destDir, INNER_JAR_NAME);
         InputStream in = new FileInputStream(wrapperZip);
         try {
             ZipInputStream zis = new ZipInputStream(in);
@@ -156,12 +171,12 @@ public class MavenUtils {
                     if (entry.isDirectory()) {
                         continue;
                     }
-                    File out = new File(destDir, entry.getName());
-                    File parent = out.getParentFile();
-                    if (parent != null && !parent.exists() && !parent.mkdirs() && !parent.isDirectory()) {
-                        throw new IOException("Could not create directory: " + parent.getAbsolutePath());
+                    if (!INNER_JAR_NAME.equals(entry.getName())) {
+                        // Unexpected entry. Skip it rather than materialize a
+                        // file path derived from untrusted archive metadata.
+                        continue;
                     }
-                    OutputStream fos = new FileOutputStream(out);
+                    OutputStream fos = new FileOutputStream(innerJar);
                     try {
                         byte[] buf = new byte[8192];
                         int n;
@@ -171,7 +186,10 @@ public class MavenUtils {
                     } finally {
                         fos.close();
                     }
+                    return;
                 }
+                throw new IOException("Wrapper zip does not contain a " + INNER_JAR_NAME
+                        + " entry: " + wrapperZip.getAbsolutePath());
             } finally {
                 zis.close();
             }

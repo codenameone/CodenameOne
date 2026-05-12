@@ -12,6 +12,7 @@ import java.util.zip.ZipOutputStream;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -124,6 +125,94 @@ class MavenUtilsTest {
         Files.write(notInM2.toPath(), new byte[]{0x50, 0x4B, 0x05, 0x06});
 
         assertNull(MavenUtils.findDesignerJarInM2(notInM2));
+    }
+
+    @Test
+    void refusesPathTraversalEntriesAndDoesNotWriteOutsideExtractDir(@TempDir Path tempDir) throws Exception {
+        // CodeQL flagged the original extraction loop as a Zip Slip risk: it
+        // built `new File(destDir, entry.getName())` from untrusted archive
+        // metadata. Pack a wrapper whose only entry is a `../../etc/passwd`-
+        // style traversal name and verify the resolver refuses to extract
+        // (no file outside the extracted dir, no inner jar produced).
+        String version = "8.0-SNAPSHOT";
+        Path m2 = tempDir.resolve("m2/com/codenameone");
+        Path coreDir = Files.createDirectories(m2.resolve("codenameone-core/" + version));
+        Path designerDir = Files.createDirectories(m2.resolve("codenameone-designer/" + version));
+        File coreJar = coreDir.resolve("codenameone-core-" + version + ".jar").toFile();
+        Files.write(coreJar.toPath(), new byte[]{0x50, 0x4B, 0x05, 0x06});
+
+        File wrapperZip = designerDir.resolve(
+                "codenameone-designer-" + version + "-jar-with-dependencies.jar").toFile();
+        File traversalSentinel = tempDir.resolve("escaped.txt").toFile();
+        FileOutputStream fos = new FileOutputStream(wrapperZip);
+        try {
+            ZipOutputStream zos = new ZipOutputStream(fos);
+            try {
+                // The relative `../../escaped.txt` resolves to tempDir/escaped.txt
+                // if the extractor were vulnerable: extractedDir lives at
+                // designerDir/<wrapper>-extracted/, so two ".." pops back to
+                // tempDir's root.
+                zos.putNextEntry(new ZipEntry("../../escaped.txt"));
+                zos.write("if-you-see-me-zip-slip-happened".getBytes("UTF-8"));
+                zos.closeEntry();
+            } finally {
+                zos.close();
+            }
+        } finally {
+            fos.close();
+        }
+
+        File resolved = MavenUtils.findDesignerJarInM2(coreJar);
+        assertNull(resolved, "Resolver must report failure when the wrapper has no designer_1.jar");
+        assertFalse(traversalSentinel.exists(),
+                "Traversal entry must not be written outside the extraction directory");
+    }
+
+    @Test
+    void skipsUnexpectedEntriesAndStillExtractsDesignerJar(@TempDir Path tempDir) throws Exception {
+        // Hardening guard: even if a future wrapper variant adds extra files
+        // alongside designer_1.jar, the extractor should ignore them and only
+        // surface the canonical inner jar.
+        String version = "8.0-SNAPSHOT";
+        Path m2 = tempDir.resolve("m2/com/codenameone");
+        Path coreDir = Files.createDirectories(m2.resolve("codenameone-core/" + version));
+        Path designerDir = Files.createDirectories(m2.resolve("codenameone-designer/" + version));
+        File coreJar = coreDir.resolve("codenameone-core-" + version + ".jar").toFile();
+        Files.write(coreJar.toPath(), new byte[]{0x50, 0x4B, 0x05, 0x06});
+
+        File wrapperZip = designerDir.resolve(
+                "codenameone-designer-" + version + "-jar-with-dependencies.jar").toFile();
+        byte[] expectedPayload = "real-designer-bytes".getBytes("UTF-8");
+        FileOutputStream fos = new FileOutputStream(wrapperZip);
+        try {
+            ZipOutputStream zos = new ZipOutputStream(fos);
+            try {
+                zos.putNextEntry(new ZipEntry("README.txt"));
+                zos.write("noise".getBytes("UTF-8"));
+                zos.closeEntry();
+                zos.putNextEntry(new ZipEntry("designer_1.jar"));
+                zos.write(expectedPayload);
+                zos.closeEntry();
+                zos.putNextEntry(new ZipEntry("subdir/other.jar"));
+                zos.write("nope".getBytes("UTF-8"));
+                zos.closeEntry();
+            } finally {
+                zos.close();
+            }
+        } finally {
+            fos.close();
+        }
+
+        File resolved = MavenUtils.findDesignerJarInM2(coreJar);
+        assertNotNull(resolved);
+        assertEquals("designer_1.jar", resolved.getName());
+        assertArrayEquals(expectedPayload, Files.readAllBytes(resolved.toPath()));
+        // The extra entries must not have been written to the extraction dir.
+        File extractedDir = resolved.getParentFile();
+        assertFalse(new File(extractedDir, "README.txt").exists(),
+                "Unexpected entries must be skipped, not written");
+        assertFalse(new File(extractedDir, "subdir").exists(),
+                "Unexpected nested entries must be skipped, not written");
     }
 
     @Test
