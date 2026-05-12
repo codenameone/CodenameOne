@@ -374,6 +374,16 @@ void CN1MetalApplyPolygonStencilClip(const float *xCoords, const float *yCoords,
     bindPipelineStateIfChanged(stencilWritePipeline);
     [activeEncoder setDepthStencilState:depthStencilStateWriteRef];
     [activeEncoder setStencilReferenceValue:currentStencilReference];
+
+    // Polygon points arrive in screen pixel space (CN1's clipRect builds
+    // them by transforming the user-coord intersection back through the
+    // current transform on the Java side). The shader's vertex stage
+    // would otherwise apply the live `currentTransform` again -- a
+    // double-transform that shifts and re-rotates the stencil mask. Match
+    // the GL ES2 sequence at ClipRect.m:149-150: render the polygon with
+    // an identity transform, then restore.
+    simd_float4x4 savedTransform = currentTransform;
+    currentTransform = identityMatrix();
     uploadMatricesIfChanged(1);
     // The solid pipeline expects a fragment colour buffer at index 0. Color
     // writes are masked off on this pipeline so the value doesn't matter,
@@ -399,6 +409,10 @@ void CN1MetalApplyPolygonStencilClip(const float *xCoords, const float *yCoords,
         triRemaining -= batch;
     }
 
+    // Restore the user transform so subsequent draws apply the same
+    // rotation/scale/translate the framework's been accumulating. The
+    // identity swap above was only for the polygon stencil write.
+    currentTransform = savedTransform;
     // From now on, every draw on this encoder is masked to pixels where
     // stencil == currentStencilReference.
     [activeEncoder setDepthStencilState:depthStencilStateTestEqualRef];
