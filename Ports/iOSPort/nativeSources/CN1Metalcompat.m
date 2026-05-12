@@ -258,6 +258,12 @@ void CN1MetalSetScissor(int x, int y, int width, int height) {
 }
 
 // --------------- Polygon stencil clip (#3921) ---------------
+//
+// Forward declarations for the encoder-state cache helpers defined below
+// (drawing-helpers section). The polygon stencil clip needs them too,
+// and ANSI C requires the declaration to precede the call.
+static inline void bindPipelineStateIfChanged(id<MTLRenderPipelineState> state);
+static inline void uploadMatricesIfChanged(NSUInteger atIndex);
 
 static id<MTLDepthStencilState> buildAlwaysPassDepthStencilState(void) {
     MTLDepthStencilDescriptor *desc = [[MTLDepthStencilDescriptor alloc] init];
