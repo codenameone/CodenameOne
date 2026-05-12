@@ -1732,10 +1732,49 @@ void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingShapeMutable
 {
 #ifdef CN1_USE_METAL
     // Shape clipping for mutable images on Metal: scissor rect can only
-    // express axis-aligned rects. A future improvement could rasterise the
-    // shape into a stencil/alpha mask. For now treat as "no clip" so
-    // subsequent draws still render.
-    (void)numCommands; (void)commands; (void)numPoints; (void)points;
+    // express axis-aligned rects. A future improvement could rasterise
+    // the shape into a stencil/alpha mask. Until then, fall back to a
+    // bounding-box scissor matching the form-graphics polygon path in
+    // ClipRect.m. Issue #3921 was filed against the previous no-op
+    // behaviour, where any non-rect clip on a mutable-image graphics
+    // (e.g. clipRect intersected under a non-identity transform, which
+    // builds a polygon clip via inverseClip in
+    // NativeGraphics.clipRect:4670) silently dropped the clip and let
+    // subsequent draws flood the whole image. Walk the points buffer
+    // (anchor + control points, conservative for curves) to get the
+    // bbox and queue a rectangular ClipRect op against the mutable
+    // target so the drain in drawFrame applies the scissor on the
+    // image's encoder.
+    (void)numCommands; (void)commands;
+    GLUIImage *target = [CodenameOne_GLViewController instance].currentMutableImage;
+    if (target == nil) return;
+#ifndef NEW_CODENAME_ONE_VM
+    org_xmlvm_runtime_XMLVMArray* pArray = points;
+    JAVA_ARRAY_FLOAT* data = (JAVA_ARRAY_FLOAT*)pArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
+    int len = pArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
+#else
+    JAVA_ARRAY_FLOAT* data = (JAVA_ARRAY_FLOAT*)((JAVA_ARRAY)points)->data;
+    int len = ((JAVA_ARRAY)points)->length;
+#endif
+    if (len < 2 || data == NULL) return;
+    float minX = data[0], minY = data[1];
+    float maxX = minX, maxY = minY;
+    for (int i = 2; i + 1 < len; i += 2) {
+        if (data[i]   < minX) minX = data[i];
+        if (data[i]   > maxX) maxX = data[i];
+        if (data[i+1] < minY) minY = data[i+1];
+        if (data[i+1] > maxY) maxY = data[i+1];
+    }
+    int bx = (int)floorf(minX);
+    int by = (int)floorf(minY);
+    int bw = (int)ceilf(maxX) - bx;
+    int bh = (int)ceilf(maxY) - by;
+    ClipRect *f = [[ClipRect alloc] initWithArgs:bx ypos:by w:bw h:bh f:1];
+    [f setTarget:target];
+    [[CodenameOne_GLViewController instance] upcomingAddClip:f];
+#ifndef CN1_USE_ARC
+    [f release];
+#endif
 #else
     CGContextRef context = UIGraphicsGetCurrentContext();
     CGContextRestoreGState(context);

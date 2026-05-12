@@ -98,10 +98,35 @@ static CGRect drawingRect;
 #ifdef CN1_USE_METAL
     // Phase 2: handle only the rectangular scissor case via Metal's
     // setScissorRect. Stencil-based clipping for texture/polygon clips
-    // is deferred to a later phase -- those currently fall back to a
-    // bounding-box scissor (incorrect for non-rectangular masks but
-    // does not crash).
+    // is deferred to a later phase -- those fall back to a bounding-box
+    // scissor (incorrect for non-rectangular masks but does not crash).
+    //
+    // For the texture-mask path (initWithArgs:...texture:) x/y/w/h
+    // already hold the mask's bbox, so fall straight through. For the
+    // polygon path (initWithPolygon:y:length:) the initialiser stored
+    // sentinel x=y=w=h=-1 and never computed the bbox -- this code then
+    // passed (0, 0, -2, -2) to CN1MetalSetScissor, whose width<=0 branch
+    // sets the scissor to the full framebuffer, dropping the clip
+    // entirely. Issue #3921 reproduced this every time a clipRect call
+    // hit the NativeGraphics.clipRect non-identity-transform branch
+    // (line 4670) and built an intersected polygon clip via inverseClip.
+    // Compute the polygon bbox now so the scissor matches the documented
+    // intent.
     int sx = x, sy = y, sw = width, sh = height;
+    if (numPoints > 0 && xPoints != NULL && yPoints != NULL) {
+        float minX = xPoints[0], minY = yPoints[0];
+        float maxX = minX, maxY = minY;
+        for (int i = 1; i < numPoints; i++) {
+            if (xPoints[i] < minX) minX = xPoints[i];
+            if (xPoints[i] > maxX) maxX = xPoints[i];
+            if (yPoints[i] < minY) minY = yPoints[i];
+            if (yPoints[i] > maxY) maxY = yPoints[i];
+        }
+        sx = (int)floorf(minX);
+        sy = (int)floorf(minY);
+        sw = (int)ceilf(maxX) - sx;
+        sh = (int)ceilf(maxY) - sy;
+    }
     if (sx < 0) { sw += sx; sx = 0; }
     if (sy < 0) { sh += sy; sy = 0; }
     CN1MetalSetScissor(sx, sy, sw, sh);
