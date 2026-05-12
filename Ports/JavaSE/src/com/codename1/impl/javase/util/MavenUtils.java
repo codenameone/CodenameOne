@@ -8,7 +8,14 @@ package com.codename1.impl.javase.util;
 import com.codename1.io.Log;
 import com.codename1.ui.Display;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.URL;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 /**
  *
@@ -85,7 +92,20 @@ public class MavenUtils {
             if (location == null) {
                 return null;
             }
-            File coreJar = new File(location.toURI());
+            return findDesignerJarInM2(new File(location.toURI()));
+        } catch (Throwable t) {
+            // Best-effort lookup. Any unexpected layout means we can't resolve via m2.
+        }
+        return null;
+    }
+
+    /**
+     * Test seam for {@link #findDesignerJarInM2()}: takes the codenameone-core jar
+     * path explicitly so the resolution logic can be exercised against a fake m2
+     * layout in a temp directory.
+     */
+    static File findDesignerJarInM2(File coreJar) {
+        try {
             // Expected layout: <repo>/com/codenameone/codenameone-core/<version>/codenameone-core-<version>.jar
             File versionDir = coreJar.getParentFile();
             if (versionDir == null) return null;
@@ -98,14 +118,66 @@ public class MavenUtils {
             }
             String version = versionDir.getName();
             File designerVersionDir = new File(codenameoneGroupDir, "codenameone-designer" + File.separator + version);
-            File designer = new File(designerVersionDir, "codenameone-designer-" + version + "-jar-with-dependencies.jar");
-            if (designer.isFile()) {
-                return designer;
+            // The published jar-with-dependencies artifact is *not* directly runnable:
+            // maven/designer/pom.xml's antrun step renames the shaded jar to
+            // designer_1.jar and re-zips it, so this file is a zip wrapper containing
+            // a single designer_1.jar entry with no top-level Main-Class manifest.
+            // AbstractCN1Mojo.getDesignerJar (in the maven plugin) unzips it on demand
+            // and returns the inner jar; we mirror that here so the CSSWatcher
+            // fallback path receives a path that `java -jar` can actually launch.
+            File wrapperZip = new File(designerVersionDir, "codenameone-designer-" + version + "-jar-with-dependencies.jar");
+            if (!wrapperZip.isFile()) {
+                return null;
+            }
+            File extracted = new File(wrapperZip.getParentFile(), wrapperZip.getName() + "-extracted");
+            File innerJar = new File(extracted, "designer_1.jar");
+            if (!innerJar.isFile() || innerJar.lastModified() < wrapperZip.lastModified()) {
+                extractInnerJar(wrapperZip, extracted);
+            }
+            if (innerJar.isFile()) {
+                return innerJar;
             }
         } catch (Throwable t) {
             // Best-effort lookup. Any unexpected layout means we can't resolve via m2.
         }
         return null;
+    }
+
+    private static void extractInnerJar(File wrapperZip, File destDir) throws IOException {
+        if (!destDir.exists() && !destDir.mkdirs() && !destDir.isDirectory()) {
+            throw new IOException("Could not create designer extraction directory: " + destDir.getAbsolutePath());
+        }
+        InputStream in = new FileInputStream(wrapperZip);
+        try {
+            ZipInputStream zis = new ZipInputStream(in);
+            try {
+                ZipEntry entry;
+                while ((entry = zis.getNextEntry()) != null) {
+                    if (entry.isDirectory()) {
+                        continue;
+                    }
+                    File out = new File(destDir, entry.getName());
+                    File parent = out.getParentFile();
+                    if (parent != null && !parent.exists() && !parent.mkdirs() && !parent.isDirectory()) {
+                        throw new IOException("Could not create directory: " + parent.getAbsolutePath());
+                    }
+                    OutputStream fos = new FileOutputStream(out);
+                    try {
+                        byte[] buf = new byte[8192];
+                        int n;
+                        while ((n = zis.read(buf)) > 0) {
+                            fos.write(buf, 0, n);
+                        }
+                    } finally {
+                        fos.close();
+                    }
+                }
+            } finally {
+                zis.close();
+            }
+        } finally {
+            in.close();
+        }
     }
 
     public static boolean isRunningInJDK() {

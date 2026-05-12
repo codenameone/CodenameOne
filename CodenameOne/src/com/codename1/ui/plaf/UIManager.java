@@ -1790,6 +1790,31 @@ public class UIManager {
             Display.getInstance().installNativeTheme();
             accessible = a;
         }
+        // CSSWatcher's live-reload path funnels every recompile through
+        // addThemeProps -> buildTheme without first clearing themeConstants.
+        // When the user replaces a `var()`-bound CSS rule with a literal, the
+        // recompiled theme.res carries the new style value but no longer emits
+        // the matching `@cn1-bind:<key>` entry. The stale binding left over in
+        // themeConstants would otherwise let applyThemeBindings stomp the
+        // user's literal change with the previous binding's resolved value.
+        // Drop any binding whose subject key is being re-set by this load
+        // unless the same load also re-asserts the binding.
+        java.util.List<String> bindingsToDrop = null;
+        Enumeration ek = themeProps.keys();
+        while (ek.hasMoreElements()) {
+            String key = (String) ek.nextElement();
+            if (key.startsWith("@")) {
+                continue;
+            }
+            String boundConstant = "cn1-bind:" + key;
+            if (themeConstants.containsKey(boundConstant)
+                    && !themeProps.containsKey("@" + boundConstant)) {
+                if (bindingsToDrop == null) {
+                    bindingsToDrop = new java.util.ArrayList<String>();
+                }
+                bindingsToDrop.add(boundConstant);
+            }
+        }
         Enumeration e = themeProps.keys();
         while (e.hasMoreElements()) {
             String key = (String) e.nextElement();
@@ -1800,6 +1825,11 @@ public class UIManager {
                 continue;
             }
             this.themeProps.put(key, themeProps.get(key));
+        }
+        if (bindingsToDrop != null) {
+            for (String stale : bindingsToDrop) {
+                themeConstants.remove(stale);
+            }
         }
 
         applyThemeBindings();
