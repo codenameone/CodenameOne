@@ -96,41 +96,40 @@ static CGRect drawingRect;
 
 -(void)execute {
 #ifdef CN1_USE_METAL
-    // Phase 2: handle only the rectangular scissor case via Metal's
-    // setScissorRect. Stencil-based clipping for texture/polygon clips
-    // is deferred to a later phase -- those fall back to a bounding-box
-    // scissor (incorrect for non-rectangular masks but does not crash).
+    // Issue #3921 path. Three shapes can arrive here:
     //
-    // For the texture-mask path (initWithArgs:...texture:) x/y/w/h
-    // already hold the mask's bbox, so fall straight through. For the
-    // polygon path (initWithPolygon:y:length:) the initialiser stored
-    // sentinel x=y=w=h=-1 and never computed the bbox -- this code then
-    // passed (0, 0, -2, -2) to CN1MetalSetScissor, whose width<=0 branch
-    // sets the scissor to the full framebuffer, dropping the clip
-    // entirely. Issue #3921 reproduced this every time a clipRect call
-    // hit the NativeGraphics.clipRect non-identity-transform branch
-    // (line 4670) and built an intersected polygon clip via inverseClip.
-    // Compute the polygon bbox now so the scissor matches the documented
-    // intent.
-    int sx = x, sy = y, sw = width, sh = height;
+    //   1. A rectangular clip (initWithArgs:...) -- x/y/w/h hold the
+    //      rect, no polygon points, no texture. Set the scissor and
+    //      disable any prior polygon-stencil clip so we don't carry a
+    //      stale stencil test forward.
+    //
+    //   2. A polygon clip (initWithPolygon:...) -- numPoints > 0 with
+    //      xPoints/yPoints in framebuffer pixel space (built by
+    //      NativeGraphics.clipRect's non-identity-transform branch via
+    //      inverseClip + transform back to screen space). Use the
+    //      stencil pipeline: render the polygon to the stencil at a
+    //      fresh reference value, then bind a stencil-test depth state
+    //      so subsequent draws on this encoder are masked to the
+    //      polygon shape. Mirrors the GL ES2 sequence below.
+    //
+    //   3. A texture-mask clip (initWithArgs:...:texture:) -- texture
+    //      != 0 with x/y/w/h holding the mask bbox. Metal's GLuint
+    //      texture handle from the GL path isn't directly compatible
+    //      with MTLTexture, so this still falls back to a bbox scissor
+    //      (matches the documented Phase 2 fallback for the texture
+    //      mask case; a follow-up could rasterise the alpha mask into
+    //      an MTLTexture and sample it in a stencil-write shader).
     if (numPoints > 0 && xPoints != NULL && yPoints != NULL) {
-        float minX = xPoints[0], minY = yPoints[0];
-        float maxX = minX, maxY = minY;
-        for (int i = 1; i < numPoints; i++) {
-            if (xPoints[i] < minX) minX = xPoints[i];
-            if (xPoints[i] > maxX) maxX = xPoints[i];
-            if (yPoints[i] < minY) minY = yPoints[i];
-            if (yPoints[i] > maxY) maxY = yPoints[i];
-        }
-        sx = (int)floorf(minX);
-        sy = (int)floorf(minY);
-        sw = (int)ceilf(maxX) - sx;
-        sh = (int)ceilf(maxY) - sy;
+        CN1MetalApplyPolygonStencilClip(xPoints, yPoints, numPoints);
+        clipApplied = YES;
+    } else {
+        int sx = x, sy = y, sw = width, sh = height;
+        if (sx < 0) { sw += sx; sx = 0; }
+        if (sy < 0) { sh += sy; sy = 0; }
+        CN1MetalDisablePolygonStencilClip();
+        CN1MetalSetScissor(sx, sy, sw, sh);
+        clipApplied = (sw > 0 && sh > 0);
     }
-    if (sx < 0) { sw += sx; sx = 0; }
-    if (sy < 0) { sh += sy; sy = 0; }
-    CN1MetalSetScissor(sx, sy, sw, sh);
-    clipApplied = (sw > 0 && sh > 0);
 #else
 #ifdef USE_ES2
     if ( texture != 0 || numPoints > 0 ){

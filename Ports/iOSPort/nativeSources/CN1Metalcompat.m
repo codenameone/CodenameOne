@@ -64,9 +64,36 @@ static __unsafe_unretained id<MTLRenderPipelineState> lastBoundPipelineState = n
 static CN1MetalMatrices lastBoundMatrices;
 static BOOL lastBoundMatricesValid = NO;
 
+// Polygon-shape clip state (#3921). The stencil reference counter is
+// per-encoder: every fresh polygon clip increments it and writes the new
+// value into the stencil texture, so the test for == reference naturally
+// fails against any previously-written area. Keep three depth-stencil
+// states, lazily built on first use:
+//   AlwaysPass        — default for non-stencil draws (or after Disable)
+//   WriteStencilRef   — polygon fill that paints stencil = reference
+//   TestStencilEqualRef — subsequent draws clipped to stencil == ref
+// We deliberately don't cache "is stencil clip active" because the
+// encoder-state cache is reset across mutable-image Begin/End cycles
+// (screen encoder state survives that round-trip but our cache doesn't).
+// Both Apply and Disable unconditionally re-bind so the encoder state
+// always matches the intent, at the cost of a redundant Metal API call
+// in the no-op case.
+static __strong id<MTLDepthStencilState> depthStencilStateAlwaysPass = nil;
+static __strong id<MTLDepthStencilState> depthStencilStateWriteRef = nil;
+static __strong id<MTLDepthStencilState> depthStencilStateTestEqualRef = nil;
+static uint32_t currentStencilReference = 0;
+
 static inline void invalidateEncoderStateCache(void) {
     lastBoundPipelineState = nil;
     lastBoundMatricesValid = NO;
+    // A new encoder starts at stencil reference 0; ApplyPolygonStencilClip
+    // bumps to 1 on first use. (The reference counter is encoder-scoped:
+    // for the mutable round-trip case, the cached counter is reset when
+    // the encoder cache is invalidated, but the *screen* encoder retains
+    // its actual stencil values across the mutable detour. That's fine
+    // because every fresh Apply call bumps the counter and writes the
+    // new reference, so collisions are vanishingly unlikely.)
+    currentStencilReference = 0;
 }
 
 #define CN1_MATRIX_STACK_DEPTH 32
@@ -228,6 +255,154 @@ void CN1MetalSetScissor(int x, int y, int width, int height) {
         (NSUInteger)fx, (NSUInteger)fy,
         (NSUInteger)fw, (NSUInteger)fh
     }];
+}
+
+// --------------- Polygon stencil clip (#3921) ---------------
+
+static id<MTLDepthStencilState> buildAlwaysPassDepthStencilState(void) {
+    MTLDepthStencilDescriptor *desc = [[MTLDepthStencilDescriptor alloc] init];
+    desc.depthCompareFunction = MTLCompareFunctionAlways;
+    desc.depthWriteEnabled = NO;
+    // Front + back stencil descriptors default to "always pass, keep on
+    // every outcome" which is exactly what we want for non-stencil
+    // draws -- the attachment exists but no draw engages it.
+    id<MTLDepthStencilState> state = [CN1MetalDevice() newDepthStencilStateWithDescriptor:desc];
+#ifndef CN1_USE_ARC
+    [desc release];
+#endif
+    return state;
+}
+
+static id<MTLDepthStencilState> buildWriteStencilRefDepthStencilState(void) {
+    MTLDepthStencilDescriptor *desc = [[MTLDepthStencilDescriptor alloc] init];
+    desc.depthCompareFunction = MTLCompareFunctionAlways;
+    desc.depthWriteEnabled = NO;
+    MTLStencilDescriptor *s = [[MTLStencilDescriptor alloc] init];
+    s.stencilCompareFunction = MTLCompareFunctionAlways;
+    s.stencilFailureOperation = MTLStencilOperationKeep;
+    s.depthFailureOperation = MTLStencilOperationKeep;
+    s.depthStencilPassOperation = MTLStencilOperationReplace; // write reference
+    s.readMask = 0xff;
+    s.writeMask = 0xff;
+    desc.frontFaceStencil = s;
+    desc.backFaceStencil = s;
+    id<MTLDepthStencilState> state = [CN1MetalDevice() newDepthStencilStateWithDescriptor:desc];
+#ifndef CN1_USE_ARC
+    [s release];
+    [desc release];
+#endif
+    return state;
+}
+
+static id<MTLDepthStencilState> buildTestStencilEqualRefDepthStencilState(void) {
+    MTLDepthStencilDescriptor *desc = [[MTLDepthStencilDescriptor alloc] init];
+    desc.depthCompareFunction = MTLCompareFunctionAlways;
+    desc.depthWriteEnabled = NO;
+    MTLStencilDescriptor *s = [[MTLStencilDescriptor alloc] init];
+    s.stencilCompareFunction = MTLCompareFunctionEqual;
+    s.stencilFailureOperation = MTLStencilOperationKeep;
+    s.depthFailureOperation = MTLStencilOperationKeep;
+    s.depthStencilPassOperation = MTLStencilOperationKeep;
+    s.readMask = 0xff;
+    s.writeMask = 0x00; // never write while testing
+    desc.frontFaceStencil = s;
+    desc.backFaceStencil = s;
+    id<MTLDepthStencilState> state = [CN1MetalDevice() newDepthStencilStateWithDescriptor:desc];
+#ifndef CN1_USE_ARC
+    [s release];
+    [desc release];
+#endif
+    return state;
+}
+
+static void ensureDepthStencilStates(void) {
+    if (depthStencilStateAlwaysPass == nil) {
+        depthStencilStateAlwaysPass = buildAlwaysPassDepthStencilState();
+    }
+    if (depthStencilStateWriteRef == nil) {
+        depthStencilStateWriteRef = buildWriteStencilRefDepthStencilState();
+    }
+    if (depthStencilStateTestEqualRef == nil) {
+        depthStencilStateTestEqualRef = buildTestStencilEqualRefDepthStencilState();
+    }
+}
+
+void CN1MetalApplyPolygonStencilClip(const float *xCoords, const float *yCoords, int num) {
+    if (activeEncoder == nil || pipelineCache == nil) return;
+    if (num < 3 || xCoords == NULL || yCoords == NULL) {
+        // Degenerate polygon: nothing inside it can pass -- emulate by
+        // shrinking the scissor to a zero-size rect (matches the
+        // "everything is clipped out" intent).
+        CN1MetalSetScissor(0, 0, 0, 0);
+        ensureDepthStencilStates();
+        [activeEncoder setDepthStencilState:depthStencilStateAlwaysPass];
+        return;
+    }
+    ensureDepthStencilStates();
+
+    // Bump the reference value (wrap at 255 -> 1 to avoid colliding with
+    // the cleared-zero state). Each polygon clip gets a fresh ref so
+    // earlier writes can't satisfy the test for the new clip.
+    currentStencilReference++;
+    if (currentStencilReference > 0xff) {
+        currentStencilReference = 1;
+    }
+
+    // Open the scissor so the polygon fill isn't truncated by any prior
+    // rectangular scissor. The stencil mask will produce the actual
+    // shape; later draws may re-narrow with a scissor if the framework
+    // also called clipRect with a rect.
+    CN1MetalSetScissor(0, 0, currentFramebufferWidth, currentFramebufferHeight);
+
+    // Build the triangle-fan vertex list for the polygon: (0, i, i+1)
+    // for i in [1 .. num-1). Matches CN1MetalFillPolygon's convex-only
+    // assumption. setVertexBytes has a 4KB cap, so batch like
+    // FillPolygon does.
+    enum { BATCH_TRIS = 168, BATCH_FLOATS = BATCH_TRIS * 6 };
+    float stackBuf[BATCH_FLOATS];
+
+    id<MTLRenderPipelineState> stencilWritePipeline = [pipelineCache pipelineFor:CN1MetalPipelineStencilWrite];
+    if (stencilWritePipeline == nil) {
+        return;
+    }
+    bindPipelineStateIfChanged(stencilWritePipeline);
+    [activeEncoder setDepthStencilState:depthStencilStateWriteRef];
+    [activeEncoder setStencilReferenceValue:currentStencilReference];
+    uploadMatricesIfChanged(1);
+    // The solid pipeline expects a fragment colour buffer at index 0. Color
+    // writes are masked off on this pipeline so the value doesn't matter,
+    // but we still need to bind *something* or the Metal validator will
+    // fault. Use zero — premultiplied "discarded" colour.
+    simd_float4 dummyColor = (simd_float4){0, 0, 0, 0};
+    [activeEncoder setFragmentBytes:&dummyColor length:sizeof(dummyColor) atIndex:0];
+
+    int triRemaining = num - 2;
+    int firstTri = 0;
+    while (triRemaining > 0) {
+        int batch = (triRemaining > BATCH_TRIS) ? BATCH_TRIS : triRemaining;
+        int out = 0;
+        for (int t = 0; t < batch; t++) {
+            int i = 1 + firstTri + t;          // 1, 2, 3, ...
+            stackBuf[out++] = xCoords[0];      stackBuf[out++] = yCoords[0];
+            stackBuf[out++] = xCoords[i];      stackBuf[out++] = yCoords[i];
+            stackBuf[out++] = xCoords[i + 1];  stackBuf[out++] = yCoords[i + 1];
+        }
+        [activeEncoder setVertexBytes:stackBuf length:(NSUInteger)(out * sizeof(float)) atIndex:0];
+        [activeEncoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:(NSUInteger)(out / 2)];
+        firstTri += batch;
+        triRemaining -= batch;
+    }
+
+    // From now on, every draw on this encoder is masked to pixels where
+    // stencil == currentStencilReference.
+    [activeEncoder setDepthStencilState:depthStencilStateTestEqualRef];
+    [activeEncoder setStencilReferenceValue:currentStencilReference];
+}
+
+void CN1MetalDisablePolygonStencilClip(void) {
+    if (activeEncoder == nil) return;
+    ensureDepthStencilStates();
+    [activeEncoder setDepthStencilState:depthStencilStateAlwaysPass];
 }
 
 // --------------- Drawing helpers ---------------
@@ -902,6 +1077,7 @@ static __unsafe_unretained id<MTLRenderCommandEncoder> savedScreenEncoder = nil;
 static simd_float4x4 savedScreenProjection;
 static int savedScreenFw = 0;
 static int savedScreenFh = 0;
+static uint32_t savedScreenStencilReference = 0;
 static BOOL savedScreenStateValid = NO;
 
 // Build a Y-down ortho projection for an offscreen (w x h) framebuffer.
@@ -1067,16 +1243,49 @@ BOOL CN1MetalBeginMutableImageDraw(GLUIImage *image) {
     // the same Image.getGraphics().
     desc.colorAttachments[0].loadAction = MTLLoadActionLoad;
     desc.colorAttachments[0].storeAction = MTLStoreActionStore;
+    // Attach a Stencil8 for polygon-shape clipping (#3921). Private
+    // storage (Memoryless isn't supported on the iOS Simulator on older
+    // Intel-Mac CI runners; see the note in METALView.m). Stencil values
+    // are scoped to this Begin/End cycle -- the next mutable draw on the
+    // same image will allocate a fresh stencil texture and clear it.
+    id<MTLDevice> device = CN1MetalDevice();
+    id<MTLTexture> stencilTex = nil;
+    if (device != nil) {
+        MTLTextureDescriptor *stencilDesc = [MTLTextureDescriptor
+            texture2DDescriptorWithPixelFormat:MTLPixelFormatStencil8
+            width:(NSUInteger)w height:(NSUInteger)h mipmapped:NO];
+        stencilDesc.usage = MTLTextureUsageRenderTarget;
+        stencilDesc.storageMode = MTLStorageModePrivate;
+        stencilTex = [device newTextureWithDescriptor:stencilDesc];
+        if (stencilTex != nil) {
+            desc.stencilAttachment.texture = stencilTex;
+            desc.stencilAttachment.loadAction = MTLLoadActionClear;
+            desc.stencilAttachment.storeAction = MTLStoreActionDontCare;
+            desc.stencilAttachment.clearStencil = 0;
+        }
+    }
     id<MTLRenderCommandEncoder> enc = [cb renderCommandEncoderWithDescriptor:desc];
+#ifndef CN1_USE_ARC
+    // Render pass descriptor retains the stencil attachment for the
+    // pass duration; drop our local +1 once the encoder is built.
+    [stencilTex release];
+#endif
     if (enc == nil) return NO;
     [enc setViewport:(MTLViewport){0.0, 0.0, (double)w, (double)h, 0.0, 1.0}];
 
     // Save current screen state (drawFrame opened the screen encoder via
     // setFramebuffer before starting drain) and swap in the mutable's.
+    // Include the polygon-clip stencil reference so the screen's stencil
+    // values don't collide with the mutable's (each has its own stencil
+    // texture, so the counters are independent; but the screen counter
+    // must come back unchanged so the next screen polygon clip lands at
+    // ref+1 rather than 1, which would alias against any pixels the
+    // screen wrote at ref=1 earlier in this frame).
     savedScreenEncoder = activeEncoder;
     savedScreenProjection = currentProjection;
     savedScreenFw = currentFramebufferWidth;
     savedScreenFh = currentFramebufferHeight;
+    savedScreenStencilReference = currentStencilReference;
     savedScreenStateValid = YES;
 
     activeEncoder = enc;
@@ -1111,6 +1320,10 @@ void CN1MetalEndMutableImageDraw(GLUIImage *image) {
         currentProjection = savedScreenProjection;
         currentFramebufferWidth = savedScreenFw;
         currentFramebufferHeight = savedScreenFh;
+        // Restore the screen-side stencil reference counter so any
+        // pre-detour polygon clip's writes are still distinguishable
+        // from a fresh post-detour clip (see Begin's note).
+        currentStencilReference = savedScreenStencilReference;
         savedScreenEncoder = nil;
         savedScreenStateValid = NO;
     }
