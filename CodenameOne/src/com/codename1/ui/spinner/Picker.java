@@ -759,7 +759,7 @@ public class Picker extends Button {
                 dlg.setY(Display.getInstance().getDisplayHeight());
                 dlg.setX(0);
                 dlg.setRepositionAnimation(false);
-                registerAsInputDevice(dlg);
+                registerAsInputDevice(dlg, spinner);
                 if (Display.getInstance().isTablet()) {
                     getComponentForm().getAnimationManager().flushAnimation(new Runnable() {
 
@@ -1354,7 +1354,7 @@ public class Picker extends Button {
         }
     }
 
-    private void registerAsInputDevice(final InteractionDialog dlg) {
+    private void registerAsInputDevice(final InteractionDialog dlg, final InternalPickerWidget spinner) {
 
         final Form f = this.getComponentForm();
         if (f != null) {
@@ -1399,8 +1399,19 @@ public class Picker extends Button {
 
                     @Override
                     public void close() throws Exception {
-                        currentInput = null;
-                        currentSpinner = null;
+                        // Only null the picker-wide fields if they still point at THIS popup.
+                        // When a second popup opens before the form has finished switching
+                        // input devices, Form#setCurrentInputDevice calls close() on the
+                        // previous device AFTER showInteractionDialog has already assigned
+                        // currentSpinner / currentInput to the new popup; unconditionally
+                        // nulling them here would clobber the new popup's live spinner and
+                        // break setX propagation.
+                        if (currentInput == this) { //NOPMD CompareObjectsWithEquals
+                            currentInput = null;
+                        }
+                        if (currentSpinner == spinner) { //NOPMD CompareObjectsWithEquals
+                            currentSpinner = null;
+                        }
                         if (sizeChanged != null) {
                             f.removeSizeChangedListener(sizeChanged);
                         }
