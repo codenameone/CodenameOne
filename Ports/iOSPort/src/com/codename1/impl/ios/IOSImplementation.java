@@ -1641,7 +1641,16 @@ public class IOSImplementation extends CodenameOneImplementation {
             setNativeClippingGlobal(bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight(), true);
         } else if (shape.isPolygon()) {
             int pointsSize = shape.getPointsSize();
-            if (polygonPointsBuffer == null || polygonPointsBuffer.length < pointsSize) {
+            // Reallocate when the buffer doesn't EXACTLY match -- previously
+            // this only reallocated when undersized, so a smaller polygon
+            // reused a larger buffer and the trailing slots retained the
+            // previous (larger) polygon's vertices. The native side reads
+            // the JAVA_ARRAY's allocated length, not a separate count, so
+            // those stale vertices became "real" polygon corners and
+            // produced visible spike artefacts in the rendered clip on
+            // iOS Metal (#3921 / PR #4924). Allocate exactly the size we
+            // need so trailing garbage can't appear.
+            if (polygonPointsBuffer == null || polygonPointsBuffer.length != pointsSize) {
                 polygonPointsBuffer = new float[pointsSize];
             }
             shapeToPolygon(shape, polygonPointsBuffer);

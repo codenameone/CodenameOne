@@ -1754,11 +1754,20 @@ void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingShapeMutable
 #ifndef NEW_CODENAME_ONE_VM
     org_xmlvm_runtime_XMLVMArray* pArray = points;
     JAVA_ARRAY_FLOAT* data = (JAVA_ARRAY_FLOAT*)pArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
-    int len = pArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
+    int bufferLen = pArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
 #else
     JAVA_ARRAY_FLOAT* data = (JAVA_ARRAY_FLOAT*)((JAVA_ARRAY)points)->data;
-    int len = ((JAVA_ARRAY)points)->length;
+    int bufferLen = ((JAVA_ARRAY)points)->length;
 #endif
+    // Use the Java-passed `numPoints` (the actual used float count from
+    // shape.getPointsSize()) -- the underlying buffer is reused / grown-
+    // only by getTmpNativeDrawShape_coords, so its JAVA_ARRAY length can
+    // exceed the actual point count and trailing slots contain stale
+    // data from previous (larger) shapes. Reading those would inject
+    // spurious polygon vertices that produce visible spike artefacts in
+    // the clipped fill (#3921 / PR #4924).
+    int len = numPoints;
+    if (len > bufferLen) len = bufferLen; // safety clamp
     if (len < 6 || data == NULL) return; // need at least 3 (x, y) pairs
     int numPairs = len / 2;
     JAVA_FLOAT x[numPairs];
