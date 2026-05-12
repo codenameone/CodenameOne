@@ -53,11 +53,13 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Scanner;
+import java.util.Set;
 import java.util.StringTokenizer;
 
 import java.util.zip.ZipEntry;
@@ -1865,7 +1867,7 @@ public class AndroidGradleBuilder extends Executor {
                 createIconFile(new File(drawableDir, "ic_stat_notify.png"), iconImage, 24, 24);
             }
 
-            processLocalizedIcons(assetsDir, resDir, enableAdaptiveIcons);
+            processLocalizedIcons(assetsDir, resDir, enableAdaptiveIcons, iconImage);
         } catch (IOException ex) {
             throw new BuildException("Failed to generate icon files", ex);
         }
@@ -4467,8 +4469,20 @@ public class AndroidGradleBuilder extends Executor {
      * picks up the correct launcher icon at runtime based on the device
      * locale. Source files are removed from assetsDir so they are not shipped
      * as stray assets.
+     *
+     * <p>When a region-qualified icon (e.g. cn1_icon_ar_AE.png) is supplied
+     * without a matching language-only counterpart (cn1_icon_ar.png), the
+     * default app icon is also written to drawable-&lt;lang&gt;/ (and the
+     * matching mipmap-*-&lt;lang&gt;/ directories). This is required to
+     * suppress Android's sibling-locale fallback: starting with API 24 the
+     * resource resolver, when it can't find an exact (ar-rPK) or parent (ar)
+     * match, walks every child of the parent locale and would otherwise pick
+     * ar-rAE for an ar-PK user. Inserting the default icon at the parent
+     * level short-circuits that lookup so only devices whose region matches
+     * the supplied variant receive it.</p>
      */
-    private void processLocalizedIcons(File assetsDir, File resDir, boolean enableAdaptiveIcons) throws IOException {
+    private void processLocalizedIcons(File assetsDir, File resDir, boolean enableAdaptiveIcons,
+            BufferedImage defaultIcon) throws IOException {
         File[] candidates = assetsDir.listFiles(new FilenameFilter() {
             @Override
             public boolean accept(File dir, String name) {
@@ -4478,6 +4492,22 @@ public class AndroidGradleBuilder extends Executor {
         });
         if (candidates == null || candidates.length == 0) {
             return;
+        }
+        Set<String> languagesWithRegion = new HashSet<String>();
+        Set<String> languagesWithLanguageOnly = new HashSet<String>();
+        for (File candidate : candidates) {
+            String name = candidate.getName();
+            String core = name.substring("cn1_icon_".length(), name.length() - ".png".length());
+            String[] parts = core.split("_");
+            if (parts.length < 1 || parts[0].length() != 2) {
+                continue;
+            }
+            String lang = parts[0].toLowerCase();
+            if (parts.length >= 2 && parts[1].length() == 2) {
+                languagesWithRegion.add(lang);
+            } else {
+                languagesWithLanguageOnly.add(lang);
+            }
         }
         for (File candidate : candidates) {
             String name = candidate.getName();
@@ -4499,30 +4529,45 @@ public class AndroidGradleBuilder extends Executor {
                 continue;
             }
 
-            createIconFile(makeLocalizedDir(resDir, "drawable", qualifier, "icon.png"), img, 128, 128);
-            createIconFile(makeLocalizedDir(resDir, "drawable-hdpi", qualifier, "icon.png"), img, 72, 72);
-            createIconFile(makeLocalizedDir(resDir, "drawable-ldpi", qualifier, "icon.png"), img, 36, 36);
-            createIconFile(makeLocalizedDir(resDir, "drawable-mdpi", qualifier, "icon.png"), img, 48, 48);
-            createIconFile(makeLocalizedDir(resDir, "drawable-xhdpi", qualifier, "icon.png"), img, 96, 96);
-            createIconFile(makeLocalizedDir(resDir, "drawable-xxhdpi", qualifier, "icon.png"), img, 144, 144);
-            createIconFile(makeLocalizedDir(resDir, "drawable-xxxhdpi", qualifier, "icon.png"), img, 192, 192);
-
-            if (enableAdaptiveIcons) {
-                createIconFile(makeLocalizedDir(resDir, "mipmap-mdpi", qualifier, "ic_launcher.png"), img, 48, 48);
-                createIconFile(makeLocalizedDir(resDir, "mipmap-hdpi", qualifier, "ic_launcher.png"), img, 72, 72);
-                createIconFile(makeLocalizedDir(resDir, "mipmap-xhdpi", qualifier, "ic_launcher.png"), img, 96, 96);
-                createIconFile(makeLocalizedDir(resDir, "mipmap-xxhdpi", qualifier, "ic_launcher.png"), img, 144, 144);
-                createIconFile(makeLocalizedDir(resDir, "mipmap-xxxhdpi", qualifier, "ic_launcher.png"), img, 192, 192);
-
-                createIconFile(makeLocalizedDir(resDir, "mipmap-mdpi", qualifier, "ic_launcher_foreground.png"), img, 108, 108);
-                createIconFile(makeLocalizedDir(resDir, "mipmap-hdpi", qualifier, "ic_launcher_foreground.png"), img, 162, 162);
-                createIconFile(makeLocalizedDir(resDir, "mipmap-xhdpi", qualifier, "ic_launcher_foreground.png"), img, 216, 216);
-                createIconFile(makeLocalizedDir(resDir, "mipmap-xxhdpi", qualifier, "ic_launcher_foreground.png"), img, 324, 324);
-                createIconFile(makeLocalizedDir(resDir, "mipmap-xxxhdpi", qualifier, "ic_launcher_foreground.png"), img, 432, 432);
-            }
+            writeLocalizedIconSet(resDir, qualifier, img, enableAdaptiveIcons);
 
             candidate.delete();
             log("Registered localized launcher icon for qualifier " + qualifier + " (" + name + ")");
+        }
+
+        for (String lang : languagesWithRegion) {
+            if (languagesWithLanguageOnly.contains(lang)) {
+                continue;
+            }
+            String qualifier = "-" + lang;
+            writeLocalizedIconSet(resDir, qualifier, defaultIcon, enableAdaptiveIcons);
+            log("Registered default-icon barrier for qualifier " + qualifier
+                    + " to suppress Android sibling-locale fallback");
+        }
+    }
+
+    private void writeLocalizedIconSet(File resDir, String qualifier, BufferedImage img,
+            boolean enableAdaptiveIcons) throws IOException {
+        createIconFile(makeLocalizedDir(resDir, "drawable", qualifier, "icon.png"), img, 128, 128);
+        createIconFile(makeLocalizedDir(resDir, "drawable-hdpi", qualifier, "icon.png"), img, 72, 72);
+        createIconFile(makeLocalizedDir(resDir, "drawable-ldpi", qualifier, "icon.png"), img, 36, 36);
+        createIconFile(makeLocalizedDir(resDir, "drawable-mdpi", qualifier, "icon.png"), img, 48, 48);
+        createIconFile(makeLocalizedDir(resDir, "drawable-xhdpi", qualifier, "icon.png"), img, 96, 96);
+        createIconFile(makeLocalizedDir(resDir, "drawable-xxhdpi", qualifier, "icon.png"), img, 144, 144);
+        createIconFile(makeLocalizedDir(resDir, "drawable-xxxhdpi", qualifier, "icon.png"), img, 192, 192);
+
+        if (enableAdaptiveIcons) {
+            createIconFile(makeLocalizedDir(resDir, "mipmap-mdpi", qualifier, "ic_launcher.png"), img, 48, 48);
+            createIconFile(makeLocalizedDir(resDir, "mipmap-hdpi", qualifier, "ic_launcher.png"), img, 72, 72);
+            createIconFile(makeLocalizedDir(resDir, "mipmap-xhdpi", qualifier, "ic_launcher.png"), img, 96, 96);
+            createIconFile(makeLocalizedDir(resDir, "mipmap-xxhdpi", qualifier, "ic_launcher.png"), img, 144, 144);
+            createIconFile(makeLocalizedDir(resDir, "mipmap-xxxhdpi", qualifier, "ic_launcher.png"), img, 192, 192);
+
+            createIconFile(makeLocalizedDir(resDir, "mipmap-mdpi", qualifier, "ic_launcher_foreground.png"), img, 108, 108);
+            createIconFile(makeLocalizedDir(resDir, "mipmap-hdpi", qualifier, "ic_launcher_foreground.png"), img, 162, 162);
+            createIconFile(makeLocalizedDir(resDir, "mipmap-xhdpi", qualifier, "ic_launcher_foreground.png"), img, 216, 216);
+            createIconFile(makeLocalizedDir(resDir, "mipmap-xxhdpi", qualifier, "ic_launcher_foreground.png"), img, 324, 324);
+            createIconFile(makeLocalizedDir(resDir, "mipmap-xxxhdpi", qualifier, "ic_launcher_foreground.png"), img, 432, 432);
         }
     }
 
