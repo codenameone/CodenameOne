@@ -469,6 +469,8 @@ On Android the build generates locale-qualified drawable resources at every dens
 
 No code changes are required—Android's resource framework switches icons when the locale changes.
 
+When you supply a region-qualified icon (such as `cn1_icon_ar_AE.png`) without a matching language-only variant, the build also emits the *default* (non-localized) icon into `drawable-<lang>/` and the matching `mipmap-*-<lang>/` directories. This barrier is required because Android's resource resolver (API 24+) walks every child of the parent locale when it can't find an exact or parent-language match, and would otherwise pick `ar-rAE` for, say, an `ar-PK` device. The barrier short-circuits that lookup so only devices whose region matches the supplied variant receive the localized icon. If you also ship a language-only file (for example `cn1_icon_ar.png`) it is used as the barrier instead, so you keep full control of the fallback icon for Arabic speakers outside AE.
+
 ===== iOS behaviour
 
 iOS doesn't localize launcher icons natively, so Codename One wires up https://developer.apple.com/documentation/uikit/uiapplication/2806818-setalternateiconname[alternate app icons] for you:
