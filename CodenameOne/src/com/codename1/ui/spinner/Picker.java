@@ -124,6 +124,13 @@ public class Picker extends Button {
     /// so that setters propagate into the visible wheels and getters read the wheel
     /// position. Null whenever the popup is not showing.
     private InternalPickerWidget currentSpinner;
+    /// Snapshot of `value` taken right before the lightweight popup is shown.
+    /// Setter calls from custom popup buttons (e.g. a "+7 days" action that does
+    /// `setDate(getDate() + 7d)`) stage their result into `value`, but if the user
+    /// dismisses the popup with Cancel we roll `value` back to this snapshot so
+    /// `getDate()` returns what the picker held before editing began. Non-null only
+    /// while the popup is on screen.
+    private Object preEditValue;
 
     /// Placement options for custom lightweight popup buttons.
     public static final class LightweightPopupButtonPlacement {
@@ -493,7 +500,15 @@ public class Picker extends Button {
                 }
                 restoreContentPane();
                 dlg.disposeToTheBottom();
-                if (command != COMMAND_CANCEL) {
+                if (command == COMMAND_CANCEL) {
+                    // Roll back any setX calls made while the popup was showing
+                    // (e.g. a custom "+7 days" button) so getDate() returns the
+                    // value the picker held before editing began.
+                    value = preEditValue;
+                    preEditValue = null;
+                    updateValue();
+                } else {
+                    preEditValue = null;
                     value = spinner.getValue();
                     updateValue();
                     // (x, y) = (-99, -99) signals the built-in action listner
@@ -545,6 +560,13 @@ public class Picker extends Button {
                         throw new IllegalArgumentException("Unsupported picker type " + type);
                 }
                 currentSpinner = spinner;
+                // Snapshot the committed value so a Cancel press can restore it.
+                // Custom popup buttons stage their result through setDate / setTime /
+                // setDuration / setSelectedString etc., which now mutate `value`
+                // directly so that getDate() during the edit returns the staged
+                // value; without this snapshot a Cancel after such a button would
+                // leak the staged value into the picker (#4897 follow-up).
+                preEditValue = value;
                 final InteractionDialog dlg = new InteractionDialog() {
 
                     ActionListener keyListener;
@@ -737,7 +759,7 @@ public class Picker extends Button {
                 dlg.setY(Display.getInstance().getDisplayHeight());
                 dlg.setX(0);
                 dlg.setRepositionAnimation(false);
-                registerAsInputDevice(dlg);
+                registerAsInputDevice(dlg, spinner);
                 if (Display.getInstance().isTablet()) {
                     getComponentForm().getAnimationManager().flushAnimation(new Runnable() {
 
@@ -1238,6 +1260,9 @@ public class Picker extends Button {
     /// If the lightweight popup is currently on screen the visible scroll wheels are also
     /// moved to the new value, so a custom popup button can do `setDate(getDate() + n)` and
     /// have the wheels reflect it (see `#addLightweightPopupButton(String, Runnable)`).
+    /// Such changes are *staged*: if the user dismisses the popup with Cancel the picker
+    /// rolls back to the date it held before the popup was shown; if the user presses Done
+    /// the staged value is committed.
     /// The native picker is read-only while shown - calling `setDate` against a Picker whose
     /// native popup is open updates the committed `value` but leaves the on-screen wheels
     /// unchanged until the user dismisses and re-opens the picker.
@@ -1329,7 +1354,7 @@ public class Picker extends Button {
         }
     }
 
-    private void registerAsInputDevice(final InteractionDialog dlg) {
+    private void registerAsInputDevice(final InteractionDialog dlg, final InternalPickerWidget spinner) {
 
         final Form f = this.getComponentForm();
         if (f != null) {
@@ -1374,8 +1399,19 @@ public class Picker extends Button {
 
                     @Override
                     public void close() throws Exception {
-                        currentInput = null;
-                        currentSpinner = null;
+                        // Only null the picker-wide fields if they still point at THIS popup.
+                        // When a second popup opens before the form has finished switching
+                        // input devices, Form#setCurrentInputDevice calls close() on the
+                        // previous device AFTER showInteractionDialog has already assigned
+                        // currentSpinner / currentInput to the new popup; unconditionally
+                        // nulling them here would clobber the new popup's live spinner and
+                        // break setX propagation.
+                        if (currentInput == this) { //NOPMD CompareObjectsWithEquals
+                            currentInput = null;
+                        }
+                        if (currentSpinner == spinner) { //NOPMD CompareObjectsWithEquals
+                            currentSpinner = null;
+                        }
                         if (sizeChanged != null) {
                             f.removeSizeChangedListener(sizeChanged);
                         }
@@ -1515,8 +1551,10 @@ public class Picker extends Button {
     }
 
     /// Sets the current value in a string array picker. If the lightweight popup is on screen
-    /// the visible scroll wheel is also moved to the new value; the native picker is read-only
-    /// while shown so against a native popup this updates only the committed value.
+    /// the visible scroll wheel is also moved to the new value, and the change is *staged*:
+    /// a Cancel press rolls back to the value the picker held before the popup was shown,
+    /// while a Done press commits it. The native picker is read-only while shown so against
+    /// a native popup this updates only the committed value.
     ///
     /// #### Parameters
     ///
@@ -1558,8 +1596,10 @@ public class Picker extends Button {
     }
 
     /// Sets the index of the selected string. If the lightweight popup is on screen the
-    /// visible wheel is also moved to the new value; the native picker is read-only while
-    /// shown so against a native popup this updates only the committed value.
+    /// visible wheel is also moved to the new value, and the change is *staged*: a Cancel
+    /// press rolls back to the value the picker held before the popup was shown, while a
+    /// Done press commits it. The native picker is read-only while shown so against a
+    /// native popup this updates only the committed value.
     ///
     /// #### Parameters
     ///
@@ -1676,8 +1716,10 @@ public class Picker extends Button {
 
     /// This value is only used for time type and is ignored in the case of date and time where
     /// both are embedded within the date. If the lightweight popup is on screen the visible
-    /// scroll wheels are also moved to the new value; the native picker is read-only while
-    /// shown so against a native popup this updates only the committed value.
+    /// scroll wheels are also moved to the new value, and the change is *staged*: a Cancel
+    /// press rolls back to the value the picker held before the popup was shown, while a
+    /// Done press commits it. The native picker is read-only while shown so against a native
+    /// popup this updates only the committed value.
     ///
     /// #### Parameters
     ///
@@ -1738,8 +1780,10 @@ public class Picker extends Button {
     }
 
     /// This value is only used for duration type. If the lightweight popup is on screen the
-    /// visible scroll wheels are also moved to the new value; the native picker is read-only
-    /// while shown so against a native popup this updates only the committed value.
+    /// visible scroll wheels are also moved to the new value, and the change is *staged*:
+    /// a Cancel press rolls back to the value the picker held before the popup was shown,
+    /// while a Done press commits it. The native picker is read-only while shown so against
+    /// a native popup this updates only the committed value.
     ///
     /// #### Parameters
     ///
