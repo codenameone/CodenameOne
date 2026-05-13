@@ -2296,22 +2296,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
         CanvasRenderingContext2D context = (CanvasRenderingContext2D)outputCanvas.getContext("2d");
         context.save();
-        // The crop rect and the optional clearRect below are interpreted
-        // in whatever transform was active on the canvas when ``save()``
-        // ran. ClipShape ops leave the canvas at the shape's transform
-        // (e.g. a rotation, when a clipRect runs under a rotateRadians)
-        // and a subsequent drain inherits that transform via the
-        // outer-most save/restore pair -- so without resetting here, the
-        // drain's clip becomes a rotated rectangle and clearRect wipes
-        // only a rotated wedge, leaving the form to be painted INSIDE
-        // that rotated mask while pixels OUTSIDE the mask are leftover
-        // content from the previous drain. Visible symptom in the
-        // ``graphics-clip-under-rotation`` screenshot test: the entire
-        // form (title bar + cells) appears rotated ~30deg even though
-        // the test's own ``rotateRadians(+angle) + rotateRadians(-angle)``
-        // pair cancels mathematically. Force the drain's initial clip
-        // and clear to run in device-coordinate space.
-        context.setTransform(1, 0, 0, 1, 0, 0);
         context.beginPath();
         context.rect(frame.getCropX(), frame.getCropY(), frame.getCropW(), frame.getCropH());
         context.clip();
