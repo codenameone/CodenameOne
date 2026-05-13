@@ -112,7 +112,7 @@ template.type=maven
 
 As a more complete example of a project template, see the https://github.com/shannah/cn1app-archetype-kotlin-template/blob/master/generate-app-project.rpf[generate-app-project.rpf] file in the https://github.com/shannah/cn1app-archetype-kotlin-template[bare-bones kotlin app template].
 
-This is the template that's used in https://start.codenameone.com[Codename One initializr] for the Bare-bones Kotlin project.
+This is the template that's used in https://www.codenameone.com/initializr[Codename One initializr] for the Bare-bones Kotlin project.
 
 
 

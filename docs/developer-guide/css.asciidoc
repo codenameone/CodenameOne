@@ -596,7 +596,7 @@ You can change the default source DPI for the whole stylesheet by adding `defaul
 }
 ----
 
-Most application templates in https://start.codenameone.com[Codename One Initializr] include this constant by default.
+Most application templates in https://www.codenameone.com/initializr[Codename One Initializr] include this constant by default.
 
 ====
 
