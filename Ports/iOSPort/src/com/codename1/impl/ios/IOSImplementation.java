@@ -5184,24 +5184,27 @@ public class IOSImplementation extends CodenameOneImplementation {
             if (tmpDrawShape == null) tmpDrawShape = new GeneralPath();
             if (tmpTransform == null) tmpTransform = Transform.makeIdentity();
             if (tmpDrawStroke == null) tmpDrawStroke = new Stroke();
-            GeneralPath p = (GeneralPath) shape;
             if (tmpRect2 == null) tmpRect2 = new Rectangle();
-            Rectangle origBounds = reusableRect;
-            Rectangle transformedBounds = tmpRect2;
-            p.getBounds(origBounds);
-            tmpDrawShape.setShape(shape, transform);
-            tmpDrawShape.getBounds(transformedBounds);
-            double h1 = Math.sqrt(origBounds.getWidth() * origBounds.getWidth() + origBounds.getHeight() * origBounds.getHeight());
-            double h2 = Math.sqrt(transformedBounds.getWidth() * transformedBounds.getWidth() + transformedBounds.getHeight() * transformedBounds.getHeight());
-            if (h2 < 1) h2 = 1;
-            if (h1 < 1) h1 = 1;
-            float scale = (float) (h2 / h1);
-            tmpTransform.setScale(scale, scale);
+            // Metal-only path (entry to this method is already gated on
+            // metalRendering). Factor the user transform into a non-uniform
+            // pre-rasterisation scale (sx, sy) plus a residual GPU transform
+            // -- see the matching block in GlobalGraphics.nativeDrawShape for
+            // the rationale (GH-3302 inscribed-shape drift).
+            Matrix nm = (Matrix) transform.getNativeTransform();
+            float[] m = nm.getData();
+            float c0x = m[0], c0y = m[1];
+            float c1x = m[4], c1y = m[5];
+            float sx = (float) Math.sqrt((double) c0x * c0x + (double) c0y * c0y);
+            float sy = (float) Math.sqrt((double) c1x * c1x + (double) c1y * c1y);
+            if (sx < 1e-6f) sx = 1f;
+            if (sy < 1e-6f) sy = 1f;
+            float strokeScale = (sx == sy) ? sx : (float) Math.sqrt((double) sx * (double) sy);
+            tmpTransform.setScale(sx, sy);
             tmpDrawShape.setShape(shape, tmpTransform);
             Stroke scaledStroke = null;
             if (stroke != null) {
                 tmpDrawStroke.setStroke(stroke);
-                tmpDrawStroke.setLineWidth(tmpDrawStroke.getLineWidth() * scale);
+                tmpDrawStroke.setLineWidth(tmpDrawStroke.getLineWidth() * strokeScale);
                 scaledStroke = tmpDrawStroke;
             }
             TextureAlphaMask mask = textureCache.get(tmpDrawShape, scaledStroke);
@@ -5213,7 +5216,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             Transform saved = transform;
             Transform inv = Transform.makeIdentity();
             inv.setTransform(transform);
-            inv.scale(1f / scale, 1f / scale);
+            inv.scale(1f / sx, 1f / sy);
             setTransform(inv);
             try {
                 nativeDrawAlphaMask(mask);
@@ -5748,7 +5751,6 @@ public class IOSImplementation extends CodenameOneImplementation {
 
 
                 } else {
-                    GeneralPath p = (GeneralPath)shape;
                     if (tmpDrawShape == null) {
                         tmpDrawShape = new GeneralPath();
                     }
@@ -5764,63 +5766,94 @@ public class IOSImplementation extends CodenameOneImplementation {
                     if (tmpDrawStroke == null) {
                         tmpDrawStroke = new Stroke();
                     }
-                    // If the shape is very small and would be scaled dramatically
-                    // by the transform, then we will want to rasterize the shape in a larger
-                    // size to prevent the OGL transform from making the path too blurry.
-                    // But we can't just apply the full transform because the renderer
-                    // won't render the stroke correctly with transform
-                    // So we need to factor the transformation matrix
-                    Rectangle origBounds = reusableRect;
-                    Rectangle transformedBounds = tmpRect2;
-                    p.getBounds(origBounds);
-                    tmpDrawShape.setShape(shape, transform);
-                    tmpDrawShape.getBounds(transformedBounds);
-                    
-                    double h1 = Math.sqrt(origBounds.getWidth() * origBounds.getWidth() + origBounds.getHeight() * origBounds.getHeight());
-                    double h2 = Math.sqrt(transformedBounds.getWidth() * transformedBounds.getWidth() + transformedBounds.getHeight() * transformedBounds.getHeight());
-                    if (h2 < 1) h2 = 1;
-                    if (h1 < 1) h1 = 1;
-                    
-                    
-                    float scale = (float)(h2/h1);
-                    tmpTransform.setScale(scale, scale);
+                    // Factor the user transform into a pre-rasterisation scale
+                    // (sx, sy) and a residual GPU transform = transform *
+                    // S(1/sx, 1/sy). Two strategies:
+                    //
+                    // - Metal: take sx, sy from the column norms of the 2x2
+                    //   linear part of the transform. The path is rasterised
+                    //   at the actual per-axis scale so the residual GPU
+                    //   transform is pure rotation/shear -- no non-uniform
+                    //   texture stretch. This fixes GH-3302: under
+                    //   g.translate + non-uniform g.scale + fillShape the
+                    //   inscribed shape used to drift off the axis-aligned
+                    //   drawRect because the uniform-scale rasterise +
+                    //   non-uniform GPU stretch round to different pixel
+                    //   grids.
+                    //
+                    // - GL ES2: keep the legacy uniform h2/h1 diagonal ratio.
+                    //   Existing GL goldens are calibrated against this
+                    //   behaviour; only Metal opts in to the per-axis
+                    //   decomposition.
+                    float sx, sy;
+                    if (metalRendering) {
+                        Matrix nm = (Matrix) transform.getNativeTransform();
+                        float[] m = nm.getData();
+                        // Column-major 4x4: column 0 = [m[0], m[1], ...],
+                        // column 1 = [m[4], m[5], ...]. Length of each column
+                        // is the per-axis scale magnitude (true for pure
+                        // scale, scale-then-rotate, and rotate-then-scale;
+                        // shear contributes to both norms equally).
+                        float c0x = m[0], c0y = m[1];
+                        float c1x = m[4], c1y = m[5];
+                        sx = (float) Math.sqrt((double) c0x * c0x + (double) c0y * c0y);
+                        sy = (float) Math.sqrt((double) c1x * c1x + (double) c1y * c1y);
+                        if (sx < 1e-6f) sx = 1f;
+                        if (sy < 1e-6f) sy = 1f;
+                    } else {
+                        GeneralPath p = (GeneralPath) shape;
+                        Rectangle origBounds = reusableRect;
+                        Rectangle transformedBounds = tmpRect2;
+                        p.getBounds(origBounds);
+                        tmpDrawShape.setShape(shape, transform);
+                        tmpDrawShape.getBounds(transformedBounds);
+                        double h1 = Math.sqrt(origBounds.getWidth() * origBounds.getWidth() + origBounds.getHeight() * origBounds.getHeight());
+                        double h2 = Math.sqrt(transformedBounds.getWidth() * transformedBounds.getWidth() + transformedBounds.getHeight() * transformedBounds.getHeight());
+                        if (h2 < 1) h2 = 1;
+                        if (h1 < 1) h1 = 1;
+                        float scale = (float) (h2 / h1);
+                        sx = sy = scale;
+                    }
+                    // Stroke widening: in path space the renderer can only
+                    // produce a circular pen, but the residual GPU transform
+                    // does not scale (Metal) or applies a non-uniform stretch
+                    // (GL legacy). Use the geometric mean of the per-axis
+                    // scales so the on-screen stroke matches what the user
+                    // asked for on average; when sx == sy this collapses to
+                    // the uniform legacy behaviour.
+                    float strokeScale = (sx == sy) ? sx : (float) Math.sqrt((double) sx * (double) sy);
+                    tmpTransform.setScale(sx, sy);
                     tmpDrawShape.setShape(shape, tmpTransform);
 
                     tmpTransform.setTransform(transform);
-                    tmpTransform.scale(1/scale, 1/scale);
+                    tmpTransform.scale(1f / sx, 1f / sy);
 
                     tmpTransform2.setTransform(transform);
                     try {
                         this.setTransform(tmpTransform);
                         if (stroke != null) {
-
                             tmpDrawStroke.setStroke(stroke);
-                            tmpDrawStroke.setLineWidth(tmpDrawStroke.getLineWidth() * scale);
+                            tmpDrawStroke.setLineWidth(tmpDrawStroke.getLineWidth() * strokeScale);
                         }
-                        //applyTransform();
                         TextureAlphaMask mask = textureCache.get(tmpDrawShape, stroke==null?null:tmpDrawStroke);
                         if ( mask == null ){
                             mask = (TextureAlphaMask)createAlphaMask(tmpDrawShape, stroke==null?null:tmpDrawStroke);
                             textureCache.add(tmpDrawShape, stroke==null?null:tmpDrawStroke, mask);
-
                         }
                         if (mask==null){
-                            // A null mask generally means the shape had zero bounds
                             return;
                         }
-                        //mask = (TextureAlphaMask)createAlphaMask(shape, stroke);
                         if (paint != null && paint instanceof RadialGradient) {
                             RadialGradient rgp = (RadialGradient)paint;
-                            rgp.x *= scale;
-                            rgp.y *= scale;
-                            rgp.width *= scale;
-                            rgp.height *= scale;
+                            rgp.x *= sx;
+                            rgp.y *= sy;
+                            rgp.width *= sx;
+                            rgp.height *= sy;
                             applyPaint();
                         }
                         nativeDrawAlphaMask(mask);
                     } finally {
                         setTransform(tmpTransform2);
-                        //applyTransform();
                     }
                 }
             } else {
