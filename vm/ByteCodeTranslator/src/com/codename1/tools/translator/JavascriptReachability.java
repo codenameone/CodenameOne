@@ -250,7 +250,7 @@ final class JavascriptReachability {
         stack.push(cls);
         while (!stack.isEmpty()) {
             ByteCodeClass current = stack.pop();
-            if (current == null || !seen.add(current.getClsName())) {
+            if (!seen.add(current.getClsName())) {
                 continue;
             }
             if ("com_codename1_html5_js_JSObject".equals(current.getClsName())) {
