@@ -70,8 +70,8 @@ void com_codename1_impl_ios_IOSNative_googleLogin___java_lang_Object(CN1_THREAD_
         JAVA_OBJECT d = com_codename1_ui_Display_getInstance__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
         JAVA_OBJECT jClientID = virtual_com_codename1_ui_Display_getProperty___java_lang_String_java_lang_String_R_java_lang_String(CN1_THREAD_STATE_PASS_ARG d, fromNSString(CN1_THREAD_STATE_PASS_ARG @"ios.gplus.clientId"), JAVA_NULL);
         if (jClientID == JAVA_NULL) {
-            set_field_com_codename1_social_GoogleImpl_loginMessage(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"Failed to log in due to a configuration error."), googleLoginCallback);
-            set_field_com_codename1_social_GoogleImpl_loginCompleted(CN1_THREAD_GET_STATE_PASS_ARG JAVA_TRUE, googleLoginCallback);
+            set_field_com_codename1_social_GoogleImpl_loginMessage(fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"Failed to log in due to a configuration error."), googleLoginCallback);
+            set_field_com_codename1_social_GoogleImpl_loginCompleted(JAVA_TRUE, googleLoginCallback);
             googleLoginCallback = NULL;
             CN1Log(@"Could not login to Google Plus because 'ios.gplus.clientId' property is not set.  Ensure that the ios.gplus.clientId build hint is set");
             return;
@@ -88,8 +88,8 @@ void com_codename1_impl_ios_IOSNative_googleLogin___java_lang_Object(CN1_THREAD_
             BOOL isGooglePlusInstalled = [[UIApplication sharedApplication] canOpenURL: [NSURL
                                                                                          URLWithString:@"gplus://"]];
             if (!isGooglePlusInstalled) {
-                set_field_com_codename1_social_GoogleImpl_loginMessage(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"Please install the Google Plus app on your device in order to log in with Google Plus."), googleLoginCallback);
-                set_field_com_codename1_social_GoogleImpl_loginCompleted(CN1_THREAD_GET_STATE_PASS_ARG JAVA_TRUE, googleLoginCallback);
+                set_field_com_codename1_social_GoogleImpl_loginMessage(fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"Please install the Google Plus app on your device in order to log in with Google Plus."), googleLoginCallback);
+                set_field_com_codename1_social_GoogleImpl_loginCompleted(JAVA_TRUE, googleLoginCallback);
                 googleLoginCallback = NULL;
                 CN1Log(@"Could not log into Google plus because the Google Plus app isn't installed and the ios.gplus.requireGplusAppForLogin property is set to true.  This limitation is to work around Apple app store rejections caused by logging in with Safari");
                 return;
@@ -127,11 +127,11 @@ void com_codename1_impl_ios_GoogleConnectImpl_finishedWithAuth(GTMOAuth2Authenti
     
     if (googleLoginCallback != NULL) {
         if (error != nil) {
-            set_field_com_codename1_social_GoogleImpl_loginMessage(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [error localizedDescription]), googleLoginCallback);
+            set_field_com_codename1_social_GoogleImpl_loginMessage(fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [error localizedDescription]), googleLoginCallback);
         } else {
-            set_field_com_codename1_social_GoogleImpl_loginMessage(CN1_THREAD_GET_STATE_PASS_ARG JAVA_NULL, googleLoginCallback);
+            set_field_com_codename1_social_GoogleImpl_loginMessage(JAVA_NULL, googleLoginCallback);
         }
-        set_field_com_codename1_social_GoogleImpl_loginCompleted(CN1_THREAD_GET_STATE_PASS_ARG JAVA_TRUE, googleLoginCallback);
+        set_field_com_codename1_social_GoogleImpl_loginCompleted(JAVA_TRUE, googleLoginCallback);
         googleLoginCallback = NULL;
     }
     
@@ -152,11 +152,11 @@ void com_codename1_impl_ios_GoogleConnectImpl_finishedWithAuth(GIDGoogleUser *us
     
     if (googleLoginCallback != NULL) {
         if (error != nil) {
-            set_field_com_codename1_social_GoogleImpl_loginMessage(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [error localizedDescription]), googleLoginCallback);
+            set_field_com_codename1_social_GoogleImpl_loginMessage(fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [error localizedDescription]), googleLoginCallback);
         } else {
-            set_field_com_codename1_social_GoogleImpl_loginMessage(CN1_THREAD_GET_STATE_PASS_ARG JAVA_NULL, googleLoginCallback);
+            set_field_com_codename1_social_GoogleImpl_loginMessage(JAVA_NULL, googleLoginCallback);
         }
-        set_field_com_codename1_social_GoogleImpl_loginCompleted(CN1_THREAD_GET_STATE_PASS_ARG JAVA_TRUE, googleLoginCallback);
+        set_field_com_codename1_social_GoogleImpl_loginCompleted(JAVA_TRUE, googleLoginCallback);
         googleLoginCallback = NULL;
     }
     
