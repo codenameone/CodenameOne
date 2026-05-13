@@ -83,9 +83,16 @@ class JavascriptOpcodeCoverageTest {
         // runtime from that base+interface graph, so the emitted
         // source no longer contains an explicit ``assignableTo: {}``
         // map. Verify the metadata that drives the runtime union.
-        assertTrue(translatedApp.contains("n: \"JsTypeImpl\"")
-                        && translatedApp.contains("b: \"JsTypeBase\"")
-                        && translatedApp.contains("i: [\"JsTypeIface\"]"),
+        // Class metadata is emitted as ``_Z({n:<X>, b:<Y>, i:[<Z>],
+        // m:{...}, t:<ctor>})`` -- the class-name fields use hoisted
+        // ``_qN`` aliases (the names appear many times across the
+        // bundle), and the prior assertion's literal-with-space form
+        // doesn't match either the post-hoist alias shape or the
+        // post-minify spaceless layout. Match either the direct literal
+        // or the aliased form.
+        assertTrue(JavascriptTargetIntegrationTest.bundleReferencesLiteral(translatedApp, "n:", "JsTypeImpl")
+                        && JavascriptTargetIntegrationTest.bundleReferencesLiteral(translatedApp, "b:", "JsTypeBase")
+                        && JavascriptTargetIntegrationTest.bundleReferencesLiteral(translatedApp, "i:[", "JsTypeIface"),
                 "Class metadata should include the base/interface graph that drives runtime assignability");
         // Virtual/interface dispatch previously inlined the classDef
         // method-table fast path and the ``jvm.resolveVirtual`` fallback
