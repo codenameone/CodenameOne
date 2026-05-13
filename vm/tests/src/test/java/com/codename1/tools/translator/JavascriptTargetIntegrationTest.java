@@ -357,11 +357,20 @@ class JavascriptTargetIntegrationTest {
 
         // ``_I(<cls>)`` is the short alias for ``jvm.ensureClassInitialized``
         // and the class-name argument may have been hoisted to a ``_qN``
-        // alias by the string-hoist pass -- count both forms together.
-        int initChecks = countLiteralReferences(methodBody, "_I(", "JsStaticAccess")
-                + countLiteralReferences(methodBody, "jvm.ensureClassInitialized(", "JsStaticAccess");
-        assertEquals(1, initChecks,
-                "Repeated static field access should only emit one class-init check in straight-line mode "
+        // alias by the string-hoist pass. The alias dictionary lives at
+        // the top of ``translatedApp``, outside ``methodBody``, so pass
+        // both: scan the method body for call sites, resolve the alias
+        // in the full bundle. The assertion is AT MOST ONE -- with the
+        // per-method __cn1Init cache gone (init now lives in the public
+        // wrapper around __impl), zero is also valid when the analyser
+        // proves the class is already initialised by the time the
+        // method runs (the wrapper handled it). The bug this test
+        // guards against is the OLD interpreter loop's tendency to emit
+        // a fresh init guard for each static-field access in the body.
+        int initChecks = countLiteralReferences(methodBody, translatedApp, "_I(", "JsStaticAccess")
+                + countLiteralReferences(methodBody, translatedApp, "jvm.ensureClassInitialized(", "JsStaticAccess");
+        assertTrue(initChecks <= 1,
+                "Repeated static field access should emit at most one class-init check in straight-line mode "
                         + "(got " + initChecks + ")");
     }
 
@@ -402,8 +411,11 @@ class JavascriptTargetIntegrationTest {
         assertTrue(wrapperEnd > wrapperStart,
                 "Interpreter static access fixture wrapper should have a bounded body");
         String wrapperBody = translatedApp.substring(wrapperStart, wrapperEnd);
-        assertTrue(bundleReferencesLiteral(wrapperBody, "_I(", "JsStaticAccessFlow")
-                        || bundleReferencesLiteral(wrapperBody, "jvm.ensureClassInitialized(", "JsStaticAccessFlow"),
+        // Aliases for the class name live at the top of translatedApp,
+        // outside wrapperBody, so pass both: scan wrapperBody for call
+        // sites and resolve any ``_qN`` alias against the full bundle.
+        assertTrue(bundleReferencesLiteral(wrapperBody, translatedApp, "_I(", "JsStaticAccessFlow")
+                        || bundleReferencesLiteral(wrapperBody, translatedApp, "jvm.ensureClassInitialized(", "JsStaticAccessFlow"),
                 "Interpreter static access wrapper should guard class init before delegating to __impl");
     }
 
@@ -447,8 +459,8 @@ class JavascriptTargetIntegrationTest {
         assertTrue(calleeEnd > calleeStart, "Static invoke fixture should have a bounded helper() body");
         String calleeBody = translatedApp.substring(calleeStart, calleeEnd);
 
-        assertTrue(!bundleReferencesLiteral(calleeBody, "jvm.ensureClassInitialized(", "JsStaticInvokeFlow")
-                        && !bundleReferencesLiteral(calleeBody, "_I(", "JsStaticInvokeFlow"),
+        assertTrue(!bundleReferencesLiteral(calleeBody, translatedApp, "jvm.ensureClassInitialized(", "JsStaticInvokeFlow")
+                        && !bundleReferencesLiteral(calleeBody, translatedApp, "_I(", "JsStaticInvokeFlow"),
                 "Internal static method implementations should not repeat class-init guards");
     }
 
@@ -595,44 +607,56 @@ class JavascriptTargetIntegrationTest {
     }
 
     /**
-     * True if the bundle contains a call to ``invocationPrefix("literal")``
-     * after the post-emit string-hoist pass — either the direct literal
-     * form ``foo("X"`` or the aliased form ``foo(_qN`` where ``_qN``
-     * resolves to ``"X"``.
+     * True if ``searchRegion`` contains a call to
+     * ``invocationPrefix("literal")`` after the post-emit string-hoist
+     * pass — either the direct literal form ``foo("X"`` or the aliased
+     * form ``foo(_qN`` where ``_qN`` resolves to ``"X"`` in the
+     * top-of-bundle alias dictionary. ``aliasSource`` is the full
+     * translated_app.js (or any region that contains the
+     * ``const _qN="..."`` declarations); ``searchRegion`` is the
+     * substring to scan (e.g. a method body extracted via substring).
+     * Pass the same string for both when scanning the whole bundle.
      */
-    static boolean bundleReferencesLiteral(String bundle, String invocationPrefix, String literal) {
-        if (bundle.contains(invocationPrefix + "\"" + literal + "\"")) {
+    static boolean bundleReferencesLiteral(String searchRegion, String aliasSource, String invocationPrefix, String literal) {
+        if (searchRegion.contains(invocationPrefix + "\"" + literal + "\"")) {
             return true;
         }
-        String alias = findStringAlias(bundle, literal);
-        return alias != null && bundle.contains(invocationPrefix + alias);
+        String alias = findStringAlias(aliasSource, literal);
+        return alias != null && searchRegion.contains(invocationPrefix + alias);
     }
 
     /**
-     * Count occurrences of ``invocationPrefix("literal"`` in the bundle,
-     * accounting for the post-emit string hoist (literals replaced by
-     * ``_qN`` aliases). Compares against the alias's usage count if the
-     * literal was hoisted.
+     * Whole-bundle convenience: passes the bundle as both
+     * ``searchRegion`` and ``aliasSource``.
      */
-    static int countLiteralReferences(String bundle, String invocationPrefix, String literal) {
+    static boolean bundleReferencesLiteral(String bundle, String invocationPrefix, String literal) {
+        return bundleReferencesLiteral(bundle, bundle, invocationPrefix, literal);
+    }
+
+    /**
+     * Count occurrences of ``invocationPrefix("literal"`` in
+     * ``searchRegion``, accounting for the post-emit string hoist
+     * (literals replaced by ``_qN`` aliases). The alias is looked up
+     * in ``aliasSource`` — pass the whole bundle when ``searchRegion``
+     * is a substring that doesn't contain the alias-definition table
+     * (e.g. an extracted method body).
+     */
+    static int countLiteralReferences(String searchRegion, String aliasSource, String invocationPrefix, String literal) {
         String directNeedle = invocationPrefix + "\"" + literal + "\"";
         int direct = 0;
         int from = 0;
-        while ((from = bundle.indexOf(directNeedle, from)) >= 0) {
+        while ((from = searchRegion.indexOf(directNeedle, from)) >= 0) {
             direct++;
             from += directNeedle.length();
         }
-        String alias = findStringAlias(bundle, literal);
+        String alias = findStringAlias(aliasSource, literal);
         if (alias == null) {
             return direct;
         }
         String aliasNeedle = invocationPrefix + alias;
         int aliased = 0;
         from = 0;
-        while ((from = bundle.indexOf(aliasNeedle, from)) >= 0) {
-            // The alias-definition site itself (``_qN="X"``) does NOT have
-            // ``invocationPrefix`` in front, so it's already excluded from
-            // this count. No need to subtract one.
+        while ((from = searchRegion.indexOf(aliasNeedle, from)) >= 0) {
             aliased++;
             from += aliasNeedle.length();
         }
