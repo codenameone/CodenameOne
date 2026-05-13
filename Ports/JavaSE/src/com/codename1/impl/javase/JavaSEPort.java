@@ -4678,7 +4678,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             public void actionPerformed(ActionEvent e) {
                 JavaSEPort.this.darkMode = Boolean.TRUE;
                 pref.put("cn1.simulator.darkMode", "dark");
-                refreshSkin(frm);
+                refreshThemeOnly();
             }
         });
 
@@ -4687,7 +4687,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             public void actionPerformed(ActionEvent e) {
                 JavaSEPort.this.darkMode = Boolean.FALSE;
                 pref.put("cn1.simulator.darkMode", "light");
-                refreshSkin(frm);
+                refreshThemeOnly();
             }
         });
 
@@ -4696,7 +4696,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             public void actionPerformed(ActionEvent e) {
                 JavaSEPort.this.darkMode = null;
                 pref.put("cn1.simulator.darkMode", "unsupported");
-                refreshSkin(frm);
+                refreshThemeOnly();
             }
         });
         darkLightModeMenu.add(darkModeItem);
@@ -5793,7 +5793,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                     largerTextScale = scale;
                     largerTextEnabled = scale > 1.0f + 0.001f;
                     pref.putFloat(PREF_LARGER_TEXT_SCALE, scale);
-                    refreshSkin(frm);
+                    // Theme-only refresh so the app's CSS-compiled theme survives; see
+                    // refreshThemeOnly() for why refreshSkin breaks the app theme + canvas size.
+                    refreshThemeOnly();
                 }
             });
             group.add(item);
@@ -5902,6 +5904,44 @@ public class JavaSEPort extends CodenameOneImplementation {
         } catch (NumberFormatException e) {
             return null;
         }
+    }
+
+    /// Theme-only refresh used by the Dark/Light Mode and Larger Text menu actions.
+    ///
+    /// These toggles change how the *current* theme should be resolved, but the skin (the
+    /// phone-shell image, the canvas pixel size, the screen-fit zoom) hasn't moved. Routing them
+    /// through {@link #refreshSkin} caused two visible regressions:
+    ///
+    /// 1. `refreshSkin` calls `Display.installNativeTheme()`, which delegates to
+    ///    `UIManager.setThemeProps(nativeProps)`. `setThemeProps` **replaces** the installed
+    ///    theme wholesale, so any CSS-compiled app theme (custom UIID fonts, custom margins,
+    ///    app-only style keys) is wiped to the bare native theme. Visually this read as "fonts
+    ///    are completely wrong" until the simulator was relaunched.
+    ///
+    /// 2. `refreshSkin` recomputes the canvas size from `canvas.getWidth() * retinaScale /
+    ///    skin.getWidth()`, which equals `retinaScale` on a HiDPI display whose skin already
+    ///    fits the screen. The canvas then grows to `skin * retinaScale` while subsequent
+    ///    drawing still uses `zoomLevel == 1`, so the simulator appeared to "activate zoom mode"
+    ///    after a Dark/Light click.
+    ///
+    /// Master PR #4935 (`isUsableWindowBounds`/`parsePersistedBounds` above) adds defense in
+    /// depth against the resulting bad window-bounds prefs from the Larger Text path. This
+    /// helper removes the trigger entirely by leaving the canvas alone --
+    /// `UIManager.refreshTheme()` re-applies the currently-installed themeProps (so the app
+    /// theme survives) and clears the style cache (so `shouldUseDarkStyle` resolves correctly
+    /// against the new `Display.isDarkMode()`).
+    private void refreshThemeOnly() {
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                UIManager.getInstance().refreshTheme();
+                Form curr = Display.getInstance().getCurrent();
+                if (curr != null) {
+                    deepRevaliate(curr);
+                    curr.revalidate();
+                    curr.repaint();
+                }
+            }
+        });
     }
 
 
