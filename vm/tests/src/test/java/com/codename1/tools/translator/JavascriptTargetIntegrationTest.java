@@ -226,11 +226,29 @@ class JavascriptTargetIntegrationTest {
         assertTrue(end > start, "Straight-line fixture should have a bounded method body");
         String methodBody = translatedApp.substring(start, end);
 
-        assertTrue(methodBody.contains("let l0 = __cn1Arg1;") && methodBody.contains("let l1 = __cn1Arg2;"),
-                "Straight-line lowering should use direct local variables for arguments");
-        assertTrue(!methodBody.contains("stack["),
+        // After the post-emit param-into-locals lift (f4381c716) plus the
+        // per-method ``lN/sN/pc`` → single-letter rename (aab1aebff), the
+        // canonical ``let l0 = __cn1Arg1; let l1 = __cn1Arg2;`` prelude is
+        // gone -- the function params ARE the locals, then renamed to
+        // single letters. Verify the signature carries the right number
+        // of params (one per Java arg, since add() is static) instead.
+        String signature = methodBody.substring(0, methodBody.indexOf("{") + 1);
+        int paramOpen = signature.indexOf('(');
+        int paramClose = signature.lastIndexOf(')');
+        String paramList = signature.substring(paramOpen + 1, paramClose).trim();
+        int paramCount = paramList.isEmpty() ? 0 : paramList.split(",").length;
+        assertEquals(2, paramCount,
+                "Straight-line lowering should expose the two Java args directly as function params (signature: " + signature + ")");
+        // ``stack`` / ``locals`` were renamed whole-word to ``S`` / ``L`` by
+        // shortenStackAndLocals, so the renamed interpreter prelude looks
+        // like ``let L = _N(N); let S = []; let <X> = 0;`` followed by a
+        // ``for(;;)switch(<X>)`` loop. Check the post-rename signature.
+        assertTrue(!methodBody.contains("S[") && !methodBody.contains("stack["),
                 "Straight-line lowering should avoid stack-array indexing");
-        assertTrue(!methodBody.contains("const locals = new Array") && !methodBody.contains("const stack = []") && !methodBody.contains("let pc = 0"),
+        assertTrue(!methodBody.contains("L = _N(") && !methodBody.contains("S = []")
+                        && !methodBody.contains("const locals = new Array")
+                        && !methodBody.contains("const stack = []")
+                        && !methodBody.contains("for(;;)switch("),
                 "Straight-line lowering should avoid the interpreter locals/stack/pc loop");
     }
 
@@ -542,13 +560,44 @@ class JavascriptTargetIntegrationTest {
      * or ``-1`` if neither form is found.
      */
     static int findFunctionStart(String translatedApp, String identifier, String parameterList) {
+        // First try the exact canonical signature (covers the few methods
+        // that bail out of the post-emit local/param rename passes:
+        // synchronized methods, methods whose emit shape the rename
+        // scanner doesn't recognise, etc).
         String generator = "function* " + identifier + parameterList + "{";
         int idx = translatedApp.indexOf(generator);
         if (idx >= 0) {
             return idx;
         }
         String plain = "function " + identifier + parameterList + "{";
-        return translatedApp.indexOf(plain);
+        idx = translatedApp.indexOf(plain);
+        if (idx >= 0) {
+            return idx;
+        }
+        // Post-rename emission: the ``__cn1Arg<N>`` / ``__cn1ThisObject``
+        // params are renamed to ``l<N>`` (commit f4381c716) and then
+        // ``l<N>`` is further compressed to single-letter aliases
+        // (commit aab1aebff). The function name is global and stays
+        // stable; the parameter LIST is what changes. Match the
+        // signature with any parameter list shape ``(...){``.
+        for (String prefix : new String[]{"function* ", "function "}) {
+            String token = prefix + identifier + "(";
+            int searchFrom = 0;
+            while (true) {
+                int hit = translatedApp.indexOf(token, searchFrom);
+                if (hit < 0) {
+                    break;
+                }
+                int close = translatedApp.indexOf(')', hit + token.length());
+                if (close > hit
+                        && close + 1 < translatedApp.length()
+                        && translatedApp.charAt(close + 1) == '{') {
+                    return hit;
+                }
+                searchFrom = hit + token.length();
+            }
+        }
+        return -1;
     }
 
     static String loadFixture(String name) throws Exception {
