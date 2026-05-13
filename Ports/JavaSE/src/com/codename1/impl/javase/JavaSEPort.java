@@ -14714,6 +14714,21 @@ public class JavaSEPort extends CodenameOneImplementation {
         private File bundleFile;
         private final java.util.Properties properties = new java.util.Properties();
         private boolean dirty;
+        /// Mtime to restore on the bundle file after each {@link #persist}.
+        ///
+        /// The auto-bundle persists every time the app reads a missing key (see
+        /// `get`/`storeEntry`), so during normal development the file is rewritten on most
+        /// simulator launches even when no human ever edited it. Without this restoration,
+        /// `CompileCSSMojo.getLocalizationModificationTime` -- which trusts the file mtime as
+        /// a proxy for "user edited" -- would treat each runtime persist as a fresh
+        /// localization edit and force a ~30s CSS recompile on every subsequent `cn1:run`.
+        ///
+        /// Strategy: before each persist, sample the file's current mtime. If it matches the
+        /// last value we restored (i.e. the file is exactly as we left it, no external editor
+        /// touched it), restore to that value after the write. If it differs, the user edited
+        /// outside the simulator -- capture their mtime as the new target so their edit still
+        /// flows into the staleness comparison.
+        private long preservedMtime = -1L;
 
         AutoLocalizationBundle(File bundleFile, Map<String, String> base) {
             this.bundleFile = bundleFile;
@@ -14784,12 +14799,37 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         private void persist() {
             ensureParentExists();
+            // Sample the file's mtime BEFORE writing so we can carry the user's last-edit
+            // timestamp forward. If the file doesn't exist yet (first persist of a fresh
+            // project), there's no original mtime to preserve -- fall through and let the
+            // post-write mtime become the new baseline.
+            long mtimeBeforeWrite = bundleFile.exists() ? bundleFile.lastModified() : -1L;
+            if (mtimeBeforeWrite > 0L
+                    && (preservedMtime <= 0L || mtimeBeforeWrite != preservedMtime)) {
+                // Either this is the first persist of the session, or the user edited the
+                // file externally since our last restoration. Adopt the current mtime as the
+                // new preserved target so their edit propagates to the staleness check.
+                preservedMtime = mtimeBeforeWrite;
+            }
             try (OutputStream out = new FileOutputStream(bundleFile)) {
                 properties.store(out, "Codename One auto-generated bundle");
             } catch (IOException err) {
                 Log.e(err);
             }
             dirty = false;
+            if (preservedMtime > 0L) {
+                // Best-effort: setLastModified can fail on read-only filesystems or unusual
+                // platforms. If it does, the worst case is the user gets one extra CSS
+                // recompile, which is the pre-fix behavior -- not a regression.
+                if (!bundleFile.setLastModified(preservedMtime)) {
+                    // Capture the post-write mtime so subsequent persists in this session
+                    // don't treat the failure as an external edit.
+                    preservedMtime = bundleFile.lastModified();
+                }
+            } else {
+                // File was freshly created: use this write's mtime as the future baseline.
+                preservedMtime = bundleFile.lastModified();
+            }
         }
 
         private void persistIfNeeded(boolean force) {
