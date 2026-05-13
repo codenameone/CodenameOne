@@ -311,6 +311,11 @@ public class AppPanel extends JPanel {
             JFrame window = frame.getWindow(this);
             if (window != null) {
                 Rectangle r = window.getBounds();
+                // Skip persistence when the geometry is degenerate: a layout
+                // glitch or minimized frame must not corrupt the saved state.
+                if (!JavaSEPort.isUsableWindowBounds(r)) {
+                    return;
+                }
                 prefs.putInt(getPreferencesPrefix(frame) + "preferredWindowBounds.x", r.x);
                 prefs.putInt(getPreferencesPrefix(frame) + "preferredWindowBounds.y", r.y);
                 prefs.putInt(getPreferencesPrefix(frame) + "preferredWindowBounds.width", r.width);
@@ -327,11 +332,23 @@ public class AppPanel extends JPanel {
                 setPreferredFrame(AppFrame.FrameLocation.valueOf(preferredFrameName));
             } catch (IllegalArgumentException ex){}
         }
-        preferredWindowBounds = new Rectangle(0, 0, getPreferredSize().width, getPreferredSize().height);
-        preferredWindowBounds.x = prefs.getInt(getPreferencesPrefix(frame)+"preferredWindowBounds.x", preferredWindowBounds.x);
-        preferredWindowBounds.y = prefs.getInt(getPreferencesPrefix(frame)+"preferredWindowBounds.y", preferredWindowBounds.y);
-        preferredWindowBounds.width = prefs.getInt(getPreferencesPrefix(frame)+"preferredWindowBounds.width", preferredWindowBounds.width);
-        preferredWindowBounds.height = prefs.getInt(getPreferencesPrefix(frame)+"preferredWindowBounds.height", preferredWindowBounds.height);
+        Rectangle defaults = new Rectangle(0, 0, getPreferredSize().width, getPreferredSize().height);
+        Rectangle loaded = new Rectangle(
+                prefs.getInt(getPreferencesPrefix(frame)+"preferredWindowBounds.x", defaults.x),
+                prefs.getInt(getPreferencesPrefix(frame)+"preferredWindowBounds.y", defaults.y),
+                prefs.getInt(getPreferencesPrefix(frame)+"preferredWindowBounds.width", defaults.width),
+                prefs.getInt(getPreferencesPrefix(frame)+"preferredWindowBounds.height", defaults.height));
+        if (JavaSEPort.isUsableWindowBounds(loaded)) {
+            preferredWindowBounds = loaded;
+        } else {
+            preferredWindowBounds = defaults;
+            // Clear the corrupt entries so a one-time glitch does not haunt
+            // every future launch of the simulator.
+            prefs.remove(getPreferencesPrefix(frame)+"preferredWindowBounds.x");
+            prefs.remove(getPreferencesPrefix(frame)+"preferredWindowBounds.y");
+            prefs.remove(getPreferencesPrefix(frame)+"preferredWindowBounds.width");
+            prefs.remove(getPreferencesPrefix(frame)+"preferredWindowBounds.height");
+        }
         preferredAlwaysOnTop = prefs.getBoolean(getPreferencesPrefix(frame)+"preferredAlwaysOnTop", preferredAlwaysOnTop);
 
 
