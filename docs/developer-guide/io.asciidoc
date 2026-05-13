@@ -1317,21 +1317,21 @@ The `Rest` API makes it easy to invoke a restfull webservice without many of the
 
 [source,java]
 ----
-Map<String, Object> jsonData = Rest.get(myUrl).getAsJsonMap();
+Map<String, Object> jsonData = Rest.get(myUrl).getAsJsonMap().getResponseData();
 ----
 
 For a lot of REST requests this will fail because you need to add an HTTP header indicating that you accept JSON results. you've a special case support for that:
 
 [source,java]
 ----
-Map<String, Object> jsonData = Rest.get(myUrl).acceptJson().getAsJsonMap();
+Map<String, Object> jsonData = Rest.get(myUrl).acceptJson().getAsJsonMap().getResponseData();
 ----
 
 You can also do POST requests as easily:
 
 [source,java]
 ----
-Map<String, Object> jsonData = Rest.post(myUrl).body(bodyValueAsString).getAsJsonMap();
+Map<String, Object> jsonData = Rest.post(myUrl).body(bodyValueAsString).getAsJsonMap().getResponseData();
 ----
 
 Notice the usage of post and the body builder method. There are MANY methods in the builder class that cover pretty much everything you would expect and then some when it comes to the needs of rest services.
