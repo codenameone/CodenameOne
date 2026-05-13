@@ -41,13 +41,18 @@ jobs:
     timeout-minutes: 45
     # Exercises both CocoaPods and SPM in a single Xcode project. Catches
     # regressions in either dependency manager (each pathway runs end to end)
-    # and additionally validates that they coexist correctly.
+    # and additionally validates that they coexist correctly. Also turns on
+    # Google sign-in so GoogleConnectImpl.m is compiled under Xcode -- catches
+    # signature drift between hand-written iOS port .m files and the
+    # ParparVM-generated `set_field_*` headers, which is otherwise invisible
+    # until a customer enables Google sign-in.
     env:
       IOS_DEPENDENCY_ARGS: >-
         -Dcodename1.arg.ios.dependencyManager=both
         -Dcodename1.arg.ios.pods=AFNetworking
         -Dcodename1.arg.ios.spm.packages=swift-collections|https://github.com/apple/swift-collections.git|from:1.1.0
         -Dcodename1.arg.ios.spm.products.swift-collections=Collections
+        -Dcodename1.arg.ios.gplus.clientId=000000000000-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.apps.googleusercontent.com
 
     steps:
       - uses: actions/checkout@v4
