@@ -53,7 +53,7 @@ class JavascriptTargetIntegrationTest {
 
         assertTrue(translatedApp.contains("function*") && translatedApp.contains("JsHello"),
                 "Main class should contribute translated JS generator functions");
-        assertTrue(translatedApp.contains("jvm.setMain(\"JsHello\""),
+        assertTrue(bundleReferencesLiteral(translatedApp, "jvm.setMain(", "JsHello"),
                 "Bundle should register the translated main entrypoint");
         assertTrue(runtime.contains("cn1_java_lang_Thread_start") || runtime.contains("cn1_java_lang_Thread_start__"),
                 "Runtime should provide JS native implementations for thread start");
@@ -117,7 +117,7 @@ class JavascriptTargetIntegrationTest {
         String translatedApp = new String(Files.readAllBytes(distDir.resolve("translated_app.js")), StandardCharsets.UTF_8);
         String runtime = new String(Files.readAllBytes(distDir.resolve("parparvm_runtime.js")), StandardCharsets.UTF_8);
 
-        assertTrue(translatedApp.contains("jvm.setMain(\"JsThreadingApp\""),
+        assertTrue(bundleReferencesLiteral(translatedApp, "jvm.setMain(", "JsThreadingApp"),
                 "Threaded app should register a translated main entrypoint");
         assertTrue(translatedApp.contains("waitForSignal"),
                 "Inner-class wait loop should be present in translated output");
@@ -273,7 +273,7 @@ class JavascriptTargetIntegrationTest {
 
         assertTrue(translatedApp.contains("JsCapturedRunnable"),
                 "Translator should emit a bundle for the synthetic-accessor runnable fixture");
-        assertTrue(translatedApp.contains("jvm.setMain(\"JsCapturedRunnable\""),
+        assertTrue(bundleReferencesLiteral(translatedApp, "jvm.setMain(", "JsCapturedRunnable"),
                 "Translator should complete bundle generation for the synthetic-accessor runnable fixture");
     }
 
@@ -296,7 +296,7 @@ class JavascriptTargetIntegrationTest {
         Path distDir = outputDir.resolve("dist").resolve("JsAuxiliaryMainApp-js");
         String translatedApp = new String(Files.readAllBytes(distDir.resolve("translated_app.js")), StandardCharsets.UTF_8);
 
-        assertTrue(translatedApp.contains("jvm.setMain(\"JsAuxiliaryMainApp\""),
+        assertTrue(bundleReferencesLiteral(translatedApp, "jvm.setMain(", "JsAuxiliaryMainApp"),
                 "Translator should keep the first application main as the bundle entrypoint");
         assertTrue(translatedApp.contains("HelperMain"),
                 "Translator should still include auxiliary classes that happen to declare a main()");
@@ -321,7 +321,7 @@ class JavascriptTargetIntegrationTest {
         Path distDir = outputDir.resolve("dist").resolve("JsLambdaCapture-js");
         String translatedApp = new String(Files.readAllBytes(distDir.resolve("translated_app.js")), StandardCharsets.UTF_8);
 
-        assertTrue(translatedApp.contains("jvm.setMain(\"JsLambdaCapture\""),
+        assertTrue(bundleReferencesLiteral(translatedApp, "jvm.setMain(", "JsLambdaCapture"),
                 "Translator should complete bundle generation for the lambda-capture fixture");
         assertTrue(translatedApp.contains("JsLambdaCapture"),
                 "Translated output should include the lambda-capture fixture classes");
@@ -355,9 +355,14 @@ class JavascriptTargetIntegrationTest {
         assertTrue(end > start, "Static access fixture should have a bounded method body");
         String methodBody = translatedApp.substring(start, end);
 
-        String initCheck = "jvm.ensureClassInitialized(\"JsStaticAccess\");";
-        assertEquals(methodBody.indexOf(initCheck), methodBody.lastIndexOf(initCheck),
-                "Repeated static field access should only emit one class-init check in straight-line mode");
+        // ``_I(<cls>)`` is the short alias for ``jvm.ensureClassInitialized``
+        // and the class-name argument may have been hoisted to a ``_qN``
+        // alias by the string-hoist pass -- count both forms together.
+        int initChecks = countLiteralReferences(methodBody, "_I(", "JsStaticAccess")
+                + countLiteralReferences(methodBody, "jvm.ensureClassInitialized(", "JsStaticAccess");
+        assertEquals(1, initChecks,
+                "Repeated static field access should only emit one class-init check in straight-line mode "
+                        + "(got " + initChecks + ")");
     }
 
     @ParameterizedTest
@@ -397,8 +402,8 @@ class JavascriptTargetIntegrationTest {
         assertTrue(wrapperEnd > wrapperStart,
                 "Interpreter static access fixture wrapper should have a bounded body");
         String wrapperBody = translatedApp.substring(wrapperStart, wrapperEnd);
-        assertTrue(wrapperBody.contains("_I(\"JsStaticAccessFlow\")")
-                        || wrapperBody.contains("jvm.ensureClassInitialized(\"JsStaticAccessFlow\")"),
+        assertTrue(bundleReferencesLiteral(wrapperBody, "_I(", "JsStaticAccessFlow")
+                        || bundleReferencesLiteral(wrapperBody, "jvm.ensureClassInitialized(", "JsStaticAccessFlow"),
                 "Interpreter static access wrapper should guard class init before delegating to __impl");
     }
 
@@ -442,7 +447,8 @@ class JavascriptTargetIntegrationTest {
         assertTrue(calleeEnd > calleeStart, "Static invoke fixture should have a bounded helper() body");
         String calleeBody = translatedApp.substring(calleeStart, calleeEnd);
 
-        assertTrue(!calleeBody.contains("jvm.ensureClassInitialized(\"JsStaticInvokeFlow\")"),
+        assertTrue(!bundleReferencesLiteral(calleeBody, "jvm.ensureClassInitialized(", "JsStaticInvokeFlow")
+                        && !bundleReferencesLiteral(calleeBody, "_I(", "JsStaticInvokeFlow"),
                 "Internal static method implementations should not repeat class-init guards");
     }
 
@@ -549,6 +555,88 @@ class JavascriptTargetIntegrationTest {
         } finally {
             Parser.cleanup();
         }
+    }
+
+    /**
+     * Find the alias used by the post-emit string-hoist pass for the
+     * given literal string. The hoist rewrites repeated identifier
+     * literals to ``const _qN="..."`` declarations and replaces every
+     * subsequent use with the alias. Returns the alias name (e.g.
+     * ``_q0M0``) or ``null`` if the literal is used only once / not
+     * hoisted.
+     */
+    static String findStringAlias(String translatedApp, String literal) {
+        String needle = "=\"" + literal + "\"";
+        int idx = translatedApp.indexOf(needle);
+        if (idx <= 0) {
+            return null;
+        }
+        int aliasEnd = idx;
+        int aliasStart = aliasEnd;
+        while (aliasStart > 0) {
+            char ch = translatedApp.charAt(aliasStart - 1);
+            if (ch == '_' || ch == '$' || Character.isLetterOrDigit(ch)) {
+                aliasStart--;
+            } else {
+                break;
+            }
+        }
+        if (aliasStart >= aliasEnd) {
+            return null;
+        }
+        String candidate = translatedApp.substring(aliasStart, aliasEnd);
+        // Hoisted alias names always start with ``_q``. Avoid matching
+        // a stray identifier (e.g. a method-suffix like ``...impl="X"``
+        // emitted as a property).
+        if (!candidate.startsWith("_q")) {
+            return null;
+        }
+        return candidate;
+    }
+
+    /**
+     * True if the bundle contains a call to ``invocationPrefix("literal")``
+     * after the post-emit string-hoist pass — either the direct literal
+     * form ``foo("X"`` or the aliased form ``foo(_qN`` where ``_qN``
+     * resolves to ``"X"``.
+     */
+    static boolean bundleReferencesLiteral(String bundle, String invocationPrefix, String literal) {
+        if (bundle.contains(invocationPrefix + "\"" + literal + "\"")) {
+            return true;
+        }
+        String alias = findStringAlias(bundle, literal);
+        return alias != null && bundle.contains(invocationPrefix + alias);
+    }
+
+    /**
+     * Count occurrences of ``invocationPrefix("literal"`` in the bundle,
+     * accounting for the post-emit string hoist (literals replaced by
+     * ``_qN`` aliases). Compares against the alias's usage count if the
+     * literal was hoisted.
+     */
+    static int countLiteralReferences(String bundle, String invocationPrefix, String literal) {
+        String directNeedle = invocationPrefix + "\"" + literal + "\"";
+        int direct = 0;
+        int from = 0;
+        while ((from = bundle.indexOf(directNeedle, from)) >= 0) {
+            direct++;
+            from += directNeedle.length();
+        }
+        String alias = findStringAlias(bundle, literal);
+        if (alias == null) {
+            return direct;
+        }
+        String aliasNeedle = invocationPrefix + alias;
+        int aliased = 0;
+        from = 0;
+        while ((from = bundle.indexOf(aliasNeedle, from)) >= 0) {
+            // The alias-definition site itself (``_qN="X"``) does NOT have
+            // ``invocationPrefix`` in front, so it's already excluded from
+            // this count. No need to subtract one.
+            aliased++;
+            from += aliasNeedle.length();
+        }
+        return direct + aliased;
     }
 
     /**

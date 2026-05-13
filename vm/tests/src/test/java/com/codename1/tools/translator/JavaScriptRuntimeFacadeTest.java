@@ -187,7 +187,14 @@ class JavaScriptRuntimeFacadeTest {
                 "HTML5Graphics should route linear gradients through the shape/gradient adapter");
         assertTrue(html5GraphicsSource.contains("shapeGradientRenderAdapter.fillRadialGradient("),
                 "HTML5Graphics should route radial gradients through the shape/gradient adapter");
-        assertTrue(html5GraphicsSource.contains("JavaScriptTextMetricsAdapter.charsWidth("),
+        // ``charsWidth`` was refactored to delegate to ``stringWidth`` via
+        // ``new String(ch, offset, length)`` -- the direct
+        // ``JavaScriptTextMetricsAdapter.charsWidth`` call is gone, but the
+        // measurement still goes through the adapter via ``stringWidth``.
+        // Verify either delegation chain.
+        assertTrue(html5GraphicsSource.contains("JavaScriptTextMetricsAdapter.charsWidth(")
+                        || (html5GraphicsSource.contains("public int charsWidth(")
+                                && html5GraphicsSource.contains("return stringWidth(")),
                 "HTML5Graphics should delegate char measurement to the text metrics adapter");
         assertTrue(html5GraphicsSource.contains("JavaScriptTextMetricsAdapter.stringWidth("),
                 "HTML5Graphics should delegate string measurement to the text metrics adapter");

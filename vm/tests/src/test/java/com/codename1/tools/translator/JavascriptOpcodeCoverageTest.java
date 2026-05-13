@@ -75,7 +75,8 @@ class JavascriptOpcodeCoverageTest {
 
         assertTrue(translatedApp.contains("castsAndTypes"), "Coverage fixture should translate CHECKCAST/INSTANCEOF methods");
         assertTrue(translatedApp.contains("dispatch"), "Coverage fixture should translate virtual/interface dispatch methods");
-        assertTrue(translatedApp.contains("jvm.getClassObject(\"JsTypeImpl\")"), "Coverage fixture should translate class literals");
+        assertTrue(JavascriptTargetIntegrationTest.bundleReferencesLiteral(translatedApp, "jvm.getClassObject(", "JsTypeImpl"),
+                "Coverage fixture should translate class literals");
         // ``_Z({...})`` registers each class with the short-form
         // metadata (``n=name``, ``b=baseClass``, ``i=interfaces``).
         // ``assignableTo`` is populated lazily by ``defineClass`` at
