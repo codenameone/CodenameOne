@@ -206,6 +206,16 @@ public class JavaSEPort extends CodenameOneImplementation {
     private boolean largerTextEnabled = false;
     private static final String PREF_LARGER_TEXT_SCALE = "cn1.simulator.largerTextScale";
 
+    // Floor below which any persisted window dimension is treated as the
+    // product of a layout glitch (eg. a pack() with a collapsed canvas, an
+    // iconified frame, or hand-edited prefs) rather than a real user state.
+    static final int MIN_PERSISTED_WINDOW_DIMENSION = 100;
+
+    // Defensive ceiling so absurd values from a corrupted pref or runaway
+    // scaling math cannot make a subsequent setBounds() throw or place the
+    // frame off every reachable display.
+    static final int MAX_PERSISTED_WINDOW_DIMENSION = 32767;
+
     static {
         IOS_NATIVE_FONT_CANDIDATES.put("native:MainThin", new String[] {
             "SF Pro Display", "SF Pro Text",
@@ -5825,6 +5835,75 @@ public class JavaSEPort extends CodenameOneImplementation {
         });
     }
 
+    /**
+     * Returns true when {@code r} represents a window position we are willing
+     * to persist or restore. Rejects null, NaN-equivalent (non-positive) sizes,
+     * sub-floor dimensions, oversized values, and frames that no longer have a
+     * useful overlap with any connected display. Any caller that fails this
+     * check should fall back to default bounds and remove the corrupt pref so
+     * the bad state does not survive across launches.
+     */
+    public static boolean isUsableWindowBounds(Rectangle r) {
+        if (r == null) {
+            return false;
+        }
+        if (r.width < MIN_PERSISTED_WINDOW_DIMENSION || r.height < MIN_PERSISTED_WINDOW_DIMENSION) {
+            return false;
+        }
+        if (r.width > MAX_PERSISTED_WINDOW_DIMENSION || r.height > MAX_PERSISTED_WINDOW_DIMENSION) {
+            return false;
+        }
+        try {
+            if (GraphicsEnvironment.isHeadless()) {
+                // No screens to validate against; size has already cleared the
+                // sanity floor, so accept. The simulator is not really expected
+                // to run headless, but tests do.
+                return true;
+            }
+            GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
+            GraphicsDevice[] devs = ge.getScreenDevices();
+            if (devs == null || devs.length == 0) {
+                return true;
+            }
+            Rectangle union = new Rectangle(0, 0, 0, 0);
+            for (GraphicsDevice gd : devs) {
+                union.add(gd.getDefaultConfiguration().getBounds());
+            }
+            Rectangle visible = union.intersection(r);
+            // Require enough overlap that the title bar and drag region remain
+            // reachable; a one-pixel touch is not good enough to "remember".
+            return visible.width >= MIN_PERSISTED_WINDOW_DIMENSION && visible.height >= 50;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /**
+     * Parses the comma-separated {@code "x,y,width,height"} form written to
+     * {@code window.bounds}. Returns {@code null} when the input is missing,
+     * has the wrong field count, or contains non-numeric data. The bounds
+     * returned have not been validated for screen overlap or dimensions;
+     * pair with {@link #isUsableWindowBounds(Rectangle)}.
+     */
+    static Rectangle parsePersistedBounds(String s) {
+        if (s == null) {
+            return null;
+        }
+        try {
+            String[] parts = s.split(",");
+            if (parts.length != 4) {
+                return null;
+            }
+            return new Rectangle(
+                    Integer.parseInt(parts[0].trim()),
+                    Integer.parseInt(parts[1].trim()),
+                    Integer.parseInt(parts[2].trim()),
+                    Integer.parseInt(parts[3].trim()));
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
 
     private ArrayList<Runnable> deinitializeHooks = new ArrayList<>();
     public void addDeinitializeHook(Runnable r) {
@@ -6249,9 +6328,17 @@ public class JavaSEPort extends CodenameOneImplementation {
                 private void saveBounds(ComponentEvent e) {
                     if (e.getComponent() instanceof JFrame) {
                         Frame f = (JFrame)e.getComponent();
+                        // The NORMAL check filters maximized/iconified states,
+                        // but a misbehaving pack() can still produce tiny or
+                        // off-screen geometry while remaining NORMAL. Run the
+                        // shared sanity check so a broken layout pass cannot
+                        // corrupt the persisted bounds.
                         if (f.getExtendedState() == JFrame.NORMAL) {
-                            Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
                             Rectangle bounds = f.getBounds();
+                            if (!isUsableWindowBounds(bounds)) {
+                                return;
+                            }
+                            Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
                             pref.put("window.bounds", bounds.x+","+bounds.y+","+bounds.width+","+bounds.height);
                         }
                     }
@@ -6360,18 +6447,13 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             String lastBounds = pref.get("window.bounds", null);
             if (lastBounds != null) {
-                String[] parts = lastBounds.split(",");
-                Rectangle r = new Rectangle(Integer.parseInt(parts[0]), Integer.parseInt(parts[1]), Integer.parseInt(parts[2]), Integer.parseInt(parts[3]));
-                Rectangle bounds = new Rectangle(0, 0, 0, 0);
-                GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
-                GraphicsDevice lstGDs[] = ge.getScreenDevices();
-                for (GraphicsDevice gd : lstGDs) {
-                    bounds.add(gd.getDefaultConfiguration().getBounds());
-                }
-                
-                if (bounds.intersects(r)) {
-                
+                Rectangle r = parsePersistedBounds(lastBounds);
+                if (isUsableWindowBounds(r)) {
                     window.setBounds(r);
+                } else {
+                    // Drop the bad value so a single bad pack() cannot lock the
+                    // user out across restarts.
+                    pref.remove("window.bounds");
                 }
             }
 
