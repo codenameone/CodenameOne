@@ -9,6 +9,7 @@ import com.codename1.util.StringUtil;
 import com.codenameone.examples.hellocodenameone.NativeInterfaceLanguageValidator;
 import com.codenameone.examples.hellocodenameone.tests.graphics.AffineScale;
 import com.codenameone.examples.hellocodenameone.tests.graphics.Clip;
+import com.codenameone.examples.hellocodenameone.tests.graphics.ClipUnderRotation;
 import com.codenameone.examples.hellocodenameone.tests.graphics.DrawArc;
 import com.codenameone.examples.hellocodenameone.tests.graphics.DrawGradient;
 import com.codenameone.examples.hellocodenameone.tests.graphics.DrawImage;
@@ -128,6 +129,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new FillShape(),
             new StrokeTest(),
             new Clip(),
+            new ClipUnderRotation(),
             new TileImage(),
             new Rotate(),
             new TransformTranslation(),
@@ -176,6 +178,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new TextAreaAlignmentScreenshotTest(),
             new ValidatorLightweightPickerScreenshotTest(),
             new LightweightPickerButtonsScreenshotTest(),
+            new PickerCancelRestoreTest(),
             new ToastBarTopPositionScreenshotTest(),
             // Native-theme fidelity tests (Phase 7): each emits a light+dark PNG pair
             // so the iOS Modern and Android Material themes get exercised per UIID.
@@ -344,6 +347,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 // graphics tests
                 || "AffineScale".equals(testName)
                 || "Clip".equals(testName)
+                || "ClipUnderRotation".equals(testName)
                 || "DrawArc".equals(testName)
                 || "DrawGradient".equals(testName)
                 || "DrawImage".equals(testName)

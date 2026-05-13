@@ -58,6 +58,11 @@ typedef NS_ENUM(NSInteger, CN1MetalPipeline) {
     CN1MetalPipelineLinearGradient,    // FillLinearGradient (pure GPU, no CG bitmap)
     CN1MetalPipelineRadialGradient,    // FillRadialGradient (pure GPU, no CG bitmap)
     CN1MetalPipelineAlphaMaskRadial,   // DrawTextureAlphaMask + RadialGradientPaint
+    CN1MetalPipelineStencilWrite,      // Polygon-shape stencil fill (#3921):
+                                       // color writes off, used only to mark
+                                       // pixels inside a polygon clip shape so
+                                       // subsequent draws can stencil-test
+                                       // against the reference value.
     CN1MetalPipelineCount
 };
 
@@ -114,6 +119,31 @@ void CN1MetalLoadIdentity(void);
 // Set a scissor rect in framebuffer pixel coordinates (Y-down, matching
 // our projection). Passing width<=0 or height<=0 disables clipping.
 void CN1MetalSetScissor(int x, int y, int width, int height);
+
+// Polygon-shape clipping via the stencil attachment (#3921). Mirrors the
+// GL ES2 stencil sequence in ClipRect.m:113-168:
+//
+//   1. Increment the per-encoder stencil reference value (the counter
+//      avoids the need to clear the stencil mid-frame -- every fresh
+//      polygon clip uses a new reference that previous writes can't
+//      match).
+//   2. Bind the WriteStencilRef depth-stencil state + StencilWrite
+//      pipeline (color writes disabled), render the polygon as a
+//      triangle fan from vertex 0 (matches CN1MetalFillPolygon's
+//      assumption that the polygon is convex).
+//   3. Bind the TestStencilEqualRef depth-stencil state so subsequent
+//      draws are clipped to pixels where stencil == reference.
+//
+// Polygon points are in framebuffer pixel space, same coord system as
+// CN1MetalSetScissor. Pass num = number of (x, y) pairs.
+void CN1MetalApplyPolygonStencilClip(const float *xCoords, const float *yCoords, int num);
+
+// Disable polygon stencil clipping for subsequent draws. Used when a
+// rectangular clip is set (which reverts to scissor) or when clipping
+// is removed altogether. The stencil texture itself isn't touched --
+// only the depth-stencil state goes back to "always pass, no writes"
+// so the previously-written stencil bits are simply ignored.
+void CN1MetalDisablePolygonStencilClip(void);
 
 // -------- Draw primitives (invoked from ExecutableOp subclasses' execute methods) --------
 

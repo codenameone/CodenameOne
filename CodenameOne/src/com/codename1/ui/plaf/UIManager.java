@@ -1500,11 +1500,50 @@ public class UIManager {
     /// - `themeProps`: the properties of the given theme
     public void addThemeProps(Hashtable themeProps) {
         if (accessible) {
+            dropSupersededBindings(themeProps);
             buildTheme(themeProps);
             styles.clear();
             selectedStyles.clear();
             imageCache.clear();
             current.refreshTheme(false);
+        }
+    }
+
+    /// CSSWatcher's live-reload funnels every recompile through
+    /// [#addThemeProps], which never clears [#themeConstants]. When a user
+    /// replaces a `var()`-bound CSS rule with a literal, the recompiled
+    /// theme.res carries the new style value but no longer emits the
+    /// matching `@cn1-bind:<key>` entry. Without intervention the stale
+    /// binding left in `themeConstants` would let [#applyThemeBindings]
+    /// stomp the user's literal change back to the previous binding's
+    /// resolved value -- visibly hiding every CSS edit.
+    ///
+    /// This pre-pass runs only on the overlay entry point (`addThemeProps`),
+    /// not on the full reset path ([#setThemePropsImpl] -> [#buildTheme],
+    /// which clears `themeConstants` itself, and the `@includeNativeBool`
+    /// layered initial load whose existing screenshots depend on bindings
+    /// staying in place). For each style key being re-set by the incoming
+    /// load that does NOT re-assert its binding, drop the matching binding
+    /// from `themeConstants` so the new literal wins.
+    private void dropSupersededBindings(Hashtable themeProps) {
+        if (themeProps == null || themeConstants == null || themeConstants.isEmpty()) {
+            return;
+        }
+        Enumeration e = themeProps.keys();
+        while (e.hasMoreElements()) {
+            Object keyObj = e.nextElement();
+            if (!(keyObj instanceof String)) {
+                continue;
+            }
+            String key = (String) keyObj;
+            if (key.startsWith("@")) {
+                continue;
+            }
+            String boundConstant = "cn1-bind:" + key;
+            if (themeConstants.containsKey(boundConstant)
+                    && !themeProps.containsKey("@" + boundConstant)) {
+                themeConstants.remove(boundConstant);
+            }
         }
     }
 

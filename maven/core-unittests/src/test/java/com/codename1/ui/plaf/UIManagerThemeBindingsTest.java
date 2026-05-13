@@ -126,4 +126,77 @@ public class UIManagerThemeBindingsTest extends UITestBase {
         b.setUIID("Button");
         assertEquals(0x007aff, b.getUnselectedStyle().getFgColor());
     }
+
+    /// Simulates CSSWatcher's live-reload sequence: an initial theme load
+    /// (`setThemeProps`) followed by `addThemeProps` carrying a fresh
+    /// theme.res whose source CSS has dropped a `var()` reference in favor of
+    /// a literal. The reloaded Hashtable contains the new literal value for
+    /// `Button.fgColor` but no `@cn1-bind:Button.fgColor` entry, because the
+    /// CSS compiler only emits bindings for properties that still reference a
+    /// `var()`. The stale binding left in `themeConstants` from the first
+    /// load must not stomp the user's new literal value.
+    @Test
+    public void cssReloadDropsStaleBindingWhenRuleBecomesLiteral() {
+        Hashtable initial = new Hashtable();
+        initial.put("Button.fgColor", "ff0000");
+        initial.put("@cn1-bind:Button.fgColor", "accent-color");
+        initial.put("@accent-color", "ff0000");
+        UIManager.getInstance().setThemeProps(initial);
+
+        Hashtable reloaded = new Hashtable();
+        reloaded.put("Button.fgColor", "0000ff");
+        UIManager.getInstance().addThemeProps(reloaded);
+
+        Button b = new Button();
+        b.setUIID("Button");
+        assertEquals(0x0000ff, b.getUnselectedStyle().getFgColor());
+    }
+
+    /// Companion to [#cssReloadDropsStaleBindingWhenRuleBecomesLiteral]: when
+    /// the reload Hashtable carries BOTH the property and a fresh binding,
+    /// the binding still applies. This guards against an over-eager fix that
+    /// would drop bindings every time a style key shows up in the reload.
+    @Test
+    public void cssReloadKeepsBindingWhenStillEmittedTogether() {
+        Hashtable initial = new Hashtable();
+        initial.put("Button.fgColor", "ff0000");
+        initial.put("@cn1-bind:Button.fgColor", "accent-color");
+        initial.put("@accent-color", "ff0000");
+        UIManager.getInstance().setThemeProps(initial);
+
+        Hashtable reloaded = new Hashtable();
+        reloaded.put("Button.fgColor", "0000ff");
+        reloaded.put("@cn1-bind:Button.fgColor", "accent-color");
+        reloaded.put("@accent-color", "00ff00");
+        UIManager.getInstance().addThemeProps(reloaded);
+
+        Button b = new Button();
+        b.setUIID("Button");
+        assertEquals(0x00ff00, b.getUnselectedStyle().getFgColor());
+    }
+
+    /// A pure override Hashtable (no style keys, only a single `@varname`
+    /// constant) must not invalidate the existing bindings. This is the
+    /// canonical "user rebrands the accent" call path and the existing
+    /// [#boundThemeKeyPicksUpAccentOverride] covers a single hop; this test
+    /// adds a follow-up override to make sure repeated retunes keep working.
+    @Test
+    public void overrideOnlyReloadKeepsBindings() {
+        Hashtable initial = new Hashtable();
+        initial.put("Button.fgColor", "007aff");
+        initial.put("@cn1-bind:Button.fgColor", "accent-color");
+        UIManager.getInstance().setThemeProps(initial);
+
+        Hashtable firstOverride = new Hashtable();
+        firstOverride.put("@accent-color", "ff2d95");
+        UIManager.getInstance().addThemeProps(firstOverride);
+
+        Hashtable secondOverride = new Hashtable();
+        secondOverride.put("@accent-color", "00aa66");
+        UIManager.getInstance().addThemeProps(secondOverride);
+
+        Button b = new Button();
+        b.setUIID("Button");
+        assertEquals(0x00aa66, b.getUnselectedStyle().getFgColor());
+    }
 }

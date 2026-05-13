@@ -124,7 +124,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-v1
+          key: ${{ runner.os }}-playwright-chromium-v2
           restore-keys: |
             ${{ runner.os }}-playwright-
 
@@ -133,18 +133,16 @@ jobs:
           cd scripts
           npm init -y 2>/dev/null || true
           npm install playwright
-          # Always run the full ``playwright install`` rather than
-          # conditionally ``install-deps`` on cache-hit. The cache
-          # key (``Linux-playwright-chromium-v1``) doesn't pin the
-          # playwright npm version, so a cache-hit can hand back a
-          # browser binary that the newer ``npm install playwright``
-          # no longer points at (e.g. cache has chrome-headless-shell
-          # 1217 but ``npm install`` bumped playwright to expect
-          # 1223, which fails to launch with "Executable doesn't
-          # exist"). ``install --with-deps`` is idempotent when the
-          # right binary is already cached so the cache still helps
-          # whenever versions line up.
-          npx playwright install --with-deps chromium
+          # OS-level deps (apt packages) aren't cached so always install them.
+          npx playwright install-deps chromium
+          # `npm install playwright` resolves the floating version, so the
+          # cached browser binary can drift away from what the freshly
+          # installed Playwright expects (the cache only stores the binary).
+          # `install chromium` is a no-op when the versions match and
+          # re-downloads the right build when they don't, so it makes the
+          # job resilient to Playwright revving its bundled chromium build
+          # in between cache writes.
+          npx playwright install chromium
 
       - name: Install Xvfb for headless Java AWT
         run: sudo apt-get update && sudo apt-get install -y xvfb

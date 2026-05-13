@@ -81,6 +81,26 @@ final class PlaygroundRunner {
         }
     }
 
+    /** Bridges a lambda runtime failure into the playground's
+     * {@link PlaygroundContext#reportRuntimeError(String, Throwable)}
+     * so the editor can surface the error instead of having the EDT
+     * silently swallow it. */
+    private final class LambdaErrorBridge implements CN1LambdaSupport.LambdaErrorHandler {
+        private final PlaygroundContext context;
+
+        LambdaErrorBridge(PlaygroundContext context) {
+            this.context = context;
+        }
+
+        @Override
+        public void onLambdaError(Throwable error, String bodySource) {
+            if (context == null || error == null) {
+                return;
+            }
+            context.reportRuntimeError(safeMessage(error), error);
+        }
+    }
+
     RunResult run(String script, PlaygroundContext context) {
         List<InlineMessage> inlineMessages = new ArrayList<InlineMessage>();
         try {
@@ -92,6 +112,11 @@ final class PlaygroundRunner {
             }
             PlaygroundContext.pushCurrent(context);
             CN1LambdaSupport.pushInterpreter(interpreter);
+            // Lambdas created during eval capture this handler and use it
+            // to surface their runtime failures back to the host. We push
+            // it even when the context can't actually report (no reporter
+            // wired) — the handler short-circuits in that case.
+            CN1LambdaSupport.pushErrorHandler(new LambdaErrorBridge(context));
             try {
                 ScriptPlan plan = adaptScript(script);
                 for (int i = 0; i < plan.typeDeclarations.size(); i++) {
@@ -102,6 +127,7 @@ final class PlaygroundRunner {
                 inlineMessages.add(new InlineMessage(0, "Preview updated.", "success"));
                 return new RunResult(component, Collections.<Diagnostic>emptyList(), inlineMessages);
             } finally {
+                CN1LambdaSupport.clearErrorHandler();
                 CN1LambdaSupport.clearInterpreter();
                 PlaygroundContext.clearCurrent();
             }

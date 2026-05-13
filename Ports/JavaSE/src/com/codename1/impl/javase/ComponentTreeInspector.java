@@ -580,6 +580,26 @@ private void refreshTreeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-F
     }
     
     private void editStyle() {
+        final String uiid = componentUIID.getText();
+        final int themeIdx = themes.getSelectedIndex();
+
+        // First try to open the CSS source in the user's IDE at the UIID's line. This is the
+        // modern path: cn1 8.x projects are CSS-first, the .res is generated. We fall through to
+        // the legacy designer launch only when there's no CSS source to point at.
+        File cssThemeFile = locateCssThemeFile(themeIdx);
+        if (cssThemeFile != null && cssThemeFile.exists()) {
+            if (openCssInIde(cssThemeFile, uiid)) {
+                return;
+            }
+        }
+
+        if (themeIdx < 0 || themeIdx >= themePaths.size()) {
+            JOptionPane.showMessageDialog(this,
+                    "No theme is currently selected.",
+                    "Edit Style", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+
         // Prefer the version-pinned designer jar that the Maven plugin pulled into m2.
         // Fallback to the legacy ~/.codenameone/designer_*.jar files (managed by UpdateCodenameOne).
         File resourceEditor = null;
@@ -607,37 +627,15 @@ private void refreshTreeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-F
                 return;
             }
         }
-        
+
         File javaBin = new File(System.getProperty("java.home") + File.separator + "bin" + File.separator + "java.exe");
         if(!javaBin.exists()) {
             javaBin = new File(System.getProperty("java.home") + File.separator + "bin" + File.separator + "java");
         }
         final File javaExe = javaBin;
         final File resourceEditorFinal = resourceEditor;
-        final String themeFile = themePaths.get(themes.getSelectedIndex());
-        if (themeFile.endsWith(".css.res")) {
-            File srcDir = new File(themeFile).getParentFile();
-            File projectDir = srcDir.getParentFile();
-            File cssDir = new File(projectDir, "css");
-            String cssThemeFileName = new File(themeFile).getName();
-            int lastDot = cssThemeFileName.lastIndexOf(".");
-            if (lastDot >= 0) {
-                cssThemeFileName = cssThemeFileName.substring(0, lastDot);
-            }
-            File cssThemeFile = new File(cssDir, cssThemeFileName);
-            System.out.println("Trying to open "+cssThemeFile);
-            if (cssThemeFile.exists()) {
-                try {
-                    Desktop.getDesktop().edit(cssThemeFile);
-                } catch (Throwable t) {
-                    t.printStackTrace();
-                    
-                }
-                return;
-            }
-        }
-        final String themeName = themeNames.get(themes.getSelectedIndex());
-        final String uiid = componentUIID.getText();
+        final String themeFile = themePaths.get(themeIdx);
+        final String themeName = themeNames.get(themeIdx);
         
         new Thread() {
             @Override
@@ -666,8 +664,338 @@ private void refreshTreeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-F
             }
         }.start();
     }
-    
-    
+
+    /**
+     * Resolves the {@code theme.css} source that backs the currently selected {@code *.css.res}
+     * theme, or — when no theme is selected — falls back to the conventional
+     * {@code ${project}/css/theme.css} location used by cn1 Maven projects.
+     */
+    private File locateCssThemeFile(int themeIdx) {
+        if (themeIdx >= 0 && themeIdx < themePaths.size()) {
+            String themeFile = themePaths.get(themeIdx);
+            if (themeFile.endsWith(".css.res")) {
+                File resFile = new File(themeFile);
+                File srcDir = resFile.getParentFile();
+                File projectDir = srcDir == null ? null : srcDir.getParentFile();
+                if (projectDir != null) {
+                    String name = resFile.getName();
+                    int dot = name.lastIndexOf('.');
+                    if (dot >= 0) {
+                        name = name.substring(0, dot);
+                    }
+                    File cssThemeFile = new File(new File(projectDir, "css"), name);
+                    if (cssThemeFile.exists()) {
+                        return cssThemeFile;
+                    }
+                }
+            }
+        }
+        File defaultCss = new File(JavaSEPort.getCWD(), "css" + File.separator + "theme.css");
+        if (defaultCss.exists()) {
+            return defaultCss;
+        }
+        return null;
+    }
+
+    /**
+     * Opens {@code cssFile} in the user's IDE, jumping to the first selector that matches
+     * {@code uiid}. Detects the IDE from project marker directories ({@code .idea},
+     * {@code .vscode}, {@code nbproject}, {@code .project}) and falls back through a chain of
+     * known launcher locations. When everything fails, falls back to
+     * {@link Desktop#edit(File)} so the file still opens (just without a line jump).
+     *
+     * @return {@code true} if any opener — IDE-specific or Desktop fallback — was launched.
+     */
+    private boolean openCssInIde(File cssFile, String uiid) {
+        int line = findUIIDLine(cssFile, uiid);
+        File projectRoot = findProjectRoot(cssFile);
+
+        String override = System.getProperty("codename1.ide.command");
+        if (override != null && !override.trim().isEmpty()) {
+            if (runIdeTemplate(override, cssFile, line)) {
+                return true;
+            }
+        }
+
+        if (projectRoot != null) {
+            if (new File(projectRoot, ".idea").isDirectory() || hasFileWithExtension(projectRoot, ".iml")) {
+                if (tryLaunch(intellijLaunchers(), new String[] {"--line", "{line}", "{file}"}, cssFile, line)) {
+                    return true;
+                }
+            }
+            if (new File(projectRoot, ".vscode").isDirectory()) {
+                if (tryLaunch(vscodeLaunchers(), new String[] {"-g", "{file}:{line}"}, cssFile, line)) {
+                    return true;
+                }
+            }
+            if (new File(projectRoot, "nbproject").isDirectory()) {
+                if (tryLaunch(netbeansLaunchers(), new String[] {"--open", "{file}:{line}"}, cssFile, line)) {
+                    return true;
+                }
+            }
+            // Eclipse (.project + .classpath) has no usable line-jump CLI; fall through to Desktop.
+        }
+
+        try {
+            Desktop.getDesktop().edit(cssFile);
+            return true;
+        } catch (Throwable t) {
+            t.printStackTrace();
+        }
+        return false;
+    }
+
+    /**
+     * Walks up from {@code start} looking for the project root, identified by a {@code pom.xml}
+     * or any of the IDE marker directories. Returns {@code null} when no marker is found.
+     */
+    private File findProjectRoot(File start) {
+        File dir = start.isDirectory() ? start : start.getParentFile();
+        while (dir != null) {
+            if (new File(dir, "pom.xml").isFile()
+                    || new File(dir, ".idea").isDirectory()
+                    || new File(dir, ".vscode").isDirectory()
+                    || new File(dir, "nbproject").isDirectory()
+                    || new File(dir, ".project").isFile()
+                    || hasFileWithExtension(dir, ".iml")) {
+                return dir;
+            }
+            dir = dir.getParentFile();
+        }
+        return null;
+    }
+
+    private boolean hasFileWithExtension(File dir, final String ext) {
+        File[] matches = dir.listFiles(new FileFilter() {
+            @Override
+            public boolean accept(File pathname) {
+                return pathname.isFile() && pathname.getName().endsWith(ext);
+            }
+        });
+        return matches != null && matches.length > 0;
+    }
+
+    /**
+     * Scans {@code cssFile} for the first selector that names {@code uiid}, matching common
+     * forms: {@code UIID {}, UIID:pressed {}, Other, UIID {}}. Returns 1 when no match is found
+     * so the IDE still opens the file at the top.
+     */
+    private int findUIIDLine(File cssFile, String uiid) {
+        if (uiid == null || uiid.isEmpty()) {
+            return 1;
+        }
+        java.util.regex.Pattern p = java.util.regex.Pattern.compile(
+                "(^|[\\s,])" + java.util.regex.Pattern.quote(uiid) + "\\s*([{:,]|$)");
+        java.io.BufferedReader r = null;
+        try {
+            r = new java.io.BufferedReader(new java.io.InputStreamReader(
+                    new FileInputStream(cssFile), "UTF-8"));
+            String line;
+            int n = 0;
+            while ((line = r.readLine()) != null) {
+                n++;
+                // Skip pure comment lines to reduce noise; we don't attempt full CSS parsing.
+                String trimmed = line.trim();
+                if (trimmed.startsWith("/*") || trimmed.startsWith("//") || trimmed.startsWith("*")) {
+                    continue;
+                }
+                if (p.matcher(line).find()) {
+                    return n;
+                }
+            }
+        } catch (IOException ignored) {
+        } finally {
+            if (r != null) {
+                try { r.close(); } catch (IOException ignored) {}
+            }
+        }
+        return 1;
+    }
+
+    private boolean tryLaunch(List<String> candidates, String[] argsTemplate, File file, int line) {
+        for (String c : candidates) {
+            File resolved = resolveLauncher(c);
+            if (resolved == null) {
+                continue;
+            }
+            List<String> cmd = new ArrayList<String>();
+            cmd.add(resolved.getAbsolutePath());
+            for (String t : argsTemplate) {
+                cmd.add(t.replace("{file}", file.getAbsolutePath())
+                         .replace("{line}", String.valueOf(line)));
+            }
+            try {
+                new ProcessBuilder(cmd).inheritIO().start();
+                return true;
+            } catch (IOException ignored) {
+                // Try the next candidate.
+            }
+        }
+        return false;
+    }
+
+    private boolean runIdeTemplate(String template, File file, int line) {
+        String expanded = template.replace("{file}", file.getAbsolutePath())
+                                  .replace("{line}", String.valueOf(line));
+        List<String> tokens = splitCommandLine(expanded);
+        if (tokens.isEmpty()) {
+            return false;
+        }
+        try {
+            new ProcessBuilder(tokens).inheritIO().start();
+            return true;
+        } catch (IOException ex) {
+            ex.printStackTrace();
+            return false;
+        }
+    }
+
+    private List<String> splitCommandLine(String s) {
+        // Minimal shell-style splitter: respects single and double quotes, treats backslash as
+        // an escape inside double quotes. Sufficient for paths with spaces on macOS/Linux/Windows.
+        List<String> out = new ArrayList<String>();
+        StringBuilder cur = new StringBuilder();
+        boolean inSingle = false, inDouble = false;
+        for (int i = 0; i < s.length(); i++) {
+            char ch = s.charAt(i);
+            if (inSingle) {
+                if (ch == '\'') { inSingle = false; } else { cur.append(ch); }
+            } else if (inDouble) {
+                if (ch == '\\' && i + 1 < s.length()) { cur.append(s.charAt(++i)); }
+                else if (ch == '"') { inDouble = false; }
+                else { cur.append(ch); }
+            } else if (ch == '\'') {
+                inSingle = true;
+            } else if (ch == '"') {
+                inDouble = true;
+            } else if (Character.isWhitespace(ch)) {
+                if (cur.length() > 0) { out.add(cur.toString()); cur.setLength(0); }
+            } else {
+                cur.append(ch);
+            }
+        }
+        if (cur.length() > 0) {
+            out.add(cur.toString());
+        }
+        return out;
+    }
+
+    private File resolveLauncher(String name) {
+        if (name == null || name.isEmpty()) {
+            return null;
+        }
+        File f = new File(name);
+        if (f.isAbsolute()) {
+            return f.canExecute() ? f : null;
+        }
+        String path = System.getenv("PATH");
+        if (path == null) {
+            return null;
+        }
+        boolean windows = System.getProperty("os.name", "").toLowerCase().contains("win");
+        String[] exts = windows ? new String[] {"", ".exe", ".cmd", ".bat"} : new String[] {""};
+        for (String dir : path.split(java.util.regex.Pattern.quote(File.pathSeparator))) {
+            for (String ext : exts) {
+                File candidate = new File(dir, name + ext);
+                if (candidate.isFile() && candidate.canExecute()) {
+                    return candidate;
+                }
+            }
+        }
+        return null;
+    }
+
+    private List<String> intellijLaunchers() {
+        // Tried in order. Includes Toolbox-managed scripts and stock app-bundle launcher paths
+        // so cn1 simulator can find the IDE even when its CLI shim isn't on PATH (common on
+        // macOS GUI sessions).
+        List<String> out = new ArrayList<String>();
+        out.add("idea");
+        out.add("idea-ce");
+        out.add("idea-ultimate");
+        out.add("studio");
+        String os = System.getProperty("os.name", "").toLowerCase();
+        String home = System.getProperty("user.home", "");
+        if (os.contains("mac")) {
+            out.add(home + "/Library/Application Support/JetBrains/Toolbox/scripts/idea");
+            out.add(home + "/Library/Application Support/JetBrains/Toolbox/scripts/studio");
+            out.add("/Applications/IntelliJ IDEA.app/Contents/MacOS/idea");
+            out.add("/Applications/IntelliJ IDEA CE.app/Contents/MacOS/idea");
+            out.add("/Applications/IntelliJ IDEA Ultimate.app/Contents/MacOS/idea");
+            out.add("/Applications/Android Studio.app/Contents/MacOS/studio");
+        } else if (os.contains("win")) {
+            String localAppData = System.getenv("LOCALAPPDATA");
+            if (localAppData != null) {
+                out.add(localAppData + "\\JetBrains\\Toolbox\\scripts\\idea.cmd");
+                out.add(localAppData + "\\JetBrains\\Toolbox\\scripts\\studio.cmd");
+            }
+        } else {
+            out.add(home + "/.local/share/JetBrains/Toolbox/scripts/idea");
+            out.add(home + "/.local/share/JetBrains/Toolbox/scripts/studio");
+            out.add("/snap/bin/intellij-idea-community");
+            out.add("/snap/bin/intellij-idea-ultimate");
+            out.add("/snap/bin/android-studio");
+        }
+        return out;
+    }
+
+    private List<String> vscodeLaunchers() {
+        List<String> out = new ArrayList<String>();
+        out.add("code");
+        out.add("code-insiders");
+        out.add("cursor");
+        out.add("codium");
+        String os = System.getProperty("os.name", "").toLowerCase();
+        if (os.contains("mac")) {
+            out.add("/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code");
+            out.add("/Applications/Visual Studio Code - Insiders.app/Contents/Resources/app/bin/code");
+            out.add("/Applications/Cursor.app/Contents/Resources/app/bin/code");
+            out.add("/Applications/VSCodium.app/Contents/Resources/app/bin/codium");
+        } else if (os.contains("win")) {
+            String localAppData = System.getenv("LOCALAPPDATA");
+            if (localAppData != null) {
+                out.add(localAppData + "\\Programs\\Microsoft VS Code\\bin\\code.cmd");
+                out.add(localAppData + "\\Programs\\Microsoft VS Code Insiders\\bin\\code-insiders.cmd");
+                out.add(localAppData + "\\Programs\\cursor\\resources\\app\\bin\\code.cmd");
+            }
+        } else {
+            out.add("/usr/share/code/bin/code");
+            out.add("/snap/bin/code");
+        }
+        return out;
+    }
+
+    private List<String> netbeansLaunchers() {
+        List<String> out = new ArrayList<String>();
+        out.add("netbeans");
+        String os = System.getProperty("os.name", "").toLowerCase();
+        if (os.contains("mac")) {
+            File apps = new File("/Applications");
+            File[] children = apps.exists() ? apps.listFiles() : null;
+            if (children != null) {
+                for (File c : children) {
+                    if (c.getName().startsWith("NetBeans") || c.getName().startsWith("Apache NetBeans")) {
+                        File launcher = new File(c, "Contents/MacOS/netbeans");
+                        if (launcher.isFile()) {
+                            out.add(launcher.getAbsolutePath());
+                        }
+                    }
+                }
+            }
+        } else if (os.contains("win")) {
+            String programFiles = System.getenv("ProgramFiles");
+            if (programFiles != null) {
+                out.add(programFiles + "\\NetBeans\\bin\\netbeans64.exe");
+                out.add(programFiles + "\\NetBeans\\bin\\netbeans.exe");
+            }
+        } else {
+            out.add("/usr/local/netbeans/bin/netbeans");
+            out.add("/snap/bin/netbeans");
+        }
+        return out;
+    }
+
+
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JTextField componentClass;
     private javax.swing.JTextField componentName;

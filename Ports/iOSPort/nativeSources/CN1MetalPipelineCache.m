@@ -44,6 +44,17 @@ static void configureBlendDisabled(MTLRenderPipelineColorAttachmentDescriptor *a
     a.blendingEnabled = NO;
 }
 
+// Stencil-only attachment: color writes disabled at the pipeline level so
+// the polygon fill leaves the colour buffer untouched and only updates the
+// stencil. Pairs with CN1MetalPipelineStencilWrite + the "WriteStencilRef"
+// depth-stencil state CN1Metalcompat installs around the polygon clip
+// draw.
+static void configureStencilWriteOnly(MTLRenderPipelineColorAttachmentDescriptor *a) {
+    a.pixelFormat = MTLPixelFormatBGRA8Unorm;
+    a.blendingEnabled = NO;
+    a.writeMask = MTLColorWriteMaskNone;
+}
+
 - (id<MTLRenderPipelineState>)buildPipeline:(CN1MetalPipeline)pipeline library:(id<MTLLibrary>)library {
     MTLRenderPipelineDescriptor *desc = [[MTLRenderPipelineDescriptor alloc] init];
 
@@ -89,9 +100,26 @@ static void configureBlendDisabled(MTLRenderPipelineColorAttachmentDescriptor *a
             desc.fragmentFunction = [library newFunctionWithName:@"cn1_fs_radial_gradient"];
             configureBlendPremultiplied(desc.colorAttachments[0]);
             break;
+        case CN1MetalPipelineStencilWrite:
+            // Polygon-shape clip (#3921). Uses the standard solid-color
+            // shader pair (cn1_vs_solid / cn1_fs_solid) but with color
+            // writes disabled at the pipeline level -- the fragment
+            // output is discarded and only the stencil attachment is
+            // updated, governed by the WriteStencilRef depth-stencil
+            // state CN1Metalcompat binds around the polygon-fill draw.
+            desc.vertexFunction = [library newFunctionWithName:@"cn1_vs_solid"];
+            desc.fragmentFunction = [library newFunctionWithName:@"cn1_fs_solid"];
+            configureStencilWriteOnly(desc.colorAttachments[0]);
+            break;
         default:
             return nil;
     }
+    // Stencil8 format declaration required on every pipeline that runs
+    // inside the screen / mutable render passes (both attach a Stencil8
+    // texture now to support polygon-shape clipping in #3921). Without
+    // this Metal aborts the draw call with a pixel-format mismatch even
+    // for shaders that never engage the stencil test.
+    desc.stencilAttachmentPixelFormat = MTLPixelFormatStencil8;
     if (desc.vertexFunction == nil || desc.fragmentFunction == nil) {
         NSLog(@"CN1MetalPipelineCache: shader function missing for pipeline %ld", (long)pipeline);
         return nil;

@@ -81,6 +81,7 @@ public class CN1Playground extends Lifecycle {
     private String currentMobileTab = MOBILE_TAB_CODE;
     private List<PlaygroundRunner.InlineMessage> currentMessages = new ArrayList<>();
     private List<PlaygroundRunner.InlineMessage> currentCssMessages = new ArrayList<>();
+    private final List<PlaygroundRunner.InlineMessage> currentRuntimeErrors = new ArrayList<>();
     private int editSequence;
     private int autoRunSequence;
     private int historySequence;
@@ -716,11 +717,17 @@ public class CN1Playground extends Lifecycle {
     private void executeRunScript(Form form) {
         CN.callSerially(() -> {
             List<PlaygroundRunner.InlineMessage> loggedMessages = new ArrayList<>();
+            // Lambdas wired up by the previous run may still be holding
+            // references to widgets we just replaced; clear their stale
+            // error trail before this run so the panel doesn't show
+            // failures from a script that is no longer on screen.
+            currentRuntimeErrors.clear();
             PlaygroundContext context = new PlaygroundContext(
                     form,
                     previewColumn.getContentHost(),
                     theme,
-                    message -> loggedMessages.add(new PlaygroundRunner.InlineMessage(0, message, "info"))
+                    message -> loggedMessages.add(new PlaygroundRunner.InlineMessage(0, message, "info")),
+                    this::reportLambdaRuntimeError
             );
 
             PlaygroundRunner.RunResult result = runner.run(currentScript, context);
@@ -751,6 +758,40 @@ public class CN1Playground extends Lifecycle {
             editor.setUiidCompletions(PlaygroundCssSupport.collectVisibleUiids(previewColumn.getContentHost()));
             applyCurrentCss();
             persistCurrentState();
+        });
+    }
+
+    /** Receives runtime errors raised by lambdas after a script's initial
+     * eval — the most common cause is a missing import (so an identifier
+     * like {@code Util} is unresolved when the event listener fires). The
+     * EDT would otherwise swallow these silently, leaving the user with
+     * a UI that no longer reacts. We surface each unique error as an
+     * inline editor message and flip the top bar to its failed state. */
+    private void reportLambdaRuntimeError(String message, Throwable cause) {
+        if (message == null || message.isEmpty()) {
+            return;
+        }
+        CN.callSerially(() -> {
+            // Dedup so a listener that keeps firing (e.g. text-field
+            // keystrokes) doesn't append the same message dozens of times.
+            for (int i = 0; i < currentRuntimeErrors.size(); i++) {
+                if (message.equals(currentRuntimeErrors.get(i).text)) {
+                    return;
+                }
+            }
+            PlaygroundRunner.InlineMessage entry =
+                    new PlaygroundRunner.InlineMessage(0, "Runtime error: " + message, "error");
+            currentRuntimeErrors.add(entry);
+            currentMessages.add(entry);
+            if (editor != null) {
+                editor.setInlineMessages(currentMessages);
+            }
+            if (topBar != null) {
+                topBar.showFailed();
+            }
+            if (previewColumn != null) {
+                previewColumn.setStale(true);
+            }
         });
     }
 

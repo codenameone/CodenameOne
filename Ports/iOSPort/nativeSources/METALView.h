@@ -54,6 +54,15 @@
 // are ephemeral (each is cleared on acquire), so we render into this
 // reusable texture and blit it to the drawable at present time.
 @property (nonatomic, retain) id<MTLTexture> screenTexture;
+// Stencil8 attachment used for polygon-shape clipping (#3921). Same
+// dimensions as screenTexture; cleared at the start of every frame so
+// reference-value-counter stencil reuse never crosses frame boundaries.
+// Pipeline states declare stencilAttachmentPixelFormat = Stencil8 even
+// though most draws bind an "always-pass / no-write" depth-stencil state
+// so they're functionally stencil-free; only the polygon-clip path
+// engages the stencil via ClipRect.m's CN1MetalApplyPolygonStencilClip
+// helper.
+@property (nonatomic, retain) id<MTLTexture> stencilTexture;
 @property (nonatomic, retain) UIView* peerComponentsLayer;
 @property (nonatomic, readonly) int framebufferWidth;
 @property (nonatomic, readonly) int framebufferHeight;
