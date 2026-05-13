@@ -40,37 +40,17 @@ public class ClipShape implements ExecutableOp {
 
     @Override
     public void execute(CanvasRenderingContext2D context) {
-        // See ClipRect.execute for the save/restore-leaks-transform problem.
-        // The shape coords are in ``transform``-space, so the work order is:
-        //   1. capture the live canvas transform (assumed to match the
-        //      Java-side current transform)
-        //   2. restore() pops the prior clip op's saved state
-        //   3. setTransform(transform) for the shape's coord space
-        //   4. save() records [transform, no-clip] -- this is what the *next*
-        //      clip op will pop to; that's fine because the next clip op will
-        //      capture its own ``preserved`` and overwrite the transform
-        //      anyway
-        //   5. addShape + clip(): adds the clip in device space
-        //   6. setTransform(preserved) so subsequent draw ops see the
-        //      transform the Java side currently has set
-        JSAffineTransform preserved = null;
         if (clipState.isSet()){
-            preserved = JSAffineTransform.Factory.capture(context);
             context.restore();
         }
         if (transform != null) {
             JSAffineTransform.Factory.setTransform(context, transform);
-        } else if (preserved != null) {
-            JSAffineTransform.Factory.setTransform(context, preserved);
         }
         clipState.set(true);
         context.save();
         context.beginPath();
         addShapeToPath(context, shape);
         context.clip();
-        if (preserved != null) {
-            JSAffineTransform.Factory.setTransform(context, preserved);
-        }
     }
 
     @Override

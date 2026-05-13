@@ -38,25 +38,13 @@ public class ClipRect implements ExecutableOp {
 
     @Override
     public void execute(CanvasRenderingContext2D context) {
-        // Canvas2D save/restore captures and restores the FULL state including
-        // the transform. When the prior clip op was a ClipShape under a
-        // non-identity transform, its save() recorded that transform; calling
-        // restore() here would silently revert the canvas transform to it
-        // -- leaking a stale (often rotated/scaled) transform into every draw
-        // op that follows. Capture the live transform before restore() and
-        // re-apply it so subsequent draws see the transform the Java side
-        // thinks is current (assumed to match the canvas transform at op
-        // entry, since SetTransform ops sync them).
-        JSAffineTransform preserved = null;
         if (clipState.isSet()){
-            preserved = JSAffineTransform.Factory.capture(context);
             context.restore();
-            JSAffineTransform.Factory.setTransform(context, preserved);
         }
         clipState.set(true);
         context.save();
         context.beginPath();
-
+        
         context.rect(x, y, w, h);
         context.clip();
     }
