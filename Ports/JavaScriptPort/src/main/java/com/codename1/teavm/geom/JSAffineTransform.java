@@ -65,6 +65,18 @@ public class JSAffineTransform {
                 "var jv = (t && t.__jsValue) ? t.__jsValue : t;\n"
                 + "context.transform(jv.m00, jv.m10, jv.m01, jv.m11, jv.m02, jv.m12);")
         private native static void transform(CanvasRenderingContext2D context, JSOAffineTransform t);
+
+        // Capture the canvas2D's current transform as a JSOAffineTransform.
+        // Used by the clip ops to preserve the transform across the
+        // ``context.save()/restore()`` cycle they use for clip nesting -- without
+        // this, restore() would pop the canvas back to the transform that was
+        // active when the prior clip op called save(), silently leaking that
+        // transform into every draw op that runs afterwards.
+        @JSBody(params={"context"}, script=
+                "var ctx = (context && context.__jsValue) ? context.__jsValue : context;\n"
+                + "var m = ctx.getTransform();\n"
+                + "return { m00: m.a, m10: m.b, m01: m.c, m11: m.d, m02: m.e, m12: m.f };")
+        private native static JSOAffineTransform captureFromContext(CanvasRenderingContext2D context);
     }
 
     // Pure-JS helpers that operate on the underlying matrix object. All accept
@@ -217,6 +229,10 @@ public class JSAffineTransform {
 
         public static void transform(CanvasRenderingContext2D context, JSAffineTransform t) {
             JSOFactory.transform(context, t.inner);
+        }
+
+        public static JSAffineTransform capture(CanvasRenderingContext2D context) {
+            return new JSAffineTransform(JSOFactory.captureFromContext(context));
         }
 
     }
