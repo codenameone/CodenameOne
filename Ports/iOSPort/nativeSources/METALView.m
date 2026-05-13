@@ -49,6 +49,7 @@ extern void repaintUI();
 @synthesize renderCommandEncoder;
 @synthesize drawable;
 @synthesize screenTexture;
+@synthesize stencilTexture;
 @synthesize peerComponentsLayer;
 @synthesize framebufferWidth;
 @synthesize framebufferHeight;
@@ -300,6 +301,23 @@ extern BOOL isRetinaBug();
     clearPass.colorAttachments[0].clearColor = MTLClearColorMake(0.0, 0.0, 0.0, 1.0);
     [[clearCb renderCommandEncoderWithDescriptor:clearPass] endEncoding];
     [clearCb commit];
+
+    // Build a matching Stencil8 attachment for polygon-shape clipping
+    // (#3921). Private storage rather than Memoryless because Memoryless
+    // is only supported on tile-based deferred GPUs (iOS Simulator on
+    // older Intel-Mac CI runners doesn't accept it). The stencil is
+    // ephemeral conceptually but Private works on all GPU families and
+    // the size cost is tiny (1 byte/pixel).
+    MTLTextureDescriptor *stencilDesc = [MTLTextureDescriptor
+        texture2DDescriptorWithPixelFormat:MTLPixelFormatStencil8
+        width:pw height:ph mipmapped:NO];
+    stencilDesc.usage = MTLTextureUsageRenderTarget;
+    stencilDesc.storageMode = MTLStorageModePrivate;
+    id<MTLTexture> newStencil = [layer.device newTextureWithDescriptor:stencilDesc];
+    self.stencilTexture = newStencil;
+#ifndef CN1_USE_ARC
+    [newStencil release];
+#endif
 }
 
 -(void)createRenderPassDescriptor {
@@ -317,6 +335,18 @@ extern BOOL isRetinaBug();
     colorAttachment.texture = self.screenTexture;
     colorAttachment.loadAction = MTLLoadActionLoad;
     colorAttachment.storeAction = MTLStoreActionStore;
+    // Attach the Stencil8 texture for polygon-shape clipping (#3921).
+    // Cleared at the start of every frame and discarded at the end --
+    // stencil values from previous frames are never referenced, and the
+    // reference-value counter in CN1Metalcompat resets per encoder, so
+    // a fresh clear is the right semantics.
+    if (self.stencilTexture != nil) {
+        MTLRenderPassStencilAttachmentDescriptor* stencilAttachment = self.renderPassDescriptor.stencilAttachment;
+        stencilAttachment.texture = self.stencilTexture;
+        stencilAttachment.loadAction = MTLLoadActionClear;
+        stencilAttachment.storeAction = MTLStoreActionDontCare;
+        stencilAttachment.clearStencil = 0;
+    }
 }
 
 - (void)setFramebuffer

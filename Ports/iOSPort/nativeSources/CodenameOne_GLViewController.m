@@ -1731,11 +1731,57 @@ void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingShapeMutable
 (int numCommands, JAVA_OBJECT commands, int numPoints, JAVA_OBJECT points)
 {
 #ifdef CN1_USE_METAL
-    // Shape clipping for mutable images on Metal: scissor rect can only
-    // express axis-aligned rects. A future improvement could rasterise the
-    // shape into a stencil/alpha mask. For now treat as "no clip" so
-    // subsequent draws still render.
-    (void)numCommands; (void)commands; (void)numPoints; (void)points;
+    // Polygon-shape clipping for mutable images on Metal (#3921). Queue a
+    // ClipRect polygon op against the mutable target; its execute method
+    // on the drain path routes through CN1MetalApplyPolygonStencilClip,
+    // which fills the polygon into the per-mutable-image stencil texture
+    // (allocated by CN1MetalBeginMutableImageDraw) and switches the
+    // depth-stencil state so subsequent draws on the mutable's encoder
+    // are masked to the polygon shape.
+    //
+    // The points buffer received here is a full GeneralPath dump: anchor
+    // + control coords interleaved as float pairs. Curve control points
+    // can sit outside the actual rasterised path, but CN1's clip
+    // construction only emits polygon paths through this entry point
+    // (Java side: NativeGraphics.clipRect:4670 -> inverseClip path
+    // intersect, which only produces line segments). For non-polygon
+    // shapes a future patch can route through an alpha-mask stencil
+    // fill; today the line-only assumption matches every clip CN1 can
+    // build.
+    (void)numCommands; (void)commands;
+    GLUIImage *target = [CodenameOne_GLViewController instance].currentMutableImage;
+    if (target == nil) return;
+#ifndef NEW_CODENAME_ONE_VM
+    org_xmlvm_runtime_XMLVMArray* pArray = points;
+    JAVA_ARRAY_FLOAT* data = (JAVA_ARRAY_FLOAT*)pArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
+    int bufferLen = pArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
+#else
+    JAVA_ARRAY_FLOAT* data = (JAVA_ARRAY_FLOAT*)((JAVA_ARRAY)points)->data;
+    int bufferLen = ((JAVA_ARRAY)points)->length;
+#endif
+    // Use the Java-passed `numPoints` (the actual used float count from
+    // shape.getPointsSize()) -- the underlying buffer is reused / grown-
+    // only by getTmpNativeDrawShape_coords, so its JAVA_ARRAY length can
+    // exceed the actual point count and trailing slots contain stale
+    // data from previous (larger) shapes. Reading those would inject
+    // spurious polygon vertices that produce visible spike artefacts in
+    // the clipped fill (#3921 / PR #4924).
+    int len = numPoints;
+    if (len > bufferLen) len = bufferLen; // safety clamp
+    if (len < 6 || data == NULL) return; // need at least 3 (x, y) pairs
+    int numPairs = len / 2;
+    JAVA_FLOAT x[numPairs];
+    JAVA_FLOAT y[numPairs];
+    for (int i = 0; i < numPairs; i++) {
+        x[i] = data[i * 2];
+        y[i] = data[i * 2 + 1];
+    }
+    ClipRect *f = [[ClipRect alloc] initWithPolygon:x y:y length:numPairs];
+    [f setTarget:target];
+    [[CodenameOne_GLViewController instance] upcomingAddClip:f];
+#ifndef CN1_USE_ARC
+    [f release];
+#endif
 #else
     CGContextRef context = UIGraphicsGetCurrentContext();
     CGContextRestoreGState(context);
