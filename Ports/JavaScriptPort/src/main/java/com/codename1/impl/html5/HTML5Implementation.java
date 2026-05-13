@@ -5678,8 +5678,30 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
                             @Override
                             public void fillRect(HTML5Graphics graphics, int color, int fillWidth, int fillHeight) {
-                                graphics.setColorWithAlpha(color);
-                                graphics.fillRect(0, 0, fillWidth, fillHeight);
+                                // Image.createImage(w, h, fillColor) takes an ARGB int. The
+                                // alpha byte must drive the fill's transparency:
+                                // ``setColorWithAlpha`` already sets ``fillStyle`` to an
+                                // ``rgba(...)`` string, but the FillRect op overwrites that
+                                // with ``rgb(...)`` and uses ``state.alpha`` (the graphics-
+                                // wide global alpha, defaulting to 255) as the canvas
+                                // ``globalAlpha`` -- silently dropping the colour's alpha
+                                // byte. Route the alpha through ``setAlpha`` so it lands in
+                                // ``state.alpha`` and the FillRect op picks it up. Reset
+                                // alpha to 255 afterwards so the freshly returned mutable-
+                                // image graphics has the default state the user expects.
+                                int colorAlpha = (color >>> 24) & 0xFF;
+                                if (colorAlpha == 0) {
+                                    // Fully transparent fill is a no-op; leave the surface untouched.
+                                    return;
+                                }
+                                graphics.setColor(color & 0xFFFFFF);
+                                if (colorAlpha != 0xFF) {
+                                    graphics.setAlpha(colorAlpha);
+                                    graphics.fillRect(0, 0, fillWidth, fillHeight);
+                                    graphics.setAlpha(255);
+                                } else {
+                                    graphics.fillRect(0, 0, fillWidth, fillHeight);
+                                }
                             }
                         });
         NativeImage img = new NativeImage();
