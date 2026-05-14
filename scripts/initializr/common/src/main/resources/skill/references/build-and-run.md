@@ -70,6 +70,27 @@ mvn -pl javase package -Dcodename1.platform=javase -Dcodename1.buildTarget=linux
 
 For **logic, UI, and screenshot tests**, run `mvn -pl common cn1:test` (the CN1 test runner). It executes inside a local JVM via the simulator, so CI/CD does not need a Codename One account, a build server, or platform tooling — any GitHub Actions runner with a JDK 17+ can run it. This is the right loop for fast feedback.
 
+### Framebuffer requirement on headless Linux runners
+
+The CN1 test runner boots the simulator's AWT/Swing-based JavaSE port, which needs a graphics environment. macOS and Windows runners ship one out of the box. **Linux runners (the common GitHub Actions `ubuntu-latest`) do not** — you must provide a virtual framebuffer via `xvfb-run`:
+
+```yaml
+# .github/workflows/test.yml
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: 'temurin', java-version: '17' }
+      - name: Run CN1 tests under a virtual framebuffer
+        run: xvfb-run -a ./mvnw -pl common test-compile cn1:test
+```
+
+`xvfb-run -a` automatically picks a free display number (`-a` = autodisplay). Without it the test JVM aborts with `java.awt.HeadlessException` or "Can't connect to X11 display".
+
+On `macos-latest` / `windows-latest` runners just call `./mvnw -pl common test-compile cn1:test` directly — no wrapper needed.
+
 You only need the cloud build path when you want to **produce a native artifact** (.ipa / .apk / desktop installer / web bundle) — see the next section.
 
 ## Automated cloud builds for CI / LLM workflows

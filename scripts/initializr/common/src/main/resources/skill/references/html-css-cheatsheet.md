@@ -16,7 +16,7 @@ Designers and web developers think in HTML/CSS idioms — flexbox rows, hero sec
 | `<input type="password">` | `TextField` + `setConstraint(TextArea.PASSWORD)` | |
 | `<input type="email">` | `TextField` + `setConstraint(TextArea.EMAILADDR)` | |
 | `<textarea>` | `TextArea` | |
-| `<select>` | `ComboBox` or `Picker` | `Picker` opens a native sheet on mobile. |
+| `<select>` | `Picker` | Use `Picker` (with `pickerType=Display.PICKER_TYPE_STRINGS`) — opens a native sheet on mobile. Avoid `ComboBox`; its touch UX is poor across platforms. |
 | `<input type="checkbox">` | `CheckBox` or `Switch` | |
 | `<input type="radio">` | `RadioButton` in a `ButtonGroup` | |
 | `<input type="range">` | `Slider` | |
@@ -146,10 +146,12 @@ form.setLayout(new FlowLayout(Component.CENTER, Component.CENTER));
 
 ### Media queries / responsive
 
-CN1 CSS supports `@media (prefers-color-scheme: dark)` (see `references/css.md`) but **no** viewport-size queries. Branch in Java for form-factor:
+CN1 CSS supports `@media (prefers-color-scheme: dark)` (see `references/css.md`) but **no** viewport-size queries. Branch in Java for form-factor and orientation:
 
 ```java
-if (Display.getInstance().isTablet()) {
+Display d = Display.getInstance();
+
+if (d.isTablet()) {
     form.setLayout(new BorderLayout());
     form.add(BorderLayout.WEST, sideNav);
     form.add(BorderLayout.CENTER, detail);
@@ -157,7 +159,21 @@ if (Display.getInstance().isTablet()) {
     form.setLayout(BoxLayout.y());
     form.add(BoxLayout.encloseY(quickActions, detail));
 }
+
+// Portrait vs. landscape
+if (d.isPortrait()) {
+    hero.setHidden(false);
+} else {
+    hero.setHidden(true);     // hide tall hero in landscape
+}
+
+// React when the device rotates
+form.addOrientationListener(evt -> rebuildLayout(form));
 ```
+
+`BorderLayout` has a built-in trick that often removes the need to branch on orientation manually: pass `BorderLayout.CENTER_BEHAVIOR_TOTAL_BELOW` (or call `setLandscapeSwap(...)` on the layout) and the WEST/EAST regions swap when the device rotates to landscape — useful for keeping a side panel on the leading edge as the layout flips.
+
+`form.addOrientationListener(evt -> ...)` fires whenever the screen rotates between portrait and landscape; rebuild your layout there for anything more involved than a simple component flip.
 
 See `references/mobile-adaptability.md` for the full responsive pattern matrix.
 
@@ -293,3 +309,100 @@ if (Dialog.show("Delete?", "Are you sure?", "Delete", "Cancel")) delete();
 | `filter: blur()` | None — pre-blur images at build time |
 | `backdrop-filter` | None |
 | `gradient` backgrounds | `Container` with a custom `Painter`; some CN1 versions support `cn1-derive-image` gradient borders |
+
+## Porting Android (XML + Kotlin/Java) to Codename One
+
+Codename One's component model is similar enough to Android's that you can usually translate screens one-to-one. As with HTML, the layout system is the part that differs most.
+
+### Android view → CN1 component
+
+| Android `View` | CN1 component | Notes |
+| --- | --- | --- |
+| `LinearLayout` (vertical) | `BoxLayout.y()` | |
+| `LinearLayout` (horizontal) | `BoxLayout.x()` | |
+| `RelativeLayout` / `ConstraintLayout` | `LayeredLayout` with `LayeredLayoutConstraint` | Use percent or mm insets and `setReferenceComponent*` for "below this view". |
+| `FrameLayout` | `LayeredLayout` | Same stacking semantics. |
+| `GridLayout` (Android's, not CSS) | `GridLayout` | |
+| `RecyclerView` | `InfiniteContainer` | The pagination/recycling story maps directly. |
+| `ScrollView` (vertical) | `Container.setScrollableY(true)` | Wrap your content. |
+| `HorizontalScrollView` | `Container.setScrollableX(true)` | |
+| `NestedScrollView` | **Don't nest scrollables in CN1** — see scrolling rules in `references/ui-components.md`. |
+| `Toolbar` / `ActionBar` | `Form.getToolbar()` | Already on every Form. |
+| `BottomNavigationView` | `Toolbar.addCommandToBottomBar(...)` or `Tabs` at the bottom. | |
+| `NavigationView` (drawer) | `Toolbar.addCommandToSideMenu(...)` | |
+| `TextView` | `Label` (single line) / `SpanLabel` (wrapped) | |
+| `EditText` | `TextField` (single line) / `TextArea` (multi-line) | Set `constraint` for the keyboard type. |
+| `Button` / `MaterialButton` | `Button` | |
+| `ImageView` | `Label` with image, or `URLImage` for remote | |
+| `Switch` / `CheckBox` / `RadioButton` | `Switch` / `CheckBox` / `RadioButton` | RadioButton needs `ButtonGroup`. |
+| `Spinner` | `Picker` (string list) | Do **not** use `ComboBox`. |
+| `ProgressBar` | `Slider` (set max) or `InfiniteProgress` (spinner) | |
+| `Dialog` / `AlertDialog` | `Dialog.show(...)` | `Toast` → `ToastBar.showMessage(...)`. |
+| `Fragment` | A factory method returning a configured `Container`, attached to a Form. CN1 has no Fragment lifecycle — keep state in regular Java objects. |
+| `Activity` | A separate `Form` class (or factory). Navigation = `nextForm.show()`. |
+| `Intent` (in-app) | Direct method call to the next Form's factory. |
+| `Intent` (external — phone/email/url) | `Display.execute("tel:..." / "mailto:..." / url)`. |
+| `RecyclerView.Adapter` | Implement `InfiniteContainer.fetchComponents(int, int)` or pass a list to `MultiList`. |
+
+### Android XML → CN1 Java
+
+CN1 has no XML layout for screens (the GUI builder uses its own format). Translate Android XML directly to Java:
+
+```xml
+<!-- Android: res/layout/profile.xml -->
+<LinearLayout android:orientation="vertical" android:padding="16dp">
+    <TextView android:text="@string/name" style="@style/Headline" />
+    <EditText android:hint="@string/name_hint" />
+    <Button android:text="@string/save" style="@style/PrimaryButton" />
+</LinearLayout>
+```
+
+```java
+// CN1
+Container col = new Container(BoxLayout.y());
+col.setUIID("ProfileCard");           // padding/margin lives in CSS
+
+Label headline = new Label(L10n.get("name"));
+headline.setUIID("Headline");
+
+TextField nameField = new TextField();
+nameField.setHint(L10n.get("name_hint"));
+
+Button save = new Button(L10n.get("save"));
+save.setUIID("PrimaryCta");
+
+col.add(headline).add(nameField).add(save);
+```
+
+```css
+/* Android themes ~= CN1 CSS rules. */
+ProfileCard { padding: 2mm; }
+Headline { font-family: "native:MainBold"; font-size: 4mm; color: #0f172a; }
+PrimaryCta { background-color: #1d4ed8; color: #ffffff; border-radius: 3mm; padding: 2mm 4mm; }
+```
+
+### Android idioms that DO NOT translate
+
+| Android | Why it doesn't translate | What to do |
+| --- | --- | --- |
+| `Context` everywhere | CN1 has no `Context`. | Use `Display.getInstance()` or static singletons. |
+| `findViewById(R.id.x)` | No XML view inflation. | Hold component references as fields after constructing. |
+| `Handler.post(...)` | No `Handler`. | `Display.callSerially(...)`. |
+| `LiveData`, `ViewModel` (Architecture Components) | None of the Jetpack stack is available. | `com.codename1.properties.*` for property binding, or plain observer fields. |
+| `Room`, `LiveData<List<X>>` | No Room. | `com.codename1.db.Database` (SQLite) + manual model layer. |
+| `SharedPreferences` | Different API. | `com.codename1.io.Preferences` (drop-in semantically). |
+| `Picasso` / `Glide` for image loading | Not available. | `URLImage.createToStorage(...)` or `MultiImage`. |
+| `Retrofit` / `OkHttp` | Not in the JDK subset. | `Rest.get/post(...)` — see `references/java-api-subset.md`. |
+| `Coroutines` / `RxJava` | No coroutines runtime; no RxJava. | `Display.startThread(...)` + `Display.callSerially(...)` for async; chain callbacks. |
+| `R.string.xxx` | No resources system. | `UIManager.getInstance().localize("xxx", "default")` reading from `messages.properties` bundles. |
+| `Permission` manifest entries | Different mechanism. | `Display.requestPermission(...)` at runtime + `codename1.arg.android.xPermissions` build hint. |
+| `Activity onCreate/onResume` | No Activity lifecycle. | Override `Lifecycle.init/start/stop` (app-level) and `Form.show()` (per-screen). |
+
+### Android resources
+
+| Android | CN1 |
+| --- | --- |
+| `res/values/strings.xml` | `common/src/main/l10n/messages.properties` (and per-locale `messages_de.properties`, etc.) |
+| `res/drawable/foo.png` | `common/src/main/resources/foo.png` (flat namespace — see `references/java-api-subset.md`) |
+| `res/values/colors.xml` | Theme constants in `theme.css` under `#Constants { ... }` |
+| `res/font/x.ttf` | `common/src/main/css/fonts/x.ttf`, declared via `@font-face` in `theme.css` |

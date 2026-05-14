@@ -55,6 +55,7 @@ The runtime authoritative reference is also published as JavaDoc: <https://www.c
 | `java.net.http.*`, `java.net.URLConnection`, `java.net.Socket` | **Forbidden** on cross-build targets. | `com.codename1.io.ConnectionRequest`, `NetworkManager`, or the higher-level `Rest`. |
 | `java.util.concurrent.locks.*`, `Fork/Join`, complex executors | Mostly **forbidden**. | `synchronized` blocks; `Display.callSerially(...)`, `Display.callSeriallyAndWait(...)`, `Display.startThread(...)`. |
 | `java.lang.reflect.*` | Works in the **simulator only**, fails on iOS/Android cross-builds. | Avoid reflection; use the `com.codename1.properties` framework for property-style binding. |
+| `Class.getName()` / `Class.forName(String)` | The methods exist and compile, but Codename One **obfuscates class names by default** for cross-builds. Names you see at compile time (`com.example.MyService`) will be rewritten to short opaque strings (`a.b.c`) in the iOS / Android / JavaScript binary. | Never persist or serialize a class name; never do dispatch by string-matching class names. Use interfaces + factories. If you must keep a specific class name for native interop, add it to `codename1.arg.proguardKeep` (or the equivalent ParparVM/TeaVM `keep` hint). |
 | `java.util.logging.*` | Subset only. | `com.codename1.io.Log`. |
 | `java.util.regex` | Limited — basic `Pattern` / `Matcher` exists but watch out for advanced flags. | Stick to standard regex constructs; verify in the simulator AND a cross-build for anything non-trivial. |
 | `java.time` (full set) | Partial — `LocalDate`, `LocalDateTime`, `Instant` are present; some formatter pieces are missing. | `com.codename1.l10n.SimpleDateFormat`, `com.codename1.util.DateUtil`. |
@@ -65,24 +66,44 @@ The runtime authoritative reference is also published as JavaDoc: <https://www.c
 
 `Display.getInstance().getResourceAsStream("/path")` does **not** support nested directories at runtime. Resources packaged under `common/src/main/resources/sub/dir/foo.json` will fail to load on cross-build targets even though they work in the simulator JVM — it's a real CN1 classloader constraint, not a packaging quirk.
 
-Patterns:
+Workable patterns, easiest first:
 
-- Put plain resources at the top of `common/src/main/resources/` and read them with `Display.getInstance().getResourceAsStream("/file.json")`.
-- If you need a deeper structure (a templates folder, a sample dataset, a small SQLite seed file), package the tree into a single zip placed at the top level, then read entries with `ZipInputStream`:
+1. **Flat resource at the top of `common/src/main/resources/`**. Read with `Display.getInstance().getResourceAsStream("/file.json")` plus `Util.readToString(...)`.
 
-  ```java
-  try (ZipInputStream zis = new ZipInputStream(
-          Display.getInstance().getResourceAsStream("/data.zip"))) {
-      ZipEntry e;
-      while ((e = zis.getNextEntry()) != null) {
-          if (e.getName().equals("templates/welcome.html")) {
-              return Util.readToString(zis);
-          }
-      }
-  }
-  ```
+2. **A bundled HTML hierarchy via `/html.tar`** (built-in, no cn1lib needed). If you need to ship a directory tree of HTML / CSS / JS / images for `BrowserComponent`, drop the whole tree into `common/src/main/resources/html/` — at build time the CN1 plugin tars it into `html.tar` at the resource root. At runtime call:
 
-- For larger or per-user data, prefer `FileSystemStorage` (writable files) or `Storage` (key/value blobs in the per-app sandbox).
+   ```java
+   BrowserComponent web = new BrowserComponent();
+   form.add(BorderLayout.CENTER, web);
+   try {
+       web.setURLHierarchy("/index.html");      // path relative to the html/ tree
+   } catch (IOException ex) { Log.e(ex); }
+   ```
+
+   `setURLHierarchy` extracts the tar into `FileSystemStorage` on first use (once per build), then points the WebView at the extracted directory. This is the right tool for shipping local docs, an HTML-based onboarding flow, a Mapbox-style offline tile viewer, or any other case where a `<script src="../lib/x.js">` style relative reference needs to resolve at runtime.
+
+3. **A custom zip you read with `ZipInputStream`** — useful for "shovel a deep tree of mixed assets, then look up entries by path". `java.util.zip` is **not** in the CN1 JDK subset; bring it in via the `cn1-zip` (or equivalent) cn1lib first. The Maven coordinates land in `common/pom.xml`:
+
+   ```xml
+   <dependency>
+       <groupId>com.codenameone.libs</groupId>
+       <artifactId>cn1-zip</artifactId>
+       <version>1.0</version>
+   </dependency>
+   ```
+
+   Then read entries from a flat-root zip resource:
+
+   ```java
+   try (ZipInputStream zis = new ZipInputStream(
+           Display.getInstance().getResourceAsStream("/data.zip"))) {
+       // ... iterate zis.getNextEntry() ...
+   }
+   ```
+
+   Only reach for option 3 when option 2 doesn't fit — i.e. the data isn't HTML and you specifically need random access by path.
+
+4. **For larger or per-user data**, prefer `FileSystemStorage` (writable files) or `Storage` (key/value blobs in the per-app sandbox).
 
 ## IO — file system and persistent storage
 
