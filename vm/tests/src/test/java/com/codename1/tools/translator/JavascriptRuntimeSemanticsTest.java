@@ -587,7 +587,13 @@ class JavascriptRuntimeSemanticsTest {
         int rc = process.waitFor();
         assertEquals(0, rc, "Node worker harness should exit cleanly. stdout: " + output + " stderr: " + errors);
         WorkerRunResult out = new WorkerRunResult();
-        out.rawMessage = output.trim();
+        // Include both stdout and stderr in rawMessage so System.out
+        // and System.err diagnostics from the fixture (e.g.
+        // CN1FIFO:order=[...] from JsMonitorFifoApp) show up in the
+        // assertion message when the test fails. Without this, only
+        // the final harness-emitted JSON result/error is visible and
+        // the diagnostic prints get swallowed.
+        out.rawMessage = output.trim() + (errors.trim().isEmpty() ? "" : " stderr=" + errors.trim());
         out.type = extractJsonString(output, "type");
         String result = extractJsonNumber(output, "result");
         out.result = result == null ? Integer.MIN_VALUE : Integer.parseInt(result);
