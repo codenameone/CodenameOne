@@ -44,6 +44,10 @@ import static com.codename1.ui.ComponentSelector.$;
 /// on a text area combined with a label.
 ///
 /// ```java
+/// Form hi = new Form("Test SpanLabel", BoxLayout.y());
+///
+/// Image icon = FontImage.createMaterial(FontImage.MATERIAL_INFO, "Label", 3.0f);
+///
 /// SpanLabel d = new SpanLabel("Default SpanLabel that can seamlessly line break when the text is really long.");
 /// d.setIcon(icon);
 /// SpanLabel l = new SpanLabel("NORTH Positioned Icon SpanLabel that can seamlessly line break when the text is really long.");
@@ -56,6 +60,7 @@ import static com.codename1.ui.ComponentSelector.$;
 /// c.setIcon(icon);
 /// c.setIconPosition(BorderLayout.EAST);
 /// hi.add(d).add(l).add(r).add(c);
+/// hi.show();
 /// ```
 ///
 /// @author Shai Almog

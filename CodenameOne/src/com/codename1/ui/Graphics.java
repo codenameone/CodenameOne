@@ -644,50 +644,26 @@ public final class Graphics {
     /// degrees. Usage:
     ///
     /// ```java
-    /// Painter p = new Painter(cmp) {
+    /// Form hi = new Form("fillArc / drawArc", new BorderLayout());
+    /// Container cmp = new Container();
+    /// cmp.setPreferredSize(new Dimension(300, 300));
+    /// Painter p = new Painter() {
     ///     public void paint(Graphics g, Rectangle rect) {
     ///         boolean antiAliased = g.isAntiAliased();
     ///         g.setAntiAliased(true);
-    ///         int r = Math.min(rect.getWidth(), rect.getHeight())/2;
-    ///         int x = rect.getX() + rect.getWidth()/2 - r;
-    ///         int y = rect.getY() + rect.getHeight()/2 - r;
-    ///         switch (style) {
-    ///             case CircleButtonStrokedDark:
-    ///             case CircleButtonStrokedLight: {
-    ///                 if (cmp.getStyle().getBgTransparency() != 0) {
-    ///                     int alpha = cmp.getStyle().getBgTransparency();
-    ///                     if (alpha <0) {
-    ///                         alpha = 0xff;
-    ///                     }
-    ///                     g.setColor(cmp.getStyle().getBgColor());
-    ///                     g.setAlpha(alpha);
-    ///                     g.fillArc(x, y, 2*r-1, 2*r-1, 0, 360);
-    ///                     g.setAlpha(0xff);
-    ///                 }
-    ///                 g.setColor(cmp.getStyle().getFgColor());
-    ///                 g.drawArc(x, y, 2*r-1, 2*r-1, 0, 360);
-    ///                 break;
-    ///             }
-    ///             case CircleButtonFilledDark:
-    ///             case CircleButtonFilledLight:
-    ///             case CircleButtonTransparentDark:
-    ///             case CircleButtonTransparentLight: {
-    ///                 int alpha = cmp.getStyle().getBgTransparency();
-    ///                 if (alpha < 0) {
-    ///                     alpha = 0xff;
-    ///                 }
-    ///                 g.setAlpha(alpha);
-    ///                 g.setColor(cmp.getStyle().getBgColor());
-    ///                 g.fillArc(x, y, 2*r, 2*r, 0, 360);
-    ///                 g.setAlpha(0xff);
-    ///                 break;
-    ///             }
-    ///         }
-    ///
+    ///         int r = Math.min(rect.getWidth(), rect.getHeight()) / 2;
+    ///         int x = rect.getX() + rect.getWidth() / 2 - r;
+    ///         int y = rect.getY() + rect.getHeight() / 2 - r;
+    ///         g.setColor(0x4488ff);
+    ///         g.fillArc(x, y, 2 * r, 2 * r, 0, 360);
+    ///         g.setColor(0xffffff);
+    ///         g.drawArc(x, y, 2 * r - 1, 2 * r - 1, 0, 360);
     ///         g.setAntiAliased(antiAliased);
     ///     }
     /// };
     /// cmp.getAllStyles().setBgPainter(p);
+    /// hi.add(BorderLayout.CENTER, cmp);
+    /// hi.show();
     /// ```
     ///
     /// #### Parameters

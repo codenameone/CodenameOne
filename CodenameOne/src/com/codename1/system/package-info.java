@@ -63,7 +63,7 @@
 /// combined where the "." elements are replaced by underscores. This class can be implemented in Objective-C
 /// (by providing both a header and an "m" file) or in Swift. Objective-C classes follow this convention e.g.:
 ///
-/// ```java
+/// ```objc
 /// @interface com_my_code_MyNative : NSObject {
 /// }
 /// - (id)init;
