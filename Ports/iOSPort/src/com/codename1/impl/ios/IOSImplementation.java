@@ -5233,15 +5233,23 @@ public class IOSImplementation extends CodenameOneImplementation {
                 textureCache.add(tmpDrawShape, scaledStroke, mask);
             }
             if (mask == null) return;
-            Transform saved = transform;
-            Transform inv = Transform.makeIdentity();
-            inv.setTransform(transform);
-            inv.scale(1f / sx, 1f / sy);
-            setTransform(inv);
+            // Apply the residual S(1/sx, 1/sy) via the impl-side scale path
+            // -- the same path g.scale uses. Going through setTransform with
+            // a separately-built composed Transform has been documented to
+            // silently fail to update the Metal-side currentTransform in
+            // some cases (see the Transform.setTransform comment about
+            // "iOS Metal port has shown that without this flag
+            // setTransform(composed) silently fails to apply"). The scale
+            // path queues a SetTransform op that reliably reaches both the
+            // screen and mutable-image encoders.
+            scale(1f / sx, 1f / sy);
             try {
                 nativeDrawAlphaMask(mask);
             } finally {
-                setTransform(saved);
+                // Restore by composing the inverse residual back onto the
+                // matrix. After this call the impl matrix is back at
+                // T(...) * S(sx, sy) -- exactly what the caller expects.
+                scale(sx, sy);
             }
         }
 
@@ -5861,35 +5869,39 @@ public class IOSImplementation extends CodenameOneImplementation {
                     tmpTransform.setScale(sx, sy);
                     tmpDrawShape.setShape(shape, tmpTransform);
 
-                    tmpTransform.setTransform(transform);
-                    tmpTransform.scale(1f / sx, 1f / sy);
-
-                    tmpTransform2.setTransform(transform);
+                    if (stroke != null) {
+                        tmpDrawStroke.setStroke(stroke);
+                        tmpDrawStroke.setLineWidth(tmpDrawStroke.getLineWidth() * strokeScale);
+                    }
+                    TextureAlphaMask mask = textureCache.get(tmpDrawShape, stroke==null?null:tmpDrawStroke);
+                    if ( mask == null ){
+                        mask = (TextureAlphaMask)createAlphaMask(tmpDrawShape, stroke==null?null:tmpDrawStroke);
+                        textureCache.add(tmpDrawShape, stroke==null?null:tmpDrawStroke, mask);
+                    }
+                    if (mask==null){
+                        return;
+                    }
+                    if (paint != null && paint instanceof RadialGradient) {
+                        RadialGradient rgp = (RadialGradient)paint;
+                        rgp.x = (int) (rgp.x * sx);
+                        rgp.y = (int) (rgp.y * sy);
+                        rgp.width = (int) (rgp.width * sx);
+                        rgp.height = (int) (rgp.height * sy);
+                        applyPaint();
+                    }
+                    // Apply the residual S(1/sx, 1/sy) via the impl-side scale
+                    // path (the same path g.scale uses). Going through
+                    // setTransform with a separately-built composed Transform
+                    // has been documented to silently fail to update the
+                    // Metal-side currentTransform (see the comment in
+                    // Transform.setTransform). The scale path reliably queues
+                    // a SetTransform op that reaches both the screen and the
+                    // mutable-image encoders.
+                    scale(1f / sx, 1f / sy);
                     try {
-                        this.setTransform(tmpTransform);
-                        if (stroke != null) {
-                            tmpDrawStroke.setStroke(stroke);
-                            tmpDrawStroke.setLineWidth(tmpDrawStroke.getLineWidth() * strokeScale);
-                        }
-                        TextureAlphaMask mask = textureCache.get(tmpDrawShape, stroke==null?null:tmpDrawStroke);
-                        if ( mask == null ){
-                            mask = (TextureAlphaMask)createAlphaMask(tmpDrawShape, stroke==null?null:tmpDrawStroke);
-                            textureCache.add(tmpDrawShape, stroke==null?null:tmpDrawStroke, mask);
-                        }
-                        if (mask==null){
-                            return;
-                        }
-                        if (paint != null && paint instanceof RadialGradient) {
-                            RadialGradient rgp = (RadialGradient)paint;
-                            rgp.x = (int) (rgp.x * sx);
-                            rgp.y = (int) (rgp.y * sy);
-                            rgp.width = (int) (rgp.width * sx);
-                            rgp.height = (int) (rgp.height * sy);
-                            applyPaint();
-                        }
                         nativeDrawAlphaMask(mask);
                     } finally {
-                        setTransform(tmpTransform2);
+                        scale(sx, sy);
                     }
                 }
             } else {
