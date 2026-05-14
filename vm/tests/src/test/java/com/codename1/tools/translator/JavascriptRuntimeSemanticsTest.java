@@ -604,7 +604,13 @@ class JavascriptRuntimeSemanticsTest {
         int rc = process.waitFor();
         assertEquals(0, rc, "Node worker-thread harness should exit cleanly. stdout: " + output + " stderr: " + errors);
         WorkerRunResult out = new WorkerRunResult();
-        out.rawMessage = output.trim();
+        // ``rawMessage`` is the test-runner-side capture of everything the
+        // harness wrote to stdout: result/error JSON plus any forwarded
+        // ``log`` messages from System.out.println in the fixture (see
+        // ``generatedWorkerHarnessSource`` which now relays log messages
+        // to stdout). Failure assertions concatenate this into the
+        // diagnostic so CN1FIFO-style hints land in the surefire report.
+        out.rawMessage = output.trim() + " stderr: " + errors.trim();
         out.type = extractJsonString(output, "type");
         String result = extractJsonNumber(output, "result");
         out.result = result == null ? Integer.MIN_VALUE : Integer.parseInt(result);
@@ -848,6 +854,13 @@ class JavascriptRuntimeSemanticsTest {
                 + "    self.onmessage({ data: data });\n"
                 + "  }\n"
                 + "});\n"
+                // Forward worker-side System.out.println output (CN1FIFO
+                // diagnostics, etc.) to the harness via postMessage so the
+                // parent test runner can include them in failure
+                // diagnostics. Without this flag the worker calls
+                // console.log() into worker stdout which Node's
+                // worker_threads doesn't pipe to the parent.
+                + "global.__cn1ForwardConsoleToMain = true;\n"
                 + "const workerSrc = fs.readFileSync(path.join(workerData.distDir, 'worker.js'), 'utf8');\n"
                 + "vm.runInThisContext(workerSrc, { filename: path.join(workerData.distDir, 'worker.js') });\n"
                 + "`);\n"
@@ -855,6 +868,14 @@ class JavascriptRuntimeSemanticsTest {
                 + "let done = false;\n"
                 + "worker.on('message', function(msg) {\n"
                 + "  if (done) {\n"
+                + "    return;\n"
+                + "  }\n"
+                // Relay forwarded ``log`` messages from the worker so they
+                // appear in the harness stdout that the test runner reads
+                // into ``rawMessage``. Critical for diagnostic CN1FIFO
+                // output from JsMonitorFifoApp etc.
+                + "  if (msg && msg.type === 'log') {\n"
+                + "    console.log(String(msg.message || ''));\n"
                 + "    return;\n"
                 + "  }\n"
                 + "  if (msg && (msg.type === 'result' || msg.type === 'error')) {\n"
