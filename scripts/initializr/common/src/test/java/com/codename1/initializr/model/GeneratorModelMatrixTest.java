@@ -174,6 +174,17 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertContains(claudeStub, "name: codename-one", "Claude stub must keep the skill frontmatter");
         assertContains(claudeStub, ".agent-skills/codename-one/SKILL.md",
                 "Claude stub should redirect to the canonical skill content");
+
+        // Java 17 projects no longer ship the legacy UWP/Windows native module.
+        // Both the win/ source tree and the <profile id="win"> block in the root pom
+        // should be absent.
+        for (String path : entries.keySet()) {
+            assertFalse(path.startsWith("win/") || path.startsWith("win\\"),
+                    "Java 17 projects should not bundle the win/ module — found: " + path);
+        }
+        String rootPom = getText(entries, "pom.xml");
+        assertFalse(rootPom.indexOf("<id>win</id>") >= 0,
+                "Java 17 root pom should not contain the Windows-module activation profile");
     }
 
     private void validateLegacyJava8Generation() throws Exception {
@@ -201,8 +212,19 @@ public class GeneratorModelMatrixTest extends AbstractTest {
 
         // Skill is Java 17-only. Confirm we don't ship it into a Java 8 project,
         // where the skill's "use var / records / text blocks" guidance would be wrong.
+        assertNull(entries.get(".agent-skills/codename-one/SKILL.md"),
+                "Java 8 projects should not bundle the agent skill (Java 17-only)");
         assertNull(entries.get(".claude/skills/codename-one/SKILL.md"),
-                "Java 8 projects should not bundle the Codename One Claude skill (Java 17-only)");
+                "Java 8 projects should not bundle the Claude Code skill stub (Java 17-only)");
+        assertNull(entries.get("AGENTS.md"),
+                "Java 8 projects should not bundle the AGENTS.md root pointer (Java 17-only)");
+
+        // Legacy Java 8 projects keep the win/ module — only Java 17 projects drop it.
+        assertNotNull(entries.get("win/pom.xml"),
+                "Legacy Java 8 projects should retain the win/ module");
+        String rootPom = getText(entries, "pom.xml");
+        assertContains(rootPom, "<id>win</id>",
+                "Legacy Java 8 root pom should retain the Windows-module activation profile");
     }
 
     private void validateJava17DefaultRegressionFixes() throws Exception {

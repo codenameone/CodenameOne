@@ -171,7 +171,9 @@ For arbitrary CSS-style gradients (`linear-gradient(135deg, ...)` with multiple 
 
 ## Dark mode
 
-CN1 supports a single, specific media query: `@media (prefers-color-scheme: dark)`. The CSS compiler walks rules inside that block and rewrites every selector into a `$Dark<UIID>` variant baked into `theme.res`. At runtime CN1 picks the dark variant when the platform reports dark mode (see `Display.getInstance().isDarkMode()` — also overridable with `setDarkMode(Boolean)`).
+Dark mode is **inherited automatically from the OS** on iOS and Android — you don't opt in. When the system reports dark mode, `Display.getInstance().isDarkMode()` returns `true` and CN1 applies any `$Dark<UIID>` variants in your theme. If a UIID has no `$Dark` variant the regular variant is used.
+
+To customize the dark appearance, write a `@media (prefers-color-scheme: dark)` block in `theme.css`. The CSS compiler walks rules inside that block and rewrites every selector into a `$Dark<UIID>` variant baked into `theme.res`. To force-override the platform's choice at runtime call `Display.getInstance().setDarkMode(Boolean)` (pass `null` to revert to the platform default).
 
 ```css
 Form { background-color: #ffffff; color: #0f172a; }
@@ -222,6 +224,20 @@ Title { font-family: "native:MainBold"; font-size: 4mm; }
 Body  { font-family: "native:MainRegular"; font-size: 3mm; }
 Caption { font-family: "native:ItalicLight"; font-size: 2.5mm; }
 ```
+
+### Multi-images — one image, multiple densities
+
+When you reference an image asset in `theme.css` (e.g. `background-image: url('/logo.png')`), the CSS compiler builds a **multi-image** — a single resource entry inside `theme.res` that contains the image rendered at multiple device densities (very-low through 4K, whichever your source resolution and CN1 version generate). At runtime CN1 selects the variant closest to `Display.getDeviceDensity()`, then scales as needed.
+
+The upshot:
+
+- Drop one source image (the highest resolution you have) into `common/src/main/css/images/`, reference it once in CSS, and it renders crisply across a 1x simulator, a 2x phone, and a 3x phone.
+- The compiler caps the largest variant at the image's source resolution, so feed in 3x or higher art.
+- For images you load at runtime via `Resources.openLayered("/theme").getImage("logo.png")` you get the same density-aware lookup automatically.
+
+For network-loaded images, `URLImage` handles its own density-aware caching — multi-images are specifically for assets baked into `theme.res` at build time.
+
+See `references/java-api-subset.md` *Multi-images* for the runtime API and `EncodedImage.createMulti(...)` for programmatic creation.
 
 ### Custom TTF fonts
 
@@ -312,30 +328,50 @@ String mapTileText = UIManager.getInstance().getThemeConstant("mapTileLoadingTex
 
 (The full list is in the Codename One Developer Guide under *Advanced Theming → Theme constants*: <https://www.codenameone.com/developer-guide/>.)
 
-## Java side of styling: `setUIID`, `getStyle`, `getAllStyles`
+## Java side of styling: `setUIID`, the four state styles, and `getAllStyles`
 
 ```java
 Component cmp = ...;
 
-cmp.setUIID("PrimaryCta");                    // (1) pick a CSS rule
-cmp.getAllStyles().setBgColor(0x1d4ed8);      // (2) per-instance override, write-only
-int currentBg = cmp.getStyle().getBgColor();  // (3) read effective style for the current state
+cmp.setUIID("PrimaryCta");                                  // (1) pick a CSS rule
+cmp.getAllStyles().setBgColor(0x1d4ed8);                    // (2) write-only fan-out override
+int unselectedBg = cmp.getUnselectedStyle().getBgColor();   // (3) read a specific state's value
 ```
 
 - **`setUIID(String)`** is the **only** way to apply a theme rule. Whenever you create a component and want it styled, give it a UIID, then write the rule in `theme.css`. Don't reach for the style API for things CSS can express — themed UIIDs are reusable and theme-overridable; programmatic styling is one-off.
 
-- **`getStyle()`** returns the style for the **currently selected state** (one of `getUnselectedStyle()`, `getSelectedStyle()`, `getPressedStyle()`, `getDisabledStyle()`). It is **read-only** in spirit — mutating it only modifies one state and tends to produce confusing results during interactions. Use `getStyle()` to **read** the effective values for the current state (e.g. in a test that verifies a screen rendered correctly).
+- **The four state styles map directly to the CSS selectors CN1 supports**:
 
-- **`getAllStyles()`** returns a fan-out style object that writes to **all four** state styles at once. It is the right hammer for "set this color on the component" overrides. Treat it as **write-only** — don't read values from it; the values you read may not match the state in effect, and the cross-state aggregation is for setters only.
+  | Java getter | CSS selector | When in effect |
+  | --- | --- | --- |
+  | `getUnselectedStyle()` | `UIID { ... }` | Default rendering. |
+  | `getSelectedStyle()` | `UIID.selected { ... }` | Focused. In **touch mode** focus is not rendered, so this matters on desktop/JavaScript and for arrow-key navigation; on phones the user never sees it. |
+  | `getPressedStyle()` | `UIID.pressed { ... }` | While a finger / mouse is held down on the component. |
+  | `getDisabledStyle()` | `UIID.disabled { ... }` | `cmp.setEnabled(false)`. |
+
+  For **reading** style values explicitly (in tests, in painters, in conditional logic), always call the **specific state getter** — `getUnselectedStyle()`, `getSelectedStyle()`, `getPressedStyle()`, or `getDisabledStyle()`. That's the unambiguous form and it lines up with the CSS rule that produced the value.
+
+- **`getStyle()` returns the style of the *currently active* state.** This is useful inside a custom `paint(Graphics g)` implementation, where you want the colors that should be drawn right now regardless of whether the component is selected, pressed, or disabled. **Outside of `paint()`, don't use `getStyle()`** — be explicit about which state you mean. Tests that read `getStyle()` will pass or fail depending on the focus/press state of the component at the moment of assertion, which is a flake source.
+
+- **`getAllStyles()`** returns a **fan-out** style object that writes the same value to **all four** state styles at once. It is the right hammer for "set this color on the component" overrides. Treat it as **write-only** — never read values from it; the value you read may not match any specific state, since the aggregation is for setters only.
 
 ```java
-// Test pattern — verify CSS applied:
+// Test pattern — verify CSS applied (use the explicit state getter):
 Button save = new Button("Save");
 save.setUIID("PrimaryCta");
 form.add(save);
 form.show();
 assertEqual(0x1d4ed8, save.getUnselectedStyle().getBgColor(),
         "PrimaryCta should map to accent in the theme");
+assertEqual(0x1e3a8a, save.getPressedStyle().getBgColor(),
+        "PrimaryCta.pressed should darken the accent");
+
+// Painter pattern — getStyle() picks the right state automatically:
+public void paint(Graphics g) {
+    Style s = getStyle();                  // unselected / selected / pressed / disabled, as appropriate
+    g.setColor(s.getFgColor());
+    g.drawLine(...);
+}
 
 // One-off programmatic override — animation, dynamic theming:
 errorBanner.getAllStyles().setBgColor(0xb91c1c);
@@ -343,7 +379,7 @@ errorBanner.getAllStyles().setBgColor(0xb91c1c);
 
 ## Validating styles from a test
 
-You generally don't validate CSS at the CSS level. Instead build the component, attach it to a Form, then read its effective `Style` from a unit test:
+You generally don't validate CSS at the CSS level. Instead build the component, attach it to a Form, then read each state's `Style` explicitly:
 
 ```java
 public class PrimaryCtaStyleTest extends AbstractTest {
@@ -355,16 +391,21 @@ public class PrimaryCtaStyleTest extends AbstractTest {
         f.add(btn);
         f.show();
 
-        Style s = btn.getUnselectedStyle();
-        assertEqual(0x1d4ed8, s.getBgColor(), "Accent applied to background");
-        assertEqual(0xffffff, s.getFgColor(), "Foreground forced to white");
-        assertNotNull(s.getBorder(),           "Border attached");
+        Style unsel = btn.getUnselectedStyle();
+        assertEqual(0x1d4ed8, unsel.getBgColor(), "Accent applied to background");
+        assertEqual(0xffffff, unsel.getFgColor(), "Foreground forced to white");
+        assertNotNull(unsel.getBorder(),          "Border attached");
+
+        Style pressed = btn.getPressedStyle();
+        assertEqual(0x1e3a8a, pressed.getBgColor(), "Pressed state darkens the accent");
         return true;
     }
 }
 ```
 
 This is more useful than checking raw CSS strings: it confirms the rule made it into `theme.res`, was matched at runtime, and resolved to the values you expect. Plus it catches regressions like UIID typos, accidental cascading, and resource cache staleness — symptoms that pure CSS validation would miss.
+
+Always use the **explicit state getter** (`getUnselectedStyle()` / `getSelectedStyle()` / `getPressedStyle()` / `getDisabledStyle()`) rather than `getStyle()` — the latter returns whichever state is active at the moment of assertion and can change between test runs if focus or hover state shifts.
 
 If the test fails and you want to inspect every UIID/key the theme actually contains:
 
@@ -413,7 +454,7 @@ Painters are for **drawing** (custom backgrounds, decorations), not for animatin
 
 | Symptom | Cause / fix |
 | --- | --- |
-| Style doesn't apply | Write a `Style` test (see *Validating styles from a test* above). Check the UIID is set on the component; check the colors via `getUnselectedStyle().getBgColor()`; iterate `UIManager.getInstance().getThemeProps().keySet()` to confirm the theme actually contains the entry. |
+| Style doesn't apply | Write a `Style` test (see *Validating styles from a test* above). Read the explicit state — `getUnselectedStyle().getBgColor()`, etc. — never `getStyle()`. Iterate `UIManager.getInstance().getThemeProps().keySet()` to confirm the theme actually contains the entry. |
 | Container has unexpected background / padding | The base `Container` UIID was restyled. Restore it to transparent / 0 padding / 0 margin and apply styling on a child UIID instead. |
 | Text clipped by rounded corners | Padding too small relative to `border-radius`. Increase padding so it's ≥ the radius. |
 | Padding ignored on the Form | You're setting padding on the Form itself; set it on its ContentPane or wrap content in your own UIID. |

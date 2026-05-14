@@ -1,6 +1,8 @@
 # Native Interfaces
 
-A **Native Interface** in Codename One is a Java interface in `common/` that has a per-platform implementation outside of `common/` — Objective-C (or Swift) for iOS, Java (or Kotlin) for Android, JavaScript for the JS port, plain Java for the desktop simulator. At runtime CN1 wires the Java interface to the right platform implementation. This is how you call out to platform APIs CN1 doesn't expose directly (CoreLocation, NFC, push extensions, native ads, Bluetooth, etc.).
+A **Native Interface** in Codename One is a Java interface in `common/` that has a per-platform implementation outside of `common/` — Objective-C (or Swift) for iOS, Java (or Kotlin) for Android, JavaScript for the JS port, plain Java for the desktop simulator. At runtime CN1 wires the Java interface to the right platform implementation. This is how you call out to platform APIs CN1 doesn't expose directly (NFC, native ads, Bluetooth, vendor SDKs).
+
+> **The GPS example below is for illustration only.** Codename One already ships a portable **`com.codename1.location`** API (`LocationManager.getLocationManager().getCurrentLocation()`, `setLocationListener(...)`, geofence + background tracking) — you should never roll your own GPS bridge. Maps are likewise already covered by the **`cn1-google-maps`** cn1lib (Google Maps for iOS and Android) and the built-in `com.codename1.maps.MapComponent` for OpenStreetMap. Use native interfaces for things the framework actually doesn't expose; reach for them last, not first.
 
 ## The workflow
 
@@ -50,8 +52,9 @@ ios/src/main/objectivec/com_example_myapp_native_GpsBridgeImpl.m
 android/src/main/java/com/example/myapp/native_/GpsBridgeImpl.java
 javase/src/main/java/com/example/myapp/native_/GpsBridgeImpl.java
 javascript/src/main/javascript/com_example_myapp_native_GpsBridgeImpl.js
-win/src/main/csharp/com_example_myapp_native_GpsBridgeImpl.cs       (if you have a win/ module)
 ```
+
+(Generated Java 17 projects no longer ship a `win/` module — the legacy UWP target is dropped. If a project still has a `win/` directory, a C# stub is generated as well.)
 
 The plugin will **not overwrite existing stubs** by default. Pass `-Dcn1.generateNativeInterfaces.overwrite=true` if you really want to regenerate. To emit Swift instead of Objective-C, or Kotlin instead of Java, add `-Dcn1.generateNativeInterfaces.swift=true` / `-Dcn1.generateNativeInterfaces.kotlin=true`.
 
@@ -107,7 +110,16 @@ This step matters because every platform has a different stub layout, naming con
 
 The CN1 iOS port runs **without ARC** for these `.m` files (`CLANG_ENABLE_OBJC_ARC=NO`). Don't rely on autorelease-pool magic; retain manually or use static singletons for objects whose lifetime needs to outlive a method call. (This is also true for native code authored in `Ports/iOSPort/nativeSources/`.)
 
-iOS plist privacy strings (`NSLocationWhenInUseUsageDescription`, etc.) are injected via the `codename1.arg.ios.plistInject` build hint. Don't forget those — App Store builds reject location, camera, microphone, or photo access without the appropriate descriptions.
+iOS Info.plist privacy strings have **dedicated build hint names** — set them directly, don't fall back to `ios.plistInject`. The pattern is `ios.<PListKey>=<value>`:
+
+```properties
+codename1.arg.ios.NSCameraUsageDescription=Scan QR codes to pair the device.
+codename1.arg.ios.NSLocationWhenInUseUsageDescription=Find nearby branches near your location.
+codename1.arg.ios.NSPhotoLibraryUsageDescription=Attach photos to support tickets.
+codename1.arg.ios.NSMicrophoneUsageDescription=Record voice notes.
+```
+
+App Store builds reject location, camera, microphone, photo, contacts, etc. without the appropriate descriptions. Use `ios.plistInject` only for raw XML keys that don't have a dedicated hint.
 
 If you need a CocoaPod dependency, add `codename1.arg.ios.pods=PodName,...` to `codenameone_settings.properties`.
 
@@ -191,10 +203,6 @@ public class GpsBridgeImpl {
 ```
 
 The desktop stub is where you mock platform behavior so you can iterate on the rest of the app in the simulator without a phone.
-
-### Windows (UWP, C#)
-
-If you have a `win/` module and target UWP, you also get a C# stub at `win/src/main/csharp/com_example_myapp_native_GpsBridgeImpl.cs`. Implement using UWP APIs (`Windows.Devices.Geolocation.Geolocator` etc.). UWP builds happen on the build server; you don't need Visual Studio locally to ship.
 
 ## 5. Calling the native interface from Java
 

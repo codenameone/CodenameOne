@@ -46,20 +46,33 @@ That's the signal to substitute a CN1-supported alternative — see the IO secti
 
 The runtime authoritative reference is also published as JavaDoc: <https://www.codenameone.com/javadoc/>.
 
-## What's broadly NOT supported (and why)
+## What's broadly supported
 
-| Area | Status | What to use instead |
+Codename One's `java-runtime` jar contains a curated slice of the JDK. Roughly:
+
+- **`java.lang`** — primitive boxes, `String`, `StringBuilder`, `Math`, `Number`, `Throwable`, `Object`, `Runnable`, `Thread` (but see threading note below), `Comparable`, etc. No `Class.forName(String)` style dynamic dispatch — class names are obfuscated.
+- **`java.io`** — `InputStream`, `OutputStream`, `Reader`, `Writer`, `ByteArrayInput/OutputStream`, `BufferedReader`, `BufferedWriter`, `DataInputStream`, `DataOutputStream`, `IOException`, `PrintStream`. Use these for stream-based IO over `Storage` / `FileSystemStorage` handles.
+- **`java.util`** — `ArrayList`, `LinkedList`, `HashMap`, `LinkedHashMap`, `TreeMap`, `HashSet`, `LinkedHashSet`, `TreeSet`, `Collections`, `Iterator`, `Comparator`, `Arrays`, `Date`, `Calendar`, `TimeZone`, `Hashtable`, `Vector`, `Stack`, `Random`, `UUID`, `Properties`. Most idiomatic collection code Just Works.
+- **`java.text`** — partial (`DecimalFormat`, `NumberFormat`, basic `MessageFormat`); **`java.text.SimpleDateFormat` is partial** — prefer `com.codename1.l10n.SimpleDateFormat`.
+- **`java.time`** — partial (`LocalDate`, `LocalDateTime`, `Instant`, `Duration`); a few `DateTimeFormatter` pieces are missing.
+- **`java.util.zip`** — **not** in the base subset; pull in via the `ZipSupport` cn1lib if you need it (see *Resource files are a flat namespace* below).
+- **`java.util.function`** — basic functional interfaces (`Supplier`, `Consumer`, `Function`, `Predicate`, `BiFunction`, ...) — supports lambdas + method references.
+- **`java.util.stream`** — basic `Stream`, `IntStream` pipelines; performance is OK but not optimized for large data.
+
+When in doubt, list the jar (top of this file) and search the jar's class listing for the exact symbol you need.
+
+## What's NOT supported (and what to use instead)
+
+| Area | Status | Use instead |
 | --- | --- | --- |
 | `java.awt.*` / `javax.swing.*` | **Forbidden.** | `com.codename1.ui.*` — see `references/swing-comparison.md`. |
-| `java.nio.file.*` (`Path`, `Files`, `Paths`) | **Forbidden.** | `com.codename1.io.FileSystemStorage` + `Storage`. |
-| `java.net.http.*`, `java.net.URLConnection`, `java.net.Socket` | **Forbidden** on cross-build targets. | `com.codename1.io.ConnectionRequest`, `NetworkManager`, or the higher-level `Rest`. |
-| `java.util.concurrent.locks.*`, `Fork/Join`, complex executors | Mostly **forbidden**. | `synchronized` blocks; `Display.callSerially(...)`, `Display.callSeriallyAndWait(...)`, `Display.startThread(...)`. |
-| `java.lang.reflect.*` | Works in the **simulator only**, fails on iOS/Android cross-builds. | Avoid reflection; use the `com.codename1.properties` framework for property-style binding. |
-| `Class.getName()` / `Class.forName(String)` | The methods exist and compile, but Codename One **obfuscates class names by default** for cross-builds. Names you see at compile time (`com.example.MyService`) will be rewritten to short opaque strings (`a.b.c`) in the iOS / Android / JavaScript binary. | Never persist or serialize a class name; never do dispatch by string-matching class names. Use interfaces + factories. If you must keep a specific class name for native interop, add it to `codename1.arg.proguardKeep` (or the equivalent ParparVM/TeaVM `keep` hint). |
-| `java.util.logging.*` | Subset only. | `com.codename1.io.Log`. |
-| `java.util.regex` | Limited — basic `Pattern` / `Matcher` exists but watch out for advanced flags. | Stick to standard regex constructs; verify in the simulator AND a cross-build for anything non-trivial. |
-| `java.time` (full set) | Partial — `LocalDate`, `LocalDateTime`, `Instant` are present; some formatter pieces are missing. | `com.codename1.l10n.SimpleDateFormat`, `com.codename1.util.DateUtil`. |
-| `java.util.Random` | Supported. | — |
+| `java.nio.file.*` (`Path`, `Files`, `Paths`) | **Forbidden.** | `com.codename1.io.FileSystemStorage` for files with hierarchy; `com.codename1.io.Storage` for the sandboxed app-private filesystem; `com.codename1.io.Preferences` for key/value config. |
+| `java.net.http.*`, `java.net.URLConnection`, `java.net.Socket` | **Forbidden** on cross-build targets. | `com.codename1.io.ConnectionRequest` / `NetworkManager` / `Rest` (recommended). A small `URLConnection`-style subset is also exposed as inner classes of `com.codename1.io.URL` (`URL.openConnection()` returns a `URL.URLConnection` / `URL.HttpURLConnection`) — useful when you specifically need a `URLConnection`-shaped API for porting. |
+| `java.util.concurrent.locks.*`, Fork/Join, complex `Executor`s | Mostly **forbidden**. | `synchronized` blocks; `Display.callSerially(...)`, `Display.callSeriallyAndWait(...)`, `Display.startThread(...)`. |
+| `java.lang.reflect.*` | **Forbidden everywhere** — not in the bootclasspath. Won't compile against the CN1 subset; it does not "work in the simulator". | Use the `com.codename1.properties` framework for property-style binding. For per-platform behavior write a native interface (see `references/native-interfaces.md`). |
+| `Class.getName()` / `Class.forName(String)` | The two methods compile, but CN1 **obfuscates class names by default** in iOS / Android / JavaScript cross-builds. Names you see at source time (`com.example.MyService`) are rewritten to short opaque tokens at package time. | Never persist or serialize a class name; never dispatch by string-matching class names. Reference the class **as a class literal** (`MyService.class`) — the obfuscator follows class literals correctly and re-points them at the renamed class. Look up by name only as a last resort, and accept that the lookup will fail in cross-builds. |
+| `java.util.logging.*` | **Not supported.** | `com.codename1.io.Log` (`Log.p(message)`, `Log.e(throwable)`, `Log.sendLog()` to upload). |
+| `java.util.regex` | **Not supported.** | For simple matching use `String.matches(...)` / `String.split(...)` / `String.replace(...)` — these are present and use a simplified pattern syntax under the hood. For real PCRE-style regex, look for a regex cn1lib or write the matcher by hand. |
 | `java.lang.invoke.*`, `java.lang.module.*` | **Forbidden.** | Don't generate code at runtime. |
 
 ## Resource files are a flat namespace
@@ -103,16 +116,41 @@ Workable patterns, easiest first:
 
 4. **For larger or per-user data**, prefer `FileSystemStorage` (writable files) or `Storage` (key/value blobs in the per-app sandbox).
 
-## IO — file system and persistent storage
+## IO — three different stores, each with a distinct purpose
 
-### `Storage` — small key/value blobs
+CN1 separates persistence into three orthogonal APIs. Picking the right one matters; they look superficially similar but are not interchangeable.
 
-The default place for app state. Lives under the per-app sandbox (the OS handles cleanup on uninstall). Keys are strings; values are `Object`s serialized through CN1's `Externalizable` registry, or raw byte streams.
+### `Preferences` — small key/value config
+
+The right tool for app settings, feature flags, last-used IDs, anything that maps cleanly to a key and a primitive/`String` value.
+
+```java
+import com.codename1.io.Preferences;
+
+Preferences.set("user.email", email);
+Preferences.set("notifications.enabled", true);
+Preferences.set("last.sync", System.currentTimeMillis());
+
+String email = Preferences.get("user.email", "");
+boolean notif = Preferences.get("notifications.enabled", true);
+long last  = Preferences.get("last.sync", 0L);
+
+Preferences.delete("user.email");
+```
+
+Backed by a small file inside the per-app storage area. Cheap, persistent, key/value.
+
+### `Storage` — a simplified app-private filesystem
+
+`Storage` is **not** a key/value store. It's a flat, app-private filesystem with string names as filenames. Each "entry" is just a file inside the sandbox; you open input/output streams and write whatever bytes you want.
+
+`Storage` happens to bundle a convenient `writeObject` / `readObject` pair that serializes Java objects via CN1's `Externalizable` registry — but **externalization is a general mechanism, not Storage-specific**, and `Storage` can save arbitrary files (binary, JSON, SQLite snapshots, anything).
 
 ```java
 import com.codename1.io.Storage;
+import com.codename1.io.Util;
 
-// Read/write byte streams
+// Save arbitrary bytes
 try (OutputStream os = Storage.getInstance().createOutputStream("token")) {
     os.write(tokenBytes);
 }
@@ -120,20 +158,27 @@ try (InputStream is = Storage.getInstance().createInputStream("token")) {
     byte[] bytes = Util.readInputStream(is);
 }
 
-// Object roundtrip (the class must register with Util.register or extend PropertyBusinessObject)
+// Save a Java object via Externalizable (the class must implement Externalizable
+// and be registered with Util.register("Profile", Profile.class)).
 Storage.getInstance().writeObject("profile", profile);
 Profile p = (Profile) Storage.getInstance().readObject("profile");
 
 Storage.getInstance().deleteStorageFile("token");
-Storage.getInstance().listEntries();
-Storage.getInstance().exists("profile");
+String[] entries = Storage.getInstance().listEntries();
+boolean has = Storage.getInstance().exists("profile");
 ```
 
-`Storage` is the right tool for: auth tokens, user preferences, cached API responses (small), serialized model objects.
+`Storage` is the right tool for: cached API responses, serialized model objects, screenshot baselines, anything that's app-private and doesn't need directory hierarchy.
 
-### `FileSystemStorage` — real files
+Because `Storage` is the most portable filesystem-like API across CN1 platforms (Android, iOS, JavaScript, desktop all back it identically), it's also the recommended fallback when an alternative like SQLite behaves differently per platform — see the *Database* section below.
 
-For arbitrary files (downloaded images, generated PDFs, SQLite database files), use `FileSystemStorage`. Paths are platform-relative URIs (the API hands you the root).
+### `FileSystemStorage` — real files, with hierarchy + cross-app reach
+
+Use `FileSystemStorage` when you need:
+
+- A directory tree.
+- A file path you can hand to another app (a `file://` URL passed to `BrowserComponent`, the system share sheet, a media picker, etc.).
+- Interaction with OS-visible storage areas (Documents on iOS, the Android shared storage, etc.).
 
 ```java
 import com.codename1.io.FileSystemStorage;
@@ -146,34 +191,65 @@ fs.mkdir(appHome + "downloads");
 try (OutputStream os = fs.openOutputStream(path)) {
     Util.copy(networkInputStream, os);
 }
-
-try (InputStream is = fs.openInputStream(path)) {
-    // ...
-}
-
+try (InputStream is = fs.openInputStream(path)) { /* ... */ }
 fs.delete(path);
 fs.exists(path);
 String[] files = fs.listFiles(appHome + "downloads");
-fs.getLength(path);                                // size in bytes
+fs.getLength(path);
 ```
 
-`FileSystemStorage` is the right tool for: file downloads, generated assets, SQLite DB files (`Database` API), anything you'd hand off to `BrowserComponent.setURL("file:" + path)`.
+Files written via `FileSystemStorage` can be exposed to other apps via the platform share mechanism (`Display.share(...)`).
 
-### Reading classpath resources
+### Loading classpath resources
 
 ```java
-// Flat-namespace classpath resource (file at common/src/main/resources/seed.json)
+// Flat-namespace classpath resource (file at common/src/main/resources/seed.json).
+// Display.getResourceAsStream is the JVM classloader path — it serves any file
+// packaged at the root of common/src/main/resources/.
 try (InputStream is = Display.getInstance().getResourceAsStream("/seed.json")) {
     String json = Util.readToString(is);
 }
+```
 
-// Or via Resources for the binary theme.res
+### `Resources` — entries from the binary theme/resource file
+
+`com.codename1.ui.util.Resources` is **not** a general classpath loader. It reads entries (themes, images, l10n bundles, multi-images, animations, etc.) only from the binary `.res` file produced by the CSS compiler — typically `/theme.res`.
+
+```java
 Resources r = Resources.openLayered("/theme");
-Image logo = r.getImage("logo");
+Image logo = r.getImage("logo");                    // an image baked into theme.res
 Hashtable<String, String> strings = r.getL10N("messages", "en");
 ```
 
-`Util.readToString(InputStream)` and `Util.readInputStream(InputStream)` are the CN1-friendly equivalents of `Files.readString(Path)` / `Files.readAllBytes(Path)`.
+Files placed under `common/src/main/css/images/` and bundles under `common/src/main/l10n/` end up inside `theme.res`. Files placed elsewhere under `common/src/main/resources/` are reachable via `Display.getResourceAsStream` but **not** via `Resources` — different stores, different lookups.
+
+### Multi-images — density-correct asset bundling
+
+A **multi-image** is a single named resource that contains multiple per-density variants of the same image. At runtime CN1 picks the variant closest to the device's pixel density, then scales as needed. You get crisp icons across a 1x simulator, a 2x phone, and a 3x phone without shipping a single fat image.
+
+The CSS compiler creates multi-images automatically from CSS rules that reference an image, sized at multiple densities. For example, a CSS rule like:
+
+```css
+LogoMark {
+    background-image: url('/logo.png');
+    background-size: 12mm 12mm;
+}
+```
+
+makes the compiler emit a multi-image entry named `logo.png` in `theme.res` containing variants for very-low / low / medium / high / very-high / hd / 560 / 2hd / 4k densities (whichever the source image and your CN1 version generate). At runtime `Resources.openLayered("/theme").getImage("logo.png")` returns the variant matched to `Display.getDeviceDensity()`.
+
+You can also build multi-images programmatically with `EncodedImage.createMulti(...)` and write them into a `MutableResource` if you're generating resource files at build time.
+
+Use multi-images for everything that ships with the app (icons, decorative graphics, splash artwork). For network-loaded images, use `URLImage` which handles its own density-aware caching.
+
+### `Util.readToString` / `Util.readInputStream`
+
+```java
+String json  = Util.readToString(inputStream);
+byte[] bytes = Util.readInputStream(inputStream);
+```
+
+CN1-friendly equivalents of `Files.readString(Path)` / `Files.readAllBytes(Path)` — work over any `InputStream`, including the ones from `Storage`, `FileSystemStorage`, network calls, and `getResourceAsStream`.
 
 ## Networking
 
@@ -238,13 +314,23 @@ Rest.post("https://api.example.com/items")
 
 Use `Rest` for ~95% of REST API work. The `fetchAs*` methods marshal into `byte[]`, `String`, `Map`, `JSONArray`, or `PropertyBusinessObject` and always invoke the callback on the EDT.
 
-### 3. `WebServiceProxy` and `RAD`
-
-For projects using CodeRAD, REST endpoints can be declared via the proxy/`@RAD` annotations. Out of scope of this skill — see the CN1 developer guide if your project already uses CodeRAD.
-
 ### What about `HttpClient` / `URLConnection` / `OkHttp`?
 
-Not supported. They aren't in the `java-runtime` subset and OkHttp pulls in Android-only deps. Use `ConnectionRequest` or `Rest` instead.
+`java.net.http.HttpClient` and standard `java.net.URLConnection` aren't in the subset. OkHttp pulls in Android-only deps. **Use `ConnectionRequest` or `Rest` instead.**
+
+If you specifically need a `URLConnection`-shaped API for porting (e.g. translating Java code that calls `URL.openConnection().getInputStream()`), CN1 exposes a small subset as **inner classes of `com.codename1.io.URL`**:
+
+```java
+import com.codename1.io.URL;
+URL u = new URL("https://example.com/data");
+URL.URLConnection conn = u.openConnection();        // returns URL.HttpURLConnection for http(s)
+conn.setRequestProperty("Authorization", "Bearer " + token);
+try (InputStream is = conn.getInputStream()) {
+    String body = Util.readToString(is);
+}
+```
+
+This is a portability shim, not a feature-complete replacement. Prefer `Rest` for new code.
 
 ### TLS, redirects, gzip
 
@@ -268,7 +354,7 @@ Display.getInstance().callSeriallyAndWait(() -> {
 });
 ```
 
-`startThread` is preferred over `new Thread(...).start()` because it carries CN1's per-platform thread setup (iOS autorelease pool, EDT-aware cleanup). `synchronized` blocks work, but the higher-level `java.util.concurrent.locks` are mostly not in the runtime subset.
+`Display.startThread(Runnable, String)` is the recommended factory because it carries CN1's per-platform setup (notably the iOS autorelease pool around the thread body) and gives the thread a sensible name for debugging. Plain `new Thread(...).start()` is **functional** on every CN1 target — it doesn't leak resources or crash on iOS — but it skips that setup, so prefer `startThread` for new code. `synchronized` blocks work; `java.util.concurrent.locks` is mostly not in the runtime subset.
 
 ## Logging
 
@@ -282,15 +368,6 @@ Log.sendLog();                       // upload the captured log to the CN1 serve
 ```
 
 `Log.p` and `Log.e` write to a rotating in-app log file under `Storage`. `System.out.println` works in the simulator but isn't reliably captured on device — use `Log` for anything you may need to read on a real phone.
-
-## Crypto, hashing, base64
-
-| Operation | API |
-| --- | --- |
-| Hash | `com.codename1.util.MessageDigestUtil` (MD5, SHA-1, SHA-256) |
-| Base64 | `com.codename1.util.Base64.encode(byte[])` / `Base64.decode(String)` |
-| HMAC / signing | Available in `com.codename1.io.crypto.*` (project may need the `codenameone-crypto` cn1lib) |
-| Random | `java.util.Random` is fine; `SecureRandom` is partially supported |
 
 ## Database / SQLite
 
@@ -310,6 +387,8 @@ db.close();
 ```
 
 `Database` is a thin SQLite wrapper present on every platform that supports SQLite (iOS, Android, JavaSE simulator; JavaScript via sql.js).
+
+> **Portability caveat.** The iOS and Android underlying SQLite versions and dialects differ substantially — different default `PRAGMA`s, different `JSON1`/`FTS5` availability, different statement-cache behavior under concurrent writes. Code that "works on Android" can fail on iOS at runtime. If your persistence needs are simple (a list of records, app state, blobs), **prefer `Storage`** — it has identical semantics on every CN1 target. Reach for `Database` only when you genuinely need SQL queries against more than a few thousand rows.
 
 ## Date and time
 

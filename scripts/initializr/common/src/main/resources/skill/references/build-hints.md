@@ -31,7 +31,11 @@ When in doubt, search the developer guide for the exact key name — there are h
 | `codename1.arg.ios.pods.platform=14.0` | Pod platform target (must be >= deployment_target). |
 | `codename1.arg.ios.pods.sources=https://github.com/CocoaPods/Specs.git` | Custom Pod source repos. |
 | `codename1.arg.ios.objC=true` | Allow the iOS port to use Objective-C runtime features the strict mode would block. |
-| `codename1.arg.ios.plistInject=<key>NSCameraUsageDescription</key><string>...</string>` | Inject keys into `Info.plist` (privacy strings, URL schemes, etc.). |
+| `codename1.arg.ios.NSCameraUsageDescription=...` | Camera privacy description in `Info.plist`. See *iOS privacy strings* below for the pattern. |
+| `codename1.arg.ios.NSLocationWhenInUseUsageDescription=...` | Location (in-use) privacy description. |
+| `codename1.arg.ios.NSPhotoLibraryUsageDescription=...` | Photo library privacy description. |
+| `codename1.arg.ios.NSMicrophoneUsageDescription=...` | Microphone privacy description. |
+| `codename1.arg.ios.plistInject=...raw XML...` | Inject raw `<key>…</key><value>…</value>` snippets into `Info.plist` for keys that don't have a dedicated `ios.NS*` hint above. |
 | `codename1.arg.ios.glAppDelegateHeader=#import "MyHeader.h"` | Prepend custom imports to the generated AppDelegate. |
 | `codename1.arg.ios.statusbar_hidden=true` | Hide the iOS status bar. |
 | `codename1.arg.ios.beforeFinishLaunching=...` | Native code inserted before iOS's `application:didFinishLaunchingWithOptions:` returns. |
@@ -63,14 +67,25 @@ When in doubt, search the developer guide for the exact key name — there are h
 | `gcm.sender_id=1234567890` | Firebase/GCM sender ID for Android push. |
 | `codename1.arg.ios.includePush=true` | Pair with the FCM/APNs setup on the iOS side. |
 
-## Windows (UWP) / desktop
+## iOS privacy strings (`Info.plist`)
 
-| Hint | Effect |
-| --- | --- |
-| `codename1.arg.win.desktop=true` | Generate a Windows desktop app build. |
-| `codename1.arg.win.desktopExtractDll=true` | Auto-extract bundled native DLLs at launch. |
-| `codename1.arg.win.launchOnStart=true` | Register the desktop app to start with Windows. |
-| `codename1.arg.win.runAfterInstall=true` | Run the app after the installer finishes. |
+iOS requires per-feature usage descriptions that the user sees in the system permission prompt. CN1 surfaces these as dedicated `ios.NS<Key>` build hints — set them directly rather than using `ios.plistInject` for these well-known keys:
+
+```properties
+codename1.arg.ios.NSCameraUsageDescription=Scan QR codes to pair the device.
+codename1.arg.ios.NSLocationWhenInUseUsageDescription=Find nearby branches.
+codename1.arg.ios.NSLocationAlwaysAndWhenInUseUsageDescription=Track delivery while the app is backgrounded.
+codename1.arg.ios.NSPhotoLibraryUsageDescription=Attach photos to support tickets.
+codename1.arg.ios.NSPhotoLibraryAddUsageDescription=Save edited photos back to your library.
+codename1.arg.ios.NSMicrophoneUsageDescription=Record voice notes.
+codename1.arg.ios.NSContactsUsageDescription=Invite friends from your address book.
+codename1.arg.ios.NSSpeechRecognitionUsageDescription=Transcribe voice notes locally.
+codename1.arg.ios.NSSiriUsageDescription=Trigger app actions from Siri shortcuts.
+```
+
+Any `ios.NS<Key>UsageDescription` key is forwarded into the generated `Info.plist`. App Store builds reject location, camera, microphone, photos, contacts, etc. without the matching description. See [Apple's CocoaKeys reference](https://developer.apple.com/library/content/documentation/General/Reference/InfoPlistKeyReference/Articles/CocoaKeys.html) for the complete key catalog.
+
+`ios.plistInject` remains the escape hatch for raw XML snippets that don't have a dedicated `ios.NS*` hint.
 
 ## JavaScript / web
 

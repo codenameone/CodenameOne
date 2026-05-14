@@ -156,7 +156,7 @@ Files placed in `common/src/main/resources/` are reachable as `/path/name` at ru
 
 ## What is *not* portable
 
-- **`java.awt.Graphics2D`** — CN1 has `com.codename1.ui.Graphics`, which is a smaller API. No `AffineTransform`, no `setRenderingHint`, no arbitrary `Stroke`. Use `Graphics.translate`, `Graphics.scale`, `Graphics.rotate` for transforms.
+- **`java.awt.Graphics2D`** — CN1 has `com.codename1.ui.Graphics`, which is a smaller API. It **does** support affine transforms (`Graphics.isAffineSupported()`, `Graphics.setTransform(Transform)`, plus the convenience helpers `translate(...)`, `scale(...)`, `rotate(...)`, `rotateRadians(...)`, and `resetAffine()`); it doesn't expose `setRenderingHint` or arbitrary `Stroke` objects. For a `Graphics2D.transform(AffineTransform)` port the direct equivalent is `g.setTransform(Transform.makeAffine(...))` after a `g.getTransform()` snapshot for restoration.
 - **`Robot`, `AWTEventListener`, native dialogs** — none of this exists. The simulator emulates touch via mouse but cross-build targets do not.
 - **JavaFX bindings / properties** — CN1 has its own `com.codename1.properties` package with a similar binding model, but the API differs.
 - **`paintComponent(Graphics)` override** — exists in CN1: override `paint(Graphics g)` on `Component`. Make sure to call `super.paint(g)` first.

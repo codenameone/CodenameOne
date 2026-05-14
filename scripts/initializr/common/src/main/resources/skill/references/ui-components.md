@@ -48,6 +48,7 @@ form.add(BorderLayout.CENTER, col);
 | `Button` | Tappable button | `.pressed` UIID variant for press state |
 | `TextField` | Single-line input | Use `TextField.setUIID("InitializrField")` to apply CSS |
 | `TextArea` | Multi-line input | |
+| `TextComponent` | Material-Design–style input — floating label, optional description / error message, optional action icon | The right default for new form inputs. See *TextComponent* below. |
 | `Picker` | Native picker (date/time/string/list) | Reads as a button, opens a native sheet on mobile. **Use this instead of `ComboBox`.** |
 | `Switch` / `CheckBox` / `RadioButton` | Toggles | RadioButton requires a `ButtonGroup` |
 | `Slider` | Range or progress | |
@@ -76,6 +77,37 @@ form.add(BorderLayout.CENTER, col);
 - If a generated project or a cn1lib has already restyled `Container` away from the defaults, restore it before doing anything else.
 
 The same caveat applies (more mildly) to `ContentPane` — only change it when you specifically want to recolor the entire form background and you understand the cascading impact.
+
+## `TextComponent` — the Material-Design input replacement
+
+`com.codename1.ui.TextComponent` wraps a `TextField` (or `TextArea`) with a floating label, an optional description string under the field, an error message, and an optional action icon — the Material Design "outlined / filled text field" paradigm. Prefer it over bare `TextField` for new forms.
+
+```java
+import com.codename1.ui.TextComponent;
+import com.codename1.ui.TextArea;
+import com.codename1.ui.FontImage;
+
+TextComponent email = new TextComponent()
+        .label("Email")
+        .descriptionMessage("We never share your address");
+email.getField().setConstraint(TextArea.EMAILADDR);
+email.getField().setSingleLineTextArea(true);
+
+TextComponent search = new TextComponent()
+        .label("Search")
+        .action(FontImage.MATERIAL_SEARCH)
+        .actionClick(e -> performSearch(search.getText()));
+
+if (looksInvalid(email.getText())) {
+    email.errorMessage("Enter a valid email address");
+}
+
+form.add(BorderLayout.CENTER, BoxLayout.encloseY(email, search));
+```
+
+Fluent builder methods: `label(String)`, `descriptionMessage(String)`, `errorMessage(String)` (set to `""` or `null` to clear), `action(char materialIcon)`, `actionClick(ActionListener)`, `actionAsButton(boolean)`, `onTopMode(boolean)`. The `onTopMode(true)` variant moves the label permanently above the field instead of floating into the field on focus; toggle the global default via the `textComponentOnTopBool` theme constant.
+
+`getField()` returns the underlying `TextField` if you need to set keyboard constraints or hook value listeners; `getText()` / `setText(String)` work directly on the wrapper.
 
 ## Sticky headers — `StickyHeaderContainer`
 
@@ -342,11 +374,11 @@ form.revalidate();
 
 `LayeredPane` is the replacement for "I need `position: absolute` over the whole screen" CSS thinking.
 
-## Animation — the three right tools
+## Animation — pick the right tool for the scope
 
-Codename One's animation story is built around layout-driven tweens and transition objects, **not** CSS. The hierarchy of approaches:
+Codename One's animation story is built around the **AnimationManager** owned by each Form, plus a set of high-level idioms layered on top. CSS does not animate anything in CN1. Pick the tool that matches the scope of the change.
 
-### 1. `Form.animateLayout(durationMs)` — for layout-driven animations
+### Layout-driven (the most common case): `Form.animateLayout(durationMs)`
 
 Mutate visibility / size / `LayeredLayoutConstraint` / UIID, then call `animateLayout`. CN1 captures the before+after positions and tweens children across the duration.
 
@@ -356,24 +388,62 @@ sidePanel.setVisible(!sidePanel.isVisible());
 form.animateLayout(250);
 ```
 
-Use this for show/hide animations, panel slide-in, expand/collapse cards, sticky-header-on-scroll morphs.
+Variants: `animateHierarchy(durationMs)` (the *whole subtree* re-flows, useful for deep mutations), `animateLayoutAndWait(durationMs)` (blocks the EDT until the tween finishes — only sensible during scripted demos).
 
-### 2. Form-to-form transitions — for whole-screen navigation
+For show/hide animations, panel slide-in, expand/collapse cards, sticky-header-on-scroll morphs — this is the right hammer.
+
+### Container layout replacement: `Container#replace`, `Container#replaceAndWait`
+
+```java
+Container parent = card.getParent();
+parent.replace(oldChild, newChild,
+        CommonTransitions.createFade(200));     // swap with an animated transition
+```
+
+`replace(...)` swaps a child for a new one inside the same parent, optionally driving an in-place transition (slide, fade, etc.). It's the right idiom for "the card body morphs into a new layout" without rebuilding the parent. `replaceAndWait` is the blocking version.
+
+### Hide and re-flow without animation: `revalidate()`
+
+```java
+cmp.setHidden(true).setVisible(false);
+parent.revalidate();                            // instant re-layout, no tween
+```
+
+`revalidate()` recomputes the layout and repaints immediately — no animation, no waiting. Use it for instant mutations. Note: **`revalidate()` collides with most animations** running on the same parent — never call it from inside an `animate()` cycle or while `animateLayout` is in flight, or the tween snaps and the result looks broken. If you want both an immediate flush *and* a smooth animation later, call `revalidate()` first, then start the animation on the next cycle via `Display.callSerially`.
+
+### Removing a child with a tween: `unlayout()`-style fade
+
+To remove a component with a fade/slide-out, drop it from the parent, then `animateLayout`:
+
+```java
+parent.removeComponent(card);
+parent.animateLayout(250);                       // remaining siblings re-flow to fill the gap
+```
+
+`animateUnlayout(int duration, int destOpacity, Runnable onComplete)` (on `Container`) explicitly animates a child *out* and runs the callback when the animation is done — useful when you want the removal itself to fade.
+
+### Form-to-form transitions: `setTransitionInAnimator` / `setTransitionOutAnimator`
 
 ```java
 import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.animations.MorphTransition;
 
-nextForm.setTransitionInAnimator(
-    CommonTransitions.createSlide(CommonTransitions.SLIDE_HORIZONTAL, true, 250));
-nextForm.setTransitionOutAnimator(
-    CommonTransitions.createFade(200));
+// Set on the form being LEFT (most common): controls how the current form animates OUT
+// before the next one slides in.
+currentForm.setTransitionOutAnimator(CommonTransitions.createSlide(
+        CommonTransitions.SLIDE_HORIZONTAL, false, 250));
 nextForm.show();
+
+// Less common: dictate how the destination form animates IN, ignoring the source's
+// transition-out.
+nextForm.setTransitionInAnimator(CommonTransitions.createFade(200));
 ```
 
-`CommonTransitions` exposes slide / fade / cover / uncover / dialog / empty transitions. `MorphTransition` (`MorphTransition.create(durationMs).morph(from, to)`) is for animating a specific source component into a specific destination component across forms — great for "tap a card to expand it into the full screen".
+In most CN1 codebases the **default transition** is set globally via theme constants (`formTransitionIn`, `formTransitionOut`, `formTransitionInImage`, `formTransitionOutImage`) — the native theme typically defines a platform-appropriate default (iOS-style horizontal slide on iOS, Material slide on Android). You usually only call `setTransitionOutAnimator` / `setTransitionInAnimator` to **override** that default for a specific navigation step, not to define one from scratch.
 
-### 3. `Component.animate()` + `setAnimation(true)` — for ongoing per-component animation
+`CommonTransitions` exposes slide / fade / cover / uncover / dialog / empty transitions. `MorphTransition.create(durationMs).morph(sourceCmp, targetCmp)` animates a specific source component into a specific destination component across forms — great for "tap a card to expand it into the full screen".
+
+### Ongoing per-component animation: `Component.animate()` + `registerAnimated`
 
 Override `animate()` on a Component, return `true` while the animation should keep firing, and register with the form:
 
@@ -395,9 +465,28 @@ class PulseDot extends Container {
 }
 ```
 
-This is the right hammer for breathing dots, custom progress, gradient drift — anything that needs a per-frame update. Don't try to do this from a `Painter`: painters don't have a built-in re-paint cycle, so they only repaint when something else triggers it.
+The right hammer for breathing dots, custom progress, gradient drift — anything that needs a per-frame update. The `Form.registerAnimated(Animation)` registration drives the EDT-side animation tick.
 
-`Painter` is for **drawing** (custom backgrounds, decorations); `animate()` is for **state changes that drive painting**.
+### Manual low-level control: `AnimationManager`
+
+`Form.getAnimationManager()` exposes the queue that the higher-level helpers above all funnel through. Useful for chaining animations:
+
+```java
+form.getAnimationManager().addAnimation(
+    new ComponentAnimation() {
+        public boolean isInProgress() { return /* ... */; }
+        public void updateState() { /* tick */ }
+        public void flush() { /* skip-to-end */ }
+    },
+    () -> showNextStep()                        // runs after the animation completes
+);
+```
+
+Reach for `AnimationManager` only when the higher-level helpers don't compose — e.g. you need to sequence three independent tweens and run a callback at the very end.
+
+### Painters draw, they don't animate
+
+A `Painter` is for **drawing** (custom backgrounds, decorations, shapes). It does not run on its own — the renderer calls it only when something else triggers a repaint. Don't try to drive an animation purely from a Painter: pair it with `animate()` (above) so state changes trigger the repaint cycle, *then* the Painter consumes the new state.
 
 ## Keyboard handling (text input)
 
