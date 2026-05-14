@@ -41,6 +41,8 @@ import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  *
@@ -2281,6 +2283,11 @@ public class IPhoneBuilder extends Executor {
 
                 addLocalizedIconsBuildSetting(pbxprojFile);
 
+                String teamId = request.getArg("ios.teamId", "");
+                injectDevelopmentTeam(pbxprojFile,
+                        request.getArg("ios.debug.teamId", teamId),
+                        request.getArg("ios.release.teamId", teamId));
+
             } catch (Exception ex) {
                 throw new BuildException("Failed to inject into plist");
             }
@@ -3484,6 +3491,66 @@ public class IPhoneBuilder extends Executor {
                 StandardCharsets.UTF_8)) {
             w.write(json);
         }
+    }
+
+    // Apple Team IDs are 10-character alphanumeric strings (e.g. "2K4UGY23XQ").
+    // Anything outside that range is rejected to avoid corrupting the pbxproj.
+    private static final Pattern TEAM_ID_PATTERN = Pattern.compile("[A-Za-z0-9]+");
+
+    private void injectDevelopmentTeam(File pbx, String debugTeam, String releaseTeam) throws IOException {
+        debugTeam = sanitizeTeamId(debugTeam, "ios.debug.teamId");
+        releaseTeam = sanitizeTeamId(releaseTeam, "ios.release.teamId");
+        if (debugTeam.isEmpty() && releaseTeam.isEmpty()) {
+            return;
+        }
+        String contents = readFileToString(pbx);
+        // Anchor on each XCBuildConfiguration's "buildSettings { ... }; name = Debug|Release;"
+        // boundary so we can route the right value per configuration when ios.debug.teamId
+        // and ios.release.teamId differ. DEVELOPMENT_TEAM is injected at the project level
+        // (the configurations that declare SDKROOT) so it inherits to every target.
+        Pattern blockPattern = Pattern.compile(
+                "buildSettings = \\{.*?\\};\\s*name = (Debug|Release);",
+                Pattern.DOTALL);
+        Matcher m = blockPattern.matcher(contents);
+        StringBuffer out = new StringBuffer();
+        boolean modified = false;
+        while (m.find()) {
+            String block = m.group(0);
+            String configName = m.group(1);
+            String team = "Debug".equals(configName) ? debugTeam : releaseTeam;
+            if (team.isEmpty()
+                    || block.contains("DEVELOPMENT_TEAM")
+                    || !block.contains("SDKROOT = iphoneos;")) {
+                m.appendReplacement(out, Matcher.quoteReplacement(block));
+                continue;
+            }
+            String injected = block.replace(
+                    "SDKROOT = iphoneos;",
+                    "SDKROOT = iphoneos;\n\t\t\t\tDEVELOPMENT_TEAM = " + team + ";");
+            m.appendReplacement(out, Matcher.quoteReplacement(injected));
+            modified = true;
+        }
+        m.appendTail(out);
+        if (modified) {
+            try (Writer w = new OutputStreamWriter(Files.newOutputStream(pbx.toPath()), StandardCharsets.UTF_8)) {
+                w.write(out.toString());
+            }
+        }
+    }
+
+    private String sanitizeTeamId(String raw, String hint) {
+        if (raw == null) {
+            return "";
+        }
+        String trimmed = raw.trim();
+        if (trimmed.isEmpty()) {
+            return "";
+        }
+        if (!TEAM_ID_PATTERN.matcher(trimmed).matches()) {
+            log("Ignoring " + hint + "='" + raw + "': expected an alphanumeric Apple Team ID");
+            return "";
+        }
+        return trimmed;
     }
 
     private void addLocalizedIconsBuildSetting(File pbx) throws IOException {
