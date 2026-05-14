@@ -50,17 +50,33 @@ public class JsMonitorFifoApp {
         synchronized (LOCK) {
             // Hold the lock and start entrants in known order. Each will
             // park on the monitor's entrants queue in the order they
-            // reach the synchronized block. ``Thread.sleep(0)`` between
-            // starts yields so each entrant has a turn to actually run
-            // up to the lock acquisition before the next is started.
+            // reach the synchronized block.
+            //
+            // ``Thread.sleep(1)`` (not sleep(0)) between starts is
+            // required for FIFO determinism on the cooperative scheduler:
+            // sleep(0) is a pure runqueue-tail enqueue with no real-time
+            // delay, so depending on which generator step finishes first,
+            // the newly-started entrant may not have reached
+            // ``monitorEnter`` before main resumes from sleep(0) and
+            // queues the next entrant. Whether it has or hasn't depends
+            // on how many synthetic ``yield* _Y()`` budget yields the
+            // translator emitted into the entrant's run() prologue, which
+            // varies across CompilerConfig parameterisations and host
+            // JS engines (Linux Node.js consistently lost the race;
+            // macOS Node.js mostly won it). A wall-clock park drives the
+            // scheduler's _wakeupTimer through setTimeout, which in turn
+            // drains the runqueue all the way down to the empty state
+            // before main resumes -- pinning the push-into-monitor.entrants
+            // order to start order.
             for (int i = 0; i < ENTRANTS; i++) {
                 entrants[i].start();
-                Thread.sleep(0);
+                Thread.sleep(1);
             }
-            // Give all entrants a chance to actually reach the lock and
-            // park before we release. A short sleep plus join below is
-            // enough in the cooperative scheduler.
-            Thread.sleep(5);
+            // Final guaranteed wall-clock window for any entrant whose
+            // step happened to be in flight when the per-iteration timer
+            // fired. 20 ms is well under the test deadline and dwarfs
+            // the per-step work in the cooperative scheduler.
+            Thread.sleep(20);
         }
 
         for (int i = 0; i < ENTRANTS; i++) {
