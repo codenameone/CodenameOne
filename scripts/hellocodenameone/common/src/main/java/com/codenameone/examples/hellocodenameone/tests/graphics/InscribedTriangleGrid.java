@@ -84,7 +84,20 @@ public class InscribedTriangleGrid extends AbstractGraphicsScreenshotTest {
         g.setColor(0x444444);
         g.drawString("(" + sx + "," + sy + ")", cellX - 30, cellY - 35);
 
-        g.translate(cellX, cellY);
+        // translateMatrix composes T(cellX, cellY) onto the impl matrix --
+        // it does NOT use the per-Graphics integer translate accumulator,
+        // so a subsequent g.scale(sx, sy) doesn't multiply the cell anchor.
+        // This makes the form-direct and mutable-image renderings produce
+        // identical on-screen pixels (modulo the blit offset that places
+        // the mutable image's content under the right component bounds).
+        //
+        // The translateMatrix API was added specifically to give CN1 apps
+        // a way to express matrix-correct translate semantics across all
+        // ports; see Graphics.translateMatrix javadoc for the rationale.
+        // Ports that don't yet support it fall back to translate(int, int)
+        // so the test still renders, just with the legacy column-position-
+        // dependent layout.
+        g.translateMatrix(cellX, cellY);
         g.scale(sx, sy);
 
         // Black rectangle frame -- the "ground truth" axis-aligned reference.
@@ -102,7 +115,7 @@ public class InscribedTriangleGrid extends AbstractGraphicsScreenshotTest {
         g.drawShape(triangle, pen);
 
         g.scale(1f / sx, 1f / sy);
-        g.translate(-cellX, -cellY);
+        g.translateMatrix(-cellX, -cellY);
     }
 
     @Override

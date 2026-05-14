@@ -5992,6 +5992,16 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
 
     @Override
+    public boolean isTranslateMatrixSupported() {
+        return true;
+    }
+
+    @Override
+    public void translateMatrix(Object nativeGraphics, float x, float y) {
+        ((HTML5Graphics)nativeGraphics).translateMatrix(x, y);
+    }
+
+    @Override
     public boolean isAffineSupported() {
         return true;
     }

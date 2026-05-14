@@ -4230,7 +4230,18 @@ public class IOSImplementation extends CodenameOneImplementation {
         ((NativeGraphics)nativeGraphics).rotate(angle, x, y);
     }
 
-    
+    @Override
+    public boolean isTranslateMatrixSupported() {
+        // iOS dispatches translateMatrix into NativeGraphics.transform the
+        // same way it dispatches scale/rotate, so the impl matrix sees the
+        // translate as a real composition step.
+        return true;
+    }
+
+    @Override
+    public void translateMatrix(Object nativeGraphics, float x, float y) {
+        ((NativeGraphics)nativeGraphics).translateMatrix(x, y);
+    }
 
     @Override
     public boolean isTranslationSupported() {
@@ -5323,9 +5334,25 @@ public class IOSImplementation extends CodenameOneImplementation {
             inverseTransformDirty = true;
             this.applyTransform();
         }
-        
+
+        public void translateMatrix(float x, float y) {
+            // Composes T(x, y) onto the impl-side matrix, exactly like
+            // scale/rotate. NOTE: deliberately does NOT touch the
+            // framework-level xTranslate/yTranslate accumulator that the
+            // legacy g.translate(int, int) path uses. Mixing them is well-
+            // defined (xTranslate is added to draw coords first, then this
+            // matrix applies) but apps that switch to translateMatrix
+            // should generally avoid g.translate so the two don't fight.
+            this.transform.translate(x, y, 0);
+            clipDirty = true;
+            transformApplied = false;
+            inverseClipDirty = true;
+            inverseTransformDirty = true;
+            this.applyTransform();
+        }
+
         public void translate(int x, int y){
-            
+
         }
         
         public int getTranslateX(){

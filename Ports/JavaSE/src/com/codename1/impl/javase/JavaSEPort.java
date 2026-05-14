@@ -10572,6 +10572,21 @@ public class JavaSEPort extends CodenameOneImplementation {
         setTransform(nativeGraphics, tf);
     }
 
+    @Override
+    public boolean isTranslateMatrixSupported() {
+        // JavaSE composes translateMatrix onto the Graphics2D AffineTransform
+        // the same way it does for scale/rotate (via getTransform / setTransform).
+        return true;
+    }
+
+    @Override
+    public void translateMatrix(Object nativeGraphics, float x, float y) {
+        checkEDT();
+        com.codename1.ui.Transform tf = getTransform(nativeGraphics);
+        tf.translate(x, y);
+        setTransform(nativeGraphics, tf);
+    }
+
     public void rotate(Object nativeGraphics, float angle) {
         /*
         checkEDT();
