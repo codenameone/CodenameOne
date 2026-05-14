@@ -2296,6 +2296,20 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
         CanvasRenderingContext2D context = (CanvasRenderingContext2D)outputCanvas.getContext("2d");
         context.save();
+        // Reset to identity BEFORE the crop clip is set. Without this, if
+        // the prior drain ended with a non-identity transform on the
+        // canvas state (e.g. ClipShape's setTransform leftover that the
+        // outer save/restore preserves across drains), the
+        // ``rect(cropX, cropY, cropW, cropH); clip();`` below evaluates
+        // under that leaked transform -- the resulting clip is a
+        // rotated/scaled polygon, not the intended axis-aligned crop. All
+        // ops in this drain then paint UNDER the leaked transform AND
+        // through the rotated clip, producing an entire-frame rotation
+        // visible in graphics-clip-under-rotation. Force identity now;
+        // the per-op SetTransform queue then sets the per-paint
+        // transform as before, and the outer ``restore()`` at end of
+        // drain still pops back to whatever pre-drain state was active.
+        context.setTransform(1, 0, 0, 1, 0, 0);
         context.beginPath();
         context.rect(frame.getCropX(), frame.getCropY(), frame.getCropW(), frame.getCropH());
         context.clip();
