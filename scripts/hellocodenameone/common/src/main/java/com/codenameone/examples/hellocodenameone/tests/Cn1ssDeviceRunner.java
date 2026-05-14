@@ -260,8 +260,15 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
         });
     }
 
+    private static volatile boolean platformNameLogged;
+
     private boolean shouldForceTimeoutInHtml5(String testName) {
-        if (!"HTML5".equals(Display.getInstance().getPlatformName())) {
+        String platformName = Display.getInstance().getPlatformName();
+        if (!platformNameLogged) {
+            platformNameLogged = true;
+            log("CN1SS:DIAG:platformName=" + platformName);
+        }
+        if (!"HTML5".equals(platformName)) {
             return false;
         }
         // The list is intentionally an inline `||` chain rather than a static
