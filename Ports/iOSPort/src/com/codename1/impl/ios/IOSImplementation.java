@@ -4920,14 +4920,23 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
 
         void nativeDrawLine(int color, int alpha, int x1, int y1, int x2, int y2) {
+            // The C-side nativeDrawLineMutableImpl already short-circuits
+            // through Metal under #ifdef CN1_USE_METAL (queues a DrawLine op
+            // tagged with currentMutableImage). No Java-side Metal/GL gate
+            // needed.
             nativeDrawLineMutable(color, alpha, x1, y1, x2, y2);
         }
 
         void nativeFillRect(int color, int alpha, int x, int y, int width, int height) {
+            // Same as nativeDrawLine: the C-side nativeFillRectMutableImpl
+            // routes through the Metal pipeline under #ifdef CN1_USE_METAL.
             nativeFillRectMutable(color, alpha, x, y, width, height);
         }
 
         void nativeDrawRect(int color, int alpha, int x, int y, int width, int height) {
+            // Same as nativeDrawLine / nativeFillRect: the C-side
+            // nativeDrawRectMutableImpl routes through the Metal pipeline
+            // under #ifdef CN1_USE_METAL.
             nativeDrawRectMutable(color, alpha, x, y, width, height);
         }
 
