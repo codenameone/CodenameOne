@@ -93,12 +93,11 @@ public class JsMonitorFifoApp {
             }
         }
         actual.append("]");
-        if (!ok) {
-            // Surfaces the actual admission order in the worker run
-            // result so CI failures show exactly which entrants
-            // promoted out of order, rather than just ``result=0``.
-            System.out.println("CN1FIFO:actual_order=" + actual);
-        }
+        // Always print the order so CI surfaces it whether the test
+        // passed or failed -- earlier diagnostic-on-failure attempts
+        // never made it into the rawMessage assertion field. The
+        // ``CN1FIFO:`` prefix stays unique enough for grep matching.
+        System.out.println("CN1FIFO:order=" + actual);
         result = ok ? 511 : 0;
     }
 }
