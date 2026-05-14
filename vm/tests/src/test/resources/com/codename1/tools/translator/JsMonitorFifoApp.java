@@ -84,11 +84,20 @@ public class JsMonitorFifoApp {
         }
 
         boolean ok = true;
+        StringBuilder actual = new StringBuilder("[");
         for (int i = 0; i < ENTRANTS; i++) {
+            if (i > 0) actual.append(",");
+            actual.append(order[i]);
             if (order[i] != i + 1) {
                 ok = false;
-                break;
             }
+        }
+        actual.append("]");
+        if (!ok) {
+            // Surfaces the actual admission order in the worker run
+            // result so CI failures show exactly which entrants
+            // promoted out of order, rather than just ``result=0``.
+            System.out.println("CN1FIFO:actual_order=" + actual);
         }
         result = ok ? 511 : 0;
     }
