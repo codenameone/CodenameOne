@@ -82,26 +82,24 @@ Workable patterns, easiest first:
 
    `setURLHierarchy` extracts the tar into `FileSystemStorage` on first use (once per build), then points the WebView at the extracted directory. This is the right tool for shipping local docs, an HTML-based onboarding flow, a Mapbox-style offline tile viewer, or any other case where a `<script src="../lib/x.js">` style relative reference needs to resolve at runtime.
 
-3. **A custom zip you read with `ZipInputStream`** — useful for "shovel a deep tree of mixed assets, then look up entries by path". `java.util.zip` is **not** in the CN1 JDK subset; bring it in via the `cn1-zip` (or equivalent) cn1lib first. The Maven coordinates land in `common/pom.xml`:
-
-   ```xml
-   <dependency>
-       <groupId>com.codenameone.libs</groupId>
-       <artifactId>cn1-zip</artifactId>
-       <version>1.0</version>
-   </dependency>
-   ```
-
-   Then read entries from a flat-root zip resource:
+3. **A custom zip you read with `ZipInputStream`** — useful for "shovel a deep tree of mixed assets, then look up entries by path". `java.util.zip` is **not** in the CN1 JDK subset; you need the **ZipSupport** cn1lib (distributed as a `ZipSupport.cn1lib` binary, not currently published to Maven Central). Drop the `.cn1lib` file into `<project>/cn1libs/` — the simulator's *File → Install Cn1Lib* menu does this for you — then `mvn -pl common compile` wires it in and `net.sf.zipme.ZipInputStream` / `ZipEntry` become available:
 
    ```java
+   import net.sf.zipme.ZipInputStream;
+   import net.sf.zipme.ZipEntry;
+
    try (ZipInputStream zis = new ZipInputStream(
            Display.getInstance().getResourceAsStream("/data.zip"))) {
-       // ... iterate zis.getNextEntry() ...
+       ZipEntry e;
+       while ((e = zis.getNextEntry()) != null) {
+           if (e.getName().equals("templates/welcome.html")) {
+               return Util.readToString(zis);
+           }
+       }
    }
    ```
 
-   Only reach for option 3 when option 2 doesn't fit — i.e. the data isn't HTML and you specifically need random access by path.
+   Note the package is `net.sf.zipme`, not `java.util.zip` — the cn1lib provides a CN1-portable copy under a different namespace. Only reach for option 3 when option 2 doesn't fit (i.e. the data isn't HTML and you specifically need random access by path).
 
 4. **For larger or per-user data**, prefer `FileSystemStorage` (writable files) or `Storage` (key/value blobs in the per-app sandbox).
 
