@@ -4,7 +4,7 @@ Build hints are key/value pairs in `common/codenameone_settings.properties` that
 
 This file is a curated index of the most commonly needed hints. The complete authoritative reference is in the Codename One Developer Guide:
 
-- <https://www.codenameone.com/manual/> — full guide
+- <https://www.codenameone.com/developer-guide/> — full guide
 - <https://www.codenameone.com/blog/build-hints-editor.html> — editing build hints from the simulator's *Build Hints* menu
 - <https://www.codenameone.com/blog/build-hint-variables.html> — variable substitution syntax for hints
 
@@ -91,6 +91,6 @@ codename1.arg.ios.pods.platform=${var.iosDeploy}
 
 ## How to discover the right hint
 
-1. Search the [Developer Guide](https://www.codenameone.com/manual/) for the platform feature you need.
+1. Search the [Developer Guide](https://www.codenameone.com/developer-guide/) for the platform feature you need.
 2. Or run the simulator (`mvn -pl common cn1:run`) and use the **Build Hints** menu — it lists every hint the plugin understands, with descriptions.
 3. Or grep the project's existing `codename1.arg.*` keys in `common/codenameone_settings.properties` to see what's already wired.

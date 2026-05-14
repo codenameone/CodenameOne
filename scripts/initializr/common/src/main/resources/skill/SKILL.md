@@ -20,8 +20,9 @@ This skill teaches you how to write code for a Codename One (CN1) cross-platform
 
 `SKILL.md` (this file) is the top-level cheat sheet. Deeper reference material lives under `references/` — pull the relevant file in **only when you need it**:
 
-- `references/build-and-run.md` — Maven goals, JDK matrix, `codenameone_settings.properties`, running the simulator, building for iOS/Android/Web, automated (CI) build mode.
+- `references/build-and-run.md` — Local vs cloud builds, JDK matrix, Maven goals, `codenameone_settings.properties`, running the simulator, building for iOS/Android/Web, automated (Enterprise) cloud builds in CI.
 - `references/build-hints.md` — Curated index of `codename1.arg.*` build hints (iOS, Android, push, Windows, web).
+- `references/java-api-subset.md` — How to inspect the supported Java API subset, IO (`Storage`, `FileSystemStorage`), networking (`ConnectionRequest`, `Rest`), concurrency, dates, SQLite. **Read this whenever the compliance check fails or when you reach for a `java.*` API.**
 - `references/ui-components.md` — Form, Toolbar, Container layouts (Border/Box/Flow/Grid/Layered), common components, navigation, dialogs.
 - `references/css.md` — CSS capabilities and (important) **limitations**. Selectors, supported properties, 9-patch borders, theme constants.
 - `references/swing-comparison.md` — Mapping Swing concepts and code to Codename One. Read this when porting Swing code.
@@ -66,13 +67,16 @@ This project targets **Java 17** (`<source>17</source>` / `<target>17</target>` 
 - `switch` expressions
 - Lambdas, method references, `Stream`s
 
-**Caveat — the build server still cross-compiles to bytecode that ParparVM/TeaVM can consume.** Avoid APIs not in the CN1 Java API subset:
+**Caveat — the build server cross-compiles to bytecode that ParparVM/TeaVM can consume.** Codename One ships a curated subset of the JDK, **not** the full `java.*` namespace. The `cn1:compliance-check` Maven goal runs on every compile and fails the build if you call an unsupported API. The most common gotchas:
 
 - No `java.nio.file.*` — use `com.codename1.io.FileSystemStorage` and `Storage`.
-- No `java.util.concurrent.locks.*` beyond simple `synchronized` — use `Display.getInstance().callSerially(...)` to marshal work to the EDT.
-- No `java.awt.*` / `javax.swing.*` — CN1 has its own UI stack (Form, Container, Component) that mirrors Swing concepts. See `references/swing-comparison.md`.
+- No `java.net.http.*` / `java.net.URLConnection` — use `com.codename1.io.rest.Rest` (preferred) or `ConnectionRequest`.
+- No `java.util.concurrent.locks.*` beyond simple `synchronized` — use `Display.getInstance().callSerially(...)` or `Display.startThread(...)`.
+- No `java.awt.*` / `javax.swing.*` — CN1 has its own UI stack. See `references/swing-comparison.md`.
 - No `java.lang.reflect.*` on production builds — works in the simulator only.
 - No threads spawned with `new Thread(...).start()` for UI work — always go through `Display.callSerially` or `Display.startThread(...)`.
+
+For the authoritative subset list and IO/networking patterns, read `references/java-api-subset.md` (which also shows how to grep the `java-runtime` jar to verify any specific class/method).
 
 ## The Event Dispatch Thread (EDT)
 
@@ -227,7 +231,7 @@ mvn -pl ios     package -Dcodename1.platform=ios     -Dcodename1.buildTarget=ios
 mvn -pl javascript package -Dcodename1.platform=javascript -Dcodename1.buildTarget=javascript
 ```
 
-See `references/build-and-run.md` for the complete goal list, the `codename1.arg.*` settings you can put in `codenameone_settings.properties`, and how to point the project at a local Codename One snapshot.
+See `references/build-and-run.md` for the local-vs-cloud matrix, automated-build mode (Enterprise), iOS local-build prerequisites, and the complete goal list. The full `codename1.arg.*` index lives in `references/build-hints.md`.
 
 ## What NOT to do
 
@@ -261,3 +265,4 @@ If you cannot run the simulator (e.g. headless environment), **say so explicitly
 | "Make it look right on tablet/landscape" | `references/mobile-adaptability.md` |
 | "How do I run/build/deploy" | `references/build-and-run.md` |
 | "What's the right `codename1.arg.*` for X" / native config | `references/build-hints.md` |
+| "Why does the compliance check fail" / Java/IO/networking | `references/java-api-subset.md` |

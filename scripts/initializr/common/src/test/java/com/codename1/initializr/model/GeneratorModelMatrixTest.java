@@ -132,6 +132,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 ".claude/skills/codename-one/SKILL.md",
                 ".claude/skills/codename-one/references/build-and-run.md",
                 ".claude/skills/codename-one/references/build-hints.md",
+                ".claude/skills/codename-one/references/java-api-subset.md",
                 ".claude/skills/codename-one/references/ui-components.md",
                 ".claude/skills/codename-one/references/css.md",
                 ".claude/skills/codename-one/references/swing-comparison.md",
