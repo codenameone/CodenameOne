@@ -1,6 +1,6 @@
 # Mobile Adaptability Reference
 
-A Codename One app must look right on a 4-inch iPhone SE, a 6.7-inch Pro Max, a 10-inch tablet, in portrait and landscape, with the system "Larger Text" accessibility setting on or off. CSS has no `@media` and there are no separate layouts per density. Instead, CN1 gives you a small toolbox of density-independent units and Java branches.
+A Codename One app must look right on a 4-inch iPhone SE, a 6.7-inch Pro Max, a 10-inch tablet, in portrait and landscape, with the system "Larger Text" accessibility setting on or off, and in light/dark mode. CSS has no viewport-size `@media` queries (only `prefers-color-scheme: dark` is recognized — see `references/css.md`), so per-form-factor layouts are branched in Java rather than in CSS.
 
 ## Density-independent units
 
@@ -221,7 +221,7 @@ The CN1 simulator has a "Skin" menu — pick "iPhone 15 Pro", "Pixel 8", "iPad",
 
 ## What CN1 explicitly does NOT do
 
-- No automatic dark/light mode switching from system preference — wire it yourself by listening to `Display.getInstance().isDarkMode()` (where supported) and swapping a theme constant.
+- Dark mode is opt-in: write a `@media (prefers-color-scheme: dark) { ... }` block in `theme.css` to recolor UIIDs (see `references/css.md`). For runtime overrides — toggling dark mode in-app regardless of system preference — call `Display.getInstance().setDarkMode(Boolean)`; read the current state with `Display.getInstance().isDarkMode()`.
 - No automatic landscape rotation lock — set `codename1.arg.ios.orientation=portrait` and `codename1.arg.android.screenOrientation=portrait` in `codenameone_settings.properties` if you want to lock.
 - No automatic "iPad split view" support (the macOS-style split view) — design master/detail manually with `BorderLayout`.
 - No `vh` / `vw` units in CSS. Use percent insets in `LayeredLayoutConstraint`.

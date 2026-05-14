@@ -131,6 +131,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         String[] expectedSkillEntries = new String[] {
                 ".claude/skills/codename-one/SKILL.md",
                 ".claude/skills/codename-one/references/build-and-run.md",
+                ".claude/skills/codename-one/references/build-hints.md",
                 ".claude/skills/codename-one/references/ui-components.md",
                 ".claude/skills/codename-one/references/css.md",
                 ".claude/skills/codename-one/references/swing-comparison.md",

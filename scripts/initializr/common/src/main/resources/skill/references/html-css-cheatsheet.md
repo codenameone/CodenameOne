@@ -146,7 +146,7 @@ form.setLayout(new FlowLayout(Component.CENTER, Component.CENTER));
 
 ### Media queries / responsive
 
-CN1 CSS has no `@media`. Branch in Java:
+CN1 CSS supports `@media (prefers-color-scheme: dark)` (see `references/css.md`) but **no** viewport-size queries. Branch in Java for form-factor:
 
 ```java
 if (Display.getInstance().isTablet()) {
@@ -282,7 +282,8 @@ if (Dialog.show("Delete?", "Are you sure?", "Delete", "Cancel")) delete();
 | --- | --- |
 | `position: absolute` with pixel coords | `LayeredLayout` with `LayeredLayoutConstraint` |
 | `position: sticky` | `BorderLayout.NORTH` (sticks via container structure) |
-| `@media (max-width: 600px) { ... }` | Branch in Java on `Display.isTablet()` / `getDisplayWidth()` |
+| `@media (max-width: 600px) { ... }` | No viewport queries — branch in Java on `Display.isTablet()` / `getDisplayWidth()`. |
+| `@media (prefers-color-scheme: dark) { ... }` | **Supported** — see `references/css.md`. |
 | `:hover` | Mobile has no hover; use `.pressed` state for press feedback |
 | `transition: all 0.3s` | `Form.animateLayout(300)` after mutating layout |
 | `transform: rotate(45deg)` | Override `paint(Graphics g)` and use `g.rotate(theta, x, y)` |

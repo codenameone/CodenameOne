@@ -20,7 +20,8 @@ This skill teaches you how to write code for a Codename One (CN1) cross-platform
 
 `SKILL.md` (this file) is the top-level cheat sheet. Deeper reference material lives under `references/` — pull the relevant file in **only when you need it**:
 
-- `references/build-and-run.md` — Maven goals, JDK matrix, `codenameone_settings.properties`, running the simulator, building for iOS/Android/Web.
+- `references/build-and-run.md` — Maven goals, JDK matrix, `codenameone_settings.properties`, running the simulator, building for iOS/Android/Web, automated (CI) build mode.
+- `references/build-hints.md` — Curated index of `codename1.arg.*` build hints (iOS, Android, push, Windows, web).
 - `references/ui-components.md` — Form, Toolbar, Container layouts (Border/Box/Flow/Grid/Layered), common components, navigation, dialogs.
 - `references/css.md` — CSS capabilities and (important) **limitations**. Selectors, supported properties, 9-patch borders, theme constants.
 - `references/swing-comparison.md` — Mapping Swing concepts and code to Codename One. Read this when porting Swing code.
@@ -259,3 +260,4 @@ If you cannot run the simulator (e.g. headless environment), **say so explicitly
 | "Write a test for this screen" / "Compare to a baseline" | `references/testing-and-screenshots.md` |
 | "Make it look right on tablet/landscape" | `references/mobile-adaptability.md` |
 | "How do I run/build/deploy" | `references/build-and-run.md` |
+| "What's the right `codename1.arg.*` for X" / native config | `references/build-hints.md` |

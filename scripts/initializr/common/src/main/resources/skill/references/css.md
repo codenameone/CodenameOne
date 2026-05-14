@@ -15,7 +15,8 @@ The only selector form is:
 - `UIID` matches `component.getUIID()` — e.g. `Button`, `Form`, `Label`, `Title`, `Toolbar`, `MyCustomCard`.
 - `.<state>` matches one of the built-in style variants: `.pressed`, `.disabled`, `.selected`.
 - Multiple UIIDs may be grouped with commas.
-- **No descendant combinators**, **no attribute selectors**, **no `*`**, **no `:hover`** (mobile has no hover), **no `@media` queries**.
+- **No descendant combinators**, **no attribute selectors**, **no `*`**, **no `:hover`** (mobile has no hover).
+- **`@media` queries**: only `@media (prefers-color-scheme: dark)` is honored — see *Dark mode* below. No viewport-size media queries.
 
 ```css
 /* Valid */
@@ -23,13 +24,36 @@ Button { ... }
 Button, Label { ... }
 Button.pressed { ... }
 MyCard.selected { ... }
+@media (prefers-color-scheme: dark) {     /* honored — rewrites selectors as Dark variants */
+    Form { background-color: #0f172a; }
+}
 
 /* INVALID — these silently fail or break the compile */
 Form Button { ... }              /* no descendant combinator */
 Button:hover { ... }              /* no :hover */
-@media (max-width: 600px) { ... } /* no media queries */
+@media (max-width: 600px) { ... } /* no size media queries */
 .btn { ... }                      /* class selectors don't exist; use UIIDs */
 ```
+
+## Dark mode
+
+CN1 supports a single, specific media query: `@media (prefers-color-scheme: dark)`. The CSS compiler walks rules inside that block and rewrites every selector into a `$Dark<UIID>` variant baked into `theme.res`. At runtime CN1 picks the dark variant when the platform reports dark mode (see `Display.getInstance().isDarkMode()` — also overridable with `setDarkMode(Boolean)`).
+
+```css
+Form { background-color: #ffffff; color: #0f172a; }
+Toolbar { background-color: #ffffff; }
+Button { background-color: #f1f5f9; color: #0f172a; }
+
+@media (prefers-color-scheme: dark) {
+    Form { background-color: #0f172a; color: #e2e8f0; }
+    Toolbar { background-color: #0f172a; }
+    Button { background-color: #1e293b; color: #e2e8f0; }
+}
+```
+
+Both the light and dark blocks must define the same UIIDs you want to recolor — the dark block does *not* inherit declarations from the light block; the compiler creates an entirely separate Dark variant per UIID.
+
+Don't try to nest other `@media` queries inside — viewport-size queries, prefers-reduced-motion, etc. are not recognized.
 
 Need per-screen styling? Set a different UIID on the parent and on the children, then write one rule per UIID.
 
