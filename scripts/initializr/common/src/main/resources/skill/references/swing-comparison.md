@@ -1,0 +1,172 @@
+# Swing → Codename One Comparison
+
+Codename One's UI model is consciously modeled on Swing. If you know `javax.swing`, ~80% of your reflexes will carry over. The differences are mostly *what to import* and *which methods are async*.
+
+## Mental model: identical concepts, different package
+
+| Swing concept | Codename One equivalent | Note |
+| --- | --- | --- |
+| `JFrame` | `Form` | Each Form is a full screen, not a window. Only one shows at a time. |
+| `JPanel` / `Container` | `Container` | Same name, `com.codename1.ui.Container`. |
+| `JLabel` | `Label` / `SpanLabel` | `SpanLabel` wraps text — use it for anything multi-line. |
+| `JButton` | `Button` | Same API: `addActionListener(...)`. |
+| `JTextField` | `TextField` | |
+| `JTextArea` | `TextArea` | Multi-line by default. |
+| `JCheckBox` | `CheckBox` | |
+| `JRadioButton` + `ButtonGroup` | `RadioButton` + `ButtonGroup` | Same pattern. |
+| `JComboBox` | `ComboBox` / `Picker` | `Picker` opens a native sheet on mobile — prefer it. |
+| `JList` | `List` / `MultiList` / `InfiniteContainer` | `InfiniteContainer` is the modern choice for paged data. |
+| `JTabbedPane` | `Tabs` | |
+| `JDialog` / `JOptionPane` | `Dialog` / `Dialog.show(...)` | |
+| `JMenuBar` / `JMenu` / `JMenuItem` | `Toolbar` (always present on every Form) | |
+| `JTable` | No direct equivalent | Use `Container` with `TableLayout`, or a `MultiList`. |
+| `JTree` | No direct equivalent | Build with nested `Accordion`s or custom rendering. |
+| `JScrollPane` | `Container.setScrollableY(true)` | Built into every container — no wrapper needed. |
+| `JSlider` | `Slider` | |
+| `JSpinner` | `Picker` (numeric/date variants) | |
+| `JEditorPane` (HTML) | `BrowserComponent` or `HtmlComponent` | |
+
+## Layouts
+
+| Swing | Codename One | Notes |
+| --- | --- | --- |
+| `BorderLayout` | `BorderLayout` | Same. Constraints `BorderLayout.CENTER` etc. |
+| `BoxLayout` | `BoxLayout` | `BoxLayout.y()` / `BoxLayout.x()` / `encloseY(...)` / `encloseX(...)`. |
+| `FlowLayout` | `FlowLayout` | |
+| `GridLayout` | `GridLayout` | |
+| `GridBagLayout` | `TableLayout` (closer match) or `LayeredLayout` | TableLayout is per-cell spans/sizes; LayeredLayout is percent-based. |
+| `null` (absolute) | Avoid. Use `LayeredLayout`. | |
+| Mig/Group | None — combine `Box` + `Border` + `Table`. | |
+
+```java
+// Swing:
+JPanel p = new JPanel(new BorderLayout());
+p.add(new JLabel("Title"), BorderLayout.NORTH);
+p.add(new JScrollPane(new JList<>(items)), BorderLayout.CENTER);
+
+// Codename One:
+Container p = new Container(new BorderLayout());
+p.add(BorderLayout.NORTH, new Label("Title"));
+List<String> list = new com.codename1.ui.List<>(items);
+list.setScrollableY(true);     // scroll is built-in, no wrapper
+p.add(BorderLayout.CENTER, list);
+```
+
+## Event Dispatch Thread — same idea, same hazards
+
+| Swing | Codename One |
+| --- | --- |
+| `SwingUtilities.invokeLater(r)` | `Display.getInstance().callSerially(r)` (or `CN.callSerially(r)`) |
+| `SwingUtilities.invokeAndWait(r)` | `Display.getInstance().callSeriallyAndWait(r)` |
+| `SwingWorker` | `Display.getInstance().startThread(r, "name").start()` + `callSerially` to publish results |
+| `EventQueue.isDispatchThread()` | `Display.getInstance().isEdt()` |
+| `JFrame.setVisible(true)` | `form.show()` — but only one Form is "current" at a time |
+
+```java
+// Swing background work:
+new SwingWorker<List<Row>, Void>() {
+    @Override protected List<Row> doInBackground() { return api.fetch(); }
+    @Override protected void done() { try { table.setModel(toModel(get())); } catch (...) {} }
+}.execute();
+
+// Codename One equivalent:
+Display.getInstance().startThread(() -> {
+    final List<Row> rows = api.fetch();
+    Display.getInstance().callSerially(() -> renderRows(rows));
+}, "fetcher").start();
+```
+
+## Listeners
+
+`ActionListener`, `MouseListener`, `KeyListener` exist in CN1 (`com.codename1.ui.events.*`) and accept lambdas just like Swing. Method names:
+
+| Swing | Codename One |
+| --- | --- |
+| `addActionListener(e -> ...)` | Same. |
+| `addMouseListener(...)` | `addPointerPressedListener`, `addPointerReleasedListener`, `addPointerDraggedListener` |
+| `addKeyListener(...)` | `addKeyListener(int keyCode, ActionListener l)` — keyed on key code |
+| `addComponentListener(...)` | `addSizeChangedListener`, `addOnSizeChangedListener`, `addFocusListener` |
+| `addWindowListener(...)` | Override `Form.show()` / `formAboutToBeShown()` / `formBfHide()` |
+
+## Styling
+
+| Swing | Codename One |
+| --- | --- |
+| `comp.setBackground(Color)` | `comp.getAllStyles().setBgColor(int rgb)` and `setBgTransparency(255)` |
+| `comp.setForeground(Color)` | `comp.getAllStyles().setFgColor(int rgb)` |
+| `comp.setFont(Font)` | `comp.getAllStyles().setFont(Font)` |
+| `comp.setBorder(Border)` | `comp.getAllStyles().setBorder(Border)` |
+| `UIManager.put("Button.background", ...)` | CSS in `theme.css` (preferred) or `UIManager.getInstance().setThemeProps(...)` |
+
+Always prefer CSS / UIIDs over per-instance styling — same reasoning as preferring CSS classes over inline `style=` in HTML.
+
+## Colors and fonts
+
+| Swing | Codename One |
+| --- | --- |
+| `Color.RED` / `new Color(r,g,b)` | `int` ARGB literal like `0xff0000`; the CN1 API takes `int` for color everywhere |
+| `Font.decode("Arial-BOLD-14")` | `Font.createTrueTypeFont("Roboto", "Roboto-Regular.ttf").derive(4f, Font.STYLE_BOLD)` or set in CSS |
+| `Color` system colors | Use the theme: `UIManager.getInstance().getComponentStyle("Form").getBgColor()` |
+
+## Common porting recipes
+
+### Modal dialog with OK/Cancel
+
+```java
+// Swing:
+int r = JOptionPane.showConfirmDialog(parent, "Sure?", "Confirm", JOptionPane.OK_CANCEL_OPTION);
+if (r == JOptionPane.OK_OPTION) doIt();
+
+// Codename One:
+if (Dialog.show("Confirm", "Sure?", "OK", "Cancel")) doIt();
+```
+
+### Async REST request
+
+```java
+// Swing (with HttpClient):
+HttpResponse<String> r = HttpClient.newHttpClient().send(...);
+
+// Codename One — use ConnectionRequest:
+ConnectionRequest req = new ConnectionRequest("https://api.example.com/data");
+req.addResponseListener(evt -> {
+    String body = new String(req.getResponseData());
+    // already on EDT
+    updateUi(body);
+});
+NetworkManager.getInstance().addToQueue(req);
+```
+
+`com.codename1.io.NetworkManager` handles threading, retries, and SSL on every target platform. Use it instead of `java.net.*`.
+
+### Resource loading
+
+```java
+// Swing:
+ImageIcon icon = new ImageIcon(MyClass.class.getResource("/icon.png"));
+
+// Codename One:
+Image icon = Image.createImage("/icon.png");
+// OR a Material font glyph (recommended for icons):
+Image icon = FontImage.createMaterial(FontImage.MATERIAL_FAVORITE, "Label", 6).toImage();
+```
+
+Files placed in `common/src/main/resources/` are reachable as `/path/name` at runtime.
+
+## What is *not* portable
+
+- **`java.awt.Graphics2D`** — CN1 has `com.codename1.ui.Graphics`, which is a smaller API. No `AffineTransform`, no `setRenderingHint`, no arbitrary `Stroke`. Use `Graphics.translate`, `Graphics.scale`, `Graphics.rotate` for transforms.
+- **`Robot`, `AWTEventListener`, native dialogs** — none of this exists. The simulator emulates touch via mouse but cross-build targets do not.
+- **JavaFX bindings / properties** — CN1 has its own `com.codename1.properties` package with a similar binding model, but the API differs.
+- **`paintComponent(Graphics)` override** — exists in CN1: override `paint(Graphics g)` on `Component`. Make sure to call `super.paint(g)` first.
+
+## Quick "is this a Swing reflex that works?" checklist
+
+- "Set the layout and add children" → ✅ identical
+- "Wire a listener" → ✅ identical
+- "Customize colors in code" → ✅ uses `getAllStyles().setXxx` rather than `setXxx`
+- "Pop up a dialog" → ✅ `Dialog.show(...)`
+- "Stop the UI freezing on a long task" → ✅ but use `startThread` + `callSerially`, not `SwingWorker`
+- "Add a top menu bar" → ⚠️ different — every Form already has a `Toolbar`; you don't construct one
+- "Multiple windows on screen" → ❌ only one `Form` is current at a time; use `Dialog` or `Tabs` for sub-views
+- "Custom painting with Graphics2D" → ⚠️ supported but much smaller API; verify before assuming

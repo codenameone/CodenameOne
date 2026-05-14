@@ -18,13 +18,16 @@ public class GeneratorModelMatrixTest extends AbstractTest {
 
     @Override
     public boolean runTest() throws Exception {
+        // Run the targeted regression checks first so they don't get masked when an
+        // earlier broad assertion in validateCombination(...) fails first.
+        validateClaudeSkillBundled();
+        validateJava17DefaultRegressionFixes();
+        validateLegacyJava8Generation();
         for (Template template : Template.values()) {
             for (IDE ide : IDE.values()) {
                 validateCombination(template, ide);
             }
         }
-        validateExperimentalJava17Generation();
-        validateExperimentalJava17RegressionFixes();
         validateAppendedCustomCssGeneration();
         validateCustomCssWithoutPresetOverrides();
         validateThemeCssCompilesForAllVariants();
@@ -114,37 +117,78 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertNotNull(resource.getTheme("CompileCheckTheme"), "Generated CSS should compile to a theme");
     }
 
-    private void validateExperimentalJava17Generation() throws Exception {
-        String mainClassName = "DemoExperimentalJava17";
-        String packageName = "com.acme.experimental.java17";
+    private void validateClaudeSkillBundled() throws Exception {
+        // Every generated project ships the Codename One authoring skill under
+        // .claude/skills/codename-one/ so that Claude Code in the new project picks up
+        // CN1 conventions automatically. Regression: catch accidental deletion of any
+        // file in the skill set, and confirm template-token rewriting still applies to
+        // markdown bodies (e.g. MyAppName -> the real main class name).
+        String mainClassName = "DemoSkillBundle";
+        String packageName = "com.acme.skillbundle";
+        byte[] zipData = createProjectZip(IDE.INTELLIJ, Template.BAREBONES, mainClassName, packageName);
+        Map<String, byte[]> entries = readZipEntries(zipData);
+
+        String[] expectedSkillEntries = new String[] {
+                ".claude/skills/codename-one/SKILL.md",
+                ".claude/skills/codename-one/references/build-and-run.md",
+                ".claude/skills/codename-one/references/ui-components.md",
+                ".claude/skills/codename-one/references/css.md",
+                ".claude/skills/codename-one/references/swing-comparison.md",
+                ".claude/skills/codename-one/references/html-css-cheatsheet.md",
+                ".claude/skills/codename-one/references/testing-and-screenshots.md",
+                ".claude/skills/codename-one/references/mobile-adaptability.md"
+        };
+        for (int i = 0; i < expectedSkillEntries.length; i++) {
+            assertNotNull(entries.get(expectedSkillEntries[i]),
+                    "Skill bundle missing: " + expectedSkillEntries[i]);
+        }
+
+        String skillMd = getText(entries, ".claude/skills/codename-one/SKILL.md");
+        assertContains(skillMd, "name: codename-one", "SKILL.md should preserve frontmatter slug for Claude Code");
+        assertContains(skillMd, mainClassName + " extends Lifecycle",
+                "SKILL.md placeholders should be rewritten to the project's main class");
+
+        String testingMd = getText(entries, ".claude/skills/codename-one/references/testing-and-screenshots.md");
+        assertContains(testingMd, mainClassName + "().runApp()",
+                "Reference samples should be rewritten with the project's main class");
+        assertContains(testingMd, packageName + "." + mainClassName,
+                "Reference samples should be rewritten with the project's package");
+    }
+
+    private void validateLegacyJava8Generation() throws Exception {
+        String mainClassName = "DemoLegacyJava8";
+        String packageName = "com.acme.legacy.java8";
         ProjectOptions options = new ProjectOptions(
                 ProjectOptions.ThemeMode.LIGHT,
                 ProjectOptions.Accent.DEFAULT,
                 true,
                 true,
                 ProjectOptions.PreviewLanguage.ENGLISH,
-                ProjectOptions.JavaVersion.JAVA_17_EXPERIMENTAL
+                ProjectOptions.JavaVersion.JAVA_8
         );
 
         byte[] zipData = createProjectZip(IDE.INTELLIJ, Template.BAREBONES, mainClassName, packageName, options);
         Map<String, byte[]> entries = readZipEntries(zipData);
 
-        assertCommonPom(entries, Template.BAREBONES, packageName, mainClassName, true);
-        assertSettings(entries, Template.BAREBONES, packageName, mainClassName, true);
+        assertCommonPom(entries, Template.BAREBONES, packageName, mainClassName, false);
+        assertSettings(entries, Template.BAREBONES, packageName, mainClassName, false);
         assertMainSourceFile(entries, Template.BAREBONES, packageName, mainClassName, true);
         assertLocalizationBundles(entries, Template.BAREBONES, true);
+
+        String intellijMisc = getText(entries, ".idea/misc.xml");
+        assertContains(intellijMisc, "languageLevel=\"JDK_1_8\"", "Legacy Java 8 selection should still write JDK_1_8 IntelliJ language level");
     }
 
-    private void validateExperimentalJava17RegressionFixes() throws Exception {
-        String mainClassName = "DemoExperimentalJava17Regression";
-        String packageName = "com.acme.experimental.java17regression";
+    private void validateJava17DefaultRegressionFixes() throws Exception {
+        String mainClassName = "DemoJava17Regression";
+        String packageName = "com.acme.java17regression";
         ProjectOptions options = new ProjectOptions(
                 ProjectOptions.ThemeMode.LIGHT,
                 ProjectOptions.Accent.DEFAULT,
                 true,
                 true,
                 ProjectOptions.PreviewLanguage.ENGLISH,
-                ProjectOptions.JavaVersion.JAVA_17_EXPERIMENTAL
+                ProjectOptions.JavaVersion.JAVA_17
         );
 
         byte[] zipData = createProjectZip(IDE.INTELLIJ, Template.BAREBONES, mainClassName, packageName, options);
@@ -189,8 +233,8 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertIdeFiles(ide, entries, mainClassName);
         assertGitIgnore(entries);
         assertRootPom(entries, packageName, mainClassName);
-        assertCommonPom(entries, template, packageName, mainClassName, false);
-        assertSettings(entries, template, packageName, mainClassName, false);
+        assertCommonPom(entries, template, packageName, mainClassName, true);
+        assertSettings(entries, template, packageName, mainClassName, true);
         assertMainSourceFile(entries, template, packageName, mainClassName, false);
         assertThemeDefaults(entries, template);
         assertLocalizationBundles(entries, template, false);
@@ -276,11 +320,11 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertContains(pom, "<artifactId>serializer</artifactId>", "Common pom should include xalan serializer for CN1 generate-gui-sources");
         assertContains(pom, "<version>2.7.3</version>", "Common pom should pin serializer version expected by CN1 plugin classpath");
         if (expectJava17) {
-            assertContains(pom, "<source>17</source>", "Common pom should use Java 17 source when selected");
-            assertContains(pom, "<target>17</target>", "Common pom should use Java 17 target when selected");
+            assertContains(pom, "<source>17</source>", "Common pom should default to Java 17 source");
+            assertContains(pom, "<target>17</target>", "Common pom should default to Java 17 target");
         } else {
-            assertContains(pom, "<source>1.8</source>", "Common pom should default to Java 8 source");
-            assertContains(pom, "<target>1.8</target>", "Common pom should default to Java 8 target");
+            assertContains(pom, "<source>1.8</source>", "Common pom should use Java 8 source when legacy Java 8 is selected");
+            assertContains(pom, "<target>1.8</target>", "Common pom should use Java 8 target when legacy Java 8 is selected");
         }
         if (template == Template.GRUB) {
             assertContains(pom, "<artifactId>" + mainClassName.toLowerCase() + "-CodeRAD</artifactId>", "Grub common pom should include local CodeRAD cn1lib dependency");
@@ -302,9 +346,9 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertContains(settings, "codename1.displayName=" + mainClassName, "Settings should include requested display name");
         assertContains(settings, "codename1.kotlin=" + String.valueOf(template.IS_KOTLIN), "Settings should include template kotlin flag");
         if (expectJava17) {
-            assertContains(settings, "codename1.arg.java.version=17", "Settings should include Java 17 version when selected");
+            assertContains(settings, "codename1.arg.java.version=17", "Settings should include Java 17 version by default");
         } else {
-            assertFalse(settings.indexOf("codename1.arg.java.version=17") >= 0, "Settings should not force Java 17 by default");
+            assertFalse(settings.indexOf("codename1.arg.java.version=17") >= 0, "Settings should not force Java 17 when legacy Java 8 was selected");
         }
     }
 
@@ -377,11 +421,25 @@ public class GeneratorModelMatrixTest extends AbstractTest {
             }
         }
         String javasePom = getText(entries, "javase/pom.xml");
-        assertFalse(javasePom.indexOf("<scope>provided</scope>") >= 0
-                        && javasePom.indexOf("<artifactId>codenameone-core</artifactId>") >= 0,
+        // The top-level provided codenameone-core/codenameone-javase blocks are stripped by
+        // GeneratorModel.normalizeJavasePom. Match the exact removed shape so we don't get
+        // false positives from the legitimate nested <scope>provided</scope> blocks in the
+        // build server activation profile further down the same pom.
+        String topLevelProvidedCore =
+                "<dependency>\n" +
+                "          <groupId>com.codenameone</groupId>\n" +
+                "          <artifactId>codenameone-core</artifactId>\n" +
+                "          <scope>provided</scope>\n" +
+                "      </dependency>";
+        String topLevelProvidedJavase =
+                "<dependency>\n" +
+                "          <groupId>com.codenameone</groupId>\n" +
+                "          <artifactId>codenameone-javase</artifactId>\n" +
+                "          <scope>provided</scope>\n" +
+                "      </dependency>";
+        assertFalse(javasePom.indexOf(topLevelProvidedCore) >= 0,
                 "javase/pom.xml should not contain duplicate provided codenameone-core dependency");
-        assertFalse(javasePom.indexOf("<scope>provided</scope>") >= 0
-                        && javasePom.indexOf("<artifactId>codenameone-javase</artifactId>") >= 0,
+        assertFalse(javasePom.indexOf(topLevelProvidedJavase) >= 0,
                 "javase/pom.xml should not contain duplicate provided codenameone-javase dependency");
     }
 

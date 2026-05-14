@@ -42,6 +42,8 @@ public class GeneratorModel {
             ".DS_Store\n" +
             "Thumbs.db\n";
 
+    private static final String CLAUDE_SKILL_TARGET_PREFIX = ".claude/skills/codename-one/";
+
     private final IDE ide;
     private final Template template;
     private final String appName;
@@ -83,6 +85,7 @@ public class GeneratorModel {
         copyZipEntriesToMap("/common.zip", mergedEntries, ZipEntryType.COMMON);
         copySingleTextEntryToMap(".gitignore", GENERATED_GITIGNORE, mergedEntries, ZipEntryType.COMMON);
         copySingleTextEntryToMap("README.md", buildReadmeMarkdown(), mergedEntries, ZipEntryType.COMMON);
+        addClaudeSkillEntries(mergedEntries);
         copySingleTextEntryToMap("common/pom.xml", readResourceToString(template.POM_XML), mergedEntries, ZipEntryType.TEMPLATE_POM);
         if (template.CN1LIB_ZIP != null) {
             copyZipEntriesToMap(template.CN1LIB_ZIP, mergedEntries, ZipEntryType.TEMPLATE_CN1LIB);
@@ -101,6 +104,31 @@ public class GeneratorModel {
         }
     }
 
+
+    private void addClaudeSkillEntries(Map<String, byte[]> mergedEntries) throws IOException {
+        // Ship the Codename One authoring skill inside every generated project so that
+        // Claude Code (or any agent that respects .claude/skills) gets the framework's
+        // CSS/UI/testing conventions for free. The skill markdown lives under
+        // src/main/resources/skill/** in source form and is repackaged into skill.zip
+        // at build time (CN1 classloader rejects nested directories under resources).
+        // ASCII-only Markdown so no encoding surprises end up in the project tree.
+        try (ZipInputStream zis = new ZipInputStream(getResourceAsStream("/skill.zip"))) {
+            ZipEntry entry = zis.getNextEntry();
+            while (entry != null) {
+                if (!entry.isDirectory()) {
+                    byte[] sourceData = readToBytesNoClose(zis);
+                    String relative = entry.getName();
+                    // Defensive normalization: ant may produce backslashes on Windows.
+                    relative = StringUtil.replaceAll(relative, "\\", "/");
+                    String targetPath = CLAUDE_SKILL_TARGET_PREFIX + relative;
+                    byte[] targetData = applyDataReplacements(targetPath, sourceData);
+                    mergedEntries.put(targetPath, targetData);
+                }
+                zis.closeEntry();
+                entry = zis.getNextEntry();
+            }
+        }
+    }
 
     private void addLocalizationEntries(Map<String, byte[]> mergedEntries) throws IOException {
         if (!isBareTemplate() || !options.includeLocalizationBundles) {
@@ -233,14 +261,14 @@ public class GeneratorModel {
 
 
     private String applyJavaVersionSettings(String content) {
-        if (options.javaVersion == ProjectOptions.JavaVersion.JAVA_17_EXPERIMENTAL) {
+        if (options.javaVersion == ProjectOptions.JavaVersion.JAVA_17) {
             content = replaceProperty(content, "codename1.arg.java.version", "17");
         }
         return content;
     }
 
     private String applyJavaVersionToPom(String content) {
-        if (options.javaVersion != ProjectOptions.JavaVersion.JAVA_17_EXPERIMENTAL) {
+        if (options.javaVersion != ProjectOptions.JavaVersion.JAVA_17) {
             return content;
         }
         content = StringUtil.replaceAll(content, "<source>1.8</source>", "<source>17</source>");
@@ -249,7 +277,7 @@ public class GeneratorModel {
     }
 
     private String normalizeIntellijMiscXml(String content) {
-        String languageLevel = options.javaVersion == ProjectOptions.JavaVersion.JAVA_17_EXPERIMENTAL ? "JDK_17" : "JDK_1_8";
+        String languageLevel = options.javaVersion == ProjectOptions.JavaVersion.JAVA_17 ? "JDK_17" : "JDK_1_8";
         content = removeXmlAttribute(content, "project-jdk-name");
         content = removeXmlAttribute(content, "project-jdk-type");
         content = setXmlAttribute(content, "languageLevel", languageLevel);

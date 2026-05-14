@@ -306,6 +306,22 @@
     </profiles>
 
     <build>
+        <resources>
+            <!--
+              Codename One's classloader rejects nested directories under
+              src/main/resources at runtime ("resources cannot be nested in
+              directories" - see CN1 ClassPathLoader). The on-disk skill/
+              folder is for editing/version control only; it is repackaged
+              into skill.zip by the antrun execution below before it reaches
+              the JAR.
+            -->
+            <resource>
+                <directory>src/main/resources</directory>
+                <excludes>
+                    <exclude>skill/**</exclude>
+                </excludes>
+            </resource>
+        </resources>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -399,6 +415,28 @@
                                         <include name="AndroidMaterialTheme.res"/>
                                     </fileset>
                                 </copy>
+                            </target>
+                        </configuration>
+                    </execution>
+                    <!--
+                      Build skill.zip from src/main/resources/skill/** so the
+                      Codename One authoring skill ships as a single flat
+                      resource. CN1's classloader does not allow nested
+                      directories under src/main/resources at runtime, so we
+                      package the nested markdown into a zip at build time and
+                      stream entries out in GeneratorModel.
+                    -->
+                    <execution>
+                        <id>package-claude-skill</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <zip destfile="${project.build.outputDirectory}/skill.zip">
+                                    <fileset dir="${project.basedir}/src/main/resources/skill"/>
+                                </zip>
                             </target>
                         </configuration>
                     </execution>
