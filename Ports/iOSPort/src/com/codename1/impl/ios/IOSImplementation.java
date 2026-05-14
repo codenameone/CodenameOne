@@ -5845,10 +5845,10 @@ public class IOSImplementation extends CodenameOneImplementation {
                         }
                         if (paint != null && paint instanceof RadialGradient) {
                             RadialGradient rgp = (RadialGradient)paint;
-                            rgp.x *= sx;
-                            rgp.y *= sy;
-                            rgp.width *= sx;
-                            rgp.height *= sy;
+                            rgp.x = (int) (rgp.x * sx);
+                            rgp.y = (int) (rgp.y * sy);
+                            rgp.width = (int) (rgp.width * sx);
+                            rgp.height = (int) (rgp.height * sy);
                             applyPaint();
                         }
                         nativeDrawAlphaMask(mask);
