@@ -15,7 +15,7 @@ The only selector form is:
 - `UIID` matches `component.getUIID()` — e.g. `Button`, `Form`, `Label`, `Title`, `Toolbar`, `MyCustomCard`.
 - `.<state>` matches one of the built-in style variants: `.pressed`, `.disabled`, `.selected`.
 - Multiple UIIDs may be grouped with commas.
-- **No descendant combinators**, **no attribute selectors**, **no `*`**, **no `:hover`** (mobile has no hover).
+- **No descendant combinators**, **no attribute selectors**, **no `*`**, **no `:hover`** on touch components (desktop / JavaScript ports do expose pointer-hover listeners in Java — see `references/ui-components.md`).
 - **`@media` queries**: only `@media (prefers-color-scheme: dark)` is honored — see *Dark mode* below. No viewport-size media queries.
 
 ```css
@@ -70,12 +70,12 @@ This is the right entry point for "make the app look like our brand". Sweeping c
 
 | Category | Properties |
 | --- | --- |
-| Background | `background-color`, `background-image`, `background-repeat`, `background-position` |
+| Background | `background-color`, `background-image`, `background-repeat`, `background-position`, gradient backgrounds (specific subset — see *Gradients* below) |
 | Border | `border`, `border-color`, `border-style`, `border-width`, `border-radius`, `border-image` (9-piece) — see *Borders* below |
 | Spacing | `margin`, `margin-top/right/bottom/left`, `padding`, `padding-top/right/bottom/left` |
 | Text | `color`, `font-family`, `font-size`, `font-weight`, `font-style`, `text-decoration`, `text-align` (with `align` fallback) |
 | Layout (per-component) | `cn1-text-align`, `cn1-include-native-bool` |
-| Theme constants | Any key inside `#Constants { ... }` (custom theme constants) |
+| Theme constants | Any key inside `#Constants { ... }` (see *Theme constants* below) |
 
 Anything not on this list — `display`, `position`, `float`, `flex`, `grid`, `transform`, `box-shadow`, `opacity`, `overflow`, `z-index` — is **not honored**. Use Java layouts for arrangement.
 
@@ -118,10 +118,10 @@ CN1 supports four practical border styles. Two of them are the right tools 99% o
 
 | Style | When to use | Notes |
 | --- | --- | --- |
-| **`RoundBorder`** (a circle / pill shape) | Circular FAB, avatar, pill button | Created via CSS `border-radius: <bigger than half the height>;` or `Border.createRoundBorder(...)` in Java. Native-rendered, scales perfectly. |
-| **`RoundRectBorder`** (rounded rectangle with optional shadow) | Cards, normal rounded buttons, dialogs | Auto-selected by the CSS compiler for moderate `border-radius` values. Supports shadow (`box-shadow`-like) via `RoundRectBorder.create().shadowOpacity(...)`. **Always pair with padding ≥ corner radius.** |
+| **`RoundBorder`** (a circle / pill shape) | Circular FAB, avatar, pill button | Use `border-radius: <bigger than half the height>;` or `Border.createRoundBorder(...)` in Java. Native-rendered, scales perfectly. |
+| **`RoundRectBorder`** (rounded rectangle with optional shadow) | Cards, normal rounded buttons, dialogs | Auto-selected by the CSS compiler for moderate `border-radius` values. Supports shadow via `RoundRectBorder.create().shadowOpacity(...)`. **Always pair with padding ≥ corner radius.** |
 | Solid `border: <w> solid <color>` | Plain rectangles | Vector, scales well. Fine. |
-| `border-image: url('...9.png') ...;` (**9-piece image border**) | Last resort: chat bubbles, drop shadows, complex shapes | See warning below. |
+| `border-image: url('...9.png') ...;` (**9-piece image border**) | Last resort | See warning below. |
 
 **Why the 9-piece image border is a fallback**, not a default:
 
@@ -162,6 +162,12 @@ Button {
 **Named colors**: only a few are recognized by the initializr's pre-processor (`pink`, `orange`, `purple`, `yellow`, `gray`, `grey`). Beyond that, **use hex**. CSS like `color: red;` may not compile.
 
 Alpha: use `rgba(r, g, b, a)` where `a` is 0–255 in some compiler versions and 0.0–1.0 in others — test it. The safe alternative is to leave the color opaque and animate transparency programmatically via `setAlpha(int 0..255)` on the component style.
+
+## Gradients
+
+CN1 supports a small subset of gradient backgrounds. Linear and radial gradients can be configured per UIID, but the syntax is more restricted than full CSS. The canonical way to set a gradient is via the `Style` class (see `Style.setBackgroundType` constants — `BACKGROUND_GRADIENT_LINEAR_VERTICAL`, `BACKGROUND_GRADIENT_LINEAR_HORIZONTAL`, `BACKGROUND_GRADIENT_RADIAL`). The CSS compiler accepts an equivalent shorthand for these — start with a constant lookup in the `Style` JavaDoc and translate to CSS only after confirming the variant is supported.
+
+For arbitrary CSS-style gradients (`linear-gradient(135deg, ...)` with multiple stops), the supported path is a programmatic `Painter` set via `comp.getAllStyles().setBgPainter(...)` — it's not a CSS feature.
 
 ## Dark mode
 
@@ -235,7 +241,9 @@ Title { font-family: "Inter Bold"; font-size: 4mm; }
 Body  { font-family: "Inter"; font-size: 3mm; }
 ```
 
-The compiler embeds the TTF into `theme.res`. At runtime CN1 looks the font up by the family name you declared. To load a TTF programmatically:
+Custom TTF/OTF files are **packaged with the app binary** (placed under the build output so the runtime can `Font.createTrueTypeFont(name, file)` them at startup) — they are **not** embedded inside `theme.res`. That means each font you add increases the deployed app size; choose lean subsets where possible.
+
+To load a TTF programmatically:
 
 ```java
 Font inter = Font.createTrueTypeFont("Inter", "Inter-Regular.ttf")
@@ -243,63 +251,183 @@ Font inter = Font.createTrueTypeFont("Inter", "Inter-Regular.ttf")
 label.getAllStyles().setFont(inter);
 ```
 
-The first argument is the family name (used to register it in the theme); the second is the TTF file name inside `theme.res`.
+The first argument is the family name (used to look the font up); the second is the TTF file name as packaged with the app.
 
-## Theme constants (`#Constants`)
+## Theme constants
 
-A special "selector" used to set framework-wide booleans/numbers/strings that CN1 reads at runtime:
+`#Constants { ... }` in `theme.css` exposes framework-wide booleans, numbers, strings, and image references that change CN1 component behavior. The suffix on the key name is significant: `xxxBool` → boolean, `xxxInt` → integer, `xxxImage` → image lookup, otherwise → string.
 
 ```css
 #Constants {
-    useLargerTextScaleBool: true;       /* honor system "Large Text" accessibility */
-    rtlBool: false;                     /* right-to-left layout */
-    drawMapPointerBool: true;
-    pureTouchBool: true;
+    useLargerTextScaleBool: true;          /* honor system "Larger Text" accessibility */
+    rtlBool: false;                        /* default right-to-left for the whole app */
+    drawMapPointerBool: true;              /* show a center marker on MapComponent */
     centeredPopupBool: true;
     statusBarHidden: false;
 }
 ```
 
-The naming convention `xxxBool` / `xxxInt` / `xxxImage` is required — the CSS compiler reads the suffix as the value type.
-
-`useLargerTextScaleBool: true` is added by default for barebones templates because mobile users with accessibility scaling enabled otherwise get unreadably small text.
-
-## Live preview while editing
-
-`mvn -pl common cn1:run` runs the simulator with a CSS file watcher: save `theme.css` and the simulator hot-reloads styles without restarting. This is the fastest iteration loop for visual work.
-
-## Compiling CSS programmatically (for tools/tests)
+Read a constant at runtime with `UIManager.getInstance().getThemeConstant(name, defaultValue)`:
 
 ```java
-import com.codename1.ui.css.CSSThemeCompiler;
-import com.codename1.ui.util.MutableResource;
-
-MutableResource res = new MutableResource();
-new CSSThemeCompiler().compile(cssString, res, "MyTheme");
-boolean ok = res.getTheme("MyTheme") != null;
+boolean larger = UIManager.getInstance().isThemeConstant("useLargerTextScaleBool", true);
+String mapTileText = UIManager.getInstance().getThemeConstant("mapTileLoadingText", "Loading...");
 ```
 
-Use this to validate generated CSS in tests.
+### Commonly-needed constants
+
+| Constant | Purpose |
+| --- | --- |
+| `useLargerTextScaleBool` | Honor system "Larger Text" accessibility setting via `Display.getLargerTextScale()`. |
+| `rtlBool` | Set the whole app to right-to-left layout. |
+| `globalToobarBool` | Whether `Toolbar` is enabled by default on every new `Form`. |
+| `hideBackCommandBool` | Hide the back command from the side menu when possible. |
+| `hideLeftSideMenuBool` / `hideRightSideMenuBool` | Suppress the side-menu hamburger icon on one side. |
+| `iosScrollMotionBool` | Use iOS-style rubber-band scroll physics (default `true` on iOS). |
+| `iosStyleBackArrowBool` | Use the iOS chevron back arrow icon. |
+| `paintsTitleBarBool` | Whether the title bar contributes a background fill. |
+| `pureTouchBool` | Disable focus visuals (mouse/keyboard cues) — use on pure-touch builds. |
+| `dlgCommandGridBool` | Lay dialog buttons out in a grid for uniform sizing. |
+| `dlgInvisibleButtons` | Hex color for the separator between dialog buttons. |
+| `dialogTransitionInImage` / `dialogTransitionOutImage` | Custom `Timeline` transition images for dialogs. |
+| `formTransitionIn` / `formTransitionOut` | Default form-transition names. |
+| `formTransitionInImage` / `formTransitionOutImage` | Custom `Timeline` transition images for forms. |
+| `fadeScrollBarBool` / `fadeScrollEdgeBool` / `fadeScrollEdgeInt` | Scrollbar/edge fade behavior. |
+| `centeredPopupBool` | Center popups instead of anchoring near the source component. |
+| `menuImage` / `menuImageSize` | Hamburger menu icon override and size. |
+| `infiniteImage` / `infiniteMaterialDesignSize` / `infiniteMaterialImageSize` / `infiniteDefaultColor` | `InfiniteProgress` appearance. |
+| `mapTileLoadingImage` / `mapTileLoadingText` | `MapComponent` tile-loading placeholders. |
+| `mapZoomButtonsBool` / `drawMapPointerBool` | `MapComponent` toggles. |
+| `imageviewerNavigationArrowsBool` / `imageviewerThumbnailsBool` / `imageviewerThumbnailBarHeightMM` | `ImageViewer` defaults. |
+| `mediaPlayImage` / `mediaPauseImage` / `mediaFwdImage` / `mediaBackImage` | Media-player icon overrides. |
+| `labelGap` / `listItemGapInt` | Default gaps inside compound components. |
+| `dlgButtonCommandUIID` / `dlgCommandButtonSizeInt` | Dialog button styling. |
+| `comboImage` | Dropdown arrow image used by Picker/legacy ComboBox. |
+| `checkBoxCheckedImage` / `checkBoxUncheckedImage` / `checkBoxCheckDisImage` / `checkBoxUncheckDisImage` / `checkBoxOppositeSideBool` | Custom checkbox iconography. |
+| `defaultCommandImage` / `defaultEmblemImage` | Fallback icons for command/list rendering. |
+| `iconUiid` / `textUiid` | UIID overrides for icon/text inside `SpanLabel` / `SpanButton` / `MultiButton` / `SpanMultiButton`. |
+| `interactionDialogSpeedInt` | `InteractionDialog` slide duration in ms (defaults to 400). |
+| `DecayMotionScaleFactorInt` | Velocity-to-distance multiplier for exponential-decay scroll motion (default 950). |
+| `disabledColor` | Default color used when disabling components. |
+
+(The full list is in the Codename One Developer Guide under *Advanced Theming → Theme constants*: <https://www.codenameone.com/developer-guide/>.)
+
+## Java side of styling: `setUIID`, `getStyle`, `getAllStyles`
+
+```java
+Component cmp = ...;
+
+cmp.setUIID("PrimaryCta");                    // (1) pick a CSS rule
+cmp.getAllStyles().setBgColor(0x1d4ed8);      // (2) per-instance override, write-only
+int currentBg = cmp.getStyle().getBgColor();  // (3) read effective style for the current state
+```
+
+- **`setUIID(String)`** is the **only** way to apply a theme rule. Whenever you create a component and want it styled, give it a UIID, then write the rule in `theme.css`. Don't reach for the style API for things CSS can express — themed UIIDs are reusable and theme-overridable; programmatic styling is one-off.
+
+- **`getStyle()`** returns the style for the **currently selected state** (one of `getUnselectedStyle()`, `getSelectedStyle()`, `getPressedStyle()`, `getDisabledStyle()`). It is **read-only** in spirit — mutating it only modifies one state and tends to produce confusing results during interactions. Use `getStyle()` to **read** the effective values for the current state (e.g. in a test that verifies a screen rendered correctly).
+
+- **`getAllStyles()`** returns a fan-out style object that writes to **all four** state styles at once. It is the right hammer for "set this color on the component" overrides. Treat it as **write-only** — don't read values from it; the values you read may not match the state in effect, and the cross-state aggregation is for setters only.
+
+```java
+// Test pattern — verify CSS applied:
+Button save = new Button("Save");
+save.setUIID("PrimaryCta");
+form.add(save);
+form.show();
+assertEqual(0x1d4ed8, save.getUnselectedStyle().getBgColor(),
+        "PrimaryCta should map to accent in the theme");
+
+// One-off programmatic override — animation, dynamic theming:
+errorBanner.getAllStyles().setBgColor(0xb91c1c);
+```
+
+## Validating styles from a test
+
+You generally don't validate CSS at the CSS level. Instead build the component, attach it to a Form, then read its effective `Style` from a unit test:
+
+```java
+public class PrimaryCtaStyleTest extends AbstractTest {
+    @Override public boolean shouldExecuteOnEDT() { return true; }
+    @Override public boolean runTest() {
+        Button btn = new Button("Submit");
+        btn.setUIID("PrimaryCta");
+        Form f = new Form("Test", BoxLayout.y());
+        f.add(btn);
+        f.show();
+
+        Style s = btn.getUnselectedStyle();
+        assertEqual(0x1d4ed8, s.getBgColor(), "Accent applied to background");
+        assertEqual(0xffffff, s.getFgColor(), "Foreground forced to white");
+        assertNotNull(s.getBorder(),           "Border attached");
+        return true;
+    }
+}
+```
+
+This is more useful than checking raw CSS strings: it confirms the rule made it into `theme.res`, was matched at runtime, and resolved to the values you expect. Plus it catches regressions like UIID typos, accidental cascading, and resource cache staleness — symptoms that pure CSS validation would miss.
+
+If the test fails and you want to inspect every UIID/key the theme actually contains:
+
+```java
+java.util.Hashtable<String, Object> map = UIManager.getInstance().getThemeProps();
+for (Object k : map.keySet()) System.out.println(k);
+```
+
+That's the canonical "what's actually in the theme?" introspection.
+
+## Animations — use transitions and `animate()`, not CSS
+
+CSS does not animate anything in CN1. The two right tools, in priority order:
+
+1. **`Form.animateLayout(durationMs)`** — for layout-driven animations. Mutate `setHidden`, change a child's UIID/visibility, swap LayoutConstraints, then call `animateLayout(250)`. CN1 tweens children from their old positions/sizes to the new ones. Use this for hide/show, panel push-in, expanding cards.
+
+2. **CN1 transitions (`CommonTransitions`, `MorphTransition`, `Form#setTransitionInAnimator`/`setTransitionOutAnimator`)** — for whole-screen transitions (slide, fade) and component-to-component morphs across Forms. Set the desired transition on a Form before calling `show()`.
+
+   ```java
+   nextForm.setTransitionInAnimator(CommonTransitions.createSlide(CommonTransitions.SLIDE_HORIZONTAL, true, 250));
+   nextForm.show();
+   ```
+
+3. **Per-component animation via `Component.animate()` + `setAnimation(true)`** — for "I want a value to drift over N ms". Override `animate()` on a Component, return `true` to keep the animation alive, and CN1 calls it once per frame. Register the animation with `getComponentForm().registerAnimated(this)`.
+
+   ```java
+   class Pulse extends Container {
+       private Motion m = Motion.createEaseInOutMotion(0, 255, 600);
+       @Override public boolean animate() {
+           int alpha = m.getValue();
+           getAllStyles().setBgTransparency(alpha);
+           if (m.isFinished()) m.start();   // loop
+           return true;                     // keep ticking
+       }
+       @Override protected void initComponent() {
+           super.initComponent();
+           m.start();
+           getComponentForm().registerAnimated(this);
+       }
+   }
+   ```
+
+Painters are for **drawing** (custom backgrounds, decorations), not for animating. A `Painter` that mutates state to look animated won't actually be re-painted unless something else triggers a repaint — and that something else is the `animate()` mechanism above. Use `animate()` to drive state changes; use `Painter` only for one-off drawing.
 
 ## Common pitfalls
 
-| Symptom | Likely cause |
+| Symptom | Cause / fix |
 | --- | --- |
-| Style doesn't apply | UIID typo. Default UIIDs are `Button`, `Label`, etc. — case-sensitive. |
+| Style doesn't apply | Write a `Style` test (see *Validating styles from a test* above). Check the UIID is set on the component; check the colors via `getUnselectedStyle().getBgColor()`; iterate `UIManager.getInstance().getThemeProps().keySet()` to confirm the theme actually contains the entry. |
 | Container has unexpected background / padding | The base `Container` UIID was restyled. Restore it to transparent / 0 padding / 0 margin and apply styling on a child UIID instead. |
 | Text clipped by rounded corners | Padding too small relative to `border-radius`. Increase padding so it's ≥ the radius. |
-| Colors look wrong on Android only | Channel order: a few older APIs expect ARGB ints, not 0xRGB. Stick to hex strings in CSS. |
 | Padding ignored on the Form | You're setting padding on the Form itself; set it on its ContentPane or wrap content in your own UIID. |
 | Border radius animates jaggy | Border radius is rasterized at compile when using image fallbacks; switch to `RoundRectBorder` and animate via `Form.animateLayout(...)`. |
 | `text-align` does nothing | Add the `align` fallback (the initializr appends one automatically for `text-align`). |
 | New CSS only takes effect after restart | The build cache may be stale — `mvn -pl common clean compile`. |
 | 9-piece border looks blurry on iPhone Pro | Expected — 9-piece images are rasterized at the bundled resolution. Use a vector border (`RoundBorder`/`RoundRectBorder`) instead. |
+| Custom TTF doesn't render on device but works in simulator | The `@font-face` `src:` filename and the JS-side `Font.createTrueTypeFont(name, file)` filename must match exactly, and the file must end up packaged with the app. Re-check spelling and confirm the file is under `common/src/main/css/fonts/`. |
 
 ## Reaching beyond the compiler
 
 If you need a CSS feature that doesn't exist, you have two escapes:
 
-1. **Programmatic styling**: `comp.getAllStyles().setBgColor(0xff1d4ed8 & 0xffffff)` etc. Verbose but supports anything. Margin/padding units are explicit — see *Margin and padding from Java* in `references/ui-components.md`.
-2. **Custom painters**: implement `Painter` and `comp.getAllStyles().setBgPainter(painter)`. Lets you draw arbitrary shapes/gradients.
+1. **Programmatic styling** via `comp.getAllStyles().setXxx(...)`. Verbose, write-only, but supports anything. See *Margin and padding from Java* in `references/ui-components.md` for the unit pitfall.
+2. **Custom painters** — implement `Painter` and `comp.getAllStyles().setBgPainter(painter)`. Lets you draw arbitrary shapes/gradients. Pair with `animate()` if the painted state needs to change over time.
 
 Programmatic styling is the right hammer for animations, dynamic theming, and anything per-instance.

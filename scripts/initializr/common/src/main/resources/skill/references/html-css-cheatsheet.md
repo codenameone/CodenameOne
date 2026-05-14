@@ -55,14 +55,29 @@ Container col = BoxLayout.encloseY(header, body, footer);
 
 ### Flex `space-between` (header left + actions right)
 
+If the "bar" you're building is **the form's header**, don't roll a custom row — that's exactly what the Form `Toolbar` is for. Set the title and add a right-bar command:
+
+```java
+Form f = new Form("My Profile", new BorderLayout());
+f.getToolbar().addMaterialCommandToRightBar("Edit", FontImage.MATERIAL_EDIT, e -> openEdit());
+```
+
+That gives you the title-left / action-right layout the design calls for, with platform-correct spacing and back-button handling for free. Reach for a custom `BorderLayout` row only if it's a *sub-header* inside the form body:
+
 ```html
-<div class="bar"><h2>Title</h2><button>Action</button></div>
+<div class="bar"><h3>Recent activity</h3><a href="#">See all</a></div>
 ```
 
 ```java
 Container bar = new Container(new BorderLayout());
-bar.add(BorderLayout.WEST, new Label("Title").setUIID("H2"));
-bar.add(BorderLayout.EAST, new Button("Action"));
+Label title = new Label("Recent activity");
+title.setUIID("H3");
+Button seeAll = new Button("See all");
+seeAll.setUIID("LinkButton");
+seeAll.addActionListener(e -> openActivity());
+
+bar.add(BorderLayout.WEST, title);
+bar.add(BorderLayout.EAST, seeAll);
 ```
 
 `BorderLayout` with WEST/EAST is the CN1 idiom for "stuff on each end".
@@ -80,24 +95,38 @@ for (Item i : items) grid.add(renderCard(i));
 
 If cells need different widths or row spans, use `TableLayout`.
 
-### Hero section / full-screen banner
+### Hero section / shrinking header
+
+Don't build the hero with a manual `LayeredLayout` of background image plus title — CN1's `Toolbar` is designed for this. Set the Toolbar's background image (in CSS), and let it shrink-on-scroll natively:
 
 ```css
-.hero { height: 100vh; background: url(bg.jpg) center/cover; }
+Toolbar {
+    background-image: url('/hero-bg.jpg');
+    background-position: center;
+    color: #ffffff;
+    padding: 6mm 3mm;
+}
+Title {
+    color: #ffffff;
+    font-family: "native:MainBold";
+    font-size: 5mm;
+}
 ```
 
 ```java
-Form f = new Form("", new LayeredLayout());
-Label bg = new Label(); bg.setIcon(Image.createImage("/hero-bg.jpg"));
-bg.setUIID("HeroBackground");
-Label headline = new Label("Welcome");
-headline.setUIID("HeroHeadline");
-f.add(bg).add(headline);
+Form f = new Form("Welcome", new BorderLayout());
+Toolbar tb = f.getToolbar();
+tb.setTitleCentered(true);
 
-// hero-headline rule in theme.css to position via padding
+// Body scrolls beneath the hero. The Toolbar handles the hero image itself.
+Container body = BoxLayout.encloseY(/* cards, list, whatever */);
+body.setScrollableY(true);
+f.add(BorderLayout.CENTER, body);
 ```
 
-`LayeredLayout` stacks children on top of each other and lets you offset them with percent-based insets via `LayeredLayoutConstraint`.
+For the iOS-style "large title that shrinks as you scroll" effect, look at `Toolbar.setScrollOffSize(...)` paired with a scroll listener on the body. Implementing this with bare `LayeredLayout` is substantially more code and lacks the native shrink behavior.
+
+(`LayeredLayout` is still the right tool for stacking decorations inside the body — see *position: absolute* in the "What you cannot do" table below.)
 
 ### Card (rounded, shadow-ish)
 
@@ -130,7 +159,11 @@ CN1 has no real `box-shadow`. Options: a subtle border (above), a `RoundBorder` 
 header { position: sticky; top: 0; }
 ```
 
-Don't try to replicate `position: sticky`. Use `BorderLayout.NORTH` for the header and `BorderLayout.CENTER` (which is scrollable) for the body — the NORTH region stays put when the center scrolls.
+Two CN1 idioms, depending on what you want:
+
+- **Header pinned outside the scrolling area** — put the header in `BorderLayout.NORTH` and the scrolling content in `BorderLayout.CENTER`. The NORTH region stays put when CENTER scrolls. No CSS gymnastics needed.
+
+- **Header pinned to the top of the *same* scrolling area, with shrink/fade effects as you scroll** — use `com.codename1.components.StickyHeaderContainer`. It wraps a scrolling pane and pins one or more header containers with a configurable transition (fade, slide, color shift). See *Sticky headers* in `references/ui-components.md`.
 
 ### Centered content
 
@@ -240,16 +273,21 @@ LinkButton {
 ```java
 Container list = new Container(BoxLayout.y());
 for (String label : labels) {
+    Label chevron = new Label();
+    chevron.setMaterialIcon(FontImage.MATERIAL_CHEVRON_RIGHT);
+
     Container row = new Container(new BorderLayout());
     row.setUIID("SettingsRow");
     row.add(BorderLayout.CENTER, new Label(label));
-    row.add(BorderLayout.EAST, new Label(FontImage.createMaterial(FontImage.MATERIAL_CHEVRON_RIGHT, "Label", 4)));
+    row.add(BorderLayout.EAST, chevron);
     row.setLeadComponent(row);
     row.addPointerPressedListener(e -> openSetting(label));
     list.add(row);
 }
 list.setScrollableY(true);
 ```
+
+Note the `Label.setMaterialIcon(char)` one-liner — that's the right way to attach a Material glyph, not `new Label(FontImage.createMaterial(FontImage.MATERIAL_CHEVRON_RIGHT, "Label", 4))`. See `references/ui-components.md` for the full Material convenience-API table.
 
 ### "Hero image + headline overlay"
 
@@ -296,113 +334,24 @@ if (Dialog.show("Delete?", "Are you sure?", "Delete", "Cancel")) delete();
 
 | Web feature | CN1 alternative |
 | --- | --- |
-| `position: absolute` with pixel coords | `LayeredLayout` with `LayeredLayoutConstraint` |
-| `position: sticky` | `BorderLayout.NORTH` (sticks via container structure) |
-| `@media (max-width: 600px) { ... }` | No viewport queries — branch in Java on `Display.isTablet()` / `getDisplayWidth()`. |
+| `position: absolute` over the screen (FAB, toast, tutorial overlay) | `Form.getLayeredPane()` — every Form has a top-level `LayeredPane` you can add components to. For circular FABs use `FloatingActionButton.createFAB(...).bindFabToContainer(form.getContentPane())`. |
+| `position: absolute` inside a container | `LayeredLayout` with `LayeredLayoutConstraint` (percent/mm insets, reference-component anchoring). |
+| `position: sticky` (pinned but inside the scroller) | `com.codename1.components.StickyHeaderContainer` with optional transition. See *Sticky headers* in `references/ui-components.md`. |
+| `position: sticky` (outside the scroller) | `BorderLayout.NORTH` + scrollable `CENTER`. |
+| `@media (max-width: 600px) { ... }` | No viewport queries — branch in Java on `Display.isTablet()` / `getDisplayWidth()` / `isPortrait()` / `addOrientationListener(...)`. |
 | `@media (prefers-color-scheme: dark) { ... }` | **Supported** — see `references/css.md`. |
-| `:hover` | Mobile has no hover; use `.pressed` state for press feedback |
-| `transition: all 0.3s` | `Form.animateLayout(300)` after mutating layout |
-| `transform: rotate(45deg)` | Override `paint(Graphics g)` and use `g.rotate(theta, x, y)` |
-| `box-shadow` | `RoundBorder` with `setShadowOpacity`, or 9-patch with shadow baked in |
-| `display: none` | `component.setHidden(true).setVisible(false)` then `parent.revalidate()` |
-| CSS variables (`--primary-color`) | Theme constants `#Constants { primaryColor: #1d4ed8; }` read via `UIManager.getInstance().getThemeConstant(...)` |
-| `filter: blur()` | None — pre-blur images at build time |
-| `backdrop-filter` | None |
-| `gradient` backgrounds | `Container` with a custom `Painter`; some CN1 versions support `cn1-derive-image` gradient borders |
+| `:hover` | On touch, use `.pressed` UIID state. On the desktop/JavaScript ports, components fire pointer-hover events — see `Component.addPointerHoverListener(...)` / `Component.addPointerHoverReleasedListener(...)` to react when the mouse enters/leaves. |
+| `transition: all 0.3s` | `Form.animateLayout(300)` after mutating layout / visibility / UIID. See *Animation* in `references/ui-components.md`. |
+| Whole-screen transitions | `Form.setTransitionInAnimator(CommonTransitions.createSlide(...))` etc. |
+| Cross-form morph (tap card → expand) | `MorphTransition.create(durationMs).morph(sourceCmp, targetCmp)` then `nextForm.setTransitionInAnimator(...)`. |
+| `transform: rotate(45deg)` | Override `paint(Graphics g)` and use `g.rotate(theta, x, y)`. |
+| `box-shadow` | `RoundRectBorder.create().shadowOpacity(...)` — supports shadow blur and spread. Don't ship a 9-piece PNG just for shadow. |
+| `display: none` (animated removal) | `cmp.setHidden(true); cmp.setVisible(false); parent.animateLayout(200);` — gives a real slide/collapse out. Drop the `animateLayout` only if you want instant removal. |
+| CSS variables (`--primary-color`) | Theme constants `#Constants { primaryColor: #1d4ed8; }` read via `UIManager.getInstance().getThemeConstant(...)`. See *Theme constants* in `references/css.md`. |
+| `filter: blur()` on an image | `Display.getInstance().gaussianBlurImage(srcImage, radius)`. Returns a new blurred `Image`. Apply once at load time (it's not free per-frame). |
+| `backdrop-filter` (live blur behind a popover) | Not supported on cross-platform. Capture the background, blur with `gaussianBlurImage`, paint as the popover's background. |
+| `gradient` backgrounds | The `Style` API exposes `BACKGROUND_GRADIENT_LINEAR_VERTICAL`, `BACKGROUND_GRADIENT_LINEAR_HORIZONTAL`, and `BACKGROUND_GRADIENT_RADIAL` — set via `comp.getAllStyles().setBackgroundType(byte)` plus `setBackgroundGradientStartColor` / `setBackgroundGradientEndColor` / `setBackgroundGradientRelativeX/Y/Size`. CSS handles a matching subset (look up `cn1-` gradient extensions for your CN1 version). For arbitrary multi-stop gradients write a custom `Painter`. |
 
-## Porting Android (XML + Kotlin/Java) to Codename One
+---
 
-Codename One's component model is similar enough to Android's that you can usually translate screens one-to-one. As with HTML, the layout system is the part that differs most.
-
-### Android view → CN1 component
-
-| Android `View` | CN1 component | Notes |
-| --- | --- | --- |
-| `LinearLayout` (vertical) | `BoxLayout.y()` | |
-| `LinearLayout` (horizontal) | `BoxLayout.x()` | |
-| `RelativeLayout` / `ConstraintLayout` | `LayeredLayout` with `LayeredLayoutConstraint` | Use percent or mm insets and `setReferenceComponent*` for "below this view". |
-| `FrameLayout` | `LayeredLayout` | Same stacking semantics. |
-| `GridLayout` (Android's, not CSS) | `GridLayout` | |
-| `RecyclerView` | `InfiniteContainer` | The pagination/recycling story maps directly. |
-| `ScrollView` (vertical) | `Container.setScrollableY(true)` | Wrap your content. |
-| `HorizontalScrollView` | `Container.setScrollableX(true)` | |
-| `NestedScrollView` | **Don't nest scrollables in CN1** — see scrolling rules in `references/ui-components.md`. |
-| `Toolbar` / `ActionBar` | `Form.getToolbar()` | Already on every Form. |
-| `BottomNavigationView` | `Toolbar.addCommandToBottomBar(...)` or `Tabs` at the bottom. | |
-| `NavigationView` (drawer) | `Toolbar.addCommandToSideMenu(...)` | |
-| `TextView` | `Label` (single line) / `SpanLabel` (wrapped) | |
-| `EditText` | `TextField` (single line) / `TextArea` (multi-line) | Set `constraint` for the keyboard type. |
-| `Button` / `MaterialButton` | `Button` | |
-| `ImageView` | `Label` with image, or `URLImage` for remote | |
-| `Switch` / `CheckBox` / `RadioButton` | `Switch` / `CheckBox` / `RadioButton` | RadioButton needs `ButtonGroup`. |
-| `Spinner` | `Picker` (string list) | Do **not** use `ComboBox`. |
-| `ProgressBar` | `Slider` (set max) or `InfiniteProgress` (spinner) | |
-| `Dialog` / `AlertDialog` | `Dialog.show(...)` | `Toast` → `ToastBar.showMessage(...)`. |
-| `Fragment` | A factory method returning a configured `Container`, attached to a Form. CN1 has no Fragment lifecycle — keep state in regular Java objects. |
-| `Activity` | A separate `Form` class (or factory). Navigation = `nextForm.show()`. |
-| `Intent` (in-app) | Direct method call to the next Form's factory. |
-| `Intent` (external — phone/email/url) | `Display.execute("tel:..." / "mailto:..." / url)`. |
-| `RecyclerView.Adapter` | Implement `InfiniteContainer.fetchComponents(int, int)` or pass a list to `MultiList`. |
-
-### Android XML → CN1 Java
-
-CN1 has no XML layout for screens (the GUI builder uses its own format). Translate Android XML directly to Java:
-
-```xml
-<!-- Android: res/layout/profile.xml -->
-<LinearLayout android:orientation="vertical" android:padding="16dp">
-    <TextView android:text="@string/name" style="@style/Headline" />
-    <EditText android:hint="@string/name_hint" />
-    <Button android:text="@string/save" style="@style/PrimaryButton" />
-</LinearLayout>
-```
-
-```java
-// CN1
-Container col = new Container(BoxLayout.y());
-col.setUIID("ProfileCard");           // padding/margin lives in CSS
-
-Label headline = new Label(L10n.get("name"));
-headline.setUIID("Headline");
-
-TextField nameField = new TextField();
-nameField.setHint(L10n.get("name_hint"));
-
-Button save = new Button(L10n.get("save"));
-save.setUIID("PrimaryCta");
-
-col.add(headline).add(nameField).add(save);
-```
-
-```css
-/* Android themes ~= CN1 CSS rules. */
-ProfileCard { padding: 2mm; }
-Headline { font-family: "native:MainBold"; font-size: 4mm; color: #0f172a; }
-PrimaryCta { background-color: #1d4ed8; color: #ffffff; border-radius: 3mm; padding: 2mm 4mm; }
-```
-
-### Android idioms that DO NOT translate
-
-| Android | Why it doesn't translate | What to do |
-| --- | --- | --- |
-| `Context` everywhere | CN1 has no `Context`. | Use `Display.getInstance()` or static singletons. |
-| `findViewById(R.id.x)` | No XML view inflation. | Hold component references as fields after constructing. |
-| `Handler.post(...)` | No `Handler`. | `Display.callSerially(...)`. |
-| `LiveData`, `ViewModel` (Architecture Components) | None of the Jetpack stack is available. | `com.codename1.properties.*` for property binding, or plain observer fields. |
-| `Room`, `LiveData<List<X>>` | No Room. | `com.codename1.db.Database` (SQLite) + manual model layer. |
-| `SharedPreferences` | Different API. | `com.codename1.io.Preferences` (drop-in semantically). |
-| `Picasso` / `Glide` for image loading | Not available. | `URLImage.createToStorage(...)` or `MultiImage`. |
-| `Retrofit` / `OkHttp` | Not in the JDK subset. | `Rest.get/post(...)` — see `references/java-api-subset.md`. |
-| `Coroutines` / `RxJava` | No coroutines runtime; no RxJava. | `Display.startThread(...)` + `Display.callSerially(...)` for async; chain callbacks. |
-| `R.string.xxx` | No resources system. | `UIManager.getInstance().localize("xxx", "default")` reading from `messages.properties` bundles. |
-| `Permission` manifest entries | Different mechanism. | `Display.requestPermission(...)` at runtime + `codename1.arg.android.xPermissions` build hint. |
-| `Activity onCreate/onResume` | No Activity lifecycle. | Override `Lifecycle.init/start/stop` (app-level) and `Form.show()` (per-screen). |
-
-### Android resources
-
-| Android | CN1 |
-| --- | --- |
-| `res/values/strings.xml` | `common/src/main/l10n/messages.properties` (and per-locale `messages_de.properties`, etc.) |
-| `res/drawable/foo.png` | `common/src/main/resources/foo.png` (flat namespace — see `references/java-api-subset.md`) |
-| `res/values/colors.xml` | Theme constants in `theme.css` under `#Constants { ... }` |
-| `res/font/x.ttf` | `common/src/main/css/fonts/x.ttf`, declared via `@font-face` in `theme.css` |
+For converting an Android (XML + Kotlin/Java) screen to Codename One, see the dedicated guide at `references/android-to-cn1.md`.

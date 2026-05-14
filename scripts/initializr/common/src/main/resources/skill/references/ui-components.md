@@ -77,6 +77,55 @@ form.add(BorderLayout.CENTER, col);
 
 The same caveat applies (more mildly) to `ContentPane` — only change it when you specifically want to recolor the entire form background and you understand the cascading impact.
 
+## Sticky headers — `StickyHeaderContainer`
+
+CN1 has `com.codename1.components.StickyHeaderContainer`. It wraps a scrolling content pane and pins one or more header containers to the top: while you scroll, the header stays glued in place and can morph (color shift, height change, fade) using a transition you supply.
+
+```java
+import com.codename1.components.StickyHeaderContainer;
+
+Container scrolling = BoxLayout.encloseY(card1, card2, card3, /* ... */);
+scrolling.setScrollableY(true);
+
+Container header = BoxLayout.encloseY(new Label("My Profile"));
+header.setUIID("StickyHeader");
+
+StickyHeaderContainer sticky = new StickyHeaderContainer(header, scrolling);
+form.add(BorderLayout.CENTER, sticky);
+```
+
+For animated effects (e.g. fade the header background as the user scrolls), look at `StickyHeaderContainer` overloads that take a transition and at the bundled `StickyHeaderFadeTransitionScreenshotTest` / `StickyHeaderSlideTransitionScreenshotTest` examples in the CN1 source tree.
+
+## Hero images — use the Toolbar background
+
+The common "hero image at the top of a screen, content scrolls underneath, header shrinks as you scroll" pattern is built into the CN1 `Toolbar`. The right path is **not** a manual `LayeredLayout` of background+title — instead, give the Toolbar a background image (or themed UIID) and let it handle the shrink-on-scroll behavior itself.
+
+```css
+Toolbar {
+    background-image: url('/hero.jpg');
+    background-position: center;
+    color: #ffffff;
+}
+Title {
+    color: #ffffff;
+    font-family: "native:MainBold";
+    font-size: 5mm;
+}
+```
+
+```java
+Form f = new Form("Welcome", new BorderLayout());
+Toolbar tb = f.getToolbar();
+tb.setTitleCentered(true);
+// Toolbar already paints the hero image as its background — no custom layered layout needed.
+
+Container body = BoxLayout.encloseY(/* scrollable content */);
+body.setScrollableY(true);
+f.add(BorderLayout.CENTER, body);
+```
+
+If you need the hero to **shrink** as the user scrolls (the classic iOS "large title" effect), pair the Toolbar with `Toolbar.setScrollOffSize(...)` and a `ScrollListener` on `body` — the Toolbar already knows how to interpolate its own background height in response. Avoid hand-rolling this with `LayeredLayout`; it's substantially more code and lacks the platform-native behavior the Toolbar provides.
+
 ## Toolbar — title, menu, commands
 
 ```java
@@ -84,18 +133,19 @@ Form f = new Form("Inbox", new BorderLayout());
 Toolbar tb = f.getToolbar();
 tb.setTitle("Inbox");
 
-// Right-side button(s) in the title bar
-tb.addCommandToRightBar("Compose", null, evt -> openComposeForm());
+// Right-bar / left-bar commands with Material icons — terse and native-looking.
+tb.addMaterialCommandToRightBar("Compose", FontImage.MATERIAL_EDIT, e -> openComposeForm());
+tb.addMaterialCommandToRightBar("Search",  FontImage.MATERIAL_SEARCH, e -> openSearch());
 
-// Hamburger menu items (slide-out on Android, drawer on iOS)
-tb.addCommandToSideMenu("Profile", null, evt -> openProfile());
-tb.addCommandToSideMenu("Settings", null, evt -> openSettings());
+// Hamburger side menu (slide-out on Android, drawer on iOS).
+tb.addMaterialCommandToSideMenu("Profile",  FontImage.MATERIAL_PERSON,   e -> openProfile());
+tb.addMaterialCommandToSideMenu("Settings", FontImage.MATERIAL_SETTINGS, e -> openSettings());
 
-// Bottom tabs (iOS-style)
-tb.setHomeSearchEnabled(true);  // adds a search icon and floating search bar
+// Built-in search bar
+tb.setHomeSearchEnabled(true);
 ```
 
-Use `tb.addMaterialCommandToRightBar("", FontImage.MATERIAL_SEARCH, e -> ...)` to drop in a Material icon without a glyph font of your own.
+For commands without a Material icon (text-only labels or custom images) use `addCommandToRightBar(String, Image, ActionListener)` and friends.
 
 ## Form lifecycle and navigation
 
@@ -186,20 +236,33 @@ In CSS you don't think about this — `padding: 2mm 4mm;` is unambiguous. In Jav
 ## Images and icons
 
 ```java
-// Bundled image (in common/src/main/resources/)
+// Bundled image (top-level under common/src/main/resources/ — see java-api-subset.md
+// for the flat-namespace constraint).
 Image img = Image.createImage("/logo.png");
 
-// Material icon as a font glyph (no asset file)
-FontImage icon = FontImage.createMaterial(FontImage.MATERIAL_FAVORITE, "Label", 6);
-new Label(icon);
-
-// Async load from network
+// Async load from network with a cached, scaled fallback.
 URLImage urlImg = URLImage.createToStorage(
     placeholder, "logo-storage-key", "https://example.com/logo.png",
     URLImage.RESIZE_SCALE);
 ```
 
-`FontImage` is the recommended way to add icons — it scales to any density and uses Material's font.
+### Material icons — prefer the built-in convenience APIs
+
+`FontImage` is the underlying API for icon-as-glyph, but most components expose a one-line wrapper that's much shorter than the raw `FontImage.createMaterial(...)` form.
+
+| Goal | Right call |
+| --- | --- |
+| Material icon on a `Label` | `Label l = new Label(); l.setMaterialIcon(FontImage.MATERIAL_FAVORITE);` |
+| `Label` with text + icon | `Label l = new Label("Favorite"); l.setMaterialIcon(FontImage.MATERIAL_FAVORITE);` |
+| `Button` icon-only | `Button b = new Button(FontImage.MATERIAL_DELETE);` |
+| `Button` text + icon | `Button b = new Button("Delete", FontImage.MATERIAL_DELETE);` |
+| `Toolbar` right-bar command | `f.getToolbar().addMaterialCommandToRightBar("Search", FontImage.MATERIAL_SEARCH, e -> ...);` |
+| `Toolbar` side menu command | `f.getToolbar().addMaterialCommandToSideMenu("Profile", FontImage.MATERIAL_PERSON, e -> ...);` |
+| Floating action button | `FloatingActionButton fab = FloatingActionButton.createFAB(FontImage.MATERIAL_ADD); fab.bindFabToContainer(form.getContentPane()); fab.addActionListener(e -> add());` |
+
+The verbose `new Label(FontImage.createMaterial(FontImage.MATERIAL_FAVORITE, "Label", 6))` form works but you almost never need it — the convenience APIs above take a `char` directly and use the right UIID and sizing for the component.
+
+The full Material icon catalog is exposed as `char` constants on `FontImage` — autocomplete on `FontImage.MATERIAL_` to discover them.
 
 ## Lists and infinite scrolling
 
@@ -246,21 +309,95 @@ row.setScrollVisible(false);     // hide the scrollbar on swipe
 
 If the design truly requires what looks like two-axis scrolling (e.g. a wide table), build it as a horizontally-scrolling outer container whose only child is a vertically-scrolling list of fixed-width rows — i.e. flatten one of the axes into rows of identical layout.
 
-## Animation
+## Floating Action Button + the Form's LayeredPane
+
+For overlays that need to sit on top of the regular content (the canonical example is a circular **+** FAB anchored bottom-right), CN1 gives you two tools:
+
+- **`FloatingActionButton`** — a circular Material-style button with a built-in shadow and a `bindFabToContainer` helper that pins it to the corner of any container.
+- **`Form.getLayeredPane()`** — every Form ships with a top-level `LayeredPane` that overlays the entire form. Add components here to stack them above everything else (think tooltips, custom popovers, decorations).
 
 ```java
-Component target = ...;
-target.setX(0);
-target.setY(0);
-form.animateLayout(300);   // 300ms animated re-layout after you mutated constraints
+import com.codename1.components.FloatingActionButton;
 
-// Or a specific property animation:
-Motion m = Motion.createEaseInOutMotion(0, 100, 250);
-m.start();
-// poll in callSerially loop and call target.setX(...)
+FloatingActionButton fab = FloatingActionButton.createFAB(FontImage.MATERIAL_ADD);
+fab.addActionListener(e -> openNewItem());
+fab.bindFabToContainer(form.getContentPane());   // pins it bottom-right inside the body
 ```
 
-`Form.animateLayout(duration)` is the easiest tool — change layout constraints (insets in `LayeredLayout`, visibility, sizes), then call it.
+For non-FAB overlays (a heads-up notification banner, an in-app tutorial highlight) use the layered pane directly:
+
+```java
+LayeredLayout ll = new LayeredLayout();
+form.getLayeredPane().setLayout(ll);
+
+Container banner = BoxLayout.encloseY(new SpanLabel("You're offline. Reconnecting…"));
+banner.setUIID("OfflineBanner");
+form.getLayeredPane().add(banner);
+
+LayeredLayout.LayeredLayoutConstraint c = ll.createConstraint();
+c.setInsets("auto auto 0 0").setReferenceComponentTop(banner, 1f);
+ll.addLayoutComponent(c, banner, form.getLayeredPane());
+form.revalidate();
+```
+
+`LayeredPane` is the replacement for "I need `position: absolute` over the whole screen" CSS thinking.
+
+## Animation — the three right tools
+
+Codename One's animation story is built around layout-driven tweens and transition objects, **not** CSS. The hierarchy of approaches:
+
+### 1. `Form.animateLayout(durationMs)` — for layout-driven animations
+
+Mutate visibility / size / `LayeredLayoutConstraint` / UIID, then call `animateLayout`. CN1 captures the before+after positions and tweens children across the duration.
+
+```java
+sidePanel.setHidden(!sidePanel.isHidden());
+sidePanel.setVisible(!sidePanel.isVisible());
+form.animateLayout(250);
+```
+
+Use this for show/hide animations, panel slide-in, expand/collapse cards, sticky-header-on-scroll morphs.
+
+### 2. Form-to-form transitions — for whole-screen navigation
+
+```java
+import com.codename1.ui.animations.CommonTransitions;
+import com.codename1.ui.animations.MorphTransition;
+
+nextForm.setTransitionInAnimator(
+    CommonTransitions.createSlide(CommonTransitions.SLIDE_HORIZONTAL, true, 250));
+nextForm.setTransitionOutAnimator(
+    CommonTransitions.createFade(200));
+nextForm.show();
+```
+
+`CommonTransitions` exposes slide / fade / cover / uncover / dialog / empty transitions. `MorphTransition` (`MorphTransition.create(durationMs).morph(from, to)`) is for animating a specific source component into a specific destination component across forms — great for "tap a card to expand it into the full screen".
+
+### 3. `Component.animate()` + `setAnimation(true)` — for ongoing per-component animation
+
+Override `animate()` on a Component, return `true` while the animation should keep firing, and register with the form:
+
+```java
+class PulseDot extends Container {
+    private final Motion m = Motion.createEaseInOutMotion(0, 255, 600);
+
+    @Override protected void initComponent() {
+        super.initComponent();
+        m.start();
+        getComponentForm().registerAnimated(this);
+    }
+
+    @Override public boolean animate() {
+        getAllStyles().setBgTransparency(m.getValue());
+        if (m.isFinished()) m.start();
+        return true;
+    }
+}
+```
+
+This is the right hammer for breathing dots, custom progress, gradient drift — anything that needs a per-frame update. Don't try to do this from a `Painter`: painters don't have a built-in re-paint cycle, so they only repaint when something else triggers it.
+
+`Painter` is for **drawing** (custom backgrounds, decorations); `animate()` is for **state changes that drive painting**.
 
 ## Keyboard handling (text input)
 

@@ -27,8 +27,14 @@ This skill teaches you how to write code for a Codename One (CN1) cross-platform
 - `references/css.md` — CSS capabilities and (important) **limitations**. Selectors, supported properties, 9-patch borders, theme constants.
 - `references/swing-comparison.md` — Mapping Swing concepts and code to Codename One. Read this when porting Swing code.
 - `references/html-css-cheatsheet.md` — Converting common HTML/CSS snippets to CN1 components + CSS.
+- `references/android-to-cn1.md` — Porting Android (XML + Kotlin/Java) screens to Codename One.
 - `references/testing-and-screenshots.md` — `AbstractTest`, `TestUtils`, `screenshotTest`, the `cn1:test` Maven goal, the screenshot tolerance algorithm.
 - `references/mobile-adaptability.md` — Density-independent units (mm), `convertToPixels`, `LayeredLayout` for responsive design, `Display.isTablet()`, font scaling.
+- `references/native-interfaces.md` — Authoring native interfaces for iOS/Android/JavaScript/Desktop with `cn1:generate-native-interfaces` and platform callbacks.
+- `references/cn1libs.md` — Creating, packaging, and consuming Codename One libraries (Maven and legacy `.cn1lib`).
+- `references/snapshot-builds.md` — Edge case: compiling against a Codename One SNAPSHOT from git.
+- `references/debugging.md` — `jdb`-attach workflow for an agent: start the simulator paused, set breakpoints, dump locals, drive the session non-interactively from a script.
+- `tools/` — runnable Java 17 single-file utilities. `tools/IsApiSupported.java` answers "is this `java.*` class in the CN1 subset?"; `tools/IsCssValid.java` answers "does this `theme.css` compile?". Run with `java tools/<Name>.java <args>`.
 
 When the user's task hits any one of those topics, **read the matching reference before generating code**. Do not paste large snippets without checking.
 
@@ -261,8 +267,14 @@ If you cannot run the simulator (e.g. headless environment), **say so explicitly
 | "Make this look like X" / CSS tweaks | `references/css.md` |
 | "Port this from Swing" / Swing idioms | `references/swing-comparison.md` |
 | "I have HTML/CSS, convert it" | `references/html-css-cheatsheet.md` |
+| "I have Android XML/Kotlin/Java, convert it" | `references/android-to-cn1.md` |
 | "Write a test for this screen" / "Compare to a baseline" | `references/testing-and-screenshots.md` |
 | "Make it look right on tablet/landscape" | `references/mobile-adaptability.md` |
 | "How do I run/build/deploy" | `references/build-and-run.md` |
 | "What's the right `codename1.arg.*` for X" / native config | `references/build-hints.md` |
 | "Why does the compliance check fail" / Java/IO/networking | `references/java-api-subset.md` |
+| "I need to call a native iOS/Android/JS/desktop API" | `references/native-interfaces.md` |
+| "How do I create / consume a cn1lib" | `references/cn1libs.md` |
+| "Build against a Codename One SNAPSHOT from git" | `references/snapshot-builds.md` |
+| "Debug a faulty screen — attach `jdb` to the simulator" | `references/debugging.md` |
+| Quick yes/no check: "is this `java.*` class supported", "does my `theme.css` compile" | `tools/` directory — `java tools/IsApiSupported.java <class>` / `java tools/IsCssValid.java <file>` |

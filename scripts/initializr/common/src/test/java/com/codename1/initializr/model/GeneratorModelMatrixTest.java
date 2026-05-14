@@ -129,32 +129,51 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         Map<String, byte[]> entries = readZipEntries(zipData);
 
         String[] expectedSkillEntries = new String[] {
-                ".claude/skills/codename-one/SKILL.md",
-                ".claude/skills/codename-one/references/build-and-run.md",
-                ".claude/skills/codename-one/references/build-hints.md",
-                ".claude/skills/codename-one/references/java-api-subset.md",
-                ".claude/skills/codename-one/references/ui-components.md",
-                ".claude/skills/codename-one/references/css.md",
-                ".claude/skills/codename-one/references/swing-comparison.md",
-                ".claude/skills/codename-one/references/html-css-cheatsheet.md",
-                ".claude/skills/codename-one/references/testing-and-screenshots.md",
-                ".claude/skills/codename-one/references/mobile-adaptability.md"
+                ".agent-skills/codename-one/SKILL.md",
+                ".agent-skills/codename-one/references/build-and-run.md",
+                ".agent-skills/codename-one/references/build-hints.md",
+                ".agent-skills/codename-one/references/java-api-subset.md",
+                ".agent-skills/codename-one/references/ui-components.md",
+                ".agent-skills/codename-one/references/css.md",
+                ".agent-skills/codename-one/references/swing-comparison.md",
+                ".agent-skills/codename-one/references/html-css-cheatsheet.md",
+                ".agent-skills/codename-one/references/android-to-cn1.md",
+                ".agent-skills/codename-one/references/testing-and-screenshots.md",
+                ".agent-skills/codename-one/references/mobile-adaptability.md",
+                ".agent-skills/codename-one/references/native-interfaces.md",
+                ".agent-skills/codename-one/references/cn1libs.md",
+                ".agent-skills/codename-one/references/snapshot-builds.md",
+                ".agent-skills/codename-one/references/debugging.md",
+                ".agent-skills/codename-one/tools/README.md",
+                ".agent-skills/codename-one/tools/IsApiSupported.java",
+                ".agent-skills/codename-one/tools/IsCssValid.java"
         };
         for (int i = 0; i < expectedSkillEntries.length; i++) {
             assertNotNull(entries.get(expectedSkillEntries[i]),
                     "Skill bundle missing: " + expectedSkillEntries[i]);
         }
 
-        String skillMd = getText(entries, ".claude/skills/codename-one/SKILL.md");
-        assertContains(skillMd, "name: codename-one", "SKILL.md should preserve frontmatter slug for Claude Code");
+        String skillMd = getText(entries, ".agent-skills/codename-one/SKILL.md");
+        assertContains(skillMd, "name: codename-one", "SKILL.md should preserve frontmatter slug");
         assertContains(skillMd, mainClassName + " extends Lifecycle",
                 "SKILL.md placeholders should be rewritten to the project's main class");
 
-        String testingMd = getText(entries, ".claude/skills/codename-one/references/testing-and-screenshots.md");
+        String testingMd = getText(entries, ".agent-skills/codename-one/references/testing-and-screenshots.md");
         assertContains(testingMd, mainClassName + "().runApp()",
                 "Reference samples should be rewritten with the project's main class");
         assertContains(testingMd, packageName + "." + mainClassName,
                 "Reference samples should be rewritten with the project's package");
+
+        // AGENTS.md root pointer and Claude Code stub are also bundled so vendor-specific
+        // discovery flows still work without forcing every agent to learn our path layout.
+        String agentsMd = getText(entries, "AGENTS.md");
+        assertContains(agentsMd, ".agent-skills/codename-one/SKILL.md",
+                "AGENTS.md should point agents at the canonical skill location");
+
+        String claudeStub = getText(entries, ".claude/skills/codename-one/SKILL.md");
+        assertContains(claudeStub, "name: codename-one", "Claude stub must keep the skill frontmatter");
+        assertContains(claudeStub, ".agent-skills/codename-one/SKILL.md",
+                "Claude stub should redirect to the canonical skill content");
     }
 
     private void validateLegacyJava8Generation() throws Exception {

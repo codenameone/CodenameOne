@@ -42,7 +42,52 @@ public class GeneratorModel {
             ".DS_Store\n" +
             "Thumbs.db\n";
 
-    private static final String CLAUDE_SKILL_TARGET_PREFIX = ".claude/skills/codename-one/";
+    private static final String AGENT_SKILL_TARGET_PREFIX = ".agent-skills/codename-one/";
+    private static final String CLAUDE_SKILL_STUB_PATH = ".claude/skills/codename-one/SKILL.md";
+    private static final String CLAUDE_SKILL_STUB_BODY =
+            "---\n"
+            + "name: codename-one\n"
+            + "description: Build and modify Codename One cross-platform mobile apps (Java 17, Maven, ParparVM/Android/iOS/JavaScript). Use when the project contains a `common/codenameone_settings.properties`, depends on `com.codenameone:codenameone-core`, edits CSS files under `common/src/main/css/`, calls `cn1:run`, `cn1:test`, `cn1:build`, references `com.codename1.ui.*` / `com.codename1.testing.*`, or when the user asks to build a UI, write screen tests, generate screenshots, or compare to Swing/HTML/Android.\n"
+            + "metadata:\n"
+            + "  type: skill\n"
+            + "---\n"
+            + "\n"
+            + "# Codename One — App and UI Authoring Skill (Claude Code stub)\n"
+            + "\n"
+            + "This file exists so Claude Code can index the Codename One authoring skill.\n"
+            + "The actual skill content is **vendor-neutral** and lives in this repository at:\n"
+            + "\n"
+            + "- `.agent-skills/codename-one/SKILL.md` — top-level cheat sheet\n"
+            + "- `.agent-skills/codename-one/references/*.md` — deep-dive references\n"
+            + "- `.agent-skills/codename-one/tools/` — runnable Java 17 utilities (`isApiSupported`, `isCssValid`, ...)\n"
+            + "\n"
+            + "**Read `.agent-skills/codename-one/SKILL.md` next.** All the guidance you need to\n"
+            + "build, style, test, debug, and port to Codename One is in that directory.\n";
+    private static final String AGENTS_MD_BODY =
+            "# AGENTS.md\n"
+            + "\n"
+            + "This project is a Codename One cross-platform mobile app (Java 17 / Maven /\n"
+            + "ParparVM-iOS / Android / JavaScript / desktop). A vendor-neutral authoring skill\n"
+            + "is bundled in this repository for any AI agent:\n"
+            + "\n"
+            + "- **Start here:** `.agent-skills/codename-one/SKILL.md`\n"
+            + "- **Topical references:** `.agent-skills/codename-one/references/`\n"
+            + "- **Runnable utilities (Java 17 single-file source mode):** `.agent-skills/codename-one/tools/`\n"
+            + "\n"
+            + "Tool integrations (Claude Code, Cursor, etc.) may also pick this skill up via\n"
+            + "their own conventions; the canonical source of truth is `.agent-skills/`.\n"
+            + "\n"
+            + "## Quick orientation for an agent\n"
+            + "\n"
+            + "- App source lives in `common/src/main/java/`.\n"
+            + "- Theme/styling lives in `common/src/main/css/theme.css` (Codename One CSS — a\n"
+            + "  deliberate subset, see `.agent-skills/codename-one/references/css.md`).\n"
+            + "- Run the simulator with `mvn -pl common cn1:run`.\n"
+            + "- Run tests with `mvn -pl common cn1:test` (on Linux CI use `xvfb-run -a`).\n"
+            + "- Native cloud builds use `mvn -pl <ios|android|javascript|javase> package -Dcodename1.platform=... -Dcodename1.buildTarget=...`.\n"
+            + "\n"
+            + "When in doubt, open `.agent-skills/codename-one/SKILL.md` and follow the\n"
+            + "reference table at the bottom.\n";
 
     private final IDE ide;
     private final Template template;
@@ -86,7 +131,7 @@ public class GeneratorModel {
         copySingleTextEntryToMap(".gitignore", GENERATED_GITIGNORE, mergedEntries, ZipEntryType.COMMON);
         copySingleTextEntryToMap("README.md", buildReadmeMarkdown(), mergedEntries, ZipEntryType.COMMON);
         if (options.javaVersion == ProjectOptions.JavaVersion.JAVA_17) {
-            addClaudeSkillEntries(mergedEntries);
+            addAgentSkillEntries(mergedEntries);
         }
         copySingleTextEntryToMap("common/pom.xml", readResourceToString(template.POM_XML), mergedEntries, ZipEntryType.TEMPLATE_POM);
         if (template.CN1LIB_ZIP != null) {
@@ -107,13 +152,13 @@ public class GeneratorModel {
     }
 
 
-    private void addClaudeSkillEntries(Map<String, byte[]> mergedEntries) throws IOException {
-        // Ship the Codename One authoring skill inside every generated project so that
-        // Claude Code (or any agent that respects .claude/skills) gets the framework's
-        // CSS/UI/testing conventions for free. The skill markdown lives under
-        // src/main/resources/skill/** in source form and is repackaged into skill.zip
-        // at build time (CN1 classloader rejects nested directories under resources).
-        // ASCII-only Markdown so no encoding surprises end up in the project tree.
+    private void addAgentSkillEntries(Map<String, byte[]> mergedEntries) throws IOException {
+        // Ship the Codename One authoring skill inside every generated project under a
+        // vendor-neutral path so any AI agent (Claude Code, Cursor, others) can pick it up.
+        // The skill markdown lives in source form under src/main/resources/skill/** and is
+        // repackaged into skill.zip at build time (CN1 classloader rejects nested
+        // directories under resources). ASCII-only Markdown so no encoding surprises end
+        // up in the project tree.
         try (ZipInputStream zis = new ZipInputStream(getResourceAsStream("/skill.zip"))) {
             ZipEntry entry = zis.getNextEntry();
             while (entry != null) {
@@ -122,7 +167,7 @@ public class GeneratorModel {
                     String relative = entry.getName();
                     // Defensive normalization: ant may produce backslashes on Windows.
                     relative = StringUtil.replaceAll(relative, "\\", "/");
-                    String targetPath = CLAUDE_SKILL_TARGET_PREFIX + relative;
+                    String targetPath = AGENT_SKILL_TARGET_PREFIX + relative;
                     byte[] targetData = applyDataReplacements(targetPath, sourceData);
                     mergedEntries.put(targetPath, targetData);
                 }
@@ -130,6 +175,13 @@ public class GeneratorModel {
                 entry = zis.getNextEntry();
             }
         }
+        // Top-level AGENTS.md so agents that follow the (emerging) AGENTS.md convention
+        // discover the skill without having to know our directory layout.
+        copySingleTextEntryToMap("AGENTS.md", AGENTS_MD_BODY, mergedEntries, ZipEntryType.COMMON);
+        // Claude Code stub. Frontmatter so the skill shows up in /skills, body redirects
+        // to the canonical vendor-neutral content.
+        copySingleTextEntryToMap(CLAUDE_SKILL_STUB_PATH, CLAUDE_SKILL_STUB_BODY,
+                mergedEntries, ZipEntryType.COMMON);
     }
 
     private void addLocalizationEntries(Map<String, byte[]> mergedEntries) throws IOException {
