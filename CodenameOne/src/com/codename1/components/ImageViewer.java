@@ -47,8 +47,10 @@ import com.codename1.ui.plaf.UIManager;
 ///
 /// ```java
 /// Form hi = new Form("ImageViewer", new BorderLayout());
+/// Image duke = FontImage.createMaterial(FontImage.MATERIAL_INFO, "Label", 3.0f);
 /// ImageViewer iv = new ImageViewer(duke);
 /// hi.add(BorderLayout.CENTER, iv);
+/// hi.show();
 /// ```
 ///
 /// You can simulate pinch to zoom on the simulator by dragging the right button away from the top left corner to

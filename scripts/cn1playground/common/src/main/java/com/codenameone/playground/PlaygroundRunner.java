@@ -160,8 +160,8 @@ final class PlaygroundRunner {
         interpreter.set("theme", context.getTheme());
         interpreter.set("hostForm", context.getHostForm());
         interpreter.set("previewRoot", context.getPreviewRoot());
-        interpreter.set("display", Display.getInstance());
-        interpreter.set("uiManager", UIManager.getInstance());
+        interpreter.set("display", resolveDisplayBinding());
+        interpreter.set("uiManager", resolveUiManagerBinding());
         interpreter.set("FontImage", FontImage.class);
         interpreter.set("CN", com.codename1.ui.CN.class);
         interpreter.set("BoxLayout", BoxLayout.class);
@@ -177,6 +177,26 @@ final class PlaygroundRunner {
         namespace.importPackage("com.codename1.ui.geom");
         namespace.importClass("com.codename1.ui.Component");
         namespace.importClass("com.codenameone.playground.PlaygroundContext");
+    }
+
+    /// Returns the Display singleton, or the Display class itself when no
+    /// implementation is bootstrapped (headless snippet validator). The CLI
+    /// validator only cares about parse/lex errors, so a Class fallback is
+    /// enough -- the script never actually runs against the binding.
+    private Object resolveDisplayBinding() {
+        try {
+            return Display.getInstance();
+        } catch (Throwable ex) {
+            return Display.class;
+        }
+    }
+
+    private Object resolveUiManagerBinding() {
+        try {
+            return UIManager.getInstance();
+        } catch (Throwable ex) {
+            return UIManager.class;
+        }
     }
 
     private ScriptPlan adaptScript(String script) {

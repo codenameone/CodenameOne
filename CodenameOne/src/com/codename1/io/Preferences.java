@@ -35,6 +35,7 @@ import java.util.Set;
 ///
 /// ```java
 /// // save a token to storage
+/// String myToken = "abc123";
 /// Preferences.set("token", myToken);
 ///
 /// // get the token from storage or null if it isn't there

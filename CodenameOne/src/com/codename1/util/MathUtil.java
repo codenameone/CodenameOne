@@ -1424,7 +1424,12 @@ public abstract class MathUtil {
     /// integer that would be returned by the call:
     ///
     /// ```java
-    ///    new Float(f1).compareTo(new Float(f2))
+    /// float f1 = 1.5f;
+    /// float f2 = 2.5f;
+    /// int result = new Float(f1).compareTo(new Float(f2));
+    /// Form hi = new Form("MathUtil.compare(float)", BoxLayout.y());
+    /// hi.add(new Label("Float.compareTo result: " + result));
+    /// hi.show();
     /// ```
     ///
     /// #### Parameters
@@ -1467,7 +1472,12 @@ public abstract class MathUtil {
     /// integer that would be returned by the call:
     ///
     /// ```java
-    ///    new Double(d1).compareTo(new Double(d2))
+    /// double d1 = 1.5;
+    /// double d2 = 2.5;
+    /// int result = new Double(d1).compareTo(new Double(d2));
+    /// Form hi = new Form("MathUtil.compare(double)", BoxLayout.y());
+    /// hi.add(new Label("Double.compareTo result: " + result));
+    /// hi.show();
     /// ```
     ///
     /// #### Parameters
