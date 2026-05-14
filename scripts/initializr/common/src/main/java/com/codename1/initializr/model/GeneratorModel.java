@@ -85,7 +85,9 @@ public class GeneratorModel {
         copyZipEntriesToMap("/common.zip", mergedEntries, ZipEntryType.COMMON);
         copySingleTextEntryToMap(".gitignore", GENERATED_GITIGNORE, mergedEntries, ZipEntryType.COMMON);
         copySingleTextEntryToMap("README.md", buildReadmeMarkdown(), mergedEntries, ZipEntryType.COMMON);
-        addClaudeSkillEntries(mergedEntries);
+        if (options.javaVersion == ProjectOptions.JavaVersion.JAVA_17) {
+            addClaudeSkillEntries(mergedEntries);
+        }
         copySingleTextEntryToMap("common/pom.xml", readResourceToString(template.POM_XML), mergedEntries, ZipEntryType.TEMPLATE_POM);
         if (template.CN1LIB_ZIP != null) {
             copyZipEntriesToMap(template.CN1LIB_ZIP, mergedEntries, ZipEntryType.TEMPLATE_CN1LIB);

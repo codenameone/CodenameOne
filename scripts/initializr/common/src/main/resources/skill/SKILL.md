@@ -56,14 +56,14 @@ my-app/
 
 ## Java version and language features
 
-Generated projects target **Java 17** by default (`<source>17</source>` / `<target>17</target>` in `common/pom.xml`, plus `codename1.arg.java.version=17` in `codenameone_settings.properties`). This lets you use:
+This project targets **Java 17** (`<source>17</source>` / `<target>17</target>` in `common/pom.xml`, plus `codename1.arg.java.version=17` in `codenameone_settings.properties`). Use:
 
 - `var` for local variable type inference
 - Text blocks (`"""..."""`)
 - Records
 - Pattern matching for `instanceof`
 - `switch` expressions
-- Lambda expressions, method references, `Stream`s (Java 8 baseline always available)
+- Lambdas, method references, `Stream`s
 
 **Caveat — the build server still cross-compiles to bytecode that ParparVM/TeaVM can consume.** Avoid APIs not in the CN1 Java API subset:
 
@@ -72,8 +72,6 @@ Generated projects target **Java 17** by default (`<source>17</source>` / `<targ
 - No `java.awt.*` / `javax.swing.*` — CN1 has its own UI stack (Form, Container, Component) that mirrors Swing concepts. See `references/swing-comparison.md`.
 - No `java.lang.reflect.*` on production builds — works in the simulator only.
 - No threads spawned with `new Thread(...).start()` for UI work — always go through `Display.callSerially` or `Display.startThread(...)`.
-
-If the user picks **Java 8 (Legacy)** in the initializr, the pom uses `<source>1.8</source>` and you must stick to Java 8 syntax.
 
 ## The Event Dispatch Thread (EDT)
 

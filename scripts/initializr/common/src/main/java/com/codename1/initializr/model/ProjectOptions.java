@@ -45,7 +45,7 @@ public final class ProjectOptions {
 
     public enum JavaVersion {
         JAVA_17("Java 17"),
-        JAVA_8("Java 8 (Legacy)");
+        JAVA_8("Java 8");
 
         public final String label;
 

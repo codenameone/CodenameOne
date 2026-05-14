@@ -4,11 +4,10 @@
 
 | Task | JDK |
 | --- | --- |
-| Compiling the `common` module (Java 17 default) | JDK 17+ available as `JAVA_HOME` |
-| Compiling the `common` module (legacy Java 8 setting) | JDK 8+, source/target=1.8 |
-| Running `cn1:run` / `cn1:debug` (the simulator) | **JDK 11–25** (CN1 plugin aborts on older JDKs with a friendly error) |
+| Compiling the `common` module | JDK 17+ available as `JAVA_HOME` |
+| Running `cn1:run` / `cn1:debug` (the simulator) | **JDK 17–25** (CN1 plugin aborts on older JDKs with a friendly error) |
 | Cross-compiling for Android natively | JDK 17 set in `JAVA17_HOME` |
-| Cross-compiling for iOS | macOS + Xcode + JDK 11–25 |
+| Cross-compiling for iOS | macOS + Xcode + JDK 17–25 |
 
 The simulator forks a JVM that needs the `--add-exports=java.desktop/com.apple.eawt=ALL-UNNAMED` argument on macOS / JDK 17+. The initializr already wires this into `.idea/workspace.xml` "Run in Simulator" run configurations.
 
@@ -49,7 +48,7 @@ This file lives at `common/codenameone_settings.properties`. The most useful key
 codename1.packageName=com.example.myapp
 codename1.mainName=MyAppName
 codename1.displayName=My App Name
-codename1.arg.java.version=17                 # 17 = use Java 17 build server; remove for Java 8
+codename1.arg.java.version=17                 # Required: routes the build to the Java 17 build server
 codename1.arg.android.googlePlayVersion=true
 codename1.arg.ios.includePush=false
 codename1.kotlin=false

@@ -156,8 +156,8 @@ public class GeneratorModelMatrixTest extends AbstractTest {
     }
 
     private void validateLegacyJava8Generation() throws Exception {
-        String mainClassName = "DemoLegacyJava8";
-        String packageName = "com.acme.legacy.java8";
+        String mainClassName = "DemoJava8";
+        String packageName = "com.acme.java8";
         ProjectOptions options = new ProjectOptions(
                 ProjectOptions.ThemeMode.LIGHT,
                 ProjectOptions.Accent.DEFAULT,
@@ -176,7 +176,12 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertLocalizationBundles(entries, Template.BAREBONES, true);
 
         String intellijMisc = getText(entries, ".idea/misc.xml");
-        assertContains(intellijMisc, "languageLevel=\"JDK_1_8\"", "Legacy Java 8 selection should still write JDK_1_8 IntelliJ language level");
+        assertContains(intellijMisc, "languageLevel=\"JDK_1_8\"", "Java 8 selection should write JDK_1_8 IntelliJ language level");
+
+        // Skill is Java 17-only. Confirm we don't ship it into a Java 8 project,
+        // where the skill's "use var / records / text blocks" guidance would be wrong.
+        assertNull(entries.get(".claude/skills/codename-one/SKILL.md"),
+                "Java 8 projects should not bundle the Codename One Claude skill (Java 17-only)");
     }
 
     private void validateJava17DefaultRegressionFixes() throws Exception {
