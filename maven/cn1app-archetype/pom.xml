@@ -12,6 +12,21 @@
   <name>cn1app-archetype</name>
   <description>Codename One bare-bones app project archetype.</description>
 
+  <properties>
+    <!--
+      Skip the maven-archetype-plugin integration-test phase by default.
+      The ITs (src/test/resources/projects/**/archetype.properties) generate
+      a sub-project pinned to cn1Version=${project.version} and then invoke
+      the codenameone-maven-plugin against it via nested mvn. That plugin
+      is built in this same reactor — it isn't on Maven Central at the time
+      the ITs run during `mvn install`, so they fail with an unresolvable
+      SNAPSHOT. The dedicated archetype-smoke CI workflow opts back in via
+      -Darchetype.test.skip=false; the release workflow leaves them off
+      because the freshly-deployed plugin is still propagating to Central.
+    -->
+    <archetype.test.skip>true</archetype.test.skip>
+  </properties>
+
   <build>
     <extensions>
       <extension>

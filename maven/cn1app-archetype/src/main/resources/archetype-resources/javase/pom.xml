@@ -59,18 +59,19 @@
       </dependency>
       <dependency>
           <groupId>com.codenameone</groupId>
+          <artifactId>codenameone-core</artifactId>
+          <scope>provided</scope>
+      </dependency>
+      <dependency>
+          <groupId>com.codenameone</groupId>
           <artifactId>codenameone-javase</artifactId>
           <scope>test</scope>
       </dependency>
-      <!--
-        The codenameone-core and codenameone-javase provided-scope
-        dependencies that historically lived here are now contributed by
-        the simulator profile further down (see executable-jar / app-bundle
-        profiles). Keeping them at the top level shadowed those profile
-        contributions with the wrong classifier on JDK 11+; the initializr
-        strips them at generation time via normalizeJavasePom — we bake
-        that strip into the archetype template directly.
-      -->
+      <dependency>
+          <groupId>com.codenameone</groupId>
+          <artifactId>codenameone-javase</artifactId>
+          <scope>provided</scope>
+      </dependency>
 
   </dependencies>
   

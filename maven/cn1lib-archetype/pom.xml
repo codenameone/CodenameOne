@@ -12,6 +12,11 @@
   <name>cn1lib-archetype</name>
   <description>Codename One cn1lib (library) project archetype.</description>
 
+  <properties>
+    <!-- See cn1app-archetype/pom.xml for the rationale on skipping ITs. -->
+    <archetype.test.skip>true</archetype.test.skip>
+  </properties>
+
   <build>
     <extensions>
       <extension>
