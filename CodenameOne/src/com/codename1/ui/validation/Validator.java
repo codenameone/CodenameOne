@@ -62,6 +62,9 @@ import java.util.HashMap;
 /// [this discussion](https://stackoverflow.com/questions/48481888/codename-one-regexconstraint-to-check-a-valid-phone-number/48483465#48483465) on StackOverflow):
 ///
 /// ```java
+/// Form hi = new Form("Phone Validator", BoxLayout.y());
+/// TextField phone = new TextField("", "Phone");
+/// Validator val = new Validator();
 /// val.addConstraint(phone, new Constraint() {
 ///   public  boolean isValid(Object value) {
 ///     String v = (String)value;
@@ -78,6 +81,8 @@ import java.util.HashMap;
 ///     return "Must be valid phone number";
 ///   }
 /// });
+/// hi.add(phone);
+/// hi.show();
 /// ```
 ///
 /// @author Shai Almog

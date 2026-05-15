@@ -312,6 +312,19 @@ public class HTML5Graphics {
             setTransform(Transform.makeScale((float)sx, (float)sy));
         }
     }
+
+    public void translateMatrix(double tx, double ty) {
+        // Compose T(x, y) onto the impl-side matrix, mirroring scale/rotate.
+        // Lets Graphics.translateMatrix produce matrix-correct semantics on
+        // HTML5; see Graphics.translateMatrix javadoc.
+        if (transform != null) {
+            transform.translate((float)tx, (float)ty);
+            setTransformChanged();
+            applyTransform();
+        } else {
+            setTransform(Transform.makeTranslation((float)tx, (float)ty));
+        }
+    }
     
     public void drawImage(Object img, int x, int y, int w, int h) {
         imageTransformRenderAdapter.drawImage((NativeImage)img, x, y, w, h);

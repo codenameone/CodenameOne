@@ -47,6 +47,10 @@ import com.codename1.ui.util.EventDispatcher;
 /// Label text can be positioned in one of 4 locations as such:
 ///
 /// ```java
+/// Form hi = new Form("Test Label", BoxLayout.y());
+///
+/// Image icon = FontImage.createMaterial(FontImage.MATERIAL_INFO, "Label", 3.0f);
+///
 /// Label left = new Label("Left", icon);
 /// left.setTextPosition(Component.LEFT);
 /// Label right = new Label("Right", icon);
@@ -56,6 +60,7 @@ import com.codename1.ui.util.EventDispatcher;
 /// Label top = new Label("Top", icon);
 /// top.setTextPosition(Component.TOP);
 /// hi.add(left).add(right).add(bottom).add(top);
+/// hi.show();
 /// ```
 ///
 /// @author Chen Fishbein

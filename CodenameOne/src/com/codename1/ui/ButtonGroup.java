@@ -36,6 +36,10 @@ import java.util.ArrayList;
 /// the specific `ButtonGroup`.
 ///
 /// ```java
+/// Form hi = new Form("Test ButtonGroup", BoxLayout.y());
+///
+/// Image icon = FontImage.createMaterial(FontImage.MATERIAL_INFO, "CheckBox", 3.0f);
+///
 /// CheckBox cb1 = new CheckBox("CheckBox No Icon");
 /// cb1.setSelected(true);
 /// CheckBox cb2 = new CheckBox("CheckBox With Icon", icon);
@@ -49,6 +53,7 @@ import java.util.ArrayList;
 /// new ButtonGroup(rb1, rb2, rb3);
 /// rb2.setSelected(true);
 /// hi.add(cb1).add(cb2).add(cb3).add(cb4).add(rb1).add(rb2).add(rb3);
+/// hi.show();
 /// ```
 ///
 /// @author Nir Shabi

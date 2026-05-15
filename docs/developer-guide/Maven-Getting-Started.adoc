@@ -25,7 +25,7 @@ fast with a friendly message if it is older than 11. Build-only goals (such as
 
 ==== Codename One initializr
 
-The easiest way to create a new project is to use the https://start.codenameone.com[Codename One initializr].
+The easiest way to create a new project is to use the https://www.codenameone.com/initializr[Codename One initializr].
 
 image::img/codenameone-initializr-screenshot.png[]
 

@@ -1483,6 +1483,17 @@ class AndroidGraphics {
 
     }
 
+    public void translateMatrix(float x, float y) {
+        // Composes T(x, y) onto the impl-side matrix, exactly like scale.
+        // Lets Graphics.translateMatrix produce matrix-correct translation
+        // semantics on Android -- see Graphics.translateMatrix javadoc for
+        // why this is a separate API from translate(int, int).
+        getTransform().translate(x, y);
+        transformDirty = true;
+        inverseTransformDirty = true;
+        clipFresh = false;
+    }
+
     public void rotate(float angle) {
         getTransform().rotate(angle, 0, 0);
         transformDirty = true;

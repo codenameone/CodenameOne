@@ -218,7 +218,7 @@ IMPORTANT: Codename One supports JDK 11 through 25 for running the simulator and
 
 Codename One projects are built with Maven. Typical Maven targets such as `package`, `clean` and `install` work out of the box, but the Codename One integrations that ship with each IDE provide dedicated Run and Build actions for a smoother workflow.
 
-To create a new Codename One project visit https://start.codenameone.com/ and generate a starter project, or run the Codename One Application Project Archetype (`cn1app-archetype`) directly on the command line:
+To create a new Codename One project visit https://www.codenameone.com/initializr/ and generate a starter project, or run the Codename One Application Project Archetype (`cn1app-archetype`) directly on the command line:
 
 [source,bash]
 ----

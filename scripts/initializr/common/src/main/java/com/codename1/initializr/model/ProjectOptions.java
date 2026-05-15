@@ -44,8 +44,8 @@ public final class ProjectOptions {
     }
 
     public enum JavaVersion {
-        JAVA_8("Java 8"),
-        JAVA_17_EXPERIMENTAL("Java 17 (Experimental)");
+        JAVA_17("Java 17"),
+        JAVA_8("Java 8");
 
         public final String label;
 
@@ -81,11 +81,11 @@ public final class ProjectOptions {
         this.roundedButtons = roundedButtons;
         this.includeLocalizationBundles = includeLocalizationBundles;
         this.previewLanguage = previewLanguage == null ? PreviewLanguage.ENGLISH : previewLanguage;
-        this.javaVersion = javaVersion == null ? JavaVersion.JAVA_8 : javaVersion;
+        this.javaVersion = javaVersion == null ? JavaVersion.JAVA_17 : javaVersion;
         this.customThemeCss = customThemeCss;
     }
 
     public static ProjectOptions defaults() {
-        return new ProjectOptions(ThemeMode.LIGHT, Accent.DEFAULT, true, false, PreviewLanguage.ENGLISH, JavaVersion.JAVA_8);
+        return new ProjectOptions(ThemeMode.LIGHT, Accent.DEFAULT, true, false, PreviewLanguage.ENGLISH, JavaVersion.JAVA_17);
     }
 }

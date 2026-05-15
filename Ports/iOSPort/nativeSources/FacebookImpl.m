@@ -64,14 +64,14 @@ void com_codename1_impl_ios_IOSNative_facebookLogin___java_lang_Object(CN1_THREA
             if (result.isCancelled) {
                 // Handle cancellations
 #ifdef NEW_CODENAME_ONE_VM
-                set_field_com_codename1_social_FacebookImpl_loginCancelled(threadStateData, JAVA_TRUE, instance);
+                set_field_com_codename1_social_FacebookImpl_loginCancelled(JAVA_TRUE, instance);
 #else
                 com_codename1_social_FacebookImpl* impl = (com_codename1_social_FacebookImpl*)instance;
                 impl->fields.com_codename1_social_FacebookImpl.loginCancelled_ = TRUE;
 #endif
             } else {
 #ifdef NEW_CODENAME_ONE_VM
-                set_field_com_codename1_social_FacebookImpl_loginCompleted(threadStateData, JAVA_TRUE, instance);
+                set_field_com_codename1_social_FacebookImpl_loginCompleted(JAVA_TRUE, instance);
 #else
                 com_codename1_social_FacebookImpl* impl = (com_codename1_social_FacebookImpl*)instance;
 #endif

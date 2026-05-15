@@ -50,6 +50,11 @@ import static com.codename1.ui.ComponentSelector.$;
 /// a lead component. Up to 4 rows are supported.
 ///
 /// ```java
+/// Form hi = new Form("Test MultiButton", BoxLayout.y());
+///
+/// Image icon = FontImage.createMaterial(FontImage.MATERIAL_INFO, "Button", 3.0f);
+/// Image emblem = FontImage.createMaterial(FontImage.MATERIAL_ARROW_FORWARD, "Button", 3.0f);
+///
 /// MultiButton twoLinesNoIcon = new MultiButton("MultiButton");
 /// twoLinesNoIcon.setTextLine2("Line 2");
 /// MultiButton oneLineIconEmblem = new MultiButton("Icon + Emblem");
@@ -83,6 +88,7 @@ import static com.codename1.ui.ComponentSelector.$;
 ///         add(twoLinesIconEmblemHorizontal).
 ///         add(twoLinesIconCheckBox).
 ///         add(fourLinesIcon);
+/// hi.show();
 /// ```
 ///
 /// @author Shai Almog

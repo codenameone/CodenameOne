@@ -3644,6 +3644,47 @@ public abstract class CodenameOneImplementation {
         System.out.println("Affine unsupported");
     }
 
+    /// Indicates whether the underlying implementation composes
+    /// `g.translateMatrix(float, float)` onto the impl-side transform matrix.
+    /// When this returns false `Graphics.translateMatrix` silently falls
+    /// back to the per-Graphics integer accumulator
+    /// (`Graphics.translate(int, int)`), so apps don't render at the wrong
+    /// position on ports that haven't been updated. Ports that DO route
+    /// `translateMatrix` through the matrix (iOS, JavaSE, Android, modern
+    /// JavaScript) must override this to return true AND override
+    /// `#translateMatrix(Object, float, float)`. The legacy / restricted
+    /// JavaScript builds keep the default false until the matrix path is
+    /// wired up.
+    ///
+    /// #### Returns
+    ///
+    /// true if `translateMatrix` reaches the impl matrix on this port.
+    public boolean isTranslateMatrixSupported() {
+        return false;
+    }
+
+    /// Composes a translation onto the impl-side transform matrix -- the
+    /// matrix-correct counterpart of `Graphics.translate(int, int)`. Pairs
+    /// with `#scale(Object, float, float)` and `#rotate(Object, float, int, int)`:
+    /// the new transform is `currentMatrix * T(x, y)` and any subsequent
+    /// draw applies that composed matrix as a single step (no separate
+    /// integer accumulator pre-applied before the matrix). Only invoked
+    /// when `#isTranslateMatrixSupported()` returns true; ports must keep
+    /// the two in sync.
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeGraphics`: the native graphics object
+    ///
+    /// - `x`: x-axis translation
+    ///
+    /// - `y`: y-axis translation
+    public void translateMatrix(Object nativeGraphics, float x, float y) {
+        // Default no-op: ports advertise translateMatrix support via
+        // isTranslateMatrixSupported(); Graphics.translateMatrix never
+        // reaches this body when that's false.
+    }
+
     /// Scales the coordinate system using the affine transform
     ///
     /// #### Parameters

@@ -644,50 +644,26 @@ public final class Graphics {
     /// degrees. Usage:
     ///
     /// ```java
-    /// Painter p = new Painter(cmp) {
+    /// Form hi = new Form("fillArc / drawArc", new BorderLayout());
+    /// Container cmp = new Container();
+    /// cmp.setPreferredSize(new Dimension(300, 300));
+    /// Painter p = new Painter() {
     ///     public void paint(Graphics g, Rectangle rect) {
     ///         boolean antiAliased = g.isAntiAliased();
     ///         g.setAntiAliased(true);
-    ///         int r = Math.min(rect.getWidth(), rect.getHeight())/2;
-    ///         int x = rect.getX() + rect.getWidth()/2 - r;
-    ///         int y = rect.getY() + rect.getHeight()/2 - r;
-    ///         switch (style) {
-    ///             case CircleButtonStrokedDark:
-    ///             case CircleButtonStrokedLight: {
-    ///                 if (cmp.getStyle().getBgTransparency() != 0) {
-    ///                     int alpha = cmp.getStyle().getBgTransparency();
-    ///                     if (alpha <0) {
-    ///                         alpha = 0xff;
-    ///                     }
-    ///                     g.setColor(cmp.getStyle().getBgColor());
-    ///                     g.setAlpha(alpha);
-    ///                     g.fillArc(x, y, 2*r-1, 2*r-1, 0, 360);
-    ///                     g.setAlpha(0xff);
-    ///                 }
-    ///                 g.setColor(cmp.getStyle().getFgColor());
-    ///                 g.drawArc(x, y, 2*r-1, 2*r-1, 0, 360);
-    ///                 break;
-    ///             }
-    ///             case CircleButtonFilledDark:
-    ///             case CircleButtonFilledLight:
-    ///             case CircleButtonTransparentDark:
-    ///             case CircleButtonTransparentLight: {
-    ///                 int alpha = cmp.getStyle().getBgTransparency();
-    ///                 if (alpha < 0) {
-    ///                     alpha = 0xff;
-    ///                 }
-    ///                 g.setAlpha(alpha);
-    ///                 g.setColor(cmp.getStyle().getBgColor());
-    ///                 g.fillArc(x, y, 2*r, 2*r, 0, 360);
-    ///                 g.setAlpha(0xff);
-    ///                 break;
-    ///             }
-    ///         }
-    ///
+    ///         int r = Math.min(rect.getWidth(), rect.getHeight()) / 2;
+    ///         int x = rect.getX() + rect.getWidth() / 2 - r;
+    ///         int y = rect.getY() + rect.getHeight() / 2 - r;
+    ///         g.setColor(0x4488ff);
+    ///         g.fillArc(x, y, 2 * r, 2 * r, 0, 360);
+    ///         g.setColor(0xffffff);
+    ///         g.drawArc(x, y, 2 * r - 1, 2 * r - 1, 0, 360);
     ///         g.setAntiAliased(antiAliased);
     ///     }
     /// };
     /// cmp.getAllStyles().setBgPainter(p);
+    /// hi.add(BorderLayout.CENTER, cmp);
+    /// hi.show();
     /// ```
     ///
     /// #### Parameters
@@ -1635,6 +1611,67 @@ public final class Graphics {
         impl.scale(nativeGraphics, x, y);
         scaleX = x;
         scaleY = y;
+    }
+
+    /// Translates the coordinate system using the affine transform matrix
+    /// (as opposed to `#translate(int, int)` which uses a per-Graphics
+    /// integer accumulator). On every port today
+    /// `isTranslationSupported() == false`, which means `g.translate(int, int)`
+    /// is added to draw coordinates **before** the impl matrix is applied;
+    /// a subsequent `g.scale()` or `g.rotate()` therefore multiplies the
+    /// integer translate too. That's surprising when porting code that came
+    /// from Java2D / AWT where translate composes into the matrix the same
+    /// way as scale and rotate.
+    ///
+    /// `translateMatrix` composes the translation directly onto the impl
+    /// matrix, exactly like `#scale(float, float)` and `#rotate(float)` do.
+    /// The result is uniform "post-multiply translate onto the current
+    /// transform" semantics across iOS / JavaSE / Android / JavaScript --
+    /// the same code produces the same on-screen position regardless of
+    /// which port you target or whether you're drawing into a Form's
+    /// Graphics or a mutable Image's Graphics.
+    ///
+    /// On ports where `#isTranslateMatrixSupported()` returns false (e.g.
+    /// the legacy JavaScript port) the call falls back to the integer
+    /// `#translate(int, int)` so apps don't silently render at the wrong
+    /// position -- the visual result on those ports matches whatever
+    /// `translate(int, int)` does there.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: x-axis translation
+    ///
+    /// - `y`: y-axis translation
+    ///
+    /// #### See also
+    ///
+    /// - `#isTranslateMatrixSupported()`
+    /// - `#translate(int, int)`
+    /// - `#scale(float, float)`
+    /// - `#rotateRadians(float, int, int)`
+    public void translateMatrix(float x, float y) {
+        if (impl.isTranslateMatrixSupported()) {
+            impl.translateMatrix(nativeGraphics, x, y);
+        } else {
+            translate((int) x, (int) y);
+        }
+    }
+
+    /// Checks whether `#translateMatrix(float, float)` composes through the
+    /// impl matrix on this port (the matrix-correct mode) versus falling
+    /// back to the integer `#translate(int, int)` accumulator. Use this to
+    /// gate code that needs matrix-correct translation semantics.
+    ///
+    /// #### Returns
+    ///
+    /// true if `translateMatrix` reaches the impl matrix; false on ports
+    /// where it falls back to the integer accumulator.
+    ///
+    /// #### See also
+    ///
+    /// - `#translateMatrix(float, float)`
+    public boolean isTranslateMatrixSupported() {
+        return impl.isTranslateMatrixSupported();
     }
 
     /// Rotates the coordinate system around a radian angle using the affine transform

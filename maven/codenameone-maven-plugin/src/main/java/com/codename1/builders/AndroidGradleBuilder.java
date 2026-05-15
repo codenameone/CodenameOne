@@ -458,10 +458,17 @@ public class AndroidGradleBuilder extends Executor {
                     );
                 }
             }
+            if (home == null && currentJvmIsJava17OrLater()) {
+                // The Maven plugin itself is already running on a JDK that Gradle 8 accepts
+                // (Java 17+). Use that JVM's home instead of forcing the user to duplicate
+                // the JDK location in JAVA17_HOME.
+                return System.getProperty("java.home");
+            }
             if (home == null) {
                 throw new BuildException(
                         "When using gradle 8, " +
-                                "you must set the JAVA17_HOME environment variable to the location of a Java 17 JDK"
+                                "you must set the JAVA17_HOME environment variable to the location of a Java 17 JDK " +
+                                "(or run Maven on Java 17+ and let the build reuse the current JVM)"
                 );
             }
 
@@ -472,6 +479,19 @@ public class AndroidGradleBuilder extends Executor {
             return home;
         }
         return System.getProperty("java.home");
+    }
+
+    private static boolean currentJvmIsJava17OrLater() {
+        String spec = System.getProperty("java.specification.version", "");
+        if (spec.startsWith("1.")) {
+            // 1.5 .. 1.8 era — definitely older than 17.
+            return false;
+        }
+        try {
+            return Integer.parseInt(spec) >= 17;
+        } catch (NumberFormatException ex) {
+            return false;
+        }
     }
     private int parseVersionStringAsInt(String versionString) {
         if (versionString.indexOf(".") > 0) {

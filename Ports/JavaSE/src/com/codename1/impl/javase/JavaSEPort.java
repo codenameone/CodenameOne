@@ -206,6 +206,16 @@ public class JavaSEPort extends CodenameOneImplementation {
     private boolean largerTextEnabled = false;
     private static final String PREF_LARGER_TEXT_SCALE = "cn1.simulator.largerTextScale";
 
+    // Floor below which any persisted window dimension is treated as the
+    // product of a layout glitch (eg. a pack() with a collapsed canvas, an
+    // iconified frame, or hand-edited prefs) rather than a real user state.
+    static final int MIN_PERSISTED_WINDOW_DIMENSION = 100;
+
+    // Defensive ceiling so absurd values from a corrupted pref or runaway
+    // scaling math cannot make a subsequent setBounds() throw or place the
+    // frame off every reachable display.
+    static final int MAX_PERSISTED_WINDOW_DIMENSION = 32767;
+
     static {
         IOS_NATIVE_FONT_CANDIDATES.put("native:MainThin", new String[] {
             "SF Pro Display", "SF Pro Text",
@@ -4668,7 +4678,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             public void actionPerformed(ActionEvent e) {
                 JavaSEPort.this.darkMode = Boolean.TRUE;
                 pref.put("cn1.simulator.darkMode", "dark");
-                refreshSkin(frm);
+                refreshThemeOnly();
             }
         });
 
@@ -4677,7 +4687,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             public void actionPerformed(ActionEvent e) {
                 JavaSEPort.this.darkMode = Boolean.FALSE;
                 pref.put("cn1.simulator.darkMode", "light");
-                refreshSkin(frm);
+                refreshThemeOnly();
             }
         });
 
@@ -4686,7 +4696,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             public void actionPerformed(ActionEvent e) {
                 JavaSEPort.this.darkMode = null;
                 pref.put("cn1.simulator.darkMode", "unsupported");
-                refreshSkin(frm);
+                refreshThemeOnly();
             }
         });
         darkLightModeMenu.add(darkModeItem);
@@ -5783,7 +5793,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                     largerTextScale = scale;
                     largerTextEnabled = scale > 1.0f + 0.001f;
                     pref.putFloat(PREF_LARGER_TEXT_SCALE, scale);
-                    refreshSkin(frm);
+                    // Theme-only refresh so the app's CSS-compiled theme survives; see
+                    // refreshThemeOnly() for why refreshSkin breaks the app theme + canvas size.
+                    refreshThemeOnly();
                 }
             });
             group.add(item);
@@ -5821,6 +5833,113 @@ public class JavaSEPort extends CodenameOneImplementation {
                 canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth()  * zoomLevel), (int)(getSkin().getHeight() * zoomLevel)));
                 zoomLevel = 1;
                 frm.pack();
+            }
+        });
+    }
+
+    /**
+     * Returns true when {@code r} represents a window position we are willing
+     * to persist or restore. Rejects null, NaN-equivalent (non-positive) sizes,
+     * sub-floor dimensions, oversized values, and frames that no longer have a
+     * useful overlap with any connected display. Any caller that fails this
+     * check should fall back to default bounds and remove the corrupt pref so
+     * the bad state does not survive across launches.
+     */
+    public static boolean isUsableWindowBounds(Rectangle r) {
+        if (r == null) {
+            return false;
+        }
+        if (r.width < MIN_PERSISTED_WINDOW_DIMENSION || r.height < MIN_PERSISTED_WINDOW_DIMENSION) {
+            return false;
+        }
+        if (r.width > MAX_PERSISTED_WINDOW_DIMENSION || r.height > MAX_PERSISTED_WINDOW_DIMENSION) {
+            return false;
+        }
+        try {
+            if (GraphicsEnvironment.isHeadless()) {
+                // No screens to validate against; size has already cleared the
+                // sanity floor, so accept. The simulator is not really expected
+                // to run headless, but tests do.
+                return true;
+            }
+            GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
+            GraphicsDevice[] devs = ge.getScreenDevices();
+            if (devs == null || devs.length == 0) {
+                return true;
+            }
+            Rectangle union = new Rectangle(0, 0, 0, 0);
+            for (GraphicsDevice gd : devs) {
+                union.add(gd.getDefaultConfiguration().getBounds());
+            }
+            Rectangle visible = union.intersection(r);
+            // Require enough overlap that the title bar and drag region remain
+            // reachable; a one-pixel touch is not good enough to "remember".
+            return visible.width >= MIN_PERSISTED_WINDOW_DIMENSION && visible.height >= 50;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /**
+     * Parses the comma-separated {@code "x,y,width,height"} form written to
+     * {@code window.bounds}. Returns {@code null} when the input is missing,
+     * has the wrong field count, or contains non-numeric data. The bounds
+     * returned have not been validated for screen overlap or dimensions;
+     * pair with {@link #isUsableWindowBounds(Rectangle)}.
+     */
+    static Rectangle parsePersistedBounds(String s) {
+        if (s == null) {
+            return null;
+        }
+        try {
+            String[] parts = s.split(",");
+            if (parts.length != 4) {
+                return null;
+            }
+            return new Rectangle(
+                    Integer.parseInt(parts[0].trim()),
+                    Integer.parseInt(parts[1].trim()),
+                    Integer.parseInt(parts[2].trim()),
+                    Integer.parseInt(parts[3].trim()));
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    /// Theme-only refresh used by the Dark/Light Mode and Larger Text menu actions.
+    ///
+    /// These toggles change how the *current* theme should be resolved, but the skin (the
+    /// phone-shell image, the canvas pixel size, the screen-fit zoom) hasn't moved. Routing them
+    /// through {@link #refreshSkin} caused two visible regressions:
+    ///
+    /// 1. `refreshSkin` calls `Display.installNativeTheme()`, which delegates to
+    ///    `UIManager.setThemeProps(nativeProps)`. `setThemeProps` **replaces** the installed
+    ///    theme wholesale, so any CSS-compiled app theme (custom UIID fonts, custom margins,
+    ///    app-only style keys) is wiped to the bare native theme. Visually this read as "fonts
+    ///    are completely wrong" until the simulator was relaunched.
+    ///
+    /// 2. `refreshSkin` recomputes the canvas size from `canvas.getWidth() * retinaScale /
+    ///    skin.getWidth()`, which equals `retinaScale` on a HiDPI display whose skin already
+    ///    fits the screen. The canvas then grows to `skin * retinaScale` while subsequent
+    ///    drawing still uses `zoomLevel == 1`, so the simulator appeared to "activate zoom mode"
+    ///    after a Dark/Light click.
+    ///
+    /// Master PR #4935 (`isUsableWindowBounds`/`parsePersistedBounds` above) adds defense in
+    /// depth against the resulting bad window-bounds prefs from the Larger Text path. This
+    /// helper removes the trigger entirely by leaving the canvas alone --
+    /// `UIManager.refreshTheme()` re-applies the currently-installed themeProps (so the app
+    /// theme survives) and clears the style cache (so `shouldUseDarkStyle` resolves correctly
+    /// against the new `Display.isDarkMode()`).
+    private void refreshThemeOnly() {
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                UIManager.getInstance().refreshTheme();
+                Form curr = Display.getInstance().getCurrent();
+                if (curr != null) {
+                    deepRevaliate(curr);
+                    curr.revalidate();
+                    curr.repaint();
+                }
             }
         });
     }
@@ -6249,9 +6368,17 @@ public class JavaSEPort extends CodenameOneImplementation {
                 private void saveBounds(ComponentEvent e) {
                     if (e.getComponent() instanceof JFrame) {
                         Frame f = (JFrame)e.getComponent();
+                        // The NORMAL check filters maximized/iconified states,
+                        // but a misbehaving pack() can still produce tiny or
+                        // off-screen geometry while remaining NORMAL. Run the
+                        // shared sanity check so a broken layout pass cannot
+                        // corrupt the persisted bounds.
                         if (f.getExtendedState() == JFrame.NORMAL) {
-                            Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
                             Rectangle bounds = f.getBounds();
+                            if (!isUsableWindowBounds(bounds)) {
+                                return;
+                            }
+                            Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
                             pref.put("window.bounds", bounds.x+","+bounds.y+","+bounds.width+","+bounds.height);
                         }
                     }
@@ -6360,18 +6487,13 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             String lastBounds = pref.get("window.bounds", null);
             if (lastBounds != null) {
-                String[] parts = lastBounds.split(",");
-                Rectangle r = new Rectangle(Integer.parseInt(parts[0]), Integer.parseInt(parts[1]), Integer.parseInt(parts[2]), Integer.parseInt(parts[3]));
-                Rectangle bounds = new Rectangle(0, 0, 0, 0);
-                GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
-                GraphicsDevice lstGDs[] = ge.getScreenDevices();
-                for (GraphicsDevice gd : lstGDs) {
-                    bounds.add(gd.getDefaultConfiguration().getBounds());
-                }
-                
-                if (bounds.intersects(r)) {
-                
+                Rectangle r = parsePersistedBounds(lastBounds);
+                if (isUsableWindowBounds(r)) {
                     window.setBounds(r);
+                } else {
+                    // Drop the bad value so a single bad pack() cannot lock the
+                    // user out across restarts.
+                    pref.remove("window.bounds");
                 }
             }
 
@@ -10447,6 +10569,21 @@ public class JavaSEPort extends CodenameOneImplementation {
         //g.scale(x, y);
         com.codename1.ui.Transform tf = getTransform(nativeGraphics);
         tf.scale(x, y);
+        setTransform(nativeGraphics, tf);
+    }
+
+    @Override
+    public boolean isTranslateMatrixSupported() {
+        // JavaSE composes translateMatrix onto the Graphics2D AffineTransform
+        // the same way it does for scale/rotate (via getTransform / setTransform).
+        return true;
+    }
+
+    @Override
+    public void translateMatrix(Object nativeGraphics, float x, float y) {
+        checkEDT();
+        com.codename1.ui.Transform tf = getTransform(nativeGraphics);
+        tf.translate(x, y);
         setTransform(nativeGraphics, tf);
     }
 
@@ -14592,6 +14729,21 @@ public class JavaSEPort extends CodenameOneImplementation {
         private File bundleFile;
         private final java.util.Properties properties = new java.util.Properties();
         private boolean dirty;
+        /// Mtime to restore on the bundle file after each {@link #persist}.
+        ///
+        /// The auto-bundle persists every time the app reads a missing key (see
+        /// `get`/`storeEntry`), so during normal development the file is rewritten on most
+        /// simulator launches even when no human ever edited it. Without this restoration,
+        /// `CompileCSSMojo.getLocalizationModificationTime` -- which trusts the file mtime as
+        /// a proxy for "user edited" -- would treat each runtime persist as a fresh
+        /// localization edit and force a ~30s CSS recompile on every subsequent `cn1:run`.
+        ///
+        /// Strategy: before each persist, sample the file's current mtime. If it matches the
+        /// last value we restored (i.e. the file is exactly as we left it, no external editor
+        /// touched it), restore to that value after the write. If it differs, the user edited
+        /// outside the simulator -- capture their mtime as the new target so their edit still
+        /// flows into the staleness comparison.
+        private long preservedMtime = -1L;
 
         AutoLocalizationBundle(File bundleFile, Map<String, String> base) {
             this.bundleFile = bundleFile;
@@ -14662,12 +14814,37 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         private void persist() {
             ensureParentExists();
+            // Sample the file's mtime BEFORE writing so we can carry the user's last-edit
+            // timestamp forward. If the file doesn't exist yet (first persist of a fresh
+            // project), there's no original mtime to preserve -- fall through and let the
+            // post-write mtime become the new baseline.
+            long mtimeBeforeWrite = bundleFile.exists() ? bundleFile.lastModified() : -1L;
+            if (mtimeBeforeWrite > 0L
+                    && (preservedMtime <= 0L || mtimeBeforeWrite != preservedMtime)) {
+                // Either this is the first persist of the session, or the user edited the
+                // file externally since our last restoration. Adopt the current mtime as the
+                // new preserved target so their edit propagates to the staleness check.
+                preservedMtime = mtimeBeforeWrite;
+            }
             try (OutputStream out = new FileOutputStream(bundleFile)) {
                 properties.store(out, "Codename One auto-generated bundle");
             } catch (IOException err) {
                 Log.e(err);
             }
             dirty = false;
+            if (preservedMtime > 0L) {
+                // Best-effort: setLastModified can fail on read-only filesystems or unusual
+                // platforms. If it does, the worst case is the user gets one extra CSS
+                // recompile, which is the pre-fix behavior -- not a regression.
+                if (!bundleFile.setLastModified(preservedMtime)) {
+                    // Capture the post-write mtime so subsequent persists in this session
+                    // don't treat the failure as an external edit.
+                    preservedMtime = bundleFile.lastModified();
+                }
+            } else {
+                // File was freshly created: use this write's mtime as the future baseline.
+                preservedMtime = bundleFile.lastModified();
+            }
         }
 
         private void persistIfNeeded(boolean force) {

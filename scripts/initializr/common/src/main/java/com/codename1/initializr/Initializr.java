@@ -53,7 +53,7 @@ public class Initializr extends Lifecycle {
         final boolean[] roundedButtons = new boolean[]{true};
         final boolean[] includeLocalizationBundles = new boolean[]{false};
         final ProjectOptions.PreviewLanguage[] previewLanguage = new ProjectOptions.PreviewLanguage[]{ProjectOptions.PreviewLanguage.ENGLISH};
-        final ProjectOptions.JavaVersion[] javaVersion = new ProjectOptions.JavaVersion[]{ProjectOptions.JavaVersion.JAVA_8};
+        final ProjectOptions.JavaVersion[] javaVersion = new ProjectOptions.JavaVersion[]{ProjectOptions.JavaVersion.JAVA_17};
         final String[] customThemeCss = new String[]{""};
         final String[] lastValidCustomThemeCss = new String[]{""};
         final TextArea[] customCssEditorRef = new TextArea[1];

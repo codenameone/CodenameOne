@@ -75,6 +75,24 @@ public class CompileCSSMojo extends AbstractCN1Mojo {
     }
 
     /**
+     * The localization directory is bundled into the same `theme.res` as the CSS rules
+     * (see the `-l` argument passed to `CN1CSSCLI` below). The shared
+     * {@link AbstractCN1Mojo#getCSSSourcesModificationTime} only walks `src/main/css`,
+     * so it would happily treat l10n edits as "no change" and let the up-to-date check
+     * at the top of {@link #executeImpl(String)} skip recompilation, leaving the user's
+     * `.properties` updates trapped in the stale `theme.res` until a `mvn clean` forces
+     * a rebuild. Roll the l10n directory's recursive modtime into the comparison so
+     * touching any `Messages.properties` invalidates the cached output.
+     */
+    protected long getLocalizationModificationTime() {
+        File localizationDir = findLocalizationDirectory();
+        if (localizationDir == null || !localizationDir.exists()) {
+            return 0L;
+        }
+        return lastModifiedRecursive(localizationDir, ALL_FILES_FILTER);
+    }
+
+    /**
      * Gets the source CSS directory (src/main/css).  The theme.css file should be inside this directory.
      * @return
      */
@@ -168,7 +186,9 @@ public class CompileCSSMojo extends AbstractCN1Mojo {
         File mergeFile = new File(cssBuildDir, themePrefix + "theme.css");
         mergeFile.getParentFile().mkdirs();
         try {
-            if (themeResOutput.exists() && getCSSSourcesModificationTime() < themeResOutput.lastModified()) {
+            long sourcesModTime = Math.max(getCSSSourcesModificationTime(),
+                    getLocalizationModificationTime());
+            if (themeResOutput.exists() && sourcesModTime < themeResOutput.lastModified()) {
                 getLog().info("CSS sources unchanged since last compile.  Skipping CSS compilation");
                 return;
             }

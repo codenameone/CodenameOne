@@ -49,9 +49,14 @@ import static com.codename1.ui.ComponentSelector.$;
 /// button has the UIID style of a button.
 ///
 /// ```java
+/// Form hi = new Form("Test SpanButton", BoxLayout.y());
+///
+/// Image icon = FontImage.createMaterial(FontImage.MATERIAL_INFO, "Button", 3.0f);
+///
 /// SpanButton sb = new SpanButton("SpanButton is a composite component (lead component) that looks/acts like a Button but can break lines rather than crop them when the text is very long.");
 /// sb.setIcon(icon);
 /// hi.add(sb);
+/// hi.show();
 /// ```
 ///
 /// @author Shai Almog
