@@ -216,29 +216,44 @@ try (InputStream is = Display.getInstance().getResourceAsStream("/seed.json")) {
 `com.codename1.ui.util.Resources` is **not** a general classpath loader. It reads entries (themes, images, l10n bundles, multi-images, animations, etc.) only from the binary `.res` file produced by the CSS compiler — typically `/theme.res`.
 
 ```java
-Resources r = Resources.openLayered("/theme");
+// Reach for the cached, in-RAM global resources — the Lifecycle has already
+// loaded /theme.res by the time your code runs.
+Resources r = Resources.getGlobalResources();
 Image logo = r.getImage("logo");                    // an image baked into theme.res
 Hashtable<String, String> strings = r.getL10N("messages", "en");
 ```
+
+(`Resources.openLayered("/theme")` exists but **re-reads** the resource bundle from the classpath every call. Use `getGlobalResources()` unless you're loading a *secondary* resource file that wasn't installed as the app theme.)
 
 Files placed under `common/src/main/css/images/` and bundles under `common/src/main/l10n/` end up inside `theme.res`. Files placed elsewhere under `common/src/main/resources/` are reachable via `Display.getResourceAsStream` but **not** via `Resources` — different stores, different lookups.
 
 ### Multi-images — density-correct asset bundling
 
-A **multi-image** is a single named resource that contains multiple per-density variants of the same image. At runtime CN1 picks the variant closest to the device's pixel density, then scales as needed. You get crisp icons across a 1x simulator, a 2x phone, and a 3x phone without shipping a single fat image.
+A **multi-image** is a single named resource that holds several per-density variants of the same image. At runtime CN1 picks the variant whose density matches `Display.getDeviceDensity()`, so a single named lookup renders crisply on a low-DPI Android tablet, a mid-range phone, and a 4K-class flagship without scaling artifacts.
 
-The CSS compiler creates multi-images automatically from CSS rules that reference an image, sized at multiple densities. For example, a CSS rule like:
+Codename One uses **density buckets** (closer to Android's `ldpi/mdpi/hdpi/...` than iOS's `1x/2x/3x`):
 
-```css
-LogoMark {
-    background-image: url('/logo.png');
-    background-size: 12mm 12mm;
-}
+| Constant on `Display` | Approx pixel density | Typical device |
+| --- | --- | --- |
+| `DENSITY_VERY_LOW` | ~88 ppi | very small / low-end |
+| `DENSITY_LOW` | ~120 ppi | Android ldpi |
+| `DENSITY_MEDIUM` | ~160 ppi | Android mdpi, iPhone 3GS, original iPad |
+| `DENSITY_HIGH` | ~240 ppi | Android hdpi |
+| `DENSITY_VERY_HIGH` | ~320 ppi | Android xhdpi, iPhone 4 / iPad Air 2 |
+| `DENSITY_HD` | ~540 ppi | Android xxhdpi, iPhone 6+ |
+| `DENSITY_560` | ~750 ppi | Android xxxhdpi |
+| `DENSITY_2HD` | ~1000 ppi | |
+| `DENSITY_4K` | ~1250 ppi | |
+
+Multi-images are **authored in the Codename One Designer** (the resource editor): drop in the source image at its native density, tick the lower-density buckets you want auto-generated, and the designer creates the variants and writes them as a single named multi-image entry in `theme.res`. There's no auto-derivation from a plain `url('/foo.png')` in CSS — the multi-image has to be present in the resource file.
+
+At runtime, fetch by name from the global resources cache (see *Resources — entries from the binary theme/resource file* above):
+
+```java
+Image logo = Resources.getGlobalResources().getImage("logo");
 ```
 
-makes the compiler emit a multi-image entry named `logo.png` in `theme.res` containing variants for very-low / low / medium / high / very-high / hd / 560 / 2hd / 4k densities (whichever the source image and your CN1 version generate). At runtime `Resources.openLayered("/theme").getImage("logo.png")` returns the variant matched to `Display.getDeviceDensity()`.
-
-You can also build multi-images programmatically with `EncodedImage.createMulti(...)` and write them into a `MutableResource` if you're generating resource files at build time.
+The returned `Image` is already the variant matching the device — no extra lookup or scaling code on your side.
 
 Use multi-images for everything that ships with the app (icons, decorative graphics, splash artwork). For network-loaded images, use `URLImage` which handles its own density-aware caching.
 

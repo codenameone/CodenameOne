@@ -1,6 +1,6 @@
 # cn1libs — Creating, Packaging, and Consuming Codename One Libraries
 
-A **cn1lib** is a reusable Codename One library: Java/Kotlin source, optional CSS, optional resources, and platform-native code (Objective-C, Android Java/Kotlin, JavaScript, C#) packaged into a single artifact. CN1 has two cn1lib distribution formats:
+A **cn1lib** is a reusable Codename One library: Java/Kotlin source, optional CSS, optional resources, and platform-native code (Objective-C for iOS, Java/Kotlin for Android, JavaScript for the web port, plain Java for the desktop simulator) packaged into a single artifact. CN1 has two cn1lib distribution formats:
 
 - **Maven (modern, preferred for new libraries)** — published to Maven Central or a private Maven repo, consumed via a regular `<dependency>` in `common/pom.xml`.
 - **`.cn1lib` binary (legacy)** — a self-contained zip of jars and native source trees, dropped into the consuming project's `cn1libs/` directory. Still in active use; many older CN1 libraries (ZipSupport, CodeRAD, push integrations) ship this way.

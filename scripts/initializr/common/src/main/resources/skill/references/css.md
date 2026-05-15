@@ -227,17 +227,21 @@ Caption { font-family: "native:ItalicLight"; font-size: 2.5mm; }
 
 ### Multi-images — one image, multiple densities
 
-When you reference an image asset in `theme.css` (e.g. `background-image: url('/logo.png')`), the CSS compiler builds a **multi-image** — a single resource entry inside `theme.res` that contains the image rendered at multiple device densities (very-low through 4K, whichever your source resolution and CN1 version generate). At runtime CN1 selects the variant closest to `Display.getDeviceDensity()`, then scales as needed.
+A **multi-image** is a single named resource that holds several per-density variants of the same image, packaged inside `theme.res`. At runtime CN1 picks the variant whose density matches `Display.getDeviceDensity()`.
 
-The upshot:
+CN1 uses **density buckets**, closer to Android's `ldpi/mdpi/hdpi/...` than iOS's `1x/2x/3x`: `DENSITY_VERY_LOW` (~88 ppi), `DENSITY_LOW` (~120 ppi), `DENSITY_MEDIUM` (~160 ppi, iPhone 3GS / original iPad / Android mdpi), `DENSITY_HIGH` (~240 ppi, Android hdpi), `DENSITY_VERY_HIGH` (~320 ppi, iPhone 4 era / Android xhdpi), `DENSITY_HD` (~540 ppi, iPhone 6+ / Android xxhdpi), `DENSITY_560` (~750 ppi, Android xxxhdpi), `DENSITY_2HD` (~1000 ppi), `DENSITY_4K` (~1250 ppi).
 
-- Drop one source image (the highest resolution you have) into `common/src/main/css/images/`, reference it once in CSS, and it renders crisply across a 1x simulator, a 2x phone, and a 3x phone.
-- The compiler caps the largest variant at the image's source resolution, so feed in 3x or higher art.
-- For images you load at runtime via `Resources.openLayered("/theme").getImage("logo.png")` you get the same density-aware lookup automatically.
+Multi-images are **authored in the Codename One Designer** (the resource editor) — not auto-generated from CSS. Open the theme `.res` in the designer, add the source image at its native density, tick the lower-density buckets you want, and the designer creates the variants and writes them as one named entry.
 
-For network-loaded images, `URLImage` handles its own density-aware caching — multi-images are specifically for assets baked into `theme.res` at build time.
+At runtime, fetch the matching variant by name from the cached global resources:
 
-See `references/java-api-subset.md` *Multi-images* for the runtime API and `EncodedImage.createMulti(...)` for programmatic creation.
+```java
+Image logo = Resources.getGlobalResources().getImage("logo");
+```
+
+Use multi-images for everything that ships with the app (icons, decorative graphics, splash artwork). For network-loaded images, `URLImage` handles its own density-aware caching.
+
+See `references/java-api-subset.md` *Multi-images* for the full density table.
 
 ### Custom TTF fonts
 
@@ -351,7 +355,7 @@ int unselectedBg = cmp.getUnselectedStyle().getBgColor();   // (3) read a specif
 
   For **reading** style values explicitly (in tests, in painters, in conditional logic), always call the **specific state getter** — `getUnselectedStyle()`, `getSelectedStyle()`, `getPressedStyle()`, or `getDisabledStyle()`. That's the unambiguous form and it lines up with the CSS rule that produced the value.
 
-- **`getStyle()` returns the style of the *currently active* state.** This is useful inside a custom `paint(Graphics g)` implementation, where you want the colors that should be drawn right now regardless of whether the component is selected, pressed, or disabled. **Outside of `paint()`, don't use `getStyle()`** — be explicit about which state you mean. Tests that read `getStyle()` will pass or fail depending on the focus/press state of the component at the moment of assertion, which is a flake source.
+- **`getStyle()` returns the style for the *currently active* state.** That means it's the right tool inside a custom `paint(Graphics g)` implementation — `paint()` is called for whatever state the component is in right now (unselected / focused / pressed / disabled), and `getStyle()` hands back exactly the colors, font, and border that should be used to render that state. **Outside of `paint()`, don't use `getStyle()`** — be explicit about which state you mean. Tests that read `getStyle()` will pass or fail depending on the focus/press state of the component at the moment of assertion, which is a flake source.
 
 - **`getAllStyles()`** returns a **fan-out** style object that writes the same value to **all four** state styles at once. It is the right hammer for "set this color on the component" overrides. Treat it as **write-only** — never read values from it; the value you read may not match any specific state, since the aggregation is for setters only.
 
@@ -366,9 +370,10 @@ assertEqual(0x1d4ed8, save.getUnselectedStyle().getBgColor(),
 assertEqual(0x1e3a8a, save.getPressedStyle().getBgColor(),
         "PrimaryCta.pressed should darken the accent");
 
-// Painter pattern — getStyle() picks the right state automatically:
+// Inside a custom paint(): getStyle() returns the style for the state
+// the component is currently in, so the rendering reflects that state.
 public void paint(Graphics g) {
-    Style s = getStyle();                  // unselected / selected / pressed / disabled, as appropriate
+    Style s = getStyle();                  // unselected / selected / pressed / disabled, per current state
     g.setColor(s.getFgColor());
     g.drawLine(...);
 }

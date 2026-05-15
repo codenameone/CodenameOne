@@ -54,8 +54,6 @@ javase/src/main/java/com/example/myapp/native_/GpsBridgeImpl.java
 javascript/src/main/javascript/com_example_myapp_native_GpsBridgeImpl.js
 ```
 
-(Generated Java 17 projects no longer ship a `win/` module — the legacy UWP target is dropped. If a project still has a `win/` directory, a C# stub is generated as well.)
-
 The plugin will **not overwrite existing stubs** by default. Pass `-Dcn1.generateNativeInterfaces.overwrite=true` if you really want to regenerate. To emit Swift instead of Objective-C, or Kotlin instead of Java, add `-Dcn1.generateNativeInterfaces.swift=true` / `-Dcn1.generateNativeInterfaces.kotlin=true`.
 
 ## 3. Verify the stub layout BEFORE implementing
