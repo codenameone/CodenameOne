@@ -220,11 +220,24 @@ public class StubGenerator {
             log.debug(javaseFile+" already exists. Skipping");
         }
 
-        if(overwrite || !csFile.exists()) {
-            log.info("Writing "+csFile);
-            generateCSFile(csFile, "FrameworkElement");
+        // Only emit the UWP / Windows C# stub if the project actually has a win/
+        // module. Java 17 generated projects no longer ship that module (the
+        // Windows native port is legacy), so omitting the stub avoids leaving
+        // dangling .cs files outside any compiled source set.
+        File winModuleRoot = csFile.getParentFile();
+        while (winModuleRoot != null && !"win".equals(winModuleRoot.getName())) {
+            winModuleRoot = winModuleRoot.getParentFile();
+        }
+        boolean winModulePresent = winModuleRoot != null && winModuleRoot.isDirectory();
+        if (winModulePresent) {
+            if(overwrite || !csFile.exists()) {
+                log.info("Writing "+csFile);
+                generateCSFile(csFile, "FrameworkElement");
+            } else {
+                log.debug(csFile+" already exists. Skipping");
+            }
         } else {
-            log.debug(csFile+" already exists. Skipping");
+            log.debug("No win/ module under destination — skipping C# stub for "+nativeInterface.getName());
         }
         if(overwrite || !(iosHFile.exists() || iosMFile.exists())) {
             log.info("Writing "+iosHFile);

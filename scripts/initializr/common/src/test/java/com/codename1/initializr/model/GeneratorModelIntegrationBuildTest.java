@@ -41,7 +41,7 @@ public class GeneratorModelIntegrationBuildTest extends AbstractTest {
         if (java17 == null) {
             System.out.println("[WARN] Skipping Java 17 integration build check. No JDK 17 found.");
         } else {
-            buildGeneratedProject(ProjectOptions.JavaVersion.JAVA_17_EXPERIMENTAL, java17, "java17");
+            buildGeneratedProject(ProjectOptions.JavaVersion.JAVA_17, java17, "java17");
         }
 
         return true;
