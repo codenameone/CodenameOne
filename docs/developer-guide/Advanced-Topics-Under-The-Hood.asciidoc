@@ -1543,39 +1543,50 @@ Cn1lib’s address the modularity aspect allowing you to break that down. Existi
 
 ==== How to use cn1libs
 
-Codename One has a large repository of https://www.codenameone.com/cn1libs.html[3rd party cn1libs], you can install a cn1lib by placing it in the lib directory of your project then right clicking the project and selecting #Codename One# -> #Refresh cn1lib files#.
+Codename One has a large repository of https://www.codenameone.com/cn1libs.html[3rd party cn1libs]. With the Maven build tool, you consume a cn1lib the same way you consume any other Maven dependency: by adding it to the `<dependencies>` section of your application's `common/pom.xml` file. A typical entry looks like:
 
-.Refresh cn1lib files menu option
-image::img/cn1libs-refresh.png[Refresh cn1lib files menu option,scaledwidth=40%]
+[source,xml]
+----
+<dependency>
+    <groupId>com.example</groupId>
+    <artifactId>mylib-lib</artifactId>
+    <version>1.0.0</version>
+    <type>pom</type>
+</dependency>
+----
 
-Once refreshed the content of the cn1lib will be available to code completion and you could use it.
+Add the dependency *before* the `<!-- INJECT DEPENDENCIES -->` comment in `common/pom.xml`. The `-lib` suffix on the `artifactId` and the `<type>pom</type>` declaration are both important - they tell Maven to pull in the library's "lib" aggregator module rather than a plain jar. See <<creating-cn1libs>> for the full library-consumption guide.
 
-TIP: Notice that some cn1libs require more configurations such as build hints etc. make sure to read the developers instructions when integrating a 3rd party library.
+TIP: Some cn1libs require additional configuration such as build hints. Always read the library author's instructions when integrating a 3rd party library.
 
-.Under the Hood of cn1lib Install
+.Legacy Ant projects
 ****
-#Refresh cn1lib files# invokes the ant task `refresh-libs`. You could automatically trigger a refresh as part of your build process by invoking that ant task manually.
-
-Technically that task invokes a custom task that unzips the content of the cn1lib into a set of directories accessible to the build process. Classes and stub sources are installed in `lib/impl/cls` & `lib/impl/stubs` respectively.
-
-The native files are extracted to `lib/impl/native`. The classpath for the main project and the ant build process know about these directories and include them within their path.
+If you're still maintaining an Ant-based project, you can install a cn1lib by dropping its `.cn1lib` file into the project's `lib` directory and then right-clicking the project and selecting #Codename One# -> #Refresh cn1lib files# (which invokes the `refresh-libs` Ant task). This unpacks classes and stub sources into `lib/impl/cls` and `lib/impl/stubs`, and native sources into `lib/impl/native`. New projects should use Maven instead - see <<maven-project-workflow>>.
 ****
 
 ==== Creating a simple cn1lib
 
-Creating a cn1lib is trivial, you will get into more elaborate uses soon enough but for a hello world cn1lib you can use this 2 step process:
+Codename One libraries are generated from the `cn1lib-archetype` Maven archetype, which creates a multi-module project containing a `common` module for your cross-platform Java sources and one module per native platform (iOS, Android, Java SE, JavaScript) for any native interfaces. The detailed walkthrough - command-line, IntelliJ IDEA, NetBeans, and Eclipse - lives in <<creating-cn1libs>>.
 
-.Select the CodenameOne Library Option
-image::img/cn1lib-create-step1.png[Select the CodenameOne Library Option,scaledwidth=30%]
+The quickest path from a shell:
 
-.Select the file name/destination. Notice that a Java 8 cn1lib requires Java 8 support in the parent project!
-image::img/cn1lib-create-step2.png[Select the file name/destination. Notice that a Java 8 cn1lib requires Java 8 support in the parent project!,scaledwidth=30%]
+[source,bash]
+----
+mvn archetype:generate \
+  -DarchetypeArtifactId=cn1lib-archetype \
+  -DarchetypeGroupId=com.codenameone \
+  -DarchetypeVersion=LATEST \
+  -DgroupId=com.example.mylib \
+  -DartifactId=mylib \
+  -Dversion=1.0-SNAPSHOT \
+  -DinteractiveMode=false
+----
 
-Once you go thru these steps you can define any source file within the library and it will be accessible to the users of the library.
+Once the project is generated, add your cross-platform Java sources under `common/src/main/java`, CSS under `common/src/main/css`, and run `mvn install` from the project root to build. The build produces both a Maven artifact for pom-style consumption and a legacy `.cn1lib` file in `common/target` for users still on Ant.
 
 ==== Build hints in cn1libs
 
-Some cn1libs are pretty simple to install, place them under the lib directory and refresh. For example, many of the more elaborate cn1libs need some pretty complex configurations. This is the case when native code is involved where you need to add permissions or plist entries for the various native platforms to get everything to work. This makes the cn1lib's helpful but less than seamless which is where you want to go.
+Some cn1libs are pretty simple to install - just add them as a Maven dependency in `common/pom.xml`. For example, many of the more elaborate cn1libs need some pretty complex configurations. This is the case when native code is involved where you need to add permissions or plist entries for the various native platforms to get everything to work. This makes the cn1lib's helpful but less than seamless which is where you want to go.
 
 Codename One cn1libs include two files that can be placed into the root: `codenameone_library_required.properties` & `codenameone_library_appended.properties`.
 
@@ -2761,12 +2772,12 @@ that's: you list the framework names separated by semicolons. Notice that your l
 
 === Part 3 : Packaging as a cn1lib
 
-During the initial development, I find it easier to use a regular Codename One project so that I can run and test as I go. However, once it's stabilized, and I want to distribute the library to other developers, I will transfer it over to a Codename One library project. This general process involves:
+During the initial development, I find it easier to use a regular Codename One application project so that I can run and test as I go. However, once it's stabilized, and I want to distribute the library to other developers, I will transfer it over to a Codename One library project. This general process involves:
 
-. Create a Codename One Library project.
-. Copy the.Java files from your original project into the library project.
-. Copy the `native` directory from the original project into the library project.
-. Copy the *relevant* build hints from the original project's `codenameone_settings.properties` file into the library project's `codenameone_library_appended.properties` file.
+. Generate a Maven cn1lib project using the `cn1lib-archetype` (see <<creating-cn1libs>>).
+. Copy the Java files from your original application project into the new library project's `common/src/main/java` directory.
+. Copy any native source directories from your original project into the matching platform module (`ios/src/main/objectivec`, `android/src/main/java`, etc.).
+. Copy the *relevant* build hints from the original project's `codenameone_settings.properties` file into the library project's `common/codenameone_library_appended.properties` file.
 
 For the FreshDesk.cn1lib, I modified the original project's build script to generate and build a library project automatically. However, that's beyond the scope of this tutorial.
 
@@ -3100,13 +3111,13 @@ The process for assessing the runtime library is pretty like the process for the
 
 ===== Step 2: convert the runtime library into a CN1Lib
 
-Once you've assessed the language and are optimistic that it's a good candidate for porting, you can proceed to port the runtime library into Codename One. That language's runtime library will be distributed in.jar format. You need to convert this into a cn1lib so that it can be used in a Codename One project. If you can get your hands on the source code for the runtime library then the best approach is to paste the source files into a Codename One Library project, and try to build it. This has the advantage that it will check the source during compile to ensure that it doesn't depend on any classes that Codename One doesn't support.
+Once you've assessed the language and are optimistic that it's a good candidate for porting, you can proceed to port the runtime library into Codename One. That language's runtime library will be distributed in.jar format. You need to convert this into a cn1lib so that it can be used in a Codename One project. If you can get your hands on the source code for the runtime library then the best approach is to paste the source files into a Maven cn1lib project generated with the `cn1lib-archetype` (see <<creating-cn1libs>>) and try to build it. This has the advantage that it will check the source during compile to ensure that it doesn't depend on any classes that Codename One doesn't support.
 
 If you can't find the sources of the runtime library or they don't seem to be "buildable," then the next best thing is to get the binary distribution's jar file and convert it to a cn1lib. This is what you did for the https://github.com/shannah/codenameone-kotlin[Kotlin runtime library].
 
 This procedure exploits the fact that a cn1lib file is a zip file with a specific file structure inside it. The cross-platform Java.class files are all contained inside a file named `main.zip`, inside the zip file. This is the *mandatory* file that must be inside a cn1lib.
 
-To make the library easier to use the cn1lib file can also contain a file named "stubs.zip" which includes stubs of the Java sources. When you build a cn1lib using a Codename One Library project, it will automatically generate stubs of the source so that the IDE will have access to nice things like Javadoc when using the library. The kotlin distribution includes a separate jar file with the runtime sources, named `kotlin-runtime-sources.jar`, so you used this as the "stubs." It contains full sources, which isn't necessary, but it also doesn't hurt.
+To make the library easier to use the cn1lib file can also contain a file named "stubs.zip" which includes stubs of the Java sources. When you build a cn1lib using a Maven cn1lib project, it will automatically generate stubs of the source so that the IDE will have access to nice things like Javadoc when using the library. The kotlin distribution includes a separate jar file with the runtime sources, named `kotlin-runtime-sources.jar`, so you used this as the "stubs." It contains full sources, which isn't necessary, but it also doesn't hurt.
 
 now that you had your two jar files: kotlin-runtime.jar and kotlin-runtime-sources.jar, I created a new empty directory, and copied them inside. I renamed the jars "main.zip" and "stubs.zip" respectively. Then I zipped up the directory and renamed the zip file `kotlin-runtime.cn1lib`.
 
@@ -3134,9 +3145,9 @@ After building this, I have a directory that contains "com/mycompany/myapp/Hello
 
 It also produced a.jar file that contains this class.
 
-The easiest way to integrate external code into a Codename One project, is to wrap it as a cn1lib file and place it into your Codename One project's lib directory. That way you don't have to mess with any of the build files. using the same procedure as you used to create the kotlin-runtime.cn1lib, I wrap your hellokotlin.jar as a cn1lib to produce "hellokotlin.cn1lib" and copy it to the "lib" directory of a Codename One project.
+The easiest way to integrate external code into a Codename One project is to wrap it as a cn1lib and consume it as a Maven dependency. Generate a cn1lib project with the `cn1lib-archetype` (see <<creating-cn1libs>>), drop the external class files into the `common` module, install it locally with `mvn install`, then add a `pom`-typed `<dependency>` entry to your application's `common/pom.xml`. Using the same procedure as you used to create the kotlin-runtime.cn1lib, I wrap your hellokotlin.jar as a cn1lib that exposes the same classes to the application project.
 
-NOTE: Remember to select "Codename One" -> "Refresh CN1Libs" after placing the cn1lib in your lib directory or it won't get picked up.
+NOTE: If you're maintaining a legacy Ant project, you can still drop the `.cn1lib` file into the project's `lib` directory and select "Codename One" -> "Refresh CN1Libs" to pick it up - but new projects should use the Maven dependency mechanism described above.
 
 Finally, I call your library from the start() method of your app:
 
@@ -3159,8 +3170,8 @@ At this point you already have a manual process for incorporating files built wi
 
 1. Use standard tools for your JVM language to write your code.
 2. Use the JVM language's standard build tools (for example: command-line compiler, etc..) to compile your code so that you've.class files (and optionally a.jar file).
-3. Wrap your.class files in a cn1lib.
-4. Add the cn1lib to the lib directory of a Codename One project.
+3. Wrap your.class files in a cn1lib by dropping them into a Maven cn1lib project generated from the `cn1lib-archetype` (see <<creating-cn1libs>>).
+4. Install the cn1lib locally with `mvn install` and add it as a `pom`-typed dependency to your Codename One application's `common/pom.xml`.
 5. Use your library from the Codename One project.
 
 When Steve first developed Mirah support he automated this process using an https://github.com/shannah/CN1MirahNBM/blob/master/src/ca/weblite/codename1/mirah/build.xml[ANT script]. He also automatically generated some bootstrap code so that he could develop the whole app in Mirah and he woudn't have to write any Java. For example, this level of integration has limitations.
