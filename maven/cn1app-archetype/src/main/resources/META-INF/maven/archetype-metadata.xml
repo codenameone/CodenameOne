@@ -1,0 +1,247 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<archetype-descriptor xsi:schemaLocation="https://maven.apache.org/plugins/maven-archetype-plugin/archetype-descriptor/1.1.0 http://maven.apache.org/xsd/archetype-descriptor-1.1.0.xsd" name="filechooser-demo"
+    xmlns="https://maven.apache.org/plugins/maven-archetype-plugin/archetype-descriptor/1.1.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+
+  <requiredProperties>
+    <requiredProperty key="cn1Version">
+      <defaultValue>8.0-SNAPSHOT</defaultValue>
+    </requiredProperty>
+    <requiredProperty key="cn1PluginVersion">
+      <defaultValue>8.0-SNAPSHOT</defaultValue>
+    </requiredProperty>
+    <requiredProperty key="kotlinVersion">
+      <defaultValue>1.3.72</defaultValue>
+    </requiredProperty>
+    <requiredProperty key="javaVersion">
+      <!-- Sets codename1.arg.java.version (build server) and the maven-compiler
+           source/target. Pass 8 for the broadly tested default, 17 to opt in to
+           the experimental Java 17 toolchain. The literal "auto" (default)
+           lets archetype-post-generate.groovy pick 17 when running on a
+           JDK >= 17 and 8 otherwise. -->
+      <defaultValue>auto</defaultValue>
+    </requiredProperty>
+
+    <requiredProperty key="mainName">
+      <validationRegex>^[A-Z][a-zA-Z0-9]+$</validationRegex>
+    </requiredProperty>
+
+  </requiredProperties>
+
+  <fileSets>
+
+    <fileSet encoding="UTF-8">
+      <directory>.mvn</directory>
+      <includes>
+        <include>**/*.config</include>
+      </includes>
+    </fileSet>
+    <fileSet encoding="UTF-8">
+      <directory>.mvn/wrapper</directory>
+      <includes>
+        <include>**</include>
+      </includes>
+    </fileSet>
+    <fileSet encoding="UTF-8" filtered="true">
+      <directory>.idea</directory>
+      <includes>
+        <include>**</include>
+      </includes>
+    </fileSet>
+    <fileSet encoding="UTF-8" filtered="true">
+      <directory>.vscode</directory>
+      <includes>
+        <include>**</include>
+      </includes>
+    </fileSet>
+    <!--
+      .claude/skills/codename-one/** is staged into the archetype JAR at
+      build time from scripts/initializr/common/src/main/resources/skill/**
+      (see maven/cn1app-archetype/pom.xml). It always extracts; the post-
+      generate groovy deletes it when the resolved javaVersion is 8 so
+      only Java 17 projects ship the Codename One authoring skill.
+      filtered="false" — skill markdown has $foo placeholders that Velocity
+      would otherwise misinterpret.
+    -->
+    <fileSet encoding="UTF-8">
+      <directory>.claude</directory>
+      <includes>
+        <include>**</include>
+      </includes>
+    </fileSet>
+    <fileSet encoding="UTF-8">
+      <directory>tools/netbeans</directory>
+      <includes>
+        <include>nb-configuration.xml</include>
+        <include>nbactions.xml</include>
+        <include>nbactions-*.xml</include>
+
+      </includes>
+    </fileSet>
+    <fileSet encoding="UTF-8">
+      <directory></directory>
+      <includes>
+        <include>.gitignore</include>
+        <include>*.sh</include>
+        <include>*.bat</include>
+        <include>*.adoc</include>
+        <include>mvnw</include>
+        <include>mvnw.cmd</include>
+
+      </includes>
+    </fileSet>
+    <fileSet filtered="true" encoding="UTF-8">
+      <directory>tools/eclipse</directory>
+      <includes>
+        <include>*.launch</include>
+      </includes>
+
+    </fileSet>
+  </fileSets>
+  <modules>
+    <module id="${rootArtifactId}-common" dir="common" name="${rootArtifactId}-common">
+      <fileSets>
+        <fileSet filtered="true" packaged="true" encoding="UTF-8">
+          <directory>src/main/java</directory>
+          <includes>
+            <include>**/*.java</include>
+          </includes>
+        </fileSet>
+        <fileSet filtered="true" packaged="true" encoding="UTF-8">
+          <directory>src/main/guibuilder</directory>
+          <includes>
+            <include>**/*.gui</include>
+          </includes>
+        </fileSet>
+        <fileSet encoding="UTF-8">
+          <directory>src/main/css</directory>
+          <includes>
+            <include>**/*.css</include>
+          </includes>
+        </fileSet>
+        <fileSet encoding="UTF-8">
+          <directory>src/main/l10n</directory>
+          <includes>
+            <include>**/*.properties</include>
+          </includes>
+        </fileSet>
+        <fileSet filtered="true" packaged="true" encoding="UTF-8">
+          <directory>src/test/java</directory>
+          <includes>
+            <include>**/*.java</include>
+          </includes>
+        </fileSet>
+
+
+
+        <fileSet filtered="true" encoding="UTF-8">
+          <directory></directory>
+          <includes>
+            <include>codenameone_settings.properties</include>
+          </includes>
+        </fileSet>
+        <fileSet encoding="UTF-8">
+          <directory></directory>
+          <includes>
+            <include>icon.png</include>
+          </includes>
+        </fileSet>
+      </fileSets>
+    </module>
+    <module id="${rootArtifactId}-javase" dir="javase" name="${rootArtifactId}-javase">
+      <fileSets>
+        <fileSet filtered="true" packaged="true" encoding="UTF-8">
+          <directory>src/main/java</directory>
+
+          <includes>
+            <include>**/*.java</include>
+          </includes>
+        </fileSet>
+        <fileSet filtered="true" packaged="true" encoding="UTF-8">
+          <directory>src/desktop/java</directory>
+
+          <includes>
+            <include>**/*.java</include>
+          </includes>
+        </fileSet>
+        <fileSet encoding="UTF-8">
+          <directory>src/main/resources</directory>
+          <includes>
+            <include>**</include>
+          </includes>
+        </fileSet>
+        <fileSet encoding="UTF-8">
+          <directory>src/desktop/resources</directory>
+          <includes>
+            <include>**</include>
+          </includes>
+        </fileSet>
+      </fileSets>
+    </module>
+    <module id="${rootArtifactId}-javascript" dir="javascript" name="${rootArtifactId}-javascript">
+      <fileSets>
+        <fileSet encoding="UTF-8">
+          <directory>src/main/resources</directory>
+          <includes>
+            <include>**</include>
+          </includes>
+        </fileSet>
+        <fileSet encoding="UTF-8">
+          <directory>src/main/javascript</directory>
+          <includes>
+            <include>**</include>
+          </includes>
+        </fileSet>
+      </fileSets>
+    </module>
+    <module id="${rootArtifactId}-ios" dir="ios" name="${rootArtifactId}-ios">
+      <fileSets>
+        <fileSet encoding="UTF-8">
+          <directory>src/main/resources</directory>
+          <includes>
+            <include>**</include>
+          </includes>
+        </fileSet>
+        <fileSet encoding="UTF-8">
+          <directory>src/main/objectivec</directory>
+          <includes>
+            <include>**</include>
+          </includes>
+        </fileSet>
+      </fileSets>
+    </module>
+
+    <module id="${rootArtifactId}-android" dir="android" name="${rootArtifactId}-android">
+      <fileSets>
+        <fileSet encoding="UTF-8">
+          <directory>src/main/resources</directory>
+          <includes>
+            <include>**</include>
+          </includes>
+        </fileSet>
+        <fileSet filtered="true" packaged="true" encoding="UTF-8">
+          <directory>src/main/java</directory>
+          <includes>
+            <include>**/*.java</include>
+          </includes>
+        </fileSet>
+      </fileSets>
+    </module>
+    <module id="${rootArtifactId}-win" dir="win" name="${rootArtifactId}-win">
+      <fileSets>
+        <fileSet encoding="UTF-8">
+          <directory>src/main/resources</directory>
+          <includes>
+            <include>**</include>
+          </includes>
+        </fileSet>
+        <fileSet filtered="true" packaged="true" encoding="UTF-8">
+          <directory>src/main/csharp</directory>
+          <includes>
+            <include>**/*.cs</include>
+          </includes>
+        </fileSet>
+      </fileSets>
+    </module>
+  </modules>
+</archetype-descriptor>

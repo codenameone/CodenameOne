@@ -247,39 +247,11 @@ if [ ! -f "$BUILD_CLIENT" ]; then
   fi
 fi
 
-log "Installing cn1-maven-archetypes"
-if [ "${SKIP_CN1_ARCHETYPES:-0}" = "1" ]; then
-  log "Skipping cn1-maven-archetypes install because SKIP_CN1_ARCHETYPES=1"
-  skip_archetypes=1
-else
-  set +e  # don't let a transient git failure abort the whole build
-  if [ -d cn1-maven-archetypes/.git ]; then
-    log "Updating existing cn1-maven-archetypes checkout"
-    if ! git -C cn1-maven-archetypes fetch --all --tags; then
-      log "git fetch failed (exit 128?). Leaving existing copy as-is."
-    else
-      git -C cn1-maven-archetypes reset --hard origin/master || \
-        log "git reset failed; keeping local state."
-    fi
-  else
-    if ! git clone https://github.com/shannah/cn1-maven-archetypes cn1-maven-archetypes; then
-      log "git clone failed (likely exit 128). Skipping archetype install."
-      skip_archetypes=1
-    fi
-  fi
-  set -e
-fi
-
-if [ "${skip_archetypes:-0}" -eq 0 ]; then
-  (
-    cd cn1-maven-archetypes
-    current_version=$("$MAVEN_HOME/bin/mvn" -q -DforceStdout help:evaluate -Dexpression=project.version | tr -d '\r' | tail -n 1)
-    if [ -z "$current_version" ]; then
-      log "Unable to determine cn1-maven-archetypes version; proceeding with defaults"
-    elif [ "$current_version" != "$CN1_VERSION" ]; then
-      log "Updating cn1-maven-archetypes version from $current_version to $CN1_VERSION to match local snapshot"
-      "$MAVEN_HOME/bin/mvn" -q -B versions:set -DnewVersion="$CN1_VERSION" -DgenerateBackupPoms=false
-    fi
-    "$MAVEN_HOME/bin/mvn" -T 1C -DskipTests -DskipITs=true -Dinvoker.skip=true install
-  ) || log "Archetype mvn install failed; continuing."
-fi
+# The cn1{app,lib}-archetype modules are inlined into the maven/ reactor
+# (see maven/cn1app-archetype/ and maven/cn1lib-archetype/), so they're
+# already installed into the local repo by the main `mvn install` above.
+# Refresh the local archetype catalog so `mvn archetype:generate` can
+# resolve them without a network round-trip.
+log "Refreshing local archetype catalog"
+( cd maven && "$MAVEN_HOME/bin/mvn" -q archetype:update-local-catalog ) || \
+  log "archetype:update-local-catalog failed; archetype:generate may need -DarchetypeCatalog=local manually."
