@@ -4,13 +4,13 @@ slug: skills-java17-and-theme-accents
 url: /blog/skills-java17-and-theme-accents/
 date: '2026-05-15'
 author: Shai Almog
-description: New projects now generate on Java 17 by default and ship with a vendor-neutral Codename One authoring skill that any AI agent can pick up via the emerging AGENTS.md convention. The new native themes expose a runtime accent vocabulary so a single addThemeProps call retunes the whole app. Plus a Metal pipeline that picks up per-axis transform decomposition, a colour-space build hint, a new matrix-correct translateMatrix API, push permission that no longer fires at app launch, and the JDK 11+ String API gap closes.
+description: Java 17 is the new Initializr default, generated projects ship a vendor-neutral AGENTS.md authoring skill, native themes get a runtime accent palette, plus Metal follow-ups and iOS push that no longer prompts at launch.
 feed_html: '<img src="https://www.codenameone.com/blog/skills-java17-and-theme-accents.jpg" alt="Skills, Java 17, And Theme Accents" /> New projects default to Java 17 and bundle a vendor-neutral authoring skill at <code>.agent-skills/codename-one/</code> with a top-level <code>AGENTS.md</code> any agent can discover. Native themes gain a runtime accent vocabulary: <pre>UIManager.getInstance().addThemeProps(override);</pre> retunes every accent-bearing UIID at once. Metal picks up per-axis transform decomposition, an <code>ios.metal.colorSpace</code> hint, and a new matrix-correct <code>translateMatrix</code> API. iOS push permission no longer fires at launch.'
 ---
 
 ![Skills, Java 17, And Theme Accents](/blog/skills-java17-and-theme-accents.jpg)
 
-Last week was Metal and the Skin Designer — two big structural pieces landing the same week. This week the diff is smaller in line count and bigger in surface area: it's the week the *output of the Initializr* changes. New projects you generate today look meaningfully different from the projects you generated three weeks ago, and the difference is the part of Codename One a brand new developer actually touches first.
+Last week was Metal and the Skin Designer — two big structural pieces landing the same week. This week the diff is smaller in line count and bigger in surface area: the projects the Initializr hands you have changed. Generate a new app today and it looks meaningfully different from one you generated three weeks ago, and the difference is the part of Codename One a brand new developer actually touches first.
 
 The two headline changes are the default JDK and the bundled agent skill. Both are about the same thing: the generated project should be the most modern thing we know how to ship, on day one.
 
