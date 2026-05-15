@@ -136,6 +136,16 @@ The default is `false`, so existing apps that did not opt in pick up the new beh
 
 One thing to flag if you are updating an existing iOS app: if your onboarding flow was relying on the launch-time prompt happening automatically, your prompt now never fires unless `Push.register()` or `LocalNotification.schedule()` is invoked somewhere. That is almost certainly what you want, but check that the call lands.
 
+## Skin Designer FAQ follow-up
+
+A few questions came up on [discussion #4928](https://github.com/codenameone/CodenameOne/discussions/4928) after last week's Skin Designer post, worth pulling forward here because they keep coming up in the same shape:
+
+* **Skins do not affect CSS.** The skin is simulator scaffolding (device frame, screen rect, cutouts, safe-area insets); your `theme.css` and your native theme are unrelated.
+* **For a known device, the defaults are usually right.** Pick the device, hit *Pick a shape*, click *Finish*. The customization UI is there for when our device database is incomplete (the iPhone 17e entry might say "no notch" when it actually has one, or the notch position might be off by a few pixels); when you have a physical device to measure against, that is where you refine.
+* **Themes are leaving skins.** Historically the native theme was bundled inside each skin because that is what made sense at the time. Going forward the right home for themes is the framework itself, distributed via Maven, so you pick up updates automatically. The new native themes already work this way. The per-skin embedded theme stays for legacy compatibility and the Skin Designer still writes one for you, but the *Native Theme* menu we shipped two weeks ago is the path forward.
+
+The device database the Skin Designer reads from is open at [`scripts/skindesigner/common/src/main/resources/devices.json`](https://github.com/codenameone/CodenameOne/blob/master/scripts/skindesigner/common/src/main/resources/devices.json) if you want to file a PR with a device we are missing or a row whose details are off.
+
 ## Wrapping up
 
 Two reminders. First, **flip `ios.metal=true` on your real app this week** if you have not. The default flip is days away and we would rather find any remaining edge case against your screens than against the install base on launch day. Second, if you have not generated a project from the [Initializr](/initializr/) recently, do it; the Java 17 default and the `AGENTS.md` skill are both worth seeing for yourself.
