@@ -4,8 +4,8 @@ slug: skills-java17-and-theme-accents
 url: /blog/skills-java17-and-theme-accents/
 date: '2026-05-15'
 author: Shai Almog
-description: New projects now generate on Java 17 by default and ship with a Codename One authoring skill that drops into Claude Code (or any Anthropic-compatible agent). The new native themes expose a runtime accent vocabulary so a single addThemeProps call retunes the whole app. Plus a Metal pipeline that picks up per-axis transform decomposition, a colour-space build hint, a new matrix-correct translateMatrix API, push permission that no longer fires at app launch, and the JDK 11+ String API gap closes.
-feed_html: '<img src="https://www.codenameone.com/blog/skills-java17-and-theme-accents.jpg" alt="Skills, Java 17, And Theme Accents" /> New projects default to Java 17 and bundle a Codename One authoring skill at <code>.claude/skills/codename-one/</code>. Native themes gain a runtime accent vocabulary: <pre>UIManager.getInstance().addThemeProps(override);</pre> retunes every accent-bearing UIID at once. Metal picks up per-axis transform decomposition, an <code>ios.metal.colorSpace</code> hint, and a new matrix-correct <code>translateMatrix</code> API. iOS push permission no longer fires at launch.'
+description: New projects now generate on Java 17 by default and ship with a vendor-neutral Codename One authoring skill that any AI agent can pick up via the emerging AGENTS.md convention. The new native themes expose a runtime accent vocabulary so a single addThemeProps call retunes the whole app. Plus a Metal pipeline that picks up per-axis transform decomposition, a colour-space build hint, a new matrix-correct translateMatrix API, push permission that no longer fires at app launch, and the JDK 11+ String API gap closes.
+feed_html: '<img src="https://www.codenameone.com/blog/skills-java17-and-theme-accents.jpg" alt="Skills, Java 17, And Theme Accents" /> New projects default to Java 17 and bundle a vendor-neutral authoring skill at <code>.agent-skills/codename-one/</code> with a top-level <code>AGENTS.md</code> any agent can discover. Native themes gain a runtime accent vocabulary: <pre>UIManager.getInstance().addThemeProps(override);</pre> retunes every accent-bearing UIID at once. Metal picks up per-axis transform decomposition, an <code>ios.metal.colorSpace</code> hint, and a new matrix-correct <code>translateMatrix</code> API. iOS push permission no longer fires at launch.'
 ---
 
 ![Skills, Java 17, And Theme Accents](/blog/skills-java17-and-theme-accents.jpg)
@@ -29,13 +29,14 @@ For anyone running the [Initializr](https://start.codenameone.com) today, you wi
 
 ## The Codename One skill
 
-The bigger surface-area change in the same PR is the **Codename One authoring skill** that now ships inside every generated project. If you have not used Claude Code or an agent SDK yet, the short version is: a "skill" is a directory of Markdown files at a well-known location (`.claude/skills/<name>/`) that an Anthropic-compatible agent loads as task-specific knowledge whenever the user starts working in that project. It's how you tell the agent "here is the stuff that is not obvious from reading the code".
+The bigger surface-area change in the same PR is the **Codename One authoring skill** that now ships inside every generated project — and it's vendor-neutral by design. There's an emerging convention called [`AGENTS.md`](https://agents.md) that proposes a single, universal entry-point file at the root of a repository for *any* AI agent — Claude Code, Cursor, Codex, Aider, future tools we haven't heard of — to discover project-specific guidance. Generated projects now ship one, and the actual skill content lives at a vendor-neutral path beside it.
 
 Every project the Initializr generates from today onwards contains:
 
 ```
-.claude/skills/codename-one/
-  SKILL.md
+AGENTS.md                                    # universal entry point any agent can discover
+.agent-skills/codename-one/
+  SKILL.md                                   # canonical top-level cheat sheet
   references/
     android-to-cn1.md
     build-and-run.md
@@ -55,21 +56,24 @@ Every project the Initializr generates from today onwards contains:
     IsApiSupported.java
     IsCssValid.java
     README.md
+.claude/skills/codename-one/SKILL.md         # thin stub that redirects to .agent-skills/
 ```
 
-The top-level `SKILL.md` is the entry point the agent reads first. The seven `references/` files are the deeper context the agent pulls in when the conversation actually touches the topic — there is no point loading 500 lines of CSS notes into the context window when the user is asking about a `native-interfaces` question, so each reference is gated by topic. The two small Java tools under `tools/` are runnable from the agent: one checks whether a Java API is part of the Codename One subset, the other validates whether a given CSS snippet is one Codename One's CSS compiler will accept.
+The top-level `AGENTS.md` is what any agent sees first. It explains in a dozen lines that this is a Codename One project, points at `.agent-skills/codename-one/SKILL.md` as the canonical content, and gives a four-line orientation: where the app source lives, where the CSS lives, the simulator command, the test command. That's enough for an agent that has never heard of Codename One to find its footing without us picking sides on which vendor's loader format to ship.
 
-Why does this matter in practice? Two things:
+The canonical content lives under `.agent-skills/codename-one/`. `SKILL.md` is the entry-point cheat sheet, the seven `references/` files are the deeper context the agent pulls in when the conversation actually touches the topic (no point loading 500 lines of CSS notes when the user is asking a `native-interfaces` question), and the two small Java tools under `tools/` are runnable single-file `java`-source-mode utilities: one checks whether a Java API is part of the Codename One subset, the other validates whether a given CSS snippet is one Codename One's CSS compiler will accept.
+
+The `.claude/skills/codename-one/SKILL.md` you also see in the tree is intentionally just a stub. Claude Code's skill picker indexes files at that path with a `name:` / `description:` frontmatter block, so we ship a tiny one purely so the skill shows up by name in `/skills`. The stub body redirects to the same `.agent-skills/codename-one/SKILL.md` that any other agent reads. If a future agent runtime invents its own well-known location, the fix is one more thin stub at that path — the *content* stays in one place.
+
+Why does this skill matter in practice? Two things:
 
 **Codename One is not stock JVM.** The framework targets a Java 5/8-shaped subset of the JDK so that the same bytecode translates cleanly to iOS via ParparVM, to Android via Gradle, to JavaSE for the simulator, and to JavaScript via the JS port. An agent that has only ever read regular Java idioms will routinely suggest APIs that compile against `rt.jar` but don't exist on the device — `java.nio.file`, `java.time`, half of `java.util.concurrent`. The `java-api-subset.md` reference is the small, dense map of what is *actually* on the device, which is what you want a code-writing agent to be holding in its head.
 
 **Codename One CSS is not browser CSS.** Same shape, different runtime. Our compiler accepts a subset that maps to the framework's `Style` model — UIID-keyed rules, theme constants prefixed `@`, the binding vocabulary you'll see in the theme accents section below, and a handful of platform-specific keys like `cn1-derive`. The `css.md` and `html-css-cheatsheet.md` references spell out what works, and `IsCssValid.java` lets the agent verify a proposed snippet without running the simulator. The number of times "the agent wrote me a perfectly normal-looking CSS rule that the compiler silently dropped" came up in our own testing is the entire reason this file exists.
 
-The skill is authored as plain Markdown under `scripts/initializr/common/src/main/resources/skill/` in the repo, then bundled into a `skill.zip` at build time and unpacked into the generated project by `GeneratorModel.addClaudeSkillEntries`. The same template-token replacement that rewrites `MyAppName` and `com.example.myapp` in your `pom.xml` runs over the skill files too — when the agent reads an example snippet that says `package com.acme.todo;`, it's because the project is actually called `todo`.
+The skill is authored as plain Markdown under `scripts/initializr/common/src/main/resources/skill/` in the repo, then bundled into a `skill.zip` at build time and unpacked into the generated project by `GeneratorModel.addAgentSkillEntries`. The same template-token replacement that rewrites `MyAppName` and `com.example.myapp` in your `pom.xml` runs over the skill files too — when the agent reads an example snippet that says `package com.acme.todo;`, it's because the project is actually called `todo`.
 
-You don't need to use Claude or Claude Code to benefit. The skill is plain Markdown — `.claude/skills/codename-one/SKILL.md` is also one of the better entry-point reads we have for a developer who wants the framework's mental model in one sitting. Open it in any editor and read top to bottom.
-
-For agent users specifically, two notes: the directory layout is the convention Anthropic established for [Claude Code](https://claude.com/claude-code), so dropping a generated project into a working tree and starting Claude Code "just works" — the skill loads automatically and the agent introduces itself as Codename One-aware on the first message. If your team uses a different agent runtime, the references are plain Markdown — you can repackage them into whichever loader format that runtime expects.
+You don't need to use any agent at all to benefit. The skill is plain Markdown, ASCII-only — `.agent-skills/codename-one/SKILL.md` is also one of the better entry-point reads we have for a developer who wants the framework's mental model in one sitting. Open it in any editor and read top to bottom.
 
 There is one small piece of CN1 plumbing worth pointing out, because it is the kind of thing future-you will hit if you try to extend this: Codename One's classloader doesn't tolerate nested resource directories on the JAR classpath the same way a regular JVM does. So the skill on disk lives under `scripts/initializr/common/src/main/resources/skill/`, but the build excludes that directory from the produced JAR and ships only `skill.zip`. The Initializr unpacks the zip at generation time. If you ever wondered why a couple of resource directories in the repo are shipped as zips, that is why.
 
@@ -235,7 +239,7 @@ Two things to flag explicitly for anyone updating an existing iOS app:
 
 The Metal port's first week was the big swing. This week was the follow-up: per-axis scale decomposition for non-uniform transforms, a screenshot test that localises the clip-under-rotation question, the colour-space hint that wide-gamut apps have been quietly asking about, and a new matrix-correct `translateMatrix` API that makes the rest of `Graphics` behave less surprisingly. None of those alone is a headline. Together they are what "Metal is mature" looks like a week into the rollout. And as a reminder: **flip `ios.metal=true` on your real app this week** — the default flip is days away and we'd rather find any remaining edge case against your screens than against the install base on launch day.
 
-The Initializr changes — Java 17 as the default, the bundled authoring skill — are the part of the diff that a new developer will see first, and the part that an existing developer will pick up the next time they generate a project from scratch. Open the `SKILL.md` in any project you generate today; even if you don't use an agent, it is a reasonably tight tour of the framework.
+The Initializr changes — Java 17 as the default, the bundled vendor-neutral authoring skill — are the part of the diff that a new developer will see first, and the part that an existing developer will pick up the next time they generate a project from scratch. Open `.agent-skills/codename-one/SKILL.md` in any project you generate today; even if you don't use an agent, it is a reasonably tight tour of the framework. The top-level `AGENTS.md` is twelve lines — read that one even sooner.
 
 The accent palette work is the small change I'm most pleased with — five constants, one `addThemeProps` call, every accent-bearing UIID retunes at once, light and dark independent. Try it on your own theme this week and let us know what you find.
 
