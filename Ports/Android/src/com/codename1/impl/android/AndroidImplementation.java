@@ -5483,6 +5483,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         ((AndroidGraphics) nativeGraphics).rotate(angle, x, y);
     }
 
+    @Override
+    public boolean isTranslateMatrixSupported() {
+        return true;
+    }
+
+    @Override
+    public void translateMatrix(Object nativeGraphics, float x, float y) {
+        ((AndroidGraphics) nativeGraphics).translateMatrix(x, y);
+    }
+
     public void shear(Object nativeGraphics, float x, float y) {
     }
 

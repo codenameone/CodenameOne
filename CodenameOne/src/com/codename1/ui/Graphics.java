@@ -1613,6 +1613,67 @@ public final class Graphics {
         scaleY = y;
     }
 
+    /// Translates the coordinate system using the affine transform matrix
+    /// (as opposed to `#translate(int, int)` which uses a per-Graphics
+    /// integer accumulator). On every port today
+    /// `isTranslationSupported() == false`, which means `g.translate(int, int)`
+    /// is added to draw coordinates **before** the impl matrix is applied;
+    /// a subsequent `g.scale()` or `g.rotate()` therefore multiplies the
+    /// integer translate too. That's surprising when porting code that came
+    /// from Java2D / AWT where translate composes into the matrix the same
+    /// way as scale and rotate.
+    ///
+    /// `translateMatrix` composes the translation directly onto the impl
+    /// matrix, exactly like `#scale(float, float)` and `#rotate(float)` do.
+    /// The result is uniform "post-multiply translate onto the current
+    /// transform" semantics across iOS / JavaSE / Android / JavaScript --
+    /// the same code produces the same on-screen position regardless of
+    /// which port you target or whether you're drawing into a Form's
+    /// Graphics or a mutable Image's Graphics.
+    ///
+    /// On ports where `#isTranslateMatrixSupported()` returns false (e.g.
+    /// the legacy JavaScript port) the call falls back to the integer
+    /// `#translate(int, int)` so apps don't silently render at the wrong
+    /// position -- the visual result on those ports matches whatever
+    /// `translate(int, int)` does there.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: x-axis translation
+    ///
+    /// - `y`: y-axis translation
+    ///
+    /// #### See also
+    ///
+    /// - `#isTranslateMatrixSupported()`
+    /// - `#translate(int, int)`
+    /// - `#scale(float, float)`
+    /// - `#rotateRadians(float, int, int)`
+    public void translateMatrix(float x, float y) {
+        if (impl.isTranslateMatrixSupported()) {
+            impl.translateMatrix(nativeGraphics, x, y);
+        } else {
+            translate((int) x, (int) y);
+        }
+    }
+
+    /// Checks whether `#translateMatrix(float, float)` composes through the
+    /// impl matrix on this port (the matrix-correct mode) versus falling
+    /// back to the integer `#translate(int, int)` accumulator. Use this to
+    /// gate code that needs matrix-correct translation semantics.
+    ///
+    /// #### Returns
+    ///
+    /// true if `translateMatrix` reaches the impl matrix; false on ports
+    /// where it falls back to the integer accumulator.
+    ///
+    /// #### See also
+    ///
+    /// - `#translateMatrix(float, float)`
+    public boolean isTranslateMatrixSupported() {
+        return impl.isTranslateMatrixSupported();
+    }
+
     /// Rotates the coordinate system around a radian angle using the affine transform
     ///
     /// #### Parameters

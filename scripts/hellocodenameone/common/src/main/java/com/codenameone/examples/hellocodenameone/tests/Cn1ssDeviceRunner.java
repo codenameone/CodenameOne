@@ -25,6 +25,7 @@ import com.codenameone.examples.hellocodenameone.tests.graphics.FillRect;
 import com.codenameone.examples.hellocodenameone.tests.graphics.FillRoundRect;
 import com.codenameone.examples.hellocodenameone.tests.graphics.FillShape;
 import com.codenameone.examples.hellocodenameone.tests.graphics.FillTriangle;
+import com.codenameone.examples.hellocodenameone.tests.graphics.InscribedTriangleGrid;
 import com.codenameone.examples.hellocodenameone.tests.graphics.Rotate;
 import com.codenameone.examples.hellocodenameone.tests.graphics.Scale;
 import com.codenameone.examples.hellocodenameone.tests.graphics.StrokeTest;
@@ -127,6 +128,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new FillTriangle(),
             new DrawShape(),
             new FillShape(),
+            new InscribedTriangleGrid(),
             new StrokeTest(),
             new Clip(),
             new ClipUnderRotation(),
@@ -380,6 +382,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 || "FillRoundRect".equals(testName)
                 || "FillShape".equals(testName)
                 || "FillTriangle".equals(testName)
+                || "InscribedTriangleGrid".equals(testName)
                 || "Rotate".equals(testName)
                 || "Scale".equals(testName)
                 || "StrokeTest".equals(testName)
