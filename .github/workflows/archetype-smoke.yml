@@ -16,6 +16,8 @@ on:
       - 'CodenameOneDesigner/**'
       - 'CodenameOne/src/com/codename1/ui/plaf/UIManager.java'
       - 'maven/codenameone-maven-plugin/**'
+      - 'maven/cn1app-archetype/**'
+      - 'maven/cn1lib-archetype/**'
       - 'maven/integration-tests/cn1app-archetype-test.sh'
       - 'maven/integration-tests/inc/**'
       - '.github/workflows/archetype-smoke.yml'
@@ -26,6 +28,8 @@ on:
       - 'CodenameOneDesigner/**'
       - 'CodenameOne/src/com/codename1/ui/plaf/UIManager.java'
       - 'maven/codenameone-maven-plugin/**'
+      - 'maven/cn1app-archetype/**'
+      - 'maven/cn1lib-archetype/**'
       - 'maven/integration-tests/cn1app-archetype-test.sh'
       - 'maven/integration-tests/inc/**'
       - '.github/workflows/archetype-smoke.yml'
@@ -43,20 +47,19 @@ jobs:
           cache: 'maven'
       - name: Install xvfb
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends xvfb
-      - name: Build Codename One Maven artifacts
+      - name: Build Codename One Maven artifacts (includes archetypes)
+        run: |
+          # The cn1{app,lib}-archetype modules are inlined into the maven/
+          # reactor since the migration, so this single install also stages
+          # the archetypes into the local repo for `archetype:generate`.
+          # -Darchetype.test.skip=true keeps the smoke fast — the per-tag
+          # ITs already run in the release workflow.
+          cd maven
+          xvfb-run -a mvn install -Plocal-dev-javase -DskipTests -Darchetype.test.skip=true -Dmaven.javadoc.skip=true
+      - name: Refresh archetype catalog
         run: |
           cd maven
-          xvfb-run -a mvn install -Plocal-dev-javase -DskipTests -Dmaven.javadoc.skip=true
-      - name: Fetch and install archetype projects
-        uses: carlosperate/download-file-action@v1.0.3
-        with:
-          file-url: https://github.com/shannah/cn1-maven-archetypes/archive/refs/heads/master.zip
-          file-name: cn1-maven-archetypes.zip
-      - name: Install archetype to local repo
-        run: |
-          unzip cn1-maven-archetypes.zip
-          cd cn1-maven-archetypes-master
-          xvfb-run -a mvn install archetype:update-local-catalog -Plocal-dev-javase
+          xvfb-run -a mvn archetype:update-local-catalog -Plocal-dev-javase
           xvfb-run -a mvn archetype:crawl -Plocal-dev-javase
       - name: Run archetype simulator smoke (auto-bundle pref forced on)
         run: |

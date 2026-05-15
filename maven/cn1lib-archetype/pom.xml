@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>com.codenameone</groupId>
+    <artifactId>codenameone</artifactId>
+    <version>8.0-SNAPSHOT</version>
+  </parent>
+  <artifactId>cn1lib-archetype</artifactId>
+  <packaging>maven-archetype</packaging>
+
+  <name>cn1lib-archetype</name>
+  <description>Codename One cn1lib (library) project archetype.</description>
+
+  <properties>
+    <!-- See cn1app-archetype/pom.xml for the rationale on skipping ITs. -->
+    <archetype.test.skip>true</archetype.test.skip>
+  </properties>
+
+  <build>
+    <extensions>
+      <extension>
+        <groupId>org.apache.maven.archetype</groupId>
+        <artifactId>archetype-packaging</artifactId>
+        <version>3.2.0</version>
+      </extension>
+    </extensions>
+
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <artifactId>maven-archetype-plugin</artifactId>
+          <version>3.2.0</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-resources-plugin</artifactId>
+          <version>3.3.1</version>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+  </build>
+</project>

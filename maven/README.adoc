@@ -18,12 +18,10 @@ mvn install
 ----
 
 === Building Archetype Projects
-[source, bash]
-----
-git clone https://github.com/shannah/cn1-maven-archetypes
-cd cn1-maven-archetypes
-mvn install
-----
+
+The `cn1app-archetype` and `cn1lib-archetype` Maven archetypes are part of this
+reactor (under `maven/cn1app-archetype/` and `maven/cn1lib-archetype/`). They
+build alongside the rest of the project — no separate checkout is needed.
 
 === Deploying to Maven Central
 
@@ -53,27 +51,7 @@ bash update-version.sh $NEXTVERSION && git push
 ----
 
 
-==== Step 3: Checkout cn1-maven-archetypes Repository
-
-Then do the same for the https://github.com/shannah/cn1-maven-archetypes[cn1-maven-archetypes] repository.
-
-[source, bash]
-----
-git clone https://github.com/shannah/cn1-maven-archetypes
-cd cn1-maven-archetypes
-mvn update-version.sh $NEWVERSION && git push && git push --tags
-----
-
-Then check the build log on Github to make sure that the https://github.com/shannah/cn1-maven-archetypes/actions/workflows/sonatype.yml[Deploy to Maven Central] workflow completes successfully.
-
-If this was successful, update the cn1-maven-archetypes version to the new snapshot version.
-
-[source, bash]
-----
-mvn update-version.sh 7.0.16-SNAPSHOT && git push && git push --tags
-----
-
-==== Step 4: Close and Release Staging Repository
+==== Step 3: Close and Release Staging Repository
 
 If these steps complete succesfully, then a staging repository has been created on Sonatype.  Log into the https://oss.sonatype.org/#stagingRepositories[Nexus Repository Manager] and click on "Staging Repositories".
 

@@ -1,0 +1,72 @@
+[simulator]
+command=["$MVNW", "verify", "-Psimulator", "-DskipTests", "-Dcodename1.platform=javase", "-e"]
+label="Run in Simulator"
+run=true
+
+[desktop]
+command=["$MVNW", "verify", "-Prun-desktop", "-DskipTests", "-Dcodename1.platform=javase" "-e"]
+label="Run as Desktop App"
+run=true
+
+[android]
+command=["$MVNW", "package", "-DskipTests", "-Dcodename1.platform=android", "-Dcodename1.buildTarget=android-device", "-U", "-e"]
+label="Android Build"
+group="Cloud"
+
+[ios]
+command=["$MVNW", "package", "-DskipTests", "-Dcodename1.platform=ios", "-Dcodename1.buildTarget=ios-device", "-U", "-e"]
+label="iOS Debug Build"
+group="Cloud"
+
+[ios_release]
+command=["$MVNW", "package", "-DskipTests", "-Dcodename1.platform=ios", "-Dcodename1.buildTarget=ios-device-release", "-U", "-e"]
+label="iOS Release Build"
+group="Cloud"
+
+[javascript]
+command=["$MVNW", "package", "-DskipTests", "-Dcodename1.platform=javascript", "-Dcodename1.buildTarget=javascript", "-U", "-e"]
+label="Javascript Build"
+group="Cloud"
+
+[mac_desktop]
+command=["$MVNW", "package", "-DskipTests", "-Dcodename1.platform=javase", "-Dcodename1.buildTarget=mac-os-x-desktop", "-U", "-e"]
+label="Mac Desktop Build"
+group="Cloud"
+
+[windows_desktop]
+command=["$MVNW", "package", "-DskipTests", "-Dcodename1.platform=javase", "-Dcodename1.buildTarget=windows-desktop", "-U", "-e"]
+label="Windows Desktop Build"
+group="Cloud"
+
+[windows_device]
+command=["$MVNW", "package", "-DskipTests", "-Dcodename1.platform=win", "-Dcodename1.buildTarget=windows-device", "-U", "-e"]
+label="Windows Device Build (UWP)"
+group="Cloud"
+
+
+[xcode]
+command=["$MVNW", "package", "-DskipTests", "-Dcodename1.platform=ios", "-Dcodename1.buildTarget=ios-source", "-U", "-e"]
+label="Xcode iOS Project"
+group="Local"
+
+
+[android_source]
+command=["$MVNW", "package", "-DskipTests", "-Dcodename1.platform=android", "-Dcodename1.buildTarget=android-source", "-U", "-e"]
+label="Gradle Android Project"
+group="Local"
+
+[jar]
+command=["$MVNW", "-Pexecutable-jar", "package", "-Dcodename1.platform=javase", "-DskipTests", "-U", "-e"]
+label="Cross-platform (JavaSE) Desktop App"
+group="Local"
+build=true
+
+[settings]
+command=["$MVNW", "cn1:settings", "-U", "-e"]
+label="Codename One Settings"
+group="Tools"
+
+[update]
+command=["$MVNW", "cn1:update", "-U", "-e"]
+label="Update Codename One"
+group="Tools"

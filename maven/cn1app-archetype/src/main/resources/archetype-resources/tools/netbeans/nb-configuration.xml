@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project-shared-configuration>
+    <!--
+This file contains additional configuration written by modules in the NetBeans IDE.
+The configuration is intended to be shared among all the users of project and
+therefore it is assumed to be part of version control checkout.
+Without this configuration present, some functionality in the IDE may be limited or fail altogether.
+-->
+    <config-data xmlns="http://www.netbeans.org/ns/maven-config-data/1">
+        <configurations>
+            <configuration id="Android App" profiles="">
+                <property name="codename1.buildTarget">android-device</property>
+                <property name="codename1.platform">android</property>
+            </configuration>
+            <configuration id="Android Gradle Project" profiles="">
+                <property name="codename1.buildTarget">android-source</property>
+                <property name="codename1.platform">android</property>
+            </configuration>
+            <configuration id="JavaSE Desktop App" profiles="">
+                <property name="codename1.platform">javase</property>
+            </configuration>
+            <configuration id="Javascript App" profiles="">
+                <property name="codename1.buildTarget">javascript</property>
+                <property name="codename1.platform">javascript</property>
+            </configuration>
+            <configuration id="Mac Desktop App" profiles="">
+                <property name="codename1.buildTarget">mac-os-x-desktop</property>
+                <property name="codename1.platform">javase</property>
+            </configuration>
+            <configuration id="Simulator" profiles="">
+                <property name="codename1.platform">javase</property>
+            </configuration>
+            <configuration id="Windows Desktop App" profiles="">
+                <property name="codename1.buildTarget">windows-desktop</property>
+                <property name="codename1.platform">javase</property>
+            </configuration>
+            <configuration id="Windows UWP App" profiles="">
+                <property name="codename1.buildTarget">windows-device</property>
+                <property name="codename1.platform">win</property>
+            </configuration>
+            <configuration id="iOS App (Debug)" profiles="">
+                <property name="codename1.buildTarget">ios-device</property>
+                <property name="codename1.platform">ios</property>
+            </configuration>
+            <configuration id="iOS App (Release)" profiles="">
+                <property name="codename1.buildTarget">ios-device-release</property>
+                <property name="codename1.platform">ios</property>
+            </configuration>
+            <configuration id="iOS Xcode Project" profiles="">
+                <property name="codename1.buildTarget">ios-source</property>
+                <property name="codename1.platform">ios</property>
+            </configuration>
+        </configurations>
+    </config-data>
+</project-shared-configuration>

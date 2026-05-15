@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>com.codenameone</groupId>
+    <artifactId>codenameone</artifactId>
+    <version>8.0-SNAPSHOT</version>
+  </parent>
+  <artifactId>cn1app-archetype</artifactId>
+  <packaging>maven-archetype</packaging>
+
+  <name>cn1app-archetype</name>
+  <description>Codename One bare-bones app project archetype.</description>
+
+  <properties>
+    <!--
+      Skip the maven-archetype-plugin integration-test phase by default.
+      The ITs (src/test/resources/projects/**/archetype.properties) generate
+      a sub-project pinned to cn1Version=${project.version} and then invoke
+      the codenameone-maven-plugin against it via nested mvn. That plugin
+      is built in this same reactor — it isn't on Maven Central at the time
+      the ITs run during `mvn install`, so they fail with an unresolvable
+      SNAPSHOT. The dedicated archetype-smoke CI workflow opts back in via
+      -Darchetype.test.skip=false; the release workflow leaves them off
+      because the freshly-deployed plugin is still propagating to Central.
+    -->
+    <archetype.test.skip>true</archetype.test.skip>
+  </properties>
+
+  <build>
+    <extensions>
+      <extension>
+        <groupId>org.apache.maven.archetype</groupId>
+        <artifactId>archetype-packaging</artifactId>
+        <version>3.2.0</version>
+      </extension>
+    </extensions>
+
+    <!--
+      Ship the Codename One authoring skill inside the archetype JAR under
+      archetype-resources/.claude/skills/codename-one/** so projects generated
+      via `mvn archetype:generate` get the same skill bundle the initializr
+      drops into start.codenameone.com output. The skill source of truth lives
+      under scripts/initializr/common/src/main/resources/skill/**; we copy it
+      in at build time rather than duplicating it in this module. The
+      generated project's archetype-post-generate.groovy deletes the .claude/
+      tree when the resolved javaVersion is 8, so only Java 17 projects end
+      up shipping the skill.
+    -->
+    <resources>
+      <resource>
+        <directory>src/main/resources</directory>
+      </resource>
+      <resource>
+        <directory>${project.basedir}/../../scripts/initializr/common/src/main/resources/skill</directory>
+        <targetPath>archetype-resources/.claude/skills/codename-one</targetPath>
+        <filtering>false</filtering>
+      </resource>
+    </resources>
+
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <artifactId>maven-archetype-plugin</artifactId>
+          <version>3.2.0</version>
+        </plugin>
+        <!--
+          Pin maven-resources-plugin: Maven Central currently advertises
+          maven-resources-plugin 4.0.0-beta-1 as the latest, and that build
+          requires Java 17 + Maven 4. We still run on Java 8 / Maven 3.9 for
+          the release workflow, so unpinned resolution picks the beta and
+          fails. Pin to the latest 3.x.
+        -->
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-resources-plugin</artifactId>
+          <version>3.3.1</version>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+  </build>
+</project>
