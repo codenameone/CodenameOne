@@ -3462,7 +3462,10 @@ public abstract class CodenameOneImplementation {
                 t = Math.abs(t);
                 float intp = (float) Math.floor(t);
                 float frac = t - intp;
-                if (((int) intp) % 2 == 1) {
+                // `intp` is the absolute-valued floor so it's always >= 0;
+                // using bitwise AND with 1 picks the odd cycles without
+                // tripping the Math.abs-aware oddness check.
+                if ((((int) intp) & 1) != 0) {
                     frac = 1f - frac;
                 }
                 t = frac;

@@ -2734,7 +2734,7 @@ public class Style {
             }
             return;
         }
-        if (this.filterBlurRadius != radius) {
+        if (Float.compare(this.filterBlurRadius, radius) != 0) {
             this.filterBlurRadius = radius;
             if (!override) {
                 modifiedFlag |= FILTER_BLUR_MODIFIED;
@@ -2760,7 +2760,7 @@ public class Style {
             }
             return;
         }
-        if (this.backdropFilterBlurRadius != radius) {
+        if (Float.compare(this.backdropFilterBlurRadius, radius) != 0) {
             this.backdropFilterBlurRadius = radius;
             if (!override) {
                 modifiedFlag |= BACKDROP_FILTER_BLUR_MODIFIED;
