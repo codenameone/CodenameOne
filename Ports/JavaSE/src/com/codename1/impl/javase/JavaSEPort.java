@@ -8310,11 +8310,20 @@ public class JavaSEPort extends CodenameOneImplementation {
         Graphics2D ng = (Graphics2D) getGraphics(graphics).create();
         try {
             float[] ep = new float[4];
-            g.computeEndpoints(width, height, ep);
+            g.computeShaderEndpoints(width, height, ep);
+            // Java2D's LinearGradientPaint requires distinct start/end points
+            // (rejects start == end). Fall back to drawing the first color if
+            // the gradient line collapses (zero-area rect, etc.).
+            if (Math.abs(ep[0] - ep[2]) < 0.001f && Math.abs(ep[1] - ep[3]) < 0.001f) {
+                ng.setColor(new Color(g.getColors()[0], true));
+                ng.fillRect(x, y, width, height);
+                return;
+            }
             LinearGradientPaint paint = new LinearGradientPaint(
                     new java.awt.geom.Point2D.Float(x + ep[0], y + ep[1]),
                     new java.awt.geom.Point2D.Float(x + ep[2], y + ep[3]),
-                    g.getPositions(), toAwtColors(g.getColors()), cycle(g.getCycleMethod()));
+                    g.getNormalizedPositions(), toAwtColors(g.getColors()),
+                    cycle(g.getCycleMethod()));
             ng.setPaint(paint);
             ng.fillRect(x, y, width, height);
         } finally {
@@ -8327,14 +8336,15 @@ public class JavaSEPort extends CodenameOneImplementation {
         Graphics2D ng = (Graphics2D) getGraphics(graphics).create();
         try {
             float[] geom = new float[4];
-            g.computeRadii(width, height, geom);
+            g.computeShaderRadii(width, height, geom);
             float cx = geom[0], cy = geom[1], rx = geom[2], ry = geom[3];
             float r = Math.max(rx, ry);
             RadialGradientPaint paint = new RadialGradientPaint(
                     new java.awt.geom.Point2D.Float(x + cx, y + cy),
                     r <= 0 ? 1f : r,
                     new java.awt.geom.Point2D.Float(x + cx, y + cy),
-                    g.getPositions(), toAwtColors(g.getColors()), cycle(g.getCycleMethod()));
+                    g.getNormalizedPositions(), toAwtColors(g.getColors()),
+                    cycle(g.getCycleMethod()));
             if (Math.abs(rx - ry) > 0.01f && rx > 0 && ry > 0) {
                 java.awt.geom.AffineTransform t = new java.awt.geom.AffineTransform();
                 t.translate(x + cx, y + cy);

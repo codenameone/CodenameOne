@@ -46,4 +46,10 @@ fi
 mkdir -p Ports/iOSPort/nativeSources
 cp Themes/iOSModernTheme.res Ports/iOSPort/nativeSources/iOSModernTheme.res
 
-"$MAVEN_HOME/bin/mvn" -q -f maven/pom.xml -pl ios -am -Djava.awt.headless=true clean install "$@"
+# Include `designer` in the build set so changes under maven/css-compiler/
+# are picked up by the maven plugin's CSS compile step. The designer module's
+# jar-with-dependencies embeds css-compiler classes (CSSTheme etc.); without
+# -pl designer, a cached ~/.m2/repository restores the previous build's
+# designer.jar even when CSSTheme.java has changed and new gradient/filter
+# parsing silently misses the app's theme.res.
+"$MAVEN_HOME/bin/mvn" -q -f maven/pom.xml -pl ios,designer -am -Djava.awt.headless=true clean install "$@"

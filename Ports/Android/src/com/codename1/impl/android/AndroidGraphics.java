@@ -941,15 +941,15 @@ class AndroidGraphics {
             if (g instanceof com.codename1.ui.LinearGradient) {
                 com.codename1.ui.LinearGradient lg = (com.codename1.ui.LinearGradient) g;
                 float[] ep = new float[4];
-                lg.computeEndpoints(width, height, ep);
+                lg.computeShaderEndpoints(width, height, ep);
                 paint.setShader(new LinearGradient(
                         x + ep[0], y + ep[1], x + ep[2], y + ep[3],
-                        lg.getColors(), lg.getPositions(), tile(lg.getCycleMethod())));
+                        lg.getColors(), lg.getNormalizedPositions(), tile(lg.getCycleMethod())));
                 canvas.drawRect(x, y, x + width, y + height, paint);
             } else if (g instanceof com.codename1.ui.RadialGradient) {
                 com.codename1.ui.RadialGradient rg = (com.codename1.ui.RadialGradient) g;
                 float[] geom = new float[4];
-                rg.computeRadii(width, height, geom);
+                rg.computeShaderRadii(width, height, geom);
                 float cx = geom[0], cy = geom[1], rx = geom[2], ry = geom[3];
                 float r = Math.max(rx, ry);
                 if (Math.abs(rx - ry) > 0.01f && rx > 0 && ry > 0) {
@@ -961,7 +961,7 @@ class AndroidGraphics {
                 }
                 paint.setShader(new RadialGradient(
                         x + cx, y + cy, r <= 0 ? 1f : r,
-                        rg.getColors(), rg.getPositions(), tile(rg.getCycleMethod())));
+                        rg.getColors(), rg.getNormalizedPositions(), tile(rg.getCycleMethod())));
                 canvas.drawRect(x, y, x + width, y + height, paint);
             } else if (g instanceof com.codename1.ui.ConicGradient) {
                 com.codename1.ui.ConicGradient cg = (com.codename1.ui.ConicGradient) g;

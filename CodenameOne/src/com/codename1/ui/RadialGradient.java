@@ -171,6 +171,57 @@ public final class RadialGradient extends Gradient {
         out[3] = ry;
     }
 
+    /// Computes shader-ready (cx, cy, rx, ry) for native APIs like Android's
+    /// `RadialGradient` and Java2D's `RadialGradientPaint`. For NO_CYCLE
+    /// this is the same as `computeRadii`. For REPEAT / REFLECT it scales
+    /// the radii so the [0, 1] shader range corresponds to exactly one
+    /// stop-list period (`getPositions()[0]` to `getPositions()[N-1]`),
+    /// matching the CSS `repeating-radial-gradient` semantic.
+    ///
+    /// Use `getNormalizedPositions()` for the matching stop array when
+    /// using these radii with REPEAT/REFLECT.
+    public void computeShaderRadii(int width, int height, float[] out) {
+        computeRadii(width, height, out);
+        byte cycle = getCycleMethod();
+        if (cycle == CYCLE_NONE) {
+            return;
+        }
+        float[] positions = getPositions();
+        float p0 = positions[0];
+        float pN = positions[positions.length - 1];
+        if (pN - p0 < 1e-4f) {
+            return;
+        }
+        // The native shader maps its [0, 1] range to [center, center+radius].
+        // To make one stop-list period fit in [0, 1], scale the radii by the
+        // span; rebase to a new effective inner edge by translating the radii.
+        // (Android/Java2D radial gradients are defined out from the center -
+        // there's no inner cutoff - so we only scale the outer radius.)
+        out[2] *= (pN - p0);
+        out[3] *= (pN - p0);
+    }
+
+    /// Returns stop positions rescaled to `[0, 1]` within the
+    /// `[first_stop, last_stop]` range. Use alongside `computeShaderRadii`
+    /// when feeding the native shader API.
+    public float[] getNormalizedPositions() {
+        float[] positions = getPositions();
+        if (getCycleMethod() == CYCLE_NONE) {
+            return positions;
+        }
+        float p0 = positions[0];
+        float pN = positions[positions.length - 1];
+        float span = pN - p0;
+        if (span < 1e-4f) {
+            return positions;
+        }
+        float[] out = new float[positions.length];
+        for (int i = 0; i < positions.length; i++) {
+            out[i] = (positions[i] - p0) / span;
+        }
+        return out;
+    }
+
     @Override
     public int sampleArgb(int px, int py, int width, int height) {
         float[] geom = new float[4];

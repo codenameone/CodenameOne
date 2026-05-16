@@ -55,6 +55,8 @@ public final class LinearGradient extends Gradient {
 
     /// Computes the endpoints of the gradient line for a rectangle of the
     /// given width / height (rect origin at (0,0)). Output is x0,y0,x1,y1.
+    /// These endpoints span the full bounding box; stop positions are
+    /// interpreted relative to them.
     public void computeEndpoints(int width, int height, float[] out) {
         double rad = Math.toRadians(angleDegrees);
         double sinA = Math.sin(rad);
@@ -66,6 +68,58 @@ public final class LinearGradient extends Gradient {
         out[1] = (float) (cy + cosA * half);
         out[2] = (float) (cx + sinA * half);
         out[3] = (float) (cy - cosA * half);
+    }
+
+    /// Computes shader-ready endpoints for native APIs like Android's
+    /// `LinearGradient` and Java2D's `LinearGradientPaint`. For NO_CYCLE
+    /// this is the same as `computeEndpoints`. For REPEAT / REFLECT it
+    /// clips the endpoint range to span exactly one stop-list period
+    /// (from `getPositions()[0]` to `getPositions()[N-1]` of the original
+    /// line) so the native shader's tile mode wraps the period across
+    /// the rest of the bounding box - matching the CSS
+    /// `repeating-linear-gradient` semantic.
+    ///
+    /// Use `getNormalizedPositions()` for the matching stop array when
+    /// using these endpoints with REPEAT/REFLECT.
+    public void computeShaderEndpoints(int width, int height, float[] out) {
+        computeEndpoints(width, height, out);
+        byte cycle = getCycleMethod();
+        if (cycle == CYCLE_NONE) {
+            return;
+        }
+        float[] positions = getPositions();
+        float p0 = positions[0];
+        float pN = positions[positions.length - 1];
+        if (pN - p0 < 1e-4f) {
+            return;
+        }
+        float x0 = out[0], y0 = out[1], x1 = out[2], y1 = out[3];
+        out[0] = x0 + p0 * (x1 - x0);
+        out[1] = y0 + p0 * (y1 - y0);
+        out[2] = x0 + pN * (x1 - x0);
+        out[3] = y0 + pN * (y1 - y0);
+    }
+
+    /// Returns stop positions rescaled to `[0, 1]` within the
+    /// `[first_stop, last_stop]` range of the original positions. For
+    /// NO_CYCLE this is the same as `getPositions()`; for REPEAT/REFLECT
+    /// it is the array to pass alongside `computeShaderEndpoints`.
+    public float[] getNormalizedPositions() {
+        float[] positions = getPositions();
+        if (getCycleMethod() == CYCLE_NONE) {
+            return positions;
+        }
+        float p0 = positions[0];
+        float pN = positions[positions.length - 1];
+        float span = pN - p0;
+        if (span < 1e-4f) {
+            return positions;
+        }
+        float[] out = new float[positions.length];
+        for (int i = 0; i < positions.length; i++) {
+            out[i] = (positions[i] - p0) / span;
+        }
+        return out;
     }
 
     @Override
