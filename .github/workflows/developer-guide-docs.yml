@@ -277,9 +277,16 @@ jobs:
           JSON_REPORT="${REPORT_DIR}/unused-images.json"
           TEXT_REPORT="${REPORT_DIR}/unused-images.txt"
           mkdir -p "$REPORT_DIR"
+          set +e
           python3 scripts/developer-guide/find_unused_images.py docs/developer-guide --output "$JSON_REPORT" | tee "$TEXT_REPORT"
+          STATUS=${PIPESTATUS[0]}
+          set -e
           echo "UNUSED_IMAGES_JSON=$JSON_REPORT" >> "$GITHUB_ENV"
           echo "UNUSED_IMAGES_TEXT=$TEXT_REPORT" >> "$GITHUB_ENV"
+          echo "UNUSED_IMAGES_STATUS=$STATUS" >> "$GITHUB_ENV"
+          if [ "$STATUS" -ne 0 ]; then
+            echo "Unused images detected — the final quality-gate step will fail the build." >&2
+          fi
 
       - name: Summarize AsciiDoc linter findings
         id: summarize_asciidoc_lint
@@ -367,11 +374,16 @@ jobs:
             echo "Either fix the prose, add the term to docs/developer-guide/styles/config/vocabularies/CodenameOne/accept.txt, or document an exception per docs/developer-guide/.vale.ini." >&2
             FAIL=1
           fi
+          if [ "${UNUSED_IMAGES_STATUS:-0}" != "0" ]; then
+            echo "Unused image check reported orphan files (exit status ${UNUSED_IMAGES_STATUS}). See the developer-guide-unused-images artifact." >&2
+            echo "Either delete the orphan image or add an image:: reference for it from a developer-guide asciidoc file." >&2
+            FAIL=1
+          fi
           if [ "$FAIL" -ne 0 ]; then
             echo "Developer guide quality gates failed. Warnings from vale and asciidoctor are treated as build-breaking errors." >&2
             exit 1
           fi
-          echo "Developer guide quality gates passed (vale issues=${VALE_ISSUE_COUNT:-0}, asciidoctor status=${ASCII_DOC_LINT_STATUS:-0})."
+          echo "Developer guide quality gates passed (vale issues=${VALE_ISSUE_COUNT:-0}, asciidoctor status=${ASCII_DOC_LINT_STATUS:-0}, unused-image status=${UNUSED_IMAGES_STATUS:-0})."
 
       - name: Comment with artifact download links
         if: ${{ always() && github.event_name == 'pull_request' && !github.event.pull_request.head.repo.fork }}
