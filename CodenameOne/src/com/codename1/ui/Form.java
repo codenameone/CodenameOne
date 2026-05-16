@@ -695,7 +695,7 @@ public class Form extends Container {
     }
 
     /// Locates the scrollable-Y descendant that is actually visible to the
-    /// user inside the Form viewport. Used by the status-bar tap → scroll-to-top
+    /// user inside the Form viewport. Used by the status-bar tap -> scroll-to-top
     /// path on iOS.
     ///
     /// Strategy: collect every visible scrollable-Y descendant whose absolute
