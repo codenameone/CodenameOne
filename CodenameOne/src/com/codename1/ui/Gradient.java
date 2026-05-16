@@ -123,25 +123,40 @@ public abstract class Gradient implements Paint {
     /// Samples one of the stops at fractional position t. Honors the
     /// configured cycle method. Shared by the three subclasses' sampling
     /// implementations.
+    ///
+    /// CSS `repeating-*-gradient` stops define one period from
+    /// `positions[0]` to `positions[last]`, not `[0, 1]`. For
+    /// `white 0%, red 16%` the period is 0.16 of the gradient extent and
+    /// the pattern must wrap on that range; collapsing to `t - floor(t)`
+    /// would leak the final color across the rest of the rect.
     protected final int sampleStops(float t) {
+        float p0 = positions[0];
+        float pN = positions[positions.length - 1];
+        float period = pN - p0;
         switch (cycleMethod) {
             case CYCLE_REPEAT:
-                t = t - (float) Math.floor(t);
+                if (period > 0) {
+                    float rel = (t - p0) / period;
+                    rel = rel - (float) Math.floor(rel);
+                    t = p0 + rel * period;
+                }
                 break;
             case CYCLE_REFLECT:
-                t = Math.abs(t);
-                float intp = (float) Math.floor(t);
-                float frac = t - intp;
-                if ((((int) intp) & 1) != 0) {
-                    frac = 1f - frac;
+                if (period > 0) {
+                    float rel = Math.abs((t - p0) / period);
+                    float intp = (float) Math.floor(rel);
+                    float frac = rel - intp;
+                    if ((((int) intp) & 1) != 0) {
+                        frac = 1f - frac;
+                    }
+                    t = p0 + frac * period;
                 }
-                t = frac;
                 break;
             default:
-                if (t <= positions[0]) {
+                if (t <= p0) {
                     return colors[0];
                 }
-                if (t >= positions[positions.length - 1]) {
+                if (t >= pN) {
                     return colors[colors.length - 1];
                 }
                 break;

@@ -120,13 +120,13 @@ CssGradientRepeatingLinear {
     padding: 0px;
     margin: 0.5mm;
     border: none;
-    background: repeating-linear-gradient(45deg, #eeeeee 0%, #eeeeee 5%, #cc3344 5%, #cc3344 10%);
+    background: repeating-linear-gradient(45deg, #eeeeee 0%, #cc3344 10%);
 }
 CssGradientRepeatingRadial {
     padding: 0px;
     margin: 0.5mm;
     border: none;
-    background: repeating-radial-gradient(circle at center, #ffffff, #ffffff 8%, #cc3344 8%, #cc3344 16%);
+    background: repeating-radial-gradient(circle at center, #ffffff 0%, #cc3344 16%);
 }
 
 /* filter / backdrop-filter UIIDs. These verify the CSS compiler stores the
