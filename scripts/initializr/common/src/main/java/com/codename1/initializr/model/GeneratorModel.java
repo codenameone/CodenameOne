@@ -112,15 +112,53 @@ public class GeneratorModel {
     }
 
     public void generate() {
+        // The JavaScript port backs openFileOutputStream with IndexedDB. The Blob handed to
+        // execute() retains the bytes, but the IndexedDB entry sticks around forever, so each
+        // generation accumulates a multi-MB record until the browser quota is exhausted.
+        cleanupGeneratedZips();
         String filePath = getAppHomePath() + appName.toLowerCase() + ".zip";
-        try (OutputStream fos = openFileOutputStream(filePath)) {
-            writeProjectZip(fos);
-        } catch (IOException err) {
-            Log.e(err);
-            ToastBar.showErrorMessage("Error generating zip: " + err);
-            return;
+        try {
+            writeProjectZipToStorage(filePath);
+        } catch (IOException firstErr) {
+            // Almost always quota-exhaustion. Clean up once more (covers orphan entries the
+            // first sweep missed, e.g. a half-written file from this attempt) and retry.
+            cleanupGeneratedZips();
+            try {
+                writeProjectZipToStorage(filePath);
+            } catch (IOException retryErr) {
+                Log.e(retryErr);
+                ToastBar.showErrorMessage(
+                        "Browser storage is full. Open your browser settings, clear site "
+                                + "data for this page, then try again.");
+                return;
+            }
         }
         execute(filePath);
+    }
+
+    private void writeProjectZipToStorage(String filePath) throws IOException {
+        try (OutputStream fos = openFileOutputStream(filePath)) {
+            writeProjectZip(fos);
+        }
+    }
+
+    public static void cleanupGeneratedZips() {
+        try {
+            String home = getAppHomePath();
+            String[] files = listFiles(home);
+            if (files == null) {
+                return;
+            }
+            for (String file : files) {
+                if (file != null && file.endsWith(".zip")) {
+                    try {
+                        delete(home + file);
+                    } catch (Throwable ignored) {
+                    }
+                }
+            }
+        } catch (Throwable ignored) {
+        }
     }
 
     void writeProjectZip(OutputStream outputStream) throws IOException {
