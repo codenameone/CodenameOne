@@ -33,6 +33,7 @@ import com.codename1.ui.Font;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.ImageFactory;
+import com.codename1.ui.Transform;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
@@ -269,12 +270,12 @@ public class MapComponent extends Container {
                 tx = -tx * (float) (scaleX - getWidth()) / sx;
                 float ty = (float) zoomCenterY / (float) getHeight();
                 ty = -ty * (float) (scaleY - getHeight()) / sy;
-                if (com.codename1.ui.Graphics.useMatrixTranslation) {
+                if (Graphics.useMatrixTranslation) {
                     // Matrix mode: resetAffine wipes the impl matrix to
                     // identity, which destroys the framework painting-chain
                     // translates the matrix carries. Use save/restore the
                     // impl matrix around the scale + user-translate instead.
-                    com.codename1.ui.Transform savedMatrix = g.getTransform();
+                    Transform savedMatrix = g.getTransform();
                     g.translate((int) tx, (int) ty);
                     g.scale(sx, sy);
                     paintmap(g);

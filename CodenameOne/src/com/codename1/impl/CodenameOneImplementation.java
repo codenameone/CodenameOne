@@ -809,7 +809,7 @@ public abstract class CodenameOneImplementation {
                 // chain via paintComponent below. Legacy zeroes the
                 // integer accumulator separately because resetAffine in
                 // legacy mode leaves it untouched.
-                if (com.codename1.ui.Graphics.useMatrixTranslation) {
+                if (Graphics.useMatrixTranslation) {
                     wrapper.setTransform(null);
                 } else {
                     wrapper.translate(-wrapper.getTranslateX(), -wrapper.getTranslateY());

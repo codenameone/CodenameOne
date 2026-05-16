@@ -25,6 +25,7 @@ package com.codename1.ui.scene;
 import com.codename1.properties.Property;
 import com.codename1.ui.Container;
 import com.codename1.ui.Graphics;
+import com.codename1.ui.Transform;
 
 /// A scene graph.  Supports 3D on platforms where `com.codename1.ui.Transform#isPerspectiveSupported()` is true (iOS and Android currently).
 ///
@@ -69,8 +70,8 @@ public class Scene extends Container {
             // the impl matrix around the render call instead; the legacy
             // path keeps using resetAffine since the integer accumulator
             // already preserves the framework translate.
-            com.codename1.ui.Transform savedMatrix = null;
-            if (com.codename1.ui.Graphics.useMatrixTranslation) {
+            Transform savedMatrix = null;
+            if (Graphics.useMatrixTranslation) {
                 savedMatrix = g.getTransform();
             } else {
                 g.resetAffine();
@@ -83,7 +84,7 @@ public class Scene extends Container {
             g.setAntiAliased(true);
             root.render(g);
             g.translate(-getX(), -getY());
-            if (com.codename1.ui.Graphics.useMatrixTranslation) {
+            if (Graphics.useMatrixTranslation) {
                 g.setTransform(savedMatrix);
             } else {
                 g.resetAffine();
