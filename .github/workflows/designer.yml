@@ -69,21 +69,10 @@ jobs:
           CN1_BINARIES: ${{ github.workspace }}/maven/target/cn1-binaries
         run: |
           cd maven
-          # `-Dtest=...` forces every reactor module to look for that
-          # test in its own sources. Most modules have none, so we need to
-          # tell surefire that's OK. Surefire 3.x renamed the flag to
-          # `surefire.failIfNoSpecifiedTests`; the older `failIfNoTests`
-          # is honoured by surefire 2.x. codenameone-javase is pinned to
-          # 3.2.5 (see maven/javase/pom.xml), while peer modules still
-          # run 2.21.0 from the parent pom — pass both flags so each
-          # plugin version finds the one it understands.
           mvn -B -pl designer -am -DunitTests=true -Dcodename1.platform=javase \
               -Plocal-dev-javase -Dmaven.javadoc.skip=true -Dmaven.antrun.skip=true \
               -Dcn1.binaries="${CN1_BINARIES}" \
-              -Dtest=SimpleXmlParserTest \
-              -DfailIfNoTests=false \
-              -Dsurefire.failIfNoSpecifiedTests=false \
-              test
+              -Dtest=SimpleXmlParserTest -Dsurefire.failIfNoSpecifiedTests=false test
 
       - name: Verify designer CLI CSS compilation
         run: |

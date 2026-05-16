@@ -32,9 +32,12 @@ import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Font;
 import com.codename1.ui.Image;
 import com.codename1.ui.animations.AnimationAccessor;
+import com.codename1.ui.ConicGradient;
+import com.codename1.ui.Gradient;
+import com.codename1.ui.LinearGradient;
+import com.codename1.ui.RadialGradient;
 import com.codename1.ui.plaf.Accessor;
 import com.codename1.ui.plaf.CSSBorder;
-import com.codename1.ui.plaf.GradientDescriptor;
 import com.codename1.ui.plaf.RoundBorder;
 import com.codename1.ui.plaf.RoundRectBorder;
 import com.codename1.ui.plaf.Style;
@@ -253,7 +256,7 @@ public class CSSTheme {
          * When non-null the resource emits a bgGradientEx theme entry and
          * background-type is one of the extended BACKGROUND_GRADIENT_* values.
          */
-        GradientDescriptor extendedDescriptor;
+        Gradient extendedDescriptor;
 
         /**
          * Flag to indicate whether this gradient is valid.  Both the legacy
@@ -342,11 +345,9 @@ public class CSSTheme {
                 reason = "Could not parse stops for linear-gradient";
                 return;
             }
-            extendedDescriptor = new GradientDescriptor()
-                    .setKind(GradientDescriptor.KIND_LINEAR)
-                    .setAngleDegrees(angle)
-                    .setCycleMethod(repeating ? GradientDescriptor.CYCLE_REPEAT : GradientDescriptor.CYCLE_NONE)
-                    .setStops(st.colors, st.positions);
+            LinearGradient lg = new LinearGradient(angle, st.colors, st.positions);
+            lg.setCycleMethod(repeating ? Gradient.CYCLE_REPEAT : Gradient.CYCLE_NONE);
+            extendedDescriptor = lg;
             this.type = repeating ? Style.BACKGROUND_GRADIENT_REPEATING_LINEAR : Style.BACKGROUND_GRADIENT_LINEAR;
             this.bgTransparency = (byte) 0xff;
             this.valid = true;
@@ -355,8 +356,8 @@ public class CSSTheme {
         private void parseRadialGradientExtended(ScaledUnit background, boolean repeating) {
             ScaledUnit p = (ScaledUnit) background.getParameters();
             if (p == null) { reason = "Empty radial-gradient parameters"; return; }
-            byte shape = GradientDescriptor.SHAPE_ELLIPSE;
-            byte extent = GradientDescriptor.EXTENT_FARTHEST_CORNER;
+            byte shape = RadialGradient.SHAPE_ELLIPSE;
+            byte extent = RadialGradient.EXTENT_FARTHEST_CORNER;
             float cx = 0.5f, cy = 0.5f;
             float rx = 1f, ry = 1f;
             boolean sawShapeOrExtent = false;
@@ -367,19 +368,19 @@ public class CSSTheme {
                 if (t == LexicalUnit.SAC_IDENT) {
                     String s = p.getStringValue();
                     if ("circle".equals(s)) {
-                        shape = GradientDescriptor.SHAPE_CIRCLE;
+                        shape = RadialGradient.SHAPE_CIRCLE;
                         sawShapeOrExtent = true;
                     } else if ("ellipse".equals(s)) {
-                        shape = GradientDescriptor.SHAPE_ELLIPSE;
+                        shape = RadialGradient.SHAPE_ELLIPSE;
                         sawShapeOrExtent = true;
                     } else if ("closest-side".equals(s)) {
-                        extent = GradientDescriptor.EXTENT_CLOSEST_SIDE; sawShapeOrExtent = true;
+                        extent = RadialGradient.EXTENT_CLOSEST_SIDE; sawShapeOrExtent = true;
                     } else if ("closest-corner".equals(s)) {
-                        extent = GradientDescriptor.EXTENT_CLOSEST_CORNER; sawShapeOrExtent = true;
+                        extent = RadialGradient.EXTENT_CLOSEST_CORNER; sawShapeOrExtent = true;
                     } else if ("farthest-side".equals(s)) {
-                        extent = GradientDescriptor.EXTENT_FARTHEST_SIDE; sawShapeOrExtent = true;
+                        extent = RadialGradient.EXTENT_FARTHEST_SIDE; sawShapeOrExtent = true;
                     } else if ("farthest-corner".equals(s)) {
-                        extent = GradientDescriptor.EXTENT_FARTHEST_CORNER; sawShapeOrExtent = true;
+                        extent = RadialGradient.EXTENT_FARTHEST_CORNER; sawShapeOrExtent = true;
                     } else if ("at".equals(s)) {
                         sawAt = true;
                     } else if (sawAt) {
@@ -412,7 +413,7 @@ public class CSSTheme {
                         } else {
                             ry = rx;
                         }
-                        extent = GradientDescriptor.EXTENT_EXPLICIT;
+                        extent = RadialGradient.EXTENT_EXPLICIT;
                         sawShapeOrExtent = true;
                     }
                 }
@@ -426,16 +427,12 @@ public class CSSTheme {
                 reason = "Could not parse stops for radial-gradient";
                 return;
             }
-            extendedDescriptor = new GradientDescriptor()
-                    .setKind(GradientDescriptor.KIND_RADIAL)
-                    .setRadialShape(shape)
-                    .setRadialExtent(extent)
-                    .setRelativeCenterX(cx)
-                    .setRelativeCenterY(cy)
-                    .setRelativeRadiusX(rx)
-                    .setRelativeRadiusY(ry)
-                    .setCycleMethod(repeating ? GradientDescriptor.CYCLE_REPEAT : GradientDescriptor.CYCLE_NONE)
-                    .setStops(st.colors, st.positions);
+            RadialGradient rg = new RadialGradient(st.colors, st.positions);
+            rg.setShape(shape).setExtent(extent)
+                    .setRelativeCenterX(cx).setRelativeCenterY(cy)
+                    .setRelativeRadiusX(rx).setRelativeRadiusY(ry)
+                    .setCycleMethod(repeating ? Gradient.CYCLE_REPEAT : Gradient.CYCLE_NONE);
+            extendedDescriptor = rg;
             this.type = repeating ? Style.BACKGROUND_GRADIENT_REPEATING_RADIAL : Style.BACKGROUND_GRADIENT_RADIAL_FULL;
             this.bgTransparency = (byte) 0xff;
             this.valid = true;
@@ -497,12 +494,9 @@ public class CSSTheme {
                 reason = "Could not parse stops for conic-gradient";
                 return;
             }
-            extendedDescriptor = new GradientDescriptor()
-                    .setKind(GradientDescriptor.KIND_CONIC)
-                    .setRelativeCenterX(cx)
-                    .setRelativeCenterY(cy)
-                    .setFromAngleDegrees(fromAngle)
-                    .setStops(st.colors, st.positions);
+            ConicGradient cg = new ConicGradient(st.colors, st.positions);
+            cg.setRelativeCenterX(cx).setRelativeCenterY(cy).setFromAngleDegrees(fromAngle);
+            extendedDescriptor = cg;
             this.type = Style.BACKGROUND_GRADIENT_CONIC;
             this.bgTransparency = (byte) 0xff;
             this.valid = true;
@@ -2313,13 +2307,13 @@ public class CSSTheme {
                 res.setThemeProperty(themeName, disabledId+"#bgType", el.getThemeBgType(disabledStyles));
 
                 currToken = "bgGradientEx";
-                res.setThemeProperty(themeName, unselId+".bgGradientEx", el.getThemeGradientDescriptor(unselectedStyles));
+                res.setThemeProperty(themeName, unselId+".bgGradientEx", el.getThemeGradient(unselectedStyles));
                 currToken = "selected bgGradientEx";
-                res.setThemeProperty(themeName, selId+"#bgGradientEx", el.getThemeGradientDescriptor(selectedStyles));
+                res.setThemeProperty(themeName, selId+"#bgGradientEx", el.getThemeGradient(selectedStyles));
                 currToken = "pressed bgGradientEx";
-                res.setThemeProperty(themeName, pressedId+"#bgGradientEx", el.getThemeGradientDescriptor(pressedStyles));
+                res.setThemeProperty(themeName, pressedId+"#bgGradientEx", el.getThemeGradient(pressedStyles));
                 currToken = "disabled bgGradientEx";
-                res.setThemeProperty(themeName, disabledId+"#bgGradientEx", el.getThemeGradientDescriptor(disabledStyles));
+                res.setThemeProperty(themeName, disabledId+"#bgGradientEx", el.getThemeGradient(disabledStyles));
 
                 currToken = "filterBlur";
                 emitFilterBlur(res, unselId+".filterBlur", el.getFilterBlurRadius(unselectedStyles));
@@ -4528,7 +4522,7 @@ public class CSSTheme {
 
         /// Returns the extended gradient descriptor for the given style, or
         /// null if the style does not declare an extended gradient.
-        public GradientDescriptor getThemeGradientDescriptor(Map<String,LexicalUnit> style) {
+        public Gradient getThemeGradient(Map<String,LexicalUnit> style) {
             ScaledUnit background = (ScaledUnit) style.get("background");
             if (background != null && background.isCN1Gradient()) {
                 CN1Gradient g = background.getCN1Gradient();

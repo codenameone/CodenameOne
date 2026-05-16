@@ -1361,38 +1361,21 @@ public final class Graphics {
         impl.fillLinearGradient(nativeGraphics, startColor, endColor, x + xTranslate, y + yTranslate, width, height, horizontal);
     }
 
-    /// Fills a multi-stop linear gradient at an arbitrary angle.
+    /// Fills the rectangle (x, y, width, height) with the given multi-stop
+    /// gradient. The Gradient may be a `LinearGradient`, `RadialGradient`, or
+    /// `ConicGradient` - the port picks the right native shader path
+    /// (Java2D `LinearGradientPaint`/`RadialGradientPaint` on JavaSE; Android
+    /// `LinearGradient`/`RadialGradient`/`SweepGradient` shaders; software
+    /// rasterizer fallback elsewhere). Pass null or width/height <= 0 for a no-op.
     ///
-    /// Angle follows CSS convention: 0 deg points up, 90 right, 180 down, 270 left.
+    /// #### Since
     ///
-    /// #### Parameters
-    /// - `colors`: ARGB color stops (length >= 2)
-    /// - `positions`: stop positions in [0,1] aligned with `colors`
-    /// - `x`,`y`,`width`,`height`: target rectangle
-    /// - `angleDegrees`: gradient direction
-    /// - `cycleMethod`: one of GradientDescriptor.CYCLE_NONE / CYCLE_REPEAT / CYCLE_REFLECT
-    public void fillLinearGradientWithStops(int[] colors, float[] positions, int x, int y, int width, int height, float angleDegrees, byte cycleMethod) {
-        if (width <= 0 || height <= 0 || colors == null || colors.length < 2) {
+    /// 8.1
+    public void fillGradient(Gradient gradient, int x, int y, int width, int height) {
+        if (gradient == null || width <= 0 || height <= 0) {
             return;
         }
-        impl.fillLinearGradientWithStops(nativeGraphics, colors, positions, x + xTranslate, y + yTranslate, width, height, angleDegrees, cycleMethod);
-    }
-
-    /// Fills a multi-stop radial gradient with explicit center, x/y radii and cycle mode.
-    public void fillRadialGradientWithStops(int[] colors, float[] positions, int x, int y, int width, int height, float centerX, float centerY, float radiusX, float radiusY, byte cycleMethod) {
-        if (width <= 0 || height <= 0 || colors == null || colors.length < 2) {
-            return;
-        }
-        impl.fillRadialGradientWithStops(nativeGraphics, colors, positions, x + xTranslate, y + yTranslate, width, height, centerX, centerY, radiusX, radiusY, cycleMethod);
-    }
-
-    /// Fills a conic / sweep gradient. `fromAngleDegrees` follows the CSS conic-gradient
-    /// convention (0 deg points up, sweep clockwise).
-    public void fillConicGradient(int[] colors, float[] positions, int x, int y, int width, int height, float centerX, float centerY, float fromAngleDegrees) {
-        if (width <= 0 || height <= 0 || colors == null || colors.length < 2) {
-            return;
-        }
-        impl.fillConicGradient(nativeGraphics, colors, positions, x + xTranslate, y + yTranslate, width, height, centerX, centerY, fromAngleDegrees);
+        impl.fillGradient(nativeGraphics, gradient, x + xTranslate, y + yTranslate, width, height);
     }
 
     /// Returns a copy of the given image with a Gaussian blur of the given radius

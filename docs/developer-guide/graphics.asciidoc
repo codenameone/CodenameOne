@@ -87,30 +87,35 @@ and rectangular radial transitions respectively. These APIs accept the
 inner/outer colors, focal point, and spread so you can combine them with linear
 gradients to build sophisticated backgrounds and lighting effects.
 
-For the full CSS gradient range, `Graphics` also exposes multi-stop, arbitrary-angle
-and sweep variants matching the CSS `linear-gradient`, `radial-gradient` and
-`conic-gradient` syntaxes:
+For the full CSS gradient range, `Graphics` exposes a single `fillGradient`
+method that consumes a `Gradient` value object. `Gradient` is a `Paint`
+subclass with three concrete forms - `LinearGradient`, `RadialGradient`,
+`ConicGradient` - following the same pattern as the `Shape` hierarchy:
 
 [source,java]
 ----
-int[] colors   = { 0xffff0080, 0xffff8c00, 0xff40e0d0 };
-float[] stops  = { 0f, 0.5f, 1f };
-g.fillLinearGradientWithStops(colors, stops, 0, 0, getWidth(), getHeight(),
-        45f, GradientDescriptor.CYCLE_NONE);
-g.fillRadialGradientWithStops(colors, stops, 0, 0, getWidth(), getHeight(),
-        getWidth() / 2f, getHeight() / 2f,
-        getWidth() / 2f, getHeight() / 2f,
-        GradientDescriptor.CYCLE_NONE);
-g.fillConicGradient(colors, stops, 0, 0, getWidth(), getHeight(),
-        getWidth() / 2f, getHeight() / 2f, 0f);
+int[] colors  = { 0xffff0080, 0xffff8c00, 0xff40e0d0 };
+float[] stops = { 0f, 0.5f, 1f };
+
+g.fillGradient(new LinearGradient(45f, colors, stops),
+        0, 0, getWidth(), getHeight());
+
+RadialGradient circle = new RadialGradient(colors, stops);
+circle.setShape(RadialGradient.SHAPE_CIRCLE)
+      .setExtent(RadialGradient.EXTENT_FARTHEST_CORNER);
+g.fillGradient(circle, 0, 0, getWidth(), getHeight());
+
+g.fillGradient(new ConicGradient(colors, stops),
+        0, 0, getWidth(), getHeight());
 ----
 
-The cycle method (`CYCLE_NONE` / `CYCLE_REPEAT` / `CYCLE_REFLECT`) implements
-the equivalents of CSS `repeating-linear-gradient` / `repeating-radial-gradient`
-and mirrored fills. Hardware paths are used on JavaSE (Java2D
-`LinearGradientPaint` / `RadialGradientPaint`) and Android (`LinearGradient` /
-`RadialGradient` / `SweepGradient` shaders); other ports fall back to a software
-rasterizer that produces an identical image.
+`Gradient` carries the cycle method (`CYCLE_NONE` / `CYCLE_REPEAT` /
+`CYCLE_REFLECT`) for repeating / reflected fills. Each port implements
+`fillGradient` via the fastest native shader available - Java2D
+`LinearGradientPaint` / `RadialGradientPaint` on the simulator,
+`LinearGradient` / `RadialGradient` / `SweepGradient` shaders on Android - and
+falls back to a software rasterizer that calls `Gradient#sampleArgb` per
+pixel where no native shader exists.
 
 ==== Image blur
 

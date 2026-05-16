@@ -2380,9 +2380,9 @@ public class UIManager {
                 }
                 style.setBackgroundGradient(backgroundGradient);
             }
-            Object gradientDescriptor = themeProps.get(id + Style.GRADIENT_DESCRIPTOR);
-            if (gradientDescriptor instanceof GradientDescriptor) {
-                style.setGradientDescriptor((GradientDescriptor) gradientDescriptor);
+            Object gradient = themeProps.get(id + Style.GRADIENT);
+            if (gradient instanceof com.codename1.ui.Gradient) {
+                style.setGradient((com.codename1.ui.Gradient) gradient);
             }
             Object filterBlur = themeProps.get(id + Style.FILTER_BLUR);
             if (filterBlur instanceof Number) {

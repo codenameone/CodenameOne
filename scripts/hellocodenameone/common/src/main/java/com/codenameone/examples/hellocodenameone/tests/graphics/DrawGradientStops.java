@@ -1,8 +1,11 @@
 package com.codenameone.examples.hellocodenameone.tests.graphics;
 
+import com.codename1.ui.ConicGradient;
+import com.codename1.ui.Gradient;
 import com.codename1.ui.Graphics;
+import com.codename1.ui.LinearGradient;
+import com.codename1.ui.RadialGradient;
 import com.codename1.ui.geom.Rectangle;
-import com.codename1.ui.plaf.GradientDescriptor;
 import com.codenameone.examples.hellocodenameone.tests.AbstractGraphicsScreenshotTest;
 
 /// Exercises the multi-stop / angled / conic gradient primitives added to
@@ -10,9 +13,15 @@ import com.codenameone.examples.hellocodenameone.tests.AbstractGraphicsScreensho
 /// `radial-gradient`, `conic-gradient`, and `repeating-*-gradient`. The
 /// AbstractGraphicsScreenshotTest harness paints the same drawContent four
 /// times (anti-alias on/off x direct/buffered) so per-port rasterization
-/// differences in the stop interpolation, angle math, and shader matrices
-/// surface as a pixel diff against the baseline.
+/// differences surface as a pixel diff against the baseline.
 public class DrawGradientStops extends AbstractGraphicsScreenshotTest {
+
+    private static final int[] TRI = {
+            0xffff0080,  // pink
+            0xffff8c00,  // orange
+            0xff40e0d0   // teal
+    };
+    private static final float[] TRI_STOPS = {0f, 0.5f, 1f};
 
     @Override
     protected void drawContent(Graphics g, Rectangle bounds) {
@@ -20,55 +29,48 @@ public class DrawGradientStops extends AbstractGraphicsScreenshotTest {
         int rowCount = 2;
         int cellW = bounds.getWidth() / colCount;
         int cellH = bounds.getHeight() / rowCount;
-        int[] tri = {
-                0xffff0080,  // pink
-                0xffff8c00,  // orange
-                0xff40e0d0   // teal
-        };
-        float[] triStops = {0f, 0.5f, 1f};
+        int x0 = bounds.getX();
+        int y0 = bounds.getY();
 
-        // Row 0, col 0: angled multi-stop linear gradient at 45deg
-        g.fillLinearGradientWithStops(tri, triStops,
-                bounds.getX(), bounds.getY(), cellW, cellH,
-                45f, GradientDescriptor.CYCLE_NONE);
+        // Row 0, col 0: angled multi-stop linear at 45 deg
+        g.fillGradient(new LinearGradient(45f, TRI, TRI_STOPS),
+                x0, y0, cellW, cellH);
 
-        // Row 0, col 1: same stops, 135deg, REFLECT cycling fills both ways
-        g.fillLinearGradientWithStops(tri, triStops,
-                bounds.getX() + cellW, bounds.getY(), cellW, cellH,
-                135f, GradientDescriptor.CYCLE_REFLECT);
+        // Row 0, col 1: 135 deg with REFLECT cycle method
+        LinearGradient reflected = new LinearGradient(135f, TRI, TRI_STOPS);
+        reflected.setCycleMethod(Gradient.CYCLE_REFLECT);
+        g.fillGradient(reflected, x0 + cellW, y0, cellW, cellH);
 
-        // Row 0, col 2: repeating linear gradient (tight stripe pattern)
+        // Row 0, col 2: repeating linear (tight stripes)
         int[] stripeColors = {0xffeeeeee, 0xffeeeeee, 0xffcc3333, 0xffcc3333};
         float[] stripeStops = {0f, 0.5f, 0.5f, 1f};
-        g.fillLinearGradientWithStops(stripeColors, stripeStops,
-                bounds.getX() + 2 * cellW, bounds.getY(), cellW, cellH,
-                45f, GradientDescriptor.CYCLE_REPEAT);
+        LinearGradient stripes = new LinearGradient(45f, stripeColors, stripeStops);
+        stripes.setCycleMethod(Gradient.CYCLE_REPEAT);
+        g.fillGradient(stripes, x0 + 2 * cellW, y0, cellW, cellH);
 
         // Row 1, col 0: multi-stop radial (circular), centered
-        g.fillRadialGradientWithStops(tri, triStops,
-                bounds.getX(), bounds.getY() + cellH, cellW, cellH,
-                cellW * 0.5f, cellH * 0.5f,
-                cellW * 0.5f, cellH * 0.5f,
-                GradientDescriptor.CYCLE_NONE);
+        RadialGradient circle = new RadialGradient(TRI, TRI_STOPS);
+        circle.setShape(RadialGradient.SHAPE_CIRCLE)
+              .setExtent(RadialGradient.EXTENT_FARTHEST_CORNER);
+        g.fillGradient(circle, x0, y0 + cellH, cellW, cellH);
 
-        // Row 1, col 1: elliptical radial offset to the upper-left
-        g.fillRadialGradientWithStops(tri, triStops,
-                bounds.getX() + cellW, bounds.getY() + cellH, cellW, cellH,
-                cellW * 0.3f, cellH * 0.3f,
-                cellW * 0.7f, cellH * 0.5f,
-                GradientDescriptor.CYCLE_NONE);
+        // Row 1, col 1: elliptical radial offset to upper-left
+        RadialGradient ellipse = new RadialGradient(TRI, TRI_STOPS);
+        ellipse.setShape(RadialGradient.SHAPE_ELLIPSE)
+               .setExtent(RadialGradient.EXTENT_EXPLICIT)
+               .setRelativeCenterX(0.3f).setRelativeCenterY(0.3f)
+               .setRelativeRadiusX(0.7f).setRelativeRadiusY(0.5f);
+        g.fillGradient(ellipse, x0 + cellW, y0 + cellH, cellW, cellH);
 
-        // Row 1, col 2: conic gradient (rainbow sweep) from 0deg at center
+        // Row 1, col 2: conic gradient (rainbow sweep) from 0 deg at center
         int[] rainbow = {
                 0xffff0000, 0xffffff00, 0xff00ff00,
                 0xff00ffff, 0xff0000ff, 0xffff00ff,
                 0xffff0000
         };
         float[] rainbowStops = {0f, 1f / 6f, 2f / 6f, 3f / 6f, 4f / 6f, 5f / 6f, 1f};
-        g.fillConicGradient(rainbow, rainbowStops,
-                bounds.getX() + 2 * cellW, bounds.getY() + cellH, cellW, cellH,
-                cellW * 0.5f, cellH * 0.5f,
-                0f);
+        g.fillGradient(new ConicGradient(rainbow, rainbowStops),
+                x0 + 2 * cellW, y0 + cellH, cellW, cellH);
     }
 
     @Override

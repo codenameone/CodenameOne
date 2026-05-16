@@ -1437,8 +1437,8 @@ public class EditableResources extends Resources implements TreeModel {
                                 continue;
                             }
 
-                            if(key.endsWith(com.codename1.ui.plaf.Style.GRADIENT_DESCRIPTOR)) {
-                                com.codename1.ui.plaf.GradientDescriptor g = (com.codename1.ui.plaf.GradientDescriptor) theme.get(key);
+                            if(key.endsWith(com.codename1.ui.plaf.Style.GRADIENT)) {
+                                com.codename1.ui.Gradient g = (com.codename1.ui.Gradient) theme.get(key);
                                 int[] colors = g.getColors();
                                 float[] positions = g.getPositions();
                                 StringBuilder stopsAttr = new StringBuilder();
@@ -1446,17 +1446,31 @@ public class EditableResources extends Resources implements TreeModel {
                                     if (si > 0) stopsAttr.append(';');
                                     stopsAttr.append(Integer.toHexString(colors[si])).append('@').append(positions[si]);
                                 }
+                                float angle = (g instanceof com.codename1.ui.LinearGradient)
+                                        ? ((com.codename1.ui.LinearGradient) g).getAngleDegrees() : 0f;
+                                float cx = 0.5f, cy = 0.5f, rx = 1f, ry = 1f, fromAngle = 0f;
+                                byte shape = 0, extent = 0;
+                                if (g instanceof com.codename1.ui.RadialGradient) {
+                                    com.codename1.ui.RadialGradient rg = (com.codename1.ui.RadialGradient) g;
+                                    cx = rg.getRelativeCenterX(); cy = rg.getRelativeCenterY();
+                                    shape = rg.getShape(); extent = rg.getExtent();
+                                    rx = rg.getRelativeRadiusX(); ry = rg.getRelativeRadiusY();
+                                } else if (g instanceof com.codename1.ui.ConicGradient) {
+                                    com.codename1.ui.ConicGradient cg = (com.codename1.ui.ConicGradient) g;
+                                    cx = cg.getRelativeCenterX(); cy = cg.getRelativeCenterY();
+                                    fromAngle = cg.getFromAngleDegrees();
+                                }
                                 bw.write("        <gradientEx key=\"" + key + "\""
                                         + " kind=\"" + g.getKind() + "\""
                                         + " cycle=\"" + g.getCycleMethod() + "\""
-                                        + " angle=\"" + g.getAngleDegrees() + "\""
-                                        + " cx=\"" + g.getRelativeCenterX() + "\""
-                                        + " cy=\"" + g.getRelativeCenterY() + "\""
-                                        + " shape=\"" + g.getRadialShape() + "\""
-                                        + " extent=\"" + g.getRadialExtent() + "\""
-                                        + " rx=\"" + g.getRelativeRadiusX() + "\""
-                                        + " ry=\"" + g.getRelativeRadiusY() + "\""
-                                        + " fromAngle=\"" + g.getFromAngleDegrees() + "\""
+                                        + " angle=\"" + angle + "\""
+                                        + " cx=\"" + cx + "\""
+                                        + " cy=\"" + cy + "\""
+                                        + " shape=\"" + shape + "\""
+                                        + " extent=\"" + extent + "\""
+                                        + " rx=\"" + rx + "\""
+                                        + " ry=\"" + ry + "\""
+                                        + " fromAngle=\"" + fromAngle + "\""
                                         + " stops=\"" + stopsAttr.toString() + "\" />\n");
                                 continue;
                             }
@@ -2175,18 +2189,42 @@ public class EditableResources extends Resources implements TreeModel {
                 continue;
             }
 
-            if(key.endsWith(com.codename1.ui.plaf.Style.GRADIENT_DESCRIPTOR)) {
-                com.codename1.ui.plaf.GradientDescriptor g = (com.codename1.ui.plaf.GradientDescriptor) theme.get(key);
+            if(key.endsWith(com.codename1.ui.plaf.Style.GRADIENT)) {
+                com.codename1.ui.Gradient g = (com.codename1.ui.Gradient) theme.get(key);
                 output.writeByte(g.getKind());
                 output.writeByte(g.getCycleMethod());
-                output.writeFloat(g.getAngleDegrees());
-                output.writeFloat(g.getRelativeCenterX());
-                output.writeFloat(g.getRelativeCenterY());
-                output.writeByte(g.getRadialShape());
-                output.writeByte(g.getRadialExtent());
-                output.writeFloat(g.getRelativeRadiusX());
-                output.writeFloat(g.getRelativeRadiusY());
-                output.writeFloat(g.getFromAngleDegrees());
+                // Linear-specific (angle). 0 for non-linear kinds.
+                output.writeFloat(g instanceof com.codename1.ui.LinearGradient
+                        ? ((com.codename1.ui.LinearGradient) g).getAngleDegrees() : 0f);
+                // Center (radial + conic share these; linear ignores them).
+                float relCx = 0.5f;
+                float relCy = 0.5f;
+                byte radialShape = 0;
+                byte radialExtent = 0;
+                float relRx = 1f;
+                float relRy = 1f;
+                float fromAngle = 0f;
+                if (g instanceof com.codename1.ui.RadialGradient) {
+                    com.codename1.ui.RadialGradient rg = (com.codename1.ui.RadialGradient) g;
+                    relCx = rg.getRelativeCenterX();
+                    relCy = rg.getRelativeCenterY();
+                    radialShape = rg.getShape();
+                    radialExtent = rg.getExtent();
+                    relRx = rg.getRelativeRadiusX();
+                    relRy = rg.getRelativeRadiusY();
+                } else if (g instanceof com.codename1.ui.ConicGradient) {
+                    com.codename1.ui.ConicGradient cg = (com.codename1.ui.ConicGradient) g;
+                    relCx = cg.getRelativeCenterX();
+                    relCy = cg.getRelativeCenterY();
+                    fromAngle = cg.getFromAngleDegrees();
+                }
+                output.writeFloat(relCx);
+                output.writeFloat(relCy);
+                output.writeByte(radialShape);
+                output.writeByte(radialExtent);
+                output.writeFloat(relRx);
+                output.writeFloat(relRy);
+                output.writeFloat(fromAngle);
                 int[] colors = g.getColors();
                 float[] positions = g.getPositions();
                 output.writeInt(colors.length);

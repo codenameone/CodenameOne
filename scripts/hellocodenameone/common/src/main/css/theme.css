@@ -129,9 +129,11 @@ CssGradientRepeatingRadial {
     background: repeating-radial-gradient(circle at center, #ffffff, #ffffff 8%, #cc3344 8%, #cc3344 16%);
 }
 
-/* filter: blur(...) - exercised against an inline image background so the
-   blurred result reflects both the source image and the compiled filterBlur
-   theme property. */
+/* filter / backdrop-filter UIIDs. These verify the CSS compiler stores the
+   blur radius on the Style; actual paint-time blurring is not yet wired
+   through the component paint pipeline (it lands as a follow-up using
+   Graphics.gaussianBlur), so we don't take a screenshot of these tiles -
+   the test only asserts the Style fields round-trip. */
 CssFilterBlurNone {
     padding: 0px;
     margin: 0.5mm;

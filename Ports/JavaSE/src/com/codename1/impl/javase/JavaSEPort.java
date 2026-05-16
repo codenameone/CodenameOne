@@ -8273,9 +8273,9 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     private static MultipleGradientPaint.CycleMethod cycle(byte c) {
         switch (c) {
-            case com.codename1.ui.plaf.GradientDescriptor.CYCLE_REPEAT:
+            case com.codename1.ui.Gradient.CYCLE_REPEAT:
                 return MultipleGradientPaint.CycleMethod.REPEAT;
-            case com.codename1.ui.plaf.GradientDescriptor.CYCLE_REFLECT:
+            case com.codename1.ui.Gradient.CYCLE_REFLECT:
                 return MultipleGradientPaint.CycleMethod.REFLECT;
             default:
                 return MultipleGradientPaint.CycleMethod.NO_CYCLE;
@@ -8283,21 +8283,38 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     @Override
-    public void fillLinearGradientWithStops(Object graphics, int[] colors, float[] positions,
-            int x, int y, int width, int height, float angleDegrees, byte cycleMethod) {
+    public void fillGradient(Object graphics, com.codename1.ui.Gradient gradient,
+            int x, int y, int width, int height) {
+        if (gradient == null || width <= 0 || height <= 0) {
+            return;
+        }
         checkEDT();
+        if (gradient instanceof com.codename1.ui.LinearGradient) {
+            fillLinearGradientNative(graphics, (com.codename1.ui.LinearGradient) gradient,
+                    x, y, width, height);
+            return;
+        }
+        if (gradient instanceof com.codename1.ui.RadialGradient) {
+            fillRadialGradientNative(graphics, (com.codename1.ui.RadialGradient) gradient,
+                    x, y, width, height);
+            return;
+        }
+        // Java2D has no native conic / sweep gradient; fall back to the
+        // software rasterizer in the base impl. The conic kernel allocates a
+        // single ARGB buffer the size of the rectangle.
+        super.fillGradient(graphics, gradient, x, y, width, height);
+    }
+
+    private void fillLinearGradientNative(Object graphics, com.codename1.ui.LinearGradient g,
+            int x, int y, int width, int height) {
         Graphics2D ng = (Graphics2D) getGraphics(graphics).create();
         try {
-            double rad = Math.toRadians(angleDegrees);
-            double sinA = Math.sin(rad), cosA = Math.cos(rad);
-            double cx = x + width * 0.5, cy = y + height * 0.5;
-            double half = Math.abs(width * 0.5 * sinA) + Math.abs(height * 0.5 * cosA);
-            float x0 = (float) (cx - sinA * half), y0 = (float) (cy + cosA * half);
-            float x1 = (float) (cx + sinA * half), y1 = (float) (cy - cosA * half);
+            float[] ep = new float[4];
+            g.computeEndpoints(width, height, ep);
             LinearGradientPaint paint = new LinearGradientPaint(
-                    new java.awt.geom.Point2D.Float(x0, y0),
-                    new java.awt.geom.Point2D.Float(x1, y1),
-                    positions, toAwtColors(colors), cycle(cycleMethod));
+                    new java.awt.geom.Point2D.Float(x + ep[0], y + ep[1]),
+                    new java.awt.geom.Point2D.Float(x + ep[2], y + ep[3]),
+                    g.getPositions(), toAwtColors(g.getColors()), cycle(g.getCycleMethod()));
             ng.setPaint(paint);
             ng.fillRect(x, y, width, height);
         } finally {
@@ -8305,24 +8322,24 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
-    @Override
-    public void fillRadialGradientWithStops(Object graphics, int[] colors, float[] positions,
-            int x, int y, int width, int height, float centerX, float centerY,
-            float radiusX, float radiusY, byte cycleMethod) {
-        checkEDT();
+    private void fillRadialGradientNative(Object graphics, com.codename1.ui.RadialGradient g,
+            int x, int y, int width, int height) {
         Graphics2D ng = (Graphics2D) getGraphics(graphics).create();
         try {
-            float r = Math.max(radiusX, radiusY);
+            float[] geom = new float[4];
+            g.computeRadii(width, height, geom);
+            float cx = geom[0], cy = geom[1], rx = geom[2], ry = geom[3];
+            float r = Math.max(rx, ry);
             RadialGradientPaint paint = new RadialGradientPaint(
-                    new java.awt.geom.Point2D.Float(x + centerX, y + centerY),
+                    new java.awt.geom.Point2D.Float(x + cx, y + cy),
                     r <= 0 ? 1f : r,
-                    new java.awt.geom.Point2D.Float(x + centerX, y + centerY),
-                    positions, toAwtColors(colors), cycle(cycleMethod));
-            if (Math.abs(radiusX - radiusY) > 0.01f && radiusX > 0 && radiusY > 0) {
+                    new java.awt.geom.Point2D.Float(x + cx, y + cy),
+                    g.getPositions(), toAwtColors(g.getColors()), cycle(g.getCycleMethod()));
+            if (Math.abs(rx - ry) > 0.01f && rx > 0 && ry > 0) {
                 java.awt.geom.AffineTransform t = new java.awt.geom.AffineTransform();
-                t.translate(x + centerX, y + centerY);
-                t.scale(radiusX / r, radiusY / r);
-                t.translate(-(x + centerX), -(y + centerY));
+                t.translate(x + cx, y + cy);
+                t.scale(rx / r, ry / r);
+                t.translate(-(x + cx), -(y + cy));
                 ng.transform(t);
             }
             ng.setPaint(paint);
@@ -8330,13 +8347,6 @@ public class JavaSEPort extends CodenameOneImplementation {
         } finally {
             ng.dispose();
         }
-    }
-
-    @Override
-    public void fillConicGradient(Object graphics, int[] colors, float[] positions,
-            int x, int y, int width, int height, float centerX, float centerY, float fromAngleDegrees) {
-        // Java2D has no native conic gradient; rasterize via the default impl.
-        super.fillConicGradient(graphics, colors, positions, x, y, width, height, centerX, centerY, fromAngleDegrees);
     }
 
     

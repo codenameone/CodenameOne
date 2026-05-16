@@ -181,20 +181,20 @@ ColorWheel    { background: conic-gradient(from 0deg at 50% 50%, red, yellow, gr
 DiagonalStripes { background: repeating-linear-gradient(45deg, #eee 0px, #eee 10px, #ccc 10px, #ccc 20px); }
 ```
 
-The legacy `Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL` / `_LINEAR_HORIZONTAL` / `_RADIAL` constants still work for the simple 2-color cases (and produce a slightly smaller descriptor than the multi-stop form). For richer gradients, the new background types are `BACKGROUND_GRADIENT_LINEAR` (any angle), `BACKGROUND_GRADIENT_RADIAL_FULL`, `BACKGROUND_GRADIENT_CONIC`, `BACKGROUND_GRADIENT_REPEATING_LINEAR`, `BACKGROUND_GRADIENT_REPEATING_RADIAL`. To set one programmatically:
+The legacy `Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL` / `_LINEAR_HORIZONTAL` / `_RADIAL` constants still work for the simple 2-color cases (and produce a slightly smaller descriptor than the multi-stop form). For richer gradients, use the `Gradient` hierarchy (a `Paint` subclass with three concrete kinds — `LinearGradient`, `RadialGradient`, `ConicGradient` — analogous to `Shape`). Programmatically:
 
 ```java
-GradientDescriptor g = new GradientDescriptor()
-        .setKind(GradientDescriptor.KIND_LINEAR)
-        .setAngleDegrees(135f)
-        .setStops(
-                new int[]   { 0xffff0080, 0xffff8c00, 0xff40e0d0 },
-                new float[] { 0f,         0.5f,       1f });
+LinearGradient g = new LinearGradient(135f,
+        new int[]   { 0xffff0080, 0xffff8c00, 0xff40e0d0 },
+        new float[] { 0f,         0.5f,       1f });
 card.getAllStyles().setBackgroundType(Style.BACKGROUND_GRADIENT_LINEAR);
-card.getAllStyles().setGradientDescriptor(g);
+card.getAllStyles().setGradient(g);
+
+// Or fill directly via Graphics:
+g.fillGradient(new ConicGradient(colors, stops), 0, 0, w, h);
 ```
 
-A custom `Painter` is no longer required for arbitrary gradients — only reach for that if you need a paint algorithm CSS cannot describe at all (procedural noise, sampling, etc.).
+The four-byte CSS background types map 1:1 to the concrete kinds: `BACKGROUND_GRADIENT_LINEAR` / `_REPEATING_LINEAR` pair with `LinearGradient`, `BACKGROUND_GRADIENT_RADIAL_FULL` / `_REPEATING_RADIAL` with `RadialGradient`, and `BACKGROUND_GRADIENT_CONIC` with `ConicGradient`. A custom `Painter` is no longer required for arbitrary gradients — only reach for that if you need a paint algorithm CSS cannot describe at all (procedural noise, sampling, etc.).
 
 ## Filter and backdrop-filter (blur)
 

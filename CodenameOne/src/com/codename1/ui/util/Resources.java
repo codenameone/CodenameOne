@@ -1401,23 +1401,25 @@ public class Resources {
         return Font.createTrueTypeFont(fontName, fileName).derive(fontSize, f.getStyle());
     }
 
-    /// Reads the binary form of a GradientDescriptor from the resource stream.
+    /// Reads the binary form of a `Gradient` from the resource stream.
     /// Layout: byte kind, byte cycleMethod, float angle,
     /// float relCenterX, float relCenterY, byte radialShape, byte radialExtent,
     /// float relRadiusX, float relRadiusY, float fromAngle,
     /// int stopCount, [int color, float position] * stopCount.
-    private com.codename1.ui.plaf.GradientDescriptor readGradientDescriptor(DataInputStream input) throws IOException {
-        com.codename1.ui.plaf.GradientDescriptor g = new com.codename1.ui.plaf.GradientDescriptor();
-        g.setKind(input.readByte());
-        g.setCycleMethod(input.readByte());
-        g.setAngleDegrees(input.readFloat());
-        g.setRelativeCenterX(input.readFloat());
-        g.setRelativeCenterY(input.readFloat());
-        g.setRadialShape(input.readByte());
-        g.setRadialExtent(input.readByte());
-        g.setRelativeRadiusX(input.readFloat());
-        g.setRelativeRadiusY(input.readFloat());
-        g.setFromAngleDegrees(input.readFloat());
+    /// Kind selects which subclass we materialize (linear / radial / conic).
+    /// Fields not relevant to the chosen subclass are still consumed so the
+    /// stream position stays aligned with the writer.
+    private com.codename1.ui.Gradient readGradient(DataInputStream input) throws IOException {
+        byte kind = input.readByte();
+        byte cycleMethod = input.readByte();
+        float angle = input.readFloat();
+        float relCx = input.readFloat();
+        float relCy = input.readFloat();
+        byte radialShape = input.readByte();
+        byte radialExtent = input.readByte();
+        float relRx = input.readFloat();
+        float relRy = input.readFloat();
+        float fromAngle = input.readFloat();
         int count = input.readInt();
         int[] colors = new int[count];
         float[] positions = new float[count];
@@ -1425,8 +1427,33 @@ public class Resources {
             colors[i] = input.readInt();
             positions[i] = input.readFloat();
         }
-        g.setStops(colors, positions);
-        return g;
+        switch (kind) {
+            case com.codename1.ui.Gradient.KIND_RADIAL: {
+                com.codename1.ui.RadialGradient g = new com.codename1.ui.RadialGradient(colors, positions);
+                g.setCycleMethod(cycleMethod);
+                g.setShape(radialShape);
+                g.setExtent(radialExtent);
+                g.setRelativeCenterX(relCx);
+                g.setRelativeCenterY(relCy);
+                g.setRelativeRadiusX(relRx);
+                g.setRelativeRadiusY(relRy);
+                return g;
+            }
+            case com.codename1.ui.Gradient.KIND_CONIC: {
+                com.codename1.ui.ConicGradient g = new com.codename1.ui.ConicGradient(colors, positions);
+                g.setCycleMethod(cycleMethod);
+                g.setRelativeCenterX(relCx);
+                g.setRelativeCenterY(relCy);
+                g.setFromAngleDegrees(fromAngle);
+                return g;
+            }
+            case com.codename1.ui.Gradient.KIND_LINEAR:
+            default: {
+                com.codename1.ui.LinearGradient g = new com.codename1.ui.LinearGradient(angle, colors, positions);
+                g.setCycleMethod(cycleMethod);
+                return g;
+            }
+        }
     }
 
     Hashtable loadTheme(String id, boolean newerVersion) throws IOException {
@@ -1778,8 +1805,8 @@ public class Resources {
                 continue;
             }
 
-            if (key.endsWith(Style.GRADIENT_DESCRIPTOR)) {
-                theme.put(key, readGradientDescriptor(input));
+            if (key.endsWith(Style.GRADIENT)) {
+                theme.put(key, readGradient(input));
                 continue;
             }
 
