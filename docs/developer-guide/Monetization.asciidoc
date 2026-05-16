@@ -618,7 +618,7 @@ If there is a down-side, it would be that you are also subject to the rules of e
 . For more information about Apple's auto-renewable subscription features and rules see https://developer.apple.com/app-store/subscriptions/[this document].
 . For more information about subscriptions in Google play, see https://developer.android.com/google/play/billing/billing_subscriptions.html[this document].
 
-==== Auto-Renewable vs Non-Renewable.  best choice
+==== Auto-Renewable vs Non-Renewable: Choosing between them
 
 When deciding between auto-renewable and non-renewable subscriptions, as always, the answer will depend on your needs and preferences. Auto-renewables are nice because it takes the process out of your hands. You just get paid. On the other hand, there are valid reasons to want to use non-renewables. For example, You can't cancel an auto-renewable subscription for a user. They have to do that themselves. You may also want more control over the subscription and renewal process, in which case a non-renewable might make more sense.
 

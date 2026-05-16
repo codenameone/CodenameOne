@@ -224,7 +224,7 @@ Select the _MyApp - Run Simulator_ option from this menu.
 If all goes well it should open in the Codename One simulator.
 
 
-==== Example: migrating kitchen sink app
+==== Example: Migrating kitchen sink app
 
 Let's consider a concrete example, now. Download the KitchenSink Ant project from https://github.com/codenameone/KitchenSink/archive/refs/tags/v1.0-cn7.0.11.zip[here] and extract it.
 
@@ -299,7 +299,7 @@ These modules don't use Maven for their dependencies (Android may deserve a smal
 ****
 
 [#maven-dependency-example]
-==== Example: adding Google maps dependency via Maven central
+==== Example: Adding Google maps dependency via Maven central
 
 Let's add the GoogleMaps library to your app as a maven dependency.
 

@@ -379,7 +379,7 @@ This applies to the layout managers (except for group layout) and most component
 
 Some strings in iOS need to be localized using iOS's native mechanisms - namely providing _*.lproj_ directories with _.strings_ files. For example, if you want the app to have a different bundle display name for each language, or you want to translate the "UsageDescription" strings of your Info.plist into many languages, you would need to use iOS' https://developer.apple.com/localization/[native localization facilities].
 
-===== Example: localizing the app name
+===== Example: Localizing the app name
 
 The app name, as it's displayed to the user, is defined in using the _CFBundleDisplayName_ key of the app's Info.plist file., this will be automatically set to your app's display name, as defined in your _codenameone_settings.properties_ file. This works fine if your app will have the same name in every locale, but suppose you want your app to take on a different name in French than in English. For example: You want your app to be called "Hello App" for English-speaking users, and "Bonjour App" for French-speaking users.
 
@@ -416,7 +416,7 @@ Legacy Ant projects have a different directory structure. They have no equivalen
 TIP: Whenever possible, migrate legacy builds to Maven to take advantage of the modern workflow. See <<maven-project-workflow>> for automated migration options.
 ****
 
-===== Example: localization app usage description strings
+===== Example: Localization app usage description strings
 
 iOS requires you to supply usage descriptions for many features that will be displayed to the user when the app requests permission to use the feature. For example, the https://developer.apple.com/documentation/bundleresources/information_property_list/nscamerausagedescription?language=objc[NSCameraUsageDescription] string must be provided if your app needs to use the camera. You can specify these values as build hints using the pattern `ios.NSXXXUsageDescription=This feature is needed blah blah`. In the `NSCameraUsageDescription` case, you might include the build hint:
 

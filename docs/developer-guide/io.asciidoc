@@ -216,6 +216,7 @@ hi.show();
 .Simple sample of a tree for the FileSystemStorage API
 image::img/filesystem-tree.png[Simple sample of a tree for the FileSystemStorage API,scaledwidth=20%]
 
+// vale-skip: Microsoft.HeadingPunctuation: "vs." is an abbreviation for "versus" — the period belongs to the abbreviation, not to a heading-end terminator.
 ==== Storage vs. file system
 
 The question of storage vs. file system is often confusing for novice mobile developers. This embeds two separate questions:
@@ -1291,7 +1292,7 @@ This effectively maps the `ConnectionRequest` directly to a https://www.codename
 
 `URLImage` is great. It changed the way you do some things in Codename One.
 
-For example, when you introduced it you didn't have support for the cache filesystem or for the JavaScript port. The cache filesystem is probably the best place for images of `URLImage` so supporting that as a target is a "no brainer" but JavaScript seems to work so why would it need a special case?
+For example, when you introduced it you didn't have support for the cache filesystem or for the JavaScript port. The cache filesystem is probably the best place for images of `URLImage` so supporting that as a target is an obvious choice, but JavaScript seems to work so why would it need a special case?
 
 JavaScript already knows how to download and cache images from the web. `URLImage` is actually a step back from the things a good browser can do so why not use the native abilities of the browser when you're running there and fallback to using the cache filesystem if it's available and as a last resort go to storage...
 

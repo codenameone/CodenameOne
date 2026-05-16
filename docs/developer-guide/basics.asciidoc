@@ -1,4 +1,4 @@
-== Basics: themes, styles, components, and layouts
+== Basics: Themes, styles, components, and layouts
 
 Start with a brief overview of the core ideas in Codename One. This chapter revisits them in more detail as it goes on.
 
@@ -723,7 +723,7 @@ IMPORTANT: The `calculatedInsetXXX` values here will be the same as the correspo
 
 If no inset is specified, then it's assumed to be 0. This ensures compatibility with designs that were created before layered layout supported insets.
 
-===== Component references: linking components together
+===== Component references: Linking components together
 
 If all you need to do is position a component relative to its parent container's bounds, then mere insets provide you with enough vocabulary to achieve this. But most UIs are more complex than this and require another concept: reference components. Often you will want to position a component relative to another child of the same container. This is also supported.
 

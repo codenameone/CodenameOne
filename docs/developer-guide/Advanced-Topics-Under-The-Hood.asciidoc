@@ -287,7 +287,7 @@ Only supported for App Store builds. See https://www.codenameone.com/developer-g
 |true/false defaults to false. Hides the iOS status bar if set to true.
 
 |ios.newStorageLocation
-|true/false defaults to false but defined on new projects as true by default. This changes the storage directory on iOS from using caches to using the documents directory which is more correct but might break compatibility. This is described in https://github.com/codenameone/CodenameOne/issues/1480[this issue]
+|true/false defaults to false but defined on new projects as true by default. This changes the storage directory on iOS from using caches to using the documents directory which is the recommended location but might break compatibility. This is described in https://github.com/codenameone/CodenameOne/issues/1480[this issue]
 
 |ios.prerendered_icon
 |true/false defaults to false. The iOS build process adapts the submitted icon for iOS conventions (adding an overlay) that might not be appropriate on some icons. Setting this to true leaves the icon unchanged (only scaled).
@@ -2183,7 +2183,7 @@ In reviewing the SDKs, you're looking for answers to two questions:
 . What should your Codename One FreshDesk API look like?
 . What will be involved in integrating the native SDK in your app or lib?
 
-==== Step 2: designing the Codename One public API
+==== Step 2: Designing the Codename One public API
 
 When designing the Codename One API, you should begin by looking at the
 http://developer.freshdesk.com/mobihelp/android/api/reference/com/freshdesk/mobihelp/package-summary.html[Javadocs]
@@ -2201,7 +2201,7 @@ functionally the same.
 
 So, I choose to create a class hierarchy and API that mirrors the Android SDK.
 
-==== Step 3: the architecture and internal APIs
+==== Step 3: The architecture and internal APIs
 
 A Codename One library that wraps a native SDK, will consist of the following:
 
@@ -2236,7 +2236,7 @@ image::img/5fe88406-61e4-11e5-951e-e09bd28a93c9.png[Freshdesk API Integration,sc
 2. The way for the public API to communicate with the native SDK is through the https://github.com/shannah/cn1-freshdesk/blob/master/cn1-freshdesk-demo/src/com/codename1/freshdesk/MobihelpNative.java[`MobihelpNative`] interface.
 3. You introduced the https://github.com/shannah/cn1-freshdesk/blob/master/cn1-freshdesk-demo/src/com/codename1/freshdesk/MobihelpNativeCallback.java[`MobihelpNativeCallback`] class to ease native code calling back into the public API. This was necessary for a few methods that used asynchronous callbacks.
 
-==== Step 4: implement the public API and native interface
+==== Step 4: Implement the public API and native interface
 
 you've already looked at the final product of the public API in the previous step, but let's back up and walk through the process step-by-step.
 
@@ -2407,7 +2407,7 @@ The other non-trivial wrapper is the `getUnreadCountAsync()` method that you dis
 include::../demos/common/src/main/java/com/codenameone/support/mobihelp/Mobihelp.java[tag=mobihelpShowSupportWithTags,indent=0]
 ----
 
-==== Step 5: implementing the native interface in Android
+==== Step 5: Implementing the native interface in Android
 
 Now that you've set up your public API and your native interface, it's time to work on the native side of things. You can generate stubs for all platforms in your IDE (Netbeans in your case), by right clicking on the `MobihelpNative` class in the project explorer and selecting `Generate Native Access`.
 
@@ -2455,7 +2455,7 @@ include::../demos/android/src/main/java/com/codenameone/support/mobihelp/Mobihel
 include::../demos/android/src/main/java/com/codenameone/support/mobihelp/MobihelpNativeImpl.java[tag=mobihelpNativeShowSolutions,indent=0]
 ----
 
-==== Step 6: bundling the native SDKs
+==== Step 6: Bundling the native SDKs
 
 The last step (at least on the Android side) is to bundle the FreshDesk SDK. For Android, there are a few different scenarios you'll run into for embedding SDKs:
 
@@ -2479,7 +2479,7 @@ If you look inside the `project.properties` file (inside the Mobihelp SDK direct
 android.library.reference.1=../appcompat_v7
 ----
 
-that's: it's expecting to find the `appcompat_v7` library located in the same parent directory as the Mobihelp SDK project. After a little bit of research (if you're not yet familiar with the Android AppCompat support library), you find that the `AppCompat_v7` library is part of the Android Support library, which can installed into your local Android SDK using Android SDK Manager. https://developer.android.com/tools/support-library/setup.html[Installation processed specified here].
+In other words, the Mobihelp SDK expects to find the `appcompat_v7` library located in the same parent directory as the Mobihelp SDK project. After a little bit of research (if you're not yet familiar with the Android AppCompat support library), you find that the `AppCompat_v7` library is part of the Android Support library, which can installed into your local Android SDK using Android SDK Manager. https://developer.android.com/tools/support-library/setup.html[Installation processed specified here].
 
 After installing the support library, you need to retrieve it from your Android SDK. You can find that.aar file inside the `ANDROID_HOME/sdk/extras/android/m2repository/com/android/support/appcompat-v7/19.1.0/` directory (for version 19.1.0). The contents of that directory on your system are:
 
@@ -2543,7 +2543,7 @@ appcompat_v7.aar	mobihelp.andlib
 com			support-v4-19.1.0.jar
 ----
 
-==== Step 7 : injecting Android manifest and proguard config
+==== Step 7: Injecting Android manifest and proguard config
 
 The final step on the Android side is to inject necessary permissions and services into the project's AndroidManifest.xml file.
 
@@ -2679,7 +2679,7 @@ You will want to merge this and then paste them into the build hint `android.pro
 If, after doing all this, your project fails to build, you can enable the "Include Source" option of the build server, then download the source project, open it in Eclipse or Android Studio, and debug from there.
 
 
-=== Part 2: implementing the iOS native code
+=== Part 2: Implementing the iOS native code
 
 Part 1 of this tutorial focused on the Android native integration. Now you will shift your focus to the iOS implementation.
 
@@ -2834,7 +2834,7 @@ The difficulty of porting a particular language to Codename One will vary depend
 .. Some dynamic languages may perform byte-code manipulation at runtime. This is problematic on iOS (and possibly other platforms) which prohibits such runtime behavior.
 
 
-===== Step 1: assess the language
+===== Step 1: Assess the language
 
 The more similar a language, and its build outputs are to Java, the easier it will be to port (probably). Most JVM languages have two parts:
 
@@ -3109,7 +3109,7 @@ If you find that the compiler does use invokedynamic or add references to classe
 
 The process for assessing the runtime library is pretty like the process for the bytecodes. You'll want to get your hands on the language's runtime library, and use `javap` to inspect the.class files. You're looking for the same things as you were looking for in the compiler's output: "invokedynamic" and classes that aren't supported in Codename One.
 
-===== Step 2: convert the runtime library into a CN1Lib
+===== Step 2: Convert the runtime library into a CN1Lib
 
 Once you've assessed the language and are optimistic that it's a good candidate for porting, you can proceed to port the runtime library into Codename One. That language's runtime library will be distributed in.jar format. You need to convert this into a cn1lib so that it can be used in a Codename One project. If you can get your hands on the source code for the runtime library then the best approach is to paste the source files into a Maven cn1lib project generated with the `cn1lib-archetype` (see <<creating-cn1libs>>) and try to build it. This has the advantage that it will check the source during compile to ensure that it doesn't depend on any classes that Codename One doesn't support.
 
@@ -3123,7 +3123,7 @@ now that you had your two jar files: kotlin-runtime.jar and kotlin-runtime-sourc
 
 IMPORTANT: Building cn1libs manually in this way is a ** bad habit, as it bypasses the API verification step that occurs when building a library project. it's possible, even likely, that the jar files that you convert depend on classes that aren't in the Codename One library, so your library will fail at runtime in unexpected ways. The reason you could do this with kotlin's runtime (with some confidence) is because I already analyzed the bytecodes to ensure that they didn't include anything problematic.
 
-===== Step 3: hello world
+===== Step 3: Hello world
 
 For your "Hello World" test you will need to create a separate project in your JVM language and produce class files that you will *manually* copy into an appropriate location of your project. You will want to use the *normal* tools for the language and not worry about how it integrates with Codename One. For Kotlin, I followed the getting started tutorial on the Kotlin site to create a new Kotlin project in IntelliJ. When Steve ported Mirah, he used a text editor and the mirahc command-line compiler to create your Hello World class. The tools and process will depend on the language.
 
@@ -3158,13 +3158,13 @@ include::../demos/common/src/main/java/com/codename1/hellokotlin2/KotlinForm.jav
 
 If you run this in the Simulator, it should print "Hello from Kotlin" in the output console. If you get an error, then you can dig in and try to figure out what went wrong using your standard debugging techniques. *EXPECT* an error on the first run. Hopefully it will be a missing import or something simple.
 
-===== Step 4: a more complex hello world
+===== Step 4: A more complex hello world
 
 For Kotlin, the hello world example app would actually run without the runtime library because it was so simple. it was necessary to add a more complex example to prove the need for the runtime library. It doesn't matter what you do with your more complex example, as long as it doesn't require classes that aren't in Codename One.
 
 If you want to use the Codename One inside your project, you should add the CodenameOne.jar (found inside any Codename One project) to your classpath so that it will compile.
 
-===== Step 5: automation and integration
+===== Step 5: Automation and integration
 
 At this point you already have a manual process for incorporating files built with your alternate language into a Codename One project. The process looks like:
 

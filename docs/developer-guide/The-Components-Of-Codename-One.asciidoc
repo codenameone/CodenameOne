@@ -603,7 +603,7 @@ This will adapt the icon for the action on the keys.
 
 You try to hide a lot of the platform differences in Codename One, input is **** different between OS's. A common reliance is the ability to send the "Done" event when the user presses the #Done# button. This button doesn't always exist for example: if there is an #Enter# button (due to multiline input) or if there is a #Next# button in that place.
 
-To make the behavior more uniform you slightly customized the iOS keyboard as such:
+To unify the behavior you slightly customized the iOS keyboard as such:
 
 .Next virtual keyboard with toolbar
 image::img/components-textfield-vkb-next.png[Next virtual keyboard with toolbar,scaledwidth=20%]
@@ -1321,6 +1321,7 @@ hi.add(BorderLayout.CENTER, ic);
 
 === List, MultiList, renderers & models
 
+// vale-skip: Microsoft.HeadingPunctuation: "vs." is the abbreviation for "versus"; the period is part of the abbreviation, not a heading-end terminator.
 ==== InfiniteContainer/InfiniteScrollAdapter vs. List/ContainerList
 
 Your recommendation is to always go with `Container`, `InfiniteContainer` or `InfiniteScrollAdapter`.
@@ -2720,7 +2721,7 @@ image::img/components-toolbar-search-ongoing.png[Search field after typing a cou
 
 ==== Search mode
 
-While you can implement search manually using the built-in search offers a simpler and more uniform UI.
+While you can implement search manually, using the built-in search offers a simpler and uniform UI.
 
 .built-in toolbar search functionality
 image::img/toolbar-search-mode.jpg[built-in toolbar search functionality,scaledwidth=40%]
@@ -3294,7 +3295,7 @@ This code effectively navigates to the Codename One home page by fetching the DO
 
 ==== Cordova/PhoneGap integration
 
-PhoneGap was one of the first web app packager tools in the market. it's a tool that's effectively a browser component within a native wrapper coupled with native access API's. Cordova is the open source extension of this popular project.
+PhoneGap was one of the first web app packager tools in the market: a tool that's effectively a browser component within a native wrapper coupled with native access APIs, and Cordova is the open source extension of this popular project.
 
 Codename One supports embedding PhoneGap/Cordova applications directly into Codename One applications. This is easy to do with the `BrowserComponent` and JavaScript integration. The main aspect that this integration requires is support for Cordova plugins & its JavaScript API's.
 

@@ -130,7 +130,7 @@ NEON or SSE register you can hold sixteen bytes, eight 16-bit integers, four
 32-bit integers, or four 32-bit floats, and a single instruction such as
 `VADD` or `PADDD` then operates on every lane in parallel. For data-parallel
 workloads—Base64 encode/decode, pixel blending, alpha-mask compositing,
-colour-channel manipulation, table lookups—SIMD typically delivers a 3× to
+color-channel manipulation, table lookups—SIMD typically delivers a 3× to
 10× speedup over scalar code.
 
 Modern mobile and desktop CPUs expose several SIMD instruction sets:
@@ -182,7 +182,7 @@ The returned object is safe to cache in a field as long as the cache is
 refreshed across simulator restarts (the simulator may swap the backing
 implementation).
 
-==== Allocation: alignment and provenance
+==== Allocation: Alignment and provenance
 
 SIMD load/store instructions prefer—and on some architectures require—
 that the memory address they read from or write to be a multiple of the

@@ -2,7 +2,7 @@
 
 Codename One ships an iOS Modern (liquid-glass) theme and an Android
 Material 3 theme that you can opt your app into with a single build
-hint. Both are fully overridable - their colour palettes, type
+hint. Both are fully overridable - their color palettes, type
 ramps, and state-specific styles are all reachable from your own
 `theme.css` and from runtime API.
 
@@ -71,11 +71,11 @@ appearance:
   system setting (useful for theme-preview screens or accessibility
   toggles).
 
-=== Material 3 colour palette (Android)
+=== Material 3 color palette (Android)
 
 The Android Material 3 theme is built around the Material Design 3
-"baseline" palette. Each colour is referenced from one or more
-UIIDs; if you change a colour the change ripples to every UIID that
+"baseline" palette. Each color is referenced from one or more
+UIIDs; if you change a color the change ripples to every UIID that
 inherits from it.
 
 [cols="1,1,1,2", options="header"]
@@ -86,7 +86,7 @@ inherits from it.
 |`#6750a4`
 |`#d0bcff`
 |Default `Button` fill, `BackCommand` / `TitleCommand` text,
-`SelectedTab` text colour.
+`SelectedTab` text color.
 
 |on-primary
 |`#ffffff`
@@ -103,7 +103,7 @@ inherits from it.
 |`#fef7ff`
 |`#141218`
 |`Form`, `ContentPane`, `Toolbar`, `TitleArea`, `List`, `Tabs`,
-`SideNavigationPanel`. The "page" colour.
+`SideNavigationPanel`. The "page" color.
 
 |on-surface
 |`#1d1b20`
@@ -148,7 +148,7 @@ inherits from it.
 |All `.disabled` overrides.
 |===
 
-To rebrand the app, override the colour at the role level rather
+To rebrand the app, override the color at the role level rather
 than touching every UIID. The example below layers a teal palette
 on top from your app's own `theme.css`; if you want the same
 rebrand to apply at *runtime* (for in-app accent toggles, branded
@@ -175,7 +175,7 @@ BackCommand { color: #00796b; }
 TitleCommand { color: #00796b; }
 ----
 
-=== iOS modern colour palette
+=== iOS modern color palette
 
 The iOS modern theme follows Apple's system palette.
 
@@ -208,7 +208,7 @@ The iOS modern theme follows Apple's system palette.
 |`#f2f2f7`
 |`#1c1c1e`
 |Form / ContentPane (the iOS "grouped" form bg). `Dialog` /
-`Tabs` use this colour at reduced opacity for the liquid-glass
+`Tabs` use this color at reduced opacity for the liquid-glass
 look.
 
 |surface-tertiary
@@ -242,8 +242,8 @@ look.
 |`Switch.selected`, `OnOffSwitch.selected`.
 |===
 
-To layer a brand colour on top, override `RaisedButton` and
-accent-driven UIIDs the same way as Android above. The colour names
+To layer a brand color on top, override `RaisedButton` and
+accent-driven UIIDs the same way as Android above. The color names
 match Apple's `UIColor.systemBlue` etc. so you can mirror the SF
 Symbols semantics if you want.
 
@@ -292,7 +292,7 @@ recompile.
 |`@accent-on-color`
 |`#ffffff`
 |(same)
-|Text colour painted on top of the accent fill.
+|Text color painted on top of the accent fill.
 |===
 
 .Android Material 3 (`native-themes/android-material/theme.css`)
@@ -362,7 +362,7 @@ runtime overrides:
 ----
 
 Bindings that reference a constant you did not override stay at
-their baked-in default, so a partial override (e.g. just
+their baked-in default, so a partial override (for example, just
 `--accent-color`) is fine.
 
 ==== Runtime override
@@ -397,16 +397,16 @@ suite exercises this path against both native themes, light + dark.
 ==== When the override path doesn't apply
 
 The binding mechanism handles every accent UIID the shipped themes
-expose. For other widgets - or when you want to override a colour
-the native CSS hard-codes (e.g. the iOS `success` green on
+expose. For other widgets - or when you want to override a color
+the native CSS hard-codes (for example, the iOS `success` green on
 `Switch.selected`) - either:
 
 * Layer a per-UIID redeclaration in your app's `theme.css` (see
-  `Customising in your own theme` below). Right when you want to
+  `Customizing in your own theme` below). Right when you want to
   tweak a UIID the binding vocabulary doesn't already cover.
 * Or pass the specific UIID/state key directly into
   `UIManager.addThemeProps` (`Switch.sel#bgColor` etc.). Runtime,
-  bypasses the binding system. Right when you need a one-off colour
+  bypasses the binding system. Right when you need a one-off color
   tweak you can't anchor in CSS.
 
 === Platform-specific UIIDs
@@ -420,7 +420,7 @@ iOS-only behaviour:
 
 * `Toolbar`, `TitleArea`, `Title` paint over the status-bar area.
   iOS reserves room above for the notch / status bar; in your
-  capture this reads as a coloured strip at the top of the
+  capture this reads as a colored strip at the top of the
   Form. In production the device fills it with system content
   (signal, battery, time).
 * `MultiButton` is styled as an iOS Settings row (multi-line text
@@ -505,7 +505,7 @@ mode. Both modern themes set this; user themes that want dark
 mode also need to set it.
 |===
 
-=== Customising in your own theme
+=== Customizing in your own theme
 
 Your app's `theme.css` inherits from the installed native theme:
 

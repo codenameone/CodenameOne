@@ -65,15 +65,17 @@ Use lazy initialization wherever you can. You don't need to worry about this for
 
 If your Javascript build fails, you should download the error log and see what the problem is. The most common errors are:
 
+// vale-skip: proselint.Annotations: 'XXX' is a placeholder for the actual method name inside a verbatim quote of a TeaVM error log message.
 1. "[ERROR] Method XXX.<clinit>()V is claimed to be synchronous, but it's has invocations of asynchronous methods"
 +
 This error will occur if you've static initializers that use multithreaded code (for example, wait/tell/sleep, etc...). See <<static_initializers>> for information about troubleshooting this error. Sometimes TeaVM may give a false-positive here (that is, it *thinks* you're doing some multithreaded stuff, but you're not), then you can force the build to "succeed" by adding the `javascript.stopOnErrors=false` build hint.
+// vale-skip: proselint.Annotations: 'XXX' is a placeholder for the actual method name inside a verbatim quote of a TeaVM error log message.
 2. "Method XXX wasn't found"
 +
-TeaVM uses its own Java runtime library. it's complete, but you may occasionally run into methods that haven't been implemented. If you run into errors saying that certain classes or methods weren't found, please post them to the https://github.com/codenameone/CodenameOne/issues[Codename One issue tracker]. You can also work around these by changing your own code to not use such functions. If this missing method doesn't fall on a critical path on your app, you can also force the app to still build despite this error by adding the `javascript.stopOnErrors=false` build hint.
+TeaVM uses its own Java runtime library. It's complete, but you may occasionally run into methods that haven't been implemented. If you run into errors saying that certain classes or methods weren't found, please post them to the https://github.com/codenameone/CodenameOne/issues[Codename One issue tracker]. You can also work around these by changing your own code to not use such functions. If this missing method doesn't fall on a critical path on your app, you can also force the app to still build despite this error by adding the `javascript.stopOnErrors=false` build hint.
 
 [id="zip_war_preview", reftext="Deployment Formats"]
-=== ZIP, WAR, or preview. what's the difference
+=== ZIP, WAR, or preview: What's the difference
 
 The *Javascript* build target will result in up to three different bundles being generated:
 
@@ -178,7 +180,7 @@ There is a solution. The.war JavaScript distribution includes an embedded proxy 
 
 If, but, you're using the.zip distribution or the single-file preview, you will need to set up a Proxy servlet and configure your application to use it for its network requests.
 
-==== Step 1: setting up a proxy
+==== Step 1: Setting up a proxy
 
 TIP: This section is relevant if you're using the.zip or single-file distributions of your app. You shouldn't need to set up a proxy for the.war distribution since it includes a proxy built-in.
 
@@ -186,7 +188,7 @@ The easiest way to set up a proxy is to use the Codename One *https://github.com
 
 If you don't want to install the.war file, but would rather copy the proxy servlet into an existing web project, you can do that also. https://github.com/shannah/cors-proxy/wiki/Embedding-Servlet-into-Existing-Project[See the cors-proxy wiki for more information about this].
 
-==== Step 2: configuring your application to use the proxy
+==== Step 2: Configuring your application to use the proxy
 
 three ways to configure your application to use your proxy.
 
@@ -437,7 +439,7 @@ or
 
 ===== Embedding variables in URLs
 
-In some cases the URL for a library may depend on the values of some build hints in the project. For example, in the Google Maps cn1lib, the API key must be appended to the URL for the API as a GET parameter. For example, `https://maps.googleapis.com/maps/api/js?v=3.exp&key=SOME_API_KEY`, but the developer of the library doesn't want to put his own API key in the manifest file for the library. It would be better for the API key to be supplied by the developer of the actual app that uses the library and not the library itself.
+In some cases the URL of a library may depend on the values of some build hints in the project. For example, in the Google Maps cn1lib, the API key must be appended to the URL of the API as a GET parameter. For example, `https://maps.googleapis.com/maps/api/js?v=3.exp&key=SOME_API_KEY`, but the developer of the library doesn't want to put his own API key in the manifest file for the library. It would be better for the API key to be supplied by the developer of the actual app that uses the library and not the library itself.
 
 The solution for this is to add a *variable* into the URL as follows:
 
@@ -528,7 +530,7 @@ Since a web application could potentially be run on any platform, it isn't feasi
 
 You can override this behavior dynamically by setting the `javascript.native.theme` https://www.codenameone.com/javadoc/com/codename1/ui/Display.html[Display] property to a theme that you've included in your app. All of the native themes are available on GitHub, so you can easily copy these into your application. The best place to add the theme is in your `native/javascript` directory - so that they won't be included for other platforms.
 
-==== Example: using Android theme on Android
+==== Example: Using Android theme on Android
 
 NOTE: As of Codename One 6.0, apps will automatically use the Android theme when run on an Android device, so this example isn't necessary. However the technique of changing the native theme at runtime is still applicable.
 
@@ -555,7 +557,7 @@ You can explicitly enable or disable this behaviour by setting the "platformHint
 
 NOTE: Some browsers don't allow you to specify the message that's displayed in this dialog. In those browsers, this property can be viewed as boolean: A null value will result in no prompt being shown, and a non-null value will result in a prompt being shown.
 
-==== Example: toggling the BeforeUnload prompt On/Off
+==== Example: Toggling the BeforeUnload prompt On/Off
 
 [source,java]
 ----

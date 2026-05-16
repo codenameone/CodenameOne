@@ -189,6 +189,7 @@ The `Default` selector is special in that it will set properties on the theme's 
 === Custom properties
 
 `cn1-source-dpi`::
+// vale-skip: proselint.Very: 'Very High Res' is a labelled DPI bucket in the Codename One multi-image API, not generic intensifier prose.
 Used to specify source DPI for multi-image generation of background images. Accepted values: `0` (Not multi-image), `120` (Low res), `160` (Medium Res), `320` (Very High Res), `480` (HD), Higher than `480` (2HD). If not specified, the default value will be the value of the `defaultSourceDPIInt` theme constant, if specified, or `480`, if not specified.
 `cn1-background-type`::
 Used to explicitly specify the background-type that should be used for the class.

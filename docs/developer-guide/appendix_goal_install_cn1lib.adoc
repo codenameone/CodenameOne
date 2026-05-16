@@ -2,7 +2,7 @@
 
 Installs a legacy cn1lib file as a dependency in this application project.
 
-See <<project-dependencies>> for more complete coverage of project dependencies.
+See <<project-dependencies>> for fuller coverage of project dependencies.
 
 NOTE: Using this goal explicitly is a last resort. The best solution for installing add-ons into your project is <<managing-addons-in-control-center>>.
 

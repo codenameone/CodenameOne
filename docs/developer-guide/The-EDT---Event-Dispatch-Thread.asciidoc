@@ -3,7 +3,7 @@
 [[edt-section]]
 === What Is The EDT
 
-Codename One allows developers to create as many threads as they want; however in order to interact with the Codename One user interface components a developer must use the EDT. The EDT stands for "Event Dispatch Thread" but it handles a lot more than "events".
+Codename One allows developers to create as many threads as they want; however in order to interact with the Codename One user interface components a developer must use the EDT. The EDT stands for "Event Dispatch Thread" but it handles a lot more than "events."
 
 The EDT is the main thread of Codename One, by using one thread Codename One can avoid complex synchronization code and focus on simple functionality that assumes one thread.
 
@@ -21,7 +21,7 @@ while(codenameOneRunning) {
 }
 ----
 
-Normally, every call you receive from Codename One will occur on the EDT. E.g. every event, calls to paint(), lifecycle calls (start etc.) should all occur on the EDT.
+Normally, every call you receive from Codename One will occur on the EDT. For example, every event, calls to paint(), and lifecycle calls (start etc.) should all occur on the EDT.
 
 This is pretty powerful, however it means that as long as your code is processing nothing else can happen in Codename One!
 
@@ -100,7 +100,7 @@ One of the misunderstood topics is why would we ever want to invoke `callSeriall
 3. The button repaints a release animation as its being released.
 
 However, this might cause a problem if the first event that we handle (the dialog) might cause an issue to the
-following events. E.g. a dialog will block the EDT (using `invokeAndBlock`), events will keep happening but since
+following events. For example, a dialog will block the EDT (using `invokeAndBlock`), events will keep happening but since
 the event you're in "already happened" the button repaint and the framework logging won't occur. This might
 also happen if we show a form which might trigger logic that relies on the current form still being present.
 
@@ -161,7 +161,7 @@ doOperationC();
 ----
 
 Unfortunately, this means that operation C will happen in parallel to operation B which might be a problem... +
-E.g. instead of using operation names lets use a more "real world" example:
+For example, instead of using operation names lets use a more "real world" example:
 
 [source,java]
 ----
@@ -186,7 +186,7 @@ new Thread() {
 }).start();
 ----
 
-But `updateUIWithContentOfFile` should be executed on the EDT and not on a random thread. So the right way to do this would be something like this:
+However, `updateUIWithContentOfFile` should be executed on the EDT and not on a random thread. So the right way to do this would be something like this:
 
 [source,java]
 ----

@@ -22,7 +22,7 @@ Thankfully there are solutions, such as using multiple images for every density 
 
 There is a catch though... `MultiImage` is designed for applications where you want the density to determine the size. an iPad will have the same density as an iPhone since both share the same amount of pixels per inch. This makes sense for an app since the images will be big enough to touch and clear. Furthermore, since the iPad screen is larger more data will fit on the screen!
 
-But, game developers have a different constraint when it comes to game elements. For a game you want the images to match the device resolution and take up as much screen real estate as possible, otherwise your game would be constrained to a small portion of the tablet and look small. There is a solution though, you can determine your own DPI level when loading resources and effectively force a DPI based on screen resolution when working with game images!
+Game developers have a different constraint when it comes to game elements. For a game you want the images to match the device resolution and take up as much screen real estate as possible, otherwise your game would be constrained to a small portion of the tablet and look small. There is a solution though, you can determine your own DPI level when loading resources and effectively force a DPI based on screen resolution when working with game images!
 
 To work with such varied resolutions/DPI’s and potential screen orientation changes you need another tool in your arsenal: layout managers.
 
