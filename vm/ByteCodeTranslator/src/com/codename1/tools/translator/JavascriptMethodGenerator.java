@@ -1243,6 +1243,17 @@ final class JavascriptMethodGenerator {
         // contains a ``break`` statement which it doesn't recognize as
         // safe to unwrap. We strip them here.
         s = stripUnneededCaseBraces(s);
+        // Strip dead ``{pc=N;break}`` blocks that follow an
+        // unconditional ``return`` or ``throw``. JavaC emits a synthetic
+        // GOTO at the end of every switch-case body whose statements
+        // return -- our per-instruction emit faithfully translates that
+        // GOTO into a ``{pc=N;break;}`` trailer, which the JS engine
+        // (and Firefox / Chrome devtools) report as ``unreachable code
+        // after return statement``. Strip those trailers so the bundle
+        // doesn't ship dead bytes AND so the fold passes below see a
+        // clean pc-reference graph (a pc-bump inside a dead block was
+        // previously counted as a live target and blocked legal folds).
+        s = stripDeadCodeAfterTerminator(s);
         // Inline unique-source goto chains. After register-rewrite +
         // brace-strip, many switch+pc methods boil down to chains of
         // ``case M: ..., pc=N; break;`` → ``case N: ...; pc=Q; break;``
@@ -1281,6 +1292,14 @@ final class JavascriptMethodGenerator {
         // from parparvm_runtime.js / port.js). A per-method local-only
         // rewrite avoids that.
         s = renameLocalsToShortAliases(s);
+        // Re-run the dead-code-after-terminator strip. inlineUniqueSourceCases
+        // can fold a body containing a return into a position whose source
+        // case still had a trailing ``{pc=N;break}`` tail (the synthetic
+        // GOTO JavaC emits at end-of-switch). The first pass didn't see
+        // the dead block because the return came from a DIFFERENT case at
+        // that point; after the fold the return and dead block are adjacent
+        // siblings. Cheap pass to run again.
+        s = stripDeadCodeAfterTerminator(s);
         return s;
     }
 
@@ -7372,6 +7391,204 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             return true;
         }
         return false;
+    }
+
+    /**
+     * Like {@link #findStatementEnd} but only stops at ``;`` / ``}`` /
+     * ``)`` -- not at top-level ``,``. Used for return/throw expression
+     * bodies where the comma operator is part of the expression, not a
+     * statement terminator. Returns the index of the stopping char, or
+     * {@code to} if we ran off the end without finding one.
+     */
+    private static int findExpressionStatementEnd(String body, int from, int to) {
+        int parenDepth = 0;
+        int braceDepth = 0;
+        int bracketDepth = 0;
+        for (int i = from; i < to; i++) {
+            char ch = body.charAt(i);
+            if (ch == '"' || ch == '\'') {
+                int end = skipStringLiteral(body, i);
+                if (end < 0 || end >= to) {
+                    return -1;
+                }
+                i = end;
+                continue;
+            }
+            if (ch == '(') {
+                parenDepth++;
+            } else if (ch == ')') {
+                if (parenDepth == 0) {
+                    return i;
+                }
+                parenDepth--;
+            } else if (ch == '{') {
+                braceDepth++;
+            } else if (ch == '}') {
+                if (braceDepth == 0) {
+                    return i;
+                }
+                braceDepth--;
+            } else if (ch == '[') {
+                bracketDepth++;
+            } else if (ch == ']') {
+                bracketDepth--;
+            } else if (ch == ';' && parenDepth == 0 && braceDepth == 0 && bracketDepth == 0) {
+                return i;
+            }
+        }
+        return to;
+    }
+
+    /**
+     * Walk the per-method body and strip ``{ <assign>; break; }`` blocks
+     * that follow an unconditional ``return`` or ``throw``. The block's
+     * contents are statically unreachable -- JavaC inserts these synthetic
+     * GOTO tails at the end of switch-case bodies that return -- so the
+     * trailing brace block ships dead bytes AND inflates the pc-reference
+     * count for the target label, blocking later case-merge / fold passes
+     * from collapsing chains whose only "live" reference is the dead one.
+     *
+     * Conservative: only strips a single balanced ``{...}`` block whose
+     * contents are exactly ``<ident> = <expr>; break;``. Anything more
+     * complex (function calls, multiple statements, control flow inside
+     * the block) is left untouched.
+     */
+    private static String stripDeadCodeAfterTerminator(String body) {
+        int len = body.length();
+        if (len == 0) {
+            return body;
+        }
+        StringBuilder out = new StringBuilder(len);
+        int i = 0;
+        while (i < len) {
+            char ch = body.charAt(i);
+            if (ch == '"' || ch == '\'') {
+                int end = skipStringLiteral(body, i);
+                if (end < 0) {
+                    out.append(body, i, len);
+                    return out.toString();
+                }
+                out.append(body, i, end + 1);
+                i = end + 1;
+                continue;
+            }
+            int kwLen = 0;
+            if (ch == 'r' && body.startsWith("return", i)
+                    && (i == 0 || !isIdentPart(body.charAt(i - 1)))
+                    && (i + 6 >= len || !isIdentPart(body.charAt(i + 6)))) {
+                kwLen = 6;
+            } else if (ch == 't' && body.startsWith("throw", i)
+                    && (i == 0 || !isIdentPart(body.charAt(i - 1)))
+                    && (i + 5 >= len || !isIdentPart(body.charAt(i + 5)))) {
+                kwLen = 5;
+            }
+            if (kwLen == 0) {
+                out.append(ch);
+                i++;
+                continue;
+            }
+            // Emit the keyword.
+            out.append(body, i, i + kwLen);
+            i += kwLen;
+            // Find the end of the return/throw statement. We need
+            // ``findReturnStatementEnd`` (not ``findStatementEnd``)
+            // because the return expression frequently uses the comma
+            // operator (``return a = X, b = Y, c;``) and the generic
+            // ``findStatementEnd`` stops at the first top-level ``,``,
+            // which would slice the return expression apart and leave
+            // the rest in place. The return statement is terminated by
+            // ``;``, ``}``, ``)``, or end-of-input; any other terminator
+            // (none of these) means we can't safely strip.
+            int stmtEnd = findExpressionStatementEnd(body, i, len);
+            if (stmtEnd < 0 || stmtEnd >= len) {
+                out.append(body, i, len);
+                return out.toString();
+            }
+            // Emit the statement body (including the terminator char).
+            out.append(body, i, stmtEnd + 1);
+            i = stmtEnd + 1;
+            if (body.charAt(stmtEnd) != ';') {
+                continue;
+            }
+            // Peek past whitespace for an opening ``{``.
+            int peek = i;
+            while (peek < len && Character.isWhitespace(body.charAt(peek))) {
+                peek++;
+            }
+            if (peek >= len || body.charAt(peek) != '{') {
+                continue;
+            }
+            int closeBrace = matchBrace(body, peek);
+            if (closeBrace < 0 || closeBrace >= len) {
+                continue;
+            }
+            String inner = body.substring(peek + 1, closeBrace);
+            if (!isDeadPcBumpBlock(inner)) {
+                continue;
+            }
+            // Skip the dead block (and any whitespace leading up to it).
+            i = closeBrace + 1;
+        }
+        return out.toString();
+    }
+
+    /**
+     * True when ``inner`` (the trimmed-ish contents of a ``{...}`` block)
+     * consists of exactly one assignment statement followed by a
+     * ``break;``. Used by {@link #stripDeadCodeAfterTerminator} to gate
+     * which trailing blocks are safe to drop.
+     */
+    private static boolean isDeadPcBumpBlock(String inner) {
+        int len = inner.length();
+        int i = 0;
+        while (i < len && Character.isWhitespace(inner.charAt(i))) {
+            i++;
+        }
+        // Expect an identifier (the assignment LHS).
+        int identStart = i;
+        while (i < len && isIdentPart(inner.charAt(i))) {
+            i++;
+        }
+        if (i == identStart) {
+            return false;
+        }
+        while (i < len && Character.isWhitespace(inner.charAt(i))) {
+            i++;
+        }
+        if (i >= len || inner.charAt(i) != '=') {
+            return false;
+        }
+        // Avoid ``==`` / ``=>``.
+        if (i + 1 < len && (inner.charAt(i + 1) == '=' || inner.charAt(i + 1) == '>')) {
+            return false;
+        }
+        // Find the assignment terminator (top-level ``;``).
+        int rhsEnd = findStatementEnd(inner, i + 1, len);
+        if (rhsEnd < 0 || rhsEnd >= len || inner.charAt(rhsEnd) != ';') {
+            return false;
+        }
+        int p = rhsEnd + 1;
+        while (p < len && Character.isWhitespace(inner.charAt(p))) {
+            p++;
+        }
+        if (!inner.startsWith("break", p)) {
+            return false;
+        }
+        int afterBreak = p + 5;
+        if (afterBreak < len && isIdentPart(inner.charAt(afterBreak))) {
+            // ``breakX`` is not ``break``.
+            return false;
+        }
+        while (afterBreak < len && Character.isWhitespace(inner.charAt(afterBreak))) {
+            afterBreak++;
+        }
+        if (afterBreak < len && inner.charAt(afterBreak) == ';') {
+            afterBreak++;
+        }
+        while (afterBreak < len && Character.isWhitespace(inner.charAt(afterBreak))) {
+            afterBreak++;
+        }
+        return afterBreak == len;
     }
 
     /**

@@ -690,6 +690,16 @@ if [ "${SKIP_JS_MINIFICATION:-0}" != "1" ]; then
   else
     bj_log "npx not found; skipping esbuild minification"
   fi
+  # Final post-esbuild dead-code strip. esbuild's --minify-syntax merges
+  # adjacent statements inside switch cases but does NOT eliminate dead
+  # ``{pc=N;break}`` blocks that end up following a return / throw after
+  # the merge. The translator's own ``stripDeadCodeAfterTerminator`` pass
+  # cleaned these up pre-esbuild; this pass cleans up what esbuild
+  # reintroduces.
+  if command -v python3 >/dev/null 2>&1; then
+    python3 "$SCRIPT_DIR/strip-dead-code-after-return.py" "$DIST_DIR" || \
+      bj_log "WARNING: dead-code-after-return strip failed; continuing" >&2
+  fi
 fi
 # ---------------------------------------------------------------------------
 

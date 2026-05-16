@@ -1893,13 +1893,22 @@ const jvm = {
     if (!pending) {
       return false;
     }
-    // Always-on log so a stuck-on-host-callback failure mode (host
-    // never replied — e.g. the main thread bridge missing the
-    // requested symbol) is distinguishable from a "host replied but
-    // worker logic doesn't progress" mode in test reports.
+    // Main-thread host callbacks fire on every async bridge call (image
+    // load, fetch, BrowserComponent, etc.). The :ok branch is gated
+    // behind ``?parparDiag=1`` because in steady-state apps it floods
+    // the console (one line per main-thread async call) and skews
+    // perf measurements; the :err branch stays always-on because a
+    // failure here is the kind of stuck-on-Loading symptom the lifecycle
+    // log was designed to surface.
     if (pending.thread === this.mainThread
             || (this.mainThreadObject && pending.thread && pending.thread.object === this.mainThreadObject)) {
-      vmLifecycle("main-host-callback:id=" + id + (success ? ":ok" : ":err"));
+      if (success) {
+        if (VM_DIAG_ENABLED) {
+          vmLifecycle("main-host-callback:id=" + id + ":ok");
+        }
+      } else {
+        vmLifecycle("main-host-callback:id=" + id + ":err");
+      }
     }
     delete this.pendingHostCalls[id];
     if (success) {
