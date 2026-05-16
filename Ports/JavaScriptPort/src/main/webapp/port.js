@@ -127,7 +127,18 @@
 
   jsoRegistry.classPrefixes.push(
     "com_codename1_html5_js_",
-    "com_codename1_impl_html5_JSOImplementations_"
+    "com_codename1_impl_html5_JSOImplementations_",
+    // TeaVM-era JSO interfaces under com.codename1.teavm.ext.* (LocalForage,
+    // Popover, JQuery, WebSQL, FileChooser, PhotoCapture, ...) -- every
+    // class under this package is ``interface X extends JSObject`` with
+    // method calls routed via the JS bridge. Without registering the
+    // prefix, ``resolveVirtual`` throws ``Missing virtual method`` on the
+    // first call (e.g. ``LocalForage.config(...)`` during storage init),
+    // which on initializr produces an uncaught Promise rejection that
+    // surfaces as the "Application failed to start" symptom AND blocks
+    // every subsequent storage / DOM-style read until the failure path
+    // is exhausted.
+    "com_codename1_teavm_ext_"
   );
 
   jsoRegistry.inferFn = function(value, expectedClass, jvm) {
