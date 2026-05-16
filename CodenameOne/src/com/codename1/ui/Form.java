@@ -709,7 +709,10 @@ public class Form extends Container {
             return null;
         }
         Form f = c.getComponentForm();
-        int vx, vy, vw, vh;
+        int vx;
+        int vy;
+        int vw;
+        int vh;
         if (f != null) {
             vx = f.getAbsoluteX();
             vy = f.getAbsoluteY();
