@@ -473,8 +473,10 @@ class HashnodeAdapter:
     Flow (verified against the 2026-05 Hashnode UI):
 
       1. Land on the dashboard and click the "Write" button — Hashnode
-         opens its single per-user draft slot and redirects to
-         /draft/<id>.
+         opens its current empty draft slot and redirects to
+         /draft/<id>. (Once a draft is published the slot is freed and
+         the next click creates a fresh draft, so weekly runs no
+         longer overwrite each other.)
       2. Fill the title textarea (placeholder "Article Title...") and
          paste the markdown body into the contenteditable editor. The
          leading header-image markdown line is stripped from the body
@@ -487,23 +489,21 @@ class HashnodeAdapter:
          textarea, then fill it with the post's description (trimmed).
       5. Open the publish dialog (the top "Publish" button in the
          header bar — there is a second "Publish" button inside the
-         dialog that actually publishes; we never click that one).
+         dialog that actually publishes; the dialog one is what we
+         click in step 7).
       6. Switch to the Discovery tab, clear any pre-existing tag pills,
          add the five canonical tags (java, mobile-development, ios,
          android, opensource), toggle the "Add a canonical URL" switch
          on if needed, and fill the canonical URL pointing back at
          www.codenameone.com.
-      7. Click "Close" — Hashnode autosaves everything onto the draft.
-         The post stays unpublished until a human reviews and clicks
-         Publish in the editor UI.
+      7. Click the in-dialog Publish button. Hashnode publishes the
+         post and redirects to the live article URL on the user's
+         publication domain (e.g. https://debugagent.com/<slug>);
+         that URL is what gets recorded in syndication-state.json.
 
-    Known limitation: Hashnode's "Write" button lands on a single
-    persistent "current draft" slot per user. Consecutive runs reuse
-    the same /draft/<id> URL and overwrite the prior draft's content.
-    Publish (or delete) each Hashnode draft before the next weekly
-    syndication runs, otherwise the next post will clobber it. This is
-    a Hashnode product-design choice, not something we can work around
-    from the UI side.
+    Falls back to Close-as-draft if any step in 6–7 fails so the
+    editorial work isn't lost — the caller can then publish manually
+    from the editor UI.
     """
 
     name = "hashnode"
@@ -529,6 +529,10 @@ class HashnodeAdapter:
     CANONICAL_TOGGLE_SELECTOR = "label:has-text('Add a canonical URL')"
     CANONICAL_INPUT_SELECTOR = "input[placeholder='https://example.com/original-article']"
     CLOSE_DIALOG_SELECTOR = "button:has-text('Close')"
+    # The in-dialog Publish button (distinct from the top-bar Publish
+    # which just opens the dialog) lives inside the open Radix dialog
+    # alongside "Submit for Review" and "Close".
+    DIALOG_PUBLISH_SELECTOR = "[role='dialog'][data-state='open'] button:text-is('Publish')"
 
     # The five tags every Codename One syndicated post carries on
     # Hashnode. All five exist as canonical Hashnode tags so a
@@ -638,23 +642,31 @@ class HashnodeAdapter:
                 "subheading_set": subheading_set,
             }
 
-        # --- Publish-dialog Discovery tab: tags + canonical URL ---
+        # --- Publish-dialog Discovery tab: tags + canonical URL, then publish ---
         canonical_set = False
         tags_set = False
+        published_url: str | None = None
         try:
             self._open_publish_dialog_discovery(page)
             tags_set = self._set_tags(page, mod)
             canonical_set = self._set_canonical_url(page, ctx.post.canonical_url, mod)
-            page.locator(self.CLOSE_DIALOG_SELECTOR).first.click(timeout=8000)
-            # Let the autosave-on-close round-trip finish before we
-            # close the browser context.
-            page.wait_for_timeout(4000)
+            published_url = self._publish_from_dialog(page, draft_url)
         except Exception as err:  # noqa: BLE001 — surface as non-fatal
             print(f"  [hashnode] publish-dialog flow failed (non-fatal): {err}",
                   file=sys.stderr)
+        # If publishing failed, leave the post as a draft so the
+        # editorial work isn't lost. Hashnode autosaves drafts on Close.
+        if published_url is None:
+            try:
+                page.locator(self.CLOSE_DIALOG_SELECTOR).first.click(timeout=8000)
+                page.wait_for_timeout(3000)
+            except Exception:  # noqa: BLE001
+                pass
 
         return {
-            "url": draft_url,
+            "url": published_url or draft_url,
+            "published": published_url is not None,
+            "draft_url": draft_url,
             "cover_set": cover_set,
             "subheading_set": subheading_set,
             "tags_set": tags_set,
@@ -858,6 +870,44 @@ class HashnodeAdapter:
         # synthetic button.click() in the same way the pills do.
         page.mouse.click(clicked["x"], clicked["y"])
         return True
+
+    def _publish_from_dialog(self, page, draft_url: str) -> str | None:
+        """Click the in-dialog Publish button and wait for the redirect
+        to the live article URL. Returns the published URL on success
+        or None on failure (the caller falls back to a Close-as-draft
+        flow so the editorial work isn't lost).
+        """
+        try:
+            publish_btn = page.locator(self.DIALOG_PUBLISH_SELECTOR).first
+            publish_btn.wait_for(state="visible", timeout=8000)
+            publish_btn.click()
+        except Exception as err:  # noqa: BLE001
+            print(f"  [hashnode] in-dialog Publish click failed (non-fatal): {err}",
+                  file=sys.stderr)
+            return None
+        # Hashnode publishes asynchronously: the dialog closes, the
+        # backend renders the post, and the page navigates to the
+        # public URL (e.g. https://debugagent.com/<slug>). Wait for
+        # the URL to leave /draft/ — but cap the wait so a failed
+        # publish (e.g. validation error inside the dialog) doesn't
+        # block forever.
+        try:
+            page.wait_for_url(
+                lambda url: bool(url) and "/draft/" not in url and url != draft_url,
+                timeout=60000,
+            )
+        except Exception as err:  # noqa: BLE001
+            print(f"  [hashnode] publish did not navigate within 60s (non-fatal): {err}",
+                  file=sys.stderr)
+            return None
+        # The first post-publish URL is sometimes an intermediate
+        # /publishing/... route while the article finishes building.
+        # Let the final URL settle.
+        page.wait_for_timeout(3000)
+        published_url = page.url
+        if "/draft/" in published_url or published_url == draft_url:
+            return None
+        return published_url
 
     def _set_canonical_url(self, page, canonical_url: str, mod: str) -> bool:
         try:
