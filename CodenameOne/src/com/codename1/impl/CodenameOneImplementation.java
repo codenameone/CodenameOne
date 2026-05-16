@@ -801,8 +801,20 @@ public abstract class CodenameOneImplementation {
                     continue;
                 }
                 paintQueueTemp[iter] = null;
-                wrapper.translate(-wrapper.getTranslateX(), -wrapper.getTranslateY());
-                wrapper.resetAffine();
+                // Reset wrapper graphics to a clean state before painting
+                // the next queued animation. In matrix mode, resetAffine
+                // also clears the framework painting-chain translates --
+                // which is exactly what we want here, because the wrapper
+                // is the top-level graphics that *will* re-establish the
+                // chain via paintComponent below. Legacy zeroes the
+                // integer accumulator separately because resetAffine in
+                // legacy mode leaves it untouched.
+                if (com.codename1.ui.Graphics.useMatrixTranslation) {
+                    wrapper.setTransform(null);
+                } else {
+                    wrapper.translate(-wrapper.getTranslateX(), -wrapper.getTranslateY());
+                    wrapper.resetAffine();
+                }
                 wrapper.setClip(0, 0, dwidth, dheight);
                 if (ani instanceof Component) {
                     Component cmp = (Component) ani;

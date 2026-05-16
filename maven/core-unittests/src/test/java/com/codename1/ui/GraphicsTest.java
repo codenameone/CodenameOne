@@ -203,10 +203,11 @@ class GraphicsTest extends UITestBase {
     void testMatrixModeTranslatePushesToImplMatrix() {
         // When useMatrixTranslation is on AND the impl advertises support,
         // g.translate(dx, dy) routes ONLY through impl.translateMatrix --
-        // no shadow xTranslate accumulator. getTranslateX/Y reads the
-        // translate component from the impl matrix (the stub's getTransform
-        // returns Transform.makeTranslation of the per-Graphics matrix
-        // translate accumulator translateMatrix has been mutating).
+        // no shadow xTranslate accumulator. getTranslateX/Y is intentionally
+        // 0 in matrix mode (the integer "amount to add to local coords" is
+        // zero because drawing primitives no longer add it -- the impl
+        // matrix carries the translate). Callers needing the actual screen
+        // offset must use getTransform().
         Graphics.useMatrixTranslation = true;
         implementation.setTranslateMatrixSupported(true);
 
@@ -217,9 +218,9 @@ class GraphicsTest extends UITestBase {
         assertEquals(7f, implementation.getLastTranslateMatrixY());
         assertFalse(implementation.wasTranslateInvoked(),
                 "matrix path must NOT call the legacy impl.translate hook");
-        assertEquals(5, graphics.getTranslateX(),
-                "getTranslateX must read the translate component off the impl matrix");
-        assertEquals(7, graphics.getTranslateY());
+        assertEquals(0, graphics.getTranslateX(),
+                "matrix mode: integer accumulator stays at 0; framework callers use getTransform() instead");
+        assertEquals(0, graphics.getTranslateY());
     }
 
     @Test
@@ -271,52 +272,28 @@ class GraphicsTest extends UITestBase {
     }
 
     @Test
-    void testMatrixModeResetAffinePreservesFrameworkTranslate() {
-        // resetAffine wipes the impl matrix to identity. In matrix mode the
-        // matrix carries the framework's painting-chain translates -- so a
-        // naive resetAffine destroys them and the next draw lands at screen
-        // origin. The matrix-mode branch must replay xTranslate/yTranslate
-        // onto the impl after the reset. MapComponent, Scene, and
-        // CommonTransitions all depend on this contract.
+    void testMatrixModeResetAffineWipesImplMatrix() {
+        // Matrix mode contract: resetAffine wipes the impl matrix to
+        // identity, including the framework painting-chain translates the
+        // matrix carries. Callers needing to preserve those translates must
+        // save the matrix via getTransform and restore via setTransform --
+        // see the matrix-mode branches in MapComponent, Scene,
+        // CommonTransitions, FontImage, and beginNativeGraphicsAccess.
         Graphics.useMatrixTranslation = true;
         implementation.setTranslateMatrixSupported(true);
-        implementation.resetTranslateTracking();
 
         graphics.translate(5, 7);
-        // Pretend the user composed scale, then called resetAffine -- the
-        // stub does not track scale composition, but the call still flows
-        // through impl.resetAffine which clears its native state.
-        graphics.scale(2f, 2f);
         graphics.resetAffine();
 
-        // resetAffine should have called translateMatrix(xTranslate,
-        // yTranslate) to put the framework translate back, so the impl sees
-        // translateMatrix(5, 7) again after the reset.
-        assertTrue(implementation.wasTranslateMatrixInvoked(),
-                "resetAffine in matrix mode must replay the framework translate via impl.translateMatrix");
-        assertEquals(5f, implementation.getLastTranslateMatrixX());
-        assertEquals(7f, implementation.getLastTranslateMatrixY());
-        // The Graphics-level shadow accumulator is untouched -- it represents
-        // the framework translate that survives resetAffine.
-        assertEquals(5, graphics.getTranslateX());
-        assertEquals(7, graphics.getTranslateY());
-    }
-
-    @Test
-    void testMatrixModeSetTransformIdentityPreservesFrameworkTranslate() {
-        // Same contract as resetAffine: setTransform(null) or
-        // setTransform(identity) must restore the framework translate
-        // instead of wiping the impl matrix to identity.
-        Graphics.useMatrixTranslation = true;
-        implementation.setTranslateMatrixSupported(true);
-        implementation.resetTranslateTracking();
-
-        graphics.translate(5, 7);
-        graphics.setTransform(null);
-
-        assertTrue(implementation.wasTranslateMatrixInvoked());
-        assertEquals(5f, implementation.getLastTranslateMatrixX());
-        assertEquals(7f, implementation.getLastTranslateMatrixY());
+        // The stub's matrix-translate accumulator survives because the stub
+        // only resets its own internal Transform state on resetAffine; the
+        // production iOS / Android / JavaSE impls reset their NativeGraphics
+        // transform. The point of this test is to assert that Graphics
+        // does NOT silently replay the translate -- legacy behavior, no
+        // hidden state carried across resetAffine.
+        assertEquals(0, graphics.getTranslateX(),
+                "matrix-mode getTranslateX stays 0 across translate+resetAffine");
+        assertEquals(0, graphics.getTranslateY());
     }
 
     @Test

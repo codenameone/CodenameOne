@@ -910,14 +910,8 @@ public class Label extends Component implements IconHolder, TextHolder {
             }
         }
         //getUIManager().getLookAndFeel().drawLabel(g, this);
-        // In matrix-translation mode (Graphics.useMatrixTranslation), the
-        // impl-side matrix already encodes the framework's painting-chain
-        // translates. Display.impl.drawLabelComponent applies that matrix
-        // during its internal draw calls, so passing absolute coords (the
-        // legacy path) would double-count -- pass component-local coords
-        // instead and let the matrix carry the offset.
-        int cmpX = getX() + (Graphics.useMatrixTranslation ? 0 : g.getTranslateX());
-        int cmpY = getY() + (Graphics.useMatrixTranslation ? 0 : g.getTranslateY());
+        int cmpX = getX() + g.getTranslateX();
+        int cmpY = getY() + g.getTranslateY();
         int cmpHeight = getHeight();
         int cmpWidth = getWidth();
         Style s = getStyle();

@@ -1117,11 +1117,24 @@ public class Form extends Container {
             return;
         }
         if (glassPane != null) {
-            int tx = g.getTranslateX();
-            int ty = g.getTranslateY();
-            g.translate(-tx, -ty);
-            glassPane.paint(g, getBounds());
-            g.translate(tx, ty);
+            if (Graphics.useMatrixTranslation) {
+                // In matrix mode the impl matrix carries the framework's
+                // painting-chain translates (getTranslateX returns 0), so
+                // the legacy snapshot-reset-translate dance would be a
+                // no-op and glassPane would draw at the current matrix
+                // position instead of screen origin. Save + identity +
+                // restore the impl matrix directly.
+                Transform saved = g.getTransform();
+                g.setTransform(null);
+                glassPane.paint(g, getBounds());
+                g.setTransform(saved);
+            } else {
+                int tx = g.getTranslateX();
+                int ty = g.getTranslateY();
+                g.translate(-tx, -ty);
+                glassPane.paint(g, getBounds());
+                g.translate(tx, ty);
+            }
         }
         paintGlass(g);
         if (dragged != null && dragged.isDragAndDropInitialized()) {
